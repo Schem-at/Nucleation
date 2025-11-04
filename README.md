@@ -168,6 +168,9 @@ maturin develop --features python
 cargo test
 cargo test --features simulation
 ./test-wasm.sh  # WASM tests with simulation
+
+# Pre-push verification (recommended before pushing)
+./pre-push.sh  # Runs all checks that CI runs
 ```
 
 ---

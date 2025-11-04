@@ -75,6 +75,16 @@ jobs:
         run: |
           cargo test  # Test default (no features)
           cargo test --features simulation  # Test simulation feature
+      
+      - name: Setup Python for build test
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Test Python build
+        run: |
+          pip install maturin
+          maturin build --features python,simulation
   build-wasm:
     needs: [test, check-version]
     runs-on: ubuntu-latest
