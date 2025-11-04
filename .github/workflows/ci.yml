@@ -138,7 +138,7 @@ jobs:
             ext: so
             platform: linux-arm64
             cross: true  # Enable cross-compilation
-          - os: macos-13
+          - os: macos-15-intel
             target: x86_64-apple-darwin
             ext: dylib
             platform: macos-x64

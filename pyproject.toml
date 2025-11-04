@@ -29,3 +29,5 @@ classifiers = [
 [tool.maturin]
 features = ["python", "simulation"]
 module-name = "nucleation"
+python-source = "."
+include = ["nucleation.pyi", "py.typed"]
