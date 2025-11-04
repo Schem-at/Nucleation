@@ -328,6 +328,62 @@ impl MchprsWorld {
             .map(|v| v == "true")
             .unwrap_or(false)
     }
+
+    /// Syncs the current simulation state back to the UniversalSchematic
+    ///
+    /// This updates all block states (including redstone power levels, lever states, lamp states, etc.)
+    /// from the MCHPRS simulation back to the schematic.
+    ///
+    /// Call this after running simulation if you want to export the resulting state.
+    pub fn sync_to_schematic(&mut self) {
+        let dimensions = self.schematic.get_dimensions();
+
+        for x in 0..dimensions.0 {
+            for y in 0..dimensions.1 {
+                for z in 0..dimensions.2 {
+                    let pos = BlockPos::new(x, y, z);
+                    let block = self.get_block(pos);
+
+                    // Skip air blocks
+                    if block.get_id() == 0 {
+                        continue;
+                    }
+
+                    // Get block name with minecraft: prefix
+                    let name = format!("minecraft:{}", block.get_name());
+
+                    // Get all properties from the MCHPRS block
+                    let properties: std::collections::HashMap<String, String> = block
+                        .properties()
+                        .iter()
+                        .map(|(k, v)| (k.to_string(), v.to_string()))
+                        .collect();
+
+                    // Create BlockState and update schematic
+                    let mut block_state = crate::BlockState::new(name);
+                    block_state.properties = properties;
+
+                    self.schematic.set_block(x, y, z, block_state);
+                }
+            }
+        }
+    }
+
+    /// Gets a reference to the underlying schematic
+    ///
+    /// Note: This returns the schematic in its current state.
+    /// Call `sync_to_schematic()` first if you want the latest simulation state.
+    pub fn get_schematic(&self) -> &UniversalSchematic {
+        &self.schematic
+    }
+
+    /// Consumes the MchprsWorld and returns the schematic with the current simulation state
+    ///
+    /// This automatically syncs the simulation state before returning the schematic.
+    pub fn into_schematic(mut self) -> UniversalSchematic {
+        self.sync_to_schematic();
+        self.schematic
+    }
 }
 
 impl World for MchprsWorld {

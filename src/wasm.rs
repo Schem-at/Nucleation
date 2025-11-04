@@ -1134,4 +1134,25 @@ impl MchprsWorldWrapper {
 
         result.into()
     }
+
+    /// Syncs the current simulation state back to the underlying schematic
+    ///
+    /// Call this after running simulation to update block states (redstone power, lever states, etc.)
+    pub fn sync_to_schematic(&mut self) {
+        self.world.sync_to_schematic();
+    }
+
+    /// Gets a copy of the underlying schematic
+    ///
+    /// Note: Call sync_to_schematic() first if you want the latest simulation state
+    pub fn get_schematic(&self) -> SchematicWrapper {
+        SchematicWrapper(self.world.get_schematic().clone())
+    }
+
+    /// Consumes the simulation world and returns the schematic with simulation state
+    ///
+    /// This automatically syncs before returning
+    pub fn into_schematic(mut self) -> SchematicWrapper {
+        SchematicWrapper(self.world.into_schematic())
+    }
 }

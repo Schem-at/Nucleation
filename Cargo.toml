@@ -1,6 +1,6 @@
 [package]
 name = "nucleation"
-version = "0.1.73"
+version = "0.1.74"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -65,6 +65,7 @@ ext-php-rs = { version = "0.13.1", optional = true }
 bytemuck = "1.23.1"
 
 # Simulation (MCHPRS) dependencies - optional
+# Note: These are git dependencies and will be excluded from crates.io publish
 mchprs_redpiler = { git = "https://github.com/Nano112/MCHPRS.git", optional = true }
 mchprs_redstone = { git = "https://github.com/Nano112/MCHPRS.git", optional = true }
 mchprs_world = { git = "https://github.com/Nano112/MCHPRS.git", default-features = false, optional = true }

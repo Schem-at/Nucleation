@@ -298,7 +298,10 @@ impl NucleationSchematic {
             info.insert("description".to_string(), description.clone());
         }
 
-        info.insert("regions".to_string(), self.inner.other_regions.len().to_string());
+        info.insert(
+            "regions".to_string(),
+            self.inner.other_regions.len().to_string(),
+        );
         info.insert(
             "total_blocks".to_string(),
             self.inner.total_blocks().to_string(),

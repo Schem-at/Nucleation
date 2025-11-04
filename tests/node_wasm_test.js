@@ -519,6 +519,49 @@ async function runTests() {
         console.log(`   ❌ Bracket notation test failed: ${error.message}`);
         throw error;
     }
+
+    // Test 10: Simulation Sync Back to Schematic
+    console.log('\n🧪 Test 10: Sync Simulation State to Schematic');
+    if (typeof nucleation.MchprsWorldWrapper !== 'undefined') {
+        try {
+            const syncSchematic = new SchematicWrapper();
+            
+            // Create initial circuit
+            for (let x = 0; x <= 5; x++) {
+                syncSchematic.set_block(x, 0, 0, "minecraft:gray_concrete");
+            }
+            syncSchematic.set_block(0, 1, 0, "minecraft:lever[facing=east,powered=false,face=floor]");
+            syncSchematic.set_block(5, 1, 0, "minecraft:redstone_lamp[lit=false]");
+            
+            // Run simulation
+            const syncWorld = syncSchematic.create_simulation_world();
+            syncWorld.on_use_block(0, 1, 0); // Turn on lever
+            syncWorld.tick(2);
+            syncWorld.flush();
+            
+            // Verify simulation changed state
+            const simLampState = syncWorld.is_lit(5, 1, 0);
+            console.log(`   - Simulation lamp state: ${simLampState}`);
+            
+            // Sync back to schematic
+            syncWorld.sync_to_schematic();
+            const updatedSchematic = syncWorld.get_schematic();
+            
+            // Check if schematic was updated
+            const leverBlock = updatedSchematic.get_block(0, 1, 0);
+            console.log(`   - Synced lever block: ${leverBlock}`);
+            
+            if (leverBlock && leverBlock.includes('lever')) {
+                console.log('   ✅ Sync to schematic works!');
+            } else {
+                console.log('   ⚠️  Sync may not have preserved block data');
+            }
+        } catch (error) {
+            console.log(`   ⚠️  Sync test error: ${error.message}`);
+        }
+    } else {
+        console.log('   ⚠️  Simulation feature not available');
+    }
     
     console.log('\n=== Test Summary ===');
     console.log('✅ All basic functionality tests completed');

@@ -528,6 +528,22 @@ impl PyMchprsWorld {
         self.inner.get_redstone_power(pos)
     }
 
+    pub fn sync_to_schematic(&mut self) {
+        self.inner.sync_to_schematic();
+    }
+
+    pub fn get_schematic(&self) -> PySchematic {
+        PySchematic {
+            inner: self.inner.get_schematic().clone(),
+        }
+    }
+
+    pub fn into_schematic(mut self) -> PySchematic {
+        PySchematic {
+            inner: self.inner.into_schematic(),
+        }
+    }
+
     fn __repr__(&self) -> String {
         "<MchprsWorld (redstone simulation)>".to_string()
     }

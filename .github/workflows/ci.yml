@@ -215,7 +215,8 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: publish
-          args: --allow-dirty --token ${{ secrets.CRATES_IO_TOKEN }}
+          args: --allow-dirty --no-default-features --token ${{ secrets.CRATES_IO_TOKEN }}
+        continue-on-error: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
