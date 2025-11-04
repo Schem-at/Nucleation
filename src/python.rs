@@ -213,6 +213,21 @@ impl PySchematic {
             .map(|bs| PyBlockState { inner: bs })
     }
 
+    /// Get block as formatted string with properties (e.g., "minecraft:lever[powered=true,facing=north]")
+    pub fn get_block_string(&self, x: i32, y: i32, z: i32) -> Option<String> {
+        self.inner.get_block(x, y, z).map(|bs| bs.to_string())
+    }
+
+    /// Get the palette for the default region
+    pub fn get_palette<'py>(&self, py: Python<'py>) -> PyResult<PyObject> {
+        let palette = self.inner.default_region.palette.clone();
+        let list = PyList::new(
+            py,
+            palette.iter().map(|bs| PyBlockState { inner: bs.clone() })
+        )?;
+        Ok(list.into())
+    }
+
     pub fn get_block_entity<'py>(
         &self,
         py: Python<'py>,

@@ -347,6 +347,11 @@ impl SchematicWrapper {
             .map(|block_state| block_state.name.clone())
     }
 
+    /// Get block as formatted string with properties (e.g., "minecraft:lever[powered=true,facing=north]")
+    pub fn get_block_string(&self, x: i32, y: i32, z: i32) -> Option<String> {
+        self.0.get_block(x, y, z).map(|bs| bs.to_string())
+    }
+
     pub fn get_block_with_properties(&self, x: i32, y: i32, z: i32) -> Option<BlockStateWrapper> {
         self.0.get_block(x, y, z).cloned().map(BlockStateWrapper)
     }
