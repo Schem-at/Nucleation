@@ -1,25 +1,27 @@
 // src/python.rs
 #![cfg(feature = "python")]
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyBytes};
+use pyo3::types::{PyBytes, PyDict, PyList};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
 use crate::{
-    UniversalSchematic,
-    BlockState,
-    utils::{NbtValue, NbtMap},
-    formats::{litematic, schematic},
-    print_utils::{format_schematic, format_json_schematic},
-    bounding_box::BoundingBox,
     block_position::BlockPosition,
-    universal_schematic::ChunkLoadingStrategy
+    bounding_box::BoundingBox,
+    formats::{litematic, schematic},
+    print_utils::{format_json_schematic, format_schematic},
+    universal_schematic::ChunkLoadingStrategy,
+    utils::{NbtMap, NbtValue},
+    BlockState, UniversalSchematic,
 };
 
+#[cfg(feature = "simulation")]
+use crate::simulation::{BlockPos, MchprsWorld};
+
+use bytemuck;
 #[allow(unused_imports)]
 use quartz_nbt::NbtTag;
-use bytemuck;
 
 #[pyclass(name = "BlockState")]
 #[derive(Clone)]
@@ -60,7 +62,6 @@ impl PyBlockState {
     }
 }
 
-
 #[pyclass(name = "Schematic")]
 pub struct PySchematic {
     pub(crate) inner: UniversalSchematic,
@@ -88,7 +89,9 @@ impl PySchematic {
             self.inner = schematic::from_schematic(data)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         } else {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>("Unknown or unsupported schematic format"));
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "Unknown or unsupported schematic format",
+            ));
         }
         Ok(())
     }
@@ -121,8 +124,16 @@ impl PySchematic {
         self.inner.set_block_str(x, y, z, block_name)
     }
 
-    pub fn set_block_in_region(&mut self, region_name: &str, x: i32, y: i32, z: i32, block_name: &str) -> bool {
-        self.inner.set_block_in_region_str(region_name, x, y, z, block_name)
+    pub fn set_block_in_region(
+        &mut self,
+        region_name: &str,
+        x: i32,
+        y: i32,
+        z: i32,
+        block_name: &str,
+    ) -> bool {
+        self.inner
+            .set_block_in_region_str(region_name, x, y, z, block_name)
     }
 
     /// Expose cache clearing to Python
@@ -135,15 +146,24 @@ impl PySchematic {
         self.inner.cache_stats()
     }
 
-    pub fn set_block_from_string(&mut self, x: i32, y: i32, z: i32, block_string: &str) -> PyResult<()> {
-        self.inner.set_block_from_string(x, y, z, block_string)
+    pub fn set_block_from_string(
+        &mut self,
+        x: i32,
+        y: i32,
+        z: i32,
+        block_string: &str,
+    ) -> PyResult<()> {
+        self.inner
+            .set_block_from_string(x, y, z, block_string)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
         Ok(())
     }
 
     pub fn set_block_with_properties(
         &mut self,
-        x: i32, y: i32, z: i32,
+        x: i32,
+        y: i32,
+        z: i32,
         block_name: &str,
         properties: HashMap<String, String>,
     ) {
@@ -157,27 +177,49 @@ impl PySchematic {
     pub fn copy_region(
         &mut self,
         from_schematic: &PySchematic,
-        min_x: i32, min_y: i32, min_z: i32,
-        max_x: i32, max_y: i32, max_z: i32,
-        target_x: i32, target_y: i32, target_z: i32,
+        min_x: i32,
+        min_y: i32,
+        min_z: i32,
+        max_x: i32,
+        max_y: i32,
+        max_z: i32,
+        target_x: i32,
+        target_y: i32,
+        target_z: i32,
         excluded_blocks: Option<Vec<String>>,
     ) -> PyResult<()> {
         let bounds = BoundingBox::new((min_x, min_y, min_z), (max_x, max_y, max_z));
-        let excluded: Vec<BlockState> = excluded_blocks.unwrap_or_default()
+        let excluded: Vec<BlockState> = excluded_blocks
+            .unwrap_or_default()
             .iter()
             .map(|s| UniversalSchematic::parse_block_string(s).map(|(bs, _)| bs))
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
 
-        self.inner.copy_region(&from_schematic.inner, &bounds, (target_x, target_y, target_z), &excluded)
+        self.inner
+            .copy_region(
+                &from_schematic.inner,
+                &bounds,
+                (target_x, target_y, target_z),
+                &excluded,
+            )
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))
     }
 
     pub fn get_block(&self, x: i32, y: i32, z: i32) -> Option<PyBlockState> {
-        self.inner.get_block(x, y, z).cloned().map(|bs| PyBlockState { inner: bs })
+        self.inner
+            .get_block(x, y, z)
+            .cloned()
+            .map(|bs| PyBlockState { inner: bs })
     }
 
-    pub fn get_block_entity<'py>(&self, py: Python<'py>, x: i32, y: i32, z: i32) -> PyResult<Option<PyObject>> {
+    pub fn get_block_entity<'py>(
+        &self,
+        py: Python<'py>,
+        x: i32,
+        y: i32,
+        z: i32,
+    ) -> PyResult<Option<PyObject>> {
         let pos = BlockPosition { x, y, z };
         if let Some(be) = self.inner.get_block_entity(pos) {
             let dict = PyDict::new(py);
@@ -229,13 +271,20 @@ impl PySchematic {
         strategy=None, camera_x=0.0, camera_y=0.0, camera_z=0.0
     ))]
     pub fn get_chunks<'py>(
-        &self, py: Python<'py>,
-        chunk_width: i32, chunk_height: i32, chunk_length: i32,
+        &self,
+        py: Python<'py>,
+        chunk_width: i32,
+        chunk_height: i32,
+        chunk_length: i32,
         strategy: Option<String>,
-        camera_x: f32, camera_y: f32, camera_z: f32,
+        camera_x: f32,
+        camera_y: f32,
+        camera_z: f32,
     ) -> PyResult<PyObject> {
         let strategy_enum = match strategy.as_deref() {
-            Some("distance_to_camera") => Some(ChunkLoadingStrategy::DistanceToCamera(camera_x, camera_y, camera_z)),
+            Some("distance_to_camera") => Some(ChunkLoadingStrategy::DistanceToCamera(
+                camera_x, camera_y, camera_z,
+            )),
             Some("top_down") => Some(ChunkLoadingStrategy::TopDown),
             Some("bottom_up") => Some(ChunkLoadingStrategy::BottomUp),
             Some("center_outward") => Some(ChunkLoadingStrategy::CenterOutward),
@@ -243,7 +292,9 @@ impl PySchematic {
             _ => None,
         };
 
-        let chunks = self.inner.iter_chunks(chunk_width, chunk_height, chunk_length, strategy_enum);
+        let chunks = self
+            .inner
+            .iter_chunks(chunk_width, chunk_height, chunk_length, strategy_enum);
         let mut chunk_items: Vec<PyObject> = Vec::new();
 
         for chunk in chunks {
@@ -295,9 +346,14 @@ impl PySchematic {
     }
 
     pub fn debug_info(&self) -> String {
-        format!("Schematic name: {}, Regions: {}",
-                self.inner.metadata.name.as_ref().unwrap_or(&"Unnamed".to_string()),
-                self.inner.other_regions.len() + 1 // +1 for the main region
+        format!(
+            "Schematic name: {}, Regions: {}",
+            self.inner
+                .metadata
+                .name
+                .as_ref()
+                .unwrap_or(&"Unnamed".to_string()),
+            self.inner.other_regions.len() + 1 // +1 for the main region
         )
     }
 
@@ -306,7 +362,22 @@ impl PySchematic {
     }
 
     fn __repr__(&self) -> String {
-        format!("<Schematic '{}', {} blocks>", self.inner.metadata.name.as_ref().unwrap_or(&"Unnamed".to_string()), self.inner.total_blocks())
+        format!(
+            "<Schematic '{}', {} blocks>",
+            self.inner
+                .metadata
+                .name
+                .as_ref()
+                .unwrap_or(&"Unnamed".to_string()),
+            self.inner.total_blocks()
+        )
+    }
+
+    #[cfg(feature = "simulation")]
+    pub fn create_simulation_world(&self) -> PyResult<PyMchprsWorld> {
+        let world = MchprsWorld::new(self.inner.clone())
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))?;
+        Ok(PyMchprsWorld { inner: world })
     }
 }
 
@@ -353,19 +424,26 @@ fn nbt_value_to_python(py: Python<'_>, value: &NbtValue) -> PyResult<PyObject> {
 
 #[pyfunction]
 fn debug_schematic(schematic: &PySchematic) -> String {
-    format!("{}\n{}", schematic.debug_info(), format_schematic(&schematic.inner))
+    format!(
+        "{}\n{}",
+        schematic.debug_info(),
+        format_schematic(&schematic.inner)
+    )
 }
 
 #[pyfunction]
 fn debug_json_schematic(schematic: &PySchematic) -> String {
-    format!("{}\n{}", schematic.debug_info(), format_json_schematic(&schematic.inner))
+    format!(
+        "{}\n{}",
+        schematic.debug_info(),
+        format_json_schematic(&schematic.inner)
+    )
 }
-
 
 #[pyfunction]
 fn load_schematic(path: &str) -> PyResult<PySchematic> {
-    let data = fs::read(path)
-        .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
+    let data =
+        fs::read(path).map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
 
     let mut sch = PySchematic::new(Some(
         Path::new(path)
@@ -377,7 +455,6 @@ fn load_schematic(path: &str) -> PyResult<PySchematic> {
     sch.from_data(&data)?;
     Ok(sch)
 }
-
 
 #[pyfunction]
 #[pyo3(signature = (schematic, path, format = "auto"))]
@@ -412,6 +489,50 @@ fn save_schematic(schematic: &PySchematic, path: &str, format: &str) -> PyResult
     })
 }
 
+// --- Simulation Support (Optional) ---
+
+#[cfg(feature = "simulation")]
+#[pyclass(name = "MchprsWorld")]
+pub struct PyMchprsWorld {
+    inner: MchprsWorld,
+}
+
+#[cfg(feature = "simulation")]
+#[pymethods]
+impl PyMchprsWorld {
+    pub fn on_use_block(&mut self, x: i32, y: i32, z: i32) {
+        let pos = BlockPos::new(x, y, z);
+        self.inner.on_use_block(pos);
+    }
+
+    pub fn tick(&mut self, ticks: u32) {
+        self.inner.tick(ticks);
+    }
+
+    pub fn flush(&mut self) {
+        self.inner.flush();
+    }
+
+    pub fn is_lit(&self, x: i32, y: i32, z: i32) -> bool {
+        let pos = BlockPos::new(x, y, z);
+        self.inner.is_lit(pos)
+    }
+
+    pub fn get_lever_power(&self, x: i32, y: i32, z: i32) -> bool {
+        let pos = BlockPos::new(x, y, z);
+        self.inner.get_lever_power(pos)
+    }
+
+    pub fn get_redstone_power(&self, x: i32, y: i32, z: i32) -> u8 {
+        let pos = BlockPos::new(x, y, z);
+        self.inner.get_redstone_power(pos)
+    }
+
+    fn __repr__(&self) -> String {
+        "<MchprsWorld (redstone simulation)>".to_string()
+    }
+}
+
 #[pymodule]
 fn nucleation(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySchematic>()?;
@@ -420,5 +541,9 @@ fn nucleation(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(debug_json_schematic, m)?)?;
     m.add_function(wrap_pyfunction!(load_schematic, m)?)?;
     m.add_function(wrap_pyfunction!(save_schematic, m)?)?;
+
+    #[cfg(feature = "simulation")]
+    m.add_class::<PyMchprsWorld>()?;
+
     Ok(())
 }

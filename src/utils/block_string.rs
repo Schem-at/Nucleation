@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use serde_json::Value;
+use crate::utils::{NbtMap, NbtValue};
 use crate::BlockState;
-use crate::utils::{NbtValue, NbtMap};
+use serde_json::Value;
+use std::collections::HashMap;
 
 pub fn parse_block_string(block_string: &str) -> Result<(BlockState, Option<NbtMap>), String> {
     let mut parts = block_string.splitn(2, '{');
@@ -12,7 +12,8 @@ pub fn parse_block_string(block_string: &str) -> Result<(BlockState, Option<NbtM
     let block_state = if block_state_str.contains('[') {
         let mut state_parts = block_state_str.splitn(2, '[');
         let block_name = state_parts.next().unwrap();
-        let properties_str = state_parts.next()
+        let properties_str = state_parts
+            .next()
             .ok_or("Missing properties closing bracket")?
             .trim_end_matches(']');
 
@@ -20,7 +21,10 @@ pub fn parse_block_string(block_string: &str) -> Result<(BlockState, Option<NbtM
         for prop in properties_str.split(',') {
             let mut kv = prop.split('=');
             let key = kv.next().ok_or("Missing property key")?.trim();
-            let value = kv.next().ok_or("Missing property value")?.trim()
+            let value = kv
+                .next()
+                .ok_or("Missing property value")?
+                .trim()
                 .trim_matches(|c| c == '\'' || c == '"');
             properties.insert(key.to_string(), value.to_string());
         }
@@ -55,10 +59,8 @@ pub fn parse_block_string(block_string: &str) -> Result<(BlockState, Option<NbtM
 }
 
 pub fn parse_items_array(nbt_str: &str) -> Result<Vec<NbtValue>, String> {
-
     // Find the Items array
-    let items_start = nbt_str.find("Items:[")
-        .ok_or("Missing Items array")?;
+    let items_start = nbt_str.find("Items:[").ok_or("Missing Items array")?;
     let array_start = items_start + "Items:".len();
 
     // Extract the array content
@@ -66,7 +68,7 @@ pub fn parse_items_array(nbt_str: &str) -> Result<Vec<NbtValue>, String> {
         .ok_or("Malformed Items array")?;
 
     // Remove outer brackets
-    let items_content = array_str[1..array_str.len()-1].trim();
+    let items_content = array_str[1..array_str.len() - 1].trim();
 
     let mut items = Vec::new();
     for item_str in split_items(items_content) {
@@ -78,7 +80,8 @@ pub fn parse_items_array(nbt_str: &str) -> Result<Vec<NbtValue>, String> {
         for prop in clean_item_str.split(',') {
             let prop = prop.trim();
 
-            let (key_part, value_part) = prop.split_once(':')
+            let (key_part, value_part) = prop
+                .split_once(':')
                 .ok_or_else(|| format!("Invalid property format: '{}'", prop))?;
             // Trim whitespace and quotes from the key
             let key = key_part.trim().trim_matches(|c| c == '"' || c == '\'');
@@ -86,31 +89,36 @@ pub fn parse_items_array(nbt_str: &str) -> Result<Vec<NbtValue>, String> {
 
             match key {
                 "Count" => {
-                    let count_str = value.trim_matches(|c| c == '"' || c == '\'').trim_end_matches('b');
-                    let count: i8 = count_str.parse()
+                    let count_str = value
+                        .trim_matches(|c| c == '"' || c == '\'')
+                        .trim_end_matches('b');
+                    let count: i8 = count_str
+                        .parse()
                         .map_err(|_| format!("Invalid Count value: {}", count_str))?;
                     item_nbt.insert("Count".to_string(), NbtValue::Byte(count));
-                },
+                }
                 "Slot" => {
-                    let slot_str = value.trim_matches(|c| c == '"' || c == '\'').trim_end_matches('b');
-                    let slot: i8 = slot_str.parse()
+                    let slot_str = value
+                        .trim_matches(|c| c == '"' || c == '\'')
+                        .trim_end_matches('b');
+                    let slot: i8 = slot_str
+                        .parse()
                         .map_err(|_| format!("Invalid Slot value: {}", slot_str))?;
                     item_nbt.insert("Slot".to_string(), NbtValue::Byte(slot));
-                },
+                }
                 "id" => {
                     let id = value.trim_matches(|c| c == '"' || c == '\'').to_string();
                     item_nbt.insert("id".to_string(), NbtValue::String(id));
-                },
-                _ => {
                 }
+                _ => {}
             }
         }
 
-
         // Verify required fields
-        if item_nbt.get("Count").is_none() ||
-            item_nbt.get("Slot").is_none() ||
-            item_nbt.get("id").is_none() {
+        if item_nbt.get("Count").is_none()
+            || item_nbt.get("Slot").is_none()
+            || item_nbt.get("id").is_none()
+        {
             return Err("Missing required item properties".to_string());
         }
 
@@ -143,7 +151,7 @@ fn split_items(items_str: &str) -> Vec<String> {
                     current_item.clear();
                 }
             }
-            ',' if brace_count == 0 => {},
+            ',' if brace_count == 0 => {}
             _ => {
                 if brace_count > 0 {
                     current_item.push(c);
@@ -156,7 +164,8 @@ fn split_items(items_str: &str) -> Vec<String> {
 }
 
 pub fn parse_custom_name(nbt_str: &str) -> Result<String, String> {
-    let name_start = nbt_str.find("CustomName:")
+    let name_start = nbt_str
+        .find("CustomName:")
         .ok_or("No CustomName field found")?
         + "CustomName:".len();
 
@@ -176,13 +185,12 @@ pub fn parse_custom_name(nbt_str: &str) -> Result<String, String> {
     if name_content.starts_with('{') {
         // Parse the JSON string
         match serde_json::from_str::<Value>(name_content) {
-            Ok(json) => {
-                json.get("text")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string())
-                    .ok_or_else(|| "Missing or invalid 'text' field in CustomName JSON".to_string())
-            }
-            Err(e) => Err(format!("Invalid JSON in CustomName: {}", e))
+            Ok(json) => json
+                .get("text")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .ok_or_else(|| "Missing or invalid 'text' field in CustomName JSON".to_string()),
+            Err(e) => Err(format!("Invalid JSON in CustomName: {}", e)),
         }
     } else {
         // If it's a plain string, return it as is
@@ -234,7 +242,10 @@ mod tests {
         if let Some(NbtValue::List(items)) = nbt_data.get("Items") {
             assert_eq!(items.len(), 1);
             if let NbtValue::Compound(item) = &items[0] {
-                assert_eq!(item.get("id"), Some(&NbtValue::String("minecraft:redstone".to_string())));
+                assert_eq!(
+                    item.get("id"),
+                    Some(&NbtValue::String("minecraft:redstone".to_string()))
+                );
                 assert_eq!(item.get("Count"), Some(&NbtValue::Byte(64)));
                 assert_eq!(item.get("Slot"), Some(&NbtValue::Byte(0)));
             } else {
@@ -258,23 +269,19 @@ mod tests {
             (
                 r#"CustomName:'{"text":"Test Name"}'"#,
                 "Test Name",
-                "Basic JSON case"
+                "Basic JSON case",
             ),
-            (
-                "CustomName:'Plain Text'",
-                "Plain Text",
-                "Plain text case"
-            ),
+            ("CustomName:'Plain Text'", "Plain Text", "Plain text case"),
             (
                 r#"CustomName:'{"text":"Test Name"}',OtherField:123"#,
                 "Test Name",
-                "JSON with trailing comma"
+                "JSON with trailing comma",
             ),
             (
                 "CustomName:'Simple Name',OtherField:123",
                 "Simple Name",
-                "Plain text with trailing comma"
-            )
+                "Plain text with trailing comma",
+            ),
         ];
 
         for (input, expected, description) in test_cases {
@@ -290,7 +297,10 @@ mod tests {
 
         assert_eq!(items.len(), 1);
         if let NbtValue::Compound(item) = &items[0] {
-            assert_eq!(item.get("id"), Some(&NbtValue::String("minecraft:stone".to_string())));
+            assert_eq!(
+                item.get("id"),
+                Some(&NbtValue::String("minecraft:stone".to_string()))
+            );
             assert_eq!(item.get("Count"), Some(&NbtValue::Byte(64)));
             assert_eq!(item.get("Slot"), Some(&NbtValue::Byte(0)));
         } else {

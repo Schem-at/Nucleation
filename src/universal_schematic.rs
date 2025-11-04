@@ -85,7 +85,8 @@ impl UniversalSchematic {
     }
 
     pub fn set_block_str(&mut self, x: i32, y: i32, z: i32, block_name: &str) -> bool {
-        if block_name.ends_with('}') {
+        // Check if string contains properties (bracket notation) or NBT data (braces)
+        if block_name.contains('[') || block_name.ends_with('}') {
             self.set_block_from_string(x, y, z, block_name).unwrap()
         } else {
             let block_state = match self.block_state_cache.get(block_name) {
@@ -905,13 +906,17 @@ impl UniversalSchematic {
 
         // Iterator for other regions
         let other_iter = self.other_regions.values().flat_map(|region| {
-            region.blocks.iter().enumerate().filter_map(move |(index, &palette_index)| {
-                if palette_index == 0 {
-                    return None;
-                }
-                let (x, y, z) = region.index_to_coords(index);
-                Some((BlockPosition { x, y, z }, palette_index))
-            })
+            region
+                .blocks
+                .iter()
+                .enumerate()
+                .filter_map(move |(index, &palette_index)| {
+                    if palette_index == 0 {
+                        return None;
+                    }
+                    let (x, y, z) = region.index_to_coords(index);
+                    Some((BlockPosition { x, y, z }, palette_index))
+                })
         });
 
         default_iter.chain(other_iter)
@@ -951,7 +956,9 @@ impl UniversalSchematic {
                             + (b_center_y as f32 - cam_y).powi(2)
                             + (b_center_z as f32 - cam_z).powi(2);
 
-                        a_dist.partial_cmp(&b_dist).unwrap_or(std::cmp::Ordering::Equal)
+                        a_dist
+                            .partial_cmp(&b_dist)
+                            .unwrap_or(std::cmp::Ordering::Equal)
                     });
                 }
                 ChunkLoadingStrategy::TopDown => {
@@ -1070,26 +1077,33 @@ impl UniversalSchematic {
         };
 
         for (region_name, region) in &self.other_regions {
-            all_palettes.region_palettes.insert(region_name.clone(), region.palette.clone());
+            all_palettes
+                .region_palettes
+                .insert(region_name.clone(), region.palette.clone());
         }
 
         all_palettes
     }
 
-    pub fn get_chunk_blocks_indices(&self,
-                                    offset_x: i32,
-                                    offset_y: i32,
-                                    offset_z: i32,
-                                    width: i32,
-                                    height: i32,
-                                    length: i32
+    pub fn get_chunk_blocks_indices(
+        &self,
+        offset_x: i32,
+        offset_y: i32,
+        offset_z: i32,
+        width: i32,
+        height: i32,
+        length: i32,
     ) -> Vec<(BlockPosition, usize)> {
         let mut blocks = Vec::new();
 
         // Check default region
         if self.default_region.get_bounding_box().intersects_range(
-            offset_x, offset_y, offset_z,
-            offset_x + width, offset_y + height, offset_z + length
+            offset_x,
+            offset_y,
+            offset_z,
+            offset_x + width,
+            offset_y + height,
+            offset_z + length,
         ) {
             for (index, &palette_index) in self.default_region.blocks.iter().enumerate() {
                 if palette_index == 0 {
@@ -1097,9 +1111,13 @@ impl UniversalSchematic {
                 }
 
                 let (x, y, z) = self.default_region.index_to_coords(index);
-                if x >= offset_x && x < offset_x + width &&
-                    y >= offset_y && y < offset_y + height &&
-                    z >= offset_z && z < offset_z + length {
+                if x >= offset_x
+                    && x < offset_x + width
+                    && y >= offset_y
+                    && y < offset_y + height
+                    && z >= offset_z
+                    && z < offset_z + length
+                {
                     blocks.push((BlockPosition { x, y, z }, palette_index));
                 }
             }
@@ -1108,8 +1126,12 @@ impl UniversalSchematic {
         // Check other regions
         for region in self.other_regions.values() {
             if region.get_bounding_box().intersects_range(
-                offset_x, offset_y, offset_z,
-                offset_x + width, offset_y + height, offset_z + length
+                offset_x,
+                offset_y,
+                offset_z,
+                offset_x + width,
+                offset_y + height,
+                offset_z + length,
             ) {
                 for (index, &palette_index) in region.blocks.iter().enumerate() {
                     if palette_index == 0 {
@@ -1117,9 +1139,13 @@ impl UniversalSchematic {
                     }
 
                     let (x, y, z) = region.index_to_coords(index);
-                    if x >= offset_x && x < offset_x + width &&
-                        y >= offset_y && y < offset_y + height &&
-                        z >= offset_z && z < offset_z + length {
+                    if x >= offset_x
+                        && x < offset_x + width
+                        && y >= offset_y
+                        && y < offset_y + height
+                        && z >= offset_z
+                        && z < offset_z + length
+                    {
                         blocks.push((BlockPosition { x, y, z }, palette_index));
                     }
                 }
@@ -2185,51 +2211,71 @@ mod tests {
     #[test]
     fn test_chunk_consistency() {
         let mut schematic = UniversalSchematic::new("Chunk Test".to_string());
-        
+
         // Add some non-air blocks in a pattern
         for x in 0..10 {
             for y in 0..10 {
                 for z in 0..10 {
-                    if (x + y + z) % 3 == 0 {  // Only set some blocks, not all
-                        schematic.set_block(x, y, z, BlockState::new("minecraft:stone".to_string()));
+                    if (x + y + z) % 3 == 0 {
+                        // Only set some blocks, not all
+                        schematic.set_block(
+                            x,
+                            y,
+                            z,
+                            BlockState::new("minecraft:stone".to_string()),
+                        );
                     }
                 }
             }
         }
-        
+
         let chunk_width = 16;
         let chunk_height = 16;
         let chunk_length = 16;
-        
+
         // Count chunks using both methods
-        let chunks: Vec<_> = schematic.iter_chunks(
-            chunk_width, 
-            chunk_height, 
-            chunk_length, 
-            Some(ChunkLoadingStrategy::BottomUp)
-        ).collect();
-        
-        let chunks_indices: Vec<_> = schematic.iter_chunks_indices(
-            chunk_width, 
-            chunk_height, 
-            chunk_length, 
-            Some(ChunkLoadingStrategy::BottomUp)
-        ).collect();
-        
+        let chunks: Vec<_> = schematic
+            .iter_chunks(
+                chunk_width,
+                chunk_height,
+                chunk_length,
+                Some(ChunkLoadingStrategy::BottomUp),
+            )
+            .collect();
+
+        let chunks_indices: Vec<_> = schematic
+            .iter_chunks_indices(
+                chunk_width,
+                chunk_height,
+                chunk_length,
+                Some(ChunkLoadingStrategy::BottomUp),
+            )
+            .collect();
+
         // They should now be equal since both exclude air blocks
-        assert_eq!(chunks.len(), chunks_indices.len(), 
-                   "Chunk counts should be consistent between iter_chunks and iter_chunks_indices");
-        
+        assert_eq!(
+            chunks.len(),
+            chunks_indices.len(),
+            "Chunk counts should be consistent between iter_chunks and iter_chunks_indices"
+        );
+
         // Verify both methods return the same number of non-empty chunks
-        assert!(chunks.len() > 0, "Should have at least one chunk with blocks");
-        assert_eq!(chunks.len(), 1, "Should have exactly one chunk for this small test case");
+        assert!(
+            chunks.len() > 0,
+            "Should have at least one chunk with blocks"
+        );
+        assert_eq!(
+            chunks.len(),
+            1,
+            "Should have exactly one chunk for this small test case"
+        );
     }
 
     #[test]
     fn test_exact_chunk_dimensions() {
         // Test case 1: 16x16x16 cube with 16x16x16 chunks should produce exactly 1 chunk
         let mut schematic = UniversalSchematic::new("Exact Chunk Test".to_string());
-        
+
         // Fill a 16x16x16 cube with blocks
         for x in 0..16 {
             for y in 0..16 {
@@ -2238,19 +2284,36 @@ mod tests {
                 }
             }
         }
-        
+
         let chunks: Vec<_> = schematic.iter_chunks(16, 16, 16, None).collect();
         let chunks_indices: Vec<_> = schematic.iter_chunks_indices(16, 16, 16, None).collect();
-        
-        assert_eq!(chunks.len(), 1, "16x16x16 cube with 16x16x16 chunks should produce exactly 1 chunk");
-        assert_eq!(chunks_indices.len(), 1, "iter_chunks_indices should also produce exactly 1 chunk");
-        assert_eq!(chunks[0].chunk_x, 0, "Chunk should be at coordinate (0, 0, 0)");
-        assert_eq!(chunks[0].chunk_y, 0, "Chunk should be at coordinate (0, 0, 0)");
-        assert_eq!(chunks[0].chunk_z, 0, "Chunk should be at coordinate (0, 0, 0)");
-        
+
+        assert_eq!(
+            chunks.len(),
+            1,
+            "16x16x16 cube with 16x16x16 chunks should produce exactly 1 chunk"
+        );
+        assert_eq!(
+            chunks_indices.len(),
+            1,
+            "iter_chunks_indices should also produce exactly 1 chunk"
+        );
+        assert_eq!(
+            chunks[0].chunk_x, 0,
+            "Chunk should be at coordinate (0, 0, 0)"
+        );
+        assert_eq!(
+            chunks[0].chunk_y, 0,
+            "Chunk should be at coordinate (0, 0, 0)"
+        );
+        assert_eq!(
+            chunks[0].chunk_z, 0,
+            "Chunk should be at coordinate (0, 0, 0)"
+        );
+
         // Test case 2: 64x16x16 cube with 16x16x16 chunks should produce exactly 4 chunks
         let mut schematic2 = UniversalSchematic::new("4 Chunk Test".to_string());
-        
+
         // Fill a 64x16x16 cube with blocks
         for x in 0..64 {
             for y in 0..16 {
@@ -2259,27 +2322,39 @@ mod tests {
                 }
             }
         }
-        
+
         let chunks2: Vec<_> = schematic2.iter_chunks(16, 16, 16, None).collect();
         let chunks_indices2: Vec<_> = schematic2.iter_chunks_indices(16, 16, 16, None).collect();
-        
-        assert_eq!(chunks2.len(), 4, "64x16x16 cube with 16x16x16 chunks should produce exactly 4 chunks");
-        assert_eq!(chunks_indices2.len(), 4, "iter_chunks_indices should also produce exactly 4 chunks");
-        
+
+        assert_eq!(
+            chunks2.len(),
+            4,
+            "64x16x16 cube with 16x16x16 chunks should produce exactly 4 chunks"
+        );
+        assert_eq!(
+            chunks_indices2.len(),
+            4,
+            "iter_chunks_indices should also produce exactly 4 chunks"
+        );
+
         // Verify chunk coordinates are correct (should be at x=0,1,2,3 and y=0, z=0)
         let mut chunk_x_coords: Vec<i32> = chunks2.iter().map(|c| c.chunk_x).collect();
         chunk_x_coords.sort();
-        assert_eq!(chunk_x_coords, vec![0, 1, 2, 3], "Chunks should be at x coordinates 0, 1, 2, 3");
-        
+        assert_eq!(
+            chunk_x_coords,
+            vec![0, 1, 2, 3],
+            "Chunks should be at x coordinates 0, 1, 2, 3"
+        );
+
         // All chunks should be at y=0, z=0
         for chunk in &chunks2 {
             assert_eq!(chunk.chunk_y, 0, "All chunks should be at y=0");
             assert_eq!(chunk.chunk_z, 0, "All chunks should be at z=0");
         }
-        
+
         // Test case 3: 32x32x32 cube with 16x16x16 chunks should produce exactly 8 chunks
         let mut schematic3 = UniversalSchematic::new("8 Chunk Test".to_string());
-        
+
         // Fill a 32x32x32 cube with blocks
         for x in 0..32 {
             for y in 0..32 {
@@ -2288,29 +2363,47 @@ mod tests {
                 }
             }
         }
-        
+
         let chunks3: Vec<_> = schematic3.iter_chunks(16, 16, 16, None).collect();
         let chunks_indices3: Vec<_> = schematic3.iter_chunks_indices(16, 16, 16, None).collect();
-        
-        assert_eq!(chunks3.len(), 8, "32x32x32 cube with 16x16x16 chunks should produce exactly 8 chunks");
-        assert_eq!(chunks_indices3.len(), 8, "iter_chunks_indices should also produce exactly 8 chunks");
-        
+
+        assert_eq!(
+            chunks3.len(),
+            8,
+            "32x32x32 cube with 16x16x16 chunks should produce exactly 8 chunks"
+        );
+        assert_eq!(
+            chunks_indices3.len(),
+            8,
+            "iter_chunks_indices should also produce exactly 8 chunks"
+        );
+
         // Test case 4: Sparse blocks should still chunk correctly
         let mut schematic4 = UniversalSchematic::new("Sparse Chunk Test".to_string());
-        
+
         // Place blocks only at corners of a 32x32x32 space
         schematic4.set_block(0, 0, 0, BlockState::new("minecraft:stone".to_string()));
         schematic4.set_block(31, 0, 0, BlockState::new("minecraft:stone".to_string()));
         schematic4.set_block(0, 31, 0, BlockState::new("minecraft:stone".to_string()));
         schematic4.set_block(0, 0, 31, BlockState::new("minecraft:stone".to_string()));
         schematic4.set_block(31, 31, 31, BlockState::new("minecraft:stone".to_string()));
-        
+
         let chunks4: Vec<_> = schematic4.iter_chunks(16, 16, 16, None).collect();
         let chunks_indices4: Vec<_> = schematic4.iter_chunks_indices(16, 16, 16, None).collect();
-        
+
         // Should have chunks at different coordinates due to sparse placement
-        assert_eq!(chunks4.len(), chunks_indices4.len(), "Both methods should produce same number of chunks for sparse blocks");
-        assert!(chunks4.len() <= 8, "Should not exceed 8 chunks for blocks in 32x32x32 space");
-        assert!(chunks4.len() > 0, "Should have at least one chunk with blocks");
+        assert_eq!(
+            chunks4.len(),
+            chunks_indices4.len(),
+            "Both methods should produce same number of chunks for sparse blocks"
+        );
+        assert!(
+            chunks4.len() <= 8,
+            "Should not exceed 8 chunks for blocks in 32x32x32 space"
+        );
+        assert!(
+            chunks4.len() > 0,
+            "Should have at least one chunk with blocks"
+        );
     }
 }

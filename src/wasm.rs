@@ -1,19 +1,20 @@
 // src/wasm.rs
 
-use wasm_bindgen::prelude::*;
-use js_sys::{self, Array, Object, Reflect};
-use web_sys::console;
-use crate::{
-    UniversalSchematic,
-    BlockState,
-    formats::{litematic, schematic},
-    print_utils::{format_schematic as print_schematic, format_json_schematic as print_json_schematic},
-    block_position::BlockPosition,
-};
-use std::collections::HashMap;
 use crate::bounding_box::BoundingBox;
 use crate::schematic::SchematicVersion;
 use crate::universal_schematic::ChunkLoadingStrategy;
+use crate::{
+    block_position::BlockPosition,
+    formats::{litematic, schematic},
+    print_utils::{
+        format_json_schematic as print_json_schematic, format_schematic as print_schematic,
+    },
+    BlockState, UniversalSchematic,
+};
+use js_sys::{self, Array, Object, Reflect};
+use std::collections::HashMap;
+use wasm_bindgen::prelude::*;
+use web_sys::console;
 
 #[wasm_bindgen]
 pub struct LazyChunkIterator {
@@ -28,7 +29,6 @@ pub struct LazyChunkIterator {
     current_index: usize,
 }
 
-
 #[wasm_bindgen(start)]
 pub fn start() {
     console::log_1(&"Initializing schematic utilities".into());
@@ -38,20 +38,16 @@ pub fn start() {
 #[wasm_bindgen]
 pub struct SchematicWrapper(pub(crate) UniversalSchematic);
 
-
 #[wasm_bindgen]
 pub struct BlockStateWrapper(pub(crate) BlockState);
 
 // All your existing WASM implementations go here...
 #[wasm_bindgen]
 impl SchematicWrapper {
-
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         SchematicWrapper(UniversalSchematic::new("Default".to_string()))
     }
-
-
 
     pub fn from_data(&mut self, data: &[u8]) -> Result<(), JsValue> {
         if litematic::is_litematic(data) {
@@ -88,13 +84,16 @@ impl SchematicWrapper {
     }
 
     pub fn to_schematic_version(&self, version: &str) -> Result<Vec<u8>, JsValue> {
-       let version =  schematic::to_schematic_version(&self.0, SchematicVersion::from_str(version).unwrap());
+        let version =
+            schematic::to_schematic_version(&self.0, SchematicVersion::from_str(version).unwrap());
         match version {
             Ok(data) => Ok(data),
-            Err(e) => Err(JsValue::from_str(&format!("Schematic version conversion error: {}", e)))
+            Err(e) => Err(JsValue::from_str(&format!(
+                "Schematic version conversion error: {}",
+                e
+            ))),
         }
     }
-
 
     pub fn get_available_schematic_versions(&self) -> Array {
         let versions = SchematicVersion::get_all();
@@ -116,7 +115,12 @@ impl SchematicWrapper {
 
             let properties = Object::new();
             for (key, value) in &block_state.properties {
-                Reflect::set(&properties, &JsValue::from_str(key), &JsValue::from_str(value)).unwrap();
+                Reflect::set(
+                    &properties,
+                    &JsValue::from_str(key),
+                    &JsValue::from_str(value),
+                )
+                .unwrap();
             }
             Reflect::set(&obj, &"properties".into(), &properties).unwrap();
 
@@ -134,7 +138,12 @@ impl SchematicWrapper {
 
             let properties = Object::new();
             for (key, value) in &block_state.properties {
-                Reflect::set(&properties, &JsValue::from_str(key), &JsValue::from_str(value)).unwrap();
+                Reflect::set(
+                    &properties,
+                    &JsValue::from_str(key),
+                    &JsValue::from_str(value),
+                )
+                .unwrap();
             }
             Reflect::set(&obj, &"properties".into(), &properties).unwrap();
 
@@ -160,7 +169,12 @@ impl SchematicWrapper {
 
             let properties = Object::new();
             for (key, value) in &block_state.properties {
-                Reflect::set(&properties, &JsValue::from_str(key), &JsValue::from_str(value)).unwrap();
+                Reflect::set(
+                    &properties,
+                    &JsValue::from_str(key),
+                    &JsValue::from_str(value),
+                )
+                .unwrap();
             }
             Reflect::set(&obj, &"properties".into(), &properties).unwrap();
 
@@ -172,16 +186,26 @@ impl SchematicWrapper {
     pub fn get_bounding_box(&self) -> JsValue {
         let bbox = self.0.get_bounding_box();
         let obj = Object::new();
-        Reflect::set(&obj, &"min".into(), &Array::of3(
-            &JsValue::from(bbox.min.0),
-            &JsValue::from(bbox.min.1),
-            &JsValue::from(bbox.min.2)
-        )).unwrap();
-        Reflect::set(&obj, &"max".into(), &Array::of3(
-            &JsValue::from(bbox.max.0),
-            &JsValue::from(bbox.max.1),
-            &JsValue::from(bbox.max.2)
-        )).unwrap();
+        Reflect::set(
+            &obj,
+            &"min".into(),
+            &Array::of3(
+                &JsValue::from(bbox.min.0),
+                &JsValue::from(bbox.min.1),
+                &JsValue::from(bbox.min.2),
+            ),
+        )
+        .unwrap();
+        Reflect::set(
+            &obj,
+            &"max".into(),
+            &Array::of3(
+                &JsValue::from(bbox.max.0),
+                &JsValue::from(bbox.max.1),
+                &JsValue::from(bbox.max.2),
+            ),
+        )
+        .unwrap();
         obj.into()
     }
 
@@ -196,25 +220,32 @@ impl SchematicWrapper {
         };
 
         let obj = Object::new();
-        Reflect::set(&obj, &"min".into(), &Array::of3(
-            &JsValue::from(bbox.min.0),
-            &JsValue::from(bbox.min.1),
-            &JsValue::from(bbox.min.2)
-        )).unwrap();
-        Reflect::set(&obj, &"max".into(), &Array::of3(
-            &JsValue::from(bbox.max.0),
-            &JsValue::from(bbox.max.1),
-            &JsValue::from(bbox.max.2)
-        )).unwrap();
+        Reflect::set(
+            &obj,
+            &"min".into(),
+            &Array::of3(
+                &JsValue::from(bbox.min.0),
+                &JsValue::from(bbox.min.1),
+                &JsValue::from(bbox.min.2),
+            ),
+        )
+        .unwrap();
+        Reflect::set(
+            &obj,
+            &"max".into(),
+            &Array::of3(
+                &JsValue::from(bbox.max.0),
+                &JsValue::from(bbox.max.1),
+                &JsValue::from(bbox.max.2),
+            ),
+        )
+        .unwrap();
         obj.into()
     }
-
-
 
     pub fn set_block(&mut self, x: i32, y: i32, z: i32, block_name: &str) {
         self.0.set_block_str(x, y, z, block_name);
     }
-
 
     pub fn copy_region(
         &mut self,
@@ -230,20 +261,18 @@ impl SchematicWrapper {
         target_z: i32,
         excluded_blocks: &JsValue,
     ) -> Result<(), JsValue> {
-        let bounds = BoundingBox::new(
-            (min_x, min_y, min_z),
-            (max_x, max_y, max_z)
-        );
+        let bounds = BoundingBox::new((min_x, min_y, min_z), (max_x, max_y, max_z));
 
         let excluded_blocks = if !excluded_blocks.is_undefined() && !excluded_blocks.is_null() {
-            let js_array: Array = excluded_blocks.clone().dyn_into().map_err(|_| {
-                JsValue::from_str("Excluded blocks should be an array")
-            })?;
+            let js_array: Array = excluded_blocks
+                .clone()
+                .dyn_into()
+                .map_err(|_| JsValue::from_str("Excluded blocks should be an array"))?;
             let mut rust_vec: Vec<BlockState> = Vec::new();
             for i in 0..js_array.length() {
                 let block_string = match js_array.get(i).as_string() {
                     Some(name) => name,
-                    None => return Err(JsValue::from_str("Excluded blocks should be strings"))
+                    None => return Err(JsValue::from_str("Excluded blocks should be strings")),
                 };
                 let (block_state, _) = UniversalSchematic::parse_block_string(&block_string)
                     .map_err(|e| JsValue::from_str(&format!("Invalid block state: {}", e)))?;
@@ -252,18 +281,18 @@ impl SchematicWrapper {
 
             rust_vec
         } else {
-            Vec::new()  // Return empty vec instead of None
+            Vec::new() // Return empty vec instead of None
         };
 
-        self.0.copy_region(
-            &from_schematic.0,
-            &bounds,
-            (target_x, target_y, target_z),
-            &excluded_blocks  // Now we can pass a direct reference to the Vec
-        ).map_err(|e| JsValue::from_str(&format!("Failed to copy region: {}", e)))
+        self.0
+            .copy_region(
+                &from_schematic.0,
+                &bounds,
+                (target_x, target_y, target_z),
+                &excluded_blocks, // Now we can pass a direct reference to the Vec
+            )
+            .map_err(|e| JsValue::from_str(&format!("Failed to copy region: {}", e)))
     }
-
-
 
     pub fn set_block_with_properties(
         &mut self,
@@ -277,24 +306,24 @@ impl SchematicWrapper {
         let mut props = HashMap::new();
 
         if !properties.is_undefined() && !properties.is_null() {
-            let obj: Object = properties.clone().dyn_into().map_err(|_| {
-                JsValue::from_str("Properties should be an object")
-            })?;
+            let obj: Object = properties
+                .clone()
+                .dyn_into()
+                .map_err(|_| JsValue::from_str("Properties should be an object"))?;
 
             let keys = js_sys::Object::keys(&obj);
             for i in 0..keys.length() {
                 let key = keys.get(i);
-                let key_str = key.as_string().ok_or_else(|| {
-                    JsValue::from_str("Property keys should be strings")
-                })?;
+                let key_str = key
+                    .as_string()
+                    .ok_or_else(|| JsValue::from_str("Property keys should be strings"))?;
 
-                let value = Reflect::get(&obj, &key).map_err(|_| {
-                    JsValue::from_str("Error getting property value")
-                })?;
+                let value = Reflect::get(&obj, &key)
+                    .map_err(|_| JsValue::from_str("Error getting property value"))?;
 
-                let value_str = value.as_string().ok_or_else(|| {
-                    JsValue::from_str("Property values should be strings")
-                })?;
+                let value_str = value
+                    .as_string()
+                    .ok_or_else(|| JsValue::from_str("Property values should be strings"))?;
 
                 props.insert(key_str, value_str);
             }
@@ -312,9 +341,10 @@ impl SchematicWrapper {
         Ok(())
     }
 
-
     pub fn get_block(&self, x: i32, y: i32, z: i32) -> Option<String> {
-        self.0.get_block(x, y, z).map(|block_state| block_state.name.clone())
+        self.0
+            .get_block(x, y, z)
+            .map(|block_state| block_state.name.clone())
     }
 
     pub fn get_block_with_properties(&self, x: i32, y: i32, z: i32) -> Option<BlockStateWrapper> {
@@ -367,18 +397,21 @@ impl SchematicWrapper {
         js_block_entities.into()
     }
 
-
     pub fn print_schematic(&self) -> String {
         print_schematic(&self.0)
     }
 
     pub fn debug_info(&self) -> String {
-        format!("Schematic name: {}, Regions: {}",
-                self.0.metadata.name.as_ref().unwrap_or(&"Unnamed".to_string()),
-                self.0.other_regions.len() + 1
+        format!(
+            "Schematic name: {}, Regions: {}",
+            self.0
+                .metadata
+                .name
+                .as_ref()
+                .unwrap_or(&"Unnamed".to_string()),
+            self.0.other_regions.len() + 1
         )
     }
-
 
     // Add these methods back
     pub fn get_dimensions(&self) -> Vec<i32> {
@@ -399,16 +432,23 @@ impl SchematicWrapper {
     }
 
     pub fn blocks(&self) -> Array {
-        self.0.iter_blocks()
+        self.0
+            .iter_blocks()
             .map(|(pos, block)| {
                 let obj = js_sys::Object::new();
                 js_sys::Reflect::set(&obj, &"x".into(), &pos.x.into()).unwrap();
                 js_sys::Reflect::set(&obj, &"y".into(), &pos.y.into()).unwrap();
                 js_sys::Reflect::set(&obj, &"z".into(), &pos.z.into()).unwrap();
-                js_sys::Reflect::set(&obj, &"name".into(), &JsValue::from_str(&block.name)).unwrap();
+                js_sys::Reflect::set(&obj, &"name".into(), &JsValue::from_str(&block.name))
+                    .unwrap();
                 let properties = js_sys::Object::new();
                 for (key, value) in &block.properties {
-                    js_sys::Reflect::set(&properties, &JsValue::from_str(key), &JsValue::from_str(value)).unwrap();
+                    js_sys::Reflect::set(
+                        &properties,
+                        &JsValue::from_str(key),
+                        &JsValue::from_str(value),
+                    )
+                    .unwrap();
                 }
                 js_sys::Reflect::set(&obj, &"properties".into(), &properties).unwrap();
                 obj
@@ -417,24 +457,38 @@ impl SchematicWrapper {
     }
 
     pub fn chunks(&self, chunk_width: i32, chunk_height: i32, chunk_length: i32) -> Array {
-        self.0.iter_chunks(chunk_width, chunk_height, chunk_length, Some(ChunkLoadingStrategy::BottomUp))
+        self.0
+            .iter_chunks(
+                chunk_width,
+                chunk_height,
+                chunk_length,
+                Some(ChunkLoadingStrategy::BottomUp),
+            )
             .map(|chunk| {
                 let chunk_obj = js_sys::Object::new();
                 js_sys::Reflect::set(&chunk_obj, &"chunk_x".into(), &chunk.chunk_x.into()).unwrap();
                 js_sys::Reflect::set(&chunk_obj, &"chunk_y".into(), &chunk.chunk_y.into()).unwrap();
                 js_sys::Reflect::set(&chunk_obj, &"chunk_z".into(), &chunk.chunk_z.into()).unwrap();
 
-                let blocks_array = chunk.positions.into_iter()
+                let blocks_array = chunk
+                    .positions
+                    .into_iter()
                     .map(|pos| {
                         let block = self.0.get_block(pos.x, pos.y, pos.z).unwrap();
                         let obj = js_sys::Object::new();
                         js_sys::Reflect::set(&obj, &"x".into(), &pos.x.into()).unwrap();
                         js_sys::Reflect::set(&obj, &"y".into(), &pos.y.into()).unwrap();
                         js_sys::Reflect::set(&obj, &"z".into(), &pos.z.into()).unwrap();
-                        js_sys::Reflect::set(&obj, &"name".into(), &JsValue::from_str(&block.name)).unwrap();
+                        js_sys::Reflect::set(&obj, &"name".into(), &JsValue::from_str(&block.name))
+                            .unwrap();
                         let properties = js_sys::Object::new();
                         for (key, value) in &block.properties {
-                            js_sys::Reflect::set(&properties, &JsValue::from_str(key), &JsValue::from_str(value)).unwrap();
+                            js_sys::Reflect::set(
+                                &properties,
+                                &JsValue::from_str(key),
+                                &JsValue::from_str(value),
+                            )
+                            .unwrap();
                         }
                         js_sys::Reflect::set(&obj, &"properties".into(), &properties).unwrap();
                         obj
@@ -455,37 +509,48 @@ impl SchematicWrapper {
         strategy: &str,
         camera_x: f32,
         camera_y: f32,
-        camera_z: f32
+        camera_z: f32,
     ) -> Array {
         // Map the string strategy to enum
         let strategy_enum = match strategy {
-            "distance_to_camera" => Some(ChunkLoadingStrategy::DistanceToCamera(camera_x, camera_y, camera_z)),
+            "distance_to_camera" => Some(ChunkLoadingStrategy::DistanceToCamera(
+                camera_x, camera_y, camera_z,
+            )),
             "top_down" => Some(ChunkLoadingStrategy::TopDown),
             "bottom_up" => Some(ChunkLoadingStrategy::BottomUp),
             "center_outward" => Some(ChunkLoadingStrategy::CenterOutward),
             "random" => Some(ChunkLoadingStrategy::Random),
-            _ => None // Default
+            _ => None, // Default
         };
 
         // Use the enhanced iter_chunks method
-        self.0.iter_chunks(chunk_width, chunk_height, chunk_length, strategy_enum)
+        self.0
+            .iter_chunks(chunk_width, chunk_height, chunk_length, strategy_enum)
             .map(|chunk| {
                 let chunk_obj = js_sys::Object::new();
                 js_sys::Reflect::set(&chunk_obj, &"chunk_x".into(), &chunk.chunk_x.into()).unwrap();
                 js_sys::Reflect::set(&chunk_obj, &"chunk_y".into(), &chunk.chunk_y.into()).unwrap();
                 js_sys::Reflect::set(&chunk_obj, &"chunk_z".into(), &chunk.chunk_z.into()).unwrap();
 
-                let blocks_array = chunk.positions.into_iter()
+                let blocks_array = chunk
+                    .positions
+                    .into_iter()
                     .map(|pos| {
                         let block = self.0.get_block(pos.x, pos.y, pos.z).unwrap();
                         let obj = js_sys::Object::new();
                         js_sys::Reflect::set(&obj, &"x".into(), &pos.x.into()).unwrap();
                         js_sys::Reflect::set(&obj, &"y".into(), &pos.y.into()).unwrap();
                         js_sys::Reflect::set(&obj, &"z".into(), &pos.z.into()).unwrap();
-                        js_sys::Reflect::set(&obj, &"name".into(), &JsValue::from_str(&block.name)).unwrap();
+                        js_sys::Reflect::set(&obj, &"name".into(), &JsValue::from_str(&block.name))
+                            .unwrap();
                         let properties = js_sys::Object::new();
                         for (key, value) in &block.properties {
-                            js_sys::Reflect::set(&properties, &JsValue::from_str(key), &JsValue::from_str(value)).unwrap();
+                            js_sys::Reflect::set(
+                                &properties,
+                                &JsValue::from_str(key),
+                                &JsValue::from_str(value),
+                            )
+                            .unwrap();
                         }
                         js_sys::Reflect::set(&obj, &"properties".into(), &properties).unwrap();
                         obj
@@ -498,23 +563,41 @@ impl SchematicWrapper {
             .collect::<Array>()
     }
 
-
-    pub fn get_chunk_blocks(&self, offset_x: i32, offset_y: i32, offset_z: i32, width: i32, height: i32, length: i32) -> js_sys::Array {
-        let blocks = self.0.iter_blocks()
+    pub fn get_chunk_blocks(
+        &self,
+        offset_x: i32,
+        offset_y: i32,
+        offset_z: i32,
+        width: i32,
+        height: i32,
+        length: i32,
+    ) -> js_sys::Array {
+        let blocks = self
+            .0
+            .iter_blocks()
             .filter(|(pos, _)| {
-                pos.x >= offset_x && pos.x < offset_x + width &&
-                    pos.y >= offset_y && pos.y < offset_y + height &&
-                    pos.z >= offset_z && pos.z < offset_z + length
+                pos.x >= offset_x
+                    && pos.x < offset_x + width
+                    && pos.y >= offset_y
+                    && pos.y < offset_y + height
+                    && pos.z >= offset_z
+                    && pos.z < offset_z + length
             })
             .map(|(pos, block)| {
                 let obj = js_sys::Object::new();
                 js_sys::Reflect::set(&obj, &"x".into(), &pos.x.into()).unwrap();
                 js_sys::Reflect::set(&obj, &"y".into(), &pos.y.into()).unwrap();
                 js_sys::Reflect::set(&obj, &"z".into(), &pos.z.into()).unwrap();
-                js_sys::Reflect::set(&obj, &"name".into(), &JsValue::from_str(&block.name)).unwrap();
+                js_sys::Reflect::set(&obj, &"name".into(), &JsValue::from_str(&block.name))
+                    .unwrap();
                 let properties = js_sys::Object::new();
                 for (key, value) in &block.properties {
-                    js_sys::Reflect::set(&properties, &JsValue::from_str(key), &JsValue::from_str(value)).unwrap();
+                    js_sys::Reflect::set(
+                        &properties,
+                        &JsValue::from_str(key),
+                        &JsValue::from_str(value),
+                    )
+                    .unwrap();
                 }
                 js_sys::Reflect::set(&obj, &"properties".into(), &properties).unwrap();
                 obj
@@ -523,7 +606,6 @@ impl SchematicWrapper {
 
         blocks
     }
-
 
     /// Get all palettes once - eliminates repeated string transfers
     /// Returns: { default: [BlockState], regions: { regionName: [BlockState] } }
@@ -536,11 +618,21 @@ impl SchematicWrapper {
         let default_palette = Array::new();
         for block_state in &all_palettes.default_palette {
             let block_obj = Object::new();
-            Reflect::set(&block_obj, &"name".into(), &JsValue::from_str(&block_state.name)).unwrap();
+            Reflect::set(
+                &block_obj,
+                &"name".into(),
+                &JsValue::from_str(&block_state.name),
+            )
+            .unwrap();
 
             let properties = Object::new();
             for (key, value) in &block_state.properties {
-                Reflect::set(&properties, &JsValue::from_str(key), &JsValue::from_str(value)).unwrap();
+                Reflect::set(
+                    &properties,
+                    &JsValue::from_str(key),
+                    &JsValue::from_str(value),
+                )
+                .unwrap();
             }
             Reflect::set(&block_obj, &"properties".into(), &properties).unwrap();
             default_palette.push(&block_obj);
@@ -553,16 +645,31 @@ impl SchematicWrapper {
             let region_palette = Array::new();
             for block_state in palette {
                 let block_obj = Object::new();
-                Reflect::set(&block_obj, &"name".into(), &JsValue::from_str(&block_state.name)).unwrap();
+                Reflect::set(
+                    &block_obj,
+                    &"name".into(),
+                    &JsValue::from_str(&block_state.name),
+                )
+                .unwrap();
 
                 let properties = Object::new();
                 for (key, value) in &block_state.properties {
-                    Reflect::set(&properties, &JsValue::from_str(key), &JsValue::from_str(value)).unwrap();
+                    Reflect::set(
+                        &properties,
+                        &JsValue::from_str(key),
+                        &JsValue::from_str(value),
+                    )
+                    .unwrap();
                 }
                 Reflect::set(&block_obj, &"properties".into(), &properties).unwrap();
                 region_palette.push(&block_obj);
             }
-            Reflect::set(&regions_obj, &JsValue::from_str(region_name), &region_palette).unwrap();
+            Reflect::set(
+                &regions_obj,
+                &JsValue::from_str(region_name),
+                &region_palette,
+            )
+            .unwrap();
         }
         Reflect::set(&js_object, &"regions".into(), &regions_obj).unwrap();
 
@@ -571,13 +678,14 @@ impl SchematicWrapper {
 
     /// Optimized chunks iterator that returns palette indices instead of full block data
     /// Returns array of: { chunk_x, chunk_y, chunk_z, blocks: [[x,y,z,palette_index],...] }
-    pub fn chunks_indices(
-        &self,
-        chunk_width: i32,
-        chunk_height: i32,
-        chunk_length: i32
-    ) -> Array {
-        self.0.iter_chunks_indices(chunk_width, chunk_height, chunk_length, Some(ChunkLoadingStrategy::BottomUp))
+    pub fn chunks_indices(&self, chunk_width: i32, chunk_height: i32, chunk_length: i32) -> Array {
+        self.0
+            .iter_chunks_indices(
+                chunk_width,
+                chunk_height,
+                chunk_length,
+                Some(ChunkLoadingStrategy::BottomUp),
+            )
             .map(|chunk| {
                 let chunk_obj = Object::new();
                 Reflect::set(&chunk_obj, &"chunk_x".into(), &chunk.chunk_x.into()).unwrap();
@@ -610,18 +718,21 @@ impl SchematicWrapper {
         strategy: &str,
         camera_x: f32,
         camera_y: f32,
-        camera_z: f32
+        camera_z: f32,
     ) -> Array {
         let strategy_enum = match strategy {
-            "distance_to_camera" => Some(ChunkLoadingStrategy::DistanceToCamera(camera_x, camera_y, camera_z)),
+            "distance_to_camera" => Some(ChunkLoadingStrategy::DistanceToCamera(
+                camera_x, camera_y, camera_z,
+            )),
             "top_down" => Some(ChunkLoadingStrategy::TopDown),
             "bottom_up" => Some(ChunkLoadingStrategy::BottomUp),
             "center_outward" => Some(ChunkLoadingStrategy::CenterOutward),
             "random" => Some(ChunkLoadingStrategy::Random),
-            _ => None
+            _ => None,
         };
 
-        self.0.iter_chunks_indices(chunk_width, chunk_height, chunk_length, strategy_enum)
+        self.0
+            .iter_chunks_indices(chunk_width, chunk_height, chunk_length, strategy_enum)
             .map(|chunk| {
                 let chunk_obj = Object::new();
                 Reflect::set(&chunk_obj, &"chunk_x".into(), &chunk.chunk_x.into()).unwrap();
@@ -653,9 +764,11 @@ impl SchematicWrapper {
         offset_z: i32,
         width: i32,
         height: i32,
-        length: i32
+        length: i32,
     ) -> Array {
-        let blocks = self.0.get_chunk_blocks_indices(offset_x, offset_y, offset_z, width, height, length);
+        let blocks = self
+            .0
+            .get_chunk_blocks_indices(offset_x, offset_y, offset_z, width, height, length);
 
         let blocks_array = Array::new();
         for (pos, palette_index) in blocks {
@@ -673,7 +786,8 @@ impl SchematicWrapper {
     /// All blocks as palette indices - for when you need everything at once but efficiently
     /// Returns array of [x, y, z, palette_index]
     pub fn blocks_indices(&self) -> Array {
-        self.0.iter_blocks_indices()
+        self.0
+            .iter_blocks_indices()
             .map(|(pos, palette_index)| {
                 let block_data = Array::new();
                 block_data.push(&pos.x.into());
@@ -685,20 +799,42 @@ impl SchematicWrapper {
             .collect::<Array>()
     }
 
-
-
     /// Get optimization stats
     pub fn get_optimization_info(&self) -> JsValue {
         let default_region = &self.0.default_region;
         let total_blocks = default_region.blocks.len();
-        let non_air_blocks = default_region.blocks.iter().filter(|&&idx| idx != 0).count();
+        let non_air_blocks = default_region
+            .blocks
+            .iter()
+            .filter(|&&idx| idx != 0)
+            .count();
         let palette_size = default_region.palette.len();
 
         let info_obj = Object::new();
-        Reflect::set(&info_obj, &"total_blocks".into(), &(total_blocks as u32).into()).unwrap();
-        Reflect::set(&info_obj, &"non_air_blocks".into(), &(non_air_blocks as u32).into()).unwrap();
-        Reflect::set(&info_obj, &"palette_size".into(), &(palette_size as u32).into()).unwrap();
-        Reflect::set(&info_obj, &"compression_ratio".into(), &((total_blocks as f64) / (palette_size as f64)).into()).unwrap();
+        Reflect::set(
+            &info_obj,
+            &"total_blocks".into(),
+            &(total_blocks as u32).into(),
+        )
+        .unwrap();
+        Reflect::set(
+            &info_obj,
+            &"non_air_blocks".into(),
+            &(non_air_blocks as u32).into(),
+        )
+        .unwrap();
+        Reflect::set(
+            &info_obj,
+            &"palette_size".into(),
+            &(palette_size as u32).into(),
+        )
+        .unwrap();
+        Reflect::set(
+            &info_obj,
+            &"compression_ratio".into(),
+            &((total_blocks as f64) / (palette_size as f64)).into(),
+        )
+        .unwrap();
 
         info_obj.into()
     }
@@ -711,9 +847,10 @@ impl SchematicWrapper {
         strategy: &str,
         camera_x: f32,
         camera_y: f32,
-        camera_z: f32
+        camera_z: f32,
     ) -> LazyChunkIterator {
-        let mut chunk_coords = self.calculate_chunk_coordinates(chunk_width, chunk_height, chunk_length);
+        let mut chunk_coords =
+            self.calculate_chunk_coordinates(chunk_width, chunk_height, chunk_length);
 
         // Sort coordinates by strategy
         match strategy {
@@ -727,10 +864,16 @@ impl SchematicWrapper {
                     let b_center_y = (b.1 * chunk_height) as f32 + (chunk_height as f32 / 2.0);
                     let b_center_z = (b.2 * chunk_length) as f32 + (chunk_length as f32 / 2.0);
 
-                    let a_dist = (a_center_x - camera_x).powi(2) + (a_center_y - camera_y).powi(2) + (a_center_z - camera_z).powi(2);
-                    let b_dist = (b_center_x - camera_x).powi(2) + (b_center_y - camera_y).powi(2) + (b_center_z - camera_z).powi(2);
+                    let a_dist = (a_center_x - camera_x).powi(2)
+                        + (a_center_y - camera_y).powi(2)
+                        + (a_center_z - camera_z).powi(2);
+                    let b_dist = (b_center_x - camera_x).powi(2)
+                        + (b_center_y - camera_y).powi(2)
+                        + (b_center_z - camera_z).powi(2);
 
-                    a_dist.partial_cmp(&b_dist).unwrap_or(std::cmp::Ordering::Equal)
+                    a_dist
+                        .partial_cmp(&b_dist)
+                        .unwrap_or(std::cmp::Ordering::Equal)
                 });
             }
             "bottom_up" => {
@@ -749,7 +892,12 @@ impl SchematicWrapper {
         }
     }
 
-    fn calculate_chunk_coordinates(&self, chunk_width: i32, chunk_height: i32, chunk_length: i32) -> Vec<(i32, i32, i32)> {
+    fn calculate_chunk_coordinates(
+        &self,
+        chunk_width: i32,
+        chunk_height: i32,
+        chunk_length: i32,
+    ) -> Vec<(i32, i32, i32)> {
         use std::collections::HashSet;
         let mut chunk_coords = HashSet::new();
 
@@ -793,8 +941,12 @@ impl LazyChunkIterator {
 
         // Generate this chunk's data on-demand (only in memory temporarily)
         let blocks = self.schematic_wrapper.get_chunk_blocks_indices(
-            min_x, min_y, min_z,
-            self.chunk_width, self.chunk_height, self.chunk_length
+            min_x,
+            min_y,
+            min_z,
+            self.chunk_width,
+            self.chunk_height,
+            self.chunk_length,
         );
 
         // Create result object
@@ -802,8 +954,18 @@ impl LazyChunkIterator {
         Reflect::set(&chunk_obj, &"chunk_x".into(), &chunk_x.into()).unwrap();
         Reflect::set(&chunk_obj, &"chunk_y".into(), &chunk_y.into()).unwrap();
         Reflect::set(&chunk_obj, &"chunk_z".into(), &chunk_z.into()).unwrap();
-        Reflect::set(&chunk_obj, &"index".into(), &(self.current_index - 1).into()).unwrap();
-        Reflect::set(&chunk_obj, &"total".into(), &self.current_chunk_coords.len().into()).unwrap();
+        Reflect::set(
+            &chunk_obj,
+            &"index".into(),
+            &(self.current_index - 1).into(),
+        )
+        .unwrap();
+        Reflect::set(
+            &chunk_obj,
+            &"total".into(),
+            &self.current_chunk_coords.len().into(),
+        )
+        .unwrap();
 
         // Blocks are already in the right format: [[x,y,z,palette_index], ...]
         Reflect::set(&chunk_obj, &"blocks".into(), &blocks).unwrap();
@@ -832,7 +994,6 @@ impl LazyChunkIterator {
     }
 }
 
-
 #[wasm_bindgen]
 impl BlockStateWrapper {
     #[wasm_bindgen(constructor)]
@@ -841,7 +1002,10 @@ impl BlockStateWrapper {
     }
 
     pub fn with_property(&mut self, key: &str, value: &str) {
-        self.0 = self.0.clone().with_property(key.to_string(), value.to_string());
+        self.0 = self
+            .0
+            .clone()
+            .with_property(key.to_string(), value.to_string());
     }
 
     pub fn name(&self) -> String {
@@ -858,14 +1022,116 @@ impl BlockStateWrapper {
     }
 }
 
-
 // Standalone functions
 #[wasm_bindgen]
 pub fn debug_schematic(schematic: &SchematicWrapper) -> String {
-    format!("{}\n{}", schematic.debug_info(), print_schematic(&schematic.0))
+    format!(
+        "{}\n{}",
+        schematic.debug_info(),
+        print_schematic(&schematic.0)
+    )
 }
 
 #[wasm_bindgen]
 pub fn debug_json_schematic(schematic: &SchematicWrapper) -> String {
-    format!("{}\n{}", schematic.debug_info(), print_json_schematic(&schematic.0))
+    format!(
+        "{}\n{}",
+        schematic.debug_info(),
+        print_json_schematic(&schematic.0)
+    )
+}
+
+// ============================================================================
+// SIMULATION (MCHPRS) BINDINGS
+// ============================================================================
+
+#[cfg(feature = "simulation")]
+use crate::simulation::{generate_truth_table, BlockPos, MchprsWorld};
+
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+pub struct MchprsWorldWrapper {
+    world: MchprsWorld,
+}
+
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+impl SchematicWrapper {
+    /// Creates a simulation world for this schematic
+    ///
+    /// This allows you to simulate redstone circuits and interact with them.
+    pub fn create_simulation_world(&self) -> Result<MchprsWorldWrapper, JsValue> {
+        MchprsWorldWrapper::new(self)
+    }
+}
+
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+impl MchprsWorldWrapper {
+    #[wasm_bindgen(constructor)]
+    pub fn new(schematic: &SchematicWrapper) -> Result<MchprsWorldWrapper, JsValue> {
+        let world = MchprsWorld::new(schematic.0.clone())
+            .map_err(|e| JsValue::from_str(&format!("Failed to create MchprsWorld: {}", e)))?;
+
+        Ok(MchprsWorldWrapper { world })
+    }
+
+    /// Simulates a right-click on a block (typically a lever)
+    pub fn on_use_block(&mut self, x: i32, y: i32, z: i32) {
+        self.world.on_use_block(BlockPos::new(x, y, z));
+    }
+
+    /// Advances the simulation by the specified number of ticks
+    pub fn tick(&mut self, number_of_ticks: u32) {
+        self.world.tick(number_of_ticks);
+    }
+
+    /// Flushes pending changes from the compiler to the world
+    pub fn flush(&mut self) {
+        self.world.flush();
+    }
+
+    /// Checks if a redstone lamp is lit at the given position
+    pub fn is_lit(&self, x: i32, y: i32, z: i32) -> bool {
+        self.world.is_lit(BlockPos::new(x, y, z))
+    }
+
+    /// Gets the power state of a lever
+    pub fn get_lever_power(&self, x: i32, y: i32, z: i32) -> bool {
+        self.world.get_lever_power(BlockPos::new(x, y, z))
+    }
+
+    /// Gets the redstone power level at a position
+    pub fn get_redstone_power(&self, x: i32, y: i32, z: i32) -> u8 {
+        self.world.get_redstone_power(BlockPos::new(x, y, z))
+    }
+
+    /// Generates a truth table for the circuit
+    ///
+    /// Returns an array of objects with keys like "Input 0", "Output 0", etc.
+    pub fn get_truth_table(&self) -> JsValue {
+        let truth_table = generate_truth_table(&self.world.schematic);
+
+        // Create a JavaScript array to hold the results
+        let result = js_sys::Array::new();
+
+        // Convert each row in the truth table to a JavaScript object
+        for row in truth_table {
+            let row_obj = js_sys::Object::new();
+
+            // Add each entry in the row to the object
+            for (key, value) in row {
+                js_sys::Reflect::set(
+                    &row_obj,
+                    &JsValue::from_str(&key),
+                    &JsValue::from_bool(value),
+                )
+                .unwrap();
+            }
+
+            result.push(&row_obj);
+        }
+
+        result.into()
+    }
 }

@@ -1,14 +1,8 @@
+use nucleation::{litematic, schematic, BlockState, UniversalSchematic};
 use std::fs;
 use std::path::Path;
-use nucleation::{BlockState, litematic, schematic, UniversalSchematic};
-
-
-
-
-
 
 fn litematic_to_schem_conversion(name: &str) {
-
     // Path to the sample .litematic file
     let input_path_str = format!("tests/samples/{}.litematic", name);
     let litematic_path = Path::new(&input_path_str);
@@ -17,10 +11,12 @@ fn litematic_to_schem_conversion(name: &str) {
     assert!(litematic_path.exists(), "Sample .litematic file not found");
 
     // Read the .litematic file
-    let litematic_data = fs::read(litematic_path).expect(format!("Failed to read {}", input_path_str).as_str());
+    let litematic_data =
+        fs::read(litematic_path).expect(format!("Failed to read {}", input_path_str).as_str());
 
     // Parse the .litematic data into a UniversalSchematic
-    let mut schematic = litematic::from_litematic(&litematic_data).expect("Failed to parse litematic");
+    let mut schematic =
+        litematic::from_litematic(&litematic_data).expect("Failed to parse litematic");
 
     // let region_blocks = schematic.get_region_from_index(0).unwrap().blocks.clone();
 
@@ -46,11 +42,8 @@ fn litematic_to_schem_conversion(name: &str) {
     // let json = print_json_schematic(&schematic);
     // println!("{}", json);
 
-
-
     // Convert the UniversalSchematic to .schem format
     let schem_data = schematic::to_schematic(&schematic).expect("Failed to convert to schem");
-
 
     // Save the .schem file
     let output_schem_path = format!("tests/output/{}.schem", name);
@@ -58,23 +51,21 @@ fn litematic_to_schem_conversion(name: &str) {
     fs::write(schem_path, &schem_data).expect("Failed to write schem file");
 
     // Convert the UniversalSchematic back to .litematic format
-    let litematic_data = litematic::to_litematic(&schematic).expect("Failed to convert to litematic");
+    let litematic_data =
+        litematic::to_litematic(&schematic).expect("Failed to convert to litematic");
 
     // Save the .litematic file
     let output_litematic_path = format!("tests/output/{}.litematic", name);
     let litematic_path = Path::new(&output_litematic_path);
     fs::write(litematic_path, &litematic_data).expect("Failed to write litematic file");
 
-
-
     // Optionally, read back the .schem file and compare
     let read_back_data = fs::read(schem_path).expect("Failed to read back schem file");
-    let read_back_schematic = schematic::from_schematic(&read_back_data).expect("Failed to parse schem");
+    let read_back_schematic =
+        schematic::from_schematic(&read_back_data).expect("Failed to parse schem");
 
     // Compare original and converted schematics
     assert_eq!(schematic.metadata.name, read_back_schematic.metadata.name);
-
-
 
     // Clean up the generated file
     //fs::remove_file(schem_path).expect("Failed to remove converted schem file");
@@ -82,9 +73,7 @@ fn litematic_to_schem_conversion(name: &str) {
     println!("Successfully converted sample.litematic to .schem format and verified the contents.");
 }
 
-
 fn schema_to_litematic_conversion(name: &str) {
-
     // Path to the sample .schem file
     let input_path_str = format!("tests/samples/{}.schem", name);
     let schem_path = Path::new(&input_path_str);
@@ -93,15 +82,16 @@ fn schema_to_litematic_conversion(name: &str) {
     assert!(schem_path.exists(), "Sample .schem file not found");
 
     // Read the .schem file
-    let schem_data = fs::read(schem_path).expect(format!("Failed to read {}", input_path_str).as_str());
+    let schem_data =
+        fs::read(schem_path).expect(format!("Failed to read {}", input_path_str).as_str());
 
     // Parse the .schem data into a UniversalSchematic
     let schematic = schematic::from_schematic(&schem_data).expect("Failed to parse schem");
     let block_entities = schematic.get_block_entities_as_list();
     println!("{:?}", block_entities);
     // Convert the UniversalSchematic to .litematic format
-    let litematic_data = litematic::to_litematic(&schematic).expect("Failed to convert to litematic");
-
+    let litematic_data =
+        litematic::to_litematic(&schematic).expect("Failed to convert to litematic");
 
     // Save the .litematic file
     let output_litematic_path = format!("tests/output/{}.litematic", name);
@@ -109,12 +99,12 @@ fn schema_to_litematic_conversion(name: &str) {
     fs::write(litematic_path, &litematic_data).expect("Failed to write litematic file");
 }
 
-
 #[test]
-fn load_evaluator_schematic(){
+fn load_evaluator_schematic() {
     let input_path_str = format!("tests/samples/Evaluator.schem");
     let schem_path = Path::new(&input_path_str);
-    let schem_data = fs::read(schem_path).expect(format!("Failed to read {}", input_path_str).as_str());
+    let schem_data =
+        fs::read(schem_path).expect(format!("Failed to read {}", input_path_str).as_str());
     let schematic = schematic::from_schematic(&schem_data).expect("Failed to parse schem");
     let block_entities = schematic.get_block_entities_as_list();
     let entities = schematic.get_entities_as_list();
@@ -122,35 +112,34 @@ fn load_evaluator_schematic(){
     println!("{:?}", entities);
 }
 
-
 #[test]
 fn test_cube_schematic() {
     let input_path_str = format!("tests/samples/test_cube.schem");
 
     let schem_path = Path::new(&input_path_str);
-    let schem_data = fs::read(schem_path).expect(format!("Failed to read {}", input_path_str).as_str());
+    let schem_data =
+        fs::read(schem_path).expect(format!("Failed to read {}", input_path_str).as_str());
     let schematic = schematic::from_schematic(&schem_data).expect("Failed to parse schem");
 
     //save the schematic as litematic
-    let litematic_data = litematic::to_litematic(&schematic).expect("Failed to convert to litematic");
+    let litematic_data =
+        litematic::to_litematic(&schematic).expect("Failed to convert to litematic");
     let output_litematic_path = format!("tests/output/test_cube.litematic");
     let litematic_path = Path::new(&output_litematic_path);
-    fs::write
-        (litematic_path, &litematic_data).expect("Failed to write litematic file");
+    fs::write(litematic_path, &litematic_data).expect("Failed to write litematic file");
 }
-
 
 // #[test]
 fn time_load_large_schematic() {
     let input_path_str = format!("tests/samples/large_schematic.schem");
     let schem_path = Path::new(&input_path_str);
-    let schem_data = fs::read(schem_path).expect(format!("Failed to read {}", input_path_str).as_str());
+    let schem_data =
+        fs::read(schem_path).expect(format!("Failed to read {}", input_path_str).as_str());
     let start_time = std::time::Instant::now();
     let _schematic = schematic::from_schematic(&schem_data).expect("Failed to parse schem");
     let elapsed_time = start_time.elapsed();
     println!("Time taken to load large schematic: {:?}", elapsed_time);
 }
-
 
 #[test]
 fn test_expand_schematic() {
@@ -162,7 +151,12 @@ fn test_expand_schematic() {
     println!("Initial bbox: {:?}", schematic.get_bounding_box());
 
     // Set a block
-    let result = schematic.set_block(4, 4, 4, BlockState::new("minecraft:sea_lantern".to_string()));
+    let result = schematic.set_block(
+        4,
+        4,
+        4,
+        BlockState::new("minecraft:sea_lantern".to_string()),
+    );
     println!("Block set result: {}", result);
 
     // Print region info
@@ -184,7 +178,6 @@ fn test_expand_schematic() {
     assert_eq!(schematic.get_dimensions(), (1, 1, 1));
 }
 
-
 // convert litematic-rose-farm from samples to schem
 #[test]
 fn test_litematic_to_schem_conversion() {
@@ -199,10 +192,6 @@ fn test_litematic_to_schem_conversion() {
     // fs::remove_file("tests/output/litematic-rose-farm.schem").expect("Failed to remove converted schem file");
     println!("Successfully converted litematic-rose-farm.litematic to .schem format and verified the contents.");
 }
-    
-
-
-
 
 struct TestFiles<'a> {
     extension: &'a str,
@@ -216,7 +205,9 @@ impl<'a> Iterator for TestFiles<'a> {
         while let Some(entry) = self.reader.next() {
             if let Ok(entry) = entry {
                 let path = entry.path();
-                if path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some(self.extension) {
+                if path.is_file()
+                    && path.extension().and_then(|ext| ext.to_str()) == Some(self.extension)
+                {
                     if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                         return Some(stem.to_string());
                     }
@@ -229,5 +220,8 @@ impl<'a> Iterator for TestFiles<'a> {
 
 fn list_test_file(extension: &str) -> TestFiles {
     const DIR_PATH: &str = "./tests/samples";
-    TestFiles { extension, reader: fs::read_dir(DIR_PATH).unwrap() }
+    TestFiles {
+        extension,
+        reader: fs::read_dir(DIR_PATH).unwrap(),
+    }
 }

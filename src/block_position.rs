@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
@@ -22,7 +22,6 @@ impl BlockPosition {
 
 // Core implementation available to all users of the library
 impl BlockPosition {
-
     #[cfg(not(feature = "wasm"))]
     pub fn new(x: i32, y: i32, z: i32) -> Self {
         BlockPosition { x, y, z }

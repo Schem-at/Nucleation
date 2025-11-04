@@ -14,7 +14,7 @@ fi
 
 # Run the WASM tests with wasm-pack (this is the preferred method)
 echo "🚀 Running WASM bindgen tests with wasm-pack..."
-wasm-pack test --node --features wasm
+wasm-pack test --node --features wasm,simulation
 
 # Run Node.js integration test if the build exists
 if [ -d "pkg" ]; then

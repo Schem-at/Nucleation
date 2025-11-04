@@ -1,12 +1,15 @@
-use crate::{UniversalSchematic, BlockState};
 use crate::metadata::Metadata;
 use crate::region::Region;
+use crate::{BlockState, UniversalSchematic};
 
 impl std::fmt::Debug for UniversalSchematic {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("UniversalSchematic")
             .field("metadata", &self.metadata)
-            .field("regions", &self.get_all_regions().keys().collect::<Vec<_>>())
+            .field(
+                "regions",
+                &self.get_all_regions().keys().collect::<Vec<_>>(),
+            )
             .finish()
     }
 }
@@ -23,7 +26,9 @@ pub fn format_schematic(schematic: &UniversalSchematic) -> String {
 }
 
 pub fn get_schematic_json(schematic: &UniversalSchematic) -> String {
-    schematic.get_json_string().unwrap_or_else(|e| format!("Failed to serialize: {}", e))
+    schematic
+        .get_json_string()
+        .unwrap_or_else(|e| format!("Failed to serialize: {}", e))
 }
 
 pub fn format_palette(palette: &Vec<BlockState>) -> String {
@@ -44,7 +49,10 @@ pub fn format_region(name: &str, region: &Region) -> String {
         let block_palette_index = region.blocks[i];
         let block_position = region.index_to_coords(i);
         let block_state = region.palette.get(block_palette_index as usize).unwrap();
-        output.push_str(&format!("      {} @ {:?}: {:?}\n", block_palette_index, block_position, block_state));
+        output.push_str(&format!(
+            "      {} @ {:?}: {:?}\n",
+            block_palette_index, block_position, block_state
+        ));
     }
     output
 }

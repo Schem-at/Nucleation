@@ -4,14 +4,13 @@
 #![cfg(feature = "php")]
 #![cfg_attr(windows, feature(abi_vectorcall))]
 
+use crate::{
+    formats::{litematic, schematic},
+    print_utils::{format_json_schematic, format_schematic},
+    BlockState, UniversalSchematic,
+};
 use ext_php_rs::prelude::*;
 use std::collections::HashMap;
-use crate::{
-    UniversalSchematic,
-    BlockState,
-    formats::{litematic, schematic},
-    print_utils::{format_schematic, format_json_schematic},
-};
 
 /// Simple test function to verify the extension works
 #[php_function]
@@ -24,7 +23,10 @@ pub fn nucleation_hello() -> String {
 pub fn nucleation_version() -> HashMap<String, String> {
     let mut info = HashMap::new();
     info.insert("version".to_string(), env!("CARGO_PKG_VERSION").to_string());
-    info.insert("description".to_string(), env!("CARGO_PKG_DESCRIPTION").to_string());
+    info.insert(
+        "description".to_string(),
+        env!("CARGO_PKG_DESCRIPTION").to_string(),
+    );
     info.insert("authors".to_string(), env!("CARGO_PKG_AUTHORS").to_string());
     info.insert("features".to_string(), "php".to_string());
     info
@@ -62,15 +64,15 @@ pub fn nucleation_convert_format(input_data: String, output_format: String) -> P
 
     // Convert to target format
     let output_bytes = match output_format.to_lowercase().as_str() {
-        "litematic" => {
-            litematic::to_litematic(&schematic)
-                .map_err(|e| PhpException::default(format!("Failed to convert to litematic: {}", e)))?
+        "litematic" => litematic::to_litematic(&schematic)
+            .map_err(|e| PhpException::default(format!("Failed to convert to litematic: {}", e)))?,
+        "schematic" => schematic::to_schematic(&schematic)
+            .map_err(|e| PhpException::default(format!("Failed to convert to schematic: {}", e)))?,
+        _ => {
+            return Err(PhpException::default(
+                "Unsupported output format".to_string(),
+            ))
         }
-        "schematic" => {
-            schematic::to_schematic(&schematic)
-                .map_err(|e| PhpException::default(format!("Failed to convert to schematic: {}", e)))?
-        }
-        _ => return Err(PhpException::default("Unsupported output format".to_string()))
     };
 
     // Convert bytes to string (this is not ideal but works for now)
@@ -104,7 +106,10 @@ impl NucleationSchematic {
                     self.inner = schematic;
                     Ok(true)
                 }
-                Err(e) => Err(PhpException::default(format!("Failed to load litematic: {}", e)))
+                Err(e) => Err(PhpException::default(format!(
+                    "Failed to load litematic: {}",
+                    e
+                ))),
             }
         } else if schematic::is_schematic(bytes) {
             match schematic::from_schematic(bytes) {
@@ -112,10 +117,15 @@ impl NucleationSchematic {
                     self.inner = schematic;
                     Ok(true)
                 }
-                Err(e) => Err(PhpException::default(format!("Failed to load schematic: {}", e)))
+                Err(e) => Err(PhpException::default(format!(
+                    "Failed to load schematic: {}",
+                    e
+                ))),
             }
         } else {
-            Err(PhpException::default("Unknown or unsupported format".to_string()))
+            Err(PhpException::default(
+                "Unknown or unsupported format".to_string(),
+            ))
         }
     }
 
@@ -128,7 +138,10 @@ impl NucleationSchematic {
                 self.inner = schematic;
                 Ok(true)
             }
-            Err(e) => Err(PhpException::default(format!("Failed to load litematic: {}", e)))
+            Err(e) => Err(PhpException::default(format!(
+                "Failed to load litematic: {}",
+                e
+            ))),
         }
     }
 
@@ -141,7 +154,10 @@ impl NucleationSchematic {
                 self.inner = schematic;
                 Ok(true)
             }
-            Err(e) => Err(PhpException::default(format!("Failed to load schematic: {}", e)))
+            Err(e) => Err(PhpException::default(format!(
+                "Failed to load schematic: {}",
+                e
+            ))),
         }
     }
 
@@ -150,7 +166,10 @@ impl NucleationSchematic {
     pub fn to_litematic(&self) -> PhpResult<String> {
         match litematic::to_litematic(&self.inner) {
             Ok(data) => Ok(String::from_utf8_lossy(&data).to_string()),
-            Err(e) => Err(PhpException::default(format!("Failed to export to litematic: {}", e)))
+            Err(e) => Err(PhpException::default(format!(
+                "Failed to export to litematic: {}",
+                e
+            ))),
         }
     }
 
@@ -159,7 +178,10 @@ impl NucleationSchematic {
     pub fn to_schematic(&self) -> PhpResult<String> {
         match schematic::to_schematic(&self.inner) {
             Ok(data) => Ok(String::from_utf8_lossy(&data).to_string()),
-            Err(e) => Err(PhpException::default(format!("Failed to export to schematic: {}", e)))
+            Err(e) => Err(PhpException::default(format!(
+                "Failed to export to schematic: {}",
+                e
+            ))),
         }
     }
 
@@ -173,15 +195,31 @@ impl NucleationSchematic {
 
     /// Set a block from a block string
     #[php_method]
-    pub fn set_block_from_string(&mut self, x: i32, y: i32, z: i32, block_string: String) -> PhpResult<()> {
-        self.inner.set_block_from_string(x, y, z, &block_string)
-            .map_err(|e| PhpException::default(format!("Failed to set block from string: {}", e)))?;
+    pub fn set_block_from_string(
+        &mut self,
+        x: i32,
+        y: i32,
+        z: i32,
+        block_string: String,
+    ) -> PhpResult<()> {
+        self.inner
+            .set_block_from_string(x, y, z, &block_string)
+            .map_err(|e| {
+                PhpException::default(format!("Failed to set block from string: {}", e))
+            })?;
         Ok(())
     }
 
     /// Set a block with properties
     #[php_method]
-    pub fn set_block_with_properties(&mut self, x: i32, y: i32, z: i32, block_name: String, properties: HashMap<String, String>) -> PhpResult<()> {
+    pub fn set_block_with_properties(
+        &mut self,
+        x: i32,
+        y: i32,
+        z: i32,
+        block_name: String,
+        properties: HashMap<String, String>,
+    ) -> PhpResult<()> {
         let mut block_state = BlockState::new(block_name);
         for (key, value) in properties {
             block_state = block_state.with_property(key, value);
@@ -193,12 +231,19 @@ impl NucleationSchematic {
     /// Get block at coordinates
     #[php_method]
     pub fn get_block(&self, x: i32, y: i32, z: i32) -> Option<String> {
-        self.inner.get_block(x, y, z).map(|block_state| block_state.name.clone())
+        self.inner
+            .get_block(x, y, z)
+            .map(|block_state| block_state.name.clone())
     }
 
     /// Get block with properties
     #[php_method]
-    pub fn get_block_with_properties(&self, x: i32, y: i32, z: i32) -> Option<HashMap<String, String>> {
+    pub fn get_block_with_properties(
+        &self,
+        x: i32,
+        y: i32,
+        z: i32,
+    ) -> Option<HashMap<String, String>> {
         if let Some(block_state) = self.inner.get_block(x, y, z) {
             let mut result = HashMap::new();
             result.insert("name".to_string(), block_state.name.clone());
@@ -253,9 +298,15 @@ impl NucleationSchematic {
             info.insert("description".to_string(), description.clone());
         }
 
-        info.insert("regions".to_string(), self.inner.regions.len().to_string());
-        info.insert("total_blocks".to_string(), self.inner.total_blocks().to_string());
-        info.insert("total_volume".to_string(), self.inner.total_volume().to_string());
+        info.insert("regions".to_string(), self.inner.other_regions.len().to_string());
+        info.insert(
+            "total_blocks".to_string(),
+            self.inner.total_blocks().to_string(),
+        );
+        info.insert(
+            "total_volume".to_string(),
+            self.inner.total_volume().to_string(),
+        );
 
         info
     }
@@ -314,9 +365,14 @@ impl NucleationSchematic {
     /// Get debug information
     #[php_method]
     pub fn debug_info(&self) -> String {
-        format!("Schematic name: {}, Regions: {}",
-                self.inner.metadata.name.as_ref().unwrap_or(&"Unnamed".to_string()),
-                self.inner.regions.len()
+        format!(
+            "Schematic name: {}, Regions: {}",
+            self.inner
+                .metadata
+                .name
+                .as_ref()
+                .unwrap_or(&"Unnamed".to_string()),
+            self.inner.other_regions.len()
         )
     }
 
@@ -324,15 +380,22 @@ impl NucleationSchematic {
     #[php_method]
     #[allow(non_snake_case)]
     pub fn __toString(&self) -> String {
-        format!("Nucleation Schematic: {} ({} regions)",
-                self.inner.metadata.name.as_ref().unwrap_or(&"Unnamed".to_string()),
-                self.inner.regions.len())
+        format!(
+            "Nucleation Schematic: {} ({} regions)",
+            self.inner
+                .metadata
+                .name
+                .as_ref()
+                .unwrap_or(&"Unnamed".to_string()),
+            self.inner.other_regions.len()
+        )
     }
 
     /// Get all blocks as array
     #[php_method]
     pub fn get_all_blocks(&self) -> Vec<HashMap<String, String>> {
-        self.inner.iter_blocks()
+        self.inner
+            .iter_blocks()
             .map(|(pos, block)| {
                 let mut block_info = HashMap::new();
                 block_info.insert("x".to_string(), pos.x.to_string());
@@ -365,15 +428,14 @@ impl NucleationSchematic {
         target_x: i32,
         target_y: i32,
         target_z: i32,
-        excluded_blocks: Option<Vec<String>>
+        excluded_blocks: Option<Vec<String>>,
     ) -> PhpResult<()> {
-        let bounds = crate::bounding_box::BoundingBox::new(
-            (min_x, min_y, min_z),
-            (max_x, max_y, max_z)
-        );
+        let bounds =
+            crate::bounding_box::BoundingBox::new((min_x, min_y, min_z), (max_x, max_y, max_z));
 
         let excluded = if let Some(excluded) = excluded_blocks {
-            excluded.into_iter()
+            excluded
+                .into_iter()
                 .filter_map(|block_string| {
                     UniversalSchematic::parse_block_string(&block_string)
                         .ok()
@@ -384,12 +446,14 @@ impl NucleationSchematic {
             Vec::new()
         };
 
-        self.inner.copy_region(
-            &from_schematic.inner,
-            &bounds,
-            (target_x, target_y, target_z),
-            &excluded
-        ).map_err(|e| PhpException::default(format!("Failed to copy region: {}", e)))?;
+        self.inner
+            .copy_region(
+                &from_schematic.inner,
+                &bounds,
+                (target_x, target_y, target_z),
+                &excluded,
+            )
+            .map_err(|e| PhpException::default(format!("Failed to copy region: {}", e)))?;
 
         Ok(())
     }
@@ -415,7 +479,9 @@ pub fn nucleation_load_from_file(file_path: String) -> PhpResult<NucleationSchem
         schematic::from_schematic(&data)
             .map_err(|e| PhpException::default(format!("Failed to load schematic: {}", e)))?
     } else {
-        return Err(PhpException::default("Unknown or unsupported format".to_string()));
+        return Err(PhpException::default(
+            "Unknown or unsupported format".to_string(),
+        ));
     };
 
     Ok(NucleationSchematic { inner })
@@ -423,17 +489,17 @@ pub fn nucleation_load_from_file(file_path: String) -> PhpResult<NucleationSchem
 
 /// Save schematic to file
 #[php_function]
-pub fn nucleation_save_to_file(schematic: &NucleationSchematic, file_path: String, format: String) -> PhpResult<bool> {
+pub fn nucleation_save_to_file(
+    schematic: &NucleationSchematic,
+    file_path: String,
+    format: String,
+) -> PhpResult<bool> {
     let data = match format.to_lowercase().as_str() {
-        "litematic" => {
-            litematic::to_litematic(&schematic.inner)
-                .map_err(|e| PhpException::default(format!("Failed to export to litematic: {}", e)))?
-        }
-        "schematic" => {
-            schematic::to_schematic(&schematic.inner)
-                .map_err(|e| PhpException::default(format!("Failed to export to schematic: {}", e)))?
-        }
-        _ => return Err(PhpException::default("Unsupported format".to_string()))
+        "litematic" => litematic::to_litematic(&schematic.inner)
+            .map_err(|e| PhpException::default(format!("Failed to export to litematic: {}", e)))?,
+        "schematic" => schematic::to_schematic(&schematic.inner)
+            .map_err(|e| PhpException::default(format!("Failed to export to schematic: {}", e)))?,
+        _ => return Err(PhpException::default("Unsupported format".to_string())),
     };
 
     std::fs::write(&file_path, data)

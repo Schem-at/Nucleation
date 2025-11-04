@@ -82,15 +82,44 @@ impl Metadata {
     }
 
     pub fn from_nbt(nbt: &NbtCompound) -> Result<Self, String> {
-        let name = nbt.get::<_, &str>("Name").map_err(|_| "").ok().map(|s| s.to_string());
-        let author = nbt.get::<_, &str>("Author").map_err(|_| "").ok().map(|s| s.to_string());
-        let description = nbt.get::<_, &str>("Description").map_err(|_| "").ok().map(|s| s.to_string());
-        let created = nbt.get::<_, i64>("TimeCreated").map_err(|_| 0).ok().map(|v| v as u64);
-        let modified = nbt.get::<_, i64>("TimeModified").map_err(|_| 0).ok().map(|v| v as u64);
+        let name = nbt
+            .get::<_, &str>("Name")
+            .map_err(|_| "")
+            .ok()
+            .map(|s| s.to_string());
+        let author = nbt
+            .get::<_, &str>("Author")
+            .map_err(|_| "")
+            .ok()
+            .map(|s| s.to_string());
+        let description = nbt
+            .get::<_, &str>("Description")
+            .map_err(|_| "")
+            .ok()
+            .map(|s| s.to_string());
+        let created = nbt
+            .get::<_, i64>("TimeCreated")
+            .map_err(|_| 0)
+            .ok()
+            .map(|v| v as u64);
+        let modified = nbt
+            .get::<_, i64>("TimeModified")
+            .map_err(|_| 0)
+            .ok()
+            .map(|v| v as u64);
         let lm_version = nbt.get::<_, i32>("lm_version").map_err(|_| 0).ok();
         let mc_version = nbt.get::<_, i32>("mc_version").map_err(|_| 0).ok();
         let we_version = nbt.get::<_, i32>("we_version").map_err(|_| 0).ok();
 
-        Ok(Metadata::new(name, author, description, created, modified, lm_version, mc_version, we_version))
+        Ok(Metadata::new(
+            name,
+            author,
+            description,
+            created,
+            modified,
+            lm_version,
+            mc_version,
+            we_version,
+        ))
     }
 }

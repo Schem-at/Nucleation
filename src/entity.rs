@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use quartz_nbt::{NbtCompound, NbtList, NbtTag};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum NbtValue {
@@ -53,9 +53,8 @@ impl Entity {
             NbtTag::LongArray(arr) => NbtValue::LongArray(arr.clone()),
             NbtTag::ByteArray(arr) => NbtValue::ByteArray(arr.clone()),
             NbtTag::List(list) => {
-                let values: Vec<NbtValue> = list.iter()
-                    .map(|tag| Self::nbt_tag_to_value(tag))
-                    .collect();
+                let values: Vec<NbtValue> =
+                    list.iter().map(|tag| Self::nbt_tag_to_value(tag)).collect();
                 NbtValue::List(values)
             }
             NbtTag::Compound(compound) => {
@@ -82,7 +81,8 @@ impl Entity {
             NbtValue::LongArray(arr) => NbtTag::LongArray(arr.clone()),
             NbtValue::ByteArray(arr) => NbtTag::ByteArray(arr.clone()),
             NbtValue::List(list) => {
-                let tags: Vec<NbtTag> = list.iter()
+                let tags: Vec<NbtTag> = list
+                    .iter()
                     .map(|value| Self::value_to_nbt_tag(value))
                     .collect();
                 NbtTag::List(NbtList::from(tags))
@@ -112,7 +112,7 @@ impl Entity {
         let pos_list = NbtList::from(vec![
             NbtTag::Double(self.position.0),
             NbtTag::Double(self.position.1),
-            NbtTag::Double(self.position.2)
+            NbtTag::Double(self.position.2),
         ]);
         compound.insert("Pos", NbtTag::List(pos_list));
 
@@ -132,12 +132,10 @@ impl Entity {
         // Handle both id cases, but preserve the minecraft: prefix
         let id = match nbt.get::<_, &str>("id") {
             Ok(id) => id.to_string(),
-            Err(_) => {
-                match nbt.get::<_, &str>("Id") {
-                    Ok(id) => id.to_string(),
-                    Err(e) => return Err(format!("Failed to get Entity id: {}", e)),
-                }
-            }
+            Err(_) => match nbt.get::<_, &str>("Id") {
+                Ok(id) => id.to_string(),
+                Err(e) => return Err(format!("Failed to get Entity id: {}", e)),
+            },
         };
 
         // Don't strip the minecraft: prefix anymore
@@ -147,13 +145,20 @@ impl Entity {
             format!("minecraft:{}", id)
         };
 
-        let position = nbt.get::<_, &NbtList>("Pos")
+        let position = nbt
+            .get::<_, &NbtList>("Pos")
             .map_err(|e| format!("Failed to get Entity position: {}", e))?;
         let position = if position.len() == 3 {
             (
-                position.get::<f64>(0).map_err(|e| format!("Failed to get X position: {}", e))?,
-                position.get::<f64>(1).map_err(|e| format!("Failed to get Y position: {}", e))?,
-                position.get::<f64>(2).map_err(|e| format!("Failed to get Z position: {}", e))?,
+                position
+                    .get::<f64>(0)
+                    .map_err(|e| format!("Failed to get X position: {}", e))?,
+                position
+                    .get::<f64>(1)
+                    .map_err(|e| format!("Failed to get Y position: {}", e))?,
+                position
+                    .get::<f64>(2)
+                    .map_err(|e| format!("Failed to get Z position: {}", e))?,
             )
         } else {
             return Err("Invalid position data".to_string());
@@ -202,8 +207,13 @@ mod tests {
     #[test]
     fn test_entity_serialization() {
         let mut entity = Entity::new("minecraft:creeper".to_string(), (1.0, 2.0, 3.0));
-        entity.nbt.insert("Health".to_string(), NbtValue::Float(20.0));
-        entity.nbt.insert("CustomName".to_string(), NbtValue::String("Bob".to_string()));
+        entity
+            .nbt
+            .insert("Health".to_string(), NbtValue::Float(20.0));
+        entity.nbt.insert(
+            "CustomName".to_string(),
+            NbtValue::String("Bob".to_string()),
+        );
 
         let nbt = entity.to_nbt();
 
@@ -231,7 +241,7 @@ mod tests {
         let pos_list = NbtList::from(vec![
             NbtTag::Double(1.0),
             NbtTag::Double(2.0),
-            NbtTag::Double(3.0)
+            NbtTag::Double(3.0),
         ]);
         compound.insert("Pos", NbtTag::List(pos_list));
 
@@ -245,7 +255,10 @@ mod tests {
         assert_eq!(entity.id, "minecraft:creeper");
         assert_eq!(entity.position, (1.0, 2.0, 3.0));
         assert_eq!(entity.nbt.get("Health"), Some(&NbtValue::Float(20.0)));
-        assert_eq!(entity.nbt.get("CustomName"), Some(&NbtValue::String("Bob".to_string())));
+        assert_eq!(
+            entity.nbt.get("CustomName"),
+            Some(&NbtValue::String("Bob".to_string()))
+        );
     }
 
     #[test]
@@ -253,20 +266,34 @@ mod tests {
         let mut entity = Entity::new("minecraft:item".to_string(), (0.0, 0.0, 0.0));
 
         // Test array types
-        entity.nbt.insert("IntArray".to_string(), NbtValue::IntArray(vec![1, 2, 3]));
-        entity.nbt.insert("LongArray".to_string(), NbtValue::LongArray(vec![1, 2, 3]));
-        entity.nbt.insert("ByteArray".to_string(), NbtValue::ByteArray(vec![1, 2, 3]));
+        entity
+            .nbt
+            .insert("IntArray".to_string(), NbtValue::IntArray(vec![1, 2, 3]));
+        entity
+            .nbt
+            .insert("LongArray".to_string(), NbtValue::LongArray(vec![1, 2, 3]));
+        entity
+            .nbt
+            .insert("ByteArray".to_string(), NbtValue::ByteArray(vec![1, 2, 3]));
 
         // Test nested compound
         let mut nested_map = HashMap::new();
-        nested_map.insert("NestedString".to_string(), NbtValue::String("test".to_string()));
-        entity.nbt.insert("Compound".to_string(), NbtValue::Compound(nested_map));
+        nested_map.insert(
+            "NestedString".to_string(),
+            NbtValue::String("test".to_string()),
+        );
+        entity
+            .nbt
+            .insert("Compound".to_string(), NbtValue::Compound(nested_map));
 
         // Test list
-        entity.nbt.insert("List".to_string(), NbtValue::List(vec![
-            NbtValue::String("a".to_string()),
-            NbtValue::String("b".to_string()),
-        ]));
+        entity.nbt.insert(
+            "List".to_string(),
+            NbtValue::List(vec![
+                NbtValue::String("a".to_string()),
+                NbtValue::String("b".to_string()),
+            ]),
+        );
 
         let nbt = entity.to_nbt();
         if let NbtTag::Compound(compound) = nbt {
@@ -304,20 +331,26 @@ mod tests {
     fn test_invalid_nbt() {
         // Test missing id
         let mut compound = NbtCompound::new();
-        compound.insert("Pos", NbtTag::List(NbtList::from(vec![
-            NbtTag::Double(0.0),
-            NbtTag::Double(0.0),
-            NbtTag::Double(0.0)
-        ])));
+        compound.insert(
+            "Pos",
+            NbtTag::List(NbtList::from(vec![
+                NbtTag::Double(0.0),
+                NbtTag::Double(0.0),
+                NbtTag::Double(0.0),
+            ])),
+        );
         assert!(Entity::from_nbt(&compound).is_err());
 
         // Test invalid position
         let mut compound = NbtCompound::new();
         compound.insert("id", NbtTag::String("minecraft:creeper".to_string()));
-        compound.insert("Pos", NbtTag::List(NbtList::from(vec![
-            NbtTag::Double(0.0),
-            NbtTag::Double(0.0)
-        ])));
+        compound.insert(
+            "Pos",
+            NbtTag::List(NbtList::from(vec![
+                NbtTag::Double(0.0),
+                NbtTag::Double(0.0),
+            ])),
+        );
         assert!(Entity::from_nbt(&compound).is_err());
     }
 }

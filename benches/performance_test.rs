@@ -1,6 +1,6 @@
 // benches/performance_test
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use nucleation::{Region, BlockState};
+use nucleation::{BlockState, Region};
 use std::collections::HashMap;
 
 fn fill_cube_no_cache_small_region(size: i32) {
@@ -34,7 +34,7 @@ fn fill_cube_with_cache_large_region(size: i32) {
     let mut region = Region::new(
         "Test".to_string(),
         (-margin, -margin, -margin),
-        (size + 2 * margin, size + 2 * margin, size + 2 * margin)
+        (size + 2 * margin, size + 2 * margin, size + 2 * margin),
     );
     let stone = BlockState::new("minecraft:stone".to_string());
 
@@ -158,5 +158,10 @@ fn bench_region_expansion(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_nucleation_strategies, bench_block_state_creation, bench_region_expansion);
+criterion_group!(
+    benches,
+    bench_nucleation_strategies,
+    bench_block_state_creation,
+    bench_region_expansion
+);
 criterion_main!(benches);

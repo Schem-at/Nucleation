@@ -21,7 +21,6 @@ fn benchmark_block_setting(c: &mut Criterion) {
     });
 }
 
-
 fn benchmark_big_schematic_creation(c: &mut Criterion) {
     c.bench_function("create big schematic", |b| {
         b.iter(|| {
@@ -29,7 +28,12 @@ fn benchmark_big_schematic_creation(c: &mut Criterion) {
             for x in 0..100 {
                 for y in 0..100 {
                     for z in 0..100 {
-                        schematic.set_block(x, y, z, BlockState::new("minecraft:stone".to_string()));
+                        schematic.set_block(
+                            x,
+                            y,
+                            z,
+                            BlockState::new("minecraft:stone".to_string()),
+                        );
                     }
                 }
             }
@@ -47,7 +51,12 @@ fn benchmark_big_schematic_creation_with_region_prealloc(c: &mut Criterion) {
             for x in 0..100 {
                 for y in 0..100 {
                     for z in 0..100 {
-                        schematic.set_block(x, y, z, BlockState::new("minecraft:stone".to_string()));
+                        schematic.set_block(
+                            x,
+                            y,
+                            z,
+                            BlockState::new("minecraft:stone".to_string()),
+                        );
                     }
                 }
             }
@@ -56,7 +65,11 @@ fn benchmark_big_schematic_creation_with_region_prealloc(c: &mut Criterion) {
     });
 }
 
-
-
-criterion_group!(benches, benchmark_schematic_creation, benchmark_block_setting, benchmark_big_schematic_creation, benchmark_big_schematic_creation_with_region_prealloc);
+criterion_group!(
+    benches,
+    benchmark_schematic_creation,
+    benchmark_block_setting,
+    benchmark_big_schematic_creation,
+    benchmark_big_schematic_creation_with_region_prealloc
+);
 criterion_main!(benches);

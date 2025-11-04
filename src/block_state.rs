@@ -1,8 +1,8 @@
+use quartz_nbt::{NbtCompound, NbtTag};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::{Hash, Hasher};
-use quartz_nbt::{NbtCompound, NbtTag};
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlockState {
@@ -102,11 +102,6 @@ impl BlockState {
 
         Ok(BlockState { name, properties })
     }
-
-
-
-
-
 }
 
 #[cfg(test)]
@@ -119,6 +114,9 @@ mod tests {
             .with_property("variant".to_string(), "granite".to_string());
 
         assert_eq!(block.name, "minecraft:stone");
-        assert_eq!(block.properties.get("variant"), Some(&"granite".to_string()));
+        assert_eq!(
+            block.properties.get("variant"),
+            Some(&"granite".to_string())
+        );
     }
 }

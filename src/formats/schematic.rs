@@ -1,15 +1,15 @@
 use std::fmt;
 use std::io::{BufReader, Cursor, Read};
 
-use flate2::Compression;
-use flate2::read::GzDecoder;
-use flate2::write::GzEncoder;
-use quartz_nbt::{NbtCompound, NbtList, NbtTag};
-use quartz_nbt::io::{read_nbt, Flavor};
-use crate::{BlockState, UniversalSchematic};
 use crate::block_entity::BlockEntity;
 use crate::entity::Entity;
 use crate::region::Region;
+use crate::{BlockState, UniversalSchematic};
+use flate2::read::GzDecoder;
+use flate2::write::GzEncoder;
+use flate2::Compression;
+use quartz_nbt::io::{read_nbt, Flavor};
+use quartz_nbt::{NbtCompound, NbtList, NbtTag};
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::JsValue;
@@ -23,7 +23,6 @@ pub enum SchematicVersion {
     V2,
     V3,
 }
-
 
 impl SchematicVersion {
     pub fn as_str(&self) -> &str {
@@ -48,17 +47,12 @@ impl SchematicVersion {
     pub fn get_all() -> Vec<SchematicVersion> {
         vec![SchematicVersion::V2, SchematicVersion::V3]
     }
-
-
 }
 impl fmt::Display for SchematicVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.as_str())
     }
 }
-
-
-
 
 pub fn is_schematic(data: &[u8]) -> bool {
     // Decompress the data
@@ -73,7 +67,6 @@ pub fn is_schematic(data: &[u8]) -> bool {
         }
     };
 
-
     //things should be under Schematic tag if not treat root as the schematic
     let root = root.get::<_, &NbtCompound>("Schematic").unwrap_or(&root);
 
@@ -85,7 +78,6 @@ pub fn is_schematic(data: &[u8]) -> bool {
         return root.get::<_, &NbtCompound>("Blocks").is_ok();
     }
 
-
     // Check if it's a v3 schematic (which has a Blocks compound)
     if version.unwrap() == 3 {
         #[cfg(feature = "wasm")]
@@ -94,20 +86,22 @@ pub fn is_schematic(data: &[u8]) -> bool {
     }
 
     // Otherwise check for v2 format
-    root.get::<_, i32>("DataVersion").is_ok() &&
-    root.get::<_, i16>("Width").is_ok() &&
-    root.get::<_, i16>("Height").is_ok() &&
-    root.get::<_, i16>("Length").is_ok() &&
-    root.get::<_, &Vec<i8>>("BlockData").is_ok()
+    root.get::<_, i32>("DataVersion").is_ok()
+        && root.get::<_, i16>("Width").is_ok()
+        && root.get::<_, i16>("Height").is_ok()
+        && root.get::<_, i16>("Length").is_ok()
+        && root.get::<_, &Vec<i8>>("BlockData").is_ok()
 }
-
 
 // Default function uses v3 format
 pub fn to_schematic(schematic: &UniversalSchematic) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     to_schematic_version(schematic, SchematicVersion::get_default())
 }
 
-pub fn to_schematic_version(schematic: &UniversalSchematic, version: SchematicVersion) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+pub fn to_schematic_version(
+    schematic: &UniversalSchematic,
+    version: SchematicVersion,
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     match version {
         SchematicVersion::V2 => to_schematic_v2(schematic),
         SchematicVersion::V3 => to_schematic_v3(schematic),
@@ -115,12 +109,17 @@ pub fn to_schematic_version(schematic: &UniversalSchematic, version: SchematicVe
 }
 
 // Version 3 format (recommended)
-pub fn to_schematic_v3(schematic: &UniversalSchematic) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+pub fn to_schematic_v3(
+    schematic: &UniversalSchematic,
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut schematic_data = NbtCompound::new();
 
     // Version 3 format
     schematic_data.insert("Version", NbtTag::Int(3));
-    schematic_data.insert("DataVersion", NbtTag::Int(schematic.metadata.mc_version.unwrap_or(1343)));
+    schematic_data.insert(
+        "DataVersion",
+        NbtTag::Int(schematic.metadata.mc_version.unwrap_or(1343)),
+    );
 
     let bounding_box = schematic.get_bounding_box();
     let (width, height, length) = bounding_box.get_dimensions();
@@ -145,14 +144,23 @@ pub fn to_schematic_v3(schematic: &UniversalSchematic) -> Result<Vec<u8>, Box<dy
     blocks_container.insert("Palette", palette_nbt);
 
     // Remap block data using the new palette mapping
-    let remapped_blocks: Vec<u32> = merged_region.blocks.iter()
+    let remapped_blocks: Vec<u32> = merged_region
+        .blocks
+        .iter()
         .map(|&original_id| {
             if original_id < palette_mapping.len() {
                 palette_mapping[original_id] as u32
             } else {
                 // Out of bounds - map to air and log warning if debugging
                 #[cfg(feature = "wasm")]
-                console::log_1(&format!("Warning: Block index {} out of bounds (palette size: {}), mapping to air", original_id, palette_mapping.len()).into());
+                console::log_1(
+                    &format!(
+                        "Warning: Block index {} out of bounds (palette size: {}), mapping to air",
+                        original_id,
+                        palette_mapping.len()
+                    )
+                    .into(),
+                );
                 0 // Default to air for out-of-bounds indices
             }
         })
@@ -178,12 +186,16 @@ pub fn to_schematic_v3(schematic: &UniversalSchematic) -> Result<Vec<u8>, Box<dy
     }
 
     // Encode remapped block data
-    let block_data: Vec<u8> = remapped_blocks.iter()
+    let block_data: Vec<u8> = remapped_blocks
+        .iter()
         .flat_map(|&block_id| encode_varint(block_id))
         .collect();
 
     // Add block data to Blocks container (renamed from "BlockData" to "Data" in v3)
-    blocks_container.insert("Data", NbtTag::ByteArray(block_data.iter().map(|&x| x as i8).collect()));
+    blocks_container.insert(
+        "Data",
+        NbtTag::ByteArray(block_data.iter().map(|&x| x as i8).collect()),
+    );
 
     // Add block entities to Blocks container
     let mut block_entities = NbtList::new();
@@ -224,16 +236,26 @@ pub fn to_schematic_v3(schematic: &UniversalSchematic) -> Result<Vec<u8>, Box<dy
 
     // Write NBT with proper compression
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-    quartz_nbt::io::write_nbt(&mut encoder, None, &root, quartz_nbt::io::Flavor::Uncompressed)?;
+    quartz_nbt::io::write_nbt(
+        &mut encoder,
+        None,
+        &root,
+        quartz_nbt::io::Flavor::Uncompressed,
+    )?;
     Ok(encoder.finish()?)
 }
 
 // Version 2 format (legacy compatibility)
-pub fn to_schematic_v2(schematic: &UniversalSchematic) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+pub fn to_schematic_v2(
+    schematic: &UniversalSchematic,
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut schematic_data = NbtCompound::new();
 
     schematic_data.insert("Version", NbtTag::Int(2)); // Schematic format version 2
-    schematic_data.insert("DataVersion", NbtTag::Int(schematic.metadata.mc_version.unwrap_or(1343)));
+    schematic_data.insert(
+        "DataVersion",
+        NbtTag::Int(schematic.metadata.mc_version.unwrap_or(1343)),
+    );
 
     let bounding_box = schematic.get_bounding_box();
     let (width, height, length) = bounding_box.get_dimensions();
@@ -242,7 +264,10 @@ pub fn to_schematic_v2(schematic: &UniversalSchematic) -> Result<Vec<u8>, Box<dy
     schematic_data.insert("Height", NbtTag::Short((height as i16).abs()));
     schematic_data.insert("Length", NbtTag::Short((length as i16).abs()));
 
-    schematic_data.insert("Size", NbtTag::IntArray(vec![width as i32, height as i32, length as i32]));
+    schematic_data.insert(
+        "Size",
+        NbtTag::IntArray(vec![width as i32, height as i32, length as i32]),
+    );
 
     let offset = vec![0, 0, 0];
     schematic_data.insert("Offset", NbtTag::IntArray(offset));
@@ -250,13 +275,21 @@ pub fn to_schematic_v2(schematic: &UniversalSchematic) -> Result<Vec<u8>, Box<dy
     let merged_region = schematic.get_merged_region();
 
     schematic_data.insert("Palette", convert_palette_v2(&merged_region.palette).0);
-    schematic_data.insert("PaletteMax", convert_palette_v2(&merged_region.palette).1 + 1);
+    schematic_data.insert(
+        "PaletteMax",
+        convert_palette_v2(&merged_region.palette).1 + 1,
+    );
 
-    let block_data: Vec<u8> = merged_region.blocks.iter()
+    let block_data: Vec<u8> = merged_region
+        .blocks
+        .iter()
         .flat_map(|&block_id| encode_varint(block_id as u32))
         .collect();
 
-    schematic_data.insert("BlockData", NbtTag::ByteArray(block_data.iter().map(|&x| x as i8).collect()));
+    schematic_data.insert(
+        "BlockData",
+        NbtTag::ByteArray(block_data.iter().map(|&x| x as i8).collect()),
+    );
 
     let mut block_entities = NbtList::new();
     let mut entities = NbtList::new();
@@ -275,7 +308,12 @@ pub fn to_schematic_v2(schematic: &UniversalSchematic) -> Result<Vec<u8>, Box<dy
     root.insert("Schematic", NbtTag::Compound(schematic_data));
 
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-    quartz_nbt::io::write_nbt(&mut encoder, None, &root, quartz_nbt::io::Flavor::Uncompressed)?;
+    quartz_nbt::io::write_nbt(
+        &mut encoder,
+        None,
+        &root,
+        quartz_nbt::io::Flavor::Uncompressed,
+    )?;
     Ok(encoder.finish()?)
 }
 
@@ -311,11 +349,16 @@ fn convert_palette_with_mapping(palette: &Vec<BlockState>) -> (NbtCompound, Vec<
         let key = if block_state.properties.is_empty() {
             block_state.name.clone()
         } else {
-            format!("{}[{}]", block_state.name,
-                    block_state.properties.iter()
-                        .map(|(k, v)| format!("{}={}", k, v))
-                        .collect::<Vec<_>>()
-                        .join(","))
+            format!(
+                "{}[{}]",
+                block_state.name,
+                block_state
+                    .properties
+                    .iter()
+                    .map(|(k, v)| format!("{}={}", k, v))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )
         };
 
         // Check if this block state already exists in the palette
@@ -362,11 +405,16 @@ fn convert_palette_v2(palette: &Vec<BlockState>) -> (NbtCompound, i32) {
         let key = if block_state.properties.is_empty() {
             block_state.name.clone()
         } else {
-            format!("{}[{}]", block_state.name,
-                    block_state.properties.iter()
-                        .map(|(k, v)| format!("{}={}", k, v))
-                        .collect::<Vec<_>>()
-                        .join(","))
+            format!(
+                "{}[{}]",
+                block_state.name,
+                block_state
+                    .properties
+                    .iter()
+                    .map(|(k, v)| format!("{}={}", k, v))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )
         };
 
         nbt_palette.insert(&key, NbtTag::Int(next_id));
@@ -377,8 +425,8 @@ fn convert_palette_v2(palette: &Vec<BlockState>) -> (NbtCompound, i32) {
     (nbt_palette, max_id as i32)
 }
 pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::error::Error>> {
-    let reader   = BufReader::with_capacity(1 << 20, data);   // 1 MiB buf
-    let mut gz   = GzDecoder::new(reader);
+    let reader = BufReader::with_capacity(1 << 20, data); // 1 MiB buf
+    let mut gz = GzDecoder::new(reader);
     let (root, _) = read_nbt(&mut gz, Flavor::Uncompressed)?;
 
     let schem = root.get::<_, &NbtCompound>("Schematic").unwrap_or(&root);
@@ -388,7 +436,8 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::er
         metadata.get::<_, &str>("Name").ok().map(|s| s.to_string())
     } else {
         None
-    }.unwrap_or_else(|| "Unnamed".to_string());
+    }
+    .unwrap_or_else(|| "Unnamed".to_string());
 
     let mc_version = schem.get::<_, i32>("DataVersion").ok();
 
@@ -399,8 +448,7 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::er
     let height = schem.get::<_, i16>("Height")? as u32;
     let length = schem.get::<_, i16>("Length")? as u32;
 
-    let block_container=
-    if schem_version == 2 {
+    let block_container = if schem_version == 2 {
         schem
     } else {
         schem.get::<_, &NbtCompound>("Blocks")?
@@ -410,8 +458,11 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::er
 
     let block_data = parse_block_data(&block_container, width, height, length)?;
 
-
-    let mut region = Region::new("Main".to_string(), (0, 0, 0), (width as i32, height as i32, length as i32));
+    let mut region = Region::new(
+        "Main".to_string(),
+        (0, 0, 0),
+        (width as i32, height as i32, length as i32),
+    );
     region.palette = block_palette;
 
     region.blocks = block_data.iter().map(|&x| x as usize).collect();
@@ -429,8 +480,6 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::er
     schematic.add_region(region);
     Ok(schematic)
 }
-
-
 
 fn convert_block_entities(region: &Region) -> NbtList {
     let mut block_entities = NbtList::new();
@@ -452,9 +501,12 @@ fn convert_entities(region: &Region) -> NbtList {
     entities
 }
 
-fn parse_block_palette(region_tag: &NbtCompound) -> Result<Vec<BlockState>, Box<dyn std::error::Error>> {
+fn parse_block_palette(
+    region_tag: &NbtCompound,
+) -> Result<Vec<BlockState>, Box<dyn std::error::Error>> {
     let palette_compound = region_tag.get::<_, &NbtCompound>("Palette")?;
-    let palette_max = region_tag.get::<_, i32>("PaletteMax") // V2
+    let palette_max = region_tag
+        .get::<_, i32>("PaletteMax") // V2
         .unwrap_or(palette_compound.len() as i32) as usize; // V3
     let mut palette = vec![BlockState::new("minecraft:air".to_string()); palette_max + 1];
 
@@ -534,8 +586,7 @@ fn parse_block_data(
         .or(region_tag.get::<_, &Vec<i8>>("Data"))?;
 
     let mut block_data_u8: &[u8] = unsafe {
-        std::slice::from_raw_parts(block_data_i8.as_ptr() as *const u8,
-                                   block_data_i8.len())
+        std::slice::from_raw_parts(block_data_i8.as_ptr() as *const u8, block_data_i8.len())
     };
 
     // ---------- fast var-int decode ----------
@@ -567,15 +618,16 @@ fn parse_block_data(
             "Block data length mismatch: expected {}, got {}",
             expected_length,
             block_data.len()
-        ).into());
+        )
+        .into());
     }
 
     Ok(block_data)
 }
 
-
-
-fn parse_block_entities(region_tag: &NbtCompound) -> Result<Vec<BlockEntity>, Box<dyn std::error::Error>> {
+fn parse_block_entities(
+    region_tag: &NbtCompound,
+) -> Result<Vec<BlockEntity>, Box<dyn std::error::Error>> {
     let block_entities_list = region_tag.get::<_, &NbtList>("BlockEntities")?;
     let mut block_entities = Vec::new();
 
@@ -605,8 +657,6 @@ fn parse_entities(region_tag: &NbtCompound) -> Result<Vec<Entity>, Box<dyn std::
     Ok(entities)
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -614,8 +664,8 @@ mod tests {
     use std::io::Write;
     use std::path::Path;
 
-    use crate::{BlockState, UniversalSchematic};
     use crate::litematic::{from_litematic, to_litematic};
+    use crate::{BlockState, UniversalSchematic};
 
     use super::*;
 
@@ -643,24 +693,35 @@ mod tests {
 
         // Save the .schem file
         let mut file = File::create("test_schematic.schem").expect("Failed to create file");
-        file.write_all(&schem_data).expect("Failed to write to file");
+        file.write_all(&schem_data)
+            .expect("Failed to write to file");
 
         // Read the .schem file back
         let loaded_schem_data = std::fs::read("test_schematic.schem").expect("Failed to read file");
 
         // Parse the loaded .schem data
-        let loaded_schematic = from_schematic(&loaded_schem_data).expect("Failed to parse schematic");
+        let loaded_schematic =
+            from_schematic(&loaded_schem_data).expect("Failed to parse schematic");
 
         // Compare the original and loaded schematics
         assert_eq!(schematic.metadata.name, loaded_schematic.metadata.name);
-        assert_eq!(schematic.other_regions.len(), loaded_schematic.other_regions.len());
-        assert_eq!(schematic.get_bounding_box(), loaded_schematic.get_bounding_box());
+        assert_eq!(
+            schematic.other_regions.len(),
+            loaded_schematic.other_regions.len()
+        );
+        assert_eq!(
+            schematic.get_bounding_box(),
+            loaded_schematic.get_bounding_box()
+        );
 
         let original_region = schematic.default_region;
         let loaded_region = loaded_schematic.default_region;
 
         assert_eq!(original_region.entities.len(), loaded_region.entities.len());
-        assert_eq!(original_region.block_entities.len(), loaded_region.block_entities.len());
+        assert_eq!(
+            original_region.block_entities.len(),
+            loaded_region.block_entities.len()
+        );
 
         // Clean up the generated file
         //std::fs::remove_file("test_schematic.schem").expect("Failed to remove file");
@@ -686,7 +747,11 @@ mod tests {
             let mut cursor = Cursor::new(encoded);
             let decoded = decode_varint(&mut cursor).unwrap();
 
-            assert_eq!(value, decoded, "Encoding and decoding failed for value: {}", value);
+            assert_eq!(
+                value, decoded,
+                "Encoding and decoding failed for value: {}",
+                value
+            );
         }
     }
 
@@ -694,11 +759,13 @@ mod tests {
     fn test_parse_block_data() {
         let mut nbt = NbtCompound::new();
         let block_data = vec![0, 1, 2, 1, 0, 2, 1, 0]; // 8 blocks
-        let encoded_block_data: Vec<u8> = block_data.iter()
-            .flat_map(|&v| encode_varint(v))
-            .collect();
+        let encoded_block_data: Vec<u8> =
+            block_data.iter().flat_map(|&v| encode_varint(v)).collect();
 
-        nbt.insert("BlockData", NbtTag::ByteArray(encoded_block_data.iter().map(|&x| x as i8).collect()));
+        nbt.insert(
+            "BlockData",
+            NbtTag::ByteArray(encoded_block_data.iter().map(|&x| x as i8).collect()),
+        );
 
         let parsed_data = parse_block_data(&nbt, 2, 2, 2).expect("Failed to parse block data");
         assert_eq!(parsed_data, vec![0, 1, 2, 1, 0, 2, 1, 0]);
@@ -711,7 +778,9 @@ mod tests {
             BlockState::new("minecraft:dirt".to_string()),
             BlockState {
                 name: "minecraft:wool".to_string(),
-                properties: [("color".to_string(), "red".to_string())].into_iter().collect(),
+                properties: [("color".to_string(), "red".to_string())]
+                    .into_iter()
+                    .collect(),
             },
         ];
 
@@ -722,7 +791,12 @@ mod tests {
         assert_eq!(nbt_palette.get::<_, i32>("minecraft:air").unwrap(), 0);
         assert_eq!(nbt_palette.get::<_, i32>("minecraft:stone").unwrap(), 1);
         assert_eq!(nbt_palette.get::<_, i32>("minecraft:dirt").unwrap(), 2);
-        assert_eq!(nbt_palette.get::<_, i32>("minecraft:wool[color=red]").unwrap(), 3);
+        assert_eq!(
+            nbt_palette
+                .get::<_, i32>("minecraft:wool[color=red]")
+                .unwrap(),
+            3
+        );
     }
 
     #[test]
@@ -732,7 +806,9 @@ mod tests {
             BlockState::new("minecraft:dirt".to_string()),
             BlockState {
                 name: "minecraft:wool".to_string(),
-                properties: [("color".to_string(), "red".to_string())].into_iter().collect(),
+                properties: [("color".to_string(), "red".to_string())]
+                    .into_iter()
+                    .collect(),
             },
         ];
 
@@ -743,7 +819,12 @@ mod tests {
         assert_eq!(nbt_palette.get::<_, i32>("minecraft:air").unwrap(), 0);
         assert_eq!(nbt_palette.get::<_, i32>("minecraft:stone").unwrap(), 1);
         assert_eq!(nbt_palette.get::<_, i32>("minecraft:dirt").unwrap(), 2);
-        assert_eq!(nbt_palette.get::<_, i32>("minecraft:wool[color=red]").unwrap(), 3);
+        assert_eq!(
+            nbt_palette
+                .get::<_, i32>("minecraft:wool[color=red]")
+                .unwrap(),
+            3
+        );
     }
 
     #[test]
@@ -789,7 +870,8 @@ mod tests {
         let input_path_str = format!("tests/samples/{}.schem", name);
         let schem_path = Path::new(&input_path_str);
         assert!(schem_path.exists(), "Sample .schem file not found");
-        let schem_data = fs::read(schem_path).expect(format!("Failed to read {}", input_path_str).as_str());
+        let schem_data =
+            fs::read(schem_path).expect(format!("Failed to read {}", input_path_str).as_str());
 
         let mut schematic = from_schematic(&schem_data).expect("Failed to parse schematic");
         assert_eq!(schematic.metadata.name, Some("Unnamed".to_string()));
@@ -811,17 +893,27 @@ mod tests {
         let schematic = from_schematic(&schem_data).expect("Failed to parse schematic");
 
         //convert the UniversalSchematic to a Litematic
-        let litematic_output_data = to_litematic(&schematic).expect("Failed to convert to litematic");
-        let mut litematic_output_file = File::create(output_litematic_name).expect("Failed to create litematic file");
-        litematic_output_file.write_all(&litematic_output_data).expect("Failed to write litematic file");
+        let litematic_output_data =
+            to_litematic(&schematic).expect("Failed to convert to litematic");
+        let mut litematic_output_file =
+            File::create(output_litematic_name).expect("Failed to create litematic file");
+        litematic_output_file
+            .write_all(&litematic_output_data)
+            .expect("Failed to write litematic file");
 
         //load back from the litematic file
-        let litematic_data = fs::read(output_litematic_name).expect("Failed to read litematic file");
-        let schematic_from_litematic = from_litematic(&litematic_data).expect("Failed to parse litematic");
+        let litematic_data =
+            fs::read(output_litematic_name).expect("Failed to read litematic file");
+        let schematic_from_litematic =
+            from_litematic(&litematic_data).expect("Failed to parse litematic");
 
         //convert the Litematic back to a UniversalSchematic
-        let schematic_output_data = to_schematic(&schematic_from_litematic).expect("Failed to convert to schematic");
-        let mut schematic_output_file = File::create(output_schematic_name).expect("Failed to create schematic file");
-        schematic_output_file.write_all(&schematic_output_data).expect("Failed to write schematic file");
+        let schematic_output_data =
+            to_schematic(&schematic_from_litematic).expect("Failed to convert to schematic");
+        let mut schematic_output_file =
+            File::create(output_schematic_name).expect("Failed to create schematic file");
+        schematic_output_file
+            .write_all(&schematic_output_data)
+            .expect("Failed to write schematic file");
     }
 }

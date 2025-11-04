@@ -72,7 +72,6 @@ impl NbtMap {
         }
         compound
     }
-
 }
 
 impl IntoIterator for NbtMap {
@@ -139,7 +138,6 @@ impl NbtValue {
             NbtValue::LongArray(v) => NbtTag::LongArray(v.clone()),
         }
     }
-
 
     pub fn as_string(&self) -> Option<&String> {
         if let NbtValue::String(s) = self {

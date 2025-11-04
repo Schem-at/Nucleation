@@ -1,7 +1,7 @@
 // examples/universal_schematic_overhead.rs
-use nucleation::{UniversalSchematic, Region, BlockState};
-use std::time::Instant;
+use nucleation::{BlockState, Region, UniversalSchematic};
 use std::collections::HashMap;
+use std::time::Instant;
 
 // Simulate your optimized UniversalSchematic
 struct OptimizedUniversalSchematic {
@@ -22,7 +22,8 @@ impl OptimizedUniversalSchematic {
             Some(cached) => cached.clone(),
             None => {
                 let new_block = BlockState::new(block_name.to_string());
-                self.block_cache.insert(block_name.to_string(), new_block.clone());
+                self.block_cache
+                    .insert(block_name.to_string(), new_block.clone());
                 new_block
             }
         };
@@ -34,7 +35,7 @@ impl OptimizedUniversalSchematic {
         self.inner.default_region = Region::new(
             "Main".to_string(),
             (-margin, -margin, -margin),
-            (size + 2 * margin, size + 2 * margin, size + 2 * margin)
+            (size + 2 * margin, size + 2 * margin, size + 2 * margin),
         );
     }
 }
@@ -64,7 +65,7 @@ fn main() {
         let mut region_prealloc = Region::new(
             "Test".to_string(),
             (-margin, -margin, -margin),
-            (size + 2 * margin, size + 2 * margin, size + 2 * margin)
+            (size + 2 * margin, size + 2 * margin, size + 2 * margin),
         );
         let stone_prealloc = BlockState::new("minecraft:stone".to_string());
         for x in 0..size {
@@ -128,34 +129,59 @@ fn main() {
         let python_style_time = start.elapsed();
 
         // Results
-        println!("  Direct Region (cached):               {:>8.1}ms", region_time.as_secs_f64() * 1000.0);
-        println!("  Direct Region (pre-allocated):        {:>8.1}ms ({:.1}x)",
-                 region_prealloc_time.as_secs_f64() * 1000.0,
-                 region_time.as_secs_f64() / region_prealloc_time.as_secs_f64());
-        println!("  UniversalSchematic (current/slow):     {:>8.1}ms ({:.1}x slower than Region)",
-                 universal_slow_time.as_secs_f64() * 1000.0,
-                 universal_slow_time.as_secs_f64() / region_time.as_secs_f64());
-        println!("  UniversalSchematic (cached):           {:>8.1}ms ({:.1}x)",
-                 universal_cached_time.as_secs_f64() * 1000.0,
-                 universal_slow_time.as_secs_f64() / universal_cached_time.as_secs_f64());
-        println!("  UniversalSchematic (optimized):        {:>8.1}ms ({:.1}x)",
-                 universal_optimized_time.as_secs_f64() * 1000.0,
-                 universal_slow_time.as_secs_f64() / universal_optimized_time.as_secs_f64());
-        println!("  Python MCSchematic style:              {:>8.1}ms", python_style_time.as_secs_f64() * 1000.0);
+        println!(
+            "  Direct Region (cached):               {:>8.1}ms",
+            region_time.as_secs_f64() * 1000.0
+        );
+        println!(
+            "  Direct Region (pre-allocated):        {:>8.1}ms ({:.1}x)",
+            region_prealloc_time.as_secs_f64() * 1000.0,
+            region_time.as_secs_f64() / region_prealloc_time.as_secs_f64()
+        );
+        println!(
+            "  UniversalSchematic (current/slow):     {:>8.1}ms ({:.1}x slower than Region)",
+            universal_slow_time.as_secs_f64() * 1000.0,
+            universal_slow_time.as_secs_f64() / region_time.as_secs_f64()
+        );
+        println!(
+            "  UniversalSchematic (cached):           {:>8.1}ms ({:.1}x)",
+            universal_cached_time.as_secs_f64() * 1000.0,
+            universal_slow_time.as_secs_f64() / universal_cached_time.as_secs_f64()
+        );
+        println!(
+            "  UniversalSchematic (optimized):        {:>8.1}ms ({:.1}x)",
+            universal_optimized_time.as_secs_f64() * 1000.0,
+            universal_slow_time.as_secs_f64() / universal_optimized_time.as_secs_f64()
+        );
+        println!(
+            "  Python MCSchematic style:              {:>8.1}ms",
+            python_style_time.as_secs_f64() * 1000.0
+        );
 
         // Overhead analysis
         let overhead_current = universal_slow_time.as_secs_f64() / region_time.as_secs_f64();
-        let overhead_optimized = universal_optimized_time.as_secs_f64() / region_prealloc_time.as_secs_f64();
+        let overhead_optimized =
+            universal_optimized_time.as_secs_f64() / region_prealloc_time.as_secs_f64();
 
-        println!("  📊 UniversalSchematic overhead (current): {:.1}x", overhead_current);
-        println!("  📊 UniversalSchematic overhead (optimized): {:.1}x", overhead_optimized);
+        println!(
+            "  📊 UniversalSchematic overhead (current): {:.1}x",
+            overhead_current
+        );
+        println!(
+            "  📊 UniversalSchematic overhead (optimized): {:.1}x",
+            overhead_optimized
+        );
 
         if universal_optimized_time < python_style_time {
-            println!("  🎉 Optimized beats Python style by {:.1}x!",
-                     python_style_time.as_secs_f64() / universal_optimized_time.as_secs_f64());
+            println!(
+                "  🎉 Optimized beats Python style by {:.1}x!",
+                python_style_time.as_secs_f64() / universal_optimized_time.as_secs_f64()
+            );
         } else {
-            println!("  ⚠️  Python style is {:.1}x faster",
-                     universal_optimized_time.as_secs_f64() / python_style_time.as_secs_f64());
+            println!(
+                "  ⚠️  Python style is {:.1}x faster",
+                universal_optimized_time.as_secs_f64() / python_style_time.as_secs_f64()
+            );
         }
         println!();
     }
@@ -195,14 +221,24 @@ fn main() {
     }
     let python_large_time = start.elapsed();
 
-    println!("Optimized Nucleation: {:>8.1}ms", optimized_large_time.as_secs_f64() * 1000.0);
-    println!("Python style:         {:>8.1}ms", python_large_time.as_secs_f64() * 1000.0);
+    println!(
+        "Optimized Nucleation: {:>8.1}ms",
+        optimized_large_time.as_secs_f64() * 1000.0
+    );
+    println!(
+        "Python style:         {:>8.1}ms",
+        python_large_time.as_secs_f64() * 1000.0
+    );
 
     if optimized_large_time < python_large_time {
-        println!("🎉 Nucleation wins at scale by {:.1}x!",
-                 python_large_time.as_secs_f64() / optimized_large_time.as_secs_f64());
+        println!(
+            "🎉 Nucleation wins at scale by {:.1}x!",
+            python_large_time.as_secs_f64() / optimized_large_time.as_secs_f64()
+        );
     } else {
-        println!("📈 Python style scales better by {:.1}x",
-                 optimized_large_time.as_secs_f64() / python_large_time.as_secs_f64());
+        println!(
+            "📈 Python style scales better by {:.1}x",
+            optimized_large_time.as_secs_f64() / python_large_time.as_secs_f64()
+        );
     }
 }

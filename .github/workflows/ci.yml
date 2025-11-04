@@ -73,7 +73,8 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Run tests
         run: |
-          cargo test  # Test default (no features) 
+          cargo test  # Test default (no features)
+          cargo test --features simulation  # Test simulation feature
   build-wasm:
     needs: [test, check-version]
     runs-on: ubuntu-latest
@@ -230,10 +231,10 @@ jobs:
             const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
             pkg.version = '${{ needs.check-version.outputs.version }}';
             pkg.description = 'A high-performance Minecraft schematic parser and utility library';
-            pkg.repository = { type: 'git', url: 'https://github.com/Nano112/Nucleation' };
-            pkg.homepage = 'https://github.com/Nano112/Nucleation';
+            pkg.repository = { type: 'git', url: 'https://github.com/Schem-at/Nucleation' };
+            pkg.homepage = 'https://github.com/Schem-at/Nucleation';
             pkg.author = 'Nano <nano@schem.at>';
-            pkg.license = 'MIT OR Apache-2.0';
+            pkg.license = 'AGPL-3.0-only';
             fs.writeFileSync(path, JSON.stringify(pkg, null, 2));
           "
           npm publish
@@ -247,7 +248,7 @@ jobs:
       - name: Install maturin & Publish
         run: |
           pip install maturin
-          maturin publish --features python --username __token__ --password ${{ secrets.PYPI_API_TOKEN }}
+          maturin publish --features python,simulation --username __token__ --password ${{ secrets.PYPI_API_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

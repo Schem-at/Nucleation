@@ -1,18 +1,17 @@
 // src/ffi.rs
 #![cfg(feature = "ffi")]
-use std::os::raw::{c_char, c_uchar, c_int, c_float};
-use std::ffi::{CStr, CString};
-use std::collections::HashMap;
-use std::ptr;
 use crate::{
-    UniversalSchematic,
-    BlockState,
-    formats::{litematic, schematic},
-    print_utils::{format_schematic, format_json_schematic},
     block_position::BlockPosition,
     bounding_box::BoundingBox,
-    universal_schematic::ChunkLoadingStrategy
+    formats::{litematic, schematic},
+    print_utils::{format_json_schematic, format_schematic},
+    universal_schematic::ChunkLoadingStrategy,
+    BlockState, UniversalSchematic,
 };
+use std::collections::HashMap;
+use std::ffi::{CStr, CString};
+use std::os::raw::{c_char, c_float, c_int, c_uchar};
+use std::ptr;
 
 // --- C-Compatible Data Structures ---
 
@@ -90,7 +89,6 @@ pub struct CChunkArray {
     data: *mut CChunk,
     len: usize,
 }
-
 
 // --- Wrapper Structs with Opaque Pointers ---
 
@@ -212,7 +210,6 @@ pub extern "C" fn free_chunk_array(mut array: CChunkArray) {
     }
 }
 
-
 // --- Schematic Lifecycle ---
 
 /// Creates a new, empty schematic.
@@ -235,7 +232,6 @@ pub extern "C" fn schematic_free(schematic: *mut SchematicWrapper) {
     }
 }
 
-
 // --- Data I/O ---
 
 /// Populates a schematic from raw byte data, auto-detecting the format.
@@ -246,18 +242,26 @@ pub extern "C" fn schematic_from_data(
     data: *const c_uchar,
     data_len: usize,
 ) -> c_int {
-    if schematic.is_null() || data.is_null() { return -1; }
+    if schematic.is_null() || data.is_null() {
+        return -1;
+    }
     let data_slice = unsafe { std::slice::from_raw_parts(data, data_len) };
     let s = unsafe { &mut *(*schematic).0 };
 
     if litematic::is_litematic(data_slice) {
         match litematic::from_litematic(data_slice) {
-            Ok(res) => { *s = res; 0 }
+            Ok(res) => {
+                *s = res;
+                0
+            }
             Err(_) => -2,
         }
     } else if schematic::is_schematic(data_slice) {
         match schematic::from_schematic(data_slice) {
-            Ok(res) => { *s = res; 0 }
+            Ok(res) => {
+                *s = res;
+                0
+            }
             Err(_) => -2,
         }
     } else {
@@ -268,12 +272,21 @@ pub extern "C" fn schematic_from_data(
 /// Populates a schematic from Litematic data.
 /// Returns 0 on success, negative on error.
 #[no_mangle]
-pub extern "C" fn schematic_from_litematic(schematic: *mut SchematicWrapper, data: *const c_uchar, data_len: usize) -> c_int {
-    if schematic.is_null() || data.is_null() { return -1; }
+pub extern "C" fn schematic_from_litematic(
+    schematic: *mut SchematicWrapper,
+    data: *const c_uchar,
+    data_len: usize,
+) -> c_int {
+    if schematic.is_null() || data.is_null() {
+        return -1;
+    }
     let data_slice = unsafe { std::slice::from_raw_parts(data, data_len) };
     let s = unsafe { &mut *(*schematic).0 };
     match litematic::from_litematic(data_slice) {
-        Ok(res) => { *s = res; 0 },
+        Ok(res) => {
+            *s = res;
+            0
+        }
         Err(_) => -2,
     }
 }
@@ -282,7 +295,12 @@ pub extern "C" fn schematic_from_litematic(schematic: *mut SchematicWrapper, dat
 /// The returned ByteArray must be freed with `free_byte_array`.
 #[no_mangle]
 pub extern "C" fn schematic_to_litematic(schematic: *const SchematicWrapper) -> ByteArray {
-    if schematic.is_null() { return ByteArray { data: ptr::null_mut(), len: 0 }; }
+    if schematic.is_null() {
+        return ByteArray {
+            data: ptr::null_mut(),
+            len: 0,
+        };
+    }
     let s = unsafe { &*(*schematic).0 };
     match litematic::to_litematic(s) {
         Ok(data) => {
@@ -292,19 +310,31 @@ pub extern "C" fn schematic_to_litematic(schematic: *const SchematicWrapper) -> 
             std::mem::forget(data);
             ByteArray { data: ptr, len }
         }
-        Err(_) => ByteArray { data: ptr::null_mut(), len: 0 },
+        Err(_) => ByteArray {
+            data: ptr::null_mut(),
+            len: 0,
+        },
     }
 }
 
 /// Populates a schematic from classic `.schematic` data.
 /// Returns 0 on success, negative on error.
 #[no_mangle]
-pub extern "C" fn schematic_from_schematic(schematic: *mut SchematicWrapper, data: *const c_uchar, data_len: usize) -> c_int {
-    if schematic.is_null() || data.is_null() { return -1; }
+pub extern "C" fn schematic_from_schematic(
+    schematic: *mut SchematicWrapper,
+    data: *const c_uchar,
+    data_len: usize,
+) -> c_int {
+    if schematic.is_null() || data.is_null() {
+        return -1;
+    }
     let data_slice = unsafe { std::slice::from_raw_parts(data, data_len) };
     let s = unsafe { &mut *(*schematic).0 };
     match schematic::from_schematic(data_slice) {
-        Ok(res) => { *s = res; 0 },
+        Ok(res) => {
+            *s = res;
+            0
+        }
         Err(_) => -2,
     }
 }
@@ -313,7 +343,12 @@ pub extern "C" fn schematic_from_schematic(schematic: *mut SchematicWrapper, dat
 /// The returned ByteArray must be freed with `free_byte_array`.
 #[no_mangle]
 pub extern "C" fn schematic_to_schematic(schematic: *const SchematicWrapper) -> ByteArray {
-    if schematic.is_null() { return ByteArray { data: ptr::null_mut(), len: 0 }; }
+    if schematic.is_null() {
+        return ByteArray {
+            data: ptr::null_mut(),
+            len: 0,
+        };
+    }
     let s = unsafe { &*(*schematic).0 };
     match schematic::to_schematic(s) {
         Ok(data) => {
@@ -323,7 +358,10 @@ pub extern "C" fn schematic_to_schematic(schematic: *const SchematicWrapper) -> 
             std::mem::forget(data);
             ByteArray { data: ptr, len }
         }
-        Err(_) => ByteArray { data: ptr::null_mut(), len: 0 },
+        Err(_) => ByteArray {
+            data: ptr::null_mut(),
+            len: 0,
+        },
     }
 }
 
@@ -334,10 +372,14 @@ pub extern "C" fn schematic_to_schematic(schematic: *const SchematicWrapper) -> 
 #[no_mangle]
 pub extern "C" fn schematic_set_block(
     schematic: *mut SchematicWrapper,
-    x: c_int, y: c_int, z: c_int,
+    x: c_int,
+    y: c_int,
+    z: c_int,
     block_name: *const c_char,
 ) -> c_int {
-    if schematic.is_null() || block_name.is_null() { return -1; }
+    if schematic.is_null() || block_name.is_null() {
+        return -1;
+    }
     let s = unsafe { &mut *(*schematic).0 };
     let block_name_str = unsafe { CStr::from_ptr(block_name).to_string_lossy().into_owned() };
 
@@ -352,12 +394,16 @@ pub extern "C" fn schematic_set_block(
 #[no_mangle]
 pub extern "C" fn schematic_set_block_with_properties(
     schematic: *mut SchematicWrapper,
-    x: c_int, y: c_int, z: c_int,
+    x: c_int,
+    y: c_int,
+    z: c_int,
     block_name: *const c_char,
     properties: *const CProperty,
     properties_len: usize,
 ) -> c_int {
-    if schematic.is_null() || block_name.is_null() { return -1; }
+    if schematic.is_null() || block_name.is_null() {
+        return -1;
+    }
     let s = unsafe { &mut *(*schematic).0 };
     let block_name_str = unsafe { CStr::from_ptr(block_name).to_string_lossy().into_owned() };
 
@@ -371,7 +417,10 @@ pub extern "C" fn schematic_set_block_with_properties(
         }
     }
 
-    let block_state = BlockState { name: block_name_str, properties: props };
+    let block_state = BlockState {
+        name: block_name_str,
+        properties: props,
+    };
     s.set_block(x, y, z, block_state);
     0
 }
@@ -381,10 +430,14 @@ pub extern "C" fn schematic_set_block_with_properties(
 #[no_mangle]
 pub extern "C" fn schematic_set_block_from_string(
     schematic: *mut SchematicWrapper,
-    x: c_int, y: c_int, z: c_int,
+    x: c_int,
+    y: c_int,
+    z: c_int,
     block_string: *const c_char,
 ) -> c_int {
-    if schematic.is_null() || block_string.is_null() { return -1; }
+    if schematic.is_null() || block_string.is_null() {
+        return -1;
+    }
     let s = unsafe { &mut *(*schematic).0 };
     let block_str = unsafe { CStr::from_ptr(block_string).to_string_lossy() };
     match s.set_block_from_string(x, y, z, &block_str) {
@@ -399,20 +452,29 @@ pub extern "C" fn schematic_set_block_from_string(
 pub extern "C" fn schematic_copy_region(
     target: *mut SchematicWrapper,
     source: *const SchematicWrapper,
-    min_x: c_int, min_y: c_int, min_z: c_int,
-    max_x: c_int, max_y: c_int, max_z: c_int,
-    target_x: c_int, target_y: c_int, target_z: c_int,
+    min_x: c_int,
+    min_y: c_int,
+    min_z: c_int,
+    max_x: c_int,
+    max_y: c_int,
+    max_z: c_int,
+    target_x: c_int,
+    target_y: c_int,
+    target_z: c_int,
     excluded_blocks: *const *const c_char,
     excluded_blocks_len: usize,
 ) -> c_int {
-    if target.is_null() || source.is_null() { return -1; }
+    if target.is_null() || source.is_null() {
+        return -1;
+    }
     let target_s = unsafe { &mut *(*target).0 };
     let source_s = unsafe { &*(*source).0 };
     let bounds = BoundingBox::new((min_x, min_y, min_z), (max_x, max_y, max_z));
 
     let mut excluded = Vec::new();
     if !excluded_blocks.is_null() {
-        let excluded_slice = unsafe { std::slice::from_raw_parts(excluded_blocks, excluded_blocks_len) };
+        let excluded_slice =
+            unsafe { std::slice::from_raw_parts(excluded_blocks, excluded_blocks_len) };
         for &block_ptr in excluded_slice {
             let block_str = unsafe { CStr::from_ptr(block_ptr).to_string_lossy() };
             match UniversalSchematic::parse_block_string(&block_str) {
@@ -435,9 +497,13 @@ pub extern "C" fn schematic_copy_region(
 #[no_mangle]
 pub extern "C" fn schematic_get_block(
     schematic: *const SchematicWrapper,
-    x: c_int, y: c_int, z: c_int,
+    x: c_int,
+    y: c_int,
+    z: c_int,
 ) -> *mut c_char {
-    if schematic.is_null() { return ptr::null_mut(); }
+    if schematic.is_null() {
+        return ptr::null_mut();
+    }
     let s = unsafe { &*(*schematic).0 };
     s.get_block(x, y, z).map_or(ptr::null_mut(), |block_state| {
         CString::new(block_state.name.clone()).unwrap().into_raw()
@@ -449,9 +515,13 @@ pub extern "C" fn schematic_get_block(
 #[no_mangle]
 pub extern "C" fn schematic_get_block_with_properties(
     schematic: *const SchematicWrapper,
-    x: c_int, y: c_int, z: c_int,
+    x: c_int,
+    y: c_int,
+    z: c_int,
 ) -> *mut BlockStateWrapper {
-    if schematic.is_null() { return ptr::null_mut(); }
+    if schematic.is_null() {
+        return ptr::null_mut();
+    }
     let s = unsafe { &*(*schematic).0 };
     s.get_block(x, y, z).cloned().map_or(ptr::null_mut(), |bs| {
         Box::into_raw(Box::new(BlockStateWrapper(Box::into_raw(Box::new(bs)))))
@@ -462,8 +532,15 @@ pub extern "C" fn schematic_get_block_with_properties(
 /// The returned CBlockEntity pointer must be freed by calling `free_block_entity_array` on a CBlockEntityArray of length 1.
 /// Returns NULL if no block entity is found.
 #[no_mangle]
-pub extern "C" fn schematic_get_block_entity(schematic: *const SchematicWrapper, x: c_int, y: c_int, z: c_int) -> *mut CBlockEntity {
-    if schematic.is_null() { return ptr::null_mut(); }
+pub extern "C" fn schematic_get_block_entity(
+    schematic: *const SchematicWrapper,
+    x: c_int,
+    y: c_int,
+    z: c_int,
+) -> *mut CBlockEntity {
+    if schematic.is_null() {
+        return ptr::null_mut();
+    }
     let s = unsafe { &*(*schematic).0 };
     let pos = BlockPosition { x, y, z };
 
@@ -483,8 +560,15 @@ pub extern "C" fn schematic_get_block_entity(schematic: *const SchematicWrapper,
 /// Gets a list of all block entities in the schematic.
 /// The returned CBlockEntityArray must be freed with `free_block_entity_array`.
 #[no_mangle]
-pub extern "C" fn schematic_get_all_block_entities(schematic: *const SchematicWrapper) -> CBlockEntityArray {
-    if schematic.is_null() { return CBlockEntityArray { data: ptr::null_mut(), len: 0 }; }
+pub extern "C" fn schematic_get_all_block_entities(
+    schematic: *const SchematicWrapper,
+) -> CBlockEntityArray {
+    if schematic.is_null() {
+        return CBlockEntityArray {
+            data: ptr::null_mut(),
+            len: 0,
+        };
+    }
     let s = unsafe { &*(*schematic).0 };
     let block_entities = s.get_block_entities_as_list();
 
@@ -511,9 +595,15 @@ pub extern "C" fn schematic_get_all_block_entities(schematic: *const SchematicWr
 /// The returned CBlockArray must be freed with `free_block_array`.
 #[no_mangle]
 pub extern "C" fn schematic_get_all_blocks(schematic: *const SchematicWrapper) -> CBlockArray {
-    if schematic.is_null() { return CBlockArray { data: ptr::null_mut(), len: 0 }; }
+    if schematic.is_null() {
+        return CBlockArray {
+            data: ptr::null_mut(),
+            len: 0,
+        };
+    }
     let s = unsafe { &*(*schematic).0 };
-    let blocks: Vec<CBlock> = s.iter_blocks()
+    let blocks: Vec<CBlock> = s
+        .iter_blocks()
         .map(|(pos, block)| {
             let props_json = serde_json::to_string(&block.properties).unwrap_or_default();
             CBlock {
@@ -538,22 +628,37 @@ pub extern "C" fn schematic_get_all_blocks(schematic: *const SchematicWrapper) -
 #[no_mangle]
 pub extern "C" fn schematic_get_chunk_blocks(
     schematic: *const SchematicWrapper,
-    offset_x: c_int, offset_y: c_int, offset_z: c_int,
-    width: c_int, height: c_int, length: c_int
+    offset_x: c_int,
+    offset_y: c_int,
+    offset_z: c_int,
+    width: c_int,
+    height: c_int,
+    length: c_int,
 ) -> CBlockArray {
-    if schematic.is_null() { return CBlockArray { data: ptr::null_mut(), len: 0 }; }
+    if schematic.is_null() {
+        return CBlockArray {
+            data: ptr::null_mut(),
+            len: 0,
+        };
+    }
     let s = unsafe { &*(*schematic).0 };
 
-    let blocks: Vec<CBlock> = s.iter_blocks()
+    let blocks: Vec<CBlock> = s
+        .iter_blocks()
         .filter(|(pos, _)| {
-            pos.x >= offset_x && pos.x < offset_x + width &&
-                pos.y >= offset_y && pos.y < offset_y + height &&
-                pos.z >= offset_z && pos.z < offset_z + length
+            pos.x >= offset_x
+                && pos.x < offset_x + width
+                && pos.y >= offset_y
+                && pos.y < offset_y + height
+                && pos.z >= offset_z
+                && pos.z < offset_z + length
         })
         .map(|(pos, block)| {
             let props_json = serde_json::to_string(&block.properties).unwrap_or_default();
             CBlock {
-                x: pos.x, y: pos.y, z: pos.z,
+                x: pos.x,
+                y: pos.y,
+                z: pos.z,
                 name: CString::new(block.name.clone()).unwrap().into_raw(),
                 properties_json: CString::new(props_json).unwrap().into_raw(),
             }
@@ -574,13 +679,19 @@ pub extern "C" fn schematic_get_chunk_blocks(
 #[no_mangle]
 pub extern "C" fn schematic_get_chunks(
     schematic: *const SchematicWrapper,
-    chunk_width: c_int, chunk_height: c_int, chunk_length: c_int,
+    chunk_width: c_int,
+    chunk_height: c_int,
+    chunk_length: c_int,
 ) -> CChunkArray {
     schematic_get_chunks_with_strategy(
         schematic,
-        chunk_width, chunk_height, chunk_length,
+        chunk_width,
+        chunk_height,
+        chunk_length,
         ptr::null(), // Use default strategy
-        0.0, 0.0, 0.0 // Camera position not used for default
+        0.0,
+        0.0,
+        0.0, // Camera position not used for default
     )
 }
 
@@ -589,16 +700,31 @@ pub extern "C" fn schematic_get_chunks(
 #[no_mangle]
 pub extern "C" fn schematic_get_chunks_with_strategy(
     schematic: *const SchematicWrapper,
-    chunk_width: c_int, chunk_height: c_int, chunk_length: c_int,
+    chunk_width: c_int,
+    chunk_height: c_int,
+    chunk_length: c_int,
     strategy: *const c_char,
-    camera_x: c_float, camera_y: c_float, camera_z: c_float,
+    camera_x: c_float,
+    camera_y: c_float,
+    camera_z: c_float,
 ) -> CChunkArray {
-    if schematic.is_null() { return CChunkArray { data: ptr::null_mut(), len: 0 }; }
+    if schematic.is_null() {
+        return CChunkArray {
+            data: ptr::null_mut(),
+            len: 0,
+        };
+    }
     let s = unsafe { &*(*schematic).0 };
-    let strategy_str = if strategy.is_null() { "" } else { unsafe { CStr::from_ptr(strategy).to_str().unwrap_or("") } };
+    let strategy_str = if strategy.is_null() {
+        ""
+    } else {
+        unsafe { CStr::from_ptr(strategy).to_str().unwrap_or("") }
+    };
 
     let strategy_enum = match strategy_str {
-        "distance_to_camera" => Some(ChunkLoadingStrategy::DistanceToCamera(camera_x, camera_y, camera_z)),
+        "distance_to_camera" => Some(ChunkLoadingStrategy::DistanceToCamera(
+            camera_x, camera_y, camera_z,
+        )),
         "top_down" => Some(ChunkLoadingStrategy::TopDown),
         "bottom_up" => Some(ChunkLoadingStrategy::BottomUp),
         "center_outward" => Some(ChunkLoadingStrategy::CenterOutward),
@@ -606,14 +732,19 @@ pub extern "C" fn schematic_get_chunks_with_strategy(
         _ => Some(ChunkLoadingStrategy::BottomUp), // Default strategy
     };
 
-    let chunks: Vec<CChunk> = s.iter_chunks(chunk_width, chunk_height, chunk_length, strategy_enum)
+    let chunks: Vec<CChunk> = s
+        .iter_chunks(chunk_width, chunk_height, chunk_length, strategy_enum)
         .map(|chunk| {
-            let blocks: Vec<CBlock> = chunk.positions.into_iter()
+            let blocks: Vec<CBlock> = chunk
+                .positions
+                .into_iter()
                 .filter_map(|pos| s.get_block(pos.x, pos.y, pos.z).map(|b| (pos, b)))
                 .map(|(pos, block)| {
                     let props_json = serde_json::to_string(&block.properties).unwrap_or_default();
                     CBlock {
-                        x: pos.x, y: pos.y, z: pos.z,
+                        x: pos.x,
+                        y: pos.y,
+                        z: pos.z,
                         name: CString::new(block.name.clone()).unwrap().into_raw(),
                         properties_json: CString::new(props_json).unwrap().into_raw(),
                     }
@@ -629,7 +760,10 @@ pub extern "C" fn schematic_get_chunks_with_strategy(
                 chunk_x: chunk.chunk_x,
                 chunk_y: chunk.chunk_y,
                 chunk_z: chunk.chunk_z,
-                blocks: CBlockArray { data: blocks_ptr, len: blocks_len },
+                blocks: CBlockArray {
+                    data: blocks_ptr,
+                    len: blocks_len,
+                },
             }
         })
         .collect();
@@ -641,14 +775,18 @@ pub extern "C" fn schematic_get_chunks_with_strategy(
     CChunkArray { data: ptr, len }
 }
 
-
 // --- Metadata & Info ---
 
 /// Gets the schematic's dimensions [width, height, length].
 /// The returned IntArray must be freed with `free_int_array`.
 #[no_mangle]
 pub extern "C" fn schematic_get_dimensions(schematic: *const SchematicWrapper) -> IntArray {
-    if schematic.is_null() { return IntArray { data: ptr::null_mut(), len: 0 }; }
+    if schematic.is_null() {
+        return IntArray {
+            data: ptr::null_mut(),
+            len: 0,
+        };
+    }
     let s = unsafe { &*(*schematic).0 };
     let (x, y, z) = s.get_dimensions();
     let dims = vec![x, y, z];
@@ -662,14 +800,18 @@ pub extern "C" fn schematic_get_dimensions(schematic: *const SchematicWrapper) -
 /// Gets the total number of non-air blocks in the schematic.
 #[no_mangle]
 pub extern "C" fn schematic_get_block_count(schematic: *const SchematicWrapper) -> c_int {
-    if schematic.is_null() { return 0; }
+    if schematic.is_null() {
+        return 0;
+    }
     unsafe { (*(*schematic).0).total_blocks() }
 }
 
 /// Gets the total volume of the schematic's bounding box.
 #[no_mangle]
 pub extern "C" fn schematic_get_volume(schematic: *const SchematicWrapper) -> c_int {
-    if schematic.is_null() { return 0; }
+    if schematic.is_null() {
+        return 0;
+    }
     unsafe { (*(*schematic).0).total_volume() }
 }
 
@@ -677,10 +819,18 @@ pub extern "C" fn schematic_get_volume(schematic: *const SchematicWrapper) -> c_
 /// The returned StringArray must be freed with `free_string_array`.
 #[no_mangle]
 pub extern "C" fn schematic_get_region_names(schematic: *const SchematicWrapper) -> StringArray {
-    if schematic.is_null() { return StringArray { data: ptr::null_mut(), len: 0 }; }
+    if schematic.is_null() {
+        return StringArray {
+            data: ptr::null_mut(),
+            len: 0,
+        };
+    }
     let s = unsafe { &*(*schematic).0 };
     let names = s.get_region_names();
-    let c_names: Vec<*mut c_char> = names.into_iter().map(|n| CString::new(n).unwrap().into_raw()).collect();
+    let c_names: Vec<*mut c_char> = names
+        .into_iter()
+        .map(|n| CString::new(n).unwrap().into_raw())
+        .collect();
 
     let mut c_names = c_names;
     let ptr = c_names.as_mut_ptr();
@@ -689,14 +839,15 @@ pub extern "C" fn schematic_get_region_names(schematic: *const SchematicWrapper)
     StringArray { data: ptr, len }
 }
 
-
 // --- BlockState Wrapper ---
 
 /// Creates a new BlockState.
 /// The returned pointer must be freed with `blockstate_free`.
 #[no_mangle]
 pub extern "C" fn blockstate_new(name: *const c_char) -> *mut BlockStateWrapper {
-    if name.is_null() { return ptr::null_mut(); }
+    if name.is_null() {
+        return ptr::null_mut();
+    }
     let name_str = unsafe { CStr::from_ptr(name).to_string_lossy().into_owned() };
     let bs = BlockState::new(name_str);
     Box::into_raw(Box::new(BlockStateWrapper(Box::into_raw(Box::new(bs)))))
@@ -721,20 +872,26 @@ pub extern "C" fn blockstate_with_property(
     key: *const c_char,
     value: *const c_char,
 ) -> *mut BlockStateWrapper {
-    if block_state.is_null() || key.is_null() || value.is_null() { return ptr::null_mut(); }
+    if block_state.is_null() || key.is_null() || value.is_null() {
+        return ptr::null_mut();
+    }
     let state = unsafe { &*(*block_state).0 };
     let key_str = unsafe { CStr::from_ptr(key).to_string_lossy().into_owned() };
     let value_str = unsafe { CStr::from_ptr(value).to_string_lossy().into_owned() };
 
     let new_state = state.clone().with_property(key_str, value_str);
-    Box::into_raw(Box::new(BlockStateWrapper(Box::into_raw(Box::new(new_state)))))
+    Box::into_raw(Box::new(BlockStateWrapper(Box::into_raw(Box::new(
+        new_state,
+    )))))
 }
 
 /// Gets the name of a BlockState.
 /// The returned C string must be freed with `free_string`.
 #[no_mangle]
 pub extern "C" fn blockstate_get_name(block_state: *const BlockStateWrapper) -> *mut c_char {
-    if block_state.is_null() { return ptr::null_mut(); }
+    if block_state.is_null() {
+        return ptr::null_mut();
+    }
     let state = unsafe { &*(*block_state).0 };
     CString::new(state.name.clone()).unwrap().into_raw()
 }
@@ -742,11 +899,20 @@ pub extern "C" fn blockstate_get_name(block_state: *const BlockStateWrapper) -> 
 /// Gets all properties of a BlockState.
 /// The returned CPropertyArray must be freed with `free_property_array`.
 #[no_mangle]
-pub extern "C" fn blockstate_get_properties(block_state: *const BlockStateWrapper) -> CPropertyArray {
-    if block_state.is_null() { return CPropertyArray { data: ptr::null_mut(), len: 0 }; }
+pub extern "C" fn blockstate_get_properties(
+    block_state: *const BlockStateWrapper,
+) -> CPropertyArray {
+    if block_state.is_null() {
+        return CPropertyArray {
+            data: ptr::null_mut(),
+            len: 0,
+        };
+    }
     let state = unsafe { &*(*block_state).0 };
 
-    let props: Vec<CProperty> = state.properties.iter()
+    let props: Vec<CProperty> = state
+        .properties
+        .iter()
         .map(|(k, v)| CProperty {
             key: CString::new(k.clone()).unwrap().into_raw(),
             value: CString::new(v.clone()).unwrap().into_raw(),
@@ -760,18 +926,21 @@ pub extern "C" fn blockstate_get_properties(block_state: *const BlockStateWrappe
     CPropertyArray { data: ptr, len }
 }
 
-
 // --- Debugging & Utility Functions ---
 
 /// Returns a string with basic debug info about the schematic.
 /// The returned C string must be freed with `free_string`.
 #[no_mangle]
 pub extern "C" fn schematic_debug_info(schematic: *const SchematicWrapper) -> *mut c_char {
-    if schematic.is_null() { return ptr::null_mut(); }
+    if schematic.is_null() {
+        return ptr::null_mut();
+    }
     let s = unsafe { &*(*schematic).0 };
-    let info = format!("Schematic name: {}, Regions: {}",
-                       s.metadata.name.as_ref().unwrap_or(&"Unnamed".to_string()),
-                       s.other_regions.len() + 1); // +1 for the main region
+    let info = format!(
+        "Schematic name: {}, Regions: {}",
+        s.metadata.name.as_ref().unwrap_or(&"Unnamed".to_string()),
+        s.other_regions.len() + 1
+    ); // +1 for the main region
     CString::new(info).unwrap().into_raw()
 }
 
@@ -779,7 +948,9 @@ pub extern "C" fn schematic_debug_info(schematic: *const SchematicWrapper) -> *m
 /// The returned C string must be freed with `free_string`.
 #[no_mangle]
 pub extern "C" fn schematic_print(schematic: *const SchematicWrapper) -> *mut c_char {
-    if schematic.is_null() { return ptr::null_mut(); }
+    if schematic.is_null() {
+        return ptr::null_mut();
+    }
     let s = unsafe { &*(*schematic).0 };
     let output = format_schematic(s);
     CString::new(output).unwrap().into_raw()
@@ -789,11 +960,15 @@ pub extern "C" fn schematic_print(schematic: *const SchematicWrapper) -> *mut c_
 /// The returned C string must be freed with `free_string`.
 #[no_mangle]
 pub extern "C" fn debug_schematic(schematic: *const SchematicWrapper) -> *mut c_char {
-    if schematic.is_null() { return ptr::null_mut(); }
+    if schematic.is_null() {
+        return ptr::null_mut();
+    }
     let s = unsafe { &*(*schematic).0 };
-    let debug_info = format!("Schematic name: {}, Regions: {}",
-                             s.metadata.name.as_ref().unwrap_or(&"Unnamed".to_string()),
-                             s.other_regions.len() + 1); // +1 for the main region
+    let debug_info = format!(
+        "Schematic name: {}, Regions: {}",
+        s.metadata.name.as_ref().unwrap_or(&"Unnamed".to_string()),
+        s.other_regions.len() + 1
+    ); // +1 for the main region
     let info = format!("{}\n{}", debug_info, format_schematic(s));
     CString::new(info).unwrap().into_raw()
 }
@@ -802,11 +977,15 @@ pub extern "C" fn debug_schematic(schematic: *const SchematicWrapper) -> *mut c_
 /// The returned C string must be freed with `free_string`.
 #[no_mangle]
 pub extern "C" fn debug_json_schematic(schematic: *const SchematicWrapper) -> *mut c_char {
-    if schematic.is_null() { return ptr::null_mut(); }
+    if schematic.is_null() {
+        return ptr::null_mut();
+    }
     let s = unsafe { &*(*schematic).0 };
-    let debug_info = format!("Schematic name: {}, Regions: {}",
-                             s.metadata.name.as_ref().unwrap_or(&"Unnamed".to_string()),
-                             s.other_regions.len() + 1); // +1 for the main region
+    let debug_info = format!(
+        "Schematic name: {}, Regions: {}",
+        s.metadata.name.as_ref().unwrap_or(&"Unnamed".to_string()),
+        s.other_regions.len() + 1
+    ); // +1 for the main region
     let info = format!("{}\n{}", debug_info, format_json_schematic(s));
     CString::new(info).unwrap().into_raw()
 }

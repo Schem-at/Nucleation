@@ -1,11 +1,11 @@
-use std::collections::HashMap;
-use quartz_nbt::{NbtCompound, NbtList, NbtTag};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use crate::{ BlockState};
 use crate::block_entity::BlockEntity;
 use crate::block_position::BlockPosition;
 use crate::bounding_box::BoundingBox;
 use crate::entity::Entity;
+use crate::BlockState;
+use quartz_nbt::{NbtCompound, NbtList, NbtTag};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Region {
@@ -15,7 +15,10 @@ pub struct Region {
     pub blocks: Vec<usize>,
     pub(crate) palette: Vec<BlockState>,
     pub entities: Vec<Entity>,
-    #[serde(serialize_with = "serialize_block_entities", deserialize_with = "deserialize_block_entities")]
+    #[serde(
+        serialize_with = "serialize_block_entities",
+        deserialize_with = "deserialize_block_entities"
+    )]
     pub block_entities: HashMap<(i32, i32, i32), BlockEntity>,
     #[serde(skip, default = "HashMap::new")]
     palette_index: HashMap<BlockState, usize>,
@@ -45,7 +48,11 @@ where
     Ok(block_entities_vec
         .into_iter()
         .map(|be| {
-            let pos = (be.position.0 as i32, be.position.1 as i32, be.position.2 as i32);
+            let pos = (
+                be.position.0 as i32,
+                be.position.1 as i32,
+                be.position.2 as i32,
+            );
             (pos, be)
         })
         .collect())
@@ -98,21 +105,22 @@ impl Region {
 
     pub fn is_empty(&self) -> bool {
         // Check if all blocks in the region are air (typically index 0 in palette)
-        self.blocks.iter().all(|&block_index| {
-            self.palette[block_index as usize].name == "minecraft:air"
-        })
+        self.blocks
+            .iter()
+            .all(|&block_index| self.palette[block_index as usize].name == "minecraft:air")
     }
 
     /// Alternative implementation checking for non-air blocks
     pub fn has_non_air_blocks(&self) -> bool {
-        self.blocks.iter().any(|&block_index| {
-            self.palette[block_index as usize].name != "minecraft:air"
-        })
+        self.blocks
+            .iter()
+            .any(|&block_index| self.palette[block_index as usize].name != "minecraft:air")
     }
 
     /// Count non-air blocks (if this method doesn't exist already)
     pub fn count_non_air_blocks(&self) -> usize {
-        self.blocks.iter()
+        self.blocks
+            .iter()
             .filter(|&&block_index| self.palette[block_index as usize].name != "minecraft:air")
             .count()
     }
@@ -141,12 +149,14 @@ impl Region {
     }
 
     pub fn set_block_entity(&mut self, position: BlockPosition, block_entity: BlockEntity) -> bool {
-        self.block_entities.insert((position.x, position.y, position.z), block_entity);
+        self.block_entities
+            .insert((position.x, position.y, position.z), block_entity);
         true
     }
 
     pub fn get_block_entity(&self, position: BlockPosition) -> Option<&BlockEntity> {
-        self.block_entities.get(&(position.x, position.y, position.z))
+        self.block_entities
+            .get(&(position.x, position.y, position.z))
     }
 
     pub fn get_bounding_box(&self) -> BoundingBox {
@@ -267,7 +277,11 @@ impl Region {
             return;
         }
 
-        let air_id = self.palette.iter().position(|b| b.name == "minecraft:air").unwrap();
+        let air_id = self
+            .palette
+            .iter()
+            .position(|b| b.name == "minecraft:air")
+            .unwrap();
         let mut new_blocks = vec![air_id; new_bounding_box.volume() as usize];
 
         // Copy existing blocks efficiently
@@ -361,7 +375,12 @@ impl Region {
     }
 
     fn merge_block_entities(&mut self, other: &Region) {
-        self.block_entities.extend(other.block_entities.iter().map(|(&pos, be)| (pos, be.clone())));
+        self.block_entities.extend(
+            other
+                .block_entities
+                .iter()
+                .map(|(&pos, be)| (pos, be.clone())),
+        );
     }
 
     pub fn add_entity(&mut self, entity: Entity) {
@@ -377,7 +396,8 @@ impl Region {
     }
 
     pub fn add_block_entity(&mut self, block_entity: BlockEntity) {
-        self.block_entities.insert(block_entity.position, block_entity);
+        self.block_entities
+            .insert(block_entity.position, block_entity);
     }
 
     pub fn remove_block_entity(&mut self, position: (i32, i32, i32)) -> Option<BlockEntity> {
@@ -387,20 +407,39 @@ impl Region {
     pub fn to_nbt(&self) -> NbtTag {
         let mut tag = NbtCompound::new();
         tag.insert("Name", NbtTag::String(self.name.clone()));
-        tag.insert("Position", NbtTag::IntArray(vec![self.position.0, self.position.1, self.position.2]));
-        tag.insert("Size", NbtTag::IntArray(vec![self.size.0, self.size.1, self.size.2]));
+        tag.insert(
+            "Position",
+            NbtTag::IntArray(vec![self.position.0, self.position.1, self.position.2]),
+        );
+        tag.insert(
+            "Size",
+            NbtTag::IntArray(vec![self.size.0, self.size.1, self.size.2]),
+        );
 
         let mut blocks_tag = NbtCompound::new();
         for (index, &block_index) in self.blocks.iter().enumerate() {
             let (x, y, z) = self.index_to_coords(index);
-            blocks_tag.insert(&format!("{},{},{}", x, y, z), NbtTag::Int(block_index as i32));
+            blocks_tag.insert(
+                &format!("{},{},{}", x, y, z),
+                NbtTag::Int(block_index as i32),
+            );
         }
         tag.insert("Blocks", NbtTag::Compound(blocks_tag));
 
-        let palette_list = NbtList::from(self.palette.iter().map(|b| b.to_nbt()).collect::<Vec<NbtTag>>());
+        let palette_list = NbtList::from(
+            self.palette
+                .iter()
+                .map(|b| b.to_nbt())
+                .collect::<Vec<NbtTag>>(),
+        );
         tag.insert("Palette", NbtTag::List(palette_list));
 
-        let entities_list = NbtList::from(self.entities.iter().map(|e| e.to_nbt()).collect::<Vec<NbtTag>>());
+        let entities_list = NbtList::from(
+            self.entities
+                .iter()
+                .map(|e| e.to_nbt())
+                .collect::<Vec<NbtTag>>(),
+        );
         tag.insert("Entities", NbtTag::List(entities_list));
 
         let mut block_entities_tag = NbtCompound::new();
@@ -413,7 +452,8 @@ impl Region {
     }
 
     pub fn from_nbt(nbt: &NbtCompound) -> Result<Self, String> {
-        let name = nbt.get::<_, &str>("Name")
+        let name = nbt
+            .get::<_, &str>("Name")
             .map_err(|e| format!("Failed to get Region Name: {}", e))?
             .to_string();
 
@@ -427,9 +467,11 @@ impl Region {
             _ => return Err("Invalid Size tag".to_string()),
         };
 
-        let palette_tag = nbt.get::<_, &NbtList>("Palette")
+        let palette_tag = nbt
+            .get::<_, &NbtList>("Palette")
             .map_err(|e| format!("Failed to get Palette: {}", e))?;
-        let palette: Vec<BlockState> = palette_tag.iter()
+        let palette: Vec<BlockState> = palette_tag
+            .iter()
             .filter_map(|tag| {
                 if let NbtTag::Compound(compound) = tag {
                     BlockState::from_nbt(compound).ok()
@@ -439,24 +481,26 @@ impl Region {
             })
             .collect();
 
-        let blocks_tag = nbt.get::<_, &NbtCompound>("Blocks")
+        let blocks_tag = nbt
+            .get::<_, &NbtCompound>("Blocks")
             .map_err(|e| format!("Failed to get Blocks: {}", e))?;
         let mut blocks = vec![0; (size.0 * size.1 * size.2) as usize];
         for (key, value) in blocks_tag.inner() {
             if let NbtTag::Int(index) = value {
-                let coords: Vec<i32> = key.split(',')
-                    .map(|s| s.parse::<i32>().unwrap())
-                    .collect();
+                let coords: Vec<i32> = key.split(',').map(|s| s.parse::<i32>().unwrap()).collect();
                 if coords.len() == 3 {
-                    let block_index = (coords[1] * size.0 * size.2 + coords[2] * size.0 + coords[0]) as usize;
+                    let block_index =
+                        (coords[1] * size.0 * size.2 + coords[2] * size.0 + coords[0]) as usize;
                     blocks[block_index] = *index as usize;
                 }
             }
         }
 
-        let entities_tag = nbt.get::<_, &NbtList>("Entities")
+        let entities_tag = nbt
+            .get::<_, &NbtList>("Entities")
             .map_err(|e| format!("Failed to get Entities: {}", e))?;
-        let entities = entities_tag.iter()
+        let entities = entities_tag
+            .iter()
             .filter_map(|tag| {
                 if let NbtTag::Compound(compound) = tag {
                     Entity::from_nbt(compound).ok()
@@ -466,14 +510,13 @@ impl Region {
             })
             .collect();
 
-        let block_entities_tag = nbt.get::<_, &NbtCompound>("BlockEntities")
+        let block_entities_tag = nbt
+            .get::<_, &NbtCompound>("BlockEntities")
             .map_err(|e| format!("Failed to get BlockEntities: {}", e))?;
         let mut block_entities = HashMap::new();
         for (key, value) in block_entities_tag.inner() {
             if let NbtTag::Compound(be_compound) = value {
-                let coords: Vec<i32> = key.split(',')
-                    .map(|s| s.parse::<i32>().unwrap())
-                    .collect();
+                let coords: Vec<i32> = key.split(',').map(|s| s.parse::<i32>().unwrap()).collect();
                 if coords.len() == 3 {
                     if let block_entity = BlockEntity::from_nbt(be_compound) {
                         block_entities.insert((coords[0], coords[1], coords[2]), block_entity);
@@ -505,11 +548,22 @@ impl Region {
         let mut region_nbt = NbtCompound::new();
 
         // 1. Position and Size
-        region_nbt.insert("Position", NbtTag::IntArray(vec![self.position.0, self.position.1, self.position.2]));
-        region_nbt.insert("Size", NbtTag::IntArray(vec![self.size.0, self.size.1, self.size.2]));
+        region_nbt.insert(
+            "Position",
+            NbtTag::IntArray(vec![self.position.0, self.position.1, self.position.2]),
+        );
+        region_nbt.insert(
+            "Size",
+            NbtTag::IntArray(vec![self.size.0, self.size.1, self.size.2]),
+        );
 
         // 2. BlockStatePalette
-        let palette_nbt = NbtList::from(self.palette.iter().map(|block_state| block_state.to_nbt()).collect::<Vec<NbtTag>>());
+        let palette_nbt = NbtList::from(
+            self.palette
+                .iter()
+                .map(|block_state| block_state.to_nbt())
+                .collect::<Vec<NbtTag>>(),
+        );
         region_nbt.insert("BlockStatePalette", NbtTag::List(palette_nbt));
 
         // 3. BlockStates (packed long array)
@@ -517,7 +571,12 @@ impl Region {
         region_nbt.insert("BlockStates", NbtTag::LongArray(block_states));
 
         // 4. Entities
-        let entities_nbt = NbtList::from(self.entities.iter().map(|entity| entity.to_nbt()).collect::<Vec<NbtTag>>());
+        let entities_nbt = NbtList::from(
+            self.entities
+                .iter()
+                .map(|entity| entity.to_nbt())
+                .collect::<Vec<NbtTag>>(),
+        );
         region_nbt.insert("Entities", NbtTag::List(entities_nbt));
 
         // 5. TileEntities
@@ -543,8 +602,10 @@ impl Region {
                 ((packed_states[start_long_index] as u64) >> start_offset) & (mask as u64)
             } else {
                 // Block spans two longs
-                let low_bits = ((packed_states[start_long_index] as u64) >> start_offset) & ((1 << (64 - start_offset)) - 1);
-                let high_bits = (packed_states[start_long_index + 1] as u64) & ((1 << (bits_per_block - (64 - start_offset))) - 1);
+                let low_bits = ((packed_states[start_long_index] as u64) >> start_offset)
+                    & ((1 << (64 - start_offset)) - 1);
+                let high_bits = (packed_states[start_long_index + 1] as u64)
+                    & ((1 << (bits_per_block - (64 - start_offset))) - 1);
                 low_bits | (high_bits << (64 - start_offset))
             };
 
@@ -606,7 +667,10 @@ impl Region {
     }
 
     pub fn count_blocks(&self) -> usize {
-        self.blocks.iter().filter(|&&block_index| block_index != 0).count()
+        self.blocks
+            .iter()
+            .filter(|&&block_index| block_index != 0)
+            .count()
     }
 
     pub fn get_palette_index(&self, block: &BlockState) -> Option<usize> {
@@ -646,8 +710,6 @@ mod tests {
         assert_eq!(unpacked_blocks, blocks);
     }
 
-
-
     #[test]
     fn test_region_creation() {
         let region = Region::new("Test".to_string(), (0, 0, 0), (2, 2, 2));
@@ -666,7 +728,10 @@ mod tests {
 
         assert!(region.set_block(0, 0, 0, stone.clone()));
         assert_eq!(region.get_block(0, 0, 0), Some(&stone));
-        assert_eq!(region.get_block(1, 1, 1), Some(&BlockState::new("minecraft:air".to_string())));
+        assert_eq!(
+            region.get_block(1, 1, 1),
+            Some(&BlockState::new("minecraft:air".to_string()))
+        );
         assert_eq!(region.get_block(2, 2, 2), None);
     }
 
@@ -680,7 +745,10 @@ mod tests {
         region.expand_to_fit(new_size.0, new_size.1, new_size.2);
 
         assert_eq!(region.get_block(0, 0, 0), Some(&stone));
-        assert_eq!(region.get_block(3, 3, 3), Some(&BlockState::new("minecraft:air".to_string())));
+        assert_eq!(
+            region.get_block(3, 3, 3),
+            Some(&BlockState::new("minecraft:air".to_string()))
+        );
     }
 
     #[test]
@@ -724,7 +792,10 @@ mod tests {
         assert_eq!(region.name, deserialized_region.name);
         assert_eq!(region.position, deserialized_region.position);
         assert_eq!(region.size, deserialized_region.size);
-        assert_eq!(region.get_block(0, 0, 0), deserialized_region.get_block(0, 0, 0));
+        assert_eq!(
+            region.get_block(0, 0, 0),
+            deserialized_region.get_block(0, 0, 0)
+        );
     }
 
     #[test]
@@ -870,7 +941,10 @@ mod tests {
 
         assert_eq!(region.position, (0, 0, 0));
         assert_eq!(region.get_block(3, 3, 3), Some(&stone));
-        assert_eq!(region.get_block(0, 0, 0), Some(&BlockState::new("minecraft:air".to_string())));
+        assert_eq!(
+            region.get_block(0, 0, 0),
+            Some(&BlockState::new("minecraft:air".to_string()))
+        );
     }
 
     #[test]
@@ -884,10 +958,11 @@ mod tests {
         // With hybrid approach, expect aggressive expansion
         assert_eq!(region.position, (-65, -65, -65)); // Now expects -65 instead of -1
         assert_eq!(region.get_block(-1, -1, -1), Some(&dirt));
-        assert_eq!(region.get_block(0, 0, 0), Some(&BlockState::new("minecraft:air".to_string())));
+        assert_eq!(
+            region.get_block(0, 0, 0),
+            Some(&BlockState::new("minecraft:air".to_string()))
+        );
     }
-
-
 
     #[test]
     fn test_expand_to_fit_large_positive_coordinates() {
@@ -929,8 +1004,8 @@ mod tests {
 
         // With hybrid approach, expect aggressive expansion
         // The exact value depends on your expansion logic, but should be around -66
-        assert!(region.position.0 <= -2);  // Position should shift to at least -2
-        assert!(region.position.1 <= -2);  // or more negative due to expansion margin
+        assert!(region.position.0 <= -2); // Position should shift to at least -2
+        assert!(region.position.1 <= -2); // or more negative due to expansion margin
         assert!(region.position.2 <= -2);
 
         // These should all work regardless of expansion strategy
@@ -956,7 +1031,6 @@ mod tests {
         assert_eq!(region.get_block(2, 2, 2), Some(&dirt));
         assert_eq!(region.get_block(5, 5, 5), Some(&stone));
     }
-
 
     #[test]
     fn test_incremental_expansion_in_x() {
@@ -1023,17 +1097,12 @@ mod tests {
         for x in 0..32 {
             for y in 0..32 {
                 for z in 0..32 {
-                    let expected = if (x + y + z) % 2 == 0 {
-                        &stone
-                    } else {
-                        &dirt
-                    };
+                    let expected = if (x + y + z) % 2 == 0 { &stone } else { &dirt };
                     assert_eq!(region.get_block(x, y, z), Some(expected));
                 }
             }
         }
     }
-
 
     #[test]
     fn test_bounding_box() {
@@ -1058,7 +1127,7 @@ mod tests {
         for i in 0..8 {
             let coords = region.index_to_coords(i);
             let index = region.coords_to_index(coords.0, coords.1, coords.2);
-            assert!( index < volume1);
+            assert!(index < volume1);
             assert_eq!(index, i);
         }
 
@@ -1081,12 +1150,7 @@ mod tests {
             assert!(index >= 0 && index < volume3);
             assert_eq!(index, i);
         }
-
-
-
     }
-
-
 
     #[test]
     fn test_merge_negative_size() {
@@ -1125,7 +1189,5 @@ mod tests {
 
         // Check if the new block is set correctly
         assert_eq!(region.get_block(1, 2, 1), Some(&diamond));
-
     }
-
 }

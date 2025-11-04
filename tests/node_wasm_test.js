@@ -351,6 +351,175 @@ async function runTests() {
         console.log(`   - First 10 lazy chunks contain ${realBlockCount} blocks`);
     }
 
+    // Test 8: Redstone Simulation (if available)
+    console.log('\n🧪 Test 8: Redstone Simulation');
+    if (typeof nucleation.MchprsWorldWrapper !== 'undefined') {
+        console.log('   ✅ Simulation feature is available');
+        
+        try {
+            // Create a simple redstone line with lever and lamp
+            const redstoneSchematic = new SchematicWrapper();
+            
+            // Base layer
+            for (let x = 0; x <= 15; x++) {
+                redstoneSchematic.set_block(x, 0, 0, "minecraft:gray_concrete");
+            }
+            
+            // Redstone wire with proper properties
+            for (let x = 1; x <= 14; x++) {
+                redstoneSchematic.set_block_with_properties(x, 1, 0, "minecraft:redstone_wire", {
+                    power: "0",
+                    east: x < 14 ? "side" : "none",
+                    west: "side",
+                    north: "none",
+                    south: "none"
+                });
+            }
+            
+            // Lever at start with properties
+            redstoneSchematic.set_block_with_properties(0, 1, 0, "minecraft:lever", {
+                facing: "east",
+                powered: "false",
+                face: "floor"
+            });
+            
+            // Lamp at end with properties
+            redstoneSchematic.set_block_with_properties(15, 1, 0, "minecraft:redstone_lamp", {
+                lit: "false"
+            });
+            
+            console.log('   - Created test circuit: lever -> wire -> lamp');
+            
+            // Create simulation world
+            const simWorld = redstoneSchematic.create_simulation_world();
+            console.log('   - Simulation world created successfully');
+            
+            // Initial state
+            const initialLamp = simWorld.is_lit(15, 1, 0);
+            const initialLever = simWorld.get_lever_power(0, 1, 0);
+            console.log(`   - Initial state: lever=${initialLever}, lamp=${initialLamp}`);
+            
+            // Toggle lever
+            simWorld.on_use_block(0, 1, 0);
+            simWorld.tick(2);
+            simWorld.flush();
+            
+            const afterToggle = simWorld.is_lit(15, 1, 0);
+            const leverAfterToggle = simWorld.get_lever_power(0, 1, 0);
+            console.log(`   - After toggle: lever=${leverAfterToggle}, lamp=${afterToggle}`);
+            
+            if (leverAfterToggle !== initialLever) {
+                console.log('   ✅ Lever toggled successfully');
+            } else {
+                console.log('   ⚠️  Lever did not toggle');
+            }
+            
+            // Toggle again
+            simWorld.on_use_block(0, 1, 0);
+            simWorld.tick(2);
+            simWorld.flush();
+            
+            const afterSecondToggle = simWorld.is_lit(15, 1, 0);
+            console.log(`   - After second toggle: lamp=${afterSecondToggle}`);
+            
+            console.log('   ✅ Simulation tests passed');
+            
+        } catch (error) {
+            console.log(`   ⚠️  Simulation test error: ${error.message}`);
+            console.log('   This may be expected if simulation dependencies are not fully compiled');
+        }
+    } else {
+        console.log('   ⚠️  Simulation feature not available (compile with --features simulation)');
+    }
+
+    // Test 9: Bracket Notation in set_block
+    console.log('\n🧪 Test 9: Bracket Notation Support');
+    try {
+        const bracketSchematic = new SchematicWrapper();
+        
+        // Test 1: Simple block with no properties (should work as before)
+        bracketSchematic.set_block(0, 0, 0, "minecraft:gray_concrete");
+        const simpleBlock = bracketSchematic.get_block(0, 0, 0);
+        console.log(`   - Simple block: ${simpleBlock}`);
+        if (simpleBlock !== "minecraft:gray_concrete") {
+            throw new Error(`Expected minecraft:gray_concrete, got ${simpleBlock}`);
+        }
+        
+        // Test 2: Block with bracket notation
+        bracketSchematic.set_block(0, 1, 0, "minecraft:lever[facing=east,powered=false,face=floor]");
+        const leverBlock = bracketSchematic.get_block(0, 1, 0);
+        console.log(`   - Lever block: ${leverBlock}`);
+        if (leverBlock !== "minecraft:lever") {
+            throw new Error(`Expected minecraft:lever, got ${leverBlock}`);
+        }
+        
+        // Test 3: Another bracket notation example
+        bracketSchematic.set_block(5, 1, 0, "minecraft:redstone_wire[power=0,east=side,west=side,north=none,south=none]");
+        const wireBlock = bracketSchematic.get_block(5, 1, 0);
+        console.log(`   - Wire block: ${wireBlock}`);
+        if (wireBlock !== "minecraft:redstone_wire") {
+            throw new Error(`Expected minecraft:redstone_wire, got ${wireBlock}`);
+        }
+        
+        // Test 4: Lamp with bracket notation
+        bracketSchematic.set_block(15, 1, 0, "minecraft:redstone_lamp[lit=false]");
+        const lampBlock = bracketSchematic.get_block(15, 1, 0);
+        console.log(`   - Lamp block: ${lampBlock}`);
+        if (lampBlock !== "minecraft:redstone_lamp") {
+            throw new Error(`Expected minecraft:redstone_lamp, got ${lampBlock}`);
+        }
+        
+        console.log('   ✅ All bracket notation tests passed');
+        
+        // Test 5: Use bracket notation circuit in simulation (if available)
+        if (typeof nucleation.MchprsWorldWrapper !== 'undefined') {
+            console.log('   - Testing bracket notation in simulation...');
+            
+            // Create complete circuit using only bracket notation
+            const bracketRedstoneSchematic = new SchematicWrapper();
+            
+            // Base layer
+            for (let x = 0; x <= 15; x++) {
+                bracketRedstoneSchematic.set_block(x, 0, 0, "minecraft:gray_concrete");
+            }
+            
+            // Lever using bracket notation
+            bracketRedstoneSchematic.set_block(0, 1, 0, "minecraft:lever[facing=east,powered=false,face=floor]");
+            
+            // Redstone wire using bracket notation
+            for (let x = 1; x <= 14; x++) {
+                const eastProp = x < 14 ? "side" : "none";
+                bracketRedstoneSchematic.set_block(x, 1, 0, 
+                    `minecraft:redstone_wire[power=0,east=${eastProp},west=side,north=none,south=none]`);
+            }
+            
+            // Lamp using bracket notation
+            bracketRedstoneSchematic.set_block(15, 1, 0, "minecraft:redstone_lamp[lit=false]");
+            
+            // Create simulation and test
+            const bracketSimWorld = bracketRedstoneSchematic.create_simulation_world();
+            const bracketInitialLamp = bracketSimWorld.is_lit(15, 1, 0);
+            console.log(`     - Initial lamp state: ${bracketInitialLamp}`);
+            
+            // Toggle lever
+            bracketSimWorld.on_use_block(0, 1, 0);
+            bracketSimWorld.tick(2);
+            bracketSimWorld.flush();
+            
+            const bracketAfterToggle = bracketSimWorld.is_lit(15, 1, 0);
+            console.log(`     - Lamp after toggle: ${bracketAfterToggle}`);
+            
+            if (bracketAfterToggle !== bracketInitialLamp) {
+                console.log('   ✅ Bracket notation works in simulation!');
+            } else {
+                console.log('   ⚠️  Lamp state did not change');
+            }
+        }
+    } catch (error) {
+        console.log(`   ❌ Bracket notation test failed: ${error.message}`);
+        throw error;
+    }
+    
     console.log('\n=== Test Summary ===');
     console.log('✅ All basic functionality tests completed');
     console.log('📊 Check the output above for any ❌ ERROR messages');

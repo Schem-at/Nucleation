@@ -1,6 +1,6 @@
 [package]
 name = "nucleation"
-version = "0.1.72"
+version = "0.1.73"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -25,6 +25,13 @@ wasm = [
 python = ["pyo3/extension-module"]
 # New PHP feature
 php = ["ext-php-rs"]
+# Redstone simulation support
+simulation = [
+    "mchprs_redpiler",
+    "mchprs_redstone",
+    "mchprs_world",
+    "mchprs_blocks",
+]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
@@ -36,6 +43,7 @@ log = "0.4.22"
 console = "0.15.8"
 
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+hematite-nbt = "*"
 tracing = "0.1.40"
 thiserror = "1.0.63"
 
@@ -56,6 +64,12 @@ ext-php-rs = { version = "0.13.1", optional = true }
 
 bytemuck = "1.23.1"
 
+# Simulation (MCHPRS) dependencies - optional
+mchprs_redpiler = { git = "https://github.com/Nano112/MCHPRS.git", optional = true }
+mchprs_redstone = { git = "https://github.com/Nano112/MCHPRS.git", optional = true }
+mchprs_world = { git = "https://github.com/Nano112/MCHPRS.git", default-features = false, optional = true }
+mchprs_blocks = { git = "https://github.com/Nano112/MCHPRS.git", optional = true }
+
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
 num-complex = "0.4"
@@ -73,3 +87,7 @@ debug = true
 [profile.release]
 lto = true
 opt-level = 3
+
+# Patch for MCHPRS compatibility
+[patch.crates-io]
+hematite-nbt = { git = "https://github.com/StackDoubleFlow/hematite_nbt" }
