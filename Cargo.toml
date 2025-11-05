@@ -1,6 +1,6 @@
 [package]
 name = "nucleation"
-version = "0.1.78"
+version = "0.1.79"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -74,6 +74,7 @@ mchprs_blocks = { git = "https://github.com/Nano112/MCHPRS.git", optional = true
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
 num-complex = "0.4"
+base64 = "0.22"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 criterion = "0.5.1"
