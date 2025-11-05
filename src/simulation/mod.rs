@@ -28,7 +28,7 @@ mod mchprs_world;
 mod tests;
 mod truth_table;
 
-pub use mchprs_world::{MchprsWorld, MchprsWorldError};
+pub use mchprs_world::{MchprsWorld, MchprsWorldError, SimulationOptions};
 pub use truth_table::generate_truth_table;
 
 // Re-export commonly used MCHPRS types for convenience

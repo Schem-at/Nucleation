@@ -223,7 +223,7 @@ impl PySchematic {
         let palette = self.inner.default_region.palette.clone();
         let list = PyList::new(
             py,
-            palette.iter().map(|bs| PyBlockState { inner: bs.clone() })
+            palette.iter().map(|bs| PyBlockState { inner: bs.clone() }),
         )?;
         Ok(list.into())
     }

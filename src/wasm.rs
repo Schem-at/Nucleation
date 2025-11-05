@@ -1051,7 +1051,44 @@ pub fn debug_json_schematic(schematic: &SchematicWrapper) -> String {
 // ============================================================================
 
 #[cfg(feature = "simulation")]
-use crate::simulation::{generate_truth_table, BlockPos, MchprsWorld};
+use crate::simulation::{generate_truth_table, BlockPos, MchprsWorld, SimulationOptions};
+
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+pub struct SimulationOptionsWrapper {
+    inner: SimulationOptions,
+}
+
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+impl SimulationOptionsWrapper {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self {
+            inner: SimulationOptions::default(),
+        }
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn optimize(&self) -> bool {
+        self.inner.optimize
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_optimize(&mut self, value: bool) {
+        self.inner.optimize = value;
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn io_only(&self) -> bool {
+        self.inner.io_only
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_io_only(&mut self, value: bool) {
+        self.inner.io_only = value;
+    }
+}
 
 #[cfg(feature = "simulation")]
 #[wasm_bindgen]
@@ -1062,11 +1099,21 @@ pub struct MchprsWorldWrapper {
 #[cfg(feature = "simulation")]
 #[wasm_bindgen]
 impl SchematicWrapper {
-    /// Creates a simulation world for this schematic
+    /// Creates a simulation world for this schematic with default options
     ///
     /// This allows you to simulate redstone circuits and interact with them.
     pub fn create_simulation_world(&self) -> Result<MchprsWorldWrapper, JsValue> {
         MchprsWorldWrapper::new(self)
+    }
+
+    /// Creates a simulation world for this schematic with custom options
+    ///
+    /// This allows you to configure simulation behavior like wire state tracking.
+    pub fn create_simulation_world_with_options(
+        &self,
+        options: &SimulationOptionsWrapper,
+    ) -> Result<MchprsWorldWrapper, JsValue> {
+        MchprsWorldWrapper::with_options(self, options)
     }
 }
 
@@ -1076,6 +1123,17 @@ impl MchprsWorldWrapper {
     #[wasm_bindgen(constructor)]
     pub fn new(schematic: &SchematicWrapper) -> Result<MchprsWorldWrapper, JsValue> {
         let world = MchprsWorld::new(schematic.0.clone())
+            .map_err(|e| JsValue::from_str(&format!("Failed to create MchprsWorld: {}", e)))?;
+
+        Ok(MchprsWorldWrapper { world })
+    }
+
+    /// Creates a simulation world with custom options
+    pub fn with_options(
+        schematic: &SchematicWrapper,
+        options: &SimulationOptionsWrapper,
+    ) -> Result<MchprsWorldWrapper, JsValue> {
+        let world = MchprsWorld::with_options(schematic.0.clone(), options.inner.clone())
             .map_err(|e| JsValue::from_str(&format!("Failed to create MchprsWorld: {}", e)))?;
 
         Ok(MchprsWorldWrapper { world })

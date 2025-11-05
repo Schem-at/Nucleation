@@ -16,19 +16,50 @@ pub enum MchprsWorldError {
     InvalidOperation(String),
 }
 
+/// Configuration options for MCHPRS simulation
+#[derive(Debug, Clone)]
+pub struct SimulationOptions {
+    /// Enable optimization in the compiler
+    pub optimize: bool,
+    /// When true, only inputs/outputs are tracked (faster but no intermediate wire states)
+    /// When false, all redstone wire states are updated (slower but shows wire power levels)
+    pub io_only: bool,
+}
+
+impl Default for SimulationOptions {
+    fn default() -> Self {
+        Self {
+            optimize: true,
+            io_only: false, // Default to false so wire states are visible
+        }
+    }
+}
+
 pub struct MchprsWorld {
     pub(crate) schematic: UniversalSchematic,
     chunks: HashMap<(i32, i32), Chunk>,
     to_be_ticked: Vec<TickEntry>,
     compiler: Compiler,
+    options: SimulationOptions,
 }
 
 impl MchprsWorld {
-    /// Creates a new MchprsWorld from a UniversalSchematic
+    /// Creates a new MchprsWorld from a UniversalSchematic with default options
     ///
     /// # Errors
     /// Returns an error if chunk initialization or compilation fails
     pub fn new(schematic: UniversalSchematic) -> Result<Self, String> {
+        Self::with_options(schematic, SimulationOptions::default())
+    }
+
+    /// Creates a new MchprsWorld from a UniversalSchematic with custom options
+    ///
+    /// # Errors
+    /// Returns an error if chunk initialization or compilation fails
+    pub fn with_options(
+        schematic: UniversalSchematic,
+        options: SimulationOptions,
+    ) -> Result<Self, String> {
         let mut world = MchprsWorld {
             schematic,
             chunks: HashMap::new(),
@@ -46,6 +77,7 @@ impl MchprsWorld {
                 #[cfg(not(target_arch = "wasm32"))]
                 c
             },
+            options,
         };
 
         world.initialize_chunks()?;
@@ -62,9 +94,9 @@ impl MchprsWorld {
             BlockPos::new(bounding_box.max.0, bounding_box.max.1, bounding_box.max.2),
         );
 
-        let options = CompilerOptions {
-            optimize: true,
-            io_only: true,
+        let compiler_options = CompilerOptions {
+            optimize: self.options.optimize,
+            io_only: self.options.io_only,
             wire_dot_out: true,
             backend_variant: BackendVariant::Direct,
             ..Default::default()
@@ -77,7 +109,7 @@ impl MchprsWorld {
 
         // Try compilation with error handling
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            temp_compiler.compile(self, bounds, options, ticks, monitor)
+            temp_compiler.compile(self, bounds, compiler_options, ticks, monitor)
         })) {
             Ok(_) => {
                 self.compiler = temp_compiler;
