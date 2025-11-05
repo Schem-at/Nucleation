@@ -12,6 +12,7 @@ mod item;
 mod metadata;
 mod print_utils;
 mod region;
+mod transforms;
 mod universal_schematic;
 pub mod utils;
 

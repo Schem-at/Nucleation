@@ -394,6 +394,83 @@ impl PySchematic {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))?;
         Ok(PyMchprsWorld { inner: world })
     }
+
+    // Transformation methods
+
+    /// Flip the schematic along the X axis
+    pub fn flip_x(&mut self) {
+        self.inner.flip_x();
+    }
+
+    /// Flip the schematic along the Y axis
+    pub fn flip_y(&mut self) {
+        self.inner.flip_y();
+    }
+
+    /// Flip the schematic along the Z axis
+    pub fn flip_z(&mut self) {
+        self.inner.flip_z();
+    }
+
+    /// Rotate the schematic around the Y axis (horizontal plane)
+    /// Degrees must be 90, 180, or 270
+    pub fn rotate_y(&mut self, degrees: i32) {
+        self.inner.rotate_y(degrees);
+    }
+
+    /// Rotate the schematic around the X axis
+    /// Degrees must be 90, 180, or 270
+    pub fn rotate_x(&mut self, degrees: i32) {
+        self.inner.rotate_x(degrees);
+    }
+
+    /// Rotate the schematic around the Z axis
+    /// Degrees must be 90, 180, or 270
+    pub fn rotate_z(&mut self, degrees: i32) {
+        self.inner.rotate_z(degrees);
+    }
+
+    /// Flip a specific region along the X axis
+    pub fn flip_region_x(&mut self, region_name: &str) -> PyResult<()> {
+        self.inner
+            .flip_region_x(region_name)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))
+    }
+
+    /// Flip a specific region along the Y axis
+    pub fn flip_region_y(&mut self, region_name: &str) -> PyResult<()> {
+        self.inner
+            .flip_region_y(region_name)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))
+    }
+
+    /// Flip a specific region along the Z axis
+    pub fn flip_region_z(&mut self, region_name: &str) -> PyResult<()> {
+        self.inner
+            .flip_region_z(region_name)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))
+    }
+
+    /// Rotate a specific region around the Y axis
+    pub fn rotate_region_y(&mut self, region_name: &str, degrees: i32) -> PyResult<()> {
+        self.inner
+            .rotate_region_y(region_name, degrees)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))
+    }
+
+    /// Rotate a specific region around the X axis
+    pub fn rotate_region_x(&mut self, region_name: &str, degrees: i32) -> PyResult<()> {
+        self.inner
+            .rotate_region_x(region_name, degrees)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))
+    }
+
+    /// Rotate a specific region around the Z axis
+    pub fn rotate_region_z(&mut self, region_name: &str, degrees: i32) -> PyResult<()> {
+        self.inner
+            .rotate_region_z(region_name, degrees)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))
+    }
 }
 
 // --- NBT Conversion Helpers ---

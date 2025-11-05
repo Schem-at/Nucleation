@@ -676,6 +676,402 @@ impl Region {
     pub fn get_palette_index(&self, block: &BlockState) -> Option<usize> {
         self.palette.iter().position(|b| b == block)
     }
+
+    // Transformation methods
+
+    /// Flip the region along the X axis
+    pub fn flip_x(&mut self) {
+        use crate::transforms::{transform_block_state_flip, Axis};
+
+        let (size_x, size_y, size_z) = self.size;
+        let volume = self.volume();
+        let mut new_blocks = vec![0; volume];
+
+        // Create new transformed blocks array
+        for index in 0..volume {
+            let (x, y, z) = self.index_to_coords(index);
+            let new_x = self.bbox.max.0 - (x - self.bbox.min.0);
+            let new_index = self.coords_to_index(new_x, y, z);
+            new_blocks[new_index] = self.blocks[index];
+        }
+
+        // Transform block state properties
+        let mut new_palette = Vec::with_capacity(self.palette.len());
+        for block_state in &self.palette {
+            new_palette.push(transform_block_state_flip(block_state, Axis::X));
+        }
+
+        self.blocks = new_blocks;
+        self.palette = new_palette;
+        self.rebuild_palette_index();
+
+        // Transform block entities
+        let mut new_block_entities = HashMap::new();
+        for ((x, y, z), mut be) in self.block_entities.drain() {
+            let new_x = self.bbox.max.0 - (x - self.bbox.min.0);
+            be.position = (new_x, y, z);
+            new_block_entities.insert((new_x, y, z), be);
+        }
+        self.block_entities = new_block_entities;
+
+        // Transform entities
+        for entity in &mut self.entities {
+            let rel_x = entity.position.0 - self.bbox.min.0 as f64;
+            entity.position.0 = self.bbox.max.0 as f64 - rel_x;
+        }
+    }
+
+    /// Flip the region along the Y axis
+    pub fn flip_y(&mut self) {
+        use crate::transforms::{transform_block_state_flip, Axis};
+
+        let volume = self.volume();
+        let mut new_blocks = vec![0; volume];
+
+        for index in 0..volume {
+            let (x, y, z) = self.index_to_coords(index);
+            let new_y = self.bbox.max.1 - (y - self.bbox.min.1);
+            let new_index = self.coords_to_index(x, new_y, z);
+            new_blocks[new_index] = self.blocks[index];
+        }
+
+        let mut new_palette = Vec::with_capacity(self.palette.len());
+        for block_state in &self.palette {
+            new_palette.push(transform_block_state_flip(block_state, Axis::Y));
+        }
+
+        self.blocks = new_blocks;
+        self.palette = new_palette;
+        self.rebuild_palette_index();
+
+        let mut new_block_entities = HashMap::new();
+        for ((x, y, z), mut be) in self.block_entities.drain() {
+            let new_y = self.bbox.max.1 - (y - self.bbox.min.1);
+            be.position = (x, new_y, z);
+            new_block_entities.insert((x, new_y, z), be);
+        }
+        self.block_entities = new_block_entities;
+
+        for entity in &mut self.entities {
+            let rel_y = entity.position.1 - self.bbox.min.1 as f64;
+            entity.position.1 = self.bbox.max.1 as f64 - rel_y;
+        }
+    }
+
+    /// Flip the region along the Z axis
+    pub fn flip_z(&mut self) {
+        use crate::transforms::{transform_block_state_flip, Axis};
+
+        let volume = self.volume();
+        let mut new_blocks = vec![0; volume];
+
+        for index in 0..volume {
+            let (x, y, z) = self.index_to_coords(index);
+            let new_z = self.bbox.max.2 - (z - self.bbox.min.2);
+            let new_index = self.coords_to_index(x, y, new_z);
+            new_blocks[new_index] = self.blocks[index];
+        }
+
+        let mut new_palette = Vec::with_capacity(self.palette.len());
+        for block_state in &self.palette {
+            new_palette.push(transform_block_state_flip(block_state, Axis::Z));
+        }
+
+        self.blocks = new_blocks;
+        self.palette = new_palette;
+        self.rebuild_palette_index();
+
+        let mut new_block_entities = HashMap::new();
+        for ((x, y, z), mut be) in self.block_entities.drain() {
+            let new_z = self.bbox.max.2 - (z - self.bbox.min.2);
+            be.position = (x, y, new_z);
+            new_block_entities.insert((x, y, new_z), be);
+        }
+        self.block_entities = new_block_entities;
+
+        for entity in &mut self.entities {
+            let rel_z = entity.position.2 - self.bbox.min.2 as f64;
+            entity.position.2 = self.bbox.max.2 as f64 - rel_z;
+        }
+    }
+
+    /// Rotate the region around the Y axis (horizontal plane)
+    /// Degrees must be 90, 180, or 270
+    pub fn rotate_y(&mut self, degrees: i32) {
+        use crate::transforms::{transform_block_state_rotate, Axis};
+
+        if degrees % 90 != 0 || degrees == 0 {
+            return; // Only support 90-degree rotations
+        }
+
+        let normalized_degrees = ((degrees % 360 + 360) % 360) as i32;
+        let rotations = normalized_degrees / 90;
+
+        for _ in 0..rotations {
+            self.rotate_y_90();
+        }
+    }
+
+    fn rotate_y_90(&mut self) {
+        use crate::transforms::{transform_block_state_rotate, Axis};
+
+        // For 90-degree rotation around Y:
+        // X and Z swap and dimensions change: (sx, sy, sz) -> (sz, sy, sx)
+        // Keep the origin at min corner
+
+        let old_bbox = self.bbox.clone();
+        let (old_size_x, size_y, old_size_z) = self.size;
+
+        // New dimensions after rotation
+        let new_size = (old_size_z, size_y, old_size_x);
+        let new_bbox = BoundingBox::from_position_and_size(self.position, new_size);
+
+        let new_volume = new_bbox.volume() as usize;
+        let air_index = self
+            .palette
+            .iter()
+            .position(|b| b.name == "minecraft:air")
+            .unwrap_or(0);
+        let mut new_blocks = vec![air_index; new_volume];
+
+        // Transform each block position
+        for index in 0..self.blocks.len() {
+            let (x, y, z) = old_bbox.index_to_coords(index);
+
+            // Calculate relative position in old space
+            let rel_x = x - old_bbox.min.0;
+            let rel_z = z - old_bbox.min.2;
+
+            // 90-degree rotation: (x, z) -> (z, size_x - 1 - x)
+            let new_rel_x = rel_z;
+            let new_rel_z = old_size_x - 1 - rel_x;
+
+            // Calculate absolute position in new space
+            let new_x = new_bbox.min.0 + new_rel_x;
+            let new_z = new_bbox.min.2 + new_rel_z;
+
+            let new_index = new_bbox.coords_to_index(new_x, y, new_z);
+            new_blocks[new_index] = self.blocks[index];
+        }
+
+        // Transform block state properties
+        let mut new_palette = Vec::with_capacity(self.palette.len());
+        for block_state in &self.palette {
+            new_palette.push(transform_block_state_rotate(block_state, Axis::Y, 90));
+        }
+
+        let new_bbox_clone = new_bbox.clone();
+
+        self.position = new_bbox.to_position_and_size().0;
+        self.size = new_bbox.to_position_and_size().1;
+        self.blocks = new_blocks;
+        self.palette = new_palette;
+        self.bbox = new_bbox;
+        self.rebuild_palette_index();
+
+        // Transform block entities
+        let old_bbox_for_be = old_bbox.clone();
+        let mut new_block_entities = HashMap::new();
+        for ((x, y, z), mut be) in self.block_entities.drain() {
+            let rel_x = x - old_bbox_for_be.min.0;
+            let rel_z = z - old_bbox_for_be.min.2;
+            let new_rel_x = rel_z;
+            let new_rel_z = old_size_x - 1 - rel_x;
+            let new_x = new_bbox_clone.min.0 + new_rel_x;
+            let new_z = new_bbox_clone.min.2 + new_rel_z;
+            be.position = (new_x, y, new_z);
+            new_block_entities.insert((new_x, y, new_z), be);
+        }
+        self.block_entities = new_block_entities;
+
+        // Transform entities
+        for entity in &mut self.entities {
+            let rel_x = entity.position.0 - old_bbox.min.0 as f64;
+            let rel_z = entity.position.2 - old_bbox.min.2 as f64;
+            let new_rel_x = rel_z;
+            let new_rel_z = old_size_x as f64 - 1.0 - rel_x;
+            entity.position.0 = new_bbox_clone.min.0 as f64 + new_rel_x;
+            entity.position.2 = new_bbox_clone.min.2 as f64 + new_rel_z;
+        }
+    }
+
+    /// Rotate the region around the X axis
+    /// Degrees must be 90, 180, or 270
+    pub fn rotate_x(&mut self, degrees: i32) {
+        use crate::transforms::{transform_block_state_rotate, Axis};
+
+        if degrees % 90 != 0 || degrees == 0 {
+            return;
+        }
+
+        let normalized_degrees = ((degrees % 360 + 360) % 360) as i32;
+        let rotations = normalized_degrees / 90;
+
+        for _ in 0..rotations {
+            self.rotate_x_90();
+        }
+    }
+
+    fn rotate_x_90(&mut self) {
+        use crate::transforms::{transform_block_state_rotate, Axis};
+
+        let old_bbox = self.bbox.clone();
+        let (size_x, old_size_y, old_size_z) = self.size;
+
+        // New dimensions after rotation around X
+        let new_size = (size_x, old_size_z, old_size_y);
+        let new_bbox = BoundingBox::from_position_and_size(self.position, new_size);
+
+        let new_volume = new_bbox.volume() as usize;
+        let air_index = self
+            .palette
+            .iter()
+            .position(|b| b.name == "minecraft:air")
+            .unwrap_or(0);
+        let mut new_blocks = vec![air_index; new_volume];
+
+        for index in 0..self.blocks.len() {
+            let (x, y, z) = old_bbox.index_to_coords(index);
+
+            let rel_y = y - old_bbox.min.1;
+            let rel_z = z - old_bbox.min.2;
+
+            // 90-degree rotation around X: (y, z) -> (z, size_y - 1 - y)
+            let new_rel_y = rel_z;
+            let new_rel_z = old_size_y - 1 - rel_y;
+
+            let new_y = new_bbox.min.1 + new_rel_y;
+            let new_z = new_bbox.min.2 + new_rel_z;
+
+            let new_index = new_bbox.coords_to_index(x, new_y, new_z);
+            new_blocks[new_index] = self.blocks[index];
+        }
+
+        let mut new_palette = Vec::with_capacity(self.palette.len());
+        for block_state in &self.palette {
+            new_palette.push(transform_block_state_rotate(block_state, Axis::X, 90));
+        }
+
+        let new_bbox_clone = new_bbox.clone();
+
+        self.position = new_bbox.to_position_and_size().0;
+        self.size = new_bbox.to_position_and_size().1;
+        self.blocks = new_blocks;
+        self.palette = new_palette;
+        self.bbox = new_bbox;
+        self.rebuild_palette_index();
+
+        let mut new_block_entities = HashMap::new();
+        for ((x, y, z), mut be) in self.block_entities.drain() {
+            let rel_y = y - old_bbox.min.1;
+            let rel_z = z - old_bbox.min.2;
+            let new_rel_y = rel_z;
+            let new_rel_z = old_size_y - 1 - rel_y;
+            let new_y = new_bbox_clone.min.1 + new_rel_y;
+            let new_z = new_bbox_clone.min.2 + new_rel_z;
+            be.position = (x, new_y, new_z);
+            new_block_entities.insert((x, new_y, new_z), be);
+        }
+        self.block_entities = new_block_entities;
+
+        for entity in &mut self.entities {
+            let rel_y = entity.position.1 - old_bbox.min.1 as f64;
+            let rel_z = entity.position.2 - old_bbox.min.2 as f64;
+            let new_rel_y = rel_z;
+            let new_rel_z = old_size_y as f64 - 1.0 - rel_y;
+            entity.position.1 = new_bbox_clone.min.1 as f64 + new_rel_y;
+            entity.position.2 = new_bbox_clone.min.2 as f64 + new_rel_z;
+        }
+    }
+
+    /// Rotate the region around the Z axis
+    /// Degrees must be 90, 180, or 270
+    pub fn rotate_z(&mut self, degrees: i32) {
+        use crate::transforms::{transform_block_state_rotate, Axis};
+
+        if degrees % 90 != 0 || degrees == 0 {
+            return;
+        }
+
+        let normalized_degrees = ((degrees % 360 + 360) % 360) as i32;
+        let rotations = normalized_degrees / 90;
+
+        for _ in 0..rotations {
+            self.rotate_z_90();
+        }
+    }
+
+    fn rotate_z_90(&mut self) {
+        use crate::transforms::{transform_block_state_rotate, Axis};
+
+        let old_bbox = self.bbox.clone();
+        let (old_size_x, old_size_y, size_z) = self.size;
+
+        // New dimensions after rotation around Z
+        let new_size = (old_size_y, old_size_x, size_z);
+        let new_bbox = BoundingBox::from_position_and_size(self.position, new_size);
+
+        let new_volume = new_bbox.volume() as usize;
+        let air_index = self
+            .palette
+            .iter()
+            .position(|b| b.name == "minecraft:air")
+            .unwrap_or(0);
+        let mut new_blocks = vec![air_index; new_volume];
+
+        for index in 0..self.blocks.len() {
+            let (x, y, z) = old_bbox.index_to_coords(index);
+
+            let rel_x = x - old_bbox.min.0;
+            let rel_y = y - old_bbox.min.1;
+
+            // 90-degree rotation around Z: (x, y) -> (y, size_x - 1 - x)
+            let new_rel_x = rel_y;
+            let new_rel_y = old_size_x - 1 - rel_x;
+
+            let new_x = new_bbox.min.0 + new_rel_x;
+            let new_y = new_bbox.min.1 + new_rel_y;
+
+            let new_index = new_bbox.coords_to_index(new_x, new_y, z);
+            new_blocks[new_index] = self.blocks[index];
+        }
+
+        let mut new_palette = Vec::with_capacity(self.palette.len());
+        for block_state in &self.palette {
+            new_palette.push(transform_block_state_rotate(block_state, Axis::Z, 90));
+        }
+
+        let new_bbox_clone = new_bbox.clone();
+
+        self.position = new_bbox.to_position_and_size().0;
+        self.size = new_bbox.to_position_and_size().1;
+        self.blocks = new_blocks;
+        self.palette = new_palette;
+        self.bbox = new_bbox;
+        self.rebuild_palette_index();
+
+        let mut new_block_entities = HashMap::new();
+        for ((x, y, z), mut be) in self.block_entities.drain() {
+            let rel_x = x - old_bbox.min.0;
+            let rel_y = y - old_bbox.min.1;
+            let new_rel_x = rel_y;
+            let new_rel_y = old_size_x - 1 - rel_x;
+            let new_x = new_bbox_clone.min.0 + new_rel_x;
+            let new_y = new_bbox_clone.min.1 + new_rel_y;
+            be.position = (new_x, new_y, z);
+            new_block_entities.insert((new_x, new_y, z), be);
+        }
+        self.block_entities = new_block_entities;
+
+        for entity in &mut self.entities {
+            let rel_x = entity.position.0 - old_bbox.min.0 as f64;
+            let rel_y = entity.position.1 - old_bbox.min.1 as f64;
+            let new_rel_x = rel_y;
+            let new_rel_y = old_size_x as f64 - 1.0 - rel_x;
+            entity.position.0 = new_bbox_clone.min.0 as f64 + new_rel_x;
+            entity.position.1 = new_bbox_clone.min.1 as f64 + new_rel_y;
+        }
+    }
 }
 
 #[cfg(test)]

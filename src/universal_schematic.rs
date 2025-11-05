@@ -1527,6 +1527,116 @@ impl UniversalSchematic {
             self.block_state_cache.capacity(),
         )
     }
+
+    // Transformation methods (convenience wrappers for default region)
+
+    /// Flip the default region along the X axis
+    pub fn flip_x(&mut self) {
+        self.default_region.flip_x();
+    }
+
+    /// Flip the default region along the Y axis
+    pub fn flip_y(&mut self) {
+        self.default_region.flip_y();
+    }
+
+    /// Flip the default region along the Z axis
+    pub fn flip_z(&mut self) {
+        self.default_region.flip_z();
+    }
+
+    /// Rotate the default region around the Y axis (horizontal plane)
+    pub fn rotate_y(&mut self, degrees: i32) {
+        self.default_region.rotate_y(degrees);
+    }
+
+    /// Rotate the default region around the X axis
+    pub fn rotate_x(&mut self, degrees: i32) {
+        self.default_region.rotate_x(degrees);
+    }
+
+    /// Rotate the default region around the Z axis
+    pub fn rotate_z(&mut self, degrees: i32) {
+        self.default_region.rotate_z(degrees);
+    }
+
+    /// Flip a specific region along the X axis
+    pub fn flip_region_x(&mut self, region_name: &str) -> Result<(), String> {
+        if region_name == self.default_region_name {
+            self.default_region.flip_x();
+            Ok(())
+        } else if let Some(region) = self.other_regions.get_mut(region_name) {
+            region.flip_x();
+            Ok(())
+        } else {
+            Err(format!("Region '{}' not found", region_name))
+        }
+    }
+
+    /// Flip a specific region along the Y axis
+    pub fn flip_region_y(&mut self, region_name: &str) -> Result<(), String> {
+        if region_name == self.default_region_name {
+            self.default_region.flip_y();
+            Ok(())
+        } else if let Some(region) = self.other_regions.get_mut(region_name) {
+            region.flip_y();
+            Ok(())
+        } else {
+            Err(format!("Region '{}' not found", region_name))
+        }
+    }
+
+    /// Flip a specific region along the Z axis
+    pub fn flip_region_z(&mut self, region_name: &str) -> Result<(), String> {
+        if region_name == self.default_region_name {
+            self.default_region.flip_z();
+            Ok(())
+        } else if let Some(region) = self.other_regions.get_mut(region_name) {
+            region.flip_z();
+            Ok(())
+        } else {
+            Err(format!("Region '{}' not found", region_name))
+        }
+    }
+
+    /// Rotate a specific region around the Y axis
+    pub fn rotate_region_y(&mut self, region_name: &str, degrees: i32) -> Result<(), String> {
+        if region_name == self.default_region_name {
+            self.default_region.rotate_y(degrees);
+            Ok(())
+        } else if let Some(region) = self.other_regions.get_mut(region_name) {
+            region.rotate_y(degrees);
+            Ok(())
+        } else {
+            Err(format!("Region '{}' not found", region_name))
+        }
+    }
+
+    /// Rotate a specific region around the X axis
+    pub fn rotate_region_x(&mut self, region_name: &str, degrees: i32) -> Result<(), String> {
+        if region_name == self.default_region_name {
+            self.default_region.rotate_x(degrees);
+            Ok(())
+        } else if let Some(region) = self.other_regions.get_mut(region_name) {
+            region.rotate_x(degrees);
+            Ok(())
+        } else {
+            Err(format!("Region '{}' not found", region_name))
+        }
+    }
+
+    /// Rotate a specific region around the Z axis
+    pub fn rotate_region_z(&mut self, region_name: &str, degrees: i32) -> Result<(), String> {
+        if region_name == self.default_region_name {
+            self.default_region.rotate_z(degrees);
+            Ok(())
+        } else if let Some(region) = self.other_regions.get_mut(region_name) {
+            region.rotate_z(degrees);
+            Ok(())
+        } else {
+            Err(format!("Region '{}' not found", region_name))
+        }
+    }
 }
 
 #[cfg(test)]

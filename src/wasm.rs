@@ -921,6 +921,83 @@ impl SchematicWrapper {
 
         chunk_coords.into_iter().collect()
     }
+
+    // Transformation methods
+
+    /// Flip the schematic along the X axis
+    pub fn flip_x(&mut self) {
+        self.0.flip_x();
+    }
+
+    /// Flip the schematic along the Y axis
+    pub fn flip_y(&mut self) {
+        self.0.flip_y();
+    }
+
+    /// Flip the schematic along the Z axis
+    pub fn flip_z(&mut self) {
+        self.0.flip_z();
+    }
+
+    /// Rotate the schematic around the Y axis (horizontal plane)
+    /// Degrees must be 90, 180, or 270
+    pub fn rotate_y(&mut self, degrees: i32) {
+        self.0.rotate_y(degrees);
+    }
+
+    /// Rotate the schematic around the X axis
+    /// Degrees must be 90, 180, or 270
+    pub fn rotate_x(&mut self, degrees: i32) {
+        self.0.rotate_x(degrees);
+    }
+
+    /// Rotate the schematic around the Z axis
+    /// Degrees must be 90, 180, or 270
+    pub fn rotate_z(&mut self, degrees: i32) {
+        self.0.rotate_z(degrees);
+    }
+
+    /// Flip a specific region along the X axis
+    pub fn flip_region_x(&mut self, region_name: &str) -> Result<(), JsValue> {
+        self.0
+            .flip_region_x(region_name)
+            .map_err(|e| JsValue::from_str(&e))
+    }
+
+    /// Flip a specific region along the Y axis
+    pub fn flip_region_y(&mut self, region_name: &str) -> Result<(), JsValue> {
+        self.0
+            .flip_region_y(region_name)
+            .map_err(|e| JsValue::from_str(&e))
+    }
+
+    /// Flip a specific region along the Z axis
+    pub fn flip_region_z(&mut self, region_name: &str) -> Result<(), JsValue> {
+        self.0
+            .flip_region_z(region_name)
+            .map_err(|e| JsValue::from_str(&e))
+    }
+
+    /// Rotate a specific region around the Y axis
+    pub fn rotate_region_y(&mut self, region_name: &str, degrees: i32) -> Result<(), JsValue> {
+        self.0
+            .rotate_region_y(region_name, degrees)
+            .map_err(|e| JsValue::from_str(&e))
+    }
+
+    /// Rotate a specific region around the X axis
+    pub fn rotate_region_x(&mut self, region_name: &str, degrees: i32) -> Result<(), JsValue> {
+        self.0
+            .rotate_region_x(region_name, degrees)
+            .map_err(|e| JsValue::from_str(&e))
+    }
+
+    /// Rotate a specific region around the Z axis
+    pub fn rotate_region_z(&mut self, region_name: &str, degrees: i32) -> Result<(), JsValue> {
+        self.0
+            .rotate_region_z(region_name, degrees)
+            .map_err(|e| JsValue::from_str(&e))
+    }
 }
 
 impl Clone for SchematicWrapper {
