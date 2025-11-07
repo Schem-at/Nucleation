@@ -85,6 +85,8 @@ impl MchprsWorld {
 
         world.initialize_chunks()?;
         world.populate_chunks();
+        // NOTE: Don't replace custom IO wires with redstone blocks - that makes them always powered
+        // Instead, we keep them as wires and modify the identify_nodes pass to convert them to Constants
         world.update_redstone();
         world.initialize_compiler()?;
         Ok(world)
@@ -219,6 +221,24 @@ impl MchprsWorld {
         }
 
         BlockEntity::from_nbt(&block_entity.id, &converted)
+    }
+
+    fn replace_custom_io_wires_with_blocks(&mut self) {
+        // Replace redstone wires at custom IO positions with redstone blocks
+        // This is necessary because the Redpiler's input_search pass only creates
+        // outgoing edges for blocks that unconditionally provide power (like redstone blocks)
+        // whereas wires only conditionally provide power based on their current level
+        use mchprs_blocks::blocks::Block;
+
+        // Clone to avoid borrow checker issues
+        let custom_io_positions = self.options.custom_io.clone();
+        for pos in custom_io_positions {
+            let block = self.get_block(pos);
+            if matches!(block, Block::RedstoneWire { .. }) {
+                // Replace with redstone block so it can act as a power source
+                self.set_block(pos, Block::RedstoneBlock {});
+            }
+        }
     }
 
     fn convert_nbt_value(value: crate::utils::NbtValue) -> Option<nbt::Value> {

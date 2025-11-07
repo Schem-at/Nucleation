@@ -623,4 +623,229 @@ mod tests {
             "Lamp should be lit after lever is toggled with bracket notation blocks"
         );
     }
+
+    // ============================================================================
+    // Custom IO Signal INJECTION Tests
+    // These tests verify that setSignalStrength actually POWERS circuits
+    // (not just stores values for monitoring)
+    // ============================================================================
+
+    fn create_wire_to_lamp_circuit() -> UniversalSchematic {
+        let mut schematic = UniversalSchematic::new("Wire to Lamp Test".to_string());
+
+        // Base layer
+        for x in 0..5 {
+            schematic.set_block(x, 0, 0, BlockState::new("minecraft:stone".to_string()));
+        }
+
+        // Redstone wire chain
+        schematic.set_block_str(
+            0,
+            1,
+            0,
+            "minecraft:redstone_wire[power=0,east=side,west=none,north=none,south=none]",
+        );
+        schematic.set_block_str(
+            1,
+            1,
+            0,
+            "minecraft:redstone_wire[power=0,east=side,west=side,north=none,south=none]",
+        );
+        schematic.set_block_str(
+            2,
+            1,
+            0,
+            "minecraft:redstone_wire[power=0,east=side,west=side,north=none,south=none]",
+        );
+
+        // Lamp at the end
+        schematic.set_block_str(3, 1, 0, "minecraft:redstone_lamp[lit=false]");
+
+        schematic
+    }
+
+    #[test]
+    fn test_custom_io_injection_powers_wire() {
+        use super::super::SimulationOptions;
+        let schematic = create_wire_to_lamp_circuit();
+        let inject_pos = BlockPos::new(0, 1, 0);
+
+        let options = SimulationOptions {
+            custom_io: vec![inject_pos],
+            ..Default::default()
+        };
+
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // Initially wire should have no power
+        let initial_signal = world.get_signal_strength(inject_pos);
+        assert_eq!(initial_signal, 0, "Wire should start with no signal");
+
+        // Inject signal strength 15
+        world.set_signal_strength(inject_pos, 15);
+        world.tick(5);
+        world.flush();
+
+        // Verify signal was stored
+        let signal_strength = world.get_signal_strength(inject_pos);
+        assert_eq!(
+            signal_strength, 15,
+            "Custom IO must store injected signal strength"
+        );
+
+        // This test verifies signal storage. Signal propagation to components
+        // is tested in test_custom_io_injection_lights_lamp
+    }
+
+    #[test]
+    fn test_custom_io_injection_lights_lamp() {
+        use super::super::SimulationOptions;
+        let schematic = create_wire_to_lamp_circuit();
+        let inject_pos = BlockPos::new(0, 1, 0);
+        let lamp_pos = BlockPos::new(3, 1, 0);
+
+        let options = SimulationOptions {
+            custom_io: vec![inject_pos],
+            ..Default::default()
+        };
+
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // Lamp should start off
+        assert!(!world.is_lit(lamp_pos), "Lamp should start off");
+
+        // Inject signal
+        world.set_signal_strength(inject_pos, 15);
+        world.tick(10);
+        world.flush();
+
+        let is_lit = world.is_lit(lamp_pos);
+        let signal = world.get_signal_strength(inject_pos);
+        let wire_power = world.get_redstone_power(inject_pos);
+
+        assert!(
+            is_lit,
+            "CRITICAL: Injecting signal via custom IO MUST light the lamp. Signal={}, Wire power={}",
+            signal, wire_power
+        );
+    }
+
+    #[test]
+    fn test_custom_io_monitoring_natural_power() {
+        use super::super::SimulationOptions;
+        // Verify custom IO can MONITOR naturally powered circuits
+        let mut schematic = UniversalSchematic::new("Powered Circuit".to_string());
+
+        // Base
+        for x in 0..5 {
+            schematic.set_block(x, 0, 0, BlockState::new("minecraft:stone".to_string()));
+        }
+
+        // Redstone block (always powered) -> wire
+        schematic.set_block_str(0, 1, 0, "minecraft:redstone_block");
+        schematic.set_block_str(
+            1,
+            1,
+            0,
+            "minecraft:redstone_wire[power=0,east=side,west=side,north=none,south=none]",
+        );
+        schematic.set_block_str(
+            2,
+            1,
+            0,
+            "minecraft:redstone_wire[power=0,east=side,west=side,north=none,south=none]",
+        );
+
+        let monitor_pos = BlockPos::new(2, 1, 0);
+
+        let options = SimulationOptions {
+            custom_io: vec![monitor_pos],
+            ..Default::default()
+        };
+
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // Tick to let power propagate
+        world.tick(5);
+        world.flush();
+
+        let signal = world.get_signal_strength(monitor_pos);
+        let power = world.get_redstone_power(monitor_pos);
+
+        assert!(
+            signal > 0,
+            "Custom IO should read signal from naturally powered circuit"
+        );
+        assert!(power > 0, "Natural power should exist");
+    }
+
+    #[test]
+    fn test_custom_io_relay_between_circuits() {
+        use super::super::SimulationOptions;
+        // Test the actual relay use case: read from one circuit, inject to another
+
+        // Circuit A: Redstone block -> wire (output)
+        let mut circuit_a = UniversalSchematic::new("Circuit A".to_string());
+        for x in 0..3 {
+            circuit_a.set_block(x, 0, 0, BlockState::new("minecraft:stone".to_string()));
+        }
+        circuit_a.set_block_str(0, 1, 0, "minecraft:redstone_block");
+        circuit_a.set_block_str(
+            1,
+            1,
+            0,
+            "minecraft:redstone_wire[power=0,east=side,west=side,north=none,south=none]",
+        );
+        circuit_a.set_block_str(
+            2,
+            1,
+            0,
+            "minecraft:redstone_wire[power=0,east=side,west=side,north=none,south=none]",
+        );
+
+        let output_pos = BlockPos::new(2, 1, 0);
+        let options_a = SimulationOptions {
+            custom_io: vec![output_pos],
+            ..Default::default()
+        };
+
+        let mut world_a =
+            MchprsWorld::with_options(circuit_a, options_a).expect("Failed to create world A");
+
+        // Circuit B: wire (input) -> lamp
+        let circuit_b = create_wire_to_lamp_circuit();
+        let input_pos = BlockPos::new(0, 1, 0);
+        let lamp_pos = BlockPos::new(3, 1, 0);
+
+        let options_b = SimulationOptions {
+            custom_io: vec![input_pos],
+            ..Default::default()
+        };
+
+        let mut world_b =
+            MchprsWorld::with_options(circuit_b, options_b).expect("Failed to create world B");
+
+        // Simulate: Circuit A runs, we read its output
+        world_a.tick(5);
+        world_a.flush();
+        let output_signal = world_a.get_signal_strength(output_pos);
+
+        assert!(output_signal > 0, "Circuit A should produce output signal");
+
+        // Relay: Inject A's output into B's input
+        world_b.set_signal_strength(input_pos, output_signal);
+        world_b.tick(10);
+        world_b.flush();
+
+        // Verify: B's lamp should light up
+        let lamp_lit = world_b.is_lit(lamp_pos);
+        assert!(
+            lamp_lit,
+            "Circuit B's lamp should light from relayed signal (signal={})",
+            output_signal
+        );
+    }
 }
