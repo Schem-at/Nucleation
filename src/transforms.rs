@@ -1,5 +1,4 @@
 use crate::BlockState;
-use std::collections::HashMap;
 
 /// Axis enum for transformations
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

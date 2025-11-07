@@ -1165,6 +1165,18 @@ impl SimulationOptionsWrapper {
     pub fn set_io_only(&mut self, value: bool) {
         self.inner.io_only = value;
     }
+
+    /// Adds a position to the custom IO list
+    #[wasm_bindgen(js_name = addCustomIo)]
+    pub fn add_custom_io(&mut self, x: i32, y: i32, z: i32) {
+        self.inner.custom_io.push(BlockPos::new(x, y, z));
+    }
+
+    /// Clears the custom IO list
+    #[wasm_bindgen(js_name = clearCustomIo)]
+    pub fn clear_custom_io(&mut self) {
+        self.inner.custom_io.clear();
+    }
 }
 
 #[cfg(feature = "simulation")]
@@ -1244,6 +1256,19 @@ impl MchprsWorldWrapper {
     /// Gets the redstone power level at a position
     pub fn get_redstone_power(&self, x: i32, y: i32, z: i32) -> u8 {
         self.world.get_redstone_power(BlockPos::new(x, y, z))
+    }
+
+    /// Sets the signal strength at a specific block position (for custom IO nodes)
+    #[wasm_bindgen(js_name = setSignalStrength)]
+    pub fn set_signal_strength(&mut self, x: i32, y: i32, z: i32, strength: u8) {
+        self.world
+            .set_signal_strength(BlockPos::new(x, y, z), strength);
+    }
+
+    /// Gets the signal strength at a specific block position (for custom IO nodes)
+    #[wasm_bindgen(js_name = getSignalStrength)]
+    pub fn get_signal_strength(&self, x: i32, y: i32, z: i32) -> u8 {
+        self.world.get_signal_strength(BlockPos::new(x, y, z))
     }
 
     /// Generates a truth table for the circuit

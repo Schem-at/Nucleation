@@ -620,6 +620,17 @@ impl PyMchprsWorld {
         self.inner.get_redstone_power(pos)
     }
 
+    /// Sets the signal strength at a specific block position (for custom IO nodes)
+    pub fn set_signal_strength(&mut self, x: i32, y: i32, z: i32, strength: u8) {
+        self.inner
+            .set_signal_strength(BlockPos::new(x, y, z), strength);
+    }
+
+    /// Gets the signal strength at a specific block position (for custom IO nodes)
+    pub fn get_signal_strength(&self, x: i32, y: i32, z: i32) -> u8 {
+        self.inner.get_signal_strength(BlockPos::new(x, y, z))
+    }
+
     pub fn sync_to_schematic(&mut self) {
         self.inner.sync_to_schematic();
     }

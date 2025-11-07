@@ -276,6 +276,241 @@ mod tests {
     }
 
     #[test]
+    fn test_signal_strength_set_get() {
+        use super::super::SimulationOptions;
+        let schematic = create_simple_redstone_line();
+        let wire_pos = BlockPos::new(5, 1, 0);
+
+        let options = SimulationOptions {
+            custom_io: vec![wire_pos],
+            ..Default::default()
+        };
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // Initially should return 0
+        assert_eq!(
+            world.get_signal_strength(wire_pos),
+            0,
+            "Signal strength should start at 0"
+        );
+
+        // Set signal strength
+        world.set_signal_strength(wire_pos, 10);
+        world.tick(1);
+        world.flush();
+
+        // Should be able to read it back
+        let strength = world.get_signal_strength(wire_pos);
+        assert_eq!(
+            strength, 10,
+            "Signal strength should be readable after setting"
+        );
+    }
+
+    #[test]
+    fn test_signal_strength_boundary_values() {
+        use super::super::SimulationOptions;
+        let schematic = create_simple_redstone_line();
+        let wire_pos = BlockPos::new(5, 1, 0);
+
+        let options = SimulationOptions {
+            custom_io: vec![wire_pos],
+            ..Default::default()
+        };
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // Test minimum value (0)
+        world.set_signal_strength(wire_pos, 0);
+        world.tick(1);
+        world.flush();
+        assert_eq!(
+            world.get_signal_strength(wire_pos),
+            0,
+            "Should handle signal strength of 0"
+        );
+
+        // Test maximum value (15)
+        world.set_signal_strength(wire_pos, 15);
+        world.tick(1);
+        world.flush();
+        assert_eq!(
+            world.get_signal_strength(wire_pos),
+            15,
+            "Should handle signal strength of 15"
+        );
+
+        // Test mid-range value
+        world.set_signal_strength(wire_pos, 7);
+        world.tick(1);
+        world.flush();
+        assert_eq!(
+            world.get_signal_strength(wire_pos),
+            7,
+            "Should handle mid-range signal strength"
+        );
+    }
+
+    #[test]
+    fn test_signal_strength_update() {
+        use super::super::SimulationOptions;
+        let schematic = create_simple_redstone_line();
+        let wire_pos = BlockPos::new(5, 1, 0);
+
+        let options = SimulationOptions {
+            custom_io: vec![wire_pos],
+            ..Default::default()
+        };
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // Set signal strength to different values
+        world.set_signal_strength(wire_pos, 8);
+        world.tick(1);
+        world.flush();
+        assert_eq!(
+            world.get_signal_strength(wire_pos),
+            8,
+            "Should update signal strength"
+        );
+
+        // Change to different value
+        world.set_signal_strength(wire_pos, 3);
+        world.tick(1);
+        world.flush();
+        assert_eq!(
+            world.get_signal_strength(wire_pos),
+            3,
+            "Should update to new signal strength"
+        );
+    }
+
+    #[test]
+    fn test_signal_strength_with_lever() {
+        use super::super::SimulationOptions;
+        let schematic = create_simple_redstone_line();
+        let lever_pos = BlockPos::new(0, 1, 0);
+        let wire_pos = BlockPos::new(5, 1, 0);
+        let lamp_pos = BlockPos::new(15, 1, 0);
+
+        let options = SimulationOptions {
+            custom_io: vec![wire_pos],
+            ..Default::default()
+        };
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // Lamp should start off
+        assert_eq!(world.is_lit(lamp_pos), false, "Lamp should start off");
+
+        // Toggle lever and verify custom IO still works
+        world.on_use_block(lever_pos);
+        world.tick(5);
+        world.flush();
+
+        // Lamp should be on from lever
+        assert_eq!(
+            world.is_lit(lamp_pos),
+            true,
+            "Lamp should light up from lever"
+        );
+
+        // Custom IO signal should still be gettable
+        let custom_signal = world.get_signal_strength(wire_pos);
+        // Signal should exist (value doesn't matter for this test)
+        let _ = custom_signal;
+    }
+
+    #[test]
+    fn test_signal_strength_multiple_positions() {
+        use super::super::SimulationOptions;
+        let schematic = create_simple_redstone_line();
+        let pos1 = BlockPos::new(3, 1, 0);
+        let pos2 = BlockPos::new(7, 1, 0);
+        let pos3 = BlockPos::new(11, 1, 0);
+
+        let options = SimulationOptions {
+            custom_io: vec![pos1, pos2, pos3],
+            ..Default::default()
+        };
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // Set different signal strengths at multiple positions
+        world.set_signal_strength(pos1, 5);
+        world.set_signal_strength(pos2, 10);
+        world.set_signal_strength(pos3, 15);
+        world.tick(5);
+        world.flush();
+
+        // Each should maintain its own value
+        assert_eq!(
+            world.get_signal_strength(pos1),
+            5,
+            "Position 1 should have signal strength 5"
+        );
+        assert_eq!(
+            world.get_signal_strength(pos2),
+            10,
+            "Position 2 should have signal strength 10"
+        );
+        assert_eq!(
+            world.get_signal_strength(pos3),
+            15,
+            "Position 3 should have signal strength 15"
+        );
+    }
+
+    #[test]
+    fn test_signal_strength_persistence() {
+        use super::super::SimulationOptions;
+        let schematic = create_simple_redstone_line();
+        let wire_pos = BlockPos::new(5, 1, 0);
+
+        let options = SimulationOptions {
+            custom_io: vec![wire_pos],
+            ..Default::default()
+        };
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // Set signal strength
+        world.set_signal_strength(wire_pos, 12);
+        world.tick(1);
+        world.flush();
+
+        let initial_strength = world.get_signal_strength(wire_pos);
+
+        // Run more ticks
+        world.tick(20);
+        world.flush();
+
+        // Signal should persist
+        assert_eq!(
+            world.get_signal_strength(wire_pos),
+            initial_strength,
+            "Signal strength should persist across ticks"
+        );
+    }
+
+    #[test]
+    fn test_signal_strength_invalid_position() {
+        let schematic = create_simple_redstone_line();
+        let world = MchprsWorld::new(schematic).expect("World creation failed");
+
+        // Query signal strength at position with no redstone component
+        let invalid_pos = BlockPos::new(100, 100, 100);
+        let strength = world.get_signal_strength(invalid_pos);
+
+        // Should return 0 for invalid positions
+        assert_eq!(
+            strength, 0,
+            "Invalid position should return signal strength of 0"
+        );
+    }
+
+    #[test]
     fn test_bracket_notation_set_block() {
         let mut schematic = UniversalSchematic::new("Bracket Notation Test".to_string());
 

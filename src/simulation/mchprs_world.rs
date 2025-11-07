@@ -24,6 +24,8 @@ pub struct SimulationOptions {
     /// When true, only inputs/outputs are tracked (faster but no intermediate wire states)
     /// When false, all redstone wire states are updated (slower but shows wire power levels)
     pub io_only: bool,
+    /// List of positions to designate as custom IO nodes for signal injection/monitoring
+    pub custom_io: Vec<BlockPos>,
 }
 
 impl Default for SimulationOptions {
@@ -31,6 +33,7 @@ impl Default for SimulationOptions {
         Self {
             optimize: true,
             io_only: false, // Default to false so wire states are visible
+            custom_io: Vec::new(),
         }
     }
 }
@@ -99,6 +102,7 @@ impl MchprsWorld {
             io_only: self.options.io_only,
             wire_dot_out: true,
             backend_variant: BackendVariant::Direct,
+            custom_io: self.options.custom_io.clone(),
             ..Default::default()
         };
 
@@ -291,6 +295,26 @@ impl MchprsWorld {
             block.set_properties(properties.iter().map(|(k, v)| (*k, v.as_str())).collect());
             self.set_block_raw(pos, block.get_id());
         }
+    }
+
+    /// Sets the signal strength at a specific block position (for custom IO nodes)
+    ///
+    /// # Arguments
+    /// * `pos` - The block position
+    /// * `strength` - The signal strength (0-15)
+    pub fn set_signal_strength(&mut self, pos: BlockPos, strength: u8) {
+        self.compiler.set_signal_strength(pos, strength);
+    }
+
+    /// Gets the signal strength at a specific block position (for custom IO nodes)
+    ///
+    /// # Arguments
+    /// * `pos` - The block position
+    ///
+    /// # Returns
+    /// The current signal strength (0-15), or 0 if not a valid component
+    pub fn get_signal_strength(&self, pos: BlockPos) -> u8 {
+        self.compiler.get_signal_strength(pos).unwrap_or(0)
     }
 
     /// Simulates a right-click on a block (typically a lever)

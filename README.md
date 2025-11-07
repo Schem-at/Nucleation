@@ -105,6 +105,25 @@ simWorld.flush();
 const isLit = simWorld.is_lit(15, 1, 0); // Check if lamp is lit
 ```
 
+**Custom IO signal injection/monitoring:**
+
+```js
+// Configure custom IO nodes for precise signal control
+const options = new SimulationOptions();
+options.addCustomIo(5, 1, 0); // Mark position as custom IO node
+
+const simWorld = schematic.create_simulation_world_with_options(options);
+
+// Inject custom signal strength
+simWorld.setSignalStrength(5, 1, 0, 12); // Set signal to 12
+simWorld.tick(5);
+simWorld.flush();
+
+// Read signal strength
+const strength = simWorld.getSignalStrength(5, 1, 0);
+console.log(`Signal strength: ${strength}`);
+```
+
 [More in `examples/wasm.md`](examples/wasm.md)
 
 ---

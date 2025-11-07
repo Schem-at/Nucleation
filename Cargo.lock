@@ -187,7 +187,7 @@ dependencies = [
  "regex",
  "rustc-hash 1.1.0",
  "shlex",
- "syn 2.0.108",
+ "syn 2.0.109",
  "which",
 ]
 
@@ -361,7 +361,7 @@ dependencies = [
  "quote",
  "serde",
  "serde_json",
- "syn 2.0.108",
+ "syn 2.0.109",
  "tempfile",
  "toml 0.9.8",
 ]
@@ -513,7 +513,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
 ]
 
 [[package]]
@@ -731,7 +731,7 @@ checksum = "1e567bd82dcff979e4b03460c307b3cdc9e96fde3d73bed1496d2bc75d9dd62a"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
 ]
 
 [[package]]
@@ -753,7 +753,7 @@ checksum = "97369cbbc041bc366949bc74d34658d6cda5621039731c6310521892a3a20ae0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
 ]
 
 [[package]]
@@ -792,7 +792,7 @@ dependencies = [
  "once_cell",
  "proc-macro2",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
 ]
 
 [[package]]
@@ -890,9 +890,9 @@ checksum = "52051878f80a721bb68ebfbc930e07b65ba72f2da88968ea5c06fd6ca3d3a127"
 
 [[package]]
 name = "fixedbitset"
-version = "0.4.2"
+version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
+checksum = "1d674e81391d1e1ab681a28d99df07927c6d4aa5b027d7da16ba32d1d21ecd99"
 
 [[package]]
 name = "flate2"
@@ -1256,15 +1256,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "instant"
-version = "0.1.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0242819d153cba4b4b05a5a8f2a7e9bbf97b6055b2a002b395c96b5ff3c0222"
-dependencies = [
- "cfg-if",
-]
-
-[[package]]
 name = "is-terminal"
 version = "0.4.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1304,6 +1295,15 @@ name = "itertools"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
 dependencies = [
  "either",
 ]
@@ -1513,7 +1513,7 @@ dependencies = [
 [[package]]
 name = "mchprs_blocks"
 version = "0.4.1"
-source = "git+https://github.com/Nano112/MCHPRS.git#eeb89c7ee5df82fa2094390a363254638a38cfb3"
+source = "git+https://github.com/Nano112/MCHPRS.git#03f1fb0cee2ec1f51f43e8fce0343061878a4d20"
 dependencies = [
  "hematite-nbt",
  "mchprs_proc_macros",
@@ -1524,21 +1524,19 @@ dependencies = [
 [[package]]
 name = "mchprs_proc_macros"
 version = "0.4.1"
-source = "git+https://github.com/Nano112/MCHPRS.git#eeb89c7ee5df82fa2094390a363254638a38cfb3"
+source = "git+https://github.com/Nano112/MCHPRS.git#03f1fb0cee2ec1f51f43e8fce0343061878a4d20"
 dependencies = [
  "quote",
- "syn 1.0.109",
+ "syn 2.0.109",
 ]
 
 [[package]]
 name = "mchprs_redpiler"
 version = "0.1.0"
-source = "git+https://github.com/Nano112/MCHPRS.git#eeb89c7ee5df82fa2094390a363254638a38cfb3"
+source = "git+https://github.com/Nano112/MCHPRS.git#03f1fb0cee2ec1f51f43e8fce0343061878a4d20"
 dependencies = [
- "console",
  "enum_dispatch",
- "instant",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "mchprs_blocks",
  "mchprs_redstone",
  "mchprs_world",
@@ -1548,13 +1546,12 @@ dependencies = [
  "serde_json",
  "smallvec",
  "tracing",
- "web-sys",
 ]
 
 [[package]]
 name = "mchprs_redstone"
 version = "0.1.0"
-source = "git+https://github.com/Nano112/MCHPRS.git#eeb89c7ee5df82fa2094390a363254638a38cfb3"
+source = "git+https://github.com/Nano112/MCHPRS.git#03f1fb0cee2ec1f51f43e8fce0343061878a4d20"
 dependencies = [
  "mchprs_blocks",
  "mchprs_world",
@@ -1565,15 +1562,14 @@ dependencies = [
 [[package]]
 name = "mchprs_utils"
 version = "0.4.1"
-source = "git+https://github.com/Nano112/MCHPRS.git#eeb89c7ee5df82fa2094390a363254638a38cfb3"
+source = "git+https://github.com/Nano112/MCHPRS.git#03f1fb0cee2ec1f51f43e8fce0343061878a4d20"
 
 [[package]]
 name = "mchprs_world"
 version = "0.4.1"
-source = "git+https://github.com/Nano112/MCHPRS.git#eeb89c7ee5df82fa2094390a363254638a38cfb3"
+source = "git+https://github.com/Nano112/MCHPRS.git#03f1fb0cee2ec1f51f43e8fce0343061878a4d20"
 dependencies = [
  "hematite-nbt",
- "itertools 0.13.0",
  "mchprs_blocks",
  "rustc-hash 2.1.1",
  "serde",
@@ -1667,7 +1663,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation"
-version = "0.1.80"
+version = "0.1.81"
 dependencies = [
  "base64 0.22.1",
  "bytemuck",
@@ -1774,7 +1770,7 @@ checksum = "a948666b637a0f465e8564c73e89d4dde00d72d4d473cc972f390fc3dcee7d9c"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
 ]
 
 [[package]]
@@ -1898,9 +1894,9 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
 name = "petgraph"
-version = "0.6.5"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4c5cc86750666a3ed20bdaf5ca2a0344f9c67674cae0515bec2da16fbaa47db"
+checksum = "3672b37090dbd86368a4145bc067582552b29c27377cad4e0a306c97f9bd7772"
 dependencies = [
  "fixedbitset",
  "indexmap",
@@ -1999,7 +1995,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "479ca8adacdd7ce8f1fb39ce9ecccbfe93a3f1344b3d0d97f20bc0196208f62b"
 dependencies = [
  "proc-macro2",
- "syn 2.0.108",
+ "syn 2.0.109",
 ]
 
 [[package]]
@@ -2078,7 +2074,7 @@ dependencies = [
  "proc-macro2",
  "pyo3-macros-backend",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
 ]
 
 [[package]]
@@ -2091,7 +2087,7 @@ dependencies = [
  "proc-macro2",
  "pyo3-build-config",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
 ]
 
 [[package]]
@@ -2150,9 +2146,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.41"
+version = "1.0.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce25767e7b499d1b604768e7cde645d14cc8584231ea6b295e9c9eb22c02e1d1"
+checksum = "a338cc41d27e6cc6dce6cefc13a0729dfbb81c262b1f519331575dd80ef3067f"
 dependencies = [
  "proc-macro2",
 ]
@@ -2231,7 +2227,7 @@ dependencies = [
 [[package]]
 name = "redpiler_graph"
 version = "0.4.1"
-source = "git+https://github.com/Nano112/MCHPRS.git#eeb89c7ee5df82fa2094390a363254638a38cfb3"
+source = "git+https://github.com/Nano112/MCHPRS.git#03f1fb0cee2ec1f51f43e8fce0343061878a4d20"
 dependencies = [
  "bincode",
  "serde",
@@ -2386,7 +2382,7 @@ checksum = "1783eabc414609e28a5ba76aee5ddd52199f7107a0b24c2e9746a1ecc34a683d"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
 ]
 
 [[package]]
@@ -2460,7 +2456,7 @@ checksum = "d540f220d3187173da220f885ab66608367b6574e925011a9353e4badda91d79"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
 ]
 
 [[package]]
@@ -2614,9 +2610,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.108"
+version = "2.0.109"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da58917d35242480a05c2897064da0a80589a2a0476c9a3f2fdc83b53502e917"
+checksum = "2f17c7e013e88258aa9543dcbe81aca68a667a9ac37cd69c9fbc07858bfe0e2f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2631,7 +2627,7 @@ checksum = "728a70f3dbaf5bab7f0c4b1ac8d7ae5ea60a4b5549c8a5914361c99147a709d2"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
 ]
 
 [[package]]
@@ -2711,7 +2707,7 @@ checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
 ]
 
 [[package]]
@@ -2722,7 +2718,7 @@ checksum = "3ff15c8ecd7de3849db632e14d18d2571fa09dfc5ed93479bc4485c7a517c913"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
 ]
 
 [[package]]
@@ -2872,7 +2868,7 @@ checksum = "81383ab64e72a7a8b8e13130c49e3dab29def6d0c7d76a03087b3cf71c5c6903"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
 ]
 
 [[package]]
@@ -3099,7 +3095,7 @@ dependencies = [
  "bumpalo",
  "proc-macro2",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
  "wasm-bindgen-shared",
 ]
 
@@ -3133,7 +3129,7 @@ checksum = "085b2df989e1e6f9620c1311df6c996e83fe16f57792b272ce1e024ac16a90f1"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
 ]
 
 [[package]]
@@ -3210,7 +3206,7 @@ checksum = "053e2e040ab57b9dc951b72c264860db7eb3b0200ba345b4e4c3b14f67855ddf"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
 ]
 
 [[package]]
@@ -3221,7 +3217,7 @@ checksum = "3f316c4a2570ba26bbec722032c4099d8c8bc095efccdc15688708623367e358"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
 ]
 
 [[package]]
@@ -3454,7 +3450,7 @@ checksum = "b659052874eb698efe5b9e8cf382204678a0086ebf46982b79d6ca3182927e5d"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
  "synstructure",
 ]
 
@@ -3475,7 +3471,7 @@ checksum = "88d2b8d9c68ad2b9e4340d7832716a4d21a22a1154777ad56ea55c51a9cf3831"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
 ]
 
 [[package]]
@@ -3495,7 +3491,7 @@ checksum = "d71e5d6e06ab090c67b5e44993ec16b72dcbaabc526db883a360057678b48502"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
  "synstructure",
 ]
 
@@ -3529,7 +3525,7 @@ checksum = "eadce39539ca5cb3985590102671f2567e659fca9666581ad3411d59207951f3"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.108",
+ "syn 2.0.109",
 ]
 
 [[package]]
