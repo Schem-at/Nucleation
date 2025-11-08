@@ -354,6 +354,18 @@ impl UniversalSchematic {
         let bounding_box = self.get_bounding_box();
         bounding_box.get_dimensions()
     }
+    
+    /// Get the tight bounding box (actual min/max coordinates of placed non-air blocks)
+    /// This only considers the default region. Returns None if no non-air blocks exist.
+    pub fn get_tight_bounds(&self) -> Option<BoundingBox> {
+        self.default_region.get_tight_bounds()
+    }
+    
+    /// Get the tight dimensions (width, height, length) of actual block content
+    /// Returns (0, 0, 0) if no non-air blocks have been placed yet
+    pub fn get_tight_dimensions(&self) -> (i32, i32, i32) {
+        self.default_region.get_tight_dimensions()
+    }
 
     pub fn get_json_string(&self) -> Result<String, String> {
         // Attempt to serialize the metadata
