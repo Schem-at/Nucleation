@@ -423,28 +423,28 @@ impl SchematicWrapper {
         let (x, y, z) = self.0.get_dimensions();
         vec![x, y, z]
     }
-    
+
     /// Get the tight dimensions of actual block content (excluding pre-allocated space)
     /// Returns [width, height, length] or [0, 0, 0] if no non-air blocks exist
     pub fn get_tight_dimensions(&self) -> Vec<i32> {
         let (x, y, z) = self.0.get_tight_dimensions();
         vec![x, y, z]
     }
-    
+
     /// Get the tight bounding box min coordinates [x, y, z]
     /// Returns null if no non-air blocks have been placed
     pub fn get_tight_bounds_min(&self) -> Option<Vec<i32>> {
-        self.0.get_tight_bounds().map(|bounds| {
-            vec![bounds.min.0, bounds.min.1, bounds.min.2]
-        })
+        self.0
+            .get_tight_bounds()
+            .map(|bounds| vec![bounds.min.0, bounds.min.1, bounds.min.2])
     }
-    
+
     /// Get the tight bounding box max coordinates [x, y, z]
     /// Returns null if no non-air blocks have been placed
     pub fn get_tight_bounds_max(&self) -> Option<Vec<i32>> {
-        self.0.get_tight_bounds().map(|bounds| {
-            vec![bounds.max.0, bounds.max.1, bounds.max.2]
-        })
+        self.0
+            .get_tight_bounds()
+            .map(|bounds| vec![bounds.max.0, bounds.max.1, bounds.max.2])
     }
 
     pub fn get_block_count(&self) -> i32 {

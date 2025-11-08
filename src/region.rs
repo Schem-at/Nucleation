@@ -25,7 +25,7 @@ pub struct Region {
 
     #[serde(skip)]
     bbox: BoundingBox,
-    
+
     /// Tracks the actual min/max coordinates of non-air blocks placed in this region
     /// Unlike bbox (which is pre-allocated for performance), tight_bounds only covers
     /// the space that actually contains blocks
@@ -97,12 +97,12 @@ impl Region {
     pub fn rebuild_bbox(&mut self) {
         self.bbox = BoundingBox::from_position_and_size(self.position, self.size);
     }
-    
+
     /// Rebuild tight bounds by scanning all blocks
     /// This is typically called after deserialization
     pub fn rebuild_tight_bounds(&mut self) {
         self.tight_bounds = None;
-        
+
         // Scan all blocks to find non-air blocks
         for index in 0..self.blocks.len() {
             let palette_idx = self.blocks[index];
@@ -168,12 +168,12 @@ impl Region {
         let index = self.coords_to_index(x, y, z);
         let palette_index = self.get_or_insert_in_palette(block.clone());
         self.blocks[index] = palette_index;
-        
+
         // Update tight bounds if this is a non-air block
         if !block.name.contains("air") {
             self.update_tight_bounds(x, y, z);
         }
-        
+
         true
     }
 
@@ -210,7 +210,7 @@ impl Region {
     pub fn get_dimensions(&self) -> (i32, i32, i32) {
         self.bbox.get_dimensions()
     }
-    
+
     /// Update the tight bounds to include the given coordinate
     fn update_tight_bounds(&mut self, x: i32, y: i32, z: i32) {
         match &self.tight_bounds {
@@ -236,13 +236,13 @@ impl Region {
             }
         }
     }
-    
+
     /// Get the tight bounding box (actual min/max coordinates of placed non-air blocks)
     /// Returns None if no non-air blocks have been placed yet
     pub fn get_tight_bounds(&self) -> Option<BoundingBox> {
         self.tight_bounds.clone()
     }
-    
+
     /// Get the tight dimensions (width, height, length) of actual block content
     /// Returns (0, 0, 0) if no non-air blocks have been placed yet
     pub fn get_tight_dimensions(&self) -> (i32, i32, i32) {
@@ -1659,128 +1659,128 @@ mod tests {
         // Check if the new block is set correctly
         assert_eq!(region.get_block(1, 2, 1), Some(&diamond));
     }
-    
+
     #[test]
     fn test_tight_bounds_empty_region() {
         let region = Region::new("Test".to_string(), (0, 0, 0), (10, 10, 10));
-        
+
         // Empty region should have no tight bounds
         assert_eq!(region.get_tight_bounds(), None);
         assert_eq!(region.get_tight_dimensions(), (0, 0, 0));
     }
-    
+
     #[test]
     fn test_tight_bounds_single_block() {
         let mut region = Region::new("Test".to_string(), (0, 0, 0), (10, 10, 10));
         let stone = BlockState::new("minecraft:stone".to_string());
-        
+
         region.set_block(5, 3, 7, stone);
-        
+
         let bounds = region.get_tight_bounds().unwrap();
         assert_eq!(bounds.min, (5, 3, 7));
         assert_eq!(bounds.max, (5, 3, 7));
         assert_eq!(region.get_tight_dimensions(), (1, 1, 1));
     }
-    
+
     #[test]
     fn test_tight_bounds_multiple_blocks() {
         let mut region = Region::new("Test".to_string(), (0, 0, 0), (10, 10, 10));
         let stone = BlockState::new("minecraft:stone".to_string());
         let dirt = BlockState::new("minecraft:dirt".to_string());
-        
+
         // Place blocks at various positions
         region.set_block(2, 1, 3, stone.clone());
         region.set_block(5, 4, 8, dirt.clone());
         region.set_block(3, 2, 5, stone.clone());
-        
+
         let bounds = region.get_tight_bounds().unwrap();
         assert_eq!(bounds.min, (2, 1, 3));
         assert_eq!(bounds.max, (5, 4, 8));
         assert_eq!(region.get_tight_dimensions(), (4, 4, 6));
     }
-    
+
     #[test]
     fn test_tight_bounds_ignores_air() {
         let mut region = Region::new("Test".to_string(), (0, 0, 0), (10, 10, 10));
         let stone = BlockState::new("minecraft:stone".to_string());
         let air = BlockState::new("minecraft:air".to_string());
-        
+
         // Place stones
         region.set_block(1, 1, 1, stone.clone());
         region.set_block(3, 3, 3, stone.clone());
-        
+
         // Place air blocks (should not affect tight bounds)
         region.set_block(0, 0, 0, air.clone());
         region.set_block(5, 5, 5, air.clone());
-        
+
         let bounds = region.get_tight_bounds().unwrap();
         assert_eq!(bounds.min, (1, 1, 1));
         assert_eq!(bounds.max, (3, 3, 3));
         assert_eq!(region.get_tight_dimensions(), (3, 3, 3));
     }
-    
+
     #[test]
     fn test_tight_bounds_with_expansion() {
         let mut region = Region::new("Test".to_string(), (0, 0, 0), (5, 5, 5));
         let stone = BlockState::new("minecraft:stone".to_string());
-        
+
         // Place initial block
         region.set_block(2, 2, 2, stone.clone());
-        
+
         let bounds1 = region.get_tight_bounds().unwrap();
         assert_eq!(bounds1.min, (2, 2, 2));
         assert_eq!(bounds1.max, (2, 2, 2));
-        
+
         // Place block that requires region expansion
         region.set_block(10, 10, 10, stone.clone());
-        
+
         let bounds2 = region.get_tight_bounds().unwrap();
         assert_eq!(bounds2.min, (2, 2, 2));
         assert_eq!(bounds2.max, (10, 10, 10));
         assert_eq!(region.get_tight_dimensions(), (9, 9, 9));
     }
-    
+
     #[test]
     fn test_tight_bounds_vs_allocated_bounds() {
         let mut region = Region::new("Test".to_string(), (0, 0, 0), (2, 2, 2));
         let stone = BlockState::new("minecraft:stone".to_string());
-        
+
         // Place a tiny 2x2x1 structure within initial bounds
         region.set_block(0, 0, 0, stone.clone());
         region.set_block(1, 0, 0, stone.clone());
         region.set_block(0, 1, 0, stone.clone());
         region.set_block(1, 1, 0, stone.clone());
-        
+
         // Force expansion by placing a block far away
         region.set_block(10, 10, 10, stone.clone());
-        
+
         // Allocated dimensions should now be much larger due to pre-allocation
         let allocated_dims = region.get_dimensions();
         assert!(allocated_dims.0 >= 64); // At least 64 due to expansion strategy
         assert!(allocated_dims.1 >= 64);
         assert!(allocated_dims.2 >= 64);
-        
+
         // Tight dimensions should reflect actual structure (min to max of placed blocks)
         let tight_dims = region.get_tight_dimensions();
         assert_eq!(tight_dims, (11, 11, 11)); // From (0,0,0) to (10,10,10) inclusive
     }
-    
+
     #[test]
     fn test_rebuild_tight_bounds() {
         let mut region = Region::new("Test".to_string(), (0, 0, 0), (10, 10, 10));
         let stone = BlockState::new("minecraft:stone".to_string());
-        
+
         // Place some blocks
         region.set_block(1, 1, 1, stone.clone());
         region.set_block(5, 5, 5, stone.clone());
-        
+
         let bounds_before = region.get_tight_bounds().unwrap();
         assert_eq!(bounds_before.min, (1, 1, 1));
         assert_eq!(bounds_before.max, (5, 5, 5));
-        
+
         // Rebuild tight bounds (simulating deserialization)
         region.rebuild_tight_bounds();
-        
+
         let bounds_after = region.get_tight_bounds().unwrap();
         assert_eq!(bounds_after.min, (1, 1, 1));
         assert_eq!(bounds_after.max, (5, 5, 5));
