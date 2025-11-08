@@ -848,4 +848,71 @@ mod tests {
             output_signal
         );
     }
+
+    #[test]
+    fn test_custom_io_sync_to_schematic_preserves_power() {
+        // This test verifies that sync_to_schematic() correctly syncs custom IO node power
+        use super::super::SimulationOptions;
+        use mchprs_world::World;
+
+        let mut schematic = UniversalSchematic::new("Custom IO Sync Test".to_string());
+
+        // Base
+        schematic.set_block(
+            0,
+            0,
+            0,
+            BlockState::new("minecraft:gray_concrete".to_string()),
+        );
+
+        // Redstone wire with power=0 initially
+        let mut wire = BlockState::new("minecraft:redstone_wire".to_string());
+        wire.properties.insert("power".to_string(), "0".to_string());
+        wire.properties
+            .insert("east".to_string(), "side".to_string());
+        wire.properties
+            .insert("west".to_string(), "side".to_string());
+        wire.properties
+            .insert("north".to_string(), "none".to_string());
+        wire.properties
+            .insert("south".to_string(), "none".to_string());
+        schematic.set_block(0, 1, 0, wire);
+
+        let custom_io_pos = BlockPos::new(0, 1, 0);
+        let options = SimulationOptions {
+            custom_io: vec![custom_io_pos],
+            ..Default::default()
+        };
+
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // Set signal strength to 15
+        world.set_signal_strength(custom_io_pos, 15);
+        world.tick(5);
+        world.flush();
+
+        // Sync to schematic
+        world.sync_to_schematic();
+
+        // Get the synced schematic
+        let synced_schematic = world.get_schematic();
+
+        // Check the block in the schematic
+        let synced_block = synced_schematic
+            .get_block(0, 1, 0)
+            .expect("Block should exist at custom IO position");
+
+        // Verify the power property is 15 (not 0!)
+        let power_value = synced_block
+            .properties
+            .get("power")
+            .expect("Redstone wire should have power property");
+
+        assert_eq!(
+            power_value, "15",
+            "Synced schematic should have power=15 after custom IO injection, got power={}",
+            power_value
+        );
+    }
 }

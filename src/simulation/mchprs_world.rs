@@ -371,7 +371,13 @@ impl MchprsWorld {
         let mut temp_compiler = std::mem::take(&mut self.compiler);
         temp_compiler.flush(self);
         self.compiler = temp_compiler;
-        self.update_redstone();
+
+        // Only call update_redstone() for non-custom-IO circuits
+        // For custom IO circuits, update_redstone() would recalculate wire power from inputs,
+        // overwriting the redpiler's flushed state (including custom IO injected values)
+        if self.options.custom_io.is_empty() {
+            self.update_redstone();
+        }
     }
 
     /// Checks if a redstone lamp is lit at the given position
@@ -420,6 +426,7 @@ impl MchprsWorld {
             for y in 0..dimensions.1 {
                 for z in 0..dimensions.2 {
                     let pos = BlockPos::new(x, y, z);
+                    let raw_id = self.get_block_raw(pos);
                     let block = self.get_block(pos);
 
                     // Skip air blocks
@@ -436,14 +443,6 @@ impl MchprsWorld {
                         .iter()
                         .map(|(k, v)| (k.to_string(), v.to_string()))
                         .collect();
-
-                    // Debug custom IO blocks
-                    if custom_io_set.contains(&pos) {
-                        eprintln!(
-                            "[NUCLEATION DEBUG] Custom IO at {:?}: name={}, properties={:?}",
-                            pos, name, properties
-                        );
-                    }
 
                     // Create BlockState and update schematic
                     let mut block_state = crate::BlockState::new(name);
