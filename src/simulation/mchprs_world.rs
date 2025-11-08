@@ -413,6 +413,8 @@ impl MchprsWorld {
     /// Call this after running simulation if you want to export the resulting state.
     pub fn sync_to_schematic(&mut self) {
         let dimensions = self.schematic.get_dimensions();
+        let custom_io_set: std::collections::HashSet<_> =
+            self.options.custom_io.iter().cloned().collect();
 
         for x in 0..dimensions.0 {
             for y in 0..dimensions.1 {
@@ -434,6 +436,14 @@ impl MchprsWorld {
                         .iter()
                         .map(|(k, v)| (k.to_string(), v.to_string()))
                         .collect();
+
+                    // Debug custom IO blocks
+                    if custom_io_set.contains(&pos) {
+                        eprintln!(
+                            "[NUCLEATION DEBUG] Custom IO at {:?}: name={}, properties={:?}",
+                            pos, name, properties
+                        );
+                    }
 
                     // Create BlockState and update schematic
                     let mut block_state = crate::BlockState::new(name);
