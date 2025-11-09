@@ -915,4 +915,175 @@ mod tests {
             power_value
         );
     }
+
+    #[test]
+    fn test_custom_io_with_adjacent_wires() {
+        // This test verifies that wires ADJACENT to custom IO also update correctly
+        use super::super::SimulationOptions;
+        use mchprs_world::World;
+
+        let mut schematic = UniversalSchematic::new("Custom IO Adjacent Test".to_string());
+
+        // Base blocks
+        for x in 0..3 {
+            schematic.set_block(
+                x,
+                0,
+                0,
+                BlockState::new("minecraft:gray_concrete".to_string()),
+            );
+        }
+
+        // Three wires in a row: [0,1,0] (custom IO) -> [1,1,0] (adjacent) -> [2,1,0] (2 blocks away)
+        for x in 0..3 {
+            let mut wire = BlockState::new("minecraft:redstone_wire".to_string());
+            wire.properties.insert("power".to_string(), "0".to_string());
+            wire.properties
+                .insert("east".to_string(), "side".to_string());
+            wire.properties
+                .insert("west".to_string(), "side".to_string());
+            wire.properties
+                .insert("north".to_string(), "none".to_string());
+            wire.properties
+                .insert("south".to_string(), "none".to_string());
+            schematic.set_block(x, 1, 0, wire);
+        }
+
+        let custom_io_pos = BlockPos::new(0, 1, 0);
+        let adjacent_pos = BlockPos::new(1, 1, 0);
+        let far_pos = BlockPos::new(2, 1, 0);
+
+        let options = SimulationOptions {
+            custom_io: vec![custom_io_pos],
+            io_only: false,  // CRITICAL: We want ALL wires to update
+            optimize: false, // CRITICAL: Don't skip non-IO wires during compilation!
+            ..Default::default()
+        };
+
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // Set signal strength to 15 on custom IO
+        world.set_signal_strength(custom_io_pos, 15);
+        world.tick(5); // Allow propagation
+        world.flush();
+        world.sync_to_schematic();
+
+        let synced_schematic = world.get_schematic();
+
+        // Check custom IO wire (should be 15)
+        let custom_io_block = synced_schematic
+            .get_block(0, 1, 0)
+            .expect("Custom IO block should exist");
+        let custom_io_power: u8 = custom_io_block
+            .properties
+            .get("power")
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(0);
+
+        // Check adjacent wire (should be 14)
+        let adjacent_block = synced_schematic
+            .get_block(1, 1, 0)
+            .expect("Adjacent block should exist");
+        let adjacent_power: u8 = adjacent_block
+            .properties
+            .get("power")
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(0);
+
+        // Check far wire (should be 13)
+        let far_block = synced_schematic
+            .get_block(2, 1, 0)
+            .expect("Far block should exist");
+        let far_power: u8 = far_block
+            .properties
+            .get("power")
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(0);
+
+        eprintln!("[TEST] Custom IO wire power: {}", custom_io_power);
+        eprintln!("[TEST] Adjacent wire power: {}", adjacent_power);
+        eprintln!("[TEST] Far wire power: {}", far_power);
+
+        assert_eq!(custom_io_power, 15, "Custom IO wire should have power 15");
+        assert!(
+            adjacent_power > 0,
+            "Adjacent wire should have power > 0, got {}",
+            adjacent_power
+        );
+        assert!(
+            far_power > 0,
+            "Far wire should have power > 0, got {}",
+            far_power
+        );
+    }
+
+    #[test]
+    fn test_io_only_mode_performance() {
+        // This test verifies that io_only mode works for maximum performance
+        use super::super::SimulationOptions;
+
+        let mut schematic = UniversalSchematic::new("IO Only Test".to_string());
+
+        // Base blocks
+        for x in 0..3 {
+            schematic.set_block(
+                x,
+                0,
+                0,
+                BlockState::new("minecraft:gray_concrete".to_string()),
+            );
+        }
+
+        // Three wires: input -> middle -> output
+        for x in 0..3 {
+            let mut wire = BlockState::new("minecraft:redstone_wire".to_string());
+            wire.properties.insert("power".to_string(), "0".to_string());
+            wire.properties
+                .insert("east".to_string(), "side".to_string());
+            wire.properties
+                .insert("west".to_string(), "side".to_string());
+            wire.properties
+                .insert("north".to_string(), "none".to_string());
+            wire.properties
+                .insert("south".to_string(), "none".to_string());
+            schematic.set_block(x, 1, 0, wire);
+        }
+
+        let input_pos = BlockPos::new(0, 1, 0);
+        let output_pos = BlockPos::new(2, 1, 0);
+
+        let options = SimulationOptions {
+            custom_io: vec![input_pos, output_pos],
+            io_only: true,   // PERFORMANCE MODE: Only sync IO nodes to schematic
+            optimize: false, // Need middle wires in graph for propagation
+            ..Default::default()
+        };
+
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // Set input
+        world.set_signal_strength(input_pos, 15);
+        world.tick(5);
+        world.flush();
+
+        // In io_only mode, we should be able to read IO positions
+        let input_signal = world.get_signal_strength(input_pos);
+        let output_signal = world.get_signal_strength(output_pos);
+
+        eprintln!(
+            "[TEST] IO-only mode - Input signal: {}, Output signal: {}",
+            input_signal, output_signal
+        );
+
+        assert_eq!(
+            input_signal, 15,
+            "Should be able to read input signal in io_only mode"
+        );
+        assert!(
+            output_signal > 0,
+            "Output should receive signal in io_only mode"
+        );
+    }
 }

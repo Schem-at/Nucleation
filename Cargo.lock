@@ -808,7 +808,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -863,11 +863,11 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "fat-macho"
-version = "0.4.9"
+version = "0.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c9c45caa6c6edfaee4cb3bd84ea9686e115df7f0efb530e15fb466eccb0b345"
+checksum = "a64465b99fa411ca36a47048e9b1deec20f609b072711e3949e6d135403ea16d"
 dependencies = [
- "goblin",
+ "goblin 0.10.3",
 ]
 
 [[package]]
@@ -1006,7 +1006,18 @@ checksum = "daa0a64d21a7eb230583b4c5f4e23b7e4e57974f96620f42a7e75e08ae66d745"
 dependencies = [
  "log",
  "plain",
- "scroll",
+ "scroll 0.12.0",
+]
+
+[[package]]
+name = "goblin"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "51876e3748c4a347fe65b906f2b1ae46a1e55a497b22c94c1f4f2c469ff7673a"
+dependencies = [
+ "log",
+ "plain",
+ "scroll 0.13.0",
 ]
 
 [[package]]
@@ -1070,11 +1081,11 @@ dependencies = [
 
 [[package]]
 name = "home"
-version = "0.5.12"
+version = "0.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc627f471c528ff0c4a49e1d5e60450c8f6461dd6d10ba9dcd3a61d3dff7728d"
+checksum = "e3d1354bf6b7235cb4a0576c2619fd4ed18183f689b12b006a0ee7329eeff9a5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1263,7 +1274,7 @@ checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
 dependencies = [
  "hermit-abi",
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1348,13 +1359,13 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "lddtree"
-version = "0.3.7"
+version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0779ac94bd7b6ab781fa12388dbf79ac45ec1fa433e7d25521753be8227b08e"
+checksum = "547a362ad16dead8837d5b30402a81b05bb57c352044389f8748f4f2dbd51914"
 dependencies = [
  "fs-err",
  "glob",
- "goblin",
+ "goblin 0.10.3",
 ]
 
 [[package]]
@@ -1475,7 +1486,7 @@ dependencies = [
  "flate2",
  "fs-err",
  "glob",
- "goblin",
+ "goblin 0.9.3",
  "ignore",
  "indexmap",
  "itertools 0.12.1",
@@ -1513,7 +1524,7 @@ dependencies = [
 [[package]]
 name = "mchprs_blocks"
 version = "0.4.1"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=b385411#b3854113afa89cd285489e684699ad5233724164"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=757c67f#757c67fde53ef4bc11ba78433d631bb1b130b731"
 dependencies = [
  "hematite-nbt",
  "mchprs_proc_macros",
@@ -1524,7 +1535,7 @@ dependencies = [
 [[package]]
 name = "mchprs_proc_macros"
 version = "0.4.1"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=b385411#b3854113afa89cd285489e684699ad5233724164"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=757c67f#757c67fde53ef4bc11ba78433d631bb1b130b731"
 dependencies = [
  "quote",
  "syn 2.0.109",
@@ -1533,7 +1544,7 @@ dependencies = [
 [[package]]
 name = "mchprs_redpiler"
 version = "0.1.0"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=b385411#b3854113afa89cd285489e684699ad5233724164"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=757c67f#757c67fde53ef4bc11ba78433d631bb1b130b731"
 dependencies = [
  "enum_dispatch",
  "itertools 0.14.0",
@@ -1551,7 +1562,7 @@ dependencies = [
 [[package]]
 name = "mchprs_redstone"
 version = "0.1.0"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=b385411#b3854113afa89cd285489e684699ad5233724164"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=757c67f#757c67fde53ef4bc11ba78433d631bb1b130b731"
 dependencies = [
  "mchprs_blocks",
  "mchprs_world",
@@ -1562,12 +1573,12 @@ dependencies = [
 [[package]]
 name = "mchprs_utils"
 version = "0.4.1"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=b385411#b3854113afa89cd285489e684699ad5233724164"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=757c67f#757c67fde53ef4bc11ba78433d631bb1b130b731"
 
 [[package]]
 name = "mchprs_world"
 version = "0.4.1"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=b385411#b3854113afa89cd285489e684699ad5233724164"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=757c67f#757c67fde53ef4bc11ba78433d631bb1b130b731"
 dependencies = [
  "hematite-nbt",
  "mchprs_blocks",
@@ -1658,12 +1669,12 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
 name = "nucleation"
-version = "0.1.87"
+version = "0.1.89"
 dependencies = [
  "base64 0.22.1",
  "bytemuck",
@@ -2227,7 +2238,7 @@ dependencies = [
 [[package]]
 name = "redpiler_graph"
 version = "0.4.1"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=b385411#b3854113afa89cd285489e684699ad5233724164"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=757c67f#757c67fde53ef4bc11ba78433d631bb1b130b731"
 dependencies = [
  "bincode",
  "serde",
@@ -2326,7 +2337,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.11.0",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2371,7 +2382,16 @@ version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ab8598aa408498679922eff7fa985c25d58a90771bd6be794434c5277eab1a6"
 dependencies = [
- "scroll_derive",
+ "scroll_derive 0.12.1",
+]
+
+[[package]]
+name = "scroll"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1257cd4248b4132760d6524d6dda4e053bc648c9070b960929bf50cfb1e7add"
+dependencies = [
+ "scroll_derive 0.13.1",
 ]
 
 [[package]]
@@ -2379,6 +2399,17 @@ name = "scroll_derive"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1783eabc414609e28a5ba76aee5ddd52199f7107a0b24c2e9746a1ecc34a683d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.109",
+]
+
+[[package]]
+name = "scroll_derive"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed76efe62313ab6610570951494bdaa81568026e0318eaa55f167de70eeea67d"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2657,7 +2688,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.2",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3176,7 +3207,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3242,6 +3273,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7837d08f69c77cf6b07689544538e017c1bfcf57e34b4c0ff58e6c2cd3b37091"
 dependencies = [
  "windows-link",
+]
+
+[[package]]
+name = "windows-sys"
+version = "0.52.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "282be5f36a8ce781fad8c8ae18fa3f9beff57ec1b52cb3de0789201425d9a33d"
+dependencies = [
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
