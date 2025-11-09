@@ -38,12 +38,26 @@ impl Default for SimulationOptions {
     }
 }
 
+/// Custom IO state change event
+#[derive(Debug, Clone)]
+pub struct CustomIoChange {
+    pub x: i32,
+    pub y: i32,
+    pub z: i32,
+    pub old_power: u8,
+    pub new_power: u8,
+}
+
 pub struct MchprsWorld {
     pub(crate) schematic: UniversalSchematic,
     chunks: HashMap<(i32, i32), Chunk>,
     to_be_ticked: Vec<TickEntry>,
     compiler: Compiler,
     options: SimulationOptions,
+    /// Previous state of custom IO positions for change detection
+    custom_io_states: HashMap<BlockPos, u8>,
+    /// Queue of custom IO changes since last poll
+    custom_io_changes: Vec<CustomIoChange>,
 }
 
 impl MchprsWorld {
@@ -81,6 +95,8 @@ impl MchprsWorld {
                 c
             },
             options,
+            custom_io_states: HashMap::new(),
+            custom_io_changes: Vec::new(),
         };
 
         world.initialize_chunks()?;
@@ -337,6 +353,12 @@ impl MchprsWorld {
         self.compiler.get_signal_strength(pos).unwrap_or(0)
     }
 
+    /// Checks if a position has a node in the redpiler graph (DEBUG)
+    #[cfg(test)]
+    pub fn has_node(&self, pos: BlockPos) -> bool {
+        self.compiler.get_signal_strength(pos).is_some()
+    }
+
     /// Simulates a right-click on a block (typically a lever)
     ///
     /// # Errors
@@ -468,6 +490,69 @@ impl MchprsWorld {
     pub fn into_schematic(mut self) -> UniversalSchematic {
         self.sync_to_schematic();
         self.schematic
+    }
+
+    /// Check for custom IO state changes and queue them
+    /// Call this after tick() or set_signal_strength() to detect changes
+    ///
+    /// **Performance**: This is a no-op if there are no custom IO positions,
+    /// so it has zero overhead for circuits without custom IO.
+    pub fn check_custom_io_changes(&mut self) {
+        // Early return if no custom IO - zero overhead!
+        if self.options.custom_io.is_empty() {
+            return;
+        }
+
+        // Check each custom IO position for changes
+        for pos in &self.options.custom_io {
+            let current_power = self.get_signal_strength(*pos);
+            let previous_power = self.custom_io_states.get(pos).copied().unwrap_or(255); // 255 = uninitialized
+
+            if current_power != previous_power && previous_power != 255 {
+                // State changed, queue the change
+                self.custom_io_changes.push(CustomIoChange {
+                    x: pos.x,
+                    y: pos.y,
+                    z: pos.z,
+                    old_power: previous_power,
+                    new_power: current_power,
+                });
+            }
+
+            // Update tracked state
+            self.custom_io_states.insert(*pos, current_power);
+        }
+    }
+
+    /// Get and clear all custom IO changes since last poll
+    /// Returns a vector of changes in the order they occurred
+    ///
+    /// # Example
+    /// ```ignore
+    /// // After ticking
+    /// world.tick(5);
+    /// world.check_custom_io_changes();
+    ///
+    /// // Poll for changes
+    /// let changes = world.poll_custom_io_changes();
+    /// for change in changes {
+    ///     println!("IO at ({},{},{}) changed: {} -> {}",
+    ///         change.x, change.y, change.z, change.old_power, change.new_power);
+    /// }
+    /// ```
+    pub fn poll_custom_io_changes(&mut self) -> Vec<CustomIoChange> {
+        std::mem::take(&mut self.custom_io_changes)
+    }
+
+    /// Get custom IO changes without clearing the queue
+    /// Useful for inspecting changes without consuming them
+    pub fn peek_custom_io_changes(&self) -> &[CustomIoChange] {
+        &self.custom_io_changes
+    }
+
+    /// Clear all queued custom IO changes without returning them
+    pub fn clear_custom_io_changes(&mut self) {
+        self.custom_io_changes.clear();
     }
 }
 

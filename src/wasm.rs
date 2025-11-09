@@ -1294,6 +1294,108 @@ impl MchprsWorldWrapper {
         self.world.get_signal_strength(BlockPos::new(x, y, z))
     }
 
+    /// Check for custom IO state changes and queue them
+    /// Call this after tick() or setSignalStrength() to detect changes
+    #[wasm_bindgen(js_name = checkCustomIoChanges)]
+    pub fn check_custom_io_changes(&mut self) {
+        self.world.check_custom_io_changes();
+    }
+
+    /// Get and clear all custom IO changes since last poll
+    /// Returns an array of change objects with {x, y, z, oldPower, newPower}
+    #[wasm_bindgen(js_name = pollCustomIoChanges)]
+    pub fn poll_custom_io_changes(&mut self) -> JsValue {
+        let changes = self.world.poll_custom_io_changes();
+        let array = js_sys::Array::new();
+
+        for change in changes {
+            let obj = js_sys::Object::new();
+            js_sys::Reflect::set(
+                &obj,
+                &JsValue::from_str("x"),
+                &JsValue::from_f64(change.x as f64),
+            )
+            .unwrap();
+            js_sys::Reflect::set(
+                &obj,
+                &JsValue::from_str("y"),
+                &JsValue::from_f64(change.y as f64),
+            )
+            .unwrap();
+            js_sys::Reflect::set(
+                &obj,
+                &JsValue::from_str("z"),
+                &JsValue::from_f64(change.z as f64),
+            )
+            .unwrap();
+            js_sys::Reflect::set(
+                &obj,
+                &JsValue::from_str("oldPower"),
+                &JsValue::from_f64(change.old_power as f64),
+            )
+            .unwrap();
+            js_sys::Reflect::set(
+                &obj,
+                &JsValue::from_str("newPower"),
+                &JsValue::from_f64(change.new_power as f64),
+            )
+            .unwrap();
+            array.push(&obj);
+        }
+
+        array.into()
+    }
+
+    /// Get custom IO changes without clearing the queue
+    #[wasm_bindgen(js_name = peekCustomIoChanges)]
+    pub fn peek_custom_io_changes(&self) -> JsValue {
+        let changes = self.world.peek_custom_io_changes();
+        let array = js_sys::Array::new();
+
+        for change in changes {
+            let obj = js_sys::Object::new();
+            js_sys::Reflect::set(
+                &obj,
+                &JsValue::from_str("x"),
+                &JsValue::from_f64(change.x as f64),
+            )
+            .unwrap();
+            js_sys::Reflect::set(
+                &obj,
+                &JsValue::from_str("y"),
+                &JsValue::from_f64(change.y as f64),
+            )
+            .unwrap();
+            js_sys::Reflect::set(
+                &obj,
+                &JsValue::from_str("z"),
+                &JsValue::from_f64(change.z as f64),
+            )
+            .unwrap();
+            js_sys::Reflect::set(
+                &obj,
+                &JsValue::from_str("oldPower"),
+                &JsValue::from_f64(change.old_power as f64),
+            )
+            .unwrap();
+            js_sys::Reflect::set(
+                &obj,
+                &JsValue::from_str("newPower"),
+                &JsValue::from_f64(change.new_power as f64),
+            )
+            .unwrap();
+            array.push(&obj);
+        }
+
+        array.into()
+    }
+
+    /// Clear all queued custom IO changes
+    #[wasm_bindgen(js_name = clearCustomIoChanges)]
+    pub fn clear_custom_io_changes(&mut self) {
+        self.world.clear_custom_io_changes();
+    }
+
     /// Generates a truth table for the circuit
     ///
     /// Returns an array of objects with keys like "Input 0", "Output 0", etc.

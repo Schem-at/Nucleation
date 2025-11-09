@@ -631,6 +631,57 @@ impl PyMchprsWorld {
         self.inner.get_signal_strength(BlockPos::new(x, y, z))
     }
 
+    /// Check for custom IO state changes and queue them
+    /// Call this after tick() or set_signal_strength() to detect changes
+    pub fn check_custom_io_changes(&mut self) {
+        self.inner.check_custom_io_changes();
+    }
+
+    /// Get and clear all custom IO changes since last poll
+    /// Returns a list of dictionaries with keys: x, y, z, old_power, new_power
+    pub fn poll_custom_io_changes(&mut self, py: Python) -> PyResult<PyObject> {
+        let changes = self.inner.poll_custom_io_changes();
+        let mut list_items: Vec<PyObject> = Vec::new();
+
+        for change in changes {
+            let dict = PyDict::new(py);
+            dict.set_item("x", change.x)?;
+            dict.set_item("y", change.y)?;
+            dict.set_item("z", change.z)?;
+            dict.set_item("old_power", change.old_power)?;
+            dict.set_item("new_power", change.new_power)?;
+            list_items.push(dict.into());
+        }
+
+        let list = PyList::new(py, list_items)?;
+        Ok(list.into())
+    }
+
+    /// Get custom IO changes without clearing the queue
+    /// Returns a list of dictionaries with keys: x, y, z, old_power, new_power
+    pub fn peek_custom_io_changes(&self, py: Python) -> PyResult<PyObject> {
+        let changes = self.inner.peek_custom_io_changes();
+        let mut list_items: Vec<PyObject> = Vec::new();
+
+        for change in changes {
+            let dict = PyDict::new(py);
+            dict.set_item("x", change.x)?;
+            dict.set_item("y", change.y)?;
+            dict.set_item("z", change.z)?;
+            dict.set_item("old_power", change.old_power)?;
+            dict.set_item("new_power", change.new_power)?;
+            list_items.push(dict.into());
+        }
+
+        let list = PyList::new(py, list_items)?;
+        Ok(list.into())
+    }
+
+    /// Clear all queued custom IO changes
+    pub fn clear_custom_io_changes(&mut self) {
+        self.inner.clear_custom_io_changes();
+    }
+
     pub fn sync_to_schematic(&mut self) {
         self.inner.sync_to_schematic();
     }

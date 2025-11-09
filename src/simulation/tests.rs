@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use super::super::{generate_truth_table, BlockPos, MchprsWorld};
+    use super::super::{generate_truth_table, BlockPos, MchprsWorld, SimulationOptions};
     use crate::{BlockState, UniversalSchematic};
 
     fn create_simple_redstone_line() -> UniversalSchematic {
@@ -1085,5 +1085,397 @@ mod tests {
             output_signal > 0,
             "Output should receive signal in io_only mode"
         );
+    }
+
+    #[test]
+    fn test_custom_io_callbacks_basic() {
+        // Test basic callback functionality - simplified to test direct state changes
+        let schematic = create_and_gate();
+
+        // Use actual positions from the schematic:
+        // Wires at: (0,1,1), (1,1,1), (2,1,1), (1,1,2)
+        // Lamp at: (1,1,3)
+        let input_a = BlockPos::new(0, 1, 1);
+        let input_b = BlockPos::new(2, 1, 1);
+        let output = BlockPos::new(1, 1, 2); // Center wire before lamp
+
+        let options = SimulationOptions {
+            custom_io: vec![input_a, input_b, output],
+            optimize: false,
+            io_only: false,
+            ..Default::default()
+        };
+
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // Initialize tracking (first check sets baseline)
+        world.check_custom_io_changes();
+        world.clear_custom_io_changes();
+
+        // Test 1: Single input change
+        world.set_signal_strength(input_a, 15);
+        world.check_custom_io_changes();
+
+        let changes = world.poll_custom_io_changes();
+        eprintln!(
+            "[TEST] Changes after setting input A: {} changes",
+            changes.len()
+        );
+        // In a connected circuit, setting one wire may affect others instantly
+        assert!(changes.len() >= 1, "Should detect at least input A change");
+        let input_a_change = changes.iter().find(|c| c.x == 0 && c.y == 1 && c.z == 1);
+        assert!(input_a_change.is_some(), "Should detect input A change");
+        assert_eq!(
+            input_a_change.unwrap().new_power,
+            15,
+            "Input A should be powered to 15"
+        );
+
+        // Test 2: Second input change (after tick to propagate)
+        world.tick(5);
+        world.flush();
+        world.check_custom_io_changes();
+        world.poll_custom_io_changes(); // Clear any propagation changes
+
+        world.set_signal_strength(input_b, 15);
+        eprintln!("[TEST] After set input_b to 15:");
+        eprintln!(
+            "  get_signal_strength(input_a) = {}",
+            world.get_signal_strength(input_a)
+        );
+        eprintln!(
+            "  get_signal_strength(input_b) = {}",
+            world.get_signal_strength(input_b)
+        );
+        world.check_custom_io_changes();
+
+        let changes = world.poll_custom_io_changes();
+        eprintln!("  Changes detected: {}", changes.len());
+        assert!(changes.len() >= 1, "Should detect input B change");
+
+        let input_b_change = changes.iter().find(|c| c.x == 2 && c.y == 1 && c.z == 1);
+        assert!(input_b_change.is_some(), "Should detect input B change");
+
+        // Test 3: Verify output state (may have already changed due to instant propagation)
+        world.tick(5);
+        world.flush();
+
+        let output_power = world.get_signal_strength(output);
+        assert!(
+            output_power > 0,
+            "Output should be powered when both inputs are high"
+        );
+    }
+
+    #[test]
+    fn test_custom_io_callbacks_multiple_changes() {
+        // Test detecting multiple state changes in sequence
+        let schematic = create_and_gate();
+
+        // Use actual positions from the schematic:
+        // Wires at: (0,1,1), (1,1,1), (2,1,1), (1,1,2)
+        let input_a = BlockPos::new(0, 1, 1); // Wire for input A
+        let input_b = BlockPos::new(2, 1, 1); // Wire for input B
+
+        let options = SimulationOptions {
+            custom_io: vec![input_a, input_b],
+            optimize: false,
+            io_only: false,
+            ..Default::default()
+        };
+
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // Initialize
+        world.check_custom_io_changes();
+        world.clear_custom_io_changes();
+
+        // Debug: Check if both nodes exist
+        eprintln!("[TEST] Node existence check:");
+        eprintln!(
+            "  input_a ({:?}) has_node: {}",
+            input_a,
+            world.has_node(input_a)
+        );
+        eprintln!(
+            "  input_b ({:?}) has_node: {}",
+            input_b,
+            world.has_node(input_b)
+        );
+
+        // Change 1: Set input A to 15
+        world.set_signal_strength(input_a, 15);
+        eprintln!("[TEST] After set input_a to 15:");
+        eprintln!(
+            "  get_signal_strength(input_a) = {}",
+            world.get_signal_strength(input_a)
+        );
+        eprintln!(
+            "  get_signal_strength(input_b) = {}",
+            world.get_signal_strength(input_b)
+        );
+        world.check_custom_io_changes();
+        let changes = world.poll_custom_io_changes();
+        eprintln!("  Changes detected: {}", changes.len());
+        // In a connected circuit, changes may propagate to multiple wires
+        assert!(changes.len() >= 1, "Should detect at least input A change");
+        let input_a_change = changes.iter().find(|c| c.x == 0 && c.y == 1 && c.z == 1);
+        assert!(input_a_change.is_some(), "Should detect input A change");
+
+        // Change 2: Set input B to 15
+        world.set_signal_strength(input_b, 15);
+        eprintln!("[TEST] After set input_b to 15:");
+        eprintln!(
+            "  get_signal_strength(input_a) = {}",
+            world.get_signal_strength(input_a)
+        );
+        eprintln!(
+            "  get_signal_strength(input_b) = {}",
+            world.get_signal_strength(input_b)
+        );
+        world.check_custom_io_changes();
+        let changes = world.poll_custom_io_changes();
+        eprintln!("  Changes detected: {}", changes.len());
+        assert!(changes.len() >= 1, "Should detect at least input B change");
+        let input_b_change = changes.iter().find(|c| c.x == 2 && c.y == 1 && c.z == 1);
+        assert!(input_b_change.is_some(), "Should detect input B change");
+
+        // Change 3: Set input A back to 0
+        world.set_signal_strength(input_a, 0);
+        eprintln!("[TEST] After set input_a to 0:");
+        eprintln!(
+            "  get_signal_strength(input_a) = {}",
+            world.get_signal_strength(input_a)
+        );
+        eprintln!(
+            "  get_signal_strength(input_b) = {}",
+            world.get_signal_strength(input_b)
+        );
+        world.check_custom_io_changes();
+        let changes = world.poll_custom_io_changes();
+        eprintln!("  Changes detected: {}", changes.len());
+        assert!(
+            changes.len() >= 1,
+            "Should detect at least input A change back to 0"
+        );
+        let input_a_change = changes.iter().find(|c| c.x == 0 && c.y == 1 && c.z == 1);
+        assert!(
+            input_a_change.is_some(),
+            "Should detect input A change to 0"
+        );
+        assert_eq!(input_a_change.unwrap().new_power, 0, "Input A should be 0");
+
+        // Queue should be empty after all polls
+        let changes = world.poll_custom_io_changes();
+        assert_eq!(changes.len(), 0, "Queue should be empty");
+    }
+
+    #[test]
+    fn test_custom_io_callbacks_peek() {
+        // Test peeking at changes without consuming them
+        let schematic = create_and_gate();
+
+        let input_a = BlockPos::new(0, 1, 0);
+
+        let options = SimulationOptions {
+            custom_io: vec![input_a],
+            optimize: false,
+            io_only: false,
+            ..Default::default()
+        };
+
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        world.check_custom_io_changes();
+        world.clear_custom_io_changes();
+
+        world.set_signal_strength(input_a, 15);
+        world.check_custom_io_changes();
+
+        // Peek should not consume
+        let peeked1 = world.peek_custom_io_changes();
+        assert_eq!(peeked1.len(), 1, "Should see 1 change via peek");
+
+        // Peek again - should still be there
+        let peeked2 = world.peek_custom_io_changes();
+        assert_eq!(peeked2.len(), 1, "Changes should still be in queue");
+
+        // Poll should consume
+        let polled = world.poll_custom_io_changes();
+        assert_eq!(polled.len(), 1, "Should poll 1 change");
+
+        // Now peek should be empty
+        let peeked3 = world.peek_custom_io_changes();
+        assert_eq!(peeked3.len(), 0, "Queue should be empty after poll");
+    }
+
+    #[test]
+    fn test_custom_io_callbacks_no_false_positives() {
+        // Test that unchanged values don't trigger callbacks
+        let schematic = create_and_gate();
+
+        let input_a = BlockPos::new(0, 1, 0);
+
+        let options = SimulationOptions {
+            custom_io: vec![input_a],
+            optimize: false,
+            io_only: false,
+            ..Default::default()
+        };
+
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        world.check_custom_io_changes();
+        world.clear_custom_io_changes();
+
+        // Set to 15
+        world.set_signal_strength(input_a, 15);
+        world.check_custom_io_changes();
+        world.poll_custom_io_changes(); // Clear
+
+        // Set to 15 again (no change)
+        world.set_signal_strength(input_a, 15);
+        world.check_custom_io_changes();
+
+        let changes = world.poll_custom_io_changes();
+        assert_eq!(
+            changes.len(),
+            0,
+            "Setting to same value should not trigger change"
+        );
+
+        // Tick with no changes
+        world.tick(5);
+        world.flush();
+        world.check_custom_io_changes();
+
+        let changes = world.poll_custom_io_changes();
+        assert_eq!(
+            changes.len(),
+            0,
+            "Ticking with no changes should not trigger callbacks"
+        );
+    }
+
+    #[test]
+    fn test_custom_io_callbacks_performance_zero_overhead() {
+        // Test that callbacks have zero overhead when no custom IO is used
+        let schematic = create_and_gate();
+
+        // NO custom IO positions
+        let options = SimulationOptions {
+            custom_io: vec![], // Empty!
+            optimize: false,
+            io_only: false,
+            ..Default::default()
+        };
+
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // These should be instant no-ops
+        let start = std::time::Instant::now();
+        for _ in 0..1000 {
+            world.check_custom_io_changes();
+        }
+        let elapsed = start.elapsed();
+
+        eprintln!(
+            "[TEST] 1000 check_custom_io_changes() calls with no custom IO: {:?}",
+            elapsed
+        );
+
+        // Should be extremely fast (< 1ms for 1000 calls)
+        assert!(
+            elapsed.as_micros() < 1000,
+            "Should have near-zero overhead when no custom IO"
+        );
+
+        // Changes should always be empty
+        let changes = world.poll_custom_io_changes();
+        assert_eq!(changes.len(), 0);
+    }
+
+    #[test]
+    fn test_custom_io_callbacks_performance_minimal_overhead() {
+        // Test that callbacks have minimal overhead even with custom IO
+        let schematic = create_and_gate();
+
+        let input_a = BlockPos::new(0, 1, 0);
+        let input_b = BlockPos::new(0, 1, 2);
+        let output = BlockPos::new(4, 1, 1);
+
+        let options = SimulationOptions {
+            custom_io: vec![input_a, input_b, output],
+            optimize: false,
+            io_only: false,
+            ..Default::default()
+        };
+
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        world.check_custom_io_changes();
+        world.clear_custom_io_changes();
+
+        // Measure overhead of change detection (no changes)
+        let start = std::time::Instant::now();
+        for _ in 0..1000 {
+            world.check_custom_io_changes();
+        }
+        let elapsed = start.elapsed();
+
+        eprintln!(
+            "[TEST] 1000 check_custom_io_changes() calls with 3 custom IO: {:?}",
+            elapsed
+        );
+
+        // Should still be fast (< 10ms for 1000 calls with 3 IO positions)
+        assert!(
+            elapsed.as_millis() < 10,
+            "Should have minimal overhead with custom IO"
+        );
+    }
+
+    #[test]
+    fn test_custom_io_callbacks_clear() {
+        // Test clearing the change queue
+        let schematic = create_and_gate();
+
+        let input_a = BlockPos::new(0, 1, 0);
+
+        let options = SimulationOptions {
+            custom_io: vec![input_a],
+            optimize: false,
+            io_only: false,
+            ..Default::default()
+        };
+
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        world.check_custom_io_changes();
+        world.clear_custom_io_changes();
+
+        // Make some changes
+        world.set_signal_strength(input_a, 15);
+        world.check_custom_io_changes();
+        world.set_signal_strength(input_a, 0);
+        world.check_custom_io_changes();
+
+        // Should have 2 changes
+        let peeked = world.peek_custom_io_changes();
+        assert_eq!(peeked.len(), 2);
+
+        // Clear without polling
+        world.clear_custom_io_changes();
+
+        // Should be empty now
+        let polled = world.poll_custom_io_changes();
+        assert_eq!(polled.len(), 0, "Queue should be empty after clear");
     }
 }
