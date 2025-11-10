@@ -341,6 +341,48 @@ impl SchematicWrapper {
         Ok(())
     }
 
+    #[wasm_bindgen(js_name = setBlockWithNbt)]
+    pub fn set_block_with_nbt(
+        &mut self,
+        x: i32,
+        y: i32,
+        z: i32,
+        block_name: &str,
+        nbt_data: &JsValue,
+    ) -> Result<(), JsValue> {
+        // Convert JsValue to HashMap<String, String>
+        let mut nbt = HashMap::new();
+
+        if !nbt_data.is_undefined() && !nbt_data.is_null() {
+            let obj: Object = nbt_data
+                .clone()
+                .dyn_into()
+                .map_err(|_| JsValue::from_str("NBT data should be an object"))?;
+
+            let keys = js_sys::Object::keys(&obj);
+            for i in 0..keys.length() {
+                let key = keys.get(i);
+                let key_str = key
+                    .as_string()
+                    .ok_or_else(|| JsValue::from_str("NBT keys should be strings"))?;
+
+                let value = Reflect::get(&obj, &key)
+                    .map_err(|_| JsValue::from_str("Error getting NBT value"))?;
+
+                let value_str = value
+                    .as_string()
+                    .ok_or_else(|| JsValue::from_str("NBT values should be strings"))?;
+
+                nbt.insert(key_str, value_str);
+            }
+        }
+
+        self.0
+            .set_block_with_nbt(x, y, z, block_name, nbt)
+            .map_err(|e| JsValue::from_str(&format!("Error setting block with NBT: {}", e)))?;
+        Ok(())
+    }
+
     pub fn get_block(&self, x: i32, y: i32, z: i32) -> Option<String> {
         self.0
             .get_block(x, y, z)

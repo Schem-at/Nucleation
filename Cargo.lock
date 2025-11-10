@@ -1686,7 +1686,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation"
-version = "0.1.92"
+version = "0.1.93"
 dependencies = [
  "base64 0.22.1",
  "bytemuck",

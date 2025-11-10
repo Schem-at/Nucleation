@@ -174,6 +174,25 @@ impl PySchematic {
         self.inner.set_block(x, y, z, block_state);
     }
 
+    pub fn set_block_with_nbt(
+        &mut self,
+        x: i32,
+        y: i32,
+        z: i32,
+        block_name: &str,
+        nbt_data: HashMap<String, String>,
+    ) -> PyResult<()> {
+        self.inner
+            .set_block_with_nbt(x, y, z, block_name, nbt_data)
+            .map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "Error setting block with NBT: {}",
+                    e
+                ))
+            })?;
+        Ok(())
+    }
+
     pub fn copy_region(
         &mut self,
         from_schematic: &PySchematic,

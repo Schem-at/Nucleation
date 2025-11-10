@@ -278,6 +278,78 @@ impl UniversalSchematic {
         self.default_region.set_block_entity(position, block_entity)
     }
 
+    /// Sets a block with NBT data in one convenient call
+    ///
+    /// # Arguments
+    /// * `x`, `y`, `z` - Block coordinates
+    /// * `block_name` - Block name with optional properties (e.g., "minecraft:sign[rotation=0]")
+    /// * `nbt_data` - NBT data as a HashMap (keys and values as strings for JSON compatibility)
+    ///
+    /// # Examples
+    /// ```
+    /// use nucleation::UniversalSchematic;
+    /// use std::collections::HashMap;
+    ///
+    /// let mut schematic = UniversalSchematic::new("test".to_string());
+    /// let mut nbt = HashMap::new();
+    /// nbt.insert("Text1".to_string(), r#"{"text":"Hello"}"#.to_string());
+    /// schematic.set_block_with_nbt(0, 0, 0, "minecraft:sign", nbt).unwrap();
+    /// ```
+    pub fn set_block_with_nbt(
+        &mut self,
+        x: i32,
+        y: i32,
+        z: i32,
+        block_name: &str,
+        nbt_data: std::collections::HashMap<String, String>,
+    ) -> Result<bool, String> {
+        // Parse block name (may include properties like [rotation=0])
+        let (block_state, _) = Self::parse_block_string(block_name)?;
+
+        // Set the basic block first
+        if !self.set_block(x, y, z, block_state.clone()) {
+            return Ok(false);
+        }
+
+        // Create block entity with NBT data
+        let mut block_entity = BlockEntity::new(block_state.name.clone(), (x, y, z));
+
+        for (key, value) in nbt_data {
+            // Try to parse value as NbtValue
+            let nbt_value = Self::parse_nbt_value(&value);
+            block_entity = block_entity.with_nbt_data(key, nbt_value);
+        }
+
+        self.set_block_entity(BlockPosition { x, y, z }, block_entity);
+        Ok(true)
+    }
+
+    /// Helper function to parse a string value into an appropriate NbtValue
+    fn parse_nbt_value(value: &str) -> NbtValue {
+        // If it's a JSON string (for Text components), keep as string
+        if value.starts_with('{') && value.ends_with('}') {
+            return NbtValue::String(value.to_string());
+        }
+
+        // Try to parse as integer
+        if let Ok(i) = value.parse::<i32>() {
+            return NbtValue::Int(i);
+        }
+
+        // Try to parse as float
+        if let Ok(f) = value.parse::<f32>() {
+            return NbtValue::Float(f);
+        }
+
+        // Try to parse as boolean
+        if let Ok(b) = value.parse::<bool>() {
+            return NbtValue::Byte(if b { 1 } else { 0 });
+        }
+
+        // Default to string
+        NbtValue::String(value.to_string())
+    }
+
     pub fn set_block_entity_in_region(
         &mut self,
         region_name: &str,
@@ -2527,5 +2599,159 @@ mod tests {
             chunks4.len() > 0,
             "Should have at least one chunk with blocks"
         );
+    }
+
+    #[test]
+    fn test_set_block_with_nbt_sign() {
+        let mut schematic = UniversalSchematic::new("test_schematic".to_string());
+        let mut nbt = HashMap::new();
+        nbt.insert("Text1".to_string(), r#"{"text":"Hello"}"#.to_string());
+        nbt.insert("Text2".to_string(), r#"{"text":"World"}"#.to_string());
+        nbt.insert("Text3".to_string(), r#"{"text":"Line 3"}"#.to_string());
+        nbt.insert("Text4".to_string(), r#"{"text":"Line 4"}"#.to_string());
+
+        let result = schematic.set_block_with_nbt(0, 1, 0, "minecraft:oak_sign[rotation=0]", nbt);
+        assert!(result.is_ok());
+
+        // Verify block was set
+        let block = schematic.get_block(0, 1, 0);
+        assert!(block.is_some());
+        assert_eq!(block.unwrap().name, "minecraft:oak_sign");
+
+        // Verify block entity was created
+        let entity = schematic.get_block_entity(BlockPosition { x: 0, y: 1, z: 0 });
+        assert!(entity.is_some());
+
+        let entity = entity.unwrap();
+        assert_eq!(entity.id, "minecraft:oak_sign");
+        assert!(entity.nbt.get("Text1").is_some());
+        assert!(entity.nbt.get("Text2").is_some());
+    }
+
+    #[test]
+    fn test_set_block_with_nbt_chest() {
+        let mut schematic = UniversalSchematic::new("test_schematic".to_string());
+        let mut nbt = HashMap::new();
+        nbt.insert(
+            "CustomName".to_string(),
+            r#"{"text":"My Chest"}"#.to_string(),
+        );
+        nbt.insert("Lock".to_string(), "secret_key".to_string());
+
+        let result = schematic.set_block_with_nbt(5, 2, 3, "minecraft:chest[facing=north]", nbt);
+        assert!(result.is_ok());
+
+        // Verify block was set
+        let block = schematic.get_block(5, 2, 3);
+        assert!(block.is_some());
+        assert_eq!(block.unwrap().name, "minecraft:chest");
+
+        // Verify block entity
+        let entity = schematic.get_block_entity(BlockPosition { x: 5, y: 2, z: 3 });
+        assert!(entity.is_some());
+
+        let entity = entity.unwrap();
+        assert_eq!(entity.id, "minecraft:chest");
+        assert!(entity.nbt.get("CustomName").is_some());
+        assert!(entity.nbt.get("Lock").is_some());
+    }
+
+    #[test]
+    fn test_set_block_with_nbt_furnace() {
+        let mut schematic = UniversalSchematic::new("test_schematic".to_string());
+        let mut nbt = HashMap::new();
+        nbt.insert("BurnTime".to_string(), "200".to_string());
+        nbt.insert("CookTime".to_string(), "100".to_string());
+
+        let result = schematic.set_block_with_nbt(10, 5, 10, "minecraft:furnace[lit=true]", nbt);
+        assert!(result.is_ok());
+
+        // Verify block entity has numeric NBT values
+        let entity = schematic.get_block_entity(BlockPosition { x: 10, y: 5, z: 10 });
+        assert!(entity.is_some());
+
+        let entity = entity.unwrap();
+        assert!(entity.nbt.get("BurnTime").is_some());
+        assert!(entity.nbt.get("CookTime").is_some());
+    }
+
+    #[test]
+    fn test_set_block_with_nbt_empty_nbt() {
+        let mut schematic = UniversalSchematic::new("test_schematic".to_string());
+        let nbt = HashMap::new();
+
+        let result = schematic.set_block_with_nbt(0, 0, 0, "minecraft:stone", nbt);
+        assert!(result.is_ok());
+
+        // Verify block was set
+        let block = schematic.get_block(0, 0, 0);
+        assert!(block.is_some());
+        assert_eq!(block.unwrap().name, "minecraft:stone");
+
+        // Should still create a block entity (even if empty)
+        let entity = schematic.get_block_entity(BlockPosition { x: 0, y: 0, z: 0 });
+        assert!(entity.is_some());
+    }
+
+    #[test]
+    fn test_set_block_with_nbt_multiple_blocks() {
+        let mut schematic = UniversalSchematic::new("test_schematic".to_string());
+
+        // Set multiple signs with different NBT data
+        for i in 0..3 {
+            let mut nbt = HashMap::new();
+            nbt.insert("Text1".to_string(), format!(r#"{{"text":"Sign {i}"}}"#));
+
+            let result = schematic.set_block_with_nbt(i, 0, 0, "minecraft:oak_sign", nbt);
+            assert!(result.is_ok());
+        }
+
+        // Verify all blocks and entities were created
+        for i in 0..3 {
+            let block = schematic.get_block(i, 0, 0);
+            assert!(block.is_some());
+
+            let entity = schematic.get_block_entity(BlockPosition { x: i, y: 0, z: 0 });
+            assert!(entity.is_some());
+            assert!(entity.unwrap().nbt.get("Text1").is_some());
+        }
+    }
+
+    #[test]
+    fn test_parse_nbt_value() {
+        // Test JSON string (should stay as string)
+        let json_value = UniversalSchematic::parse_nbt_value(r#"{"text":"Hello"}"#);
+        match json_value {
+            NbtValue::String(s) => assert!(s.contains("Hello")),
+            _ => panic!("Expected String variant for JSON"),
+        }
+
+        // Test integer
+        let int_value = UniversalSchematic::parse_nbt_value("42");
+        match int_value {
+            NbtValue::Int(i) => assert_eq!(i, 42),
+            _ => panic!("Expected Int variant"),
+        }
+
+        // Test float
+        let float_value = UniversalSchematic::parse_nbt_value("3.14");
+        match float_value {
+            NbtValue::Float(f) => assert!((f - 3.14).abs() < 0.01),
+            _ => panic!("Expected Float variant"),
+        }
+
+        // Test boolean
+        let bool_value = UniversalSchematic::parse_nbt_value("true");
+        match bool_value {
+            NbtValue::Byte(b) => assert_eq!(b, 1),
+            _ => panic!("Expected Byte variant for boolean"),
+        }
+
+        // Test plain string
+        let string_value = UniversalSchematic::parse_nbt_value("plain text");
+        match string_value {
+            NbtValue::String(s) => assert_eq!(s, "plain text"),
+            _ => panic!("Expected String variant"),
+        }
     }
 }
