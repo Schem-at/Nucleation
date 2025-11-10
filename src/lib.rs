@@ -8,6 +8,7 @@ mod bounding_box;
 mod chunk;
 mod entity;
 mod formats;
+pub mod insign;
 mod item;
 mod metadata;
 mod print_utils;

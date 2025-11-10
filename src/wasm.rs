@@ -1147,6 +1147,51 @@ pub fn debug_json_schematic(schematic: &SchematicWrapper) -> String {
 }
 
 // ============================================================================
+// INSIGN BINDINGS
+// ============================================================================
+
+#[wasm_bindgen]
+impl SchematicWrapper {
+    /// Extract all sign text from the schematic
+    /// Returns a JavaScript array of objects: [{pos: [x,y,z], text: "..."}]
+    #[wasm_bindgen(js_name = extractSigns)]
+    pub fn extract_signs(&self) -> JsValue {
+        let signs = crate::insign::extract_signs(&self.0);
+
+        let js_signs = Array::new();
+        for sign in signs {
+            let obj = Object::new();
+
+            // Create pos array
+            let pos_array = Array::new();
+            pos_array.push(&JsValue::from_f64(sign.pos[0] as f64));
+            pos_array.push(&JsValue::from_f64(sign.pos[1] as f64));
+            pos_array.push(&JsValue::from_f64(sign.pos[2] as f64));
+
+            Reflect::set(&obj, &"pos".into(), &pos_array).unwrap();
+            Reflect::set(&obj, &"text".into(), &JsValue::from_str(&sign.text)).unwrap();
+
+            js_signs.push(&obj);
+        }
+
+        js_signs.into()
+    }
+
+    /// Compile Insign annotations from the schematic's signs
+    /// Returns a JavaScript object with compiled region metadata
+    /// This returns raw Insign data - interpretation is up to the consumer
+    #[wasm_bindgen(js_name = compileInsign)]
+    pub fn compile_insign(&self) -> Result<JsValue, JsValue> {
+        let insign_data = crate::insign::compile_schematic_insign(&self.0)
+            .map_err(|e| JsValue::from_str(&format!("Insign compilation error: {}", e)))?;
+
+        // Convert serde_json::Value to JsValue
+        serde_wasm_bindgen::to_value(&insign_data)
+            .map_err(|e| JsValue::from_str(&format!("JSON serialization error: {}", e)))
+    }
+}
+
+// ============================================================================
 // SIMULATION (MCHPRS) BINDINGS
 // ============================================================================
 

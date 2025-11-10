@@ -1267,6 +1267,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "insign"
+version = "0.1.1"
+dependencies = [
+ "clap",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "is-terminal"
 version = "0.4.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1674,7 +1684,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation"
-version = "0.1.90"
+version = "0.1.91"
 dependencies = [
  "base64 0.22.1",
  "bytemuck",
@@ -1685,6 +1695,7 @@ dependencies = [
  "flate2",
  "getrandom 0.2.16",
  "hematite-nbt",
+ "insign",
  "js-sys",
  "log",
  "maturin",

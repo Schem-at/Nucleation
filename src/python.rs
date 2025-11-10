@@ -471,6 +471,51 @@ impl PySchematic {
             .rotate_region_z(region_name, degrees)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))
     }
+
+    // ============================================================================
+    // INSIGN METHODS
+    // ============================================================================
+
+    /// Extract all sign text from the schematic
+    /// Returns a list of dicts: [{"pos": [x,y,z], "text": "..."}]
+    pub fn extract_signs(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let signs = crate::insign::extract_signs(&self.inner);
+
+        let list = PyList::new(py, &[] as &[PyObject])?;
+        for sign in signs {
+            let dict = PyDict::new(py);
+            let pos_list = PyList::new(py, &[sign.pos[0], sign.pos[1], sign.pos[2]])?;
+            dict.set_item("pos", pos_list)?;
+            dict.set_item("text", sign.text)?;
+            list.append(dict)?;
+        }
+
+        Ok(list.into())
+    }
+
+    /// Compile Insign annotations from the schematic's signs
+    /// Returns a Python dict with compiled region metadata
+    /// This returns raw Insign data - interpretation is up to the consumer
+    pub fn compile_insign(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let insign_data = crate::insign::compile_schematic_insign(&self.inner).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Insign compilation error: {}",
+                e
+            ))
+        })?;
+
+        // Convert serde_json::Value to Python object
+        let json_str = serde_json::to_string(&insign_data).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "JSON serialization error: {}",
+                e
+            ))
+        })?;
+
+        let json_module = py.import("json")?;
+        let loads = json_module.getattr("loads")?;
+        Ok(loads.call1((json_str,))?.extract()?)
+    }
 }
 
 // --- NBT Conversion Helpers ---

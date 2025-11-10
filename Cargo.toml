@@ -1,6 +1,6 @@
 [package]
 name = "nucleation"
-version = "0.1.90"
+version = "0.1.91"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -41,6 +41,7 @@ quartz_nbt = "0.2.9"
 flate2 = "1.1.2"
 log = "0.4.22"
 console = "0.15.8"
+insign = { path = "../Insign/crates/insign-core" }
 
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 hematite-nbt = "*"
