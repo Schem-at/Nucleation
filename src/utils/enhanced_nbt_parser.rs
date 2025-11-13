@@ -225,10 +225,10 @@ pub fn create_container_items_nbt(
     let mut slot: u8 = 0;
 
     while remaining_items > 0 && (slot as u32) < container_slots {
-        let stack_size = std::cmp::min(remaining_items, MAX_STACK) as u8;
+        let stack_size = std::cmp::min(remaining_items, MAX_STACK);
         let mut item_nbt = NbtMap::new();
-        // Use legacy format for MCHPRS compatibility: 'Count' as Byte
-        item_nbt.insert("Count".to_string(), NbtValue::Byte(stack_size as i8));
+        // Use modern format (1.20.5+): lowercase 'count' as Int
+        item_nbt.insert("count".to_string(), NbtValue::Int(stack_size as i32));
         item_nbt.insert("Slot".to_string(), NbtValue::Byte(slot as i8));
         item_nbt.insert("id".to_string(), NbtValue::String(item_id.clone()));
 

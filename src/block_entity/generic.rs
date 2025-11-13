@@ -122,6 +122,25 @@ impl BlockEntity {
         let has_nbt_data = self.nbt.iter().next().is_some();
         if has_nbt_data {
             let mut data_compound = NbtCompound::new();
+
+            // Add modern format fields for containers (1.20.5+)
+            let is_container = self.id.contains("barrel")
+                || self.id.contains("chest")
+                || self.id.contains("hopper")
+                || self.id.contains("dropper")
+                || self.id.contains("dispenser");
+
+            if is_container {
+                // Add empty components compound (required in 1.20.5+)
+                data_compound.insert(
+                    "components",
+                    NbtValue::Compound(NbtMap::new()).to_quartz_nbt(),
+                );
+                // Add id field (matches the block entity type)
+                data_compound.insert("id", NbtValue::String(self.id.clone()).to_quartz_nbt());
+            }
+
+            // Add all NBT data
             for (key, value) in &self.nbt {
                 data_compound.insert(key, value.to_quartz_nbt());
             }

@@ -109,6 +109,11 @@ impl MchprsWorld {
         // NOTE: Don't replace custom IO wires with redstone blocks - that makes them always powered
         // Instead, we keep them as wires and modify the identify_nodes pass to convert them to Constants
         world.update_redstone();
+
+        // Process any scheduled ticks (like comparator updates) before compilation
+        // This ensures comparators have read their input containers and set their output strength
+        world.process_scheduled_ticks();
+
         world.initialize_compiler()?;
         Ok(world)
     }
@@ -247,14 +252,18 @@ impl MchprsWorld {
 
     fn convert_block_entity(&self, block_entity: UtilBlockEntity) -> Option<BlockEntity> {
         // Convert our NbtValue HashMap to mchprs's nbt::Value HashMap
+        use crate::utils::NbtValue;
         use nbt;
         use std::collections::HashMap as StdHashMap;
+
         let nbt_hashmap = block_entity.to_hashmap();
         let mut converted: StdHashMap<String, nbt::Value> = StdHashMap::new();
 
         for (key, value) in nbt_hashmap {
+            // Convert to legacy format for MCHPRS compatibility (Count: Byte instead of count: Int)
+            let legacy_value = value.to_legacy_item_format();
             // Convert NbtValue to hematite_nbt::Value
-            if let Some(converted_value) = Self::convert_nbt_value(value) {
+            if let Some(converted_value) = Self::convert_nbt_value(legacy_value) {
                 converted.insert(key, converted_value);
             }
         }
@@ -352,6 +361,30 @@ impl MchprsWorld {
                     let block = self.get_block(normalized_pos);
                     mchprs_redstone::update(block, self, normalized_pos);
                 }
+            }
+        }
+    }
+
+    /// Processes all scheduled ticks until none remain
+    /// This is useful during initialization to let comparators and other blocks update
+    fn process_scheduled_ticks(&mut self) {
+        // Process ticks in multiple passes to handle cascading updates
+        // Limit to prevent infinite loops
+        for _ in 0..100 {
+            if self.to_be_ticked.is_empty() {
+                break;
+            }
+
+            // Sort by priority (higher priority first)
+            self.to_be_ticked
+                .sort_by(|a, b| b.tick_priority.cmp(&a.tick_priority));
+
+            // Take all ticks to process this pass
+            let ticks_to_process: Vec<_> = self.to_be_ticked.drain(..).collect();
+
+            for tick in ticks_to_process {
+                let block = self.get_block(tick.pos);
+                mchprs_redstone::tick(block, self, tick.pos);
             }
         }
     }

@@ -338,29 +338,29 @@ fn test_backwards_compat_items_array() {
 
 #[test]
 fn test_count_field_format() {
-    // Verify Count field uses uppercase and Byte type (legacy format for MCHPRS compatibility)
+    // Verify count field uses lowercase and Int type (modern format 1.20.5+)
     let be = get_first_block_entity("minecraft:barrel{signal=14}");
     let items = get_items_from_data(&be);
 
     assert!(items.len() > 0, "Should have items");
 
     if let NbtTag::Compound(item) = &items[0] {
-        // Should have uppercase 'Count', not lowercase 'count' (legacy format)
+        // Should have lowercase 'count', not uppercase 'Count' (modern format)
         assert!(
-            item.contains_key("Count"),
-            "Should have uppercase 'Count' field"
+            item.contains_key("count"),
+            "Should have lowercase 'count' field"
         );
         assert!(
-            !item.contains_key("count"),
-            "Should NOT have lowercase 'count' field"
+            !item.contains_key("Count"),
+            "Should NOT have uppercase 'Count' field"
         );
 
-        // Should be Byte, not Int (legacy format)
+        // Should be Int, not Byte (modern format)
         let count = item
-            .get::<_, i8>("Count")
-            .expect("Count should be Byte type");
-        assert!(count > 0, "Count should be positive");
-        assert!(count <= 64, "Count should not exceed stack size");
+            .get::<_, i32>("count")
+            .expect("count should be Int type");
+        assert!(count > 0, "count should be positive");
+        assert!(count <= 64, "count should not exceed stack size");
     } else {
         panic!("First item is not a compound");
     }

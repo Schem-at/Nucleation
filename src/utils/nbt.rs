@@ -179,6 +179,60 @@ impl NbtValue {
             None
         }
     }
+
+    /// Converts item NBT from legacy format (Count: Byte) to modern format (count: Int)
+    /// Used when exporting schematics to ensure compatibility with modern Minecraft
+    pub fn to_modern_item_format(&self) -> NbtValue {
+        match self {
+            NbtValue::Compound(map) => {
+                let mut new_map = NbtMap::new();
+                for (key, value) in map.iter() {
+                    if key == "Count" {
+                        // Convert Count: Byte to count: Int
+                        if let NbtValue::Byte(b) = value {
+                            new_map.insert("count".to_string(), NbtValue::Int(*b as i32));
+                        } else {
+                            new_map.insert(key.clone(), value.to_modern_item_format());
+                        }
+                    } else {
+                        new_map.insert(key.clone(), value.to_modern_item_format());
+                    }
+                }
+                NbtValue::Compound(new_map)
+            }
+            NbtValue::List(list) => {
+                NbtValue::List(list.iter().map(|v| v.to_modern_item_format()).collect())
+            }
+            _ => self.clone(),
+        }
+    }
+
+    /// Converts item NBT from modern format (count: Int) to legacy format (Count: Byte)
+    /// Used when preparing data for MCHPRS which expects the legacy format
+    pub fn to_legacy_item_format(&self) -> NbtValue {
+        match self {
+            NbtValue::Compound(map) => {
+                let mut new_map = NbtMap::new();
+                for (key, value) in map.iter() {
+                    if key == "count" {
+                        // Convert count: Int to Count: Byte
+                        if let NbtValue::Int(i) = value {
+                            new_map.insert("Count".to_string(), NbtValue::Byte(*i as i8));
+                        } else {
+                            new_map.insert(key.clone(), value.to_legacy_item_format());
+                        }
+                    } else {
+                        new_map.insert(key.clone(), value.to_legacy_item_format());
+                    }
+                }
+                NbtValue::Compound(new_map)
+            }
+            NbtValue::List(list) => {
+                NbtValue::List(list.iter().map(|v| v.to_legacy_item_format()).collect())
+            }
+            _ => self.clone(),
+        }
+    }
 }
 
 #[cfg(feature = "wasm")]

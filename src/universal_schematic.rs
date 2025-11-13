@@ -1405,7 +1405,7 @@ impl UniversalSchematic {
     }
 
     /// Creates Items NBT data for a barrel to achieve desired signal strength
-    /// Uses legacy format for MCHPRS compatibility: 'Count' as Byte, 'Slot' as Byte
+    /// Uses modern format (1.20.5+): lowercase 'count' as Int
     fn create_barrel_items_nbt(signal_strength: u8) -> Vec<NbtValue> {
         let total_items = Self::calculate_items_for_signal(signal_strength);
         let mut items = Vec::new();
@@ -1413,10 +1413,10 @@ impl UniversalSchematic {
         let mut slot: u8 = 0;
 
         while remaining_items > 0 {
-            let stack_size = std::cmp::min(remaining_items, 64) as u8;
+            let stack_size = std::cmp::min(remaining_items, 64);
             let mut item_nbt = NbtMap::new(); // Using NbtMap instead of HashMap
-            // Legacy format for MCHPRS compatibility: 'Count' as Byte
-            item_nbt.insert("Count".to_string(), NbtValue::Byte(stack_size as i8));
+                                              // Modern format (1.20.5+): lowercase 'count' as Int
+            item_nbt.insert("count".to_string(), NbtValue::Int(stack_size as i32));
             item_nbt.insert("Slot".to_string(), NbtValue::Byte(slot as i8));
             item_nbt.insert(
                 "id".to_string(),
@@ -1425,7 +1425,7 @@ impl UniversalSchematic {
 
             items.push(NbtValue::Compound(item_nbt));
 
-            remaining_items -= stack_size as u32;
+            remaining_items -= stack_size;
             slot += 1;
         }
 
@@ -2330,12 +2330,12 @@ mod tests {
             let mut total_items = 0;
             for item in items {
                 if let NbtValue::Compound(item_map) = item {
-                    // Check for legacy format: uppercase 'Count' as Byte (MCHPRS compatible)
-                    if let Some(NbtValue::Byte(count)) = item_map.get("Count") {
+                    // Check for modern format: lowercase 'count' as Int (1.20.5+)
+                    if let Some(NbtValue::Int(count)) = item_map.get("count") {
                         total_items += *count as u32;
                     }
-                    // Also check for modern format: lowercase 'count' as Int (for imported schematics)
-                    else if let Some(NbtValue::Int(count)) = item_map.get("count") {
+                    // Also check for legacy format: uppercase 'Count' as Byte (backward compatibility)
+                    else if let Some(NbtValue::Byte(count)) = item_map.get("Count") {
                         total_items += *count as u32;
                     }
                 }
@@ -2375,12 +2375,12 @@ mod tests {
             let mut total_items = 0;
             for item in items {
                 if let NbtValue::Compound(item_map) = item {
-                    // Check for legacy format: uppercase 'Count' as Byte (MCHPRS compatible)
-                    if let Some(NbtValue::Byte(count)) = item_map.get("Count") {
+                    // Check for modern format: lowercase 'count' as Int (1.20.5+)
+                    if let Some(NbtValue::Int(count)) = item_map.get("count") {
                         total_items += *count as u32;
                     }
-                    // Also check for modern format: lowercase 'count' as Int (for imported schematics)
-                    else if let Some(NbtValue::Int(count)) = item_map.get("count") {
+                    // Also check for legacy format: uppercase 'Count' as Byte (backward compatibility)
+                    else if let Some(NbtValue::Byte(count)) = item_map.get("Count") {
                         total_items += *count as u32;
                     }
                 }
