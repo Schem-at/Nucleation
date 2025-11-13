@@ -123,9 +123,14 @@ fn create_metadata(schematic: &UniversalSchematic) -> NbtCompound {
     metadata.insert("TimeCreated", NbtTag::Long(now));
     metadata.insert("TimeModified", NbtTag::Long(modified));
 
-    // Rest of the function remains the same...
-    let bounding_box = schematic.get_bounding_box();
-    let (width, height, length) = bounding_box.get_dimensions();
+    // Use tight dimensions for EnclosingSize to avoid huge empty space
+    let merged_region = schematic.get_merged_region();
+    let (width, height, length) = if let Some(tight_bounds) = merged_region.get_tight_bounds() {
+        tight_bounds.get_dimensions()
+    } else {
+        merged_region.get_dimensions()
+    };
+
     let mut enclosing_size = NbtCompound::new();
     enclosing_size.insert("x", NbtTag::Int(width as i32));
     enclosing_size.insert("y", NbtTag::Int(height as i32));
@@ -147,20 +152,23 @@ fn create_regions(schematic: &UniversalSchematic) -> NbtCompound {
     let mut regions = NbtCompound::new();
 
     for (name, region) in &schematic.get_all_regions() {
+        // Use compact region to avoid huge empty space
+        let compact_region = region.to_compact();
+
         let mut region_nbt = NbtCompound::new();
 
         // Position
         let mut position = NbtCompound::new();
-        position.insert("x", NbtTag::Int(region.position.0));
-        position.insert("y", NbtTag::Int(region.position.1));
-        position.insert("z", NbtTag::Int(region.position.2));
+        position.insert("x", NbtTag::Int(compact_region.position.0));
+        position.insert("y", NbtTag::Int(compact_region.position.1));
+        position.insert("z", NbtTag::Int(compact_region.position.2));
         region_nbt.insert("Position", NbtTag::Compound(position));
 
         // Size
         let mut size = NbtCompound::new();
-        size.insert("x", NbtTag::Int(region.size.0));
-        size.insert("y", NbtTag::Int(region.size.1));
-        size.insert("z", NbtTag::Int(region.size.2));
+        size.insert("x", NbtTag::Int(compact_region.size.0));
+        size.insert("y", NbtTag::Int(compact_region.size.1));
+        size.insert("z", NbtTag::Int(compact_region.size.2));
         region_nbt.insert("Size", NbtTag::Compound(size));
 
         // BlockStatePalette
@@ -168,19 +176,19 @@ fn create_regions(schematic: &UniversalSchematic) -> NbtCompound {
         let mut reordered_palette = Vec::new();
 
         // First, find and add air
-        let air_index = region
+        let air_index = compact_region
             .palette
             .iter()
             .position(|block| block.name == "minecraft:air");
         if let Some(air_idx) = air_index {
-            reordered_palette.push(region.palette[air_idx].clone());
+            reordered_palette.push(compact_region.palette[air_idx].clone());
         } else {
             // If no air is found, add it
             reordered_palette.push(BlockState::new("minecraft:air".to_string()));
         }
 
         // Then add all other blocks (skipping air since we already added it)
-        for block in region.palette.iter() {
+        for block in compact_region.palette.iter() {
             if block.name != "minecraft:air" {
                 reordered_palette.push(block.clone());
             }
@@ -197,10 +205,10 @@ fn create_regions(schematic: &UniversalSchematic) -> NbtCompound {
 
         // BlockStates
         // We need to map block indices from the original palette to the reordered palette
-        let mut index_mapping = vec![0; region.palette.len()];
+        let mut index_mapping = vec![0; compact_region.palette.len()];
 
         // Build the mapping from original palette indices to reordered indices
-        for (orig_idx, block) in region.palette.iter().enumerate() {
+        for (orig_idx, block) in compact_region.palette.iter().enumerate() {
             if block.name == "minecraft:air" {
                 // Air is always mapped to 0 in the reordered palette
                 index_mapping[orig_idx] = 0;
@@ -215,13 +223,13 @@ fn create_regions(schematic: &UniversalSchematic) -> NbtCompound {
         // Remap block indices and create packed states
         let bits_per_block =
             std::cmp::max((reordered_palette.len() as f64).log2().ceil() as usize, 2);
-        let size = region.blocks.len();
+        let size = compact_region.blocks.len();
         let expected_len = (size * bits_per_block + 63) / 64;
 
         let mut packed_states = vec![0i64; expected_len];
         let mask = (1i64 << bits_per_block) - 1;
 
-        for (index, &block_state) in region.blocks.iter().enumerate() {
+        for (index, &block_state) in compact_region.blocks.iter().enumerate() {
             // Map the original block state index to the reordered index
             let mapped_state = index_mapping[block_state];
 
@@ -247,7 +255,7 @@ fn create_regions(schematic: &UniversalSchematic) -> NbtCompound {
 
         // Entities
         let entities = NbtList::from(
-            region
+            compact_region
                 .entities
                 .iter()
                 .map(|entity| entity.to_nbt())
@@ -257,7 +265,7 @@ fn create_regions(schematic: &UniversalSchematic) -> NbtCompound {
 
         // TileEntities
         let tile_entities = NbtList::from(
-            region
+            compact_region
                 .block_entities
                 .values()
                 .map(|block_entity| NbtTag::Compound(block_entity.to_nbt()))

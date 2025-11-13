@@ -58,6 +58,9 @@ pub struct MchprsWorld {
     custom_io_states: HashMap<BlockPos, u8>,
     /// Queue of custom IO changes since last poll
     custom_io_changes: Vec<CustomIoChange>,
+    /// Minimum coordinates of the schematic for coordinate normalization
+    /// MCHPRS expects coordinates starting from 0, so we normalize schematic coords
+    min_coords: (i32, i32, i32),
 }
 
 impl MchprsWorld {
@@ -77,6 +80,7 @@ impl MchprsWorld {
         schematic: UniversalSchematic,
         options: SimulationOptions,
     ) -> Result<Self, String> {
+        let min_coords = schematic.get_bounding_box().min;
         let mut world = MchprsWorld {
             schematic,
             chunks: HashMap::new(),
@@ -97,6 +101,7 @@ impl MchprsWorld {
             options,
             custom_io_states: HashMap::new(),
             custom_io_changes: Vec::new(),
+            min_coords,
         };
 
         world.initialize_chunks()?;
@@ -110,17 +115,30 @@ impl MchprsWorld {
 
     fn initialize_compiler(&mut self) -> Result<(), String> {
         let bounding_box = self.schematic.get_bounding_box();
+        // Normalize coordinates to start from (0, 0, 0) for MCHPRS
         let bounds = (
             BlockPos::new(0, 0, 0),
-            BlockPos::new(bounding_box.max.0, bounding_box.max.1, bounding_box.max.2),
+            BlockPos::new(
+                bounding_box.max.0 - self.min_coords.0,
+                bounding_box.max.1 - self.min_coords.1,
+                bounding_box.max.2 - self.min_coords.2,
+            ),
         );
+
+        // Normalize custom IO positions for the compiler
+        let normalized_custom_io: Vec<BlockPos> = self
+            .options
+            .custom_io
+            .iter()
+            .map(|&pos| self.normalize_pos(pos))
+            .collect();
 
         let compiler_options = CompilerOptions {
             optimize: self.options.optimize,
             io_only: self.options.io_only,
             wire_dot_out: true,
             backend_variant: BackendVariant::Direct,
-            custom_io: self.options.custom_io.clone(),
+            custom_io: normalized_custom_io,
             ..Default::default()
         };
 
@@ -189,7 +207,12 @@ impl MchprsWorld {
                         None
                     };
                 (
-                    BlockPos::new(pos.x, pos.y, pos.z),
+                    // Normalize coordinates relative to schematic minimum
+                    BlockPos::new(
+                        pos.x - self.min_coords.0,
+                        pos.y - self.min_coords.1,
+                        pos.z - self.min_coords.2,
+                    ),
                     name,
                     properties,
                     block_entity,
@@ -295,15 +318,39 @@ impl MchprsWorld {
         (pos.x >> 4, pos.z >> 4)
     }
 
+    /// Normalizes a position from schematic coordinates to MCHPRS coordinates
+    /// MCHPRS expects coordinates starting from 0, while schematics may have negative coords
+    fn normalize_pos(&self, pos: BlockPos) -> BlockPos {
+        BlockPos::new(
+            pos.x - self.min_coords.0,
+            pos.y - self.min_coords.1,
+            pos.z - self.min_coords.2,
+        )
+    }
+
+    /// Denormalizes a position from MCHPRS coordinates back to schematic coordinates
+    fn denormalize_pos(&self, pos: BlockPos) -> BlockPos {
+        BlockPos::new(
+            pos.x + self.min_coords.0,
+            pos.y + self.min_coords.1,
+            pos.z + self.min_coords.2,
+        )
+    }
+
     /// Updates redstone state for all blocks in the schematic
     pub fn update_redstone(&mut self) {
-        let dimensions = self.schematic.get_dimensions();
-        for x in 0..dimensions.0 {
-            for y in 0..dimensions.1 {
-                for z in 0..dimensions.2 {
-                    let pos = BlockPos::new(x, y, z);
-                    let block = self.get_block(pos);
-                    mchprs_redstone::update(block, self, pos);
+        let bounding_box = self.schematic.get_bounding_box();
+        let (min_x, min_y, min_z) = self.min_coords;
+        let (max_x, max_y, max_z) = bounding_box.max;
+
+        // Iterate using actual schematic coordinates, then normalize for MCHPRS
+        for x in min_x..=max_x {
+            for y in min_y..=max_y {
+                for z in min_z..=max_z {
+                    let schematic_pos = BlockPos::new(x, y, z);
+                    let normalized_pos = self.normalize_pos(schematic_pos);
+                    let block = self.get_block(normalized_pos);
+                    mchprs_redstone::update(block, self, normalized_pos);
                 }
             }
         }
@@ -440,16 +487,20 @@ impl MchprsWorld {
     ///
     /// Call this after running simulation if you want to export the resulting state.
     pub fn sync_to_schematic(&mut self) {
-        let dimensions = self.schematic.get_dimensions();
+        let bounding_box = self.schematic.get_bounding_box();
+        let (min_x, min_y, min_z) = self.min_coords;
+        let (max_x, max_y, max_z) = bounding_box.max;
         let custom_io_set: std::collections::HashSet<_> =
             self.options.custom_io.iter().cloned().collect();
 
-        for x in 0..dimensions.0 {
-            for y in 0..dimensions.1 {
-                for z in 0..dimensions.2 {
-                    let pos = BlockPos::new(x, y, z);
-                    let raw_id = self.get_block_raw(pos);
-                    let block = self.get_block(pos);
+        // Iterate using actual schematic coordinates
+        for x in min_x..=max_x {
+            for y in min_y..=max_y {
+                for z in min_z..=max_z {
+                    // Normalize position for MCHPRS access
+                    let normalized_pos = self.normalize_pos(BlockPos::new(x, y, z));
+                    let raw_id = self.get_block_raw(normalized_pos);
+                    let block = self.get_block(normalized_pos);
 
                     // Skip air blocks
                     if block.get_id() == 0 {

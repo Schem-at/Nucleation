@@ -252,6 +252,67 @@ impl Region {
             .unwrap_or((0, 0, 0))
     }
 
+    /// Create a compacted region containing only the non-air blocks within tight bounds.
+    /// This is ideal for exporting schematics as it removes all allocated but empty space.
+    /// Block entities and entities are preserved at their correct positions.
+    /// Returns a clone if no tight bounds exist (empty region).
+    pub fn to_compact(&self) -> Region {
+        // If no tight bounds, return a minimal clone
+        let Some(tight_bounds) = &self.tight_bounds else {
+            // Empty region - return minimal region
+            let mut empty = Region::new(self.name.clone(), (0, 0, 0), (1, 1, 1));
+            empty.palette = self.palette.clone();
+            return empty;
+        };
+
+        let tight_dims = tight_bounds.get_dimensions();
+        let tight_pos = tight_bounds.min;
+
+        // Create new region with exact tight bounds
+        let mut compact = Region::new(self.name.clone(), tight_pos, tight_dims);
+
+        // Build palette mapping (same as current palette)
+        compact.palette = self.palette.clone();
+        compact.rebuild_palette_index();
+
+        // Copy blocks within tight bounds
+        for index in 0..self.blocks.len() {
+            let palette_idx = self.blocks[index];
+            if palette_idx == 0 {
+                continue; // Skip air blocks
+            }
+
+            let (x, y, z) = self.index_to_coords(index);
+
+            // Only copy if within tight bounds
+            if tight_bounds.contains((x, y, z)) {
+                let block = self.palette[palette_idx].clone();
+                compact.set_block(x, y, z, block);
+            }
+        }
+
+        // Copy block entities within tight bounds
+        for (&pos, be) in &self.block_entities {
+            if tight_bounds.contains(pos) {
+                compact.block_entities.insert(pos, be.clone());
+            }
+        }
+
+        // Copy entities within tight bounds
+        for entity in &self.entities {
+            let entity_pos = (
+                entity.position.0.floor() as i32,
+                entity.position.1.floor() as i32,
+                entity.position.2.floor() as i32,
+            );
+            if tight_bounds.contains(entity_pos) {
+                compact.entities.push(entity.clone());
+            }
+        }
+
+        compact
+    }
+
     pub fn get_block(&self, x: i32, y: i32, z: i32) -> Option<&BlockState> {
         if !self.is_in_region(x, y, z) {
             return None;

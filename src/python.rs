@@ -361,6 +361,18 @@ impl PySchematic {
 
     #[getter]
     pub fn dimensions(&self) -> (i32, i32, i32) {
+        // Return tight dimensions if available (actual content size), otherwise allocated
+        let tight = self.inner.get_tight_dimensions();
+        if tight != (0, 0, 0) {
+            tight
+        } else {
+            self.inner.get_dimensions()
+        }
+    }
+
+    #[getter]
+    pub fn allocated_dimensions(&self) -> (i32, i32, i32) {
+        // Return the full allocated buffer size (internal use)
         self.inner.get_dimensions()
     }
 

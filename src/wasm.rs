@@ -462,6 +462,19 @@ impl SchematicWrapper {
 
     // Add these methods back
     pub fn get_dimensions(&self) -> Vec<i32> {
+        // Return tight dimensions by default (actual content size)
+        let tight = self.0.get_tight_dimensions();
+        if tight != (0, 0, 0) {
+            vec![tight.0, tight.1, tight.2]
+        } else {
+            let (x, y, z) = self.0.get_dimensions();
+            vec![x, y, z]
+        }
+    }
+
+    /// Get the allocated dimensions (full buffer size including pre-allocated space)
+    /// Use this if you need to know the internal buffer size
+    pub fn get_allocated_dimensions(&self) -> Vec<i32> {
         let (x, y, z) = self.0.get_dimensions();
         vec![x, y, z]
     }

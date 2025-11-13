@@ -121,30 +121,33 @@ pub fn to_schematic_v3(
         NbtTag::Int(schematic.metadata.mc_version.unwrap_or(1343)),
     );
 
-    let bounding_box = schematic.get_bounding_box();
-    let (width, height, length) = bounding_box.get_dimensions();
+    // Use compact region with tight bounds for export to avoid huge empty space
+    let merged_region = schematic.get_merged_region();
+    let compact_region = merged_region.to_compact();
+
+    let (width, height, length) = compact_region.get_dimensions();
+    let offset_pos = compact_region.position;
 
     schematic_data.insert("Width", NbtTag::Short((width as i16).abs()));
     schematic_data.insert("Height", NbtTag::Short((height as i16).abs()));
     schematic_data.insert("Length", NbtTag::Short((length as i16).abs()));
 
-    let offset = vec![0, 0, 0];
+    // Set offset to the minimum position of the compact region
+    let offset = vec![offset_pos.0, offset_pos.1, offset_pos.2];
     schematic_data.insert("Offset", NbtTag::IntArray(offset));
-
-    let merged_region = schematic.get_merged_region();
 
     // Create the Blocks container (required in v3)
     let mut blocks_container = NbtCompound::new();
 
-    // Create clean palette and mapping
-    let (palette_nbt, palette_mapping) = convert_palette_with_mapping(&merged_region.palette);
+    // Create clean palette and mapping from compact region
+    let (palette_nbt, palette_mapping) = convert_palette_with_mapping(&compact_region.palette);
 
     // Store palette size before moving palette_nbt
-    let palette_size = palette_nbt.len();
+    let _palette_size = palette_nbt.len();
     blocks_container.insert("Palette", palette_nbt);
 
     // Remap block data using the new palette mapping
-    let remapped_blocks: Vec<u32> = merged_region
+    let remapped_blocks: Vec<u32> = compact_region
         .blocks
         .iter()
         .map(|&original_id| {
@@ -166,25 +169,6 @@ pub fn to_schematic_v3(
         })
         .collect();
 
-    // Debug logging for palette issues
-    #[cfg(feature = "wasm")]
-    {
-        console::log_1(&format!("Original palette size: {}", merged_region.palette.len()).into());
-        console::log_1(&format!("New palette size: {}", palette_size).into());
-        console::log_1(&format!("Mapping array size: {}", palette_mapping.len()).into());
-        console::log_1(&format!("Block data size: {}", merged_region.blocks.len()).into());
-
-        // Log first few mappings for debugging
-        for (i, &original_id) in merged_region.blocks.iter().take(10).enumerate() {
-            let mapped_id = if original_id < palette_mapping.len() {
-                palette_mapping[original_id]
-            } else {
-                0
-            };
-            console::log_1(&format!("Block[{}]: {} -> {}", i, original_id, mapped_id).into());
-        }
-    }
-
     // Encode remapped block data
     let block_data: Vec<u8> = remapped_blocks
         .iter()
@@ -197,30 +181,26 @@ pub fn to_schematic_v3(
         NbtTag::ByteArray(block_data.iter().map(|&x| x as i8).collect()),
     );
 
-    // Add block entities to Blocks container (using v3 format)
-    let mut block_entities = NbtList::new();
+    // Add block entities from compact region (using v3 format)
+    let block_entities = convert_block_entities_v3(&compact_region);
+    blocks_container.insert("BlockEntities", NbtTag::List(block_entities));
 
-    // Entities remain at root level in v3 - with validation
+    // Entities from compact region remain at root level in v3 - with validation
     let mut entities = NbtList::new();
-    for region in schematic.get_all_regions().values() {
-        block_entities.extend(convert_block_entities_v3(region).iter().cloned());
+    let region_entities = convert_entities(&compact_region);
 
-        let region_entities = convert_entities(region);
-
-        // Only add valid entities
-        for entity in region_entities.iter() {
-            if let NbtTag::Compound(compound) = entity {
-                // Validate that entity has required fields
-                if compound.contains_key("Id") && compound.contains_key("Pos") {
-                    entities.push(entity.clone());
-                } else {
-                    #[cfg(feature = "wasm")]
-                    console::log_1(&"Warning: Skipping invalid entity missing Id or Pos".into());
-                }
+    // Only add valid entities
+    for entity in region_entities.iter() {
+        if let NbtTag::Compound(compound) = entity {
+            // Validate that entity has required fields
+            if compound.contains_key("Id") && compound.contains_key("Pos") {
+                entities.push(entity.clone());
+            } else {
+                #[cfg(feature = "wasm")]
+                console::log_1(&"Warning: Skipping invalid entity missing Id or Pos".into());
             }
         }
     }
-    blocks_container.insert("BlockEntities", NbtTag::List(block_entities));
 
     // Add the Blocks container to schematic data
     schematic_data.insert("Blocks", NbtTag::Compound(blocks_container));
@@ -257,8 +237,12 @@ pub fn to_schematic_v2(
         NbtTag::Int(schematic.metadata.mc_version.unwrap_or(1343)),
     );
 
-    let bounding_box = schematic.get_bounding_box();
-    let (width, height, length) = bounding_box.get_dimensions();
+    // Use compact region with tight bounds for export
+    let merged_region = schematic.get_merged_region();
+    let compact_region = merged_region.to_compact();
+
+    let (width, height, length) = compact_region.get_dimensions();
+    let offset_pos = compact_region.position;
 
     schematic_data.insert("Width", NbtTag::Short((width as i16).abs()));
     schematic_data.insert("Height", NbtTag::Short((height as i16).abs()));
@@ -269,18 +253,17 @@ pub fn to_schematic_v2(
         NbtTag::IntArray(vec![width as i32, height as i32, length as i32]),
     );
 
-    let offset = vec![0, 0, 0];
+    // Set offset to the minimum position of the compact region
+    let offset = vec![offset_pos.0, offset_pos.1, offset_pos.2];
     schematic_data.insert("Offset", NbtTag::IntArray(offset));
 
-    let merged_region = schematic.get_merged_region();
-
-    schematic_data.insert("Palette", convert_palette_v2(&merged_region.palette).0);
+    schematic_data.insert("Palette", convert_palette_v2(&compact_region.palette).0);
     schematic_data.insert(
         "PaletteMax",
-        convert_palette_v2(&merged_region.palette).1 + 1,
+        convert_palette_v2(&compact_region.palette).1 + 1,
     );
 
-    let block_data: Vec<u8> = merged_region
+    let block_data: Vec<u8> = compact_region
         .blocks
         .iter()
         .flat_map(|&block_id| encode_varint(block_id as u32))
@@ -291,14 +274,11 @@ pub fn to_schematic_v2(
         NbtTag::ByteArray(block_data.iter().map(|&x| x as i8).collect()),
     );
 
-    let mut block_entities = NbtList::new();
-    let mut entities = NbtList::new();
-    for region in schematic.get_all_regions().values() {
-        block_entities.extend(convert_block_entities(region).iter().cloned());
-        entities.extend(convert_entities(region).iter().cloned());
-    }
-    schematic_data.insert("BlockEntities", NbtTag::List(block_entities));
+    // Use block entities and entities from compact region
+    let block_entities = convert_block_entities(&compact_region);
+    let entities = convert_entities(&compact_region);
 
+    schematic_data.insert("BlockEntities", NbtTag::List(block_entities));
     schematic_data.insert("Entities", NbtTag::List(entities));
 
     schematic_data.insert("Metadata", schematic.metadata.to_nbt());
@@ -721,9 +701,11 @@ mod tests {
             schematic.other_regions.len(),
             loaded_schematic.other_regions.len()
         );
+        // Compare tight dimensions (actual content) instead of allocated bounds
+        // The export uses compact regions, so loaded schematic will have tight bounds
         assert_eq!(
-            schematic.get_bounding_box(),
-            loaded_schematic.get_bounding_box()
+            schematic.get_tight_dimensions(),
+            loaded_schematic.get_dimensions() // Loaded will have tight bounds as its actual size
         );
 
         let original_region = schematic.default_region;
