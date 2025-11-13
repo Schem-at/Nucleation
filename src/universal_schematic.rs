@@ -2149,7 +2149,8 @@ mod tests {
                     item.get("id").unwrap(),
                     &NbtValue::String("minecraft:redstone".to_string())
                 );
-                assert_eq!(item.get("Count").unwrap(), &NbtValue::Byte(64));
+                // Modern format uses lowercase 'count' as Int
+                assert_eq!(item.get("count").unwrap(), &NbtValue::Int(64));
                 assert_eq!(item.get("Slot").unwrap(), &NbtValue::Byte(0));
             } else {
                 panic!("Expected compound NBT value");
@@ -2327,7 +2328,8 @@ mod tests {
             let mut total_items = 0;
             for item in items {
                 if let NbtValue::Compound(item_map) = item {
-                    if let Some(NbtValue::Byte(count)) = item_map.get("Count") {
+                    // Modern format uses lowercase 'count' as Int
+                    if let Some(NbtValue::Int(count)) = item_map.get("count") {
                         total_items += *count as u32;
                     }
                 }
@@ -2367,7 +2369,8 @@ mod tests {
             let mut total_items = 0;
             for item in items {
                 if let NbtValue::Compound(item_map) = item {
-                    if let Some(NbtValue::Byte(count)) = item_map.get("Count") {
+                    // Modern format uses lowercase 'count' as Int
+                    if let Some(NbtValue::Int(count)) = item_map.get("count") {
                         total_items += *count as u32;
                     }
                 }

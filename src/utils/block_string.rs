@@ -88,19 +88,23 @@ pub fn parse_items_array(nbt_str: &str) -> Result<Vec<NbtValue>, String> {
             let value = value_part.trim();
 
             match key {
-                "Count" => {
+                // Accept both "Count" (old) and "count" (new) for backward compat
+                "Count" | "count" => {
                     let count_str = value
                         .trim_matches(|c| c == '"' || c == '\'')
-                        .trim_end_matches('b');
-                    let count: i8 = count_str
+                        .trim_end_matches('b')
+                        .trim_end_matches('B');
+                    let count: i32 = count_str
                         .parse()
-                        .map_err(|_| format!("Invalid Count value: {}", count_str))?;
-                    item_nbt.insert("Count".to_string(), NbtValue::Byte(count));
+                        .map_err(|_| format!("Invalid count value: {}", count_str))?;
+                    // Store in modern format: lowercase 'count' as Int
+                    item_nbt.insert("count".to_string(), NbtValue::Int(count));
                 }
                 "Slot" => {
                     let slot_str = value
                         .trim_matches(|c| c == '"' || c == '\'')
-                        .trim_end_matches('b');
+                        .trim_end_matches('b')
+                        .trim_end_matches('B');
                     let slot: i8 = slot_str
                         .parse()
                         .map_err(|_| format!("Invalid Slot value: {}", slot_str))?;
@@ -114,8 +118,8 @@ pub fn parse_items_array(nbt_str: &str) -> Result<Vec<NbtValue>, String> {
             }
         }
 
-        // Verify required fields
-        if item_nbt.get("Count").is_none()
+        // Verify required fields (modern format uses lowercase 'count')
+        if item_nbt.get("count").is_none()
             || item_nbt.get("Slot").is_none()
             || item_nbt.get("id").is_none()
         {
@@ -246,7 +250,8 @@ mod tests {
                     item.get("id"),
                     Some(&NbtValue::String("minecraft:redstone".to_string()))
                 );
-                assert_eq!(item.get("Count"), Some(&NbtValue::Byte(64)));
+                // Modern format uses lowercase 'count' as Int
+                assert_eq!(item.get("count"), Some(&NbtValue::Int(64)));
                 assert_eq!(item.get("Slot"), Some(&NbtValue::Byte(0)));
             } else {
                 panic!("Expected compound NBT value for item");
@@ -301,7 +306,8 @@ mod tests {
                 item.get("id"),
                 Some(&NbtValue::String("minecraft:stone".to_string()))
             );
-            assert_eq!(item.get("Count"), Some(&NbtValue::Byte(64)));
+            // Modern format uses lowercase 'count' as Int
+            assert_eq!(item.get("count"), Some(&NbtValue::Int(64)));
             assert_eq!(item.get("Slot"), Some(&NbtValue::Byte(0)));
         } else {
             panic!("Expected compound NBT value");

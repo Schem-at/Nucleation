@@ -227,7 +227,8 @@ pub fn create_container_items_nbt(
     while remaining_items > 0 && (slot as u32) < container_slots {
         let stack_size = std::cmp::min(remaining_items, MAX_STACK) as u8;
         let mut item_nbt = NbtMap::new();
-        item_nbt.insert("Count".to_string(), NbtValue::Byte(stack_size as i8));
+        // Modern format (1.13+): lowercase 'count' as Int, not 'Count' as Byte
+        item_nbt.insert("count".to_string(), NbtValue::Int(stack_size as i32));
         item_nbt.insert("Slot".to_string(), NbtValue::Byte(slot as i8));
         item_nbt.insert("id".to_string(), NbtValue::String(item_id.clone()));
 
