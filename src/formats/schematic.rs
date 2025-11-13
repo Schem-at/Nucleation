@@ -197,13 +197,13 @@ pub fn to_schematic_v3(
         NbtTag::ByteArray(block_data.iter().map(|&x| x as i8).collect()),
     );
 
-    // Add block entities to Blocks container
+    // Add block entities to Blocks container (using v3 format)
     let mut block_entities = NbtList::new();
 
     // Entities remain at root level in v3 - with validation
     let mut entities = NbtList::new();
     for region in schematic.get_all_regions().values() {
-        block_entities.extend(convert_block_entities(region).iter().cloned());
+        block_entities.extend(convert_block_entities_v3(region).iter().cloned());
 
         let region_entities = convert_entities(region);
 
@@ -486,6 +486,18 @@ fn convert_block_entities(region: &Region) -> NbtList {
 
     for (_, block_entity) in &region.block_entities {
         block_entities.push(block_entity.to_nbt());
+    }
+
+    block_entities
+}
+
+// Convert block entities for Sponge Schematic v3 format
+// Uses to_nbt_v3() which wraps block-specific data in a "Data" compound
+fn convert_block_entities_v3(region: &Region) -> NbtList {
+    let mut block_entities = NbtList::new();
+
+    for (_, block_entity) in &region.block_entities {
+        block_entities.push(block_entity.to_nbt_v3());
     }
 
     block_entities

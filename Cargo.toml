@@ -1,6 +1,6 @@
 [package]
 name = "nucleation"
-version = "0.1.93"
+version = "0.1.94"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -20,7 +20,7 @@ wasm = [
     "wasm-bindgen",
     "js-sys",
     "web-sys",
-    "serde-wasm-bindgen"
+    "serde-wasm-bindgen",
 ]
 python = ["pyo3/extension-module"]
 # New PHP feature

@@ -97,6 +97,39 @@ impl BlockEntity {
         }
         nbt
     }
+
+    /// Converts BlockEntity to NBT format for Sponge Schematic v3
+    ///
+    /// According to the Sponge Schematic v3 spec, block entities should have:
+    /// - Id: string (required)
+    /// - Pos: int[3] (required)
+    /// - Data: compound (optional) - contains all block-specific NBT data
+    ///
+    /// This differs from to_nbt() which puts all data at root level (used for litematic)
+    pub fn to_nbt_v3(&self) -> NbtCompound {
+        let mut nbt = NbtCompound::new();
+
+        // Required fields at root level
+        nbt.insert("Id", NbtValue::String(self.id.clone()).to_quartz_nbt());
+        nbt.insert(
+            "Pos",
+            NbtValue::IntArray(vec![self.position.0, self.position.1, self.position.2])
+                .to_quartz_nbt(),
+        );
+
+        // Wrap all block-specific NBT data in a "Data" compound
+        // Only add Data compound if there's actually NBT data to include
+        let has_nbt_data = self.nbt.iter().next().is_some();
+        if has_nbt_data {
+            let mut data_compound = NbtCompound::new();
+            for (key, value) in &self.nbt {
+                data_compound.insert(key, value.to_quartz_nbt());
+            }
+            nbt.insert("Data", quartz_nbt::NbtTag::Compound(data_compound));
+        }
+
+        nbt
+    }
 }
 
 #[cfg(test)]

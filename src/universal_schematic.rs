@@ -1463,39 +1463,14 @@ impl UniversalSchematic {
             BlockState::new(block_state_str.to_string())
         };
 
-        // Parse NBT data if present
+        // Parse NBT data if present using enhanced parser
         let nbt_data = if let Some(nbt_str) = nbt_str {
-            let mut nbt_map = HashMap::new();
-
-            // Check for signal strength specification
-            if block_state.get_name() == "minecraft:barrel" && nbt_str.contains("signal=") {
-                if let Some(signal_str) = nbt_str.split('=').nth(1) {
-                    let signal_strength: u8 = signal_str
-                        .trim()
-                        .parse()
-                        .map_err(|_| "Invalid signal strength value")?;
-
-                    if signal_strength > 15 {
-                        return Err("Signal strength must be between 0 and 15".to_string());
-                    }
-
-                    let items = Self::create_barrel_items_nbt(signal_strength);
-                    nbt_map.insert("Items".to_string(), NbtValue::List(items));
-                }
+            let parsed = crate::utils::parse_enhanced_nbt(block_state.get_name(), nbt_str)?;
+            if parsed.is_empty() {
+                None
             } else {
-                // Handle regular NBT parsing
-                if nbt_str.contains("Items:[") {
-                    let items = parse_items_array(nbt_str)?;
-                    nbt_map.insert("Items".to_string(), NbtValue::List(items));
-                }
-
-                if nbt_str.contains("CustomName:") {
-                    let name = parse_custom_name(nbt_str)?;
-                    nbt_map.insert("CustomName".to_string(), NbtValue::String(name));
-                }
+                Some(parsed)
             }
-
-            Some(nbt_map)
         } else {
             None
         };
