@@ -123,12 +123,13 @@ impl BlockEntity {
         if has_nbt_data {
             let mut data_compound = NbtCompound::new();
 
-            // Add modern format fields for containers (1.20.5+)
+            // Add modern format fields for containers and jukeboxes (1.20.5+)
             let is_container = self.id.contains("barrel")
                 || self.id.contains("chest")
                 || self.id.contains("hopper")
                 || self.id.contains("dropper")
-                || self.id.contains("dispenser");
+                || self.id.contains("dispenser")
+                || self.id.contains("jukebox");
 
             if is_container {
                 // Add empty components compound (required in 1.20.5+)

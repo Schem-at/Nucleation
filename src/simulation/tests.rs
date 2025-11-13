@@ -1478,4 +1478,132 @@ mod tests {
         let polled = world.poll_custom_io_changes();
         assert_eq!(polled.len(), 0, "Queue should be empty after clear");
     }
+
+    #[test]
+    fn test_comparator_reading_barrel_signal_strengths() {
+        // Test that comparators correctly read signal strength from barrels
+        // This tests the coordinate normalization fix for get_redstone_power()
+        for signal in 0..=15 {
+            let mut schematic = UniversalSchematic::new(format!("Barrel Signal {}", signal));
+
+            // Place concrete base
+            for i in 0..4 {
+                schematic.set_block(
+                    i,
+                    0,
+                    0,
+                    BlockState::new("minecraft:gray_concrete".to_string()),
+                );
+            }
+
+            // Place barrel with signal strength at x=0
+            schematic
+                .set_block_from_string(
+                    0,
+                    1,
+                    0,
+                    &format!("minecraft:barrel[facing=north]{{signal={}}}", signal),
+                )
+                .expect("Failed to set barrel");
+
+            // Place comparator facing west (reading from barrel) at x=1
+            let mut comparator = BlockState::new("minecraft:comparator".to_string());
+            comparator
+                .properties
+                .insert("facing".to_string(), "west".to_string());
+            comparator
+                .properties
+                .insert("mode".to_string(), "compare".to_string());
+            comparator
+                .properties
+                .insert("powered".to_string(), "false".to_string());
+            schematic.set_block(1, 1, 0, comparator);
+
+            // Place redstone wire at x=2 and x=3
+            let mut wire = BlockState::new("minecraft:redstone_wire".to_string());
+            wire.properties.insert("power".to_string(), "0".to_string());
+            schematic.set_block(2, 1, 0, wire.clone());
+            schematic.set_block(3, 1, 0, wire);
+
+            // Create simulation
+            let world = MchprsWorld::new(schematic).expect("World creation failed");
+
+            // Check power at wire positions
+            let power_at_2 = world.get_redstone_power(BlockPos::new(2, 1, 0));
+            let power_at_3 = world.get_redstone_power(BlockPos::new(3, 1, 0));
+
+            // Wire at x=2 should have signal strength
+            assert_eq!(
+                power_at_2, signal,
+                "Wire at x=2 should have power {} for barrel signal {}",
+                signal, signal
+            );
+
+            // Wire at x=3 should have signal - 1 (with minimum of 0)
+            let expected_power_3 = if signal > 0 { signal - 1 } else { 0 };
+            assert_eq!(
+                power_at_3, expected_power_3,
+                "Wire at x=3 should have power {} for barrel signal {}",
+                expected_power_3, signal
+            );
+        }
+    }
+
+    #[test]
+    fn test_comparator_reading_hopper_signal_strengths() {
+        use mchprs_world::World;
+        // Test with hoppers as well (different container type)
+        for signal in 0..=15 {
+            let mut schematic = UniversalSchematic::new(format!("Hopper Signal {}", signal));
+
+            schematic.set_block(
+                0,
+                0,
+                0,
+                BlockState::new("minecraft:gray_concrete".to_string()),
+            );
+            schematic.set_block(
+                1,
+                0,
+                0,
+                BlockState::new("minecraft:gray_concrete".to_string()),
+            );
+
+            // Place hopper with signal strength
+            schematic
+                .set_block_from_string(
+                    0,
+                    1,
+                    0,
+                    &format!("minecraft:hopper[facing=down]{{signal={}}}", signal),
+                )
+                .expect("Failed to set hopper");
+
+            // Place comparator facing west
+            let mut comparator = BlockState::new("minecraft:comparator".to_string());
+            comparator
+                .properties
+                .insert("facing".to_string(), "west".to_string());
+            comparator
+                .properties
+                .insert("mode".to_string(), "compare".to_string());
+            schematic.set_block(1, 1, 0, comparator);
+
+            // Place redstone wire to check output
+            let mut wire = BlockState::new("minecraft:redstone_wire".to_string());
+            wire.properties.insert("power".to_string(), "0".to_string());
+            schematic.set_block(2, 1, 0, wire);
+
+            // Create simulation
+            let world = MchprsWorld::new(schematic).expect("World creation failed");
+
+            // Check power at wire position
+            let power_at_2 = world.get_redstone_power(BlockPos::new(2, 1, 0));
+            assert_eq!(
+                power_at_2, signal,
+                "Wire should have power {} for hopper signal {}",
+                signal, signal
+            );
+        }
+    }
 }

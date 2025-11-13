@@ -241,6 +241,30 @@ pub fn create_container_items_nbt(
     items
 }
 
+/// Get the music disc for a given signal strength (1-15)
+/// Signal 0 = no disc, 1-15 = specific discs
+fn get_jukebox_disc(signal: u8) -> Option<&'static str> {
+    match signal {
+        0 => None,
+        1 => Some("minecraft:music_disc_13"),
+        2 => Some("minecraft:music_disc_cat"),
+        3 => Some("minecraft:music_disc_blocks"),
+        4 => Some("minecraft:music_disc_chirp"),
+        5 => Some("minecraft:music_disc_far"),
+        6 => Some("minecraft:music_disc_mall"),
+        7 => Some("minecraft:music_disc_mellohi"),
+        8 => Some("minecraft:music_disc_stal"),
+        9 => Some("minecraft:music_disc_strad"),
+        10 => Some("minecraft:music_disc_ward"),
+        11 => Some("minecraft:music_disc_11"),
+        12 => Some("minecraft:music_disc_wait"),
+        13 => Some("minecraft:music_disc_pigstep"),
+        14 => Some("minecraft:music_disc_otherside"),
+        15 => Some("minecraft:music_disc_5"),
+        _ => None,
+    }
+}
+
 /// Main parsing function that combines all features
 pub fn parse_enhanced_nbt(
     block_name: &str,
@@ -248,8 +272,27 @@ pub fn parse_enhanced_nbt(
 ) -> Result<HashMap<String, NbtValue>, String> {
     let mut nbt_map = HashMap::new();
 
-    // 1. Check for signal shorthand (only for containers)
-    if let Some(spec) = get_container_spec(block_name) {
+    let block_name_stripped = block_name.strip_prefix("minecraft:").unwrap_or(block_name);
+
+    // 1. Check for jukebox signal (special case)
+    if block_name_stripped == "jukebox" {
+        if let Some((signal, _)) = parse_signal_params(nbt_str) {
+            if signal > 15 {
+                return Err("Signal strength must be between 0 and 15".to_string());
+            }
+
+            if let Some(disc) = get_jukebox_disc(signal) {
+                // Create RecordItem NBT for jukebox
+                let mut record_item = NbtMap::new();
+                record_item.insert("count".to_string(), NbtValue::Int(1));
+                record_item.insert("id".to_string(), NbtValue::String(disc.to_string()));
+                nbt_map.insert("RecordItem".to_string(), NbtValue::Compound(record_item));
+            }
+            // Signal 0 means no disc, so we don't add RecordItem
+        }
+    }
+    // 2. Check for signal shorthand (for containers)
+    else if let Some(spec) = get_container_spec(block_name) {
         if let Some((signal, custom_item)) = parse_signal_params(nbt_str) {
             if signal > 15 {
                 return Err("Signal strength must be between 0 and 15".to_string());

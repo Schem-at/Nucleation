@@ -1365,7 +1365,17 @@ impl UniversalSchematic {
         z: i32,
         block_string: &str,
     ) -> Result<bool, String> {
-        let (block_state, nbt_data) = Self::parse_block_string(block_string)?;
+        let (mut block_state, nbt_data) = Self::parse_block_string(block_string)?;
+
+        // Special handling for jukebox: set has_record blockstate if RecordItem exists
+        if block_state.name.contains("jukebox") {
+            if let Some(ref nbt) = nbt_data {
+                let has_record = nbt.contains_key("RecordItem");
+                block_state
+                    .properties
+                    .insert("has_record".to_string(), has_record.to_string());
+            }
+        }
 
         // Set the basic block first
         if !self.set_block(x, y, z, block_state.clone()) {

@@ -389,18 +389,20 @@ impl MchprsWorld {
         }
     }
 
-    /// Gets the redstone power level at a position
+    /// Gets the redstone power level at a position (in schematic coordinates)
     pub fn get_redstone_power(&self, pos: BlockPos) -> u8 {
-        self.get_block(pos)
+        let normalized_pos = self.normalize_pos(pos);
+        self.get_block(normalized_pos)
             .properties()
             .get("power")
             .and_then(|s| s.parse().ok())
             .unwrap_or(0)
     }
 
-    /// Sets the redstone power level at a position (for redstone wire)
+    /// Sets the redstone power level at a position (for redstone wire, in schematic coordinates)
     pub fn set_redstone_power(&mut self, pos: BlockPos, power: u8) {
-        let mut block = self.get_block(pos);
+        let normalized_pos = self.normalize_pos(pos);
+        let mut block = self.get_block(normalized_pos);
         if block.get_name() == "redstone_wire" {
             let mut properties: HashMap<&str, String> = block
                 .properties()
@@ -409,28 +411,32 @@ impl MchprsWorld {
                 .collect();
             properties.insert("power", power.to_string());
             block.set_properties(properties.iter().map(|(k, v)| (*k, v.as_str())).collect());
-            self.set_block_raw(pos, block.get_id());
+            self.set_block_raw(normalized_pos, block.get_id());
         }
     }
 
-    /// Sets the signal strength at a specific block position (for custom IO nodes)
+    /// Sets the signal strength at a specific block position (for custom IO nodes, in schematic coordinates)
     ///
     /// # Arguments
-    /// * `pos` - The block position
+    /// * `pos` - The block position in schematic coordinates
     /// * `strength` - The signal strength (0-15)
     pub fn set_signal_strength(&mut self, pos: BlockPos, strength: u8) {
-        self.compiler.set_signal_strength(pos, strength);
+        let normalized_pos = self.normalize_pos(pos);
+        self.compiler.set_signal_strength(normalized_pos, strength);
     }
 
-    /// Gets the signal strength at a specific block position (for custom IO nodes)
+    /// Gets the signal strength at a specific block position (for custom IO nodes, in schematic coordinates)
     ///
     /// # Arguments
-    /// * `pos` - The block position
+    /// * `pos` - The block position in schematic coordinates
     ///
     /// # Returns
     /// The current signal strength (0-15), or 0 if not a valid component
     pub fn get_signal_strength(&self, pos: BlockPos) -> u8 {
-        self.compiler.get_signal_strength(pos).unwrap_or(0)
+        let normalized_pos = self.normalize_pos(pos);
+        self.compiler
+            .get_signal_strength(normalized_pos)
+            .unwrap_or(0)
     }
 
     /// Checks if a position has a node in the redpiler graph (DEBUG)
@@ -439,16 +445,17 @@ impl MchprsWorld {
         self.compiler.get_signal_strength(pos).is_some()
     }
 
-    /// Simulates a right-click on a block (typically a lever)
+    /// Simulates a right-click on a block (typically a lever, in schematic coordinates)
     ///
     /// # Errors
     /// Logs a warning if the block is not a lever
     pub fn on_use_block(&mut self, pos: BlockPos) {
-        let block = self.get_block(pos);
+        let normalized_pos = self.normalize_pos(pos);
+        let block = self.get_block(normalized_pos);
         if block.get_name() == "lever" {
             let current_state = self.get_lever_power(pos);
             self.set_lever_power(pos, !current_state);
-            self.compiler.on_use_block(pos);
+            self.compiler.on_use_block(normalized_pos);
             return;
         }
 
@@ -482,18 +489,20 @@ impl MchprsWorld {
         }
     }
 
-    /// Checks if a redstone lamp is lit at the given position
+    /// Checks if a redstone lamp is lit at the given position (in schematic coordinates)
     pub fn is_lit(&self, pos: BlockPos) -> bool {
-        self.get_block(pos)
+        let normalized_pos = self.normalize_pos(pos);
+        self.get_block(normalized_pos)
             .properties()
             .get("lit")
             .map(|v| v == "true")
             .unwrap_or(false)
     }
 
-    /// Sets the power state of a lever
+    /// Sets the power state of a lever (in schematic coordinates)
     pub fn set_lever_power(&mut self, pos: BlockPos, powered: bool) {
-        let mut block = self.get_block(pos);
+        let normalized_pos = self.normalize_pos(pos);
+        let mut block = self.get_block(normalized_pos);
         let mut properties: HashMap<&str, String> = block
             .properties()
             .iter()
@@ -501,12 +510,13 @@ impl MchprsWorld {
             .collect();
         properties.insert("powered", powered.to_string());
         block.set_properties(properties.iter().map(|(k, v)| (*k, v.as_str())).collect());
-        self.set_block_raw(pos, block.get_id());
+        self.set_block_raw(normalized_pos, block.get_id());
     }
 
-    /// Gets the power state of a lever
+    /// Gets the power state of a lever (in schematic coordinates)
     pub fn get_lever_power(&self, pos: BlockPos) -> bool {
-        self.get_block(pos)
+        let normalized_pos = self.normalize_pos(pos);
+        self.get_block(normalized_pos)
             .properties()
             .get("powered")
             .map(|v| v == "true")
