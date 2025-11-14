@@ -27,6 +27,7 @@ mod mchprs_world;
 #[cfg(test)]
 mod tests;
 mod truth_table;
+pub mod typed_executor;
 
 pub use mchprs_world::{MchprsWorld, MchprsWorldError, SimulationOptions};
 pub use truth_table::generate_truth_table;

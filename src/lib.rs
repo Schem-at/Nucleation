@@ -13,6 +13,7 @@ mod item;
 mod metadata;
 mod print_utils;
 mod region;
+pub mod schematic_builder;
 mod transforms;
 mod universal_schematic;
 pub mod utils;
@@ -34,6 +35,9 @@ pub use block_state::BlockState;
 pub use formats::{litematic, schematic};
 pub use print_utils::{format_json_schematic, format_schematic};
 pub use region::Region;
+pub use schematic_builder::{
+    palettes, IoMarker, IoType as BuilderIoType, PaletteEntry, SchematicBuilder,
+};
 pub use universal_schematic::UniversalSchematic;
 
 // Re-export WASM types when building with WASM feature

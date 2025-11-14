@@ -439,6 +439,59 @@ impl MchprsWorld {
             .unwrap_or(0)
     }
 
+    /// Sets signal strength for multiple positions at once (batch operation)
+    ///
+    /// This is more efficient than calling set_signal_strength multiple times
+    /// as it reduces the number of function calls across the WASM boundary.
+    ///
+    /// # Arguments
+    /// * `positions` - Array of (x, y, z) tuples in schematic coordinates
+    /// * `strengths` - Array of signal strengths (0-15), must match positions length
+    ///
+    /// # Errors
+    /// Returns an error if positions and strengths arrays have different lengths
+    pub fn set_signals_batch(
+        &mut self,
+        positions: &[(i32, i32, i32)],
+        strengths: &[u8],
+    ) -> Result<(), String> {
+        if positions.len() != strengths.len() {
+            return Err(format!(
+                "Position count ({}) doesn't match strength count ({})",
+                positions.len(),
+                strengths.len()
+            ));
+        }
+
+        for (i, &(x, y, z)) in positions.iter().enumerate() {
+            let pos = BlockPos::new(x, y, z);
+            let strength = strengths[i];
+            self.set_signal_strength(pos, strength);
+        }
+
+        Ok(())
+    }
+
+    /// Gets signal strength for multiple positions at once (batch operation)
+    ///
+    /// This is more efficient than calling get_signal_strength multiple times
+    /// as it reduces the number of function calls across the WASM boundary.
+    ///
+    /// # Arguments
+    /// * `positions` - Array of (x, y, z) tuples in schematic coordinates
+    ///
+    /// # Returns
+    /// Array of signal strengths (0-15) corresponding to each position
+    pub fn get_signals_batch(&self, positions: &[(i32, i32, i32)]) -> Vec<u8> {
+        positions
+            .iter()
+            .map(|&(x, y, z)| {
+                let pos = BlockPos::new(x, y, z);
+                self.get_signal_strength(pos)
+            })
+            .collect()
+    }
+
     /// Checks if a position has a node in the redpiler graph (DEBUG)
     #[cfg(test)]
     pub fn has_node(&self, pos: BlockPos) -> bool {

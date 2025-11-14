@@ -666,6 +666,15 @@ pub struct PyMchprsWorld {
 }
 
 #[cfg(feature = "simulation")]
+impl PyMchprsWorld {
+    /// Extract the inner MchprsWorld, consuming self
+    /// This is used internally by from_layout to take ownership
+    pub fn into_inner(self) -> MchprsWorld {
+        self.inner
+    }
+}
+
+#[cfg(feature = "simulation")]
 #[pymethods]
 impl PyMchprsWorld {
     pub fn on_use_block(&mut self, x: i32, y: i32, z: i32) {
@@ -780,17 +789,691 @@ impl PyMchprsWorld {
     }
 }
 
+// =============================================================================
+// TYPED CIRCUIT EXECUTOR PYTHON BINDINGS
+// =============================================================================
+
+#[cfg(feature = "simulation")]
+use crate::simulation::typed_executor::{
+    ExecutionMode, IoLayout, IoLayoutBuilder, IoType, LayoutFunction, OutputCondition, StateMode,
+    TypedCircuitExecutor, Value,
+};
+
+/// Python-compatible Value wrapper
+#[cfg(feature = "simulation")]
+#[pyclass(name = "Value")]
+pub struct PyValue {
+    inner: Value,
+}
+
+#[cfg(feature = "simulation")]
+#[pymethods]
+impl PyValue {
+    /// Create a U32 value
+    #[staticmethod]
+    fn u32(value: u32) -> Self {
+        Self {
+            inner: Value::U32(value),
+        }
+    }
+
+    /// Create an I32 value
+    #[staticmethod]
+    fn i32(value: i32) -> Self {
+        Self {
+            inner: Value::I32(value),
+        }
+    }
+
+    /// Create an F32 value
+    #[staticmethod]
+    fn f32(value: f32) -> Self {
+        Self {
+            inner: Value::F32(value),
+        }
+    }
+
+    /// Create a Bool value
+    #[staticmethod]
+    fn bool(value: bool) -> Self {
+        Self {
+            inner: Value::Bool(value),
+        }
+    }
+
+    /// Create a String value
+    #[staticmethod]
+    fn string(value: String) -> Self {
+        Self {
+            inner: Value::String(value),
+        }
+    }
+
+    /// Convert to Python object
+    fn to_py(&self, py: Python) -> PyObject {
+        match &self.inner {
+            Value::U32(v) => v.into_pyobject(py).unwrap().into(),
+            Value::I32(v) => v.into_pyobject(py).unwrap().into(),
+            Value::U64(v) => v.into_pyobject(py).unwrap().into(),
+            Value::I64(v) => v.into_pyobject(py).unwrap().into(),
+            Value::F32(v) => v.into_pyobject(py).unwrap().into(),
+            Value::Bool(v) => v.into_pyobject(py).unwrap().as_any().clone().unbind(),
+            Value::String(v) => v.into_pyobject(py).unwrap().into(),
+            Value::Array(_) => "[Array]".into_pyobject(py).unwrap().into(),
+            Value::Struct(_) => "[Struct]".into_pyobject(py).unwrap().into(),
+            Value::BitArray(_) => "[BitArray]".into_pyobject(py).unwrap().into(),
+            Value::Bytes(_) => "[Bytes]".into_pyobject(py).unwrap().into(),
+        }
+    }
+
+    /// Get type name
+    fn type_name(&self) -> String {
+        match &self.inner {
+            Value::U32(_) => "U32".to_string(),
+            Value::I32(_) => "I32".to_string(),
+            Value::U64(_) => "U64".to_string(),
+            Value::I64(_) => "I64".to_string(),
+            Value::F32(_) => "F32".to_string(),
+            Value::Bool(_) => "Bool".to_string(),
+            Value::String(_) => "String".to_string(),
+            Value::Array(_) => "Array".to_string(),
+            Value::Struct(_) => "Struct".to_string(),
+            Value::BitArray(_) => "BitArray".to_string(),
+            Value::Bytes(_) => "Bytes".to_string(),
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        format!("Value({})", self.type_name())
+    }
+}
+
+/// IoType builder for Python
+#[cfg(feature = "simulation")]
+#[pyclass(name = "IoType")]
+pub struct PyIoType {
+    inner: IoType,
+}
+
+#[cfg(feature = "simulation")]
+#[pymethods]
+impl PyIoType {
+    /// Create an unsigned integer type
+    #[staticmethod]
+    fn unsigned_int(bits: usize) -> Self {
+        Self {
+            inner: IoType::UnsignedInt { bits },
+        }
+    }
+
+    /// Create a signed integer type
+    #[staticmethod]
+    fn signed_int(bits: usize) -> Self {
+        Self {
+            inner: IoType::SignedInt { bits },
+        }
+    }
+
+    /// Create a Float32 type
+    #[staticmethod]
+    fn float32() -> Self {
+        Self {
+            inner: IoType::Float32,
+        }
+    }
+
+    /// Create a Boolean type
+    #[staticmethod]
+    fn boolean() -> Self {
+        Self {
+            inner: IoType::Boolean,
+        }
+    }
+
+    /// Create an ASCII string type
+    #[staticmethod]
+    fn ascii(chars: usize) -> Self {
+        Self {
+            inner: IoType::Ascii { chars },
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        match &self.inner {
+            IoType::UnsignedInt { bits } => format!("IoType.unsigned_int({})", bits),
+            IoType::SignedInt { bits } => format!("IoType.signed_int({})", bits),
+            IoType::Float32 => "IoType.float32()".to_string(),
+            IoType::Boolean => "IoType.boolean()".to_string(),
+            IoType::Ascii { chars } => format!("IoType.ascii({})", chars),
+            _ => "IoType(...)".to_string(),
+        }
+    }
+}
+
+/// LayoutFunction builder for Python
+#[cfg(feature = "simulation")]
+#[pyclass(name = "LayoutFunction")]
+pub struct PyLayoutFunction {
+    inner: LayoutFunction,
+}
+
+#[cfg(feature = "simulation")]
+#[pymethods]
+impl PyLayoutFunction {
+    /// One bit per position (0 or 15)
+    #[staticmethod]
+    fn one_to_one() -> Self {
+        Self {
+            inner: LayoutFunction::OneToOne,
+        }
+    }
+
+    /// Four bits per position (0-15)
+    #[staticmethod]
+    fn packed4() -> Self {
+        Self {
+            inner: LayoutFunction::Packed4,
+        }
+    }
+
+    /// Custom bit-to-position mapping
+    #[staticmethod]
+    fn custom(mapping: Vec<usize>) -> Self {
+        Self {
+            inner: LayoutFunction::Custom(mapping),
+        }
+    }
+
+    /// Row-major 2D layout
+    #[staticmethod]
+    fn row_major(rows: usize, cols: usize, bits_per_element: usize) -> Self {
+        Self {
+            inner: LayoutFunction::RowMajor {
+                rows,
+                cols,
+                bits_per_element,
+            },
+        }
+    }
+
+    /// Column-major 2D layout
+    #[staticmethod]
+    fn column_major(rows: usize, cols: usize, bits_per_element: usize) -> Self {
+        Self {
+            inner: LayoutFunction::ColumnMajor {
+                rows,
+                cols,
+                bits_per_element,
+            },
+        }
+    }
+
+    /// Scanline layout for screens
+    #[staticmethod]
+    fn scanline(width: usize, height: usize, bits_per_pixel: usize) -> Self {
+        Self {
+            inner: LayoutFunction::Scanline {
+                width,
+                height,
+                bits_per_pixel,
+            },
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        "LayoutFunction(...)".to_string()
+    }
+}
+
+/// OutputCondition for conditional execution
+#[cfg(feature = "simulation")]
+#[pyclass(name = "OutputCondition")]
+pub struct PyOutputCondition {
+    inner: OutputCondition,
+}
+
+#[cfg(feature = "simulation")]
+#[pymethods]
+impl PyOutputCondition {
+    /// Output equals a value
+    #[staticmethod]
+    fn equals(value: &PyValue) -> Self {
+        Self {
+            inner: OutputCondition::Equals(value.inner.clone()),
+        }
+    }
+
+    /// Output not equals a value
+    #[staticmethod]
+    fn not_equals(value: &PyValue) -> Self {
+        Self {
+            inner: OutputCondition::NotEquals(value.inner.clone()),
+        }
+    }
+
+    /// Output greater than a value
+    #[staticmethod]
+    fn greater_than(value: &PyValue) -> Self {
+        Self {
+            inner: OutputCondition::GreaterThan(value.inner.clone()),
+        }
+    }
+
+    /// Output less than a value
+    #[staticmethod]
+    fn less_than(value: &PyValue) -> Self {
+        Self {
+            inner: OutputCondition::LessThan(value.inner.clone()),
+        }
+    }
+
+    /// Bitwise AND with mask
+    #[staticmethod]
+    fn bitwise_and(mask: u64) -> Self {
+        Self {
+            inner: OutputCondition::BitwiseAnd(mask),
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        "OutputCondition(...)".to_string()
+    }
+}
+
+/// ExecutionMode for circuit execution
+#[cfg(feature = "simulation")]
+#[pyclass(name = "ExecutionMode")]
+pub struct PyExecutionMode {
+    inner: ExecutionMode,
+}
+
+#[cfg(feature = "simulation")]
+#[pymethods]
+impl PyExecutionMode {
+    /// Run for a fixed number of ticks
+    #[staticmethod]
+    fn fixed_ticks(ticks: u32) -> Self {
+        Self {
+            inner: ExecutionMode::FixedTicks { ticks },
+        }
+    }
+
+    /// Run until an output meets a condition
+    #[staticmethod]
+    fn until_condition(
+        output_name: String,
+        condition: &PyOutputCondition,
+        max_ticks: u32,
+        check_interval: u32,
+    ) -> Self {
+        Self {
+            inner: ExecutionMode::UntilCondition {
+                output_name,
+                condition: condition.inner.clone(),
+                max_ticks,
+                check_interval,
+            },
+        }
+    }
+
+    /// Run until any output changes
+    #[staticmethod]
+    fn until_change(max_ticks: u32, check_interval: u32) -> Self {
+        Self {
+            inner: ExecutionMode::UntilChange {
+                max_ticks,
+                check_interval,
+            },
+        }
+    }
+
+    /// Run until outputs are stable
+    #[staticmethod]
+    fn until_stable(stable_ticks: u32, max_ticks: u32) -> Self {
+        Self {
+            inner: ExecutionMode::UntilStable {
+                stable_ticks,
+                max_ticks,
+            },
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        "ExecutionMode(...)".to_string()
+    }
+}
+
+/// IoLayoutBuilder for Python
+#[cfg(feature = "simulation")]
+#[pyclass(name = "IoLayoutBuilder")]
+pub struct PyIoLayoutBuilder {
+    inner: IoLayoutBuilder,
+}
+
+#[cfg(feature = "simulation")]
+#[pymethods]
+impl PyIoLayoutBuilder {
+    /// Create a new IO layout builder
+    #[new]
+    fn new() -> Self {
+        Self {
+            inner: IoLayoutBuilder::new(),
+        }
+    }
+
+    /// Add an input
+    fn add_input<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        name: String,
+        io_type: &PyIoType,
+        layout: &PyLayoutFunction,
+        positions: Vec<(i32, i32, i32)>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        slf.inner = slf
+            .inner
+            .clone()
+            .add_input(name, io_type.inner.clone(), layout.inner.clone(), positions)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
+        Ok(slf)
+    }
+
+    /// Add an output
+    fn add_output<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        name: String,
+        io_type: &PyIoType,
+        layout: &PyLayoutFunction,
+        positions: Vec<(i32, i32, i32)>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        slf.inner = slf
+            .inner
+            .clone()
+            .add_output(name, io_type.inner.clone(), layout.inner.clone(), positions)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
+        Ok(slf)
+    }
+
+    /// Add an input with automatic layout inference
+    fn add_input_auto<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        name: String,
+        io_type: &PyIoType,
+        positions: Vec<(i32, i32, i32)>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        slf.inner = slf
+            .inner
+            .clone()
+            .add_input_auto(name, io_type.inner.clone(), positions)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
+        Ok(slf)
+    }
+
+    /// Add an output with automatic layout inference
+    fn add_output_auto<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        name: String,
+        io_type: &PyIoType,
+        positions: Vec<(i32, i32, i32)>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        slf.inner = slf
+            .inner
+            .clone()
+            .add_output_auto(name, io_type.inner.clone(), positions)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
+        Ok(slf)
+    }
+
+    /// Build the IO layout
+    fn build(slf: PyRef<'_, Self>) -> PyIoLayout {
+        PyIoLayout {
+            inner: slf.inner.clone().build(),
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        "IoLayoutBuilder(...)".to_string()
+    }
+}
+
+/// IoLayout wrapper for Python
+#[cfg(feature = "simulation")]
+#[pyclass(name = "IoLayout")]
+pub struct PyIoLayout {
+    inner: IoLayout,
+}
+
+#[cfg(feature = "simulation")]
+#[pymethods]
+impl PyIoLayout {
+    /// Get input names
+    fn input_names(&self) -> Vec<String> {
+        self.inner
+            .input_names()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect()
+    }
+
+    /// Get output names
+    fn output_names(&self) -> Vec<String> {
+        self.inner
+            .output_names()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect()
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "IoLayout(inputs={}, outputs={})",
+            self.inner.inputs.len(),
+            self.inner.outputs.len()
+        )
+    }
+}
+
+/// TypedCircuitExecutor wrapper for Python
+#[cfg(feature = "simulation")]
+#[pyclass(name = "TypedCircuitExecutor")]
+pub struct PyTypedCircuitExecutor {
+    inner: TypedCircuitExecutor,
+}
+
+#[cfg(feature = "simulation")]
+#[pymethods]
+impl PyTypedCircuitExecutor {
+    /// Create executor from world and layout
+    /// Note: In Python, this extracts inputs/outputs from the layout and calls new()
+    #[staticmethod]
+    fn from_layout(world: &PyMchprsWorld, layout: &PyIoLayout) -> PyResult<Self> {
+        // In Python, we can't consume the world, so we create a new world from the schematic
+        // and use the layout's inputs/outputs
+        let schematic = world.inner.get_schematic().clone();
+        let new_world = MchprsWorld::new(schematic)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))?;
+
+        Ok(Self {
+            inner: TypedCircuitExecutor::from_layout(new_world, layout.inner.clone()),
+        })
+    }
+
+    /// Set state mode
+    fn set_state_mode(&mut self, mode: &str) -> PyResult<()> {
+        let state_mode = match mode {
+            "stateless" => StateMode::Stateless,
+            "stateful" => StateMode::Stateful,
+            "manual" => StateMode::Manual,
+            _ => {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "Invalid state mode. Use 'stateless', 'stateful', or 'manual'",
+                ))
+            }
+        };
+        self.inner.set_state_mode(state_mode);
+        Ok(())
+    }
+
+    /// Reset the simulation
+    fn reset(&mut self) -> PyResult<()> {
+        self.inner
+            .reset()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))
+    }
+
+    /// Execute the circuit
+    fn execute(
+        &mut self,
+        py: Python,
+        inputs: std::collections::HashMap<String, PyObject>,
+        mode: &PyExecutionMode,
+    ) -> PyResult<PyObject> {
+        // Convert inputs from Python dict to HashMap<String, Value>
+        let mut input_map = std::collections::HashMap::new();
+        for (key, value_py) in inputs {
+            // Try to extract Value from PyObject
+            let value = if let Ok(b) = value_py.extract::<bool>(py) {
+                Value::Bool(b)
+            } else if let Ok(i) = value_py.extract::<i32>(py) {
+                Value::I32(i)
+            } else if let Ok(u) = value_py.extract::<u32>(py) {
+                Value::U32(u)
+            } else if let Ok(f) = value_py.extract::<f32>(py) {
+                Value::F32(f)
+            } else if let Ok(s) = value_py.extract::<String>(py) {
+                Value::String(s)
+            } else {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
+                    "Unsupported input value type for key '{}'",
+                    key
+                )));
+            };
+
+            input_map.insert(key, value);
+        }
+
+        // Execute
+        let result = self
+            .inner
+            .execute(input_map, mode.inner.clone())
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))?;
+
+        // Convert result to Python dict
+        let result_dict = pyo3::types::PyDict::new(py);
+
+        // Add outputs
+        let outputs_dict = pyo3::types::PyDict::new(py);
+        for (name, value) in result.outputs {
+            let py_value: PyObject = match value {
+                Value::U32(v) => v.into_pyobject(py).unwrap().into(),
+                Value::I32(v) => v.into_pyobject(py).unwrap().into(),
+                Value::U64(v) => v.into_pyobject(py).unwrap().into(),
+                Value::I64(v) => v.into_pyobject(py).unwrap().into(),
+                Value::F32(v) => v.into_pyobject(py).unwrap().into(),
+                Value::Bool(v) => v.into_pyobject(py).unwrap().as_any().clone().unbind(),
+                Value::String(v) => v.into_pyobject(py).unwrap().into(),
+                _ => "[Complex]".into_pyobject(py).unwrap().into(),
+            };
+            outputs_dict.set_item(name, py_value)?;
+        }
+        result_dict.set_item("outputs", outputs_dict)?;
+
+        // Add ticks_elapsed
+        result_dict.set_item("ticks_elapsed", result.ticks_elapsed)?;
+
+        // Add condition_met
+        result_dict.set_item("condition_met", result.condition_met)?;
+
+        Ok(result_dict.into())
+    }
+
+    fn __repr__(&self) -> String {
+        "TypedCircuitExecutor(...)".to_string()
+    }
+}
+
+// --- SchematicBuilder Support ---
+
+#[pyclass(name = "SchematicBuilder")]
+pub struct PySchematicBuilder {
+    inner: crate::SchematicBuilder,
+}
+
+#[pymethods]
+impl PySchematicBuilder {
+    #[new]
+    fn new() -> Self {
+        Self {
+            inner: crate::SchematicBuilder::new(),
+        }
+    }
+
+    /// Set the name of the schematic
+    fn name<'py>(mut slf: PyRefMut<'py, Self>, name: String) -> PyRefMut<'py, Self> {
+        let old_builder = std::mem::replace(&mut slf.inner, crate::SchematicBuilder::new());
+        slf.inner = old_builder.name(name);
+        slf
+    }
+
+    /// Map a character to a block string
+    fn map<'py>(mut slf: PyRefMut<'py, Self>, ch: char, block: String) -> PyRefMut<'py, Self> {
+        let old_builder = std::mem::replace(&mut slf.inner, crate::SchematicBuilder::new());
+        slf.inner = old_builder.map(ch, &block);
+        slf
+    }
+
+    /// Add multiple layers (list of list of strings)
+    fn layers<'py>(mut slf: PyRefMut<'py, Self>, layers: Vec<Vec<String>>) -> PyRefMut<'py, Self> {
+        // Convert Vec<Vec<String>> to Vec<&[&str]>
+        let layer_refs: Vec<Vec<&str>> = layers
+            .iter()
+            .map(|layer| layer.iter().map(|s| s.as_str()).collect())
+            .collect();
+        let layer_slice_refs: Vec<&[&str]> = layer_refs.iter().map(|v| v.as_slice()).collect();
+        let old_builder = std::mem::replace(&mut slf.inner, crate::SchematicBuilder::new());
+        slf.inner = old_builder.layers(&layer_slice_refs);
+        slf
+    }
+
+    /// Build the schematic
+    fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PySchematic> {
+        let builder = std::mem::replace(&mut slf.inner, crate::SchematicBuilder::new());
+        let schematic = builder
+            .build()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
+        Ok(PySchematic { inner: schematic })
+    }
+
+    /// Create from template string
+    #[staticmethod]
+    fn from_template(template: String) -> PyResult<PySchematicBuilder> {
+        let builder = crate::SchematicBuilder::from_template(&template)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
+        Ok(Self { inner: builder })
+    }
+}
+
 #[pymodule]
 fn nucleation(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySchematic>()?;
     m.add_class::<PyBlockState>()?;
+    m.add_class::<PySchematicBuilder>()?;
     m.add_function(wrap_pyfunction!(debug_schematic, m)?)?;
     m.add_function(wrap_pyfunction!(debug_json_schematic, m)?)?;
     m.add_function(wrap_pyfunction!(load_schematic, m)?)?;
     m.add_function(wrap_pyfunction!(save_schematic, m)?)?;
 
     #[cfg(feature = "simulation")]
-    m.add_class::<PyMchprsWorld>()?;
+    {
+        m.add_class::<PyMchprsWorld>()?;
+        m.add_class::<PyValue>()?;
+        m.add_class::<PyIoType>()?;
+        m.add_class::<PyLayoutFunction>()?;
+        m.add_class::<PyOutputCondition>()?;
+        m.add_class::<PyExecutionMode>()?;
+        m.add_class::<PyIoLayoutBuilder>()?;
+        m.add_class::<PyIoLayout>()?;
+        m.add_class::<PyTypedCircuitExecutor>()?;
+    }
 
     Ok(())
 }

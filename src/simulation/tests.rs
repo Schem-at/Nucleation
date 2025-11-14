@@ -706,7 +706,7 @@ mod tests {
         let lamp_pos = BlockPos::new(3, 1, 0);
 
         let options = SimulationOptions {
-            custom_io: vec![inject_pos],
+            custom_io: vec![inject_pos, lamp_pos],
             ..Default::default()
         };
 
@@ -718,6 +718,7 @@ mod tests {
 
         // Inject signal
         world.set_signal_strength(inject_pos, 15);
+        world.flush(); // Flush before ticking to propagate the signal
         world.tick(10);
         world.flush();
 
@@ -821,7 +822,7 @@ mod tests {
         let lamp_pos = BlockPos::new(3, 1, 0);
 
         let options_b = SimulationOptions {
-            custom_io: vec![input_pos],
+            custom_io: vec![input_pos, lamp_pos],
             ..Default::default()
         };
 
@@ -837,6 +838,7 @@ mod tests {
 
         // Relay: Inject A's output into B's input
         world_b.set_signal_strength(input_pos, output_signal);
+        world_b.flush(); // Flush before ticking to propagate the signal
         world_b.tick(10);
         world_b.flush();
 

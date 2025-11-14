@@ -1546,3 +1546,688 @@ impl MchprsWorldWrapper {
         SchematicWrapper(self.world.into_schematic())
     }
 }
+
+// =============================================================================
+// TYPED CIRCUIT EXECUTOR BINDINGS
+// =============================================================================
+
+#[cfg(feature = "simulation")]
+use crate::simulation::typed_executor::{
+    ExecutionMode, ExecutionResult, IoLayout, IoLayoutBuilder, IoMapping, IoType, LayoutFunction,
+    OutputCondition, StateMode, TypedCircuitExecutor, Value,
+};
+
+/// JavaScript-compatible Value wrapper
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct ValueWrapper {
+    inner: Value,
+}
+
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+impl ValueWrapper {
+    /// Create a U32 value
+    #[wasm_bindgen(js_name = fromU32)]
+    pub fn from_u32(value: u32) -> Self {
+        Self {
+            inner: Value::U32(value),
+        }
+    }
+
+    /// Create an I32 value
+    #[wasm_bindgen(js_name = fromI32)]
+    pub fn from_i32(value: i32) -> Self {
+        Self {
+            inner: Value::I32(value),
+        }
+    }
+
+    /// Create an F32 value
+    #[wasm_bindgen(js_name = fromF32)]
+    pub fn from_f32(value: f32) -> Self {
+        Self {
+            inner: Value::F32(value),
+        }
+    }
+
+    /// Create a Bool value
+    #[wasm_bindgen(js_name = fromBool)]
+    pub fn from_bool(value: bool) -> Self {
+        Self {
+            inner: Value::Bool(value),
+        }
+    }
+
+    /// Create a String value
+    #[wasm_bindgen(js_name = fromString)]
+    pub fn from_string(value: String) -> Self {
+        Self {
+            inner: Value::String(value),
+        }
+    }
+
+    /// Convert to JavaScript value
+    #[wasm_bindgen(js_name = toJs)]
+    pub fn to_js(&self) -> JsValue {
+        match &self.inner {
+            Value::U32(v) => JsValue::from_f64(*v as f64),
+            Value::I32(v) => JsValue::from_f64(*v as f64),
+            Value::U64(v) => JsValue::from_f64(*v as f64),
+            Value::I64(v) => JsValue::from_f64(*v as f64),
+            Value::F32(v) => JsValue::from_f64(*v as f64),
+            Value::Bool(v) => JsValue::from_bool(*v),
+            Value::String(v) => JsValue::from_str(v),
+            Value::Array(_) => JsValue::from_str("[Array]"),
+            Value::Struct(_) => JsValue::from_str("[Struct]"),
+            Value::BitArray(_) => JsValue::from_str("[BitArray]"),
+            Value::Bytes(_) => JsValue::from_str("[Bytes]"),
+        }
+    }
+
+    /// Get type name
+    #[wasm_bindgen(js_name = typeName)]
+    pub fn type_name(&self) -> String {
+        match &self.inner {
+            Value::U32(_) => "U32".to_string(),
+            Value::I32(_) => "I32".to_string(),
+            Value::U64(_) => "U64".to_string(),
+            Value::I64(_) => "I64".to_string(),
+            Value::F32(_) => "F32".to_string(),
+            Value::Bool(_) => "Bool".to_string(),
+            Value::String(_) => "String".to_string(),
+            Value::Array(_) => "Array".to_string(),
+            Value::Struct(_) => "Struct".to_string(),
+            Value::BitArray(_) => "BitArray".to_string(),
+            Value::Bytes(_) => "Bytes".to_string(),
+        }
+    }
+}
+
+/// IoType builder for JavaScript
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+pub struct IoTypeWrapper {
+    inner: IoType,
+}
+
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+impl IoTypeWrapper {
+    /// Create an unsigned integer type
+    #[wasm_bindgen(js_name = unsignedInt)]
+    pub fn unsigned_int(bits: usize) -> Self {
+        Self {
+            inner: IoType::UnsignedInt { bits },
+        }
+    }
+
+    /// Create a signed integer type
+    #[wasm_bindgen(js_name = signedInt)]
+    pub fn signed_int(bits: usize) -> Self {
+        Self {
+            inner: IoType::SignedInt { bits },
+        }
+    }
+
+    /// Create a Float32 type
+    #[wasm_bindgen(js_name = float32)]
+    pub fn float32() -> Self {
+        Self {
+            inner: IoType::Float32,
+        }
+    }
+
+    /// Create a Boolean type
+    #[wasm_bindgen(js_name = boolean)]
+    pub fn boolean() -> Self {
+        Self {
+            inner: IoType::Boolean,
+        }
+    }
+
+    /// Create an ASCII string type
+    #[wasm_bindgen(js_name = ascii)]
+    pub fn ascii(chars: usize) -> Self {
+        Self {
+            inner: IoType::Ascii { chars },
+        }
+    }
+}
+
+/// LayoutFunction builder for JavaScript
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+pub struct LayoutFunctionWrapper {
+    inner: LayoutFunction,
+}
+
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+impl LayoutFunctionWrapper {
+    /// One bit per position (0 or 15)
+    #[wasm_bindgen(js_name = oneToOne)]
+    pub fn one_to_one() -> Self {
+        Self {
+            inner: LayoutFunction::OneToOne,
+        }
+    }
+
+    /// Four bits per position (0-15)
+    #[wasm_bindgen(js_name = packed4)]
+    pub fn packed4() -> Self {
+        Self {
+            inner: LayoutFunction::Packed4,
+        }
+    }
+
+    /// Custom bit-to-position mapping
+    #[wasm_bindgen(js_name = custom)]
+    pub fn custom(mapping: Vec<usize>) -> Self {
+        Self {
+            inner: LayoutFunction::Custom(mapping),
+        }
+    }
+
+    /// Row-major 2D layout
+    #[wasm_bindgen(js_name = rowMajor)]
+    pub fn row_major(rows: usize, cols: usize, bits_per_element: usize) -> Self {
+        Self {
+            inner: LayoutFunction::RowMajor {
+                rows,
+                cols,
+                bits_per_element,
+            },
+        }
+    }
+
+    /// Column-major 2D layout
+    #[wasm_bindgen(js_name = columnMajor)]
+    pub fn column_major(rows: usize, cols: usize, bits_per_element: usize) -> Self {
+        Self {
+            inner: LayoutFunction::ColumnMajor {
+                rows,
+                cols,
+                bits_per_element,
+            },
+        }
+    }
+
+    /// Scanline layout for screens
+    #[wasm_bindgen(js_name = scanline)]
+    pub fn scanline(width: usize, height: usize, bits_per_pixel: usize) -> Self {
+        Self {
+            inner: LayoutFunction::Scanline {
+                width,
+                height,
+                bits_per_pixel,
+            },
+        }
+    }
+}
+
+/// OutputCondition for conditional execution
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+pub struct OutputConditionWrapper {
+    inner: OutputCondition,
+}
+
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+impl OutputConditionWrapper {
+    /// Output equals a value
+    #[wasm_bindgen(js_name = equals)]
+    pub fn equals(value: &ValueWrapper) -> Self {
+        Self {
+            inner: OutputCondition::Equals(value.inner.clone()),
+        }
+    }
+
+    /// Output not equals a value
+    #[wasm_bindgen(js_name = notEquals)]
+    pub fn not_equals(value: &ValueWrapper) -> Self {
+        Self {
+            inner: OutputCondition::NotEquals(value.inner.clone()),
+        }
+    }
+
+    /// Output greater than a value
+    #[wasm_bindgen(js_name = greaterThan)]
+    pub fn greater_than(value: &ValueWrapper) -> Self {
+        Self {
+            inner: OutputCondition::GreaterThan(value.inner.clone()),
+        }
+    }
+
+    /// Output less than a value
+    #[wasm_bindgen(js_name = lessThan)]
+    pub fn less_than(value: &ValueWrapper) -> Self {
+        Self {
+            inner: OutputCondition::LessThan(value.inner.clone()),
+        }
+    }
+
+    /// Bitwise AND with mask
+    #[wasm_bindgen(js_name = bitwiseAnd)]
+    pub fn bitwise_and(mask: u32) -> Self {
+        Self {
+            inner: OutputCondition::BitwiseAnd(mask as u64),
+        }
+    }
+}
+
+/// ExecutionMode for circuit execution
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+pub struct ExecutionModeWrapper {
+    inner: ExecutionMode,
+}
+
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+impl ExecutionModeWrapper {
+    /// Run for a fixed number of ticks
+    #[wasm_bindgen(js_name = fixedTicks)]
+    pub fn fixed_ticks(ticks: u32) -> Self {
+        Self {
+            inner: ExecutionMode::FixedTicks { ticks },
+        }
+    }
+
+    /// Run until an output meets a condition
+    #[wasm_bindgen(js_name = untilCondition)]
+    pub fn until_condition(
+        output_name: String,
+        condition: &OutputConditionWrapper,
+        max_ticks: u32,
+        check_interval: u32,
+    ) -> Self {
+        Self {
+            inner: ExecutionMode::UntilCondition {
+                output_name,
+                condition: condition.inner.clone(),
+                max_ticks,
+                check_interval,
+            },
+        }
+    }
+
+    /// Run until any output changes
+    #[wasm_bindgen(js_name = untilChange)]
+    pub fn until_change(max_ticks: u32, check_interval: u32) -> Self {
+        Self {
+            inner: ExecutionMode::UntilChange {
+                max_ticks,
+                check_interval,
+            },
+        }
+    }
+
+    /// Run until outputs are stable
+    #[wasm_bindgen(js_name = untilStable)]
+    pub fn until_stable(stable_ticks: u32, max_ticks: u32) -> Self {
+        Self {
+            inner: ExecutionMode::UntilStable {
+                stable_ticks,
+                max_ticks,
+            },
+        }
+    }
+}
+
+/// IoLayoutBuilder for JavaScript
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+pub struct IoLayoutBuilderWrapper {
+    inner: IoLayoutBuilder,
+}
+
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+impl IoLayoutBuilderWrapper {
+    /// Create a new IO layout builder
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self {
+            inner: IoLayoutBuilder::new(),
+        }
+    }
+
+    /// Add an input
+    #[wasm_bindgen(js_name = addInput)]
+    pub fn add_input(
+        mut self,
+        name: String,
+        io_type: &IoTypeWrapper,
+        layout: &LayoutFunctionWrapper,
+        positions: Vec<JsValue>,
+    ) -> Result<IoLayoutBuilderWrapper, JsValue> {
+        // Convert positions from JsValue array to Vec<(i32, i32, i32)>
+        let mut pos_vec = Vec::new();
+        for pos in positions {
+            let array = js_sys::Array::from(&pos);
+            if array.length() != 3 {
+                return Err(JsValue::from_str("Position must be [x, y, z]"));
+            }
+            let x = array.get(0).as_f64().ok_or("Invalid x")? as i32;
+            let y = array.get(1).as_f64().ok_or("Invalid y")? as i32;
+            let z = array.get(2).as_f64().ok_or("Invalid z")? as i32;
+            pos_vec.push((x, y, z));
+        }
+
+        self.inner = self
+            .inner
+            .add_input(name, io_type.inner.clone(), layout.inner.clone(), pos_vec)
+            .map_err(|e| JsValue::from_str(&e))?;
+
+        Ok(self)
+    }
+
+    /// Add an output
+    #[wasm_bindgen(js_name = addOutput)]
+    pub fn add_output(
+        mut self,
+        name: String,
+        io_type: &IoTypeWrapper,
+        layout: &LayoutFunctionWrapper,
+        positions: Vec<JsValue>,
+    ) -> Result<IoLayoutBuilderWrapper, JsValue> {
+        // Convert positions
+        let mut pos_vec = Vec::new();
+        for pos in positions {
+            let array = js_sys::Array::from(&pos);
+            if array.length() != 3 {
+                return Err(JsValue::from_str("Position must be [x, y, z]"));
+            }
+            let x = array.get(0).as_f64().ok_or("Invalid x")? as i32;
+            let y = array.get(1).as_f64().ok_or("Invalid y")? as i32;
+            let z = array.get(2).as_f64().ok_or("Invalid z")? as i32;
+            pos_vec.push((x, y, z));
+        }
+
+        self.inner = self
+            .inner
+            .add_output(name, io_type.inner.clone(), layout.inner.clone(), pos_vec)
+            .map_err(|e| JsValue::from_str(&e))?;
+
+        Ok(self)
+    }
+
+    /// Add an input with automatic layout inference
+    #[wasm_bindgen(js_name = addInputAuto)]
+    pub fn add_input_auto(
+        mut self,
+        name: String,
+        io_type: &IoTypeWrapper,
+        positions: Vec<JsValue>,
+    ) -> Result<IoLayoutBuilderWrapper, JsValue> {
+        // Convert positions
+        let mut pos_vec = Vec::new();
+        for pos in positions {
+            let array = js_sys::Array::from(&pos);
+            if array.length() != 3 {
+                return Err(JsValue::from_str("Position must be [x, y, z]"));
+            }
+            let x = array.get(0).as_f64().ok_or("Invalid x")? as i32;
+            let y = array.get(1).as_f64().ok_or("Invalid y")? as i32;
+            let z = array.get(2).as_f64().ok_or("Invalid z")? as i32;
+            pos_vec.push((x, y, z));
+        }
+
+        self.inner = self
+            .inner
+            .add_input_auto(name, io_type.inner.clone(), pos_vec)
+            .map_err(|e| JsValue::from_str(&e))?;
+
+        Ok(self)
+    }
+
+    /// Add an output with automatic layout inference
+    #[wasm_bindgen(js_name = addOutputAuto)]
+    pub fn add_output_auto(
+        mut self,
+        name: String,
+        io_type: &IoTypeWrapper,
+        positions: Vec<JsValue>,
+    ) -> Result<IoLayoutBuilderWrapper, JsValue> {
+        // Convert positions
+        let mut pos_vec = Vec::new();
+        for pos in positions {
+            let array = js_sys::Array::from(&pos);
+            if array.length() != 3 {
+                return Err(JsValue::from_str("Position must be [x, y, z]"));
+            }
+            let x = array.get(0).as_f64().ok_or("Invalid x")? as i32;
+            let y = array.get(1).as_f64().ok_or("Invalid y")? as i32;
+            let z = array.get(2).as_f64().ok_or("Invalid z")? as i32;
+            pos_vec.push((x, y, z));
+        }
+
+        self.inner = self
+            .inner
+            .add_output_auto(name, io_type.inner.clone(), pos_vec)
+            .map_err(|e| JsValue::from_str(&e))?;
+
+        Ok(self)
+    }
+
+    /// Build the IO layout
+    pub fn build(self) -> IoLayoutWrapper {
+        IoLayoutWrapper {
+            inner: self.inner.build(),
+        }
+    }
+}
+
+/// IoLayout wrapper for JavaScript
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+pub struct IoLayoutWrapper {
+    inner: IoLayout,
+}
+
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+impl IoLayoutWrapper {
+    /// Get input names
+    #[wasm_bindgen(js_name = inputNames)]
+    pub fn input_names(&self) -> Vec<String> {
+        self.inner
+            .input_names()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect()
+    }
+
+    /// Get output names
+    #[wasm_bindgen(js_name = outputNames)]
+    pub fn output_names(&self) -> Vec<String> {
+        self.inner
+            .output_names()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect()
+    }
+}
+
+/// TypedCircuitExecutor wrapper for JavaScript
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+pub struct TypedCircuitExecutorWrapper {
+    inner: TypedCircuitExecutor,
+}
+
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+impl TypedCircuitExecutorWrapper {
+    /// Create executor from world and layout
+    #[wasm_bindgen(js_name = fromLayout)]
+    pub fn from_layout(
+        world: MchprsWorldWrapper,
+        layout: IoLayoutWrapper,
+    ) -> Result<TypedCircuitExecutorWrapper, JsValue> {
+        Ok(Self {
+            inner: TypedCircuitExecutor::from_layout(world.world, layout.inner),
+        })
+    }
+
+    /// Create executor from world, layout, and options
+    #[wasm_bindgen(js_name = fromLayoutWithOptions)]
+    pub fn from_layout_with_options(
+        world: MchprsWorldWrapper,
+        layout: IoLayoutWrapper,
+        options: &SimulationOptionsWrapper,
+    ) -> Result<TypedCircuitExecutorWrapper, JsValue> {
+        Ok(Self {
+            inner: TypedCircuitExecutor::from_layout_with_options(
+                world.world,
+                layout.inner,
+                options.inner.clone(),
+            ),
+        })
+    }
+
+    /// Set state mode
+    #[wasm_bindgen(js_name = setStateMode)]
+    pub fn set_state_mode(&mut self, mode: &str) -> Result<(), JsValue> {
+        let state_mode = match mode {
+            "stateless" => StateMode::Stateless,
+            "stateful" => StateMode::Stateful,
+            "manual" => StateMode::Manual,
+            _ => {
+                return Err(JsValue::from_str(
+                    "Invalid state mode. Use 'stateless', 'stateful', or 'manual'",
+                ))
+            }
+        };
+        self.inner.set_state_mode(state_mode);
+        Ok(())
+    }
+
+    /// Reset the simulation
+    pub fn reset(&mut self) -> Result<(), JsValue> {
+        self.inner.reset().map_err(|e| JsValue::from_str(&e))
+    }
+
+    /// Execute the circuit
+    pub fn execute(
+        &mut self,
+        inputs: JsValue,
+        mode: &ExecutionModeWrapper,
+    ) -> Result<JsValue, JsValue> {
+        // Convert inputs from JS object to HashMap<String, Value>
+        let mut input_map = std::collections::HashMap::new();
+        let obj = js_sys::Object::from(inputs);
+        let entries = js_sys::Object::entries(&obj);
+
+        for i in 0..entries.length() {
+            let entry = js_sys::Array::from(&entries.get(i));
+            let key = entry.get(0).as_string().ok_or("Invalid input key")?;
+            let value_js = entry.get(1);
+
+            // Try to convert JsValue to Value
+            let value = if let Some(b) = value_js.as_bool() {
+                Value::Bool(b)
+            } else if let Some(n) = value_js.as_f64() {
+                // Assume integers for now
+                Value::U32(n as u32)
+            } else if let Some(s) = value_js.as_string() {
+                Value::String(s)
+            } else {
+                return Err(JsValue::from_str("Unsupported input value type"));
+            };
+
+            input_map.insert(key, value);
+        }
+
+        // Execute
+        let result = self
+            .inner
+            .execute(input_map, mode.inner.clone())
+            .map_err(|e| JsValue::from_str(&e))?;
+
+        // Convert result to JS object
+        let result_obj = js_sys::Object::new();
+
+        // Add outputs
+        let outputs_obj = js_sys::Object::new();
+        for (name, value) in result.outputs {
+            let value_wrapper = ValueWrapper { inner: value };
+            js_sys::Reflect::set(
+                &outputs_obj,
+                &JsValue::from_str(&name),
+                &value_wrapper.to_js(),
+            )
+            .unwrap();
+        }
+        js_sys::Reflect::set(&result_obj, &JsValue::from_str("outputs"), &outputs_obj).unwrap();
+
+        // Add ticks_elapsed
+        js_sys::Reflect::set(
+            &result_obj,
+            &JsValue::from_str("ticksElapsed"),
+            &JsValue::from_f64(result.ticks_elapsed as f64),
+        )
+        .unwrap();
+
+        // Add condition_met
+        js_sys::Reflect::set(
+            &result_obj,
+            &JsValue::from_str("conditionMet"),
+            &JsValue::from_bool(result.condition_met),
+        )
+        .unwrap();
+
+        Ok(result_obj.into())
+    }
+}
+
+// --- SchematicBuilder Support ---
+
+/// SchematicBuilder for creating schematics from ASCII art
+#[wasm_bindgen]
+pub struct SchematicBuilderWrapper {
+    inner: crate::SchematicBuilder,
+}
+
+#[wasm_bindgen]
+impl SchematicBuilderWrapper {
+    /// Create a new schematic builder with standard palette
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self {
+            inner: crate::SchematicBuilder::new(),
+        }
+    }
+
+    /// Set the name of the schematic
+    #[wasm_bindgen(js_name = name)]
+    pub fn name(mut self, name: String) -> Self {
+        self.inner = self.inner.name(name);
+        self
+    }
+
+    /// Map a character to a block string
+    #[wasm_bindgen(js_name = map)]
+    pub fn map(mut self, ch: char, block: String) -> Self {
+        self.inner = self.inner.map(ch, &block);
+        self
+    }
+
+    /// Build the schematic
+    #[wasm_bindgen(js_name = build)]
+    pub fn build(self) -> Result<SchematicWrapper, JsValue> {
+        let schematic = self.inner.build().map_err(|e| JsValue::from_str(&e))?;
+        Ok(SchematicWrapper(schematic))
+    }
+
+    /// Create from template string
+    #[wasm_bindgen(js_name = fromTemplate)]
+    pub fn from_template(template: String) -> Result<SchematicBuilderWrapper, JsValue> {
+        let builder =
+            crate::SchematicBuilder::from_template(&template).map_err(|e| JsValue::from_str(&e))?;
+        Ok(Self { inner: builder })
+    }
+}

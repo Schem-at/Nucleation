@@ -743,6 +743,139 @@ impl UniversalSchematic {
         bounding_box
     }
 
+    /// Stack/repeat this schematic multiple times along an axis, returning a new schematic
+    ///
+    /// # Arguments
+    /// * `count` - Number of additional copies (total instances will be count + 1, including original)
+    /// * `axis` - Which axis to stack along ('x', 'y', or 'z')
+    /// * `spacing` - Spacing between instances (0 = touching)
+    ///
+    /// # Example
+    /// ```ignore
+    /// // Create a 1-bit adder, then stack it 3 times along X axis for 4-bit adder
+    /// let single_bit = create_1bit_adder();
+    /// let four_bit = single_bit.stack(3, 'x', 0)?;
+    /// ```
+    pub fn stack(&self, count: usize, axis: char, spacing: i32) -> Result<Self, String> {
+        if count == 0 {
+            return Ok(self.clone());
+        }
+
+        let bbox = self.get_bounding_box();
+        let size = bbox.get_dimensions();
+
+        // Calculate step size based on axis
+        let (step_x, step_y, step_z) = match axis.to_lowercase().next().unwrap() {
+            'x' => (size.0 + spacing, 0, 0),
+            'y' => (0, size.1 + spacing, 0),
+            'z' => (0, 0, size.2 + spacing),
+            _ => return Err(format!("Invalid axis '{}', must be 'x', 'y', or 'z'", axis)),
+        };
+
+        let mut result = UniversalSchematic::new(format!(
+            "{}_stacked",
+            self.metadata
+                .name
+                .as_ref()
+                .unwrap_or(&"schematic".to_string())
+        ));
+
+        // Copy all blocks from each instance
+        for instance in 0..=count {
+            let offset_x = step_x * instance as i32;
+            let offset_y = step_y * instance as i32;
+            let offset_z = step_z * instance as i32;
+
+            // Copy all blocks from this schematic
+            for (pos, block_state) in self.iter_blocks() {
+                result.set_block(
+                    pos.x + offset_x,
+                    pos.y + offset_y,
+                    pos.z + offset_z,
+                    block_state.clone(),
+                );
+            }
+
+            // Copy block entities from default region
+            for block_entity in self.default_region.get_block_entities_as_list() {
+                let pos = block_entity.position;
+                result.set_block_entity(
+                    BlockPosition {
+                        x: pos.0 + offset_x,
+                        y: pos.1 + offset_y,
+                        z: pos.2 + offset_z,
+                    },
+                    block_entity.clone(),
+                );
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Stack/repeat this schematic in-place, modifying the current schematic
+    ///
+    /// This is more memory-efficient than `stack()` if you don't need the original.
+    ///
+    /// # Arguments
+    /// * `count` - Number of additional copies to add
+    /// * `axis` - Which axis to stack along ('x', 'y', or 'z')
+    /// * `spacing` - Spacing between instances (0 = touching)
+    pub fn stack_in_place(&mut self, count: usize, axis: char, spacing: i32) -> Result<(), String> {
+        if count == 0 {
+            return Ok(());
+        }
+
+        let bbox = self.get_bounding_box();
+        let size = bbox.get_dimensions();
+
+        // Calculate step size based on axis
+        let (step_x, step_y, step_z) = match axis.to_lowercase().next().unwrap() {
+            'x' => (size.0 + spacing, 0, 0),
+            'y' => (0, size.1 + spacing, 0),
+            'z' => (0, 0, size.2 + spacing),
+            _ => return Err(format!("Invalid axis '{}', must be 'x', 'y', or 'z'", axis)),
+        };
+
+        // Collect all blocks and entities from the original (instance 0)
+        let original_blocks: Vec<_> = self
+            .iter_blocks()
+            .map(|(pos, block)| (pos.clone(), block.clone()))
+            .collect();
+
+        let original_entities: Vec<_> = self.default_region.get_block_entities_as_list();
+
+        // Add copies for instances 1..=count
+        for instance in 1..=count {
+            let offset_x = step_x * instance as i32;
+            let offset_y = step_y * instance as i32;
+            let offset_z = step_z * instance as i32;
+
+            for (pos, block_state) in &original_blocks {
+                self.set_block(
+                    pos.x + offset_x,
+                    pos.y + offset_y,
+                    pos.z + offset_z,
+                    block_state.clone(),
+                );
+            }
+
+            for block_entity in &original_entities {
+                let pos = block_entity.position;
+                self.set_block_entity(
+                    BlockPosition {
+                        x: pos.0 + offset_x,
+                        y: pos.1 + offset_y,
+                        z: pos.2 + offset_z,
+                    },
+                    block_entity.clone(),
+                );
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn to_schematic(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         crate::formats::schematic::to_schematic(self)
     }

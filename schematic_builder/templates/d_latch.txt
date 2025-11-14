@@ -1,0 +1,16 @@
+# Base layer
+ccc
+ccc
+ccc
+ccc
+
+# Logic layer
+··│
+^→⇑
+c·│
+│·│
+
+[palette]
+→ = minecraft:repeater[facing=west,delay=1,locked=false,powered=true]
+⇑ = minecraft:repeater[facing=south,delay=1,locked=true,powered=false]
+^ = minecraft:redstone_wall_torch[facing=north,lit=true]
