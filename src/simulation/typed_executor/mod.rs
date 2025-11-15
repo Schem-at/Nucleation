@@ -115,6 +115,7 @@
 //! ```
 
 mod executor;
+pub mod insign_io;
 mod io_layout_builder;
 mod io_mapping;
 mod io_type;
@@ -130,6 +131,9 @@ mod integration_tests;
 // Public API
 pub use executor::{
     ExecutionMode, ExecutionResult, OutputCondition, StateMode, TypedCircuitExecutor,
+};
+pub use insign_io::{
+    create_executor_from_insign, parse_io_layout_from_insign, InsignIoError, SortStrategy,
 };
 pub use io_layout_builder::{IoLayout, IoLayoutBuilder};
 pub use io_mapping::IoMapping;

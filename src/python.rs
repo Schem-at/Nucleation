@@ -1297,6 +1297,21 @@ impl PyTypedCircuitExecutor {
         })
     }
 
+    /// Create executor from Insign annotations in schematic
+    #[staticmethod]
+    fn from_insign(schematic: &PySchematic) -> PyResult<Self> {
+        use crate::simulation::typed_executor::create_executor_from_insign;
+
+        let executor = create_executor_from_insign(&schematic.inner).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                "Failed to create executor from Insign: {}",
+                e
+            ))
+        })?;
+
+        Ok(Self { inner: executor })
+    }
+
     /// Set state mode
     fn set_state_mode(&mut self, mode: &str) -> PyResult<()> {
         let state_mode = match mode {

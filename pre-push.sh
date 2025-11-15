@@ -50,6 +50,7 @@ run_check "Build (Python + simulation)" "cargo build --release --features python
 # 3. Test checks
 run_check "Tests (default)" "cargo test"
 run_check "Tests (simulation)" "cargo test --features simulation"
+run_check "Tests (Insign IO integration)" "cargo test --lib --features simulation typed_executor::insign_io"
 
 # 4. Python build check (if maturin is available)
 if command -v maturin &> /dev/null; then

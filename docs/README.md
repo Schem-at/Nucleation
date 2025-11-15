@@ -43,6 +43,7 @@ These guides apply to all languages:
 ### Core Features
 - **[SchematicBuilder Guide](shared/guide/schematic-builder.md)** - Build schematics with ASCII art and compositional design
 - **[TypedCircuitExecutor Guide](shared/guide/typed-executor.md)** - High-level circuit simulation with typed IO
+- **[Insign IO Integration](insign-io-integration.md)** - Auto-create TypedCircuitExecutor from sign annotations
 - **[Unicode Palette Reference](shared/unicode-palette.md)** - Visual circuit design characters
 
 ## Quick Comparison
