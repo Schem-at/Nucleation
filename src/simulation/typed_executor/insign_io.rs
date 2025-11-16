@@ -70,36 +70,19 @@ fn extract_redstone_positions(
 ) -> Vec<(i32, i32, i32)> {
     let mut positions = Vec::new();
 
-    eprintln!(
-        "[extract_redstone_positions] Sign at {:?}, checking {} boxes",
-        sign_pos,
-        boxes.len()
-    );
-
-    for (i, (min, max)) in boxes.iter().enumerate() {
-        eprintln!("  Box {}: [{:?}] to [{:?}]", i, min, max);
-
+    for (min, max) in boxes {
         for x in min[0]..=max[0] {
             for y in min[1]..=max[1] {
                 for z in min[2]..=max[2] {
                     if let Some(block) = schematic.get_block(x, y, z) {
-                        eprintln!("    Checking [{}, {}, {}]: {}", x, y, z, block.name);
                         if is_valid_custom_io_block(block) {
-                            eprintln!("      -> VALID IO BLOCK, adding to positions");
                             positions.push((x, y, z));
                         }
-                    } else {
-                        eprintln!("    No block at [{}, {}, {}]", x, y, z);
                     }
                 }
             }
         }
     }
-
-    eprintln!(
-        "[extract_redstone_positions] Found {} total positions",
-        positions.len()
-    );
 
     // Sort by relative offset from sign using the specified strategy
     positions.sort_by_key(|&(x, y, z)| {
@@ -230,11 +213,20 @@ fn parse_io_type(data_type_str: &str, position_count: usize) -> Result<IoType, I
     }
 }
 
-/// Infer layout function based on position count
-fn infer_layout_function(position_count: usize) -> LayoutFunction {
-    if position_count <= 4 {
+/// Infer layout function based on position count and IoType
+fn infer_layout_function(position_count: usize, io_type: &IoType) -> LayoutFunction {
+    let bit_count = io_type.bit_count();
+
+    // If bit count matches position count, use OneToOne (e.g., 1 bool = 1 position)
+    if bit_count == position_count {
+        LayoutFunction::OneToOne
+    }
+    // If we have fewer positions than bits, use Packed4 (e.g., 4 bits in 1 position)
+    else if position_count <= 4 && bit_count <= position_count * 4 {
         LayoutFunction::Packed4
-    } else {
+    }
+    // Otherwise, use OneToOne
+    else {
         LayoutFunction::OneToOne
     }
 }
@@ -319,7 +311,7 @@ pub fn parse_io_layout_from_insign(
         let io_type = parse_io_type(data_type_str, positions.len())?;
 
         // Infer layout function
-        let layout = infer_layout_function(positions.len());
+        let layout = infer_layout_function(positions.len(), &io_type);
 
         // Add to builder
         match io_direction {
@@ -857,6 +849,175 @@ cc··cccccc
 
         if !positions.is_empty() {
             assert_eq!(positions[0], (3, 1, 9), "Position should be [3, 1, 9]");
+        }
+    }
+
+    #[test]
+    fn test_full_adder_execution_reproduces_browser_error() {
+        use super::super::{ExecutionMode, Value};
+
+        // Reproduce the exact scenario from the browser where we get "Bit count mismatch: expected 1, got 4"
+
+        let template = r#"# Base layer
+·····c····
+·····c····
+··ccccc···
+·ccccccc··
+cc··cccccc
+·c··c·····
+·ccccc····
+·cccccc···
+···cccc···
+···c··c···
+
+# Logic layer
+·····│····
+·····↑····
+··│█←┤█···
+·█◀←┬▲▲┐··
+──··├┴┴┴←─
+·█··↑·····
+·▲─←┤█····
+·█←┬▲▲┐···
+···├┴┴┤···
+···│··│···
+"#;
+
+        let builder = SchematicBuilder::from_template(template).unwrap();
+        let mut schematic = builder.build().unwrap();
+
+        println!("Schematic bounding box: {:?}", schematic.get_bounding_box());
+
+        // Add all 5 Insign IO annotations exactly as in the browser
+        let mut nbt = std::collections::HashMap::new();
+
+        // io.a at [3, 2, 9]
+        nbt.clear();
+        nbt.insert(
+            "Text1".to_string(),
+            "{\"text\":\"@io.a=rc([0,-1,0],[0,-1,0])\"}".to_string(),
+        );
+        nbt.insert(
+            "Text2".to_string(),
+            "{\"text\":\"#io.a:type=\\\"input\\\"\"}".to_string(),
+        );
+        nbt.insert(
+            "Text3".to_string(),
+            "{\"text\":\"#io.a:data_type=\\\"bool\\\"\"}".to_string(),
+        );
+        nbt.insert("Text4".to_string(), "{\"text\":\"\"}".to_string());
+        schematic
+            .set_block_with_nbt(3, 2, 9, "minecraft:oak_sign[rotation=0]", nbt.clone())
+            .unwrap();
+
+        // io.b at [6, 2, 9]
+        nbt.clear();
+        nbt.insert(
+            "Text1".to_string(),
+            "{\"text\":\"@io.b=rc([0,-1,0],[0,-1,0])\"}".to_string(),
+        );
+        nbt.insert(
+            "Text2".to_string(),
+            "{\"text\":\"#io.b:type=\\\"input\\\"\"}".to_string(),
+        );
+        nbt.insert(
+            "Text3".to_string(),
+            "{\"text\":\"#io.b:data_type=\\\"bool\\\"\"}".to_string(),
+        );
+        nbt.insert("Text4".to_string(), "{\"text\":\"\"}".to_string());
+        schematic
+            .set_block_with_nbt(6, 2, 9, "minecraft:oak_sign[rotation=0]", nbt.clone())
+            .unwrap();
+
+        // io.carry_in at [9, 2, 4]
+        nbt.clear();
+        nbt.insert(
+            "Text1".to_string(),
+            "{\"text\":\"@io.carry_in=rc([0,-1,0],[0,-1,0])\"}".to_string(),
+        );
+        nbt.insert(
+            "Text2".to_string(),
+            "{\"text\":\"#io.carry_in:type=\\\"input\\\"\"}".to_string(),
+        );
+        nbt.insert(
+            "Text3".to_string(),
+            "{\"text\":\"#io.carry_in:data_type=\\\"bool\\\"\"}".to_string(),
+        );
+        nbt.insert("Text4".to_string(), "{\"text\":\"\"}".to_string());
+        schematic
+            .set_block_with_nbt(9, 2, 4, "minecraft:oak_sign[rotation=0]", nbt.clone())
+            .unwrap();
+
+        // io.sum at [5, 2, 0] (OUTPUT)
+        nbt.clear();
+        nbt.insert(
+            "Text1".to_string(),
+            "{\"text\":\"@io.sum=rc([0,-1,0],[0,-1,0])\"}".to_string(),
+        );
+        nbt.insert(
+            "Text2".to_string(),
+            "{\"text\":\"#io.sum:type=\\\"output\\\"\"}".to_string(),
+        );
+        nbt.insert(
+            "Text3".to_string(),
+            "{\"text\":\"#io.sum:data_type=\\\"bool\\\"\"}".to_string(),
+        );
+        nbt.insert("Text4".to_string(), "{\"text\":\"\"}".to_string());
+        schematic
+            .set_block_with_nbt(5, 2, 0, "minecraft:oak_sign[rotation=0]", nbt.clone())
+            .unwrap();
+
+        // io.carry_out at [0, 2, 4] (OUTPUT)
+        nbt.clear();
+        nbt.insert(
+            "Text1".to_string(),
+            "{\"text\":\"@io.carry_out=rc([0,-1,0],[0,-1,0])\"}".to_string(),
+        );
+        nbt.insert(
+            "Text2".to_string(),
+            "{\"text\":\"#io.carry_out:type=\\\"output\\\"\"}".to_string(),
+        );
+        nbt.insert(
+            "Text3".to_string(),
+            "{\"text\":\"#io.carry_out:data_type=\\\"bool\\\"\"}".to_string(),
+        );
+        nbt.insert("Text4".to_string(), "{\"text\":\"\"}".to_string());
+        schematic
+            .set_block_with_nbt(0, 2, 4, "minecraft:oak_sign[rotation=0]", nbt.clone())
+            .unwrap();
+
+        // Create executor from Insign
+        println!("\n=== Creating TypedCircuitExecutor from Insign ===");
+        let mut executor =
+            create_executor_from_insign(&schematic).expect("Should create executor from Insign");
+
+        println!("\n=== Executor created successfully ===");
+
+        // Try to execute with all false inputs (matching browser scenario)
+        println!("\n=== Executing with all false inputs ===");
+        let mut inputs = std::collections::HashMap::new();
+        inputs.insert("a".to_string(), Value::Bool(false));
+        inputs.insert("b".to_string(), Value::Bool(false));
+        inputs.insert("carry_in".to_string(), Value::Bool(false));
+
+        let result = executor.execute(
+            inputs,
+            ExecutionMode::UntilStable {
+                stable_ticks: 5,
+                max_ticks: 100,
+            },
+        );
+
+        match result {
+            Ok(exec_result) => {
+                println!("✓ Execution succeeded!");
+                println!("Outputs: {:?}", exec_result.outputs);
+                println!("Ticks: {}", exec_result.ticks_elapsed);
+            }
+            Err(e) => {
+                println!("✗ Execution failed: {}", e);
+                panic!("Should not fail with error: {}", e);
+            }
         }
     }
 }
