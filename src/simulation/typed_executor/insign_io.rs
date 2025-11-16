@@ -70,19 +70,36 @@ fn extract_redstone_positions(
 ) -> Vec<(i32, i32, i32)> {
     let mut positions = Vec::new();
 
-    for (min, max) in boxes {
+    eprintln!(
+        "[extract_redstone_positions] Sign at {:?}, checking {} boxes",
+        sign_pos,
+        boxes.len()
+    );
+
+    for (i, (min, max)) in boxes.iter().enumerate() {
+        eprintln!("  Box {}: [{:?}] to [{:?}]", i, min, max);
+
         for x in min[0]..=max[0] {
             for y in min[1]..=max[1] {
                 for z in min[2]..=max[2] {
                     if let Some(block) = schematic.get_block(x, y, z) {
+                        eprintln!("    Checking [{}, {}, {}]: {}", x, y, z, block.name);
                         if is_valid_custom_io_block(block) {
+                            eprintln!("      -> VALID IO BLOCK, adding to positions");
                             positions.push((x, y, z));
                         }
+                    } else {
+                        eprintln!("    No block at [{}, {}, {}]", x, y, z);
                     }
                 }
             }
         }
     }
+
+    eprintln!(
+        "[extract_redstone_positions] Found {} total positions",
+        positions.len()
+    );
 
     // Sort by relative offset from sign using the specified strategy
     positions.sort_by_key(|&(x, y, z)| {
@@ -343,8 +360,19 @@ pub fn create_executor_from_insign(
     let builder = parse_io_layout_from_insign(&input, schematic)?;
     let layout = builder.build();
 
+    // Create a copy of the schematic without signs (MCHPRS might not support all sign block types)
+    let mut schematic_without_signs = schematic.clone();
+    for (pos, _) in &input {
+        // Replace sign blocks with air
+        let air_block = crate::BlockState {
+            name: "minecraft:air".to_string(),
+            properties: std::collections::HashMap::new(),
+        };
+        schematic_without_signs.set_block(pos[0], pos[1], pos[2], air_block);
+    }
+
     // Create MchprsWorld
-    let world = MchprsWorld::new(schematic.clone())
+    let world = MchprsWorld::new(schematic_without_signs)
         .map_err(|e| InsignIoError::SchematicError(e.to_string()))?;
 
     // Create executor
@@ -724,5 +752,111 @@ cc··cccccc
 
         // If we got here, the fix worked! The signs were properly removed before
         // creating the MCHPRS world, so it didn't panic on unsupported block types.
+    }
+
+    #[test]
+    fn test_insign_position_extraction_matches_javascript() {
+        // This test verifies that Rust extracts the same positions as JavaScript
+        // Reproduces the issue where JavaScript finds 1 position but Rust finds 4
+
+        let template = r#"# Base layer
+·····c····
+·····c····
+··ccccc···
+·ccccccc··
+cc··cccccc
+·c··c·····
+·ccccc····
+·cccccc···
+···cccc···
+···c··c···
+
+# Logic layer
+·····│····
+·····↑····
+··│█←┤█···
+·█◀←┬▲▲┐··
+──··├┴┴┴←─
+·█··↑·····
+·▲─←┤█····
+·█←┬▲▲┐···
+···├┴┴┤···
+···│··│···
+"#;
+
+        let builder = SchematicBuilder::from_template(template).unwrap();
+        let mut schematic = builder.build().unwrap();
+
+        // Add ONE sign for input 'a' at position [3, 2, 9]
+        // The sign points to [3, 1, 9] with rc([0,-1,0],[0,-1,0])
+        let mut nbt_a = std::collections::HashMap::new();
+        nbt_a.insert(
+            "Text1".to_string(),
+            "{\"text\":\"@io.a=rc([0,-1,0],[0,-1,0])\"}".to_string(),
+        );
+        nbt_a.insert(
+            "Text2".to_string(),
+            "{\"text\":\"#io.a:type=\\\"input\\\"\"}".to_string(),
+        );
+        nbt_a.insert(
+            "Text3".to_string(),
+            "{\"text\":\"#io.a:data_type=\\\"bool\\\"\"}".to_string(),
+        );
+        nbt_a.insert("Text4".to_string(), "{\"text\":\"\"}".to_string());
+        schematic
+            .set_block_with_nbt(3, 2, 9, "minecraft:oak_sign[rotation=0]", nbt_a)
+            .unwrap();
+
+        // Extract signs
+        let signs = crate::insign::extract_signs(&schematic);
+        assert_eq!(signs.len(), 1, "Should have exactly 1 sign");
+
+        let sign = &signs[0];
+        assert_eq!(sign.pos, [3, 2, 9], "Sign should be at [3, 2, 9]");
+
+        // Parse with Insign
+        let input: Vec<([i32; 3], String)> = signs.into_iter().map(|s| (s.pos, s.text)).collect();
+        let dsl_map = ::insign::compile(&input).expect("Insign compilation should succeed");
+
+        // Check the compiled region
+        let region = dsl_map.get("io.a").expect("Should have io.a region");
+        let boxes = region
+            .bounding_boxes
+            .as_ref()
+            .expect("Should have bounding boxes");
+
+        println!("Bounding boxes for io.a: {:?}", boxes);
+        assert_eq!(boxes.len(), 1, "Should have exactly 1 bounding box");
+
+        // The bounding box should be [[3, 1, 9], [3, 1, 9]] (absolute coords)
+        let bbox = boxes[0];
+        println!("Bounding box: min={:?}, max={:?}", bbox.0, bbox.1);
+        assert_eq!(bbox.0, [3, 1, 9], "Bounding box min should be [3, 1, 9]");
+        assert_eq!(bbox.1, [3, 1, 9], "Bounding box max should be [3, 1, 9]");
+
+        // Now extract redstone positions
+        let positions =
+            extract_redstone_positions(boxes, (3, 2, 9), &schematic, SortStrategy::Distance);
+
+        println!("Extracted {} positions: {:?}", positions.len(), positions);
+
+        // Check what block is at [3, 1, 9]
+        if let Some(block) = schematic.get_block(3, 1, 9) {
+            println!("Block at [3, 1, 9]: {}", block.name);
+        } else {
+            println!("No block at [3, 1, 9]");
+        }
+
+        // THIS IS THE BUG: We expect 1 position but might get 4
+        assert_eq!(
+            positions.len(),
+            1,
+            "Should extract exactly 1 position for a single-block bounding box, but got {}",
+            positions.len()
+        );
+
+        if !positions.is_empty() {
+            assert_eq!(positions[0], (3, 1, 9), "Position should be [3, 1, 9]");
+        }
     }
 }

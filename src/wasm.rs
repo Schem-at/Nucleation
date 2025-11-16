@@ -2100,10 +2100,36 @@ impl TypedCircuitExecutorWrapper {
     ) -> Result<TypedCircuitExecutorWrapper, JsValue> {
         use crate::simulation::typed_executor::create_executor_from_insign;
 
+        // Debug: Log schematic info
+        let bbox = schematic.0.get_bounding_box();
+        console::log_1(
+            &format!(
+                "[WASM fromInsign] Schematic bbox: min={:?}, max={:?}",
+                bbox.min, bbox.max
+            )
+            .into(),
+        );
+
+        let signs = crate::insign::extract_signs(&schematic.0);
+        console::log_1(&format!("[WASM fromInsign] Found {} signs", signs.len()).into());
+
+        for sign in &signs {
+            console::log_1(
+                &format!(
+                    "  Sign at {:?}: {}",
+                    sign.pos,
+                    sign.text.lines().next().unwrap_or("")
+                )
+                .into(),
+            );
+        }
+
         let executor = create_executor_from_insign(&schematic.0).map_err(|e| {
+            console::log_1(&format!("[WASM fromInsign] ERROR: {}", e).into());
             JsValue::from_str(&format!("Failed to create executor from Insign: {}", e))
         })?;
 
+        console::log_1(&"[WASM fromInsign] Successfully created executor".into());
         Ok(Self { inner: executor })
     }
 
