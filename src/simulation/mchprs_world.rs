@@ -179,8 +179,14 @@ impl MchprsWorld {
         let (min_x, min_y, min_z) = (bounding_box.min.0, bounding_box.min.1, bounding_box.min.2);
         let (max_x, max_y, max_z) = (bounding_box.max.0, bounding_box.max.1, bounding_box.max.2);
 
-        for chunk_x in (min_x >> 4)..=((max_x >> 4) + 1) {
-            for chunk_z in (min_z >> 4)..=((max_z >> 4) + 1) {
+        // Normalize coordinates to MCHPRS space (0-based)
+        let norm_min_x = 0;
+        let norm_min_z = 0;
+        let norm_max_x = max_x - min_x;
+        let norm_max_z = max_z - min_z;
+
+        for chunk_x in (norm_min_x >> 4)..=((norm_max_x >> 4) + 1) {
+            for chunk_z in (norm_min_z >> 4)..=((norm_max_z >> 4) + 1) {
                 let chunk = Chunk::empty(chunk_x, chunk_z, ((max_y - min_y) / 16 + 1) as usize);
                 self.chunks.insert((chunk_x, chunk_z), chunk);
             }

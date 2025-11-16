@@ -588,4 +588,141 @@ mod tests {
             layout2.inputs.get("test").unwrap().positions
         );
     }
+
+    #[test]
+    fn test_create_executor_from_insign_with_full_adder() {
+        // This test reproduces the issue where SchematicBuilder creates a full adder
+        // with signs, and we need to ensure MCHPRS can handle it (by removing signs)
+        let template = r#"# Base layer
+·····c····
+·····c····
+··ccccc···
+·ccccccc··
+cc··cccccc
+·c··c·····
+·ccccc····
+·cccccc···
+···cccc···
+···c··c···
+
+# Logic layer
+·····│····
+·····↑····
+··│█←┤█···
+·█◀←┬▲▲┐··
+──··├┴┴┴←─
+·█··↑·····
+·▲─←┤█····
+·█←┬▲▲┐···
+···├┴┴┤···
+···│··│···
+"#;
+
+        let builder = SchematicBuilder::from_template(template).unwrap();
+        let mut schematic = builder.build().unwrap();
+
+        // Add Insign IO annotations via signs
+        let mut nbt_a = std::collections::HashMap::new();
+        nbt_a.insert(
+            "Text1".to_string(),
+            "{\"text\":\"@io.a=rc([0,-1,0],[0,-1,0])\"}".to_string(),
+        );
+        nbt_a.insert(
+            "Text2".to_string(),
+            "{\"text\":\"#io.a:type=\\\"input\\\"\"}".to_string(),
+        );
+        nbt_a.insert(
+            "Text3".to_string(),
+            "{\"text\":\"#io.a:data_type=\\\"bool\\\"\"}".to_string(),
+        );
+        nbt_a.insert("Text4".to_string(), "{\"text\":\"\"}".to_string());
+        schematic
+            .set_block_with_nbt(3, 2, 9, "minecraft:oak_sign[rotation=0]", nbt_a)
+            .unwrap();
+
+        let mut nbt_b = std::collections::HashMap::new();
+        nbt_b.insert(
+            "Text1".to_string(),
+            "{\"text\":\"@io.b=rc([0,-1,0],[0,-1,0])\"}".to_string(),
+        );
+        nbt_b.insert(
+            "Text2".to_string(),
+            "{\"text\":\"#io.b:type=\\\"input\\\"\"}".to_string(),
+        );
+        nbt_b.insert(
+            "Text3".to_string(),
+            "{\"text\":\"#io.b:data_type=\\\"bool\\\"\"}".to_string(),
+        );
+        nbt_b.insert("Text4".to_string(), "{\"text\":\"\"}".to_string());
+        schematic
+            .set_block_with_nbt(6, 2, 9, "minecraft:oak_sign[rotation=0]", nbt_b)
+            .unwrap();
+
+        let mut nbt_cin = std::collections::HashMap::new();
+        nbt_cin.insert(
+            "Text1".to_string(),
+            "{\"text\":\"@io.carry_in=rc([0,-1,0],[0,-1,0])\"}".to_string(),
+        );
+        nbt_cin.insert(
+            "Text2".to_string(),
+            "{\"text\":\"#io.carry_in:type=\\\"input\\\"\"}".to_string(),
+        );
+        nbt_cin.insert(
+            "Text3".to_string(),
+            "{\"text\":\"#io.carry_in:data_type=\\\"bool\\\"\"}".to_string(),
+        );
+        nbt_cin.insert("Text4".to_string(), "{\"text\":\"\"}".to_string());
+        schematic
+            .set_block_with_nbt(9, 2, 4, "minecraft:oak_sign[rotation=0]", nbt_cin)
+            .unwrap();
+
+        let mut nbt_sum = std::collections::HashMap::new();
+        nbt_sum.insert(
+            "Text1".to_string(),
+            "{\"text\":\"@io.sum=rc([0,-1,0],[0,-1,0])\"}".to_string(),
+        );
+        nbt_sum.insert(
+            "Text2".to_string(),
+            "{\"text\":\"#io.sum:type=\\\"output\\\"\"}".to_string(),
+        );
+        nbt_sum.insert(
+            "Text3".to_string(),
+            "{\"text\":\"#io.sum:data_type=\\\"bool\\\"\"}".to_string(),
+        );
+        nbt_sum.insert("Text4".to_string(), "{\"text\":\"\"}".to_string());
+        schematic
+            .set_block_with_nbt(5, 2, 0, "minecraft:oak_sign[rotation=0]", nbt_sum)
+            .unwrap();
+
+        let mut nbt_cout = std::collections::HashMap::new();
+        nbt_cout.insert(
+            "Text1".to_string(),
+            "{\"text\":\"@io.carry_out=rc([0,-1,0],[0,-1,0])\"}".to_string(),
+        );
+        nbt_cout.insert(
+            "Text2".to_string(),
+            "{\"text\":\"#io.carry_out:type=\\\"output\\\"\"}".to_string(),
+        );
+        nbt_cout.insert(
+            "Text3".to_string(),
+            "{\"text\":\"#io.carry_out:data_type=\\\"bool\\\"\"}".to_string(),
+        );
+        nbt_cout.insert("Text4".to_string(), "{\"text\":\"\"}".to_string());
+        schematic
+            .set_block_with_nbt(0, 2, 4, "minecraft:oak_sign[rotation=0]", nbt_cout)
+            .unwrap();
+
+        // This should not panic - signs should be removed before creating MCHPRS world
+        // Before the fix, this would panic with "called `Option::unwrap()` on a `None` value"
+        // because MCHPRS couldn't handle the oak_sign blocks
+        let executor = create_executor_from_insign(&schematic);
+        assert!(
+            executor.is_ok(),
+            "Failed to create executor from Insign with full adder: {:?}",
+            executor.err()
+        );
+
+        // If we got here, the fix worked! The signs were properly removed before
+        // creating the MCHPRS world, so it didn't panic on unsupported block types.
+    }
 }
