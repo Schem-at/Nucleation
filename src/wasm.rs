@@ -2201,12 +2201,14 @@ impl TypedCircuitExecutorWrapper {
         Ok(result_obj.into())
     }
 
-    /// Get the underlying MchprsWorld for reading signal strengths
-    #[wasm_bindgen(js_name = getWorld)]
-    pub fn get_world(&self) -> MchprsWorldWrapper {
-        MchprsWorldWrapper {
-            world: self.inner.world().clone(),
-        }
+    /// Sync the simulation state back to the schematic
+    /// 
+    /// Call this after execute() to update the schematic with the current simulation state.
+    /// Returns the updated schematic.
+    #[wasm_bindgen(js_name = syncToSchematic)]
+    pub fn sync_to_schematic(&mut self) -> SchematicWrapper {
+        let schematic = self.inner.sync_and_get_schematic();
+        SchematicWrapper(schematic.clone())
     }
 }
 

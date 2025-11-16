@@ -353,6 +353,15 @@ impl TypedCircuitExecutor {
         &mut self.world
     }
 
+    /// Sync the simulation state back to the schematic and return a reference
+    /// 
+    /// This updates the schematic with the current block states from the simulation,
+    /// useful for visualizing the circuit state after execution.
+    pub fn sync_and_get_schematic(&mut self) -> &crate::UniversalSchematic {
+        self.world.sync_to_schematic();
+        self.world.get_schematic()
+    }
+
     /// Read all outputs from the world
     fn read_outputs(&self) -> Result<HashMap<String, Value>, String> {
         let mut outputs = HashMap::new();
