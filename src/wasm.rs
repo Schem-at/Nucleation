@@ -29,8 +29,12 @@ pub struct LazyChunkIterator {
     current_index: usize,
 }
 
+/// Initialize WASM module with panic hook for better error messages
 #[wasm_bindgen(start)]
 pub fn start() {
+    #[cfg(feature = "console_error_panic_hook")]
+    console_error_panic_hook::set_once();
+
     console::log_1(&"Initializing schematic utilities".into());
 }
 

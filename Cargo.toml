@@ -1,6 +1,6 @@
 [package]
 name = "nucleation"
-version = "0.1.102"
+version = "0.1.103"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -21,6 +21,7 @@ wasm = [
     "js-sys",
     "web-sys",
     "serde-wasm-bindgen",
+    "console_error_panic_hook",
 ]
 python = ["pyo3/extension-module"]
 # New PHP feature
@@ -53,6 +54,7 @@ wasm-bindgen = { version = "0.2", features = ["serde-serialize"], optional = tru
 js-sys = { version = "0.3.70", optional = true }
 serde-wasm-bindgen = { version = "0.4", optional = true }
 web-sys = { version = "0.3", optional = true, features = ["console"] }
+console_error_panic_hook = { version = "0.1", optional = true }
 rand = "0.8.5"
 getrandom = { version = "0.2", features = ["js"] }
 
