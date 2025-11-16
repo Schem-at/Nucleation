@@ -34,7 +34,7 @@ pub struct LazyChunkIterator {
 pub fn start() {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
-
+    
     console::log_1(&"Initializing schematic utilities".into());
 }
 
@@ -2199,6 +2199,14 @@ impl TypedCircuitExecutorWrapper {
         .unwrap();
 
         Ok(result_obj.into())
+    }
+
+    /// Get the underlying MchprsWorld for reading signal strengths
+    #[wasm_bindgen(js_name = getWorld)]
+    pub fn get_world(&self) -> MchprsWorldWrapper {
+        MchprsWorldWrapper {
+            world: self.inner.world().clone(),
+        }
     }
 }
 
