@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "nucleation"
-version = "0.1.110"
+version = "0.1.111"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = [{ name = "Nano", email = "nano@schem.at" }]
 license = { text = "AGPL-3.0-only" }
