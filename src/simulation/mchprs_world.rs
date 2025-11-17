@@ -589,6 +589,7 @@ impl MchprsWorld {
     ///
     /// Call this after running simulation if you want to export the resulting state.
     pub fn sync_to_schematic(&mut self) {
+        self.flush();
         let bounding_box = self.schematic.get_bounding_box();
         let (min_x, min_y, min_z) = self.min_coords;
         let (max_x, max_y, max_z) = bounding_box.max;

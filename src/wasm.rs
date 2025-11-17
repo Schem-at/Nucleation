@@ -34,7 +34,7 @@ pub struct LazyChunkIterator {
 pub fn start() {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
-    
+
     console::log_1(&"Initializing schematic utilities".into());
 }
 
@@ -2202,7 +2202,7 @@ impl TypedCircuitExecutorWrapper {
     }
 
     /// Sync the simulation state back to the schematic
-    /// 
+    ///
     /// Call this after execute() to update the schematic with the current simulation state.
     /// Returns the updated schematic.
     #[wasm_bindgen(js_name = syncToSchematic)]
