@@ -1,0 +1,15 @@
+# Base layer
+cc
+cc
+
+# Logic layer
+█─
+▲·
+
+# Signs layer
+·S
+S·
+
+[palette]
+S = minecraft:oak_wall_sign[facing=north]{@io.out=rc([0,-1,0],[0,-1,0]);#io.out:type="output";#io.out:data_type="bool"}
+
