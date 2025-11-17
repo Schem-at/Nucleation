@@ -142,6 +142,17 @@ fn parse_io_type(data_type_str: &str, position_count: usize) -> Result<IoType, I
             }
             Ok(IoType::Boolean)
         }
+        "nibble" | "signal" | "signal_strength" => {
+            // 4-bit value using Packed4 layout (signal strength 0-15 on a single wire)
+            if position_count != 1 {
+                return Err(InsignIoError::PositionCountMismatch(
+                    data_type_str.to_string(),
+                    1,
+                    position_count,
+                ));
+            }
+            Ok(IoType::UnsignedInt { bits: 4 })
+        }
         "unsigned" | "uint" => Ok(IoType::UnsignedInt {
             bits: position_count,
         }),
