@@ -133,7 +133,8 @@ pub use executor::{
     ExecutionMode, ExecutionResult, OutputCondition, StateMode, TypedCircuitExecutor,
 };
 pub use insign_io::{
-    create_executor_from_insign, parse_io_layout_from_insign, InsignIoError, SortStrategy,
+    create_executor_from_insign, create_executor_from_insign_with_options,
+    parse_io_layout_from_insign, InsignIoError, SortStrategy,
 };
 pub use io_layout_builder::{IoLayout, IoLayoutBuilder};
 pub use io_mapping::IoMapping;

@@ -382,6 +382,40 @@ pub fn create_executor_from_insign(
     Ok(TypedCircuitExecutor::from_layout(world, layout))
 }
 
+/// Create a TypedCircuitExecutor from Insign annotations with custom simulation options
+pub fn create_executor_from_insign_with_options(
+    schematic: &UniversalSchematic,
+    options: crate::simulation::SimulationOptions,
+) -> Result<TypedCircuitExecutor, InsignIoError> {
+    // Extract signs from schematic
+    let signs = insign::extract_signs(schematic);
+
+    // Convert to input format
+    let input: Vec<([i32; 3], String)> = signs.into_iter().map(|s| (s.pos, s.text)).collect();
+
+    // Parse IO layout
+    let builder = parse_io_layout_from_insign(&input, schematic)?;
+    let layout = builder.build();
+
+    // Create a copy of the schematic without signs (MCHPRS might not support all sign block types)
+    let mut schematic_without_signs = schematic.clone();
+    for (pos, _) in &input {
+        // Replace sign blocks with air
+        let air_block = crate::BlockState {
+            name: "minecraft:air".to_string(),
+            properties: std::collections::HashMap::new(),
+        };
+        schematic_without_signs.set_block(pos[0], pos[1], pos[2], air_block);
+    }
+
+    // Create MchprsWorld with options
+    let world = MchprsWorld::with_options(schematic_without_signs, options)
+        .map_err(|e| InsignIoError::SchematicError(e.to_string()))?;
+
+    // Create executor (it will use the options from the world)
+    Ok(TypedCircuitExecutor::from_layout(world, layout))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

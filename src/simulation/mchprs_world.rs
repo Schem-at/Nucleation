@@ -31,8 +31,8 @@ pub struct SimulationOptions {
 impl Default for SimulationOptions {
     fn default() -> Self {
         Self {
-            optimize: true,
-            io_only: false, // Default to false so wire states are visible
+            optimize: true, // Default to true for performance
+            io_only: false, // Default to false so wire states are visible when optimize=false
             custom_io: Vec::new(),
         }
     }

@@ -2107,6 +2107,22 @@ impl TypedCircuitExecutorWrapper {
         Ok(Self { inner: executor })
     }
 
+    /// Create executor from Insign annotations with custom simulation options
+    #[wasm_bindgen(js_name = fromInsignWithOptions)]
+    pub fn from_insign_with_options(
+        schematic: &SchematicWrapper,
+        options: &SimulationOptionsWrapper,
+    ) -> Result<TypedCircuitExecutorWrapper, JsValue> {
+        use crate::simulation::typed_executor::create_executor_from_insign_with_options;
+
+        let executor =
+            create_executor_from_insign_with_options(&schematic.0, options.inner.clone()).map_err(
+                |e| JsValue::from_str(&format!("Failed to create executor from Insign: {}", e)),
+            )?;
+
+        Ok(Self { inner: executor })
+    }
+
     /// Set state mode
     #[wasm_bindgen(js_name = setStateMode)]
     pub fn set_state_mode(&mut self, mode: &str) -> Result<(), JsValue> {
