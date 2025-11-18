@@ -409,11 +409,13 @@ pub fn create_executor_from_insign_with_options(
     }
 
     // Create MchprsWorld with options
-    let world = MchprsWorld::with_options(schematic_without_signs, options)
+    let world = MchprsWorld::with_options(schematic_without_signs, options.clone())
         .map_err(|e| InsignIoError::SchematicError(e.to_string()))?;
 
-    // Create executor (it will use the options from the world)
-    Ok(TypedCircuitExecutor::from_layout(world, layout))
+    // Create executor with the same options so reset() preserves them
+    Ok(TypedCircuitExecutor::from_layout_with_options(
+        world, layout, options,
+    ))
 }
 
 #[cfg(test)]
