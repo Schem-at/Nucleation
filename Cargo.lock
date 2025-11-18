@@ -1537,7 +1537,7 @@ dependencies = [
 [[package]]
 name = "mchprs_blocks"
 version = "0.4.1"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=26bc5c6f37260a8f05ed5956fa3397eb7cf1235c#26bc5c6f37260a8f05ed5956fa3397eb7cf1235c"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=80a781f#80a781fc7ad0f6efef54ec92fe5c14a567c644e1"
 dependencies = [
  "hematite-nbt",
  "mchprs_proc_macros",
@@ -1548,7 +1548,7 @@ dependencies = [
 [[package]]
 name = "mchprs_proc_macros"
 version = "0.4.1"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=26bc5c6f37260a8f05ed5956fa3397eb7cf1235c#26bc5c6f37260a8f05ed5956fa3397eb7cf1235c"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=80a781f#80a781fc7ad0f6efef54ec92fe5c14a567c644e1"
 dependencies = [
  "quote",
  "syn 2.0.110",
@@ -1557,7 +1557,7 @@ dependencies = [
 [[package]]
 name = "mchprs_redpiler"
 version = "0.1.0"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=26bc5c6f37260a8f05ed5956fa3397eb7cf1235c#26bc5c6f37260a8f05ed5956fa3397eb7cf1235c"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=80a781f#80a781fc7ad0f6efef54ec92fe5c14a567c644e1"
 dependencies = [
  "enum_dispatch",
  "itertools 0.14.0",
@@ -1575,7 +1575,7 @@ dependencies = [
 [[package]]
 name = "mchprs_redstone"
 version = "0.1.0"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=26bc5c6f37260a8f05ed5956fa3397eb7cf1235c#26bc5c6f37260a8f05ed5956fa3397eb7cf1235c"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=80a781f#80a781fc7ad0f6efef54ec92fe5c14a567c644e1"
 dependencies = [
  "mchprs_blocks",
  "mchprs_world",
@@ -1586,12 +1586,12 @@ dependencies = [
 [[package]]
 name = "mchprs_utils"
 version = "0.4.1"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=26bc5c6f37260a8f05ed5956fa3397eb7cf1235c#26bc5c6f37260a8f05ed5956fa3397eb7cf1235c"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=80a781f#80a781fc7ad0f6efef54ec92fe5c14a567c644e1"
 
 [[package]]
 name = "mchprs_world"
 version = "0.4.1"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=26bc5c6f37260a8f05ed5956fa3397eb7cf1235c#26bc5c6f37260a8f05ed5956fa3397eb7cf1235c"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=80a781f#80a781fc7ad0f6efef54ec92fe5c14a567c644e1"
 dependencies = [
  "hematite-nbt",
  "mchprs_blocks",
@@ -1687,7 +1687,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation"
-version = "0.1.112"
+version = "0.1.113"
 dependencies = [
  "base64",
  "bytemuck",
@@ -2253,7 +2253,7 @@ dependencies = [
 [[package]]
 name = "redpiler_graph"
 version = "0.4.1"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=26bc5c6f37260a8f05ed5956fa3397eb7cf1235c#26bc5c6f37260a8f05ed5956fa3397eb7cf1235c"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=80a781f#80a781fc7ad0f6efef54ec92fe5c14a567c644e1"
 dependencies = [
  "bincode",
  "serde",
