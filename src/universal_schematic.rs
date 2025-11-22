@@ -1311,62 +1311,46 @@ impl UniversalSchematic {
         height: i32,
         length: i32,
     ) -> Vec<(BlockPosition, usize)> {
-        let mut blocks = Vec::new();
+        let mut blocks = Vec::with_capacity((width * height * length) as usize);
 
-        // Check default region
-        if self.default_region.get_bounding_box().intersects_range(
-            offset_x,
-            offset_y,
-            offset_z,
-            offset_x + width,
-            offset_y + height,
-            offset_z + length,
-        ) {
-            for (index, &palette_index) in self.default_region.blocks.iter().enumerate() {
-                if palette_index == 0 {
-                    continue; // Skip air
-                }
+        // Helper to process a region
+        let mut process_region = |region: &Region| {
+            let region_bbox = region.get_bounding_box();
 
-                let (x, y, z) = self.default_region.index_to_coords(index);
-                if x >= offset_x
-                    && x < offset_x + width
-                    && y >= offset_y
-                    && y < offset_y + height
-                    && z >= offset_z
-                    && z < offset_z + length
-                {
-                    blocks.push((BlockPosition { x, y, z }, palette_index));
+            // Calculate intersection between chunk and region
+            let start_x = std::cmp::max(offset_x, region_bbox.min.0);
+            let end_x = std::cmp::min(offset_x + width, region_bbox.max.0);
+
+            let start_y = std::cmp::max(offset_y, region_bbox.min.1);
+            let end_y = std::cmp::min(offset_y + height, region_bbox.max.1);
+
+            let start_z = std::cmp::max(offset_z, region_bbox.min.2);
+            let end_z = std::cmp::min(offset_z + length, region_bbox.max.2);
+
+            // If there is an intersection volume
+            if start_x < end_x && start_y < end_y && start_z < end_z {
+                for y in start_y..end_y {
+                    for z in start_z..end_z {
+                        for x in start_x..end_x {
+                            let index = region.coords_to_index(x, y, z);
+                            // Safety check for index bounds if needed, but coords_to_index should be safe within bbox
+                            if let Some(&palette_index) = region.blocks.get(index) {
+                                if palette_index != 0 {
+                                    blocks.push((BlockPosition { x, y, z }, palette_index));
+                                }
+                            }
+                        }
+                    }
                 }
             }
-        }
+        };
+
+        // Check default region
+        process_region(&self.default_region);
 
         // Check other regions
         for region in self.other_regions.values() {
-            if region.get_bounding_box().intersects_range(
-                offset_x,
-                offset_y,
-                offset_z,
-                offset_x + width,
-                offset_y + height,
-                offset_z + length,
-            ) {
-                for (index, &palette_index) in region.blocks.iter().enumerate() {
-                    if palette_index == 0 {
-                        continue; // Skip air
-                    }
-
-                    let (x, y, z) = region.index_to_coords(index);
-                    if x >= offset_x
-                        && x < offset_x + width
-                        && y >= offset_y
-                        && y < offset_y + height
-                        && z >= offset_z
-                        && z < offset_z + length
-                    {
-                        blocks.push((BlockPosition { x, y, z }, palette_index));
-                    }
-                }
-            }
+            process_region(region);
         }
 
         blocks
