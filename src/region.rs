@@ -103,11 +103,19 @@ impl Region {
     pub fn rebuild_tight_bounds(&mut self) {
         self.tight_bounds = None;
 
+        // Find air index to correctly identify non-air blocks
+        let air_index = self.palette.iter().position(|b| b.name == "minecraft:air");
+
         // Scan all blocks to find non-air blocks
         for index in 0..self.blocks.len() {
             let palette_idx = self.blocks[index];
-            if palette_idx > 0 {
-                // palette_idx 0 is always air, so > 0 means non-air
+
+            let is_air = match air_index {
+                Some(idx) => palette_idx == idx,
+                None => false, // If no air in palette, assume everything is valid block
+            };
+
+            if !is_air {
                 let (x, y, z) = self.index_to_coords(index);
                 self.update_tight_bounds(x, y, z);
             }
