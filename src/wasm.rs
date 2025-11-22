@@ -901,17 +901,18 @@ impl SchematicWrapper {
 
         let result = Object::new();
 
-        // Blocks array
-        let blocks_array = Array::new();
+        // Blocks array - Optimized to Flat Int32Array
+        // [x, y, z, palette_index, x, y, z, palette_index, ...]
+        let mut flat_blocks = Vec::with_capacity(blocks.len() * 4);
         for (pos, palette_index) in blocks {
-            let block_data = Array::new();
-            block_data.push(&pos.x.into());
-            block_data.push(&pos.y.into());
-            block_data.push(&pos.z.into());
-            block_data.push(&(palette_index as u32).into());
-            blocks_array.push(&block_data);
+            flat_blocks.push(pos.x);
+            flat_blocks.push(pos.y);
+            flat_blocks.push(pos.z);
+            flat_blocks.push(palette_index as i32);
         }
-        Reflect::set(&result, &"blocks".into(), &blocks_array).unwrap();
+        let blocks_typed_array = js_sys::Int32Array::from(&flat_blocks[..]);
+
+        Reflect::set(&result, &"blocks".into(), &blocks_typed_array).unwrap();
 
         // 2. Get Entities (Naive filtering)
         // This runs in WASM/Rust so it's faster than JS
@@ -1181,7 +1182,7 @@ impl LazyChunkIterator {
         let min_z = chunk_z * self.chunk_length;
 
         // Generate this chunk's data on-demand (only in memory temporarily)
-        let blocks = self.schematic_wrapper.get_chunk_blocks_indices(
+        let blocks = self.schematic_wrapper.0.get_chunk_blocks_indices(
             min_x,
             min_y,
             min_z,
@@ -1208,8 +1209,17 @@ impl LazyChunkIterator {
         )
         .unwrap();
 
-        // Blocks are already in the right format: [[x,y,z,palette_index], ...]
-        Reflect::set(&chunk_obj, &"blocks".into(), &blocks).unwrap();
+        // Flatten blocks to Int32Array for performance
+        let mut flat_blocks = Vec::with_capacity(blocks.len() * 4);
+        for (pos, palette_index) in blocks {
+            flat_blocks.push(pos.x);
+            flat_blocks.push(pos.y);
+            flat_blocks.push(pos.z);
+            flat_blocks.push(palette_index as i32);
+        }
+        let blocks_typed_array = js_sys::Int32Array::from(&flat_blocks[..]);
+
+        Reflect::set(&chunk_obj, &"blocks".into(), &blocks_typed_array).unwrap();
 
         chunk_obj.into()
     }
