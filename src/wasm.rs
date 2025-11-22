@@ -870,6 +870,83 @@ impl SchematicWrapper {
         blocks_array
     }
 
+    /// Get optimized chunk data including blocks and relevant tile entities
+    /// Returns { blocks: [[x,y,z,palette_index],...], entities: [{id, position, nbt},...] }
+    #[wasm_bindgen(js_name = getChunkData)]
+    pub fn get_chunk_data(
+        &self,
+        chunk_x: i32,
+        chunk_y: i32,
+        chunk_z: i32,
+        chunk_width: i32,
+        chunk_height: i32,
+        chunk_length: i32,
+    ) -> JsValue {
+        let min_x = chunk_x * chunk_width;
+        let min_y = chunk_y * chunk_height;
+        let min_z = chunk_z * chunk_length;
+        let max_x = min_x + chunk_width;
+        let max_y = min_y + chunk_height;
+        let max_z = min_z + chunk_length;
+
+        // 1. Get Blocks (indices)
+        let blocks = self.0.get_chunk_blocks_indices(
+            min_x,
+            min_y,
+            min_z,
+            chunk_width,
+            chunk_height,
+            chunk_length,
+        );
+
+        let result = Object::new();
+
+        // Blocks array
+        let blocks_array = Array::new();
+        for (pos, palette_index) in blocks {
+            let block_data = Array::new();
+            block_data.push(&pos.x.into());
+            block_data.push(&pos.y.into());
+            block_data.push(&pos.z.into());
+            block_data.push(&(palette_index as u32).into());
+            blocks_array.push(&block_data);
+        }
+        Reflect::set(&result, &"blocks".into(), &blocks_array).unwrap();
+
+        // 2. Get Entities (Naive filtering)
+        // This runs in WASM/Rust so it's faster than JS
+        let all_entities = self.0.get_block_entities_as_list();
+        let entities_array = Array::new();
+
+        for entity in all_entities {
+            // Filter in Rust
+            if entity.position.0 >= min_x
+                && entity.position.0 < max_x
+                && entity.position.1 >= min_y
+                && entity.position.1 < max_y
+                && entity.position.2 >= min_z
+                && entity.position.2 < max_z
+            {
+                let obj = Object::new();
+                Reflect::set(&obj, &"id".into(), &JsValue::from_str(&entity.id)).unwrap();
+
+                let pos_arr = Array::new();
+                pos_arr.push(&JsValue::from(entity.position.0));
+                pos_arr.push(&JsValue::from(entity.position.1));
+                pos_arr.push(&JsValue::from(entity.position.2));
+                Reflect::set(&obj, &"position".into(), &pos_arr).unwrap();
+
+                // NBT
+                Reflect::set(&obj, &"nbt".into(), &entity.nbt.to_js_value()).unwrap();
+
+                entities_array.push(&obj);
+            }
+        }
+        Reflect::set(&result, &"entities".into(), &entities_array).unwrap();
+
+        result.into()
+    }
+
     /// All blocks as palette indices - for when you need everything at once but efficiently
     /// Returns array of [x, y, z, palette_index]
     pub fn blocks_indices(&self) -> Array {
