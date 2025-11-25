@@ -1318,14 +1318,22 @@ impl UniversalSchematic {
             let region_bbox = region.get_bounding_box();
 
             // Calculate intersection between chunk and region
+            // Note: region_bbox.max is INCLUSIVE, but Rust ranges are EXCLUSIVE on the end
+            // So we need +1 to include blocks at the maximum boundary
             let start_x = std::cmp::max(offset_x, region_bbox.min.0);
-            let end_x = std::cmp::min(offset_x + width, region_bbox.max.0);
+            let end_x = std::cmp::min(offset_x + width, region_bbox.max.0 + 1);
 
             let start_y = std::cmp::max(offset_y, region_bbox.min.1);
-            let end_y = std::cmp::min(offset_y + height, region_bbox.max.1);
+            let end_y = std::cmp::min(offset_y + height, region_bbox.max.1 + 1);
 
             let start_z = std::cmp::max(offset_z, region_bbox.min.2);
-            let end_z = std::cmp::min(offset_z + length, region_bbox.max.2);
+            let end_z = std::cmp::min(offset_z + length, region_bbox.max.2 + 1);
+
+            // Find air index for this region to correctly skip air blocks
+            let air_index = region
+                .palette
+                .iter()
+                .position(|b| b.name == "minecraft:air");
 
             // If there is an intersection volume
             if start_x < end_x && start_y < end_y && start_z < end_z {
@@ -1333,9 +1341,14 @@ impl UniversalSchematic {
                     for z in start_z..end_z {
                         for x in start_x..end_x {
                             let index = region.coords_to_index(x, y, z);
-                            // Safety check for index bounds if needed, but coords_to_index should be safe within bbox
                             if let Some(&palette_index) = region.blocks.get(index) {
-                                if palette_index != 0 {
+                                // Skip if it matches the air index
+                                let is_air = match air_index {
+                                    Some(idx) => palette_index == idx,
+                                    None => false, // If no air in palette, assume no blocks are air
+                                };
+
+                                if !is_air {
                                     blocks.push((BlockPosition { x, y, z }, palette_index));
                                 }
                             }
