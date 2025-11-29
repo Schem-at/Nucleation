@@ -2075,6 +2075,77 @@ impl IoLayoutBuilderWrapper {
         Ok(self)
     }
 
+    /// Add an input defined by a region (bounding box)
+    /// Iterates Y (layers), then X (rows), then Z (columns)
+    #[wasm_bindgen(js_name = addInputRegion)]
+    pub fn add_input_region(
+        mut self,
+        name: String,
+        io_type: &IoTypeWrapper,
+        layout: &LayoutFunctionWrapper,
+        min: BlockPosition,
+        max: BlockPosition,
+    ) -> Result<IoLayoutBuilderWrapper, JsValue> {
+        let mut positions = Vec::new();
+
+        let min_x = std::cmp::min(min.x, max.x);
+        let max_x = std::cmp::max(min.x, max.x);
+        let min_y = std::cmp::min(min.y, max.y);
+        let max_y = std::cmp::max(min.y, max.y);
+        let min_z = std::cmp::min(min.z, max.z);
+        let max_z = std::cmp::max(min.z, max.z);
+
+        // Standard redstone order: Y-axis first (layers), then X (rows), then Z (columns)
+        for y in min_y..=max_y {
+            for x in min_x..=max_x {
+                for z in min_z..=max_z {
+                    positions.push((x, y, z));
+                }
+            }
+        }
+
+        self.inner = self
+            .inner
+            .add_input(name, io_type.inner.clone(), layout.inner.clone(), positions)
+            .map_err(|e| JsValue::from_str(&e))?;
+
+        Ok(self)
+    }
+
+    /// Add an input defined by a region with automatic layout inference
+    #[wasm_bindgen(js_name = addInputRegionAuto)]
+    pub fn add_input_region_auto(
+        mut self,
+        name: String,
+        io_type: &IoTypeWrapper,
+        min: BlockPosition,
+        max: BlockPosition,
+    ) -> Result<IoLayoutBuilderWrapper, JsValue> {
+        let mut positions = Vec::new();
+
+        let min_x = std::cmp::min(min.x, max.x);
+        let max_x = std::cmp::max(min.x, max.x);
+        let min_y = std::cmp::min(min.y, max.y);
+        let max_y = std::cmp::max(min.y, max.y);
+        let min_z = std::cmp::min(min.z, max.z);
+        let max_z = std::cmp::max(min.z, max.z);
+
+        for y in min_y..=max_y {
+            for x in min_x..=max_x {
+                for z in min_z..=max_z {
+                    positions.push((x, y, z));
+                }
+            }
+        }
+
+        self.inner = self
+            .inner
+            .add_input_auto(name, io_type.inner.clone(), positions)
+            .map_err(|e| JsValue::from_str(&e))?;
+
+        Ok(self)
+    }
+
     /// Add an output with automatic layout inference
     #[wasm_bindgen(js_name = addOutputAuto)]
     pub fn add_output_auto(
@@ -2099,6 +2170,77 @@ impl IoLayoutBuilderWrapper {
         self.inner = self
             .inner
             .add_output_auto(name, io_type.inner.clone(), pos_vec)
+            .map_err(|e| JsValue::from_str(&e))?;
+
+        Ok(self)
+    }
+
+    /// Add an output defined by a region (bounding box)
+    /// Iterates Y (layers), then X (rows), then Z (columns)
+    #[wasm_bindgen(js_name = addOutputRegion)]
+    pub fn add_output_region(
+        mut self,
+        name: String,
+        io_type: &IoTypeWrapper,
+        layout: &LayoutFunctionWrapper,
+        min: BlockPosition,
+        max: BlockPosition,
+    ) -> Result<IoLayoutBuilderWrapper, JsValue> {
+        let mut positions = Vec::new();
+
+        let min_x = std::cmp::min(min.x, max.x);
+        let max_x = std::cmp::max(min.x, max.x);
+        let min_y = std::cmp::min(min.y, max.y);
+        let max_y = std::cmp::max(min.y, max.y);
+        let min_z = std::cmp::min(min.z, max.z);
+        let max_z = std::cmp::max(min.z, max.z);
+
+        // Standard redstone order: Y-axis first (layers), then X (rows), then Z (columns)
+        for y in min_y..=max_y {
+            for x in min_x..=max_x {
+                for z in min_z..=max_z {
+                    positions.push((x, y, z));
+                }
+            }
+        }
+
+        self.inner = self
+            .inner
+            .add_output(name, io_type.inner.clone(), layout.inner.clone(), positions)
+            .map_err(|e| JsValue::from_str(&e))?;
+
+        Ok(self)
+    }
+
+    /// Add an output defined by a region with automatic layout inference
+    #[wasm_bindgen(js_name = addOutputRegionAuto)]
+    pub fn add_output_region_auto(
+        mut self,
+        name: String,
+        io_type: &IoTypeWrapper,
+        min: BlockPosition,
+        max: BlockPosition,
+    ) -> Result<IoLayoutBuilderWrapper, JsValue> {
+        let mut positions = Vec::new();
+
+        let min_x = std::cmp::min(min.x, max.x);
+        let max_x = std::cmp::max(min.x, max.x);
+        let min_y = std::cmp::min(min.y, max.y);
+        let max_y = std::cmp::max(min.y, max.y);
+        let min_z = std::cmp::min(min.z, max.z);
+        let max_z = std::cmp::max(min.z, max.z);
+
+        for y in min_y..=max_y {
+            for x in min_x..=max_x {
+                for z in min_z..=max_z {
+                    positions.push((x, y, z));
+                }
+            }
+        }
+
+        self.inner = self
+            .inner
+            .add_output_auto(name, io_type.inner.clone(), positions)
             .map_err(|e| JsValue::from_str(&e))?;
 
         Ok(self)
