@@ -440,9 +440,22 @@ impl MchprsWorld {
     /// The current signal strength (0-15), or 0 if not a valid component
     pub fn get_signal_strength(&self, pos: BlockPos) -> u8 {
         let normalized_pos = self.normalize_pos(pos);
-        self.compiler
-            .get_signal_strength(normalized_pos)
-            .unwrap_or(0)
+        if let Some(signal) = self.compiler.get_signal_strength(normalized_pos) {
+            // If we have a non-zero signal from the compiler, return it.
+            // If it's 0, we fall back to checking block state (for things like lamps).
+            if signal > 0 {
+                return signal;
+            }
+        }
+
+        // Fallback: Check if block is a lit lamp (or other lit component)
+        // This is useful for blocks that consume power but don't emit it in the graph (like lamps)
+        // Note: This relies on the world being flushed to be accurate!
+        if self.is_lit(pos) {
+            return 15;
+        }
+
+        0
     }
 
     /// Sets signal strength for multiple positions at once (batch operation)

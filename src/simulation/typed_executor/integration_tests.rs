@@ -228,6 +228,96 @@ fn test_xor_gate_both_true() {
 }
 
 // ============================================================================
+// LAMP OUTPUT TESTS
+// ============================================================================
+
+fn create_lamp_output_schematic() -> UniversalSchematic {
+    let mut schematic = UniversalSchematic::new("Lamp Output Test".to_string());
+
+    // Base layer
+    for x in 0..3 {
+        schematic.set_block(
+            x,
+            0,
+            0,
+            crate::BlockState::new("minecraft:gray_concrete".to_string()),
+        );
+    }
+
+    // Input wire at (0, 1, 0)
+    schematic.set_block_str(
+        0,
+        1,
+        0,
+        "minecraft:redstone_wire[power=0,east=side,west=none,north=none,south=none]",
+    );
+
+    // Middle wire at (1, 1, 0)
+    schematic.set_block_str(
+        1,
+        1,
+        0,
+        "minecraft:redstone_wire[power=0,east=side,west=side,north=none,south=none]",
+    );
+
+    // Lamp output at (2, 1, 0)
+    schematic.set_block_str(2, 1, 0, "minecraft:redstone_lamp[lit=false]");
+
+    schematic
+}
+
+fn create_lamp_output_io() -> (HashMap<String, IoMapping>, HashMap<String, IoMapping>) {
+    let mut inputs = HashMap::new();
+    let mut outputs = HashMap::new();
+
+    // Input "in" at (0, 1, 0)
+    inputs.insert(
+        "in".to_string(),
+        IoMapping {
+            io_type: IoType::Boolean,
+            layout: LayoutFunction::OneToOne,
+            positions: vec![(0, 1, 0)],
+        },
+    );
+
+    // Output "out" at (2, 1, 0) - This is the LAMP
+    outputs.insert(
+        "out".to_string(),
+        IoMapping {
+            io_type: IoType::Boolean,
+            layout: LayoutFunction::OneToOne,
+            positions: vec![(2, 1, 0)],
+        },
+    );
+
+    (inputs, outputs)
+}
+
+#[test]
+fn test_lamp_as_output() {
+    // Regression test for using a redstone lamp as a circuit output
+    let schematic = create_lamp_output_schematic();
+    let (inputs, outputs) = create_lamp_output_io();
+    let mut executor = create_executor(schematic, inputs, outputs);
+
+    // Turn input ON
+    let mut input_values = HashMap::new();
+    input_values.insert("in".to_string(), Value::Bool(true));
+
+    let result = executor
+        .execute(input_values, ExecutionMode::FixedTicks { ticks: 10 })
+        .expect("Execution failed");
+
+    let output = result.outputs.get("out").expect("Missing output");
+
+    assert_eq!(
+        *output,
+        Value::Bool(true),
+        "Lamp output should be true when powered"
+    );
+}
+
+// ============================================================================
 // D-LATCH TESTS (Stateful)
 // ============================================================================
 

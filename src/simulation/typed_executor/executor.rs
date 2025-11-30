@@ -363,7 +363,12 @@ impl TypedCircuitExecutor {
     }
 
     /// Read all outputs from the world
-    fn read_outputs(&self) -> Result<HashMap<String, Value>, String> {
+    fn read_outputs(&mut self) -> Result<HashMap<String, Value>, String> {
+        // Flush the compiler state to ensure block states (like lamps) are up to date
+        // This is critical for reading outputs that rely on block properties (e.g. lit lamps)
+        // rather than just signal strength from the compiler graph.
+        self.world.flush();
+
         let mut outputs = HashMap::new();
         for (name, mapping) in &self.outputs {
             // Read signals from the world (batch operation)
