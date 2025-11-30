@@ -1,6 +1,7 @@
 // src/wasm.rs
 
 use crate::bounding_box::BoundingBox;
+use crate::definition_region::DefinitionRegion;
 use crate::schematic::SchematicVersion;
 use crate::universal_schematic::ChunkLoadingStrategy;
 use crate::{
@@ -15,6 +16,274 @@ use js_sys::{self, Array, Object, Reflect};
 use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
+
+#[wasm_bindgen]
+pub struct DefinitionRegionWrapper {
+    inner: DefinitionRegion,
+}
+
+#[wasm_bindgen]
+impl DefinitionRegionWrapper {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self {
+            inner: DefinitionRegion::new(),
+        }
+    }
+
+    #[wasm_bindgen(js_name = addBounds)]
+    pub fn add_bounds(&mut self, min: BlockPosition, max: BlockPosition) {
+        self.inner
+            .add_bounds((min.x, min.y, min.z), (max.x, max.y, max.z));
+    }
+
+    #[wasm_bindgen(js_name = fromBounds)]
+    pub fn from_bounds(min: BlockPosition, max: BlockPosition) -> Self {
+        Self {
+            inner: DefinitionRegion::from_bounds((min.x, min.y, min.z), (max.x, max.y, max.z)),
+        }
+    }
+
+    #[wasm_bindgen(js_name = setMetadata)]
+    pub fn set_metadata(mut self, key: String, value: String) -> Self {
+        self.inner = self.inner.with_metadata(key, value);
+        self
+    }
+
+    #[wasm_bindgen(js_name = addPoint)]
+    pub fn add_point(&mut self, x: i32, y: i32, z: i32) {
+        self.inner.add_point(x, y, z);
+    }
+
+    #[wasm_bindgen(js_name = merge)]
+    pub fn merge(&mut self, other: &DefinitionRegionWrapper) {
+        self.inner.merge(&other.inner);
+    }
+
+    #[wasm_bindgen(js_name = filterByBlock)]
+    pub fn filter_by_block(
+        &self,
+        schematic: &SchematicWrapper,
+        block_name: String,
+    ) -> DefinitionRegionWrapper {
+        DefinitionRegionWrapper {
+            inner: self.inner.filter_by_block(&schematic.0, &block_name),
+        }
+    }
+
+    // ========================================================================
+    // Boolean Operations
+    // ========================================================================
+
+    /// Subtract another region from this one (removes points present in `other`)
+    #[wasm_bindgen(js_name = subtract)]
+    pub fn subtract(&mut self, other: &DefinitionRegionWrapper) {
+        self.inner.subtract(&other.inner);
+    }
+
+    /// Keep only points present in both regions (intersection)
+    #[wasm_bindgen(js_name = intersect)]
+    pub fn intersect(&mut self, other: &DefinitionRegionWrapper) {
+        self.inner.intersect(&other.inner);
+    }
+
+    /// Create a new region that is the union of this region and another
+    #[wasm_bindgen(js_name = union)]
+    pub fn union(&self, other: &DefinitionRegionWrapper) -> DefinitionRegionWrapper {
+        DefinitionRegionWrapper {
+            inner: self.inner.union(&other.inner),
+        }
+    }
+
+    // ========================================================================
+    // Geometric Transformations
+    // ========================================================================
+
+    /// Translate all boxes by the given offset
+    #[wasm_bindgen(js_name = shift)]
+    pub fn shift(&mut self, x: i32, y: i32, z: i32) {
+        self.inner.shift(x, y, z);
+    }
+
+    /// Expand all boxes by the given amounts in each direction
+    #[wasm_bindgen(js_name = expand)]
+    pub fn expand(&mut self, x: i32, y: i32, z: i32) {
+        self.inner.expand(x, y, z);
+    }
+
+    /// Contract all boxes by the given amount uniformly
+    #[wasm_bindgen(js_name = contract)]
+    pub fn contract(&mut self, amount: i32) {
+        self.inner.contract(amount);
+    }
+
+    /// Get the overall bounding box encompassing all boxes in this region
+    /// Returns an object with {min: [x,y,z], max: [x,y,z]} or null if empty
+    #[wasm_bindgen(js_name = getBounds)]
+    pub fn get_bounds(&self) -> JsValue {
+        match self.inner.get_bounds() {
+            Some(bbox) => {
+                let obj = Object::new();
+                let min = Array::new();
+                min.push(&JsValue::from(bbox.min.0));
+                min.push(&JsValue::from(bbox.min.1));
+                min.push(&JsValue::from(bbox.min.2));
+                let max = Array::new();
+                max.push(&JsValue::from(bbox.max.0));
+                max.push(&JsValue::from(bbox.max.1));
+                max.push(&JsValue::from(bbox.max.2));
+                Reflect::set(&obj, &"min".into(), &min).unwrap();
+                Reflect::set(&obj, &"max".into(), &max).unwrap();
+                obj.into()
+            }
+            None => JsValue::NULL,
+        }
+    }
+
+    // ========================================================================
+    // Connectivity Analysis
+    // ========================================================================
+
+    /// Check if all points in the region are connected (6-connectivity)
+    #[wasm_bindgen(js_name = isContiguous)]
+    pub fn is_contiguous(&self) -> bool {
+        self.inner.is_contiguous()
+    }
+
+    /// Get the number of connected components in this region
+    #[wasm_bindgen(js_name = connectedComponents)]
+    pub fn connected_components(&self) -> usize {
+        self.inner.connected_components()
+    }
+
+    // ========================================================================
+    // Filtering
+    // ========================================================================
+
+    /// Filter positions by block state properties (JS object)
+    /// Only keeps positions where the block has ALL specified properties matching
+    #[wasm_bindgen(js_name = filterByProperties)]
+    pub fn filter_by_properties(
+        &self,
+        schematic: &SchematicWrapper,
+        properties: &JsValue,
+    ) -> Result<DefinitionRegionWrapper, JsValue> {
+        let mut props = std::collections::HashMap::new();
+
+        if !properties.is_undefined() && !properties.is_null() {
+            let obj: Object = properties
+                .clone()
+                .dyn_into()
+                .map_err(|_| JsValue::from_str("Properties should be an object"))?;
+
+            let keys = js_sys::Object::keys(&obj);
+            for i in 0..keys.length() {
+                let key = keys.get(i);
+                let key_str = key
+                    .as_string()
+                    .ok_or_else(|| JsValue::from_str("Property keys should be strings"))?;
+
+                let value = Reflect::get(&obj, &key)
+                    .map_err(|_| JsValue::from_str("Error getting property value"))?;
+
+                let value_str = value
+                    .as_string()
+                    .ok_or_else(|| JsValue::from_str("Property values should be strings"))?;
+
+                props.insert(key_str, value_str);
+            }
+        }
+
+        Ok(DefinitionRegionWrapper {
+            inner: self.inner.filter_by_properties(&schematic.0, &props),
+        })
+    }
+
+    // ========================================================================
+    // Utility Methods
+    // ========================================================================
+
+    /// Check if the region is empty
+    #[wasm_bindgen(js_name = isEmpty)]
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    /// Check if the region contains a specific point
+    #[wasm_bindgen(js_name = contains)]
+    pub fn contains(&self, x: i32, y: i32, z: i32) -> bool {
+        self.inner.contains(x, y, z)
+    }
+
+    /// Get total volume (number of blocks) covered by all boxes
+    #[wasm_bindgen(js_name = volume)]
+    pub fn volume(&self) -> u32 {
+        self.inner.volume() as u32
+    }
+
+    /// Get a list of all positions as an array of [x, y, z] arrays
+    #[wasm_bindgen(js_name = positions)]
+    pub fn positions(&self) -> Array {
+        let array = Array::new();
+        for (x, y, z) in self.inner.iter_positions() {
+            let pos = Array::new();
+            pos.push(&JsValue::from(x));
+            pos.push(&JsValue::from(y));
+            pos.push(&JsValue::from(z));
+            array.push(&pos);
+        }
+        array
+    }
+
+    /// Get positions in globally sorted order (Y, then X, then Z)
+    ///
+    /// This provides **deterministic bit ordering** for circuits regardless of
+    /// how the region was constructed. Use this for IO bit assignment.
+    #[wasm_bindgen(js_name = positionsSorted)]
+    pub fn positions_sorted(&self) -> Array {
+        let array = Array::new();
+        for (x, y, z) in self.inner.iter_positions_sorted() {
+            let pos = Array::new();
+            pos.push(&JsValue::from(x));
+            pos.push(&JsValue::from(y));
+            pos.push(&JsValue::from(z));
+            array.push(&pos);
+        }
+        array
+    }
+
+    // ========================================================================
+    // Boolean Operations (Immutable variants)
+    // ========================================================================
+
+    /// Create a new region with points from `other` removed (immutable)
+    #[wasm_bindgen(js_name = subtracted)]
+    pub fn subtracted(&self, other: &DefinitionRegionWrapper) -> DefinitionRegionWrapper {
+        DefinitionRegionWrapper {
+            inner: self.inner.subtracted(&other.inner),
+        }
+    }
+
+    /// Create a new region with only points in both (immutable)
+    #[wasm_bindgen(js_name = intersected)]
+    pub fn intersected(&self, other: &DefinitionRegionWrapper) -> DefinitionRegionWrapper {
+        DefinitionRegionWrapper {
+            inner: self.inner.intersected(&other.inner),
+        }
+    }
+
+    /// Add all points from another region to this one (mutating union)
+    #[wasm_bindgen(js_name = unionInto)]
+    pub fn union_into(&mut self, other: &DefinitionRegionWrapper) {
+        self.inner.union_into(&other.inner);
+    }
+
+    /// Simplify the region by merging adjacent/overlapping boxes
+    #[wasm_bindgen(js_name = simplify)]
+    pub fn simplify(&mut self) {
+        self.inner.simplify();
+    }
+}
 
 #[wasm_bindgen]
 pub struct LazyChunkIterator {
@@ -2112,6 +2381,27 @@ impl IoLayoutBuilderWrapper {
         Ok(self)
     }
 
+    /// Add an input defined by a DefinitionRegion
+    #[wasm_bindgen(js_name = addInputFromRegion)]
+    pub fn add_input_from_region(
+        mut self,
+        name: String,
+        io_type: &IoTypeWrapper,
+        layout: &LayoutFunctionWrapper,
+        region: &DefinitionRegionWrapper,
+    ) -> Result<IoLayoutBuilderWrapper, JsValue> {
+        self.inner = self
+            .inner
+            .add_input_from_region(
+                name,
+                io_type.inner.clone(),
+                layout.inner.clone(),
+                region.inner.clone(),
+            )
+            .map_err(|e| JsValue::from_str(&e))?;
+        Ok(self)
+    }
+
     /// Add an input defined by a region with automatic layout inference
     #[wasm_bindgen(js_name = addInputRegionAuto)]
     pub fn add_input_region_auto(
@@ -2143,6 +2433,21 @@ impl IoLayoutBuilderWrapper {
             .add_input_auto(name, io_type.inner.clone(), positions)
             .map_err(|e| JsValue::from_str(&e))?;
 
+        Ok(self)
+    }
+
+    /// Add an input defined by a DefinitionRegion with automatic layout inference
+    #[wasm_bindgen(js_name = addInputFromRegionAuto)]
+    pub fn add_input_from_region_auto(
+        mut self,
+        name: String,
+        io_type: &IoTypeWrapper,
+        region: &DefinitionRegionWrapper,
+    ) -> Result<IoLayoutBuilderWrapper, JsValue> {
+        self.inner = self
+            .inner
+            .add_input_from_region_auto(name, io_type.inner.clone(), region.inner.clone())
+            .map_err(|e| JsValue::from_str(&e))?;
         Ok(self)
     }
 
@@ -2212,6 +2517,27 @@ impl IoLayoutBuilderWrapper {
         Ok(self)
     }
 
+    /// Add an output defined by a DefinitionRegion
+    #[wasm_bindgen(js_name = addOutputFromRegion)]
+    pub fn add_output_from_region(
+        mut self,
+        name: String,
+        io_type: &IoTypeWrapper,
+        layout: &LayoutFunctionWrapper,
+        region: &DefinitionRegionWrapper,
+    ) -> Result<IoLayoutBuilderWrapper, JsValue> {
+        self.inner = self
+            .inner
+            .add_output_from_region(
+                name,
+                io_type.inner.clone(),
+                layout.inner.clone(),
+                region.inner.clone(),
+            )
+            .map_err(|e| JsValue::from_str(&e))?;
+        Ok(self)
+    }
+
     /// Add an output defined by a region with automatic layout inference
     #[wasm_bindgen(js_name = addOutputRegionAuto)]
     pub fn add_output_region_auto(
@@ -2243,6 +2569,21 @@ impl IoLayoutBuilderWrapper {
             .add_output_auto(name, io_type.inner.clone(), positions)
             .map_err(|e| JsValue::from_str(&e))?;
 
+        Ok(self)
+    }
+
+    /// Add an output defined by a DefinitionRegion with automatic layout inference
+    #[wasm_bindgen(js_name = addOutputFromRegionAuto)]
+    pub fn add_output_from_region_auto(
+        mut self,
+        name: String,
+        io_type: &IoTypeWrapper,
+        region: &DefinitionRegionWrapper,
+    ) -> Result<IoLayoutBuilderWrapper, JsValue> {
+        self.inner = self
+            .inner
+            .add_output_from_region_auto(name, io_type.inner.clone(), region.inner.clone())
+            .map_err(|e| JsValue::from_str(&e))?;
         Ok(self)
     }
 
@@ -2454,6 +2795,352 @@ impl TypedCircuitExecutorWrapper {
     pub fn sync_to_schematic(&mut self) -> SchematicWrapper {
         let schematic = self.inner.sync_and_get_schematic();
         SchematicWrapper(schematic.clone())
+    }
+
+    /// Manually advance the simulation by a specified number of ticks
+    ///
+    /// This is useful for manual state control when using 'manual' state mode.
+    /// Unlike execute(), this does not set any inputs or read outputs.
+    #[wasm_bindgen(js_name = tick)]
+    pub fn tick(&mut self, ticks: u32) {
+        self.inner.tick(ticks);
+    }
+
+    /// Manually flush the simulation state
+    ///
+    /// Ensures all pending changes are propagated through the redstone network.
+    #[wasm_bindgen(js_name = flush)]
+    pub fn flush(&mut self) {
+        self.inner.flush();
+    }
+
+    /// Set a single input value without executing
+    #[wasm_bindgen(js_name = setInput)]
+    pub fn set_input(&mut self, name: String, value: &ValueWrapper) -> Result<(), JsValue> {
+        self.inner
+            .set_input(&name, &value.inner)
+            .map_err(|e| JsValue::from_str(&e))
+    }
+
+    /// Read a single output value without executing
+    #[wasm_bindgen(js_name = readOutput)]
+    pub fn read_output(&mut self, name: String) -> Result<ValueWrapper, JsValue> {
+        let value = self
+            .inner
+            .read_output(&name)
+            .map_err(|e| JsValue::from_str(&e))?;
+        Ok(ValueWrapper { inner: value })
+    }
+
+    /// Get all input names
+    #[wasm_bindgen(js_name = inputNames)]
+    pub fn input_names(&self) -> Vec<String> {
+        self.inner
+            .input_names()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect()
+    }
+
+    /// Get all output names
+    #[wasm_bindgen(js_name = outputNames)]
+    pub fn output_names(&self) -> Vec<String> {
+        self.inner
+            .output_names()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect()
+    }
+
+    /// Get detailed layout information for debugging and visualization
+    ///
+    /// Returns a JS object with the structure:
+    /// ```javascript
+    /// {
+    ///   inputs: {
+    ///     "name": {
+    ///       ioType: "UnsignedInt { bits: 8 }",
+    ///       positions: [[x, y, z], ...],  // In bit order (LSB first)
+    ///       bitCount: 8
+    ///     }
+    ///   },
+    ///   outputs: { ... }
+    /// }
+    /// ```
+    #[wasm_bindgen(js_name = getLayoutInfo)]
+    pub fn get_layout_info(&self) -> JsValue {
+        let layout_info = self.inner.get_layout_info();
+
+        let result = Object::new();
+        let inputs_obj = Object::new();
+        let outputs_obj = Object::new();
+
+        // Convert inputs
+        for (name, info) in &layout_info.inputs {
+            let io_obj = Object::new();
+            Reflect::set(&io_obj, &"ioType".into(), &JsValue::from_str(&info.io_type)).unwrap();
+            Reflect::set(
+                &io_obj,
+                &"bitCount".into(),
+                &JsValue::from(info.bit_count as u32),
+            )
+            .unwrap();
+
+            let positions_arr = Array::new();
+            for (x, y, z) in &info.positions {
+                let pos = Array::new();
+                pos.push(&JsValue::from(*x));
+                pos.push(&JsValue::from(*y));
+                pos.push(&JsValue::from(*z));
+                positions_arr.push(&pos);
+            }
+            Reflect::set(&io_obj, &"positions".into(), &positions_arr).unwrap();
+            Reflect::set(&inputs_obj, &name.into(), &io_obj).unwrap();
+        }
+
+        // Convert outputs
+        for (name, info) in &layout_info.outputs {
+            let io_obj = Object::new();
+            Reflect::set(&io_obj, &"ioType".into(), &JsValue::from_str(&info.io_type)).unwrap();
+            Reflect::set(
+                &io_obj,
+                &"bitCount".into(),
+                &JsValue::from(info.bit_count as u32),
+            )
+            .unwrap();
+
+            let positions_arr = Array::new();
+            for (x, y, z) in &info.positions {
+                let pos = Array::new();
+                pos.push(&JsValue::from(*x));
+                pos.push(&JsValue::from(*y));
+                pos.push(&JsValue::from(*z));
+                positions_arr.push(&pos);
+            }
+            Reflect::set(&io_obj, &"positions".into(), &positions_arr).unwrap();
+            Reflect::set(&outputs_obj, &name.into(), &io_obj).unwrap();
+        }
+
+        Reflect::set(&result, &"inputs".into(), &inputs_obj).unwrap();
+        Reflect::set(&result, &"outputs".into(), &outputs_obj).unwrap();
+
+        result.into()
+    }
+}
+
+// --- CircuitBuilder Support ---
+
+#[cfg(feature = "simulation")]
+use crate::simulation::CircuitBuilder;
+
+/// CircuitBuilder wrapper for JavaScript
+/// Provides a fluent API for creating TypedCircuitExecutor instances
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+pub struct CircuitBuilderWrapper {
+    inner: CircuitBuilder,
+}
+
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+impl CircuitBuilderWrapper {
+    /// Create a new CircuitBuilder from a schematic
+    #[wasm_bindgen(constructor)]
+    pub fn new(schematic: &SchematicWrapper) -> Self {
+        Self {
+            inner: CircuitBuilder::new(schematic.0.clone()),
+        }
+    }
+
+    /// Create a CircuitBuilder pre-populated from Insign annotations
+    #[wasm_bindgen(js_name = fromInsign)]
+    pub fn from_insign(schematic: &SchematicWrapper) -> Result<CircuitBuilderWrapper, JsValue> {
+        let builder =
+            CircuitBuilder::from_insign(schematic.0.clone()).map_err(|e| JsValue::from_str(&e))?;
+        Ok(Self { inner: builder })
+    }
+
+    /// Add an input with full control
+    #[wasm_bindgen(js_name = withInput)]
+    pub fn with_input(
+        mut self,
+        name: String,
+        io_type: &IoTypeWrapper,
+        layout: &LayoutFunctionWrapper,
+        region: &DefinitionRegionWrapper,
+    ) -> Result<CircuitBuilderWrapper, JsValue> {
+        self.inner = self
+            .inner
+            .with_input(
+                name,
+                io_type.inner.clone(),
+                layout.inner.clone(),
+                region.inner.clone(),
+            )
+            .map_err(|e| JsValue::from_str(&e))?;
+        Ok(self)
+    }
+
+    /// Add an input with automatic layout inference
+    #[wasm_bindgen(js_name = withInputAuto)]
+    pub fn with_input_auto(
+        mut self,
+        name: String,
+        io_type: &IoTypeWrapper,
+        region: &DefinitionRegionWrapper,
+    ) -> Result<CircuitBuilderWrapper, JsValue> {
+        self.inner = self
+            .inner
+            .with_input_auto(name, io_type.inner.clone(), region.inner.clone())
+            .map_err(|e| JsValue::from_str(&e))?;
+        Ok(self)
+    }
+
+    /// Add an output with full control
+    #[wasm_bindgen(js_name = withOutput)]
+    pub fn with_output(
+        mut self,
+        name: String,
+        io_type: &IoTypeWrapper,
+        layout: &LayoutFunctionWrapper,
+        region: &DefinitionRegionWrapper,
+    ) -> Result<CircuitBuilderWrapper, JsValue> {
+        self.inner = self
+            .inner
+            .with_output(
+                name,
+                io_type.inner.clone(),
+                layout.inner.clone(),
+                region.inner.clone(),
+            )
+            .map_err(|e| JsValue::from_str(&e))?;
+        Ok(self)
+    }
+
+    /// Add an output with automatic layout inference
+    #[wasm_bindgen(js_name = withOutputAuto)]
+    pub fn with_output_auto(
+        mut self,
+        name: String,
+        io_type: &IoTypeWrapper,
+        region: &DefinitionRegionWrapper,
+    ) -> Result<CircuitBuilderWrapper, JsValue> {
+        self.inner = self
+            .inner
+            .with_output_auto(name, io_type.inner.clone(), region.inner.clone())
+            .map_err(|e| JsValue::from_str(&e))?;
+        Ok(self)
+    }
+
+    /// Set simulation options
+    #[wasm_bindgen(js_name = withOptions)]
+    pub fn with_options(mut self, options: &SimulationOptionsWrapper) -> Self {
+        self.inner = self.inner.with_options(options.inner.clone());
+        self
+    }
+
+    /// Set state mode: 'stateless', 'stateful', or 'manual'
+    #[wasm_bindgen(js_name = withStateMode)]
+    pub fn with_state_mode(mut self, mode: &str) -> Result<CircuitBuilderWrapper, JsValue> {
+        let state_mode = match mode {
+            "stateless" => StateMode::Stateless,
+            "stateful" => StateMode::Stateful,
+            "manual" => StateMode::Manual,
+            _ => {
+                return Err(JsValue::from_str(
+                    "Invalid state mode. Use 'stateless', 'stateful', or 'manual'",
+                ))
+            }
+        };
+        self.inner = self.inner.with_state_mode(state_mode);
+        Ok(self)
+    }
+
+    /// Validate the circuit configuration
+    #[wasm_bindgen(js_name = validate)]
+    pub fn validate(&self) -> Result<(), JsValue> {
+        self.inner
+            .validate()
+            .map(|_| ())
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    /// Build the TypedCircuitExecutor
+    #[wasm_bindgen(js_name = build)]
+    pub fn build(self) -> Result<TypedCircuitExecutorWrapper, JsValue> {
+        let executor = self.inner.build().map_err(|e| JsValue::from_str(&e))?;
+        Ok(TypedCircuitExecutorWrapper { inner: executor })
+    }
+
+    /// Build with validation (convenience method)
+    #[wasm_bindgen(js_name = buildValidated)]
+    pub fn build_validated(self) -> Result<TypedCircuitExecutorWrapper, JsValue> {
+        let executor = self
+            .inner
+            .build_validated()
+            .map_err(|e| JsValue::from_str(&e))?;
+        Ok(TypedCircuitExecutorWrapper { inner: executor })
+    }
+
+    /// Get the current number of inputs
+    #[wasm_bindgen(js_name = inputCount)]
+    pub fn input_count(&self) -> usize {
+        self.inner.input_count()
+    }
+
+    /// Get the current number of outputs
+    #[wasm_bindgen(js_name = outputCount)]
+    pub fn output_count(&self) -> usize {
+        self.inner.output_count()
+    }
+
+    /// Get the names of defined inputs
+    #[wasm_bindgen(js_name = inputNames)]
+    pub fn input_names(&self) -> Vec<String> {
+        self.inner
+            .input_names()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect()
+    }
+
+    /// Get the names of defined outputs
+    #[wasm_bindgen(js_name = outputNames)]
+    pub fn output_names(&self) -> Vec<String> {
+        self.inner
+            .output_names()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect()
+    }
+}
+
+// --- State Mode Constants ---
+
+/// State mode constants for JavaScript
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+pub struct StateModeConstants;
+
+#[cfg(feature = "simulation")]
+#[wasm_bindgen]
+impl StateModeConstants {
+    /// Always reset before execution (default)
+    #[wasm_bindgen(getter = STATELESS)]
+    pub fn stateless() -> String {
+        "stateless".to_string()
+    }
+
+    /// Preserve state between executions
+    #[wasm_bindgen(getter = STATEFUL)]
+    pub fn stateful() -> String {
+        "stateful".to_string()
+    }
+
+    /// Manual state control
+    #[wasm_bindgen(getter = MANUAL)]
+    pub fn manual() -> String {
+        "manual".to_string()
     }
 }
 

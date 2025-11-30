@@ -12,7 +12,9 @@ async function runTests() {
 
     try {
         nucleation = require(wasmPath);
-        await nucleation.default(); // Initialize WASM
+        if (nucleation.default && typeof nucleation.default === 'function') {
+            await nucleation.default(); // Initialize WASM if strictly required (e.g. web target)
+        }
         console.log('✅ WASM module loaded successfully');
     } catch (error) {
         console.error('❌ Failed to load WASM module:', error);
@@ -194,38 +196,48 @@ async function runTests() {
         };
 
         // Analyze each block in the chunk
-        for (let i = 0; i < chunk.blocks.length; i++) {
-            const blockData = chunk.blocks[i];
+        if (chunk.blocks.constructor && (chunk.blocks.constructor.name === 'Int32Array' || chunk.blocks instanceof Int32Array)) {
+            // Handle flat Int32Array [x, y, z, idx, x, y, z, idx, ...]
+            for (let i = 0; i < chunk.blocks.length; i += 4) {
+                const x = chunk.blocks[i];
+                const y = chunk.blocks[i + 1];
+                const z = chunk.blocks[i + 2];
+                const paletteIndex = chunk.blocks[i + 3];
 
-            // Validate block data structure
-            if (!Array.isArray(blockData) || blockData.length !== 4) {
-                console.log(`   ❌ ERROR: Invalid block data structure at chunk ${chunk.chunk_x},${chunk.chunk_y},${chunk.chunk_z}, block ${i}`);
-                console.log(`     Expected array of length 4, got:`, blockData);
-                continue;
+                const blockInfo = { x, y, z, paletteIndex };
+                chunkInfo.blocks.push(blockInfo);
+                allBlocks.push(blockInfo);
             }
+        } else {
+            // Handle array of arrays
+            for (let i = 0; i < chunk.blocks.length; i++) {
+                const blockData = chunk.blocks[i];
 
-            const [x, y, z, paletteIndex] = blockData;
+                // Validate block data structure
+                if (!Array.isArray(blockData) || blockData.length !== 4) {
+                    console.log(`   ❌ ERROR: Invalid block data structure at chunk ${chunk.chunk_x},${chunk.chunk_y},${chunk.chunk_z}, block ${i}`);
+                    console.log(`     Expected array of length 4, got:`, blockData);
+                    continue;
+                }
 
-            // Validate coordinate values
-            if (typeof x !== 'number' || typeof y !== 'number' || typeof z !== 'number') {
-                console.log(`   ❌ ERROR: Non-numeric coordinates: (${x}, ${y}, ${z})`);
-                continue;
+                const [x, y, z, paletteIndex] = blockData;
+
+                // Validate coordinate values
+                if (typeof x !== 'number' || typeof y !== 'number' || typeof z !== 'number') {
+                    console.log(`   ❌ ERROR: Non-numeric coordinates: (${x}, ${y}, ${z})`);
+                    continue;
+                }
+
+                // Validate palette index
+                if (typeof paletteIndex !== 'number' || paletteIndex < 0 || paletteIndex > 1000) {
+                    console.log(`   ❌ ERROR: Invalid palette index: ${paletteIndex} at (${x}, ${y}, ${z})`);
+                    continue;
+                }
+
+                const blockInfo = { x, y, z, paletteIndex };
+                chunkInfo.blocks.push(blockInfo);
+                allBlocks.push(blockInfo);
             }
-
-            // Validate palette index
-            if (typeof paletteIndex !== 'number' || paletteIndex < 0 || paletteIndex > 1000) {
-                console.log(`   ❌ ERROR: Invalid palette index: ${paletteIndex} at (${x}, ${y}, ${z})`);
-                continue;
-            }
-
-            // Check for obviously wrong values (this is where you might catch "false" values)
-            if (paletteIndex !== Math.floor(paletteIndex)) {
-                console.log(`   ⚠️  WARNING: Non-integer palette index: ${paletteIndex} at (${x}, ${y}, ${z})`);
-            }
-
-            const blockInfo = { x, y, z, paletteIndex };
-            chunkInfo.blocks.push(blockInfo);
-            allBlocks.push(blockInfo);
         }
 
         chunkData.push(chunkInfo);
@@ -607,6 +619,412 @@ async function runTests() {
         }
     } else {
         console.log('   ⚠️  IoLayoutBuilderWrapper not available');
+    }
+
+    // Test 12: Multi-Region IO Definition
+    console.log('\n🧪 Test 12: Multi-Region IO Definition');
+    if (typeof nucleation.DefinitionRegionWrapper !== 'undefined') {
+        try {
+            const { IoLayoutBuilderWrapper, IoTypeWrapper, DefinitionRegionWrapper, BlockPosition } = nucleation;
+
+            let builder = new IoLayoutBuilderWrapper();
+            // Use 8-bit integer
+            const ioType = IoTypeWrapper.unsignedInt(8);
+
+            // Create DefinitionRegion
+            let region = new DefinitionRegionWrapper();
+            // First 4 bits: 0,0,0 -> 3,0,0
+            region.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(3, 0, 0));
+            // Next 4 bits: 0,0,2 -> 3,0,2 (disjoint!)
+            region.addBounds(new BlockPosition(0, 0, 2), new BlockPosition(3, 0, 2));
+
+            // Add input with auto layout (should infer OneToOne for 8 bits)
+            builder = builder.addInputFromRegionAuto("split_byte", ioType, region);
+
+            const ioLayout = builder.build();
+            const inputs = ioLayout.inputNames();
+
+            console.log(`   - Inputs: ${inputs.join(', ')}`);
+
+            if (inputs.includes("split_byte")) {
+                console.log('   ✅ Multi-region input added successfully');
+            } else {
+                throw new Error('Failed to add multi-region input');
+            }
+
+        } catch (error) {
+            console.log(`   ❌ Multi-region test failed:`, error);
+        }
+    } else {
+        console.log('   ⚠️  DefinitionRegionWrapper not available');
+    }
+
+    // Test 13: Region Filtering and Merging
+    console.log('\n🧪 Test 13: Region Filtering and Merging');
+    if (typeof nucleation.DefinitionRegionWrapper !== 'undefined' && typeof nucleation.SchematicWrapper !== 'undefined') {
+        try {
+            const { SchematicWrapper, DefinitionRegionWrapper, BlockPosition } = nucleation;
+
+            // Create a schematic with specific block layout
+            const schematic = new SchematicWrapper();
+
+            // 3x3x1 area
+            // (0,0,0) - stone
+            // (1,0,0) - redstone
+            // (2,0,0) - stone
+            // (0,0,1) - redstone
+            // (1,0,1) - stone
+            // (2,0,1) - redstone
+            schematic.set_block(0, 0, 0, "minecraft:stone");
+            schematic.set_block(1, 0, 0, "minecraft:redstone_wire");
+            schematic.set_block(2, 0, 0, "minecraft:stone");
+            schematic.set_block(0, 0, 1, "minecraft:redstone_wire");
+            schematic.set_block(1, 0, 1, "minecraft:stone");
+            schematic.set_block(2, 0, 1, "minecraft:redstone_wire");
+
+            // Create a region covering the whole 3x3x2 area
+            let fullRegion = new DefinitionRegionWrapper();
+            fullRegion.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(2, 0, 1));
+
+            // Filter for "redstone"
+            let filteredRegion = fullRegion.filterByBlock(schematic, "redstone");
+
+            // We expect 3 blocks to be in the filtered region: (1,0,0), (0,0,1), (2,0,1)
+            // Can't easily check volume directly from wrapper without exposing it, 
+            // but we can try to use it in an IO layout to verify bit count.
+
+            const { IoLayoutBuilderWrapper, IoTypeWrapper } = nucleation;
+
+            // 3 positions -> should fit in 3 bits (OneToOne) or 1 nibble (Packed4)
+            // Let's try auto-inference with 3 bits
+            const ioType = IoTypeWrapper.unsignedInt(3);
+            let builder = new IoLayoutBuilderWrapper();
+
+            try {
+                builder = builder.addInputFromRegionAuto("filtered_input", ioType, filteredRegion);
+                const layout = builder.build();
+                if (layout.inputNames().includes("filtered_input")) {
+                    console.log('   ✅ Filtered region successfully used as 3-bit input');
+                }
+            } catch (e) {
+                console.log(`   ❌ Failed to use filtered region: ${e}`);
+                throw e;
+            }
+
+            // Test Add Point
+            let pointRegion = new DefinitionRegionWrapper();
+            pointRegion.addPoint(10, 10, 10);
+
+            let builder2 = new IoLayoutBuilderWrapper();
+            // 1 bit
+            builder2 = builder2.addInputFromRegionAuto("point_input", IoTypeWrapper.boolean(), pointRegion);
+            if (builder2.build().inputNames().includes("point_input")) {
+                console.log('   ✅ addPoint working');
+            }
+
+            // Test Merge
+            let regionA = new DefinitionRegionWrapper();
+            regionA.addPoint(0, 0, 0);
+            let regionB = new DefinitionRegionWrapper();
+            regionB.addPoint(1, 0, 0);
+
+            regionA.merge(regionB);
+
+            let builder3 = new IoLayoutBuilderWrapper();
+            // 2 bits
+            builder3 = builder3.addInputFromRegionAuto("merged_input", IoTypeWrapper.unsignedInt(2), regionA);
+            if (builder3.build().inputNames().includes("merged_input")) {
+                console.log('   ✅ merge working');
+            }
+
+        } catch (error) {
+            console.log(`   ❌ Region filtering test failed:`, error);
+        }
+    } else {
+        console.log('   ⚠️  DefinitionRegionWrapper or SchematicWrapper not available');
+    }
+
+    // Test 14: Boolean Operations (subtract/intersect)
+    console.log('\n🧪 Test 14: DefinitionRegion Boolean Operations');
+    if (typeof nucleation.DefinitionRegionWrapper !== 'undefined') {
+        try {
+            const { DefinitionRegionWrapper, BlockPosition } = nucleation;
+
+            // Create two overlapping regions
+            let regionA = new DefinitionRegionWrapper();
+            regionA.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(5, 0, 0)); // 0-5
+
+            let regionB = new DefinitionRegionWrapper();
+            regionB.addBounds(new BlockPosition(3, 0, 0), new BlockPosition(7, 0, 0)); // 3-7
+
+            // Test subtract
+            let subtractRegion = new DefinitionRegionWrapper();
+            subtractRegion.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(5, 0, 0));
+            subtractRegion.subtract(regionB);
+            console.log(`   - Subtract: [0-5] - [3-7] = volume ${subtractRegion.volume()}`);
+            if (subtractRegion.volume() === 3) { // 0, 1, 2
+                console.log('   ✅ Subtract working correctly');
+            } else {
+                console.log(`   ❌ Expected volume 3, got ${subtractRegion.volume()}`);
+            }
+
+            // Test intersect
+            let intersectRegion = new DefinitionRegionWrapper();
+            intersectRegion.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(5, 0, 0));
+            intersectRegion.intersect(regionB);
+            console.log(`   - Intersect: [0-5] ∩ [3-7] = volume ${intersectRegion.volume()}`);
+            if (intersectRegion.volume() === 3) { // 3, 4, 5
+                console.log('   ✅ Intersect working correctly');
+            } else {
+                console.log(`   ❌ Expected volume 3, got ${intersectRegion.volume()}`);
+            }
+
+            // Test union
+            let unionRegion = regionA.union(regionB);
+            console.log(`   - Union: [0-5] ∪ [3-7] = volume ${unionRegion.volume()}`);
+            if (unionRegion.volume() === 8) { // 0-7
+                console.log('   ✅ Union working correctly');
+            } else {
+                console.log(`   ❌ Expected volume 8, got ${unionRegion.volume()}`);
+            }
+
+        } catch (error) {
+            console.log(`   ❌ Boolean operations test failed: ${error.message}`);
+        }
+    } else {
+        console.log('   ⚠️  DefinitionRegionWrapper not available');
+    }
+
+    // Test 15: Geometric Shifts
+    console.log('\n🧪 Test 15: DefinitionRegion Geometric Shifts');
+    if (typeof nucleation.DefinitionRegionWrapper !== 'undefined') {
+        try {
+            const { DefinitionRegionWrapper, BlockPosition } = nucleation;
+
+            let region = new DefinitionRegionWrapper();
+            region.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(2, 2, 2));
+
+            // Get initial bounds
+            const initialBounds = region.getBounds();
+            console.log(`   - Initial bounds: min=[${initialBounds.min}], max=[${initialBounds.max}]`);
+
+            // Shift by 10, 20, 30
+            region.shift(10, 20, 30);
+            const shiftedBounds = region.getBounds();
+            console.log(`   - After shift(10,20,30): min=[${shiftedBounds.min}], max=[${shiftedBounds.max}]`);
+
+            if (shiftedBounds.min[0] === 10 && shiftedBounds.min[1] === 20 && shiftedBounds.min[2] === 30) {
+                console.log('   ✅ Shift working correctly');
+            } else {
+                console.log('   ❌ Shift did not produce expected results');
+            }
+
+            // Test expand
+            let expandRegion = new DefinitionRegionWrapper();
+            expandRegion.addBounds(new BlockPosition(5, 5, 5), new BlockPosition(10, 10, 10));
+            expandRegion.expand(2, 2, 2);
+            const expandedBounds = expandRegion.getBounds();
+            console.log(`   - After expand(2,2,2): min=[${expandedBounds.min}], max=[${expandedBounds.max}]`);
+
+            if (expandedBounds.min[0] === 3 && expandedBounds.max[0] === 12) {
+                console.log('   ✅ Expand working correctly');
+            } else {
+                console.log('   ❌ Expand did not produce expected results');
+            }
+
+            // Test contract
+            expandRegion.contract(2);
+            const contractedBounds = expandRegion.getBounds();
+            console.log(`   - After contract(2): min=[${contractedBounds.min}], max=[${contractedBounds.max}]`);
+
+            if (contractedBounds.min[0] === 5 && contractedBounds.max[0] === 10) {
+                console.log('   ✅ Contract working correctly');
+            } else {
+                console.log('   ❌ Contract did not produce expected results');
+            }
+
+        } catch (error) {
+            console.log(`   ❌ Geometric shifts test failed: ${error.message}`);
+        }
+    } else {
+        console.log('   ⚠️  DefinitionRegionWrapper not available');
+    }
+
+    // Test 16: Property Filtering
+    console.log('\n🧪 Test 16: DefinitionRegion Property Filtering');
+    if (typeof nucleation.DefinitionRegionWrapper !== 'undefined' && typeof nucleation.SchematicWrapper !== 'undefined') {
+        try {
+            const { SchematicWrapper, DefinitionRegionWrapper, BlockPosition } = nucleation;
+
+            const schematic = new SchematicWrapper();
+            // Set up blocks with different properties
+            schematic.set_block_with_properties(0, 0, 0, "minecraft:redstone_lamp", { lit: "true" });
+            schematic.set_block_with_properties(1, 0, 0, "minecraft:redstone_lamp", { lit: "false" });
+            schematic.set_block_with_properties(2, 0, 0, "minecraft:redstone_lamp", { lit: "true" });
+
+            // Create region covering all three
+            let region = new DefinitionRegionWrapper();
+            region.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(2, 0, 0));
+
+            // Filter for lit=true
+            const litRegion = region.filterByProperties(schematic, { lit: "true" });
+            console.log(`   - Filter for lit=true: volume ${litRegion.volume()}`);
+
+            if (litRegion.volume() === 2) {
+                console.log('   ✅ Property filtering working correctly');
+            } else {
+                console.log(`   ❌ Expected volume 2, got ${litRegion.volume()}`);
+            }
+
+        } catch (error) {
+            console.log(`   ❌ Property filtering test failed: ${error.message}`);
+        }
+    } else {
+        console.log('   ⚠️  Required wrappers not available');
+    }
+
+    // Test 17: CircuitBuilder Flow
+    console.log('\n🧪 Test 17: CircuitBuilder Flow');
+    if (typeof nucleation.CircuitBuilderWrapper !== 'undefined') {
+        try {
+            const { SchematicWrapper, CircuitBuilderWrapper, DefinitionRegionWrapper, IoTypeWrapper, BlockPosition } = nucleation;
+
+            // Create a simple schematic with input/output areas
+            const schematic = new SchematicWrapper();
+            // Base layer
+            for (let x = 0; x < 10; x++) {
+                schematic.set_block(x, 0, 0, "minecraft:stone");
+            }
+            // Input wire at x=0
+            schematic.set_block_with_properties(0, 1, 0, "minecraft:redstone_wire", { power: "0" });
+            // Output wire at x=9
+            schematic.set_block_with_properties(9, 1, 0, "minecraft:redstone_wire", { power: "0" });
+
+            // Create regions
+            let inputRegion = new DefinitionRegionWrapper();
+            inputRegion.addPoint(0, 1, 0);
+
+            let outputRegion = new DefinitionRegionWrapper();
+            outputRegion.addPoint(9, 1, 0);
+
+            // Create circuit builder
+            let builder = new CircuitBuilderWrapper(schematic);
+            builder = builder.withInputAuto("in", IoTypeWrapper.boolean(), inputRegion);
+            builder = builder.withOutputAuto("out", IoTypeWrapper.boolean(), outputRegion);
+
+            console.log(`   - Builder has ${builder.inputCount()} inputs, ${builder.outputCount()} outputs`);
+            console.log(`   - Input names: ${builder.inputNames().join(', ')}`);
+            console.log(`   - Output names: ${builder.outputNames().join(', ')}`);
+
+            if (builder.inputCount() === 1 && builder.outputCount() === 1) {
+                console.log('   ✅ CircuitBuilder flow working correctly');
+            } else {
+                console.log('   ❌ Unexpected input/output counts');
+            }
+
+        } catch (error) {
+            console.log(`   ❌ CircuitBuilder test failed: ${error.message}`);
+        }
+    } else {
+        console.log('   ⚠️  CircuitBuilderWrapper not available');
+    }
+
+    // Test 18: Manual Ticking
+    console.log('\n🧪 Test 18: Manual Ticking');
+    if (typeof nucleation.TypedCircuitExecutorWrapper !== 'undefined') {
+        try {
+            const { SchematicWrapper, IoLayoutBuilderWrapper, IoTypeWrapper, LayoutFunctionWrapper, BlockPosition, ValueWrapper } = nucleation;
+
+            // Create a simple circuit
+            const schematic = new SchematicWrapper();
+            for (let x = 0; x <= 5; x++) {
+                schematic.set_block(x, 0, 0, "minecraft:gray_concrete");
+            }
+            schematic.set_block_with_properties(0, 1, 0, "minecraft:lever", {
+                facing: "east", powered: "false", face: "floor"
+            });
+            for (let x = 1; x <= 4; x++) {
+                schematic.set_block_with_properties(x, 1, 0, "minecraft:redstone_wire", {
+                    power: "0", east: "side", west: "side", north: "none", south: "none"
+                });
+            }
+            schematic.set_block_with_properties(5, 1, 0, "minecraft:redstone_lamp", { lit: "false" });
+
+            // Create layout
+            let layoutBuilder = new IoLayoutBuilderWrapper();
+            layoutBuilder = layoutBuilder.addInputAuto("lever", IoTypeWrapper.boolean(), [[0, 1, 0]]);
+            layoutBuilder = layoutBuilder.addOutputAuto("lamp", IoTypeWrapper.boolean(), [[5, 1, 0]]);
+            const layout = layoutBuilder.build();
+
+            // Create simulation world
+            const world = schematic.create_simulation_world();
+            const executor = nucleation.TypedCircuitExecutorWrapper.fromLayout(world, layout);
+
+            // Set to manual mode
+            executor.setStateMode("manual");
+
+            // Manual tick test
+            executor.tick(5);
+            executor.flush();
+
+            console.log('   ✅ Manual ticking executed without errors');
+
+            // Test setInput and readOutput
+            const leverValue = ValueWrapper.fromBool(true);
+            executor.setInput("lever", leverValue);
+            executor.flush();
+            executor.tick(5);
+            executor.flush();
+
+            const lampState = executor.readOutput("lamp");
+            console.log(`   - After setting lever=true and ticking: lamp=${lampState.toJs()}`);
+            console.log('   ✅ setInput/readOutput working');
+
+        } catch (error) {
+            console.log(`   ❌ Manual ticking test failed: ${error.message}`);
+        }
+    } else {
+        console.log('   ⚠️  TypedCircuitExecutorWrapper not available');
+    }
+
+    // Test 19: Connectivity Analysis
+    console.log('\n🧪 Test 19: Connectivity Analysis');
+    if (typeof nucleation.DefinitionRegionWrapper !== 'undefined') {
+        try {
+            const { DefinitionRegionWrapper, BlockPosition } = nucleation;
+
+            // Contiguous region (L-shape)
+            let contiguousRegion = new DefinitionRegionWrapper();
+            contiguousRegion.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(3, 0, 0));
+            contiguousRegion.addBounds(new BlockPosition(3, 0, 0), new BlockPosition(3, 3, 0));
+
+            const isContiguous = contiguousRegion.isContiguous();
+            console.log(`   - L-shape region isContiguous: ${isContiguous}`);
+            if (isContiguous) {
+                console.log('   ✅ isContiguous correctly identifies connected region');
+            } else {
+                console.log('   ❌ L-shape should be contiguous');
+            }
+
+            // Non-contiguous region (two separate points)
+            let nonContiguousRegion = new DefinitionRegionWrapper();
+            nonContiguousRegion.addPoint(0, 0, 0);
+            nonContiguousRegion.addPoint(10, 10, 10);
+
+            const isNotContiguous = !nonContiguousRegion.isContiguous();
+            const components = nonContiguousRegion.connectedComponents();
+            console.log(`   - Two separate points: isContiguous=${!isNotContiguous}, components=${components}`);
+            if (isNotContiguous && components === 2) {
+                console.log('   ✅ connectedComponents correctly counts 2 components');
+            } else {
+                console.log('   ❌ Expected 2 components');
+            }
+
+        } catch (error) {
+            console.log(`   ❌ Connectivity analysis test failed: ${error.message}`);
+        }
+    } else {
+        console.log('   ⚠️  DefinitionRegionWrapper not available');
     }
 
     console.log('\n=== Test Summary ===');

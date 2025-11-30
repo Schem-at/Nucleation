@@ -130,7 +130,8 @@ mod integration_tests;
 
 // Public API
 pub use executor::{
-    ExecutionMode, ExecutionResult, OutputCondition, StateMode, TypedCircuitExecutor,
+    ExecutionMode, ExecutionResult, IoLayoutInfo, LayoutInfo, OutputCondition, StateMode,
+    TypedCircuitExecutor,
 };
 pub use insign_io::{
     create_executor_from_insign, create_executor_from_insign_with_options,

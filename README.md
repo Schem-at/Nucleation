@@ -15,12 +15,14 @@
 ## Features
 
 ### Core
+
 - **Multi-format support**: `.schematic`, `.litematic`, `.nbt`, and more
 - **Memory-safe Rust core** with zero-copy deserialization
 - **Cross-platform**: Linux, macOS, Windows (x86_64 + ARM64)
 - **Multi-language**: Rust, JavaScript/TypeScript (WASM), Python, C/FFI
 
 ### Schematic Building
+
 - **SchematicBuilder**: Create schematics with ASCII art and Unicode characters
 - **Compositional Design**: Build circuits hierarchically from smaller components
 - **Unicode Palettes**: Visual circuit design with intuitive characters (`→`, `│`, `█`, etc.)
@@ -28,13 +30,17 @@
 - **CLI Tool**: Build schematics from command line (`schematic-builder`)
 
 ### Circuit Simulation
+
 - **Redstone simulation** via MCHPRS integration (optional `simulation` feature)
 - **TypedCircuitExecutor**: High-level API with typed inputs/outputs (Bool, U32, Ascii, etc.)
+- **CircuitBuilder**: Fluent API for streamlined executor creation
+- **DefinitionRegion**: Advanced region manipulation with boolean ops, filtering, and connectivity analysis
 - **Custom IO**: Inject and monitor signal strengths at specific positions
 - **Execution Modes**: Fixed ticks, until condition, until stable, until change
-- **State Management**: Stateless, stateful, or manual control
+- **State Management**: Stateless, stateful, or manual tick control
 
 ### Developer Experience
+
 - **Bracket notation** for blocks: `"minecraft:lever[facing=east,powered=false]"`
 - **Feature parity** across all language bindings
 - **Comprehensive documentation** in [`docs/`](docs/)
@@ -48,7 +54,7 @@
 
 ```bash
 cargo add nucleation
-````
+```
 
 ### JavaScript / TypeScript (WASM)
 
@@ -93,7 +99,7 @@ println!("{:?}", schematic.get_info());
 ```ts
 import { SchematicParser } from "nucleation";
 
-const bytes = await fetch("example.litematic").then(r => r.arrayBuffer());
+const bytes = await fetch("example.litematic").then((r) => r.arrayBuffer());
 const parser = new SchematicParser();
 await parser.fromData(new Uint8Array(bytes));
 console.log(parser.getDimensions());
@@ -123,7 +129,7 @@ let circuit = SchematicBuilder::new()
         # Base layer
         ccc
         ccc
-        
+
         # Logic layer
         ─→─
         │█│
@@ -180,8 +186,18 @@ schematic-builder -i circuit.txt -o circuit.schem --format schem
 
 ```js
 const schematic = new SchematicWrapper();
-schematic.set_block(0, 1, 0, "minecraft:lever[facing=east,powered=false,face=floor]");
-schematic.set_block(5, 1, 0, "minecraft:redstone_wire[power=15,east=side,west=side]");
+schematic.set_block(
+	0,
+	1,
+	0,
+	"minecraft:lever[facing=east,powered=false,face=floor]"
+);
+schematic.set_block(
+	5,
+	1,
+	0,
+	"minecraft:redstone_wire[power=15,east=side,west=side]"
+);
 ```
 
 [More in `examples/rust.md`](examples/rust.md)
@@ -271,6 +287,7 @@ These guides apply to all languages:
 
 - [SchematicBuilder Guide](docs/shared/guide/schematic-builder.md) - ASCII art and compositional design
 - [TypedCircuitExecutor Guide](docs/shared/guide/typed-executor.md) - High-level circuit simulation
+- [Circuit API Guide](docs/shared/guide/circuit-api.md) - CircuitBuilder and DefinitionRegion
 - [Unicode Palette Reference](docs/shared/unicode-palette.md) - Visual circuit characters
 
 ### 🎯 Quick Links

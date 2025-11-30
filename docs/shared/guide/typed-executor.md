@@ -88,26 +88,34 @@ IoType::Struct {
 Layout functions define how binary data maps to physical redstone positions:
 
 ### OneToOne
+
 One bit per nibble (signal 0 or 15):
+
 ```rust
 LayoutFunction::OneToOne
 ```
 
 ### Packed4
+
 Four bits per nibble (hex encoding):
+
 ```rust
 LayoutFunction::Packed4
 ```
 
 ### RowMajor / ColumnMajor
+
 For 2D data like matrices:
+
 ```rust
 LayoutFunction::RowMajor { width: 8 }
 LayoutFunction::ColumnMajor { height: 8 }
 ```
 
 ### Custom
+
 Define your own mapping logic:
+
 ```rust
 LayoutFunction::Custom {
     spread: Box::new(|bits| { /* bits -> nibbles */ }),
@@ -118,13 +126,17 @@ LayoutFunction::Custom {
 ## Execution Modes
 
 ### Fixed Ticks
+
 Run for a specific number of simulation ticks:
+
 ```rust
 ExecutionMode::FixedTicks { ticks: 100 }
 ```
 
 ### Until Condition
+
 Run until an output meets a condition (with timeout):
+
 ```rust
 ExecutionMode::UntilCondition {
     output_name: "ready".to_string(),
@@ -135,7 +147,9 @@ ExecutionMode::UntilCondition {
 ```
 
 ### Until Stable
+
 Run until all outputs are stable for N ticks:
+
 ```rust
 ExecutionMode::UntilStable {
     stable_ticks: 20,
@@ -144,7 +158,9 @@ ExecutionMode::UntilStable {
 ```
 
 ### Until Change
+
 Run until any output changes:
+
 ```rust
 ExecutionMode::UntilChange {
     timeout_ticks: 1000,
@@ -157,22 +173,35 @@ ExecutionMode::UntilChange {
 Control whether simulation state persists between executions:
 
 ### Stateless (Default)
+
 Reset to initial state before each execution:
+
 ```rust
 executor.set_state_mode(StateMode::Stateless);
 ```
 
 ### Stateful
+
 Preserve state between executions:
+
 ```rust
 executor.set_state_mode(StateMode::Stateful);
 ```
 
 ### Manual
-Control reset manually:
+
+Control reset and ticking manually:
+
 ```rust
 executor.set_state_mode(StateMode::Manual);
 executor.reset()?;  // Explicit reset when needed
+
+// Manual tick control
+executor.set_input("a", &Value::U32(5))?;
+executor.set_input("b", &Value::U32(3))?;
+executor.tick(10);  // Advance by 10 ticks
+executor.flush();   // Propagate changes
+let result = executor.read_output("sum")?;
 ```
 
 ## Building an Executor
@@ -278,12 +307,12 @@ for (a, b, expected) in test_cases {
     let mut inputs = HashMap::new();
     inputs.insert("a".to_string(), Value::Bool(a));
     inputs.insert("b".to_string(), Value::Bool(b));
-    
+
     let result = executor.execute(
         inputs,
         ExecutionMode::FixedTicks { ticks: 100 }
     )?;
-    
+
     let output = result.outputs.get("result").unwrap();
     assert_eq!(*output, Value::Bool(expected));
 }
@@ -332,9 +361,42 @@ let sum = result.outputs.get("sum").unwrap();
 assert_eq!(*sum, Value::U32(12));  // 01100
 ```
 
+## Using CircuitBuilder
+
+For a more streamlined approach to creating executors, use `CircuitBuilder`:
+
+```rust
+use nucleation::simulation::{CircuitBuilder, IoType};
+
+let executor = CircuitBuilder::new(schematic)
+    .with_input_auto("a", IoType::UnsignedInt { bits: 8 }, input_region)?
+    .with_output_auto("sum", IoType::UnsignedInt { bits: 9 }, output_region)?
+    .with_state_mode(StateMode::Stateful)
+    .build_validated()?;
+```
+
+See [Circuit API Guide](circuit-api.md) for complete `CircuitBuilder` documentation.
+
+## Layout Debugging
+
+Use `get_layout_info()` to inspect bit-to-position mappings:
+
+```rust
+let layout = executor.get_layout_info();
+
+for (name, info) in &layout.inputs {
+    println!("{}: {} ({} bits)", name, info.io_type, info.bit_count);
+    for (bit, pos) in info.positions.iter().enumerate() {
+        println!("  Bit {}: {:?}", bit, pos);
+    }
+}
+```
+
+This helps debug issues where bits map to unexpected positions.
+
 ## API Reference
 
 - [Rust API](../api/rust.md#typedcircuitexecutor)
 - [JavaScript API](../api/javascript.md#typedcircuitexecutor)
 - [Python API](../api/python.md#typedcircuitexecutor)
-
+- [Circuit API Guide](circuit-api.md) - CircuitBuilder and DefinitionRegion

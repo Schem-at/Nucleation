@@ -6,6 +6,7 @@ mod block_position;
 mod block_state;
 mod bounding_box;
 mod chunk;
+pub mod definition_region;
 mod entity;
 mod formats;
 pub mod insign;

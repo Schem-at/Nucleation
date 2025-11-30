@@ -23,12 +23,14 @@
 //! let is_lit = world.is_lit(BlockPos::new(15, 1, 0));
 //! ```
 
+pub mod circuit_builder;
 mod mchprs_world;
 #[cfg(test)]
 mod tests;
 mod truth_table;
 pub mod typed_executor;
 
+pub use circuit_builder::CircuitBuilder;
 pub use mchprs_world::{MchprsWorld, MchprsWorldError, SimulationOptions};
 pub use truth_table::generate_truth_table;
 

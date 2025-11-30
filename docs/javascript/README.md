@@ -34,6 +34,8 @@ const bytes = schematic.to_litematic();
 7. [SchematicBuilder](#schematicbuilder)
 8. [Simulation](#simulation)
 9. [TypedCircuitExecutor](#typedcircuitexecutor)
+10. [DefinitionRegion](#definitionregion)
+11. [CircuitBuilder](#circuitbuilder)
 
 ## Installation & Setup
 
@@ -56,11 +58,12 @@ const schematic = new SchematicWrapper();
 
 ```html
 <script type="module">
-  import init, { SchematicWrapper } from
-    "https://cdn.jsdelivr.net/npm/nucleation@latest/nucleation-cdn-loader.js";
+	import init, {
+		SchematicWrapper,
+	} from "https://cdn.jsdelivr.net/npm/nucleation@latest/nucleation-cdn-loader.js";
 
-  await init();  // Automatically resolves WASM path
-  const schematic = new SchematicWrapper();
+	await init(); // Automatically resolves WASM path
+	const schematic = new SchematicWrapper();
 </script>
 ```
 
@@ -69,8 +72,9 @@ const schematic = new SchematicWrapper();
 ```typescript
 import init, { SchematicWrapper } from "nucleation";
 
-const wasmBytes = await fetch("/path/to/nucleation_bg.wasm")
-  .then(r => r.arrayBuffer());
+const wasmBytes = await fetch("/path/to/nucleation_bg.wasm").then((r) =>
+	r.arrayBuffer()
+);
 
 await init(wasmBytes);
 ```
@@ -83,53 +87,96 @@ Main class for working with schematics.
 
 ```typescript
 class SchematicWrapper {
-  constructor();  // Creates empty schematic named "Default"
-  
-  // Loading/Saving
-  from_data(bytes: Uint8Array): void;
-  from_litematic(bytes: Uint8Array): void;
-  from_schematic(bytes: Uint8Array): void;
-  to_litematic(): Uint8Array;
-  to_schematic(): Uint8Array;
-  
-  // Block operations
-  set_block(x: number, y: number, z: number, blockName: string): void;
-  set_block_with_properties(x: number, y: number, z: number, 
-                            blockName: string, properties: object): void;
-  set_block_from_string(x: number, y: number, z: number, 
-                       blockString: string): void;
-  get_block(x: number, y: number, z: number): string | null;
-  get_block_with_properties(x: number, y: number, z: number): BlockStateWrapper | null;
-  
-  // Block entities
-  get_block_entity(x: number, y: number, z: number): object | null;
-  get_all_block_entities(): Array<object>;
-  
-  // Region operations
-  copy_region(sourceRegion: string, minX: number, minY: number, minZ: number,
-             maxX: number, maxY: number, maxZ: number,
-             targetX: number, targetY: number, targetZ: number,
-             excludedBlocks: string[]): void;
-  
-  // Information
-  get_dimensions(): [number, number, number];
-  get_block_count(): number;
-  get_volume(): number;
-  get_region_names(): string[];
-  debug_info(): string;
-  print_schematic(): string;
-  
-  // Iteration
-  blocks(): Array<{x: number, y: number, z: number, name: string, properties: object}>;
-  chunks(width: number, height: number, length: number): Array<any>;
-  chunks_with_strategy(width: number, height: number, length: number,
-                      strategy: string, cx?: number, cy?: number, cz?: number): Array<any>;
-  get_chunk_blocks(offsetX: number, offsetY: number, offsetZ: number,
-                  width: number, height: number, length: number): Array<any>;
-  
-  // Simulation (requires simulation feature)
-  create_simulation_world(): MchprsWorldWrapper;
-  create_simulation_world_with_options(options: SimulationOptionsWrapper): MchprsWorldWrapper;
+	constructor(); // Creates empty schematic named "Default"
+
+	// Loading/Saving
+	from_data(bytes: Uint8Array): void;
+	from_litematic(bytes: Uint8Array): void;
+	from_schematic(bytes: Uint8Array): void;
+	to_litematic(): Uint8Array;
+	to_schematic(): Uint8Array;
+
+	// Block operations
+	set_block(x: number, y: number, z: number, blockName: string): void;
+	set_block_with_properties(
+		x: number,
+		y: number,
+		z: number,
+		blockName: string,
+		properties: object
+	): void;
+	set_block_from_string(
+		x: number,
+		y: number,
+		z: number,
+		blockString: string
+	): void;
+	get_block(x: number, y: number, z: number): string | null;
+	get_block_with_properties(
+		x: number,
+		y: number,
+		z: number
+	): BlockStateWrapper | null;
+
+	// Block entities
+	get_block_entity(x: number, y: number, z: number): object | null;
+	get_all_block_entities(): Array<object>;
+
+	// Region operations
+	copy_region(
+		sourceRegion: string,
+		minX: number,
+		minY: number,
+		minZ: number,
+		maxX: number,
+		maxY: number,
+		maxZ: number,
+		targetX: number,
+		targetY: number,
+		targetZ: number,
+		excludedBlocks: string[]
+	): void;
+
+	// Information
+	get_dimensions(): [number, number, number];
+	get_block_count(): number;
+	get_volume(): number;
+	get_region_names(): string[];
+	debug_info(): string;
+	print_schematic(): string;
+
+	// Iteration
+	blocks(): Array<{
+		x: number;
+		y: number;
+		z: number;
+		name: string;
+		properties: object;
+	}>;
+	chunks(width: number, height: number, length: number): Array<any>;
+	chunks_with_strategy(
+		width: number,
+		height: number,
+		length: number,
+		strategy: string,
+		cx?: number,
+		cy?: number,
+		cz?: number
+	): Array<any>;
+	get_chunk_blocks(
+		offsetX: number,
+		offsetY: number,
+		offsetZ: number,
+		width: number,
+		height: number,
+		length: number
+	): Array<any>;
+
+	// Simulation (requires simulation feature)
+	create_simulation_world(): MchprsWorldWrapper;
+	create_simulation_world_with_options(
+		options: SimulationOptionsWrapper
+	): MchprsWorldWrapper;
 }
 ```
 
@@ -139,11 +186,11 @@ Represents a block with properties.
 
 ```typescript
 class BlockStateWrapper {
-  constructor(name: string);
-  
-  with_property(key: string, value: string): void;  // Mutates in place
-  name(): string;
-  properties(): object;
+	constructor(name: string);
+
+	with_property(key: string, value: string): void; // Mutates in place
+	name(): string;
+	properties(): object;
 }
 ```
 
@@ -154,20 +201,20 @@ class BlockStateWrapper {
 ```typescript
 // Browser
 const fileInput = document.querySelector('input[type="file"]');
-fileInput.addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  
-  const schematic = new SchematicWrapper();
-  schematic.from_data(bytes);  // Auto-detects format
-  
-  console.log(schematic.get_dimensions());
+fileInput.addEventListener("change", async (e) => {
+	const file = e.target.files[0];
+	const bytes = new Uint8Array(await file.arrayBuffer());
+
+	const schematic = new SchematicWrapper();
+	schematic.from_data(bytes); // Auto-detects format
+
+	console.log(schematic.get_dimensions());
 });
 
 // Node.js
-import { readFileSync } from 'fs';
+import { readFileSync } from "fs";
 
-const bytes = new Uint8Array(readFileSync('input.litematic'));
+const bytes = new Uint8Array(readFileSync("input.litematic"));
 const schematic = new SchematicWrapper();
 schematic.from_litematic(bytes);
 ```
@@ -177,21 +224,21 @@ schematic.from_litematic(bytes);
 ```typescript
 // Browser - Download
 const bytes = schematic.to_litematic();
-const blob = new Blob([bytes], { type: 'application/octet-stream' });
+const blob = new Blob([bytes], { type: "application/octet-stream" });
 const url = URL.createObjectURL(blob);
 
-const a = document.createElement('a');
+const a = document.createElement("a");
 a.href = url;
-a.download = 'output.litematic';
+a.download = "output.litematic";
 a.click();
 
 URL.revokeObjectURL(url);
 
 // Node.js
-import { writeFileSync } from 'fs';
+import { writeFileSync } from "fs";
 
 const bytes = schematic.to_litematic();
-writeFileSync('output.litematic', bytes);
+writeFileSync("output.litematic", bytes);
 ```
 
 ## Block Operations
@@ -204,14 +251,16 @@ schematic.set_block(0, 0, 0, "minecraft:stone");
 
 // Block with properties (object)
 schematic.set_block_with_properties(0, 1, 0, "minecraft:lever", {
-  facing: "east",
-  powered: "false"
+	facing: "east",
+	powered: "false",
 });
 
 // Block from string (bracket notation)
 schematic.set_block_from_string(
-  1, 1, 0,
-  "minecraft:redstone_wire[power=15,north=side,south=side]"
+	1,
+	1,
+	0,
+	"minecraft:redstone_wire[power=15,north=side,south=side]"
 );
 
 // Using BlockStateWrapper
@@ -227,14 +276,14 @@ block.with_property("delay", "2");
 // Get block name only
 const blockName = schematic.get_block(0, 0, 0);
 if (blockName) {
-  console.log(`Block: ${blockName}`);
+	console.log(`Block: ${blockName}`);
 }
 
 // Get block with properties
 const blockState = schematic.get_block_with_properties(0, 1, 0);
 if (blockState) {
-  console.log(`Block: ${blockState.name()}`);
-  console.log(`Properties:`, blockState.properties());
+	console.log(`Block: ${blockState.name()}`);
+	console.log(`Properties:`, blockState.properties());
 }
 ```
 
@@ -244,18 +293,18 @@ if (blockState) {
 // Get all blocks
 const allBlocks = schematic.blocks();
 for (const block of allBlocks) {
-  console.log(`(${block.x}, ${block.y}, ${block.z}) = ${block.name}`);
-  console.log(`Properties:`, block.properties);
+	console.log(`(${block.x}, ${block.y}, ${block.z}) = ${block.name}`);
+	console.log(`Properties:`, block.properties);
 }
 
 // Filter non-air blocks
-const nonAirBlocks = allBlocks.filter(b => !b.name.includes('air'));
+const nonAirBlocks = allBlocks.filter((b) => !b.name.includes("air"));
 
 // Count block types
 const blockCounts = new Map();
 for (const block of allBlocks) {
-  const count = blockCounts.get(block.name) || 0;
-  blockCounts.set(block.name, count + 1);
+	const count = blockCounts.get(block.name) || 0;
+	blockCounts.set(block.name, count + 1);
 }
 ```
 
@@ -265,23 +314,29 @@ for (const block of allBlocks) {
 // Get chunks (bottom-up order)
 const chunks = schematic.chunks(16, 16, 16);
 for (const chunk of chunks) {
-  console.log(`Chunk at (${chunk.offset_x}, ${chunk.offset_y}, ${chunk.offset_z})`);
-  console.log(`Blocks:`, chunk.blocks);
+	console.log(
+		`Chunk at (${chunk.offset_x}, ${chunk.offset_y}, ${chunk.offset_z})`
+	);
+	console.log(`Blocks:`, chunk.blocks);
 }
 
 // Get chunks with strategy
 const strategies = [
-  "distance_to_camera",
-  "top_down",
-  "bottom_up",
-  "center_outward",
-  "random"
+	"distance_to_camera",
+	"top_down",
+	"bottom_up",
+	"center_outward",
+	"random",
 ];
 
 const chunks = schematic.chunks_with_strategy(
-  16, 16, 16,
-  "distance_to_camera",
-  0, 100, 0  // Camera position
+	16,
+	16,
+	16,
+	"distance_to_camera",
+	0,
+	100,
+	0 // Camera position
 );
 
 // Get specific chunk
@@ -295,11 +350,17 @@ const chunkBlocks = schematic.get_chunk_blocks(0, 0, 0, 16, 16, 16);
 ```typescript
 // Copy a region
 schematic.copy_region(
-  "Main",           // Source region name
-  0, 0, 0,         // Min coordinates
-  10, 10, 10,      // Max coordinates
-  20, 0, 0,        // Target position
-  ["minecraft:air"] // Excluded blocks
+	"Main", // Source region name
+	0,
+	0,
+	0, // Min coordinates
+	10,
+	10,
+	10, // Max coordinates
+	20,
+	0,
+	0, // Target position
+	["minecraft:air"] // Excluded blocks
 );
 ```
 
@@ -326,8 +387,10 @@ console.log(`Volume: ${schematic.get_volume()}`);
 ```typescript
 // Set block with entity using string notation
 schematic.set_block_from_string(
-  0, 1, 0,
-  'minecraft:barrel[facing=up]{signal=13}'
+	0,
+	1,
+	0,
+	"minecraft:barrel[facing=up]{signal=13}"
 );
 
 // Note: Direct block entity manipulation is limited in WASM
@@ -340,14 +403,17 @@ schematic.set_block_from_string(
 // Get single block entity
 const entity = schematic.get_block_entity(0, 1, 0);
 if (entity) {
-  console.log(`Entity:`, entity);
-  // Entity is a plain JavaScript object with NBT data
+	console.log(`Entity:`, entity);
+	// Entity is a plain JavaScript object with NBT data
 }
 
 // Get all block entities
 const allEntities = schematic.get_all_block_entities();
 for (const entity of allEntities) {
-  console.log(`Entity at (${entity.x}, ${entity.y}, ${entity.z}):`, entity.data);
+	console.log(
+		`Entity at (${entity.x}, ${entity.y}, ${entity.z}):`,
+		entity.data
+	);
 }
 ```
 
@@ -364,7 +430,8 @@ import init, { SchematicBuilder } from "nucleation";
 await init();
 
 const circuit = SchematicBuilder.new()
-  .from_template(`
+	.from_template(
+		`
     # Base layer
     ccc
     ccc
@@ -372,8 +439,9 @@ const circuit = SchematicBuilder.new()
     # Logic layer
     ─→─
     │█│
-  `)
-  .build();
+  `
+	)
+	.build();
 ```
 
 ### Compositional Design
@@ -385,10 +453,10 @@ const xorGate = createXorGate();
 
 // Compose into larger circuit
 const halfAdder = SchematicBuilder.new()
-  .map_schematic('A', andGate)
-  .map_schematic('X', xorGate)
-  .layers([["AX"]])
-  .build();
+	.map_schematic("A", andGate)
+	.map_schematic("X", xorGate)
+	.layers([["AX"]])
+	.build();
 ```
 
 ## Simulation
@@ -403,7 +471,12 @@ await init();
 
 const schematic = new SchematicWrapper();
 // Build circuit...
-schematic.set_block_from_string(0, 1, 0, "minecraft:lever[facing=north,powered=false]");
+schematic.set_block_from_string(
+	0,
+	1,
+	0,
+	"minecraft:lever[facing=north,powered=false]"
+);
 schematic.set_block_from_string(5, 1, 0, "minecraft:redstone_lamp[lit=false]");
 // ... add redstone wiring ...
 
@@ -429,13 +502,13 @@ import { SimulationOptionsWrapper } from "nucleation";
 
 // Configure custom IO positions
 const options = new SimulationOptionsWrapper();
-options.addCustomIo(0, 1, 0);  // Input position
+options.addCustomIo(0, 1, 0); // Input position
 options.addCustomIo(10, 1, 0); // Output position
 
 const world = schematic.create_simulation_world_with_options(options);
 
 // Inject custom signal strength (0-15)
-world.setSignalStrength(0, 1, 0, 15);  // Max power
+world.setSignalStrength(0, 1, 0, 15); // Max power
 world.tick(5);
 world.flush();
 
@@ -448,21 +521,23 @@ console.log(`Output signal: ${outputSignal}`);
 
 ```typescript
 // Set multiple signals at once
-const positions = [[0, 1, 0], [0, 1, 2], [0, 1, 4]];
+const positions = [
+	[0, 1, 0],
+	[0, 1, 2],
+	[0, 1, 4],
+];
 const strengths = [15, 0, 15];
 
 for (let i = 0; i < positions.length; i++) {
-  const [x, y, z] = positions[i];
-  world.setSignalStrength(x, y, z, strengths[i]);
+	const [x, y, z] = positions[i];
+	world.setSignalStrength(x, y, z, strengths[i]);
 }
 
 world.tick(10);
 world.flush();
 
 // Read multiple signals
-const outputs = positions.map(([x, y, z]) => 
-  world.getSignalStrength(x, y, z)
-);
+const outputs = positions.map(([x, y, z]) => world.getSignalStrength(x, y, z));
 ```
 
 ## TypedCircuitExecutor
@@ -474,28 +549,42 @@ See [TypedCircuitExecutor Guide](../shared/guide/typed-executor.md) for complete
 ### Quick Example
 
 ```typescript
-import { TypedCircuitExecutor, IoType, LayoutFunction, Value } from "nucleation";
+import {
+	TypedCircuitExecutor,
+	IoType,
+	LayoutFunction,
+	Value,
+} from "nucleation";
 
 // Define IO mappings
 const inputs = new Map([
-  ["a", {
-    io_type: IoType.Bool,
-    layout: LayoutFunction.OneToOne,
-    positions: [[0, 1, 0]]
-  }],
-  ["b", {
-    io_type: IoType.Bool,
-    layout: LayoutFunction.OneToOne,
-    positions: [[0, 1, 2]]
-  }]
+	[
+		"a",
+		{
+			io_type: IoType.Bool,
+			layout: LayoutFunction.OneToOne,
+			positions: [[0, 1, 0]],
+		},
+	],
+	[
+		"b",
+		{
+			io_type: IoType.Bool,
+			layout: LayoutFunction.OneToOne,
+			positions: [[0, 1, 2]],
+		},
+	],
 ]);
 
 const outputs = new Map([
-  ["result", {
-    io_type: IoType.Bool,
-    layout: LayoutFunction.OneToOne,
-    positions: [[10, 1, 0]]
-  }]
+	[
+		"result",
+		{
+			io_type: IoType.Bool,
+			layout: LayoutFunction.OneToOne,
+			positions: [[10, 1, 0]],
+		},
+	],
 ]);
 
 // Create executor
@@ -503,18 +592,18 @@ const executor = new TypedCircuitExecutor(world, inputs, outputs);
 
 // Execute with typed values
 const inputValues = new Map([
-  ["a", Value.Bool(true)],
-  ["b", Value.Bool(true)]
+	["a", Value.Bool(true)],
+	["b", Value.Bool(true)],
 ]);
 
 const result = executor.execute(inputValues, {
-  mode: "fixed_ticks",
-  ticks: 100
+	mode: "fixed_ticks",
+	ticks: 100,
 });
 
 // Get typed output
 const output = result.outputs.get("result");
-console.log(`Result: ${output}`);  // Value.Bool(true)
+console.log(`Result: ${output}`); // Value.Bool(true)
 ```
 
 ## TypeScript Types
@@ -522,33 +611,33 @@ console.log(`Result: ${output}`);  // Value.Bool(true)
 ```typescript
 // Block state
 interface BlockState {
-  name: string;
-  properties: Record<string, string>;
+	name: string;
+	properties: Record<string, string>;
 }
 
 // Block with position
 interface PositionedBlock {
-  x: number;
-  y: number;
-  z: number;
-  name: string;
-  properties: Record<string, string>;
+	x: number;
+	y: number;
+	z: number;
+	name: string;
+	properties: Record<string, string>;
 }
 
 // Chunk
 interface Chunk {
-  offset_x: number;
-  offset_y: number;
-  offset_z: number;
-  blocks: PositionedBlock[];
+	offset_x: number;
+	offset_y: number;
+	offset_z: number;
+	blocks: PositionedBlock[];
 }
 
 // Execution mode
-type ExecutionMode = 
-  | { mode: "fixed_ticks", ticks: number }
-  | { mode: "until_condition", output: string, condition: any, timeout: number }
-  | { mode: "until_stable", stable_ticks: number, timeout: number }
-  | { mode: "until_change", timeout: number };
+type ExecutionMode =
+	| { mode: "fixed_ticks"; ticks: number }
+	| { mode: "until_condition"; output: string; condition: any; timeout: number }
+	| { mode: "until_stable"; stable_ticks: number; timeout: number }
+	| { mode: "until_change"; timeout: number };
 ```
 
 ## Examples
@@ -557,16 +646,16 @@ type ExecutionMode =
 
 ```typescript
 function downloadSchematic(schematic: SchematicWrapper, filename: string) {
-  const bytes = schematic.to_litematic();
-  const blob = new Blob([bytes], { type: 'application/octet-stream' });
-  const url = URL.createObjectURL(blob);
-  
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  
-  URL.revokeObjectURL(url);
+	const bytes = schematic.to_litematic();
+	const blob = new Blob([bytes], { type: "application/octet-stream" });
+	const url = URL.createObjectURL(blob);
+
+	const a = document.createElement("a");
+	a.href = url;
+	a.download = filename;
+	a.click();
+
+	URL.revokeObjectURL(url);
 }
 ```
 
@@ -574,17 +663,17 @@ function downloadSchematic(schematic: SchematicWrapper, filename: string) {
 
 ```typescript
 async function uploadSchematic(file: File): Promise<SchematicWrapper> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const schematic = new SchematicWrapper();
-  schematic.from_data(bytes);
-  return schematic;
+	const bytes = new Uint8Array(await file.arrayBuffer());
+	const schematic = new SchematicWrapper();
+	schematic.from_data(bytes);
+	return schematic;
 }
 
 // Usage
 const input = document.querySelector('input[type="file"]');
-input.addEventListener('change', async (e) => {
-  const schematic = await uploadSchematic(e.target.files[0]);
-  console.log(schematic.get_dimensions());
+input.addEventListener("change", async (e) => {
+	const schematic = await uploadSchematic(e.target.files[0]);
+	console.log(schematic.get_dimensions());
 });
 ```
 
@@ -592,23 +681,248 @@ input.addEventListener('change', async (e) => {
 
 ```typescript
 async function buildAndTestCircuit() {
-  await init();
-  
-  const schematic = new SchematicWrapper();
-  
-  // Build AND gate
-  schematic.set_block(0, 0, 0, "minecraft:stone");
-  schematic.set_block_from_string(0, 1, 0, "minecraft:lever[facing=north,powered=false]");
-  // ... build circuit ...
-  
-  // Test simulation
-  const world = schematic.create_simulation_world();
-  world.on_use_block(0, 1, 0);  // Toggle input
-  world.tick(10);
-  world.flush();
-  
-  const output = world.is_lit(10, 1, 0);
-  console.log(`Test passed: ${output === true}`);
+	await init();
+
+	const schematic = new SchematicWrapper();
+
+	// Build AND gate
+	schematic.set_block(0, 0, 0, "minecraft:stone");
+	schematic.set_block_from_string(
+		0,
+		1,
+		0,
+		"minecraft:lever[facing=north,powered=false]"
+	);
+	// ... build circuit ...
+
+	// Test simulation
+	const world = schematic.create_simulation_world();
+	world.on_use_block(0, 1, 0); // Toggle input
+	world.tick(10);
+	world.flush();
+
+	const output = world.is_lit(10, 1, 0);
+	console.log(`Test passed: ${output === true}`);
+}
+```
+
+## DefinitionRegion
+
+Advanced region manipulation for defining circuit IO areas.
+
+See [Circuit API Guide](../shared/guide/circuit-api.md) for complete documentation.
+
+### Creating Regions
+
+```typescript
+import { DefinitionRegionWrapper, BlockPosition } from "nucleation";
+
+// Create empty region
+const region = new DefinitionRegionWrapper();
+
+// Add bounding box
+region.addBounds(new BlockPosition(0, 1, 0), new BlockPosition(7, 1, 0));
+
+// Add single point
+region.addPoint(10, 1, 0);
+
+// Create from bounds directly
+const region2 = DefinitionRegionWrapper.fromBounds(
+	new BlockPosition(0, 0, 0),
+	new BlockPosition(10, 10, 10)
+);
+```
+
+### Boolean Operations
+
+```typescript
+const regionA = new DefinitionRegionWrapper();
+regionA.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(5, 0, 0));
+
+const regionB = new DefinitionRegionWrapper();
+regionB.addBounds(new BlockPosition(3, 0, 0), new BlockPosition(8, 0, 0));
+
+// Mutating operations (modify in-place)
+regionA.subtract(regionB); // Remove B's points from A
+regionA.intersect(regionB); // Keep only common points
+regionA.unionInto(regionB); // Add B's points to A
+
+// Immutable operations (return new region)
+const diff = regionA.subtracted(regionB);
+const common = regionA.intersected(regionB);
+const combined = regionA.union(regionB);
+```
+
+### Geometric Transformations
+
+```typescript
+const region = new DefinitionRegionWrapper();
+region.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(10, 10, 10));
+
+// Move region
+region.shift(100, 50, 200);
+
+// Expand outward
+region.expand(2, 2, 2);
+
+// Contract inward
+region.contract(1);
+
+// Get bounds
+const bounds = region.getBounds();
+// { min: [x, y, z], max: [x, y, z] } or null
+```
+
+### Connectivity Analysis
+
+```typescript
+// Check if all points are connected (6-connectivity)
+const isConnected = region.isContiguous();
+
+// Count separate islands
+const componentCount = region.connectedComponents();
+```
+
+### Filtering by Block Properties
+
+```typescript
+const schematic = new SchematicWrapper();
+// ... add blocks ...
+
+// Filter by block name
+const lamps = region.filterByBlock(schematic, "redstone_lamp");
+
+// Filter by properties
+const litLamps = region.filterByProperties(schematic, { lit: "true" });
+```
+
+### Position Iteration
+
+```typescript
+// Get all positions (in add order)
+const positions = region.positions(); // [[x,y,z], ...]
+
+// Get positions in deterministic Y→X→Z order (for bit assignment)
+const sortedPositions = region.positionsSorted();
+```
+
+### Memory Management
+
+```typescript
+// ⚠️ IMPORTANT: Free WASM objects when done
+const region = new DefinitionRegionWrapper();
+// ... use region ...
+region.free(); // Required to prevent memory leaks
+```
+
+## CircuitBuilder
+
+Fluent API for creating `TypedCircuitExecutor` instances.
+
+See [Circuit API Guide](../shared/guide/circuit-api.md) for complete documentation.
+
+### Basic Usage
+
+```typescript
+import {
+	CircuitBuilderWrapper,
+	DefinitionRegionWrapper,
+	IoTypeWrapper,
+	BlockPosition,
+} from "nucleation";
+
+const schematic = new SchematicWrapper();
+// ... build your circuit ...
+
+// Define IO regions
+const inputRegion = new DefinitionRegionWrapper();
+inputRegion.addBounds(new BlockPosition(0, 1, 0), new BlockPosition(7, 1, 0));
+
+const outputRegion = new DefinitionRegionWrapper();
+outputRegion.addBounds(
+	new BlockPosition(0, 1, 20),
+	new BlockPosition(7, 1, 20)
+);
+
+// Build executor with fluent API
+const executor = new CircuitBuilderWrapper(schematic)
+	.withInputAuto("data_in", IoTypeWrapper.unsignedInt(8), inputRegion)
+	.withOutputAuto("data_out", IoTypeWrapper.unsignedInt(8), outputRegion)
+	.withStateMode("stateful")
+	.buildValidated();
+
+// Clean up regions (executor clones them)
+inputRegion.free();
+outputRegion.free();
+```
+
+### From Insign Annotations
+
+```typescript
+// Create from sign annotations in schematic
+const builder = CircuitBuilderWrapper.fromInsign(schematic);
+const executor = builder.build();
+```
+
+### Validation
+
+```typescript
+const builder = new CircuitBuilderWrapper(schematic)
+	.withInputAuto("a", IoTypeWrapper.unsignedInt(8), regionA)
+	.withOutputAuto("out", IoTypeWrapper.unsignedInt(8), regionOut);
+
+// Explicit validation (throws on error)
+builder.validate();
+
+// Or validate during build
+const executor = builder.buildValidated();
+```
+
+### State Modes
+
+```typescript
+// Reset before each execute (default)
+builder.withStateMode("stateless");
+
+// Preserve state between executes
+builder.withStateMode("stateful");
+
+// Manual control (use tick/flush)
+builder.withStateMode("manual");
+```
+
+### Manual Tick Control
+
+```typescript
+const executor = builder.withStateMode("manual").build();
+
+// Set inputs individually
+executor.setInput("a", ValueWrapper.fromU32(5));
+executor.setInput("b", ValueWrapper.fromU32(3));
+executor.flush();
+
+// Tick manually
+for (let i = 0; i < 10; i++) {
+	executor.tick(1);
+	executor.flush();
+
+	const result = executor.readOutput("sum");
+	console.log(`Tick ${i}: ${result.toJs()}`);
+}
+```
+
+### Layout Debugging
+
+```typescript
+// See exactly which block maps to which bit
+const layoutInfo = executor.getLayoutInfo();
+
+console.log("Inputs:");
+for (const [name, info] of Object.entries(layoutInfo.inputs)) {
+	console.log(`  ${name}: ${info.ioType} (${info.bitCount} bits)`);
+	info.positions.forEach((pos, bit) => {
+		console.log(`    Bit ${bit}: [${pos.join(", ")}]`);
+	});
 }
 ```
 
@@ -616,7 +930,6 @@ async function buildAndTestCircuit() {
 
 - [SchematicBuilder Guide](../shared/guide/schematic-builder.md)
 - [TypedCircuitExecutor Guide](../shared/guide/typed-executor.md)
+- [Circuit API Guide](../shared/guide/circuit-api.md)
 - [Unicode Palette Reference](../shared/unicode-palette.md)
 - [NPM Package](https://www.npmjs.com/package/nucleation)
-
-

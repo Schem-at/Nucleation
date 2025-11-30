@@ -6,6 +6,26 @@ use super::{IoLayout, IoMapping, Value};
 use crate::simulation::MchprsWorld;
 use std::collections::HashMap;
 
+/// Information about a single IO port's layout
+#[derive(Debug, Clone)]
+pub struct IoLayoutInfo {
+    /// Type description (e.g., "UnsignedInt { bits: 8 }")
+    pub io_type: String,
+    /// Positions in bit order: index 0 = LSB, index N-1 = MSB
+    pub positions: Vec<(i32, i32, i32)>,
+    /// Total number of bits
+    pub bit_count: usize,
+}
+
+/// Complete layout information for debugging and visualization
+#[derive(Debug, Clone)]
+pub struct LayoutInfo {
+    /// Input layouts by name
+    pub inputs: HashMap<String, IoLayoutInfo>,
+    /// Output layouts by name
+    pub outputs: HashMap<String, IoLayoutInfo>,
+}
+
 /// Condition to check on outputs
 #[derive(Debug, Clone)]
 pub enum OutputCondition {
@@ -351,6 +371,110 @@ impl TypedCircuitExecutor {
     /// Get a mutable reference to the world (for advanced use)
     pub fn world_mut(&mut self) -> &mut MchprsWorld {
         &mut self.world
+    }
+
+    /// Manually advance the simulation by a specified number of ticks
+    ///
+    /// This is useful for manual state control when using `StateMode::Manual`.
+    /// Unlike `execute()`, this does not set any inputs or read outputs -
+    /// it only advances the simulation.
+    ///
+    /// # Example
+    /// ```ignore
+    /// executor.set_state_mode(StateMode::Manual);
+    /// // Set inputs manually via world
+    /// executor.tick(10);
+    /// // Read outputs manually
+    /// ```
+    pub fn tick(&mut self, ticks: u32) {
+        self.world.tick(ticks);
+    }
+
+    /// Manually flush the simulation state
+    ///
+    /// This ensures all pending changes are propagated through the redstone network.
+    /// Useful after manually setting inputs or before reading outputs.
+    pub fn flush(&mut self) {
+        self.world.flush();
+    }
+
+    /// Set a single input value without executing
+    ///
+    /// Useful for manual control flow where you want to set inputs
+    /// incrementally before ticking.
+    pub fn set_input(&mut self, name: &str, value: &Value) -> Result<(), String> {
+        let mapping = self
+            .inputs
+            .get(name)
+            .ok_or_else(|| format!("Unknown input: {}", name))?;
+
+        let nibbles = mapping.encode(value)?;
+        self.world.set_signals_batch(&mapping.positions, &nibbles)?;
+        Ok(())
+    }
+
+    /// Read a single output value without executing
+    ///
+    /// Useful for manual control flow where you want to read outputs
+    /// after ticking.
+    pub fn read_output(&mut self, name: &str) -> Result<Value, String> {
+        // Flush first to ensure state is current
+        self.world.flush();
+
+        let mapping = self
+            .outputs
+            .get(name)
+            .ok_or_else(|| format!("Unknown output: {}", name))?;
+
+        let nibbles = self.world.get_signals_batch(&mapping.positions);
+        mapping.decode(&nibbles)
+    }
+
+    /// Get all input names
+    pub fn input_names(&self) -> Vec<&str> {
+        self.inputs.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Get all output names
+    pub fn output_names(&self) -> Vec<&str> {
+        self.outputs.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Get detailed layout information for debugging and visualization
+    ///
+    /// Returns a map of IO name -> layout details including:
+    /// - `io_type`: String description of the type (e.g., "UnsignedInt(8)")
+    /// - `positions`: List of (x, y, z) positions in bit order
+    /// - `bit_count`: Number of bits
+    ///
+    /// This is useful for visualizing exactly which blocks map to which bits.
+    pub fn get_layout_info(&self) -> LayoutInfo {
+        let mut inputs = HashMap::new();
+        let mut outputs = HashMap::new();
+
+        for (name, mapping) in &self.inputs {
+            inputs.insert(
+                name.clone(),
+                IoLayoutInfo {
+                    io_type: format!("{:?}", mapping.io_type),
+                    positions: mapping.positions.clone(),
+                    bit_count: mapping.positions.len(),
+                },
+            );
+        }
+
+        for (name, mapping) in &self.outputs {
+            outputs.insert(
+                name.clone(),
+                IoLayoutInfo {
+                    io_type: format!("{:?}", mapping.io_type),
+                    positions: mapping.positions.clone(),
+                    bit_count: mapping.positions.len(),
+                },
+            );
+        }
+
+        LayoutInfo { inputs, outputs }
     }
 
     /// Sync the simulation state back to the schematic and return a reference

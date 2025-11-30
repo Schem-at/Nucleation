@@ -3,6 +3,7 @@
 //! Provides a fluent API for defining circuit inputs and outputs with types and layouts.
 
 use super::{IoMapping, IoType, LayoutFunction};
+use crate::definition_region::DefinitionRegion;
 use std::collections::HashMap;
 
 /// Builder for constructing IO layouts
@@ -50,6 +51,29 @@ impl IoLayoutBuilder {
         Ok(self)
     }
 
+    /// Add an input defined by a DefinitionRegion
+    pub fn add_input_from_region(
+        self,
+        name: impl Into<String>,
+        io_type: IoType,
+        layout: LayoutFunction,
+        region: DefinitionRegion,
+    ) -> Result<Self, String> {
+        let positions: Vec<_> = region.iter_positions().collect();
+        self.add_input(name, io_type, layout, positions)
+    }
+
+    /// Add an input defined by a DefinitionRegion with automatic layout inference
+    pub fn add_input_from_region_auto(
+        self,
+        name: impl Into<String>,
+        io_type: IoType,
+        region: DefinitionRegion,
+    ) -> Result<Self, String> {
+        let positions: Vec<_> = region.iter_positions().collect();
+        self.add_input_auto(name, io_type, positions)
+    }
+
     /// Add an output with full control
     pub fn add_output(
         mut self,
@@ -77,6 +101,29 @@ impl IoLayoutBuilder {
 
         self.outputs.insert(name, mapping);
         Ok(self)
+    }
+
+    /// Add an output defined by a DefinitionRegion
+    pub fn add_output_from_region(
+        self,
+        name: impl Into<String>,
+        io_type: IoType,
+        layout: LayoutFunction,
+        region: DefinitionRegion,
+    ) -> Result<Self, String> {
+        let positions: Vec<_> = region.iter_positions().collect();
+        self.add_output(name, io_type, layout, positions)
+    }
+
+    /// Add an output defined by a DefinitionRegion with automatic layout inference
+    pub fn add_output_from_region_auto(
+        self,
+        name: impl Into<String>,
+        io_type: IoType,
+        region: DefinitionRegion,
+    ) -> Result<Self, String> {
+        let positions: Vec<_> = region.iter_positions().collect();
+        self.add_output_auto(name, io_type, positions)
     }
 
     /// Add an input with automatic layout inference
