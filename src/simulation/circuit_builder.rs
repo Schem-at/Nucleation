@@ -7,7 +7,7 @@
 //!
 //! ```ignore
 //! use nucleation::simulation::circuit_builder::CircuitBuilder;
-//! use nucleation::simulation::typed_executor::{IoType, LayoutFunction};
+//! use nucleation::simulation::typed_executor::{IoType, LayoutFunction, SortStrategy};
 //!
 //! let executor = CircuitBuilder::new(schematic)
 //!     .with_input("a", IoType::UnsignedInt { bits: 8 }, region_a)?
@@ -16,11 +16,16 @@
 //!     .with_options(SimulationOptions::default())
 //!     .validate()?
 //!     .build()?;
+//!
+//! // With custom sort strategy:
+//! let executor = CircuitBuilder::new(schematic)
+//!     .with_input_sorted("a", IoType::UnsignedInt { bits: 8 }, region_a, SortStrategy::YDescXZ)?
+//!     .build()?;
 //! ```
 
 use crate::definition_region::DefinitionRegion;
 use crate::simulation::typed_executor::{
-    IoLayoutBuilder, IoType, LayoutFunction, StateMode, TypedCircuitExecutor,
+    IoLayoutBuilder, IoType, LayoutFunction, SortStrategy, StateMode, TypedCircuitExecutor,
 };
 use crate::simulation::{MchprsWorld, SimulationOptions};
 use crate::UniversalSchematic;
@@ -147,15 +152,31 @@ impl CircuitBuilder {
     }
 
     /// Add an input with full control over type, layout, and region
+    ///
+    /// Uses the default sort strategy (YXZ - Y first, then X, then Z).
+    /// For custom ordering, use `with_input_sorted`.
     pub fn with_input(
-        mut self,
+        self,
         name: impl Into<String>,
         io_type: IoType,
         layout: LayoutFunction,
         region: DefinitionRegion,
     ) -> Result<Self, String> {
+        self.with_input_sorted(name, io_type, layout, region, SortStrategy::default())
+    }
+
+    /// Add an input with full control and custom sort strategy
+    pub fn with_input_sorted(
+        mut self,
+        name: impl Into<String>,
+        io_type: IoType,
+        layout: LayoutFunction,
+        region: DefinitionRegion,
+        sort: SortStrategy,
+    ) -> Result<Self, String> {
         let name = name.into();
-        let positions: Vec<_> = region.iter_positions().collect();
+        let raw_positions: Vec<_> = region.iter_positions().collect();
+        let positions = sort.sort(&raw_positions);
 
         if positions.is_empty() {
             return Err(format!("Input '{}' has no positions", name));
@@ -169,14 +190,29 @@ impl CircuitBuilder {
     }
 
     /// Add an input with automatic layout inference
+    ///
+    /// Uses the default sort strategy (YXZ - Y first, then X, then Z).
+    /// For custom ordering, use `with_input_auto_sorted`.
     pub fn with_input_auto(
-        mut self,
+        self,
         name: impl Into<String>,
         io_type: IoType,
         region: DefinitionRegion,
     ) -> Result<Self, String> {
+        self.with_input_auto_sorted(name, io_type, region, SortStrategy::default())
+    }
+
+    /// Add an input with automatic layout inference and custom sort strategy
+    pub fn with_input_auto_sorted(
+        mut self,
+        name: impl Into<String>,
+        io_type: IoType,
+        region: DefinitionRegion,
+        sort: SortStrategy,
+    ) -> Result<Self, String> {
         let name = name.into();
-        let positions: Vec<_> = region.iter_positions().collect();
+        let raw_positions: Vec<_> = region.iter_positions().collect();
+        let positions = sort.sort(&raw_positions);
 
         if positions.is_empty() {
             return Err(format!("Input '{}' has no positions", name));
@@ -190,15 +226,31 @@ impl CircuitBuilder {
     }
 
     /// Add an output with full control over type, layout, and region
+    ///
+    /// Uses the default sort strategy (YXZ - Y first, then X, then Z).
+    /// For custom ordering, use `with_output_sorted`.
     pub fn with_output(
-        mut self,
+        self,
         name: impl Into<String>,
         io_type: IoType,
         layout: LayoutFunction,
         region: DefinitionRegion,
     ) -> Result<Self, String> {
+        self.with_output_sorted(name, io_type, layout, region, SortStrategy::default())
+    }
+
+    /// Add an output with full control and custom sort strategy
+    pub fn with_output_sorted(
+        mut self,
+        name: impl Into<String>,
+        io_type: IoType,
+        layout: LayoutFunction,
+        region: DefinitionRegion,
+        sort: SortStrategy,
+    ) -> Result<Self, String> {
         let name = name.into();
-        let positions: Vec<_> = region.iter_positions().collect();
+        let raw_positions: Vec<_> = region.iter_positions().collect();
+        let positions = sort.sort(&raw_positions);
 
         if positions.is_empty() {
             return Err(format!("Output '{}' has no positions", name));
@@ -212,14 +264,29 @@ impl CircuitBuilder {
     }
 
     /// Add an output with automatic layout inference
+    ///
+    /// Uses the default sort strategy (YXZ - Y first, then X, then Z).
+    /// For custom ordering, use `with_output_auto_sorted`.
     pub fn with_output_auto(
-        mut self,
+        self,
         name: impl Into<String>,
         io_type: IoType,
         region: DefinitionRegion,
     ) -> Result<Self, String> {
+        self.with_output_auto_sorted(name, io_type, region, SortStrategy::default())
+    }
+
+    /// Add an output with automatic layout inference and custom sort strategy
+    pub fn with_output_auto_sorted(
+        mut self,
+        name: impl Into<String>,
+        io_type: IoType,
+        region: DefinitionRegion,
+        sort: SortStrategy,
+    ) -> Result<Self, String> {
         let name = name.into();
-        let positions: Vec<_> = region.iter_positions().collect();
+        let raw_positions: Vec<_> = region.iter_positions().collect();
+        let positions = sort.sort(&raw_positions);
 
         if positions.is_empty() {
             return Err(format!("Output '{}' has no positions", name));

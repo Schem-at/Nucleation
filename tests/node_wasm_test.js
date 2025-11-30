@@ -1027,8 +1027,102 @@ async function runTests() {
         console.log('   ⚠️  DefinitionRegionWrapper not available');
     }
 
-    // Test 20: DefinitionRegion Renderer Support (NEW)
-    console.log('\n🧪 Test 20: DefinitionRegion Renderer Support');
+    // Test 20: SortStrategy (NEW)
+    console.log('\n🧪 Test 20: SortStrategy');
+    if (typeof nucleation.SortStrategyWrapper !== 'undefined') {
+        try {
+            const { SortStrategyWrapper, DefinitionRegionWrapper, BlockPosition } = nucleation;
+
+            // Test factory methods
+            const yxz = SortStrategyWrapper.yxz();
+            const xyz = SortStrategyWrapper.xyz();
+            const zyx = SortStrategyWrapper.zyx();
+            const yDescXZ = SortStrategyWrapper.yDescXZ();
+            const descending = SortStrategyWrapper.descending();
+            const preserve = SortStrategyWrapper.preserve();
+            const reverse = SortStrategyWrapper.reverse();
+            const distanceFrom = SortStrategyWrapper.distanceFrom(5, 5, 5);
+
+            console.log(`   - Created strategies: yxz=${yxz.name}, xyz=${xyz.name}, zyx=${zyx.name}`);
+            console.log(`   - yDescXZ=${yDescXZ.name}, descending=${descending.name}`);
+            console.log(`   - preserve=${preserve.name}, reverse=${reverse.name}`);
+            console.log(`   - distanceFrom=${distanceFrom.name}`);
+
+            // Test fromString
+            const fromStr = SortStrategyWrapper.fromString("y_desc");
+            console.log(`   - fromString("y_desc") = ${fromStr.name}`);
+
+            try {
+                SortStrategyWrapper.fromString("invalid");
+                console.log('   ❌ Should have thrown for invalid strategy');
+            } catch (e) {
+                console.log('   ✅ Correctly throws for invalid strategy');
+            }
+
+            // Test with CircuitBuilder (if available)
+            if (typeof nucleation.CircuitBuilderWrapper !== 'undefined') {
+                const { SchematicWrapper, CircuitBuilderWrapper, IoTypeWrapper } = nucleation;
+
+                // Create a simple schematic
+                const schematic = new SchematicWrapper();
+                for (let x = 0; x < 8; x++) {
+                    schematic.set_block(x, 0, 0, "minecraft:stone");
+                    schematic.set_block_with_properties(x, 1, 0, "minecraft:redstone_wire", { power: "0" });
+                }
+
+                // Create region with multiple Y levels (to test Y sorting)
+                let region = new DefinitionRegionWrapper();
+                region.addBounds(new BlockPosition(0, 1, 0), new BlockPosition(3, 1, 0));  // Y=1
+                region.addBounds(new BlockPosition(0, 2, 0), new BlockPosition(3, 2, 0));  // Y=2
+
+                // Test default sorting (YXZ)
+                let builder = new CircuitBuilderWrapper(schematic);
+                builder = builder.withInputAuto("default_sort", IoTypeWrapper.unsignedInt(8), region);
+                console.log('   ✅ withInputAuto with default sort works');
+
+                // Test custom sorting (Y descending)
+                builder = new CircuitBuilderWrapper(schematic);
+                builder = builder.withInputAutoSorted(
+                    "y_desc_sort",
+                    IoTypeWrapper.unsignedInt(8),
+                    region,
+                    SortStrategyWrapper.yDescXZ()
+                );
+                console.log('   ✅ withInputAutoSorted with Y descending works');
+
+                // Test preserve (box order)
+                builder = new CircuitBuilderWrapper(schematic);
+                builder = builder.withInputAutoSorted(
+                    "preserve_sort",
+                    IoTypeWrapper.unsignedInt(8),
+                    region,
+                    SortStrategyWrapper.preserve()
+                );
+                console.log('   ✅ withInputAutoSorted with preserve works');
+
+                // Test distance-based
+                builder = new CircuitBuilderWrapper(schematic);
+                builder = builder.withInputAutoSorted(
+                    "distance_sort",
+                    IoTypeWrapper.unsignedInt(8),
+                    region,
+                    SortStrategyWrapper.distanceFrom(2, 1, 0)
+                );
+                console.log('   ✅ withInputAutoSorted with distanceFrom works');
+            }
+
+            console.log('   ✅ All SortStrategy tests passed');
+
+        } catch (error) {
+            console.log(`   ❌ SortStrategy test failed: ${error.message}`);
+            console.log(error.stack);
+        }
+    } else {
+        console.log('   ⚠️  SortStrategyWrapper not available');
+    }
+
+    // Test 21: DefinitionRegion Renderer Support (NEW)
+    console.log('\n🧪 Test 21: DefinitionRegion Renderer Support');
     if (typeof nucleation.DefinitionRegionWrapper !== 'undefined') {
         try {
             const { DefinitionRegionWrapper, BlockPosition } = nucleation;

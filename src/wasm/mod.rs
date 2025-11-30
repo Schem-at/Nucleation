@@ -29,7 +29,7 @@ pub use schematic::{
 pub use schematic_builder::SchematicBuilderWrapper;
 
 #[cfg(feature = "simulation")]
-pub use circuit_builder::{CircuitBuilderWrapper, StateModeConstants};
+pub use circuit_builder::{CircuitBuilderWrapper, SortStrategyWrapper, StateModeConstants};
 #[cfg(feature = "simulation")]
 pub use simulation::{MchprsWorldWrapper, SimulationOptionsWrapper};
 #[cfg(feature = "simulation")]

@@ -11,8 +11,9 @@
 5. [Metadata](#metadata)
 6. [Connectivity Analysis](#connectivity-analysis)
 7. [Filtering with Schematics](#filtering-with-schematics)
-8. [Renderer Integration](#renderer-integration)
-9. [Best Practices](#best-practices)
+8. [Sort Strategies for Circuit Execution](#sort-strategies-for-circuit-execution)
+9. [Renderer Integration](#renderer-integration)
+10. [Best Practices](#best-practices)
 
 ---
 
@@ -297,6 +298,150 @@ const litLamps = region.filterByProperties(schematic, { lit: "true" });
 redstone = region.filter_by_block(schematic, "redstone");
 lit_lamps = region.filter_by_properties(schematic, { lit: "true" });
 ```
+
+---
+
+## Sort Strategies for Circuit Execution
+
+When using `DefinitionRegion` for circuit IO, the order of positions determines bit assignment (position 0 = LSB). Use `SortStrategy` to control this ordering.
+
+### Available Strategies
+
+```javascript
+// JavaScript
+const { SortStrategyWrapper } = nucleation;
+
+// Axis-first ascending
+SortStrategyWrapper.yxz(); // Y first, then X, then Z (DEFAULT)
+SortStrategyWrapper.xyz(); // X first, then Y, then Z
+SortStrategyWrapper.zyx(); // Z first, then Y, then X
+
+// Axis-first descending (primary axis descending, others ascending)
+SortStrategyWrapper.yDescXZ(); // Y descending, then X, then Z
+SortStrategyWrapper.xDescYZ(); // X descending, then Y, then Z
+SortStrategyWrapper.zDescYX(); // Z descending, then Y, then X
+
+// Fully descending
+SortStrategyWrapper.descending(); // Y, X, Z all descending
+
+// Distance-based (useful for radial layouts)
+SortStrategyWrapper.distanceFrom(x, y, z); // Closest to (x,y,z) first
+SortStrategyWrapper.distanceFromDesc(x, y, z); // Farthest from (x,y,z) first
+
+// Order preservation
+SortStrategyWrapper.preserve(); // Keep order from region construction
+SortStrategyWrapper.reverse(); // Reverse the iteration order
+```
+
+```python
+# Python
+from nucleation import SortStrategy
+
+# Axis-first ascending
+SortStrategy.yxz()      # Y first, then X, then Z (DEFAULT)
+SortStrategy.xyz()      # X first, then Y, then Z
+SortStrategy.zyx()      # Z first, then Y, then X
+
+# Axis-first descending
+SortStrategy.y_desc_xz()  # Y descending, then X, then Z
+SortStrategy.x_desc_yz()  # X descending, then Y, then Z
+SortStrategy.z_desc_yx()  # Z descending, then Y, then X
+
+# Fully descending
+SortStrategy.descending()  # Y, X, Z all descending
+
+# Distance-based
+SortStrategy.distance_from(x, y, z)
+SortStrategy.distance_from_desc(x, y, z)
+
+# Order preservation
+SortStrategy.preserve()
+SortStrategy.reverse()
+```
+
+### Using with CircuitBuilder
+
+```javascript
+// JavaScript - Default sorting (YXZ)
+let builder = new CircuitBuilderWrapper(schematic).withInputAuto(
+	"data",
+	IoTypeWrapper.unsignedInt(8),
+	region
+);
+
+// Custom sorting (Y descending for top-to-bottom bit ordering)
+builder = new CircuitBuilderWrapper(schematic).withInputAutoSorted(
+	"data",
+	IoTypeWrapper.unsignedInt(8),
+	region,
+	SortStrategyWrapper.yDescXZ()
+);
+
+// Preserve box order (LSB in first box, MSB in second)
+const multiBoxRegion = DefinitionRegionWrapper.fromBoundingBoxes([
+	{ min: [0, 0, 0], max: [3, 0, 0] }, // Bits 0-3
+	{ min: [0, 0, 2], max: [3, 0, 2] }, // Bits 4-7
+]);
+builder = new CircuitBuilderWrapper(schematic).withInputAutoSorted(
+	"data",
+	IoTypeWrapper.unsignedInt(8),
+	multiBoxRegion,
+	SortStrategyWrapper.preserve()
+);
+
+// Distance-based (closest to sign position first)
+const signPos = [5, 2, 0];
+builder = new CircuitBuilderWrapper(schematic).withInputAutoSorted(
+	"data",
+	IoTypeWrapper.unsignedInt(8),
+	region,
+	SortStrategyWrapper.distanceFrom(...signPos)
+);
+```
+
+```python
+# Python - Default sorting (YXZ)
+builder = CircuitBuilder(schematic)
+builder.with_input_auto("data", IoType.unsigned_int(8), region)
+
+# Custom sorting (Y descending)
+builder = CircuitBuilder(schematic)
+builder.with_input_auto_sorted(
+    "data",
+    IoType.unsigned_int(8),
+    region,
+    SortStrategy.y_desc_xz()
+)
+
+# Preserve box order
+multi_box_region = DefinitionRegion.from_bounding_boxes([
+    ((0, 0, 0), (3, 0, 0)),  # Bits 0-3
+    ((0, 0, 2), (3, 0, 2)),  # Bits 4-7
+])
+builder = CircuitBuilder(schematic)
+builder.with_input_auto_sorted(
+    "data",
+    IoType.unsigned_int(8),
+    multi_box_region,
+    SortStrategy.preserve()
+)
+```
+
+### Parse from String
+
+```javascript
+// JavaScript
+const strategy = SortStrategyWrapper.fromString("y_desc");
+console.log(strategy.name); // "y_desc_x_z"
+```
+
+```python
+# Python
+strategy = SortStrategy.from_string("y_desc")
+print(strategy.name)  # "y_desc_x_z"
+```
+
+Valid strings: `"yxz"`, `"xyz"`, `"zyx"`, `"y_desc"`, `"x_desc"`, `"z_desc"`, `"descending"`, `"preserve"`, `"boxOrder"`, `"reverse"`
 
 ---
 

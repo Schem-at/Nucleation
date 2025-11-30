@@ -2,7 +2,7 @@
 //!
 //! Provides a fluent API for defining circuit inputs and outputs with types and layouts.
 
-use super::{IoMapping, IoType, LayoutFunction};
+use super::{IoMapping, IoType, LayoutFunction, SortStrategy};
 use crate::definition_region::DefinitionRegion;
 use std::collections::HashMap;
 
@@ -52,6 +52,9 @@ impl IoLayoutBuilder {
     }
 
     /// Add an input defined by a DefinitionRegion
+    ///
+    /// Uses the default sort strategy (YXZ - Y first, then X, then Z).
+    /// For custom ordering, use `add_input_from_region_sorted`.
     pub fn add_input_from_region(
         self,
         name: impl Into<String>,
@@ -59,19 +62,47 @@ impl IoLayoutBuilder {
         layout: LayoutFunction,
         region: DefinitionRegion,
     ) -> Result<Self, String> {
-        let positions: Vec<_> = region.iter_positions().collect();
-        self.add_input(name, io_type, layout, positions)
+        self.add_input_from_region_sorted(name, io_type, layout, region, SortStrategy::default())
+    }
+
+    /// Add an input defined by a DefinitionRegion with a custom sort strategy
+    pub fn add_input_from_region_sorted(
+        self,
+        name: impl Into<String>,
+        io_type: IoType,
+        layout: LayoutFunction,
+        region: DefinitionRegion,
+        sort: SortStrategy,
+    ) -> Result<Self, String> {
+        let positions = region.iter_positions().collect::<Vec<_>>();
+        let sorted_positions = sort.sort(&positions);
+        self.add_input(name, io_type, layout, sorted_positions)
     }
 
     /// Add an input defined by a DefinitionRegion with automatic layout inference
+    ///
+    /// Uses the default sort strategy (YXZ - Y first, then X, then Z).
+    /// For custom ordering, use `add_input_from_region_auto_sorted`.
     pub fn add_input_from_region_auto(
         self,
         name: impl Into<String>,
         io_type: IoType,
         region: DefinitionRegion,
     ) -> Result<Self, String> {
-        let positions: Vec<_> = region.iter_positions().collect();
-        self.add_input_auto(name, io_type, positions)
+        self.add_input_from_region_auto_sorted(name, io_type, region, SortStrategy::default())
+    }
+
+    /// Add an input defined by a DefinitionRegion with automatic layout and custom sort strategy
+    pub fn add_input_from_region_auto_sorted(
+        self,
+        name: impl Into<String>,
+        io_type: IoType,
+        region: DefinitionRegion,
+        sort: SortStrategy,
+    ) -> Result<Self, String> {
+        let positions = region.iter_positions().collect::<Vec<_>>();
+        let sorted_positions = sort.sort(&positions);
+        self.add_input_auto(name, io_type, sorted_positions)
     }
 
     /// Add an output with full control
@@ -104,6 +135,9 @@ impl IoLayoutBuilder {
     }
 
     /// Add an output defined by a DefinitionRegion
+    ///
+    /// Uses the default sort strategy (YXZ - Y first, then X, then Z).
+    /// For custom ordering, use `add_output_from_region_sorted`.
     pub fn add_output_from_region(
         self,
         name: impl Into<String>,
@@ -111,19 +145,47 @@ impl IoLayoutBuilder {
         layout: LayoutFunction,
         region: DefinitionRegion,
     ) -> Result<Self, String> {
-        let positions: Vec<_> = region.iter_positions().collect();
-        self.add_output(name, io_type, layout, positions)
+        self.add_output_from_region_sorted(name, io_type, layout, region, SortStrategy::default())
+    }
+
+    /// Add an output defined by a DefinitionRegion with a custom sort strategy
+    pub fn add_output_from_region_sorted(
+        self,
+        name: impl Into<String>,
+        io_type: IoType,
+        layout: LayoutFunction,
+        region: DefinitionRegion,
+        sort: SortStrategy,
+    ) -> Result<Self, String> {
+        let positions = region.iter_positions().collect::<Vec<_>>();
+        let sorted_positions = sort.sort(&positions);
+        self.add_output(name, io_type, layout, sorted_positions)
     }
 
     /// Add an output defined by a DefinitionRegion with automatic layout inference
+    ///
+    /// Uses the default sort strategy (YXZ - Y first, then X, then Z).
+    /// For custom ordering, use `add_output_from_region_auto_sorted`.
     pub fn add_output_from_region_auto(
         self,
         name: impl Into<String>,
         io_type: IoType,
         region: DefinitionRegion,
     ) -> Result<Self, String> {
-        let positions: Vec<_> = region.iter_positions().collect();
-        self.add_output_auto(name, io_type, positions)
+        self.add_output_from_region_auto_sorted(name, io_type, region, SortStrategy::default())
+    }
+
+    /// Add an output defined by a DefinitionRegion with automatic layout and custom sort strategy
+    pub fn add_output_from_region_auto_sorted(
+        self,
+        name: impl Into<String>,
+        io_type: IoType,
+        region: DefinitionRegion,
+        sort: SortStrategy,
+    ) -> Result<Self, String> {
+        let positions = region.iter_positions().collect::<Vec<_>>();
+        let sorted_positions = sort.sort(&positions);
+        self.add_output_auto(name, io_type, sorted_positions)
     }
 
     /// Add an input with automatic layout inference

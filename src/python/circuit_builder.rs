@@ -4,11 +4,176 @@
 
 use pyo3::prelude::*;
 
-use crate::simulation::typed_executor::StateMode;
+use crate::simulation::typed_executor::{SortStrategy, StateMode};
 use crate::simulation::CircuitBuilder;
-use crate::UniversalSchematic;
 
 use super::{PyDefinitionRegion, PyIoType, PyLayoutFunction, PySchematic, PyTypedCircuitExecutor};
+
+// --- Sort Strategy ---
+
+/// Sort strategy for ordering positions in IO layouts
+///
+/// Controls how positions are ordered when assigned to bits.
+/// Position 0 corresponds to bit 0 (LSB), position 1 to bit 1, etc.
+#[pyclass(name = "SortStrategy")]
+#[derive(Clone)]
+pub struct PySortStrategy {
+    pub(crate) inner: SortStrategy,
+}
+
+#[pymethods]
+impl PySortStrategy {
+    // ========================================================================
+    // Axis-first sorting (ascending)
+    // ========================================================================
+
+    /// Sort by Y first (ascending), then X, then Z
+    /// Standard Minecraft layer-based ordering. This is the default.
+    #[staticmethod]
+    fn yxz() -> Self {
+        Self {
+            inner: SortStrategy::YXZ,
+        }
+    }
+
+    /// Sort by X first (ascending), then Y, then Z
+    #[staticmethod]
+    fn xyz() -> Self {
+        Self {
+            inner: SortStrategy::XYZ,
+        }
+    }
+
+    /// Sort by Z first (ascending), then Y, then X
+    #[staticmethod]
+    fn zyx() -> Self {
+        Self {
+            inner: SortStrategy::ZYX,
+        }
+    }
+
+    // ========================================================================
+    // Axis-first sorting (descending)
+    // ========================================================================
+
+    /// Sort by Y first (descending), then X ascending, then Z ascending
+    #[staticmethod]
+    fn y_desc_xz() -> Self {
+        Self {
+            inner: SortStrategy::YDescXZ,
+        }
+    }
+
+    /// Sort by X first (descending), then Y ascending, then Z ascending
+    #[staticmethod]
+    fn x_desc_yz() -> Self {
+        Self {
+            inner: SortStrategy::XDescYZ,
+        }
+    }
+
+    /// Sort by Z first (descending), then Y ascending, then X ascending
+    #[staticmethod]
+    fn z_desc_yx() -> Self {
+        Self {
+            inner: SortStrategy::ZDescYX,
+        }
+    }
+
+    // ========================================================================
+    // Fully descending
+    // ========================================================================
+
+    /// Sort by Y descending, then X descending, then Z descending
+    #[staticmethod]
+    fn descending() -> Self {
+        Self {
+            inner: SortStrategy::YXZDesc,
+        }
+    }
+
+    // ========================================================================
+    // Distance-based sorting
+    // ========================================================================
+
+    /// Sort by Euclidean distance from a reference point (ascending)
+    /// Closest positions first. Useful for radial layouts.
+    #[staticmethod]
+    fn distance_from(x: i32, y: i32, z: i32) -> Self {
+        Self {
+            inner: SortStrategy::distance_from(x, y, z),
+        }
+    }
+
+    /// Sort by Euclidean distance from a reference point (descending)
+    /// Farthest positions first.
+    #[staticmethod]
+    fn distance_from_desc(x: i32, y: i32, z: i32) -> Self {
+        Self {
+            inner: SortStrategy::distance_from_desc(x, y, z),
+        }
+    }
+
+    // ========================================================================
+    // Special strategies
+    // ========================================================================
+
+    /// Preserve the order positions were added (no sorting)
+    /// Useful when you've manually ordered positions or are using `from_bounding_boxes`
+    /// where box order matters.
+    #[staticmethod]
+    fn preserve() -> Self {
+        Self {
+            inner: SortStrategy::Preserve,
+        }
+    }
+
+    /// Reverse of whatever order positions were added
+    #[staticmethod]
+    fn reverse() -> Self {
+        Self {
+            inner: SortStrategy::Reverse,
+        }
+    }
+
+    // ========================================================================
+    // Parsing
+    // ========================================================================
+
+    /// Parse sort strategy from string
+    ///
+    /// Accepts: "yxz", "xyz", "zyx", "y_desc", "x_desc", "z_desc",
+    ///          "descending", "preserve", "reverse"
+    #[staticmethod]
+    fn from_string(s: &str) -> PyResult<Self> {
+        SortStrategy::from_str(s)
+            .map(|inner| Self { inner })
+            .ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "Unknown sort strategy: {}",
+                    s
+                ))
+            })
+    }
+
+    /// Get the name of this strategy
+    #[getter]
+    fn name(&self) -> String {
+        self.inner.name().to_string()
+    }
+
+    fn __repr__(&self) -> String {
+        format!("SortStrategy.{}", self.inner.name())
+    }
+}
+
+impl Default for PySortStrategy {
+    fn default() -> Self {
+        Self {
+            inner: SortStrategy::default(),
+        }
+    }
+}
 
 /// CircuitBuilder wrapper for Python
 /// Provides a fluent API for creating TypedCircuitExecutor instances
@@ -48,6 +213,9 @@ impl PyCircuitBuilder {
     }
 
     /// Add an input with explicit layout
+    ///
+    /// Uses the default sort strategy (YXZ - Y first, then X, then Z).
+    /// For custom ordering, use `with_input_sorted`.
     fn with_input(
         &mut self,
         name: String,
@@ -69,7 +237,34 @@ impl PyCircuitBuilder {
         Ok(())
     }
 
+    /// Add an input with explicit layout and custom sort strategy
+    fn with_input_sorted(
+        &mut self,
+        name: String,
+        io_type: &PyIoType,
+        layout: &PyLayoutFunction,
+        region: &PyDefinitionRegion,
+        sort: &PySortStrategy,
+    ) -> PyResult<()> {
+        let builder = self.take_builder()?;
+        self.inner = Some(
+            builder
+                .with_input_sorted(
+                    name,
+                    io_type.inner.clone(),
+                    layout.inner.clone(),
+                    region.inner.clone(),
+                    sort.inner.clone(),
+                )
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?,
+        );
+        Ok(())
+    }
+
     /// Add an input with auto-inferred layout
+    ///
+    /// Uses the default sort strategy (YXZ - Y first, then X, then Z).
+    /// For custom ordering, use `with_input_auto_sorted`.
     fn with_input_auto(
         &mut self,
         name: String,
@@ -85,7 +280,32 @@ impl PyCircuitBuilder {
         Ok(())
     }
 
+    /// Add an input with auto-inferred layout and custom sort strategy
+    fn with_input_auto_sorted(
+        &mut self,
+        name: String,
+        io_type: &PyIoType,
+        region: &PyDefinitionRegion,
+        sort: &PySortStrategy,
+    ) -> PyResult<()> {
+        let builder = self.take_builder()?;
+        self.inner = Some(
+            builder
+                .with_input_auto_sorted(
+                    name,
+                    io_type.inner.clone(),
+                    region.inner.clone(),
+                    sort.inner.clone(),
+                )
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?,
+        );
+        Ok(())
+    }
+
     /// Add an output with explicit layout
+    ///
+    /// Uses the default sort strategy (YXZ - Y first, then X, then Z).
+    /// For custom ordering, use `with_output_sorted`.
     fn with_output(
         &mut self,
         name: String,
@@ -107,7 +327,34 @@ impl PyCircuitBuilder {
         Ok(())
     }
 
+    /// Add an output with explicit layout and custom sort strategy
+    fn with_output_sorted(
+        &mut self,
+        name: String,
+        io_type: &PyIoType,
+        layout: &PyLayoutFunction,
+        region: &PyDefinitionRegion,
+        sort: &PySortStrategy,
+    ) -> PyResult<()> {
+        let builder = self.take_builder()?;
+        self.inner = Some(
+            builder
+                .with_output_sorted(
+                    name,
+                    io_type.inner.clone(),
+                    layout.inner.clone(),
+                    region.inner.clone(),
+                    sort.inner.clone(),
+                )
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?,
+        );
+        Ok(())
+    }
+
     /// Add an output with auto-inferred layout
+    ///
+    /// Uses the default sort strategy (YXZ - Y first, then X, then Z).
+    /// For custom ordering, use `with_output_auto_sorted`.
     fn with_output_auto(
         &mut self,
         name: String,
@@ -118,6 +365,28 @@ impl PyCircuitBuilder {
         self.inner = Some(
             builder
                 .with_output_auto(name, io_type.inner.clone(), region.inner.clone())
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?,
+        );
+        Ok(())
+    }
+
+    /// Add an output with auto-inferred layout and custom sort strategy
+    fn with_output_auto_sorted(
+        &mut self,
+        name: String,
+        io_type: &PyIoType,
+        region: &PyDefinitionRegion,
+        sort: &PySortStrategy,
+    ) -> PyResult<()> {
+        let builder = self.take_builder()?;
+        self.inner = Some(
+            builder
+                .with_output_auto_sorted(
+                    name,
+                    io_type.inner.clone(),
+                    region.inner.clone(),
+                    sort.inner.clone(),
+                )
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?,
         );
         Ok(())

@@ -29,7 +29,7 @@ pub use schematic::{PyBlockState, PySchematic};
 pub use schematic_builder::PySchematicBuilder;
 
 #[cfg(feature = "simulation")]
-pub use circuit_builder::PyCircuitBuilder;
+pub use circuit_builder::{PyCircuitBuilder, PySortStrategy};
 #[cfg(feature = "simulation")]
 pub use simulation::PyMchprsWorld;
 #[cfg(feature = "simulation")]
@@ -66,6 +66,7 @@ pub fn nucleation(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m.add_class::<PyIoLayout>()?;
         m.add_class::<PyTypedCircuitExecutor>()?;
         m.add_class::<PyCircuitBuilder>()?;
+        m.add_class::<PySortStrategy>()?;
     }
 
     Ok(())

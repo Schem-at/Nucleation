@@ -633,6 +633,131 @@ def test_get_layout_info():
 
 
 # =============================================================================
+# SortStrategy Tests (NEW)
+# =============================================================================
+
+
+def test_sort_strategy_creation():
+    """Test SortStrategy factory methods."""
+    if not SIMULATION_AVAILABLE:
+        return
+
+    from nucleation import SortStrategy
+
+    # Test all factory methods
+    yxz = SortStrategy.yxz()
+    xyz = SortStrategy.xyz()
+    zyx = SortStrategy.zyx()
+    y_desc = SortStrategy.y_desc_xz()
+    x_desc = SortStrategy.x_desc_yz()
+    z_desc = SortStrategy.z_desc_yx()
+    descending = SortStrategy.descending()
+    preserve = SortStrategy.preserve()
+    reverse = SortStrategy.reverse()
+    dist = SortStrategy.distance_from(5, 5, 5)
+    dist_desc = SortStrategy.distance_from_desc(5, 5, 5)
+
+    # Verify names
+    assert yxz.name == "y_x_z"
+    assert xyz.name == "x_y_z"
+    assert zyx.name == "z_y_x"
+    assert y_desc.name == "y_desc_x_z"
+    assert preserve.name == "preserve"
+    assert reverse.name == "reverse"
+    assert dist.name == "distance_from"
+
+    test_passed("SortStrategy Creation")
+
+
+def test_sort_strategy_from_string():
+    """Test SortStrategy.from_string parsing."""
+    if not SIMULATION_AVAILABLE:
+        return
+
+    from nucleation import SortStrategy
+
+    # Valid strings
+    assert SortStrategy.from_string("yxz").name == "y_x_z"
+    assert SortStrategy.from_string("y_x_z").name == "y_x_z"
+    assert SortStrategy.from_string("y").name == "y_x_z"
+    assert SortStrategy.from_string("xyz").name == "x_y_z"
+    assert SortStrategy.from_string("y_desc").name == "y_desc_x_z"
+    assert SortStrategy.from_string("preserve").name == "preserve"
+    assert SortStrategy.from_string("boxOrder").name == "preserve"
+    assert SortStrategy.from_string("reverse").name == "reverse"
+
+    # Invalid string should raise
+    try:
+        SortStrategy.from_string("invalid")
+        assert False, "Should have raised ValueError"
+    except ValueError:
+        pass
+
+    test_passed("SortStrategy from_string")
+
+
+def test_circuit_builder_with_sort_strategy():
+    """Test CircuitBuilder with custom sort strategies."""
+    if not SIMULATION_AVAILABLE:
+        return
+
+    from nucleation import SortStrategy
+
+    # Create schematic with 8 positions across 2 Y levels
+    schematic = Schematic("Sort Strategy Test")
+    for y in [1, 2]:
+        for x in range(4):
+            schematic.set_block(x, 0, 0, "minecraft:stone")
+            schematic.set_block(x, y, 0, "minecraft:redstone_wire[power=0]")
+
+    # Create region spanning two Y levels
+    region = DefinitionRegion()
+    region.add_bounds((0, 1, 0), (3, 1, 0))  # Y=1, 4 blocks
+    region.add_bounds((0, 2, 0), (3, 2, 0))  # Y=2, 4 blocks
+
+    # Test with default sort (YXZ)
+    builder = CircuitBuilder(schematic)
+    builder.with_input_auto("default", IoType.unsigned_int(8), region)
+    assert builder.input_count() == 1
+    test_passed("CircuitBuilder default sort")
+
+    # Test with Y descending sort
+    builder2 = CircuitBuilder(schematic)
+    builder2.with_input_auto_sorted(
+        "y_desc", IoType.unsigned_int(8), region, SortStrategy.y_desc_xz()
+    )
+    assert builder2.input_count() == 1
+    test_passed("CircuitBuilder Y descending sort")
+
+    # Test with preserve (box order)
+    builder3 = CircuitBuilder(schematic)
+    builder3.with_input_auto_sorted(
+        "preserve", IoType.unsigned_int(8), region, SortStrategy.preserve()
+    )
+    assert builder3.input_count() == 1
+    test_passed("CircuitBuilder preserve sort")
+
+    # Test with distance-based sort
+    builder4 = CircuitBuilder(schematic)
+    builder4.with_input_auto_sorted(
+        "distance",
+        IoType.unsigned_int(8),
+        region,
+        SortStrategy.distance_from(2, 1, 0),
+    )
+    assert builder4.input_count() == 1
+    test_passed("CircuitBuilder distance sort")
+
+    # Test output with sort strategy
+    builder5 = CircuitBuilder(schematic)
+    builder5.with_output_auto_sorted(
+        "out", IoType.unsigned_int(8), region, SortStrategy.xyz()
+    )
+    assert builder5.output_count() == 1
+    test_passed("CircuitBuilder output with sort")
+
+
+# =============================================================================
 # Run All Tests
 # =============================================================================
 
@@ -682,6 +807,13 @@ def run_all_tests():
     test_circuit_builder()
     test_io_layout_builder_regions()
     test_get_layout_info()
+    print()
+
+    # SortStrategy tests (NEW)
+    print("--- SortStrategy Tests ---")
+    test_sort_strategy_creation()
+    test_sort_strategy_from_string()
+    test_circuit_builder_with_sort_strategy()
     print()
 
     print("=" * 60)

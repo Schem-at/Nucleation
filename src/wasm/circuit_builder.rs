@@ -6,10 +6,166 @@ use super::{
     DefinitionRegionWrapper, IoTypeWrapper, LayoutFunctionWrapper, SchematicWrapper,
     SimulationOptionsWrapper, TypedCircuitExecutorWrapper,
 };
-use crate::simulation::typed_executor::StateMode;
+use crate::simulation::typed_executor::{SortStrategy, StateMode};
 use crate::simulation::CircuitBuilder;
 use js_sys::{Array, Object, Reflect};
 use wasm_bindgen::prelude::*;
+
+// --- Sort Strategy ---
+
+/// Sort strategy for ordering positions in IO layouts
+///
+/// Controls how positions are ordered when assigned to bits.
+/// Position 0 corresponds to bit 0 (LSB), position 1 to bit 1, etc.
+#[wasm_bindgen]
+pub struct SortStrategyWrapper {
+    pub(crate) inner: SortStrategy,
+}
+
+#[wasm_bindgen]
+impl SortStrategyWrapper {
+    // ========================================================================
+    // Axis-first sorting (ascending)
+    // ========================================================================
+
+    /// Sort by Y first (ascending), then X, then Z
+    /// Standard Minecraft layer-based ordering. This is the default.
+    #[wasm_bindgen(js_name = yxz)]
+    pub fn yxz() -> Self {
+        Self {
+            inner: SortStrategy::YXZ,
+        }
+    }
+
+    /// Sort by X first (ascending), then Y, then Z
+    #[wasm_bindgen(js_name = xyz)]
+    pub fn xyz() -> Self {
+        Self {
+            inner: SortStrategy::XYZ,
+        }
+    }
+
+    /// Sort by Z first (ascending), then Y, then X
+    #[wasm_bindgen(js_name = zyx)]
+    pub fn zyx() -> Self {
+        Self {
+            inner: SortStrategy::ZYX,
+        }
+    }
+
+    // ========================================================================
+    // Axis-first sorting (descending)
+    // ========================================================================
+
+    /// Sort by Y first (descending), then X ascending, then Z ascending
+    #[wasm_bindgen(js_name = yDescXZ)]
+    pub fn y_desc_xz() -> Self {
+        Self {
+            inner: SortStrategy::YDescXZ,
+        }
+    }
+
+    /// Sort by X first (descending), then Y ascending, then Z ascending
+    #[wasm_bindgen(js_name = xDescYZ)]
+    pub fn x_desc_yz() -> Self {
+        Self {
+            inner: SortStrategy::XDescYZ,
+        }
+    }
+
+    /// Sort by Z first (descending), then Y ascending, then X ascending
+    #[wasm_bindgen(js_name = zDescYX)]
+    pub fn z_desc_yx() -> Self {
+        Self {
+            inner: SortStrategy::ZDescYX,
+        }
+    }
+
+    // ========================================================================
+    // Fully descending
+    // ========================================================================
+
+    /// Sort by Y descending, then X descending, then Z descending
+    #[wasm_bindgen(js_name = descending)]
+    pub fn descending() -> Self {
+        Self {
+            inner: SortStrategy::YXZDesc,
+        }
+    }
+
+    // ========================================================================
+    // Distance-based sorting
+    // ========================================================================
+
+    /// Sort by Euclidean distance from a reference point (ascending)
+    /// Closest positions first. Useful for radial layouts.
+    #[wasm_bindgen(js_name = distanceFrom)]
+    pub fn distance_from(x: i32, y: i32, z: i32) -> Self {
+        Self {
+            inner: SortStrategy::distance_from(x, y, z),
+        }
+    }
+
+    /// Sort by Euclidean distance from a reference point (descending)
+    /// Farthest positions first.
+    #[wasm_bindgen(js_name = distanceFromDesc)]
+    pub fn distance_from_desc(x: i32, y: i32, z: i32) -> Self {
+        Self {
+            inner: SortStrategy::distance_from_desc(x, y, z),
+        }
+    }
+
+    // ========================================================================
+    // Special strategies
+    // ========================================================================
+
+    /// Preserve the order positions were added (no sorting)
+    /// Useful when you've manually ordered positions or are using `fromBoundingBoxes`
+    /// where box order matters.
+    #[wasm_bindgen(js_name = preserve)]
+    pub fn preserve() -> Self {
+        Self {
+            inner: SortStrategy::Preserve,
+        }
+    }
+
+    /// Reverse of whatever order positions were added
+    #[wasm_bindgen(js_name = reverse)]
+    pub fn reverse() -> Self {
+        Self {
+            inner: SortStrategy::Reverse,
+        }
+    }
+
+    // ========================================================================
+    // Parsing
+    // ========================================================================
+
+    /// Parse sort strategy from string
+    ///
+    /// Accepts: "yxz", "xyz", "zyx", "y_desc", "x_desc", "z_desc",
+    ///          "descending", "preserve", "reverse"
+    #[wasm_bindgen(js_name = fromString)]
+    pub fn from_string(s: &str) -> Result<SortStrategyWrapper, JsValue> {
+        SortStrategy::from_str(s)
+            .map(|inner| Self { inner })
+            .ok_or_else(|| JsValue::from_str(&format!("Unknown sort strategy: {}", s)))
+    }
+
+    /// Get the name of this strategy
+    #[wasm_bindgen(getter)]
+    pub fn name(&self) -> String {
+        self.inner.name().to_string()
+    }
+}
+
+impl Default for SortStrategyWrapper {
+    fn default() -> Self {
+        Self {
+            inner: SortStrategy::default(),
+        }
+    }
+}
 
 // --- CircuitBuilder Support ---
 
@@ -39,6 +195,9 @@ impl CircuitBuilderWrapper {
     }
 
     /// Add an input with full control
+    ///
+    /// Uses the default sort strategy (YXZ - Y first, then X, then Z).
+    /// For custom ordering, use `withInputSorted`.
     #[wasm_bindgen(js_name = withInput)]
     pub fn with_input(
         mut self,
@@ -59,7 +218,33 @@ impl CircuitBuilderWrapper {
         Ok(self)
     }
 
+    /// Add an input with full control and custom sort strategy
+    #[wasm_bindgen(js_name = withInputSorted)]
+    pub fn with_input_sorted(
+        mut self,
+        name: String,
+        io_type: &IoTypeWrapper,
+        layout: &LayoutFunctionWrapper,
+        region: &DefinitionRegionWrapper,
+        sort: &SortStrategyWrapper,
+    ) -> Result<CircuitBuilderWrapper, JsValue> {
+        self.inner = self
+            .inner
+            .with_input_sorted(
+                name,
+                io_type.inner.clone(),
+                layout.inner.clone(),
+                region.inner.clone(),
+                sort.inner.clone(),
+            )
+            .map_err(|e| JsValue::from_str(&e))?;
+        Ok(self)
+    }
+
     /// Add an input with automatic layout inference
+    ///
+    /// Uses the default sort strategy (YXZ - Y first, then X, then Z).
+    /// For custom ordering, use `withInputAutoSorted`.
     #[wasm_bindgen(js_name = withInputAuto)]
     pub fn with_input_auto(
         mut self,
@@ -74,7 +259,31 @@ impl CircuitBuilderWrapper {
         Ok(self)
     }
 
+    /// Add an input with automatic layout inference and custom sort strategy
+    #[wasm_bindgen(js_name = withInputAutoSorted)]
+    pub fn with_input_auto_sorted(
+        mut self,
+        name: String,
+        io_type: &IoTypeWrapper,
+        region: &DefinitionRegionWrapper,
+        sort: &SortStrategyWrapper,
+    ) -> Result<CircuitBuilderWrapper, JsValue> {
+        self.inner = self
+            .inner
+            .with_input_auto_sorted(
+                name,
+                io_type.inner.clone(),
+                region.inner.clone(),
+                sort.inner.clone(),
+            )
+            .map_err(|e| JsValue::from_str(&e))?;
+        Ok(self)
+    }
+
     /// Add an output with full control
+    ///
+    /// Uses the default sort strategy (YXZ - Y first, then X, then Z).
+    /// For custom ordering, use `withOutputSorted`.
     #[wasm_bindgen(js_name = withOutput)]
     pub fn with_output(
         mut self,
@@ -95,7 +304,33 @@ impl CircuitBuilderWrapper {
         Ok(self)
     }
 
+    /// Add an output with full control and custom sort strategy
+    #[wasm_bindgen(js_name = withOutputSorted)]
+    pub fn with_output_sorted(
+        mut self,
+        name: String,
+        io_type: &IoTypeWrapper,
+        layout: &LayoutFunctionWrapper,
+        region: &DefinitionRegionWrapper,
+        sort: &SortStrategyWrapper,
+    ) -> Result<CircuitBuilderWrapper, JsValue> {
+        self.inner = self
+            .inner
+            .with_output_sorted(
+                name,
+                io_type.inner.clone(),
+                layout.inner.clone(),
+                region.inner.clone(),
+                sort.inner.clone(),
+            )
+            .map_err(|e| JsValue::from_str(&e))?;
+        Ok(self)
+    }
+
     /// Add an output with automatic layout inference
+    ///
+    /// Uses the default sort strategy (YXZ - Y first, then X, then Z).
+    /// For custom ordering, use `withOutputAutoSorted`.
     #[wasm_bindgen(js_name = withOutputAuto)]
     pub fn with_output_auto(
         mut self,
@@ -106,6 +341,27 @@ impl CircuitBuilderWrapper {
         self.inner = self
             .inner
             .with_output_auto(name, io_type.inner.clone(), region.inner.clone())
+            .map_err(|e| JsValue::from_str(&e))?;
+        Ok(self)
+    }
+
+    /// Add an output with automatic layout inference and custom sort strategy
+    #[wasm_bindgen(js_name = withOutputAutoSorted)]
+    pub fn with_output_auto_sorted(
+        mut self,
+        name: String,
+        io_type: &IoTypeWrapper,
+        region: &DefinitionRegionWrapper,
+        sort: &SortStrategyWrapper,
+    ) -> Result<CircuitBuilderWrapper, JsValue> {
+        self.inner = self
+            .inner
+            .with_output_auto_sorted(
+                name,
+                io_type.inner.clone(),
+                region.inner.clone(),
+                sort.inner.clone(),
+            )
             .map_err(|e| JsValue::from_str(&e))?;
         Ok(self)
     }

@@ -120,6 +120,7 @@ mod io_layout_builder;
 mod io_mapping;
 mod io_type;
 mod layout_function;
+mod sort_strategy;
 mod value;
 
 #[cfg(test)]
@@ -135,10 +136,11 @@ pub use executor::{
 };
 pub use insign_io::{
     create_executor_from_insign, create_executor_from_insign_with_options,
-    parse_io_layout_from_insign, InsignIoError, SortStrategy,
+    parse_io_layout_from_insign, InsignIoError,
 };
 pub use io_layout_builder::{IoLayout, IoLayoutBuilder};
 pub use io_mapping::IoMapping;
 pub use io_type::IoType;
 pub use layout_function::LayoutFunction;
+pub use sort_strategy::SortStrategy;
 pub use value::Value;
