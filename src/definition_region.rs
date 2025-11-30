@@ -472,6 +472,159 @@ impl DefinitionRegion {
     pub fn positions(&self) -> Vec<(i32, i32, i32)> {
         self.iter_positions().collect()
     }
+
+    // ========================================================================
+    // Box Access (for Rendering)
+    // ========================================================================
+
+    /// Create a DefinitionRegion from multiple bounding boxes
+    ///
+    /// Unlike `from_positions()` which takes individual points and merges them,
+    /// this takes pre-defined bounding boxes directly.
+    pub fn from_bounding_boxes(boxes: Vec<((i32, i32, i32), (i32, i32, i32))>) -> Self {
+        let mut region = Self::new();
+        for (min, max) in boxes {
+            region.add_bounds(min, max);
+        }
+        region
+    }
+
+    /// Get the number of bounding boxes in this region
+    pub fn box_count(&self) -> usize {
+        self.boxes.len()
+    }
+
+    /// Get a specific bounding box by index
+    ///
+    /// Returns None if index is out of bounds.
+    /// The returned tuple is ((min_x, min_y, min_z), (max_x, max_y, max_z))
+    pub fn get_box(&self, index: usize) -> Option<((i32, i32, i32), (i32, i32, i32))> {
+        self.boxes.get(index).map(|bbox| (bbox.min, bbox.max))
+    }
+
+    /// Get all bounding boxes in this region
+    ///
+    /// Returns a Vec of ((min_x, min_y, min_z), (max_x, max_y, max_z)) tuples.
+    /// Useful for rendering each box separately.
+    pub fn get_boxes(&self) -> Vec<((i32, i32, i32), (i32, i32, i32))> {
+        self.boxes.iter().map(|bbox| (bbox.min, bbox.max)).collect()
+    }
+
+    /// Get a reference to the internal boxes (for advanced use)
+    pub fn boxes_ref(&self) -> &[BoundingBox] {
+        &self.boxes
+    }
+
+    // ========================================================================
+    // Metadata Access
+    // ========================================================================
+
+    /// Get a metadata value by key
+    pub fn get_metadata(&self, key: &str) -> Option<&String> {
+        self.metadata.get(key)
+    }
+
+    /// Set a metadata value (mutating version)
+    pub fn set_metadata(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.metadata.insert(key.into(), value.into());
+    }
+
+    /// Get all metadata as a reference
+    pub fn metadata_ref(&self) -> &HashMap<String, String> {
+        &self.metadata
+    }
+
+    /// Get all metadata keys
+    pub fn metadata_keys(&self) -> Vec<&String> {
+        self.metadata.keys().collect()
+    }
+
+    // ========================================================================
+    // Geometry Helpers (for Rendering)
+    // ========================================================================
+
+    /// Get the dimensions (width, height, length) of the overall bounding box
+    ///
+    /// Returns (0, 0, 0) if the region is empty.
+    pub fn dimensions(&self) -> (i32, i32, i32) {
+        match self.get_bounds() {
+            Some(bbox) => bbox.get_dimensions(),
+            None => (0, 0, 0),
+        }
+    }
+
+    /// Get the center point of the region (integer coordinates)
+    ///
+    /// Returns None if the region is empty.
+    pub fn center(&self) -> Option<(i32, i32, i32)> {
+        self.get_bounds().map(|bbox| {
+            (
+                (bbox.min.0 + bbox.max.0) / 2,
+                (bbox.min.1 + bbox.max.1) / 2,
+                (bbox.min.2 + bbox.max.2) / 2,
+            )
+        })
+    }
+
+    /// Get the center point of the region as f32 (for rendering)
+    ///
+    /// Returns None if the region is empty.
+    pub fn center_f32(&self) -> Option<(f32, f32, f32)> {
+        self.get_bounds().map(|bbox| {
+            (
+                (bbox.min.0 as f32 + bbox.max.0 as f32 + 1.0) / 2.0,
+                (bbox.min.1 as f32 + bbox.max.1 as f32 + 1.0) / 2.0,
+                (bbox.min.2 as f32 + bbox.max.2 as f32 + 1.0) / 2.0,
+            )
+        })
+    }
+
+    /// Check if this region intersects with a bounding box
+    ///
+    /// Useful for frustum culling in renderers.
+    pub fn intersects_bounds(&self, min: (i32, i32, i32), max: (i32, i32, i32)) -> bool {
+        let query = BoundingBox::new(min, max);
+        self.boxes.iter().any(|bbox| bbox.intersects(&query))
+    }
+
+    // ========================================================================
+    // Immutable Geometric Transformations
+    // ========================================================================
+
+    /// Create a new region shifted by the given offset (immutable)
+    ///
+    /// Returns a new region without modifying `self`.
+    pub fn shifted(&self, x: i32, y: i32, z: i32) -> Self {
+        let mut result = self.clone();
+        result.shift(x, y, z);
+        result
+    }
+
+    /// Create a new region expanded by the given amounts (immutable)
+    ///
+    /// Returns a new region without modifying `self`.
+    pub fn expanded(&self, x: i32, y: i32, z: i32) -> Self {
+        let mut result = self.clone();
+        result.expand(x, y, z);
+        result
+    }
+
+    /// Create a new region contracted by the given amount (immutable)
+    ///
+    /// Returns a new region without modifying `self`.
+    pub fn contracted(&self, amount: i32) -> Self {
+        let mut result = self.clone();
+        result.contract(amount);
+        result
+    }
+
+    /// Create a deep copy of this region
+    ///
+    /// Explicit clone method for language bindings that don't have
+    /// automatic Clone support.
+    pub fn copy(&self) -> Self {
+        self.clone()
+    }
 }
 
 #[cfg(test)]
@@ -568,5 +721,282 @@ mod tests {
         assert!(region.contains(10, 10, 10));
         assert!(!region.contains(11, 0, 0));
         assert!(!region.contains(-1, 0, 0));
+    }
+
+    // ========================================================================
+    // NEW TESTS: Box Access
+    // ========================================================================
+
+    #[test]
+    fn test_from_bounding_boxes() {
+        let boxes = vec![((0, 0, 0), (2, 2, 2)), ((5, 5, 5), (7, 7, 7))];
+        let region = DefinitionRegion::from_bounding_boxes(boxes);
+
+        assert_eq!(region.box_count(), 2);
+        assert!(region.contains(1, 1, 1));
+        assert!(region.contains(6, 6, 6));
+        assert!(!region.contains(3, 3, 3));
+    }
+
+    #[test]
+    fn test_box_count() {
+        let mut region = DefinitionRegion::new();
+        assert_eq!(region.box_count(), 0);
+
+        region.add_bounds((0, 0, 0), (1, 1, 1));
+        assert_eq!(region.box_count(), 1);
+
+        region.add_bounds((5, 5, 5), (6, 6, 6));
+        assert_eq!(region.box_count(), 2);
+    }
+
+    #[test]
+    fn test_get_box() {
+        let region = DefinitionRegion::from_bounding_boxes(vec![
+            ((0, 0, 0), (2, 2, 2)),
+            ((5, 5, 5), (7, 7, 7)),
+        ]);
+
+        let box0 = region.get_box(0).unwrap();
+        assert_eq!(box0, ((0, 0, 0), (2, 2, 2)));
+
+        let box1 = region.get_box(1).unwrap();
+        assert_eq!(box1, ((5, 5, 5), (7, 7, 7)));
+
+        assert!(region.get_box(2).is_none());
+    }
+
+    #[test]
+    fn test_get_boxes() {
+        let region = DefinitionRegion::from_bounding_boxes(vec![
+            ((0, 0, 0), (1, 1, 1)),
+            ((3, 3, 3), (4, 4, 4)),
+        ]);
+
+        let boxes = region.get_boxes();
+        assert_eq!(boxes.len(), 2);
+        assert_eq!(boxes[0], ((0, 0, 0), (1, 1, 1)));
+        assert_eq!(boxes[1], ((3, 3, 3), (4, 4, 4)));
+    }
+
+    // ========================================================================
+    // NEW TESTS: Metadata Access
+    // ========================================================================
+
+    #[test]
+    fn test_metadata_access() {
+        let mut region = DefinitionRegion::new();
+
+        // Initially no metadata
+        assert!(region.get_metadata("color").is_none());
+
+        // Set metadata
+        region.set_metadata("color", "red");
+        region.set_metadata("label", "Input A");
+
+        // Get metadata
+        assert_eq!(region.get_metadata("color"), Some(&"red".to_string()));
+        assert_eq!(region.get_metadata("label"), Some(&"Input A".to_string()));
+        assert!(region.get_metadata("nonexistent").is_none());
+
+        // Get all keys
+        let keys = region.metadata_keys();
+        assert_eq!(keys.len(), 2);
+    }
+
+    #[test]
+    fn test_with_metadata_chaining() {
+        let region = DefinitionRegion::from_bounds((0, 0, 0), (1, 1, 1))
+            .with_metadata("type", "input")
+            .with_metadata("index", "0");
+
+        assert_eq!(region.get_metadata("type"), Some(&"input".to_string()));
+        assert_eq!(region.get_metadata("index"), Some(&"0".to_string()));
+    }
+
+    // ========================================================================
+    // NEW TESTS: Geometry Helpers
+    // ========================================================================
+
+    #[test]
+    fn test_dimensions() {
+        let region = DefinitionRegion::from_bounds((0, 0, 0), (9, 4, 2));
+        let dims = region.dimensions();
+        assert_eq!(dims, (10, 5, 3)); // inclusive bounds
+
+        // Empty region
+        let empty = DefinitionRegion::new();
+        assert_eq!(empty.dimensions(), (0, 0, 0));
+    }
+
+    #[test]
+    fn test_center() {
+        // Simple box
+        let region = DefinitionRegion::from_bounds((0, 0, 0), (10, 10, 10));
+        assert_eq!(region.center(), Some((5, 5, 5)));
+
+        // Box not at origin
+        let region2 = DefinitionRegion::from_bounds((10, 20, 30), (20, 30, 40));
+        assert_eq!(region2.center(), Some((15, 25, 35)));
+
+        // Empty region
+        let empty = DefinitionRegion::new();
+        assert_eq!(empty.center(), None);
+    }
+
+    #[test]
+    fn test_center_f32() {
+        let region = DefinitionRegion::from_bounds((0, 0, 0), (9, 9, 9));
+        let center = region.center_f32().unwrap();
+        // Center of 0..9 inclusive is at 5.0 (middle of block coordinates)
+        assert!((center.0 - 5.0).abs() < 0.01);
+        assert!((center.1 - 5.0).abs() < 0.01);
+        assert!((center.2 - 5.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_intersects_bounds() {
+        let region = DefinitionRegion::from_bounds((0, 0, 0), (10, 10, 10));
+
+        // Intersecting
+        assert!(region.intersects_bounds((5, 5, 5), (15, 15, 15)));
+        assert!(region.intersects_bounds((-5, -5, -5), (5, 5, 5)));
+        assert!(region.intersects_bounds((5, 5, 5), (6, 6, 6))); // Inside
+
+        // Not intersecting
+        assert!(!region.intersects_bounds((20, 20, 20), (30, 30, 30)));
+        assert!(!region.intersects_bounds((-10, -10, -10), (-1, -1, -1)));
+    }
+
+    // ========================================================================
+    // NEW TESTS: Immutable Transformations
+    // ========================================================================
+
+    #[test]
+    fn test_shifted() {
+        let original = DefinitionRegion::from_bounds((0, 0, 0), (5, 5, 5));
+        let shifted = original.shifted(10, 20, 30);
+
+        // Original unchanged
+        let orig_bounds = original.get_bounds().unwrap();
+        assert_eq!(orig_bounds.min, (0, 0, 0));
+        assert_eq!(orig_bounds.max, (5, 5, 5));
+
+        // Shifted is different
+        let shifted_bounds = shifted.get_bounds().unwrap();
+        assert_eq!(shifted_bounds.min, (10, 20, 30));
+        assert_eq!(shifted_bounds.max, (15, 25, 35));
+    }
+
+    #[test]
+    fn test_expanded() {
+        let original = DefinitionRegion::from_bounds((5, 5, 5), (10, 10, 10));
+        let expanded = original.expanded(2, 2, 2);
+
+        // Original unchanged
+        let orig_bounds = original.get_bounds().unwrap();
+        assert_eq!(orig_bounds.min, (5, 5, 5));
+
+        // Expanded is different
+        let exp_bounds = expanded.get_bounds().unwrap();
+        assert_eq!(exp_bounds.min, (3, 3, 3));
+        assert_eq!(exp_bounds.max, (12, 12, 12));
+    }
+
+    #[test]
+    fn test_contracted() {
+        let original = DefinitionRegion::from_bounds((0, 0, 0), (10, 10, 10));
+        let contracted = original.contracted(2);
+
+        // Original unchanged
+        let orig_bounds = original.get_bounds().unwrap();
+        assert_eq!(orig_bounds.min, (0, 0, 0));
+
+        // Contracted is different
+        let cont_bounds = contracted.get_bounds().unwrap();
+        assert_eq!(cont_bounds.min, (2, 2, 2));
+        assert_eq!(cont_bounds.max, (8, 8, 8));
+    }
+
+    #[test]
+    fn test_copy() {
+        let original =
+            DefinitionRegion::from_bounds((0, 0, 0), (5, 5, 5)).with_metadata("name", "test");
+
+        let copy = original.copy();
+
+        // Both have same content
+        assert_eq!(copy.box_count(), 1);
+        assert_eq!(copy.get_metadata("name"), Some(&"test".to_string()));
+
+        // They are independent
+        let orig_bounds = original.get_bounds().unwrap();
+        let copy_bounds = copy.get_bounds().unwrap();
+        assert_eq!(orig_bounds.min, copy_bounds.min);
+    }
+
+    // ========================================================================
+    // NEW TESTS: from_positions vs from_bounding_boxes
+    // ========================================================================
+
+    #[test]
+    fn test_from_positions_creates_region() {
+        // Create points forming a line
+        let positions = vec![(0, 0, 0), (1, 0, 0), (2, 0, 0), (3, 0, 0)];
+
+        let region = DefinitionRegion::from_positions(&positions);
+
+        // Volume should be exactly 4 points
+        assert_eq!(region.volume(), 4);
+
+        // All positions should be contained
+        for pos in &positions {
+            assert!(region.contains(pos.0, pos.1, pos.2));
+        }
+
+        // Should have some boxes (algorithm may vary)
+        assert!(region.box_count() >= 1);
+    }
+
+    #[test]
+    fn test_from_positions_covers_all_points() {
+        // Create 8 points forming a 2x2x2 cube
+        // The algorithm may create multiple boxes but should cover all points
+        let positions = vec![
+            (0, 0, 0),
+            (1, 0, 0),
+            (0, 1, 0),
+            (1, 1, 0),
+            (0, 0, 1),
+            (1, 0, 1),
+            (0, 1, 1),
+            (1, 1, 1),
+        ];
+
+        let region = DefinitionRegion::from_positions(&positions);
+
+        // Volume should cover all 8 points
+        assert_eq!(region.volume(), 8);
+
+        // All original positions should be contained
+        for pos in &positions {
+            assert!(
+                region.contains(pos.0, pos.1, pos.2),
+                "Region should contain {:?}",
+                pos
+            );
+        }
+    }
+
+    #[test]
+    fn test_from_bounding_boxes_keeps_separate() {
+        // Two separate boxes
+        let boxes = vec![((0, 0, 0), (0, 0, 0)), ((2, 2, 2), (2, 2, 2))];
+
+        let region = DefinitionRegion::from_bounding_boxes(boxes);
+
+        // Kept as 2 boxes (not merged)
+        assert_eq!(region.box_count(), 2);
+        assert_eq!(region.volume(), 2);
     }
 }

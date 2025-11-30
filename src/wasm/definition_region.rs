@@ -273,6 +273,319 @@ impl DefinitionRegionWrapper {
     pub fn simplify(&mut self) {
         self.inner.simplify();
     }
+
+    // ========================================================================
+    // Box Access (for Rendering)
+    // ========================================================================
+
+    /// Create a DefinitionRegion from multiple bounding boxes
+    ///
+    /// Takes an array of {min: [x,y,z], max: [x,y,z]} objects.
+    /// Unlike fromPositions which merges adjacent points, this keeps boxes as provided.
+    #[wasm_bindgen(js_name = fromBoundingBoxes)]
+    pub fn from_bounding_boxes(boxes: &JsValue) -> Result<DefinitionRegionWrapper, JsValue> {
+        let array: Array = boxes
+            .clone()
+            .dyn_into()
+            .map_err(|_| JsValue::from_str("Expected an array of bounding boxes"))?;
+
+        let mut box_list = Vec::new();
+
+        for i in 0..array.length() {
+            let item = array.get(i);
+            let obj: Object = item
+                .dyn_into()
+                .map_err(|_| JsValue::from_str("Each box should be an object"))?;
+
+            let min_val = Reflect::get(&obj, &"min".into())
+                .map_err(|_| JsValue::from_str("Box missing 'min' property"))?;
+            let max_val = Reflect::get(&obj, &"max".into())
+                .map_err(|_| JsValue::from_str("Box missing 'max' property"))?;
+
+            let min_arr: Array = min_val
+                .dyn_into()
+                .map_err(|_| JsValue::from_str("'min' should be an array"))?;
+            let max_arr: Array = max_val
+                .dyn_into()
+                .map_err(|_| JsValue::from_str("'max' should be an array"))?;
+
+            let min = (
+                min_arr
+                    .get(0)
+                    .as_f64()
+                    .ok_or_else(|| JsValue::from_str("Invalid min x"))? as i32,
+                min_arr
+                    .get(1)
+                    .as_f64()
+                    .ok_or_else(|| JsValue::from_str("Invalid min y"))? as i32,
+                min_arr
+                    .get(2)
+                    .as_f64()
+                    .ok_or_else(|| JsValue::from_str("Invalid min z"))? as i32,
+            );
+            let max = (
+                max_arr
+                    .get(0)
+                    .as_f64()
+                    .ok_or_else(|| JsValue::from_str("Invalid max x"))? as i32,
+                max_arr
+                    .get(1)
+                    .as_f64()
+                    .ok_or_else(|| JsValue::from_str("Invalid max y"))? as i32,
+                max_arr
+                    .get(2)
+                    .as_f64()
+                    .ok_or_else(|| JsValue::from_str("Invalid max z"))? as i32,
+            );
+
+            box_list.push((min, max));
+        }
+
+        Ok(DefinitionRegionWrapper {
+            inner: DefinitionRegion::from_bounding_boxes(box_list),
+        })
+    }
+
+    /// Create a DefinitionRegion from an array of positions
+    ///
+    /// Takes an array of [x, y, z] arrays. Adjacent points will be merged into boxes.
+    #[wasm_bindgen(js_name = fromPositions)]
+    pub fn from_positions(positions: &JsValue) -> Result<DefinitionRegionWrapper, JsValue> {
+        let array: Array = positions
+            .clone()
+            .dyn_into()
+            .map_err(|_| JsValue::from_str("Expected an array of positions"))?;
+
+        let mut pos_list = Vec::new();
+
+        for i in 0..array.length() {
+            let pos_arr: Array = array
+                .get(i)
+                .dyn_into()
+                .map_err(|_| JsValue::from_str("Each position should be an array"))?;
+
+            let x = pos_arr
+                .get(0)
+                .as_f64()
+                .ok_or_else(|| JsValue::from_str("Invalid x coordinate"))?
+                as i32;
+            let y = pos_arr
+                .get(1)
+                .as_f64()
+                .ok_or_else(|| JsValue::from_str("Invalid y coordinate"))?
+                as i32;
+            let z = pos_arr
+                .get(2)
+                .as_f64()
+                .ok_or_else(|| JsValue::from_str("Invalid z coordinate"))?
+                as i32;
+
+            pos_list.push((x, y, z));
+        }
+
+        Ok(DefinitionRegionWrapper {
+            inner: DefinitionRegion::from_positions(&pos_list),
+        })
+    }
+
+    /// Get the number of bounding boxes in this region
+    #[wasm_bindgen(js_name = boxCount)]
+    pub fn box_count(&self) -> usize {
+        self.inner.box_count()
+    }
+
+    /// Get a specific bounding box by index
+    ///
+    /// Returns {min: [x,y,z], max: [x,y,z]} or null if index is out of bounds
+    #[wasm_bindgen(js_name = getBox)]
+    pub fn get_box(&self, index: usize) -> JsValue {
+        match self.inner.get_box(index) {
+            Some((min, max)) => {
+                let obj = Object::new();
+                let min_arr = Array::new();
+                min_arr.push(&JsValue::from(min.0));
+                min_arr.push(&JsValue::from(min.1));
+                min_arr.push(&JsValue::from(min.2));
+                let max_arr = Array::new();
+                max_arr.push(&JsValue::from(max.0));
+                max_arr.push(&JsValue::from(max.1));
+                max_arr.push(&JsValue::from(max.2));
+                Reflect::set(&obj, &"min".into(), &min_arr).unwrap();
+                Reflect::set(&obj, &"max".into(), &max_arr).unwrap();
+                obj.into()
+            }
+            None => JsValue::NULL,
+        }
+    }
+
+    /// Get all bounding boxes in this region
+    ///
+    /// Returns an array of {min: [x,y,z], max: [x,y,z]} objects.
+    /// Useful for rendering each box separately.
+    #[wasm_bindgen(js_name = getBoxes)]
+    pub fn get_boxes(&self) -> Array {
+        let array = Array::new();
+        for (min, max) in self.inner.get_boxes() {
+            let obj = Object::new();
+            let min_arr = Array::new();
+            min_arr.push(&JsValue::from(min.0));
+            min_arr.push(&JsValue::from(min.1));
+            min_arr.push(&JsValue::from(min.2));
+            let max_arr = Array::new();
+            max_arr.push(&JsValue::from(max.0));
+            max_arr.push(&JsValue::from(max.1));
+            max_arr.push(&JsValue::from(max.2));
+            Reflect::set(&obj, &"min".into(), &min_arr).unwrap();
+            Reflect::set(&obj, &"max".into(), &max_arr).unwrap();
+            array.push(&obj);
+        }
+        array
+    }
+
+    // ========================================================================
+    // Metadata Access
+    // ========================================================================
+
+    /// Get a metadata value by key
+    ///
+    /// Returns the value string or null if not found
+    #[wasm_bindgen(js_name = getMetadata)]
+    pub fn get_metadata(&self, key: &str) -> JsValue {
+        match self.inner.get_metadata(key) {
+            Some(value) => JsValue::from_str(value),
+            None => JsValue::NULL,
+        }
+    }
+
+    /// Get all metadata as a JS object
+    #[wasm_bindgen(js_name = getAllMetadata)]
+    pub fn get_all_metadata(&self) -> JsValue {
+        let obj = Object::new();
+        for (key, value) in self.inner.metadata_ref() {
+            Reflect::set(&obj, &JsValue::from_str(key), &JsValue::from_str(value)).unwrap();
+        }
+        obj.into()
+    }
+
+    /// Get all metadata keys
+    #[wasm_bindgen(js_name = metadataKeys)]
+    pub fn metadata_keys(&self) -> Array {
+        let array = Array::new();
+        for key in self.inner.metadata_keys() {
+            array.push(&JsValue::from_str(key));
+        }
+        array
+    }
+
+    // ========================================================================
+    // Geometry Helpers (for Rendering)
+    // ========================================================================
+
+    /// Get the dimensions (width, height, length) of the overall bounding box
+    ///
+    /// Returns [width, height, length] or [0, 0, 0] if empty
+    #[wasm_bindgen(js_name = dimensions)]
+    pub fn dimensions(&self) -> Array {
+        let (w, h, l) = self.inner.dimensions();
+        let arr = Array::new();
+        arr.push(&JsValue::from(w));
+        arr.push(&JsValue::from(h));
+        arr.push(&JsValue::from(l));
+        arr
+    }
+
+    /// Get the center point of the region (integer coordinates)
+    ///
+    /// Returns [x, y, z] or null if empty
+    #[wasm_bindgen(js_name = center)]
+    pub fn center(&self) -> JsValue {
+        match self.inner.center() {
+            Some((x, y, z)) => {
+                let arr = Array::new();
+                arr.push(&JsValue::from(x));
+                arr.push(&JsValue::from(y));
+                arr.push(&JsValue::from(z));
+                arr.into()
+            }
+            None => JsValue::NULL,
+        }
+    }
+
+    /// Get the center point of the region as f32 (for rendering)
+    ///
+    /// Returns [x, y, z] as floats or null if empty
+    #[wasm_bindgen(js_name = centerF32)]
+    pub fn center_f32(&self) -> JsValue {
+        match self.inner.center_f32() {
+            Some((x, y, z)) => {
+                let arr = Array::new();
+                arr.push(&JsValue::from(x));
+                arr.push(&JsValue::from(y));
+                arr.push(&JsValue::from(z));
+                arr.into()
+            }
+            None => JsValue::NULL,
+        }
+    }
+
+    /// Check if this region intersects with a bounding box
+    ///
+    /// Useful for frustum culling in renderers.
+    #[wasm_bindgen(js_name = intersectsBounds)]
+    pub fn intersects_bounds(
+        &self,
+        min_x: i32,
+        min_y: i32,
+        min_z: i32,
+        max_x: i32,
+        max_y: i32,
+        max_z: i32,
+    ) -> bool {
+        self.inner
+            .intersects_bounds((min_x, min_y, min_z), (max_x, max_y, max_z))
+    }
+
+    // ========================================================================
+    // Immutable Geometric Transformations
+    // ========================================================================
+
+    /// Create a new region shifted by the given offset (immutable)
+    #[wasm_bindgen(js_name = shifted)]
+    pub fn shifted(&self, x: i32, y: i32, z: i32) -> DefinitionRegionWrapper {
+        DefinitionRegionWrapper {
+            inner: self.inner.shifted(x, y, z),
+        }
+    }
+
+    /// Create a new region expanded by the given amounts (immutable)
+    #[wasm_bindgen(js_name = expanded)]
+    pub fn expanded(&self, x: i32, y: i32, z: i32) -> DefinitionRegionWrapper {
+        DefinitionRegionWrapper {
+            inner: self.inner.expanded(x, y, z),
+        }
+    }
+
+    /// Create a new region contracted by the given amount (immutable)
+    #[wasm_bindgen(js_name = contracted)]
+    pub fn contracted(&self, amount: i32) -> DefinitionRegionWrapper {
+        DefinitionRegionWrapper {
+            inner: self.inner.contracted(amount),
+        }
+    }
+
+    /// Create a deep copy of this region
+    #[wasm_bindgen(js_name = copy)]
+    pub fn copy(&self) -> DefinitionRegionWrapper {
+        DefinitionRegionWrapper {
+            inner: self.inner.copy(),
+        }
+    }
+
+    /// Clone this region (alias for copy)
+    #[wasm_bindgen(js_name = clone)]
+    pub fn clone_region(&self) -> DefinitionRegionWrapper {
+        self.copy()
+    }
 }
 
 impl Default for DefinitionRegionWrapper {

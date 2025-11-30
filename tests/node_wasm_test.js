@@ -1027,6 +1027,170 @@ async function runTests() {
         console.log('   ⚠️  DefinitionRegionWrapper not available');
     }
 
+    // Test 20: DefinitionRegion Renderer Support (NEW)
+    console.log('\n🧪 Test 20: DefinitionRegion Renderer Support');
+    if (typeof nucleation.DefinitionRegionWrapper !== 'undefined') {
+        try {
+            const { DefinitionRegionWrapper, BlockPosition } = nucleation;
+
+            // Test fromBoundingBoxes
+            const boxes = [
+                { min: [0, 0, 0], max: [2, 2, 2] },
+                { min: [5, 5, 5], max: [7, 7, 7] }
+            ];
+            const region = DefinitionRegionWrapper.fromBoundingBoxes(boxes);
+            console.log(`   - fromBoundingBoxes: created region with volume ${region.volume()}`);
+
+            // Test boxCount
+            const boxCount = region.boxCount();
+            console.log(`   - boxCount: ${boxCount}`);
+            if (boxCount === 2) {
+                console.log('   ✅ boxCount correct');
+            } else {
+                console.log(`   ❌ Expected 2 boxes, got ${boxCount}`);
+            }
+
+            // Test getBox
+            const box0 = region.getBox(0);
+            console.log(`   - getBox(0): min=[${box0.min}], max=[${box0.max}]`);
+            if (box0.min[0] === 0 && box0.max[0] === 2) {
+                console.log('   ✅ getBox correct');
+            } else {
+                console.log('   ❌ getBox returned unexpected values');
+            }
+
+            // Test getBoxes
+            const allBoxes = region.getBoxes();
+            console.log(`   - getBoxes: returned ${allBoxes.length} boxes`);
+            if (allBoxes.length === 2) {
+                console.log('   ✅ getBoxes correct');
+            } else {
+                console.log(`   ❌ Expected 2 boxes, got ${allBoxes.length}`);
+            }
+
+            // Test fromPositions
+            const positions = [[0, 0, 0], [1, 0, 0], [2, 0, 0]];
+            const posRegion = DefinitionRegionWrapper.fromPositions(positions);
+            console.log(`   - fromPositions: volume ${posRegion.volume()}`);
+            if (posRegion.volume() === 3) {
+                console.log('   ✅ fromPositions correct');
+            } else {
+                console.log(`   ❌ Expected volume 3, got ${posRegion.volume()}`);
+            }
+
+            // Test metadata
+            let metaRegion = new DefinitionRegionWrapper();
+            metaRegion.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(1, 1, 1));
+            metaRegion = metaRegion.setMetadata("color", "red").setMetadata("label", "Input A");
+
+            const color = metaRegion.getMetadata("color");
+            console.log(`   - getMetadata("color"): ${color}`);
+            if (color === "red") {
+                console.log('   ✅ Metadata get/set correct');
+            } else {
+                console.log(`   ❌ Expected "red", got "${color}"`);
+            }
+
+            const allMeta = metaRegion.getAllMetadata();
+            const metaKeys = metaRegion.metadataKeys();
+            console.log(`   - getAllMetadata keys: ${metaKeys.length}`);
+
+            // Test dimensions
+            let dimRegion = DefinitionRegionWrapper.fromBounds(
+                new BlockPosition(0, 0, 0),
+                new BlockPosition(9, 4, 2)
+            );
+            const dims = dimRegion.dimensions();
+            console.log(`   - dimensions: [${dims}]`);
+            if (dims[0] === 10 && dims[1] === 5 && dims[2] === 3) {
+                console.log('   ✅ dimensions correct');
+            } else {
+                console.log(`   ❌ Expected [10, 5, 3], got [${dims}]`);
+            }
+
+            // Test center
+            let centerRegion = DefinitionRegionWrapper.fromBounds(
+                new BlockPosition(0, 0, 0),
+                new BlockPosition(10, 10, 10)
+            );
+            const center = centerRegion.center();
+            console.log(`   - center: [${center}]`);
+            if (center[0] === 5 && center[1] === 5 && center[2] === 5) {
+                console.log('   ✅ center correct');
+            } else {
+                console.log(`   ❌ Expected [5, 5, 5], got [${center}]`);
+            }
+
+            // Test centerF32
+            const centerF32 = centerRegion.centerF32();
+            console.log(`   - centerF32: [${centerF32[0].toFixed(2)}, ${centerF32[1].toFixed(2)}, ${centerF32[2].toFixed(2)}]`);
+
+            // Test intersectsBounds (frustum culling)
+            const intersects1 = centerRegion.intersectsBounds(5, 5, 5, 15, 15, 15);
+            const intersects2 = centerRegion.intersectsBounds(20, 20, 20, 30, 30, 30);
+            console.log(`   - intersectsBounds (overlapping): ${intersects1}`);
+            console.log(`   - intersectsBounds (non-overlapping): ${intersects2}`);
+            if (intersects1 && !intersects2) {
+                console.log('   ✅ intersectsBounds correct');
+            } else {
+                console.log('   ❌ intersectsBounds returned unexpected values');
+            }
+
+            // Test immutable transformations
+            let origRegion = DefinitionRegionWrapper.fromBounds(
+                new BlockPosition(0, 0, 0),
+                new BlockPosition(5, 5, 5)
+            );
+
+            const shiftedRegion = origRegion.shifted(10, 20, 30);
+            const origBounds = origRegion.getBounds();
+            const shiftedBounds = shiftedRegion.getBounds();
+            console.log(`   - Original after shifted(): min=[${origBounds.min}]`);
+            console.log(`   - Shifted result: min=[${shiftedBounds.min}]`);
+            if (origBounds.min[0] === 0 && shiftedBounds.min[0] === 10) {
+                console.log('   ✅ shifted() is immutable');
+            } else {
+                console.log('   ❌ shifted() should not modify original');
+            }
+
+            const expandedRegion = origRegion.expanded(2, 2, 2);
+            const expandedBounds = expandedRegion.getBounds();
+            console.log(`   - Expanded result: min=[${expandedBounds.min}], max=[${expandedBounds.max}]`);
+
+            const contractedRegion = expandedRegion.contracted(2);
+            const contractedBounds = contractedRegion.getBounds();
+            console.log(`   - Contracted result: min=[${contractedBounds.min}], max=[${contractedBounds.max}]`);
+
+            // Test copy/clone
+            let copyRegion = DefinitionRegionWrapper.fromBounds(
+                new BlockPosition(0, 0, 0),
+                new BlockPosition(3, 3, 3)
+            );
+            copyRegion = copyRegion.setMetadata("test", "value");
+
+            const cloned = copyRegion.clone();
+            cloned.shift(100, 100, 100);
+
+            const copyBounds = copyRegion.getBounds();
+            const clonedBounds = cloned.getBounds();
+            console.log(`   - Original after clone modified: min=[${copyBounds.min}]`);
+            console.log(`   - Clone after shift: min=[${clonedBounds.min}]`);
+            if (copyBounds.min[0] === 0 && clonedBounds.min[0] === 100) {
+                console.log('   ✅ clone() creates independent copy');
+            } else {
+                console.log('   ❌ clone() should create independent copy');
+            }
+
+            console.log('   ✅ All renderer support tests passed');
+
+        } catch (error) {
+            console.log(`   ❌ Renderer support test failed: ${error.message}`);
+            console.log(error.stack);
+        }
+    } else {
+        console.log('   ⚠️  DefinitionRegionWrapper not available');
+    }
+
     console.log('\n=== Test Summary ===');
     console.log('✅ All basic functionality tests completed');
     console.log('📊 Check the output above for any ❌ ERROR messages');

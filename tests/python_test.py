@@ -231,6 +231,207 @@ def test_definition_region_contains():
 
 
 # =============================================================================
+# DefinitionRegion Renderer Support Tests (NEW)
+# =============================================================================
+
+
+def test_definition_region_from_bounding_boxes():
+    """Test from_bounding_boxes factory method."""
+    boxes = [((0, 0, 0), (2, 2, 2)), ((5, 5, 5), (7, 7, 7))]
+    region = DefinitionRegion.from_bounding_boxes(boxes)
+
+    assert region.box_count() == 2
+    assert region.contains(1, 1, 1)
+    assert region.contains(6, 6, 6)
+    assert not region.contains(3, 3, 3)
+
+    test_passed("DefinitionRegion from_bounding_boxes")
+
+
+def test_definition_region_from_positions():
+    """Test from_positions factory method."""
+    positions = [(0, 0, 0), (1, 0, 0), (2, 0, 0)]
+    region = DefinitionRegion.from_positions(positions)
+
+    assert region.volume() == 3
+    assert region.contains(0, 0, 0)
+    assert region.contains(1, 0, 0)
+    assert region.contains(2, 0, 0)
+
+    test_passed("DefinitionRegion from_positions")
+
+
+def test_definition_region_box_access():
+    """Test box access methods for rendering."""
+    boxes = [((0, 0, 0), (2, 2, 2)), ((5, 5, 5), (7, 7, 7))]
+    region = DefinitionRegion.from_bounding_boxes(boxes)
+
+    # Test box_count
+    assert region.box_count() == 2
+
+    # Test get_box
+    box0 = region.get_box(0)
+    assert box0 == ((0, 0, 0), (2, 2, 2))
+
+    box1 = region.get_box(1)
+    assert box1 == ((5, 5, 5), (7, 7, 7))
+
+    assert region.get_box(2) is None
+
+    # Test get_boxes
+    all_boxes = region.get_boxes()
+    assert len(all_boxes) == 2
+    assert all_boxes[0] == ((0, 0, 0), (2, 2, 2))
+    assert all_boxes[1] == ((5, 5, 5), (7, 7, 7))
+
+    test_passed("DefinitionRegion Box Access")
+
+
+def test_definition_region_metadata():
+    """Test metadata access methods."""
+    region = DefinitionRegion.from_bounds((0, 0, 0), (5, 5, 5))
+
+    # Test set/get metadata
+    region.set_metadata("color", "red")
+    region.set_metadata("label", "Input A")
+
+    assert region.get_metadata("color") == "red"
+    assert region.get_metadata("label") == "Input A"
+    assert region.get_metadata("nonexistent") is None
+
+    # Test with_metadata chaining
+    region2 = (
+        DefinitionRegion.from_bounds((0, 0, 0), (1, 1, 1))
+        .with_metadata("type", "input")
+        .with_metadata("index", "0")
+    )
+    assert region2.get_metadata("type") == "input"
+    assert region2.get_metadata("index") == "0"
+
+    # Test get_all_metadata
+    all_meta = region.get_all_metadata()
+    assert "color" in all_meta
+    assert all_meta["color"] == "red"
+
+    # Test metadata_keys
+    keys = region.metadata_keys()
+    assert "color" in keys
+    assert "label" in keys
+
+    test_passed("DefinitionRegion Metadata")
+
+
+def test_definition_region_dimensions():
+    """Test dimensions method."""
+    region = DefinitionRegion.from_bounds((0, 0, 0), (9, 4, 2))
+    dims = region.dimensions()
+    assert dims == (10, 5, 3)  # inclusive bounds
+
+    # Empty region
+    empty = DefinitionRegion()
+    assert empty.dimensions() == (0, 0, 0)
+
+    test_passed("DefinitionRegion Dimensions")
+
+
+def test_definition_region_center():
+    """Test center methods."""
+    region = DefinitionRegion.from_bounds((0, 0, 0), (10, 10, 10))
+
+    # Integer center
+    center = region.center()
+    assert center == (5, 5, 5)
+
+    # Float center
+    center_f32 = region.center_f32()
+    assert center_f32 is not None
+    assert abs(center_f32[0] - 5.5) < 0.1
+    assert abs(center_f32[1] - 5.5) < 0.1
+    assert abs(center_f32[2] - 5.5) < 0.1
+
+    # Empty region
+    empty = DefinitionRegion()
+    assert empty.center() is None
+    assert empty.center_f32() is None
+
+    test_passed("DefinitionRegion Center")
+
+
+def test_definition_region_intersects_bounds():
+    """Test intersects_bounds for frustum culling."""
+    region = DefinitionRegion.from_bounds((0, 0, 0), (10, 10, 10))
+
+    # Intersecting
+    assert region.intersects_bounds((5, 5, 5), (15, 15, 15))
+    assert region.intersects_bounds((-5, -5, -5), (5, 5, 5))
+    assert region.intersects_bounds((5, 5, 5), (6, 6, 6))  # Inside
+
+    # Not intersecting
+    assert not region.intersects_bounds((20, 20, 20), (30, 30, 30))
+    assert not region.intersects_bounds((-10, -10, -10), (-1, -1, -1))
+
+    test_passed("DefinitionRegion Intersects Bounds")
+
+
+def test_definition_region_immutable_transforms():
+    """Test immutable transformation methods."""
+    original = DefinitionRegion.from_bounds((0, 0, 0), (5, 5, 5))
+
+    # Test shifted
+    shifted = original.shifted(10, 20, 30)
+    orig_bounds = original.get_bounds()
+    shifted_bounds = shifted.get_bounds()
+
+    assert orig_bounds["min"] == (0, 0, 0)
+    assert shifted_bounds["min"] == (10, 20, 30)
+
+    # Test expanded
+    expanded = original.expanded(2, 2, 2)
+    exp_bounds = expanded.get_bounds()
+    assert orig_bounds["min"] == (0, 0, 0)  # Original unchanged
+    assert exp_bounds["min"] == (-2, -2, -2)
+    assert exp_bounds["max"] == (7, 7, 7)
+
+    # Test contracted
+    contracted = expanded.contracted(2)
+    cont_bounds = contracted.get_bounds()
+    assert cont_bounds["min"] == (0, 0, 0)
+    assert cont_bounds["max"] == (5, 5, 5)
+
+    test_passed("DefinitionRegion Immutable Transforms")
+
+
+def test_definition_region_copy():
+    """Test copy method and Python copy protocol."""
+    import copy
+
+    original = DefinitionRegion.from_bounds((0, 0, 0), (5, 5, 5))
+    original.set_metadata("name", "test")
+
+    # Test explicit copy
+    copied = original.copy()
+    copied.shift(100, 100, 100)
+
+    orig_bounds = original.get_bounds()
+    copy_bounds = copied.get_bounds()
+    assert orig_bounds["min"] == (0, 0, 0)
+    assert copy_bounds["min"] == (100, 100, 100)
+
+    # Test Python copy protocol
+    original2 = DefinitionRegion.from_bounds((0, 0, 0), (3, 3, 3))
+    shallow = copy.copy(original2)
+    deep = copy.deepcopy(original2)
+
+    shallow.shift(10, 10, 10)
+    deep.shift(20, 20, 20)
+
+    orig2_bounds = original2.get_bounds()
+    assert orig2_bounds["min"] == (0, 0, 0)
+
+    test_passed("DefinitionRegion Copy")
+
+
+# =============================================================================
 # Simulation Tests (require simulation feature)
 # =============================================================================
 
@@ -458,6 +659,19 @@ def run_all_tests():
     test_definition_region_connectivity()
     test_definition_region_positions()
     test_definition_region_contains()
+    print()
+
+    # DefinitionRegion Renderer Support tests (NEW)
+    print("--- DefinitionRegion Renderer Support Tests ---")
+    test_definition_region_from_bounding_boxes()
+    test_definition_region_from_positions()
+    test_definition_region_box_access()
+    test_definition_region_metadata()
+    test_definition_region_dimensions()
+    test_definition_region_center()
+    test_definition_region_intersects_bounds()
+    test_definition_region_immutable_transforms()
+    test_definition_region_copy()
     print()
 
     # Simulation tests

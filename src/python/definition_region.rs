@@ -210,12 +210,152 @@ impl PyDefinitionRegion {
         self.inner.simplify();
     }
 
+    // ========================================================================
+    // Box Access (for Rendering)
+    // ========================================================================
+
+    /// Create a DefinitionRegion from multiple bounding boxes
+    ///
+    /// Unlike from_positions() which takes individual points and merges them,
+    /// this takes pre-defined bounding boxes directly as a list of ((min_x, min_y, min_z), (max_x, max_y, max_z)) tuples.
+    #[staticmethod]
+    fn from_bounding_boxes(boxes: Vec<((i32, i32, i32), (i32, i32, i32))>) -> Self {
+        Self {
+            inner: DefinitionRegion::from_bounding_boxes(boxes),
+        }
+    }
+
+    /// Create a DefinitionRegion from an array of positions
+    ///
+    /// Takes a list of (x, y, z) tuples. Adjacent points will be merged into boxes.
+    #[staticmethod]
+    fn from_positions(positions: Vec<(i32, i32, i32)>) -> Self {
+        Self {
+            inner: DefinitionRegion::from_positions(&positions),
+        }
+    }
+
+    /// Get the number of bounding boxes in this region
+    fn box_count(&self) -> usize {
+        self.inner.box_count()
+    }
+
+    /// Get a specific bounding box by index
+    ///
+    /// Returns ((min_x, min_y, min_z), (max_x, max_y, max_z)) or None if index is out of bounds
+    fn get_box(&self, index: usize) -> Option<((i32, i32, i32), (i32, i32, i32))> {
+        self.inner.get_box(index)
+    }
+
+    /// Get all bounding boxes in this region
+    ///
+    /// Returns a list of ((min_x, min_y, min_z), (max_x, max_y, max_z)) tuples.
+    /// Useful for rendering each box separately.
+    fn get_boxes(&self) -> Vec<((i32, i32, i32), (i32, i32, i32))> {
+        self.inner.get_boxes()
+    }
+
+    // ========================================================================
+    // Metadata Access
+    // ========================================================================
+
+    /// Get a metadata value by key
+    ///
+    /// Returns the value string or None if not found
+    fn get_metadata(&self, key: &str) -> Option<String> {
+        self.inner.get_metadata(key).cloned()
+    }
+
+    /// Set a metadata value (mutating version)
+    fn set_metadata(&mut self, key: String, value: String) {
+        self.inner.set_metadata(key, value);
+    }
+
+    /// Get all metadata as a dictionary
+    fn get_all_metadata(&self) -> HashMap<String, String> {
+        self.inner.metadata_ref().clone()
+    }
+
+    /// Get all metadata keys
+    fn metadata_keys(&self) -> Vec<String> {
+        self.inner.metadata_keys().into_iter().cloned().collect()
+    }
+
+    // ========================================================================
+    // Geometry Helpers (for Rendering)
+    // ========================================================================
+
+    /// Get the dimensions (width, height, length) of the overall bounding box
+    ///
+    /// Returns (0, 0, 0) if empty
+    fn dimensions(&self) -> (i32, i32, i32) {
+        self.inner.dimensions()
+    }
+
+    /// Get the center point of the region (integer coordinates)
+    ///
+    /// Returns None if empty
+    fn center(&self) -> Option<(i32, i32, i32)> {
+        self.inner.center()
+    }
+
+    /// Get the center point of the region as floats (for rendering)
+    ///
+    /// Returns None if empty
+    fn center_f32(&self) -> Option<(f32, f32, f32)> {
+        self.inner.center_f32()
+    }
+
+    /// Check if this region intersects with a bounding box
+    ///
+    /// Useful for frustum culling in renderers.
+    fn intersects_bounds(&self, min: (i32, i32, i32), max: (i32, i32, i32)) -> bool {
+        self.inner.intersects_bounds(min, max)
+    }
+
+    // ========================================================================
+    // Immutable Geometric Transformations
+    // ========================================================================
+
+    /// Create a new region shifted by the given offset (immutable)
+    fn shifted(&self, x: i32, y: i32, z: i32) -> Self {
+        Self {
+            inner: self.inner.shifted(x, y, z),
+        }
+    }
+
+    /// Create a new region expanded by the given amounts (immutable)
+    fn expanded(&self, x: i32, y: i32, z: i32) -> Self {
+        Self {
+            inner: self.inner.expanded(x, y, z),
+        }
+    }
+
+    /// Create a new region contracted by the given amount (immutable)
+    fn contracted(&self, amount: i32) -> Self {
+        Self {
+            inner: self.inner.contracted(amount),
+        }
+    }
+
+    /// Create a deep copy of this region
+    fn copy(&self) -> Self {
+        Self {
+            inner: self.inner.copy(),
+        }
+    }
+
+    // ========================================================================
+    // Python Special Methods
+    // ========================================================================
+
     fn __repr__(&self) -> String {
         let bounds = self.inner.get_bounds();
         match bounds {
             Some(bbox) => format!(
-                "<DefinitionRegion {} points, bounds=({},{},{}) to ({},{},{})>",
+                "<DefinitionRegion {} points, {} boxes, bounds=({},{},{}) to ({},{},{})>",
                 self.inner.volume(),
+                self.inner.box_count(),
                 bbox.min.0,
                 bbox.min.1,
                 bbox.min.2,
@@ -233,6 +373,14 @@ impl PyDefinitionRegion {
 
     fn __bool__(&self) -> bool {
         !self.inner.is_empty()
+    }
+
+    fn __copy__(&self) -> Self {
+        self.copy()
+    }
+
+    fn __deepcopy__(&self, _memo: &Bound<'_, PyDict>) -> Self {
+        self.copy()
     }
 }
 
