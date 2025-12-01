@@ -447,6 +447,9 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::er
 
     region.blocks = block_data.iter().map(|&x| x as usize).collect();
 
+    // Rebuild tight bounds after loading blocks directly
+    region.rebuild_tight_bounds();
+
     let block_entities = parse_block_entities(&block_container)?;
     for block_entity in block_entities {
         region.add_block_entity(block_entity);
