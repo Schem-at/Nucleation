@@ -8,12 +8,13 @@
 2. [Accessing Region Data](#accessing-region-data)
 3. [Geometric Transformations](#geometric-transformations)
 4. [Boolean Operations](#boolean-operations)
-5. [Metadata](#metadata)
-6. [Connectivity Analysis](#connectivity-analysis)
-7. [Filtering with Schematics](#filtering-with-schematics)
-8. [Sort Strategies for Circuit Execution](#sort-strategies-for-circuit-execution)
-9. [Renderer Integration](#renderer-integration)
-10. [Best Practices](#best-practices)
+11. [Serialization & Persistence](#serialization--persistence)
+12. [Metadata](#metadata)
+13. [Connectivity Analysis](#connectivity-analysis)
+14. [Filtering with Schematics](#filtering-with-schematics)
+15. [Sort Strategies for Circuit Execution](#sort-strategies-for-circuit-execution)
+16. [Renderer Integration](#renderer-integration)
+17. [Best Practices](#best-practices)
 
 ---
 
@@ -240,7 +241,49 @@ combined = region_a.union(region_b);
 
 ---
 
-## Metadata
+## Serialization & Persistence
+
+Definition Regions can be serialized and embedded directly into schematic files. This allows you to define logical regions (like inputs, outputs, or documentation zones) that persist when the schematic is saved and loaded.
+
+### Supported Formats
+
+- **.litematic**: Stored in the `Metadata` compound tag.
+- **.schem (V3)**: Stored in the `Metadata` compound tag.
+- **.schem (V2)**: Legacy support via `Metadata` tag injection.
+
+### How it Works
+
+When you save a `UniversalSchematic`, its `definition_regions` map is serialized to JSON and stored in the schematic's metadata under the key `NucleationDefinitions`. When loading, this JSON is parsed back into full `DefinitionRegion` objects.
+
+### Example
+
+```rust
+// Rust
+let mut schematic = UniversalSchematic::new("MyCircuit".to_string());
+
+// Create a region
+let mut region = DefinitionRegion::new();
+region.add_bounds((0, 0, 0), (5, 5, 5));
+region.set_metadata("type", "input");
+
+// Add to schematic
+schematic.definition_regions.insert("MainInput".to_string(), region);
+
+// Save to file (region data is embedded)
+let data = schematic.to_schematic().unwrap();
+std::fs::write("circuit.schem", data).unwrap();
+
+// ... later ...
+
+// Load from file (region data is restored)
+let loaded = UniversalSchematic::from_schematic(&data).unwrap();
+let loaded_region = loaded.definition_regions.get("MainInput").unwrap();
+assert_eq!(loaded_region.get_metadata("type"), Some(&"input".to_string()));
+```
+
+This works seamlessly across all language bindings (Rust, JavaScript/WASM, Python).
+
+---
 
 Store arbitrary key-value data with regions:
 

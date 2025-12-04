@@ -146,6 +146,13 @@ fn create_metadata(schematic: &UniversalSchematic) -> NbtCompound {
 
     metadata.insert("Software", NbtTag::String("UniversalSchematic".to_string()));
 
+    // Add NucleationDefinitions if present
+    if !schematic.definition_regions.is_empty() {
+        if let Ok(json) = serde_json::to_string(&schematic.definition_regions) {
+            metadata.insert("NucleationDefinitions", NbtTag::String(json));
+        }
+    }
+
     metadata
 }
 fn create_regions(schematic: &UniversalSchematic) -> NbtCompound {
@@ -302,6 +309,13 @@ fn parse_metadata(
         .map(|t| t as u64);
 
     // We don't need to parse EnclosingSize, TotalVolume, TotalBlocks as they will be recalculated
+
+    // Parse NucleationDefinitions
+    if let Ok(json) = metadata.get::<_, &str>("NucleationDefinitions") {
+        if let Ok(regions) = serde_json::from_str(json) {
+            schematic.definition_regions = regions;
+        }
+    }
 
     Ok(())
 }

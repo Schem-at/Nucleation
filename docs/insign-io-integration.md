@@ -12,6 +12,8 @@ Instead of manually defining IO layouts in code, you can annotate your Minecraft
 4. Sort positions using distance-based or custom sorting strategies
 5. Create a fully configured `TypedCircuitExecutor`
 
+You can also use `import_insign_regions()` to simply extract regions into the schematic's metadata without creating an executor.
+
 ## Basic Usage
 
 ### 1. Annotate Your Schematic with Signs
@@ -43,6 +45,25 @@ let result = executor.execute(
     inputs,
     ExecutionMode::FixedTicks { ticks: 10 }
 )?;
+```
+
+### 3. Direct Region Import (Advanced)
+
+If you just want to populate the schematic's `definition_regions` from signs (e.g., for later use or serialization), use `import_insign_regions()`:
+
+```rust
+let mut schematic = /* load schematic */;
+
+// Extracts all Insign regions and stores them in schematic.definition_regions
+schematic.import_insign_regions()?;
+
+// Now you can access them directly
+if let Some(region) = schematic.definition_regions.get("io.counter") {
+    println!("Counter region volume: {}", region.volume());
+}
+
+// When you save the schematic, these regions will be persisted!
+let bytes = schematic.to_schematic()?;
 ```
 
 ## Insign Syntax for IO

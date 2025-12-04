@@ -2,6 +2,7 @@ use crate::block_entity::BlockEntity;
 use crate::block_position::BlockPosition;
 use crate::bounding_box::BoundingBox;
 use crate::chunk::Chunk;
+use crate::definition_region::DefinitionRegion;
 use crate::entity::Entity;
 use crate::metadata::Metadata;
 use crate::region::Region;
@@ -19,6 +20,8 @@ pub struct UniversalSchematic {
     pub default_region: Region,
     pub other_regions: HashMap<String, Region>,
     pub default_region_name: String,
+    #[serde(default = "HashMap::new")]
+    pub definition_regions: HashMap<String, DefinitionRegion>,
     #[serde(skip, default = "HashMap::new")]
     block_state_cache: HashMap<String, BlockState>,
 }
@@ -58,6 +61,7 @@ impl UniversalSchematic {
             default_region: Region::new(default_region_name.clone(), (0, 0, 0), (1, 1, 1)),
             other_regions: HashMap::new(),
             default_region_name,
+            definition_regions: HashMap::new(),
             block_state_cache: HashMap::new(),
         }
     }
@@ -641,7 +645,18 @@ impl UniversalSchematic {
     pub fn to_nbt(&self) -> NbtCompound {
         let mut root = NbtCompound::new();
 
-        root.insert("Metadata", self.metadata.to_nbt());
+        let mut metadata_tag = self.metadata.to_nbt();
+
+        // Serialize definition regions to JSON string and store in Metadata
+        if !self.definition_regions.is_empty() {
+            if let NbtTag::Compound(ref mut metadata_compound) = metadata_tag {
+                if let Ok(json) = serde_json::to_string(&self.definition_regions) {
+                    metadata_compound.insert("NucleationDefinitions", NbtTag::String(json));
+                }
+            }
+        }
+
+        root.insert("Metadata", metadata_tag);
 
         // Create combined regions for NBT
         let mut regions_tag = NbtCompound::new();
@@ -660,10 +675,19 @@ impl UniversalSchematic {
     }
 
     pub fn from_nbt(nbt: NbtCompound) -> Result<Self, String> {
-        let metadata = Metadata::from_nbt(
-            nbt.get::<_, &NbtCompound>("Metadata")
-                .map_err(|e| format!("Failed to get Metadata: {}", e))?,
-        )?;
+        let metadata_tag = nbt
+            .get::<_, &NbtCompound>("Metadata")
+            .map_err(|e| format!("Failed to get Metadata: {}", e))?;
+
+        let metadata = Metadata::from_nbt(metadata_tag)?;
+
+        // Try to parse definition regions from Metadata
+        let mut definition_regions = HashMap::new();
+        if let Ok(json) = metadata_tag.get::<_, &str>("NucleationDefinitions") {
+            if let Ok(regions) = serde_json::from_str(json) {
+                definition_regions = regions;
+            }
+        }
 
         let regions_tag = nbt
             .get::<_, &NbtCompound>("Regions")
@@ -695,8 +719,66 @@ impl UniversalSchematic {
             default_region,
             other_regions,
             default_region_name,
+            definition_regions,
             block_state_cache: HashMap::new(),
         })
+    }
+
+    pub fn import_insign_regions(&mut self) -> Result<(), String> {
+        let json_value = crate::insign::compile_schematic_insign(self)
+            .map_err(|e| format!("Insign compilation error: {}", e))?;
+
+        if let Some(regions_map) = json_value.as_object() {
+            for (name, data) in regions_map {
+                let mut def_region = DefinitionRegion::new();
+
+                // Parse bounding boxes
+                if let Some(boxes) = data.get("bounding_boxes").and_then(|v| v.as_array()) {
+                    for bbox_json in boxes {
+                        if let Some(coords) = bbox_json.as_array() {
+                            if coords.len() >= 2 {
+                                let min_arr = coords[0].as_array();
+                                let max_arr = coords[1].as_array();
+
+                                if let (Some(min), Some(max)) = (min_arr, max_arr) {
+                                    if min.len() == 3 && max.len() == 3 {
+                                        let min_tuple = (
+                                            min[0].as_i64().unwrap_or(0) as i32,
+                                            min[1].as_i64().unwrap_or(0) as i32,
+                                            min[2].as_i64().unwrap_or(0) as i32,
+                                        );
+                                        let max_tuple = (
+                                            max[0].as_i64().unwrap_or(0) as i32,
+                                            max[1].as_i64().unwrap_or(0) as i32,
+                                            max[2].as_i64().unwrap_or(0) as i32,
+                                        );
+                                        def_region.add_bounds(min_tuple, max_tuple);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Parse metadata
+                if let Some(meta) = data.get("metadata").and_then(|v| v.as_object()) {
+                    for (key, value) in meta {
+                        // Convert value to string
+                        let val_str = match value {
+                            serde_json::Value::String(s) => s.clone(),
+                            serde_json::Value::Number(n) => n.to_string(),
+                            serde_json::Value::Bool(b) => b.to_string(),
+                            _ => value.to_string(),
+                        };
+                        def_region.set_metadata(key, val_str);
+                    }
+                }
+
+                self.definition_regions.insert(name.clone(), def_region);
+            }
+        }
+
+        Ok(())
     }
 
     pub fn get_default_region_mut(&mut self) -> &mut Region {

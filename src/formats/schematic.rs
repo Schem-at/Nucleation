@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt;
 use std::io::{BufReader, Cursor, Read};
 
@@ -208,7 +209,15 @@ pub fn to_schematic_v3(
     schematic_data.insert("Entities", NbtTag::List(entities));
 
     // Add metadata
-    schematic_data.insert("Metadata", schematic.metadata.to_nbt());
+    let mut metadata_tag = schematic.metadata.to_nbt();
+    if !schematic.definition_regions.is_empty() {
+        if let NbtTag::Compound(ref mut metadata_compound) = metadata_tag {
+            if let Ok(json) = serde_json::to_string(&schematic.definition_regions) {
+                metadata_compound.insert("NucleationDefinitions", NbtTag::String(json));
+            }
+        }
+    }
+    schematic_data.insert("Metadata", metadata_tag);
 
     // Create the proper root structure with "Schematic" tag
     let mut root = NbtCompound::new();
@@ -281,7 +290,16 @@ pub fn to_schematic_v2(
     schematic_data.insert("BlockEntities", NbtTag::List(block_entities));
     schematic_data.insert("Entities", NbtTag::List(entities));
 
-    schematic_data.insert("Metadata", schematic.metadata.to_nbt());
+    // Add metadata
+    let mut metadata_tag = schematic.metadata.to_nbt();
+    if !schematic.definition_regions.is_empty() {
+        if let NbtTag::Compound(ref mut metadata_compound) = metadata_tag {
+            if let Ok(json) = serde_json::to_string(&schematic.definition_regions) {
+                metadata_compound.insert("NucleationDefinitions", NbtTag::String(json));
+            }
+        }
+    }
+    schematic_data.insert("Metadata", metadata_tag);
 
     // Create the proper root structure with "Schematic" tag
     let mut root = NbtCompound::new();
@@ -412,7 +430,14 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::er
     let schem = root.get::<_, &NbtCompound>("Schematic").unwrap_or(&root);
     let schem_version = schem.get::<_, i32>("Version")?;
 
+    let mut definition_regions = HashMap::new();
+
     let name = if let Some(metadata) = schem.get::<_, &NbtCompound>("Metadata").ok() {
+        if let Ok(json) = metadata.get::<_, &str>("NucleationDefinitions") {
+            if let Ok(regions) = serde_json::from_str(json) {
+                definition_regions = regions;
+            }
+        }
         metadata.get::<_, &str>("Name").ok().map(|s| s.to_string())
     } else {
         None
@@ -422,6 +447,7 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::er
     let mc_version = schem.get::<_, i32>("DataVersion").ok();
 
     let mut schematic = UniversalSchematic::new(name);
+    schematic.definition_regions = definition_regions;
     schematic.metadata.mc_version = mc_version;
 
     let width = schem.get::<_, i16>("Width")? as u32;

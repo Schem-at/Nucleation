@@ -70,6 +70,7 @@ These guides apply to all languages:
 | TypedCircuitExecutor | ✅   | ✅         | ⚠️     |
 | CircuitBuilder       | ✅   | ✅         | ⚠️     |
 | DefinitionRegion     | ✅   | ✅         | ⚠️     |
+| Insign DSL Support   | ✅   | ✅         | ⚠️     |
 | Custom IO Signals    | ✅   | ✅         | ⚠️     |
 
 **Legend:**
