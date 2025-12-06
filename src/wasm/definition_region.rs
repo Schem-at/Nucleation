@@ -2,6 +2,7 @@
 
 use crate::block_position::BlockPosition;
 use crate::definition_region::DefinitionRegion;
+use crate::UniversalSchematic;
 use js_sys::{Array, Object, Reflect};
 use wasm_bindgen::prelude::*;
 
@@ -10,6 +11,8 @@ use super::SchematicWrapper;
 #[wasm_bindgen]
 pub struct DefinitionRegionWrapper {
     pub(crate) inner: DefinitionRegion,
+    pub(crate) schematic_ptr: *mut UniversalSchematic,
+    pub(crate) name: Option<String>,
 }
 
 #[wasm_bindgen]
@@ -18,36 +21,120 @@ impl DefinitionRegionWrapper {
     pub fn new() -> Self {
         Self {
             inner: DefinitionRegion::new(),
+            schematic_ptr: std::ptr::null_mut(),
+            name: None,
+        }
+    }
+
+    fn sync(&self) {
+        if let Some(name) = &self.name {
+            if !self.schematic_ptr.is_null() {
+                unsafe {
+                    (*self.schematic_ptr)
+                        .definition_regions
+                        .insert(name.clone(), self.inner.clone());
+                }
+            }
         }
     }
 
     #[wasm_bindgen(js_name = addBounds)]
-    pub fn add_bounds(&mut self, min: BlockPosition, max: BlockPosition) {
+    pub fn add_bounds(
+        mut self,
+        min: JsValue,
+        max: JsValue,
+    ) -> Result<DefinitionRegionWrapper, JsValue> {
+        let min_x = Reflect::get(&min, &"x".into())?.as_f64().unwrap_or(0.0) as i32;
+        let min_y = Reflect::get(&min, &"y".into())?.as_f64().unwrap_or(0.0) as i32;
+        let min_z = Reflect::get(&min, &"z".into())?.as_f64().unwrap_or(0.0) as i32;
+
+        let max_x = Reflect::get(&max, &"x".into())?.as_f64().unwrap_or(0.0) as i32;
+        let max_y = Reflect::get(&max, &"y".into())?.as_f64().unwrap_or(0.0) as i32;
+        let max_z = Reflect::get(&max, &"z".into())?.as_f64().unwrap_or(0.0) as i32;
+
         self.inner
-            .add_bounds((min.x, min.y, min.z), (max.x, max.y, max.z));
+            .add_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
+        self.sync();
+        Ok(self)
     }
 
     #[wasm_bindgen(js_name = fromBounds)]
     pub fn from_bounds(min: BlockPosition, max: BlockPosition) -> Self {
         Self {
             inner: DefinitionRegion::from_bounds((min.x, min.y, min.z), (max.x, max.y, max.z)),
+            schematic_ptr: std::ptr::null_mut(),
+            name: None,
         }
     }
 
     #[wasm_bindgen(js_name = setMetadata)]
     pub fn set_metadata(mut self, key: String, value: String) -> Self {
-        self.inner = self.inner.with_metadata(key, value);
+        self.inner.with_metadata(key, value);
+        self.sync();
         self
+    }
+
+    #[wasm_bindgen(js_name = setColor)]
+    pub fn set_color(mut self, color: u32) -> Self {
+        let hex = format!("#{:06x}", color);
+        self.inner.set_color(color);
+        self.sync();
+        self
+    }
+
+    #[wasm_bindgen(js_name = addFilter)]
+    pub fn add_filter(mut self, filter: String) -> Result<DefinitionRegionWrapper, JsValue> {
+        if !self.schematic_ptr.is_null() {
+            unsafe {
+                let sch = &*self.schematic_ptr;
+                self.inner.filter_by_block(sch, &filter);
+            }
+            self.sync();
+            Ok(self)
+        } else {
+            // Fallback for detached regions
+            let current = self
+                .inner
+                .metadata
+                .get("filter")
+                .cloned()
+                .unwrap_or_default();
+            let new_val = if current.is_empty() {
+                filter
+            } else {
+                format!("{},{}", current, filter)
+            };
+            self.inner.set_metadata("filter".to_string(), new_val);
+            Ok(self)
+        }
+    }
+
+    #[wasm_bindgen(js_name = excludeBlock)]
+    pub fn exclude_block(mut self, block_name: String) -> Result<DefinitionRegionWrapper, JsValue> {
+        if !self.schematic_ptr.is_null() {
+            unsafe {
+                let sch = &*self.schematic_ptr;
+                self.inner.exclude_block(sch, &block_name);
+            }
+            self.sync();
+            Ok(self)
+        } else {
+            Err(JsValue::from_str(
+                "Cannot exclude block: Region is not attached to a schematic",
+            ))
+        }
     }
 
     #[wasm_bindgen(js_name = addPoint)]
     pub fn add_point(&mut self, x: i32, y: i32, z: i32) {
         self.inner.add_point(x, y, z);
+        self.sync();
     }
 
     #[wasm_bindgen(js_name = merge)]
     pub fn merge(&mut self, other: &DefinitionRegionWrapper) {
         self.inner.merge(&other.inner);
+        self.sync();
     }
 
     #[wasm_bindgen(js_name = filterByBlock)]
@@ -56,8 +143,13 @@ impl DefinitionRegionWrapper {
         schematic: &SchematicWrapper,
         block_name: String,
     ) -> DefinitionRegionWrapper {
+        // Create a clone and filter it (since filter_by_block now mutates)
+        let mut filtered = self.inner.clone();
+        filtered.filter_by_block(&schematic.0, &block_name);
         DefinitionRegionWrapper {
-            inner: self.inner.filter_by_block(&schematic.0, &block_name),
+            inner: filtered,
+            schematic_ptr: std::ptr::null_mut(),
+            name: None,
         }
     }
 
@@ -82,6 +174,8 @@ impl DefinitionRegionWrapper {
     pub fn union(&self, other: &DefinitionRegionWrapper) -> DefinitionRegionWrapper {
         DefinitionRegionWrapper {
             inner: self.inner.union(&other.inner),
+            schematic_ptr: std::ptr::null_mut(),
+            name: None,
         }
     }
 
@@ -186,6 +280,8 @@ impl DefinitionRegionWrapper {
 
         Ok(DefinitionRegionWrapper {
             inner: self.inner.filter_by_properties(&schematic.0, &props),
+            schematic_ptr: std::ptr::null_mut(),
+            name: None,
         })
     }
 
@@ -251,6 +347,8 @@ impl DefinitionRegionWrapper {
     pub fn subtracted(&self, other: &DefinitionRegionWrapper) -> DefinitionRegionWrapper {
         DefinitionRegionWrapper {
             inner: self.inner.subtracted(&other.inner),
+            schematic_ptr: std::ptr::null_mut(),
+            name: None,
         }
     }
 
@@ -259,6 +357,8 @@ impl DefinitionRegionWrapper {
     pub fn intersected(&self, other: &DefinitionRegionWrapper) -> DefinitionRegionWrapper {
         DefinitionRegionWrapper {
             inner: self.inner.intersected(&other.inner),
+            schematic_ptr: std::ptr::null_mut(),
+            name: None,
         }
     }
 
@@ -343,6 +443,8 @@ impl DefinitionRegionWrapper {
 
         Ok(DefinitionRegionWrapper {
             inner: DefinitionRegion::from_bounding_boxes(box_list),
+            schematic_ptr: std::ptr::null_mut(),
+            name: None,
         })
     }
 
@@ -385,6 +487,8 @@ impl DefinitionRegionWrapper {
 
         Ok(DefinitionRegionWrapper {
             inner: DefinitionRegion::from_positions(&pos_list),
+            schematic_ptr: std::ptr::null_mut(),
+            name: None,
         })
     }
 
@@ -554,6 +658,8 @@ impl DefinitionRegionWrapper {
     pub fn shifted(&self, x: i32, y: i32, z: i32) -> DefinitionRegionWrapper {
         DefinitionRegionWrapper {
             inner: self.inner.shifted(x, y, z),
+            schematic_ptr: std::ptr::null_mut(),
+            name: None,
         }
     }
 
@@ -562,6 +668,8 @@ impl DefinitionRegionWrapper {
     pub fn expanded(&self, x: i32, y: i32, z: i32) -> DefinitionRegionWrapper {
         DefinitionRegionWrapper {
             inner: self.inner.expanded(x, y, z),
+            schematic_ptr: std::ptr::null_mut(),
+            name: None,
         }
     }
 
@@ -570,6 +678,8 @@ impl DefinitionRegionWrapper {
     pub fn contracted(&self, amount: i32) -> DefinitionRegionWrapper {
         DefinitionRegionWrapper {
             inner: self.inner.contracted(amount),
+            schematic_ptr: std::ptr::null_mut(),
+            name: None,
         }
     }
 
@@ -578,6 +688,8 @@ impl DefinitionRegionWrapper {
     pub fn copy(&self) -> DefinitionRegionWrapper {
         DefinitionRegionWrapper {
             inner: self.inner.copy(),
+            schematic_ptr: std::ptr::null_mut(),
+            name: None,
         }
     }
 

@@ -3,6 +3,7 @@
 //! Core schematic operations: loading, saving, block manipulation, iteration.
 
 use crate::bounding_box::BoundingBox;
+use crate::definition_region::DefinitionRegion;
 use crate::schematic::SchematicVersion;
 use crate::universal_schematic::ChunkLoadingStrategy;
 use crate::{
@@ -17,6 +18,15 @@ use js_sys::{self, Array, Object, Reflect};
 use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
+
+use super::definition_region::DefinitionRegionWrapper;
+
+#[cfg(feature = "simulation")]
+use super::circuit_builder::CircuitBuilderWrapper;
+#[cfg(feature = "simulation")]
+use super::typed_executor::TypedCircuitExecutorWrapper;
+#[cfg(feature = "simulation")]
+use crate::simulation::typed_executor::IoType;
 
 #[wasm_bindgen]
 pub struct LazyChunkIterator {
@@ -1159,6 +1169,338 @@ impl SchematicWrapper {
         self.0
             .rotate_region_z(region_name, degrees)
             .map_err(|e| JsValue::from_str(&e))
+    }
+
+    #[wasm_bindgen(js_name = addDefinitionRegion)]
+    pub fn add_definition_region(&mut self, name: String, region: &DefinitionRegionWrapper) {
+        self.0.definition_regions.insert(name, region.inner.clone());
+    }
+
+    #[wasm_bindgen(js_name = getDefinitionRegion)]
+    pub fn get_definition_region(
+        &mut self,
+        name: String,
+    ) -> Result<DefinitionRegionWrapper, JsValue> {
+        match self.0.definition_regions.get(&name) {
+            Some(region) => Ok(DefinitionRegionWrapper {
+                inner: region.clone(),
+                schematic_ptr: &mut self.0 as *mut _,
+                name: Some(name),
+            }),
+            None => Err(JsValue::from_str(&format!(
+                "Definition region '{}' not found",
+                name
+            ))),
+        }
+    }
+
+    #[wasm_bindgen(js_name = removeDefinitionRegion)]
+    pub fn remove_definition_region(&mut self, name: String) -> bool {
+        self.0.definition_regions.remove(&name).is_some()
+    }
+
+    #[wasm_bindgen(js_name = getDefinitionRegionNames)]
+    pub fn get_definition_region_names(&self) -> Array {
+        let array = Array::new();
+        for name in self.0.definition_regions.keys() {
+            array.push(&JsValue::from_str(name));
+        }
+        array
+    }
+
+    #[wasm_bindgen(js_name = createDefinitionRegion)]
+    pub fn create_definition_region(&mut self, name: String) {
+        self.0
+            .definition_regions
+            .insert(name, DefinitionRegion::new());
+    }
+
+    #[wasm_bindgen(js_name = definitionRegionAddBounds)]
+    pub fn definition_region_add_bounds(
+        &mut self,
+        name: String,
+        min: BlockPosition,
+        max: BlockPosition,
+    ) -> Result<(), JsValue> {
+        match self.0.definition_regions.get_mut(&name) {
+            Some(region) => {
+                region.add_bounds((min.x, min.y, min.z), (max.x, max.y, max.z));
+                Ok(())
+            }
+            None => Err(JsValue::from_str(&format!(
+                "Definition region '{}' not found",
+                name
+            ))),
+        }
+    }
+
+    #[wasm_bindgen(js_name = definitionRegionAddPoint)]
+    pub fn definition_region_add_point(
+        &mut self,
+        name: String,
+        x: i32,
+        y: i32,
+        z: i32,
+    ) -> Result<(), JsValue> {
+        match self.0.definition_regions.get_mut(&name) {
+            Some(region) => {
+                region.add_point(x, y, z);
+                Ok(())
+            }
+            None => Err(JsValue::from_str(&format!(
+                "Definition region '{}' not found",
+                name
+            ))),
+        }
+    }
+
+    #[wasm_bindgen(js_name = definitionRegionSetMetadata)]
+    pub fn definition_region_set_metadata(
+        &mut self,
+        name: String,
+        key: String,
+        value: String,
+    ) -> Result<(), JsValue> {
+        match self.0.definition_regions.get_mut(&name) {
+            Some(region) => {
+                region.metadata.insert(key, value);
+                Ok(())
+            }
+            None => Err(JsValue::from_str(&format!(
+                "Definition region '{}' not found",
+                name
+            ))),
+        }
+    }
+
+    #[wasm_bindgen(js_name = definitionRegionShift)]
+    pub fn definition_region_shift(
+        &mut self,
+        name: String,
+        x: i32,
+        y: i32,
+        z: i32,
+    ) -> Result<(), JsValue> {
+        match self.0.definition_regions.get_mut(&name) {
+            Some(region) => {
+                region.shift(x, y, z);
+                Ok(())
+            }
+            None => Err(JsValue::from_str(&format!(
+                "Definition region '{}' not found",
+                name
+            ))),
+        }
+    }
+
+    #[wasm_bindgen(js_name = createRegion)]
+    pub fn create_region(
+        &mut self,
+        name: String,
+        min: JsValue,
+        max: JsValue,
+    ) -> Result<DefinitionRegionWrapper, JsValue> {
+        let min_x = Reflect::get(&min, &"x".into())?.as_f64().unwrap_or(0.0) as i32;
+        let min_y = Reflect::get(&min, &"y".into())?.as_f64().unwrap_or(0.0) as i32;
+        let min_z = Reflect::get(&min, &"z".into())?.as_f64().unwrap_or(0.0) as i32;
+
+        let max_x = Reflect::get(&max, &"x".into())?.as_f64().unwrap_or(0.0) as i32;
+        let max_y = Reflect::get(&max, &"y".into())?.as_f64().unwrap_or(0.0) as i32;
+        let max_z = Reflect::get(&max, &"z".into())?.as_f64().unwrap_or(0.0) as i32;
+
+        let mut region = DefinitionRegion::new();
+        region.add_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
+
+        self.0
+            .definition_regions
+            .insert(name.clone(), region.clone());
+
+        Ok(DefinitionRegionWrapper {
+            inner: region,
+            schematic_ptr: &mut self.0 as *mut UniversalSchematic,
+            name: Some(name),
+        })
+    }
+
+    #[wasm_bindgen(js_name = updateRegion)]
+    pub fn update_region(&mut self, name: String, region: &DefinitionRegionWrapper) {
+        self.0.definition_regions.insert(name, region.inner.clone());
+    }
+
+    #[wasm_bindgen(js_name = createDefinitionRegionFromPoint)]
+    pub fn create_definition_region_from_point(&mut self, name: String, x: i32, y: i32, z: i32) {
+        let mut region = DefinitionRegion::new();
+        region.add_point(x, y, z);
+        self.0.definition_regions.insert(name, region);
+    }
+
+    #[wasm_bindgen(js_name = createDefinitionRegionFromBounds)]
+    pub fn create_definition_region_from_bounds(
+        &mut self,
+        name: String,
+        min: BlockPosition,
+        max: BlockPosition,
+    ) {
+        let mut region = DefinitionRegion::new();
+        region.add_bounds((min.x, min.y, min.z), (max.x, max.y, max.z));
+        self.0.definition_regions.insert(name, region);
+    }
+
+    #[cfg(feature = "simulation")]
+    #[wasm_bindgen(js_name = createCircuitBuilder)]
+    pub fn create_circuit_builder(&self) -> CircuitBuilderWrapper {
+        CircuitBuilderWrapper::new(self)
+    }
+
+    #[cfg(feature = "simulation")]
+    #[wasm_bindgen(js_name = createCircuit)]
+    pub fn create_circuit(
+        &mut self,
+        inputs: JsValue,
+        outputs: JsValue,
+    ) -> Result<TypedCircuitExecutorWrapper, JsValue> {
+        let mut builder = CircuitBuilderWrapper::new(self);
+
+        if !inputs.is_undefined() {
+            let inputs_array = Array::from(&inputs);
+            for i in 0..inputs_array.length() {
+                let input = inputs_array.get(i);
+                let name = Reflect::get(&input, &JsValue::from_str("name"))?
+                    .as_string()
+                    .ok_or_else(|| JsValue::from_str("Input name missing or not a string"))?;
+
+                let bits = Reflect::get(&input, &JsValue::from_str("bits"))?
+                    .as_f64()
+                    .unwrap_or(1.0) as u32;
+
+                let region_name = Reflect::get(&input, &JsValue::from_str("region"))?
+                    .as_string()
+                    .ok_or_else(|| {
+                        JsValue::from_str("Input region name missing or not a string")
+                    })?;
+
+                let region = self.get_definition_region(region_name.clone())?;
+                let io_type = crate::simulation::typed_executor::IoType::UnsignedInt {
+                    bits: bits as usize,
+                };
+                let io_type_wrapper = crate::IoTypeWrapper { inner: io_type };
+
+                builder = builder.with_input_auto(name, &io_type_wrapper, &region)?;
+            }
+        }
+
+        if !outputs.is_undefined() {
+            let outputs_array = Array::from(&outputs);
+            for i in 0..outputs_array.length() {
+                let output = outputs_array.get(i);
+                let name = Reflect::get(&output, &JsValue::from_str("name"))?
+                    .as_string()
+                    .ok_or_else(|| JsValue::from_str("Output name missing or not a string"))?;
+
+                let bits = Reflect::get(&output, &JsValue::from_str("bits"))?
+                    .as_f64()
+                    .unwrap_or(1.0) as u32;
+
+                let region_name = Reflect::get(&output, &JsValue::from_str("region"))?
+                    .as_string()
+                    .ok_or_else(|| {
+                        JsValue::from_str("Output region name missing or not a string")
+                    })?;
+
+                let region = self.get_definition_region(region_name.clone())?;
+                let io_type = crate::simulation::typed_executor::IoType::UnsignedInt {
+                    bits: bits as usize,
+                };
+                let io_type_wrapper = crate::IoTypeWrapper { inner: io_type };
+
+                builder = builder.with_output_auto(name, &io_type_wrapper, &region)?;
+            }
+        }
+
+        Ok(builder.build()?)
+    }
+
+    #[cfg(feature = "simulation")]
+    #[wasm_bindgen(js_name = buildExecutor)]
+    pub fn build_executor(
+        &mut self,
+        config: JsValue,
+    ) -> Result<TypedCircuitExecutorWrapper, JsValue> {
+        let mut builder = CircuitBuilderWrapper::new(self);
+
+        // Parse config object
+        // Expected format:
+        // {
+        //   inputs: [ { name: "a", bits: 8, region: "a" }, ... ],
+        //   outputs: [ { name: "out", bits: 9, region: "c" }, ... ]
+        // }
+
+        let inputs = Reflect::get(&config, &JsValue::from_str("inputs"))?;
+        if !inputs.is_undefined() {
+            let inputs_array = Array::from(&inputs);
+            for i in 0..inputs_array.length() {
+                let input = inputs_array.get(i);
+                let name = Reflect::get(&input, &JsValue::from_str("name"))?
+                    .as_string()
+                    .ok_or_else(|| JsValue::from_str("Input name missing or not a string"))?;
+
+                let bits = Reflect::get(&input, &JsValue::from_str("bits"))?
+                    .as_f64()
+                    .unwrap_or(1.0) as u32;
+
+                let region_name = Reflect::get(&input, &JsValue::from_str("region"))?
+                    .as_string()
+                    .ok_or_else(|| {
+                        JsValue::from_str("Input region name missing or not a string")
+                    })?;
+
+                // Get region wrapper
+                let region = self.get_definition_region(region_name.clone())?;
+
+                // Create IO Type (defaulting to unsigned int for now)
+                // TODO: Add support for signed/other types via config
+                let io_type = crate::simulation::typed_executor::IoType::UnsignedInt {
+                    bits: bits as usize,
+                };
+                let io_type_wrapper = crate::IoTypeWrapper { inner: io_type };
+
+                builder = builder.with_input_auto(name, &io_type_wrapper, &region)?;
+            }
+        }
+
+        let outputs = Reflect::get(&config, &JsValue::from_str("outputs"))?;
+        if !outputs.is_undefined() {
+            let outputs_array = Array::from(&outputs);
+            for i in 0..outputs_array.length() {
+                let output = outputs_array.get(i);
+                let name = Reflect::get(&output, &JsValue::from_str("name"))?
+                    .as_string()
+                    .ok_or_else(|| JsValue::from_str("Output name missing or not a string"))?;
+
+                let bits = Reflect::get(&output, &JsValue::from_str("bits"))?
+                    .as_f64()
+                    .unwrap_or(1.0) as u32;
+
+                let region_name = Reflect::get(&output, &JsValue::from_str("region"))?
+                    .as_string()
+                    .ok_or_else(|| {
+                        JsValue::from_str("Output region name missing or not a string")
+                    })?;
+
+                // Get region wrapper
+                let region = self.get_definition_region(region_name.clone())?;
+
+                // Create IO Type
+                let io_type = crate::simulation::typed_executor::IoType::UnsignedInt {
+                    bits: bits as usize,
+                };
+                let io_type_wrapper = crate::IoTypeWrapper { inner: io_type };
+
+                builder = builder.with_output_auto(name, &io_type_wrapper, &region)?;
+            }
+        }
+
+        Ok(builder.build()?)
     }
 }
 

@@ -1920,6 +1920,24 @@ impl UniversalSchematic {
             Err(format!("Region '{}' not found", region_name))
         }
     }
+
+    /// Create a new definition region and return a mutable reference to it for chaining
+    pub fn create_region(
+        &mut self,
+        name: String,
+        min: (i32, i32, i32),
+        max: (i32, i32, i32),
+    ) -> &mut DefinitionRegion {
+        let mut region = DefinitionRegion::new();
+        region.add_bounds(min, max);
+        self.definition_regions.insert(name.clone(), region);
+        self.definition_regions.get_mut(&name).unwrap()
+    }
+
+    /// Get a mutable reference to a definition region for chaining
+    pub fn get_definition_region_mut(&mut self, name: &str) -> Option<&mut DefinitionRegion> {
+        self.definition_regions.get_mut(name)
+    }
 }
 
 #[cfg(test)]

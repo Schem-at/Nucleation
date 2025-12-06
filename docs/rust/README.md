@@ -93,6 +93,32 @@ pub struct Region {
 }
 ```
 
+### DefinitionRegion
+
+A logical region defined by multiple bounding boxes, used for defining inputs, outputs, and other logical constructs.
+
+```rust
+pub struct DefinitionRegion {
+    pub boxes: Vec<BoundingBox>,
+    pub metadata: HashMap<String, String>,
+}
+```
+
+**Methods (Fluent API):**
+- `new() -> Self` - Create empty region
+- `from_bounds(min: (i32, i32, i32), max: (i32, i32, i32)) -> Self` - Create from bounds
+- `add_bounds(&mut self, min, max) -> &mut Self` - Add a bounding box
+- `add_point(&mut self, x, y, z) -> &mut Self` - Add a single point
+- `set_color(&mut self, color: u32) -> &mut Self` - Set visualization color
+- `with_metadata(&mut self, key, value) -> &mut Self` - Add metadata
+- `filter_by_block(&mut self, schematic, block_name) -> &mut Self` - Keep only matching blocks
+- `exclude_block(&mut self, schematic, block_name) -> &mut Self` - Remove matching blocks
+- `subtract(&mut self, other) -> &mut Self` - Boolean subtraction
+- `intersect(&mut self, other) -> &mut Self` - Boolean intersection
+- `union_into(&mut self, other) -> &mut Self` - Boolean union
+
+**Note:** Methods like `filter_by_block` require a reference to the `UniversalSchematic`. Due to Rust's borrowing rules, you may need to clone the region or build it separately before inserting it into the schematic if you need to filter based on the schematic's own blocks.
+
 ## Loading and Saving
 
 ### Litematic Format

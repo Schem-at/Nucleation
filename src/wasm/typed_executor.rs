@@ -810,6 +810,24 @@ impl TypedCircuitExecutorWrapper {
         self.inner.reset().map_err(|e| JsValue::from_str(&e))
     }
 
+    /// Run the circuit with simplified arguments
+    #[wasm_bindgen(js_name = run)]
+    pub fn run(&mut self, inputs: JsValue, limit: u32, mode: &str) -> Result<JsValue, JsValue> {
+        let execution_mode = match mode {
+            "fixed" => ExecutionMode::FixedTicks { ticks: limit },
+            "stable" => ExecutionMode::UntilStable {
+                stable_ticks: limit,
+                max_ticks: 10000,
+            }, // Default max ticks
+            _ => return Err(JsValue::from_str("Invalid mode. Use 'fixed' or 'stable'")),
+        };
+
+        let mode_wrapper = ExecutionModeWrapper {
+            inner: execution_mode,
+        };
+        self.execute(inputs, &mode_wrapper)
+    }
+
     /// Execute the circuit
     pub fn execute(
         &mut self,

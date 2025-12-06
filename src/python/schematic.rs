@@ -11,6 +11,7 @@ use std::path::Path;
 use crate::{
     block_position::BlockPosition,
     bounding_box::BoundingBox,
+    definition_region::DefinitionRegion,
     formats::{litematic, schematic},
     print_utils::{format_json_schematic, format_schematic},
     universal_schematic::ChunkLoadingStrategy,
@@ -18,10 +19,18 @@ use crate::{
     BlockState, UniversalSchematic,
 };
 
+use super::definition_region::PyDefinitionRegion;
+
 use bytemuck;
 
 #[cfg(feature = "simulation")]
+use super::typed_executor::PyTypedCircuitExecutor;
+#[cfg(feature = "simulation")]
 use super::PyMchprsWorld;
+#[cfg(feature = "simulation")]
+use crate::simulation::typed_executor::IoType;
+#[cfg(feature = "simulation")]
+use crate::simulation::CircuitBuilder;
 #[cfg(feature = "simulation")]
 use crate::simulation::MchprsWorld;
 
@@ -428,6 +437,90 @@ impl PySchematic {
         Ok(PyMchprsWorld { inner: world })
     }
 
+    #[cfg(feature = "simulation")]
+    pub fn build_executor(
+        &self,
+        inputs: Vec<HashMap<String, String>>,
+        outputs: Vec<HashMap<String, String>>,
+    ) -> PyResult<PyTypedCircuitExecutor> {
+        let mut builder = CircuitBuilder::new(self.inner.clone());
+
+        for input in inputs {
+            let name = input.get("name").ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>("Input name missing")
+            })?;
+            let region_name = input.get("region").ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>("Input region missing")
+            })?;
+            let bits_str = input.get("bits").map(|s| s.as_str()).unwrap_or("1");
+            let bits = bits_str.parse::<u32>().map_err(|_| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>("Invalid bits value")
+            })?;
+
+            let region = self
+                .inner
+                .definition_regions
+                .get(region_name)
+                .ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                        "Region '{}' not found",
+                        region_name
+                    ))
+                })?
+                .clone();
+
+            builder = builder
+                .with_input_auto(
+                    name,
+                    IoType::UnsignedInt {
+                        bits: bits as usize,
+                    },
+                    region,
+                )
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
+        }
+
+        for output in outputs {
+            let name = output.get("name").ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>("Output name missing")
+            })?;
+            let region_name = output.get("region").ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>("Output region missing")
+            })?;
+            let bits_str = output.get("bits").map(|s| s.as_str()).unwrap_or("1");
+            let bits = bits_str.parse::<u32>().map_err(|_| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>("Invalid bits value")
+            })?;
+
+            let region = self
+                .inner
+                .definition_regions
+                .get(region_name)
+                .ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                        "Region '{}' not found",
+                        region_name
+                    ))
+                })?
+                .clone();
+
+            builder = builder
+                .with_output_auto(
+                    name,
+                    IoType::UnsignedInt {
+                        bits: bits as usize,
+                    },
+                    region,
+                )
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
+        }
+
+        let executor = builder
+            .build()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))?;
+        Ok(PyTypedCircuitExecutor { inner: executor })
+    }
+
     // Transformation methods
 
     /// Flip the schematic along the X axis
@@ -548,6 +641,152 @@ impl PySchematic {
         let json_module = py.import("json")?;
         let loads = json_module.getattr("loads")?;
         Ok(loads.call1((json_str,))?.extract()?)
+    }
+
+    // Definition Region Methods
+
+    pub fn add_definition_region(&mut self, name: String, region: &PyDefinitionRegion) {
+        self.inner
+            .definition_regions
+            .insert(name, region.inner.clone());
+    }
+
+    pub fn get_definition_region(&mut self, name: String) -> PyResult<PyDefinitionRegion> {
+        match self.inner.definition_regions.get(&name) {
+            Some(region) => Ok(PyDefinitionRegion {
+                inner: region.clone(),
+                schematic_ptr: &mut self.inner as *mut UniversalSchematic as usize,
+                name: Some(name),
+            }),
+            None => Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "Definition region '{}' not found",
+                name
+            ))),
+        }
+    }
+
+    pub fn create_region(
+        &mut self,
+        name: String,
+        min: (i32, i32, i32),
+        max: (i32, i32, i32),
+    ) -> PyResult<PyDefinitionRegion> {
+        let mut region = DefinitionRegion::new();
+        region.add_bounds(min, max);
+        self.inner
+            .definition_regions
+            .insert(name.clone(), region.clone());
+
+        Ok(PyDefinitionRegion {
+            inner: region,
+            schematic_ptr: &mut self.inner as *mut UniversalSchematic as usize,
+            name: Some(name),
+        })
+    }
+
+    pub fn remove_definition_region(&mut self, name: String) -> bool {
+        self.inner.definition_regions.remove(&name).is_some()
+    }
+
+    pub fn get_definition_region_names(&self) -> Vec<String> {
+        self.inner.definition_regions.keys().cloned().collect()
+    }
+
+    pub fn create_definition_region(&mut self, name: String) {
+        self.inner
+            .definition_regions
+            .insert(name, DefinitionRegion::new());
+    }
+
+    pub fn create_definition_region_from_point(&mut self, name: String, x: i32, y: i32, z: i32) {
+        let mut region = DefinitionRegion::new();
+        region.add_point(x, y, z);
+        self.inner.definition_regions.insert(name, region);
+    }
+
+    pub fn create_definition_region_from_bounds(
+        &mut self,
+        name: String,
+        min: (i32, i32, i32),
+        max: (i32, i32, i32),
+    ) {
+        let mut region = DefinitionRegion::new();
+        region.add_bounds(min, max);
+        self.inner.definition_regions.insert(name, region);
+    }
+
+    pub fn definition_region_add_bounds(
+        &mut self,
+        name: String,
+        min: (i32, i32, i32),
+        max: (i32, i32, i32),
+    ) -> PyResult<()> {
+        match self.inner.definition_regions.get_mut(&name) {
+            Some(region) => {
+                region.add_bounds(min, max);
+                Ok(())
+            }
+            None => Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "Definition region '{}' not found",
+                name
+            ))),
+        }
+    }
+
+    pub fn definition_region_add_point(
+        &mut self,
+        name: String,
+        x: i32,
+        y: i32,
+        z: i32,
+    ) -> PyResult<()> {
+        match self.inner.definition_regions.get_mut(&name) {
+            Some(region) => {
+                region.add_point(x, y, z);
+                Ok(())
+            }
+            None => Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "Definition region '{}' not found",
+                name
+            ))),
+        }
+    }
+
+    pub fn definition_region_set_metadata(
+        &mut self,
+        name: String,
+        key: String,
+        value: String,
+    ) -> PyResult<()> {
+        match self.inner.definition_regions.get_mut(&name) {
+            Some(region) => {
+                region.metadata.insert(key, value);
+                Ok(())
+            }
+            None => Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "Definition region '{}' not found",
+                name
+            ))),
+        }
+    }
+
+    pub fn definition_region_shift(
+        &mut self,
+        name: String,
+        x: i32,
+        y: i32,
+        z: i32,
+    ) -> PyResult<()> {
+        match self.inner.definition_regions.get_mut(&name) {
+            Some(region) => {
+                region.shift(x, y, z);
+                Ok(())
+            }
+            None => Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "Definition region '{}' not found",
+                name
+            ))),
+        }
     }
 }
 

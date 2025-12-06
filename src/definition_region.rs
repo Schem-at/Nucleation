@@ -35,29 +35,37 @@ impl DefinitionRegion {
     }
 
     /// Add a bounding box to the region
-    pub fn add_bounds(&mut self, min: (i32, i32, i32), max: (i32, i32, i32)) {
+    pub fn add_bounds(&mut self, min: (i32, i32, i32), max: (i32, i32, i32)) -> &mut Self {
         // Ensure min/max are correctly ordered for the BoundingBox
         let true_min = (min.0.min(max.0), min.1.min(max.1), min.2.min(max.2));
         let true_max = (min.0.max(max.0), min.1.max(max.1), min.2.max(max.2));
 
         self.boxes.push(BoundingBox::new(true_min, true_max));
+        self
     }
 
     /// Add a single point to the region
-    pub fn add_point(&mut self, x: i32, y: i32, z: i32) {
-        self.add_bounds((x, y, z), (x, y, z));
+    pub fn add_point(&mut self, x: i32, y: i32, z: i32) -> &mut Self {
+        self.add_bounds((x, y, z), (x, y, z))
     }
 
     /// Merge another region into this one
-    pub fn merge(&mut self, other: &DefinitionRegion) {
+    pub fn merge(&mut self, other: &DefinitionRegion) -> &mut Self {
         self.boxes.extend(other.boxes.clone());
         self.metadata.extend(other.metadata.clone());
+        self
     }
 
     /// Set metadata key-value pair
-    pub fn with_metadata(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+    pub fn with_metadata(&mut self, key: impl Into<String>, value: impl Into<String>) -> &mut Self {
         self.metadata.insert(key.into(), value.into());
         self
+    }
+
+    /// Set color of the region (helper for metadata)
+    pub fn set_color(&mut self, color: u32) -> &mut Self {
+        let hex = format!("#{:06x}", color);
+        self.with_metadata("color", hex)
     }
 
     /// Iterate over all positions in the region
@@ -195,7 +203,7 @@ impl DefinitionRegion {
     /// Subtract another region from this one (removes points present in `other`)
     ///
     /// Mutates `self` in place. For an immutable version, use `subtracted()`.
-    pub fn subtract(&mut self, other: &DefinitionRegion) {
+    pub fn subtract(&mut self, other: &DefinitionRegion) -> &mut Self {
         let other_positions: HashSet<_> = other.iter_positions().collect();
         let remaining: Vec<_> = self
             .iter_positions()
@@ -204,12 +212,13 @@ impl DefinitionRegion {
 
         let simplified = Self::from_positions(&remaining);
         self.boxes = simplified.boxes;
+        self
     }
 
     /// Keep only points present in both regions (intersection)
     ///
     /// Mutates `self` in place. For an immutable version, use `intersected()`.
-    pub fn intersect(&mut self, other: &DefinitionRegion) {
+    pub fn intersect(&mut self, other: &DefinitionRegion) -> &mut Self {
         let other_positions: HashSet<_> = other.iter_positions().collect();
         let intersection: Vec<_> = self
             .iter_positions()
@@ -218,14 +227,16 @@ impl DefinitionRegion {
 
         let simplified = Self::from_positions(&intersection);
         self.boxes = simplified.boxes;
+        self
     }
 
     /// Add all points from another region to this one (union)
     ///
     /// Mutates `self` in place. For an immutable version, use `union()`.
-    pub fn union_into(&mut self, other: &DefinitionRegion) {
+    pub fn union_into(&mut self, other: &DefinitionRegion) -> &mut Self {
         self.merge(other);
         self.simplify();
+        self
     }
 
     // ========================================================================
@@ -265,16 +276,17 @@ impl DefinitionRegion {
     // ========================================================================
 
     /// Translate all boxes by the given offset
-    pub fn shift(&mut self, x: i32, y: i32, z: i32) {
+    pub fn shift(&mut self, x: i32, y: i32, z: i32) -> &mut Self {
         for bbox in &mut self.boxes {
             bbox.min = (bbox.min.0 + x, bbox.min.1 + y, bbox.min.2 + z);
             bbox.max = (bbox.max.0 + x, bbox.max.1 + y, bbox.max.2 + z);
         }
+        self
     }
 
     /// Expand all boxes by the given amounts in each direction
     /// Positive values expand outward, negative values contract
-    pub fn expand(&mut self, x: i32, y: i32, z: i32) {
+    pub fn expand(&mut self, x: i32, y: i32, z: i32) -> &mut Self {
         for bbox in &mut self.boxes {
             bbox.min = (bbox.min.0 - x, bbox.min.1 - y, bbox.min.2 - z);
             bbox.max = (bbox.max.0 + x, bbox.max.1 + y, bbox.max.2 + z);
@@ -283,11 +295,12 @@ impl DefinitionRegion {
         self.boxes.retain(|bbox| {
             bbox.min.0 <= bbox.max.0 && bbox.min.1 <= bbox.max.1 && bbox.min.2 <= bbox.max.2
         });
+        self
     }
 
     /// Contract all boxes by the given amount uniformly
-    pub fn contract(&mut self, amount: i32) {
-        self.expand(-amount, -amount, -amount);
+    pub fn contract(&mut self, amount: i32) -> &mut Self {
+        self.expand(-amount, -amount, -amount)
     }
 
     /// Get the overall bounding box encompassing all boxes in this region
@@ -399,7 +412,27 @@ impl DefinitionRegion {
     // ========================================================================
 
     /// Filter positions by block name (substring match)
-    pub fn filter_by_block(&self, schematic: &UniversalSchematic, block_name: &str) -> Self {
+    /// This modifies the region in-place to keep only blocks matching the name.
+    pub fn filter_by_block(
+        &mut self,
+        schematic: &UniversalSchematic,
+        block_name: &str,
+    ) -> &mut Self {
+        let filtered = self.filter_by_block_immutable(schematic, block_name);
+        *self = filtered;
+        self
+    }
+
+    /// Exclude a block type from the region (subtraction)
+    /// This modifies the region in-place to remove blocks matching the name.
+    pub fn exclude_block(&mut self, schematic: &UniversalSchematic, block_name: &str) -> &mut Self {
+        let to_exclude = self.filter_by_block_immutable(schematic, block_name);
+        self.subtract(&to_exclude);
+        self
+    }
+
+    /// Internal immutable filter helper
+    fn filter_by_block_immutable(&self, schematic: &UniversalSchematic, block_name: &str) -> Self {
         let positions: Vec<_> = self
             .iter_positions()
             .filter(|&(x, y, z)| {
@@ -806,7 +839,8 @@ mod tests {
 
     #[test]
     fn test_with_metadata_chaining() {
-        let region = DefinitionRegion::from_bounds((0, 0, 0), (1, 1, 1))
+        let mut region = DefinitionRegion::from_bounds((0, 0, 0), (1, 1, 1));
+        region
             .with_metadata("type", "input")
             .with_metadata("index", "0");
 
@@ -920,8 +954,8 @@ mod tests {
 
     #[test]
     fn test_copy() {
-        let original =
-            DefinitionRegion::from_bounds((0, 0, 0), (5, 5, 5)).with_metadata("name", "test");
+        let mut original = DefinitionRegion::from_bounds((0, 0, 0), (5, 5, 5));
+        original.with_metadata("name", "test");
 
         let copy = original.copy();
 

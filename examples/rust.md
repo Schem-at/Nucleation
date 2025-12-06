@@ -113,3 +113,50 @@ The Rust side does **not** re-export those symbols to avoid name clashes.
 * **Deterministic randomness**—chunk loading strategy `"Random"` hashes the
   schematic name, so the order is stable across runs.
 
+---
+
+## 6 · Definition Regions & Fluent API
+
+Nucleation provides a fluent API for defining logical regions within your schematic. This is useful for marking inputs, outputs, or other significant areas.
+
+### Basic Usage
+
+You can chain methods to define a region's properties:
+
+```rust
+schematic.create_region("my_region".to_string(), (0, 0, 0), (5, 5, 5))
+    .add_bounds((10, 0, 0), (15, 5, 5)) // Add disjoint area
+    .set_color(0xFF0000)                // Set visualization color
+    .with_metadata("type", "input");    // Add custom metadata
+```
+
+### Filtering Blocks (Borrow Checker Patterns)
+
+When filtering a region based on the blocks inside it (e.g., "keep only stone blocks"), you need to access the schematic's block data. In Rust, this creates a borrow checker challenge because the region is owned by the schematic.
+
+**Pattern A: Clone, Modify, Insert**
+Safest approach. Clone the region so you can borrow the schematic immutably while modifying the region.
+
+```rust
+if let Some(region) = schematic.definition_regions.get("layout") {
+    let mut region_clone = region.clone();
+    
+    // Now safe to borrow schematic immutably
+    region_clone.filter_by_block(&schematic, "minecraft:stone");
+    
+    // Update the schematic
+    schematic.definition_regions.insert("stone_only".to_string(), region_clone);
+}
+```
+
+**Pattern B: Build Before Inserting**
+Create the region independently, modify it, and then insert it into the schematic.
+
+```rust
+use nucleation::definition_region::DefinitionRegion;
+
+let mut new_region = DefinitionRegion::from_bounds((0,0,0), (5,5,5));
+new_region.exclude_block(&schematic, "minecraft:air");
+schematic.definition_regions.insert("non_air".to_string(), new_region);
+```
+

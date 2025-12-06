@@ -3,6 +3,7 @@
 //! Region manipulation for circuit IO definitions.
 
 use crate::definition_region::DefinitionRegion;
+use crate::UniversalSchematic;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use std::collections::HashMap;
@@ -15,6 +16,8 @@ use super::PySchematic;
 #[derive(Clone)]
 pub struct PyDefinitionRegion {
     pub(crate) inner: DefinitionRegion,
+    pub(crate) schematic_ptr: usize,
+    pub(crate) name: Option<String>,
 }
 
 #[pymethods]
@@ -24,6 +27,20 @@ impl PyDefinitionRegion {
     fn new() -> Self {
         Self {
             inner: DefinitionRegion::new(),
+            schematic_ptr: 0,
+            name: None,
+        }
+    }
+
+    fn sync(&self) {
+        if let Some(name) = &self.name {
+            if self.schematic_ptr != 0 {
+                unsafe {
+                    let sch = &mut *(self.schematic_ptr as *mut UniversalSchematic);
+                    sch.definition_regions
+                        .insert(name.clone(), self.inner.clone());
+                }
+            }
         }
     }
 
@@ -32,29 +49,88 @@ impl PyDefinitionRegion {
     fn from_bounds(min: (i32, i32, i32), max: (i32, i32, i32)) -> Self {
         Self {
             inner: DefinitionRegion::from_bounds(min, max),
+            schematic_ptr: 0,
+            name: None,
         }
     }
 
     /// Add a bounding box to the region
-    fn add_bounds(&mut self, min: (i32, i32, i32), max: (i32, i32, i32)) {
+    fn add_bounds(&mut self, min: (i32, i32, i32), max: (i32, i32, i32)) -> Self {
         self.inner.add_bounds(min, max);
+        self.sync();
+        self.clone()
     }
 
     /// Add a single point to the region
-    fn add_point(&mut self, x: i32, y: i32, z: i32) {
+    fn add_point(&mut self, x: i32, y: i32, z: i32) -> Self {
         self.inner.add_point(x, y, z);
+        self.sync();
+        self.clone()
     }
 
     /// Set metadata on the region (returns new instance for chaining)
-    fn with_metadata(&self, key: String, value: String) -> Self {
-        Self {
-            inner: self.inner.clone().with_metadata(key, value),
+    fn set_metadata(&mut self, key: String, value: String) -> Self {
+        self.inner.set_metadata(key, value);
+        self.sync();
+        self.clone()
+    }
+
+    /// Set color of the region (helper for metadata)
+    fn set_color(&mut self, color: u32) -> Self {
+        let hex = format!("#{:06x}", color);
+        self.inner.set_metadata("color".to_string(), hex);
+        self.sync();
+        self.clone()
+    }
+
+    /// Add a filter to the region (intersection with block type)
+    fn add_filter(&mut self, filter: String) -> PyResult<Self> {
+        if self.schematic_ptr != 0 {
+            unsafe {
+                let sch = &*(self.schematic_ptr as *const UniversalSchematic);
+                self.inner.filter_by_block(sch, &filter);
+            }
+            self.sync();
+            Ok(self.clone())
+        } else {
+            // Fallback for detached regions: store as metadata
+            let current = self
+                .inner
+                .metadata
+                .get("filter")
+                .cloned()
+                .unwrap_or_default();
+            let new_val = if current.is_empty() {
+                filter
+            } else {
+                format!("{},{}", current, filter)
+            };
+            self.inner.set_metadata("filter".to_string(), new_val);
+            Ok(self.clone())
+        }
+    }
+
+    /// Exclude a block type from the region (subtraction)
+    fn exclude_block(&mut self, block_name: String) -> PyResult<Self> {
+        if self.schematic_ptr != 0 {
+            unsafe {
+                let sch = &*(self.schematic_ptr as *const UniversalSchematic);
+                self.inner.exclude_block(sch, &block_name);
+            }
+            self.sync();
+            Ok(self.clone())
+        } else {
+            Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "Cannot exclude block: Region is not attached to a schematic",
+            ))
         }
     }
 
     /// Merge another region into this one
-    fn merge(&mut self, other: &PyDefinitionRegion) {
+    fn merge(&mut self, other: &PyDefinitionRegion) -> Self {
         self.inner.merge(&other.inner);
+        self.sync();
+        self.clone()
     }
 
     // ========================================================================
@@ -84,6 +160,8 @@ impl PyDefinitionRegion {
     fn union(&self, other: &PyDefinitionRegion) -> Self {
         Self {
             inner: self.inner.union(&other.inner),
+            schematic_ptr: 0,
+            name: None,
         }
     }
 
@@ -91,6 +169,8 @@ impl PyDefinitionRegion {
     fn subtracted(&self, other: &PyDefinitionRegion) -> Self {
         Self {
             inner: self.inner.subtracted(&other.inner),
+            schematic_ptr: 0,
+            name: None,
         }
     }
 
@@ -98,6 +178,8 @@ impl PyDefinitionRegion {
     fn intersected(&self, other: &PyDefinitionRegion) -> Self {
         Self {
             inner: self.inner.intersected(&other.inner),
+            schematic_ptr: 0,
+            name: None,
         }
     }
 
@@ -108,16 +190,19 @@ impl PyDefinitionRegion {
     /// Translate all boxes by the given offset
     fn shift(&mut self, x: i32, y: i32, z: i32) {
         self.inner.shift(x, y, z);
+        self.sync();
     }
 
     /// Expand all boxes by the given amounts in each direction
     fn expand(&mut self, x: i32, y: i32, z: i32) {
         self.inner.expand(x, y, z);
+        self.sync();
     }
 
     /// Contract all boxes by the given amount uniformly
     fn contract(&mut self, amount: i32) {
         self.inner.contract(amount);
+        self.sync();
     }
 
     /// Get the overall bounding box encompassing all boxes in this region
@@ -154,8 +239,13 @@ impl PyDefinitionRegion {
 
     /// Filter positions by block name (substring match)
     fn filter_by_block(&self, schematic: &PySchematic, block_name: &str) -> Self {
+        // Create a clone and filter it (since filter_by_block now mutates)
+        let mut filtered = self.inner.clone();
+        filtered.filter_by_block(&schematic.inner, block_name);
         Self {
-            inner: self.inner.filter_by_block(&schematic.inner, block_name),
+            inner: filtered,
+            schematic_ptr: 0,
+            name: None,
         }
     }
 
@@ -170,6 +260,8 @@ impl PyDefinitionRegion {
             inner: self
                 .inner
                 .filter_by_properties(&schematic.inner, &properties),
+            schematic_ptr: 0,
+            name: None,
         }
     }
 
@@ -208,6 +300,7 @@ impl PyDefinitionRegion {
     /// Simplify the region by merging adjacent/overlapping boxes
     fn simplify(&mut self) {
         self.inner.simplify();
+        self.sync();
     }
 
     // ========================================================================
@@ -222,6 +315,8 @@ impl PyDefinitionRegion {
     fn from_bounding_boxes(boxes: Vec<((i32, i32, i32), (i32, i32, i32))>) -> Self {
         Self {
             inner: DefinitionRegion::from_bounding_boxes(boxes),
+            schematic_ptr: 0,
+            name: None,
         }
     }
 
@@ -232,6 +327,8 @@ impl PyDefinitionRegion {
     fn from_positions(positions: Vec<(i32, i32, i32)>) -> Self {
         Self {
             inner: DefinitionRegion::from_positions(&positions),
+            schematic_ptr: 0,
+            name: None,
         }
     }
 
@@ -266,8 +363,8 @@ impl PyDefinitionRegion {
         self.inner.get_metadata(key).cloned()
     }
 
-    /// Set a metadata value (mutating version)
-    fn set_metadata(&mut self, key: String, value: String) {
+    /// Set a metadata value (mutating version, doesn't return self for chaining)
+    fn set_metadata_mut(&mut self, key: String, value: String) {
         self.inner.set_metadata(key, value);
     }
 
@@ -321,6 +418,8 @@ impl PyDefinitionRegion {
     fn shifted(&self, x: i32, y: i32, z: i32) -> Self {
         Self {
             inner: self.inner.shifted(x, y, z),
+            schematic_ptr: 0,
+            name: None,
         }
     }
 
@@ -328,6 +427,8 @@ impl PyDefinitionRegion {
     fn expanded(&self, x: i32, y: i32, z: i32) -> Self {
         Self {
             inner: self.inner.expanded(x, y, z),
+            schematic_ptr: 0,
+            name: None,
         }
     }
 
@@ -335,6 +436,8 @@ impl PyDefinitionRegion {
     fn contracted(&self, amount: i32) -> Self {
         Self {
             inner: self.inner.contracted(amount),
+            schematic_ptr: 0,
+            name: None,
         }
     }
 
@@ -342,6 +445,8 @@ impl PyDefinitionRegion {
     fn copy(&self) -> Self {
         Self {
             inner: self.inner.copy(),
+            schematic_ptr: 0,
+            name: None,
         }
     }
 
