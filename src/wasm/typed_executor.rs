@@ -845,16 +845,7 @@ impl TypedCircuitExecutorWrapper {
             let value_js = entry.get(1);
 
             // Try to convert JsValue to Value
-            let value = if let Some(b) = value_js.as_bool() {
-                Value::Bool(b)
-            } else if let Some(n) = value_js.as_f64() {
-                // Assume integers for now
-                Value::U32(n as u32)
-            } else if let Some(s) = value_js.as_string() {
-                Value::String(s)
-            } else {
-                return Err(JsValue::from_str("Unsupported input value type"));
-            };
+            let value = js_to_value(value_js)?;
 
             input_map.insert(key, value);
         }
@@ -1038,5 +1029,24 @@ impl TypedCircuitExecutorWrapper {
         Reflect::set(&result, &"outputs".into(), &outputs_obj).unwrap();
 
         result.into()
+    }
+}
+
+fn js_to_value(value_js: JsValue) -> Result<Value, JsValue> {
+    if let Some(b) = value_js.as_bool() {
+        Ok(Value::Bool(b))
+    } else if let Some(n) = value_js.as_f64() {
+        Ok(Value::U32(n as u32))
+    } else if let Some(s) = value_js.as_string() {
+        Ok(Value::String(s))
+    } else if Array::is_array(&value_js) {
+        let arr = Array::from(&value_js);
+        let mut values = Vec::new();
+        for i in 0..arr.length() {
+            values.push(js_to_value(arr.get(i))?);
+        }
+        Ok(Value::Array(values))
+    } else {
+        Err(JsValue::from_str("Unsupported input value type"))
     }
 }

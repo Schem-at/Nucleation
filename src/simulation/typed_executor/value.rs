@@ -125,6 +125,14 @@ impl Value {
             _ => Err(format!("Cannot convert {:?} to bytes", self)),
         }
     }
+
+    /// Try to get as array
+    pub fn as_array(&self) -> Result<&Vec<Value>, String> {
+        match self {
+            Value::Array(v) => Ok(v),
+            _ => Err(format!("Cannot convert {:?} to array", self)),
+        }
+    }
 }
 
 impl fmt::Display for Value {

@@ -130,6 +130,55 @@ impl IoType {
                 Ok(bit_array.clone())
             }
 
+            IoType::Array {
+                element_type,
+                length,
+            } => {
+                let values = value.as_array()?;
+                if values.len() != *length {
+                    return Err(format!(
+                        "Array length mismatch: expected {}, got {}",
+                        length,
+                        values.len()
+                    ));
+                }
+                let mut bits = Vec::new();
+                for v in values {
+                    bits.extend(element_type.to_binary(v)?);
+                }
+                Ok(bits)
+            }
+
+            IoType::Matrix {
+                element_type,
+                rows,
+                cols,
+            } => {
+                let values = value.as_array()?;
+                if values.len() != *rows {
+                    return Err(format!(
+                        "Matrix rows mismatch: expected {}, got {}",
+                        rows,
+                        values.len()
+                    ));
+                }
+                let mut bits = Vec::new();
+                for row_val in values {
+                    let row = row_val.as_array()?;
+                    if row.len() != *cols {
+                        return Err(format!(
+                            "Matrix cols mismatch: expected {}, got {}",
+                            cols,
+                            row.len()
+                        ));
+                    }
+                    for v in row {
+                        bits.extend(element_type.to_binary(v)?);
+                    }
+                }
+                Ok(bits)
+            }
+
             _ => Err(format!("to_binary not yet implemented for {:?}", self)),
         }
     }
@@ -207,6 +256,40 @@ impl IoType {
             }
 
             IoType::BitArray { .. } => Ok(Value::BitArray(bits.to_vec())),
+
+            IoType::Array {
+                element_type,
+                length,
+            } => {
+                let element_bits = element_type.bit_count();
+                let mut values = Vec::with_capacity(*length);
+                for i in 0..*length {
+                    let start = i * element_bits;
+                    let end = start + element_bits;
+                    values.push(element_type.from_binary(&bits[start..end])?);
+                }
+                Ok(Value::Array(values))
+            }
+
+            IoType::Matrix {
+                element_type,
+                rows,
+                cols,
+            } => {
+                let element_bits = element_type.bit_count();
+                let mut rows_vec = Vec::with_capacity(*rows);
+                for r in 0..*rows {
+                    let mut cols_vec = Vec::with_capacity(*cols);
+                    for c in 0..*cols {
+                        let index = (r * cols + c) * element_bits;
+                        let start = index;
+                        let end = start + element_bits;
+                        cols_vec.push(element_type.from_binary(&bits[start..end])?);
+                    }
+                    rows_vec.push(Value::Array(cols_vec));
+                }
+                Ok(Value::Array(rows_vec))
+            }
 
             _ => Err(format!("from_binary not yet implemented for {:?}", self)),
         }
