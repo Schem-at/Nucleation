@@ -120,7 +120,7 @@ mod io_layout_builder;
 mod io_mapping;
 mod io_type;
 mod layout_function;
-mod sort_strategy;
+pub mod sort_strategy;
 mod value;
 
 #[cfg(test)]

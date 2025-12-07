@@ -22,11 +22,11 @@ use web_sys::console;
 use super::definition_region::DefinitionRegionWrapper;
 
 #[cfg(feature = "simulation")]
-use super::circuit_builder::CircuitBuilderWrapper;
+use super::circuit_builder::{CircuitBuilderWrapper, SortStrategyWrapper};
 #[cfg(feature = "simulation")]
 use super::typed_executor::TypedCircuitExecutorWrapper;
 #[cfg(feature = "simulation")]
-use crate::simulation::typed_executor::IoType;
+use crate::simulation::typed_executor::{IoType, SortStrategy};
 
 #[wasm_bindgen]
 pub struct LazyChunkIterator {
@@ -1431,8 +1431,8 @@ impl SchematicWrapper {
         // Parse config object
         // Expected format:
         // {
-        //   inputs: [ { name: "a", bits: 8, region: "a" }, ... ],
-        //   outputs: [ { name: "out", bits: 9, region: "c" }, ... ]
+        //   inputs: [ { name: "a", type: "uint", bits: 8, region: "a" }, ... ],
+        //   outputs: [ { name: "out", type: "matrix", rows: 4, cols: 4, element: "boolean", region: "c" }, ... ]
         // }
 
         let inputs = Reflect::get(&config, &JsValue::from_str("inputs"))?;
@@ -1444,10 +1444,6 @@ impl SchematicWrapper {
                     .as_string()
                     .ok_or_else(|| JsValue::from_str("Input name missing or not a string"))?;
 
-                let bits = Reflect::get(&input, &JsValue::from_str("bits"))?
-                    .as_f64()
-                    .unwrap_or(1.0) as u32;
-
                 let region_name = Reflect::get(&input, &JsValue::from_str("region"))?
                     .as_string()
                     .ok_or_else(|| {
@@ -1457,14 +1453,27 @@ impl SchematicWrapper {
                 // Get region wrapper
                 let region = self.get_definition_region(region_name.clone())?;
 
-                // Create IO Type (defaulting to unsigned int for now)
-                // TODO: Add support for signed/other types via config
-                let io_type = crate::simulation::typed_executor::IoType::UnsignedInt {
-                    bits: bits as usize,
-                };
+                // Create IO Type
+                let io_type = parse_js_io_type(&input)?;
                 let io_type_wrapper = crate::IoTypeWrapper { inner: io_type };
 
-                builder = builder.with_input_auto(name, &io_type_wrapper, &region)?;
+                // Parse sort strategy
+                let sort_str = Reflect::get(&input, &JsValue::from_str("sort"))?.as_string();
+
+                let sort_wrapper = if let Some(s) = sort_str {
+                    Some(SortStrategyWrapper {
+                        inner: parse_sort_string(&s),
+                    })
+                } else {
+                    None
+                };
+
+                if let Some(sort) = sort_wrapper {
+                    builder =
+                        builder.with_input_auto_sorted(name, &io_type_wrapper, &region, &sort)?;
+                } else {
+                    builder = builder.with_input_auto(name, &io_type_wrapper, &region)?;
+                }
             }
         }
 
@@ -1477,10 +1486,6 @@ impl SchematicWrapper {
                     .as_string()
                     .ok_or_else(|| JsValue::from_str("Output name missing or not a string"))?;
 
-                let bits = Reflect::get(&output, &JsValue::from_str("bits"))?
-                    .as_f64()
-                    .unwrap_or(1.0) as u32;
-
                 let region_name = Reflect::get(&output, &JsValue::from_str("region"))?
                     .as_string()
                     .ok_or_else(|| {
@@ -1491,12 +1496,26 @@ impl SchematicWrapper {
                 let region = self.get_definition_region(region_name.clone())?;
 
                 // Create IO Type
-                let io_type = crate::simulation::typed_executor::IoType::UnsignedInt {
-                    bits: bits as usize,
-                };
+                let io_type = parse_js_io_type(&output)?;
                 let io_type_wrapper = crate::IoTypeWrapper { inner: io_type };
 
-                builder = builder.with_output_auto(name, &io_type_wrapper, &region)?;
+                // Parse sort strategy
+                let sort_str = Reflect::get(&output, &JsValue::from_str("sort"))?.as_string();
+
+                let sort_wrapper = if let Some(s) = sort_str {
+                    Some(SortStrategyWrapper {
+                        inner: parse_sort_string(&s),
+                    })
+                } else {
+                    None
+                };
+
+                if let Some(sort) = sort_wrapper {
+                    builder =
+                        builder.with_output_auto_sorted(name, &io_type_wrapper, &region, &sort)?;
+                } else {
+                    builder = builder.with_output_auto(name, &io_type_wrapper, &region)?;
+                }
             }
         }
 
@@ -1678,5 +1697,128 @@ impl SchematicWrapper {
         // Convert serde_json::Value to JsValue
         serde_wasm_bindgen::to_value(&insign_data)
             .map_err(|e| JsValue::from_str(&format!("JSON serialization error: {}", e)))
+    }
+}
+
+#[cfg(feature = "simulation")]
+fn parse_sort_string(sort_str: &str) -> SortStrategy {
+    use crate::simulation::typed_executor::sort_strategy::{Axis, Direction};
+
+    // Handle standard presets
+    match sort_str {
+        "yxz" => return SortStrategy::YXZ,
+        "xyz" => return SortStrategy::XYZ,
+        "zyx" => return SortStrategy::ZYX,
+        "yDescXZ" => return SortStrategy::YDescXZ,
+        "xDescYZ" => return SortStrategy::XDescYZ,
+        "zDescYX" => return SortStrategy::ZDescYX,
+        "descending" => return SortStrategy::YXZDesc,
+        _ => {}
+    }
+
+    // Parse custom string like "-y+x-z" or "yxz"
+    let mut orders = Vec::new();
+    let mut chars = sort_str.chars().peekable();
+
+    while let Some(&c) = chars.peek() {
+        let direction = if c == '-' {
+            chars.next();
+            Direction::Descending
+        } else if c == '+' {
+            chars.next();
+            Direction::Ascending
+        } else {
+            Direction::Ascending // Default to ascending if no sign
+        };
+
+        if let Some(axis_char) = chars.next() {
+            let axis = match axis_char.to_ascii_lowercase() {
+                'x' => Axis::X,
+                'y' => Axis::Y,
+                'z' => Axis::Z,
+                _ => continue, // Skip invalid chars
+            };
+            orders.push((axis, direction));
+        }
+    }
+
+    if orders.is_empty() {
+        SortStrategy::YXZ // Fallback
+    } else {
+        SortStrategy::Custom(orders)
+    }
+}
+
+#[cfg(feature = "simulation")]
+fn parse_js_io_type(config: &JsValue) -> Result<IoType, JsValue> {
+    if config.is_string() {
+        let type_str = config.as_string().unwrap();
+        return match type_str.as_str() {
+            "boolean" => Ok(IoType::Boolean),
+            "float" => Ok(IoType::Float32),
+            "uint" => Ok(IoType::UnsignedInt { bits: 1 }),
+            "int" => Ok(IoType::SignedInt { bits: 1 }),
+            "hex" => Ok(IoType::UnsignedInt { bits: 4 }),
+            _ => Err(JsValue::from_str(&format!(
+                "Unknown simple IO type: {}",
+                type_str
+            ))),
+        };
+    }
+
+    let type_str = Reflect::get(config, &"type".into())?
+        .as_string()
+        .unwrap_or_else(|| "uint".to_string());
+
+    match type_str.as_str() {
+        "uint" => {
+            let bits = Reflect::get(config, &"bits".into())?
+                .as_f64()
+                .unwrap_or(1.0) as usize;
+            Ok(IoType::UnsignedInt { bits })
+        }
+        "int" => {
+            let bits = Reflect::get(config, &"bits".into())?
+                .as_f64()
+                .unwrap_or(1.0) as usize;
+            Ok(IoType::SignedInt { bits })
+        }
+        "float" => Ok(IoType::Float32),
+        "boolean" => Ok(IoType::Boolean),
+        "hex" => Ok(IoType::UnsignedInt { bits: 4 }),
+        "array" => {
+            let length = Reflect::get(config, &"length".into())?
+                .as_f64()
+                .ok_or_else(|| JsValue::from_str("Array type requires 'length'"))?
+                as usize;
+
+            let element_val = Reflect::get(config, &"element".into())?;
+            let element_type = parse_js_io_type(&element_val)?;
+
+            Ok(IoType::Array {
+                element_type: Box::new(element_type),
+                length,
+            })
+        }
+        "matrix" => {
+            let rows = Reflect::get(config, &"rows".into())?
+                .as_f64()
+                .ok_or_else(|| JsValue::from_str("Matrix type requires 'rows'"))?
+                as usize;
+            let cols = Reflect::get(config, &"cols".into())?
+                .as_f64()
+                .ok_or_else(|| JsValue::from_str("Matrix type requires 'cols'"))?
+                as usize;
+
+            let element_val = Reflect::get(config, &"element".into())?;
+            let element_type = parse_js_io_type(&element_val)?;
+
+            Ok(IoType::Matrix {
+                element_type: Box::new(element_type),
+                rows,
+                cols,
+            })
+        }
+        _ => Err(JsValue::from_str(&format!("Unknown IO type: {}", type_str))),
     }
 }

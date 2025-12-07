@@ -153,7 +153,6 @@ impl DefinitionRegionWrapper {
             schematic_ptr: std::ptr::null_mut(),
             name: None,
         }
-    
     }
 
     // ========================================================================
@@ -389,7 +388,6 @@ impl DefinitionRegionWrapper {
         self.sync();
         self
     }
-
 
     // ========================================================================
     // Box Access (for Rendering)

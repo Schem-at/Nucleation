@@ -68,6 +68,23 @@ pub enum SortStrategy {
 
     /// Reverse of whatever order positions were added
     Reverse,
+
+    /// Custom sort order defined by a list of axes and directions
+    /// Example: [ (Y, Descending), (X, Ascending), (Z, Ascending) ]
+    Custom(Vec<(Axis, Direction)>),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Axis {
+    X,
+    Y,
+    Z,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Direction {
+    Ascending,
+    Descending,
 }
 
 impl Default for SortStrategy {
@@ -94,6 +111,32 @@ impl SortStrategy {
                     a.1.cmp(&b.1)
                         .then_with(|| a.0.cmp(&b.0))
                         .then_with(|| a.2.cmp(&b.2))
+                });
+            }
+            SortStrategy::Custom(orders) => {
+                positions.sort_by(|a, b| {
+                    for (axis, direction) in orders {
+                        let val_a = match axis {
+                            Axis::X => a.0,
+                            Axis::Y => a.1,
+                            Axis::Z => a.2,
+                        };
+                        let val_b = match axis {
+                            Axis::X => b.0,
+                            Axis::Y => b.1,
+                            Axis::Z => b.2,
+                        };
+
+                        let cmp = match direction {
+                            Direction::Ascending => val_a.cmp(&val_b),
+                            Direction::Descending => val_b.cmp(&val_a),
+                        };
+
+                        if cmp != std::cmp::Ordering::Equal {
+                            return cmp;
+                        }
+                    }
+                    std::cmp::Ordering::Equal
                 });
             }
             SortStrategy::XYZ => {
@@ -226,6 +269,7 @@ impl SortStrategy {
             SortStrategy::DistanceFromDesc { .. } => "distance_from_desc",
             SortStrategy::Preserve => "preserve",
             SortStrategy::Reverse => "reverse",
+            SortStrategy::Custom(_) => "custom",
         }
     }
 }
