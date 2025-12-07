@@ -153,6 +153,9 @@ impl DefinitionRegionWrapper {
             schematic_ptr: std::ptr::null_mut(),
             name: None,
         }
+    
+    }
+
     // ========================================================================
     // Boolean Operations
     // ========================================================================
@@ -171,8 +174,6 @@ impl DefinitionRegionWrapper {
         self.inner.intersect(&other.inner);
         self.sync();
         self
-    }ub fn intersect(&mut self, other: &DefinitionRegionWrapper) {
-        self.inner.intersect(&other.inner);
     }
 
     /// Create a new region that is the union of this region and another
@@ -368,6 +369,11 @@ impl DefinitionRegionWrapper {
     #[wasm_bindgen(js_name = intersected)]
     pub fn intersected(&self, other: &DefinitionRegionWrapper) -> DefinitionRegionWrapper {
         DefinitionRegionWrapper {
+            inner: self.inner.intersected(&other.inner),
+            schematic_ptr: std::ptr::null_mut(),
+            name: None,
+        }
+    }
     /// Add all points from another region to this one (mutating union)
     #[wasm_bindgen(js_name = unionInto)]
     pub fn union_into(mut self, other: &DefinitionRegionWrapper) -> Self {
@@ -384,11 +390,6 @@ impl DefinitionRegionWrapper {
         self
     }
 
-    /// Simplify the region by merging adjacent/overlapping boxes
-    #[wasm_bindgen(js_name = simplify)]
-    pub fn simplify(&mut self) {
-        self.inner.simplify();
-    }
 
     // ========================================================================
     // Box Access (for Rendering)
