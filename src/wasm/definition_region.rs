@@ -126,15 +126,17 @@ impl DefinitionRegionWrapper {
     }
 
     #[wasm_bindgen(js_name = addPoint)]
-    pub fn add_point(&mut self, x: i32, y: i32, z: i32) {
+    pub fn add_point(mut self, x: i32, y: i32, z: i32) -> Self {
         self.inner.add_point(x, y, z);
         self.sync();
+        self
     }
 
     #[wasm_bindgen(js_name = merge)]
-    pub fn merge(&mut self, other: &DefinitionRegionWrapper) {
+    pub fn merge(mut self, other: &DefinitionRegionWrapper) -> Self {
         self.inner.merge(&other.inner);
         self.sync();
+        self
     }
 
     #[wasm_bindgen(js_name = filterByBlock)]
@@ -151,21 +153,25 @@ impl DefinitionRegionWrapper {
             schematic_ptr: std::ptr::null_mut(),
             name: None,
         }
-    }
-
     // ========================================================================
     // Boolean Operations
     // ========================================================================
 
     /// Subtract another region from this one (removes points present in `other`)
     #[wasm_bindgen(js_name = subtract)]
-    pub fn subtract(&mut self, other: &DefinitionRegionWrapper) {
+    pub fn subtract(mut self, other: &DefinitionRegionWrapper) -> Self {
         self.inner.subtract(&other.inner);
+        self.sync();
+        self
     }
 
     /// Keep only points present in both regions (intersection)
     #[wasm_bindgen(js_name = intersect)]
-    pub fn intersect(&mut self, other: &DefinitionRegionWrapper) {
+    pub fn intersect(mut self, other: &DefinitionRegionWrapper) -> Self {
+        self.inner.intersect(&other.inner);
+        self.sync();
+        self
+    }ub fn intersect(&mut self, other: &DefinitionRegionWrapper) {
         self.inner.intersect(&other.inner);
     }
 
@@ -185,20 +191,26 @@ impl DefinitionRegionWrapper {
 
     /// Translate all boxes by the given offset
     #[wasm_bindgen(js_name = shift)]
-    pub fn shift(&mut self, x: i32, y: i32, z: i32) {
+    pub fn shift(mut self, x: i32, y: i32, z: i32) -> Self {
         self.inner.shift(x, y, z);
+        self.sync();
+        self
     }
 
     /// Expand all boxes by the given amounts in each direction
     #[wasm_bindgen(js_name = expand)]
-    pub fn expand(&mut self, x: i32, y: i32, z: i32) {
+    pub fn expand(mut self, x: i32, y: i32, z: i32) -> Self {
         self.inner.expand(x, y, z);
+        self.sync();
+        self
     }
 
     /// Contract all boxes by the given amount uniformly
     #[wasm_bindgen(js_name = contract)]
-    pub fn contract(&mut self, amount: i32) {
+    pub fn contract(mut self, amount: i32) -> Self {
         self.inner.contract(amount);
+        self.sync();
+        self
     }
 
     /// Get the overall bounding box encompassing all boxes in this region
@@ -356,16 +368,20 @@ impl DefinitionRegionWrapper {
     #[wasm_bindgen(js_name = intersected)]
     pub fn intersected(&self, other: &DefinitionRegionWrapper) -> DefinitionRegionWrapper {
         DefinitionRegionWrapper {
-            inner: self.inner.intersected(&other.inner),
-            schematic_ptr: std::ptr::null_mut(),
-            name: None,
-        }
-    }
-
     /// Add all points from another region to this one (mutating union)
     #[wasm_bindgen(js_name = unionInto)]
-    pub fn union_into(&mut self, other: &DefinitionRegionWrapper) {
+    pub fn union_into(mut self, other: &DefinitionRegionWrapper) -> Self {
         self.inner.union_into(&other.inner);
+        self.sync();
+        self
+    }
+
+    /// Simplify the region by merging adjacent/overlapping boxes
+    #[wasm_bindgen(js_name = simplify)]
+    pub fn simplify(mut self) -> Self {
+        self.inner.simplify();
+        self.sync();
+        self
     }
 
     /// Simplify the region by merging adjacent/overlapping boxes
@@ -697,6 +713,31 @@ impl DefinitionRegionWrapper {
     #[wasm_bindgen(js_name = clone)]
     pub fn clone_region(&self) -> DefinitionRegionWrapper {
         self.copy()
+    }
+
+    #[wasm_bindgen(js_name = getBlocks)]
+    pub fn get_blocks(&self) -> Result<Array, JsValue> {
+        if self.schematic_ptr.is_null() {
+            return Err(JsValue::from_str("Region is not attached to a schematic"));
+        }
+
+        let sch = unsafe { &*self.schematic_ptr };
+        let arr = Array::new();
+
+        for (x, y, z) in self.inner.iter_positions() {
+            let obj = Object::new();
+            Reflect::set(&obj, &"x".into(), &JsValue::from(x))?;
+            Reflect::set(&obj, &"y".into(), &JsValue::from(y))?;
+            Reflect::set(&obj, &"z".into(), &JsValue::from(z))?;
+
+            if let Some(block) = sch.get_block(x, y, z) {
+                Reflect::set(&obj, &"block".into(), &JsValue::from(block.name.clone()))?;
+            }
+
+            arr.push(&obj);
+        }
+
+        Ok(arr)
     }
 }
 
