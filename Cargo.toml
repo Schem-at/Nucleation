@@ -1,6 +1,6 @@
 [package]
 name = "nucleation"
-version = "0.1.134"
+version = "0.1.135"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]

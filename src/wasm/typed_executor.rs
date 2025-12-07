@@ -74,10 +74,36 @@ impl ValueWrapper {
             Value::F32(v) => JsValue::from_f64(*v as f64),
             Value::Bool(v) => JsValue::from_bool(*v),
             Value::String(v) => JsValue::from_str(v),
-            Value::Array(_) => JsValue::from_str("[Array]"),
-            Value::Struct(_) => JsValue::from_str("[Struct]"),
-            Value::BitArray(_) => JsValue::from_str("[BitArray]"),
-            Value::Bytes(_) => JsValue::from_str("[Bytes]"),
+            Value::Array(arr) => {
+                let js_arr = Array::new();
+                for val in arr {
+                    let wrapper = ValueWrapper { inner: val.clone() };
+                    js_arr.push(&wrapper.to_js());
+                }
+                js_arr.into()
+            }
+            Value::Struct(fields) => {
+                let obj = Object::new();
+                for (key, val) in fields {
+                    let wrapper = ValueWrapper { inner: val.clone() };
+                    Reflect::set(&obj, &JsValue::from_str(key), &wrapper.to_js()).unwrap();
+                }
+                obj.into()
+            }
+            Value::BitArray(bits) => {
+                let js_arr = Array::new();
+                for bit in bits {
+                    js_arr.push(&JsValue::from_bool(*bit));
+                }
+                js_arr.into()
+            }
+            Value::Bytes(bytes) => {
+                let js_arr = Array::new();
+                for byte in bytes {
+                    js_arr.push(&JsValue::from_f64(*byte as f64));
+                }
+                js_arr.into()
+            }
         }
     }
 
