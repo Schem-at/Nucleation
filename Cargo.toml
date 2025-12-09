@@ -1,6 +1,6 @@
 [package]
 name = "nucleation"
-version = "0.1.135"
+version = "0.1.136"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -71,11 +71,11 @@ bytemuck = "1.23.1"
 # Note: These are git dependencies and will be excluded from crates.io publish
 # Using Nano112's MCHPRS fork with custom IO support and bug fixes
 # Networking is disabled to avoid WASM compatibility issues
-# Rev 80a781f: Fixes comparator side input edge type for custom IO wires
-mchprs_redpiler = { git = "https://github.com/Nano112/MCHPRS.git", rev = "80a781f", optional = true }
-mchprs_redstone = { git = "https://github.com/Nano112/MCHPRS.git", rev = "80a781f", optional = true }
-mchprs_world = { git = "https://github.com/Nano112/MCHPRS.git", rev = "80a781f", optional = true, default-features = false }
-mchprs_blocks = { git = "https://github.com/Nano112/MCHPRS.git", rev = "80a781f", optional = true }
+# Rev 541c0b2: Latest bug fixes from Nano112's MCHPRS fork
+mchprs_redpiler = { git = "https://github.com/Nano112/MCHPRS.git", rev = "541c0b2e96857a6abaa567755c3fbb6c7f5be971", optional = true }
+mchprs_redstone = { git = "https://github.com/Nano112/MCHPRS.git", rev = "541c0b2e96857a6abaa567755c3fbb6c7f5be971", optional = true }
+mchprs_world = { git = "https://github.com/Nano112/MCHPRS.git", rev = "541c0b2e96857a6abaa567755c3fbb6c7f5be971", optional = true, default-features = false }
+mchprs_blocks = { git = "https://github.com/Nano112/MCHPRS.git", rev = "541c0b2e96857a6abaa567755c3fbb6c7f5be971", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
