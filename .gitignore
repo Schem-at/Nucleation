@@ -3,3 +3,4 @@
 /pkg/
 .history/
 .DS_Store
+.vscode/
