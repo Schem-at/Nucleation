@@ -31,7 +31,7 @@
 
 pub mod palettes;
 
-use crate::{BlockState, UniversalSchematic};
+use crate::UniversalSchematic;
 use std::collections::HashMap;
 
 /// Palette entry - either a block or a sub-schematic

@@ -1,7 +1,7 @@
 use quartz_nbt::{self, NbtCompound, NbtTag};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::{Error, ErrorKind, Read, Write};
+// use std::io::{Error, ErrorKind, Read, Write};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Endian {

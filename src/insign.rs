@@ -4,7 +4,7 @@ use crate::block_entity::BlockEntity;
 use crate::universal_schematic::UniversalSchematic;
 use insign::{compile, Error as CompileError};
 use serde_json::Value as JsonValue;
-use std::collections::HashMap;
+// use std::collections::HashMap;
 
 /// Sign input for Insign compilation
 #[derive(Debug, Clone)]

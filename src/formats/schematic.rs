@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::io::{BufReader, Cursor, Read};
+use std::io::{BufReader, Read};
 
 use crate::block_entity::BlockEntity;
 use crate::entity::Entity;
@@ -682,7 +682,7 @@ fn parse_entities(region_tag: &NbtCompound) -> Result<Vec<Entity>, Box<dyn std::
 mod tests {
     use std::fs;
     use std::fs::File;
-    use std::io::Write;
+    use std::io::{Cursor, Write};
     use std::path::Path;
 
     use crate::litematic::{from_litematic, to_litematic};

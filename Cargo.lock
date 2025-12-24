@@ -1845,7 +1845,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation"
-version = "0.1.139"
+version = "0.1.140"
 dependencies = [
  "base64",
  "blockpedia",

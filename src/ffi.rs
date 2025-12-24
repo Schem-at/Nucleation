@@ -162,7 +162,7 @@ fn free_single_block(block: &mut CBlock) {
 
 /// Frees a CBlockArray returned by functions like `schematic_get_all_blocks`.
 #[no_mangle]
-pub extern "C" fn free_block_array(mut array: CBlockArray) {
+pub extern "C" fn free_block_array(array: CBlockArray) {
     if !array.data.is_null() {
         unsafe {
             let mut blocks = Vec::from_raw_parts(array.data, array.len, array.len);
@@ -181,7 +181,7 @@ fn free_single_block_entity(entity: &mut CBlockEntity) {
 
 /// Frees a CBlockEntityArray returned by `schematic_get_all_block_entities`.
 #[no_mangle]
-pub extern "C" fn free_block_entity_array(mut array: CBlockEntityArray) {
+pub extern "C" fn free_block_entity_array(array: CBlockEntityArray) {
     if !array.data.is_null() {
         unsafe {
             let mut entities = Vec::from_raw_parts(array.data, array.len, array.len);
@@ -199,7 +199,7 @@ fn free_single_chunk(chunk: &mut CChunk) {
 
 /// Frees a CChunkArray returned by `schematic_get_chunks`.
 #[no_mangle]
-pub extern "C" fn free_chunk_array(mut array: CChunkArray) {
+pub extern "C" fn free_chunk_array(array: CChunkArray) {
     if !array.data.is_null() {
         unsafe {
             let mut chunks = Vec::from_raw_parts(array.data, array.len, array.len);
@@ -384,7 +384,7 @@ pub extern "C" fn schematic_set_block(
     let block_name_str = unsafe { CStr::from_ptr(block_name).to_string_lossy().into_owned() };
 
     let block_state = BlockState::new(block_name_str);
-    s.set_block(x, y, z, block_state);
+    s.set_block(x, y, z, &block_state);
     0
 }
 
@@ -421,7 +421,7 @@ pub extern "C" fn schematic_set_block_with_properties(
         name: block_name_str,
         properties: props,
     };
-    s.set_block(x, y, z, block_state);
+    s.set_block(x, y, z, &block_state);
     0
 }
 

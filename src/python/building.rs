@@ -1,7 +1,7 @@
 use crate::building::{
     BilinearGradientBrush, BlockPalette, BrushEnum, BuildingTool, ColorBrush, Cuboid,
-    InterpolationSpace, LinearGradientBrush, MultiPointGradientBrush, PointGradientBrush,
-    ShadedBrush, ShapeEnum, SolidBrush, Sphere,
+    InterpolationSpace, LinearGradientBrush, PointGradientBrush, ShadedBrush, ShapeEnum,
+    SolidBrush, Sphere,
 };
 use crate::python::schematic::PySchematic;
 use crate::BlockState;

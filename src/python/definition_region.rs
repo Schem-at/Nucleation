@@ -5,7 +5,7 @@
 use crate::definition_region::DefinitionRegion;
 use crate::UniversalSchematic;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::PyDict;
 use std::collections::HashMap;
 
 use super::PySchematic;

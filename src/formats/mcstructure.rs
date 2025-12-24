@@ -366,7 +366,7 @@ pub fn to_mcstructure(
             let mut be_compound = NbtMap::new();
             // be.to_nbt() returns NbtCompound (quartz). We need NbtMap.
             // But we can construct NbtMap from BlockEntity data directly
-            let mut be_data_map = NbtMap::from_quartz_nbt(&be.to_nbt());
+            let be_data_map = NbtMap::from_quartz_nbt(&be.to_nbt());
 
             be_compound.insert(
                 "block_entity_data".to_string(),

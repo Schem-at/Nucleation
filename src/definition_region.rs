@@ -126,7 +126,7 @@ impl DefinitionRegion {
             let start = *point_set.iter().next().unwrap();
 
             // Greedily expand in X, then Z, then Y
-            let mut min = start;
+            let min = start;
             let mut max = start;
 
             // Expand +X

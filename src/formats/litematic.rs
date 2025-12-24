@@ -389,11 +389,10 @@ fn parse_regions(
             if let Ok(tile_entities_list) = region_nbt.get::<_, &NbtList>("TileEntities") {
                 for tag in tile_entities_list.iter() {
                     if let NbtTag::Compound(compound) = tag {
-                        if let block_entity = BlockEntity::from_nbt(compound) {
-                            region
-                                .block_entities
-                                .insert(block_entity.position, block_entity);
-                        }
+                        let block_entity = BlockEntity::from_nbt(compound);
+                        region
+                            .block_entities
+                            .insert(block_entity.position, block_entity);
                     }
                 }
             }

@@ -34,7 +34,7 @@ use crate::simulation::CircuitBuilder;
 #[cfg(feature = "simulation")]
 use crate::simulation::MchprsWorld;
 
-use crate::building::{BuildingTool, Cuboid, Shape, SolidBrush, Sphere};
+use crate::building::{BuildingTool, Cuboid, SolidBrush, Sphere};
 
 #[pyclass(name = "BlockState")]
 #[derive(Clone)]
@@ -935,7 +935,7 @@ pub fn save_schematic(
     format: &str,
     version: Option<String>,
 ) -> PyResult<()> {
-    Python::with_gil(|py| {
+    Python::with_gil(|_py| {
         let manager = get_manager();
         let manager = manager
             .lock()

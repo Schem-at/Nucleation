@@ -718,9 +718,8 @@ impl Region {
             if let NbtTag::Compound(be_compound) = value {
                 let coords: Vec<i32> = key.split(',').map(|s| s.parse::<i32>().unwrap()).collect();
                 if coords.len() == 3 {
-                    if let block_entity = BlockEntity::from_nbt(be_compound) {
-                        block_entities.insert((coords[0], coords[1], coords[2]), block_entity);
-                    }
+                    let block_entity = BlockEntity::from_nbt(be_compound);
+                    block_entities.insert((coords[0], coords[1], coords[2]), block_entity);
                 }
             }
         }
@@ -885,7 +884,7 @@ impl Region {
     pub fn flip_x(&mut self) {
         use crate::transforms::{transform_block_state_flip, Axis};
 
-        let (size_x, size_y, size_z) = self.size;
+        let _ = self.size;
         let volume = self.volume();
         let mut new_blocks = vec![0; volume];
 
@@ -1000,8 +999,6 @@ impl Region {
     /// Rotate the region around the Y axis (horizontal plane)
     /// Degrees must be 90, 180, or 270
     pub fn rotate_y(&mut self, degrees: i32) {
-        use crate::transforms::{transform_block_state_rotate, Axis};
-
         if degrees % 90 != 0 || degrees == 0 {
             return; // Only support 90-degree rotations
         }
@@ -1100,8 +1097,6 @@ impl Region {
     /// Rotate the region around the X axis
     /// Degrees must be 90, 180, or 270
     pub fn rotate_x(&mut self, degrees: i32) {
-        use crate::transforms::{transform_block_state_rotate, Axis};
-
         if degrees % 90 != 0 || degrees == 0 {
             return;
         }
@@ -1189,8 +1184,6 @@ impl Region {
     /// Rotate the region around the Z axis
     /// Degrees must be 90, 180, or 270
     pub fn rotate_z(&mut self, degrees: i32) {
-        use crate::transforms::{transform_block_state_rotate, Axis};
-
         if degrees % 90 != 0 || degrees == 0 {
             return;
         }
