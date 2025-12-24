@@ -8,7 +8,7 @@ use crate::schematic::SchematicVersion;
 use crate::universal_schematic::ChunkLoadingStrategy;
 use crate::{
     block_position::BlockPosition,
-    formats::{litematic, schematic},
+    formats::{litematic, manager::get_manager, schematic},
     print_utils::{
         format_json_schematic as print_json_schematic, format_schematic as print_schematic,
     },
@@ -66,15 +66,67 @@ impl SchematicWrapper {
     }
 
     pub fn from_data(&mut self, data: &[u8]) -> Result<(), JsValue> {
-        if litematic::is_litematic(data) {
-            console::log_1(&"Parsing litematic data".into());
-            self.from_litematic(data)
-        } else if schematic::is_schematic(data) {
-            console::log_1(&"Parsing schematic data".into());
-            self.from_schematic(data)
-        } else {
-            Err(JsValue::from_str("Unknown or unsupported schematic format"))
+        let manager = get_manager();
+        let manager = manager.lock().unwrap();
+
+        match manager.read(data) {
+            Ok(schematic) => {
+                self.0 = schematic;
+                Ok(())
+            }
+            Err(e) => Err(JsValue::from_str(&format!(
+                "Schematic parsing error: {}",
+                e
+            ))),
         }
+    }
+
+    pub fn get_supported_import_formats() -> Array {
+        let manager = get_manager();
+        let manager = manager.lock().unwrap();
+        let formats = manager.list_importers();
+        let js_formats = Array::new();
+        for format in formats {
+            js_formats.push(&JsValue::from_str(&format));
+        }
+        js_formats
+    }
+
+    pub fn get_supported_export_formats() -> Array {
+        let manager = get_manager();
+        let manager = manager.lock().unwrap();
+        let formats = manager.list_exporters();
+        let js_formats = Array::new();
+        for format in formats {
+            js_formats.push(&JsValue::from_str(&format));
+        }
+        js_formats
+    }
+
+    pub fn get_format_versions(format: &str) -> Array {
+        let manager = get_manager();
+        let manager = manager.lock().unwrap();
+        let versions = manager.get_exporter_versions(format).unwrap_or_default();
+        let js_versions = Array::new();
+        for version in versions {
+            js_versions.push(&JsValue::from_str(&version));
+        }
+        js_versions
+    }
+
+    pub fn get_default_format_version(format: &str) -> Option<String> {
+        let manager = get_manager();
+        let manager = manager.lock().unwrap();
+        manager.get_exporter_default_version(format)
+    }
+
+    pub fn save_as(&self, format: &str, version: Option<String>) -> Result<Vec<u8>, JsValue> {
+        let manager = get_manager();
+        let manager = manager.lock().unwrap();
+
+        manager
+            .write(format, &self.0, version.as_deref())
+            .map_err(|e| JsValue::from_str(&format!("Export error: {}", e)))
     }
 
     pub fn from_litematic(&mut self, data: &[u8]) -> Result<(), JsValue> {

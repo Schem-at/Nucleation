@@ -6,8 +6,10 @@ use crate::definition_region::DefinitionRegion;
 use crate::entity::Entity;
 use crate::metadata::Metadata;
 use crate::region::Region;
+use crate::utils::block_string::{parse_custom_name, parse_items_array};
+use crate::utils::enhanced_nbt_parser::parse_enhanced_nbt;
+use crate::utils::NbtMap;
 use crate::utils::NbtValue;
-use crate::utils::{parse_custom_name, parse_items_array, NbtMap};
 use crate::BlockState;
 use quartz_nbt::{NbtCompound, NbtTag};
 use rand::SeedableRng;
@@ -473,7 +475,7 @@ impl UniversalSchematic {
         Ok(combined_json)
     }
 
-    pub(crate) fn total_blocks(&self) -> i32 {
+    pub fn total_blocks(&self) -> i32 {
         let mut total = self.default_region.count_blocks() as i32;
         total += self
             .other_regions
@@ -483,7 +485,7 @@ impl UniversalSchematic {
         total
     }
 
-    pub(crate) fn total_volume(&self) -> i32 {
+    pub fn total_volume(&self) -> i32 {
         let mut total = self.default_region.volume() as i32;
         total += self
             .other_regions

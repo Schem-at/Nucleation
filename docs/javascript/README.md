@@ -96,6 +96,14 @@ class SchematicWrapper {
 	to_litematic(): Uint8Array;
 	to_schematic(): Uint8Array;
 
+	// Format Support
+	static get_supported_import_formats(): string[];
+	static get_supported_export_formats(): string[];
+	static get_format_versions(format: string): string[];
+	static get_default_format_version(format: string): string | undefined;
+	
+	save_as(format: string, version?: string): Uint8Array;
+
 	// Block operations
 	set_block(x: number, y: number, z: number, blockName: string): void;
 	set_block_with_properties(
@@ -217,6 +225,10 @@ import { readFileSync } from "fs";
 const bytes = new Uint8Array(readFileSync("input.litematic"));
 const schematic = new SchematicWrapper();
 schematic.from_litematic(bytes);
+
+// Check supported formats
+console.log(SchematicWrapper.get_supported_import_formats());
+// ["litematic", "schematic", "mcstructure"]
 ```
 
 ### Save to File
@@ -239,6 +251,21 @@ import { writeFileSync } from "fs";
 
 const bytes = schematic.to_litematic();
 writeFileSync("output.litematic", bytes);
+
+// Check export formats
+console.log(SchematicWrapper.get_supported_export_formats());
+// ["litematic", "schematic", "mcstructure"]
+
+// Check versions
+console.log(SchematicWrapper.get_format_versions("schematic"));
+// ["v1", "v2", "v3"]
+
+console.log(SchematicWrapper.get_default_format_version("schematic"));
+// "v3"
+
+// Save with specific format and version
+const schemBytes = schematic.save_as("schematic", "v2");
+writeFileSync("output.v2.schem", schemBytes);
 ```
 
 ## Block Operations

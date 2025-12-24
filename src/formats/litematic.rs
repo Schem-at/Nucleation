@@ -367,6 +367,10 @@ fn parse_regions(
             let block_states = region_nbt.get::<_, &[i64]>("BlockStates")?;
             // region.unpack_block_states(block_states);
             region.blocks = region.unpack_block_states(block_states);
+
+            // Rebuild tight bounds after unpacking blocks directly
+            region.rebuild_tight_bounds();
+
             // Parse Entities
             if let Ok(entities_list) = region_nbt.get::<_, &NbtList>("Entities") {
                 region.entities = entities_list
@@ -634,5 +638,49 @@ mod tests {
                 }
             }
         }
+    }
+}
+
+use crate::formats::manager::{SchematicExporter, SchematicImporter};
+
+pub struct LitematicFormat;
+
+impl SchematicImporter for LitematicFormat {
+    fn name(&self) -> String {
+        "litematic".to_string()
+    }
+
+    fn detect(&self, data: &[u8]) -> bool {
+        is_litematic(data)
+    }
+
+    fn read(&self, data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::error::Error>> {
+        from_litematic(data)
+    }
+}
+
+impl SchematicExporter for LitematicFormat {
+    fn name(&self) -> String {
+        "litematic".to_string()
+    }
+
+    fn extensions(&self) -> Vec<String> {
+        vec!["litematic".to_string()]
+    }
+
+    fn available_versions(&self) -> Vec<String> {
+        vec!["default".to_string()]
+    }
+
+    fn default_version(&self) -> String {
+        "default".to_string()
+    }
+
+    fn write(
+        &self,
+        schematic: &UniversalSchematic,
+        _version: Option<&str>,
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        to_litematic(schematic)
     }
 }

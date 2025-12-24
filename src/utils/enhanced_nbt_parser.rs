@@ -1,10 +1,12 @@
+use super::block_string::{parse_custom_name, parse_items_array};
+use super::container_spec::get_container_spec;
 /// Enhanced NBT parser for block entity strings
 ///
 /// Supports:
 /// - signal= shorthand for all containers with item= customization
 /// - Generic NBT field parsing (Lock, LootTable, Text1-4, integers, etc.)
 /// - Backward compatibility with existing Items:[] and CustomName: syntax
-use crate::utils::{get_container_spec, parse_custom_name, parse_items_array, NbtMap, NbtValue};
+use crate::nbt::{NbtMap, NbtValue};
 use std::collections::HashMap;
 
 /// Parse generic NBT fields from a string

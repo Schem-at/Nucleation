@@ -17,6 +17,19 @@ schematic.set_block(0, 0, 0, BlockState::new("minecraft:stone".to_string()));
 // Save as litematic
 let bytes = nucleation::litematic::to_litematic(&schematic)?;
 std::fs::write("output.litematic", bytes)?;
+
+// Or use the FormatManager for unified handling
+use nucleation::formats::manager::get_manager;
+let manager = get_manager().lock().unwrap();
+
+// Check support
+println!("Importers: {:?}", manager.list_importers());
+println!("Exporters: {:?}", manager.list_exporters());
+println!("Schematic versions: {:?}", manager.get_exporter_versions("schematic"));
+println!("Default version: {:?}", manager.get_exporter_default_version("schematic"));
+
+// Save
+let bytes = manager.write("schematic", &schematic, Some("v3"))?;
 ```
 
 ## Table of Contents

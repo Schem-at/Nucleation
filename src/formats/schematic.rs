@@ -940,3 +940,57 @@ mod tests {
             .expect("Failed to write schematic file");
     }
 }
+
+use crate::formats::manager::{SchematicExporter, SchematicImporter};
+
+pub struct SchematicFormat;
+
+impl SchematicImporter for SchematicFormat {
+    fn name(&self) -> String {
+        "schematic".to_string()
+    }
+
+    fn detect(&self, data: &[u8]) -> bool {
+        is_schematic(data)
+    }
+
+    fn read(&self, data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::error::Error>> {
+        from_schematic(data)
+    }
+}
+
+impl SchematicExporter for SchematicFormat {
+    fn name(&self) -> String {
+        "schematic".to_string()
+    }
+
+    fn extensions(&self) -> Vec<String> {
+        vec!["schem".to_string(), "schematic".to_string()]
+    }
+
+    fn available_versions(&self) -> Vec<String> {
+        SchematicVersion::get_all()
+            .iter()
+            .map(|v| v.as_str().to_string())
+            .collect()
+    }
+
+    fn default_version(&self) -> String {
+        SchematicVersion::get_default().as_str().to_string()
+    }
+
+    fn write(
+        &self,
+        schematic: &UniversalSchematic,
+        version: Option<&str>,
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        if let Some(v) = version {
+            match SchematicVersion::from_str(v) {
+                Some(ver) => to_schematic_version(schematic, ver),
+                None => Err(format!("Unsupported version: {}", v).into()),
+            }
+        } else {
+            to_schematic(schematic)
+        }
+    }
+}

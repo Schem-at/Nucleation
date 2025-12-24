@@ -69,6 +69,20 @@ class Schematic:
     def to_schematic(self) -> bytes:
         """Save as WorldEdit schematic format"""
     
+    # Format Support
+    @staticmethod
+    def get_supported_import_formats() -> list[str]:
+        """List supported import formats"""
+    @staticmethod
+    def get_supported_export_formats() -> list[str]:
+        """List supported export formats"""
+    @staticmethod
+    def get_format_versions(format: str) -> list[str]:
+        """Get available versions for an export format"""
+    @staticmethod
+    def get_default_format_version(format: str) -> str | None:
+        """Get default version for an export format"""
+    
     # Block operations
     def set_block(self, x: int, y: int, z: int, block_name: str) -> None:
         """Set block at position"""
@@ -168,6 +182,10 @@ schematic.load_from_litematic(data)
 # Auto-detect format
 schematic.load_from_bytes(data)
 
+# Check supported formats
+print(Schematic.get_supported_import_formats())
+# ['litematic', 'schematic', 'mcstructure']
+
 print(schematic.get_dimensions())
 ```
 
@@ -181,6 +199,20 @@ with open("output.litematic", "wb") as f:
 # Save as WorldEdit schematic
 with open("output.schem", "wb") as f:
     f.write(schematic.to_schematic())
+
+# Check export formats and versions
+print(Schematic.get_supported_export_formats())
+# ['litematic', 'schematic', 'mcstructure']
+
+print(Schematic.get_format_versions("schematic"))
+# ['v1', 'v2', 'v3']
+
+print(Schematic.get_default_format_version("schematic"))
+# 'v3'
+
+# Save with specific format and version
+from nucleation import save_schematic
+save_schematic(schematic, "output.v2.schem", format="schematic", version="v2")
 ```
 
 ## Block Operations

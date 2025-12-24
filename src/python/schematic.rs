@@ -12,7 +12,7 @@ use crate::{
     block_position::BlockPosition,
     bounding_box::BoundingBox,
     definition_region::DefinitionRegion,
-    formats::{litematic, schematic},
+    formats::{litematic, manager::get_manager, schematic},
     print_utils::{format_json_schematic, format_schematic},
     universal_schematic::ChunkLoadingStrategy,
     utils::{NbtMap, NbtValue},
@@ -93,18 +93,49 @@ impl PySchematic {
     }
 
     pub fn from_data(&mut self, data: &[u8]) -> PyResult<()> {
-        if litematic::is_litematic(data) {
-            self.inner = litematic::from_litematic(data)
-                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
-        } else if schematic::is_schematic(data) {
-            self.inner = schematic::from_schematic(data)
-                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
-        } else {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "Unknown or unsupported schematic format",
-            ));
+        let manager = get_manager();
+        let manager = manager
+            .lock()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        match manager.read(data) {
+            Ok(schematic) => {
+                self.inner = schematic;
+                Ok(())
+            }
+            Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                e.to_string(),
+            )),
         }
-        Ok(())
+    }
+
+    #[staticmethod]
+    pub fn get_supported_import_formats() -> Vec<String> {
+        let manager = get_manager();
+        // unwrapping safe here as we're returning static strings essentially
+        let manager = manager.lock().unwrap();
+        manager.list_importers()
+    }
+
+    #[staticmethod]
+    pub fn get_supported_export_formats() -> Vec<String> {
+        let manager = get_manager();
+        let manager = manager.lock().unwrap();
+        manager.list_exporters()
+    }
+
+    #[staticmethod]
+    pub fn get_format_versions(format: &str) -> Vec<String> {
+        let manager = get_manager();
+        let manager = manager.lock().unwrap();
+        manager.get_exporter_versions(format).unwrap_or_default()
+    }
+
+    #[staticmethod]
+    pub fn get_default_format_version(format: &str) -> Option<String> {
+        let manager = get_manager();
+        let manager = manager.lock().unwrap();
+        manager.get_exporter_default_version(format)
     }
 
     pub fn from_litematic(&mut self, data: &[u8]) -> PyResult<()> {
@@ -868,30 +899,27 @@ pub fn load_schematic(path: &str) -> PyResult<PySchematic> {
 }
 
 #[pyfunction]
-#[pyo3(signature = (schematic, path, format = "auto"))]
-pub fn save_schematic(schematic: &PySchematic, path: &str, format: &str) -> PyResult<()> {
+#[pyo3(signature = (schematic, path, format = "auto", version = None))]
+pub fn save_schematic(
+    schematic: &PySchematic,
+    path: &str,
+    format: &str,
+    version: Option<String>,
+) -> PyResult<()> {
     Python::with_gil(|py| {
-        let py_bytes = match format {
-            "litematic" => schematic.to_litematic(py)?,
-            "schematic" => schematic.to_schematic(py)?,
-            "auto" => {
-                if path.ends_with(".litematic") {
-                    schematic.to_litematic(py)?
-                } else {
-                    schematic.to_schematic(py)?
-                }
-            }
-            other => {
-                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Unknown format '{}', choose 'litematic', 'schematic', or 'auto'",
-                    other
-                )))
-            }
+        let manager = get_manager();
+        let manager = manager
+            .lock()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        let bytes = if format == "auto" {
+            manager.write_auto(path, &schematic.inner, version.as_deref())
+        } else {
+            manager.write(format, &schematic.inner, version.as_deref())
         };
 
-        // Extract actual bytes from PyObject
-        let bytes_obj = py_bytes.bind(py).downcast::<PyBytes>()?;
-        let bytes = bytes_obj.as_bytes();
+        let bytes =
+            bytes.map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
 
         fs::write(path, bytes)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;

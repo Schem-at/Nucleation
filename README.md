@@ -16,7 +16,7 @@
 
 ### Core
 
-- **Multi-format support**: `.schematic`, `.litematic`, `.nbt`, and more
+- **Multi-format support**: `.schematic`, `.litematic`, `.nbt`, `.mcstructure`, and more
 - **Memory-safe Rust core** with zero-copy deserialization
 - **Cross-platform**: Linux, macOS, Windows (x86_64 + ARM64)
 - **Multi-language**: Rust, JavaScript/TypeScript (WASM), Python, C/FFI
@@ -176,6 +176,9 @@ schematic-builder -i circuit.txt -o circuit.litematic
 
 # Choose format
 schematic-builder -i circuit.txt -o circuit.schem --format schem
+
+# Export as mcstructure
+schematic-builder -i circuit.txt -o circuit.mcstructure --format mcstructure
 ```
 
 ---

@@ -270,6 +270,3 @@ fn test_chunk_blocks_indices_negative_coords() {
 
     println!("✅ Negative coordinates test passed!");
 }
-
-
-
