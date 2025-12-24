@@ -698,11 +698,15 @@ solid = Brush.solid("minecraft:stone")
 # Solid color (matches closest block)
 color = Brush.color(255, 128, 0, None)  # Orange
 
-# Shaded (uses surface normal for lighting)
-shaded = Brush.shaded(
-    255, 255, 255,  # Base color (White)
-    0.0, 1.0, 0.0,  # Light direction (Top-down)
-    ["concrete"]    # Filter: only concrete
+# 4-Point Bilinear Gradient (Quad)
+bilinear = Brush.bilinear_gradient(
+    0, 0, 0, 10, 0, 0, 0, 10, 0,  # Origin, U-end, V-end
+    255, 0, 0,    # Origin Color (Red)
+    0, 0, 255,    # U-end Color (Blue)
+    0, 255, 0,    # V-end Color (Green)
+    255, 255, 0,  # Opposite Color (Yellow)
+    1,            # Oklab interpolation
+    None          # No filter
 )
 ```
 

@@ -1014,11 +1014,15 @@ const solid = BrushWrapper.solid("minecraft:stone");
 // Solid color (matches closest block)
 const color = BrushWrapper.color(255, 128, 0, null); // Orange
 
-// Shaded (uses surface normal for lighting)
-const shaded = BrushWrapper.shaded(
-    255, 255, 255,  // Base color (White)
-    0.0, 1.0, 0.0,  // Light direction (Top-down)
-    ["concrete"]    // Filter: only concrete
+// 4-Point Bilinear Gradient (Quad)
+const bilinear = BrushWrapper.bilinear_gradient(
+    0, 0, 0, 10, 0, 0, 0, 10, 0,  // Origin, U-end, V-end
+    255, 0, 0,    // Origin Color (Red)
+    0, 0, 255,    // U-end Color (Blue)
+    0, 255, 0,    // V-end Color (Green)
+    255, 255, 0,  // Opposite Color (Yellow)
+    1,            // Oklab interpolation
+    null          // No filter
 );
 ```
 

@@ -1,6 +1,6 @@
 use crate::building::{
-    BlockPalette, Brush, BuildingTool, ColorBrush, Cuboid, InterpolationSpace, LinearGradientBrush,
-    MultiPointGradientBrush, ShadedBrush, Shape, SolidBrush, Sphere,
+    BilinearGradientBrush, BlockPalette, Brush, BuildingTool, ColorBrush, Cuboid, InterpolationSpace,
+    LinearGradientBrush, MultiPointGradientBrush, ShadedBrush, Shape, SolidBrush, Sphere,
 };
 use crate::python::schematic::PySchematic;
 use crate::BlockState;
@@ -91,6 +91,46 @@ impl PyBrush {
         let mut brush = LinearGradientBrush::new(
             (x1, y1, z1), (r1, g1, b1),
             (x2, y2, z2), (r2, g2, b2),
+        ).with_space(interp_space);
+
+        if let Some(keywords) = palette_filter {
+             let palette = Arc::new(BlockPalette::new_filtered(|f| {
+                keywords.iter().any(|k| f.id.contains(k))
+            }));
+            brush = brush.with_palette(palette);
+        }
+
+        Self {
+            inner: Box::new(brush),
+        }
+    }
+
+    /// Create a bilinear gradient brush (4-corner quad)
+    #[staticmethod]
+    pub fn bilinear_gradient(
+        ox: i32, oy: i32, oz: i32,
+        ux: i32, uy: i32, uz: i32,
+        vx: i32, vy: i32, vz: i32,
+        r00: u8, g00: u8, b00: u8,
+        r10: u8, g10: u8, b10: u8,
+        r01: u8, g01: u8, b01: u8,
+        r11: u8, g11: u8, b11: u8,
+        space: Option<u8>,
+        palette_filter: Option<Vec<String>>,
+    ) -> Self {
+        let interp_space = match space {
+            Some(1) => InterpolationSpace::Oklab,
+            _ => InterpolationSpace::Rgb,
+        };
+
+        let mut brush = BilinearGradientBrush::new(
+            (ox, oy, oz),
+            (ux, uy, uz),
+            (vx, vy, vz),
+            (r00, g00, b00),
+            (r10, g10, b10),
+            (r01, g01, b01),
+            (r11, g11, b11),
         ).with_space(interp_space);
 
         if let Some(keywords) = palette_filter {

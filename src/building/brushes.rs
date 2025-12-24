@@ -1,5 +1,5 @@
 use crate::BlockState;
-use blockpedia::{all_blocks, ExtendedColorData};
+use blockpedia::{all_blocks, BlockFacts, ExtendedColorData};
 use std::sync::{Arc, OnceLock};
 
 /// A palette of blocks used for color matching
@@ -9,13 +9,37 @@ pub struct BlockPalette {
 
 impl BlockPalette {
     pub fn new_all() -> Self {
+        Self::new_filtered(|_| true)
+    }
+
+    pub fn new_filtered<F>(filter: F) -> Self
+    where
+        F: Fn(&BlockFacts) -> bool,
+    {
         let mut blocks = Vec::new();
         for facts in all_blocks() {
             if let Some(c) = &facts.extras.color {
-                blocks.push((c.to_extended(), facts.id.to_string()));
+                if filter(facts) {
+                    blocks.push((c.to_extended(), facts.id.to_string()));
+                }
             }
         }
         Self { blocks }
+    }
+
+    /// Create a palette containing only concrete blocks
+    pub fn new_concrete() -> Self {
+        Self::new_filtered(|f| f.id.contains("concrete") && !f.id.contains("powder"))
+    }
+
+    /// Create a palette containing only wool blocks
+    pub fn new_wool() -> Self {
+        Self::new_filtered(|f| f.id.contains("wool"))
+    }
+
+    /// Create a palette containing only terracotta blocks
+    pub fn new_terracotta() -> Self {
+        Self::new_filtered(|f| f.id.contains("terracotta") && !f.id.contains("glazed"))
     }
 
     pub fn find_closest(&self, target: &ExtendedColorData) -> Option<String> {
@@ -137,6 +161,11 @@ impl LinearGradientBrush {
         self.space = space;
         self
     }
+
+    pub fn with_palette(mut self, palette: Arc<BlockPalette>) -> Self {
+        self.palette = palette;
+        self
+    }
 }
 
 impl Brush for LinearGradientBrush {
@@ -236,6 +265,11 @@ impl MultiPointGradientBrush {
         self.space = space;
         self
     }
+
+    pub fn with_palette(mut self, palette: Arc<BlockPalette>) -> Self {
+        self.palette = palette;
+        self
+    }
 }
 
 impl Brush for MultiPointGradientBrush {
@@ -306,6 +340,150 @@ impl Brush for MultiPointGradientBrush {
     }
 }
 
+/// A brush that interpolates color bilinearly on a quad defined by 4 corners.
+/// 
+/// The quad is defined by 3 points: Origin (P00), Top-Right (P10), Bottom-Left (P01).
+/// P11 is implicitly P10 + P01 - P00 (parallelogram) or explicitly P11.
+/// 
+/// For simplicity, we define it by Origin and two vectors (u_vec, v_vec) which form the plane basis.
+/// We project points onto this plane to find (u, v) coordinates.
+/// 
+/// Colors:
+/// c00 = Color at Origin (u=0, v=0)
+/// c10 = Color at End of U (u=1, v=0)
+/// c01 = Color at End of V (u=0, v=1)
+/// c11 = Color at Opposite Corner (u=1, v=1)
+pub struct BilinearGradientBrush {
+    origin: (f64, f64, f64),
+    u_vec: (f64, f64, f64), 
+    v_vec: (f64, f64, f64), 
+    u_len_sq: f64,
+    v_len_sq: f64,
+    c00: ExtendedColorData,
+    c10: ExtendedColorData,
+    c01: ExtendedColorData,
+    c11: ExtendedColorData,
+    palette: Arc<BlockPalette>,
+    space: InterpolationSpace,
+}
+
+impl BilinearGradientBrush {
+    pub fn new(
+        origin: (i32, i32, i32),
+        u_point: (i32, i32, i32),
+        v_point: (i32, i32, i32),
+        c00: (u8, u8, u8), // Origin
+        c10: (u8, u8, u8), // U-end
+        c01: (u8, u8, u8), // V-end
+        c11: (u8, u8, u8), // Opposite corner
+    ) -> Self {
+        let origin_f = (origin.0 as f64, origin.1 as f64, origin.2 as f64);
+        let u_vec = (
+            u_point.0 as f64 - origin_f.0,
+            u_point.1 as f64 - origin_f.1,
+            u_point.2 as f64 - origin_f.2,
+        );
+        let v_vec = (
+            v_point.0 as f64 - origin_f.0,
+            v_point.1 as f64 - origin_f.1,
+            v_point.2 as f64 - origin_f.2,
+        );
+
+        let u_len_sq = u_vec.0 * u_vec.0 + u_vec.1 * u_vec.1 + u_vec.2 * u_vec.2;
+        let v_len_sq = v_vec.0 * v_vec.0 + v_vec.1 * v_vec.1 + v_vec.2 * v_vec.2;
+
+        Self {
+            origin: origin_f,
+            u_vec,
+            v_vec,
+            u_len_sq,
+            v_len_sq,
+            c00: ExtendedColorData::from_rgb(c00.0, c00.1, c00.2),
+            c10: ExtendedColorData::from_rgb(c10.0, c10.1, c10.2),
+            c01: ExtendedColorData::from_rgb(c01.0, c01.1, c01.2),
+            c11: ExtendedColorData::from_rgb(c11.0, c11.1, c11.2),
+            palette: get_default_palette(),
+            space: InterpolationSpace::Rgb,
+        }
+    }
+
+    pub fn with_space(mut self, space: InterpolationSpace) -> Self {
+        self.space = space;
+        self
+    }
+
+    pub fn with_palette(mut self, palette: Arc<BlockPalette>) -> Self {
+        self.palette = palette;
+        self
+    }
+}
+
+impl Brush for BilinearGradientBrush {
+    fn get_block(&self, x: i32, y: i32, z: i32, _normal: (f64, f64, f64)) -> Option<BlockState> {
+        // Project point onto the two axes
+        let px = x as f64 - self.origin.0;
+        let py = y as f64 - self.origin.1;
+        let pz = z as f64 - self.origin.2;
+
+        // u = P . U / |U|^2
+        let u = if self.u_len_sq > 0.0 {
+            (px * self.u_vec.0 + py * self.u_vec.1 + pz * self.u_vec.2) / self.u_len_sq
+        } else {
+            0.0
+        }.clamp(0.0, 1.0);
+
+        // v = P . V / |V|^2
+        let v = if self.v_len_sq > 0.0 {
+            (px * self.v_vec.0 + py * self.v_vec.1 + pz * self.v_vec.2) / self.v_len_sq
+        } else {
+            0.0
+        }.clamp(0.0, 1.0);
+
+        // Bilinear interpolation
+        // C(u, v) = lerp(lerp(c00, c10, u), lerp(c01, c11, u), v)
+
+        let color = match self.space {
+            InterpolationSpace::Rgb => {
+                // Top edge
+                let r_top = self.c00.rgb[0] as f64 * (1.0 - u) + self.c10.rgb[0] as f64 * u;
+                let g_top = self.c00.rgb[1] as f64 * (1.0 - u) + self.c10.rgb[1] as f64 * u;
+                let b_top = self.c00.rgb[2] as f64 * (1.0 - u) + self.c10.rgb[2] as f64 * u;
+
+                // Bottom edge
+                let r_bot = self.c01.rgb[0] as f64 * (1.0 - u) + self.c11.rgb[0] as f64 * u;
+                let g_bot = self.c01.rgb[1] as f64 * (1.0 - u) + self.c11.rgb[1] as f64 * u;
+                let b_bot = self.c01.rgb[2] as f64 * (1.0 - u) + self.c11.rgb[2] as f64 * u;
+
+                // Final
+                let r = (r_top * (1.0 - v) + r_bot * v) as u8;
+                let g = (g_top * (1.0 - v) + g_bot * v) as u8;
+                let b = (b_top * (1.0 - v) + b_bot * v) as u8;
+
+                ExtendedColorData::from_rgb(r, g, b)
+            }
+            InterpolationSpace::Oklab => {
+                // Similar logic but in Oklab space
+                let l_top = self.c00.oklab[0] * (1.0 - u) as f32 + self.c10.oklab[0] * u as f32;
+                let a_top = self.c00.oklab[1] * (1.0 - u) as f32 + self.c10.oklab[1] * u as f32;
+                let b_top = self.c00.oklab[2] * (1.0 - u) as f32 + self.c10.oklab[2] * u as f32;
+
+                let l_bot = self.c01.oklab[0] * (1.0 - u) as f32 + self.c11.oklab[0] * u as f32;
+                let a_bot = self.c01.oklab[1] * (1.0 - u) as f32 + self.c11.oklab[1] * u as f32;
+                let b_bot = self.c01.oklab[2] * (1.0 - u) as f32 + self.c11.oklab[2] * u as f32;
+
+                let l = l_top * (1.0 - v) as f32 + l_bot * v as f32;
+                let a = a_top * (1.0 - v) as f32 + a_bot * v as f32;
+                let b = b_top * (1.0 - v) as f32 + b_bot * v as f32;
+
+                let mut c = self.c00;
+                c.oklab = [l, a, b];
+                c
+            }
+        };
+
+        self.palette.find_closest(&color).map(|id| BlockState::new(id))
+    }
+}
 
 /// A brush that shades blocks based on surface normal relative to a light source
 pub struct ShadedBrush {
@@ -331,6 +509,11 @@ impl ShadedBrush {
             light_dir: normalized_dir,
             palette: get_default_palette(),
         }
+    }
+
+    pub fn with_palette(mut self, palette: Arc<BlockPalette>) -> Self {
+        self.palette = palette;
+        self
     }
 }
 
