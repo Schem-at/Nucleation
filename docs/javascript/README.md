@@ -1024,6 +1024,17 @@ const bilinear = BrushWrapper.bilinear_gradient(
     1,            // Oklab interpolation
     null          // No filter
 );
+
+// Point Cloud Gradient (Arbitrary points, IDW)
+const points = BrushWrapper.point_gradient(
+    // Positions [x1, y1, z1, x2, y2, z2...]
+    [0, 0, 0,  10, 10, 10,  5, 5, 5],
+    // Colors [r1, g1, b1, r2, g2, b2...]
+    [255, 0, 0,  0, 0, 255,  0, 255, 0], 
+    2.5,  // Falloff (power), default 2.0
+    1,    // Oklab
+    null
+);
 ```
 
 ### Palette Management

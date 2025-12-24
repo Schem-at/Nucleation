@@ -708,6 +708,18 @@ bilinear = Brush.bilinear_gradient(
     1,            # Oklab interpolation
     None          # No filter
 )
+
+# Point Cloud Gradient (Arbitrary points, IDW)
+points_brush = Brush.point_gradient(
+    [
+        ((0, 0, 0), (255, 0, 0)),
+        ((10, 10, 10), (0, 0, 255)),
+        ((5, 5, 5), (0, 255, 0))
+    ],
+    2.5,  # Falloff (power), default 2.0
+    1,    # Oklab
+    None
+)
 ```
 
 ## See Also

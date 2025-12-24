@@ -418,6 +418,129 @@ impl BilinearGradientBrush {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct GradientPoint {
+    pub position: (f64, f64, f64),
+    pub color: ExtendedColorData,
+}
+
+/// A brush that interpolates color based on arbitrary points in 3D space using Inverse Distance Weighting (IDW).
+pub struct PointGradientBrush {
+    points: Vec<GradientPoint>,
+    palette: Arc<BlockPalette>,
+    space: InterpolationSpace,
+    falloff: f64, // Power parameter for IDW (typically 2.0)
+}
+
+impl PointGradientBrush {
+    pub fn new(points: Vec<((i32, i32, i32), (u8, u8, u8))>) -> Self {
+        let gradient_points = points
+            .into_iter()
+            .map(|(pos, rgb)| GradientPoint {
+                position: (pos.0 as f64, pos.1 as f64, pos.2 as f64),
+                color: ExtendedColorData::from_rgb(rgb.0, rgb.1, rgb.2),
+            })
+            .collect();
+
+        Self {
+            points: gradient_points,
+            palette: get_default_palette(),
+            space: InterpolationSpace::Rgb,
+            falloff: 2.0,
+        }
+    }
+
+    pub fn with_space(mut self, space: InterpolationSpace) -> Self {
+        self.space = space;
+        self
+    }
+
+    pub fn with_palette(mut self, palette: Arc<BlockPalette>) -> Self {
+        self.palette = palette;
+        self
+    }
+
+    pub fn with_falloff(mut self, falloff: f64) -> Self {
+        self.falloff = falloff;
+        self
+    }
+}
+
+impl Brush for PointGradientBrush {
+    fn get_block(&self, x: i32, y: i32, z: i32, _normal: (f64, f64, f64)) -> Option<BlockState> {
+        if self.points.is_empty() {
+            return None;
+        }
+
+        let px = x as f64;
+        let py = y as f64;
+        let pz = z as f64;
+
+        let mut sum_r = 0.0;
+        let mut sum_g = 0.0;
+        let mut sum_b = 0.0;
+        
+        let mut sum_l = 0.0;
+        let mut sum_a = 0.0;
+        let mut sum_ok_b = 0.0;
+        
+        let mut total_weight = 0.0;
+
+        for point in &self.points {
+            let dx = px - point.position.0;
+            let dy = py - point.position.1;
+            let dz = pz - point.position.2;
+            let dist_sq = dx * dx + dy * dy + dz * dz;
+            let dist = dist_sq.sqrt();
+
+            if dist < 1e-6 {
+                return self.palette.find_closest(&point.color).map(|id| BlockState::new(id));
+            }
+
+            let weight = 1.0 / dist.powf(self.falloff);
+            total_weight += weight;
+
+            match self.space {
+                InterpolationSpace::Rgb => {
+                    sum_r += point.color.rgb[0] as f64 * weight;
+                    sum_g += point.color.rgb[1] as f64 * weight;
+                    sum_b += point.color.rgb[2] as f64 * weight;
+                }
+                InterpolationSpace::Oklab => {
+                    sum_l += point.color.oklab[0] as f64 * weight;
+                    sum_a += point.color.oklab[1] as f64 * weight;
+                    sum_ok_b += point.color.oklab[2] as f64 * weight;
+                }
+            }
+        }
+
+        let color = if total_weight > 0.0 {
+            match self.space {
+                InterpolationSpace::Rgb => {
+                    let r = (sum_r / total_weight) as u8;
+                    let g = (sum_g / total_weight) as u8;
+                    let b = (sum_b / total_weight) as u8;
+                    ExtendedColorData::from_rgb(r, g, b)
+                }
+                InterpolationSpace::Oklab => {
+                    let l = (sum_l / total_weight) as f32;
+                    let a = (sum_a / total_weight) as f32;
+                    let b = (sum_ok_b / total_weight) as f32;
+                    
+                    let mut c = self.points[0].color; // Dummy clone for layout
+                    c.oklab = [l, a, b];
+                    c
+                }
+            }
+        } else {
+            // Should be unreachable if points is not empty, but fallback to first point
+            self.points[0].color
+        };
+
+        self.palette.find_closest(&color).map(|id| BlockState::new(id))
+    }
+}
+
 impl Brush for BilinearGradientBrush {
     fn get_block(&self, x: i32, y: i32, z: i32, _normal: (f64, f64, f64)) -> Option<BlockState> {
         // Project point onto the two axes

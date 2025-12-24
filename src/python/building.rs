@@ -1,6 +1,6 @@
 use crate::building::{
     BilinearGradientBrush, BlockPalette, Brush, BuildingTool, ColorBrush, Cuboid, InterpolationSpace,
-    LinearGradientBrush, MultiPointGradientBrush, ShadedBrush, Shape, SolidBrush, Sphere,
+    LinearGradientBrush, MultiPointGradientBrush, PointGradientBrush, ShadedBrush, Shape, SolidBrush, Sphere,
 };
 use crate::python::schematic::PySchematic;
 use crate::BlockState;
@@ -151,6 +151,37 @@ impl PyBrush {
     pub fn shaded(r: u8, g: u8, b: u8, lx: f64, ly: f64, lz: f64, palette_filter: Option<Vec<String>>) -> Self {
         let mut brush = ShadedBrush::new((r, g, b), (lx, ly, lz));
         
+        if let Some(keywords) = palette_filter {
+             let palette = Arc::new(BlockPalette::new_filtered(|f| {
+                keywords.iter().any(|k| f.id.contains(k))
+            }));
+            brush = brush.with_palette(palette);
+        }
+
+        Self {
+            inner: Box::new(brush),
+        }
+    }
+
+    /// Create a point cloud gradient brush using Inverse Distance Weighting (IDW)
+    /// points: List of ((x, y, z), (r, g, b)) tuples
+    /// falloff: Power parameter (default 2.0 if None)
+    #[staticmethod]
+    pub fn point_gradient(
+        points: Vec<((i32, i32, i32), (u8, u8, u8))>,
+        falloff: Option<f64>,
+        space: Option<u8>,
+        palette_filter: Option<Vec<String>>,
+    ) -> Self {
+        let interp_space = match space {
+            Some(1) => InterpolationSpace::Oklab,
+            _ => InterpolationSpace::Rgb,
+        };
+
+        let mut brush = PointGradientBrush::new(points)
+            .with_space(interp_space)
+            .with_falloff(falloff.unwrap_or(2.0));
+
         if let Some(keywords) = palette_filter {
              let palette = Arc::new(BlockPalette::new_filtered(|f| {
                 keywords.iter().any(|k| f.id.contains(k))

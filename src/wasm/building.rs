@@ -1,6 +1,6 @@
 use crate::building::{
-    BlockPalette, Brush, BuildingTool, ColorBrush, Cuboid, InterpolationSpace, LinearGradientBrush,
-    MultiPointGradientBrush, ShadedBrush, Shape, SolidBrush, Sphere,
+    BilinearGradientBrush, BlockPalette, Brush, BuildingTool, ColorBrush, Cuboid, InterpolationSpace,
+    LinearGradientBrush, MultiPointGradientBrush, PointGradientBrush, ShadedBrush, Shape, SolidBrush, Sphere,
 };
 use crate::wasm::schematic::SchematicWrapper;
 use crate::BlockState;
@@ -131,6 +131,52 @@ impl BrushWrapper {
         Self {
             inner: Box::new(brush),
         }
+    }
+
+    /// Create a point cloud gradient brush using Inverse Distance Weighting (IDW)
+    /// positions: Flat array [x1, y1, z1, x2, y2, z2, ...]
+    /// colors: Flat array [r1, g1, b1, r2, g2, b2, ...]
+    /// falloff: Power parameter (default 2.0 if None)
+    pub fn point_gradient(
+        positions: Vec<i32>,
+        colors: Vec<u8>,
+        falloff: Option<f64>,
+        space: Option<u8>,
+        palette_filter: Option<Vec<String>>,
+    ) -> Result<BrushWrapper, JsValue> {
+        if positions.len() % 3 != 0 || colors.len() % 3 != 0 || positions.len() / 3 != colors.len() / 3 {
+            return Err(JsValue::from_str("Positions and colors arrays must match in length (3 components per point)"));
+        }
+
+        let count = positions.len() / 3;
+        let mut points = Vec::with_capacity(count);
+
+        for i in 0..count {
+            points.push((
+                (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]),
+                (colors[i * 3], colors[i * 3 + 1], colors[i * 3 + 2])
+            ));
+        }
+
+        let interp_space = match space {
+            Some(1) => InterpolationSpace::Oklab,
+            _ => InterpolationSpace::Rgb,
+        };
+
+        let mut brush = PointGradientBrush::new(points)
+            .with_space(interp_space)
+            .with_falloff(falloff.unwrap_or(2.0));
+
+        if let Some(keywords) = palette_filter {
+             let palette = Arc::new(BlockPalette::new_filtered(|f| {
+                keywords.iter().any(|k| f.id.contains(k))
+            }));
+            brush = brush.with_palette(palette);
+        }
+
+        Ok(Self {
+            inner: Box::new(brush),
+        })
     }
 }
 

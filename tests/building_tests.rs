@@ -1,6 +1,6 @@
 use nucleation::building::{
     BlockPalette, Brush, BuildingTool, ColorBrush, Cuboid, InterpolationSpace, LinearGradientBrush,
-    MultiPointGradientBrush, ShadedBrush, Sphere, BilinearGradientBrush
+    MultiPointGradientBrush, ShadedBrush, Sphere, BilinearGradientBrush, PointGradientBrush
 };
 use nucleation::UniversalSchematic;
 use std::sync::Arc;
@@ -145,6 +145,52 @@ fn test_bilinear_gradient() {
     assert!(c01.name.contains("green") || c01.name.contains("lime") || c01.name.contains("emerald")); // Lime is often closer to pure green than green_wool
     assert!(c11.name.contains("yellow") || c11.name.contains("gold"));
     // Center should be a mix (greyish or brownish depending on interpolation space)
+}
+
+#[test]
+fn test_point_gradient_brush() {
+    let mut schematic = UniversalSchematic::new("point_gradient".to_string());
+    let mut tool = BuildingTool::new(&mut schematic);
+
+    let cuboid = Cuboid::new((0, 0, 0), (10, 10, 10));
+
+    // 3D Points:
+    // (0,0,0) Red
+    // (10,10,10) Blue
+    // (5,5,5) Green (Center)
+    // (10,0,0) Yellow
+    let points = vec![
+        ((0, 0, 0), (255, 0, 0)),
+        ((10, 10, 10), (0, 0, 255)),
+        ((5, 5, 5), (0, 255, 0)),
+        ((10, 0, 0), (255, 255, 0)),
+    ];
+
+    let brush = PointGradientBrush::new(points).with_falloff(2.5);
+
+    tool.fill(&cuboid, &brush);
+
+    let origin = schematic.get_block(0, 0, 0).unwrap();
+    let center = schematic.get_block(5, 5, 5).unwrap();
+    let far = schematic.get_block(10, 10, 10).unwrap();
+    let corner = schematic.get_block(10, 0, 0).unwrap();
+    
+    // Test exact points
+    println!("Origin: {}", origin.name);
+    println!("Center: {}", center.name);
+    println!("Far: {}", far.name);
+    println!("Corner: {}", corner.name);
+
+    assert!(origin.name.contains("red"));
+    assert!(center.name.contains("green") || center.name.contains("lime") || center.name.contains("emerald"));
+    assert!(far.name.contains("blue"));
+    assert!(corner.name.contains("yellow") || corner.name.contains("gold"));
+
+    // Test interpolated point (between red and yellow)
+    let mid_edge = schematic.get_block(5, 0, 0).unwrap();
+    println!("Mid Edge (5,0,0): {}", mid_edge.name);
+    // Should be orange-ish
+    assert!(mid_edge.name.contains("orange") || mid_edge.name.contains("terracotta") || mid_edge.name.contains("acacia") || mid_edge.name.contains("honeycomb"));
 }
 
 #[test]
