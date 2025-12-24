@@ -50,6 +50,8 @@ pub fn start() {
     console::log_1(&"Initializing schematic utilities".into());
 }
 
+use crate::building::{BuildingTool, Cuboid, Shape, SolidBrush, Sphere};
+
 // Wrapper structs
 #[wasm_bindgen]
 pub struct SchematicWrapper(pub(crate) UniversalSchematic);
@@ -63,6 +65,42 @@ impl SchematicWrapper {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         SchematicWrapper(UniversalSchematic::new("Default".to_string()))
+    }
+
+    #[wasm_bindgen(js_name = fillCuboid)]
+    pub fn fill_cuboid(
+        &mut self,
+        min_x: i32,
+        min_y: i32,
+        min_z: i32,
+        max_x: i32,
+        max_y: i32,
+        max_z: i32,
+        block_state: &str,
+    ) {
+        let block = BlockState::new(block_state.to_string());
+        let shape = Cuboid::new((min_x, min_y, min_z), (max_x, max_y, max_z));
+        let brush = SolidBrush::new(block);
+        
+        let mut tool = BuildingTool::new(&mut self.0);
+        tool.fill(&shape, &brush);
+    }
+
+    #[wasm_bindgen(js_name = fillSphere)]
+    pub fn fill_sphere(
+        &mut self,
+        cx: i32,
+        cy: i32,
+        cz: i32,
+        radius: f64,
+        block_state: &str,
+    ) {
+        let block = BlockState::new(block_state.to_string());
+        let shape = Sphere::new((cx, cy, cz), radius);
+        let brush = SolidBrush::new(block);
+        
+        let mut tool = BuildingTool::new(&mut self.0);
+        tool.fill(&shape, &brush);
     }
 
     pub fn from_data(&mut self, data: &[u8]) -> Result<(), JsValue> {

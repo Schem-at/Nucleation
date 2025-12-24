@@ -985,6 +985,26 @@ const brush = BrushWrapper.linear_gradient(
 WasmBuildingTool.fill(schematic, sphere, brush);
 ```
 
+### Simple Helpers
+
+For simple tasks, you can use the direct methods on `SchematicWrapper`:
+
+```typescript
+// Fill a cuboid region with a solid block
+schematic.fillCuboid(
+    0, 0, 0,      // Min [x, y, z]
+    10, 5, 10,    // Max [x, y, z]
+    "minecraft:red_concrete"
+);
+
+// Fill a sphere with a solid block
+schematic.fillSphere(
+    0, 0, 0,      // Center [x, y, z]
+    10.0,         // Radius
+    "minecraft:blue_wool"
+);
+```
+
 ### Available Brushes
 
 ```typescript

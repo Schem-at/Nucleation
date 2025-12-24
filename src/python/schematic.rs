@@ -34,6 +34,10 @@ use crate::simulation::CircuitBuilder;
 #[cfg(feature = "simulation")]
 use crate::simulation::MchprsWorld;
 
+use crate::building::{
+    BuildingTool, Cuboid, Shape, SolidBrush, Sphere,
+};
+
 #[pyclass(name = "BlockState")]
 #[derive(Clone)]
 pub struct PyBlockState {
@@ -107,6 +111,40 @@ impl PySchematic {
                 e.to_string(),
             )),
         }
+    }
+
+    pub fn fill_cuboid(
+        &mut self,
+        min_x: i32,
+        min_y: i32,
+        min_z: i32,
+        max_x: i32,
+        max_y: i32,
+        max_z: i32,
+        block_state: &str,
+    ) {
+        let block = BlockState::new(block_state.to_string());
+        let shape = Cuboid::new((min_x, min_y, min_z), (max_x, max_y, max_z));
+        let brush = SolidBrush::new(block);
+        
+        let mut tool = BuildingTool::new(&mut self.inner);
+        tool.fill(&shape, &brush);
+    }
+
+    pub fn fill_sphere(
+        &mut self,
+        cx: i32,
+        cy: i32,
+        cz: i32,
+        radius: f64,
+        block_state: &str,
+    ) {
+        let block = BlockState::new(block_state.to_string());
+        let shape = Sphere::new((cx, cy, cz), radius);
+        let brush = SolidBrush::new(block);
+        
+        let mut tool = BuildingTool::new(&mut self.inner);
+        tool.fill(&shape, &brush);
     }
 
     #[staticmethod]

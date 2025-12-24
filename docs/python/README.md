@@ -669,6 +669,26 @@ brush = Brush.linear_gradient(
 BuildingTool.fill(schematic, sphere, brush)
 ```
 
+### Simple Helpers
+
+For simple tasks, you can use the direct methods on `Schematic`:
+
+```python
+# Fill a cuboid region with a solid block
+schematic.fill_cuboid(
+    0, 0, 0,      # Min (x, y, z)
+    10, 5, 10,    # Max (x, y, z)
+    "minecraft:red_concrete"
+)
+
+# Fill a sphere with a solid block
+schematic.fill_sphere(
+    0, 0, 0,      # Center (x, y, z)
+    10.0,         # Radius
+    "minecraft:blue_wool"
+)
+```
+
 ### Available Brushes
 
 ```python
