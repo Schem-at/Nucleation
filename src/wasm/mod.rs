@@ -11,6 +11,7 @@
 //! - `circuit_builder`: Fluent executor builder (feature-gated)
 
 mod definition_region;
+mod palettes;
 mod schematic;
 mod schematic_builder;
 
@@ -23,6 +24,7 @@ mod typed_executor;
 
 // Re-export all public types to maintain the same JS API
 pub use definition_region::DefinitionRegionWrapper;
+pub use palettes::PaletteManager;
 pub use schematic::{
     debug_json_schematic, debug_schematic, BlockStateWrapper, LazyChunkIterator, SchematicWrapper,
 };
