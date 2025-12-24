@@ -30,7 +30,7 @@ with open("output.litematic", "wb") as f:
 6. [Block Entities](#block-entities)
 7. [SchematicBuilder](#schematicbuilder)
 8. [Simulation](#simulation)
-9. [TypedCircuitExecutor](#typedcircuitexecutor)
+10. [Procedural Building](#procedural-building)
 
 ## Installation
 
@@ -640,6 +640,50 @@ def convert_all_schematics(input_dir: str, output_dir: str):
         print(f"Converted: {filename}")
 
 convert_all_schematics("input/", "output/")
+```
+
+## Procedural Building
+
+Generate structures procedurally using geometric shapes and brushes.
+
+```python
+from nucleation import Schematic, BuildingTool, Shape, Brush
+
+schematic = Schematic("build")
+
+# Create a sphere shape
+sphere = Shape.sphere(
+    0, 0, 0,  # Center (x, y, z)
+    10.0      # Radius
+)
+
+# Create a gradient brush (Red -> Blue)
+brush = Brush.linear_gradient(
+    0, 0, 0, 255, 0, 0,      # Start: Pos(0,0,0), Red(255,0,0)
+    10, 0, 0, 0, 0, 255,     # End: Pos(10,0,0), Blue(0,0,255)
+    1,                       # 1 = Oklab interpolation (smoother), 0 = RGB
+    ["wool"]                 # Optional filter: only use wool blocks
+)
+
+# Apply brush to shape
+BuildingTool.fill(schematic, sphere, brush)
+```
+
+### Available Brushes
+
+```python
+# Solid block
+solid = Brush.solid("minecraft:stone")
+
+# Solid color (matches closest block)
+color = Brush.color(255, 128, 0, None)  # Orange
+
+# Shaded (uses surface normal for lighting)
+shaded = Brush.shaded(
+    255, 255, 255,  # Base color (White)
+    0.0, 1.0, 0.0,  # Light direction (Top-down)
+    ["concrete"]    # Filter: only concrete
+)
 ```
 
 ## See Also

@@ -12,6 +12,7 @@
 
 #![cfg(feature = "python")]
 
+mod building;
 mod definition_region;
 mod schematic;
 mod schematic_builder;
@@ -48,6 +49,9 @@ pub fn nucleation(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySchematic>()?;
     m.add_class::<PyBlockState>()?;
     m.add_class::<PyDefinitionRegion>()?;
+    m.add_class::<building::PyBuildingTool>()?;
+    m.add_class::<building::PyShape>()?;
+    m.add_class::<building::PyBrush>()?;
     m.add_class::<PySchematicBuilder>()?;
     m.add_function(wrap_pyfunction!(debug_schematic, m)?)?;
     m.add_function(wrap_pyfunction!(debug_json_schematic, m)?)?;

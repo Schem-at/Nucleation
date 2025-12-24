@@ -35,7 +35,7 @@ const bytes = schematic.to_litematic();
 8. [Simulation](#simulation)
 9. [TypedCircuitExecutor](#typedcircuitexecutor)
 10. [DefinitionRegion](#definitionregion)
-11. [CircuitBuilder](#circuitbuilder)
+12. [Procedural Building](#procedural-building)
 
 ## Installation & Setup
 
@@ -951,6 +951,72 @@ for (const [name, info] of Object.entries(layoutInfo.inputs)) {
 		console.log(`    Bit ${bit}: [${pos.join(", ")}]`);
 	});
 }
+```
+
+## Procedural Building
+
+Generate structures procedurally using geometric shapes and brushes.
+
+```typescript
+import { 
+    ShapeWrapper, 
+    BrushWrapper, 
+    WasmBuildingTool, 
+    SchematicWrapper 
+} from "nucleation";
+
+const schematic = new SchematicWrapper();
+
+// Create a sphere shape
+const sphere = ShapeWrapper.sphere(
+    0, 0, 0, // Center (x, y, z)
+    10.0     // Radius
+);
+
+// Create a gradient brush (Red -> Blue)
+const brush = BrushWrapper.linear_gradient(
+    0, 0, 0, 255, 0, 0,      // Start: Pos(0,0,0), Red(255,0,0)
+    10, 0, 0, 0, 0, 255,     // End: Pos(10,0,0), Blue(0,0,255)
+    1,                       // 1 = Oklab interpolation (smoother), 0 = RGB
+    ["wool"]                 // Optional filter: only use wool blocks
+);
+
+// Apply brush to shape
+WasmBuildingTool.fill(schematic, sphere, brush);
+```
+
+### Available Brushes
+
+```typescript
+// Solid block
+const solid = BrushWrapper.solid("minecraft:stone");
+
+// Solid color (matches closest block)
+const color = BrushWrapper.color(255, 128, 0, null); // Orange
+
+// Shaded (uses surface normal for lighting)
+const shaded = BrushWrapper.shaded(
+    255, 255, 255,  // Base color (White)
+    0.0, 1.0, 0.0,  // Light direction (Top-down)
+    ["concrete"]    // Filter: only concrete
+);
+```
+
+### Palette Management
+
+Use `PaletteManager` to get blocks for your UI dropdowns.
+
+```typescript
+import { PaletteManager } from "nucleation";
+
+// Get all wool blocks
+const woolBlocks = PaletteManager.getWoolBlocks();
+
+// Get concrete blocks
+const concreteBlocks = PaletteManager.getConcreteBlocks();
+
+// Get custom mix (e.g., all wool + obsidian)
+const customPalette = PaletteManager.getPaletteByKeywords(["wool", "obsidian"]);
 ```
 
 ## See Also

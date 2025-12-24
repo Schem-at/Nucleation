@@ -1,0 +1,141 @@
+use crate::building::{
+    BlockPalette, Brush, BuildingTool, ColorBrush, Cuboid, InterpolationSpace, LinearGradientBrush,
+    MultiPointGradientBrush, ShadedBrush, Shape, SolidBrush, Sphere,
+};
+use crate::python::schematic::PySchematic;
+use crate::BlockState;
+use pyo3::prelude::*;
+use std::sync::Arc;
+
+// ============================================================================
+// Shapes
+// ============================================================================
+
+/// A wrapper for any shape (Sphere, Cuboid, etc.)
+#[pyclass(name = "Shape")]
+pub struct PyShape {
+    pub(crate) inner: Box<dyn Shape + Send + Sync>,
+}
+
+#[pymethods]
+impl PyShape {
+    /// Create a new Sphere shape
+    #[staticmethod]
+    pub fn sphere(cx: i32, cy: i32, cz: i32, radius: f64) -> Self {
+        Self {
+            inner: Box::new(Sphere::new((cx, cy, cz), radius)),
+        }
+    }
+
+    /// Create a new Cuboid shape
+    #[staticmethod]
+    pub fn cuboid(min_x: i32, min_y: i32, min_z: i32, max_x: i32, max_y: i32, max_z: i32) -> Self {
+        Self {
+            inner: Box::new(Cuboid::new((min_x, min_y, min_z), (max_x, max_y, max_z))),
+        }
+    }
+}
+
+// ============================================================================
+// Brushes
+// ============================================================================
+
+/// A wrapper for any brush (Solid, Gradient, Shaded, etc.)
+#[pyclass(name = "Brush")]
+pub struct PyBrush {
+    pub(crate) inner: Box<dyn Brush + Send + Sync>,
+}
+
+#[pymethods]
+impl PyBrush {
+    /// Create a solid brush with a specific block
+    #[staticmethod]
+    pub fn solid(block_state: &str) -> PyResult<Self> {
+        let block = BlockState::new(block_state.to_string());
+        Ok(Self {
+            inner: Box::new(SolidBrush::new(block)),
+        })
+    }
+
+    /// Create a color brush (matches closest block to RGB color)
+    #[staticmethod]
+    pub fn color(r: u8, g: u8, b: u8, palette_filter: Option<Vec<String>>) -> Self {
+        let brush = if let Some(keywords) = palette_filter {
+             let palette = Arc::new(BlockPalette::new_filtered(|f| {
+                keywords.iter().any(|k| f.id.contains(k))
+            }));
+            ColorBrush::with_palette(r, g, b, palette)
+        } else {
+            ColorBrush::new(r, g, b)
+        };
+
+        Self {
+            inner: Box::new(brush),
+        }
+    }
+
+    /// Create a linear gradient brush
+    /// Space: 0 = RGB, 1 = Oklab
+    #[staticmethod]
+    pub fn linear_gradient(
+        x1: i32, y1: i32, z1: i32, r1: u8, g1: u8, b1: u8,
+        x2: i32, y2: i32, z2: i32, r2: u8, g2: u8, b2: u8,
+        space: Option<u8>,
+        palette_filter: Option<Vec<String>>,
+    ) -> Self {
+        let interp_space = match space {
+            Some(1) => InterpolationSpace::Oklab,
+            _ => InterpolationSpace::Rgb,
+        };
+
+        let mut brush = LinearGradientBrush::new(
+            (x1, y1, z1), (r1, g1, b1),
+            (x2, y2, z2), (r2, g2, b2),
+        ).with_space(interp_space);
+
+        if let Some(keywords) = palette_filter {
+             let palette = Arc::new(BlockPalette::new_filtered(|f| {
+                keywords.iter().any(|k| f.id.contains(k))
+            }));
+            brush = brush.with_palette(palette);
+        }
+
+        Self {
+            inner: Box::new(brush),
+        }
+    }
+
+    /// Create a shaded brush (Lambertian shading)
+    /// light_dir: [x, y, z] vector
+    #[staticmethod]
+    pub fn shaded(r: u8, g: u8, b: u8, lx: f64, ly: f64, lz: f64, palette_filter: Option<Vec<String>>) -> Self {
+        let mut brush = ShadedBrush::new((r, g, b), (lx, ly, lz));
+        
+        if let Some(keywords) = palette_filter {
+             let palette = Arc::new(BlockPalette::new_filtered(|f| {
+                keywords.iter().any(|k| f.id.contains(k))
+            }));
+            brush = brush.with_palette(palette);
+        }
+
+        Self {
+            inner: Box::new(brush),
+        }
+    }
+}
+
+// ============================================================================
+// Tool
+// ============================================================================
+
+#[pyclass(name = "BuildingTool")]
+pub struct PyBuildingTool;
+
+#[pymethods]
+impl PyBuildingTool {
+    #[staticmethod]
+    pub fn fill(schematic: &mut PySchematic, shape: &PyShape, brush: &PyBrush) {
+        let mut tool = BuildingTool::new(&mut schematic.inner);
+        tool.fill(&*shape.inner, &*brush.inner);
+    }
+}

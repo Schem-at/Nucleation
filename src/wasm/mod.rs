@@ -10,6 +10,7 @@
 //! - `typed_executor`: Typed circuit execution (feature-gated)
 //! - `circuit_builder`: Fluent executor builder (feature-gated)
 
+mod building;
 mod definition_region;
 mod palettes;
 mod schematic;
@@ -23,6 +24,7 @@ mod simulation;
 mod typed_executor;
 
 // Re-export all public types to maintain the same JS API
+pub use building::{BrushWrapper, ShapeWrapper, WasmBuildingTool};
 pub use definition_region::DefinitionRegionWrapper;
 pub use palettes::PaletteManager;
 pub use schematic::{
