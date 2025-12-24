@@ -567,6 +567,119 @@ impl UniversalSchematic {
         }
     }
 
+    pub fn fix_redstone_connectivity(&mut self) {
+        let regions: Vec<String> = self.get_all_regions().keys().cloned().collect();
+        for region_name in regions {
+            self.fix_redstone_connectivity_for_region(&region_name);
+        }
+    }
+
+    pub fn fix_redstone_connectivity_for_region(&mut self, region_name: &str) {
+        let (min, max) = {
+            let region = match self.get_region(region_name) {
+                Some(r) => r,
+                None => return,
+            };
+            let (width, height, length) = region.size;
+            let (pos_x, pos_y, pos_z) = region.position;
+            (
+                (pos_x, pos_y, pos_z),
+                (pos_x + width, pos_y + height, pos_z + length),
+            )
+        };
+
+        for y in min.1..max.1 {
+            for x in min.0..max.0 {
+                for z in min.2..max.2 {
+                    let block = match self.get_block_from_region(region_name, x, y, z) {
+                        Some(b) if b.name == "minecraft:redstone_wire" => b.clone(),
+                        _ => continue,
+                    };
+
+                    let mut new_block = block.clone();
+                    let directions = [
+                        ("north", 0, -1),
+                        ("south", 0, 1),
+                        ("east", 1, 0),
+                        ("west", -1, 0),
+                    ];
+
+                    for (dir, dx, dz) in directions {
+                        let side_val = if self.should_connect_redstone(region_name, x, y, z, dx, dz)
+                        {
+                            "side"
+                        } else if self.should_connect_redstone_up(region_name, x, y, z, dx, dz) {
+                            "up"
+                        } else {
+                            "none"
+                        };
+                        new_block
+                            .properties
+                            .insert(dir.to_string(), side_val.to_string());
+                    }
+                    self.set_block_in_region(region_name, x, y, z, &new_block);
+                }
+            }
+        }
+    }
+
+    fn should_connect_redstone(
+        &self,
+        region_name: &str,
+        x: i32,
+        y: i32,
+        z: i32,
+        dx: i32,
+        dz: i32,
+    ) -> bool {
+        // Same level
+        if let Some(neighbor) = self.get_block_from_region(region_name, x + dx, y, z + dz) {
+            if is_redstone_connectable(neighbor) {
+                return true;
+            }
+        }
+        // One level down
+        if let Some(neighbor_down) = self.get_block_from_region(region_name, x + dx, y - 1, z + dz)
+        {
+            if neighbor_down.name == "minecraft:redstone_wire" {
+                // Only if the block above neighbor_down is air or non-opaque
+                if let Some(above_neighbor_down) =
+                    self.get_block_from_region(region_name, x + dx, y, z + dz)
+                {
+                    if !is_opaque(above_neighbor_down) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    fn should_connect_redstone_up(
+        &self,
+        region_name: &str,
+        x: i32,
+        y: i32,
+        z: i32,
+        dx: i32,
+        dz: i32,
+    ) -> bool {
+        // One level up
+        // Only if the block above the current wire is not opaque
+        if let Some(above_current) = self.get_block_from_region(region_name, x, y + 1, z) {
+            if is_opaque(above_current) {
+                return false;
+            }
+        }
+
+        if let Some(neighbor_up) = self.get_block_from_region(region_name, x + dx, y + 1, z + dz) {
+            if neighbor_up.name == "minecraft:redstone_wire" {
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn get_merged_region(&self) -> Region {
         let mut merged_region = self.default_region.clone();
 
@@ -1956,6 +2069,40 @@ impl UniversalSchematic {
     pub fn get_definition_region_mut(&mut self, name: &str) -> Option<&mut DefinitionRegion> {
         self.definition_regions.get_mut(name)
     }
+}
+
+pub fn is_redstone_connectable(block: &BlockState) -> bool {
+    let name = block.name.as_str();
+    name == "minecraft:redstone_wire"
+        || name == "minecraft:repeater"
+        || name == "minecraft:comparator"
+        || name == "minecraft:observer"
+        || name == "minecraft:target"
+}
+
+pub fn is_opaque(block: &BlockState) -> bool {
+    let name = block.name.as_str();
+    // Simplified opaque check - most common non-opaque blocks
+    !(name == "minecraft:air"
+        || name == "minecraft:cave_air"
+        || name == "minecraft:void_air"
+        || name.contains("glass")
+        || name.contains("slab")
+        || name.contains("stairs")
+        || name.contains("fence")
+        || name.contains("wall")
+        || name.contains("iron_bars")
+        || name.contains("door")
+        || name.contains("trapdoor")
+        || name.contains("torch")
+        || name.contains("button")
+        || name.contains("pressure_plate")
+        || name.contains("sign")
+        || name == "minecraft:redstone_wire"
+        || name == "minecraft:repeater"
+        || name == "minecraft:comparator"
+        || name == "minecraft:lever"
+        || name == "minecraft:hopper")
 }
 
 #[cfg(test)]

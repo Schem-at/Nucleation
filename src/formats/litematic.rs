@@ -446,7 +446,7 @@ mod tests {
         let mut region = Region::new("TestRegion".to_string(), (0, 0, 0), (2, 2, 2));
 
         let stone = BlockState::new("minecraft:stone".to_string());
-        let air = BlockState::new("minecraft:air".to_string());
+        let _air = BlockState::new("minecraft:air".to_string());
 
         region.set_block(0, 0, 0, &stone.clone());
         region.set_block(1, 1, 1, &stone.clone());
@@ -577,7 +577,7 @@ mod tests {
             .expect("Failed to write to file");
 
         // Read the .litematic file back
-        let loaded_litematic_data =
+        let _loaded_litematic_data =
             std::fs::read("simple_cube.litematic").expect("Failed to read file");
 
         // Clean up the generated file
@@ -592,7 +592,7 @@ mod tests {
         let mut region = Region::new("TestRegion".to_string(), (0, 0, 0), (2, 2, 2));
 
         let stone = BlockState::new("minecraft:stone".to_string());
-        let air = BlockState::new("minecraft:air".to_string());
+        let _air = BlockState::new("minecraft:air".to_string());
 
         region.set_block(0, 0, 0, &stone.clone());
         region.set_block(1, 1, 1, &stone.clone());

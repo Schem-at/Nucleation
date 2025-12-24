@@ -896,7 +896,7 @@ mod tests {
         let schem_data =
             fs::read(schem_path).expect(format!("Failed to read {}", input_path_str).as_str());
 
-        let mut schematic = from_schematic(&schem_data).expect("Failed to parse schematic");
+        let schematic = from_schematic(&schem_data).expect("Failed to parse schematic");
         assert_eq!(schematic.metadata.name, Some("Unnamed".to_string()));
     }
 

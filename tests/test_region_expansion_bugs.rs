@@ -1,7 +1,7 @@
 use nucleation::block_entity::BlockEntity;
 use nucleation::schematic;
 use nucleation::{BlockState, Region, UniversalSchematic};
-use std::fs;
+// use std::fs;
 
 #[test]
 fn test_basic_dimension_expansion_bug() {

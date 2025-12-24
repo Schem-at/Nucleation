@@ -15,8 +15,7 @@ fn litematic_to_schem_conversion(name: &str) {
         fs::read(litematic_path).expect(format!("Failed to read {}", input_path_str).as_str());
 
     // Parse the .litematic data into a UniversalSchematic
-    let mut schematic =
-        litematic::from_litematic(&litematic_data).expect("Failed to parse litematic");
+    let schematic = litematic::from_litematic(&litematic_data).expect("Failed to parse litematic");
 
     // let region_blocks = schematic.get_region_from_index(0).unwrap().blocks.clone();
 
@@ -73,7 +72,7 @@ fn litematic_to_schem_conversion(name: &str) {
     println!("Successfully converted sample.litematic to .schem format and verified the contents.");
 }
 
-fn schema_to_litematic_conversion(name: &str) {
+fn _schema_to_litematic_conversion(name: &str) {
     // Path to the sample .schem file
     let input_path_str = format!("tests/samples/{}.schem", name);
     let schem_path = Path::new(&input_path_str);
@@ -130,7 +129,7 @@ fn test_cube_schematic() {
 }
 
 // #[test]
-fn time_load_large_schematic() {
+fn _time_load_large_schematic() {
     let input_path_str = format!("tests/samples/large_schematic.schem");
     let schem_path = Path::new(&input_path_str);
     let schem_data =

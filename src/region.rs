@@ -1282,7 +1282,7 @@ mod tests {
         for i in 1..=16 {
             palette.push(BlockState::new(format!("minecraft:wool{}", i)));
         }
-        let mut region = Region {
+        let region = Region {
             name: "Test".to_string(),
             position: (0, 0, 0),
             size: (16, 1, 1),
@@ -1715,7 +1715,7 @@ mod tests {
     fn test_coords_to_index() {
         let mut region = Region::new("Test".to_string(), (0, 0, 0), (2, 2, 2));
 
-        let mut volume1 = region.volume();
+        let volume1 = region.volume();
         for i in 0..8 {
             let coords = region.index_to_coords(i);
             let index = region.coords_to_index(coords.0, coords.1, coords.2);
@@ -1725,7 +1725,7 @@ mod tests {
 
         let region2 = Region::new("Test".to_string(), (0, 0, 0), (-2, -2, -2));
 
-        let mut volume2 = region2.volume();
+        let volume2 = region2.volume();
         for i in 0..8 {
             let coords = region2.index_to_coords(i);
             let index = region2.coords_to_index(coords.0, coords.1, coords.2);
@@ -1735,7 +1735,7 @@ mod tests {
 
         region.merge(&region2);
 
-        let mut volume3 = region.volume();
+        let volume3 = region.volume();
         for i in 0..27 {
             let coords = region.index_to_coords(i);
             let index = region.coords_to_index(coords.0, coords.1, coords.2);

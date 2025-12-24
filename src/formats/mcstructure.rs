@@ -120,10 +120,12 @@ pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::
                 for (key, val) in states.iter() {
                     let val_str = match val {
                         NbtValue::Byte(b) => {
-                            if *b != 0 {
+                            if *b == 1 {
                                 "true".to_string()
-                            } else {
+                            } else if *b == 0 {
                                 "false".to_string()
+                            } else {
+                                b.to_string()
                             }
                         }
                         NbtValue::Int(i) => i.to_string(),
@@ -150,55 +152,73 @@ pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::
         }
     }
 
-    // Parse Block Indices
+    // Construct Region
+    let mut region = Region::new("Main".to_string(), (0, 0, 0), (width, height, length));
+
+    // Parse Block Indices (Multi-layer support)
     let block_indices_list = match structure.get("block_indices") {
         Some(NbtValue::List(l)) => l,
         _ => return Err("Missing block_indices".into()),
     };
-    let mut indices_iter = block_indices_list.iter();
-    let primary_layer = indices_iter.next().ok_or("Missing primary layer")?;
 
-    let indices: Vec<i32> = match primary_layer {
-        NbtValue::List(list) => list
-            .iter()
-            .filter_map(|t| {
-                if let NbtValue::Int(i) = t {
-                    Some(*i)
-                } else {
-                    None
+    for layer in block_indices_list {
+        let indices: Vec<i32> = match layer {
+            NbtValue::List(list) => list
+                .iter()
+                .filter_map(|t| {
+                    if let NbtValue::Int(i) = t {
+                        Some(*i)
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+            _ => continue,
+        };
+
+        // Set blocks
+        // Indices are ZYX order: X outer, Y middle, Z inner
+        // index = SZ*SY*X + SZ*Y + Z
+        for (i, &palette_idx) in indices.iter().enumerate() {
+            if palette_idx < 0 {
+                continue;
+            } // -1 is void/air-skip
+
+            let i = i as i32;
+            let sz = length;
+            let sy = height;
+
+            if sz == 0 || sy == 0 {
+                continue;
+            }
+
+            let x = i / sz / sy;
+            let y = (i / sz) % sy;
+            let z = i % sz;
+
+            if palette_idx < palette.len() as i32 {
+                let block = palette[palette_idx as usize].clone();
+
+                // Simple merge logic:
+                // If the block is water/lava and we already have a block here,
+                // try to set waterlogged=true instead of overwriting.
+                if (block.name == "minecraft:water" || block.name == "minecraft:flowing_water")
+                    && region.get_block(x, y, z).is_some()
+                {
+                    if let Some(existing_block) = region.get_block(x, y, z) {
+                        if existing_block.name != "minecraft:air" {
+                            let mut updated_block = existing_block.clone();
+                            updated_block
+                                .properties
+                                .insert("waterlogged".to_string(), "true".to_string());
+                            region.set_block(x, y, z, &updated_block);
+                            continue;
+                        }
+                    }
                 }
-            })
-            .collect(),
-        _ => return Err("Primary layer is not a list".into()),
-    };
 
-    // Construct Region
-    let mut region = Region::new("Main".to_string(), (0, 0, 0), (width, height, length));
-
-    // Set blocks
-    // Indices are ZYX order: X outer, Y middle, Z inner
-    // index = SZ*SY*X + SZ*Y + Z
-
-    for (i, &palette_idx) in indices.iter().enumerate() {
-        if palette_idx < 0 {
-            continue;
-        } // -1 is void/air-skip
-
-        let i = i as i32;
-        let sz = length;
-        let sy = height;
-
-        if sz == 0 || sy == 0 {
-            continue;
-        }
-
-        let x = i / sz / sy;
-        let y = (i / sz) % sy;
-        let z = i % sz;
-
-        if palette_idx < palette.len() as i32 {
-            let block = palette[palette_idx as usize].clone();
-            region.set_block(x, y, z, &block);
+                region.set_block(x, y, z, &block);
+            }
         }
     }
 
@@ -268,6 +288,10 @@ pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::
 
     let mut schematic = UniversalSchematic::new("Unnamed".to_string());
     schematic.add_region(region);
+
+    // Post-fix redstone connectivity
+    schematic.fix_redstone_connectivity();
+
     Ok(schematic)
 }
 
