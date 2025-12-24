@@ -6,8 +6,8 @@ fn test_flip_x_simple() {
     let stone = BlockState::new("minecraft:stone".to_string());
     let diamond = BlockState::new("minecraft:diamond_block".to_string());
 
-    region.set_block(0, 0, 0, stone.clone());
-    region.set_block(2, 0, 0, diamond.clone());
+    region.set_block(0, 0, 0, &stone);
+    region.set_block(2, 0, 0, &diamond);
 
     region.flip_x();
 
@@ -28,8 +28,8 @@ fn test_flip_y_simple() {
     let stone = BlockState::new("minecraft:stone".to_string());
     let diamond = BlockState::new("minecraft:diamond_block".to_string());
 
-    region.set_block(0, 0, 0, stone.clone());
-    region.set_block(0, 2, 0, diamond.clone());
+    region.set_block(0, 0, 0, &stone);
+    region.set_block(0, 2, 0, &diamond);
 
     region.flip_y();
 
@@ -49,8 +49,8 @@ fn test_flip_z_simple() {
     let stone = BlockState::new("minecraft:stone".to_string());
     let diamond = BlockState::new("minecraft:diamond_block".to_string());
 
-    region.set_block(0, 0, 0, stone.clone());
-    region.set_block(0, 0, 2, diamond.clone());
+    region.set_block(0, 0, 0, &stone);
+    region.set_block(0, 0, 2, &diamond);
 
     region.flip_z();
 
@@ -74,8 +74,8 @@ fn test_flip_x_with_directional_blocks() {
     let mut lever_west = BlockState::new("minecraft:lever".to_string());
     lever_west.set_property("facing".to_string(), "west".to_string());
 
-    region.set_block(0, 0, 0, lever_east.clone());
-    region.set_block(2, 0, 0, lever_west.clone());
+    region.set_block(0, 0, 0, &lever_east);
+    region.set_block(2, 0, 0, &lever_west);
 
     region.flip_x();
 
@@ -97,8 +97,8 @@ fn test_flip_z_with_directional_blocks() {
     let mut lever_south = BlockState::new("minecraft:lever".to_string());
     lever_south.set_property("facing".to_string(), "south".to_string());
 
-    region.set_block(0, 0, 0, lever_north.clone());
-    region.set_block(0, 0, 2, lever_south.clone());
+    region.set_block(0, 0, 0, &lever_north);
+    region.set_block(0, 0, 2, &lever_south);
 
     region.flip_z();
 
@@ -120,8 +120,8 @@ fn test_rotate_y_90_simple() {
     let mut region = Region::new("Test".to_string(), (0, 0, 0), (3, 1, 3));
     let stone = BlockState::new("minecraft:stone".to_string());
 
-    region.set_block(0, 0, 0, stone.clone());
-    region.set_block(2, 0, 0, stone.clone());
+    region.set_block(0, 0, 0, &stone);
+    region.set_block(2, 0, 0, &stone);
 
     region.rotate_y(90);
 
@@ -143,7 +143,7 @@ fn test_rotate_y_180() {
     let mut region = Region::new("Test".to_string(), (0, 0, 0), (3, 1, 3));
     let stone = BlockState::new("minecraft:stone".to_string());
 
-    region.set_block(0, 0, 0, stone.clone());
+    region.set_block(0, 0, 0, &stone);
 
     region.rotate_y(180);
 
@@ -161,7 +161,7 @@ fn test_rotate_y_with_directional_blocks() {
     let mut lever_north = BlockState::new("minecraft:lever".to_string());
     lever_north.set_property("facing".to_string(), "north".to_string());
 
-    region.set_block(0, 0, 0, lever_north.clone());
+    region.set_block(0, 0, 0, &lever_north);
 
     region.rotate_y(90);
 
@@ -180,7 +180,7 @@ fn test_rotate_y_270() {
     let mut lever_north = BlockState::new("minecraft:lever".to_string());
     lever_north.set_property("facing".to_string(), "north".to_string());
 
-    region.set_block(1, 0, 1, lever_north.clone());
+    region.set_block(1, 0, 1, &lever_north);
 
     region.rotate_y(270);
 
@@ -197,8 +197,8 @@ fn test_multiple_transformations() {
     let mut region = Region::new("Test".to_string(), (0, 0, 0), (3, 3, 3));
     let stone = BlockState::new("minecraft:stone".to_string());
 
-    region.set_block(0, 0, 0, stone.clone());
-    region.set_block(2, 2, 2, stone.clone());
+    region.set_block(0, 0, 0, &stone);
+    region.set_block(2, 2, 2, &stone);
 
     // Apply multiple transformations
     region.flip_x();
@@ -217,7 +217,7 @@ fn test_transformation_preserves_volume() {
     for x in 0..5 {
         for y in 0..5 {
             for z in 0..5 {
-                region.set_block(x, y, z, stone.clone());
+                region.set_block(x, y, z, &stone);
             }
         }
     }
@@ -238,7 +238,7 @@ fn test_flip_with_axis_property() {
     let mut log_x = BlockState::new("minecraft:oak_log".to_string());
     log_x.set_property("axis".to_string(), "x".to_string());
 
-    region.set_block(1, 0, 0, log_x.clone());
+    region.set_block(1, 0, 0, &log_x);
 
     region.flip_x();
 
@@ -254,7 +254,7 @@ fn test_rotate_with_axis_property() {
     let mut log_x = BlockState::new("minecraft:oak_log".to_string());
     log_x.set_property("axis".to_string(), "x".to_string());
 
-    region.set_block(1, 1, 1, log_x.clone());
+    region.set_block(1, 1, 1, &log_x);
 
     region.rotate_y(90);
 
@@ -292,8 +292,8 @@ fn test_universal_schematic_flip() {
     let mut schematic = UniversalSchematic::new("Test".to_string());
     let stone = BlockState::new("minecraft:stone".to_string());
 
-    schematic.set_block(0, 0, 0, stone.clone());
-    schematic.set_block(5, 0, 0, stone.clone());
+    schematic.set_block(0, 0, 0, &stone);
+    schematic.set_block(5, 0, 0, &stone);
 
     schematic.default_region.flip_x();
 
@@ -307,7 +307,7 @@ fn test_rotation_property_standing_sign() {
     let mut sign = BlockState::new("minecraft:standing_sign".to_string());
     sign.set_property("rotation".to_string(), "0".to_string());
 
-    region.set_block(1, 0, 1, sign.clone());
+    region.set_block(1, 0, 1, &sign);
 
     region.rotate_y(90);
 
@@ -329,8 +329,8 @@ fn test_flip_y_directional() {
     let mut lever_down = BlockState::new("minecraft:lever".to_string());
     lever_down.set_property("facing".to_string(), "down".to_string());
 
-    region.set_block(0, 0, 0, lever_up.clone());
-    region.set_block(0, 2, 0, lever_down.clone());
+    region.set_block(0, 0, 0, &lever_up);
+    region.set_block(0, 2, 0, &lever_down);
 
     region.flip_y();
 
@@ -346,7 +346,7 @@ fn test_rotate_x_simple() {
     let mut region = Region::new("Test".to_string(), (0, 0, 0), (1, 3, 3));
     let stone = BlockState::new("minecraft:stone".to_string());
 
-    region.set_block(0, 0, 0, stone.clone());
+    region.set_block(0, 0, 0, &stone);
 
     region.rotate_x(90);
 
@@ -359,7 +359,7 @@ fn test_rotate_z_simple() {
     let mut region = Region::new("Test".to_string(), (0, 0, 0), (3, 3, 1));
     let stone = BlockState::new("minecraft:stone".to_string());
 
-    region.set_block(0, 0, 0, stone.clone());
+    region.set_block(0, 0, 0, &stone);
 
     region.rotate_z(90);
 
@@ -381,11 +381,11 @@ fn test_redstone_circuit_flip() {
     let mut lamp = BlockState::new("minecraft:redstone_lamp".to_string());
     lamp.set_property("lit".to_string(), "false".to_string());
 
-    region.set_block(0, 0, 0, lever.clone());
-    region.set_block(1, 0, 0, wire.clone());
-    region.set_block(2, 0, 0, wire.clone());
-    region.set_block(3, 0, 0, wire.clone());
-    region.set_block(4, 0, 0, lamp.clone());
+    region.set_block(0, 0, 0, &lever);
+    region.set_block(1, 0, 0, &wire);
+    region.set_block(2, 0, 0, &wire);
+    region.set_block(3, 0, 0, &wire);
+    region.set_block(4, 0, 0, &lamp);
 
     region.flip_x();
 

@@ -1,6 +1,7 @@
 use nucleation::building::{
-    BlockPalette, Brush, BuildingTool, ColorBrush, Cuboid, InterpolationSpace, LinearGradientBrush,
-    MultiPointGradientBrush, ShadedBrush, Sphere, BilinearGradientBrush, PointGradientBrush
+    BilinearGradientBrush, BlockPalette, Brush, BuildingTool, ColorBrush, Cuboid,
+    InterpolationSpace, LinearGradientBrush, MultiPointGradientBrush, PointGradientBrush,
+    ShadedBrush, Sphere,
 };
 use nucleation::UniversalSchematic;
 use std::sync::Arc;
@@ -87,9 +88,9 @@ fn test_multi_point_gradient() {
         (0, 0, 0),
         (20, 0, 0),
         vec![
-            (0.0, (255, 0, 0)),   // Red at start
-            (0.5, (0, 255, 0)),   // Green at middle
-            (1.0, (0, 0, 255)),   // Blue at end
+            (0.0, (255, 0, 0)), // Red at start
+            (0.5, (0, 255, 0)), // Green at middle
+            (1.0, (0, 0, 255)), // Blue at end
         ],
     );
 
@@ -104,7 +105,9 @@ fn test_multi_point_gradient() {
     println!("Multi End: {}", end.name);
 
     assert!(start.name.contains("red"));
-    assert!(mid.name.contains("lime") || mid.name.contains("green") || mid.name.contains("emerald"));
+    assert!(
+        mid.name.contains("lime") || mid.name.contains("green") || mid.name.contains("emerald")
+    );
     assert!(end.name.contains("blue"));
 }
 
@@ -119,7 +122,9 @@ fn test_bilinear_gradient() {
     // (0,0) Red, (10,0) Blue
     // (0,10) Green, (10,10) Yellow
     let brush = BilinearGradientBrush::new(
-        (0, 0, 0), (10, 0, 0), (0, 10, 0),
+        (0, 0, 0),
+        (10, 0, 0),
+        (0, 10, 0),
         (255, 0, 0),   // c00 Red
         (0, 0, 255),   // c10 Blue
         (0, 255, 0),   // c01 Green
@@ -142,7 +147,9 @@ fn test_bilinear_gradient() {
 
     assert!(c00.name.contains("red"));
     assert!(c10.name.contains("blue"));
-    assert!(c01.name.contains("green") || c01.name.contains("lime") || c01.name.contains("emerald")); // Lime is often closer to pure green than green_wool
+    assert!(
+        c01.name.contains("green") || c01.name.contains("lime") || c01.name.contains("emerald")
+    ); // Lime is often closer to pure green than green_wool
     assert!(c11.name.contains("yellow") || c11.name.contains("gold"));
     // Center should be a mix (greyish or brownish depending on interpolation space)
 }
@@ -174,7 +181,7 @@ fn test_point_gradient_brush() {
     let center = schematic.get_block(5, 5, 5).unwrap();
     let far = schematic.get_block(10, 10, 10).unwrap();
     let corner = schematic.get_block(10, 0, 0).unwrap();
-    
+
     // Test exact points
     println!("Origin: {}", origin.name);
     println!("Center: {}", center.name);
@@ -182,7 +189,11 @@ fn test_point_gradient_brush() {
     println!("Corner: {}", corner.name);
 
     assert!(origin.name.contains("red"));
-    assert!(center.name.contains("green") || center.name.contains("lime") || center.name.contains("emerald"));
+    assert!(
+        center.name.contains("green")
+            || center.name.contains("lime")
+            || center.name.contains("emerald")
+    );
     assert!(far.name.contains("blue"));
     assert!(corner.name.contains("yellow") || corner.name.contains("gold"));
 
@@ -190,7 +201,12 @@ fn test_point_gradient_brush() {
     let mid_edge = schematic.get_block(5, 0, 0).unwrap();
     println!("Mid Edge (5,0,0): {}", mid_edge.name);
     // Should be orange-ish
-    assert!(mid_edge.name.contains("orange") || mid_edge.name.contains("terracotta") || mid_edge.name.contains("acacia") || mid_edge.name.contains("honeycomb"));
+    assert!(
+        mid_edge.name.contains("orange")
+            || mid_edge.name.contains("terracotta")
+            || mid_edge.name.contains("acacia")
+            || mid_edge.name.contains("honeycomb")
+    );
 }
 
 #[test]
@@ -200,7 +216,7 @@ fn test_concrete_palette() {
 
     let sphere = Sphere::new((0, 0, 0), 5.0);
     let concrete_palette = Arc::new(BlockPalette::new_concrete());
-    
+
     // Use a color that might map to something else in default palette (e.g. glass or wool)
     // Bright Red (255, 0, 0)
     let brush = ColorBrush::with_palette(255, 0, 0, concrete_palette);
@@ -230,12 +246,12 @@ fn test_custom_filter_palette() {
     let mut tool = BuildingTool::new(&mut schematic);
 
     let sphere = Sphere::new((0, 0, 0), 5.0);
-    
+
     // Create a palette that only allows "grass_block" or "moss_block"
     let nature_palette = Arc::new(BlockPalette::new_filtered(|f| {
         f.id == "minecraft:grass_block" || f.id == "minecraft:moss_block"
     }));
-    
+
     // Green color
     let brush = ColorBrush::with_palette(0, 255, 0, nature_palette);
 

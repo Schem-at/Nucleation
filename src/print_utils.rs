@@ -111,8 +111,8 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
         let dirt = BlockState::new("minecraft:dirt".to_string());
 
-        schematic.set_block(0, 0, 0, stone.clone());
-        schematic.set_block(1, 1, 1, dirt.clone());
+        schematic.set_block(0, 0, 0, &stone.clone());
+        schematic.set_block(1, 1, 1, &dirt.clone());
 
         let json = get_schematic_json(&schematic);
         println!("{}", json);
@@ -127,8 +127,8 @@ mod tests {
         let dirt = BlockState::new("minecraft:dirt".to_string());
 
         // Set blocks in the default region
-        schematic.set_block(0, 0, 0, stone.clone());
-        schematic.set_block(1, 1, 1, dirt.clone());
+        schematic.set_block(0, 0, 0, &stone.clone());
+        schematic.set_block(1, 1, 1, &dirt.clone());
 
         // This will use the Debug implementation
         println!("{:?}", schematic);
@@ -140,7 +140,7 @@ mod tests {
         println!("{}", format_block_state(&stone));
 
         // Test with a custom region
-        schematic.set_block_in_region("Custom", 5, 5, 5, stone.clone());
+        schematic.set_block_in_region("Custom", 5, 5, 5, &stone.clone());
         println!("{}", format_schematic(&schematic));
     }
 }

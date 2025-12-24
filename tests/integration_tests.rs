@@ -155,7 +155,7 @@ fn test_expand_schematic() {
         4,
         4,
         4,
-        BlockState::new("minecraft:sea_lantern".to_string()),
+        &BlockState::new("minecraft:sea_lantern".to_string()),
     );
     println!("Block set result: {}", result);
 

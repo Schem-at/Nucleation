@@ -421,7 +421,12 @@ impl SchematicBuilder {
                                 // Place a single block
                                 match UniversalSchematic::parse_block_string(block_str) {
                                     Ok((block_state, _)) => {
-                                        schematic.set_block(world_x, world_y, world_z, block_state);
+                                        schematic.set_block(
+                                            world_x,
+                                            world_y,
+                                            world_z,
+                                            &block_state,
+                                        );
                                     }
                                     Err(e) => {
                                         return Err(format!(
@@ -444,7 +449,7 @@ impl SchematicBuilder {
                                         pos.x + world_x,
                                         pos.y + world_y,
                                         pos.z + world_z,
-                                        block_state.clone(),
+                                        &block_state.clone(),
                                     );
                                 }
 

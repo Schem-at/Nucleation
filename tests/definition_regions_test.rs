@@ -10,8 +10,8 @@ fn test_definition_regions_roundtrip_chain() {
     let mut original = UniversalSchematic::new("Roundtrip Test".to_string());
 
     // Add some blocks
-    original.set_block(0, 0, 0, BlockState::new("minecraft:stone".to_string()));
-    original.set_block(1, 1, 1, BlockState::new("minecraft:dirt".to_string()));
+    original.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+    original.set_block(1, 1, 1, &BlockState::new("minecraft:dirt".to_string()));
 
     // Add Definition Regions
     let mut def_region_a = DefinitionRegion::new();
@@ -56,7 +56,7 @@ fn test_definition_regions_roundtrip_chain() {
 #[test]
 fn test_schematic_v2_definition_regions() {
     let mut original = UniversalSchematic::new("V2 Test".to_string());
-    original.set_block(0, 0, 0, BlockState::new("minecraft:stone".to_string()));
+    original.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
 
     let mut def_region = DefinitionRegion::new();
     def_region.add_bounds((0, 0, 0), (1, 1, 1));

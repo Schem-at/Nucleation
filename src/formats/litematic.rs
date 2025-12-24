@@ -449,8 +449,8 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
         let air = BlockState::new("minecraft:air".to_string());
 
-        region.set_block(0, 0, 0, stone.clone());
-        region.set_block(1, 1, 1, stone.clone());
+        region.set_block(0, 0, 0, &stone.clone());
+        region.set_block(1, 1, 1, &stone.clone());
 
         let entity = Entity::new("minecraft:creeper".to_string(), (0.5, 0.0, 0.5));
         region.add_entity(entity);
@@ -559,7 +559,7 @@ mod tests {
                         1 => BlockState::new("minecraft:dirt".to_string()),
                         _ => BlockState::new("minecraft:oak_planks".to_string()),
                     };
-                    schematic.set_block(x, y, z, block);
+                    schematic.set_block(x, y, z, &block);
                 }
             }
         }
@@ -595,8 +595,8 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
         let air = BlockState::new("minecraft:air".to_string());
 
-        region.set_block(0, 0, 0, stone.clone());
-        region.set_block(1, 1, 1, stone.clone());
+        region.set_block(0, 0, 0, &stone.clone());
+        region.set_block(1, 1, 1, &stone.clone());
 
         original_schematic.add_region(region);
 

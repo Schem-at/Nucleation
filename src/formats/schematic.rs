@@ -701,9 +701,9 @@ mod tests {
             for y in 0..5 {
                 for z in 0..5 {
                     if (x + y + z) % 2 == 0 {
-                        schematic.set_block(x, y, z, stone.clone());
+                        schematic.set_block(x, y, z, &stone.clone());
                     } else {
-                        schematic.set_block(x, y, z, dirt.clone());
+                        schematic.set_block(x, y, z, &dirt.clone());
                     }
                 }
             }

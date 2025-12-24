@@ -12,9 +12,9 @@ fn test_mcstructure_round_trip() {
     let dirt = BlockState::new("minecraft:dirt".to_string());
 
     // Set blocks
-    region.set_block(0, 0, 0, stone.clone());
-    region.set_block(1, 1, 1, dirt.clone());
-    region.set_block(2, 2, 2, stone.clone());
+    region.set_block(0, 0, 0, &stone.clone());
+    region.set_block(1, 1, 1, &dirt.clone());
+    region.set_block(2, 2, 2, &stone.clone());
 
     schematic.add_region(region);
 
@@ -65,7 +65,7 @@ fn test_mcstructure_properties() {
         properties: props,
     };
 
-    region.set_block(0, 0, 0, block);
+    region.set_block(0, 0, 0, &block);
     schematic.add_region(region);
 
     let data = to_mcstructure(&schematic).expect("Failed to export");

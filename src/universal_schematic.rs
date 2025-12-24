@@ -79,9 +79,10 @@ impl UniversalSchematic {
         all_regions
     }
 
-    pub fn set_block(&mut self, x: i32, y: i32, z: i32, block: BlockState) -> bool {
+    pub fn set_block(&mut self, x: i32, y: i32, z: i32, block: &BlockState) -> bool {
         // Check if the default region is empty and needs repositioning
-        if self.default_region.is_empty() {
+        // Optimization: Only check if region is small (1x1x1), otherwise assume it's initialized
+        if self.default_region.size == (1, 1, 1) && self.default_region.is_empty() {
             // Reposition the default region to the first block's location
             self.default_region =
                 Region::new(self.default_region_name.clone(), (x, y, z), (1, 1, 1));
@@ -105,7 +106,7 @@ impl UniversalSchematic {
                 }
             };
 
-            self.set_block(x, y, z, block_state)
+            self.set_block(x, y, z, &block_state)
         }
     }
 
@@ -115,7 +116,7 @@ impl UniversalSchematic {
         x: i32,
         y: i32,
         z: i32,
-        block: BlockState,
+        block: &BlockState,
     ) -> bool {
         if region_name == self.default_region_name {
             self.default_region.set_block(x, y, z, block)
@@ -125,6 +126,21 @@ impl UniversalSchematic {
                 .entry(region_name.to_string())
                 .or_insert_with(|| Region::new(region_name.to_string(), (x, y, z), (1, 1, 1)));
             region.set_block(x, y, z, block)
+        }
+    }
+
+    /// Ensure the default region covers the given bounds.
+    pub fn ensure_bounds(&mut self, min: (i32, i32, i32), max: (i32, i32, i32)) {
+        if self.default_region.is_empty() {
+            // If empty, just set it to the bounds
+            let size = (
+                (max.0 - min.0 + 1).max(1),
+                (max.1 - min.1 + 1).max(1),
+                (max.2 - min.2 + 1).max(1),
+            );
+            self.default_region = Region::new(self.default_region_name.clone(), min, size);
+        } else {
+            self.default_region.ensure_bounds(min, max);
         }
     }
 
@@ -163,7 +179,7 @@ impl UniversalSchematic {
             }
         };
 
-        self.set_block_in_region(region_name, x, y, z, block_state)
+        self.set_block_in_region(region_name, x, y, z, &block_state)
     }
 
     pub fn from_layers(
@@ -190,7 +206,7 @@ impl UniversalSchematic {
             for (z, row) in rows.iter().enumerate() {
                 for (x, c) in row.chars().enumerate() {
                     if let Some(block_state) = full_mappings.get(&c) {
-                        schematic.set_block(x as i32, y as i32, z as i32, block_state.clone());
+                        schematic.set_block(x as i32, y as i32, z as i32, &block_state.clone());
                     } else if c != ' ' {
                         println!(
                             "Warning: Unknown character '{}' at position ({}, {}, {})",
@@ -313,7 +329,7 @@ impl UniversalSchematic {
         let (block_state, _) = Self::parse_block_string(block_name)?;
 
         // Set the basic block first
-        if !self.set_block(x, y, z, block_state.clone()) {
+        if !self.set_block(x, y, z, &block_state.clone()) {
             return Ok(false);
         }
 
@@ -876,7 +892,7 @@ impl UniversalSchematic {
                     pos.x + offset_x,
                     pos.y + offset_y,
                     pos.z + offset_z,
-                    block_state.clone(),
+                    &block_state.clone(),
                 );
             }
 
@@ -940,7 +956,7 @@ impl UniversalSchematic {
                     pos.x + offset_x,
                     pos.y + offset_y,
                     pos.z + offset_z,
-                    block_state.clone(),
+                    &block_state.clone(),
                 );
             }
 
@@ -1013,9 +1029,9 @@ impl UniversalSchematic {
 
                         if excluded_blocks.contains(block) {
                             // Set air block instead of skipping
-                            self.set_block(new_x, new_y, new_z, air_block.clone());
+                            self.set_block(new_x, new_y, new_z, &air_block.clone());
                         } else {
-                            self.set_block(new_x, new_y, new_z, block.clone());
+                            self.set_block(new_x, new_y, new_z, &block.clone());
                         }
                     }
                 }
@@ -1592,7 +1608,7 @@ impl UniversalSchematic {
         }
 
         // Set the basic block first
-        if !self.set_block(x, y, z, block_state.clone()) {
+        if !self.set_block(x, y, z, &block_state.clone()) {
             return Ok(false);
         }
 
@@ -1719,7 +1735,7 @@ impl UniversalSchematic {
                         let new_x = x + offset.0;
                         let new_y = y + offset.1;
                         let new_z = z + offset.2;
-                        new_schematic.set_block(new_x, new_y, new_z, block.clone());
+                        new_schematic.set_block(new_x, new_y, new_z, &block.clone());
                     }
                 }
             }
@@ -1958,10 +1974,10 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
         let dirt = BlockState::new("minecraft:dirt".to_string());
 
-        assert!(schematic.set_block(0, 0, 0, stone.clone()));
+        assert!(schematic.set_block(0, 0, 0, &stone.clone()));
         assert_eq!(schematic.get_block(0, 0, 0), Some(&stone));
 
-        assert!(schematic.set_block(5, 5, 5, dirt.clone()));
+        assert!(schematic.set_block(5, 5, 5, &dirt.clone()));
         assert_eq!(schematic.get_block(5, 5, 5), Some(&dirt));
 
         // Check that the default region was expanded
@@ -1969,7 +1985,7 @@ mod tests {
 
         // Test explicit region creation and manipulation
         let obsidian = BlockState::new("minecraft:obsidian".to_string());
-        assert!(schematic.set_block_in_region("Custom", 10, 10, 10, obsidian.clone()));
+        assert!(schematic.set_block_in_region("Custom", 10, 10, 10, &obsidian.clone()));
         assert_eq!(
             schematic.get_block_from_region("Custom", 10, 10, 10),
             Some(&obsidian)
@@ -2008,12 +2024,12 @@ mod tests {
 
         // Add a block to the default region
         let stone = BlockState::new("minecraft:stone".to_string());
-        schematic.set_block(0, 0, 0, stone.clone());
+        schematic.set_block(0, 0, 0, &stone.clone());
 
         // Create and add another region
         let mut custom_region = Region::new("Custom".to_string(), (10, 10, 10), (5, 5, 5));
         let dirt = BlockState::new("minecraft:dirt".to_string());
-        custom_region.set_block(10, 10, 10, dirt.clone());
+        custom_region.set_block(10, 10, 10, &dirt);
         schematic.add_region(custom_region);
 
         // Test swapping default region
@@ -2038,7 +2054,7 @@ mod tests {
         // Create a new region
         let mut new_region = Region::new("NewDefault".to_string(), (5, 5, 5), (3, 3, 3));
         let gold = BlockState::new("minecraft:gold_block".to_string());
-        new_region.set_block(5, 5, 5, gold.clone());
+        new_region.set_block(5, 5, 5, &gold);
 
         // Set it as the default
         let old_default = schematic.set_default_region(new_region);
@@ -2057,12 +2073,12 @@ mod tests {
     fn test_bounding_box_and_dimensions() {
         let mut schematic = UniversalSchematic::new("Test Bounding Box".to_string());
 
-        schematic.set_block(0, 0, 0, BlockState::new("minecraft:stone".to_string()));
+        schematic.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
         schematic.set_block(
             4,
             4,
             4,
-            BlockState::new("minecraft:sea_lantern".to_string()),
+            &BlockState::new("minecraft:sea_lantern".to_string()),
         );
 
         let bbox = schematic.get_bounding_box();
@@ -2080,7 +2096,7 @@ mod tests {
         let mut schematic = UniversalSchematic::new("Large Schematic".to_string());
 
         let far_block = BlockState::new("minecraft:diamond_block".to_string());
-        assert!(schematic.set_block(1000, 1000, 1000, far_block.clone()));
+        assert!(schematic.set_block(1000, 1000, 1000, &far_block));
         assert_eq!(schematic.get_block(1000, 1000, 1000), Some(&far_block));
 
         let main_region = schematic.default_region.clone();
@@ -2099,8 +2115,8 @@ mod tests {
         let block1 = BlockState::new("minecraft:stone".to_string());
         let block2 = BlockState::new("minecraft:dirt".to_string());
 
-        assert!(schematic.set_block(0, 0, 0, block1.clone()));
-        assert!(schematic.set_block(10, 20, 30, block2.clone()));
+        assert!(schematic.set_block(0, 0, 0, &block1));
+        assert!(schematic.set_block(10, 20, 30, &block2));
 
         let main_region = schematic.get_region("Main").unwrap();
         assert_eq!(main_region.position, (0, 0, 0));
@@ -2119,13 +2135,13 @@ mod tests {
         let mut source = UniversalSchematic::new("Source".to_string());
 
         // Add some blocks in a pattern
-        source.set_block(0, 0, 0, BlockState::new("minecraft:stone".to_string()));
-        source.set_block(1, 1, 1, BlockState::new("minecraft:dirt".to_string()));
+        source.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+        source.set_block(1, 1, 1, &BlockState::new("minecraft:dirt".to_string()));
         source.set_block(
             2,
             2,
             2,
-            BlockState::new("minecraft:diamond_block".to_string()),
+            &BlockState::new("minecraft:diamond_block".to_string()),
         );
 
         // Add a block entity
@@ -2192,10 +2208,10 @@ mod tests {
         let air = BlockState::new("minecraft:air".to_string());
 
         // Create a 2x2x2 cube with different blocks
-        source.set_block(0, 0, 0, stone.clone());
-        source.set_block(0, 1, 0, dirt.clone());
-        source.set_block(1, 0, 0, diamond.clone());
-        source.set_block(1, 1, 0, dirt.clone());
+        source.set_block(0, 0, 0, &stone.clone());
+        source.set_block(0, 1, 0, &dirt.clone());
+        source.set_block(1, 0, 0, &diamond.clone());
+        source.set_block(1, 1, 0, &dirt.clone());
 
         // Create target schematic
         let mut target = UniversalSchematic::new("Target".to_string());
@@ -2250,7 +2266,7 @@ mod tests {
         let mut schematic = UniversalSchematic::new("Negative Coordinates Schematic".to_string());
 
         let neg_block = BlockState::new("minecraft:emerald_block".to_string());
-        assert!(schematic.set_block(-10, -10, -10, neg_block.clone()));
+        assert!(schematic.set_block(-10, -10, -10, &neg_block.clone()));
         assert_eq!(schematic.get_block(-10, -10, -10), Some(&neg_block));
 
         let main_region = schematic.get_region("Main").unwrap();
@@ -2411,9 +2427,9 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
         let dirt = BlockState::new("minecraft:dirt".to_string());
 
-        region.set_block(0, 0, 0, stone.clone());
-        region.set_block(0, 1, 0, dirt.clone());
-        region.set_block(1, 0, 0, stone.clone());
+        region.set_block(0, 0, 0, &stone);
+        region.set_block(0, 1, 0, &dirt);
+        region.set_block(1, 0, 0, &stone);
 
         assert_eq!(region.get_block(0, 0, 0), Some(&stone));
         assert_eq!(region.get_block(0, 1, 0), Some(&dirt));
@@ -2432,8 +2448,8 @@ mod tests {
         let mut schematic = UniversalSchematic::new("Test Schematic".to_string());
 
         // Add some blocks and entities
-        schematic.set_block(0, 0, 0, BlockState::new("minecraft:stone".to_string()));
-        schematic.set_block(1, 1, 1, BlockState::new("minecraft:dirt".to_string()));
+        schematic.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+        schematic.set_block(1, 1, 1, &BlockState::new("minecraft:dirt".to_string()));
         schematic.add_entity(Entity::new(
             "minecraft:creeper".to_string(),
             (0.5, 0.0, 0.5),
@@ -2501,13 +2517,13 @@ mod tests {
         let mut region2 = Region::new("Region4".to_string(), (0, 0, 0), (-2, -2, -2));
 
         // Add some blocks to the regions
-        region1.set_block(0, 0, 0, BlockState::new("minecraft:stone".to_string()));
-        region1.set_block(1, 1, 1, BlockState::new("minecraft:dirt".to_string()));
+        region1.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+        region1.set_block(1, 1, 1, &BlockState::new("minecraft:dirt".to_string()));
         region2.set_block(
             0,
             -1,
             -1,
-            BlockState::new("minecraft:gold_block".to_string()),
+            &BlockState::new("minecraft:gold_block".to_string()),
         );
 
         // Add a block to the default region
@@ -2515,7 +2531,7 @@ mod tests {
             2,
             2,
             2,
-            BlockState::new("minecraft:diamond_block".to_string()),
+            &BlockState::new("minecraft:diamond_block".to_string()),
         );
 
         schematic.add_region(region1);
@@ -2646,7 +2662,7 @@ mod tests {
                             x,
                             y,
                             z,
-                            BlockState::new("minecraft:stone".to_string()),
+                            &BlockState::new("minecraft:stone".to_string()),
                         );
                     }
                 }
@@ -2704,7 +2720,7 @@ mod tests {
         for x in 0..16 {
             for y in 0..16 {
                 for z in 0..16 {
-                    schematic.set_block(x, y, z, BlockState::new("minecraft:stone".to_string()));
+                    schematic.set_block(x, y, z, &BlockState::new("minecraft:stone".to_string()));
                 }
             }
         }
@@ -2742,7 +2758,7 @@ mod tests {
         for x in 0..64 {
             for y in 0..16 {
                 for z in 0..16 {
-                    schematic2.set_block(x, y, z, BlockState::new("minecraft:stone".to_string()));
+                    schematic2.set_block(x, y, z, &BlockState::new("minecraft:stone".to_string()));
                 }
             }
         }
@@ -2783,7 +2799,7 @@ mod tests {
         for x in 0..32 {
             for y in 0..32 {
                 for z in 0..32 {
-                    schematic3.set_block(x, y, z, BlockState::new("minecraft:stone".to_string()));
+                    schematic3.set_block(x, y, z, &BlockState::new("minecraft:stone".to_string()));
                 }
             }
         }
@@ -2806,11 +2822,11 @@ mod tests {
         let mut schematic4 = UniversalSchematic::new("Sparse Chunk Test".to_string());
 
         // Place blocks only at corners of a 32x32x32 space
-        schematic4.set_block(0, 0, 0, BlockState::new("minecraft:stone".to_string()));
-        schematic4.set_block(31, 0, 0, BlockState::new("minecraft:stone".to_string()));
-        schematic4.set_block(0, 31, 0, BlockState::new("minecraft:stone".to_string()));
-        schematic4.set_block(0, 0, 31, BlockState::new("minecraft:stone".to_string()));
-        schematic4.set_block(31, 31, 31, BlockState::new("minecraft:stone".to_string()));
+        schematic4.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+        schematic4.set_block(31, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+        schematic4.set_block(0, 31, 0, &BlockState::new("minecraft:stone".to_string()));
+        schematic4.set_block(0, 0, 31, &BlockState::new("minecraft:stone".to_string()));
+        schematic4.set_block(31, 31, 31, &BlockState::new("minecraft:stone".to_string()));
 
         let chunks4: Vec<_> = schematic4.iter_chunks(16, 16, 16, None).collect();
         let chunks_indices4: Vec<_> = schematic4.iter_chunks_indices(16, 16, 16, None).collect();

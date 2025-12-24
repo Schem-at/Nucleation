@@ -21,7 +21,7 @@ fn main() {
     lever
         .properties
         .insert("face".to_string(), "floor".to_string());
-    schematic.set_block(0, 1, 0, lever);
+    schematic.set_block(0, 1, 0, &lever);
 
     // Method 2: Using bracket notation (concise and readable)
     schematic.set_block_str(

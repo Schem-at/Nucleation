@@ -15,7 +15,7 @@ fn main() {
 
     // Base layer
     for x in 0..10 {
-        schematic.set_block(x, 0, 0, BlockState::new("minecraft:stone".to_string()));
+        schematic.set_block(x, 0, 0, &BlockState::new("minecraft:stone".to_string()));
     }
 
     // Redstone wire

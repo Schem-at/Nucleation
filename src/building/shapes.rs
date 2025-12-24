@@ -1,11 +1,4 @@
-pub trait Shape {
-    fn contains(&self, x: i32, y: i32, z: i32) -> bool;
-    // Returns an iterator over all points in the shape
-    fn points(&self) -> Vec<(i32, i32, i32)>;
-    // Returns the surface normal at the given point (normalized)
-    fn normal_at(&self, x: i32, y: i32, z: i32) -> (f64, f64, f64);
-}
-
+#[derive(Clone)]
 pub struct Sphere {
     pub center: (i32, i32, i32),
     pub radius: f64,
@@ -15,6 +8,16 @@ impl Sphere {
     pub fn new(center: (i32, i32, i32), radius: f64) -> Self {
         Self { center, radius }
     }
+}
+
+pub trait Shape {
+    fn contains(&self, x: i32, y: i32, z: i32) -> bool;
+    fn points(&self) -> Vec<(i32, i32, i32)>;
+    fn normal_at(&self, x: i32, y: i32, z: i32) -> (f64, f64, f64);
+    fn bounds(&self) -> (i32, i32, i32, i32, i32, i32);
+    fn for_each_point<F>(&self, f: F)
+    where
+        F: FnMut(i32, i32, i32);
 }
 
 impl Shape for Sphere {
@@ -27,17 +30,7 @@ impl Shape for Sphere {
 
     fn points(&self) -> Vec<(i32, i32, i32)> {
         let mut points = Vec::new();
-        let r = self.radius.ceil() as i32;
-
-        for x in (self.center.0 - r)..=(self.center.0 + r) {
-            for y in (self.center.1 - r)..=(self.center.1 + r) {
-                for z in (self.center.2 - r)..=(self.center.2 + r) {
-                    if self.contains(x, y, z) {
-                        points.push((x, y, z));
-                    }
-                }
-            }
-        }
+        self.for_each_point(|x, y, z| points.push((x, y, z)));
         points
     }
 
@@ -45,15 +38,49 @@ impl Shape for Sphere {
         let dx = x as f64 - self.center.0 as f64;
         let dy = y as f64 - self.center.1 as f64;
         let dz = z as f64 - self.center.2 as f64;
-        let len = (dx * dx + dy * dy + dz * dz).sqrt();
-        if len == 0.0 {
+        let dist = (dx * dx + dy * dy + dz * dz).sqrt();
+        if dist == 0.0 {
             (0.0, 1.0, 0.0)
         } else {
-            (dx / len, dy / len, dz / len)
+            (dx / dist, dy / dist, dz / dist)
+        }
+    }
+
+    fn bounds(&self) -> (i32, i32, i32, i32, i32, i32) {
+        let r = self.radius.ceil() as i32;
+        (
+            self.center.0 - r,
+            self.center.1 - r,
+            self.center.2 - r,
+            self.center.0 + r,
+            self.center.1 + r,
+            self.center.2 + r,
+        )
+    }
+
+    fn for_each_point<F>(&self, mut f: F)
+    where
+        F: FnMut(i32, i32, i32),
+    {
+        let (min_x, min_y, min_z, max_x, max_y, max_z) = self.bounds();
+        let r2 = self.radius * self.radius;
+
+        for x in min_x..=max_x {
+            for y in min_y..=max_y {
+                for z in min_z..=max_z {
+                    let dx = x - self.center.0;
+                    let dy = y - self.center.1;
+                    let dz = z - self.center.2;
+                    if (dx * dx + dy * dy + dz * dz) as f64 <= r2 {
+                        f(x, y, z);
+                    }
+                }
+            }
         }
     }
 }
 
+#[derive(Clone)]
 pub struct Cuboid {
     pub min: (i32, i32, i32),
     pub max: (i32, i32, i32),
@@ -79,45 +106,30 @@ impl Shape for Cuboid {
 
     fn points(&self) -> Vec<(i32, i32, i32)> {
         let mut points = Vec::new();
-        for x in self.min.0..=self.max.0 {
-            for y in self.min.1..=self.max.1 {
-                for z in self.min.2..=self.max.2 {
-                    points.push((x, y, z));
-                }
-            }
-        }
+        self.for_each_point(|x, y, z| points.push((x, y, z)));
         points
     }
 
-    fn normal_at(&self, x: i32, y: i32, z: i32) -> (f64, f64, f64) {
-        // For a cuboid, points inside don't really have a "surface normal" in the same way.
-        // We can approximate by finding which face is closest.
-        let min_d = [
-            (x - self.min.0).abs(),
-            (self.max.0 - x).abs(),
-            (y - self.min.1).abs(),
-            (self.max.1 - y).abs(),
-            (z - self.min.2).abs(),
-            (self.max.2 - z).abs(),
-        ];
+    fn normal_at(&self, _x: i32, _y: i32, _z: i32) -> (f64, f64, f64) {
+        (0.0, 1.0, 0.0) // Simplified normal
+    }
 
-        let mut min_val = min_d[0];
-        let mut min_idx = 0;
-        for (i, val) in min_d.iter().enumerate() {
-            if *val < min_val {
-                min_val = *val;
-                min_idx = i;
+    fn bounds(&self) -> (i32, i32, i32, i32, i32, i32) {
+        (
+            self.min.0, self.min.1, self.min.2, self.max.0, self.max.1, self.max.2,
+        )
+    }
+
+    fn for_each_point<F>(&self, mut f: F)
+    where
+        F: FnMut(i32, i32, i32),
+    {
+        for x in self.min.0..=self.max.0 {
+            for y in self.min.1..=self.max.1 {
+                for z in self.min.2..=self.max.2 {
+                    f(x, y, z);
+                }
             }
-        }
-
-        match min_idx {
-            0 => (-1.0, 0.0, 0.0),
-            1 => (1.0, 0.0, 0.0),
-            2 => (0.0, -1.0, 0.0),
-            3 => (0.0, 1.0, 0.0),
-            4 => (0.0, 0.0, -1.0),
-            5 => (0.0, 0.0, 1.0),
-            _ => (0.0, 1.0, 0.0),
         }
     }
 }

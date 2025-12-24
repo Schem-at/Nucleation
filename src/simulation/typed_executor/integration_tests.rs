@@ -240,7 +240,7 @@ fn create_lamp_output_schematic() -> UniversalSchematic {
             x,
             0,
             0,
-            crate::BlockState::new("minecraft:gray_concrete".to_string()),
+            &crate::BlockState::new("minecraft:gray_concrete".to_string()),
         );
     }
 
@@ -382,7 +382,7 @@ fn build_schematic_from_blocks(blocks: &[(i32, i32, i32, &str)]) -> UniversalSch
     for &(x, y, z, block_str) in blocks {
         match UniversalSchematic::parse_block_string(block_str) {
             Ok((block_state, _)) => {
-                schematic.set_block(x, y, z, block_state);
+                schematic.set_block(x, y, z, &block_state);
             }
             Err(e) => {
                 eprintln!("Warning: Failed to parse block '{}': {}", block_str, e);

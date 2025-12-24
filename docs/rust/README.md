@@ -12,7 +12,7 @@ cargo add nucleation
 use nucleation::UniversalSchematic;
 
 let mut schematic = UniversalSchematic::new("my_schematic".to_string());
-schematic.set_block(0, 0, 0, BlockState::new("minecraft:stone".to_string()));
+schematic.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
 
 // Save as litematic
 let bytes = nucleation::litematic::to_litematic(&schematic)?;
@@ -61,7 +61,7 @@ pub struct UniversalSchematic {
 **Methods:**
 - `new(name: String) -> Self` - Create empty schematic
 - `get_block(x: i32, y: i32, z: i32) -> Option<&BlockState>` - Get block at position
-- `set_block(x: i32, y: i32, z: i32, block: BlockState)` - Set block at position
+- `set_block(x: i32, y: i32, z: i32, block: &BlockState)` - Set block at position
 - `set_block_from_string(x: i32, y: i32, z: i32, block_str: &str) -> Result<(), String>` - Parse and set block
 - `get_dimensions() -> (i32, i32, i32)` - Get schematic dimensions
 - `total_blocks() -> usize` - Count non-air blocks
@@ -176,7 +176,7 @@ schematic.load_from_data(&bytes)?;  // Auto-detects format
 
 ```rust
 // Simple block
-schematic.set_block(0, 0, 0, BlockState::new("minecraft:stone".to_string()));
+schematic.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
 
 // Block with properties
 let lever = BlockState::new("minecraft:lever".to_string())

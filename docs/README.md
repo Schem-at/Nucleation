@@ -117,7 +117,7 @@ pip install nucleation
 use nucleation::UniversalSchematic;
 
 let mut schematic = UniversalSchematic::new("my_schematic".to_string());
-schematic.set_block(0, 0, 0, BlockState::new("minecraft:stone".to_string()));
+schematic.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
 
 let bytes = nucleation::litematic::to_litematic(&schematic)?;
 std::fs::write("output.litematic", bytes)?;

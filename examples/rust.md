@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut sch = UniversalSchematic::new("Demo".into());
 
     // 2) place some blocks
-    sch.set_block(0, 0, 0, BlockState::new("minecraft:stone".into()));
+    sch.set_block(0, 0, 0, &BlockState::new("minecraft:stone".into()));
     sch.set_block_from_string(1, 0, 0,
         r#"minecraft:barrel[facing=up]{signal=13}"#)?;
 

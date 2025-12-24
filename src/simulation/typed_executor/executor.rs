@@ -614,7 +614,7 @@ mod tests {
         let mut schematic = UniversalSchematic::new("test".to_string());
 
         // Add a single block so the world isn't empty
-        schematic.set_block(0, 0, 0, BlockState::new("minecraft:stone".to_string()));
+        schematic.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
 
         let world = MchprsWorld::new(schematic).unwrap();
 

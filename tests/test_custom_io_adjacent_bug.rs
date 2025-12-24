@@ -22,7 +22,7 @@ fn test_custom_io_adjacent_to_block_bug() {
         0,
         0,
         0,
-        BlockState::new("minecraft:redstone_wire".to_string())
+        &BlockState::new("minecraft:redstone_wire".to_string())
             .with_property("power".to_string(), "0".to_string())
             .with_property("north".to_string(), "none".to_string())
             .with_property("south".to_string(), "none".to_string())
@@ -35,7 +35,7 @@ fn test_custom_io_adjacent_to_block_bug() {
         0,
         1,
         0,
-        BlockState::new("minecraft:gray_concrete".to_string()),
+        &BlockState::new("minecraft:gray_concrete".to_string()),
     );
 
     // Y=2: Redstone torch at (0, 2, 0) - starts lit
@@ -43,7 +43,7 @@ fn test_custom_io_adjacent_to_block_bug() {
         0,
         2,
         0,
-        BlockState::new("minecraft:redstone_torch".to_string())
+        &BlockState::new("minecraft:redstone_torch".to_string())
             .with_property("lit".to_string(), "true".to_string()),
     );
 
@@ -117,7 +117,7 @@ fn test_custom_io_with_gap_workaround() {
         0,
         0,
         0,
-        BlockState::new("minecraft:redstone_wire".to_string())
+        &BlockState::new("minecraft:redstone_wire".to_string())
             .with_property("power".to_string(), "0".to_string()),
     );
 
@@ -126,7 +126,7 @@ fn test_custom_io_with_gap_workaround() {
         0,
         1,
         0,
-        BlockState::new("minecraft:redstone_wire".to_string())
+        &BlockState::new("minecraft:redstone_wire".to_string())
             .with_property("power".to_string(), "0".to_string()),
     );
 
@@ -135,7 +135,7 @@ fn test_custom_io_with_gap_workaround() {
         0,
         2,
         0,
-        BlockState::new("minecraft:gray_concrete".to_string()),
+        &BlockState::new("minecraft:gray_concrete".to_string()),
     );
 
     // Y=3: Torch
@@ -143,7 +143,7 @@ fn test_custom_io_with_gap_workaround() {
         0,
         3,
         0,
-        BlockState::new("minecraft:redstone_torch".to_string())
+        &BlockState::new("minecraft:redstone_torch".to_string())
             .with_property("lit".to_string(), "true".to_string()),
     );
 

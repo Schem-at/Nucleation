@@ -4,7 +4,9 @@ use crate::formats::manager::{SchematicExporter, SchematicImporter};
 use crate::nbt::io::{read_nbt, write_nbt};
 use crate::nbt::{Endian, NbtMap, NbtValue};
 use crate::region::Region;
-use crate::{BlockState, UniversalSchematic};
+use crate::universal_schematic::UniversalSchematic;
+use crate::BlockState;
+use blockpedia;
 use std::collections::HashMap;
 use std::io::Cursor;
 
@@ -131,7 +133,20 @@ pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::
                     properties.insert(key.clone(), val_str);
                 }
             }
-            palette.push(BlockState { name, properties });
+
+            // Translate Bedrock -> Java using blockpedia
+            let translated_state = if let Ok(bp_state) =
+                blockpedia::BlockState::from_bedrock(&name, properties.clone())
+            {
+                BlockState {
+                    name: bp_state.id().to_string(),
+                    properties: bp_state.properties().clone(),
+                }
+            } else {
+                BlockState { name, properties }
+            };
+
+            palette.push(translated_state);
         }
     }
 
@@ -183,7 +198,7 @@ pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::
 
         if palette_idx < palette.len() as i32 {
             let block = palette[palette_idx as usize].clone();
-            region.set_block(x, y, z, block);
+            region.set_block(x, y, z, &block);
         }
     }
 
@@ -291,10 +306,26 @@ pub fn to_mcstructure(
 
     for block in &compact_region.palette {
         let mut block_entry = NbtMap::new();
-        block_entry.insert("name".to_string(), NbtValue::String(block.name.clone()));
+
+        // Translate Java -> Bedrock using blockpedia
+        let (name, properties) =
+            if let Ok(java_bp_state) = blockpedia::BlockState::parse(&block.to_string()) {
+                if let Ok(bedrock_bp_state) = java_bp_state.to_bedrock() {
+                    (
+                        bedrock_bp_state.id().to_string(),
+                        bedrock_bp_state.properties().clone(),
+                    )
+                } else {
+                    (block.name.clone(), block.properties.clone())
+                }
+            } else {
+                (block.name.clone(), block.properties.clone())
+            };
+
+        block_entry.insert("name".to_string(), NbtValue::String(name));
 
         let mut states = NbtMap::new();
-        for (k, v) in &block.properties {
+        for (k, v) in &properties {
             let tag = if v == "true" {
                 NbtValue::Byte(1)
             } else if v == "false" {

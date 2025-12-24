@@ -122,23 +122,43 @@ impl Region {
         }
     }
 
-    pub fn get_or_insert_in_palette(&mut self, block: BlockState) -> usize {
-        match self.palette_index.get(&block) {
+    pub fn get_or_insert_in_palette(&mut self, block: &BlockState) -> usize {
+        match self.palette_index.get(block) {
             Some(&index) => index,
             None => {
                 let index = self.palette.len();
                 self.palette.push(block.clone());
-                self.palette_index.insert(block, index);
+                self.palette_index.insert(block.clone(), index);
                 index
             }
         }
     }
 
     pub fn is_empty(&self) -> bool {
+        // Fast path: if only air in palette, it's empty
+        if self.palette.len() == 1 && self.palette[0].name == "minecraft:air" {
+            return true;
+        }
+
         // Check if all blocks in the region are air (typically index 0 in palette)
+        // Optimization: Air is usually index 0. Check if any index != 0.
+        // But air might be at another index if palette was merged weirdly.
+        // Assuming standard behavior where 0 is air:
+        if self.palette[0].name == "minecraft:air" {
+            return self.blocks.iter().all(|&b| b == 0);
+        }
+
+        let air_indices: Vec<usize> = self
+            .palette
+            .iter()
+            .enumerate()
+            .filter(|(_, b)| b.name == "minecraft:air")
+            .map(|(i, _)| i)
+            .collect();
+
         self.blocks
             .iter()
-            .all(|&block_index| self.palette[block_index as usize].name == "minecraft:air")
+            .all(|&block_index| air_indices.contains(&block_index))
     }
 
     /// Alternative implementation checking for non-air blocks
@@ -168,16 +188,17 @@ impl Region {
         self.block_entities.values().cloned().collect()
     }
 
-    pub fn set_block(&mut self, x: i32, y: i32, z: i32, block: BlockState) -> bool {
+    pub fn set_block(&mut self, x: i32, y: i32, z: i32, block: &BlockState) -> bool {
         if !self.is_in_region(x, y, z) {
             self.expand_to_fit(x, y, z);
         }
 
         let index = self.coords_to_index(x, y, z);
-        let palette_index = self.get_or_insert_in_palette(block.clone());
+        let palette_index = self.get_or_insert_in_palette(block);
         self.blocks[index] = palette_index;
 
         // Update tight bounds if this is a non-air block
+        // Optimization: check against cached air check or simple name check without clone
         if !block.name.contains("air") {
             self.update_tight_bounds(x, y, z);
         }
@@ -221,27 +242,27 @@ impl Region {
 
     /// Update the tight bounds to include the given coordinate
     fn update_tight_bounds(&mut self, x: i32, y: i32, z: i32) {
-        match &self.tight_bounds {
-            None => {
-                // First non-air block - initialize tight bounds to this single point
-                self.tight_bounds = Some(BoundingBox::new((x, y, z), (x, y, z)));
+        if let Some(bounds) = &mut self.tight_bounds {
+            if x < bounds.min.0 {
+                bounds.min.0 = x;
             }
-            Some(bounds) => {
-                // Expand tight bounds to include this point
-                let new_bounds = BoundingBox::new(
-                    (
-                        bounds.min.0.min(x),
-                        bounds.min.1.min(y),
-                        bounds.min.2.min(z),
-                    ),
-                    (
-                        bounds.max.0.max(x),
-                        bounds.max.1.max(y),
-                        bounds.max.2.max(z),
-                    ),
-                );
-                self.tight_bounds = Some(new_bounds);
+            if x > bounds.max.0 {
+                bounds.max.0 = x;
             }
+            if y < bounds.min.1 {
+                bounds.min.1 = y;
+            }
+            if y > bounds.max.1 {
+                bounds.max.1 = y;
+            }
+            if z < bounds.min.2 {
+                bounds.min.2 = z;
+            }
+            if z > bounds.max.2 {
+                bounds.max.2 = z;
+            }
+        } else {
+            self.tight_bounds = Some(BoundingBox::new((x, y, z), (x, y, z)));
         }
     }
 
@@ -295,7 +316,7 @@ impl Region {
             // Only copy if within tight bounds
             if tight_bounds.contains((x, y, z)) {
                 let block = self.palette[palette_idx].clone();
-                compact.set_block(x, y, z, block);
+                compact.set_block(x, y, z, &block);
             }
         }
 
@@ -406,6 +427,46 @@ impl Region {
 
         let new_bounding_box = BoundingBox::new(new_min, new_max);
         self.expand_to_bounding_box(new_bounding_box);
+    }
+
+    /// Ensure the region covers the given bounds, expanding if necessary.
+    /// This avoids multiple reallocations when filling a known shape.
+    pub fn ensure_bounds(&mut self, min: (i32, i32, i32), max: (i32, i32, i32)) {
+        let current_bbox = self.get_bounding_box();
+        let mut new_min = current_bbox.min;
+        let mut new_max = current_bbox.max;
+        let mut expanded = false;
+
+        if min.0 < new_min.0 {
+            new_min.0 = min.0;
+            expanded = true;
+        }
+        if min.1 < new_min.1 {
+            new_min.1 = min.1;
+            expanded = true;
+        }
+        if min.2 < new_min.2 {
+            new_min.2 = min.2;
+            expanded = true;
+        }
+
+        if max.0 > new_max.0 {
+            new_max.0 = max.0;
+            expanded = true;
+        }
+        if max.1 > new_max.1 {
+            new_max.1 = max.1;
+            expanded = true;
+        }
+        if max.2 > new_max.2 {
+            new_max.2 = max.2;
+            expanded = true;
+        }
+
+        if expanded {
+            let new_bbox = BoundingBox::new(new_min, new_max);
+            self.expand_to_bounding_box(new_bbox);
+        }
     }
 
     fn expand_to_bounding_box(&mut self, new_bounding_box: BoundingBox) {
@@ -1264,7 +1325,7 @@ mod tests {
         let mut region = Region::new("Test".to_string(), (0, 0, 0), (2, 2, 2));
         let stone = BlockState::new("minecraft:stone".to_string());
 
-        assert!(region.set_block(0, 0, 0, stone.clone()));
+        assert!(region.set_block(0, 0, 0, &stone));
         assert_eq!(region.get_block(0, 0, 0), Some(&stone));
         assert_eq!(
             region.get_block(1, 1, 1),
@@ -1278,7 +1339,7 @@ mod tests {
         let mut region = Region::new("Test".to_string(), (0, 0, 0), (2, 2, 2));
         let stone = BlockState::new("minecraft:stone".to_string());
 
-        region.set_block(0, 0, 0, stone.clone());
+        region.set_block(0, 0, 0, &stone);
         let new_size = (3, 3, 3);
         region.expand_to_fit(new_size.0, new_size.1, new_size.2);
 
@@ -1319,7 +1380,7 @@ mod tests {
     fn test_to_and_from_nbt() {
         let mut region = Region::new("Test".to_string(), (0, 0, 0), (2, 2, 2));
         let stone = BlockState::new("minecraft:stone".to_string());
-        region.set_block(0, 0, 0, stone.clone());
+        region.set_block(0, 0, 0, &stone);
 
         let nbt = region.to_nbt();
         let deserialized_region = match nbt {
@@ -1340,7 +1401,7 @@ mod tests {
     fn test_to_litematic_nbt() {
         let mut region = Region::new("Test".to_string(), (0, 0, 0), (2, 2, 2));
         let stone = BlockState::new("minecraft:stone".to_string());
-        region.set_block(0, 0, 0, stone.clone());
+        region.set_block(0, 0, 0, &stone);
 
         let nbt = region.to_litematic_nbt();
 
@@ -1359,8 +1420,8 @@ mod tests {
 
         assert_eq!(region.count_blocks(), 0);
 
-        region.set_block(0, 0, 0, stone.clone());
-        region.set_block(1, 1, 1, stone.clone());
+        region.set_block(0, 0, 0, &stone);
+        region.set_block(1, 1, 1, &stone);
 
         assert_eq!(region.count_blocks(), 2);
     }
@@ -1376,8 +1437,8 @@ mod tests {
             let mut region2 = Region::new("Test2".to_string(), (2, 2, 2), (2, 2, 2));
             let stone = BlockState::new("minecraft:stone".to_string());
 
-            region1.set_block(0, 0, 0, stone.clone());
-            region2.set_block(2, 2, 2, stone.clone());
+            region1.set_block(0, 0, 0, &stone);
+            region2.set_block(2, 2, 2, &stone);
 
             region1.merge(&region2);
 
@@ -1393,8 +1454,8 @@ mod tests {
             let stone = BlockState::new("minecraft:stone".to_string());
             let dirt = BlockState::new("minecraft:dirt".to_string());
 
-            region1.set_block(0, 0, 0, stone.clone());
-            region2.set_block(2, 2, 2, dirt.clone());
+            region1.set_block(0, 0, 0, &stone);
+            region2.set_block(2, 2, 2, &dirt);
 
             region1.merge(&region2);
 
@@ -1410,10 +1471,10 @@ mod tests {
             let stone = BlockState::new("minecraft:stone".to_string());
             let dirt = BlockState::new("minecraft:dirt".to_string());
 
-            region1.set_block(0, 0, 0, stone.clone());
-            region1.set_block(1, 1, 1, dirt.clone());
+            region1.set_block(0, 0, 0, &stone);
+            region1.set_block(1, 1, 1, &dirt);
 
-            region2.set_block(2, 2, 2, dirt.clone());
+            region2.set_block(2, 2, 2, &dirt);
 
             region1.merge(&region2);
 
@@ -1422,8 +1483,8 @@ mod tests {
             assert_eq!(region1.get_block(1, 1, 1), Some(&dirt));
             assert_eq!(region1.get_block(2, 2, 2), Some(&dirt));
         }
-        region1.set_block(0, 0, 0, stone.clone());
-        region2.set_block(2, 2, 2, stone.clone());
+        region1.set_block(0, 0, 0, &stone.clone());
+        region2.set_block(2, 2, 2, &stone.clone());
 
         region1.merge(&region2);
 
@@ -1439,8 +1500,8 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
         let dirt = BlockState::new("minecraft:dirt".to_string());
 
-        region1.set_block(0, 0, 0, stone.clone());
-        region2.set_block(2, 2, 2, dirt.clone());
+        region1.set_block(0, 0, 0, &stone.clone());
+        region2.set_block(2, 2, 2, &dirt.clone());
 
         region1.merge(&region2);
 
@@ -1456,10 +1517,10 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
         let dirt = BlockState::new("minecraft:dirt".to_string());
 
-        region1.set_block(0, 0, 0, stone.clone());
-        region1.set_block(1, 1, 1, dirt.clone());
+        region1.set_block(0, 0, 0, &stone.clone());
+        region1.set_block(1, 1, 1, &dirt.clone());
 
-        region2.set_block(2, 2, 2, dirt.clone());
+        region2.set_block(2, 2, 2, &dirt.clone());
 
         region1.merge(&region2);
 
@@ -1475,7 +1536,7 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
 
         // Place a block at the farthest corner to trigger resizing
-        region.set_block(3, 3, 3, stone.clone());
+        region.set_block(3, 3, 3, &stone);
 
         assert_eq!(region.position, (0, 0, 0));
         assert_eq!(region.get_block(3, 3, 3), Some(&stone));
@@ -1491,7 +1552,7 @@ mod tests {
         let dirt = BlockState::new("minecraft:dirt".to_string());
 
         // Place a block at a negative coordinate to trigger resizing
-        region.set_block(-1, -1, -1, dirt.clone());
+        region.set_block(-1, -1, -1, &dirt);
 
         // With hybrid approach, expect aggressive expansion
         assert_eq!(region.position, (-65, -65, -65)); // Now expects -65 instead of -1
@@ -1508,7 +1569,7 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
 
         // Place a block far away to trigger significant resizing
-        region.set_block(10, 10, 10, stone.clone());
+        region.set_block(10, 10, 10, &stone);
 
         assert_eq!(region.position, (0, 0, 0));
         assert_eq!(region.get_block(10, 10, 10), Some(&stone));
@@ -1521,10 +1582,10 @@ mod tests {
         let dirt = BlockState::new("minecraft:dirt".to_string());
 
         // Place a block at one corner
-        region.set_block(0, 0, 0, stone.clone());
+        region.set_block(0, 0, 0, &stone);
 
         // Place another block far from the first to trigger resizing
-        region.set_block(4, 4, 4, dirt.clone());
+        region.set_block(4, 4, 4, &dirt);
 
         assert_eq!(region.get_block(0, 0, 0), Some(&stone));
         assert_eq!(region.get_block(4, 4, 4), Some(&dirt));
@@ -1536,9 +1597,9 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
 
         // Perform multiple expansions
-        region.set_block(3, 3, 3, stone.clone());
-        region.set_block(7, 7, 7, stone.clone());
-        region.set_block(-2, -2, -2, stone.clone());
+        region.set_block(3, 3, 3, &stone);
+        region.set_block(7, 7, 7, &stone);
+        region.set_block(-2, -2, -2, &stone);
 
         // With hybrid approach, expect aggressive expansion
         // The exact value depends on your expansion logic, but should be around -66
@@ -1559,11 +1620,11 @@ mod tests {
         let dirt = BlockState::new("minecraft:dirt".to_string());
 
         // Place blocks in the initial region
-        region.set_block(0, 0, 0, stone.clone());
-        region.set_block(2, 2, 2, dirt.clone());
+        region.set_block(0, 0, 0, &stone);
+        region.set_block(2, 2, 2, &dirt);
 
         // Trigger expansion
-        region.set_block(5, 5, 5, stone.clone());
+        region.set_block(5, 5, 5, &stone);
 
         assert_eq!(region.get_block(0, 0, 0), Some(&stone));
         assert_eq!(region.get_block(2, 2, 2), Some(&dirt));
@@ -1576,7 +1637,7 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
 
         for x in 0..32 {
-            region.set_block(x, 0, 0, stone.clone());
+            region.set_block(x, 0, 0, &stone);
             assert_eq!(region.get_block(x, 0, 0), Some(&stone));
         }
     }
@@ -1587,7 +1648,7 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
 
         for y in 0..32 {
-            region.set_block(0, y, 0, stone.clone());
+            region.set_block(0, y, 0, &stone);
             assert_eq!(region.get_block(0, y, 0), Some(&stone));
         }
     }
@@ -1598,7 +1659,7 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
 
         for z in 0..32 {
-            region.set_block(0, 0, z, stone.clone());
+            region.set_block(0, 0, z, &stone);
             assert_eq!(region.get_block(0, 0, z), Some(&stone));
         }
     }
@@ -1609,7 +1670,7 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
 
         for i in 0..32 {
-            region.set_block(i, i, i, stone.clone());
+            region.set_block(i, i, i, &stone);
             assert_eq!(region.get_block(i, i, i), Some(&stone));
         }
     }
@@ -1624,9 +1685,9 @@ mod tests {
             for y in 0..32 {
                 for z in 0..32 {
                     if (x + y + z) % 2 == 0 {
-                        region.set_block(x, y, z, stone.clone());
+                        region.set_block(x, y, z, &stone);
                     } else {
-                        region.set_block(x, y, z, dirt.clone());
+                        region.set_block(x, y, z, &dirt);
                     }
                 }
             }
@@ -1696,8 +1757,8 @@ mod tests {
         let mut region2 = Region::new("Test2".to_string(), (-2, -2, -2), (-2, -2, -2));
         let stone = BlockState::new("minecraft:stone".to_string());
 
-        region1.set_block(0, 0, 0, stone.clone());
-        region2.set_block(-2, -2, -2, stone.clone());
+        region1.set_block(0, 0, 0, &stone.clone());
+        region2.set_block(-2, -2, -2, &stone.clone());
 
         region1.merge(&region2);
 
@@ -1715,11 +1776,11 @@ mod tests {
         let diamond = BlockState::new("minecraft:diamond_block".to_string());
 
         // Set some initial blocks
-        region.set_block(1, 0, 1, stone.clone());
-        region.set_block(0, 1, 0, stone.clone());
+        region.set_block(1, 0, 1, &stone.clone());
+        region.set_block(0, 1, 0, &stone.clone());
 
         // Expand the region by setting a block outside the current bounds
-        region.set_block(1, 2, 1, diamond.clone());
+        region.set_block(1, 2, 1, &diamond.clone());
 
         // Check if the original blocks are preserved
         assert_eq!(region.get_block(1, 0, 1), Some(&stone));
@@ -1743,7 +1804,7 @@ mod tests {
         let mut region = Region::new("Test".to_string(), (0, 0, 0), (10, 10, 10));
         let stone = BlockState::new("minecraft:stone".to_string());
 
-        region.set_block(5, 3, 7, stone);
+        region.set_block(5, 3, 7, &stone);
 
         let bounds = region.get_tight_bounds().unwrap();
         assert_eq!(bounds.min, (5, 3, 7));
@@ -1758,9 +1819,9 @@ mod tests {
         let dirt = BlockState::new("minecraft:dirt".to_string());
 
         // Place blocks at various positions
-        region.set_block(2, 1, 3, stone.clone());
-        region.set_block(5, 4, 8, dirt.clone());
-        region.set_block(3, 2, 5, stone.clone());
+        region.set_block(2, 1, 3, &stone);
+        region.set_block(5, 4, 8, &dirt);
+        region.set_block(3, 2, 5, &stone);
 
         let bounds = region.get_tight_bounds().unwrap();
         assert_eq!(bounds.min, (2, 1, 3));
@@ -1775,12 +1836,12 @@ mod tests {
         let air = BlockState::new("minecraft:air".to_string());
 
         // Place stones
-        region.set_block(1, 1, 1, stone.clone());
-        region.set_block(3, 3, 3, stone.clone());
+        region.set_block(1, 1, 1, &stone);
+        region.set_block(3, 3, 3, &stone);
 
         // Place air blocks (should not affect tight bounds)
-        region.set_block(0, 0, 0, air.clone());
-        region.set_block(5, 5, 5, air.clone());
+        region.set_block(0, 0, 0, &air);
+        region.set_block(5, 5, 5, &air);
 
         let bounds = region.get_tight_bounds().unwrap();
         assert_eq!(bounds.min, (1, 1, 1));
@@ -1794,14 +1855,14 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
 
         // Place initial block
-        region.set_block(2, 2, 2, stone.clone());
+        region.set_block(2, 2, 2, &stone);
 
         let bounds1 = region.get_tight_bounds().unwrap();
         assert_eq!(bounds1.min, (2, 2, 2));
         assert_eq!(bounds1.max, (2, 2, 2));
 
         // Place block that requires region expansion
-        region.set_block(10, 10, 10, stone.clone());
+        region.set_block(10, 10, 10, &stone);
 
         let bounds2 = region.get_tight_bounds().unwrap();
         assert_eq!(bounds2.min, (2, 2, 2));
@@ -1815,13 +1876,13 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
 
         // Place a tiny 2x2x1 structure within initial bounds
-        region.set_block(0, 0, 0, stone.clone());
-        region.set_block(1, 0, 0, stone.clone());
-        region.set_block(0, 1, 0, stone.clone());
-        region.set_block(1, 1, 0, stone.clone());
+        region.set_block(0, 0, 0, &stone);
+        region.set_block(1, 0, 0, &stone);
+        region.set_block(0, 1, 0, &stone);
+        region.set_block(1, 1, 0, &stone);
 
         // Force expansion by placing a block far away
-        region.set_block(10, 10, 10, stone.clone());
+        region.set_block(10, 10, 10, &stone);
 
         // Allocated dimensions should now be much larger due to pre-allocation
         let allocated_dims = region.get_dimensions();
@@ -1840,8 +1901,8 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
 
         // Place some blocks
-        region.set_block(1, 1, 1, stone.clone());
-        region.set_block(5, 5, 5, stone.clone());
+        region.set_block(1, 1, 1, &stone);
+        region.set_block(5, 5, 5, &stone);
 
         let bounds_before = region.get_tight_bounds().unwrap();
         assert_eq!(bounds_before.min, (1, 1, 1));

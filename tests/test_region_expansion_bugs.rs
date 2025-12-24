@@ -14,14 +14,14 @@ fn test_basic_dimension_expansion_bug() {
     // Set first block
     let block1 = BlockState::new("minecraft:barrel".to_string())
         .with_property("facing".to_string(), "north".to_string());
-    schematic.set_block(0, 1, 0, block1);
+    schematic.set_block(0, 1, 0, &block1);
     let dims1 = schematic.get_dimensions();
     println!("After first block at (0, 1, 0): {:?}", dims1);
 
     // Set second block at negative Y - this triggers expansion
     let block2 = BlockState::new("minecraft:barrel".to_string())
         .with_property("facing".to_string(), "north".to_string());
-    schematic.set_block(0, -1, 0, block2);
+    schematic.set_block(0, -1, 0, &block2);
     let dims2 = schematic.get_dimensions();
     println!("After second block at (0, -1, 0): {:?}", dims2);
 
@@ -68,7 +68,7 @@ fn test_block_entity_positions_after_expansion() {
     // Set block with block entity at (0, 1, 0)
     let block1 = BlockState::new("minecraft:barrel".to_string())
         .with_property("facing".to_string(), "north".to_string());
-    schematic.set_block(0, 1, 0, block1.clone());
+    schematic.set_block(0, 1, 0, &block1);
 
     let be1 = BlockEntity::new("minecraft:barrel".to_string(), (0, 1, 0));
     schematic.add_block_entity(be1);
@@ -81,7 +81,7 @@ fn test_block_entity_positions_after_expansion() {
     // Set block at negative Y - triggers expansion
     let block2 = BlockState::new("minecraft:barrel".to_string())
         .with_property("facing".to_string(), "north".to_string());
-    schematic.set_block(0, -1, 0, block2.clone());
+    schematic.set_block(0, -1, 0, &block2);
 
     let be2 = BlockEntity::new("minecraft:barrel".to_string(), (0, -1, 0));
     schematic.add_block_entity(be2);
@@ -142,8 +142,8 @@ fn test_tight_bounds_vs_allocated_bounds() {
     let mut schematic = UniversalSchematic::new("Test".to_string());
 
     // Place just two blocks close together
-    schematic.set_block(0, 0, 0, BlockState::new("minecraft:stone".to_string()));
-    schematic.set_block(1, 0, 0, BlockState::new("minecraft:stone".to_string()));
+    schematic.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+    schematic.set_block(1, 0, 0, &BlockState::new("minecraft:stone".to_string()));
 
     let allocated_dims = schematic.get_dimensions();
     let tight_dims = schematic.get_tight_dimensions();
@@ -166,7 +166,7 @@ fn test_tight_bounds_vs_allocated_bounds() {
         10,
         10,
         10,
-        BlockState::new("minecraft:diamond_block".to_string()),
+        &BlockState::new("minecraft:diamond_block".to_string()),
     );
 
     let allocated_dims_after = schematic.get_dimensions();
@@ -213,7 +213,7 @@ fn test_export_uses_allocated_not_tight_bounds() {
     for x in 0..=1 {
         for y in 0..=1 {
             for z in 0..=1 {
-                schematic.set_block(x, y, z, BlockState::new("minecraft:stone".to_string()));
+                schematic.set_block(x, y, z, &BlockState::new("minecraft:stone".to_string()));
             }
         }
     }
@@ -221,7 +221,7 @@ fn test_export_uses_allocated_not_tight_bounds() {
     println!("Created 2x2x2 structure");
 
     // Trigger expansion by placing a far block, then removing it
-    schematic.set_block(50, 50, 50, BlockState::new("minecraft:air".to_string()));
+    schematic.set_block(50, 50, 50, &BlockState::new("minecraft:air".to_string()));
 
     let allocated_before = schematic.get_dimensions();
     let tight_before = schematic.get_tight_dimensions();
@@ -258,14 +258,14 @@ fn test_negative_coordinate_expansion_issue() {
     );
 
     // Set block at positive Y
-    region.set_block(0, 5, 0, BlockState::new("minecraft:stone".to_string()));
+    region.set_block(0, 5, 0, &BlockState::new("minecraft:stone".to_string()));
     println!(
         "After block at (0, 5, 0): pos={:?}, size={:?}",
         region.position, region.size
     );
 
     // Set block at negative Y - this triggers expansion
-    region.set_block(0, -5, 0, BlockState::new("minecraft:dirt".to_string()));
+    region.set_block(0, -5, 0, &BlockState::new("minecraft:dirt".to_string()));
     println!(
         "After block at (0, -5, 0): pos={:?}, size={:?}",
         region.position, region.size
@@ -323,7 +323,7 @@ fn test_get_merged_region_preserves_block_entities() {
 
     for &(x, y, z) in &positions {
         let block = BlockState::new("minecraft:chest".to_string());
-        schematic.set_block(x, y, z, block);
+        schematic.set_block(x, y, z, &block);
 
         let be = BlockEntity::new("minecraft:chest".to_string(), (x, y, z));
         schematic.add_block_entity(be);
@@ -409,7 +409,7 @@ fn test_region_merge_adjusts_block_entity_positions() {
     // Create a region with blocks and block entities
     let mut region = Region::new("Test".to_string(), (0, 0, 0), (5, 5, 5));
 
-    region.set_block(2, 2, 2, BlockState::new("minecraft:chest".to_string()));
+    region.set_block(2, 2, 2, &BlockState::new("minecraft:chest".to_string()));
     let be = BlockEntity::new("minecraft:chest".to_string(), (2, 2, 2));
     region.add_block_entity(be);
 
@@ -424,7 +424,7 @@ fn test_region_merge_adjusts_block_entity_positions() {
         -10,
         -10,
         -10,
-        BlockState::new("minecraft:stone".to_string()),
+        &BlockState::new("minecraft:stone".to_string()),
     );
 
     println!("\nAfter expansion:");
@@ -472,7 +472,7 @@ fn test_schematic_export_with_tight_bounds_option() {
     for x in 0..=2 {
         for y in 0..=2 {
             for z in 0..=2 {
-                schematic.set_block(x, y, z, BlockState::new("minecraft:stone".to_string()));
+                schematic.set_block(x, y, z, &BlockState::new("minecraft:stone".to_string()));
             }
         }
     }

@@ -637,7 +637,7 @@ impl MchprsWorld {
                     let mut block_state = crate::BlockState::new(name);
                     block_state.properties = properties;
 
-                    self.schematic.set_block(x, y, z, block_state);
+                    self.schematic.set_block(x, y, z, &block_state);
                 }
             }
         }

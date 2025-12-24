@@ -20,7 +20,7 @@ fn test_chunk_blocks_indices_includes_max_boundary() {
     let test_limit = 5;
 
     // Place one block at origin
-    schematic.set_block(0, 0, 0, BlockState::new("minecraft:stone".to_string()));
+    schematic.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
 
     // Then place blocks in each direction (excluding origin which we already placed)
     for i in 1..test_limit {
@@ -29,42 +29,42 @@ fn test_chunk_blocks_indices_includes_max_boundary() {
             i,
             0,
             0,
-            BlockState::new("minecraft:red_concrete".to_string()),
+            &BlockState::new("minecraft:red_concrete".to_string()),
         );
         // -x direction
         schematic.set_block(
             -i,
             0,
             0,
-            BlockState::new("minecraft:pink_concrete".to_string()),
+            &BlockState::new("minecraft:pink_concrete".to_string()),
         );
         // +y direction
         schematic.set_block(
             0,
             i,
             0,
-            BlockState::new("minecraft:green_concrete".to_string()),
+            &BlockState::new("minecraft:green_concrete".to_string()),
         );
         // -y direction
         schematic.set_block(
             0,
             -i,
             0,
-            BlockState::new("minecraft:lime_concrete".to_string()),
+            &BlockState::new("minecraft:lime_concrete".to_string()),
         );
         // +z direction (this was the failing case)
         schematic.set_block(
             0,
             0,
             i,
-            BlockState::new("minecraft:blue_concrete".to_string()),
+            &BlockState::new("minecraft:blue_concrete".to_string()),
         );
         // -z direction
         schematic.set_block(
             0,
             0,
             -i,
-            BlockState::new("minecraft:cyan_concrete".to_string()),
+            &BlockState::new("minecraft:cyan_concrete".to_string()),
         );
     }
 
@@ -194,8 +194,8 @@ fn test_chunk_blocks_indices_small_region() {
     let mut schematic = UniversalSchematic::new("SmallBoundsTest".to_string());
 
     // Create just 2 blocks: one at origin, one at +z=1
-    schematic.set_block(0, 0, 0, BlockState::new("minecraft:stone".to_string()));
-    schematic.set_block(0, 0, 1, BlockState::new("minecraft:dirt".to_string()));
+    schematic.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+    schematic.set_block(0, 0, 1, &BlockState::new("minecraft:dirt".to_string()));
 
     let tight_bounds = schematic
         .get_tight_bounds()
@@ -236,7 +236,7 @@ fn test_chunk_blocks_indices_negative_coords() {
 
     // Create blocks from z=-2 to z=0
     for z in -2..=0 {
-        schematic.set_block(0, 0, z, BlockState::new("minecraft:stone".to_string()));
+        schematic.set_block(0, 0, z, &BlockState::new("minecraft:stone".to_string()));
     }
 
     let tight_bounds = schematic

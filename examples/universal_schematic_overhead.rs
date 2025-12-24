@@ -27,7 +27,7 @@ impl OptimizedUniversalSchematic {
                 new_block
             }
         };
-        self.inner.set_block(x, y, z, block_state)
+        self.inner.set_block(x, y, z, &block_state)
     }
 
     fn pre_allocate_for_cube(&mut self, size: i32) {
@@ -53,7 +53,7 @@ fn main() {
         for x in 0..size {
             for y in 0..size {
                 for z in 0..size {
-                    region.set_block(x, y, z, stone.clone());
+                    region.set_block(x, y, z, &stone);
                 }
             }
         }
@@ -71,7 +71,7 @@ fn main() {
         for x in 0..size {
             for y in 0..size {
                 for z in 0..size {
-                    region_prealloc.set_block(x, y, z, stone_prealloc.clone());
+                    region_prealloc.set_block(x, y, z, &stone_prealloc);
                 }
             }
         }
@@ -85,7 +85,7 @@ fn main() {
                 for z in 0..size {
                     // This is what your Python binding currently does
                     let stone = BlockState::new("minecraft:stone".to_string());
-                    schematic.set_block(x, y, z, stone);
+                    schematic.set_block(x, y, z, &stone);
                 }
             }
         }

@@ -444,7 +444,7 @@ mod tests {
         let mut schematic = UniversalSchematic::new("test".to_string());
         // Add some blocks so the world isn't empty
         for x in 0..10 {
-            schematic.set_block(x, 0, 0, BlockState::new("minecraft:stone".to_string()));
+            schematic.set_block(x, 0, 0, &BlockState::new("minecraft:stone".to_string()));
         }
         schematic
     }

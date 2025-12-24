@@ -68,7 +68,7 @@ fn create_and_gate_schematic() -> nucleation::UniversalSchematic {
     for (x, y, z, block_str) in blocks {
         match nucleation::UniversalSchematic::parse_block_string(block_str) {
             Ok((block_state, _)) => {
-                schematic.set_block(x, y, z, block_state);
+                schematic.set_block(x, y, z, &block_state);
             }
             Err(e) => {
                 eprintln!("Warning: Failed to parse block '{}': {}", block_str, e);
@@ -177,7 +177,7 @@ fn create_xor_gate_schematic() -> nucleation::UniversalSchematic {
     for (x, y, z, block_str) in blocks {
         match nucleation::UniversalSchematic::parse_block_string(block_str) {
             Ok((block_state, _)) => {
-                schematic.set_block(x, y, z, block_state);
+                schematic.set_block(x, y, z, &block_state);
             }
             Err(e) => {
                 eprintln!("Warning: Failed to parse block '{}': {}", block_str, e);

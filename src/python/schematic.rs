@@ -34,9 +34,7 @@ use crate::simulation::CircuitBuilder;
 #[cfg(feature = "simulation")]
 use crate::simulation::MchprsWorld;
 
-use crate::building::{
-    BuildingTool, Cuboid, Shape, SolidBrush, Sphere,
-};
+use crate::building::{BuildingTool, Cuboid, Shape, SolidBrush, Sphere};
 
 #[pyclass(name = "BlockState")]
 #[derive(Clone)]
@@ -126,23 +124,16 @@ impl PySchematic {
         let block = BlockState::new(block_state.to_string());
         let shape = Cuboid::new((min_x, min_y, min_z), (max_x, max_y, max_z));
         let brush = SolidBrush::new(block);
-        
+
         let mut tool = BuildingTool::new(&mut self.inner);
         tool.fill(&shape, &brush);
     }
 
-    pub fn fill_sphere(
-        &mut self,
-        cx: i32,
-        cy: i32,
-        cz: i32,
-        radius: f64,
-        block_state: &str,
-    ) {
+    pub fn fill_sphere(&mut self, cx: i32, cy: i32, cz: i32, radius: f64, block_state: &str) {
         let block = BlockState::new(block_state.to_string());
         let shape = Sphere::new((cx, cy, cz), radius);
         let brush = SolidBrush::new(block);
-        
+
         let mut tool = BuildingTool::new(&mut self.inner);
         tool.fill(&shape, &brush);
     }
@@ -251,7 +242,7 @@ impl PySchematic {
             name: block_name.to_string(),
             properties,
         };
-        self.inner.set_block(x, y, z, block_state);
+        self.inner.set_block(x, y, z, &block_state);
     }
 
     pub fn set_block_with_nbt(

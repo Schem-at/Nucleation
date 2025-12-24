@@ -9,7 +9,7 @@ fn test_repeater_flip_x() {
     repeater_west.set_property("facing".to_string(), "west".to_string());
     repeater_west.set_property("delay".to_string(), "3".to_string());
 
-    region.set_block(1, 0, 0, repeater_west.clone());
+    region.set_block(1, 0, 0, &repeater_west.clone());
 
     // Flip along X axis
     region.flip_x();
@@ -39,7 +39,7 @@ fn test_repeater_rotate_y() {
     repeater_north.set_property("facing".to_string(), "north".to_string());
     repeater_north.set_property("delay".to_string(), "2".to_string());
 
-    region.set_block(1, 0, 1, repeater_north.clone());
+    region.set_block(1, 0, 1, &repeater_north.clone());
 
     // Rotate 90 degrees around Y axis
     region.rotate_y(90);
@@ -70,7 +70,7 @@ fn test_stairs_flip_x() {
     stairs_east.set_property("half".to_string(), "bottom".to_string());
     stairs_east.set_property("shape".to_string(), "straight".to_string());
 
-    region.set_block(1, 0, 0, stairs_east.clone());
+    region.set_block(1, 0, 0, &stairs_east.clone());
 
     // Flip along X axis
     region.flip_x();
@@ -100,7 +100,7 @@ fn test_stairs_rotate_y() {
     stairs_north.set_property("facing".to_string(), "north".to_string());
     stairs_north.set_property("half".to_string(), "top".to_string());
 
-    region.set_block(1, 0, 1, stairs_north.clone());
+    region.set_block(1, 0, 1, &stairs_north.clone());
 
     // Rotate 180 degrees around Y axis
     region.rotate_y(180);
@@ -128,7 +128,7 @@ fn test_redstone_wire_connections_flip() {
     wire.set_property("south".to_string(), "none".to_string());
     wire.set_property("power".to_string(), "7".to_string());
 
-    region.set_block(2, 0, 0, wire.clone());
+    region.set_block(2, 0, 0, &wire.clone());
 
     // Flip along X axis - this should swap east and west connections
     region.flip_x();
@@ -167,7 +167,7 @@ fn test_redstone_wire_connections_rotate() {
     wire.set_property("west".to_string(), "none".to_string());
     wire.set_property("power".to_string(), "15".to_string());
 
-    region.set_block(1, 0, 1, wire.clone());
+    region.set_block(1, 0, 1, &wire.clone());
 
     // Rotate 90 degrees around Y axis
     region.rotate_y(90);
@@ -204,7 +204,7 @@ fn test_comparator_flip() {
     comparator.set_property("mode".to_string(), "compare".to_string());
     comparator.set_property("powered".to_string(), "false".to_string());
 
-    region.set_block(1, 0, 0, comparator.clone());
+    region.set_block(1, 0, 0, &comparator.clone());
 
     // Flip along X axis
     region.flip_x();
@@ -238,27 +238,27 @@ fn test_full_redstone_circuit_transformation() {
     lever.set_property("facing".to_string(), "east".to_string());
     lever.set_property("face".to_string(), "floor".to_string());
     lever.set_property("powered".to_string(), "false".to_string());
-    region.set_block(0, 0, 0, lever);
+    region.set_block(0, 0, 0, &lever);
 
     // Wire
     let wire = BlockState::new("minecraft:redstone_wire".to_string());
-    region.set_block(1, 0, 0, wire.clone());
-    region.set_block(2, 0, 0, wire.clone());
+    region.set_block(1, 0, 0, &wire.clone());
+    region.set_block(2, 0, 0, &wire.clone());
 
     // Repeater facing east, delay 2
     let mut repeater = BlockState::new("minecraft:repeater".to_string());
     repeater.set_property("facing".to_string(), "east".to_string());
     repeater.set_property("delay".to_string(), "2".to_string());
-    region.set_block(3, 0, 0, repeater);
+    region.set_block(3, 0, 0, &repeater);
 
     // More wire
-    region.set_block(4, 0, 0, wire.clone());
-    region.set_block(5, 0, 0, wire.clone());
+    region.set_block(4, 0, 0, &wire.clone());
+    region.set_block(5, 0, 0, &wire.clone());
 
     // Lamp
     let mut lamp = BlockState::new("minecraft:redstone_lamp".to_string());
     lamp.set_property("lit".to_string(), "false".to_string());
-    region.set_block(6, 0, 0, lamp);
+    region.set_block(6, 0, 0, &lamp);
 
     // Now flip the entire circuit along X axis
     region.flip_x();

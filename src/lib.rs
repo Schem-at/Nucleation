@@ -5,6 +5,7 @@ pub mod block_entity;
 mod block_position;
 mod block_state;
 mod bounding_box;
+pub mod building;
 mod chunk;
 pub mod definition_region;
 mod entity;

@@ -1,6 +1,7 @@
 use crate::building::{
-    BilinearGradientBrush, BlockPalette, Brush, BuildingTool, ColorBrush, Cuboid, InterpolationSpace,
-    LinearGradientBrush, MultiPointGradientBrush, PointGradientBrush, ShadedBrush, Shape, SolidBrush, Sphere,
+    BilinearGradientBrush, BlockPalette, BrushEnum, BuildingTool, ColorBrush, Cuboid,
+    InterpolationSpace, LinearGradientBrush, PointGradientBrush, ShadedBrush, ShapeEnum,
+    SolidBrush, Sphere,
 };
 use crate::wasm::schematic::SchematicWrapper;
 use crate::BlockState;
@@ -14,10 +15,7 @@ use wasm_bindgen::prelude::*;
 /// A wrapper for any shape (Sphere, Cuboid, etc.)
 #[wasm_bindgen]
 pub struct ShapeWrapper {
-    // We cannot use Box<dyn Shape + Send + Sync> easily because wasm_bindgen structs must be Send/Sync 
-    // but the trait object itself is fine. The issue is applying it.
-    // Let's use an enum approach internally or just hide the pointer.
-    inner: Box<dyn Shape + Send + Sync>,
+    pub(crate) inner: ShapeEnum,
 }
 
 #[wasm_bindgen]
@@ -25,14 +23,14 @@ impl ShapeWrapper {
     /// Create a new Sphere shape
     pub fn sphere(cx: i32, cy: i32, cz: i32, radius: f64) -> Self {
         Self {
-            inner: Box::new(Sphere::new((cx, cy, cz), radius)),
+            inner: ShapeEnum::Sphere(Sphere::new((cx, cy, cz), radius)),
         }
     }
 
     /// Create a new Cuboid shape
     pub fn cuboid(min_x: i32, min_y: i32, min_z: i32, max_x: i32, max_y: i32, max_z: i32) -> Self {
         Self {
-            inner: Box::new(Cuboid::new((min_x, min_y, min_z), (max_x, max_y, max_z))),
+            inner: ShapeEnum::Cuboid(Cuboid::new((min_x, min_y, min_z), (max_x, max_y, max_z))),
         }
     }
 }
@@ -44,7 +42,7 @@ impl ShapeWrapper {
 /// A wrapper for any brush (Solid, Gradient, Shaded, etc.)
 #[wasm_bindgen]
 pub struct BrushWrapper {
-    inner: Box<dyn Brush + Send + Sync>,
+    pub(crate) inner: BrushEnum,
 }
 
 #[wasm_bindgen]
@@ -53,19 +51,13 @@ impl BrushWrapper {
     pub fn solid(block_state: &str) -> Result<BrushWrapper, JsValue> {
         // We need to parse properties if they exist
         let block = if block_state.contains('[') {
-             // For now simple parsing, or better reuse BlockState::new which does NOT parse properties by default currently in Nucleation core?
-             // Actually Nucleation's BlockState::new just takes the name.
-             // We should probably improve BlockState parsing or just assume it's just the name for now if properties aren't supported in string ctor.
-             // Wait, `BlockState` struct in `src/block_state.rs` has `new(name)`.
-             // If we want properties, we need to parse them.
-             // Let's assume the user passes "minecraft:stone" for now.
-             BlockState::new(block_state.to_string())
+            BlockState::new(block_state.to_string())
         } else {
-             BlockState::new(block_state.to_string())
+            BlockState::new(block_state.to_string())
         };
-        
+
         Ok(Self {
-            inner: Box::new(SolidBrush::new(block)),
+            inner: BrushEnum::Solid(SolidBrush::new(block)),
         })
     }
 
@@ -73,7 +65,7 @@ impl BrushWrapper {
     /// Palette: optional list of block IDs to restrict matching to.
     pub fn color(r: u8, g: u8, b: u8, palette_filter: Option<Vec<String>>) -> Self {
         let brush = if let Some(keywords) = palette_filter {
-             let palette = Arc::new(BlockPalette::new_filtered(|f| {
+            let palette = Arc::new(BlockPalette::new_filtered(|f| {
                 keywords.iter().any(|k| f.id.contains(k))
             }));
             ColorBrush::with_palette(r, g, b, palette)
@@ -82,15 +74,25 @@ impl BrushWrapper {
         };
 
         Self {
-            inner: Box::new(brush),
+            inner: BrushEnum::Color(brush),
         }
     }
 
     /// Create a linear gradient brush
     /// Space: 0 = RGB, 1 = Oklab
     pub fn linear_gradient(
-        x1: i32, y1: i32, z1: i32, r1: u8, g1: u8, b1: u8,
-        x2: i32, y2: i32, z2: i32, r2: u8, g2: u8, b2: u8,
+        x1: i32,
+        y1: i32,
+        z1: i32,
+        r1: u8,
+        g1: u8,
+        b1: u8,
+        x2: i32,
+        y2: i32,
+        z2: i32,
+        r2: u8,
+        g2: u8,
+        b2: u8,
         space: Option<u8>,
         palette_filter: Option<Vec<String>>,
     ) -> Self {
@@ -99,37 +101,44 @@ impl BrushWrapper {
             _ => InterpolationSpace::Rgb,
         };
 
-        let mut brush = LinearGradientBrush::new(
-            (x1, y1, z1), (r1, g1, b1),
-            (x2, y2, z2), (r2, g2, b2),
-        ).with_space(interp_space);
+        let mut brush =
+            LinearGradientBrush::new((x1, y1, z1), (r1, g1, b1), (x2, y2, z2), (r2, g2, b2))
+                .with_space(interp_space);
 
         if let Some(keywords) = palette_filter {
-             let palette = Arc::new(BlockPalette::new_filtered(|f| {
+            let palette = Arc::new(BlockPalette::new_filtered(|f| {
                 keywords.iter().any(|k| f.id.contains(k))
             }));
             brush = brush.with_palette(palette);
         }
 
         Self {
-            inner: Box::new(brush),
+            inner: BrushEnum::Linear(brush),
         }
     }
 
     /// Create a shaded brush (Lambertian shading)
     /// light_dir: [x, y, z] vector
-    pub fn shaded(r: u8, g: u8, b: u8, lx: f64, ly: f64, lz: f64, palette_filter: Option<Vec<String>>) -> Self {
+    pub fn shaded(
+        r: u8,
+        g: u8,
+        b: u8,
+        lx: f64,
+        ly: f64,
+        lz: f64,
+        palette_filter: Option<Vec<String>>,
+    ) -> Self {
         let mut brush = ShadedBrush::new((r, g, b), (lx, ly, lz));
-        
+
         if let Some(keywords) = palette_filter {
-             let palette = Arc::new(BlockPalette::new_filtered(|f| {
+            let palette = Arc::new(BlockPalette::new_filtered(|f| {
                 keywords.iter().any(|k| f.id.contains(k))
             }));
             brush = brush.with_palette(palette);
         }
 
         Self {
-            inner: Box::new(brush),
+            inner: BrushEnum::Shaded(brush),
         }
     }
 
@@ -144,8 +153,13 @@ impl BrushWrapper {
         space: Option<u8>,
         palette_filter: Option<Vec<String>>,
     ) -> Result<BrushWrapper, JsValue> {
-        if positions.len() % 3 != 0 || colors.len() % 3 != 0 || positions.len() / 3 != colors.len() / 3 {
-            return Err(JsValue::from_str("Positions and colors arrays must match in length (3 components per point)"));
+        if positions.len() % 3 != 0
+            || colors.len() % 3 != 0
+            || positions.len() / 3 != colors.len() / 3
+        {
+            return Err(JsValue::from_str(
+                "Positions and colors arrays must match in length (3 components per point)",
+            ));
         }
 
         let count = positions.len() / 3;
@@ -154,7 +168,7 @@ impl BrushWrapper {
         for i in 0..count {
             points.push((
                 (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]),
-                (colors[i * 3], colors[i * 3 + 1], colors[i * 3 + 2])
+                (colors[i * 3], colors[i * 3 + 1], colors[i * 3 + 2]),
             ));
         }
 
@@ -168,14 +182,14 @@ impl BrushWrapper {
             .with_falloff(falloff.unwrap_or(2.0));
 
         if let Some(keywords) = palette_filter {
-             let palette = Arc::new(BlockPalette::new_filtered(|f| {
+            let palette = Arc::new(BlockPalette::new_filtered(|f| {
                 keywords.iter().any(|k| f.id.contains(k))
             }));
             brush = brush.with_palette(palette);
         }
 
         Ok(Self {
-            inner: Box::new(brush),
+            inner: BrushEnum::Point(brush),
         })
     }
 }
@@ -191,10 +205,7 @@ pub struct WasmBuildingTool;
 impl WasmBuildingTool {
     /// Apply a brush to a shape on the given schematic
     pub fn fill(schematic: &mut SchematicWrapper, shape: &ShapeWrapper, brush: &BrushWrapper) {
-        // We need to lock the schematic
-        if let Ok(mut inner_schematic) = schematic.inner.lock() {
-            let mut tool = BuildingTool::new(&mut inner_schematic);
-            tool.fill(&*shape.inner, &*brush.inner);
-        }
+        let mut tool = BuildingTool::new(&mut schematic.0);
+        tool.fill(&shape.inner, &brush.inner);
     }
 }

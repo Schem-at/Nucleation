@@ -30,9 +30,9 @@ impl PaletteManager {
     pub fn get_palette_by_keywords(keywords: Vec<String>) -> Vec<String> {
         Self::filter_blocks(|f| {
             // Check if ID contains any keyword OR matches exactly (for things like "minecraft:obsidian")
-            keywords.iter().any(|k| {
-                f.id.contains(k) || f.id == k || f.id == format!("minecraft:{}", k)
-            })
+            keywords
+                .iter()
+                .any(|k| f.id.contains(k) || f.id == k || f.id == format!("minecraft:{}", k))
         })
     }
 
