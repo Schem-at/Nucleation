@@ -56,7 +56,7 @@ Main class for working with schematics.
 class Schematic:
     def __init__(self, name: str):
         """Create empty schematic"""
-        
+
     # Loading/Saving
     def load_from_bytes(self, data: bytes) -> None:
         """Load from bytes (auto-detects format)"""
@@ -68,7 +68,7 @@ class Schematic:
         """Save as litematic format"""
     def to_schematic(self) -> bytes:
         """Save as WorldEdit schematic format"""
-    
+
     # Format Support
     @staticmethod
     def get_supported_import_formats() -> list[str]:
@@ -82,35 +82,35 @@ class Schematic:
     @staticmethod
     def get_default_format_version(format: str) -> str | None:
         """Get default version for an export format"""
-    
+
     # Block operations
     def set_block(self, x: int, y: int, z: int, block_name: str) -> None:
         """Set block at position"""
-    def set_block_with_properties(self, x: int, y: int, z: int, 
+    def set_block_with_properties(self, x: int, y: int, z: int,
                                   block_name: str, properties: dict) -> None:
         """Set block with properties"""
-    def set_block_from_string(self, x: int, y: int, z: int, 
+    def set_block_from_string(self, x: int, y: int, z: int,
                              block_string: str) -> None:
         """Set block from bracket notation string"""
     def get_block(self, x: int, y: int, z: int) -> str | None:
         """Get block name at position"""
     def get_block_with_properties(self, x: int, y: int, z: int) -> dict | None:
         """Get block with properties"""
-    
+
     # Block entities
     def get_block_entity(self, x: int, y: int, z: int) -> dict | None:
         """Get block entity at position"""
     def get_all_block_entities(self) -> list[dict]:
         """Get all block entities"""
-    
+
     # Region operations
-    def copy_region(self, source_region: str, 
+    def copy_region(self, source_region: str,
                    min_x: int, min_y: int, min_z: int,
                    max_x: int, max_y: int, max_z: int,
                    target_x: int, target_y: int, target_z: int,
                    excluded_blocks: list[str]) -> None:
         """Copy region to new position"""
-    
+
     # Information
     def get_dimensions(self) -> tuple[int, int, int]:
         """Get schematic dimensions (width, height, depth)"""
@@ -124,7 +124,7 @@ class Schematic:
         """Get debug information"""
     def print_schematic(self) -> str:
         """Get ASCII representation"""
-    
+
     # Iteration
     def blocks(self) -> list[dict]:
         """Get all blocks with positions and properties"""
@@ -136,7 +136,7 @@ class Schematic:
     def get_chunk_blocks(self, offset_x: int, offset_y: int, offset_z: int,
                         width: int, height: int, length: int) -> list[dict]:
         """Get blocks in specific chunk"""
-    
+
     # Simulation (requires simulation feature)
     def create_simulation_world(self) -> SimulationWorld:
         """Create simulation world"""
@@ -152,14 +152,14 @@ Represents a block with properties.
 class BlockState:
     def __init__(self, name: str):
         """Create block state"""
-    
+
     def with_property(self, key: str, value: str) -> None:
         """Add property (mutates in place)"""
-    
+
     @property
     def name(self) -> str:
         """Get block name"""
-    
+
     @property
     def properties(self) -> dict[str, str]:
         """Get all properties"""
@@ -384,7 +384,7 @@ circuit = SchematicBuilder.new() \
         # Base layer
         ccc
         ccc
-        
+
         # Logic layer
         ─→─
         │█│
@@ -592,18 +592,18 @@ from nucleation import Schematic
 
 def build_and_test_circuit():
     schematic = Schematic("test_circuit")
-    
+
     # Build AND gate
     schematic.set_block(0, 0, 0, "minecraft:stone")
     schematic.set_block_from_string(0, 1, 0, "minecraft:lever[facing=north,powered=false]")
     # ... build circuit ...
-    
+
     # Test simulation
     world = schematic.create_simulation_world()
     world.on_use_block(0, 1, 0)  # Toggle input
     world.tick(10)
     world.flush()
-    
+
     output = world.is_lit(10, 1, 0)
     assert output == True, "Test failed!"
     print("Test passed!")
@@ -620,23 +620,23 @@ from nucleation import Schematic
 def convert_all_schematics(input_dir: str, output_dir: str):
     """Convert all .schematic files to .litematic"""
     os.makedirs(output_dir, exist_ok=True)
-    
+
     for filename in os.listdir(input_dir):
         if not filename.endswith('.schematic'):
             continue
-        
+
         input_path = os.path.join(input_dir, filename)
         output_path = os.path.join(output_dir, filename.replace('.schematic', '.litematic'))
-        
+
         # Load
         with open(input_path, "rb") as f:
             schematic = Schematic(filename)
             schematic.load_from_schematic(f.read())
-        
+
         # Save
         with open(output_path, "wb") as f:
             f.write(schematic.to_litematic())
-        
+
         print(f"Converted: {filename}")
 
 convert_all_schematics("input/", "output/")
@@ -648,5 +648,3 @@ convert_all_schematics("input/", "output/")
 - [TypedCircuitExecutor Guide](../shared/guide/typed-executor.md)
 - [Unicode Palette Reference](../shared/unicode-palette.md)
 - [PyPI Package](https://pypi.org/project/nucleation)
-
-
