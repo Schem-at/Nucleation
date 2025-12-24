@@ -60,8 +60,9 @@ fn test_mcstructure_properties() {
     props.insert("powered".to_string(), "true".to_string()); // Should become Byte(1)
     props.insert("layers".to_string(), "8".to_string()); // Should become Int(8)
 
+    // Use a custom block to avoid blockpedia validation stripping invalid properties for vanilla blocks
     let block = BlockState {
-        name: "minecraft:snow".to_string(),
+        name: "custom:snow_variant".to_string(),
         properties: props,
     };
 
@@ -72,7 +73,7 @@ fn test_mcstructure_properties() {
     let loaded = from_mcstructure(&data).expect("Failed to import");
 
     let loaded_block = loaded.get_block(0, 0, 0).unwrap();
-    assert_eq!(loaded_block.name, "minecraft:snow");
+    assert_eq!(loaded_block.name, "custom:snow_variant");
     assert_eq!(loaded_block.properties.get("facing").unwrap(), "north");
     assert_eq!(loaded_block.properties.get("powered").unwrap(), "true");
     assert_eq!(loaded_block.properties.get("layers").unwrap(), "8");

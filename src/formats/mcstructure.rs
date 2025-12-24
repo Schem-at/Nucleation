@@ -7,6 +7,7 @@ use crate::region::Region;
 use crate::universal_schematic::UniversalSchematic;
 use crate::BlockState;
 use blockpedia;
+use blockpedia::block_entity::{BlockEntityTranslator, NbtValue as BpNbtValue};
 use std::collections::HashMap;
 use std::io::Cursor;
 
@@ -246,6 +247,18 @@ pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::
                             be_nbt.insert("y".to_string(), NbtValue::Int(y));
                             be_nbt.insert("z".to_string(), NbtValue::Int(z));
 
+                            // Translate NBT using Blockpedia
+                            let bp_nbt = to_bp_nbt(&NbtValue::Compound(be_nbt.clone()));
+                            if let BpNbtValue::Compound(bp_map) = bp_nbt {
+                                let translated_bp_map =
+                                    BlockEntityTranslator::translate_bedrock_to_java(&bp_map);
+                                if let NbtValue::Compound(translated_map) =
+                                    from_bp_nbt(&BpNbtValue::Compound(translated_bp_map))
+                                {
+                                    be_nbt = translated_map;
+                                }
+                            }
+
                             // Extract ID and Pos for BlockEntity constructor
                             let id = be_nbt
                                 .get("id")
@@ -456,4 +469,50 @@ pub fn to_mcstructure(
     write_nbt(&mut cursor, &root, "", Endian::Little)?;
 
     Ok(cursor.into_inner())
+}
+
+fn to_bp_nbt(val: &NbtValue) -> BpNbtValue {
+    match val {
+        NbtValue::Byte(v) => BpNbtValue::Byte(*v),
+        NbtValue::Short(v) => BpNbtValue::Short(*v),
+        NbtValue::Int(v) => BpNbtValue::Int(*v),
+        NbtValue::Long(v) => BpNbtValue::Long(*v),
+        NbtValue::Float(v) => BpNbtValue::Float(*v),
+        NbtValue::Double(v) => BpNbtValue::Double(*v),
+        NbtValue::String(v) => BpNbtValue::String(v.clone()),
+        NbtValue::ByteArray(v) => BpNbtValue::ByteArray(v.clone()),
+        NbtValue::IntArray(v) => BpNbtValue::IntArray(v.clone()),
+        NbtValue::LongArray(v) => BpNbtValue::LongArray(v.clone()),
+        NbtValue::List(v) => BpNbtValue::List(v.iter().map(to_bp_nbt).collect()),
+        NbtValue::Compound(v) => {
+            let mut map = HashMap::new();
+            for (k, val) in v.iter() {
+                map.insert(k.clone(), to_bp_nbt(val));
+            }
+            BpNbtValue::Compound(map)
+        }
+    }
+}
+
+fn from_bp_nbt(val: &BpNbtValue) -> NbtValue {
+    match val {
+        BpNbtValue::Byte(v) => NbtValue::Byte(*v),
+        BpNbtValue::Short(v) => NbtValue::Short(*v),
+        BpNbtValue::Int(v) => NbtValue::Int(*v),
+        BpNbtValue::Long(v) => NbtValue::Long(*v),
+        BpNbtValue::Float(v) => NbtValue::Float(*v),
+        BpNbtValue::Double(v) => NbtValue::Double(*v),
+        BpNbtValue::String(v) => NbtValue::String(v.clone()),
+        BpNbtValue::ByteArray(v) => NbtValue::ByteArray(v.clone()),
+        BpNbtValue::IntArray(v) => NbtValue::IntArray(v.clone()),
+        BpNbtValue::LongArray(v) => NbtValue::LongArray(v.clone()),
+        BpNbtValue::List(v) => NbtValue::List(v.iter().map(from_bp_nbt).collect()),
+        BpNbtValue::Compound(v) => {
+            let mut map = NbtMap::new();
+            for (k, val) in v {
+                map.insert(k.clone(), from_bp_nbt(val));
+            }
+            NbtValue::Compound(map)
+        }
+    }
 }

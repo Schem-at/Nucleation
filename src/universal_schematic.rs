@@ -604,6 +604,9 @@ impl UniversalSchematic {
                         ("west", -1, 0),
                     ];
 
+                    let mut connection_states = Vec::new();
+                    let mut connected_count = 0;
+
                     for (dir, dx, dz) in directions {
                         let side_val = if self.should_connect_redstone(region_name, x, y, z, dx, dz)
                         {
@@ -613,10 +616,38 @@ impl UniversalSchematic {
                         } else {
                             "none"
                         };
-                        new_block
-                            .properties
-                            .insert(dir.to_string(), side_val.to_string());
+
+                        if side_val != "none" {
+                            connected_count += 1;
+                        }
+                        connection_states.push((dir, side_val.to_string()));
                     }
+
+                    // Fix single connection issue: if only 1 connected, opposite becomes side
+                    if connected_count == 1 {
+                        // Find the connected one
+                        if let Some(idx) =
+                            connection_states.iter().position(|(_, val)| val != "none")
+                        {
+                            // 0=north, 1=south, 2=east, 3=west
+                            // Opposites: 0<->1, 2<->3
+                            let opposite_idx = match idx {
+                                0 => 1,
+                                1 => 0,
+                                2 => 3,
+                                3 => 2,
+                                _ => unreachable!(),
+                            };
+
+                            // Force opposite to be "side"
+                            connection_states[opposite_idx].1 = "side".to_string();
+                        }
+                    }
+
+                    for (dir, val) in connection_states {
+                        new_block.properties.insert(dir.to_string(), val);
+                    }
+
                     self.set_block_in_region(region_name, x, y, z, &new_block);
                 }
             }
