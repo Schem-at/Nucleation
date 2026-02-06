@@ -31,6 +31,18 @@ pub struct Region {
     /// the space that actually contains blocks
     #[serde(skip)]
     tight_bounds: Option<BoundingBox>,
+
+    // ── Cached fields for hot-path performance ──
+    #[serde(skip)]
+    cached_width: i32,
+    #[serde(skip)]
+    cached_length: i32,
+    #[serde(skip)]
+    cached_width_x_length: i32,
+    #[serde(skip)]
+    cached_air_index: usize,
+    #[serde(skip)]
+    non_air_count: usize,
 }
 
 fn serialize_block_entities<S>(
@@ -87,35 +99,50 @@ impl Region {
             entities: Vec::new(),
             block_entities: HashMap::new(),
             bbox: bounding_box,
-            tight_bounds: None, // Will be set when first non-air block is placed
+            tight_bounds: None,
+            cached_width: 0,
+            cached_length: 0,
+            cached_width_x_length: 0,
+            cached_air_index: 0,
+            non_air_count: 0,
         };
         region.rebuild_bbox();
+        region.rebuild_air_index();
         region
     }
 
     #[inline(always)]
     pub fn rebuild_bbox(&mut self) {
         self.bbox = BoundingBox::from_position_and_size(self.position, self.size);
+        let (w, _, l) = self.bbox.get_dimensions();
+        self.cached_width = w;
+        self.cached_length = l;
+        self.cached_width_x_length = w * l;
+    }
+
+    /// Recompute cached_air_index from the palette.
+    pub(crate) fn rebuild_air_index(&mut self) {
+        self.cached_air_index = self
+            .palette
+            .iter()
+            .position(|b| b.name == "minecraft:air")
+            .unwrap_or(usize::MAX);
+    }
+
+    /// Recount non-air blocks by scanning the blocks array.
+    pub(crate) fn rebuild_non_air_count(&mut self) {
+        let air = self.cached_air_index;
+        self.non_air_count = self.blocks.iter().filter(|&&b| b != air).count();
     }
 
     /// Rebuild tight bounds by scanning all blocks
     /// This is typically called after deserialization
     pub fn rebuild_tight_bounds(&mut self) {
         self.tight_bounds = None;
+        let air = self.cached_air_index;
 
-        // Find air index to correctly identify non-air blocks
-        let air_index = self.palette.iter().position(|b| b.name == "minecraft:air");
-
-        // Scan all blocks to find non-air blocks
         for index in 0..self.blocks.len() {
-            let palette_idx = self.blocks[index];
-
-            let is_air = match air_index {
-                Some(idx) => palette_idx == idx,
-                None => false, // If no air in palette, assume everything is valid block
-            };
-
-            if !is_air {
+            if self.blocks[index] != air {
                 let (x, y, z) = self.index_to_coords(index);
                 self.update_tight_bounds(x, y, z);
             }
@@ -135,49 +162,18 @@ impl Region {
     }
 
     pub fn is_empty(&self) -> bool {
-        // Fast path: if only air in palette, it's empty
-        if self.palette.len() == 1 && self.palette[0].name == "minecraft:air" {
-            return true;
-        }
-
-        // Check if all blocks in the region are air (typically index 0 in palette)
-        // Optimization: Air is usually index 0. Check if any index != 0.
-        // But air might be at another index if palette was merged weirdly.
-        // Assuming standard behavior where 0 is air:
-        if self.palette[0].name == "minecraft:air" {
-            return self.blocks.iter().all(|&b| b == 0);
-        }
-
-        let air_indices: Vec<usize> = self
-            .palette
-            .iter()
-            .enumerate()
-            .filter(|(_, b)| b.name == "minecraft:air")
-            .map(|(i, _)| i)
-            .collect();
-
-        self.blocks
-            .iter()
-            .all(|&block_index| air_indices.contains(&block_index))
+        self.non_air_count == 0
     }
 
-    /// Alternative implementation checking for non-air blocks
     pub fn has_non_air_blocks(&self) -> bool {
-        self.blocks
-            .iter()
-            .any(|&block_index| self.palette[block_index as usize].name != "minecraft:air")
+        self.non_air_count > 0
     }
 
-    /// Count non-air blocks (if this method doesn't exist already)
     pub fn count_non_air_blocks(&self) -> usize {
-        self.blocks
-            .iter()
-            .filter(|&&block_index| self.palette[block_index as usize].name != "minecraft:air")
-            .count()
+        self.non_air_count
     }
 
-    // Add this after from_nbt deserialization
-    fn rebuild_palette_index(&mut self) {
+    pub(crate) fn rebuild_palette_index(&mut self) {
         self.palette_index = HashMap::with_capacity(self.palette.len());
         for (index, block) in self.palette.iter().enumerate() {
             self.palette_index.insert(block.clone(), index);
@@ -195,11 +191,20 @@ impl Region {
 
         let index = self.coords_to_index(x, y, z);
         let palette_index = self.get_or_insert_in_palette(block);
+        let old_palette_index = self.blocks[index];
         self.blocks[index] = palette_index;
 
+        // Update non_air_count based on old vs new block
+        let old_is_air = old_palette_index == self.cached_air_index;
+        let new_is_air = palette_index == self.cached_air_index;
+        if old_is_air && !new_is_air {
+            self.non_air_count += 1;
+        } else if !old_is_air && new_is_air {
+            self.non_air_count -= 1;
+        }
+
         // Update tight bounds if this is a non-air block
-        // Optimization: check against cached air check or simple name check without clone
-        if !block.name.contains("air") {
+        if !new_is_air {
             self.update_tight_bounds(x, y, z);
         }
 
@@ -223,12 +228,24 @@ impl Region {
 
     #[inline(always)]
     pub fn coords_to_index(&self, x: i32, y: i32, z: i32) -> usize {
-        self.bbox.coords_to_index(x, y, z)
+        let dx = x - self.bbox.min.0;
+        let dy = y - self.bbox.min.1;
+        let dz = z - self.bbox.min.2;
+        (dx + dz * self.cached_width + dy * self.cached_width_x_length) as usize
     }
 
     #[inline(always)]
     pub fn index_to_coords(&self, index: usize) -> (i32, i32, i32) {
-        self.bbox.index_to_coords(index)
+        let w = self.cached_width as usize;
+        let wl = self.cached_width_x_length as usize;
+        let dx = (index % w) as i32;
+        let dy = (index / wl) as i32;
+        let dz = ((index / w) % self.cached_length as usize) as i32;
+        (
+            dx + self.bbox.min.0,
+            dy + self.bbox.min.1,
+            dz + self.bbox.min.2,
+        )
     }
 
     #[inline(always)]
@@ -288,9 +305,10 @@ impl Region {
     pub fn to_compact(&self) -> Region {
         // If no tight bounds, return a minimal clone
         let Some(tight_bounds) = &self.tight_bounds else {
-            // Empty region - return minimal region
             let mut empty = Region::new(self.name.clone(), (0, 0, 0), (1, 1, 1));
             empty.palette = self.palette.clone();
+            empty.rebuild_palette_index();
+            empty.rebuild_air_index();
             return empty;
         };
 
@@ -299,26 +317,43 @@ impl Region {
 
         // Create new region with exact tight bounds
         let mut compact = Region::new(self.name.clone(), tight_pos, tight_dims);
-
-        // Build palette mapping (same as current palette)
         compact.palette = self.palette.clone();
         compact.rebuild_palette_index();
+        compact.rebuild_air_index();
 
-        // Copy blocks within tight bounds
-        for index in 0..self.blocks.len() {
-            let palette_idx = self.blocks[index];
-            if palette_idx == 0 {
-                continue; // Skip air blocks
-            }
+        // Phase 4: Row-level copy instead of per-block set_block
+        let old_w = self.cached_width as usize;
+        let old_l = self.cached_length as usize;
+        let (compact_w, _, compact_l) = compact.bbox.get_dimensions();
+        let compact_w = compact_w as usize;
+        let compact_l = compact_l as usize;
 
-            let (x, y, z) = self.index_to_coords(index);
+        // Tight bounds relative to source region
+        let tb_min_x = tight_bounds.min.0;
+        let tb_min_y = tight_bounds.min.1;
+        let tb_min_z = tight_bounds.min.2;
+        let tb_max_y = tight_bounds.max.1;
+        let tb_max_z = tight_bounds.max.2;
 
-            // Only copy if within tight bounds
-            if tight_bounds.contains((x, y, z)) {
-                let block = self.palette[palette_idx].clone();
-                compact.set_block(x, y, z, &block);
+        let x_off_src = (tb_min_x - self.bbox.min.0) as usize;
+        let row_len = compact_w; // tight width = compact width
+
+        for y in tb_min_y..=tb_max_y {
+            let dy_src = (y - self.bbox.min.1) as usize;
+            let dy_dst = (y - tb_min_y) as usize;
+            for z in tb_min_z..=tb_max_z {
+                let dz_src = (z - self.bbox.min.2) as usize;
+                let dz_dst = (z - tb_min_z) as usize;
+                let src_start = dy_src * old_w * old_l + dz_src * old_w + x_off_src;
+                let dst_start = dy_dst * compact_w * compact_l + dz_dst * compact_w;
+                compact.blocks[dst_start..dst_start + row_len]
+                    .copy_from_slice(&self.blocks[src_start..src_start + row_len]);
             }
         }
+
+        // Rebuild non_air_count and tight_bounds for compact region
+        compact.rebuild_non_air_count();
+        compact.tight_bounds = Some(tight_bounds.clone());
 
         // Copy block entities within tight bounds
         for (&pos, be) in &self.block_entities {
@@ -477,18 +512,31 @@ impl Region {
             return;
         }
 
-        let air_id = self
-            .palette
-            .iter()
-            .position(|b| b.name == "minecraft:air")
-            .unwrap();
+        let air_id = self.cached_air_index;
         let mut new_blocks = vec![air_id; new_bounding_box.volume() as usize];
 
-        // Copy existing blocks efficiently
-        for index in 0..self.blocks.len() {
-            let (x, y, z) = self.index_to_coords(index);
-            let new_index = new_bounding_box.coords_to_index(x, y, z);
-            new_blocks[new_index] = self.blocks[index];
+        // Phase 2: Row-level copy instead of per-element coords
+        let old_w = self.cached_width as usize;
+        let old_l = self.cached_length as usize;
+        let (_, old_h, _) = self.bbox.get_dimensions();
+        let old_h = old_h as usize;
+
+        let (new_w, _, new_l) = new_bounding_box.get_dimensions();
+        let new_w = new_w as usize;
+        let new_l = new_l as usize;
+
+        // Offset of old min within new coordinate system
+        let x_off = (self.bbox.min.0 - new_bounding_box.min.0) as usize;
+        let y_off = (self.bbox.min.1 - new_bounding_box.min.1) as usize;
+        let z_off = (self.bbox.min.2 - new_bounding_box.min.2) as usize;
+
+        for dy in 0..old_h {
+            for dz in 0..old_l {
+                let src_start = dy * old_w * old_l + dz * old_w;
+                let dst_start = (dy + y_off) * new_w * new_l + (dz + z_off) * new_w + x_off;
+                new_blocks[dst_start..dst_start + old_w]
+                    .copy_from_slice(&self.blocks[src_start..src_start + old_w]);
+            }
         }
 
         self.position = new_position;
@@ -503,53 +551,82 @@ impl Region {
     }
 
     pub fn merge(&mut self, other: &Region) {
-        let bounding_box = self.get_bounding_box().union(&other.get_bounding_box());
-        let other_bounding_box = other.get_bounding_box();
-
-        let combined_bounding_box = bounding_box.union(&other_bounding_box);
+        let combined_bounding_box = self.get_bounding_box().union(&other.get_bounding_box());
         let new_size = combined_bounding_box.get_dimensions();
         let new_position = combined_bounding_box.min;
 
-        let mut new_blocks = vec![0; (combined_bounding_box.volume()) as usize];
+        let (new_w, _, new_l) = new_size;
+        let new_w = new_w as usize;
+        let new_l = new_l as usize;
+
+        let mut new_blocks = vec![0usize; combined_bounding_box.volume() as usize];
         let mut new_palette = self.palette.clone();
         let mut reverse_new_palette: HashMap<BlockState, usize> = HashMap::new();
         for (index, block) in self.palette.iter().enumerate() {
             reverse_new_palette.insert(block.clone(), index);
         }
 
-        // Process blocks from current region
-        for index in 0..self.blocks.len() {
-            let (x, y, z) = self.index_to_coords(index);
-            let new_index = combined_bounding_box.coords_to_index(x, y, z);
-            let block_index = self.blocks[index];
-            let block = &self.palette[block_index];
-            if let Some(palette_index) = reverse_new_palette.get(block) {
-                new_blocks[new_index] = *palette_index;
-            } else {
-                new_blocks[new_index] = new_palette.len();
-                new_palette.push(block.clone());
-                reverse_new_palette.insert(block.clone(), new_palette.len() - 1);
+        // Phase 5: Pre-build remap table for self (identity since palette is same)
+        // For self, palette indices are identity, so just row-copy with offset
+        {
+            let old_w = self.cached_width as usize;
+            let old_l = self.cached_length as usize;
+            let (_, old_h, _) = self.bbox.get_dimensions();
+            let old_h = old_h as usize;
+
+            let x_off = (self.bbox.min.0 - combined_bounding_box.min.0) as usize;
+            let y_off = (self.bbox.min.1 - combined_bounding_box.min.1) as usize;
+            let z_off = (self.bbox.min.2 - combined_bounding_box.min.2) as usize;
+
+            for dy in 0..old_h {
+                for dz in 0..old_l {
+                    let src_start = dy * old_w * old_l + dz * old_w;
+                    let dst_start = (dy + y_off) * new_w * new_l + (dz + z_off) * new_w + x_off;
+                    new_blocks[dst_start..dst_start + old_w]
+                        .copy_from_slice(&self.blocks[src_start..src_start + old_w]);
+                }
             }
         }
 
-        // Process blocks from other region
-        for index in 0..other.blocks.len() {
-            let (x, y, z) = other.index_to_coords(index);
-            let new_index = combined_bounding_box.coords_to_index(x, y, z);
-            let block_palette_index = other.blocks[index];
-            let block = &other.palette[block_palette_index];
-            if let Some(palette_index) = reverse_new_palette.get(block) {
-                if block.name == "minecraft:air" {
-                    continue;
-                }
-                new_blocks[new_index] = *palette_index;
+        // Phase 5: Pre-build remap table for other palette
+        let other_air_index = other.cached_air_index;
+        let mut other_remap: Vec<usize> = Vec::with_capacity(other.palette.len());
+        for (idx, block) in other.palette.iter().enumerate() {
+            if let Some(&existing) = reverse_new_palette.get(block) {
+                other_remap.push(existing);
             } else {
+                let new_idx = new_palette.len();
                 new_palette.push(block.clone());
-                reverse_new_palette.insert(block.clone(), new_palette.len() - 1);
-                if block.name == "minecraft:air" {
-                    continue;
+                reverse_new_palette.insert(block.clone(), new_idx);
+                other_remap.push(new_idx);
+            }
+            // Mark air indices in remap for skip check
+            let _ = idx;
+        }
+
+        // Copy other blocks using remap table, row by row
+        {
+            let other_w = other.cached_width as usize;
+            let other_l = other.cached_length as usize;
+            let (_, other_h, _) = other.bbox.get_dimensions();
+            let other_h = other_h as usize;
+
+            let x_off = (other.bbox.min.0 - combined_bounding_box.min.0) as usize;
+            let y_off = (other.bbox.min.1 - combined_bounding_box.min.1) as usize;
+            let z_off = (other.bbox.min.2 - combined_bounding_box.min.2) as usize;
+
+            for dy in 0..other_h {
+                for dz in 0..other_l {
+                    let src_start = dy * other_w * other_l + dz * other_w;
+                    let dst_start = (dy + y_off) * new_w * new_l + (dz + z_off) * new_w + x_off;
+                    for dx in 0..other_w {
+                        let src_idx = other.blocks[src_start + dx];
+                        if src_idx == other_air_index {
+                            continue; // Skip air from other region
+                        }
+                        new_blocks[dst_start + dx] = other_remap[src_idx];
+                    }
                 }
-                new_blocks[new_index] = new_palette.len() - 1;
             }
         }
 
@@ -559,11 +636,11 @@ impl Region {
         self.blocks = new_blocks;
         self.palette = new_palette;
 
-        // CRUCIAL: Rebuild the cached bounding box after changing position and size
+        // Rebuild all caches
         self.rebuild_bbox();
-
-        // Rebuild palette index for performance
         self.rebuild_palette_index();
+        self.rebuild_air_index();
+        self.rebuild_non_air_count();
 
         // Merge entities and block entities
         self.merge_entities(other);
@@ -734,12 +811,18 @@ impl Region {
             block_entities,
             palette_index: HashMap::new(),
             bbox: BoundingBox::from_position_and_size(position, size),
-            tight_bounds: None, // Will be rebuilt by scanning blocks
+            tight_bounds: None,
+            cached_width: 0,
+            cached_length: 0,
+            cached_width_x_length: 0,
+            cached_air_index: 0,
+            non_air_count: 0,
         };
 
-        // Rebuild palette index, bbox, and tight bounds after deserialization
         region.rebuild_palette_index();
         region.rebuild_bbox();
+        region.rebuild_air_index();
+        region.rebuild_non_air_count();
         region.rebuild_tight_bounds();
 
         Ok(region)
@@ -868,10 +951,7 @@ impl Region {
     }
 
     pub fn count_blocks(&self) -> usize {
-        self.blocks
-            .iter()
-            .filter(|&&block_index| block_index != 0)
-            .count()
+        self.non_air_count
     }
 
     pub fn get_palette_index(&self, block: &BlockState) -> Option<usize> {
@@ -884,16 +964,19 @@ impl Region {
     pub fn flip_x(&mut self) {
         use crate::transforms::{transform_block_state_flip, Axis};
 
-        let _ = self.size;
-        let volume = self.volume();
-        let mut new_blocks = vec![0; volume];
+        // Phase 3: Reverse each X-row in-place
+        let w = self.cached_width as usize;
+        let l = self.cached_length as usize;
+        let wl = self.cached_width_x_length as usize;
+        let (_, h, _) = self.bbox.get_dimensions();
+        let h = h as usize;
+        let mut new_blocks = self.blocks.clone();
 
-        // Create new transformed blocks array
-        for index in 0..volume {
-            let (x, y, z) = self.index_to_coords(index);
-            let new_x = self.bbox.max.0 - (x - self.bbox.min.0);
-            let new_index = self.coords_to_index(new_x, y, z);
-            new_blocks[new_index] = self.blocks[index];
+        for dy in 0..h {
+            for dz in 0..l {
+                let start = dy * wl + dz * w;
+                new_blocks[start..start + w].reverse();
+            }
         }
 
         // Transform block state properties
@@ -905,6 +988,8 @@ impl Region {
         self.blocks = new_blocks;
         self.palette = new_palette;
         self.rebuild_palette_index();
+        self.rebuild_air_index();
+        self.rebuild_non_air_count();
 
         // Transform block entities
         let mut new_block_entities = HashMap::new();
@@ -926,14 +1011,22 @@ impl Region {
     pub fn flip_y(&mut self) {
         use crate::transforms::{transform_block_state_flip, Axis};
 
-        let volume = self.volume();
-        let mut new_blocks = vec![0; volume];
+        // Phase 3: Swap Y-layers using swap_nonoverlapping
+        let wl = self.cached_width_x_length as usize;
+        let (_, h, _) = self.bbox.get_dimensions();
+        let h = h as usize;
+        let mut new_blocks = self.blocks.clone();
 
-        for index in 0..volume {
-            let (x, y, z) = self.index_to_coords(index);
-            let new_y = self.bbox.max.1 - (y - self.bbox.min.1);
-            let new_index = self.coords_to_index(x, new_y, z);
-            new_blocks[new_index] = self.blocks[index];
+        // Swap layer dy with layer (h-1-dy)
+        let ptr = new_blocks.as_mut_ptr();
+        for dy in 0..h / 2 {
+            let mirror_dy = h - 1 - dy;
+            let off_a = dy * wl;
+            let off_b = mirror_dy * wl;
+            // Safety: non-overlapping because dy < h/2 < mirror_dy
+            unsafe {
+                std::ptr::swap_nonoverlapping(ptr.add(off_a), ptr.add(off_b), wl);
+            }
         }
 
         let mut new_palette = Vec::with_capacity(self.palette.len());
@@ -944,6 +1037,8 @@ impl Region {
         self.blocks = new_blocks;
         self.palette = new_palette;
         self.rebuild_palette_index();
+        self.rebuild_air_index();
+        self.rebuild_non_air_count();
 
         let mut new_block_entities = HashMap::new();
         for ((x, y, z), mut be) in self.block_entities.drain() {
@@ -963,14 +1058,25 @@ impl Region {
     pub fn flip_z(&mut self) {
         use crate::transforms::{transform_block_state_flip, Axis};
 
-        let volume = self.volume();
-        let mut new_blocks = vec![0; volume];
+        // Phase 3: Swap Z-rows within each Y-layer
+        let w = self.cached_width as usize;
+        let l = self.cached_length as usize;
+        let wl = self.cached_width_x_length as usize;
+        let (_, h, _) = self.bbox.get_dimensions();
+        let h = h as usize;
+        let mut new_blocks = self.blocks.clone();
 
-        for index in 0..volume {
-            let (x, y, z) = self.index_to_coords(index);
-            let new_z = self.bbox.max.2 - (z - self.bbox.min.2);
-            let new_index = self.coords_to_index(x, y, new_z);
-            new_blocks[new_index] = self.blocks[index];
+        let ptr = new_blocks.as_mut_ptr();
+        for dy in 0..h {
+            let layer_off = dy * wl;
+            for dz in 0..l / 2 {
+                let mirror_dz = l - 1 - dz;
+                let off_a = layer_off + dz * w;
+                let off_b = layer_off + mirror_dz * w;
+                unsafe {
+                    std::ptr::swap_nonoverlapping(ptr.add(off_a), ptr.add(off_b), w);
+                }
+            }
         }
 
         let mut new_palette = Vec::with_capacity(self.palette.len());
@@ -981,6 +1087,8 @@ impl Region {
         self.blocks = new_blocks;
         self.palette = new_palette;
         self.rebuild_palette_index();
+        self.rebuild_air_index();
+        self.rebuild_non_air_count();
 
         let mut new_block_entities = HashMap::new();
         for ((x, y, z), mut be) in self.block_entities.drain() {
@@ -1026,26 +1134,19 @@ impl Region {
         let new_bbox = BoundingBox::from_position_and_size(self.position, new_size);
 
         let new_volume = new_bbox.volume() as usize;
-        let air_index = self
-            .palette
-            .iter()
-            .position(|b| b.name == "minecraft:air")
-            .unwrap_or(0);
+        let air_index = self.cached_air_index;
         let mut new_blocks = vec![air_index; new_volume];
 
         // Transform each block position
         for index in 0..self.blocks.len() {
             let (x, y, z) = old_bbox.index_to_coords(index);
 
-            // Calculate relative position in old space
             let rel_x = x - old_bbox.min.0;
             let rel_z = z - old_bbox.min.2;
 
-            // 90-degree rotation: (x, z) -> (z, size_x - 1 - x)
             let new_rel_x = rel_z;
             let new_rel_z = old_size_x - 1 - rel_x;
 
-            // Calculate absolute position in new space
             let new_x = new_bbox.min.0 + new_rel_x;
             let new_z = new_bbox.min.2 + new_rel_z;
 
@@ -1053,7 +1154,6 @@ impl Region {
             new_blocks[new_index] = self.blocks[index];
         }
 
-        // Transform block state properties
         let mut new_palette = Vec::with_capacity(self.palette.len());
         for block_state in &self.palette {
             new_palette.push(transform_block_state_rotate(block_state, Axis::Y, 90));
@@ -1065,8 +1165,10 @@ impl Region {
         self.size = new_bbox.to_position_and_size().1;
         self.blocks = new_blocks;
         self.palette = new_palette;
-        self.bbox = new_bbox;
+        self.rebuild_bbox();
         self.rebuild_palette_index();
+        self.rebuild_air_index();
+        self.rebuild_non_air_count();
 
         // Transform block entities
         let old_bbox_for_be = old_bbox.clone();
@@ -1120,11 +1222,7 @@ impl Region {
         let new_bbox = BoundingBox::from_position_and_size(self.position, new_size);
 
         let new_volume = new_bbox.volume() as usize;
-        let air_index = self
-            .palette
-            .iter()
-            .position(|b| b.name == "minecraft:air")
-            .unwrap_or(0);
+        let air_index = self.cached_air_index;
         let mut new_blocks = vec![air_index; new_volume];
 
         for index in 0..self.blocks.len() {
@@ -1133,7 +1231,6 @@ impl Region {
             let rel_y = y - old_bbox.min.1;
             let rel_z = z - old_bbox.min.2;
 
-            // 90-degree rotation around X: (y, z) -> (z, size_y - 1 - y)
             let new_rel_y = rel_z;
             let new_rel_z = old_size_y - 1 - rel_y;
 
@@ -1155,8 +1252,10 @@ impl Region {
         self.size = new_bbox.to_position_and_size().1;
         self.blocks = new_blocks;
         self.palette = new_palette;
-        self.bbox = new_bbox;
+        self.rebuild_bbox();
         self.rebuild_palette_index();
+        self.rebuild_air_index();
+        self.rebuild_non_air_count();
 
         let mut new_block_entities = HashMap::new();
         for ((x, y, z), mut be) in self.block_entities.drain() {
@@ -1207,11 +1306,7 @@ impl Region {
         let new_bbox = BoundingBox::from_position_and_size(self.position, new_size);
 
         let new_volume = new_bbox.volume() as usize;
-        let air_index = self
-            .palette
-            .iter()
-            .position(|b| b.name == "minecraft:air")
-            .unwrap_or(0);
+        let air_index = self.cached_air_index;
         let mut new_blocks = vec![air_index; new_volume];
 
         for index in 0..self.blocks.len() {
@@ -1220,7 +1315,6 @@ impl Region {
             let rel_x = x - old_bbox.min.0;
             let rel_y = y - old_bbox.min.1;
 
-            // 90-degree rotation around Z: (x, y) -> (y, size_x - 1 - x)
             let new_rel_x = rel_y;
             let new_rel_y = old_size_x - 1 - rel_x;
 
@@ -1242,8 +1336,10 @@ impl Region {
         self.size = new_bbox.to_position_and_size().1;
         self.blocks = new_blocks;
         self.palette = new_palette;
-        self.bbox = new_bbox;
+        self.rebuild_bbox();
         self.rebuild_palette_index();
+        self.rebuild_air_index();
+        self.rebuild_non_air_count();
 
         let mut new_block_entities = HashMap::new();
         for ((x, y, z), mut be) in self.block_entities.drain() {
@@ -1293,6 +1389,11 @@ mod tests {
             palette_index: HashMap::new(),
             bbox: BoundingBox::from_position_and_size((0, 0, 0), (16, 1, 1)),
             tight_bounds: None,
+            cached_width: 16,
+            cached_length: 1,
+            cached_width_x_length: 16,
+            cached_air_index: 0,
+            non_air_count: 16,
         };
         let packed_states = region.create_packed_block_states();
         assert_eq!(packed_states.len(), 2);

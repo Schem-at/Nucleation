@@ -470,10 +470,12 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::er
         (width as i32, height as i32, length as i32),
     );
     region.palette = block_palette;
-
     region.blocks = block_data.iter().map(|&x| x as usize).collect();
 
-    // Rebuild tight bounds after loading blocks directly
+    // Rebuild caches after directly setting palette and blocks
+    region.rebuild_palette_index();
+    region.rebuild_air_index();
+    region.rebuild_non_air_count();
     region.rebuild_tight_bounds();
 
     let block_entities = parse_block_entities(&block_container)?;

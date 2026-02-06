@@ -368,7 +368,10 @@ fn parse_regions(
             // region.unpack_block_states(block_states);
             region.blocks = region.unpack_block_states(block_states);
 
-            // Rebuild tight bounds after unpacking blocks directly
+            // Rebuild caches after directly setting palette and blocks
+            region.rebuild_palette_index();
+            region.rebuild_air_index();
+            region.rebuild_non_air_count();
             region.rebuild_tight_bounds();
 
             // Parse Entities
