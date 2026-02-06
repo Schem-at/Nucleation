@@ -1,0 +1,618 @@
+//! Meshing support for generating 3D models from schematics.
+//!
+//! This module provides integration with the `schematic-mesher` crate to convert
+//! Nucleation schematics into 3D mesh formats (GLB/glTF).
+//!
+//! # Features
+//!
+//! Enable the `meshing` feature in your `Cargo.toml` to use this module:
+//!
+//! ```toml
+//! nucleation = { version = "0.1", features = ["meshing"] }
+//! ```
+//!
+//! # Example
+//!
+//! ```ignore
+//! use nucleation::{UniversalSchematic, meshing::{MeshConfig, ResourcePackSource}};
+//!
+//! // Load your schematic
+//! let schematic = UniversalSchematic::from_litematic_bytes(&data)?;
+//!
+//! // Load a resource pack
+//! let pack = ResourcePackSource::from_file("resourcepack.zip")?;
+//!
+//! // Generate a single mesh for the entire schematic
+//! let config = MeshConfig::default();
+//! let result = schematic.to_mesh(&pack, &config)?;
+//!
+//! // Save the GLB file
+//! std::fs::write("output.glb", result.glb_data)?;
+//! ```
+
+use schematic_mesher::{
+    export_glb, BlockPosition as MesherBlockPosition, BlockSource,
+    BoundingBox as MesherBoundingBox, InputBlock, Mesher, MesherConfig, ResourcePack,
+};
+use std::collections::HashMap;
+use std::path::Path;
+
+use crate::{BlockState, Region, UniversalSchematic};
+
+/// Error type for meshing operations.
+#[derive(Debug, thiserror::Error)]
+pub enum MeshError {
+    #[error("Resource pack error: {0}")]
+    ResourcePack(String),
+    #[error("Meshing error: {0}")]
+    Meshing(String),
+    #[error("Export error: {0}")]
+    Export(String),
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+}
+
+pub type Result<T> = std::result::Result<T, MeshError>;
+
+/// Source for a Minecraft resource pack.
+pub struct ResourcePackSource {
+    pack: ResourcePack,
+}
+
+impl ResourcePackSource {
+    /// Load a resource pack from a file path (ZIP or directory).
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let pack = schematic_mesher::load_resource_pack(path)
+            .map_err(|e| MeshError::ResourcePack(e.to_string()))?;
+        Ok(Self { pack })
+    }
+
+    /// Load a resource pack from bytes (for WASM compatibility).
+    pub fn from_bytes(data: &[u8]) -> Result<Self> {
+        let pack = schematic_mesher::load_resource_pack_from_bytes(data)
+            .map_err(|e| MeshError::ResourcePack(e.to_string()))?;
+        Ok(Self { pack })
+    }
+
+    /// Get a reference to the underlying ResourcePack.
+    pub fn pack(&self) -> &ResourcePack {
+        &self.pack
+    }
+
+    /// Get statistics about the loaded resource pack.
+    pub fn stats(&self) -> ResourcePackStats {
+        ResourcePackStats {
+            blockstate_count: self.pack.blockstate_count(),
+            model_count: self.pack.model_count(),
+            texture_count: self.pack.texture_count(),
+            namespaces: self
+                .pack
+                .namespaces()
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect(),
+        }
+    }
+}
+
+/// Statistics about a loaded resource pack.
+#[derive(Debug, Clone)]
+pub struct ResourcePackStats {
+    pub blockstate_count: usize,
+    pub model_count: usize,
+    pub texture_count: usize,
+    pub namespaces: Vec<String>,
+}
+
+/// Configuration for mesh generation.
+#[derive(Debug, Clone)]
+pub struct MeshConfig {
+    /// Enable face culling between adjacent solid blocks.
+    pub cull_hidden_faces: bool,
+    /// Enable ambient occlusion.
+    pub ambient_occlusion: bool,
+    /// AO intensity (0.0 = no darkening, 1.0 = full darkening).
+    pub ao_intensity: f32,
+    /// Biome for tinting (e.g., "plains", "swamp").
+    pub biome: Option<String>,
+    /// Maximum texture atlas dimension.
+    pub atlas_max_size: u32,
+}
+
+impl Default for MeshConfig {
+    fn default() -> Self {
+        Self {
+            cull_hidden_faces: true,
+            ambient_occlusion: true,
+            ao_intensity: 0.4,
+            biome: None,
+            atlas_max_size: 4096,
+        }
+    }
+}
+
+impl MeshConfig {
+    /// Create a new MeshConfig with default settings.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Enable or disable face culling.
+    pub fn with_culling(mut self, enabled: bool) -> Self {
+        self.cull_hidden_faces = enabled;
+        self
+    }
+
+    /// Enable or disable ambient occlusion.
+    pub fn with_ambient_occlusion(mut self, enabled: bool) -> Self {
+        self.ambient_occlusion = enabled;
+        self
+    }
+
+    /// Set the AO intensity.
+    pub fn with_ao_intensity(mut self, intensity: f32) -> Self {
+        self.ao_intensity = intensity;
+        self
+    }
+
+    /// Set the biome for tinting.
+    pub fn with_biome(mut self, biome: impl Into<String>) -> Self {
+        self.biome = Some(biome.into());
+        self
+    }
+
+    /// Set the maximum atlas size.
+    pub fn with_atlas_max_size(mut self, size: u32) -> Self {
+        self.atlas_max_size = size;
+        self
+    }
+
+    fn to_mesher_config(&self) -> MesherConfig {
+        let mut config = MesherConfig::default();
+        config.cull_hidden_faces = self.cull_hidden_faces;
+        config.ambient_occlusion = self.ambient_occlusion;
+        config.ao_intensity = self.ao_intensity;
+        config.atlas_max_size = self.atlas_max_size;
+        if let Some(biome) = &self.biome {
+            config = config.with_biome(biome);
+        }
+        config
+    }
+}
+
+/// Result of mesh generation.
+#[derive(Debug, Clone)]
+pub struct MeshResult {
+    /// The GLB binary data.
+    pub glb_data: Vec<u8>,
+    /// Number of vertices in the mesh.
+    pub vertex_count: usize,
+    /// Number of triangles in the mesh.
+    pub triangle_count: usize,
+    /// Whether the mesh contains transparent geometry.
+    pub has_transparency: bool,
+    /// Bounding box of the mesh.
+    pub bounds: [f32; 6], // [min_x, min_y, min_z, max_x, max_y, max_z]
+}
+
+/// Result of mesh generation for multiple regions.
+#[derive(Debug, Clone)]
+pub struct MultiMeshResult {
+    /// Map of region name to mesh result.
+    pub meshes: HashMap<String, MeshResult>,
+    /// Total vertex count across all meshes.
+    pub total_vertex_count: usize,
+    /// Total triangle count across all meshes.
+    pub total_triangle_count: usize,
+}
+
+/// Result of chunk-based mesh generation.
+#[derive(Debug, Clone)]
+pub struct ChunkMeshResult {
+    /// Map of chunk coordinate to mesh result.
+    pub meshes: HashMap<(i32, i32, i32), MeshResult>,
+    /// Total vertex count across all meshes.
+    pub total_vertex_count: usize,
+    /// Total triangle count across all meshes.
+    pub total_triangle_count: usize,
+}
+
+/// Adapter to convert a Nucleation Region into a BlockSource.
+struct RegionBlockSource {
+    blocks: HashMap<MesherBlockPosition, InputBlock>,
+    bounds: MesherBoundingBox,
+}
+
+impl RegionBlockSource {
+    fn new(region: &Region) -> Self {
+        let mut blocks = HashMap::new();
+        let bbox = region.get_bounding_box();
+
+        let mut min = [f32::MAX; 3];
+        let mut max = [f32::MIN; 3];
+
+        // Iterate through all non-air blocks in the region
+        for index in 0..region.volume() {
+            let (x, y, z) = region.index_to_coords(index);
+            if let Some(block_state) = region.get_block(x, y, z) {
+                if block_state.name != "minecraft:air" {
+                    let pos = MesherBlockPosition::new(x, y, z);
+                    let input_block = block_state_to_input_block(block_state);
+                    blocks.insert(pos, input_block);
+
+                    // Update bounds
+                    min[0] = min[0].min(x as f32);
+                    min[1] = min[1].min(y as f32);
+                    min[2] = min[2].min(z as f32);
+                    max[0] = max[0].max(x as f32 + 1.0);
+                    max[1] = max[1].max(y as f32 + 1.0);
+                    max[2] = max[2].max(z as f32 + 1.0);
+                }
+            }
+        }
+
+        // Use region bounds if no blocks found
+        if blocks.is_empty() {
+            min = [bbox.min.0 as f32, bbox.min.1 as f32, bbox.min.2 as f32];
+            max = [
+                bbox.max.0 as f32 + 1.0,
+                bbox.max.1 as f32 + 1.0,
+                bbox.max.2 as f32 + 1.0,
+            ];
+        }
+
+        let bounds = MesherBoundingBox::new(min, max);
+
+        Self { blocks, bounds }
+    }
+}
+
+impl BlockSource for RegionBlockSource {
+    fn get_block(&self, pos: MesherBlockPosition) -> Option<&InputBlock> {
+        self.blocks.get(&pos)
+    }
+
+    fn iter_blocks(&self) -> Box<dyn Iterator<Item = (MesherBlockPosition, &InputBlock)> + '_> {
+        Box::new(self.blocks.iter().map(|(pos, block)| (*pos, block)))
+    }
+
+    fn bounds(&self) -> MesherBoundingBox {
+        self.bounds
+    }
+}
+
+/// Adapter for chunk-based meshing.
+struct ChunkBlockSource {
+    blocks: HashMap<MesherBlockPosition, InputBlock>,
+    bounds: MesherBoundingBox,
+}
+
+impl ChunkBlockSource {
+    fn new(blocks: HashMap<MesherBlockPosition, InputBlock>, bounds: MesherBoundingBox) -> Self {
+        Self { blocks, bounds }
+    }
+}
+
+impl BlockSource for ChunkBlockSource {
+    fn get_block(&self, pos: MesherBlockPosition) -> Option<&InputBlock> {
+        self.blocks.get(&pos)
+    }
+
+    fn iter_blocks(&self) -> Box<dyn Iterator<Item = (MesherBlockPosition, &InputBlock)> + '_> {
+        Box::new(self.blocks.iter().map(|(pos, block)| (*pos, block)))
+    }
+
+    fn bounds(&self) -> MesherBoundingBox {
+        self.bounds
+    }
+}
+
+/// Convert a Nucleation BlockState to a schematic-mesher InputBlock.
+fn block_state_to_input_block(block_state: &BlockState) -> InputBlock {
+    let mut input = InputBlock::new(&block_state.name);
+    for (key, value) in &block_state.properties {
+        input.properties.insert(key.clone(), value.clone());
+    }
+    input
+}
+
+impl UniversalSchematic {
+    /// Generate a single mesh for the entire schematic.
+    ///
+    /// This combines all regions into a single mesh output.
+    pub fn to_mesh(&self, pack: &ResourcePackSource, config: &MeshConfig) -> Result<MeshResult> {
+        let mesher_config = config.to_mesher_config();
+        let mesher = Mesher::with_config(pack.pack.clone(), mesher_config);
+
+        // Collect all blocks from all regions
+        let mut all_blocks = HashMap::new();
+        let mut min = [f32::MAX; 3];
+        let mut max = [f32::MIN; 3];
+
+        // Process default region
+        collect_region_blocks(&self.default_region, &mut all_blocks, &mut min, &mut max);
+
+        // Process other regions
+        for region in self.other_regions.values() {
+            collect_region_blocks(region, &mut all_blocks, &mut min, &mut max);
+        }
+
+        if all_blocks.is_empty() {
+            return Err(MeshError::Meshing("No blocks to mesh".to_string()));
+        }
+
+        let bounds = MesherBoundingBox::new(min, max);
+        let source = ChunkBlockSource::new(all_blocks, bounds);
+
+        let output = mesher
+            .mesh(&source)
+            .map_err(|e| MeshError::Meshing(e.to_string()))?;
+
+        let glb_data = export_glb(&output).map_err(|e| MeshError::Export(e.to_string()))?;
+
+        Ok(MeshResult {
+            glb_data,
+            vertex_count: output.total_vertices(),
+            triangle_count: output.total_triangles(),
+            has_transparency: output.has_transparency(),
+            bounds: [
+                output.bounds.min[0],
+                output.bounds.min[1],
+                output.bounds.min[2],
+                output.bounds.max[0],
+                output.bounds.max[1],
+                output.bounds.max[2],
+            ],
+        })
+    }
+
+    /// Generate one mesh per region.
+    ///
+    /// Returns a map of region name to mesh result.
+    pub fn mesh_by_region(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+    ) -> Result<MultiMeshResult> {
+        let mesher_config = config.to_mesher_config();
+
+        let mut meshes = HashMap::new();
+        let mut total_vertex_count = 0;
+        let mut total_triangle_count = 0;
+
+        // Mesh default region
+        if let Some(result) = mesh_region(&pack.pack, &self.default_region, &mesher_config)? {
+            total_vertex_count += result.vertex_count;
+            total_triangle_count += result.triangle_count;
+            meshes.insert(self.default_region_name.clone(), result);
+        }
+
+        // Mesh other regions
+        for (name, region) in &self.other_regions {
+            if let Some(result) = mesh_region(&pack.pack, region, &mesher_config)? {
+                total_vertex_count += result.vertex_count;
+                total_triangle_count += result.triangle_count;
+                meshes.insert(name.clone(), result);
+            }
+        }
+
+        Ok(MultiMeshResult {
+            meshes,
+            total_vertex_count,
+            total_triangle_count,
+        })
+    }
+
+    /// Generate one mesh per 16x16x16 chunk.
+    ///
+    /// This is useful for large schematics where you want to load/unload
+    /// meshes based on camera position.
+    pub fn mesh_by_chunk(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+    ) -> Result<ChunkMeshResult> {
+        self.mesh_by_chunk_size(pack, config, 16)
+    }
+
+    /// Generate one mesh per chunk of the specified size.
+    pub fn mesh_by_chunk_size(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+        chunk_size: i32,
+    ) -> Result<ChunkMeshResult> {
+        let mesher_config = config.to_mesher_config();
+
+        // Collect all blocks from all regions into chunks
+        let mut chunks: HashMap<(i32, i32, i32), HashMap<MesherBlockPosition, InputBlock>> =
+            HashMap::new();
+
+        // Process default region
+        collect_region_blocks_by_chunk(&self.default_region, &mut chunks, chunk_size);
+
+        // Process other regions
+        for region in self.other_regions.values() {
+            collect_region_blocks_by_chunk(region, &mut chunks, chunk_size);
+        }
+
+        let mut meshes = HashMap::new();
+        let mut total_vertex_count = 0;
+        let mut total_triangle_count = 0;
+
+        for (chunk_coord, blocks) in chunks {
+            if blocks.is_empty() {
+                continue;
+            }
+
+            // Calculate bounds for this chunk
+            let mut min = [f32::MAX; 3];
+            let mut max = [f32::MIN; 3];
+
+            for pos in blocks.keys() {
+                min[0] = min[0].min(pos.x as f32);
+                min[1] = min[1].min(pos.y as f32);
+                min[2] = min[2].min(pos.z as f32);
+                max[0] = max[0].max(pos.x as f32 + 1.0);
+                max[1] = max[1].max(pos.y as f32 + 1.0);
+                max[2] = max[2].max(pos.z as f32 + 1.0);
+            }
+
+            let bounds = MesherBoundingBox::new(min, max);
+            let source = ChunkBlockSource::new(blocks, bounds);
+
+            let mesher = Mesher::with_config(pack.pack.clone(), mesher_config.clone());
+            let output = mesher
+                .mesh(&source)
+                .map_err(|e| MeshError::Meshing(e.to_string()))?;
+
+            let glb_data = export_glb(&output).map_err(|e| MeshError::Export(e.to_string()))?;
+
+            let result = MeshResult {
+                glb_data,
+                vertex_count: output.total_vertices(),
+                triangle_count: output.total_triangles(),
+                has_transparency: output.has_transparency(),
+                bounds: [
+                    output.bounds.min[0],
+                    output.bounds.min[1],
+                    output.bounds.min[2],
+                    output.bounds.max[0],
+                    output.bounds.max[1],
+                    output.bounds.max[2],
+                ],
+            };
+
+            total_vertex_count += result.vertex_count;
+            total_triangle_count += result.triangle_count;
+            meshes.insert(chunk_coord, result);
+        }
+
+        Ok(ChunkMeshResult {
+            meshes,
+            total_vertex_count,
+            total_triangle_count,
+        })
+    }
+}
+
+/// Helper function to mesh a single region.
+fn mesh_region(
+    pack: &ResourcePack,
+    region: &Region,
+    config: &MesherConfig,
+) -> Result<Option<MeshResult>> {
+    let source = RegionBlockSource::new(region);
+
+    if source.blocks.is_empty() {
+        return Ok(None);
+    }
+
+    let mesher = Mesher::with_config(pack.clone(), config.clone());
+    let output = mesher
+        .mesh(&source)
+        .map_err(|e| MeshError::Meshing(e.to_string()))?;
+
+    let glb_data = export_glb(&output).map_err(|e| MeshError::Export(e.to_string()))?;
+
+    Ok(Some(MeshResult {
+        glb_data,
+        vertex_count: output.total_vertices(),
+        triangle_count: output.total_triangles(),
+        has_transparency: output.has_transparency(),
+        bounds: [
+            output.bounds.min[0],
+            output.bounds.min[1],
+            output.bounds.min[2],
+            output.bounds.max[0],
+            output.bounds.max[1],
+            output.bounds.max[2],
+        ],
+    }))
+}
+
+/// Helper function to collect blocks from a region.
+fn collect_region_blocks(
+    region: &Region,
+    blocks: &mut HashMap<MesherBlockPosition, InputBlock>,
+    min: &mut [f32; 3],
+    max: &mut [f32; 3],
+) {
+    for index in 0..region.volume() {
+        let (x, y, z) = region.index_to_coords(index);
+        if let Some(block_state) = region.get_block(x, y, z) {
+            if block_state.name != "minecraft:air" {
+                let pos = MesherBlockPosition::new(x, y, z);
+                let input_block = block_state_to_input_block(block_state);
+                blocks.insert(pos, input_block);
+
+                min[0] = min[0].min(x as f32);
+                min[1] = min[1].min(y as f32);
+                min[2] = min[2].min(z as f32);
+                max[0] = max[0].max(x as f32 + 1.0);
+                max[1] = max[1].max(y as f32 + 1.0);
+                max[2] = max[2].max(z as f32 + 1.0);
+            }
+        }
+    }
+}
+
+/// Helper function to collect blocks from a region into chunk buckets.
+fn collect_region_blocks_by_chunk(
+    region: &Region,
+    chunks: &mut HashMap<(i32, i32, i32), HashMap<MesherBlockPosition, InputBlock>>,
+    chunk_size: i32,
+) {
+    for index in 0..region.volume() {
+        let (x, y, z) = region.index_to_coords(index);
+        if let Some(block_state) = region.get_block(x, y, z) {
+            if block_state.name != "minecraft:air" {
+                // Calculate chunk coordinate
+                let chunk_x = x.div_euclid(chunk_size);
+                let chunk_y = y.div_euclid(chunk_size);
+                let chunk_z = z.div_euclid(chunk_size);
+
+                let chunk_blocks = chunks.entry((chunk_x, chunk_y, chunk_z)).or_default();
+                let pos = MesherBlockPosition::new(x, y, z);
+                let input_block = block_state_to_input_block(block_state);
+                chunk_blocks.insert(pos, input_block);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mesh_config_builder() {
+        let config = MeshConfig::new()
+            .with_culling(false)
+            .with_ambient_occlusion(false)
+            .with_biome("swamp")
+            .with_ao_intensity(0.6);
+
+        assert!(!config.cull_hidden_faces);
+        assert!(!config.ambient_occlusion);
+        assert_eq!(config.biome, Some("swamp".to_string()));
+        assert!((config.ao_intensity - 0.6).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_block_state_to_input_block() {
+        let mut block_state = BlockState::new("minecraft:oak_stairs".to_string());
+        block_state
+            .properties
+            .insert("facing".to_string(), "north".to_string());
+        block_state
+            .properties
+            .insert("half".to_string(), "bottom".to_string());
+
+        let input = block_state_to_input_block(&block_state);
+
+        assert_eq!(input.name, "minecraft:oak_stairs");
+        assert_eq!(input.properties.get("facing"), Some(&"north".to_string()));
+        assert_eq!(input.properties.get("half"), Some(&"bottom".to_string()));
+    }
+}

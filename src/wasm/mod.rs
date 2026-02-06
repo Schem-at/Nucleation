@@ -6,6 +6,7 @@
 //! - `definition_region`: Region manipulation for circuit IO
 //! - `schematic`: Core schematic operations
 //! - `schematic_builder`: ASCII art schematic construction
+//! - `meshing`: 3D mesh generation (feature-gated)
 //! - `simulation`: MCHPRS simulation (feature-gated)
 //! - `typed_executor`: Typed circuit execution (feature-gated)
 //! - `circuit_builder`: Fluent executor builder (feature-gated)
@@ -18,6 +19,8 @@ mod schematic_builder;
 
 #[cfg(feature = "simulation")]
 mod circuit_builder;
+#[cfg(feature = "meshing")]
+mod meshing;
 #[cfg(feature = "simulation")]
 mod simulation;
 #[cfg(feature = "simulation")]
@@ -34,6 +37,11 @@ pub use schematic_builder::SchematicBuilderWrapper;
 
 #[cfg(feature = "simulation")]
 pub use circuit_builder::{CircuitBuilderWrapper, SortStrategyWrapper, StateModeConstants};
+#[cfg(feature = "meshing")]
+pub use meshing::{
+    ChunkMeshResultWrapper, MeshConfigWrapper, MeshResultWrapper, MultiMeshResultWrapper,
+    ResourcePackWrapper,
+};
 #[cfg(feature = "simulation")]
 pub use simulation::{MchprsWorldWrapper, SimulationOptionsWrapper};
 #[cfg(feature = "simulation")]

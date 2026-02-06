@@ -6,6 +6,7 @@
 //! - `schematic`: Core schematic operations
 //! - `schematic_builder`: ASCII art schematic construction
 //! - `definition_region`: Region manipulation for circuit IO
+//! - `meshing`: 3D mesh generation (feature-gated)
 //! - `simulation`: MCHPRS simulation (feature-gated)
 //! - `typed_executor`: Typed circuit execution (feature-gated)
 //! - `circuit_builder`: Fluent executor builder (feature-gated)
@@ -19,6 +20,8 @@ mod schematic_builder;
 
 #[cfg(feature = "simulation")]
 mod circuit_builder;
+#[cfg(feature = "meshing")]
+mod meshing;
 #[cfg(feature = "simulation")]
 mod simulation;
 #[cfg(feature = "simulation")]
@@ -31,6 +34,10 @@ pub use schematic_builder::PySchematicBuilder;
 
 #[cfg(feature = "simulation")]
 pub use circuit_builder::{PyCircuitBuilder, PySortStrategy};
+#[cfg(feature = "meshing")]
+pub use meshing::{
+    PyChunkMeshResult, PyMeshConfig, PyMeshResult, PyMultiMeshResult, PyResourcePack,
+};
 #[cfg(feature = "simulation")]
 pub use simulation::PyMchprsWorld;
 #[cfg(feature = "simulation")]
@@ -57,6 +64,15 @@ pub fn nucleation(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(debug_json_schematic, m)?)?;
     m.add_function(wrap_pyfunction!(load_schematic, m)?)?;
     m.add_function(wrap_pyfunction!(save_schematic, m)?)?;
+
+    #[cfg(feature = "meshing")]
+    {
+        m.add_class::<meshing::PyResourcePack>()?;
+        m.add_class::<meshing::PyMeshConfig>()?;
+        m.add_class::<meshing::PyMeshResult>()?;
+        m.add_class::<meshing::PyMultiMeshResult>()?;
+        m.add_class::<meshing::PyChunkMeshResult>()?;
+    }
 
     #[cfg(feature = "simulation")]
     {

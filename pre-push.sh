@@ -108,6 +108,26 @@ else
 fi
 echo ""
 
+# 8. API parity check
+echo -e "${YELLOW}Checking:${NC} API parity across WASM/Python/FFI"
+PARITY_BIN="target/check_api_parity"
+if [ ! -f "$PARITY_BIN" ] || [ "tools/check_api_parity.rs" -nt "$PARITY_BIN" ]; then
+    rustc tools/check_api_parity.rs -o "$PARITY_BIN" 2>/dev/null
+fi
+if [ -f "$PARITY_BIN" ]; then
+    if "$PARITY_BIN" 2>&1; then
+        echo -e "${GREEN}✓${NC} API parity check passed"
+    else
+        echo -e "${RED}✗${NC} API parity check FAILED"
+        echo "   Run: rustc tools/check_api_parity.rs -o /tmp/parity && /tmp/parity --verbose"
+        echo "   Generate stubs: /tmp/parity --generate-stubs"
+        OVERALL_STATUS=1
+    fi
+else
+    echo -e "${YELLOW}⚠${NC} Could not compile parity checker"
+fi
+echo ""
+
 # Final summary
 echo "=================================="
 if [ $OVERALL_STATUS -eq 0 ]; then

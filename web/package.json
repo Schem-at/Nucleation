@@ -1,0 +1,8 @@
+{
+  "name": "nucleation-mesh-viewer",
+  "version": "0.1.0",
+  "scripts": {
+    "start": "bun run server.ts",
+    "dev": "bun run --watch server.ts"
+  }
+}

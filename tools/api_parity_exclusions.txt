@@ -1,0 +1,126 @@
+# API Parity Exclusions
+# Format:
+#   [section] - One of: wasm_only, python_only, ffi_only, no_ffi, no_wasm, no_python
+#   Class.method = reason   (class-scoped exclusion)
+#   free_function = reason  (free function exclusion)
+#   *.method = reason       (wildcard class)
+#   Class.prefix* = reason  (prefix match)
+#
+# [wasm_only]   = expected in WASM only -> suppress if missing from Python/FFI
+# [python_only] = expected in Python only -> suppress if missing from WASM/FFI
+# [ffi_only]    = expected in FFI only -> suppress if missing from WASM/Python
+# [no_ffi]      = not expected in FFI -> suppress if missing from FFI
+# [no_wasm]     = not expected in WASM -> suppress if missing from WASM
+# [no_python]   = not expected in Python -> suppress if missing from Python
+
+[ffi_only]
+*.free = FFI memory management
+free_* = FFI memory management
+Schematic.print = FFI debug variant (WASM/Python use print_schematic)
+
+[python_only]
+*.__repr__ = Python dunder method
+*.__str__ = Python dunder method
+*.__bool__ = Python dunder method
+*.__len__ = Python dunder method
+*.__copy__ = Python dunder method
+*.__deepcopy__ = Python dunder method
+load_schematic = Python file I/O convenience
+save_schematic = Python file I/O convenience
+Schematic.test = Python debug method
+Schematic.cache_info = Python debug method
+Schematic.clear_cache = Python debug method
+ResourcePack.from_file = Python file I/O
+MeshResult.save = Python file I/O
+MultiMeshResult.save_all = Python file I/O
+ChunkMeshResult.save_all = Python file I/O
+Value.to_py = Python interop
+
+[wasm_only]
+start = WASM panic hook init
+LazyChunkIterator.* = WASM-specific lazy iteration
+Schematic.blocks_indices = WASM JS optimization
+Schematic.chunks_indices = WASM JS optimization
+Schematic.chunks_indices_with_strategy = WASM JS optimization
+Schematic.get_chunk_blocks_indices = WASM JS optimization
+Schematic.get_chunk_data = WASM JS optimization
+Schematic.get_optimization_info = WASM debug
+Schematic.optimization_info = WASM debug
+Schematic.create_lazy_chunk_iterator = WASM-specific lazy iteration
+Schematic.blocks = WASM JS array return format
+PaletteManager.* = WASM-specific palette helper
+StateModeConstants.* = WASM-specific constants enum
+SimulationOptions.* = WASM-specific simulation config
+Value.to_js = WASM JS interop
+Value.from_* = WASM factory methods
+ResourcePack.get_stats = WASM debug
+ResourcePack.stats = WASM debug
+MeshResult.get_stats = WASM debug
+MeshResult.stats = WASM debug
+CircuitBuilder.with_options = WASM-specific (uses SimulationOptions type)
+IoLayoutBuilder.add_input_region = WASM-specific (takes min/max coords directly)
+IoLayoutBuilder.add_input_region_auto = WASM-specific (takes min/max coords directly)
+IoLayoutBuilder.add_output_region = WASM-specific (takes min/max coords directly)
+IoLayoutBuilder.add_output_region_auto = WASM-specific (takes min/max coords directly)
+TypedCircuitExecutor.from_insign_with_options = WASM-specific (uses SimulationOptions)
+TypedCircuitExecutor.from_layout_with_options = WASM-specific (uses SimulationOptions)
+TypedCircuitExecutor.run = WASM-specific simplified execute
+TypedCircuitExecutor.sync_to_schematic = WASM-specific sync API
+MchprsWorld.with_options = WASM-specific (uses SimulationOptions type)
+MchprsWorld.truth_table = WASM-specific truth table generation
+
+# --- Methods not expected in WASM ---
+[no_wasm]
+Schematic.all_blocks = FFI/Python naming convention (WASM uses blocks())
+DefinitionRegion.set_metadata_mut = Python mutability helper (WASM uses set_metadata)
+DefinitionRegion.sync = FFI sync method (WASM uses direct property access)
+ResourcePack.from_bytes = Python/FFI binary I/O
+MultiMeshResult.all_meshes = Python convenience method
+ChunkMeshResult.all_meshes = Python convenience method
+Value.bool = Python typed value factory
+Value.f32 = Python typed value factory
+Value.i32 = Python typed value factory
+Value.u32 = Python typed value factory
+Value.string = Python typed value factory
+
+# --- Methods not expected in Python ---
+[no_python]
+Schematic.chunk_blocks = WASM/FFI chunk access (Python has different iteration)
+Schematic.chunks_with_strategy = WASM/FFI chunk loading strategies
+ResourcePack.new = WASM constructor (Python uses from_file/from_bytes)
+MchprsWorld.new = WASM constructor (Python creates via Schematic method)
+Schematic.create_simulation_world_with_options = WASM-specific (uses SimulationOptions)
+Schematic.create_circuit = WASM/FFI convenience (Python uses CircuitBuilder directly)
+Schematic.create_circuit_builder = WASM/FFI convenience (Python uses CircuitBuilder directly)
+DefinitionRegion.blocks = WASM/FFI method (returns blocks at positions)
+DefinitionRegion.clone_region = WASM/FFI alias for copy
+
+# --- Circuit ecosystem: not expected in FFI ---
+[no_ffi]
+CircuitBuilder.* = Complex builder pattern requiring closures/state machines
+TypedCircuitExecutor.* = Complex stateful executor with callback patterns
+ExecutionMode.* = Circuit execution config, used with TypedCircuitExecutor
+IoLayout.* = Circuit I/O layout, used with CircuitBuilder
+IoLayoutBuilder.* = Complex builder for I/O layouts
+IoType.* = Circuit I/O type definitions
+LayoutFunction.* = Circuit layout mapping functions
+OutputCondition.* = Circuit output condition matching
+SortStrategy.* = Block sorting strategies for circuit I/O
+Value.* = Circuit typed values
+MchprsWorld.* = Simulation world requiring feature gate + complex state
+Schematic.create_circuit = Requires circuit ecosystem
+Schematic.create_circuit_builder = Requires circuit ecosystem
+Schematic.build_executor = Requires circuit ecosystem
+Schematic.create_simulation_world = Requires simulation feature gate
+Schematic.create_simulation_world_with_options = Requires simulation feature gate
+
+# --- Meshing ecosystem: not expected in FFI ---
+ResourcePack.* = Requires meshing feature gate + binary resources
+MeshConfig.* = Requires meshing feature gate
+MeshResult.* = Requires meshing feature gate
+MultiMeshResult.* = Requires meshing feature gate
+ChunkMeshResult.* = Requires meshing feature gate
+Schematic.to_mesh = Requires meshing feature gate
+Schematic.mesh_by_region = Requires meshing feature gate
+Schematic.mesh_by_chunk = Requires meshing feature gate
+Schematic.mesh_by_chunk_size = Requires meshing feature gate

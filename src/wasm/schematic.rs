@@ -346,6 +346,31 @@ impl SchematicWrapper {
         self.0.set_block_str(x, y, z, block_name);
     }
 
+    pub fn set_block_in_region(
+        &mut self,
+        region_name: &str,
+        x: i32,
+        y: i32,
+        z: i32,
+        block_name: &str,
+    ) -> bool {
+        self.0
+            .set_block_in_region_str(region_name, x, y, z, block_name)
+    }
+
+    pub fn set_block_from_string(
+        &mut self,
+        x: i32,
+        y: i32,
+        z: i32,
+        block_string: &str,
+    ) -> Result<(), JsValue> {
+        self.0
+            .set_block_from_string(x, y, z, block_string)
+            .map(|_| ())
+            .map_err(|e| JsValue::from_str(&e))
+    }
+
     pub fn copy_region(
         &mut self,
         from_schematic: &SchematicWrapper,

@@ -24,6 +24,8 @@ pub mod utils;
 // Feature-specific modules
 #[cfg(feature = "ffi")]
 pub mod ffi;
+#[cfg(feature = "meshing")]
+pub mod meshing;
 #[cfg(feature = "php")]
 mod php;
 #[cfg(feature = "python")]

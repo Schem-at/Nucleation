@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nucleation Mesh Viewer</title>
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #16213e;
+      padding: 1rem 2rem;
+      border-bottom: 1px solid #0f3460;
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 500;
+    }
+
+    main {
+      display: flex;
+      flex: 1;
+      gap: 1rem;
+      padding: 1rem;
+    }
+
+    .panel {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 1rem;
+      border: 1px solid #0f3460;
+    }
+
+    .controls {
+      width: 400px;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .viewer-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    model-viewer {
+      width: 100%;
+      flex: 1;
+      min-height: 400px;
+      background: #0a0a14;
+      border-radius: 8px;
+    }
+
+    .section {
+      margin-bottom: 1rem;
+    }
+
+    .section-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 0.5rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.875rem;
+      margin-bottom: 0.25rem;
+      color: #aaa;
+    }
+
+    input[type="file"],
+    select {
+      width: 100%;
+      padding: 0.5rem;
+      background: #0f3460;
+      border: 1px solid #1a4a7a;
+      border-radius: 4px;
+      color: #fff;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 0.875rem;
+    }
+
+    input[type="file"] {
+      padding: 0.375rem;
+    }
+
+    input:focus,
+    select:focus {
+      outline: none;
+      border-color: #4a9eff;
+    }
+
+    button {
+      background: #4a9eff;
+      color: #fff;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 4px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #3a8eef;
+    }
+
+    button:disabled {
+      background: #444;
+      cursor: not-allowed;
+    }
+
+    .status {
+      padding: 0.5rem;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      margin-top: 0.5rem;
+    }
+
+    .status.error {
+      background: #3d1515;
+      color: #ff6b6b;
+    }
+
+    .status.success {
+      background: #153d15;
+      color: #6bff6b;
+    }
+
+    .status.info {
+      background: #15293d;
+      color: #6bb3ff;
+    }
+
+    .checkbox-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .checkbox-group label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      width: 1rem;
+      height: 1rem;
+    }
+
+    .stats {
+      font-size: 0.75rem;
+      color: #888;
+      margin-top: 0.5rem;
+    }
+
+    .file-info {
+      font-size: 0.75rem;
+      color: #6b9;
+      margin-top: 0.25rem;
+    }
+
+    .supported-formats {
+      font-size: 0.7rem;
+      color: #666;
+      margin-top: 0.25rem;
+    }
+
+    .download-btn {
+      background: #2d8659;
+      margin-top: 0.5rem;
+    }
+
+    .download-btn:hover {
+      background: #3d9669;
+    }
+
+    .download-btn:disabled {
+      background: #444;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Nucleation Mesh Viewer</h1>
+  </header>
+
+  <main>
+    <div class="controls panel">
+      <div class="section">
+        <div class="section-title">Resource Pack</div>
+        <label for="resourcePack">Load resource pack (.zip)</label>
+        <input type="file" id="resourcePack" accept=".zip">
+        <div id="packStatus" class="status info">No resource pack loaded</div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Schematic</div>
+        <label for="schematic">Load schematic file</label>
+        <input type="file" id="schematic" accept=".litematic,.schem,.schematic,.nbt,.mcstructure">
+        <div class="supported-formats">Supported: .litematic, .schem, .schematic, .nbt, .mcstructure</div>
+        <div id="schematicStatus" class="status info">No schematic loaded</div>
+        <div id="schematicInfo" class="file-info"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Mesh Options</div>
+        <div class="checkbox-group">
+          <label>
+            <input type="checkbox" id="optCulling" checked> Face culling
+          </label>
+          <label>
+            <input type="checkbox" id="optAO" checked> Ambient occlusion
+          </label>
+        </div>
+        <label for="optAoIntensity" style="margin-top: 0.5rem;">AO Intensity</label>
+        <input type="range" id="optAoIntensity" min="0" max="100" value="40" style="width: 100%;">
+        <div style="font-size: 0.75rem; color: #888;" id="aoIntensityLabel">0.4</div>
+
+        <label for="optBiome" style="margin-top: 0.5rem;">Biome</label>
+        <select id="optBiome">
+          <option value="">Default</option>
+          <option value="plains">Plains</option>
+          <option value="forest">Forest</option>
+          <option value="swamp">Swamp</option>
+          <option value="jungle">Jungle</option>
+          <option value="taiga">Taiga</option>
+          <option value="desert">Desert</option>
+          <option value="savanna">Savanna</option>
+          <option value="badlands">Badlands</option>
+        </select>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Mesh Mode</div>
+        <select id="meshMode">
+          <option value="single">Single mesh (entire schematic)</option>
+          <option value="region">By region</option>
+          <option value="chunk">By chunk (16x16x16)</option>
+        </select>
+      </div>
+
+      <button id="meshBtn" disabled>Generate Mesh</button>
+      <div id="meshStatus" class="status info">Load a resource pack and schematic to begin</div>
+      <div id="meshStats" class="stats"></div>
+
+      <button id="downloadBtn" class="download-btn" disabled>Download GLB</button>
+    </div>
+
+    <div class="viewer-container panel">
+      <model-viewer
+        id="viewer"
+        camera-controls
+        auto-rotate
+        shadow-intensity="1"
+        environment-image="neutral"
+        exposure="1"
+      >
+        <div slot="poster" style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666;">
+          Generate a mesh to view it here
+        </div>
+      </model-viewer>
+    </div>
+  </main>
+
+  <script type="module">
+    // State
+    let resourcePack = null;
+    let schematic = null;
+    let wasmModule = null;
+    let currentGlbData = null;
+    let currentFileName = "mesh";
+
+    // Elements
+    const resourcePackInput = document.getElementById('resourcePack');
+    const schematicInput = document.getElementById('schematic');
+    const packStatus = document.getElementById('packStatus');
+    const schematicStatus = document.getElementById('schematicStatus');
+    const schematicInfo = document.getElementById('schematicInfo');
+    const meshBtn = document.getElementById('meshBtn');
+    const meshStatus = document.getElementById('meshStatus');
+    const meshStats = document.getElementById('meshStats');
+    const viewer = document.getElementById('viewer');
+    const optCulling = document.getElementById('optCulling');
+    const optAO = document.getElementById('optAO');
+    const optAoIntensity = document.getElementById('optAoIntensity');
+    const aoIntensityLabel = document.getElementById('aoIntensityLabel');
+    const optBiome = document.getElementById('optBiome');
+    const meshMode = document.getElementById('meshMode');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    // AO intensity slider
+    optAoIntensity.addEventListener('input', () => {
+      aoIntensityLabel.textContent = (optAoIntensity.value / 100).toFixed(2);
+    });
+
+    // Check if both resource pack and schematic are loaded
+    function updateMeshButton() {
+      meshBtn.disabled = !resourcePack || !schematic;
+      if (resourcePack && schematic) {
+        meshStatus.textContent = 'Ready to generate mesh';
+        meshStatus.className = 'status info';
+      }
+    }
+
+    // Load WASM module
+    async function loadWasm() {
+      try {
+        meshStatus.textContent = 'Loading WASM module...';
+        meshStatus.className = 'status info';
+
+        const wasm = await import('/pkg/nucleation.js');
+        await wasm.default();
+        wasmModule = wasm;
+
+        // Check if meshing feature is available
+        if (!wasm.ResourcePackWrapper) {
+          meshStatus.textContent = 'WASM loaded but meshing feature not enabled. Rebuild with: wasm-pack build --target web --features "wasm,meshing"';
+          meshStatus.className = 'status error';
+          return false;
+        }
+
+        meshStatus.textContent = 'WASM loaded. Load a resource pack and schematic to begin.';
+        return true;
+      } catch (e) {
+        console.error('Failed to load WASM:', e);
+        meshStatus.textContent = `WASM not available: ${e.message}. Build with: wasm-pack build --target web --features "wasm,meshing"`;
+        meshStatus.className = 'status error';
+        return false;
+      }
+    }
+
+    // Load resource pack
+    resourcePackInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      packStatus.textContent = 'Loading resource pack...';
+      packStatus.className = 'status info';
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+
+        resourcePack = new wasmModule.ResourcePackWrapper(bytes);
+
+        packStatus.textContent = `Loaded: ${resourcePack.blockstateCount} blockstates, ${resourcePack.modelCount} models, ${resourcePack.textureCount} textures`;
+        packStatus.className = 'status success';
+        updateMeshButton();
+      } catch (e) {
+        console.error('Failed to load resource pack:', e);
+        packStatus.textContent = `Error: ${e.message || e}`;
+        packStatus.className = 'status error';
+        resourcePack = null;
+        updateMeshButton();
+      }
+    });
+
+    // Load schematic
+    schematicInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      schematicStatus.textContent = 'Loading schematic...';
+      schematicStatus.className = 'status info';
+      schematicInfo.textContent = '';
+      currentFileName = file.name.replace(/\.[^/.]+$/, "");
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+
+        schematic = new wasmModule.SchematicWrapper();
+        schematic.from_data(bytes);
+
+        // Get schematic info
+        const bounds = schematic.get_bounding_box();
+        const blockCount = schematic.get_block_count();
+        const width = bounds.max[0] - bounds.min[0] + 1;
+        const height = bounds.max[1] - bounds.min[1] + 1;
+        const length = bounds.max[2] - bounds.min[2] + 1;
+
+        schematicStatus.textContent = `Loaded: ${file.name}`;
+        schematicStatus.className = 'status success';
+        schematicInfo.textContent = `Size: ${width}x${height}x${length}, Blocks: ${blockCount}`;
+        updateMeshButton();
+      } catch (e) {
+        console.error('Failed to load schematic:', e);
+        schematicStatus.textContent = `Error: ${e.message || e}`;
+        schematicStatus.className = 'status error';
+        schematicInfo.textContent = '';
+        schematic = null;
+        updateMeshButton();
+      }
+    });
+
+    // Generate mesh
+    meshBtn.addEventListener('click', async () => {
+      if (!resourcePack || !schematic || !wasmModule) return;
+
+      meshBtn.disabled = true;
+      meshStatus.textContent = 'Generating mesh...';
+      meshStatus.className = 'status info';
+      meshStats.textContent = '';
+      downloadBtn.disabled = true;
+      currentGlbData = null;
+
+      try {
+        // Create mesh config
+        const config = new wasmModule.MeshConfigWrapper();
+        config.setCullHiddenFaces(optCulling.checked);
+        config.setAmbientOcclusion(optAO.checked);
+        config.setAoIntensity(optAoIntensity.value / 100);
+        if (optBiome.value) {
+          config.setBiome(optBiome.value);
+        }
+
+        let result;
+        const mode = meshMode.value;
+
+        if (mode === 'single') {
+          result = schematic.toMesh(resourcePack, config);
+          currentGlbData = result.glbData;
+
+          meshStats.textContent = `Vertices: ${result.vertexCount}, Triangles: ${result.triangleCount}${result.hasTransparency ? ' (has transparency)' : ''}`;
+        } else if (mode === 'region') {
+          result = schematic.meshByRegion(resourcePack, config);
+          const regions = result.getRegionNames();
+
+          if (regions.length > 0) {
+            // Use first region for display
+            const firstMesh = result.getMesh(regions[0]);
+            currentGlbData = firstMesh.glbData;
+            meshStats.textContent = `Regions: ${regions.length}, Total vertices: ${result.totalVertexCount}, Total triangles: ${result.totalTriangleCount}`;
+          }
+        } else if (mode === 'chunk') {
+          result = schematic.meshByChunk(resourcePack, config);
+          const chunks = result.getChunkCoordinates();
+
+          if (chunks.length > 0) {
+            // Use first chunk for display
+            const firstCoord = chunks[0];
+            const firstMesh = result.getMesh(firstCoord[0], firstCoord[1], firstCoord[2]);
+            currentGlbData = firstMesh.glbData;
+            meshStats.textContent = `Chunks: ${chunks.length}, Total vertices: ${result.totalVertexCount}, Total triangles: ${result.totalTriangleCount}`;
+          }
+        }
+
+        if (currentGlbData) {
+          // Create blob URL for GLB
+          const glbBlob = new Blob([currentGlbData], { type: 'model/gltf-binary' });
+          const glbUrl = URL.createObjectURL(glbBlob);
+
+          // Update viewer
+          viewer.src = glbUrl;
+
+          meshStatus.textContent = 'Mesh generated successfully';
+          meshStatus.className = 'status success';
+          downloadBtn.disabled = false;
+        } else {
+          meshStatus.textContent = 'No mesh data generated';
+          meshStatus.className = 'status error';
+        }
+
+      } catch (e) {
+        console.error('Mesh generation failed:', e);
+        meshStatus.textContent = `Error: ${e.message || e}`;
+        meshStatus.className = 'status error';
+      }
+
+      meshBtn.disabled = false;
+    });
+
+    // Download GLB
+    downloadBtn.addEventListener('click', () => {
+      if (!currentGlbData) return;
+
+      const blob = new Blob([currentGlbData], { type: 'model/gltf-binary' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentFileName}.glb`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+
+    // Initialize
+    loadWasm();
+  </script>
+</body>
+</html>

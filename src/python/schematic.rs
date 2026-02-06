@@ -848,6 +848,159 @@ impl PySchematic {
             ))),
         }
     }
+
+    pub fn update_region(&mut self, name: String, region: &PyDefinitionRegion) {
+        self.inner
+            .definition_regions
+            .insert(name, region.inner.clone());
+    }
+
+    pub fn save_as(
+        &self,
+        py: Python<'_>,
+        format: &str,
+        version: Option<String>,
+    ) -> PyResult<PyObject> {
+        let manager = get_manager();
+        let manager = manager
+            .lock()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        let bytes = manager
+            .write(format, &self.inner, version.as_deref())
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
+        Ok(PyBytes::new(py, &bytes).into())
+    }
+
+    pub fn to_schematic_version(&self, py: Python<'_>, version: &str) -> PyResult<PyObject> {
+        use crate::schematic::SchematicVersion;
+        let sv = SchematicVersion::from_str(version).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Unknown schematic version: {}",
+                version
+            ))
+        })?;
+        let bytes = schematic::to_schematic_version(&self.inner, sv)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
+        Ok(PyBytes::new(py, &bytes).into())
+    }
+
+    #[staticmethod]
+    pub fn get_available_schematic_versions() -> Vec<String> {
+        use crate::schematic::SchematicVersion;
+        SchematicVersion::get_all()
+            .iter()
+            .map(|v| v.to_string())
+            .collect()
+    }
+
+    pub fn get_all_palettes<'py>(&self, py: Python<'py>) -> PyResult<PyObject> {
+        let all_palettes = self.inner.get_all_palettes();
+
+        let result = PyDict::new(py);
+
+        // Default palette
+        let default_list = PyList::new(
+            py,
+            all_palettes
+                .default_palette
+                .iter()
+                .map(|bs| PyBlockState { inner: bs.clone() }),
+        )?;
+        result.set_item("default", default_list)?;
+
+        // Region palettes
+        let regions_dict = PyDict::new(py);
+        for (name, palette) in &all_palettes.region_palettes {
+            let region_list = PyList::new(
+                py,
+                palette.iter().map(|bs| PyBlockState { inner: bs.clone() }),
+            )?;
+            regions_dict.set_item(name, region_list)?;
+        }
+        result.set_item("regions", regions_dict)?;
+
+        Ok(result.into())
+    }
+
+    pub fn get_default_region_palette<'py>(&self, py: Python<'py>) -> PyResult<PyObject> {
+        let palette = self.inner.get_default_region_palette();
+        let list = PyList::new(py, palette.into_iter().map(|bs| PyBlockState { inner: bs }))?;
+        Ok(list.into())
+    }
+
+    pub fn get_palette_from_region<'py>(
+        &self,
+        py: Python<'py>,
+        region_name: &str,
+    ) -> PyResult<PyObject> {
+        let palette = if region_name == "default" || region_name == "Default" {
+            &self.inner.default_region.palette
+        } else {
+            match self.inner.other_regions.get(region_name) {
+                Some(region) => &region.palette,
+                None => {
+                    return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                        "Region '{}' not found",
+                        region_name
+                    )))
+                }
+            }
+        };
+        let list = PyList::new(
+            py,
+            palette.iter().map(|bs| PyBlockState { inner: bs.clone() }),
+        )?;
+        Ok(list.into())
+    }
+
+    pub fn get_bounding_box(&self) -> ((i32, i32, i32), (i32, i32, i32)) {
+        let bbox = self.inner.get_bounding_box();
+        (bbox.min, bbox.max)
+    }
+
+    pub fn get_region_bounding_box(
+        &self,
+        region_name: &str,
+    ) -> PyResult<((i32, i32, i32), (i32, i32, i32))> {
+        let bbox = if region_name == "default" || region_name == "Default" {
+            self.inner.default_region.get_bounding_box()
+        } else {
+            match self.inner.other_regions.get(region_name) {
+                Some(region) => region.get_bounding_box(),
+                None => {
+                    return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                        "Region '{}' not found",
+                        region_name
+                    )))
+                }
+            }
+        };
+        Ok((bbox.min, bbox.max))
+    }
+
+    pub fn get_tight_dimensions(&self) -> (i32, i32, i32) {
+        self.inner.get_tight_dimensions()
+    }
+
+    pub fn get_tight_bounds_min(&self) -> Option<(i32, i32, i32)> {
+        self.inner.get_tight_bounds().map(|b| b.min)
+    }
+
+    pub fn get_tight_bounds_max(&self) -> Option<(i32, i32, i32)> {
+        self.inner.get_tight_bounds().map(|b| b.max)
+    }
+
+    pub fn get_block_with_properties(&self, x: i32, y: i32, z: i32) -> Option<PyBlockState> {
+        self.inner
+            .get_block(x, y, z)
+            .cloned()
+            .map(|bs| PyBlockState { inner: bs })
+    }
+
+    pub fn print_schematic(&self) -> String {
+        format_schematic(&self.inner)
+    }
 }
 
 // --- NBT Conversion Helpers ---
