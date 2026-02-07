@@ -1079,12 +1079,25 @@ struct ParityResult {
 /// - Python `#[setter] fn name()` -> canonical "name" (setter)
 /// This means if Python has `#[getter] dimensions` and WASM has `get_dimensions`, they match.
 fn canonical_method_name(name: &str, is_getter: bool, is_setter: bool) -> String {
-    if is_getter || is_setter {
-        // Python getters/setters: the name is already bare (e.g., "dimensions")
+    if is_getter {
+        // Python getters: PyO3 strips "get_" prefix (e.g., get_name -> .name property)
+        if name.starts_with("get_") && name.len() > 4 {
+            return name[4..].to_string();
+        }
         return name.to_string();
     }
-    // Strip get_ prefix for WASM/FFI methods that are effectively getters
+    if is_setter {
+        // Python setters: PyO3 strips "set_" prefix (e.g., set_name -> .name = x)
+        if name.starts_with("set_") && name.len() > 4 {
+            return name[4..].to_string();
+        }
+        return name.to_string();
+    }
+    // Strip get_/set_ prefix for WASM/FFI methods that are effectively getters/setters
     if name.starts_with("get_") && name.len() > 4 {
+        return name[4..].to_string();
+    }
+    if name.starts_with("set_") && name.len() > 4 {
         return name[4..].to_string();
     }
     name.to_string()
@@ -1164,6 +1177,7 @@ fn compare_surfaces(
             } else {
                 exclusions.is_excluded(class, method, t)
                     .or_else(|| exclusions.is_excluded(class, &format!("get_{}", method), t))
+                    .or_else(|| exclusions.is_excluded(class, &format!("set_{}", method), t))
             };
             if let Some(r) = reason {
                 if any_reason.is_none() {

@@ -12,7 +12,7 @@ use crate::{
     block_position::BlockPosition,
     bounding_box::BoundingBox,
     definition_region::DefinitionRegion,
-    formats::{litematic, manager::get_manager, schematic},
+    formats::{litematic, manager::get_manager, mcstructure, schematic},
     print_utils::{format_json_schematic, format_schematic},
     universal_schematic::ChunkLoadingStrategy,
     utils::{NbtMap, NbtValue},
@@ -256,6 +256,22 @@ impl PySchematic {
 
     pub fn to_schematic(&self, py: Python<'_>) -> PyResult<PyObject> {
         let bytes = schematic::to_schematic(&self.inner)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
+        Ok(PyBytes::new(py, &bytes).into())
+    }
+
+    /// Load schematic from McStructure (Bedrock) format bytes.
+    pub fn from_mcstructure(&mut self, data: &[u8]) -> PyResult<()> {
+        self.inner = mcstructure::from_mcstructure(data)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+        self.last_block_name.clear();
+        self.default_region_initialized = true;
+        Ok(())
+    }
+
+    /// Export schematic to McStructure (Bedrock) format.
+    pub fn to_mcstructure(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let bytes = mcstructure::to_mcstructure(&self.inner)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
         Ok(PyBytes::new(py, &bytes).into())
     }
@@ -652,6 +668,104 @@ impl PySchematic {
     #[getter]
     pub fn region_names(&self) -> Vec<String> {
         self.inner.get_region_names()
+    }
+
+    // --- Metadata Accessors ---
+
+    /// Get the schematic name.
+    #[getter]
+    pub fn get_name(&self) -> Option<String> {
+        self.inner.metadata.name.clone()
+    }
+
+    /// Set the schematic name.
+    #[setter]
+    pub fn set_name(&mut self, name: String) {
+        self.inner.metadata.name = Some(name);
+    }
+
+    /// Get the schematic author.
+    #[getter]
+    pub fn author(&self) -> Option<String> {
+        self.inner.metadata.author.clone()
+    }
+
+    /// Set the schematic author.
+    #[setter]
+    pub fn set_author(&mut self, author: String) {
+        self.inner.metadata.author = Some(author);
+    }
+
+    /// Get the schematic description.
+    #[getter]
+    pub fn description(&self) -> Option<String> {
+        self.inner.metadata.description.clone()
+    }
+
+    /// Set the schematic description.
+    #[setter]
+    pub fn set_description(&mut self, description: String) {
+        self.inner.metadata.description = Some(description);
+    }
+
+    /// Get the creation timestamp (milliseconds since epoch).
+    #[getter]
+    pub fn created(&self) -> Option<u64> {
+        self.inner.metadata.created
+    }
+
+    /// Set the creation timestamp.
+    #[setter]
+    pub fn set_created(&mut self, created: u64) {
+        self.inner.metadata.created = Some(created);
+    }
+
+    /// Get the modification timestamp (milliseconds since epoch).
+    #[getter]
+    pub fn modified(&self) -> Option<u64> {
+        self.inner.metadata.modified
+    }
+
+    /// Set the modification timestamp.
+    #[setter]
+    pub fn set_modified(&mut self, modified: u64) {
+        self.inner.metadata.modified = Some(modified);
+    }
+
+    /// Get the Litematic format version.
+    #[getter]
+    pub fn lm_version(&self) -> Option<i32> {
+        self.inner.metadata.lm_version
+    }
+
+    /// Set the Litematic format version.
+    #[setter]
+    pub fn set_lm_version(&mut self, version: i32) {
+        self.inner.metadata.lm_version = Some(version);
+    }
+
+    /// Get the Minecraft data version.
+    #[getter]
+    pub fn mc_version(&self) -> Option<i32> {
+        self.inner.metadata.mc_version
+    }
+
+    /// Set the Minecraft data version.
+    #[setter]
+    pub fn set_mc_version(&mut self, version: i32) {
+        self.inner.metadata.mc_version = Some(version);
+    }
+
+    /// Get the WorldEdit version.
+    #[getter]
+    pub fn we_version(&self) -> Option<i32> {
+        self.inner.metadata.we_version
+    }
+
+    /// Set the WorldEdit version.
+    #[setter]
+    pub fn set_we_version(&mut self, version: i32) {
+        self.inner.metadata.we_version = Some(version);
     }
 
     pub fn debug_info(&self) -> String {

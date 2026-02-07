@@ -67,6 +67,98 @@ class Schematic:
         """Export schematic to WorldEdit/Sponge format."""
         ...
 
+    def from_mcstructure(self, data: bytes) -> None:
+        """Load schematic from McStructure (Bedrock) format bytes."""
+        ...
+
+    def to_mcstructure(self) -> bytes:
+        """Export schematic to McStructure (Bedrock) format."""
+        ...
+
+    # --- Metadata Accessors ---
+
+    @property
+    def name(self) -> Optional[str]:
+        """Get the schematic name."""
+        ...
+
+    @name.setter
+    def name(self, value: str) -> None:
+        """Set the schematic name."""
+        ...
+
+    @property
+    def author(self) -> Optional[str]:
+        """Get the schematic author."""
+        ...
+
+    @author.setter
+    def author(self, value: str) -> None:
+        """Set the schematic author."""
+        ...
+
+    @property
+    def description(self) -> Optional[str]:
+        """Get the schematic description."""
+        ...
+
+    @description.setter
+    def description(self, value: str) -> None:
+        """Set the schematic description."""
+        ...
+
+    @property
+    def created(self) -> Optional[int]:
+        """Get the creation timestamp (milliseconds since epoch)."""
+        ...
+
+    @created.setter
+    def created(self, value: int) -> None:
+        """Set the creation timestamp."""
+        ...
+
+    @property
+    def modified(self) -> Optional[int]:
+        """Get the modification timestamp (milliseconds since epoch)."""
+        ...
+
+    @modified.setter
+    def modified(self, value: int) -> None:
+        """Set the modification timestamp."""
+        ...
+
+    @property
+    def lm_version(self) -> Optional[int]:
+        """Get the Litematic format version."""
+        ...
+
+    @lm_version.setter
+    def lm_version(self, value: int) -> None:
+        """Set the Litematic format version."""
+        ...
+
+    @property
+    def mc_version(self) -> Optional[int]:
+        """Get the Minecraft data version."""
+        ...
+
+    @mc_version.setter
+    def mc_version(self, value: int) -> None:
+        """Set the Minecraft data version."""
+        ...
+
+    @property
+    def we_version(self) -> Optional[int]:
+        """Get the WorldEdit version."""
+        ...
+
+    @we_version.setter
+    def we_version(self, value: int) -> None:
+        """Set the WorldEdit version."""
+        ...
+
+    # --- Block Operations ---
+
     def set_block(self, x: int, y: int, z: int, block_name: str) -> bool:
         """Set a block at the given position using block string notation."""
         ...

@@ -8,7 +8,7 @@ use crate::schematic::SchematicVersion;
 use crate::universal_schematic::ChunkLoadingStrategy;
 use crate::{
     block_position::BlockPosition,
-    formats::{litematic, manager::get_manager, schematic},
+    formats::{litematic, manager::get_manager, mcstructure, schematic},
     print_utils::{
         format_json_schematic as print_json_schematic, format_schematic as print_schematic,
     },
@@ -180,6 +180,17 @@ impl SchematicWrapper {
     pub fn to_schematic(&self) -> Result<Vec<u8>, JsValue> {
         schematic::to_schematic(&self.0)
             .map_err(|e| JsValue::from_str(&format!("Schematic conversion error: {}", e)))
+    }
+
+    pub fn from_mcstructure(&mut self, data: &[u8]) -> Result<(), JsValue> {
+        self.0 = mcstructure::from_mcstructure(data)
+            .map_err(|e| JsValue::from_str(&format!("McStructure parsing error: {}", e)))?;
+        Ok(())
+    }
+
+    pub fn to_mcstructure(&self) -> Result<Vec<u8>, JsValue> {
+        mcstructure::to_mcstructure(&self.0)
+            .map_err(|e| JsValue::from_str(&format!("McStructure conversion error: {}", e)))
     }
 
     pub fn to_schematic_version(&self, version: &str) -> Result<Vec<u8>, JsValue> {
@@ -668,6 +679,88 @@ impl SchematicWrapper {
                 .unwrap_or(&"Unnamed".to_string()),
             self.0.other_regions.len() + 1
         )
+    }
+
+    // --- Metadata Accessors ---
+
+    #[wasm_bindgen(js_name = "getName")]
+    pub fn get_name(&self) -> Option<String> {
+        self.0.metadata.name.clone()
+    }
+
+    #[wasm_bindgen(js_name = "setName")]
+    pub fn set_name(&mut self, name: &str) {
+        self.0.metadata.name = Some(name.to_string());
+    }
+
+    #[wasm_bindgen(js_name = "getAuthor")]
+    pub fn get_author(&self) -> Option<String> {
+        self.0.metadata.author.clone()
+    }
+
+    #[wasm_bindgen(js_name = "setAuthor")]
+    pub fn set_author(&mut self, author: &str) {
+        self.0.metadata.author = Some(author.to_string());
+    }
+
+    #[wasm_bindgen(js_name = "getDescription")]
+    pub fn get_description(&self) -> Option<String> {
+        self.0.metadata.description.clone()
+    }
+
+    #[wasm_bindgen(js_name = "setDescription")]
+    pub fn set_description(&mut self, description: &str) {
+        self.0.metadata.description = Some(description.to_string());
+    }
+
+    #[wasm_bindgen(js_name = "getCreated")]
+    pub fn get_created(&self) -> Option<f64> {
+        self.0.metadata.created.map(|v| v as f64)
+    }
+
+    #[wasm_bindgen(js_name = "setCreated")]
+    pub fn set_created(&mut self, created: f64) {
+        self.0.metadata.created = Some(created as u64);
+    }
+
+    #[wasm_bindgen(js_name = "getModified")]
+    pub fn get_modified(&self) -> Option<f64> {
+        self.0.metadata.modified.map(|v| v as f64)
+    }
+
+    #[wasm_bindgen(js_name = "setModified")]
+    pub fn set_modified(&mut self, modified: f64) {
+        self.0.metadata.modified = Some(modified as u64);
+    }
+
+    #[wasm_bindgen(js_name = "getLmVersion")]
+    pub fn get_lm_version(&self) -> Option<i32> {
+        self.0.metadata.lm_version
+    }
+
+    #[wasm_bindgen(js_name = "setLmVersion")]
+    pub fn set_lm_version(&mut self, version: i32) {
+        self.0.metadata.lm_version = Some(version);
+    }
+
+    #[wasm_bindgen(js_name = "getMcVersion")]
+    pub fn get_mc_version(&self) -> Option<i32> {
+        self.0.metadata.mc_version
+    }
+
+    #[wasm_bindgen(js_name = "setMcVersion")]
+    pub fn set_mc_version(&mut self, version: i32) {
+        self.0.metadata.mc_version = Some(version);
+    }
+
+    #[wasm_bindgen(js_name = "getWeVersion")]
+    pub fn get_we_version(&self) -> Option<i32> {
+        self.0.metadata.we_version
+    }
+
+    #[wasm_bindgen(js_name = "setWeVersion")]
+    pub fn set_we_version(&mut self, version: i32) {
+        self.0.metadata.we_version = Some(version);
     }
 
     // Add these methods back

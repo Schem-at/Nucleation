@@ -8,7 +8,7 @@ use crate::{
         LinearGradientBrush, PointGradientBrush, ShadedBrush, ShapeEnum, SolidBrush, Sphere,
     },
     definition_region::DefinitionRegion,
-    formats::{litematic, manager::get_manager, schematic},
+    formats::{litematic, manager::get_manager, mcstructure, schematic},
     print_utils::{format_json_schematic, format_schematic},
     universal_schematic::ChunkLoadingStrategy,
     BlockState, SchematicBuilder, UniversalSchematic,
@@ -240,7 +240,8 @@ pub extern "C" fn schematic_free(schematic: *mut SchematicWrapper) {
 // --- Data I/O ---
 
 /// Populates a schematic from raw byte data, auto-detecting the format.
-/// Returns 0 on success, negative on error.
+/// Supports Litematic, Sponge Schematic, and McStructure (Bedrock) formats.
+/// Returns 0 on success, -1 for null pointers, -2 for parse error, -3 for unknown format.
 #[no_mangle]
 pub extern "C" fn schematic_from_data(
     schematic: *mut SchematicWrapper,
@@ -253,24 +254,24 @@ pub extern "C" fn schematic_from_data(
     let data_slice = unsafe { std::slice::from_raw_parts(data, data_len) };
     let s = unsafe { &mut *(*schematic).0 };
 
-    if litematic::is_litematic(data_slice) {
-        match litematic::from_litematic(data_slice) {
-            Ok(res) => {
-                *s = res;
-                0
-            }
-            Err(_) => -2,
+    let manager = get_manager();
+    let manager = match manager.lock() {
+        Ok(m) => m,
+        Err(_) => return -2,
+    };
+    match manager.read(data_slice) {
+        Ok(res) => {
+            *s = res;
+            0
         }
-    } else if schematic::is_schematic(data_slice) {
-        match schematic::from_schematic(data_slice) {
-            Ok(res) => {
-                *s = res;
-                0
+        Err(_) => {
+            // Check if any format was detected but failed to parse
+            if manager.detect_format(data_slice).is_some() {
+                -2 // Parse error
+            } else {
+                -3 // Unknown format
             }
-            Err(_) => -2,
         }
-    } else {
-        -3 // Unknown format
     }
 }
 
@@ -356,6 +357,54 @@ pub extern "C" fn schematic_to_schematic(schematic: *const SchematicWrapper) -> 
     }
     let s = unsafe { &*(*schematic).0 };
     match schematic::to_schematic(s) {
+        Ok(data) => {
+            let mut data = data;
+            let ptr = data.as_mut_ptr();
+            let len = data.len();
+            std::mem::forget(data);
+            ByteArray { data: ptr, len }
+        }
+        Err(_) => ByteArray {
+            data: ptr::null_mut(),
+            len: 0,
+        },
+    }
+}
+
+/// Populates a schematic from McStructure (Bedrock) data.
+/// Returns 0 on success, negative on error.
+#[no_mangle]
+pub extern "C" fn schematic_from_mcstructure(
+    schematic: *mut SchematicWrapper,
+    data: *const c_uchar,
+    data_len: usize,
+) -> c_int {
+    if schematic.is_null() || data.is_null() {
+        return -1;
+    }
+    let data_slice = unsafe { std::slice::from_raw_parts(data, data_len) };
+    let s = unsafe { &mut *(*schematic).0 };
+    match mcstructure::from_mcstructure(data_slice) {
+        Ok(res) => {
+            *s = res;
+            0
+        }
+        Err(_) => -2,
+    }
+}
+
+/// Converts the schematic to McStructure (Bedrock) format.
+/// The returned ByteArray must be freed with `free_byte_array`.
+#[no_mangle]
+pub extern "C" fn schematic_to_mcstructure(schematic: *const SchematicWrapper) -> ByteArray {
+    if schematic.is_null() {
+        return ByteArray {
+            data: ptr::null_mut(),
+            len: 0,
+        };
+    }
+    let s = unsafe { &*(*schematic).0 };
+    match mcstructure::to_mcstructure(s) {
         Ok(data) => {
             let mut data = data;
             let ptr = data.as_mut_ptr();
@@ -1114,6 +1163,186 @@ pub extern "C" fn debug_json_schematic(schematic: *const SchematicWrapper) -> *m
     ); // +1 for the main region
     let info = format!("{}\n{}", debug_info, format_json_schematic(s));
     CString::new(info).unwrap().into_raw()
+}
+
+// --- Metadata Accessors ---
+
+/// Get the schematic name. Returns null if not set.
+/// The returned C string must be freed with `free_string`.
+#[no_mangle]
+pub extern "C" fn schematic_get_name(schematic: *const SchematicWrapper) -> *mut c_char {
+    if schematic.is_null() {
+        return ptr::null_mut();
+    }
+    let s = unsafe { &*(*schematic).0 };
+    match &s.metadata.name {
+        Some(name) => CString::new(name.as_str()).unwrap_or_default().into_raw(),
+        None => ptr::null_mut(),
+    }
+}
+
+/// Set the schematic name.
+#[no_mangle]
+pub extern "C" fn schematic_set_name(schematic: *mut SchematicWrapper, name: *const c_char) {
+    if schematic.is_null() || name.is_null() {
+        return;
+    }
+    let s = unsafe { &mut *(*schematic).0 };
+    let name = unsafe { CStr::from_ptr(name).to_string_lossy().into_owned() };
+    s.metadata.name = Some(name);
+}
+
+/// Get the schematic author. Returns null if not set.
+/// The returned C string must be freed with `free_string`.
+#[no_mangle]
+pub extern "C" fn schematic_get_author(schematic: *const SchematicWrapper) -> *mut c_char {
+    if schematic.is_null() {
+        return ptr::null_mut();
+    }
+    let s = unsafe { &*(*schematic).0 };
+    match &s.metadata.author {
+        Some(author) => CString::new(author.as_str()).unwrap_or_default().into_raw(),
+        None => ptr::null_mut(),
+    }
+}
+
+/// Set the schematic author.
+#[no_mangle]
+pub extern "C" fn schematic_set_author(schematic: *mut SchematicWrapper, author: *const c_char) {
+    if schematic.is_null() || author.is_null() {
+        return;
+    }
+    let s = unsafe { &mut *(*schematic).0 };
+    let author = unsafe { CStr::from_ptr(author).to_string_lossy().into_owned() };
+    s.metadata.author = Some(author);
+}
+
+/// Get the schematic description. Returns null if not set.
+/// The returned C string must be freed with `free_string`.
+#[no_mangle]
+pub extern "C" fn schematic_get_description(schematic: *const SchematicWrapper) -> *mut c_char {
+    if schematic.is_null() {
+        return ptr::null_mut();
+    }
+    let s = unsafe { &*(*schematic).0 };
+    match &s.metadata.description {
+        Some(desc) => CString::new(desc.as_str()).unwrap_or_default().into_raw(),
+        None => ptr::null_mut(),
+    }
+}
+
+/// Set the schematic description.
+#[no_mangle]
+pub extern "C" fn schematic_set_description(
+    schematic: *mut SchematicWrapper,
+    description: *const c_char,
+) {
+    if schematic.is_null() || description.is_null() {
+        return;
+    }
+    let s = unsafe { &mut *(*schematic).0 };
+    let desc = unsafe { CStr::from_ptr(description).to_string_lossy().into_owned() };
+    s.metadata.description = Some(desc);
+}
+
+/// Get the creation timestamp (milliseconds since epoch). Returns -1 if not set.
+#[no_mangle]
+pub extern "C" fn schematic_get_created(schematic: *const SchematicWrapper) -> i64 {
+    if schematic.is_null() {
+        return -1;
+    }
+    let s = unsafe { &*(*schematic).0 };
+    s.metadata.created.map(|v| v as i64).unwrap_or(-1)
+}
+
+/// Set the creation timestamp (milliseconds since epoch).
+#[no_mangle]
+pub extern "C" fn schematic_set_created(schematic: *mut SchematicWrapper, created: u64) {
+    if schematic.is_null() {
+        return;
+    }
+    let s = unsafe { &mut *(*schematic).0 };
+    s.metadata.created = Some(created);
+}
+
+/// Get the modification timestamp (milliseconds since epoch). Returns -1 if not set.
+#[no_mangle]
+pub extern "C" fn schematic_get_modified(schematic: *const SchematicWrapper) -> i64 {
+    if schematic.is_null() {
+        return -1;
+    }
+    let s = unsafe { &*(*schematic).0 };
+    s.metadata.modified.map(|v| v as i64).unwrap_or(-1)
+}
+
+/// Set the modification timestamp (milliseconds since epoch).
+#[no_mangle]
+pub extern "C" fn schematic_set_modified(schematic: *mut SchematicWrapper, modified: u64) {
+    if schematic.is_null() {
+        return;
+    }
+    let s = unsafe { &mut *(*schematic).0 };
+    s.metadata.modified = Some(modified);
+}
+
+/// Get the Litematic format version. Returns -1 if not set.
+#[no_mangle]
+pub extern "C" fn schematic_get_lm_version(schematic: *const SchematicWrapper) -> c_int {
+    if schematic.is_null() {
+        return -1;
+    }
+    let s = unsafe { &*(*schematic).0 };
+    s.metadata.lm_version.unwrap_or(-1)
+}
+
+/// Set the Litematic format version.
+#[no_mangle]
+pub extern "C" fn schematic_set_lm_version(schematic: *mut SchematicWrapper, version: c_int) {
+    if schematic.is_null() {
+        return;
+    }
+    let s = unsafe { &mut *(*schematic).0 };
+    s.metadata.lm_version = Some(version);
+}
+
+/// Get the Minecraft data version. Returns -1 if not set.
+#[no_mangle]
+pub extern "C" fn schematic_get_mc_version(schematic: *const SchematicWrapper) -> c_int {
+    if schematic.is_null() {
+        return -1;
+    }
+    let s = unsafe { &*(*schematic).0 };
+    s.metadata.mc_version.unwrap_or(-1)
+}
+
+/// Set the Minecraft data version.
+#[no_mangle]
+pub extern "C" fn schematic_set_mc_version(schematic: *mut SchematicWrapper, version: c_int) {
+    if schematic.is_null() {
+        return;
+    }
+    let s = unsafe { &mut *(*schematic).0 };
+    s.metadata.mc_version = Some(version);
+}
+
+/// Get the WorldEdit version. Returns -1 if not set.
+#[no_mangle]
+pub extern "C" fn schematic_get_we_version(schematic: *const SchematicWrapper) -> c_int {
+    if schematic.is_null() {
+        return -1;
+    }
+    let s = unsafe { &*(*schematic).0 };
+    s.metadata.we_version.unwrap_or(-1)
+}
+
+/// Set the WorldEdit version.
+#[no_mangle]
+pub extern "C" fn schematic_set_we_version(schematic: *mut SchematicWrapper, version: c_int) {
+    if schematic.is_null() {
+        return;
+    }
+    let s = unsafe { &mut *(*schematic).0 };
+    s.metadata.we_version = Some(version);
 }
 
 // --- C-Compatible Bounding Box ---
