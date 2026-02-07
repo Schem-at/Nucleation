@@ -118,16 +118,14 @@ impl PyMchprsWorld {
     }
 
     pub fn get_schematic(&self) -> PySchematic {
-        PySchematic {
-            inner: self.inner.get_schematic().clone(),
-        }
+        PySchematic::from_inner(self.inner.get_schematic().clone())
     }
 
     pub fn into_schematic(&mut self) -> PySchematic {
         // Clone and consume the inner world since Python objects can't be moved
         let schematic = self.inner.get_schematic().clone();
         self.inner.sync_to_schematic();
-        PySchematic { inner: schematic }
+        PySchematic::from_inner(schematic)
     }
 
     fn __repr__(&self) -> String {

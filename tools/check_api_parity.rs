@@ -438,22 +438,57 @@ fn count_braces(line: &str) -> (usize, usize) {
     let mut opens = 0;
     let mut closes = 0;
     let mut in_string = false;
+    let in_char = false;
     let mut escape_next = false;
-    for ch in line.chars() {
+    let chars: Vec<char> = line.chars().collect();
+    let len = chars.len();
+    let mut i = 0;
+    while i < len {
+        let ch = chars[i];
         if escape_next {
             escape_next = false;
+            i += 1;
             continue;
         }
-        if ch == '\\' && in_string {
+        if ch == '\\' && (in_string || in_char) {
             escape_next = true;
+            i += 1;
             continue;
         }
-        if ch == '"' {
+        if ch == '"' && !in_char {
             in_string = !in_string;
+            i += 1;
             continue;
         }
         if in_string {
+            i += 1;
             continue;
+        }
+        // Handle char literals: 'x', '\n', '\x7D', etc.
+        if ch == '\'' && !in_char && !in_string {
+            // Look ahead for closing quote to confirm it's a char literal
+            // Patterns: 'x', '\x', '\xx', '\xxx' (up to 4 chars inside)
+            if i + 2 < len && chars[i + 1] != '\\' && chars[i + 2] == '\'' {
+                // Simple char literal like '{' or '}'
+                i += 3;
+                continue;
+            }
+            if i + 3 < len && chars[i + 1] == '\\' && chars[i + 3] == '\'' {
+                // Escaped char literal like '\n' or '\\'
+                i += 4;
+                continue;
+            }
+            // Longer escapes like '\x7D' — scan ahead for closing quote
+            if i + 1 < len && chars[i + 1] == '\\' {
+                let mut j = i + 2;
+                while j < len && j < i + 8 && chars[j] != '\'' {
+                    j += 1;
+                }
+                if j < len && chars[j] == '\'' {
+                    i = j + 1;
+                    continue;
+                }
+            }
         }
         if ch == '{' {
             opens += 1;
@@ -461,6 +496,7 @@ fn count_braces(line: &str) -> (usize, usize) {
         if ch == '}' {
             closes += 1;
         }
+        i += 1;
     }
     (opens, closes)
 }

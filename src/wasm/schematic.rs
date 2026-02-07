@@ -522,6 +522,92 @@ impl SchematicWrapper {
         self.0.get_block(x, y, z).cloned().map(BlockStateWrapper)
     }
 
+    /// Batch set blocks at multiple positions to the same block name.
+    /// `positions` is a flat Int32Array of [x0,y0,z0, x1,y1,z1, ...].
+    /// Returns the number of blocks set.
+    pub fn set_blocks(&mut self, positions: &[i32], block_name: &str) -> usize {
+        let count = positions.len() / 3;
+        if count == 0 {
+            return 0;
+        }
+
+        // Complex block strings fall back to per-call path
+        if block_name.contains('[') || block_name.ends_with('}') {
+            let mut set = 0;
+            for i in 0..count {
+                let (x, y, z) = (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+                if self.0.set_block_str(x, y, z, block_name) {
+                    set += 1;
+                }
+            }
+            return set;
+        }
+
+        // Pre-expand to fit all positions
+        let (mut min_x, mut min_y, mut min_z) = (positions[0], positions[1], positions[2]);
+        let (mut max_x, mut max_y, mut max_z) = (min_x, min_y, min_z);
+        for i in 1..count {
+            let (x, y, z) = (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+            if x < min_x {
+                min_x = x;
+            }
+            if y < min_y {
+                min_y = y;
+            }
+            if z < min_z {
+                min_z = z;
+            }
+            if x > max_x {
+                max_x = x;
+            }
+            if y > max_y {
+                max_y = y;
+            }
+            if z > max_z {
+                max_z = z;
+            }
+        }
+
+        let region = &mut self.0.default_region;
+        region.ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
+        let palette_index = region.get_or_insert_palette_by_name(block_name);
+
+        for i in 0..count {
+            let (x, y, z) = (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+            region.set_block_at_index_unchecked(palette_index, x, y, z);
+        }
+
+        count
+    }
+
+    /// Batch get block names at multiple positions.
+    /// `positions` is a flat Int32Array of [x0,y0,z0, x1,y1,z1, ...].
+    /// Returns a JS Array of block name strings (null for empty/out-of-bounds).
+    pub fn get_blocks(&self, positions: &[i32]) -> Array {
+        let count = positions.len() / 3;
+        let result = Array::new_with_length(count as u32);
+        let region = &self.0.default_region;
+
+        for i in 0..count {
+            let (x, y, z) = (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+            let val = if region.is_in_region(x, y, z) {
+                region
+                    .get_block_name(x, y, z)
+                    .map(|s| JsValue::from_str(s))
+                    .unwrap_or(JsValue::NULL)
+            } else {
+                // Fall back to multi-region scan
+                self.0
+                    .get_block(x, y, z)
+                    .map(|bs| JsValue::from_str(&bs.name))
+                    .unwrap_or(JsValue::NULL)
+            };
+            result.set(i as u32, val);
+        }
+
+        result
+    }
+
     pub fn get_block_entity(&self, x: i32, y: i32, z: i32) -> JsValue {
         let block_position = BlockPosition { x, y, z };
         if let Some(block_entity) = self.0.get_block_entity(block_position) {

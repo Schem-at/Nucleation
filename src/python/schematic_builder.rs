@@ -53,7 +53,7 @@ impl PySchematicBuilder {
         let schematic = builder
             .build()
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
-        Ok(PySchematic { inner: schematic })
+        Ok(PySchematic::from_inner(schematic))
     }
 
     /// Create from template string

@@ -1363,6 +1363,114 @@ impl Region {
             entity.position.1 = new_bbox_clone.min.1 as f64 + new_rel_y;
         }
     }
+
+    // ── Fast-path methods for Python binding performance ──
+
+    /// Look up or insert a block in the palette by name only (no properties).
+    /// Uses a linear scan of the palette (palettes are typically 2-20 entries).
+    /// Avoids creating a full BlockState + HashMap lookup on cache miss.
+    #[inline]
+    pub fn get_or_insert_palette_by_name(&mut self, name: &str) -> usize {
+        // Linear scan is faster than HashMap for small palettes
+        for (i, bs) in self.palette.iter().enumerate() {
+            if bs.name == name && bs.properties.is_empty() {
+                return i;
+            }
+        }
+        // Not found — insert new entry
+        let index = self.palette.len();
+        let block = BlockState::new(name.to_string());
+        self.palette_index.insert(block.clone(), index);
+        self.palette.push(block);
+        index
+    }
+
+    /// Direct array write with air-count and tight-bounds bookkeeping.
+    /// Caller must ensure (x, y, z) is within region bounds.
+    #[inline(always)]
+    pub fn set_block_at_index_unchecked(&mut self, palette_index: usize, x: i32, y: i32, z: i32) {
+        let index = self.coords_to_index(x, y, z);
+        let old_palette_index = self.blocks[index];
+        self.blocks[index] = palette_index;
+
+        let old_is_air = old_palette_index == self.cached_air_index;
+        let new_is_air = palette_index == self.cached_air_index;
+        if old_is_air && !new_is_air {
+            self.non_air_count += 1;
+        } else if !old_is_air && new_is_air {
+            self.non_air_count -= 1;
+        }
+
+        if !new_is_air {
+            self.update_tight_bounds(x, y, z);
+        }
+    }
+
+    /// Get the block name at a position without cloning anything.
+    /// Returns None if out of bounds or if the block is air.
+    #[inline]
+    pub fn get_block_name(&self, x: i32, y: i32, z: i32) -> Option<&str> {
+        if !self.is_in_region(x, y, z) {
+            return None;
+        }
+        let index = self.coords_to_index(x, y, z);
+        let block_index = self.blocks[index];
+        self.palette.get(block_index).map(|bs| bs.name.as_str())
+    }
+
+    /// Fill a rectangular region with a single palette index.
+    /// Uses row-level `fill()` for maximum throughput.
+    /// Caller must ensure min/max are within region bounds and palette_index is valid.
+    pub fn fill_uniform(
+        &mut self,
+        min: (i32, i32, i32),
+        max: (i32, i32, i32),
+        palette_index: usize,
+    ) {
+        let new_is_air = palette_index == self.cached_air_index;
+        let w = self.cached_width;
+        let wl = self.cached_width_x_length;
+        let base_x = self.bbox.min.0;
+        let base_y = self.bbox.min.1;
+        let base_z = self.bbox.min.2;
+
+        let dx_min = min.0 - base_x;
+        let dx_max = max.0 - base_x;
+        let row_len = (dx_max - dx_min + 1) as usize;
+
+        let mut air_delta: i64 = 0;
+
+        for y in min.1..=max.1 {
+            let dy = y - base_y;
+            for z in min.2..=max.2 {
+                let dz = z - base_z;
+                let row_start = (dx_min + dz * w + dy * wl) as usize;
+                let row_end = row_start + row_len;
+                let row = &mut self.blocks[row_start..row_end];
+
+                // Count air blocks being replaced/created for delta tracking
+                for &old in row.iter() {
+                    let old_is_air = old == self.cached_air_index;
+                    if old_is_air && !new_is_air {
+                        air_delta += 1;
+                    } else if !old_is_air && new_is_air {
+                        air_delta -= 1;
+                    }
+                }
+
+                row.fill(palette_index);
+            }
+        }
+
+        // Batch update non_air_count
+        self.non_air_count = (self.non_air_count as i64 + air_delta) as usize;
+
+        // Update tight bounds once for the entire fill
+        if !new_is_air {
+            self.update_tight_bounds(min.0, min.1, min.2);
+            self.update_tight_bounds(max.0, max.1, max.2);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -2009,5 +2117,566 @@ mod tests {
         assert_eq!(bounds_after.min, (1, 1, 1));
         assert_eq!(bounds_after.max, (5, 5, 5));
         assert_eq!(region.get_tight_dimensions(), (5, 5, 5));
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Phase 1: non_air_count tracking tests
+    // ══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_non_air_count_basic() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (4, 4, 4));
+        assert_eq!(region.count_blocks(), 0);
+        assert!(region.is_empty());
+
+        let stone = BlockState::new("minecraft:stone".to_string());
+        region.set_block(0, 0, 0, &stone);
+        assert_eq!(region.count_blocks(), 1);
+        assert!(!region.is_empty());
+
+        region.set_block(1, 1, 1, &stone);
+        assert_eq!(region.count_blocks(), 2);
+    }
+
+    #[test]
+    fn test_non_air_count_overwrite_non_air_with_non_air() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (4, 4, 4));
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let dirt = BlockState::new("minecraft:dirt".to_string());
+
+        region.set_block(0, 0, 0, &stone);
+        assert_eq!(region.count_blocks(), 1);
+
+        // Overwrite stone with dirt — count should stay 1
+        region.set_block(0, 0, 0, &dirt);
+        assert_eq!(region.count_blocks(), 1);
+        assert_eq!(region.get_block(0, 0, 0), Some(&dirt));
+    }
+
+    #[test]
+    fn test_non_air_count_overwrite_non_air_with_air() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (4, 4, 4));
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let air = BlockState::new("minecraft:air".to_string());
+
+        region.set_block(0, 0, 0, &stone);
+        region.set_block(1, 0, 0, &stone);
+        assert_eq!(region.count_blocks(), 2);
+
+        // Replace stone with air — count should decrement
+        region.set_block(0, 0, 0, &air);
+        assert_eq!(region.count_blocks(), 1);
+        assert!(!region.is_empty());
+
+        region.set_block(1, 0, 0, &air);
+        assert_eq!(region.count_blocks(), 0);
+        assert!(region.is_empty());
+    }
+
+    #[test]
+    fn test_non_air_count_set_air_on_air() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (4, 4, 4));
+        let air = BlockState::new("minecraft:air".to_string());
+
+        // Setting air on already-air should not underflow
+        region.set_block(0, 0, 0, &air);
+        assert_eq!(region.count_blocks(), 0);
+        assert!(region.is_empty());
+    }
+
+    #[test]
+    fn test_non_air_count_survives_expansion() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (2, 2, 2));
+        let stone = BlockState::new("minecraft:stone".to_string());
+
+        region.set_block(0, 0, 0, &stone);
+        region.set_block(1, 1, 1, &stone);
+        assert_eq!(region.count_blocks(), 2);
+
+        // Trigger expansion
+        region.set_block(10, 10, 10, &stone);
+        assert_eq!(region.count_blocks(), 3);
+
+        // Original blocks should still be there
+        assert_eq!(region.get_block(0, 0, 0), Some(&stone));
+        assert_eq!(region.get_block(1, 1, 1), Some(&stone));
+    }
+
+    #[test]
+    fn test_non_air_count_after_merge() {
+        let mut r1 = Region::new("R1".to_string(), (0, 0, 0), (4, 4, 4));
+        let mut r2 = Region::new("R2".to_string(), (4, 0, 0), (4, 4, 4));
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let dirt = BlockState::new("minecraft:dirt".to_string());
+
+        r1.set_block(0, 0, 0, &stone);
+        r1.set_block(1, 0, 0, &stone);
+        r2.set_block(4, 0, 0, &dirt);
+        r2.set_block(5, 0, 0, &dirt);
+        r2.set_block(6, 0, 0, &dirt);
+
+        r1.merge(&r2);
+        assert_eq!(r1.count_blocks(), 5);
+    }
+
+    #[test]
+    fn test_non_air_count_after_flip() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (4, 4, 4));
+        let stone = BlockState::new("minecraft:stone".to_string());
+
+        region.set_block(0, 0, 0, &stone);
+        region.set_block(1, 1, 1, &stone);
+        region.set_block(2, 2, 2, &stone);
+        assert_eq!(region.count_blocks(), 3);
+
+        region.flip_x();
+        assert_eq!(region.count_blocks(), 3);
+
+        region.flip_y();
+        assert_eq!(region.count_blocks(), 3);
+
+        region.flip_z();
+        assert_eq!(region.count_blocks(), 3);
+    }
+
+    #[test]
+    fn test_non_air_count_after_rotate() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (4, 4, 4));
+        let stone = BlockState::new("minecraft:stone".to_string());
+
+        region.set_block(0, 0, 0, &stone);
+        region.set_block(1, 1, 1, &stone);
+        assert_eq!(region.count_blocks(), 2);
+
+        region.rotate_y(90);
+        assert_eq!(region.count_blocks(), 2);
+
+        region.rotate_x(90);
+        assert_eq!(region.count_blocks(), 2);
+
+        region.rotate_z(90);
+        assert_eq!(region.count_blocks(), 2);
+    }
+
+    #[test]
+    fn test_non_air_count_after_to_compact() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (10, 10, 10));
+        let stone = BlockState::new("minecraft:stone".to_string());
+
+        region.set_block(2, 2, 2, &stone);
+        region.set_block(5, 5, 5, &stone);
+        region.set_block(3, 3, 3, &stone);
+
+        let compact = region.to_compact();
+        assert_eq!(compact.count_blocks(), 3);
+        assert!(!compact.is_empty());
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Phase 2: expand_to_bounding_box row copy correctness
+    // ══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_expand_preserves_all_blocks_3d() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (3, 3, 3));
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let dirt = BlockState::new("minecraft:dirt".to_string());
+        let glass = BlockState::new("minecraft:glass".to_string());
+
+        // Fill with a unique pattern per position
+        region.set_block(0, 0, 0, &stone);
+        region.set_block(1, 0, 0, &dirt);
+        region.set_block(2, 0, 0, &glass);
+        region.set_block(0, 1, 1, &dirt);
+        region.set_block(1, 2, 2, &glass);
+        region.set_block(2, 2, 0, &stone);
+
+        // Expand in negative direction
+        region.set_block(-5, -5, -5, &stone);
+
+        // Verify all original blocks survived the expansion
+        assert_eq!(region.get_block(0, 0, 0), Some(&stone));
+        assert_eq!(region.get_block(1, 0, 0), Some(&dirt));
+        assert_eq!(region.get_block(2, 0, 0), Some(&glass));
+        assert_eq!(region.get_block(0, 1, 1), Some(&dirt));
+        assert_eq!(region.get_block(1, 2, 2), Some(&glass));
+        assert_eq!(region.get_block(2, 2, 0), Some(&stone));
+        assert_eq!(region.get_block(-5, -5, -5), Some(&stone));
+    }
+
+    #[test]
+    fn test_expand_with_negative_origin() {
+        let mut region = Region::new("Test".to_string(), (-2, -2, -2), (4, 4, 4));
+        let stone = BlockState::new("minecraft:stone".to_string());
+
+        region.set_block(-2, -2, -2, &stone);
+        region.set_block(1, 1, 1, &stone);
+
+        // Expand further negative
+        region.set_block(-10, -10, -10, &stone);
+
+        assert_eq!(region.get_block(-2, -2, -2), Some(&stone));
+        assert_eq!(region.get_block(1, 1, 1), Some(&stone));
+        assert_eq!(region.get_block(-10, -10, -10), Some(&stone));
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Phase 3: Flip correctness — double flip must restore original
+    // ══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_flip_x_double_restores_original() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (5, 3, 4));
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let dirt = BlockState::new("minecraft:dirt".to_string());
+
+        region.set_block(0, 0, 0, &stone);
+        region.set_block(4, 2, 3, &dirt);
+        region.set_block(2, 1, 2, &stone);
+
+        let original_blocks = region.blocks.clone();
+
+        region.flip_x();
+        region.flip_x();
+
+        assert_eq!(region.blocks, original_blocks);
+    }
+
+    #[test]
+    fn test_flip_y_double_restores_original() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (5, 3, 4));
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let dirt = BlockState::new("minecraft:dirt".to_string());
+
+        region.set_block(0, 0, 0, &stone);
+        region.set_block(4, 2, 3, &dirt);
+        region.set_block(2, 1, 2, &stone);
+
+        let original_blocks = region.blocks.clone();
+
+        region.flip_y();
+        region.flip_y();
+
+        assert_eq!(region.blocks, original_blocks);
+    }
+
+    #[test]
+    fn test_flip_z_double_restores_original() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (5, 3, 4));
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let dirt = BlockState::new("minecraft:dirt".to_string());
+
+        region.set_block(0, 0, 0, &stone);
+        region.set_block(4, 2, 3, &dirt);
+        region.set_block(2, 1, 2, &stone);
+
+        let original_blocks = region.blocks.clone();
+
+        region.flip_z();
+        region.flip_z();
+
+        assert_eq!(region.blocks, original_blocks);
+    }
+
+    #[test]
+    fn test_flip_x_odd_width() {
+        // Odd width: middle column should stay in place
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (3, 1, 1));
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let dirt = BlockState::new("minecraft:dirt".to_string());
+        let glass = BlockState::new("minecraft:glass".to_string());
+
+        region.set_block(0, 0, 0, &stone);
+        region.set_block(1, 0, 0, &dirt);
+        region.set_block(2, 0, 0, &glass);
+
+        region.flip_x();
+
+        // After flip_x: block at x=0 should now be at x=2 and vice versa
+        // But palette is also transformed, so check via get_block
+        // The block content at position 0 should now be what was at position 2
+        let b0 = region.get_block(0, 0, 0).unwrap();
+        let b2 = region.get_block(2, 0, 0).unwrap();
+        // glass was at x=2, should now be at x=0
+        assert!(b0.name.contains("glass"));
+        // stone was at x=0, should now be at x=2
+        assert!(b2.name.contains("stone"));
+    }
+
+    #[test]
+    fn test_flip_y_odd_height() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (1, 3, 1));
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let dirt = BlockState::new("minecraft:dirt".to_string());
+
+        region.set_block(0, 0, 0, &stone);
+        region.set_block(0, 2, 0, &dirt);
+
+        region.flip_y();
+
+        let b0 = region.get_block(0, 0, 0).unwrap();
+        let b2 = region.get_block(0, 2, 0).unwrap();
+        assert!(b0.name.contains("dirt"));
+        assert!(b2.name.contains("stone"));
+    }
+
+    #[test]
+    fn test_flip_z_odd_length() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (1, 1, 3));
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let dirt = BlockState::new("minecraft:dirt".to_string());
+
+        region.set_block(0, 0, 0, &stone);
+        region.set_block(0, 0, 2, &dirt);
+
+        region.flip_z();
+
+        let b0 = region.get_block(0, 0, 0).unwrap();
+        let b2 = region.get_block(0, 0, 2).unwrap();
+        assert!(b0.name.contains("dirt"));
+        assert!(b2.name.contains("stone"));
+    }
+
+    #[test]
+    fn test_flip_dimension_1() {
+        // Flipping along an axis where that dimension is 1 should be a no-op for blocks
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (1, 4, 4));
+        let stone = BlockState::new("minecraft:stone".to_string());
+
+        region.set_block(0, 0, 0, &stone);
+        region.set_block(0, 3, 3, &stone);
+
+        let original_blocks = region.blocks.clone();
+        region.flip_x();
+        assert_eq!(region.blocks, original_blocks);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Phase 4: to_compact row copy correctness
+    // ══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_to_compact_preserves_all_blocks() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (20, 20, 20));
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let dirt = BlockState::new("minecraft:dirt".to_string());
+        let glass = BlockState::new("minecraft:glass".to_string());
+
+        // Place blocks at various positions
+        region.set_block(5, 5, 5, &stone);
+        region.set_block(10, 10, 10, &dirt);
+        region.set_block(7, 8, 9, &glass);
+        region.set_block(5, 10, 5, &stone);
+        region.set_block(10, 5, 10, &dirt);
+
+        let compact = region.to_compact();
+
+        // All blocks should be retrievable at the same world coordinates
+        assert_eq!(compact.get_block(5, 5, 5), Some(&stone));
+        assert_eq!(compact.get_block(10, 10, 10), Some(&dirt));
+        assert_eq!(compact.get_block(7, 8, 9), Some(&glass));
+        assert_eq!(compact.get_block(5, 10, 5), Some(&stone));
+        assert_eq!(compact.get_block(10, 5, 10), Some(&dirt));
+        assert_eq!(compact.count_blocks(), 5);
+    }
+
+    #[test]
+    fn test_to_compact_single_block() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (100, 100, 100));
+        let stone = BlockState::new("minecraft:stone".to_string());
+
+        region.set_block(50, 50, 50, &stone);
+
+        let compact = region.to_compact();
+        assert_eq!(compact.size, (1, 1, 1));
+        assert_eq!(compact.get_block(50, 50, 50), Some(&stone));
+        assert_eq!(compact.count_blocks(), 1);
+    }
+
+    #[test]
+    fn test_to_compact_empty_region() {
+        let region = Region::new("Test".to_string(), (0, 0, 0), (10, 10, 10));
+
+        let compact = region.to_compact();
+        assert_eq!(compact.count_blocks(), 0);
+        assert!(compact.is_empty());
+    }
+
+    #[test]
+    fn test_to_compact_air_not_counted() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (10, 10, 10));
+        let stone = BlockState::new("minecraft:stone".to_string());
+
+        // Place blocks in a line
+        for x in 3..7 {
+            region.set_block(x, 5, 5, &stone);
+        }
+
+        let compact = region.to_compact();
+        assert_eq!(compact.count_blocks(), 4);
+
+        // Air blocks between stone and edges should exist in compact but not be counted
+        let air_pos = compact.get_block(3, 5, 5);
+        assert_eq!(air_pos, Some(&stone));
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Phase 5: Merge palette remap correctness
+    // ══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_merge_palette_remap_correctness() {
+        let mut r1 = Region::new("R1".to_string(), (0, 0, 0), (4, 4, 4));
+        let mut r2 = Region::new("R2".to_string(), (4, 0, 0), (4, 4, 4));
+
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let dirt = BlockState::new("minecraft:dirt".to_string());
+        let glass = BlockState::new("minecraft:glass".to_string());
+        let oak = BlockState::new("minecraft:oak_planks".to_string());
+
+        // r1 has stone, dirt
+        r1.set_block(0, 0, 0, &stone);
+        r1.set_block(1, 0, 0, &dirt);
+
+        // r2 has glass, oak (different palette)
+        r2.set_block(4, 0, 0, &glass);
+        r2.set_block(5, 0, 0, &oak);
+
+        r1.merge(&r2);
+
+        // All blocks should be correct after palette remapping
+        assert_eq!(r1.get_block(0, 0, 0), Some(&stone));
+        assert_eq!(r1.get_block(1, 0, 0), Some(&dirt));
+        assert_eq!(r1.get_block(4, 0, 0), Some(&glass));
+        assert_eq!(r1.get_block(5, 0, 0), Some(&oak));
+    }
+
+    #[test]
+    fn test_merge_air_from_other_does_not_overwrite() {
+        let mut r1 = Region::new("R1".to_string(), (0, 0, 0), (4, 4, 4));
+        let r2 = Region::new("R2".to_string(), (0, 0, 0), (4, 4, 4));
+
+        let stone = BlockState::new("minecraft:stone".to_string());
+
+        // r1 has a stone block; r2 has air at the same position
+        r1.set_block(0, 0, 0, &stone);
+
+        r1.merge(&r2);
+
+        // Air from r2 should NOT overwrite stone from r1
+        assert_eq!(r1.get_block(0, 0, 0), Some(&stone));
+    }
+
+    #[test]
+    fn test_merge_overlapping_non_air_overwrites() {
+        let mut r1 = Region::new("R1".to_string(), (0, 0, 0), (4, 4, 4));
+        let mut r2 = Region::new("R2".to_string(), (0, 0, 0), (4, 4, 4));
+
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let dirt = BlockState::new("minecraft:dirt".to_string());
+
+        r1.set_block(0, 0, 0, &stone);
+        r2.set_block(0, 0, 0, &dirt);
+
+        r1.merge(&r2);
+
+        // Dirt from r2 should overwrite stone from r1
+        assert_eq!(r1.get_block(0, 0, 0), Some(&dirt));
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Cross-phase: cached fields consistency after complex operations
+    // ══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_cached_dims_after_rotation() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (3, 5, 7));
+        let stone = BlockState::new("minecraft:stone".to_string());
+        region.set_block(0, 0, 0, &stone);
+
+        // After rotate_y(90): (3,5,7) -> (7,5,3)
+        region.rotate_y(90);
+        let dims = region.get_dimensions();
+        assert_eq!(dims, (7, 5, 3));
+
+        // coords_to_index should still work correctly
+        let vol = region.volume();
+        for i in 0..vol {
+            let (x, y, z) = region.index_to_coords(i);
+            let roundtrip = region.coords_to_index(x, y, z);
+            assert_eq!(i, roundtrip, "roundtrip failed for index {}", i);
+        }
+    }
+
+    #[test]
+    fn test_index_roundtrip_after_expand() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (3, 3, 3));
+        let stone = BlockState::new("minecraft:stone".to_string());
+        region.set_block(0, 0, 0, &stone);
+
+        // Trigger expansion
+        region.set_block(20, 20, 20, &stone);
+
+        let vol = region.volume();
+        for i in 0..vol {
+            let (x, y, z) = region.index_to_coords(i);
+            let roundtrip = region.coords_to_index(x, y, z);
+            assert_eq!(
+                i, roundtrip,
+                "roundtrip failed for index {} -> ({},{},{}) -> {}",
+                i, x, y, z, roundtrip
+            );
+        }
+    }
+
+    #[test]
+    fn test_nbt_roundtrip_preserves_count() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (4, 4, 4));
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let dirt = BlockState::new("minecraft:dirt".to_string());
+
+        region.set_block(0, 0, 0, &stone);
+        region.set_block(1, 1, 1, &dirt);
+        region.set_block(2, 2, 2, &stone);
+
+        let nbt = region.to_nbt();
+        let deserialized = match nbt {
+            NbtTag::Compound(compound) => Region::from_nbt(&compound).unwrap(),
+            _ => panic!("Expected NbtTag::Compound"),
+        };
+
+        assert_eq!(deserialized.count_blocks(), 3);
+        assert!(!deserialized.is_empty());
+        assert_eq!(deserialized.get_block(0, 0, 0), Some(&stone));
+        assert_eq!(deserialized.get_block(1, 1, 1), Some(&dirt));
+        assert_eq!(deserialized.get_block(2, 2, 2), Some(&stone));
+    }
+
+    #[test]
+    fn test_full_solid_fill_then_clear() {
+        let mut region = Region::new("Test".to_string(), (0, 0, 0), (4, 4, 4));
+        let stone = BlockState::new("minecraft:stone".to_string());
+        let air = BlockState::new("minecraft:air".to_string());
+
+        // Fill entirely with stone
+        for y in 0..4 {
+            for z in 0..4 {
+                for x in 0..4 {
+                    region.set_block(x, y, z, &stone);
+                }
+            }
+        }
+        assert_eq!(region.count_blocks(), 64);
+
+        // Clear every block back to air
+        for y in 0..4 {
+            for z in 0..4 {
+                for x in 0..4 {
+                    region.set_block(x, y, z, &air);
+                }
+            }
+        }
+        assert_eq!(region.count_blocks(), 0);
+        assert!(region.is_empty());
     }
 }

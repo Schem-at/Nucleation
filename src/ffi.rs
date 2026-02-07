@@ -451,6 +451,127 @@ pub extern "C" fn schematic_set_block_from_string(
     }
 }
 
+/// Batch-sets blocks at multiple positions to the same block name.
+/// `positions` is a flat array of [x0,y0,z0, x1,y1,z1, ...] with `positions_len` elements (must be a multiple of 3).
+/// Returns the number of blocks set, or negative on error.
+#[no_mangle]
+pub extern "C" fn schematic_set_blocks(
+    schematic: *mut SchematicWrapper,
+    positions: *const c_int,
+    positions_len: usize,
+    block_name: *const c_char,
+) -> c_int {
+    if schematic.is_null() || positions.is_null() || block_name.is_null() {
+        return -1;
+    }
+    if positions_len % 3 != 0 {
+        return -2;
+    }
+    let count = positions_len / 3;
+    if count == 0 {
+        return 0;
+    }
+    let s = unsafe { &mut *(*schematic).0 };
+    let block_name_str = unsafe { CStr::from_ptr(block_name).to_string_lossy() };
+    let pos_slice = unsafe { std::slice::from_raw_parts(positions, positions_len) };
+
+    // Complex block strings fall back to per-call path
+    if block_name_str.contains('[') || block_name_str.ends_with('}') {
+        let mut set = 0i32;
+        for i in 0..count {
+            let (x, y, z) = (pos_slice[i * 3], pos_slice[i * 3 + 1], pos_slice[i * 3 + 2]);
+            if s.set_block_str(x, y, z, &block_name_str) {
+                set += 1;
+            }
+        }
+        return set;
+    }
+
+    // Pre-expand to fit all positions
+    let (mut min_x, mut min_y, mut min_z) = (pos_slice[0], pos_slice[1], pos_slice[2]);
+    let (mut max_x, mut max_y, mut max_z) = (min_x, min_y, min_z);
+    for i in 1..count {
+        let (x, y, z) = (pos_slice[i * 3], pos_slice[i * 3 + 1], pos_slice[i * 3 + 2]);
+        if x < min_x {
+            min_x = x;
+        }
+        if y < min_y {
+            min_y = y;
+        }
+        if z < min_z {
+            min_z = z;
+        }
+        if x > max_x {
+            max_x = x;
+        }
+        if y > max_y {
+            max_y = y;
+        }
+        if z > max_z {
+            max_z = z;
+        }
+    }
+
+    let region = &mut s.default_region;
+    region.ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
+    let palette_index = region.get_or_insert_palette_by_name(&block_name_str);
+
+    for i in 0..count {
+        let (x, y, z) = (pos_slice[i * 3], pos_slice[i * 3 + 1], pos_slice[i * 3 + 2]);
+        region.set_block_at_index_unchecked(palette_index, x, y, z);
+    }
+
+    count as c_int
+}
+
+/// Batch-gets block names at multiple positions.
+/// `positions` is a flat array of [x0,y0,z0, x1,y1,z1, ...] with `positions_len` elements (must be a multiple of 3).
+/// Returns a StringArray where each entry is the block name (or NULL for empty/out-of-bounds).
+/// The returned StringArray must be freed with `free_string_array`.
+#[no_mangle]
+pub extern "C" fn schematic_get_blocks(
+    schematic: *const SchematicWrapper,
+    positions: *const c_int,
+    positions_len: usize,
+) -> StringArray {
+    if schematic.is_null() || positions.is_null() || positions_len % 3 != 0 {
+        return StringArray {
+            data: ptr::null_mut(),
+            len: 0,
+        };
+    }
+    let count = positions_len / 3;
+    if count == 0 {
+        return StringArray {
+            data: ptr::null_mut(),
+            len: 0,
+        };
+    }
+    let s = unsafe { &*(*schematic).0 };
+    let pos_slice = unsafe { std::slice::from_raw_parts(positions, positions_len) };
+    let region = &s.default_region;
+
+    let mut results: Vec<*mut c_char> = Vec::with_capacity(count);
+    for i in 0..count {
+        let (x, y, z) = (pos_slice[i * 3], pos_slice[i * 3 + 1], pos_slice[i * 3 + 2]);
+        let name = if region.is_in_region(x, y, z) {
+            region.get_block_name(x, y, z)
+        } else {
+            s.get_block(x, y, z).map(|bs| bs.name.as_str())
+        };
+        match name {
+            Some(n) => results.push(CString::new(n).unwrap().into_raw()),
+            None => results.push(ptr::null_mut()),
+        }
+    }
+
+    let mut results = std::mem::ManuallyDrop::new(results);
+    StringArray {
+        data: results.as_mut_ptr(),
+        len: count,
+    }
+}
+
 /// Copies a region from a source schematic to a target schematic.
 /// Returns 0 on success, negative on error.
 #[no_mangle]

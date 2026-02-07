@@ -78,15 +78,48 @@ impl PyBlockState {
 #[pyclass(name = "Schematic")]
 pub struct PySchematic {
     pub(crate) inner: UniversalSchematic,
+    // ── Cached fields for fast-path Python bindings ──
+    last_block_name: String,
+    last_palette_index: usize,
+    default_region_initialized: bool,
+}
+
+impl PySchematic {
+    /// Create a PySchematic from an existing UniversalSchematic.
+    /// Used by builder, simulation, and other internal constructors.
+    pub(crate) fn from_inner(inner: UniversalSchematic) -> Self {
+        Self {
+            inner,
+            last_block_name: String::new(),
+            last_palette_index: 0,
+            default_region_initialized: false,
+        }
+    }
+
+    /// Ensure the default region is properly initialized for the given coordinate.
+    /// Only does real work on the very first call.
+    #[inline(always)]
+    fn ensure_default_region(&mut self, x: i32, y: i32, z: i32) {
+        if !self.default_region_initialized {
+            if self.inner.default_region.size == (1, 1, 1) && self.inner.default_region.is_empty() {
+                self.inner.default_region = crate::region::Region::new(
+                    self.inner.default_region_name.clone(),
+                    (x, y, z),
+                    (1, 1, 1),
+                );
+            }
+            self.default_region_initialized = true;
+        }
+    }
 }
 
 #[pymethods]
 impl PySchematic {
     #[new]
     fn new(name: Option<String>) -> Self {
-        Self {
-            inner: UniversalSchematic::new(name.unwrap_or_else(|| "Default".to_string())),
-        }
+        Self::from_inner(UniversalSchematic::new(
+            name.unwrap_or_else(|| "Default".to_string()),
+        ))
     }
 
     // test method to check if the Python class is working
@@ -103,6 +136,9 @@ impl PySchematic {
         match manager.read(data) {
             Ok(schematic) => {
                 self.inner = schematic;
+                self.last_block_name.clear();
+                self.last_palette_index = 0;
+                self.default_region_initialized = true; // loaded schematics are already initialized
                 Ok(())
             }
             Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -121,12 +157,26 @@ impl PySchematic {
         max_z: i32,
         block_state: &str,
     ) {
-        let block = BlockState::new(block_state.to_string());
-        let shape = Cuboid::new((min_x, min_y, min_z), (max_x, max_y, max_z));
-        let brush = SolidBrush::new(block);
+        // For complex block strings (with properties/NBT), fall back to BuildingTool
+        if block_state.contains('[') || block_state.ends_with('}') {
+            let block = BlockState::new(block_state.to_string());
+            let shape = Cuboid::new((min_x, min_y, min_z), (max_x, max_y, max_z));
+            let brush = SolidBrush::new(block);
+            let mut tool = BuildingTool::new(&mut self.inner);
+            tool.fill(&shape, &brush);
+            return;
+        }
 
-        let mut tool = BuildingTool::new(&mut self.inner);
-        tool.fill(&shape, &brush);
+        // Fast path: direct array fill for simple block names
+        self.ensure_default_region(min_x, min_y, min_z);
+
+        let region = &mut self.inner.default_region;
+
+        // Pre-expand to fit both corners at once
+        region.ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
+
+        let palette_index = region.get_or_insert_palette_by_name(block_state);
+        region.fill_uniform((min_x, min_y, min_z), (max_x, max_y, max_z), palette_index);
     }
 
     pub fn fill_sphere(&mut self, cx: i32, cy: i32, cz: i32, radius: f64, block_state: &str) {
@@ -170,6 +220,8 @@ impl PySchematic {
     pub fn from_litematic(&mut self, data: &[u8]) -> PyResult<()> {
         self.inner = litematic::from_litematic(data)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+        self.last_block_name.clear();
+        self.default_region_initialized = true;
         Ok(())
     }
 
@@ -182,6 +234,8 @@ impl PySchematic {
     pub fn from_schematic(&mut self, data: &[u8]) -> PyResult<()> {
         self.inner = schematic::from_schematic(data)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+        self.last_block_name.clear();
+        self.default_region_initialized = true;
         Ok(())
     }
 
@@ -192,7 +246,36 @@ impl PySchematic {
     }
 
     pub fn set_block(&mut self, x: i32, y: i32, z: i32, block_name: &str) -> bool {
-        self.inner.set_block_str(x, y, z, block_name)
+        // Fast path: simple block names (no properties/NBT) go directly to Region
+        if block_name.contains('[') || block_name.ends_with('}') {
+            // Complex block string — fall back to full parsing path
+            return self.inner.set_block_str(x, y, z, block_name);
+        }
+
+        // One-time default region initialization
+        self.ensure_default_region(x, y, z);
+
+        let region = &mut self.inner.default_region;
+
+        // Expand region if coordinate is outside bounds
+        if !region.is_in_region(x, y, z) {
+            region.expand_to_fit(x, y, z);
+        }
+
+        // Check block name cache — avoid palette lookup on repeated block names
+        let palette_index = if block_name == self.last_block_name {
+            self.last_palette_index
+        } else {
+            let idx = region.get_or_insert_palette_by_name(block_name);
+            self.last_block_name.clear();
+            self.last_block_name.push_str(block_name);
+            self.last_palette_index = idx;
+            idx
+        };
+
+        // Direct array write with bookkeeping
+        region.set_block_at_index_unchecked(palette_index, x, y, z);
+        true
     }
 
     pub fn set_block_in_region(
@@ -297,6 +380,16 @@ impl PySchematic {
     }
 
     pub fn get_block(&self, x: i32, y: i32, z: i32) -> Option<PyBlockState> {
+        // Fast path: try default region directly first
+        if self.inner.default_region.is_in_region(x, y, z) {
+            return self
+                .inner
+                .default_region
+                .get_block(x, y, z)
+                .cloned()
+                .map(|bs| PyBlockState { inner: bs });
+        }
+        // Fall back to multi-region scan
         self.inner
             .get_block(x, y, z)
             .cloned()
@@ -305,7 +398,91 @@ impl PySchematic {
 
     /// Get block as formatted string with properties (e.g., "minecraft:lever[powered=true,facing=north]")
     pub fn get_block_string(&self, x: i32, y: i32, z: i32) -> Option<String> {
+        // Fast path: try default region directly, returning name only if no properties
+        if self.inner.default_region.is_in_region(x, y, z) {
+            return self
+                .inner
+                .default_region
+                .get_block(x, y, z)
+                .map(|bs| bs.to_string());
+        }
+        // Fall back to multi-region scan
         self.inner.get_block(x, y, z).map(|bs| bs.to_string())
+    }
+
+    /// Batch set blocks at multiple positions with the same block name.
+    /// Crosses the FFI boundary once. Returns the number of blocks set.
+    pub fn set_blocks(&mut self, positions: Vec<(i32, i32, i32)>, block_name: &str) -> usize {
+        if positions.is_empty() {
+            return 0;
+        }
+
+        // Complex block strings fall back to per-call path
+        if block_name.contains('[') || block_name.ends_with('}') {
+            let mut count = 0;
+            for &(x, y, z) in &positions {
+                if self.inner.set_block_str(x, y, z, block_name) {
+                    count += 1;
+                }
+            }
+            return count;
+        }
+
+        // Initialize default region with first position
+        let (fx, fy, fz) = positions[0];
+        self.ensure_default_region(fx, fy, fz);
+
+        // Pre-expand to fit all positions
+        let mut min = (fx, fy, fz);
+        let mut max = (fx, fy, fz);
+        for &(x, y, z) in &positions[1..] {
+            if x < min.0 {
+                min.0 = x;
+            }
+            if y < min.1 {
+                min.1 = y;
+            }
+            if z < min.2 {
+                min.2 = z;
+            }
+            if x > max.0 {
+                max.0 = x;
+            }
+            if y > max.1 {
+                max.1 = y;
+            }
+            if z > max.2 {
+                max.2 = z;
+            }
+        }
+
+        let region = &mut self.inner.default_region;
+        region.ensure_bounds(min, max);
+
+        let palette_index = region.get_or_insert_palette_by_name(block_name);
+
+        for &(x, y, z) in &positions {
+            region.set_block_at_index_unchecked(palette_index, x, y, z);
+        }
+
+        positions.len()
+    }
+
+    /// Batch get block names at multiple positions.
+    /// Crosses the FFI boundary once. Returns a list of block names (None for out-of-bounds).
+    pub fn get_blocks(&self, positions: Vec<(i32, i32, i32)>) -> Vec<Option<String>> {
+        let region = &self.inner.default_region;
+        positions
+            .iter()
+            .map(|&(x, y, z)| {
+                if region.is_in_region(x, y, z) {
+                    region.get_block_name(x, y, z).map(|s| s.to_string())
+                } else {
+                    // Fall back to multi-region scan
+                    self.inner.get_block(x, y, z).map(|bs| bs.name.clone())
+                }
+            })
+            .collect()
     }
 
     /// Get the palette for the default region
