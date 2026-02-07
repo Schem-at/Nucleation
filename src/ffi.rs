@@ -3227,7 +3227,7 @@ pub extern "C" fn schematicbuilder_from_template(
 mod meshing_ffi {
     use super::*;
     use crate::meshing::{
-        ChunkMeshResult, MeshConfig, MeshResult, MultiMeshResult, ResourcePackSource,
+        ChunkMeshResult, MeshConfig, MeshResult, MultiMeshResult, RawMeshExport, ResourcePackSource,
     };
 
     // --- Wrapper Structs ---
@@ -3237,6 +3237,7 @@ mod meshing_ffi {
     pub struct FFIMeshResult(MeshResult);
     pub struct FFIMultiMeshResult(MultiMeshResult);
     pub struct FFIChunkMeshResult(ChunkMeshResult);
+    pub struct FFIRawMeshExport(RawMeshExport);
 
     // --- ResourcePack Lifecycle ---
 
@@ -3609,6 +3610,42 @@ mod meshing_ffi {
         config.atlas_max_size
     }
 
+    #[no_mangle]
+    pub extern "C" fn meshconfig_set_cull_occluded_blocks(ptr: *mut FFIMeshConfig, val: c_int) {
+        if ptr.is_null() {
+            return;
+        }
+        let config = unsafe { &mut (*ptr).0 };
+        config.cull_occluded_blocks = val != 0;
+    }
+
+    #[no_mangle]
+    pub extern "C" fn meshconfig_get_cull_occluded_blocks(ptr: *const FFIMeshConfig) -> c_int {
+        if ptr.is_null() {
+            return 1; // default: true
+        }
+        let config = unsafe { &(*ptr).0 };
+        config.cull_occluded_blocks as c_int
+    }
+
+    #[no_mangle]
+    pub extern "C" fn meshconfig_set_greedy_meshing(ptr: *mut FFIMeshConfig, val: c_int) {
+        if ptr.is_null() {
+            return;
+        }
+        let config = unsafe { &mut (*ptr).0 };
+        config.greedy_meshing = val != 0;
+    }
+
+    #[no_mangle]
+    pub extern "C" fn meshconfig_get_greedy_meshing(ptr: *const FFIMeshConfig) -> c_int {
+        if ptr.is_null() {
+            return 0; // default: false
+        }
+        let config = unsafe { &(*ptr).0 };
+        config.greedy_meshing as c_int
+    }
+
     // --- MeshResult FFI ---
 
     #[no_mangle]
@@ -3907,5 +3944,184 @@ mod meshing_ffi {
             Ok(result) => Box::into_raw(Box::new(FFIChunkMeshResult(result))),
             Err(_) => ptr::null_mut(),
         }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn schematic_to_usdz(
+        schematic: *const SchematicWrapper,
+        pack: *const FFIResourcePack,
+        config: *const FFIMeshConfig,
+    ) -> *mut FFIMeshResult {
+        if schematic.is_null() || pack.is_null() || config.is_null() {
+            return ptr::null_mut();
+        }
+        let s = unsafe { &*(*schematic).0 };
+        let p = unsafe { &(*pack).0 };
+        let c = unsafe { &(*config).0 };
+        match s.to_usdz(p, c) {
+            Ok(result) => Box::into_raw(Box::new(FFIMeshResult(result))),
+            Err(_) => ptr::null_mut(),
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn schematic_to_raw_mesh(
+        schematic: *const SchematicWrapper,
+        pack: *const FFIResourcePack,
+        config: *const FFIMeshConfig,
+    ) -> *mut FFIRawMeshExport {
+        if schematic.is_null() || pack.is_null() || config.is_null() {
+            return ptr::null_mut();
+        }
+        let s = unsafe { &*(*schematic).0 };
+        let p = unsafe { &(*pack).0 };
+        let c = unsafe { &(*config).0 };
+        match s.to_raw_mesh(p, c) {
+            Ok(result) => Box::into_raw(Box::new(FFIRawMeshExport(result))),
+            Err(_) => ptr::null_mut(),
+        }
+    }
+
+    // --- RawMeshExport FFI ---
+
+    #[no_mangle]
+    pub extern "C" fn rawmeshexport_free(ptr: *mut FFIRawMeshExport) {
+        if !ptr.is_null() {
+            unsafe {
+                let _ = Box::from_raw(ptr);
+            }
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn rawmeshexport_vertex_count(ptr: *const FFIRawMeshExport) -> usize {
+        if ptr.is_null() {
+            return 0;
+        }
+        let raw = unsafe { &(*ptr).0 };
+        raw.vertex_count()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn rawmeshexport_triangle_count(ptr: *const FFIRawMeshExport) -> usize {
+        if ptr.is_null() {
+            return 0;
+        }
+        let raw = unsafe { &(*ptr).0 };
+        raw.triangle_count()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn rawmeshexport_positions(ptr: *const FFIRawMeshExport) -> CFloatArray {
+        if ptr.is_null() {
+            return CFloatArray {
+                data: ptr::null_mut(),
+                len: 0,
+            };
+        }
+        let raw = unsafe { &(*ptr).0 };
+        let floats = raw.positions_flat();
+        let len = floats.len();
+        let boxed = floats.into_boxed_slice();
+        let data = Box::into_raw(boxed) as *mut c_float;
+        CFloatArray { data, len }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn rawmeshexport_normals(ptr: *const FFIRawMeshExport) -> CFloatArray {
+        if ptr.is_null() {
+            return CFloatArray {
+                data: ptr::null_mut(),
+                len: 0,
+            };
+        }
+        let raw = unsafe { &(*ptr).0 };
+        let floats = raw.normals_flat();
+        let len = floats.len();
+        let boxed = floats.into_boxed_slice();
+        let data = Box::into_raw(boxed) as *mut c_float;
+        CFloatArray { data, len }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn rawmeshexport_uvs(ptr: *const FFIRawMeshExport) -> CFloatArray {
+        if ptr.is_null() {
+            return CFloatArray {
+                data: ptr::null_mut(),
+                len: 0,
+            };
+        }
+        let raw = unsafe { &(*ptr).0 };
+        let floats = raw.uvs_flat();
+        let len = floats.len();
+        let boxed = floats.into_boxed_slice();
+        let data = Box::into_raw(boxed) as *mut c_float;
+        CFloatArray { data, len }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn rawmeshexport_colors(ptr: *const FFIRawMeshExport) -> CFloatArray {
+        if ptr.is_null() {
+            return CFloatArray {
+                data: ptr::null_mut(),
+                len: 0,
+            };
+        }
+        let raw = unsafe { &(*ptr).0 };
+        let floats = raw.colors_flat();
+        let len = floats.len();
+        let boxed = floats.into_boxed_slice();
+        let data = Box::into_raw(boxed) as *mut c_float;
+        CFloatArray { data, len }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn rawmeshexport_indices(ptr: *const FFIRawMeshExport) -> IntArray {
+        if ptr.is_null() {
+            return IntArray {
+                data: ptr::null_mut(),
+                len: 0,
+            };
+        }
+        let raw = unsafe { &(*ptr).0 };
+        let indices: Vec<c_int> = raw.indices().iter().map(|&i| i as c_int).collect();
+        let len = indices.len();
+        let boxed = indices.into_boxed_slice();
+        let data = Box::into_raw(boxed) as *mut c_int;
+        IntArray { data, len }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn rawmeshexport_texture_rgba(ptr: *const FFIRawMeshExport) -> ByteArray {
+        if ptr.is_null() {
+            return ByteArray {
+                data: ptr::null_mut(),
+                len: 0,
+            };
+        }
+        let raw = unsafe { &(*ptr).0 };
+        let pixels = raw.texture_rgba().to_vec();
+        let len = pixels.len();
+        let boxed = pixels.into_boxed_slice();
+        let data = Box::into_raw(boxed) as *mut c_uchar;
+        ByteArray { data, len }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn rawmeshexport_texture_width(ptr: *const FFIRawMeshExport) -> u32 {
+        if ptr.is_null() {
+            return 0;
+        }
+        let raw = unsafe { &(*ptr).0 };
+        raw.texture_width()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn rawmeshexport_texture_height(ptr: *const FFIRawMeshExport) -> u32 {
+        if ptr.is_null() {
+            return 0;
+        }
+        let raw = unsafe { &(*ptr).0 };
+        raw.texture_height()
     }
 }

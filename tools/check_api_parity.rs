@@ -875,6 +875,7 @@ fn parse_ffi_surface(base_dir: &str) -> ApiSurface {
         ("chunkmeshresult_", "ChunkMeshResult"),
         ("meshconfig_", "MeshConfig"),
         ("resourcepack_", "ResourcePack"),
+        ("rawmeshexport_", "RawMeshExport"),
         ("mchprsworld_", "MchprsWorld"),
         ("buildingtool_", "BuildingTool"),
         ("blockstate_", "BlockState"),

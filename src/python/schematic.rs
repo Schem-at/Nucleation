@@ -1260,6 +1260,40 @@ impl PySchematic {
             .map(|result| super::meshing::PyChunkMeshResult { inner: result })
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
+
+    /// Generate a USDZ mesh for the entire schematic.
+    #[cfg(feature = "meshing")]
+    #[pyo3(signature = (pack, config=None))]
+    pub fn to_usdz(
+        &self,
+        pack: &super::meshing::PyResourcePack,
+        config: Option<&super::meshing::PyMeshConfig>,
+    ) -> PyResult<super::meshing::PyMeshResult> {
+        let default_config = crate::meshing::MeshConfig::default();
+        let config = config.map(|c| &c.inner).unwrap_or(&default_config);
+
+        self.inner
+            .to_usdz(&pack.inner, config)
+            .map(|result| super::meshing::PyMeshResult { inner: result })
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    /// Generate raw mesh data for custom rendering pipelines.
+    #[cfg(feature = "meshing")]
+    #[pyo3(signature = (pack, config=None))]
+    pub fn to_raw_mesh(
+        &self,
+        pack: &super::meshing::PyResourcePack,
+        config: Option<&super::meshing::PyMeshConfig>,
+    ) -> PyResult<super::meshing::PyRawMeshExport> {
+        let default_config = crate::meshing::MeshConfig::default();
+        let config = config.map(|c| &c.inner).unwrap_or(&default_config);
+
+        self.inner
+            .to_raw_mesh(&pack.inner, config)
+            .map(|result| super::meshing::PyRawMeshExport { inner: result })
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
 }
 
 // --- NBT Conversion Helpers ---

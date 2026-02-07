@@ -7,7 +7,7 @@ use pyo3::types::PyBytes;
 use std::collections::HashMap;
 
 use crate::meshing::{
-    ChunkMeshResult, MeshConfig, MeshResult, MultiMeshResult, ResourcePackSource,
+    ChunkMeshResult, MeshConfig, MeshResult, MultiMeshResult, RawMeshExport, ResourcePackSource,
 };
 
 /// Wrapper for a Minecraft resource pack.
@@ -215,13 +215,15 @@ pub struct PyMeshConfig {
 impl PyMeshConfig {
     /// Create a new MeshConfig with default settings.
     #[new]
-    #[pyo3(signature = (cull_hidden_faces=true, ambient_occlusion=true, ao_intensity=0.4, biome=None, atlas_max_size=4096))]
+    #[pyo3(signature = (cull_hidden_faces=true, ambient_occlusion=true, ao_intensity=0.4, biome=None, atlas_max_size=4096, cull_occluded_blocks=true, greedy_meshing=false))]
     pub fn new(
         cull_hidden_faces: bool,
         ambient_occlusion: bool,
         ao_intensity: f32,
         biome: Option<String>,
         atlas_max_size: u32,
+        cull_occluded_blocks: bool,
+        greedy_meshing: bool,
     ) -> Self {
         Self {
             inner: MeshConfig {
@@ -230,6 +232,8 @@ impl PyMeshConfig {
                 ao_intensity,
                 biome,
                 atlas_max_size,
+                cull_occluded_blocks,
+                greedy_meshing,
             },
         }
     }
@@ -289,10 +293,35 @@ impl PyMeshConfig {
         self.inner.atlas_max_size = value;
     }
 
+    /// Skip blocks fully hidden by opaque neighbors on all 6 sides.
+    #[getter]
+    pub fn cull_occluded_blocks(&self) -> bool {
+        self.inner.cull_occluded_blocks
+    }
+
+    #[setter]
+    pub fn set_cull_occluded_blocks(&mut self, value: bool) {
+        self.inner.cull_occluded_blocks = value;
+    }
+
+    /// Merge adjacent coplanar faces into larger quads (reduces triangle count).
+    #[getter]
+    pub fn greedy_meshing(&self) -> bool {
+        self.inner.greedy_meshing
+    }
+
+    #[setter]
+    pub fn set_greedy_meshing(&mut self, value: bool) {
+        self.inner.greedy_meshing = value;
+    }
+
     fn __repr__(&self) -> String {
         format!(
-            "<MeshConfig cull={} ao={} biome={:?}>",
-            self.inner.cull_hidden_faces, self.inner.ambient_occlusion, self.inner.biome
+            "<MeshConfig cull={} ao={} greedy={} biome={:?}>",
+            self.inner.cull_hidden_faces,
+            self.inner.ambient_occlusion,
+            self.inner.greedy_meshing,
+            self.inner.biome
         )
     }
 }
@@ -489,6 +518,79 @@ impl PyChunkMeshResult {
             self.inner.meshes.len(),
             self.inner.total_vertex_count,
             self.inner.total_triangle_count
+        )
+    }
+}
+
+/// Result of raw mesh export for custom rendering.
+#[pyclass(name = "RawMeshExport")]
+pub struct PyRawMeshExport {
+    pub(crate) inner: RawMeshExport,
+}
+
+#[pymethods]
+impl PyRawMeshExport {
+    /// Get vertex positions as a flat list of floats (x, y, z, x, y, z, ...).
+    pub fn positions_flat(&self) -> Vec<f32> {
+        self.inner.positions_flat()
+    }
+
+    /// Get vertex normals as a flat list of floats.
+    pub fn normals_flat(&self) -> Vec<f32> {
+        self.inner.normals_flat()
+    }
+
+    /// Get texture coordinates as a flat list of floats (u, v, u, v, ...).
+    pub fn uvs_flat(&self) -> Vec<f32> {
+        self.inner.uvs_flat()
+    }
+
+    /// Get vertex colors as a flat list of floats (r, g, b, a, ...).
+    pub fn colors_flat(&self) -> Vec<f32> {
+        self.inner.colors_flat()
+    }
+
+    /// Get triangle indices.
+    pub fn indices(&self) -> Vec<u32> {
+        self.inner.indices().to_vec()
+    }
+
+    /// Get texture atlas RGBA pixel data.
+    pub fn texture_rgba<'py>(&self, py: Python<'py>) -> Bound<'py, PyBytes> {
+        PyBytes::new(py, self.inner.texture_rgba())
+    }
+
+    /// Get texture atlas width.
+    #[getter]
+    pub fn texture_width(&self) -> u32 {
+        self.inner.texture_width()
+    }
+
+    /// Get texture atlas height.
+    #[getter]
+    pub fn texture_height(&self) -> u32 {
+        self.inner.texture_height()
+    }
+
+    /// Get the vertex count.
+    #[getter]
+    pub fn vertex_count(&self) -> usize {
+        self.inner.vertex_count()
+    }
+
+    /// Get the triangle count.
+    #[getter]
+    pub fn triangle_count(&self) -> usize {
+        self.inner.triangle_count()
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "<RawMeshExport vertices={} triangles={} atlas={}x{}>",
+            self.inner.vertex_count(),
+            self.inner.triangle_count(),
+            self.inner.texture_width(),
+            self.inner.texture_height()
         )
     }
 }

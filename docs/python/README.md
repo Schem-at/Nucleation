@@ -31,6 +31,7 @@ with open("output.litematic", "wb") as f:
 7. [SchematicBuilder](#schematicbuilder)
 8. [Simulation](#simulation)
 10. [Procedural Building](#procedural-building)
+11. [3D Mesh Generation](#3d-mesh-generation)
 
 ## Installation
 
@@ -720,6 +721,102 @@ points_brush = Brush.point_gradient(
     1,    # Oklab
     None
 )
+```
+
+## 3D Mesh Generation
+
+The meshing feature generates 3D meshes from schematics using Minecraft resource packs.
+
+### Loading a Resource Pack
+```python
+from nucleation import ResourcePack
+
+# From a file
+pack = ResourcePack.from_file("path/to/resourcepack.zip")
+
+# From bytes
+with open("pack.zip", "rb") as f:
+    pack = ResourcePack.from_bytes(f.read())
+
+# Inspect the pack
+print(f"Blockstates: {pack.blockstate_count}")
+print(f"Models: {pack.model_count}")
+print(f"Textures: {pack.texture_count}")
+print(f"Namespaces: {pack.namespaces}")
+```
+
+### Generating Meshes
+```python
+from nucleation import Schematic, MeshConfig
+
+schematic = Schematic()
+schematic.from_litematic(data)
+
+# Default config
+config = MeshConfig()
+
+# Or customize
+config = MeshConfig(
+    cull_hidden_faces=True,
+    ambient_occlusion=True,
+    ao_intensity=0.4,
+    cull_occluded_blocks=True,
+    greedy_meshing=True,  # reduces triangle count
+    biome="plains",
+    atlas_max_size=4096,
+)
+
+# Generate a GLB mesh
+result = schematic.to_mesh(pack, config)
+result.save("output.glb")
+print(f"Vertices: {result.vertex_count}, Triangles: {result.triangle_count}")
+
+# Generate a USDZ mesh (Apple AR format)
+usdz_result = schematic.to_usdz(pack, config)
+usdz_result.save("output.usdz")
+
+# Generate raw mesh data for custom pipelines
+raw = schematic.to_raw_mesh(pack, config)
+positions = raw.positions_flat()  # [x, y, z, x, y, z, ...]
+indices = raw.indices()
+atlas_pixels = raw.texture_rgba()
+```
+
+### Per-Region and Per-Chunk Meshing
+```python
+# One mesh per region
+multi = schematic.mesh_by_region(pack, config)
+for name in multi.region_names:
+    mesh = multi.get_mesh(name)
+    mesh.save(f"{name}.glb")
+
+# One mesh per 16x16x16 chunk
+chunks = schematic.mesh_by_chunk(pack, config)
+for coord in chunks.chunk_coordinates:
+    mesh = chunks.get_mesh(*coord)
+    # coord is (x, y, z)
+
+# Custom chunk size
+chunks = schematic.mesh_by_chunk_size(pack, 32, config)
+```
+
+### Resource Pack Querying
+```python
+# List all entries
+blockstates = pack.list_blockstates()  # ["minecraft:stone", ...]
+models = pack.list_models()
+textures = pack.list_textures()
+
+# Query individual entries
+json_str = pack.get_blockstate_json("minecraft:stone")
+model_json = pack.get_model_json("minecraft:block/stone")
+info = pack.get_texture_info("minecraft:block/stone")  # {width, height, is_animated, frame_count}
+pixels = pack.get_texture_pixels("minecraft:block/stone")  # raw RGBA bytes
+
+# Add custom entries
+pack.add_blockstate_json("custom:block", '{"variants": {"": {"model": "custom:block/my_block"}}}')
+pack.add_model_json("custom:block/my_block", '{"parent": "block/cube_all", "textures": {"all": "custom:block/my_texture"}}')
+pack.add_texture("custom:block/my_texture", 16, 16, rgba_bytes)
 ```
 
 ## See Also

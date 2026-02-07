@@ -39,6 +39,18 @@
 - **Execution Modes**: Fixed ticks, until condition, until stable, until change
 - **State Management**: Stateless, stateful, or manual tick control
 
+### 3D Mesh Generation
+
+- **Resource pack loading** from ZIP files or raw bytes
+- **GLB/glTF export** for standard 3D viewers and engines
+- **USDZ export** for Apple AR Quick Look
+- **Raw mesh export** for custom rendering pipelines (positions, normals, UVs, colors, indices)
+- **Per-region and per-chunk meshing** for large schematics
+- **Greedy meshing** to reduce triangle count
+- **Occlusion culling** to skip fully hidden blocks
+- **Ambient occlusion** with configurable intensity
+- **Resource pack querying** — list/get/add blockstates, models, and textures
+
 ### Developer Experience
 
 - **Bracket notation** for blocks: `"minecraft:lever[facing=east,powered=false]"`
@@ -242,6 +254,32 @@ assert_eq!(*output, Value::Bool(true));  // AND gate result
 
 See [TypedCircuitExecutor Guide](docs/guide/typed-executor.md) for execution modes, state management, and more.
 
+### 3D Mesh Generation
+
+```rust
+use nucleation::{UniversalSchematic, meshing::{MeshConfig, ResourcePackSource}};
+
+// Load schematic and resource pack
+let schematic = UniversalSchematic::from_litematic_bytes(&schem_data)?;
+let pack = ResourcePackSource::from_file("resourcepack.zip")?;
+
+// Configure meshing
+let config = MeshConfig::new()
+    .with_greedy_meshing(true)
+    .with_cull_occluded_blocks(true);
+
+// Generate GLB mesh
+let result = schematic.to_mesh(&pack, &config)?;
+std::fs::write("output.glb", &result.glb_data)?;
+
+// Or USDZ for AR
+let usdz = schematic.to_usdz(&pack, &config)?;
+
+// Or raw mesh data for custom rendering
+let raw = schematic.to_raw_mesh(&pack, &config)?;
+println!("Vertices: {}, Triangles: {}", raw.vertex_count(), raw.triangle_count());
+```
+
 ---
 
 ## Development
@@ -252,6 +290,9 @@ cargo build --release
 
 # Build with simulation support
 cargo build --release --features simulation
+
+# Build with meshing support
+cargo build --release --features meshing
 
 # Build WASM module (includes simulation)
 ./build-wasm.sh
@@ -265,6 +306,7 @@ maturin develop --features python
 # Run tests
 cargo test
 cargo test --features simulation
+cargo test --features meshing
 ./test-wasm.sh  # WASM tests with simulation
 
 # Pre-push verification (recommended before pushing)

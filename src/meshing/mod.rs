@@ -31,8 +31,9 @@
 //! ```
 
 use schematic_mesher::{
-    export_glb, resource_pack::TextureData, BlockPosition as MesherBlockPosition, BlockSource,
-    BoundingBox as MesherBoundingBox, InputBlock, Mesher, MesherConfig, ResourcePack,
+    export_glb, export_raw, export_usdz, resource_pack::TextureData,
+    BlockPosition as MesherBlockPosition, BlockSource, BoundingBox as MesherBoundingBox,
+    InputBlock, Mesher, MesherConfig, MesherOutput, RawMeshData, ResourcePack,
 };
 use std::collections::HashMap;
 use std::path::Path;
@@ -212,6 +213,10 @@ pub struct MeshConfig {
     pub biome: Option<String>,
     /// Maximum texture atlas dimension.
     pub atlas_max_size: u32,
+    /// Skip blocks that are fully hidden by opaque neighbors on all 6 sides.
+    pub cull_occluded_blocks: bool,
+    /// Merge adjacent coplanar faces into larger quads (reduces triangle count).
+    pub greedy_meshing: bool,
 }
 
 impl Default for MeshConfig {
@@ -222,6 +227,8 @@ impl Default for MeshConfig {
             ao_intensity: 0.4,
             biome: None,
             atlas_max_size: 4096,
+            cull_occluded_blocks: true,
+            greedy_meshing: false,
         }
     }
 }
@@ -262,12 +269,26 @@ impl MeshConfig {
         self
     }
 
+    /// Enable or disable occluded block culling.
+    pub fn with_cull_occluded_blocks(mut self, enabled: bool) -> Self {
+        self.cull_occluded_blocks = enabled;
+        self
+    }
+
+    /// Enable or disable greedy meshing.
+    pub fn with_greedy_meshing(mut self, enabled: bool) -> Self {
+        self.greedy_meshing = enabled;
+        self
+    }
+
     fn to_mesher_config(&self) -> MesherConfig {
         let mut config = MesherConfig::default();
         config.cull_hidden_faces = self.cull_hidden_faces;
         config.ambient_occlusion = self.ambient_occlusion;
         config.ao_intensity = self.ao_intensity;
         config.atlas_max_size = self.atlas_max_size;
+        config.cull_occluded_blocks = self.cull_occluded_blocks;
+        config.greedy_meshing = self.greedy_meshing;
         if let Some(biome) = &self.biome {
             config = config.with_biome(biome);
         }
@@ -310,6 +331,82 @@ pub struct ChunkMeshResult {
     pub total_vertex_count: usize,
     /// Total triangle count across all meshes.
     pub total_triangle_count: usize,
+}
+
+/// Result of raw mesh export for custom rendering.
+#[derive(Debug)]
+pub struct RawMeshExport {
+    pub(crate) inner: RawMeshData,
+}
+
+impl RawMeshExport {
+    /// Vertex positions (3 floats per vertex).
+    pub fn positions_flat(&self) -> Vec<f32> {
+        self.inner.positions_flat()
+    }
+
+    /// Vertex normals (3 floats per vertex).
+    pub fn normals_flat(&self) -> Vec<f32> {
+        self.inner.normals_flat()
+    }
+
+    /// Texture coordinates (2 floats per vertex).
+    pub fn uvs_flat(&self) -> Vec<f32> {
+        self.inner.uvs_flat()
+    }
+
+    /// Vertex colors (4 floats per vertex, RGBA).
+    pub fn colors_flat(&self) -> Vec<f32> {
+        self.inner.colors_flat()
+    }
+
+    /// Triangle indices.
+    pub fn indices(&self) -> &[u32] {
+        &self.inner.indices
+    }
+
+    /// Texture atlas RGBA pixel data.
+    pub fn texture_rgba(&self) -> &[u8] {
+        &self.inner.texture_rgba
+    }
+
+    /// Texture atlas width.
+    pub fn texture_width(&self) -> u32 {
+        self.inner.texture_width
+    }
+
+    /// Texture atlas height.
+    pub fn texture_height(&self) -> u32 {
+        self.inner.texture_height
+    }
+
+    /// Number of vertices.
+    pub fn vertex_count(&self) -> usize {
+        self.inner.vertex_count()
+    }
+
+    /// Number of triangles.
+    pub fn triangle_count(&self) -> usize {
+        self.inner.triangle_count()
+    }
+}
+
+/// Build a MeshResult from a MesherOutput and export data bytes.
+fn mesh_result_from_output(output: &MesherOutput, data: Vec<u8>) -> MeshResult {
+    MeshResult {
+        glb_data: data,
+        vertex_count: output.total_vertices(),
+        triangle_count: output.total_triangles(),
+        has_transparency: output.has_transparency(),
+        bounds: [
+            output.bounds.min[0],
+            output.bounds.min[1],
+            output.bounds.min[2],
+            output.bounds.max[0],
+            output.bounds.max[1],
+            output.bounds.max[2],
+        ],
+    }
 }
 
 /// Adapter to convert a Nucleation Region into a BlockSource.
@@ -412,10 +509,12 @@ fn block_state_to_input_block(block_state: &BlockState) -> InputBlock {
 }
 
 impl UniversalSchematic {
-    /// Generate a single mesh for the entire schematic.
-    ///
-    /// This combines all regions into a single mesh output.
-    pub fn to_mesh(&self, pack: &ResourcePackSource, config: &MeshConfig) -> Result<MeshResult> {
+    /// Compute the raw MesherOutput for the entire schematic (internal helper).
+    fn compute_mesh_output(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+    ) -> Result<MesherOutput> {
         let mesher_config = config.to_mesher_config();
         let mesher = Mesher::with_config(pack.pack.clone(), mesher_config);
 
@@ -439,26 +538,39 @@ impl UniversalSchematic {
         let bounds = MesherBoundingBox::new(min, max);
         let source = ChunkBlockSource::new(all_blocks, bounds);
 
-        let output = mesher
+        mesher
             .mesh(&source)
-            .map_err(|e| MeshError::Meshing(e.to_string()))?;
+            .map_err(|e| MeshError::Meshing(e.to_string()))
+    }
 
+    /// Generate a single GLB mesh for the entire schematic.
+    ///
+    /// This combines all regions into a single mesh output.
+    pub fn to_mesh(&self, pack: &ResourcePackSource, config: &MeshConfig) -> Result<MeshResult> {
+        let output = self.compute_mesh_output(pack, config)?;
         let glb_data = export_glb(&output).map_err(|e| MeshError::Export(e.to_string()))?;
+        Ok(mesh_result_from_output(&output, glb_data))
+    }
 
-        Ok(MeshResult {
-            glb_data,
-            vertex_count: output.total_vertices(),
-            triangle_count: output.total_triangles(),
-            has_transparency: output.has_transparency(),
-            bounds: [
-                output.bounds.min[0],
-                output.bounds.min[1],
-                output.bounds.min[2],
-                output.bounds.max[0],
-                output.bounds.max[1],
-                output.bounds.max[2],
-            ],
-        })
+    /// Generate a USDZ mesh for the entire schematic.
+    pub fn to_usdz(&self, pack: &ResourcePackSource, config: &MeshConfig) -> Result<MeshResult> {
+        let output = self.compute_mesh_output(pack, config)?;
+        let usdz_data = export_usdz(&output).map_err(|e| MeshError::Export(e.to_string()))?;
+        Ok(mesh_result_from_output(&output, usdz_data))
+    }
+
+    /// Generate raw mesh data for the entire schematic.
+    ///
+    /// Returns positions, normals, UVs, colors, indices, and texture atlas data
+    /// for custom rendering pipelines.
+    pub fn to_raw_mesh(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+    ) -> Result<RawMeshExport> {
+        let output = self.compute_mesh_output(pack, config)?;
+        let raw = export_raw(&output);
+        Ok(RawMeshExport { inner: raw })
     }
 
     /// Generate one mesh per region.
@@ -563,20 +675,7 @@ impl UniversalSchematic {
 
             let glb_data = export_glb(&output).map_err(|e| MeshError::Export(e.to_string()))?;
 
-            let result = MeshResult {
-                glb_data,
-                vertex_count: output.total_vertices(),
-                triangle_count: output.total_triangles(),
-                has_transparency: output.has_transparency(),
-                bounds: [
-                    output.bounds.min[0],
-                    output.bounds.min[1],
-                    output.bounds.min[2],
-                    output.bounds.max[0],
-                    output.bounds.max[1],
-                    output.bounds.max[2],
-                ],
-            };
+            let result = mesh_result_from_output(&output, glb_data);
 
             total_vertex_count += result.vertex_count;
             total_triangle_count += result.triangle_count;
@@ -610,20 +709,7 @@ fn mesh_region(
 
     let glb_data = export_glb(&output).map_err(|e| MeshError::Export(e.to_string()))?;
 
-    Ok(Some(MeshResult {
-        glb_data,
-        vertex_count: output.total_vertices(),
-        triangle_count: output.total_triangles(),
-        has_transparency: output.has_transparency(),
-        bounds: [
-            output.bounds.min[0],
-            output.bounds.min[1],
-            output.bounds.min[2],
-            output.bounds.max[0],
-            output.bounds.max[1],
-            output.bounds.max[2],
-        ],
-    }))
+    Ok(Some(mesh_result_from_output(&output, glb_data)))
 }
 
 /// Helper function to collect blocks from a region.
@@ -753,5 +839,110 @@ mod tests {
         assert_eq!(input.name, "minecraft:oak_stairs");
         assert_eq!(input.properties.get("facing"), Some(&"north".to_string()));
         assert_eq!(input.properties.get("half"), Some(&"bottom".to_string()));
+    }
+
+    #[test]
+    fn test_mesh_config_defaults() {
+        let config = MeshConfig::default();
+        assert!(config.cull_hidden_faces);
+        assert!(config.ambient_occlusion);
+        assert!((config.ao_intensity - 0.4).abs() < 0.001);
+        assert_eq!(config.biome, None);
+        assert_eq!(config.atlas_max_size, 4096);
+        assert!(config.cull_occluded_blocks);
+        assert!(!config.greedy_meshing);
+    }
+
+    #[test]
+    fn test_mesh_config_new_fields() {
+        let config = MeshConfig::new()
+            .with_cull_occluded_blocks(false)
+            .with_greedy_meshing(true)
+            .with_atlas_max_size(2048);
+
+        assert!(!config.cull_occluded_blocks);
+        assert!(config.greedy_meshing);
+        assert_eq!(config.atlas_max_size, 2048);
+    }
+
+    #[test]
+    fn test_mesh_config_full_builder_chain() {
+        let config = MeshConfig::new()
+            .with_culling(false)
+            .with_ambient_occlusion(false)
+            .with_ao_intensity(0.8)
+            .with_biome("jungle")
+            .with_atlas_max_size(1024)
+            .with_cull_occluded_blocks(false)
+            .with_greedy_meshing(true);
+
+        assert!(!config.cull_hidden_faces);
+        assert!(!config.ambient_occlusion);
+        assert!((config.ao_intensity - 0.8).abs() < 0.001);
+        assert_eq!(config.biome, Some("jungle".to_string()));
+        assert_eq!(config.atlas_max_size, 1024);
+        assert!(!config.cull_occluded_blocks);
+        assert!(config.greedy_meshing);
+    }
+
+    #[test]
+    fn test_split_resource_name_with_namespace() {
+        let (ns, path) = split_resource_name("minecraft:stone").unwrap();
+        assert_eq!(ns, "minecraft");
+        assert_eq!(path, "stone");
+    }
+
+    #[test]
+    fn test_split_resource_name_without_namespace() {
+        let (ns, path) = split_resource_name("stone").unwrap();
+        assert_eq!(ns, "minecraft");
+        assert_eq!(path, "stone");
+    }
+
+    #[test]
+    fn test_split_resource_name_custom_namespace() {
+        let (ns, path) = split_resource_name("mymod:block/custom_block").unwrap();
+        assert_eq!(ns, "mymod");
+        assert_eq!(path, "block/custom_block");
+    }
+
+    #[test]
+    fn test_block_state_to_input_block_no_properties() {
+        let block_state = BlockState::new("minecraft:stone".to_string());
+        let input = block_state_to_input_block(&block_state);
+        assert_eq!(input.name, "minecraft:stone");
+        assert!(input.properties.is_empty());
+    }
+
+    #[test]
+    fn test_to_mesher_config_propagates_fields() {
+        let config = MeshConfig::new()
+            .with_culling(false)
+            .with_ambient_occlusion(false)
+            .with_ao_intensity(0.7)
+            .with_cull_occluded_blocks(false)
+            .with_greedy_meshing(true);
+
+        let mesher_config = config.to_mesher_config();
+        assert!(!mesher_config.cull_hidden_faces);
+        assert!(!mesher_config.ambient_occlusion);
+        assert!((mesher_config.ao_intensity - 0.7).abs() < 0.001);
+        assert!(!mesher_config.cull_occluded_blocks);
+        assert!(mesher_config.greedy_meshing);
+    }
+
+    #[test]
+    fn test_empty_schematic_mesh_error() {
+        let _schematic = UniversalSchematic::new("Empty".to_string());
+        // from_bytes with invalid data should return an error
+        let result = ResourcePackSource::from_bytes(&[0, 1, 2, 3]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resource_pack_stats() {
+        // from_bytes with invalid data should error
+        let result = ResourcePackSource::from_bytes(&[]);
+        assert!(result.is_err());
     }
 }

@@ -36,6 +36,7 @@ const bytes = schematic.to_litematic();
 9. [TypedCircuitExecutor](#typedcircuitexecutor)
 10. [DefinitionRegion](#definitionregion)
 12. [Procedural Building](#procedural-building)
+13. [3D Mesh Generation](#3d-mesh-generation)
 
 ## Installation & Setup
 
@@ -1052,6 +1053,83 @@ const concreteBlocks = PaletteManager.getConcreteBlocks();
 
 // Get custom mix (e.g., all wool + obsidian)
 const customPalette = PaletteManager.getPaletteByKeywords(["wool", "obsidian"]);
+```
+
+## 3D Mesh Generation
+
+Generate 3D meshes from schematics using Minecraft resource packs.
+
+### Loading a Resource Pack
+
+```javascript
+import { ResourcePackWrapper, MeshConfigWrapper } from 'nucleation';
+
+// Load from bytes (e.g., fetched ZIP file)
+const response = await fetch('resourcepack.zip');
+const data = new Uint8Array(await response.arrayBuffer());
+const pack = new ResourcePackWrapper(data);
+
+console.log(`Blockstates: ${pack.blockstateCount}`);
+console.log(`Models: ${pack.modelCount}`);
+console.log(`Textures: ${pack.textureCount}`);
+```
+
+### Generating Meshes
+
+```javascript
+const config = new MeshConfigWrapper();
+config.setCullHiddenFaces(true);
+config.setAmbientOcclusion(true);
+config.setAoIntensity(0.4);
+config.setCullOccludedBlocks(true);
+config.setGreedyMeshing(true);
+
+// Generate GLB mesh
+const result = schematic.toMesh(pack, config);
+const glbData = result.glbData; // Uint8Array
+console.log(`Vertices: ${result.vertexCount}, Triangles: ${result.triangleCount}`);
+
+// Generate USDZ mesh
+const usdzResult = schematic.toUsdz(pack, config);
+
+// Generate raw mesh data
+const raw = schematic.toRawMesh(pack, config);
+const positions = raw.positionsFlat(); // Float32Array
+const indices = raw.indices(); // Uint32Array
+```
+
+### Per-Region and Per-Chunk Meshing
+
+```javascript
+// Per region
+const multi = schematic.meshByRegion(pack, config);
+const names = multi.getRegionNames();
+names.forEach(name => {
+    const mesh = multi.getMesh(name);
+    // use mesh.glbData
+});
+
+// Per chunk
+const chunks = schematic.meshByChunk(pack, config);
+const coords = chunks.getChunkCoordinates(); // [[x,y,z], ...]
+
+// Custom chunk size
+const chunks32 = schematic.meshByChunkSize(pack, config, 32);
+```
+
+### Resource Pack Querying
+
+```javascript
+const blockstates = pack.listBlockstates();
+const models = pack.listModels();
+const json = pack.getBlockstateJson("minecraft:stone");
+const info = pack.getTextureInfo("minecraft:block/stone");
+// { width, height, isAnimated, frameCount }
+
+// Add custom entries
+pack.addBlockstateJson("custom:block", jsonString);
+pack.addModelJson("custom:block/my_block", modelJson);
+pack.addTexture("custom:texture", 16, 16, rgbaBytes);
 ```
 
 ## See Also

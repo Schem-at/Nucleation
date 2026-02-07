@@ -72,6 +72,11 @@ MchprsWorld.truth_table = WASM-specific truth table generation
 # --- Methods not expected in WASM ---
 [no_wasm]
 Schematic.all_blocks = FFI/Python naming convention (WASM uses blocks())
+# RawMeshExport: FFI short names not in WASM (WASM uses _flat suffix)
+RawMeshExport.positions = FFI naming (WASM: positions_flat)
+RawMeshExport.normals = FFI naming (WASM: normals_flat)
+RawMeshExport.uvs = FFI naming (WASM: uvs_flat)
+RawMeshExport.colors = FFI naming (WASM: colors_flat)
 DefinitionRegion.set_metadata_mut = Python mutability helper (WASM uses set_metadata)
 DefinitionRegion.sync = FFI sync method (WASM uses direct property access)
 ResourcePack.from_bytes = Python/FFI binary I/O
@@ -86,6 +91,11 @@ Value.string = Python typed value factory
 # --- Methods not expected in Python ---
 [no_python]
 Schematic.chunk_blocks = WASM/FFI chunk access (Python has different iteration)
+# RawMeshExport: FFI short names not in Python (Python uses _flat suffix)
+RawMeshExport.positions = FFI naming (Python: positions_flat)
+RawMeshExport.normals = FFI naming (Python: normals_flat)
+RawMeshExport.uvs = FFI naming (Python: uvs_flat)
+RawMeshExport.colors = FFI naming (Python: colors_flat)
 Schematic.chunks_with_strategy = WASM/FFI chunk loading strategies
 ResourcePack.new = WASM constructor (Python uses from_file/from_bytes)
 MchprsWorld.new = WASM constructor (Python creates via Schematic method)
@@ -114,7 +124,12 @@ Schematic.build_executor = Requires circuit ecosystem
 Schematic.create_simulation_world = Requires simulation feature gate
 Schematic.create_simulation_world_with_options = Requires simulation feature gate
 
-# --- Meshing ecosystem: specific FFI exclusions ---
+# --- Meshing ecosystem: specific exclusions ---
+# RawMeshExport: Python/WASM _flat suffix not in FFI (FFI: rawmeshexport_positions etc.)
+RawMeshExport.positions_flat = Python/WASM naming (FFI: positions)
+RawMeshExport.normals_flat = Python/WASM naming (FFI: normals)
+RawMeshExport.uvs_flat = Python/WASM naming (FFI: uvs)
+RawMeshExport.colors_flat = Python/WASM naming (FFI: colors)
 ResourcePack.new = WASM constructor (FFI uses from_bytes)
 ResourcePack.stats = FFI exposes individual stat getters
 MultiMeshResult.all_meshes = Python convenience (FFI uses get_mesh)

@@ -99,6 +99,88 @@ with open("demo.litematic", "wb") as f:
 
 ---
 
+---
+
+## 6. 3D Mesh Generation
+
+Generate 3D meshes from schematics using Minecraft resource packs.
+
+```python
+from nucleation import Schematic, ResourcePack, MeshConfig
+
+# Load schematic
+with open("build.litematic", "rb") as f:
+    data = f.read()
+sch = Schematic("build")
+sch.load_from_bytes(data)
+
+# Load resource pack
+pack = ResourcePack.from_file("resourcepack.zip")
+print(f"Loaded {pack.blockstate_count} blockstates, {pack.model_count} models, {pack.texture_count} textures")
+
+# Configure meshing
+config = MeshConfig(
+    cull_hidden_faces=True,
+    ambient_occlusion=True,
+    ao_intensity=0.4,
+    cull_occluded_blocks=True,
+    greedy_meshing=True,
+)
+
+# Generate GLB
+result = sch.to_mesh(pack, config)
+result.save("output.glb")
+print(f"GLB: {result.vertex_count} vertices, {result.triangle_count} triangles")
+
+# Generate USDZ (for Apple AR Quick Look)
+usdz = sch.to_usdz(pack, config)
+usdz.save("output.usdz")
+
+# Generate raw mesh data
+raw = sch.to_raw_mesh(pack, config)
+positions = raw.positions_flat()   # list[float], 3 per vertex
+normals = raw.normals_flat()       # list[float], 3 per vertex
+uvs = raw.uvs_flat()               # list[float], 2 per vertex
+indices = raw.indices()            # list[int]
+print(f"Raw: {raw.vertex_count} vertices, {raw.triangle_count} triangles")
+```
+
+### Per-region and per-chunk meshing
+
+```python
+# One mesh per region
+multi = sch.mesh_by_region(pack, config)
+multi.save_all("output_dir/")
+
+# One mesh per 16x16x16 chunk
+chunks = sch.mesh_by_chunk(pack, config)
+chunks.save_all("chunks_dir/")
+
+# Custom chunk size
+chunks32 = sch.mesh_by_chunk_size(pack, config, 32)
+```
+
+### Resource pack querying
+
+```python
+blockstates = pack.list_blockstates()   # list[str]
+models = pack.list_models()
+textures = pack.list_textures()
+
+# Query specific entries
+json_str = pack.get_blockstate_json("minecraft:stone")
+info = pack.get_texture_info("minecraft:block/stone")
+# info = {"width": 16, "height": 16, "is_animated": False, "frame_count": 1}
+pixels = pack.get_texture_pixels("minecraft:block/stone")  # bytes
+
+# Add custom entries
+pack.add_blockstate_json("mymod:custom", blockstate_json_str)
+pack.add_model_json("mymod:block/custom", model_json_str)
+pack.add_texture("mymod:block/custom", 16, 16, rgba_bytes)
+```
+
+---
+
 ### Gotchas & tips
 
 * **Everything is immutable-copy except `set_block*`** – methods that start with `set_` mutate the schematic; others usually return a fresh object or `dict`.

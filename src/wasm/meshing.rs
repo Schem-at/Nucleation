@@ -6,7 +6,7 @@ use js_sys::{Array, Object, Reflect, Uint8Array};
 use wasm_bindgen::prelude::*;
 
 use crate::meshing::{
-    ChunkMeshResult, MeshConfig, MeshResult, MultiMeshResult, ResourcePackSource,
+    ChunkMeshResult, MeshConfig, MeshResult, MultiMeshResult, RawMeshExport, ResourcePackSource,
 };
 
 use super::schematic::SchematicWrapper;
@@ -263,6 +263,30 @@ impl MeshConfigWrapper {
     pub fn atlas_max_size(&self) -> u32 {
         self.inner.atlas_max_size
     }
+
+    /// Enable or disable occluded block culling.
+    #[wasm_bindgen(js_name = setCullOccludedBlocks)]
+    pub fn set_cull_occluded_blocks(&mut self, enabled: bool) {
+        self.inner.cull_occluded_blocks = enabled;
+    }
+
+    /// Get whether occluded block culling is enabled.
+    #[wasm_bindgen(getter, js_name = cullOccludedBlocks)]
+    pub fn cull_occluded_blocks(&self) -> bool {
+        self.inner.cull_occluded_blocks
+    }
+
+    /// Enable or disable greedy meshing.
+    #[wasm_bindgen(js_name = setGreedyMeshing)]
+    pub fn set_greedy_meshing(&mut self, enabled: bool) {
+        self.inner.greedy_meshing = enabled;
+    }
+
+    /// Get whether greedy meshing is enabled.
+    #[wasm_bindgen(getter, js_name = greedyMeshing)]
+    pub fn greedy_meshing(&self) -> bool {
+        self.inner.greedy_meshing
+    }
 }
 
 /// Result of mesh generation.
@@ -433,6 +457,74 @@ impl ChunkMeshResultWrapper {
     }
 }
 
+/// Result of raw mesh export for custom rendering.
+#[wasm_bindgen]
+pub struct RawMeshExportWrapper {
+    inner: RawMeshExport,
+}
+
+#[wasm_bindgen]
+impl RawMeshExportWrapper {
+    /// Get vertex positions as a flat Float32Array.
+    #[wasm_bindgen(js_name = positionsFlat)]
+    pub fn positions_flat(&self) -> Vec<f32> {
+        self.inner.positions_flat()
+    }
+
+    /// Get vertex normals as a flat Float32Array.
+    #[wasm_bindgen(js_name = normalsFlat)]
+    pub fn normals_flat(&self) -> Vec<f32> {
+        self.inner.normals_flat()
+    }
+
+    /// Get texture coordinates as a flat Float32Array.
+    #[wasm_bindgen(js_name = uvsFlat)]
+    pub fn uvs_flat(&self) -> Vec<f32> {
+        self.inner.uvs_flat()
+    }
+
+    /// Get vertex colors as a flat Float32Array.
+    #[wasm_bindgen(js_name = colorsFlat)]
+    pub fn colors_flat(&self) -> Vec<f32> {
+        self.inner.colors_flat()
+    }
+
+    /// Get triangle indices.
+    pub fn indices(&self) -> Vec<u32> {
+        self.inner.indices().to_vec()
+    }
+
+    /// Get texture atlas RGBA pixel data.
+    #[wasm_bindgen(js_name = textureRgba)]
+    pub fn texture_rgba(&self) -> Vec<u8> {
+        self.inner.texture_rgba().to_vec()
+    }
+
+    /// Get texture atlas width.
+    #[wasm_bindgen(getter, js_name = textureWidth)]
+    pub fn texture_width(&self) -> u32 {
+        self.inner.texture_width()
+    }
+
+    /// Get texture atlas height.
+    #[wasm_bindgen(getter, js_name = textureHeight)]
+    pub fn texture_height(&self) -> u32 {
+        self.inner.texture_height()
+    }
+
+    /// Get the vertex count.
+    #[wasm_bindgen(getter, js_name = vertexCount)]
+    pub fn vertex_count(&self) -> usize {
+        self.inner.vertex_count()
+    }
+
+    /// Get the triangle count.
+    #[wasm_bindgen(getter, js_name = triangleCount)]
+    pub fn triangle_count(&self) -> usize {
+        self.inner.triangle_count()
+    }
+}
+
 // Add meshing methods to SchematicWrapper
 #[wasm_bindgen]
 impl SchematicWrapper {
@@ -486,6 +578,32 @@ impl SchematicWrapper {
         self.0
             .mesh_by_chunk_size(&pack.inner, &config.inner, chunk_size)
             .map(|result| ChunkMeshResultWrapper { inner: result })
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    /// Generate a USDZ mesh for the entire schematic.
+    #[wasm_bindgen(js_name = toUsdz)]
+    pub fn to_usdz(
+        &self,
+        pack: &ResourcePackWrapper,
+        config: &MeshConfigWrapper,
+    ) -> Result<MeshResultWrapper, JsValue> {
+        self.0
+            .to_usdz(&pack.inner, &config.inner)
+            .map(|result| MeshResultWrapper { inner: result })
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    /// Generate raw mesh data for custom rendering pipelines.
+    #[wasm_bindgen(js_name = toRawMesh)]
+    pub fn to_raw_mesh(
+        &self,
+        pack: &ResourcePackWrapper,
+        config: &MeshConfigWrapper,
+    ) -> Result<RawMeshExportWrapper, JsValue> {
+        self.0
+            .to_raw_mesh(&pack.inner, &config.inner)
+            .map(|result| RawMeshExportWrapper { inner: result })
             .map_err(|e| JsValue::from_str(&e.to_string()))
     }
 }

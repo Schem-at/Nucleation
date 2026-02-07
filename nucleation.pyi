@@ -486,6 +486,22 @@ class Schematic:
         """Generate meshes per custom-sized chunk."""
         ...
 
+    def to_usdz(
+        self,
+        pack: "ResourcePack",
+        config: Optional["MeshConfig"] = None,
+    ) -> "MeshResult":
+        """Generate a USDZ mesh from the schematic."""
+        ...
+
+    def to_raw_mesh(
+        self,
+        pack: "ResourcePack",
+        config: Optional["MeshConfig"] = None,
+    ) -> "RawMeshExport":
+        """Generate raw mesh data for custom rendering pipelines."""
+        ...
+
     def __str__(self) -> str: ...
     def __repr__(self) -> str: ...
 
@@ -1508,6 +1524,48 @@ class ResourcePack:
         """List of namespaces."""
         ...
 
+    def list_blockstates(self) -> List[str]:
+        """List all blockstate names as 'namespace:block_id'."""
+        ...
+
+    def list_models(self) -> List[str]:
+        """List all model names as 'namespace:model_path'."""
+        ...
+
+    def list_textures(self) -> List[str]:
+        """List all texture names as 'namespace:texture_path'."""
+        ...
+
+    def get_blockstate_json(self, name: str) -> Optional[str]:
+        """Get a blockstate definition as a JSON string. Returns None if not found."""
+        ...
+
+    def get_model_json(self, name: str) -> Optional[str]:
+        """Get a block model as a JSON string. Returns None if not found."""
+        ...
+
+    def get_texture_info(self, name: str) -> Optional[Dict[str, Any]]:
+        """Get texture info dict with width, height, is_animated, frame_count."""
+        ...
+
+    def get_texture_pixels(self, name: str) -> Optional[bytes]:
+        """Get raw RGBA8 pixel data for a texture. Returns None if not found."""
+        ...
+
+    def add_blockstate_json(self, name: str, json: str) -> None:
+        """Add a blockstate definition from a JSON string."""
+        ...
+
+    def add_model_json(self, name: str, json: str) -> None:
+        """Add a block model from a JSON string."""
+        ...
+
+    def add_texture(
+        self, name: str, width: int, height: int, pixels: bytes
+    ) -> None:
+        """Add a texture from raw RGBA8 pixel data."""
+        ...
+
     def __repr__(self) -> str: ...
 
 
@@ -1521,6 +1579,8 @@ class MeshConfig:
         ao_intensity: float = 0.4,
         biome: Optional[str] = None,
         atlas_max_size: int = 4096,
+        cull_occluded_blocks: bool = True,
+        greedy_meshing: bool = False,
     ) -> None:
         """Create mesh configuration."""
         ...
@@ -1549,6 +1609,20 @@ class MeshConfig:
     def atlas_max_size(self) -> int: ...
     @atlas_max_size.setter
     def atlas_max_size(self, value: int) -> None: ...
+
+    @property
+    def cull_occluded_blocks(self) -> bool:
+        """Skip blocks fully hidden by opaque neighbors on all 6 sides."""
+        ...
+    @cull_occluded_blocks.setter
+    def cull_occluded_blocks(self, value: bool) -> None: ...
+
+    @property
+    def greedy_meshing(self) -> bool:
+        """Merge adjacent coplanar faces into larger quads."""
+        ...
+    @greedy_meshing.setter
+    def greedy_meshing(self, value: bool) -> None: ...
 
     def __repr__(self) -> str: ...
 
@@ -1663,6 +1737,56 @@ class ChunkMeshResult:
     @property
     def chunk_count(self) -> int:
         """Number of chunk meshes."""
+        ...
+
+    def __repr__(self) -> str: ...
+
+
+class RawMeshExport:
+    """Raw mesh data for custom rendering pipelines."""
+
+    def positions_flat(self) -> List[float]:
+        """Get vertex positions as a flat list (x, y, z, x, y, z, ...)."""
+        ...
+
+    def normals_flat(self) -> List[float]:
+        """Get vertex normals as a flat list."""
+        ...
+
+    def uvs_flat(self) -> List[float]:
+        """Get texture coordinates as a flat list (u, v, u, v, ...)."""
+        ...
+
+    def colors_flat(self) -> List[float]:
+        """Get vertex colors as a flat list (r, g, b, a, ...)."""
+        ...
+
+    def indices(self) -> List[int]:
+        """Get triangle indices."""
+        ...
+
+    def texture_rgba(self) -> bytes:
+        """Get texture atlas RGBA pixel data."""
+        ...
+
+    @property
+    def texture_width(self) -> int:
+        """Texture atlas width."""
+        ...
+
+    @property
+    def texture_height(self) -> int:
+        """Texture atlas height."""
+        ...
+
+    @property
+    def vertex_count(self) -> int:
+        """Number of vertices."""
+        ...
+
+    @property
+    def triangle_count(self) -> int:
+        """Number of triangles."""
         ...
 
     def __repr__(self) -> str: ...

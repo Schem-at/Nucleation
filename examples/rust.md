@@ -10,12 +10,14 @@ nucleation = { path = "../nucleation", default-features = false, features = ["se
 
 ### Optional feature flags
 
-| Feature   | What it adds                                                 |
-| --------- | ------------------------------------------------------------ |
-| `python`  | PyO3 bindings (`nucleation::python::nucleation(...)`)        |
-| `wasm`    | `wasm-bindgen` Web-API wrappers (re-exported at crate root). |
-| `ffi`     | C-ABI helpers in `nucleation::ffi`.                          |
-| *no flag* | Pure-Rust core only.                                         |
+| Feature      | What it adds                                                 |
+| ------------ | ------------------------------------------------------------ |
+| `python`     | PyO3 bindings (`nucleation::python::nucleation(...)`)        |
+| `wasm`       | `wasm-bindgen` Web-API wrappers (re-exported at crate root). |
+| `ffi`        | C-ABI helpers in `nucleation::ffi`.                          |
+| `meshing`    | 3D mesh generation (GLB, USDZ, raw) via `schematic-mesher`.  |
+| `simulation` | Redstone circuit simulation via MCHPRS integration.          |
+| *no flag*    | Pure-Rust core only.                                         |
 
 ---
 
@@ -103,7 +105,103 @@ The Rust side does **not** re-export those symbols to avoid name clashes.
 
 ---
 
-## 6 · Design notes & gotchas
+## 6 · 3D Mesh Generation (feature = "meshing")
+
+Enable the `meshing` feature to generate 3D meshes from schematics:
+
+```toml
+nucleation = { version = "0.1", features = ["meshing"] }
+```
+
+### Basic mesh generation
+
+```rust
+use nucleation::{UniversalSchematic, meshing::{MeshConfig, ResourcePackSource}};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Load a schematic
+    let data = std::fs::read("build.litematic")?;
+    let schematic = nucleation::litematic::from_litematic(&data)?;
+
+    // Load a resource pack (ZIP or directory)
+    let pack = ResourcePackSource::from_file("resourcepack.zip")?;
+    let stats = pack.stats();
+    println!("Loaded {} blockstates, {} models, {} textures",
+        stats.blockstate_count, stats.model_count, stats.texture_count);
+
+    // Configure meshing
+    let config = MeshConfig::new()
+        .with_culling(true)
+        .with_ambient_occlusion(true)
+        .with_ao_intensity(0.4)
+        .with_cull_occluded_blocks(true)
+        .with_greedy_meshing(true);
+
+    // Generate GLB
+    let result = schematic.to_mesh(&pack, &config)?;
+    std::fs::write("output.glb", &result.glb_data)?;
+    println!("GLB: {} vertices, {} triangles", result.vertex_count, result.triangle_count);
+
+    // Generate USDZ (for Apple AR Quick Look)
+    let usdz = schematic.to_usdz(&pack, &config)?;
+    std::fs::write("output.usdz", &usdz.glb_data)?;
+
+    // Generate raw mesh data (for custom renderers)
+    let raw = schematic.to_raw_mesh(&pack, &config)?;
+    println!("Raw: {} vertices, {} triangles", raw.vertex_count(), raw.triangle_count());
+    let _positions = raw.positions_flat();  // Vec<f32>, 3 per vertex
+    let _normals = raw.normals_flat();      // Vec<f32>, 3 per vertex
+    let _uvs = raw.uvs_flat();             // Vec<f32>, 2 per vertex
+    let _indices = raw.indices();           // &[u32]
+
+    Ok(())
+}
+```
+
+### Per-region and per-chunk meshing
+
+```rust
+// One mesh per region
+let multi = schematic.mesh_by_region(&pack, &config)?;
+for (name, mesh) in &multi.meshes {
+    std::fs::write(format!("{name}.glb"), &mesh.glb_data)?;
+}
+
+// One mesh per 16x16x16 chunk
+let chunks = schematic.mesh_by_chunk(&pack, &config)?;
+for ((cx, cy, cz), mesh) in &chunks.meshes {
+    std::fs::write(format!("chunk_{cx}_{cy}_{cz}.glb"), &mesh.glb_data)?;
+}
+
+// Custom chunk size
+let chunks32 = schematic.mesh_by_chunk_size(&pack, &config, 32)?;
+```
+
+### Querying and modifying resource packs
+
+```rust
+// List all entries
+let blockstates = pack.list_blockstates();  // Vec<String>
+let models = pack.list_models();
+let textures = pack.list_textures();
+
+// Query specific entries
+if let Some(json) = pack.get_blockstate_json("minecraft:stone") {
+    println!("Stone blockstate: {json}");
+}
+if let Some((w, h, animated, frames)) = pack.get_texture_info("minecraft:block/stone") {
+    println!("Texture: {w}x{h}, animated={animated}, frames={frames}");
+}
+
+// Add custom entries
+pack.add_blockstate_json("mymod:custom", &blockstate_json)?;
+pack.add_model_json("mymod:block/custom", &model_json)?;
+pack.add_texture("mymod:block/custom", 16, 16, rgba_pixels)?;
+```
+
+---
+
+## 7 · Design notes & gotchas
 
 * **All mutation is via `&mut UniversalSchematic`**; most helper structs
   (`Region`, `BlockEntity`, `Entity`, etc.) expose their own methods but are
@@ -115,7 +213,7 @@ The Rust side does **not** re-export those symbols to avoid name clashes.
 
 ---
 
-## 6 · Definition Regions & Fluent API
+## 8 · Definition Regions & Fluent API
 
 Nucleation provides a fluent API for defining logical regions within your schematic. This is useful for marking inputs, outputs, or other significant areas.
 
