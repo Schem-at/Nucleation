@@ -3,16 +3,12 @@
 //! Generate 3D meshes (GLB) from schematics using resource packs.
 
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyList};
+use pyo3::types::PyBytes;
 use std::collections::HashMap;
-use std::path::Path;
 
 use crate::meshing::{
-    ChunkMeshResult, MeshConfig, MeshError, MeshResult, MultiMeshResult, ResourcePackSource,
-    ResourcePackStats,
+    ChunkMeshResult, MeshConfig, MeshResult, MultiMeshResult, ResourcePackSource,
 };
-
-use super::schematic::PySchematic;
 
 /// Wrapper for a Minecraft resource pack.
 #[pyclass(name = "ResourcePack")]
@@ -497,100 +493,5 @@ impl PyChunkMeshResult {
     }
 }
 
-// Add meshing methods to PySchematic
-#[pymethods]
-impl PySchematic {
-    /// Generate a single mesh for the entire schematic.
-    ///
-    /// Args:
-    ///     pack: The resource pack to use for textures and models.
-    ///     config: Optional mesh configuration. Uses defaults if not provided.
-    ///
-    /// Returns:
-    ///     MeshResult containing the GLB data and statistics.
-    #[pyo3(signature = (pack, config=None))]
-    pub fn to_mesh(
-        &self,
-        pack: &PyResourcePack,
-        config: Option<&PyMeshConfig>,
-    ) -> PyResult<PyMeshResult> {
-        let default_config = MeshConfig::default();
-        let config = config.map(|c| &c.inner).unwrap_or(&default_config);
-
-        self.inner
-            .to_mesh(&pack.inner, config)
-            .map(|result| PyMeshResult { inner: result })
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
-    }
-
-    /// Generate one mesh per region.
-    ///
-    /// Args:
-    ///     pack: The resource pack to use for textures and models.
-    ///     config: Optional mesh configuration. Uses defaults if not provided.
-    ///
-    /// Returns:
-    ///     MultiMeshResult containing meshes keyed by region name.
-    #[pyo3(signature = (pack, config=None))]
-    pub fn mesh_by_region(
-        &self,
-        pack: &PyResourcePack,
-        config: Option<&PyMeshConfig>,
-    ) -> PyResult<PyMultiMeshResult> {
-        let default_config = MeshConfig::default();
-        let config = config.map(|c| &c.inner).unwrap_or(&default_config);
-
-        self.inner
-            .mesh_by_region(&pack.inner, config)
-            .map(|result| PyMultiMeshResult { inner: result })
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
-    }
-
-    /// Generate one mesh per 16x16x16 chunk.
-    ///
-    /// Args:
-    ///     pack: The resource pack to use for textures and models.
-    ///     config: Optional mesh configuration. Uses defaults if not provided.
-    ///
-    /// Returns:
-    ///     ChunkMeshResult containing meshes keyed by chunk coordinates.
-    #[pyo3(signature = (pack, config=None))]
-    pub fn mesh_by_chunk(
-        &self,
-        pack: &PyResourcePack,
-        config: Option<&PyMeshConfig>,
-    ) -> PyResult<PyChunkMeshResult> {
-        let default_config = MeshConfig::default();
-        let config = config.map(|c| &c.inner).unwrap_or(&default_config);
-
-        self.inner
-            .mesh_by_chunk(&pack.inner, config)
-            .map(|result| PyChunkMeshResult { inner: result })
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
-    }
-
-    /// Generate one mesh per chunk of the specified size.
-    ///
-    /// Args:
-    ///     pack: The resource pack to use for textures and models.
-    ///     chunk_size: Size of each chunk in blocks (e.g., 16 for standard Minecraft chunks).
-    ///     config: Optional mesh configuration. Uses defaults if not provided.
-    ///
-    /// Returns:
-    ///     ChunkMeshResult containing meshes keyed by chunk coordinates.
-    #[pyo3(signature = (pack, chunk_size, config=None))]
-    pub fn mesh_by_chunk_size(
-        &self,
-        pack: &PyResourcePack,
-        chunk_size: i32,
-        config: Option<&PyMeshConfig>,
-    ) -> PyResult<PyChunkMeshResult> {
-        let default_config = MeshConfig::default();
-        let config = config.map(|c| &c.inner).unwrap_or(&default_config);
-
-        self.inner
-            .mesh_by_chunk_size(&pack.inner, config, chunk_size)
-            .map(|result| PyChunkMeshResult { inner: result })
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
-    }
-}
+// Meshing methods for PySchematic are in src/python/schematic.rs
+// (behind #[cfg(feature = "meshing")] inside the main #[pymethods] block)

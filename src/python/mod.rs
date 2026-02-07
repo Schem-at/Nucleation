@@ -34,10 +34,6 @@ pub use schematic_builder::PySchematicBuilder;
 
 #[cfg(feature = "simulation")]
 pub use circuit_builder::{PyCircuitBuilder, PySortStrategy};
-#[cfg(feature = "meshing")]
-pub use meshing::{
-    PyChunkMeshResult, PyMeshConfig, PyMeshResult, PyMultiMeshResult, PyResourcePack,
-};
 #[cfg(feature = "simulation")]
 pub use simulation::PyMchprsWorld;
 #[cfg(feature = "simulation")]

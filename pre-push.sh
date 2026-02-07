@@ -46,6 +46,7 @@ run_check "Build (default features)" "cargo build --release"
 run_check "Build (simulation feature)" "cargo build --release --features simulation"
 run_check "Build (WASM + simulation)" "cargo build --release --target wasm32-unknown-unknown --features wasm,simulation"
 run_check "Build (Python + simulation)" "cargo build --release --features python,simulation"
+run_check "Build (Python + meshing)" "cargo build --release --features python,meshing"
 
 # 3. Test checks
 run_check "Tests (default)" "cargo test"

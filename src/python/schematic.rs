@@ -189,32 +189,47 @@ impl PySchematic {
     }
 
     #[staticmethod]
-    pub fn get_supported_import_formats() -> Vec<String> {
+    pub fn get_supported_import_formats() -> PyResult<Vec<String>> {
         let manager = get_manager();
-        // unwrapping safe here as we're returning static strings essentially
-        let manager = manager.lock().unwrap();
-        manager.list_importers()
+        let manager = manager.lock().map_err(|_| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                "Failed to acquire format manager lock",
+            )
+        })?;
+        Ok(manager.list_importers())
     }
 
     #[staticmethod]
-    pub fn get_supported_export_formats() -> Vec<String> {
+    pub fn get_supported_export_formats() -> PyResult<Vec<String>> {
         let manager = get_manager();
-        let manager = manager.lock().unwrap();
-        manager.list_exporters()
+        let manager = manager.lock().map_err(|_| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                "Failed to acquire format manager lock",
+            )
+        })?;
+        Ok(manager.list_exporters())
     }
 
     #[staticmethod]
-    pub fn get_format_versions(format: &str) -> Vec<String> {
+    pub fn get_format_versions(format: &str) -> PyResult<Vec<String>> {
         let manager = get_manager();
-        let manager = manager.lock().unwrap();
-        manager.get_exporter_versions(format).unwrap_or_default()
+        let manager = manager.lock().map_err(|_| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                "Failed to acquire format manager lock",
+            )
+        })?;
+        Ok(manager.get_exporter_versions(format).unwrap_or_default())
     }
 
     #[staticmethod]
-    pub fn get_default_format_version(format: &str) -> Option<String> {
+    pub fn get_default_format_version(format: &str) -> PyResult<Option<String>> {
         let manager = get_manager();
-        let manager = manager.lock().unwrap();
-        manager.get_exporter_default_version(format)
+        let manager = manager.lock().map_err(|_| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                "Failed to acquire format manager lock",
+            )
+        })?;
+        Ok(manager.get_exporter_default_version(format))
     }
 
     pub fn from_litematic(&mut self, data: &[u8]) -> PyResult<()> {
@@ -1177,6 +1192,73 @@ impl PySchematic {
 
     pub fn print_schematic(&self) -> String {
         format_schematic(&self.inner)
+    }
+
+    // --- Meshing methods (feature-gated) ---
+
+    #[cfg(feature = "meshing")]
+    #[pyo3(signature = (pack, config=None))]
+    pub fn to_mesh(
+        &self,
+        pack: &super::meshing::PyResourcePack,
+        config: Option<&super::meshing::PyMeshConfig>,
+    ) -> PyResult<super::meshing::PyMeshResult> {
+        let default_config = crate::meshing::MeshConfig::default();
+        let config = config.map(|c| &c.inner).unwrap_or(&default_config);
+
+        self.inner
+            .to_mesh(&pack.inner, config)
+            .map(|result| super::meshing::PyMeshResult { inner: result })
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    #[cfg(feature = "meshing")]
+    #[pyo3(signature = (pack, config=None))]
+    pub fn mesh_by_region(
+        &self,
+        pack: &super::meshing::PyResourcePack,
+        config: Option<&super::meshing::PyMeshConfig>,
+    ) -> PyResult<super::meshing::PyMultiMeshResult> {
+        let default_config = crate::meshing::MeshConfig::default();
+        let config = config.map(|c| &c.inner).unwrap_or(&default_config);
+
+        self.inner
+            .mesh_by_region(&pack.inner, config)
+            .map(|result| super::meshing::PyMultiMeshResult { inner: result })
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    #[cfg(feature = "meshing")]
+    #[pyo3(signature = (pack, config=None))]
+    pub fn mesh_by_chunk(
+        &self,
+        pack: &super::meshing::PyResourcePack,
+        config: Option<&super::meshing::PyMeshConfig>,
+    ) -> PyResult<super::meshing::PyChunkMeshResult> {
+        let default_config = crate::meshing::MeshConfig::default();
+        let config = config.map(|c| &c.inner).unwrap_or(&default_config);
+
+        self.inner
+            .mesh_by_chunk(&pack.inner, config)
+            .map(|result| super::meshing::PyChunkMeshResult { inner: result })
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    #[cfg(feature = "meshing")]
+    #[pyo3(signature = (pack, chunk_size, config=None))]
+    pub fn mesh_by_chunk_size(
+        &self,
+        pack: &super::meshing::PyResourcePack,
+        chunk_size: i32,
+        config: Option<&super::meshing::PyMeshConfig>,
+    ) -> PyResult<super::meshing::PyChunkMeshResult> {
+        let default_config = crate::meshing::MeshConfig::default();
+        let config = config.map(|c| &c.inner).unwrap_or(&default_config);
+
+        self.inner
+            .mesh_by_chunk_size(&pack.inner, config, chunk_size)
+            .map(|result| super::meshing::PyChunkMeshResult { inner: result })
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
 }
 
