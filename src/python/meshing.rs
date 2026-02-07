@@ -107,6 +107,98 @@ impl PyResourcePack {
         })
     }
 
+    /// List all blockstate names as "namespace:block_id".
+    pub fn list_blockstates(&self) -> Vec<String> {
+        self.inner.list_blockstates()
+    }
+
+    /// List all model names as "namespace:model_path".
+    pub fn list_models(&self) -> Vec<String> {
+        self.inner.list_models()
+    }
+
+    /// List all texture names as "namespace:texture_path".
+    pub fn list_textures(&self) -> Vec<String> {
+        self.inner.list_textures()
+    }
+
+    /// Get a blockstate definition as a JSON string. Returns None if not found.
+    pub fn get_blockstate_json(&self, name: &str) -> Option<String> {
+        self.inner.get_blockstate_json(name)
+    }
+
+    /// Get a block model as a JSON string. Returns None if not found.
+    pub fn get_model_json(&self, name: &str) -> Option<String> {
+        self.inner.get_model_json(name)
+    }
+
+    /// Get texture info as a dict with width, height, is_animated, frame_count.
+    /// Returns None if not found.
+    pub fn get_texture_info(&self, name: &str) -> Option<HashMap<String, PyObject>> {
+        let (w, h, animated, frames) = self.inner.get_texture_info(name)?;
+        Python::with_gil(|py| {
+            let mut map = HashMap::new();
+            map.insert(
+                "width".to_string(),
+                w.into_pyobject(py).unwrap().into_any().unbind(),
+            );
+            map.insert(
+                "height".to_string(),
+                h.into_pyobject(py).unwrap().into_any().unbind(),
+            );
+            map.insert(
+                "is_animated".to_string(),
+                (animated as u32)
+                    .into_pyobject(py)
+                    .unwrap()
+                    .into_any()
+                    .unbind(),
+            );
+            map.insert(
+                "frame_count".to_string(),
+                frames.into_pyobject(py).unwrap().into_any().unbind(),
+            );
+            Some(map)
+        })
+    }
+
+    /// Get raw RGBA8 pixel data for a texture. Returns None if not found.
+    pub fn get_texture_pixels<'py>(
+        &self,
+        py: Python<'py>,
+        name: &str,
+    ) -> Option<Bound<'py, PyBytes>> {
+        let pixels = self.inner.get_texture_pixels(name)?;
+        Some(PyBytes::new(py, pixels))
+    }
+
+    /// Add a blockstate definition from a JSON string.
+    pub fn add_blockstate_json(&mut self, name: &str, json: &str) -> PyResult<()> {
+        self.inner
+            .add_blockstate_json(name, json)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
+    }
+
+    /// Add a block model from a JSON string.
+    pub fn add_model_json(&mut self, name: &str, json: &str) -> PyResult<()> {
+        self.inner
+            .add_model_json(name, json)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
+    }
+
+    /// Add a texture from raw RGBA8 pixel data.
+    pub fn add_texture(
+        &mut self,
+        name: &str,
+        width: u32,
+        height: u32,
+        pixels: &[u8],
+    ) -> PyResult<()> {
+        self.inner
+            .add_texture(name, width, height, pixels.to_vec())
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
+    }
+
     fn __repr__(&self) -> String {
         let stats = self.inner.stats();
         format!(

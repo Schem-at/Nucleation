@@ -31,7 +31,7 @@
 //! ```
 
 use schematic_mesher::{
-    export_glb, BlockPosition as MesherBlockPosition, BlockSource,
+    export_glb, resource_pack::TextureData, BlockPosition as MesherBlockPosition, BlockSource,
     BoundingBox as MesherBoundingBox, InputBlock, Mesher, MesherConfig, ResourcePack,
 };
 use std::collections::HashMap;
@@ -77,6 +77,101 @@ impl ResourcePackSource {
     /// Get a reference to the underlying ResourcePack.
     pub fn pack(&self) -> &ResourcePack {
         &self.pack
+    }
+
+    /// Get a mutable reference to the underlying ResourcePack.
+    pub fn pack_mut(&mut self) -> &mut ResourcePack {
+        &mut self.pack
+    }
+
+    /// List all blockstate names as "namespace:block_id".
+    pub fn list_blockstates(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        for (namespace, blocks) in &self.pack.blockstates {
+            for block_id in blocks.keys() {
+                names.push(format!("{}:{}", namespace, block_id));
+            }
+        }
+        names
+    }
+
+    /// List all model names as "namespace:model_path".
+    pub fn list_models(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        for (namespace, models) in &self.pack.models {
+            for model_path in models.keys() {
+                names.push(format!("{}:{}", namespace, model_path));
+            }
+        }
+        names
+    }
+
+    /// List all texture names as "namespace:texture_path".
+    pub fn list_textures(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        for (namespace, textures) in &self.pack.textures {
+            for texture_path in textures.keys() {
+                names.push(format!("{}:{}", namespace, texture_path));
+            }
+        }
+        names
+    }
+
+    /// Get a blockstate definition as JSON. Returns None if not found.
+    /// Since BlockstateDefinition doesn't implement Serialize, we manually build JSON.
+    pub fn get_blockstate_json(&self, name: &str) -> Option<String> {
+        let def = self.pack.get_blockstate(name)?;
+        Some(blockstate_definition_to_json(def))
+    }
+
+    /// Get a block model as JSON. Returns None if not found.
+    pub fn get_model_json(&self, name: &str) -> Option<String> {
+        let model = self.pack.get_model(name)?;
+        serde_json::to_string(model).ok()
+    }
+
+    /// Get texture info: (width, height, is_animated, frame_count). Returns None if not found.
+    pub fn get_texture_info(&self, name: &str) -> Option<(u32, u32, bool, u32)> {
+        let tex = self.pack.get_texture(name)?;
+        Some((tex.width, tex.height, tex.is_animated, tex.frame_count))
+    }
+
+    /// Get raw RGBA8 pixel data for a texture. Returns None if not found.
+    pub fn get_texture_pixels(&self, name: &str) -> Option<&[u8]> {
+        let tex = self.pack.get_texture(name)?;
+        Some(&tex.pixels)
+    }
+
+    /// Add a blockstate definition from JSON. Name format: "namespace:block_id".
+    pub fn add_blockstate_json(&mut self, name: &str, json: &str) -> Result<()> {
+        let (namespace, path) = split_resource_name(name)?;
+        let def: schematic_mesher::BlockstateDefinition =
+            serde_json::from_str(json).map_err(|e| MeshError::ResourcePack(e.to_string()))?;
+        self.pack.add_blockstate(&namespace, &path, def);
+        Ok(())
+    }
+
+    /// Add a block model from JSON. Name format: "namespace:model_path".
+    pub fn add_model_json(&mut self, name: &str, json: &str) -> Result<()> {
+        let (namespace, path) = split_resource_name(name)?;
+        let model: schematic_mesher::BlockModel =
+            serde_json::from_str(json).map_err(|e| MeshError::ResourcePack(e.to_string()))?;
+        self.pack.add_model(&namespace, &path, model);
+        Ok(())
+    }
+
+    /// Add a texture from raw RGBA8 pixel data. Name format: "namespace:texture_path".
+    pub fn add_texture(
+        &mut self,
+        name: &str,
+        width: u32,
+        height: u32,
+        pixels: Vec<u8>,
+    ) -> Result<()> {
+        let (namespace, path) = split_resource_name(name)?;
+        let texture = TextureData::new(width, height, pixels);
+        self.pack.add_texture(&namespace, &path, texture);
+        Ok(())
     }
 
     /// Get statistics about the loaded resource pack.
@@ -577,6 +672,50 @@ fn collect_region_blocks_by_chunk(
                 let input_block = block_state_to_input_block(block_state);
                 chunk_blocks.insert(pos, input_block);
             }
+        }
+    }
+}
+
+/// Split a "namespace:path" resource name into (namespace, path).
+fn split_resource_name(name: &str) -> Result<(String, String)> {
+    match name.split_once(':') {
+        Some((ns, path)) => Ok((ns.to_string(), path.to_string())),
+        None => Ok(("minecraft".to_string(), name.to_string())),
+    }
+}
+
+/// Manually serialize BlockstateDefinition to JSON since it doesn't implement Serialize.
+fn blockstate_definition_to_json(def: &schematic_mesher::BlockstateDefinition) -> String {
+    match def {
+        schematic_mesher::BlockstateDefinition::Variants(variants) => {
+            let mut map = serde_json::Map::new();
+            let mut variants_map = serde_json::Map::new();
+            for (key, models) in variants {
+                if models.len() == 1 {
+                    variants_map.insert(
+                        key.clone(),
+                        serde_json::to_value(&models[0]).unwrap_or_default(),
+                    );
+                } else {
+                    variants_map.insert(
+                        key.clone(),
+                        serde_json::to_value(models).unwrap_or_default(),
+                    );
+                }
+            }
+            map.insert(
+                "variants".to_string(),
+                serde_json::Value::Object(variants_map),
+            );
+            serde_json::Value::Object(map).to_string()
+        }
+        schematic_mesher::BlockstateDefinition::Multipart(cases) => {
+            let mut map = serde_json::Map::new();
+            map.insert(
+                "multipart".to_string(),
+                serde_json::to_value(cases).unwrap_or_default(),
+            );
+            serde_json::Value::Object(map).to_string()
         }
     }
 }

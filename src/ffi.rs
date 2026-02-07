@@ -3218,3 +3218,694 @@ pub extern "C" fn schematicbuilder_from_template(
         Err(_) => ptr::null_mut(),
     }
 }
+
+// =============================================================================
+// Meshing FFI Bindings (feature-gated)
+// =============================================================================
+
+#[cfg(feature = "meshing")]
+mod meshing_ffi {
+    use super::*;
+    use crate::meshing::{
+        ChunkMeshResult, MeshConfig, MeshResult, MultiMeshResult, ResourcePackSource,
+    };
+
+    // --- Wrapper Structs ---
+
+    pub struct FFIResourcePack(ResourcePackSource);
+    pub struct FFIMeshConfig(MeshConfig);
+    pub struct FFIMeshResult(MeshResult);
+    pub struct FFIMultiMeshResult(MultiMeshResult);
+    pub struct FFIChunkMeshResult(ChunkMeshResult);
+
+    // --- ResourcePack Lifecycle ---
+
+    #[no_mangle]
+    pub extern "C" fn resourcepack_from_bytes(
+        data: *const c_uchar,
+        data_len: usize,
+    ) -> *mut FFIResourcePack {
+        if data.is_null() || data_len == 0 {
+            return ptr::null_mut();
+        }
+        let data_slice = unsafe { std::slice::from_raw_parts(data, data_len) };
+        match ResourcePackSource::from_bytes(data_slice) {
+            Ok(pack) => Box::into_raw(Box::new(FFIResourcePack(pack))),
+            Err(_) => ptr::null_mut(),
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn resourcepack_free(ptr: *mut FFIResourcePack) {
+        if !ptr.is_null() {
+            unsafe {
+                let _ = Box::from_raw(ptr);
+            }
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn resourcepack_blockstate_count(ptr: *const FFIResourcePack) -> usize {
+        if ptr.is_null() {
+            return 0;
+        }
+        let pack = unsafe { &(*ptr).0 };
+        pack.stats().blockstate_count
+    }
+
+    #[no_mangle]
+    pub extern "C" fn resourcepack_model_count(ptr: *const FFIResourcePack) -> usize {
+        if ptr.is_null() {
+            return 0;
+        }
+        let pack = unsafe { &(*ptr).0 };
+        pack.stats().model_count
+    }
+
+    #[no_mangle]
+    pub extern "C" fn resourcepack_texture_count(ptr: *const FFIResourcePack) -> usize {
+        if ptr.is_null() {
+            return 0;
+        }
+        let pack = unsafe { &(*ptr).0 };
+        pack.stats().texture_count
+    }
+
+    #[no_mangle]
+    pub extern "C" fn resourcepack_namespaces(ptr: *const FFIResourcePack) -> StringArray {
+        if ptr.is_null() {
+            return StringArray {
+                data: ptr::null_mut(),
+                len: 0,
+            };
+        }
+        let pack = unsafe { &(*ptr).0 };
+        vec_string_to_string_array(pack.stats().namespaces)
+    }
+
+    // --- ResourcePack Query/List/Mutate ---
+
+    #[no_mangle]
+    pub extern "C" fn resourcepack_list_blockstates(ptr: *const FFIResourcePack) -> StringArray {
+        if ptr.is_null() {
+            return StringArray {
+                data: ptr::null_mut(),
+                len: 0,
+            };
+        }
+        let pack = unsafe { &(*ptr).0 };
+        vec_string_to_string_array(pack.list_blockstates())
+    }
+
+    #[no_mangle]
+    pub extern "C" fn resourcepack_list_models(ptr: *const FFIResourcePack) -> StringArray {
+        if ptr.is_null() {
+            return StringArray {
+                data: ptr::null_mut(),
+                len: 0,
+            };
+        }
+        let pack = unsafe { &(*ptr).0 };
+        vec_string_to_string_array(pack.list_models())
+    }
+
+    #[no_mangle]
+    pub extern "C" fn resourcepack_list_textures(ptr: *const FFIResourcePack) -> StringArray {
+        if ptr.is_null() {
+            return StringArray {
+                data: ptr::null_mut(),
+                len: 0,
+            };
+        }
+        let pack = unsafe { &(*ptr).0 };
+        vec_string_to_string_array(pack.list_textures())
+    }
+
+    #[no_mangle]
+    pub extern "C" fn resourcepack_get_blockstate_json(
+        ptr: *const FFIResourcePack,
+        name: *const c_char,
+    ) -> *mut c_char {
+        if ptr.is_null() || name.is_null() {
+            return ptr::null_mut();
+        }
+        let pack = unsafe { &(*ptr).0 };
+        let name_str = unsafe { CStr::from_ptr(name).to_string_lossy() };
+        match pack.get_blockstate_json(&name_str) {
+            Some(json) => CString::new(json).unwrap().into_raw(),
+            None => ptr::null_mut(),
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn resourcepack_get_model_json(
+        ptr: *const FFIResourcePack,
+        name: *const c_char,
+    ) -> *mut c_char {
+        if ptr.is_null() || name.is_null() {
+            return ptr::null_mut();
+        }
+        let pack = unsafe { &(*ptr).0 };
+        let name_str = unsafe { CStr::from_ptr(name).to_string_lossy() };
+        match pack.get_model_json(&name_str) {
+            Some(json) => CString::new(json).unwrap().into_raw(),
+            None => ptr::null_mut(),
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn resourcepack_get_texture_info(
+        ptr: *const FFIResourcePack,
+        name: *const c_char,
+    ) -> IntArray {
+        if ptr.is_null() || name.is_null() {
+            return IntArray {
+                data: ptr::null_mut(),
+                len: 0,
+            };
+        }
+        let pack = unsafe { &(*ptr).0 };
+        let name_str = unsafe { CStr::from_ptr(name).to_string_lossy() };
+        match pack.get_texture_info(&name_str) {
+            Some((w, h, animated, frames)) => {
+                let vals = vec![
+                    w as c_int,
+                    h as c_int,
+                    if animated { 1 } else { 0 },
+                    frames as c_int,
+                ];
+                let mut boxed = vals.into_boxed_slice();
+                let p = boxed.as_mut_ptr();
+                let len = boxed.len();
+                std::mem::forget(boxed);
+                IntArray { data: p, len }
+            }
+            None => IntArray {
+                data: ptr::null_mut(),
+                len: 0,
+            },
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn resourcepack_get_texture_pixels(
+        ptr: *const FFIResourcePack,
+        name: *const c_char,
+    ) -> ByteArray {
+        if ptr.is_null() || name.is_null() {
+            return ByteArray {
+                data: ptr::null_mut(),
+                len: 0,
+            };
+        }
+        let pack = unsafe { &(*ptr).0 };
+        let name_str = unsafe { CStr::from_ptr(name).to_string_lossy() };
+        match pack.get_texture_pixels(&name_str) {
+            Some(pixels) => {
+                let mut data = pixels.to_vec();
+                let p = data.as_mut_ptr();
+                let len = data.len();
+                std::mem::forget(data);
+                ByteArray { data: p, len }
+            }
+            None => ByteArray {
+                data: ptr::null_mut(),
+                len: 0,
+            },
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn resourcepack_add_blockstate_json(
+        ptr: *mut FFIResourcePack,
+        name: *const c_char,
+        json: *const c_char,
+    ) -> c_int {
+        if ptr.is_null() || name.is_null() || json.is_null() {
+            return -1;
+        }
+        let pack = unsafe { &mut (*ptr).0 };
+        let name_str = unsafe { CStr::from_ptr(name).to_string_lossy() };
+        let json_str = unsafe { CStr::from_ptr(json).to_string_lossy() };
+        match pack.add_blockstate_json(&name_str, &json_str) {
+            Ok(_) => 0,
+            Err(_) => -2,
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn resourcepack_add_model_json(
+        ptr: *mut FFIResourcePack,
+        name: *const c_char,
+        json: *const c_char,
+    ) -> c_int {
+        if ptr.is_null() || name.is_null() || json.is_null() {
+            return -1;
+        }
+        let pack = unsafe { &mut (*ptr).0 };
+        let name_str = unsafe { CStr::from_ptr(name).to_string_lossy() };
+        let json_str = unsafe { CStr::from_ptr(json).to_string_lossy() };
+        match pack.add_model_json(&name_str, &json_str) {
+            Ok(_) => 0,
+            Err(_) => -2,
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn resourcepack_add_texture(
+        ptr: *mut FFIResourcePack,
+        name: *const c_char,
+        width: u32,
+        height: u32,
+        pixels: *const c_uchar,
+        pixels_len: usize,
+    ) -> c_int {
+        if ptr.is_null() || name.is_null() || pixels.is_null() {
+            return -1;
+        }
+        let pack = unsafe { &mut (*ptr).0 };
+        let name_str = unsafe { CStr::from_ptr(name).to_string_lossy() };
+        let pixels_slice = unsafe { std::slice::from_raw_parts(pixels, pixels_len) };
+        match pack.add_texture(&name_str, width, height, pixels_slice.to_vec()) {
+            Ok(_) => 0,
+            Err(_) => -2,
+        }
+    }
+
+    // --- MeshConfig FFI ---
+
+    #[no_mangle]
+    pub extern "C" fn meshconfig_new() -> *mut FFIMeshConfig {
+        Box::into_raw(Box::new(FFIMeshConfig(MeshConfig::default())))
+    }
+
+    #[no_mangle]
+    pub extern "C" fn meshconfig_free(ptr: *mut FFIMeshConfig) {
+        if !ptr.is_null() {
+            unsafe {
+                let _ = Box::from_raw(ptr);
+            }
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn meshconfig_set_cull_hidden_faces(ptr: *mut FFIMeshConfig, val: c_int) {
+        if !ptr.is_null() {
+            let config = unsafe { &mut (*ptr).0 };
+            config.cull_hidden_faces = val != 0;
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn meshconfig_set_ambient_occlusion(ptr: *mut FFIMeshConfig, val: c_int) {
+        if !ptr.is_null() {
+            let config = unsafe { &mut (*ptr).0 };
+            config.ambient_occlusion = val != 0;
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn meshconfig_set_ao_intensity(ptr: *mut FFIMeshConfig, val: c_float) {
+        if !ptr.is_null() {
+            let config = unsafe { &mut (*ptr).0 };
+            config.ao_intensity = val;
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn meshconfig_set_biome(ptr: *mut FFIMeshConfig, biome: *const c_char) {
+        if !ptr.is_null() {
+            let config = unsafe { &mut (*ptr).0 };
+            if biome.is_null() {
+                config.biome = None;
+            } else {
+                let biome_str = unsafe { CStr::from_ptr(biome).to_string_lossy().into_owned() };
+                config.biome = Some(biome_str);
+            }
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn meshconfig_set_atlas_max_size(ptr: *mut FFIMeshConfig, size: u32) {
+        if !ptr.is_null() {
+            let config = unsafe { &mut (*ptr).0 };
+            config.atlas_max_size = size;
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn meshconfig_get_cull_hidden_faces(ptr: *const FFIMeshConfig) -> c_int {
+        if ptr.is_null() {
+            return 0;
+        }
+        let config = unsafe { &(*ptr).0 };
+        if config.cull_hidden_faces {
+            1
+        } else {
+            0
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn meshconfig_get_ambient_occlusion(ptr: *const FFIMeshConfig) -> c_int {
+        if ptr.is_null() {
+            return 0;
+        }
+        let config = unsafe { &(*ptr).0 };
+        if config.ambient_occlusion {
+            1
+        } else {
+            0
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn meshconfig_get_ao_intensity(ptr: *const FFIMeshConfig) -> c_float {
+        if ptr.is_null() {
+            return 0.0;
+        }
+        let config = unsafe { &(*ptr).0 };
+        config.ao_intensity
+    }
+
+    #[no_mangle]
+    pub extern "C" fn meshconfig_get_biome(ptr: *const FFIMeshConfig) -> *mut c_char {
+        if ptr.is_null() {
+            return ptr::null_mut();
+        }
+        let config = unsafe { &(*ptr).0 };
+        match &config.biome {
+            Some(biome) => CString::new(biome.clone()).unwrap().into_raw(),
+            None => ptr::null_mut(),
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn meshconfig_get_atlas_max_size(ptr: *const FFIMeshConfig) -> u32 {
+        if ptr.is_null() {
+            return 0;
+        }
+        let config = unsafe { &(*ptr).0 };
+        config.atlas_max_size
+    }
+
+    // --- MeshResult FFI ---
+
+    #[no_mangle]
+    pub extern "C" fn meshresult_free(ptr: *mut FFIMeshResult) {
+        if !ptr.is_null() {
+            unsafe {
+                let _ = Box::from_raw(ptr);
+            }
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn meshresult_glb_data(ptr: *const FFIMeshResult) -> ByteArray {
+        if ptr.is_null() {
+            return ByteArray {
+                data: ptr::null_mut(),
+                len: 0,
+            };
+        }
+        let result = unsafe { &(*ptr).0 };
+        let mut data = result.glb_data.clone();
+        let p = data.as_mut_ptr();
+        let len = data.len();
+        std::mem::forget(data);
+        ByteArray { data: p, len }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn meshresult_vertex_count(ptr: *const FFIMeshResult) -> usize {
+        if ptr.is_null() {
+            return 0;
+        }
+        let result = unsafe { &(*ptr).0 };
+        result.vertex_count
+    }
+
+    #[no_mangle]
+    pub extern "C" fn meshresult_triangle_count(ptr: *const FFIMeshResult) -> usize {
+        if ptr.is_null() {
+            return 0;
+        }
+        let result = unsafe { &(*ptr).0 };
+        result.triangle_count
+    }
+
+    #[no_mangle]
+    pub extern "C" fn meshresult_has_transparency(ptr: *const FFIMeshResult) -> c_int {
+        if ptr.is_null() {
+            return 0;
+        }
+        let result = unsafe { &(*ptr).0 };
+        if result.has_transparency {
+            1
+        } else {
+            0
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn meshresult_bounds(ptr: *const FFIMeshResult) -> CFloatArray {
+        if ptr.is_null() {
+            return CFloatArray {
+                data: ptr::null_mut(),
+                len: 0,
+            };
+        }
+        let result = unsafe { &(*ptr).0 };
+        let vals = result.bounds.to_vec();
+        let mut boxed = vals.into_boxed_slice();
+        let p = boxed.as_mut_ptr();
+        let len = boxed.len();
+        std::mem::forget(boxed);
+        CFloatArray { data: p, len }
+    }
+
+    // --- MultiMeshResult FFI ---
+
+    #[no_mangle]
+    pub extern "C" fn multimeshresult_free(ptr: *mut FFIMultiMeshResult) {
+        if !ptr.is_null() {
+            unsafe {
+                let _ = Box::from_raw(ptr);
+            }
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn multimeshresult_region_names(ptr: *const FFIMultiMeshResult) -> StringArray {
+        if ptr.is_null() {
+            return StringArray {
+                data: ptr::null_mut(),
+                len: 0,
+            };
+        }
+        let result = unsafe { &(*ptr).0 };
+        let names: Vec<String> = result.meshes.keys().cloned().collect();
+        vec_string_to_string_array(names)
+    }
+
+    #[no_mangle]
+    pub extern "C" fn multimeshresult_get_mesh(
+        ptr: *const FFIMultiMeshResult,
+        region_name: *const c_char,
+    ) -> *mut FFIMeshResult {
+        if ptr.is_null() || region_name.is_null() {
+            return ptr::null_mut();
+        }
+        let result = unsafe { &(*ptr).0 };
+        let name = unsafe { CStr::from_ptr(region_name).to_string_lossy() };
+        match result.meshes.get(name.as_ref()) {
+            Some(mesh) => Box::into_raw(Box::new(FFIMeshResult(mesh.clone()))),
+            None => ptr::null_mut(),
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn multimeshresult_total_vertex_count(ptr: *const FFIMultiMeshResult) -> usize {
+        if ptr.is_null() {
+            return 0;
+        }
+        let result = unsafe { &(*ptr).0 };
+        result.total_vertex_count
+    }
+
+    #[no_mangle]
+    pub extern "C" fn multimeshresult_total_triangle_count(
+        ptr: *const FFIMultiMeshResult,
+    ) -> usize {
+        if ptr.is_null() {
+            return 0;
+        }
+        let result = unsafe { &(*ptr).0 };
+        result.total_triangle_count
+    }
+
+    #[no_mangle]
+    pub extern "C" fn multimeshresult_mesh_count(ptr: *const FFIMultiMeshResult) -> usize {
+        if ptr.is_null() {
+            return 0;
+        }
+        let result = unsafe { &(*ptr).0 };
+        result.meshes.len()
+    }
+
+    // --- ChunkMeshResult FFI ---
+
+    #[no_mangle]
+    pub extern "C" fn chunkmeshresult_free(ptr: *mut FFIChunkMeshResult) {
+        if !ptr.is_null() {
+            unsafe {
+                let _ = Box::from_raw(ptr);
+            }
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn chunkmeshresult_chunk_coordinates(
+        ptr: *const FFIChunkMeshResult,
+    ) -> IntArray {
+        if ptr.is_null() {
+            return IntArray {
+                data: ptr::null_mut(),
+                len: 0,
+            };
+        }
+        let result = unsafe { &(*ptr).0 };
+        let mut flat: Vec<c_int> = Vec::with_capacity(result.meshes.len() * 3);
+        for (cx, cy, cz) in result.meshes.keys() {
+            flat.push(*cx);
+            flat.push(*cy);
+            flat.push(*cz);
+        }
+        let mut boxed = flat.into_boxed_slice();
+        let p = boxed.as_mut_ptr();
+        let len = boxed.len();
+        std::mem::forget(boxed);
+        IntArray { data: p, len }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn chunkmeshresult_get_mesh(
+        ptr: *const FFIChunkMeshResult,
+        cx: c_int,
+        cy: c_int,
+        cz: c_int,
+    ) -> *mut FFIMeshResult {
+        if ptr.is_null() {
+            return ptr::null_mut();
+        }
+        let result = unsafe { &(*ptr).0 };
+        match result.meshes.get(&(cx, cy, cz)) {
+            Some(mesh) => Box::into_raw(Box::new(FFIMeshResult(mesh.clone()))),
+            None => ptr::null_mut(),
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn chunkmeshresult_total_vertex_count(ptr: *const FFIChunkMeshResult) -> usize {
+        if ptr.is_null() {
+            return 0;
+        }
+        let result = unsafe { &(*ptr).0 };
+        result.total_vertex_count
+    }
+
+    #[no_mangle]
+    pub extern "C" fn chunkmeshresult_total_triangle_count(
+        ptr: *const FFIChunkMeshResult,
+    ) -> usize {
+        if ptr.is_null() {
+            return 0;
+        }
+        let result = unsafe { &(*ptr).0 };
+        result.total_triangle_count
+    }
+
+    #[no_mangle]
+    pub extern "C" fn chunkmeshresult_chunk_count(ptr: *const FFIChunkMeshResult) -> usize {
+        if ptr.is_null() {
+            return 0;
+        }
+        let result = unsafe { &(*ptr).0 };
+        result.meshes.len()
+    }
+
+    // --- Schematic Meshing Methods ---
+
+    #[no_mangle]
+    pub extern "C" fn schematic_to_mesh(
+        schematic: *const SchematicWrapper,
+        pack: *const FFIResourcePack,
+        config: *const FFIMeshConfig,
+    ) -> *mut FFIMeshResult {
+        if schematic.is_null() || pack.is_null() || config.is_null() {
+            return ptr::null_mut();
+        }
+        let s = unsafe { &*(*schematic).0 };
+        let p = unsafe { &(*pack).0 };
+        let c = unsafe { &(*config).0 };
+        match s.to_mesh(p, c) {
+            Ok(result) => Box::into_raw(Box::new(FFIMeshResult(result))),
+            Err(_) => ptr::null_mut(),
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn schematic_mesh_by_region(
+        schematic: *const SchematicWrapper,
+        pack: *const FFIResourcePack,
+        config: *const FFIMeshConfig,
+    ) -> *mut FFIMultiMeshResult {
+        if schematic.is_null() || pack.is_null() || config.is_null() {
+            return ptr::null_mut();
+        }
+        let s = unsafe { &*(*schematic).0 };
+        let p = unsafe { &(*pack).0 };
+        let c = unsafe { &(*config).0 };
+        match s.mesh_by_region(p, c) {
+            Ok(result) => Box::into_raw(Box::new(FFIMultiMeshResult(result))),
+            Err(_) => ptr::null_mut(),
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn schematic_mesh_by_chunk(
+        schematic: *const SchematicWrapper,
+        pack: *const FFIResourcePack,
+        config: *const FFIMeshConfig,
+    ) -> *mut FFIChunkMeshResult {
+        if schematic.is_null() || pack.is_null() || config.is_null() {
+            return ptr::null_mut();
+        }
+        let s = unsafe { &*(*schematic).0 };
+        let p = unsafe { &(*pack).0 };
+        let c = unsafe { &(*config).0 };
+        match s.mesh_by_chunk(p, c) {
+            Ok(result) => Box::into_raw(Box::new(FFIChunkMeshResult(result))),
+            Err(_) => ptr::null_mut(),
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn schematic_mesh_by_chunk_size(
+        schematic: *const SchematicWrapper,
+        pack: *const FFIResourcePack,
+        config: *const FFIMeshConfig,
+        chunk_size: c_int,
+    ) -> *mut FFIChunkMeshResult {
+        if schematic.is_null() || pack.is_null() || config.is_null() {
+            return ptr::null_mut();
+        }
+        let s = unsafe { &*(*schematic).0 };
+        let p = unsafe { &(*pack).0 };
+        let c = unsafe { &(*config).0 };
+        match s.mesh_by_chunk_size(p, c, chunk_size) {
+            Ok(result) => Box::into_raw(Box::new(FFIChunkMeshResult(result))),
+            Err(_) => ptr::null_mut(),
+        }
+    }
+}

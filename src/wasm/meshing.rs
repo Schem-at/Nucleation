@@ -56,6 +56,104 @@ impl ResourcePackWrapper {
         arr
     }
 
+    /// List all blockstate names.
+    #[wasm_bindgen(js_name = listBlockstates)]
+    pub fn list_blockstates(&self) -> Array {
+        let names = self.inner.list_blockstates();
+        let arr = Array::new();
+        for name in names {
+            arr.push(&JsValue::from_str(&name));
+        }
+        arr
+    }
+
+    /// List all model names.
+    #[wasm_bindgen(js_name = listModels)]
+    pub fn list_models(&self) -> Array {
+        let names = self.inner.list_models();
+        let arr = Array::new();
+        for name in names {
+            arr.push(&JsValue::from_str(&name));
+        }
+        arr
+    }
+
+    /// List all texture names.
+    #[wasm_bindgen(js_name = listTextures)]
+    pub fn list_textures(&self) -> Array {
+        let names = self.inner.list_textures();
+        let arr = Array::new();
+        for name in names {
+            arr.push(&JsValue::from_str(&name));
+        }
+        arr
+    }
+
+    /// Get a blockstate definition as a JSON string. Returns null if not found.
+    #[wasm_bindgen(js_name = getBlockstateJson)]
+    pub fn get_blockstate_json(&self, name: &str) -> Option<String> {
+        self.inner.get_blockstate_json(name)
+    }
+
+    /// Get a block model as a JSON string. Returns null if not found.
+    #[wasm_bindgen(js_name = getModelJson)]
+    pub fn get_model_json(&self, name: &str) -> Option<String> {
+        self.inner.get_model_json(name)
+    }
+
+    /// Get texture info as a JS object with width, height, isAnimated, frameCount.
+    /// Returns null if not found.
+    #[wasm_bindgen(js_name = getTextureInfo)]
+    pub fn get_texture_info(&self, name: &str) -> JsValue {
+        match self.inner.get_texture_info(name) {
+            Some((w, h, animated, frames)) => {
+                let obj = Object::new();
+                Reflect::set(&obj, &"width".into(), &JsValue::from(w)).unwrap();
+                Reflect::set(&obj, &"height".into(), &JsValue::from(h)).unwrap();
+                Reflect::set(&obj, &"isAnimated".into(), &JsValue::from(animated)).unwrap();
+                Reflect::set(&obj, &"frameCount".into(), &JsValue::from(frames)).unwrap();
+                obj.into()
+            }
+            None => JsValue::NULL,
+        }
+    }
+
+    /// Get raw RGBA8 pixel data for a texture. Returns null if not found.
+    #[wasm_bindgen(js_name = getTexturePixels)]
+    pub fn get_texture_pixels(&self, name: &str) -> Option<Vec<u8>> {
+        self.inner.get_texture_pixels(name).map(|p| p.to_vec())
+    }
+
+    /// Add a blockstate definition from a JSON string.
+    #[wasm_bindgen(js_name = addBlockstateJson)]
+    pub fn add_blockstate_json(&mut self, name: &str, json: &str) -> Result<(), JsValue> {
+        self.inner
+            .add_blockstate_json(name, json)
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    /// Add a block model from a JSON string.
+    #[wasm_bindgen(js_name = addModelJson)]
+    pub fn add_model_json(&mut self, name: &str, json: &str) -> Result<(), JsValue> {
+        self.inner
+            .add_model_json(name, json)
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    /// Add a texture from raw RGBA8 pixel data.
+    #[wasm_bindgen(js_name = addTexture)]
+    pub fn add_texture(
+        &mut self,
+        name: &str,
+        width: u32,
+        height: u32,
+        pixels: &[u8],
+    ) -> Result<(), JsValue> {
+        self.inner
+            .add_texture(name, width, height, pixels.to_vec())
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
     /// Get statistics about the resource pack as a JS object.
     #[wasm_bindgen(js_name = getStats)]
     pub fn get_stats(&self) -> Object {

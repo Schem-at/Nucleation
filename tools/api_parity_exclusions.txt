@@ -114,13 +114,8 @@ Schematic.build_executor = Requires circuit ecosystem
 Schematic.create_simulation_world = Requires simulation feature gate
 Schematic.create_simulation_world_with_options = Requires simulation feature gate
 
-# --- Meshing ecosystem: not expected in FFI ---
-ResourcePack.* = Requires meshing feature gate + binary resources
-MeshConfig.* = Requires meshing feature gate
-MeshResult.* = Requires meshing feature gate
-MultiMeshResult.* = Requires meshing feature gate
-ChunkMeshResult.* = Requires meshing feature gate
-Schematic.to_mesh = Requires meshing feature gate
-Schematic.mesh_by_region = Requires meshing feature gate
-Schematic.mesh_by_chunk = Requires meshing feature gate
-Schematic.mesh_by_chunk_size = Requires meshing feature gate
+# --- Meshing ecosystem: specific FFI exclusions ---
+ResourcePack.new = WASM constructor (FFI uses from_bytes)
+ResourcePack.stats = FFI exposes individual stat getters
+MultiMeshResult.all_meshes = Python convenience (FFI uses get_mesh)
+ChunkMeshResult.all_meshes = Python convenience (FFI uses get_mesh)
