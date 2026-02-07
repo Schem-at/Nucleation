@@ -17,6 +17,7 @@
 *.free = FFI memory management
 free_* = FFI memory management
 Schematic.print = FFI debug variant (WASM/Python use print_schematic)
+SchematicBuilder.build_with_error = FFI error-via-outpointer pattern (WASM/Python use exceptions)
 
 [python_only]
 *.__repr__ = Python dunder method

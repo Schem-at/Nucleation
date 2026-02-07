@@ -186,7 +186,7 @@ jobs:
           CXX: ${{ matrix.cross && 'aarch64-linux-gnu-g++' || '' }}
           AR: ${{ matrix.cross && 'aarch64-linux-gnu-ar' || '' }}
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.cross && 'aarch64-linux-gnu-gcc' || '' }}
-        run: cargo build --release --target ${{ matrix.target }} --features ffi
+        run: cargo build --release --target ${{ matrix.target }} --features ffi,meshing
 
       - name: Move nucleation library output
         run: |

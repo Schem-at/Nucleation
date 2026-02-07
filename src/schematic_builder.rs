@@ -663,8 +663,8 @@ impl SchematicBuilder {
                 continue;
             }
 
-            if line.starts_with('#') && !in_palette {
-                // Layer marker - finalize previous layer
+            if (line == "#" || line.starts_with("# ")) && !in_palette {
+                // Layer marker / comment - finalize previous layer
                 if !current_layer.is_empty() {
                     builder.layers.push(current_layer.clone());
                     current_layer.clear();

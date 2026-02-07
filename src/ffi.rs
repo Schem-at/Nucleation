@@ -1547,9 +1547,9 @@ pub extern "C" fn schematic_fill_cuboid(
 #[no_mangle]
 pub extern "C" fn schematic_fill_sphere(
     schematic: *mut SchematicWrapper,
-    cx: c_int,
-    cy: c_int,
-    cz: c_int,
+    cx: c_float,
+    cy: c_float,
+    cz: c_float,
     radius: c_float,
     block_name: *const c_char,
 ) -> c_int {
@@ -1559,7 +1559,10 @@ pub extern "C" fn schematic_fill_sphere(
     let s = unsafe { &mut *(*schematic).0 };
     let name = unsafe { CStr::from_ptr(block_name).to_string_lossy().into_owned() };
     let block = BlockState::new(name);
-    let shape = ShapeEnum::Sphere(Sphere::new((cx, cy, cz), radius as f64));
+    let shape = ShapeEnum::Sphere(Sphere::new(
+        (cx as i32, cy as i32, cz as i32),
+        radius as f64,
+    ));
     let brush = SolidBrush::new(block);
     let mut tool = BuildingTool::new(s);
     tool.fill(&shape, &brush);
@@ -1742,42 +1745,33 @@ pub extern "C" fn schematic_set_block_in_region(
 // --- Schematic Palette/Bounding Box/Info ---
 
 #[no_mangle]
-pub extern "C" fn schematic_get_bounding_box(schematic: *const SchematicWrapper) -> CBoundingBox {
-    let empty = CBoundingBox {
-        min_x: 0,
-        min_y: 0,
-        min_z: 0,
-        max_x: 0,
-        max_y: 0,
-        max_z: 0,
-    };
+pub extern "C" fn schematic_get_bounding_box(schematic: *const SchematicWrapper) -> IntArray {
     if schematic.is_null() {
-        return empty;
+        return IntArray {
+            data: ptr::null_mut(),
+            len: 0,
+        };
     }
     let s = unsafe { &*(*schematic).0 };
     let bbox = s.get_bounding_box();
-    CBoundingBox {
-        min_x: bbox.min.0,
-        min_y: bbox.min.1,
-        min_z: bbox.min.2,
-        max_x: bbox.max.0,
-        max_y: bbox.max.1,
-        max_z: bbox.max.2,
-    }
+    let vals = vec![
+        bbox.min.0, bbox.min.1, bbox.min.2, bbox.max.0, bbox.max.1, bbox.max.2,
+    ];
+    let mut boxed = vals.into_boxed_slice();
+    let p = boxed.as_mut_ptr();
+    let len = boxed.len();
+    std::mem::forget(boxed);
+    IntArray { data: p, len }
 }
 
 #[no_mangle]
 pub extern "C" fn schematic_get_region_bounding_box(
     schematic: *const SchematicWrapper,
     region_name: *const c_char,
-) -> CBoundingBox {
-    let empty = CBoundingBox {
-        min_x: 0,
-        min_y: 0,
-        min_z: 0,
-        max_x: 0,
-        max_y: 0,
-        max_z: 0,
+) -> IntArray {
+    let empty = IntArray {
+        data: ptr::null_mut(),
+        len: 0,
     };
     if schematic.is_null() || region_name.is_null() {
         return empty;
@@ -1792,14 +1786,14 @@ pub extern "C" fn schematic_get_region_bounding_box(
             None => return empty,
         }
     };
-    CBoundingBox {
-        min_x: bbox.min.0,
-        min_y: bbox.min.1,
-        min_z: bbox.min.2,
-        max_x: bbox.max.0,
-        max_y: bbox.max.1,
-        max_z: bbox.max.2,
-    }
+    let vals = vec![
+        bbox.min.0, bbox.min.1, bbox.min.2, bbox.max.0, bbox.max.1, bbox.max.2,
+    ];
+    let mut boxed = vals.into_boxed_slice();
+    let p = boxed.as_mut_ptr();
+    let len = boxed.len();
+    std::mem::forget(boxed);
+    IntArray { data: p, len }
 }
 
 #[no_mangle]
@@ -2366,28 +2360,26 @@ pub extern "C" fn definitionregion_subtract(
 }
 
 #[no_mangle]
-pub extern "C" fn definitionregion_get_bounds(ptr: *const DefinitionRegionWrapper) -> CBoundingBox {
-    let empty = CBoundingBox {
-        min_x: 0,
-        min_y: 0,
-        min_z: 0,
-        max_x: 0,
-        max_y: 0,
-        max_z: 0,
+pub extern "C" fn definitionregion_get_bounds(ptr: *const DefinitionRegionWrapper) -> IntArray {
+    let empty = IntArray {
+        data: ptr::null_mut(),
+        len: 0,
     };
     if ptr.is_null() {
         return empty;
     }
     let r = unsafe { &(*ptr).0 };
     match r.get_bounds() {
-        Some(bbox) => CBoundingBox {
-            min_x: bbox.min.0,
-            min_y: bbox.min.1,
-            min_z: bbox.min.2,
-            max_x: bbox.max.0,
-            max_y: bbox.max.1,
-            max_z: bbox.max.2,
-        },
+        Some(bbox) => {
+            let vals = vec![
+                bbox.min.0, bbox.min.1, bbox.min.2, bbox.max.0, bbox.max.1, bbox.max.2,
+            ];
+            let mut boxed = vals.into_boxed_slice();
+            let p = boxed.as_mut_ptr();
+            let len = boxed.len();
+            std::mem::forget(boxed);
+            IntArray { data: p, len }
+        }
         None => empty,
     }
 }
@@ -2765,13 +2757,20 @@ pub extern "C" fn definitionregion_get_boxes(ptr: *const DefinitionRegionWrapper
 #[no_mangle]
 pub extern "C" fn definitionregion_get_all_metadata(
     ptr: *const DefinitionRegionWrapper,
-) -> *mut c_char {
+) -> StringArray {
     if ptr.is_null() {
-        return ptr::null_mut();
+        return StringArray {
+            data: ptr::null_mut(),
+            len: 0,
+        };
     }
     let r = unsafe { &(*ptr).0 };
-    let json = serde_json::to_string(&r.metadata).unwrap_or_default();
-    CString::new(json).unwrap().into_raw()
+    let pairs: Vec<String> = r
+        .metadata
+        .iter()
+        .map(|(k, v)| format!("{}={}", k, v))
+        .collect();
+    vec_string_to_string_array(pairs)
 }
 
 #[no_mangle]
@@ -3149,13 +3148,13 @@ pub struct BrushWrapper(BrushEnum);
 
 #[no_mangle]
 pub extern "C" fn shape_sphere(
-    cx: c_int,
-    cy: c_int,
-    cz: c_int,
+    cx: c_float,
+    cy: c_float,
+    cz: c_float,
     radius: c_float,
 ) -> *mut ShapeWrapper {
     Box::into_raw(Box::new(ShapeWrapper(ShapeEnum::Sphere(Sphere::new(
-        (cx, cy, cz),
+        (cx as i32, cy as i32, cz as i32),
         radius as f64,
     )))))
 }
@@ -3434,6 +3433,31 @@ pub extern "C" fn schematicbuilder_build(
     }
 }
 
+/// Builds the schematic and returns an error message if it fails.
+/// On success, sets `*out` to the new schematic and returns NULL.
+/// On failure, returns an error string (must be freed with `free_string`) and sets `*out` to NULL.
+#[no_mangle]
+pub extern "C" fn schematicbuilder_build_with_error(
+    ptr: *mut SchematicBuilderWrapper,
+    out: *mut *mut SchematicWrapper,
+) -> *mut c_char {
+    if ptr.is_null() || out.is_null() {
+        return CString::new("null pointer").unwrap().into_raw();
+    }
+    let wrapper = unsafe { Box::from_raw(ptr) };
+    match wrapper.0.build() {
+        Ok(schematic) => {
+            let w = SchematicWrapper(Box::into_raw(Box::new(schematic)));
+            unsafe { *out = Box::into_raw(Box::new(w)) };
+            ptr::null_mut()
+        }
+        Err(e) => {
+            unsafe { *out = ptr::null_mut() };
+            CString::new(e).unwrap().into_raw()
+        }
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn schematicbuilder_from_template(
     template: *const c_char,
@@ -3453,7 +3477,8 @@ pub extern "C" fn schematicbuilder_from_template(
 // =============================================================================
 
 #[cfg(feature = "meshing")]
-mod meshing_ffi {
+#[allow(unused_imports)]
+pub mod meshing_ffi {
     use super::*;
     use crate::meshing::{
         ChunkMeshResult, MeshConfig, MeshResult, MultiMeshResult, RawMeshExport, ResourcePackSource,
