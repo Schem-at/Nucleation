@@ -371,7 +371,10 @@ fn test_get_merged_region_preserves_block_entities() {
         );
     }
 
-    // Now check what happens when we export and reload
+    // Now check what happens when we export and reload via sponge schematic.
+    // Sponge schematic normalizes positions relative to [0,0,0] of the schematic
+    // (the Offset stores the original world position hint). So after roundtrip,
+    // block entity positions will be shifted by -compact_region.position.
     let bytes = schematic::to_schematic(&schematic).expect("Failed to export");
     let reloaded = schematic::from_schematic(&bytes).expect("Failed to reload");
 
@@ -389,12 +392,14 @@ fn test_get_merged_region_preserves_block_entities() {
         "Should preserve all block entities after export/reload"
     );
 
-    // Verify each position
-    for &(x, y, z) in &positions {
+    // Sponge schematic uses positions relative to [0,0,0]. The compact region
+    // min is (-3, 0, 0), so original positions are shifted by +3 in X.
+    let expected_positions = vec![(3, 0, 0), (8, 5, 5), (0, 2, 4)];
+    for &(x, y, z) in &expected_positions {
         let found = entities_after.iter().any(|be| be.position == (x, y, z));
         assert!(
             found,
-            "Block entity at position {:?} should be preserved",
+            "Block entity at position {:?} should be preserved (relative to schematic origin)",
             (x, y, z)
         );
     }

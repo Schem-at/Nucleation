@@ -260,22 +260,54 @@ fn create_regions(schematic: &UniversalSchematic) -> NbtCompound {
 
         region_nbt.insert("BlockStates", NbtTag::LongArray(packed_states));
 
-        // Entities
+        // Entities - Litematic stores entity positions relative to region Position
         let entities = NbtList::from(
             compact_region
                 .entities
                 .iter()
-                .map(|entity| entity.to_nbt())
+                .map(|entity| {
+                    let mut entity_nbt = if let NbtTag::Compound(c) = entity.to_nbt() {
+                        c
+                    } else {
+                        NbtCompound::new()
+                    };
+
+                    let rel_x = entity.position.0 - compact_region.position.0 as f64;
+                    let rel_y = entity.position.1 - compact_region.position.1 as f64;
+                    let rel_z = entity.position.2 - compact_region.position.2 as f64;
+
+                    let pos_list = NbtList::from(vec![
+                        NbtTag::Double(rel_x),
+                        NbtTag::Double(rel_y),
+                        NbtTag::Double(rel_z),
+                    ]);
+                    entity_nbt.insert("Pos", NbtTag::List(pos_list));
+
+                    NbtTag::Compound(entity_nbt)
+                })
                 .collect::<Vec<NbtTag>>(),
         );
         region_nbt.insert("Entities", NbtTag::List(entities));
 
-        // TileEntities
+        // TileEntities - Litematic stores block entity coordinates relative to region Position
         let tile_entities = NbtList::from(
             compact_region
                 .block_entities
                 .values()
-                .map(|block_entity| NbtTag::Compound(block_entity.to_nbt()))
+                .map(|block_entity| {
+                    let mut block_entity_nbt = block_entity.to_nbt();
+
+                    let rel_x = block_entity.position.0 - compact_region.position.0;
+                    let rel_y = block_entity.position.1 - compact_region.position.1;
+                    let rel_z = block_entity.position.2 - compact_region.position.2;
+
+                    block_entity_nbt.insert("x", NbtTag::Int(rel_x));
+                    block_entity_nbt.insert("y", NbtTag::Int(rel_y));
+                    block_entity_nbt.insert("z", NbtTag::Int(rel_z));
+                    block_entity_nbt.insert("Pos", NbtTag::IntArray(vec![rel_x, rel_y, rel_z]));
+
+                    NbtTag::Compound(block_entity_nbt)
+                })
                 .collect::<Vec<NbtTag>>(),
         );
         region_nbt.insert("TileEntities", NbtTag::List(tile_entities));
@@ -374,13 +406,18 @@ fn parse_regions(
             region.rebuild_non_air_count();
             region.rebuild_tight_bounds();
 
-            // Parse Entities
+            // Parse Entities - Litematic stores positions relative to region Position
             if let Ok(entities_list) = region_nbt.get::<_, &NbtList>("Entities") {
                 region.entities = entities_list
                     .iter()
                     .filter_map(|tag| {
                         if let NbtTag::Compound(compound) = tag {
-                            Entity::from_nbt(compound).ok()
+                            let mut entity = Entity::from_nbt(compound).ok()?;
+                            // Convert from relative to absolute position
+                            entity.position.0 += position.0 as f64;
+                            entity.position.1 += position.1 as f64;
+                            entity.position.2 += position.2 as f64;
+                            Some(entity)
                         } else {
                             None
                         }
@@ -388,11 +425,15 @@ fn parse_regions(
                     .collect();
             }
 
-            // Parse TileEntities
+            // Parse TileEntities - Litematic stores positions relative to region Position
             if let Ok(tile_entities_list) = region_nbt.get::<_, &NbtList>("TileEntities") {
                 for tag in tile_entities_list.iter() {
                     if let NbtTag::Compound(compound) = tag {
-                        let block_entity = BlockEntity::from_nbt(compound);
+                        let mut block_entity = BlockEntity::from_nbt(compound);
+                        // Convert from relative to absolute position
+                        block_entity.position.0 += position.0;
+                        block_entity.position.1 += position.1;
+                        block_entity.position.2 += position.2;
                         region
                             .block_entities
                             .insert(block_entity.position, block_entity);
@@ -636,6 +677,195 @@ mod tests {
                     assert_eq!(
                         original_region.get_block(x, y, z),
                         roundtrip_region.get_block(x, y, z)
+                    );
+                }
+            }
+        }
+    }
+
+    /// Test that litematic export stores block entity and entity positions
+    /// relative to the region Position, not as absolute coordinates.
+    #[test]
+    fn test_litematic_relative_positions_in_nbt() {
+        let mut schematic = UniversalSchematic::new("RelativePositionTest".to_string());
+        schematic.metadata.created = Some(1000);
+        schematic.metadata.modified = Some(2000);
+
+        // Place blocks and block entities at non-zero positions
+        // so the compact region will have a non-zero position offset
+        let stone = BlockState::new("minecraft:stone".to_string());
+        schematic.set_block(10, 20, 30, &stone);
+        schematic.set_block(11, 21, 31, &stone);
+
+        // Add a block entity at absolute position (10, 20, 30)
+        let block_entity = BlockEntity::new("minecraft:chest".to_string(), (10, 20, 30));
+        schematic.default_region.add_block_entity(block_entity);
+
+        // Add an entity at absolute position (10.5, 20.0, 30.5)
+        let entity = Entity::new("minecraft:creeper".to_string(), (10.5, 20.0, 30.5));
+        schematic.default_region.add_entity(entity);
+
+        // Export to litematic
+        let litematic_data = to_litematic(&schematic).unwrap();
+
+        // Parse back the raw NBT to inspect stored positions
+        let mut decoder = flate2::read::GzDecoder::new(litematic_data.as_slice());
+        let mut decompressed = Vec::new();
+        std::io::Read::read_to_end(&mut decoder, &mut decompressed).unwrap();
+        let (root, _) = quartz_nbt::io::read_nbt(
+            &mut std::io::Cursor::new(decompressed),
+            quartz_nbt::io::Flavor::Uncompressed,
+        )
+        .unwrap();
+
+        let regions = root.get::<_, &NbtCompound>("Regions").unwrap();
+        // Get the first (and only) region
+        let (_, region_tag) = regions.inner().iter().next().unwrap();
+        let region_nbt = if let NbtTag::Compound(c) = region_tag {
+            c
+        } else {
+            panic!("Expected compound")
+        };
+
+        // Get the region position (should be the compact region min)
+        let pos_nbt = region_nbt.get::<_, &NbtCompound>("Position").unwrap();
+        let region_x = pos_nbt.get::<_, i32>("x").unwrap();
+        let region_y = pos_nbt.get::<_, i32>("y").unwrap();
+        let region_z = pos_nbt.get::<_, i32>("z").unwrap();
+
+        // Region position should be at the tight bounds min (10, 20, 30)
+        assert_eq!(region_x, 10);
+        assert_eq!(region_y, 20);
+        assert_eq!(region_z, 30);
+
+        // Check block entity positions are RELATIVE to region position
+        let tile_entities = region_nbt.get::<_, &NbtList>("TileEntities").unwrap();
+        assert_eq!(tile_entities.len(), 1);
+        if let NbtTag::Compound(be_nbt) = &tile_entities[0] {
+            // Block entity at absolute (10,20,30) with region at (10,20,30)
+            // should be stored as relative (0,0,0)
+            let pos = be_nbt.get::<_, &[i32]>("Pos").unwrap();
+            assert_eq!(
+                pos,
+                &[0, 0, 0],
+                "Block entity position should be relative to region, got {:?}",
+                pos
+            );
+
+            assert_eq!(be_nbt.get::<_, i32>("x").unwrap(), 0);
+            assert_eq!(be_nbt.get::<_, i32>("y").unwrap(), 0);
+            assert_eq!(be_nbt.get::<_, i32>("z").unwrap(), 0);
+        } else {
+            panic!("Expected compound tag for block entity");
+        }
+
+        // Check entity positions are RELATIVE to region position
+        let entities = region_nbt.get::<_, &NbtList>("Entities").unwrap();
+        assert_eq!(entities.len(), 1);
+        if let NbtTag::Compound(ent_nbt) = &entities[0] {
+            let pos = ent_nbt.get::<_, &NbtList>("Pos").unwrap();
+            // Entity at absolute (10.5, 20.0, 30.5) with region at (10, 20, 30)
+            // should be stored as relative (0.5, 0.0, 0.5)
+            let x = pos.get::<f64>(0).unwrap();
+            let y = pos.get::<f64>(1).unwrap();
+            let z = pos.get::<f64>(2).unwrap();
+            assert!(
+                (x - 0.5).abs() < 0.001,
+                "Entity X should be 0.5 relative, got {}",
+                x
+            );
+            assert!(
+                (y - 0.0).abs() < 0.001,
+                "Entity Y should be 0.0 relative, got {}",
+                y
+            );
+            assert!(
+                (z - 0.5).abs() < 0.001,
+                "Entity Z should be 0.5 relative, got {}",
+                z
+            );
+        } else {
+            panic!("Expected compound tag for entity");
+        }
+    }
+
+    /// Test that litematic roundtrip preserves absolute positions of block entities
+    /// and entities even when the region has a non-zero position offset.
+    #[test]
+    fn test_litematic_roundtrip_with_offset_positions() {
+        let mut schematic = UniversalSchematic::new("OffsetRoundtrip".to_string());
+        schematic.metadata.created = Some(1000);
+        schematic.metadata.modified = Some(2000);
+
+        let stone = BlockState::new("minecraft:stone".to_string());
+        // Place blocks at offset positions
+        for x in 10..13 {
+            for y in 20..23 {
+                for z in 30..33 {
+                    schematic.set_block(x, y, z, &stone);
+                }
+            }
+        }
+
+        // Add block entities at specific positions
+        let chest1 = BlockEntity::new("minecraft:chest".to_string(), (10, 20, 30));
+        let chest2 = BlockEntity::new("minecraft:chest".to_string(), (12, 22, 32));
+        schematic.default_region.add_block_entity(chest1);
+        schematic.default_region.add_block_entity(chest2);
+
+        // Add entities
+        let creeper = Entity::new("minecraft:creeper".to_string(), (11.5, 21.0, 31.5));
+        schematic.default_region.add_entity(creeper);
+
+        // Roundtrip
+        let litematic_data = to_litematic(&schematic).unwrap();
+        let roundtrip = from_litematic(&litematic_data).unwrap();
+
+        let rt_region = roundtrip
+            .get_region(&roundtrip.default_region_name)
+            .unwrap();
+
+        // Block entities should preserve absolute positions
+        assert_eq!(rt_region.block_entities.len(), 2);
+        assert!(
+            rt_region.block_entities.contains_key(&(10, 20, 30)),
+            "Block entity at (10,20,30) should exist after roundtrip"
+        );
+        assert!(
+            rt_region.block_entities.contains_key(&(12, 22, 32)),
+            "Block entity at (12,22,32) should exist after roundtrip"
+        );
+
+        // Entities should preserve absolute positions
+        assert_eq!(rt_region.entities.len(), 1);
+        let rt_entity = &rt_region.entities[0];
+        assert!(
+            (rt_entity.position.0 - 11.5).abs() < 0.001,
+            "Entity X should be 11.5, got {}",
+            rt_entity.position.0
+        );
+        assert!(
+            (rt_entity.position.1 - 21.0).abs() < 0.001,
+            "Entity Y should be 21.0, got {}",
+            rt_entity.position.1
+        );
+        assert!(
+            (rt_entity.position.2 - 31.5).abs() < 0.001,
+            "Entity Z should be 31.5, got {}",
+            rt_entity.position.2
+        );
+
+        // Blocks should also be preserved
+        for x in 10..13 {
+            for y in 20..23 {
+                for z in 30..33 {
+                    assert_eq!(
+                        rt_region.get_block(x, y, z).map(|b| b.name.as_str()),
+                        Some("minecraft:stone"),
+                        "Block at ({},{},{}) should be stone",
+                        x,
+                        y,
+                        z
                     );
                 }
             }

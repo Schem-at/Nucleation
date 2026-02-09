@@ -100,6 +100,9 @@ pub struct CChunkArray {
 pub struct SchematicWrapper(*mut UniversalSchematic);
 pub struct BlockStateWrapper(*mut BlockState);
 
+#[cfg(feature = "simulation")]
+pub struct MchprsWorldWrapper(*mut crate::simulation::MchprsWorld);
+
 // --- Memory Management ---
 
 /// Frees a ByteArray returned by the library.
@@ -3469,6 +3472,238 @@ pub extern "C" fn schematicbuilder_from_template(
     match SchematicBuilder::from_template(&t) {
         Ok(builder) => Box::into_raw(Box::new(SchematicBuilderWrapper(builder))),
         Err(_) => ptr::null_mut(),
+    }
+}
+
+// =============================================================================
+// Simulation FFI Bindings (feature-gated)
+// =============================================================================
+
+#[cfg(feature = "simulation")]
+pub mod simulation_ffi {
+    use super::*;
+    use crate::simulation::{MchprsWorld, SimulationOptions};
+    use mchprs_blocks::BlockPos;
+
+    /// Creates a new MchprsWorld from a schematic with default options.
+    /// Returns null on error. Caller must free with `mchprs_world_free`.
+    #[no_mangle]
+    pub extern "C" fn mchprs_world_new(
+        schematic: *const SchematicWrapper,
+    ) -> *mut MchprsWorldWrapper {
+        if schematic.is_null() {
+            return ptr::null_mut();
+        }
+        let s = unsafe { &*(*schematic).0 };
+        match MchprsWorld::new(s.clone()) {
+            Ok(world) => {
+                let w = Box::into_raw(Box::new(world));
+                Box::into_raw(Box::new(MchprsWorldWrapper(w)))
+            }
+            Err(_) => ptr::null_mut(),
+        }
+    }
+
+    /// Creates a new MchprsWorld from a schematic with options.
+    /// `optimize`: 0=false, non-zero=true
+    /// `io_only`: 0=false, non-zero=true
+    /// Returns null on error. Caller must free with `mchprs_world_free`.
+    #[no_mangle]
+    pub extern "C" fn mchprs_world_new_with_options(
+        schematic: *const SchematicWrapper,
+        optimize: c_int,
+        io_only: c_int,
+    ) -> *mut MchprsWorldWrapper {
+        if schematic.is_null() {
+            return ptr::null_mut();
+        }
+        let s = unsafe { &*(*schematic).0 };
+        let options = SimulationOptions {
+            optimize: optimize != 0,
+            io_only: io_only != 0,
+            custom_io: Vec::new(),
+        };
+        match MchprsWorld::with_options(s.clone(), options) {
+            Ok(world) => {
+                let w = Box::into_raw(Box::new(world));
+                Box::into_raw(Box::new(MchprsWorldWrapper(w)))
+            }
+            Err(_) => ptr::null_mut(),
+        }
+    }
+
+    /// Frees a MchprsWorld.
+    #[no_mangle]
+    pub extern "C" fn mchprs_world_free(world: *mut MchprsWorldWrapper) {
+        if !world.is_null() {
+            unsafe {
+                let wrapper = Box::from_raw(world);
+                let _ = Box::from_raw(wrapper.0);
+            }
+        }
+    }
+
+    /// Advances the simulation by the specified number of ticks.
+    /// Returns 0 on success, -1 on null pointer.
+    #[no_mangle]
+    pub extern "C" fn mchprs_world_tick(world: *mut MchprsWorldWrapper, ticks: u32) -> c_int {
+        if world.is_null() {
+            return -1;
+        }
+        let w = unsafe { &mut *(*world).0 };
+        w.tick(ticks);
+        0
+    }
+
+    /// Flushes pending changes from the compiler to the world.
+    /// Returns 0 on success, -1 on null pointer.
+    #[no_mangle]
+    pub extern "C" fn mchprs_world_flush(world: *mut MchprsWorldWrapper) -> c_int {
+        if world.is_null() {
+            return -1;
+        }
+        let w = unsafe { &mut *(*world).0 };
+        w.flush();
+        0
+    }
+
+    /// Sets the power state of a lever.
+    /// `powered`: 0=off, non-zero=on. Uses c_int instead of bool for ABI safety.
+    /// Returns 0 on success, -1 on null pointer.
+    #[no_mangle]
+    pub extern "C" fn mchprs_world_set_lever_power(
+        world: *mut MchprsWorldWrapper,
+        x: c_int,
+        y: c_int,
+        z: c_int,
+        powered: c_int,
+    ) -> c_int {
+        if world.is_null() {
+            return -1;
+        }
+        let w = unsafe { &mut *(*world).0 };
+        w.set_lever_power(BlockPos::new(x, y, z), powered != 0);
+        0
+    }
+
+    /// Gets the power state of a lever.
+    /// Returns 1 if powered, 0 if not, -1 on null pointer.
+    #[no_mangle]
+    pub extern "C" fn mchprs_world_get_lever_power(
+        world: *const MchprsWorldWrapper,
+        x: c_int,
+        y: c_int,
+        z: c_int,
+    ) -> c_int {
+        if world.is_null() {
+            return -1;
+        }
+        let w = unsafe { &*(*world).0 };
+        if w.get_lever_power(BlockPos::new(x, y, z)) {
+            1
+        } else {
+            0
+        }
+    }
+
+    /// Checks if a redstone lamp is lit at the given position.
+    /// Returns 1 if lit, 0 if not, -1 on null pointer.
+    #[no_mangle]
+    pub extern "C" fn mchprs_world_is_lit(
+        world: *const MchprsWorldWrapper,
+        x: c_int,
+        y: c_int,
+        z: c_int,
+    ) -> c_int {
+        if world.is_null() {
+            return -1;
+        }
+        let w = unsafe { &*(*world).0 };
+        if w.is_lit(BlockPos::new(x, y, z)) {
+            1
+        } else {
+            0
+        }
+    }
+
+    /// Sets the signal strength at a position (for custom IO).
+    /// `strength` is 0-15.
+    /// Returns 0 on success, -1 on null pointer.
+    #[no_mangle]
+    pub extern "C" fn mchprs_world_set_signal_strength(
+        world: *mut MchprsWorldWrapper,
+        x: c_int,
+        y: c_int,
+        z: c_int,
+        strength: u8,
+    ) -> c_int {
+        if world.is_null() {
+            return -1;
+        }
+        let w = unsafe { &mut *(*world).0 };
+        w.set_signal_strength(BlockPos::new(x, y, z), strength);
+        0
+    }
+
+    /// Gets the signal strength at a position.
+    /// Returns 0-15 signal strength, or 0 on null pointer.
+    #[no_mangle]
+    pub extern "C" fn mchprs_world_get_signal_strength(
+        world: *const MchprsWorldWrapper,
+        x: c_int,
+        y: c_int,
+        z: c_int,
+    ) -> u8 {
+        if world.is_null() {
+            return 0;
+        }
+        let w = unsafe { &*(*world).0 };
+        w.get_signal_strength(BlockPos::new(x, y, z))
+    }
+
+    /// Simulates a right-click on a block (typically a lever).
+    /// Returns 0 on success, -1 on null pointer.
+    #[no_mangle]
+    pub extern "C" fn mchprs_world_on_use_block(
+        world: *mut MchprsWorldWrapper,
+        x: c_int,
+        y: c_int,
+        z: c_int,
+    ) -> c_int {
+        if world.is_null() {
+            return -1;
+        }
+        let w = unsafe { &mut *(*world).0 };
+        w.on_use_block(BlockPos::new(x, y, z));
+        0
+    }
+
+    /// Syncs the simulation state back to the schematic.
+    /// Returns 0 on success, -1 on null pointer.
+    #[no_mangle]
+    pub extern "C" fn mchprs_world_sync_to_schematic(world: *mut MchprsWorldWrapper) -> c_int {
+        if world.is_null() {
+            return -1;
+        }
+        let w = unsafe { &mut *(*world).0 };
+        w.sync_to_schematic();
+        0
+    }
+
+    /// Gets a clone of the schematic from the world.
+    /// Caller must free the returned SchematicWrapper with `schematic_free`.
+    /// Returns null on null pointer.
+    #[no_mangle]
+    pub extern "C" fn mchprs_world_get_schematic(
+        world: *const MchprsWorldWrapper,
+    ) -> *mut SchematicWrapper {
+        if world.is_null() {
+            return ptr::null_mut();
+        }
+        let w = unsafe { &*(*world).0 };
+        let cloned = w.get_schematic().clone();
+        let boxed = Box::into_raw(Box::new(cloned));
+        Box::into_raw(Box::new(SchematicWrapper(boxed)))
     }
 }
 

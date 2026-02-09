@@ -492,11 +492,18 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::er
     Ok(schematic)
 }
 
+// Sponge Schematic spec: block entity positions are relative to [0,0,0] of the schematic
+// (without the offset applied). We subtract the region position (which becomes the offset).
 fn convert_block_entities(region: &Region) -> NbtList {
     let mut block_entities = NbtList::new();
 
     for (_, block_entity) in &region.block_entities {
-        block_entities.push(block_entity.to_nbt());
+        let mut nbt = block_entity.to_nbt();
+        let rel_x = block_entity.position.0 - region.position.0;
+        let rel_y = block_entity.position.1 - region.position.1;
+        let rel_z = block_entity.position.2 - region.position.2;
+        nbt.insert("Pos", NbtTag::IntArray(vec![rel_x, rel_y, rel_z]));
+        block_entities.push(nbt);
     }
 
     block_entities
@@ -504,21 +511,46 @@ fn convert_block_entities(region: &Region) -> NbtList {
 
 // Convert block entities for Sponge Schematic v3 format
 // Uses to_nbt_v3() which wraps block-specific data in a "Data" compound
+// Positions are relative to [0,0,0] of the schematic (without offset applied)
 fn convert_block_entities_v3(region: &Region) -> NbtList {
     let mut block_entities = NbtList::new();
 
     for (_, block_entity) in &region.block_entities {
-        block_entities.push(block_entity.to_nbt_v3());
+        let mut nbt = block_entity.to_nbt_v3();
+        let rel_x = block_entity.position.0 - region.position.0;
+        let rel_y = block_entity.position.1 - region.position.1;
+        let rel_z = block_entity.position.2 - region.position.2;
+        nbt.insert("Pos", NbtTag::IntArray(vec![rel_x, rel_y, rel_z]));
+        block_entities.push(nbt);
     }
 
     block_entities
 }
 
+// Sponge Schematic spec: entity positions are relative to [0,0,0] of the schematic
+// (without the offset applied). We subtract the region position (which becomes the offset).
 fn convert_entities(region: &Region) -> NbtList {
     let mut entities = NbtList::new();
 
     for entity in &region.entities {
-        entities.push(entity.to_nbt());
+        let mut entity_nbt = if let NbtTag::Compound(c) = entity.to_nbt() {
+            c
+        } else {
+            NbtCompound::new()
+        };
+
+        let rel_x = entity.position.0 - region.position.0 as f64;
+        let rel_y = entity.position.1 - region.position.1 as f64;
+        let rel_z = entity.position.2 - region.position.2 as f64;
+
+        let pos_list = NbtList::from(vec![
+            NbtTag::Double(rel_x),
+            NbtTag::Double(rel_y),
+            NbtTag::Double(rel_z),
+        ]);
+        entity_nbt.insert("Pos", NbtTag::List(pos_list));
+
+        entities.push(NbtTag::Compound(entity_nbt));
     }
 
     entities
@@ -656,7 +688,28 @@ fn parse_block_entities(
 
     for tag in block_entities_list.iter() {
         if let NbtTag::Compound(compound) = tag {
-            let block_entity = BlockEntity::from_nbt(compound);
+            // Sponge Schematic v3 wraps block-specific data in a "Data" compound.
+            // Flatten it so consumers (e.g. MCHPRS) can find fields like "Items"
+            // at the top level, matching the vanilla block entity NBT layout.
+            let flattened = if compound.contains_key("Data") {
+                let mut flat = NbtCompound::new();
+                // Copy top-level fields (Id, Pos)
+                for (key, value) in compound.inner() {
+                    if key != "Data" {
+                        flat.insert(key, value.clone());
+                    }
+                }
+                // Merge Data contents into top level
+                if let Ok(data) = compound.get::<_, &NbtCompound>("Data") {
+                    for (key, value) in data.inner() {
+                        flat.insert(key, value.clone());
+                    }
+                }
+                flat
+            } else {
+                compound.clone()
+            };
+            let block_entity = BlockEntity::from_nbt(&flattened);
             block_entities.push(block_entity);
         }
     }
@@ -940,6 +993,153 @@ mod tests {
         schematic_output_file
             .write_all(&schematic_output_data)
             .expect("Failed to write schematic file");
+    }
+
+    /// Test that sponge schematic export stores block entity and entity positions
+    /// relative to the schematic origin [0,0,0] (without offset applied).
+    #[test]
+    fn test_schematic_relative_positions_in_nbt() {
+        use crate::block_entity::BlockEntity;
+        use crate::entity::Entity;
+
+        let mut schematic = UniversalSchematic::new("RelativePositionTest".to_string());
+
+        let stone = BlockState::new("minecraft:stone".to_string());
+        // Place blocks at offset positions so compact region has non-zero position
+        schematic.set_block(10, 20, 30, &stone);
+        schematic.set_block(11, 21, 31, &stone);
+
+        // Add a block entity at absolute position (10, 20, 30)
+        let block_entity = BlockEntity::new("minecraft:chest".to_string(), (10, 20, 30));
+        schematic.default_region.add_block_entity(block_entity);
+
+        // Add an entity at absolute position (10.5, 20.0, 30.5)
+        let entity = Entity::new("minecraft:creeper".to_string(), (10.5, 20.0, 30.5));
+        schematic.default_region.add_entity(entity);
+
+        // Export to schematic v3
+        let schem_data = to_schematic_v3(&schematic).unwrap();
+
+        // Parse back the raw NBT
+        let reader = std::io::BufReader::new(schem_data.as_slice());
+        let mut gz = GzDecoder::new(reader);
+        let (root, _) = read_nbt(&mut gz, Flavor::Uncompressed).unwrap();
+        let schem = root.get::<_, &NbtCompound>("Schematic").unwrap();
+
+        // Offset should be at (10, 20, 30) - the compact region position
+        let offset = schem.get::<_, &[i32]>("Offset").unwrap();
+        assert_eq!(offset, &[10, 20, 30]);
+
+        // Block entity positions should be relative to origin (not offset)
+        let blocks = schem.get::<_, &NbtCompound>("Blocks").unwrap();
+        let block_entities = blocks.get::<_, &NbtList>("BlockEntities").unwrap();
+        assert_eq!(block_entities.len(), 1);
+        if let NbtTag::Compound(be_nbt) = &block_entities[0] {
+            let pos = be_nbt.get::<_, &[i32]>("Pos").unwrap();
+            // Absolute (10,20,30) minus offset (10,20,30) = relative (0,0,0)
+            assert_eq!(
+                pos,
+                &[0, 0, 0],
+                "Block entity position should be relative to schematic origin, got {:?}",
+                pos
+            );
+        } else {
+            panic!("Expected compound tag for block entity");
+        }
+
+        // Test entity positions via v2 (v3 has a pre-existing bug where entities
+        // are filtered out due to case-sensitive "Id" vs "id" check)
+        let schem_v2_data = to_schematic_v2(&schematic).unwrap();
+        let reader_v2 = std::io::BufReader::new(schem_v2_data.as_slice());
+        let mut gz_v2 = GzDecoder::new(reader_v2);
+        let (root_v2, _) = read_nbt(&mut gz_v2, Flavor::Uncompressed).unwrap();
+        let schem_v2 = root_v2.get::<_, &NbtCompound>("Schematic").unwrap();
+
+        let entities_v2 = schem_v2.get::<_, &NbtList>("Entities").unwrap();
+        assert_eq!(entities_v2.len(), 1);
+        if let NbtTag::Compound(ent_nbt) = &entities_v2[0] {
+            let pos = ent_nbt.get::<_, &NbtList>("Pos").unwrap();
+            let x = pos.get::<f64>(0).unwrap();
+            let y = pos.get::<f64>(1).unwrap();
+            let z = pos.get::<f64>(2).unwrap();
+            // Absolute (10.5,20.0,30.5) minus offset (10,20,30) = relative (0.5,0.0,0.5)
+            assert!(
+                (x - 0.5).abs() < 0.001,
+                "Entity X should be 0.5 relative, got {}",
+                x
+            );
+            assert!(
+                (y - 0.0).abs() < 0.001,
+                "Entity Y should be 0.0 relative, got {}",
+                y
+            );
+            assert!(
+                (z - 0.5).abs() < 0.001,
+                "Entity Z should be 0.5 relative, got {}",
+                z
+            );
+        } else {
+            panic!("Expected compound tag for entity");
+        }
+    }
+
+    /// Test sponge schematic roundtrip preserves positions correctly after export/import.
+    #[test]
+    fn test_schematic_roundtrip_with_offset_positions() {
+        use crate::block_entity::BlockEntity;
+        use crate::entity::Entity;
+
+        let mut schematic = UniversalSchematic::new("OffsetRoundtrip".to_string());
+
+        let stone = BlockState::new("minecraft:stone".to_string());
+        for x in 10..13 {
+            for y in 20..23 {
+                for z in 30..33 {
+                    schematic.set_block(x, y, z, &stone);
+                }
+            }
+        }
+
+        let chest = BlockEntity::new("minecraft:chest".to_string(), (10, 20, 30));
+        schematic.default_region.add_block_entity(chest);
+
+        let creeper = Entity::new("minecraft:creeper".to_string(), (11.5, 21.0, 31.5));
+        schematic.default_region.add_entity(creeper);
+
+        // Roundtrip through v2 (v3 has a pre-existing entity export filter bug)
+        let schem_data = to_schematic_v2(&schematic).unwrap();
+        let roundtrip = from_schematic(&schem_data).unwrap();
+
+        let rt_region = &roundtrip.default_region;
+
+        // Block entities - since import creates region at (0,0,0), positions stay relative
+        // which is correct for sponge schematic (the offset is stored separately)
+        assert_eq!(rt_region.block_entities.len(), 1);
+        assert!(
+            rt_region.block_entities.contains_key(&(0, 0, 0)),
+            "Block entity should be at relative (0,0,0) after import, keys: {:?}",
+            rt_region.block_entities.keys().collect::<Vec<_>>()
+        );
+
+        // Entities - positions should be relative to schematic origin
+        // Entity at absolute (11.5, 21.0, 31.5) minus offset (10, 20, 30) = relative (1.5, 1.0, 1.5)
+        assert_eq!(rt_region.entities.len(), 1);
+        let rt_entity = &rt_region.entities[0];
+        assert!(
+            (rt_entity.position.0 - 1.5).abs() < 0.001,
+            "Entity X should be 1.5 relative, got {}",
+            rt_entity.position.0
+        );
+        assert!(
+            (rt_entity.position.1 - 1.0).abs() < 0.001,
+            "Entity Y should be 1.0 relative, got {}",
+            rt_entity.position.1
+        );
+        assert!(
+            (rt_entity.position.2 - 1.5).abs() < 0.001,
+            "Entity Z should be 1.5 relative, got {}",
+            rt_entity.position.2
+        );
     }
 }
 
