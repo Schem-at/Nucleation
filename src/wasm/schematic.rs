@@ -8,7 +8,7 @@ use crate::schematic::SchematicVersion;
 use crate::universal_schematic::ChunkLoadingStrategy;
 use crate::{
     block_position::BlockPosition,
-    formats::{litematic, manager::get_manager, mcstructure, schematic},
+    formats::{litematic, manager::get_manager, mcstructure, schematic, world},
     print_utils::{
         format_json_schematic as print_json_schematic, format_schematic as print_schematic,
     },
@@ -151,13 +151,32 @@ impl SchematicWrapper {
         manager.get_exporter_default_version(format)
     }
 
-    pub fn save_as(&self, format: &str, version: Option<String>) -> Result<Vec<u8>, JsValue> {
+    pub fn save_as(
+        &self,
+        format: &str,
+        version: Option<String>,
+        settings: Option<String>,
+    ) -> Result<Vec<u8>, JsValue> {
         let manager = get_manager();
         let manager = manager.lock().unwrap();
 
         manager
-            .write(format, &self.0, version.as_deref())
+            .write_with_settings(format, &self.0, version.as_deref(), settings.as_deref())
             .map_err(|e| JsValue::from_str(&format!("Export error: {}", e)))
+    }
+
+    /// Get the settings schema for an export format (returns JSON string or undefined).
+    pub fn get_export_settings_schema(format: &str) -> Option<String> {
+        let manager = get_manager();
+        let manager = manager.lock().unwrap();
+        manager.get_export_settings_schema(format)
+    }
+
+    /// Get the settings schema for an import format (returns JSON string or undefined).
+    pub fn get_import_settings_schema(format: &str) -> Option<String> {
+        let manager = get_manager();
+        let manager = manager.lock().unwrap();
+        manager.get_import_settings_schema(format)
     }
 
     pub fn from_litematic(&mut self, data: &[u8]) -> Result<(), JsValue> {
@@ -191,6 +210,80 @@ impl SchematicWrapper {
     pub fn to_mcstructure(&self) -> Result<Vec<u8>, JsValue> {
         mcstructure::to_mcstructure(&self.0)
             .map_err(|e| JsValue::from_str(&format!("McStructure conversion error: {}", e)))
+    }
+
+    pub fn from_mca(&mut self, data: &[u8]) -> Result<(), JsValue> {
+        self.0 = world::from_mca(data)
+            .map_err(|e| JsValue::from_str(&format!("MCA parsing error: {}", e)))?;
+        Ok(())
+    }
+
+    pub fn from_mca_bounded(
+        &mut self,
+        data: &[u8],
+        min_x: i32,
+        min_y: i32,
+        min_z: i32,
+        max_x: i32,
+        max_y: i32,
+        max_z: i32,
+    ) -> Result<(), JsValue> {
+        self.0 = world::from_mca_bounded(data, min_x, min_y, min_z, max_x, max_y, max_z)
+            .map_err(|e| JsValue::from_str(&format!("MCA parsing error: {}", e)))?;
+        Ok(())
+    }
+
+    pub fn from_world_zip(&mut self, data: &[u8]) -> Result<(), JsValue> {
+        self.0 = world::from_world_zip(data)
+            .map_err(|e| JsValue::from_str(&format!("World zip parsing error: {}", e)))?;
+        Ok(())
+    }
+
+    pub fn from_world_zip_bounded(
+        &mut self,
+        data: &[u8],
+        min_x: i32,
+        min_y: i32,
+        min_z: i32,
+        max_x: i32,
+        max_y: i32,
+        max_z: i32,
+    ) -> Result<(), JsValue> {
+        self.0 = world::from_world_zip_bounded(data, min_x, min_y, min_z, max_x, max_y, max_z)
+            .map_err(|e| JsValue::from_str(&format!("World zip parsing error: {}", e)))?;
+        Ok(())
+    }
+
+    pub fn to_world(&self, options_json: Option<String>) -> Result<JsValue, JsValue> {
+        let options = match options_json {
+            Some(ref json) => Some(
+                serde_json::from_str::<world::WorldExportOptions>(json)
+                    .map_err(|e| JsValue::from_str(&format!("Invalid options JSON: {}", e)))?,
+            ),
+            None => None,
+        };
+        let files = world::to_world(&self.0, options)
+            .map_err(|e| JsValue::from_str(&format!("World export error: {}", e)))?;
+
+        let map = js_sys::Map::new();
+        for (path, data) in &files {
+            let key = JsValue::from_str(path);
+            let value = js_sys::Uint8Array::from(data.as_slice());
+            map.set(&key, &value);
+        }
+        Ok(map.into())
+    }
+
+    pub fn to_world_zip(&self, options_json: Option<String>) -> Result<Vec<u8>, JsValue> {
+        let options = match options_json {
+            Some(ref json) => Some(
+                serde_json::from_str::<world::WorldExportOptions>(json)
+                    .map_err(|e| JsValue::from_str(&format!("Invalid options JSON: {}", e)))?,
+            ),
+            None => None,
+        };
+        world::to_world_zip(&self.0, options)
+            .map_err(|e| JsValue::from_str(&format!("World zip export error: {}", e)))
     }
 
     pub fn to_schematic_version(&self, version: &str) -> Result<Vec<u8>, JsValue> {
@@ -663,6 +756,56 @@ impl SchematicWrapper {
             js_block_entities.push(&obj);
         }
         js_block_entities.into()
+    }
+
+    /// Get the number of mobile entities (not block entities).
+    pub fn entity_count(&self) -> usize {
+        self.0.default_region.entities.len()
+    }
+
+    /// Get all mobile entities as a JS array of objects.
+    pub fn get_entities(&self) -> JsValue {
+        let entities = &self.0.default_region.entities;
+        let js_entities = Array::new();
+        for entity in entities {
+            let obj = Object::new();
+            Reflect::set(&obj, &"id".into(), &JsValue::from_str(&entity.id)).unwrap();
+
+            let position = Array::new();
+            position.push(&JsValue::from(entity.position.0));
+            position.push(&JsValue::from(entity.position.1));
+            position.push(&JsValue::from(entity.position.2));
+            Reflect::set(&obj, &"position".into(), &position).unwrap();
+
+            let nbt_json = serde_json::to_string(&entity.nbt).unwrap_or_default();
+            Reflect::set(&obj, &"nbt".into(), &JsValue::from_str(&nbt_json)).unwrap();
+
+            js_entities.push(&obj);
+        }
+        js_entities.into()
+    }
+
+    /// Add a mobile entity to the schematic.
+    pub fn add_entity(
+        &mut self,
+        id: &str,
+        x: f64,
+        y: f64,
+        z: f64,
+        nbt_json: Option<String>,
+    ) -> Result<(), JsValue> {
+        let mut entity = crate::entity::Entity::new(id.to_string(), (x, y, z));
+        if let Some(ref json) = nbt_json {
+            entity.nbt = serde_json::from_str(json)
+                .map_err(|e| JsValue::from_str(&format!("Invalid NBT JSON: {}", e)))?;
+        }
+        self.0.add_entity(entity);
+        Ok(())
+    }
+
+    /// Remove a mobile entity by index. Returns true if removed.
+    pub fn remove_entity(&mut self, index: usize) -> bool {
+        self.0.remove_entity(index).is_some()
     }
 
     pub fn print_schematic(&self) -> String {

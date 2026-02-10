@@ -12,7 +12,7 @@ use crate::{
     block_position::BlockPosition,
     bounding_box::BoundingBox,
     definition_region::DefinitionRegion,
-    formats::{litematic, manager::get_manager, mcstructure, schematic},
+    formats::{litematic, manager::get_manager, mcstructure, schematic, world},
     print_utils::{format_json_schematic, format_schematic},
     universal_schematic::ChunkLoadingStrategy,
     utils::{NbtMap, NbtValue},
@@ -274,6 +274,142 @@ impl PySchematic {
         let bytes = mcstructure::to_mcstructure(&self.inner)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
         Ok(PyBytes::new(py, &bytes).into())
+    }
+
+    /// Import from a single MCA region file.
+    pub fn from_mca(&mut self, data: &[u8]) -> PyResult<()> {
+        self.inner = world::from_mca(data)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+        self.last_block_name.clear();
+        self.default_region_initialized = true;
+        Ok(())
+    }
+
+    /// Import from a single MCA region file with coordinate bounds.
+    pub fn from_mca_bounded(
+        &mut self,
+        data: &[u8],
+        min_x: i32,
+        min_y: i32,
+        min_z: i32,
+        max_x: i32,
+        max_y: i32,
+        max_z: i32,
+    ) -> PyResult<()> {
+        self.inner = world::from_mca_bounded(data, min_x, min_y, min_z, max_x, max_y, max_z)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+        self.last_block_name.clear();
+        self.default_region_initialized = true;
+        Ok(())
+    }
+
+    /// Import from a zipped Minecraft world folder.
+    pub fn from_world_zip(&mut self, data: &[u8]) -> PyResult<()> {
+        self.inner = world::from_world_zip(data)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+        self.last_block_name.clear();
+        self.default_region_initialized = true;
+        Ok(())
+    }
+
+    /// Import from a zipped world folder with coordinate bounds.
+    pub fn from_world_zip_bounded(
+        &mut self,
+        data: &[u8],
+        min_x: i32,
+        min_y: i32,
+        min_z: i32,
+        max_x: i32,
+        max_y: i32,
+        max_z: i32,
+    ) -> PyResult<()> {
+        self.inner = world::from_world_zip_bounded(data, min_x, min_y, min_z, max_x, max_y, max_z)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+        self.last_block_name.clear();
+        self.default_region_initialized = true;
+        Ok(())
+    }
+
+    /// Import from a Minecraft world directory path.
+    pub fn from_world_directory(&mut self, path: &str) -> PyResult<()> {
+        self.inner = world::from_world_directory(std::path::Path::new(path))
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+        self.last_block_name.clear();
+        self.default_region_initialized = true;
+        Ok(())
+    }
+
+    /// Import from a world directory with coordinate bounds.
+    pub fn from_world_directory_bounded(
+        &mut self,
+        path: &str,
+        min_x: i32,
+        min_y: i32,
+        min_z: i32,
+        max_x: i32,
+        max_y: i32,
+        max_z: i32,
+    ) -> PyResult<()> {
+        self.inner = world::from_world_directory_bounded(
+            std::path::Path::new(path),
+            min_x,
+            min_y,
+            min_z,
+            max_x,
+            max_y,
+            max_z,
+        )
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+        self.last_block_name.clear();
+        self.default_region_initialized = true;
+        Ok(())
+    }
+
+    /// Export schematic as a Minecraft world. Returns dict[str, bytes].
+    pub fn to_world(&self, py: Python<'_>, options_json: Option<&str>) -> PyResult<PyObject> {
+        let options = match options_json {
+            Some(json) => Some(
+                serde_json::from_str::<world::WorldExportOptions>(json)
+                    .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?,
+            ),
+            None => None,
+        };
+        let files = world::to_world(&self.inner, options)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
+
+        let dict = PyDict::new(py);
+        for (path, data) in &files {
+            dict.set_item(path, PyBytes::new(py, data))?;
+        }
+        Ok(dict.into())
+    }
+
+    /// Export schematic as a zipped Minecraft world. Returns bytes.
+    pub fn to_world_zip(&self, py: Python<'_>, options_json: Option<&str>) -> PyResult<PyObject> {
+        let options = match options_json {
+            Some(json) => Some(
+                serde_json::from_str::<world::WorldExportOptions>(json)
+                    .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?,
+            ),
+            None => None,
+        };
+        let zip_bytes = world::to_world_zip(&self.inner, options)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
+        Ok(PyBytes::new(py, &zip_bytes).into())
+    }
+
+    /// Export schematic as a Minecraft world and write files to disk.
+    pub fn save_world(&self, directory: &str, options_json: Option<&str>) -> PyResult<()> {
+        let options = match options_json {
+            Some(json) => Some(
+                serde_json::from_str::<world::WorldExportOptions>(json)
+                    .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?,
+            ),
+            None => None,
+        };
+        world::save_world(&self.inner, std::path::Path::new(directory), options)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
+        Ok(())
     }
 
     pub fn set_block(&mut self, x: i32, y: i32, z: i32, block_name: &str) -> bool {
@@ -560,6 +696,60 @@ impl PySchematic {
 
         let list = PyList::new(py, list_items)?;
         Ok(list.into())
+    }
+
+    /// Get the number of entities (mobile entities, not block entities).
+    pub fn entity_count(&self) -> usize {
+        self.inner.default_region.entities.len()
+    }
+
+    /// Get all entities as a list of dicts.
+    pub fn get_entities<'py>(&self, py: Python<'py>) -> PyResult<PyObject> {
+        let entities = &self.inner.default_region.entities;
+        let mut list_items: Vec<PyObject> = Vec::new();
+
+        for entity in entities {
+            let dict = PyDict::new(py);
+            dict.set_item("id", &entity.id)?;
+            dict.set_item(
+                "position",
+                (entity.position.0, entity.position.1, entity.position.2),
+            )?;
+            dict.set_item("nbt", entity_nbt_to_python(py, &entity.nbt)?)?;
+            list_items.push(dict.into());
+        }
+
+        let list = PyList::new(py, list_items)?;
+        Ok(list.into())
+    }
+
+    /// Add an entity to the schematic.
+    pub fn add_entity(
+        &mut self,
+        id: &str,
+        x: f64,
+        y: f64,
+        z: f64,
+        nbt_json: Option<&str>,
+    ) -> PyResult<()> {
+        let mut entity = crate::entity::Entity::new(id.to_string(), (x, y, z));
+        if let Some(json) = nbt_json {
+            let nbt_map: HashMap<String, crate::entity::NbtValue> = serde_json::from_str(json)
+                .map_err(|e| {
+                    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                        "Invalid NBT JSON: {}",
+                        e
+                    ))
+                })?;
+            entity.nbt = nbt_map;
+        }
+        self.inner.add_entity(entity);
+        Ok(())
+    }
+
+    /// Remove an entity by index. Returns true if removed.
+    pub fn remove_entity(&mut self, index: usize) -> bool {
+        self.inner.remove_entity(index).is_some()
     }
 
     pub fn get_all_blocks<'py>(&self, py: Python<'py>) -> PyResult<PyObject> {
@@ -1161,11 +1351,13 @@ impl PySchematic {
             .insert(name, region.inner.clone());
     }
 
+    #[pyo3(signature = (format, version=None, settings=None))]
     pub fn save_as(
         &self,
         py: Python<'_>,
         format: &str,
         version: Option<String>,
+        settings: Option<&str>,
     ) -> PyResult<PyObject> {
         let manager = get_manager();
         let manager = manager
@@ -1173,9 +1365,48 @@ impl PySchematic {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         let bytes = manager
-            .write(format, &self.inner, version.as_deref())
+            .write_with_settings(format, &self.inner, version.as_deref(), settings)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
         Ok(PyBytes::new(py, &bytes).into())
+    }
+
+    /// Register a mesh exporter with the FormatManager, enabling save_as("mesh", ...).
+    #[cfg(feature = "meshing")]
+    pub fn register_mesh_exporter(&self, pack: &super::meshing::PyResourcePack) -> PyResult<()> {
+        let mesh_exporter = crate::meshing::MeshExporter::new(
+            crate::meshing::ResourcePackSource::from_resource_pack(pack.inner.pack().clone()),
+        );
+
+        let manager = get_manager();
+        let mut manager = manager
+            .lock()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        manager.register_exporter(mesh_exporter);
+        Ok(())
+    }
+
+    /// Get the settings schema for an export format (returns JSON or None).
+    #[staticmethod]
+    pub fn get_export_settings_schema(format: &str) -> PyResult<Option<String>> {
+        let manager = get_manager();
+        let manager = manager.lock().map_err(|_| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                "Failed to acquire format manager lock",
+            )
+        })?;
+        Ok(manager.get_export_settings_schema(format))
+    }
+
+    /// Get the settings schema for an import format (returns JSON or None).
+    #[staticmethod]
+    pub fn get_import_settings_schema(format: &str) -> PyResult<Option<String>> {
+        let manager = get_manager();
+        let manager = manager.lock().map_err(|_| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                "Failed to acquire format manager lock",
+            )
+        })?;
+        Ok(manager.get_import_settings_schema(format))
     }
 
     pub fn to_schematic_version(&self, py: Python<'_>, version: &str) -> PyResult<PyObject> {
@@ -1445,6 +1676,52 @@ fn nbt_value_to_python(py: Python<'_>, value: &NbtValue) -> PyResult<PyObject> {
             Ok(pylist.into())
         }
         NbtValue::LongArray(la) => {
+            let pylist = PyList::new(py, la.clone())?;
+            Ok(pylist.into())
+        }
+    }
+}
+
+fn entity_nbt_to_python(
+    py: Python<'_>,
+    map: &HashMap<String, crate::entity::NbtValue>,
+) -> PyResult<PyObject> {
+    let dict = PyDict::new(py);
+    for (key, value) in map.iter() {
+        dict.set_item(key, entity_nbt_value_to_python(py, value)?)?;
+    }
+    Ok(dict.into())
+}
+
+fn entity_nbt_value_to_python(
+    py: Python<'_>,
+    value: &crate::entity::NbtValue,
+) -> PyResult<PyObject> {
+    use crate::entity::NbtValue as ENV;
+    match value {
+        ENV::Byte(b) => Ok((*b).into_pyobject(py)?.into()),
+        ENV::Short(s) => Ok((*s).into_pyobject(py)?.into()),
+        ENV::Int(i) => Ok((*i).into_pyobject(py)?.into()),
+        ENV::Long(l) => Ok((*l).into_pyobject(py)?.into()),
+        ENV::Float(f) => Ok((*f).into_pyobject(py)?.into()),
+        ENV::Double(d) => Ok((*d).into_pyobject(py)?.into()),
+        ENV::ByteArray(ba) => Ok(PyBytes::new(py, bytemuck::cast_slice(ba)).into()),
+        ENV::String(s) => Ok(s.into_pyobject(py)?.into()),
+        ENV::Boolean(b) => Ok((*b).into_pyobject(py)?.to_owned().into()),
+        ENV::List(list) => {
+            let items: Vec<PyObject> = list
+                .iter()
+                .map(|item| entity_nbt_value_to_python(py, item))
+                .collect::<PyResult<_>>()?;
+            let pylist = PyList::new(py, items)?;
+            Ok(pylist.into())
+        }
+        ENV::Compound(map) => entity_nbt_to_python(py, map),
+        ENV::IntArray(ia) => {
+            let pylist = PyList::new(py, ia.clone())?;
+            Ok(pylist.into())
+        }
+        ENV::LongArray(la) => {
             let pylist = PyList::new(py, la.clone())?;
             Ok(pylist.into())
         }

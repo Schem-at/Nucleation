@@ -606,4 +606,19 @@ impl SchematicWrapper {
             .map(|result| RawMeshExportWrapper { inner: result })
             .map_err(|e| JsValue::from_str(&e.to_string()))
     }
+
+    /// Register a mesh exporter with the FormatManager, enabling save_as("mesh", ...).
+    #[wasm_bindgen(js_name = registerMeshExporter)]
+    pub fn register_mesh_exporter(&self, pack: &ResourcePackWrapper) -> Result<(), JsValue> {
+        let mesh_exporter = crate::meshing::MeshExporter::new(
+            ResourcePackSource::from_resource_pack(pack.inner.pack().clone()),
+        );
+
+        let manager = crate::formats::manager::get_manager();
+        let mut manager = manager
+            .lock()
+            .map_err(|e| JsValue::from_str(&format!("Lock error: {}", e)))?;
+        manager.register_exporter(mesh_exporter);
+        Ok(())
+    }
 }

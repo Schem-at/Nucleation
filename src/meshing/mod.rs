@@ -35,9 +35,11 @@ use schematic_mesher::{
     BlockPosition as MesherBlockPosition, BlockSource, BoundingBox as MesherBoundingBox,
     InputBlock, Mesher, MesherConfig, MesherOutput, RawMeshData, ResourcePack,
 };
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 
+use crate::entity::{Entity, NbtValue};
 use crate::{BlockState, Region, UniversalSchematic};
 
 /// Error type for meshing operations.
@@ -73,6 +75,11 @@ impl ResourcePackSource {
         let pack = schematic_mesher::load_resource_pack_from_bytes(data)
             .map_err(|e| MeshError::ResourcePack(e.to_string()))?;
         Ok(Self { pack })
+    }
+
+    /// Create a ResourcePackSource from an already-loaded ResourcePack.
+    pub fn from_resource_pack(pack: ResourcePack) -> Self {
+        Self { pack }
     }
 
     /// Get a reference to the underlying ResourcePack.
@@ -201,7 +208,8 @@ pub struct ResourcePackStats {
 }
 
 /// Configuration for mesh generation.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct MeshConfig {
     /// Enable face culling between adjacent solid blocks.
     pub cull_hidden_faces: bool,
@@ -443,6 +451,9 @@ impl RegionBlockSource {
             }
         }
 
+        // Also collect entities as entity: blocks
+        collect_region_entities(region, &mut blocks, &mut min, &mut max);
+
         // Use region bounds if no blocks found
         if blocks.is_empty() {
             min = [bbox.min.0 as f32, bbox.min.1 as f32, bbox.min.2 as f32];
@@ -506,6 +517,159 @@ fn block_state_to_input_block(block_state: &BlockState) -> InputBlock {
         input.properties.insert(key.clone(), value.clone());
     }
     input
+}
+
+/// Convert a Nucleation Entity to a schematic-mesher InputBlock with `entity:` prefix.
+///
+/// The mesher recognizes entities via the `entity:` namespace (e.g., `entity:minecart`,
+/// `entity:zombie`). Entity NBT data like Rotation is mapped to InputBlock properties.
+fn entity_to_input_block(entity: &Entity) -> InputBlock {
+    // Strip "minecraft:" prefix and add "entity:" prefix
+    let entity_id = entity.id.strip_prefix("minecraft:").unwrap_or(&entity.id);
+
+    // Map specific Minecraft entity types to mesher-supported types
+    let mesher_id = match entity_id {
+        "furnace_minecart"
+        | "chest_minecart"
+        | "tnt_minecart"
+        | "hopper_minecart"
+        | "spawner_minecart"
+        | "command_block_minecart" => "minecart",
+        id => id,
+    };
+
+    let mut input = InputBlock::new(&format!("entity:{}", mesher_id));
+
+    // Extract facing from Rotation NBT (Rotation is a list of 2 floats: [yaw, pitch])
+    if let Some(NbtValue::List(rotation)) = entity.nbt.get("Rotation") {
+        if let Some(NbtValue::Float(yaw)) = rotation.first() {
+            // Convert yaw angle to cardinal direction
+            let facing = yaw_to_facing(*yaw);
+            input
+                .properties
+                .insert("facing".to_string(), facing.to_string());
+        }
+    }
+
+    // Pass through relevant NBT as properties for the mesher
+    // Baby entities
+    if let Some(NbtValue::Byte(1)) = entity.nbt.get("IsBaby") {
+        input
+            .properties
+            .insert("is_baby".to_string(), "true".to_string());
+    }
+    // Age < 0 also indicates baby
+    if let Some(NbtValue::Int(age)) = entity.nbt.get("Age") {
+        if *age < 0 {
+            input
+                .properties
+                .insert("is_baby".to_string(), "true".to_string());
+        }
+    }
+
+    // Sheep color
+    if let Some(NbtValue::Byte(color)) = entity.nbt.get("Color") {
+        input
+            .properties
+            .insert("color".to_string(), dye_color_name(*color as u8));
+    }
+
+    // Armor stand pose properties
+    for pose_key in &[
+        "RightArmPose",
+        "LeftArmPose",
+        "RightLegPose",
+        "LeftLegPose",
+        "HeadPose",
+        "BodyPose",
+    ] {
+        if let Some(NbtValue::List(angles)) = entity.nbt.get(*pose_key) {
+            let angle_strs: Vec<String> = angles
+                .iter()
+                .filter_map(|v| match v {
+                    NbtValue::Float(f) => Some(format!("{}", f)),
+                    _ => None,
+                })
+                .collect();
+            if !angle_strs.is_empty() {
+                input
+                    .properties
+                    .insert(pose_key.to_string(), angle_strs.join(","));
+            }
+        }
+    }
+
+    input
+}
+
+/// Convert a yaw angle (degrees) to cardinal direction string.
+fn yaw_to_facing(yaw: f32) -> &'static str {
+    // Normalize yaw to 0..360
+    let normalized = ((yaw % 360.0) + 360.0) % 360.0;
+    if normalized >= 315.0 || normalized < 45.0 {
+        "south"
+    } else if normalized >= 45.0 && normalized < 135.0 {
+        "west"
+    } else if normalized >= 135.0 && normalized < 225.0 {
+        "north"
+    } else {
+        "east"
+    }
+}
+
+/// Convert a Minecraft dye color byte to color name.
+fn dye_color_name(color: u8) -> String {
+    match color {
+        0 => "white",
+        1 => "orange",
+        2 => "magenta",
+        3 => "light_blue",
+        4 => "yellow",
+        5 => "lime",
+        6 => "pink",
+        7 => "gray",
+        8 => "light_gray",
+        9 => "cyan",
+        10 => "purple",
+        11 => "blue",
+        12 => "brown",
+        13 => "green",
+        14 => "red",
+        15 => "black",
+        _ => "white",
+    }
+    .to_string()
+}
+
+/// Collect entities from a region and insert them into a block map as `entity:` blocks.
+fn collect_region_entities(
+    region: &Region,
+    blocks: &mut HashMap<MesherBlockPosition, InputBlock>,
+    min: &mut [f32; 3],
+    max: &mut [f32; 3],
+) {
+    for entity in &region.entities {
+        let input_block = entity_to_input_block(entity);
+
+        // Use floored entity position as block position
+        let x = entity.position.0.floor() as i32;
+        let y = entity.position.1.floor() as i32;
+        let z = entity.position.2.floor() as i32;
+        let pos = MesherBlockPosition::new(x, y, z);
+
+        // Only insert if there isn't already a block at this position
+        // (blocks take priority over entities for rendering)
+        if !blocks.contains_key(&pos) {
+            blocks.insert(pos, input_block);
+
+            min[0] = min[0].min(x as f32);
+            min[1] = min[1].min(y as f32);
+            min[2] = min[2].min(z as f32);
+            max[0] = max[0].max(x as f32 + 1.0);
+            max[1] = max[1].max(y as f32 + 1.0);
+            max[2] = max[2].max(z as f32 + 1.0);
+        }
+    }
 }
 
 impl UniversalSchematic {
@@ -712,7 +876,7 @@ fn mesh_region(
     Ok(Some(mesh_result_from_output(&output, glb_data)))
 }
 
-/// Helper function to collect blocks from a region.
+/// Helper function to collect blocks and entities from a region.
 fn collect_region_blocks(
     region: &Region,
     blocks: &mut HashMap<MesherBlockPosition, InputBlock>,
@@ -736,9 +900,12 @@ fn collect_region_blocks(
             }
         }
     }
+
+    // Also collect entities as entity: blocks
+    collect_region_entities(region, blocks, min, max);
 }
 
-/// Helper function to collect blocks from a region into chunk buckets.
+/// Helper function to collect blocks and entities from a region into chunk buckets.
 fn collect_region_blocks_by_chunk(
     region: &Region,
     chunks: &mut HashMap<(i32, i32, i32), HashMap<MesherBlockPosition, InputBlock>>,
@@ -748,7 +915,6 @@ fn collect_region_blocks_by_chunk(
         let (x, y, z) = region.index_to_coords(index);
         if let Some(block_state) = region.get_block(x, y, z) {
             if block_state.name != "minecraft:air" {
-                // Calculate chunk coordinate
                 let chunk_x = x.div_euclid(chunk_size);
                 let chunk_y = y.div_euclid(chunk_size);
                 let chunk_z = z.div_euclid(chunk_size);
@@ -758,6 +924,24 @@ fn collect_region_blocks_by_chunk(
                 let input_block = block_state_to_input_block(block_state);
                 chunk_blocks.insert(pos, input_block);
             }
+        }
+    }
+
+    // Also collect entities into their respective chunks
+    for entity in &region.entities {
+        let input_block = entity_to_input_block(entity);
+        let x = entity.position.0.floor() as i32;
+        let y = entity.position.1.floor() as i32;
+        let z = entity.position.2.floor() as i32;
+        let pos = MesherBlockPosition::new(x, y, z);
+
+        let chunk_x = x.div_euclid(chunk_size);
+        let chunk_y = y.div_euclid(chunk_size);
+        let chunk_z = z.div_euclid(chunk_size);
+
+        let chunk_blocks = chunks.entry((chunk_x, chunk_y, chunk_z)).or_default();
+        if !chunk_blocks.contains_key(&pos) {
+            chunk_blocks.insert(pos, input_block);
         }
     }
 }
@@ -803,6 +987,72 @@ fn blockstate_definition_to_json(def: &schematic_mesher::BlockstateDefinition) -
             );
             serde_json::Value::Object(map).to_string()
         }
+    }
+}
+
+// ─── MeshExporter (FormatManager integration) ──────────────────────────────
+
+use crate::formats::manager::SchematicExporter;
+
+/// A format exporter that produces mesh data (GLB, USDZ) through the FormatManager.
+///
+/// Unlike other exporters, MeshExporter is stateful — it holds a loaded resource pack.
+/// Register it with `FormatManager::register_exporter` after loading a resource pack.
+pub struct MeshExporter {
+    pack: ResourcePackSource,
+}
+
+impl MeshExporter {
+    pub fn new(pack: ResourcePackSource) -> Self {
+        Self { pack }
+    }
+}
+
+impl SchematicExporter for MeshExporter {
+    fn name(&self) -> String {
+        "mesh".to_string()
+    }
+
+    fn extensions(&self) -> Vec<String> {
+        vec!["glb".into(), "usdz".into()]
+    }
+
+    fn available_versions(&self) -> Vec<String> {
+        vec!["glb".into(), "usdz".into()]
+    }
+
+    fn default_version(&self) -> String {
+        "glb".to_string()
+    }
+
+    fn write(
+        &self,
+        schematic: &crate::UniversalSchematic,
+        version: Option<&str>,
+    ) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
+        self.write_with_settings(schematic, version, None)
+    }
+
+    fn write_with_settings(
+        &self,
+        schematic: &crate::UniversalSchematic,
+        version: Option<&str>,
+        settings: Option<&str>,
+    ) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let config: MeshConfig = match settings {
+            Some(s) => serde_json::from_str(s)?,
+            None => MeshConfig::default(),
+        };
+        let format = version.unwrap_or("glb");
+        match format {
+            "glb" => Ok(schematic.to_mesh(&self.pack, &config)?.glb_data),
+            "usdz" => Ok(schematic.to_usdz(&self.pack, &config)?.glb_data),
+            _ => Err(format!("Unknown mesh format: {}. Use 'glb' or 'usdz'", format).into()),
+        }
+    }
+
+    fn export_settings_schema(&self) -> Option<String> {
+        serde_json::to_string_pretty(&MeshConfig::default()).ok()
     }
 }
 

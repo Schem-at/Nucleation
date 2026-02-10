@@ -82,6 +82,21 @@ pub struct CBlockEntityArray {
 }
 
 #[repr(C)]
+pub struct CEntity {
+    id: *mut c_char,
+    x: f64,
+    y: f64,
+    z: f64,
+    nbt_json: *mut c_char,
+}
+
+#[repr(C)]
+pub struct CEntityArray {
+    data: *mut CEntity,
+    len: usize,
+}
+
+#[repr(C)]
 pub struct CChunk {
     chunk_x: c_int,
     chunk_y: c_int,
@@ -413,6 +428,352 @@ pub extern "C" fn schematic_to_mcstructure(schematic: *const SchematicWrapper) -
             let ptr = data.as_mut_ptr();
             let len = data.len();
             std::mem::forget(data);
+            ByteArray { data: ptr, len }
+        }
+        Err(_) => ByteArray {
+            data: ptr::null_mut(),
+            len: 0,
+        },
+    }
+}
+
+// --- MCA / World Import/Export ---
+
+/// C-compatible file entry for world export.
+#[repr(C)]
+pub struct CFileEntry {
+    path: *mut c_char,
+    data: *mut c_uchar,
+    data_len: usize,
+}
+
+/// C-compatible file map for world export.
+#[repr(C)]
+pub struct CFileMap {
+    entries: *mut CFileEntry,
+    len: usize,
+}
+
+/// Frees a CFileMap returned by schematic_to_world.
+#[no_mangle]
+pub extern "C" fn free_file_map(map: CFileMap) {
+    if map.entries.is_null() {
+        return;
+    }
+    let entries = unsafe { Vec::from_raw_parts(map.entries, map.len, map.len) };
+    for entry in entries {
+        if !entry.path.is_null() {
+            unsafe {
+                let _ = CString::from_raw(entry.path);
+            }
+        }
+        if !entry.data.is_null() {
+            unsafe {
+                let _ = Vec::from_raw_parts(entry.data, entry.data_len, entry.data_len);
+            }
+        }
+    }
+}
+
+/// Import from a single MCA region file.
+#[no_mangle]
+pub extern "C" fn schematic_from_mca(
+    schematic: *mut SchematicWrapper,
+    data: *const c_uchar,
+    data_len: usize,
+) -> c_int {
+    if schematic.is_null() || data.is_null() {
+        return -1;
+    }
+    let data_slice = unsafe { std::slice::from_raw_parts(data, data_len) };
+    let s = unsafe { &mut *(*schematic).0 };
+    match crate::formats::world::from_mca(data_slice) {
+        Ok(res) => {
+            *s = res;
+            0
+        }
+        Err(_) => -2,
+    }
+}
+
+/// Import from MCA with coordinate bounds.
+#[no_mangle]
+pub extern "C" fn schematic_from_mca_bounded(
+    schematic: *mut SchematicWrapper,
+    data: *const c_uchar,
+    data_len: usize,
+    min_x: c_int,
+    min_y: c_int,
+    min_z: c_int,
+    max_x: c_int,
+    max_y: c_int,
+    max_z: c_int,
+) -> c_int {
+    if schematic.is_null() || data.is_null() {
+        return -1;
+    }
+    let data_slice = unsafe { std::slice::from_raw_parts(data, data_len) };
+    let s = unsafe { &mut *(*schematic).0 };
+    match crate::formats::world::from_mca_bounded(
+        data_slice, min_x, min_y, min_z, max_x, max_y, max_z,
+    ) {
+        Ok(res) => {
+            *s = res;
+            0
+        }
+        Err(_) => -2,
+    }
+}
+
+/// Import from a zipped world folder.
+#[no_mangle]
+pub extern "C" fn schematic_from_world_zip(
+    schematic: *mut SchematicWrapper,
+    data: *const c_uchar,
+    data_len: usize,
+) -> c_int {
+    if schematic.is_null() || data.is_null() {
+        return -1;
+    }
+    let data_slice = unsafe { std::slice::from_raw_parts(data, data_len) };
+    let s = unsafe { &mut *(*schematic).0 };
+    match crate::formats::world::from_world_zip(data_slice) {
+        Ok(res) => {
+            *s = res;
+            0
+        }
+        Err(_) => -2,
+    }
+}
+
+/// Import from zipped world with coordinate bounds.
+#[no_mangle]
+pub extern "C" fn schematic_from_world_zip_bounded(
+    schematic: *mut SchematicWrapper,
+    data: *const c_uchar,
+    data_len: usize,
+    min_x: c_int,
+    min_y: c_int,
+    min_z: c_int,
+    max_x: c_int,
+    max_y: c_int,
+    max_z: c_int,
+) -> c_int {
+    if schematic.is_null() || data.is_null() {
+        return -1;
+    }
+    let data_slice = unsafe { std::slice::from_raw_parts(data, data_len) };
+    let s = unsafe { &mut *(*schematic).0 };
+    match crate::formats::world::from_world_zip_bounded(
+        data_slice, min_x, min_y, min_z, max_x, max_y, max_z,
+    ) {
+        Ok(res) => {
+            *s = res;
+            0
+        }
+        Err(_) => -2,
+    }
+}
+
+/// Import from a Minecraft world directory path.
+#[no_mangle]
+pub extern "C" fn schematic_from_world_directory(
+    schematic: *mut SchematicWrapper,
+    path: *const c_char,
+) -> c_int {
+    if schematic.is_null() || path.is_null() {
+        return -1;
+    }
+    let path_str = unsafe { CStr::from_ptr(path) };
+    let path_str = match path_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+    let s = unsafe { &mut *(*schematic).0 };
+    match crate::formats::world::from_world_directory(std::path::Path::new(path_str)) {
+        Ok(res) => {
+            *s = res;
+            0
+        }
+        Err(_) => -2,
+    }
+}
+
+/// Import from world directory with coordinate bounds.
+#[no_mangle]
+pub extern "C" fn schematic_from_world_directory_bounded(
+    schematic: *mut SchematicWrapper,
+    path: *const c_char,
+    min_x: c_int,
+    min_y: c_int,
+    min_z: c_int,
+    max_x: c_int,
+    max_y: c_int,
+    max_z: c_int,
+) -> c_int {
+    if schematic.is_null() || path.is_null() {
+        return -1;
+    }
+    let path_str = unsafe { CStr::from_ptr(path) };
+    let path_str = match path_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+    let s = unsafe { &mut *(*schematic).0 };
+    match crate::formats::world::from_world_directory_bounded(
+        std::path::Path::new(path_str),
+        min_x,
+        min_y,
+        min_z,
+        max_x,
+        max_y,
+        max_z,
+    ) {
+        Ok(res) => {
+            *s = res;
+            0
+        }
+        Err(_) => -2,
+    }
+}
+
+/// Export schematic as a Minecraft world. Returns CFileMap.
+/// The returned CFileMap must be freed with `free_file_map`.
+#[no_mangle]
+pub extern "C" fn schematic_to_world(
+    schematic: *const SchematicWrapper,
+    options_json: *const c_char,
+) -> CFileMap {
+    let empty = CFileMap {
+        entries: ptr::null_mut(),
+        len: 0,
+    };
+
+    if schematic.is_null() {
+        return empty;
+    }
+
+    let s = unsafe { &*(*schematic).0 };
+
+    let options = if options_json.is_null() {
+        None
+    } else {
+        let json_str = unsafe { CStr::from_ptr(options_json) };
+        match json_str.to_str() {
+            Ok(json) => {
+                match serde_json::from_str::<crate::formats::world::WorldExportOptions>(json) {
+                    Ok(opts) => Some(opts),
+                    Err(_) => return empty,
+                }
+            }
+            Err(_) => return empty,
+        }
+    };
+
+    let files = match crate::formats::world::to_world(s, options) {
+        Ok(f) => f,
+        Err(_) => return empty,
+    };
+
+    let mut entries: Vec<CFileEntry> = Vec::with_capacity(files.len());
+    for (path, data) in files {
+        let c_path = match CString::new(path) {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+        let mut data = data;
+        let data_ptr = data.as_mut_ptr();
+        let data_len = data.len();
+        std::mem::forget(data);
+
+        entries.push(CFileEntry {
+            path: c_path.into_raw(),
+            data: data_ptr,
+            data_len,
+        });
+    }
+
+    let len = entries.len();
+    let ptr = entries.as_mut_ptr();
+    std::mem::forget(entries);
+
+    CFileMap { entries: ptr, len }
+}
+
+/// Export and write world files to a directory.
+#[no_mangle]
+pub extern "C" fn schematic_save_world(
+    schematic: *const SchematicWrapper,
+    directory: *const c_char,
+    options_json: *const c_char,
+) -> c_int {
+    if schematic.is_null() || directory.is_null() {
+        return -1;
+    }
+
+    let s = unsafe { &*(*schematic).0 };
+
+    let dir_str = unsafe { CStr::from_ptr(directory) };
+    let dir_str = match dir_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+
+    let options = if options_json.is_null() {
+        None
+    } else {
+        let json_str = unsafe { CStr::from_ptr(options_json) };
+        match json_str.to_str() {
+            Ok(json) => {
+                match serde_json::from_str::<crate::formats::world::WorldExportOptions>(json) {
+                    Ok(opts) => Some(opts),
+                    Err(_) => return -3,
+                }
+            }
+            Err(_) => return -1,
+        }
+    };
+
+    match crate::formats::world::save_world(s, std::path::Path::new(dir_str), options) {
+        Ok(_) => 0,
+        Err(_) => -2,
+    }
+}
+
+/// Export a schematic as a zipped Minecraft world. Returns a ByteArray.
+/// Caller must free the returned ByteArray.
+#[no_mangle]
+pub extern "C" fn schematic_to_world_zip(
+    schematic: *const SchematicWrapper,
+    options_json: *const c_char,
+) -> ByteArray {
+    if schematic.is_null() {
+        return ByteArray {
+            data: ptr::null_mut(),
+            len: 0,
+        };
+    }
+
+    let s = unsafe { &*(*schematic).0 };
+
+    let options = if options_json.is_null() {
+        None
+    } else {
+        let json_str = unsafe { CStr::from_ptr(options_json) };
+        match json_str.to_str() {
+            Ok(json) => {
+                serde_json::from_str::<crate::formats::world::WorldExportOptions>(json).ok()
+            }
+            Err(_) => None,
+        }
+    };
+
+    match crate::formats::world::to_world_zip(s, options) {
+        Ok(bytes) => {
+            let mut bytes = bytes;
+            let ptr = bytes.as_mut_ptr();
+            let len = bytes.len();
+            std::mem::forget(bytes);
             ByteArray { data: ptr, len }
         }
         Err(_) => ByteArray {
@@ -767,6 +1128,112 @@ pub extern "C" fn schematic_get_all_block_entities(
     let len = c_entities.len();
     std::mem::forget(c_entities);
     CBlockEntityArray { data: ptr, len }
+}
+
+/// Gets the number of mobile entities (not block entities).
+#[no_mangle]
+pub extern "C" fn schematic_entity_count(schematic: *const SchematicWrapper) -> usize {
+    if schematic.is_null() {
+        return 0;
+    }
+    let s = unsafe { &*(*schematic).0 };
+    s.default_region.entities.len()
+}
+
+/// Gets all mobile entities as a CEntityArray.
+/// The returned CEntityArray must be freed with `free_entity_array`.
+#[no_mangle]
+pub extern "C" fn schematic_get_entities(schematic: *const SchematicWrapper) -> CEntityArray {
+    if schematic.is_null() {
+        return CEntityArray {
+            data: ptr::null_mut(),
+            len: 0,
+        };
+    }
+    let s = unsafe { &*(*schematic).0 };
+    let entities = &s.default_region.entities;
+
+    let mut c_entities = Vec::with_capacity(entities.len());
+    for entity in entities {
+        let nbt_json = serde_json::to_string(&entity.nbt).unwrap_or_default();
+        c_entities.push(CEntity {
+            id: CString::new(entity.id.clone()).unwrap().into_raw(),
+            x: entity.position.0,
+            y: entity.position.1,
+            z: entity.position.2,
+            nbt_json: CString::new(nbt_json).unwrap().into_raw(),
+        });
+    }
+
+    let ptr = c_entities.as_mut_ptr();
+    let len = c_entities.len();
+    std::mem::forget(c_entities);
+    CEntityArray { data: ptr, len }
+}
+
+/// Add a mobile entity to the schematic. Returns 0 on success, -1 on error.
+#[no_mangle]
+pub extern "C" fn schematic_add_entity(
+    schematic: *mut SchematicWrapper,
+    id: *const c_char,
+    x: f64,
+    y: f64,
+    z: f64,
+    nbt_json: *const c_char,
+) -> c_int {
+    if schematic.is_null() || id.is_null() {
+        return -1;
+    }
+    let s = unsafe { &mut *(*schematic).0 };
+    let id_str = unsafe { CStr::from_ptr(id) }.to_string_lossy().to_string();
+    let mut entity = crate::entity::Entity::new(id_str, (x, y, z));
+
+    if !nbt_json.is_null() {
+        let json = unsafe { CStr::from_ptr(nbt_json) }
+            .to_string_lossy()
+            .to_string();
+        if !json.is_empty() {
+            if let Ok(nbt_map) = serde_json::from_str(&json) {
+                entity.nbt = nbt_map;
+            }
+        }
+    }
+
+    s.add_entity(entity);
+    0
+}
+
+/// Remove a mobile entity by index. Returns 0 on success, -1 on error.
+#[no_mangle]
+pub extern "C" fn schematic_remove_entity(schematic: *mut SchematicWrapper, index: usize) -> c_int {
+    if schematic.is_null() {
+        return -1;
+    }
+    let s = unsafe { &mut *(*schematic).0 };
+    if s.remove_entity(index).is_some() {
+        0
+    } else {
+        -1
+    }
+}
+
+/// Frees a CEntityArray returned by `schematic_get_entities`.
+#[no_mangle]
+pub extern "C" fn free_entity_array(arr: CEntityArray) {
+    if arr.data.is_null() || arr.len == 0 {
+        return;
+    }
+    let entities = unsafe { Vec::from_raw_parts(arr.data, arr.len, arr.len) };
+    for entity in entities {
+        unsafe {
+            if !entity.id.is_null() {
+                drop(CString::from_raw(entity.id));
+            }
+            if !entity.nbt_json.is_null() {
+                drop(CString::from_raw(entity.nbt_json));
+            }
+        }
+    }
 }
 
 /// Gets a list of all non-air blocks in the schematic.
@@ -1579,6 +2046,7 @@ pub extern "C" fn schematic_save_as(
     schematic: *const SchematicWrapper,
     format: *const c_char,
     version: *const c_char,
+    settings: *const c_char,
 ) -> ByteArray {
     let empty = ByteArray {
         data: ptr::null_mut(),
@@ -1594,13 +2062,18 @@ pub extern "C" fn schematic_save_as(
     } else {
         Some(unsafe { CStr::from_ptr(version).to_string_lossy().into_owned() })
     };
+    let settings_str = if settings.is_null() {
+        None
+    } else {
+        Some(unsafe { CStr::from_ptr(settings).to_string_lossy().into_owned() })
+    };
 
     let manager = get_manager();
     let manager = match manager.lock() {
         Ok(m) => m,
         Err(_) => return empty,
     };
-    match manager.write(&fmt, s, ver.as_deref()) {
+    match manager.write_with_settings(&fmt, s, ver.as_deref(), settings_str.as_deref()) {
         Ok(mut data) => {
             let ptr = data.as_mut_ptr();
             let len = data.len();
@@ -1608,6 +2081,44 @@ pub extern "C" fn schematic_save_as(
             ByteArray { data: ptr, len }
         }
         Err(_) => empty,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn schematic_get_export_settings_schema(format: *const c_char) -> *mut c_char {
+    if format.is_null() {
+        return ptr::null_mut();
+    }
+    let fmt = unsafe { CStr::from_ptr(format).to_string_lossy() };
+    let manager = get_manager();
+    let manager = match manager.lock() {
+        Ok(m) => m,
+        Err(_) => return ptr::null_mut(),
+    };
+    match manager.get_export_settings_schema(&fmt) {
+        Some(schema) => CString::new(schema)
+            .map(|s| s.into_raw())
+            .unwrap_or(ptr::null_mut()),
+        None => ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn schematic_get_import_settings_schema(format: *const c_char) -> *mut c_char {
+    if format.is_null() {
+        return ptr::null_mut();
+    }
+    let fmt = unsafe { CStr::from_ptr(format).to_string_lossy() };
+    let manager = get_manager();
+    let manager = match manager.lock() {
+        Ok(m) => m,
+        Err(_) => return ptr::null_mut(),
+    };
+    match manager.get_import_settings_schema(&fmt) {
+        Some(schema) => CString::new(schema)
+            .map(|s| s.into_raw())
+            .unwrap_or(ptr::null_mut()),
+        None => ptr::null_mut(),
     }
 }
 
@@ -4612,5 +5123,26 @@ pub mod meshing_ffi {
         }
         let raw = unsafe { &(*ptr).0 };
         raw.texture_height()
+    }
+
+    /// Register a MeshExporter with the FormatManager so save_as("mesh", ...) works.
+    /// Returns 0 on success, -1 on failure.
+    #[no_mangle]
+    pub extern "C" fn schematic_register_mesh_exporter(pack: *const FFIResourcePack) -> c_int {
+        if pack.is_null() {
+            return -1;
+        }
+        let p = unsafe { &(*pack).0 };
+        let mesh_exporter = crate::meshing::MeshExporter::new(
+            ResourcePackSource::from_resource_pack(p.pack().clone()),
+        );
+
+        let manager = get_manager();
+        let mut manager = match manager.lock() {
+            Ok(m) => m,
+            Err(_) => return -1,
+        };
+        manager.register_exporter(mesh_exporter);
+        0
     }
 }

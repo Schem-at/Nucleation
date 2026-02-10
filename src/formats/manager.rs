@@ -6,6 +6,17 @@ pub trait SchematicImporter: Send + Sync {
     fn name(&self) -> String;
     fn detect(&self, data: &[u8]) -> bool;
     fn read(&self, data: &[u8]) -> Result<UniversalSchematic, Box<dyn Error>>;
+    fn read_with_settings(
+        &self,
+        data: &[u8],
+        settings: Option<&str>,
+    ) -> Result<UniversalSchematic, Box<dyn Error>> {
+        let _ = settings;
+        self.read(data)
+    }
+    fn import_settings_schema(&self) -> Option<String> {
+        None
+    }
 }
 
 pub trait SchematicExporter: Send + Sync {
@@ -18,6 +29,18 @@ pub trait SchematicExporter: Send + Sync {
         schematic: &UniversalSchematic,
         version: Option<&str>,
     ) -> Result<Vec<u8>, Box<dyn Error>>;
+    fn write_with_settings(
+        &self,
+        schematic: &UniversalSchematic,
+        version: Option<&str>,
+        settings: Option<&str>,
+    ) -> Result<Vec<u8>, Box<dyn Error>> {
+        let _ = settings;
+        self.write(schematic, version)
+    }
+    fn export_settings_schema(&self) -> Option<String> {
+        None
+    }
 }
 
 pub struct FormatManager {
@@ -59,6 +82,19 @@ impl FormatManager {
         Err("Unknown or unsupported schematic format".into())
     }
 
+    pub fn read_with_settings(
+        &self,
+        data: &[u8],
+        settings: Option<&str>,
+    ) -> Result<UniversalSchematic, Box<dyn Error>> {
+        for importer in &self.importers {
+            if importer.detect(data) {
+                return importer.read_with_settings(data, settings);
+            }
+        }
+        Err("Unknown or unsupported schematic format".into())
+    }
+
     pub fn write(
         &self,
         format: &str,
@@ -68,6 +104,21 @@ impl FormatManager {
         for exporter in &self.exporters {
             if exporter.name().eq_ignore_ascii_case(format) {
                 return exporter.write(schematic, version);
+            }
+        }
+        Err(format!("Unsupported export format: {}", format).into())
+    }
+
+    pub fn write_with_settings(
+        &self,
+        format: &str,
+        schematic: &UniversalSchematic,
+        version: Option<&str>,
+        settings: Option<&str>,
+    ) -> Result<Vec<u8>, Box<dyn Error>> {
+        for exporter in &self.exporters {
+            if exporter.name().eq_ignore_ascii_case(format) {
+                return exporter.write_with_settings(schematic, version, settings);
             }
         }
         Err(format!("Unsupported export format: {}", format).into())
@@ -118,6 +169,24 @@ impl FormatManager {
         }
         None
     }
+
+    pub fn get_export_settings_schema(&self, format: &str) -> Option<String> {
+        for exporter in &self.exporters {
+            if exporter.name().eq_ignore_ascii_case(format) {
+                return exporter.export_settings_schema();
+            }
+        }
+        None
+    }
+
+    pub fn get_import_settings_schema(&self, format: &str) -> Option<String> {
+        for importer in &self.importers {
+            if importer.name().eq_ignore_ascii_case(format) {
+                return importer.import_settings_schema();
+            }
+        }
+        None
+    }
 }
 
 pub static MANAGER: OnceLock<Arc<Mutex<FormatManager>>> = OnceLock::new();
@@ -132,6 +201,10 @@ pub fn get_manager() -> Arc<Mutex<FormatManager>> {
             manager.register_exporter(crate::formats::schematic::SchematicFormat);
             manager.register_importer(crate::formats::mcstructure::McStructureFormat);
             manager.register_exporter(crate::formats::mcstructure::McStructureFormat);
+            // MCA and WorldZip importers (registered last since detection is header-based)
+            manager.register_importer(crate::formats::world::McaFormat);
+            manager.register_importer(crate::formats::world::WorldZipFormat);
+            manager.register_exporter(crate::formats::world::WorldFormat);
             Arc::new(Mutex::new(manager))
         })
         .clone()

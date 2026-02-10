@@ -73,6 +73,10 @@ MchprsWorld.truth_table = WASM-specific truth table generation
 
 # --- Methods not expected in WASM ---
 [no_wasm]
+Schematic.from_world_directory = Filesystem not available in WASM
+Schematic.from_world_directory_bounded = Filesystem not available in WASM
+Schematic.save_world = Filesystem not available in WASM
+Schematic.from_file = Filesystem not available in WASM
 Schematic.all_blocks = FFI/Python naming convention (WASM uses blocks())
 # RawMeshExport: FFI short names not in WASM (WASM uses _flat suffix)
 RawMeshExport.positions = FFI naming (WASM: positions_flat)
@@ -107,7 +111,7 @@ Schematic.create_circuit_builder = WASM/FFI convenience (Python uses CircuitBuil
 DefinitionRegion.blocks = WASM/FFI method (returns blocks at positions)
 DefinitionRegion.clone_region = WASM/FFI alias for copy
 
-# --- Circuit ecosystem: not expected in FFI ---
+# --- Methods not expected in FFI ---
 [no_ffi]
 CircuitBuilder.* = Complex builder pattern requiring closures/state machines
 TypedCircuitExecutor.* = Complex stateful executor with callback patterns
@@ -136,3 +140,4 @@ ResourcePack.new = WASM constructor (FFI uses from_bytes)
 ResourcePack.stats = FFI exposes individual stat getters
 MultiMeshResult.all_meshes = Python convenience (FFI uses get_mesh)
 ChunkMeshResult.all_meshes = Python convenience (FFI uses get_mesh)
+MeshExporter.* = Mesh exporter registered via FormatManager (FFI uses schematic_register_mesh_exporter)

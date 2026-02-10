@@ -116,13 +116,9 @@ impl Entity {
         ]);
         compound.insert("Pos", NbtTag::List(pos_list));
 
-        // Convert HashMap<String, NbtValue> to NbtCompound
-        if !self.nbt.is_empty() {
-            let mut nbt_compound = NbtCompound::new();
-            for (key, value) in &self.nbt {
-                nbt_compound.insert(key, Self::value_to_nbt_tag(value));
-            }
-            compound.insert("NBT", NbtTag::Compound(nbt_compound));
+        // Write all NBT fields at top level (Minecraft's native format)
+        for (key, value) in &self.nbt {
+            compound.insert(key, Self::value_to_nbt_tag(value));
         }
 
         NbtTag::Compound(compound)
@@ -164,11 +160,24 @@ impl Entity {
             return Err("Invalid position data".to_string());
         };
 
-        // Get NBT data if it exists and convert it to HashMap<String, NbtValue>
+        // Get NBT data: first check for legacy "NBT" wrapper, then capture all top-level fields.
+        // Minecraft stores entity data (Health, Motion, Rotation, Passengers, etc.) as top-level
+        // fields, not in a nested "NBT" compound.
         let mut nbt_map = HashMap::new();
         if let Ok(entity_nbt) = nbt.get::<_, &NbtCompound>("NBT") {
+            // Legacy Nucleation format: data wrapped in "NBT" compound
             for (key, value) in entity_nbt.inner() {
                 nbt_map.insert(key.clone(), Self::nbt_tag_to_value(value));
+            }
+        } else {
+            // Minecraft native format: all data at top level
+            for (key, value) in nbt.inner() {
+                match key.as_str() {
+                    "id" | "Id" | "Pos" => continue, // Already handled
+                    _ => {
+                        nbt_map.insert(key.clone(), Self::nbt_tag_to_value(value));
+                    }
+                }
             }
         }
 
@@ -225,16 +234,17 @@ mod tests {
             assert_eq!(pos.get::<f64>(1).unwrap(), 2.0);
             assert_eq!(pos.get::<f64>(2).unwrap(), 3.0);
 
-            let nbt_data = compound.get::<_, &NbtCompound>("NBT").unwrap();
-            assert_eq!(nbt_data.get::<_, f32>("Health").unwrap(), 20.0);
-            assert_eq!(nbt_data.get::<_, &str>("CustomName").unwrap(), "Bob");
+            // Fields are at top level (Minecraft native format)
+            assert_eq!(compound.get::<_, f32>("Health").unwrap(), 20.0);
+            assert_eq!(compound.get::<_, &str>("CustomName").unwrap(), "Bob");
         } else {
             panic!("Expected Compound NBT tag");
         }
     }
 
     #[test]
-    fn test_entity_deserialization() {
+    fn test_entity_deserialization_legacy_nbt_wrapper() {
+        // Test legacy format with "NBT" wrapper compound
         let mut compound = NbtCompound::new();
         compound.insert("id", NbtTag::String("minecraft:creeper".to_string()));
 
@@ -262,6 +272,101 @@ mod tests {
     }
 
     #[test]
+    fn test_entity_deserialization_minecraft_native() {
+        // Test Minecraft native format with top-level fields
+        let mut compound = NbtCompound::new();
+        compound.insert("id", NbtTag::String("minecraft:creeper".to_string()));
+
+        let pos_list = NbtList::from(vec![
+            NbtTag::Double(1.0),
+            NbtTag::Double(2.0),
+            NbtTag::Double(3.0),
+        ]);
+        compound.insert("Pos", NbtTag::List(pos_list));
+
+        // Top-level fields (how Minecraft actually stores entity data)
+        compound.insert("Health", NbtTag::Float(20.0));
+        compound.insert("CustomName", NbtTag::String("Bob".to_string()));
+        compound.insert("Fire", NbtTag::Short(-1));
+        compound.insert("OnGround", NbtTag::Byte(1));
+
+        let motion = NbtList::from(vec![
+            NbtTag::Double(0.0),
+            NbtTag::Double(-0.078),
+            NbtTag::Double(0.0),
+        ]);
+        compound.insert("Motion", NbtTag::List(motion));
+
+        let rotation = NbtList::from(vec![NbtTag::Float(90.0), NbtTag::Float(0.0)]);
+        compound.insert("Rotation", NbtTag::List(rotation));
+
+        let entity = Entity::from_nbt(&compound).unwrap();
+
+        assert_eq!(entity.id, "minecraft:creeper");
+        assert_eq!(entity.position, (1.0, 2.0, 3.0));
+        assert_eq!(entity.nbt.get("Health"), Some(&NbtValue::Float(20.0)));
+        assert_eq!(
+            entity.nbt.get("CustomName"),
+            Some(&NbtValue::String("Bob".to_string()))
+        );
+        assert_eq!(entity.nbt.get("Fire"), Some(&NbtValue::Short(-1)));
+        assert_eq!(entity.nbt.get("OnGround"), Some(&NbtValue::Byte(1)));
+        assert!(entity.nbt.contains_key("Motion"));
+        assert!(entity.nbt.contains_key("Rotation"));
+    }
+
+    #[test]
+    fn test_entity_deserialization_with_passengers() {
+        // Test entity with Passengers (riding)
+        let mut compound = NbtCompound::new();
+        compound.insert("id", NbtTag::String("minecraft:pig".to_string()));
+        compound.insert(
+            "Pos",
+            NbtTag::List(NbtList::from(vec![
+                NbtTag::Double(10.0),
+                NbtTag::Double(64.0),
+                NbtTag::Double(20.0),
+            ])),
+        );
+        compound.insert("Health", NbtTag::Float(10.0));
+
+        // Add a passenger (riding entity)
+        let mut passenger = NbtCompound::new();
+        passenger.insert("id", NbtTag::String("minecraft:zombie".to_string()));
+        passenger.insert(
+            "Pos",
+            NbtTag::List(NbtList::from(vec![
+                NbtTag::Double(10.0),
+                NbtTag::Double(65.0),
+                NbtTag::Double(20.0),
+            ])),
+        );
+        passenger.insert("Health", NbtTag::Float(20.0));
+
+        let passengers = NbtList::from(vec![NbtTag::Compound(passenger)]);
+        compound.insert("Passengers", NbtTag::List(passengers));
+
+        let entity = Entity::from_nbt(&compound).unwrap();
+        assert_eq!(entity.id, "minecraft:pig");
+        assert!(entity.nbt.contains_key("Passengers"));
+
+        // Verify passengers data is preserved
+        if let Some(NbtValue::List(passengers)) = entity.nbt.get("Passengers") {
+            assert_eq!(passengers.len(), 1);
+            if let NbtValue::Compound(p) = &passengers[0] {
+                assert_eq!(
+                    p.get("id"),
+                    Some(&NbtValue::String("minecraft:zombie".to_string()))
+                );
+            } else {
+                panic!("Expected compound in passengers list");
+            }
+        } else {
+            panic!("Expected Passengers list");
+        }
+    }
+
+    #[test]
     fn test_complex_nbt_values() {
         let mut entity = Entity::new("minecraft:item".to_string(), (0.0, 0.0, 0.0));
 
@@ -284,11 +389,11 @@ mod tests {
         );
         entity
             .nbt
-            .insert("Compound".to_string(), NbtValue::Compound(nested_map));
+            .insert("NestedCompound".to_string(), NbtValue::Compound(nested_map));
 
         // Test list
         entity.nbt.insert(
-            "List".to_string(),
+            "Tags".to_string(),
             NbtValue::List(vec![
                 NbtValue::String("a".to_string()),
                 NbtValue::String("b".to_string()),
