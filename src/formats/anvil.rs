@@ -67,6 +67,10 @@ pub fn is_mca(data: &[u8]) -> bool {
     if data.len() < 8192 {
         return false;
     }
+    // Reject zip files (PK\x03\x04 magic) — these are handled by WorldZipFormat
+    if data[0] == 0x50 && data[1] == 0x4B && data[2] == 0x03 && data[3] == 0x04 {
+        return false;
+    }
     // Check for at least one valid location entry with offset >= 2
     for i in 0..1024 {
         let offset = i * 4;
@@ -759,10 +763,84 @@ fn build_chunk_nbt(chunk: &ChunkData) -> NbtCompound {
     }
     root.insert("block_entities", NbtTag::List(NbtList::from(be_list)));
 
-    // isLightOn
-    root.insert("isLightOn", NbtTag::Byte(1));
+    // Heightmaps (required by MC 1.18+ for status "minecraft:full")
+    root.insert(
+        "Heightmaps",
+        NbtTag::Compound(compute_heightmaps(chunk)),
+    );
+
+    // isLightOn = 0: tell Minecraft to recalculate lighting on load
+    root.insert("isLightOn", NbtTag::Byte(0));
 
     root
+}
+
+fn compute_heightmaps(chunk: &ChunkData) -> NbtCompound {
+    let world_min_y = chunk.y_pos * 16;
+    let mut motion_blocking = vec![0i32; 256];
+    let mut world_surface = vec![0i32; 256];
+
+    // Sort sections by Y descending so we scan from top down
+    let mut sorted_sections: Vec<&ChunkSection> = chunk.sections.iter().collect();
+    sorted_sections.sort_by(|a, b| b.y.cmp(&a.y));
+
+    for lz in 0..16usize {
+        for lx in 0..16usize {
+            let col_idx = lz * 16 + lx;
+
+            'outer: for section in &sorted_sections {
+                let section_base_y = (section.y as i32) * 16;
+                for ly in (0..16i32).rev() {
+                    let block_idx = (ly * 256 + lz as i32 * 16 + lx as i32) as usize;
+                    let palette_idx = section.block_states[block_idx] as usize;
+                    if palette_idx >= section.palette.len() {
+                        continue;
+                    }
+                    let name = &section.palette[palette_idx].name;
+                    if !matches!(
+                        name.as_str(),
+                        "minecraft:air" | "minecraft:cave_air" | "minecraft:void_air"
+                    ) {
+                        let world_y = section_base_y + ly;
+                        let hm_value = world_y - world_min_y + 1;
+                        motion_blocking[col_idx] = hm_value;
+                        world_surface[col_idx] = hm_value;
+                        break 'outer;
+                    }
+                }
+            }
+        }
+    }
+
+    let mut heightmaps = NbtCompound::new();
+    heightmaps.insert(
+        "MOTION_BLOCKING",
+        NbtTag::LongArray(pack_heightmap(&motion_blocking)),
+    );
+    heightmaps.insert(
+        "WORLD_SURFACE",
+        NbtTag::LongArray(pack_heightmap(&world_surface)),
+    );
+    heightmaps
+}
+
+/// Pack 256 heightmap values into a long array (9 bits per entry, entries don't span longs).
+fn pack_heightmap(values: &[i32]) -> Vec<i64> {
+    let bits_per_entry: usize = 9;
+    let entries_per_long = 64 / bits_per_entry; // 7
+    let num_longs = (256 + entries_per_long - 1) / entries_per_long; // 37
+    let mask = (1u64 << bits_per_entry) - 1;
+
+    let mut packed = vec![0i64; num_longs];
+
+    for (i, &value) in values.iter().enumerate().take(256) {
+        let long_index = i / entries_per_long;
+        let bit_offset = (i % entries_per_long) * bits_per_entry;
+        let v = (value as u64) & mask;
+        packed[long_index] |= (v << bit_offset) as i64;
+    }
+
+    packed
 }
 
 fn build_section_nbt(section: &ChunkSection) -> NbtCompound {

@@ -29,22 +29,34 @@ pub type WorldFiles = HashMap<String, Vec<u8>>;
 pub struct WorldExportOptions {
     #[serde(default = "default_world_name")]
     pub world_name: String,
+    /// 0=Survival, 1=Creative, 2=Adventure, 3=Spectator
     #[serde(default = "default_game_mode")]
     pub game_mode: i32,
+    /// 0=Peaceful, 1=Easy, 2=Normal, 3=Hard
     #[serde(default)]
     pub difficulty: i32,
+    /// World spawn position (x, y, z)
     #[serde(default)]
     pub spawn_position: Option<(i32, i32, i32)>,
+    /// Minecraft data version (4671 = 1.21.4)
     #[serde(default = "default_data_version")]
     pub data_version: i32,
+    /// Minecraft version string (e.g. "1.21.4")
+    #[serde(default = "default_version_name")]
+    pub version_name: String,
+    /// Use void/superflat world generation
     #[serde(default = "default_true")]
     pub void_world: bool,
+    /// Block coordinate offset for placement
     #[serde(default)]
     pub offset: (i32, i32, i32),
+    /// Enable cheats/commands
     #[serde(default = "default_true")]
     pub allow_commands: bool,
+    /// Fixed time of day (None = normal day cycle)
     #[serde(default = "default_day_time")]
     pub day_time: Option<i64>,
+    /// Disable mob spawning
     #[serde(default = "default_true")]
     pub disable_mob_spawning: bool,
 }
@@ -56,7 +68,10 @@ fn default_game_mode() -> i32 {
     1
 }
 fn default_data_version() -> i32 {
-    3700
+    4671
+}
+fn default_version_name() -> String {
+    "1.21.4".to_string()
 }
 fn default_true() -> bool {
     true
@@ -73,6 +88,7 @@ impl Default for WorldExportOptions {
             difficulty: 0,
             spawn_position: None,
             data_version: default_data_version(),
+            version_name: default_version_name(),
             void_world: true,
             offset: (0, 0, 0),
             allow_commands: true,
@@ -206,8 +222,10 @@ impl SchematicExporter for WorldFormat {
         schematic: &UniversalSchematic,
         _version: Option<&str>,
     ) -> Result<Vec<u8>, Box<dyn Error>> {
+        let opts = WorldExportOptions::default();
         let files = to_world(schematic, None)?;
-        zip_world_files(&files)
+        let prefixed = prefix_world_files(&files, &opts.world_name);
+        zip_world_files(&prefixed)
     }
 
     fn write_with_settings(
@@ -218,13 +236,26 @@ impl SchematicExporter for WorldFormat {
     ) -> Result<Vec<u8>, Box<dyn Error>> {
         let options: Option<WorldExportOptions> =
             settings.map(|s| serde_json::from_str(s)).transpose()?;
+        let world_name = options
+            .as_ref()
+            .map(|o| o.world_name.clone())
+            .unwrap_or_else(default_world_name);
         let files = to_world(schematic, options)?;
-        zip_world_files(&files)
+        let prefixed = prefix_world_files(&files, &world_name);
+        zip_world_files(&prefixed)
     }
 
     fn export_settings_schema(&self) -> Option<String> {
         serde_json::to_string_pretty(&WorldExportOptions::default()).ok()
     }
+}
+
+/// Add a wrapper directory prefix to all file paths in a WorldFiles map.
+fn prefix_world_files(files: &WorldFiles, world_name: &str) -> WorldFiles {
+    files
+        .iter()
+        .map(|(k, v)| (format!("{}/{}", world_name, k), v.clone()))
+        .collect()
 }
 
 /// Zip a WorldFiles HashMap into a single byte buffer.
@@ -256,8 +287,13 @@ pub fn to_world_zip(
     schematic: &UniversalSchematic,
     options: Option<WorldExportOptions>,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
+    let world_name = options
+        .as_ref()
+        .map(|o| o.world_name.clone())
+        .unwrap_or_else(default_world_name);
     let files = to_world(schematic, options)?;
-    zip_world_files(&files)
+    let prefixed = prefix_world_files(&files, &world_name);
+    zip_world_files(&prefixed)
 }
 
 // ─── Import: Single MCA ────────────────────────────────────────────────────
@@ -871,93 +907,117 @@ impl SectionBuilder {
 fn generate_level_dat(opts: &WorldExportOptions) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut data = NbtCompound::new();
 
-    // Basic world settings
-    data.insert("LevelName", NbtTag::String(opts.world_name.clone()));
+    // ── Core identity ────────────────────────────────────────────────────
     data.insert("DataVersion", NbtTag::Int(opts.data_version));
+    data.insert("LevelName", NbtTag::String(opts.world_name.clone()));
+    data.insert("version", NbtTag::Int(19133)); // NBT format version
+
+    let mut version = NbtCompound::new();
+    version.insert("Id", NbtTag::Int(opts.data_version));
+    version.insert("Name", NbtTag::String(opts.version_name.clone()));
+    version.insert("Series", NbtTag::String("main".to_string()));
+    version.insert("Snapshot", NbtTag::Byte(0));
+    data.insert("Version", NbtTag::Compound(version));
+
+    // ── Gameplay settings ────────────────────────────────────────────────
     data.insert("GameType", NbtTag::Int(opts.game_mode));
     data.insert("Difficulty", NbtTag::Byte(opts.difficulty as i8));
+    data.insert("DifficultyLocked", NbtTag::Byte(0));
     data.insert(
         "allowCommands",
         NbtTag::Byte(if opts.allow_commands { 1 } else { 0 }),
     );
     data.insert("hardcore", NbtTag::Byte(0));
+    data.insert("initialized", NbtTag::Byte(1));
 
-    // Spawn position
+    // ── Spawn position (1.21+ uses spawn compound) ───────────────────────
     let (sx, sy, sz) = opts.spawn_position.unwrap_or((0, 64, 0));
-    data.insert("SpawnX", NbtTag::Int(sx));
-    data.insert("SpawnY", NbtTag::Int(sy));
-    data.insert("SpawnZ", NbtTag::Int(sz));
+    let mut spawn = NbtCompound::new();
+    spawn.insert("dimension", NbtTag::String("minecraft:overworld".to_string()));
+    spawn.insert("pos", NbtTag::IntArray(vec![sx, sy, sz]));
+    spawn.insert("yaw", NbtTag::Float(0.0));
+    spawn.insert("pitch", NbtTag::Float(0.0));
+    data.insert("spawn", NbtTag::Compound(spawn));
 
-    // Time settings
+    // ── Time settings ────────────────────────────────────────────────────
     data.insert("DayTime", NbtTag::Long(opts.day_time.unwrap_or(6000)));
     data.insert("Time", NbtTag::Long(0));
 
-    // Version compound
-    let mut version = NbtCompound::new();
-    version.insert("Id", NbtTag::Int(opts.data_version));
-    version.insert("Name", NbtTag::String("1.21.1".to_string()));
-    version.insert("Snapshot", NbtTag::Byte(0));
-    data.insert("Version", NbtTag::Compound(version));
+    // ── Timestamp ────────────────────────────────────────────────────────
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64;
+    data.insert("LastPlayed", NbtTag::Long(now_ms));
 
-    // Game rules
+    // ── Weather ──────────────────────────────────────────────────────────
+    data.insert("raining", NbtTag::Byte(0));
+    data.insert("rainTime", NbtTag::Int(0));
+    data.insert("thundering", NbtTag::Byte(0));
+    data.insert("thunderTime", NbtTag::Int(0));
+    data.insert("clearWeatherTime", NbtTag::Int(0));
+
+    // ── Game rules (1.21+ format: minecraft: prefix, Byte/Int values) ───
     let mut game_rules = NbtCompound::new();
     game_rules.insert(
-        "doDaylightCycle",
-        NbtTag::String(
-            if opts.day_time.is_some() {
-                "false"
-            } else {
-                "true"
-            }
-            .to_string(),
-        ),
+        "minecraft:advance_time",
+        NbtTag::Byte(if opts.day_time.is_some() { 0 } else { 1 }),
     );
+    game_rules.insert("minecraft:advance_weather", NbtTag::Byte(0));
+    game_rules.insert("minecraft:block_drops", NbtTag::Byte(1));
+    game_rules.insert("minecraft:command_blocks_work", NbtTag::Byte(1));
+    game_rules.insert("minecraft:command_block_output", NbtTag::Byte(0));
+    game_rules.insert("minecraft:drowning_damage", NbtTag::Byte(1));
+    game_rules.insert("minecraft:fall_damage", NbtTag::Byte(1));
+    game_rules.insert("minecraft:fire_damage", NbtTag::Byte(1));
+    game_rules.insert("minecraft:fire_spread_radius_around_player", NbtTag::Int(0));
+    game_rules.insert("minecraft:keep_inventory", NbtTag::Byte(1));
+    game_rules.insert("minecraft:mob_griefing", NbtTag::Byte(0));
+    game_rules.insert("minecraft:mob_drops", NbtTag::Byte(0));
+    game_rules.insert("minecraft:natural_health_regeneration", NbtTag::Byte(1));
+    game_rules.insert("minecraft:pvp", NbtTag::Byte(1));
+    game_rules.insert("minecraft:random_tick_speed", NbtTag::Int(3));
+    game_rules.insert("minecraft:send_command_feedback", NbtTag::Byte(1));
+    game_rules.insert("minecraft:show_death_messages", NbtTag::Byte(1));
     game_rules.insert(
-        "doMobSpawning",
-        NbtTag::String(
-            if opts.disable_mob_spawning {
-                "false"
-            } else {
-                "true"
-            }
-            .to_string(),
-        ),
+        "minecraft:spawn_mobs",
+        NbtTag::Byte(if opts.disable_mob_spawning { 0 } else { 1 }),
     );
-    game_rules.insert("doWeatherCycle", NbtTag::String("false".to_string()));
-    game_rules.insert("keepInventory", NbtTag::String("true".to_string()));
-    data.insert("GameRules", NbtTag::Compound(game_rules));
+    game_rules.insert("minecraft:spawn_monsters", NbtTag::Byte(1));
+    game_rules.insert("minecraft:spawn_patrols", NbtTag::Byte(0));
+    game_rules.insert("minecraft:spawn_phantoms", NbtTag::Byte(0));
+    game_rules.insert("minecraft:spawn_wandering_traders", NbtTag::Byte(0));
+    game_rules.insert("minecraft:tnt_explodes", NbtTag::Byte(1));
+    data.insert("game_rules", NbtTag::Compound(game_rules));
 
-    // World generation settings (void/superflat)
+    // ── World generation settings (void/superflat) ───────────────────────
     if opts.void_world {
         let mut world_gen = NbtCompound::new();
         world_gen.insert("bonus_chest", NbtTag::Byte(0));
         world_gen.insert("seed", NbtTag::Long(0));
         world_gen.insert("generate_features", NbtTag::Byte(0));
 
-        // Dimensions
         let mut dimensions = NbtCompound::new();
 
-        // Overworld
+        // Overworld (flat/void)
         let mut overworld = NbtCompound::new();
         overworld.insert("type", NbtTag::String("minecraft:overworld".to_string()));
-
         let mut generator = NbtCompound::new();
         generator.insert("type", NbtTag::String("minecraft:flat".to_string()));
-
         let mut flat_settings = NbtCompound::new();
         flat_settings.insert("biome", NbtTag::String("minecraft:the_void".to_string()));
+        flat_settings.insert("features", NbtTag::Byte(0));
+        flat_settings.insert("lakes", NbtTag::Byte(0));
         flat_settings.insert("layers", NbtTag::List(NbtList::new()));
-
-        // Structure overrides (empty)
-        let mut structure_overrides = NbtCompound::new();
-        structure_overrides.insert("structures", NbtTag::Compound(NbtCompound::new()));
-        flat_settings.insert("structure_overrides", NbtTag::Compound(structure_overrides));
-
+        flat_settings.insert(
+            "structure_overrides",
+            NbtTag::List(NbtList::new()),
+        );
         generator.insert("settings", NbtTag::Compound(flat_settings));
         overworld.insert("generator", NbtTag::Compound(generator));
         dimensions.insert("minecraft:overworld", NbtTag::Compound(overworld));
 
-        // The Nether (empty)
+        // The Nether
         let mut nether = NbtCompound::new();
         nether.insert("type", NbtTag::String("minecraft:the_nether".to_string()));
         let mut nether_gen = NbtCompound::new();
@@ -975,7 +1035,7 @@ fn generate_level_dat(opts: &WorldExportOptions) -> Result<Vec<u8>, Box<dyn Erro
         nether.insert("generator", NbtTag::Compound(nether_gen));
         dimensions.insert("minecraft:the_nether", NbtTag::Compound(nether));
 
-        // The End (empty)
+        // The End
         let mut end = NbtCompound::new();
         end.insert("type", NbtTag::String("minecraft:the_end".to_string()));
         let mut end_gen = NbtCompound::new();
@@ -996,7 +1056,7 @@ fn generate_level_dat(opts: &WorldExportOptions) -> Result<Vec<u8>, Box<dyn Erro
         data.insert("WorldGenSettings", NbtTag::Compound(world_gen));
     }
 
-    // DataPacks
+    // ── Data packs ───────────────────────────────────────────────────────
     let mut data_packs = NbtCompound::new();
     data_packs.insert(
         "Enabled",
@@ -1005,13 +1065,27 @@ fn generate_level_dat(opts: &WorldExportOptions) -> Result<Vec<u8>, Box<dyn Erro
     data_packs.insert("Disabled", NbtTag::List(NbtList::new()));
     data.insert("DataPacks", NbtTag::Compound(data_packs));
 
-    // Wrap in root "Data" compound
+    // ── Misc ─────────────────────────────────────────────────────────────
+    data.insert("ServerBrands", NbtTag::List(NbtList::from(vec![NbtTag::String("vanilla".to_string())])));
+    data.insert("WasModded", NbtTag::Byte(0));
+    data.insert("WanderingTraderSpawnChance", NbtTag::Int(25));
+    data.insert("WanderingTraderSpawnDelay", NbtTag::Int(24000));
+    data.insert("ScheduledEvents", NbtTag::List(NbtList::new()));
+
+    // Dragon fight defaults
+    let mut dragon_fight = NbtCompound::new();
+    dragon_fight.insert("DragonKilled", NbtTag::Byte(0));
+    dragon_fight.insert("PreviouslyKilled", NbtTag::Byte(0));
+    dragon_fight.insert("NeedsStateScanning", NbtTag::Byte(1));
+    data.insert("DragonFight", NbtTag::Compound(dragon_fight));
+
+    // ── Wrap in root "Data" compound ─────────────────────────────────────
     let mut root = NbtCompound::new();
     root.insert("Data", NbtTag::Compound(data));
 
-    // Serialize and gzip compress
+    // ── Serialize and gzip compress ──────────────────────────────────────
     let mut nbt_bytes = Vec::new();
-    quartz_nbt::io::write_nbt(&mut nbt_bytes, None, &root, Flavor::Uncompressed)?;
+    quartz_nbt::io::write_nbt(&mut nbt_bytes, Some(""), &root, Flavor::Uncompressed)?;
 
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
     encoder.write_all(&nbt_bytes)?;
@@ -1042,6 +1116,8 @@ mod tests {
         assert_eq!(opts.world_name, "Nucleation Export");
         assert_eq!(opts.game_mode, 1);
         assert_eq!(opts.difficulty, 0);
+        assert_eq!(opts.data_version, 4671);
+        assert_eq!(opts.version_name, "1.21.4");
         assert!(opts.void_world);
         assert!(opts.allow_commands);
         assert_eq!(opts.day_time, Some(6000));

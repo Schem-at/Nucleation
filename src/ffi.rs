@@ -13,10 +13,36 @@ use crate::{
     universal_schematic::ChunkLoadingStrategy,
     BlockState, SchematicBuilder, UniversalSchematic,
 };
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_float, c_int, c_uchar};
 use std::ptr;
+
+// --- Last Error ---
+
+thread_local! {
+    static LAST_ERROR: RefCell<Option<String>> = RefCell::new(None);
+}
+
+fn set_last_error(msg: String) {
+    eprintln!("[nucleation] {}", &msg);
+    LAST_ERROR.with(|e| *e.borrow_mut() = Some(msg));
+}
+
+/// Returns the last error message as a C string.
+/// Caller must free the returned pointer with `schematic_free_string`.
+/// Returns null if no error.
+#[no_mangle]
+pub extern "C" fn schematic_last_error() -> *mut c_char {
+    LAST_ERROR.with(|e| {
+        let err = e.borrow();
+        match err.as_ref() {
+            Some(msg) => CString::new(msg.as_str()).unwrap_or_default().into_raw(),
+            None => ptr::null_mut(),
+        }
+    })
+}
 
 // --- C-Compatible Data Structures ---
 
@@ -282,9 +308,14 @@ pub extern "C" fn schematic_from_data(
             *s = res;
             0
         }
-        Err(_) => {
+        Err(e) => {
+            let detected = manager.detect_format(data_slice);
+            set_last_error(format!(
+                "schematic_from_data: detected={:?}, len={}, error={}",
+                detected, data_len, e
+            ));
             // Check if any format was detected but failed to parse
-            if manager.detect_format(data_slice).is_some() {
+            if detected.is_some() {
                 -2 // Parse error
             } else {
                 -3 // Unknown format
