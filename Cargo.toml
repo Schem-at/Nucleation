@@ -73,7 +73,7 @@ ext-php-rs = { version = "0.13.1", optional = true }
 bytemuck = "1.23.1"
 
 # Meshing dependencies - optional
-schematic-mesher = { git = "https://github.com/Schem-at/Schematic-Mesher.git", rev = "01e4c4b9999226c8d862e0f229d72cab8e5a8b93", optional = true }
+schematic-mesher = { git = "https://github.com/Schem-at/Schematic-Mesher.git", rev = "8a98d52", optional = true }
 
 # Simulation (MCHPRS) dependencies - optional
 # Note: These are git dependencies and will be excluded from crates.io publish
