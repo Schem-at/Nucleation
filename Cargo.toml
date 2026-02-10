@@ -1,6 +1,6 @@
 [package]
 name = "nucleation"
-version = "0.1.154"
+version = "0.1.155"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -73,7 +73,7 @@ ext-php-rs = { version = "0.13.1", optional = true }
 bytemuck = "1.23.1"
 
 # Meshing dependencies - optional
-schematic-mesher = { git = "https://github.com/Schem-at/Schematic-Mesher.git", rev = "8a98d52", optional = true }
+schematic-mesher = { git = "https://github.com/Schem-at/Schematic-Mesher.git", rev = "fd30f3c", optional = true }
 
 # Simulation (MCHPRS) dependencies - optional
 # Note: These are git dependencies and will be excluded from crates.io publish
