@@ -1482,6 +1482,304 @@ mod tests {
         assert_eq!(polled.len(), 0, "Queue should be empty after clear");
     }
 
+    // ============================================================================
+    // Comparator-based IO Tests
+    // These tests verify that set_signal_strength/get_signal_strength work on
+    // comparator nodes (not just wires), enabling fixed IO ports in frame walls.
+    // ============================================================================
+
+    fn create_comparator_to_lamp_circuit() -> UniversalSchematic {
+        let mut schematic = UniversalSchematic::new("Comparator to Lamp".to_string());
+
+        // Base layer: 5 blocks of concrete
+        for x in 0..5 {
+            schematic.set_block(x, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+        }
+
+        // Comparator at x=0 facing east (output goes east toward lamp)
+        schematic.set_block_str(
+            0,
+            1,
+            0,
+            "minecraft:comparator[facing=west,mode=compare,powered=false]",
+        );
+
+        // Redstone wire chain from comparator output to lamp
+        for x in 1..4 {
+            schematic.set_block_str(
+                x,
+                1,
+                0,
+                "minecraft:redstone_wire[power=0,east=side,west=side,north=none,south=none]",
+            );
+        }
+
+        // Lamp at the end
+        schematic.set_block_str(4, 1, 0, "minecraft:redstone_lamp[lit=false]");
+
+        schematic
+    }
+
+    #[test]
+    fn test_comparator_signal_injection() {
+        // Test that set_signal_strength works on a comparator node
+        let schematic = create_comparator_to_lamp_circuit();
+        let comp_pos = BlockPos::new(0, 1, 0);
+
+        let options = SimulationOptions {
+            custom_io: vec![comp_pos],
+            ..Default::default()
+        };
+
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // Initially comparator should have 0 signal
+        let initial = world.get_signal_strength(comp_pos);
+        assert_eq!(initial, 0, "Comparator should start at 0");
+
+        // Inject signal strength 15 into the comparator
+        world.set_signal_strength(comp_pos, 15);
+        world.tick(5);
+        world.flush();
+
+        // Comparator should now read 15
+        let signal = world.get_signal_strength(comp_pos);
+        assert_eq!(
+            signal, 15,
+            "Comparator should have signal 15 after injection"
+        );
+    }
+
+    #[test]
+    fn test_comparator_direct_to_lamp() {
+        // Test comparator DIRECTLY adjacent to lamp (no wires)
+        // This validates that set_signal_strength propagates through the compiled graph
+        let mut schematic = UniversalSchematic::new("Comparator Direct Lamp".to_string());
+
+        // Base
+        schematic.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+        schematic.set_block(1, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+
+        // Comparator facing west (output goes east) at (0,1,0)
+        schematic.set_block_str(
+            0,
+            1,
+            0,
+            "minecraft:comparator[facing=west,mode=compare,powered=false]",
+        );
+
+        // Lamp directly adjacent at (1,1,0)
+        schematic.set_block_str(1, 1, 0, "minecraft:redstone_lamp[lit=false]");
+
+        let comp_pos = BlockPos::new(0, 1, 0);
+        let lamp_pos = BlockPos::new(1, 1, 0);
+
+        let options = SimulationOptions {
+            custom_io: vec![comp_pos],
+            ..Default::default()
+        };
+
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // Verify both nodes exist in graph
+        assert!(world.has_node(comp_pos), "Comparator should be in graph");
+        assert!(world.has_node(lamp_pos), "Lamp should be in graph");
+
+        // Lamp should start off
+        assert!(!world.is_lit(lamp_pos), "Lamp should start off");
+
+        // Inject signal and flush (no tick needed - lamp lights immediately)
+        world.set_signal_strength(comp_pos, 15);
+        world.flush();
+
+        assert!(world.is_lit(lamp_pos), "Lamp should be lit after set+flush");
+    }
+
+    #[test]
+    fn test_comparator_injection_lights_lamp() {
+        // Test that injecting signal into a comparator propagates through wires to light a lamp
+        let schematic = create_comparator_to_lamp_circuit();
+        let comp_pos = BlockPos::new(0, 1, 0);
+        let lamp_pos = BlockPos::new(4, 1, 0);
+
+        let options = SimulationOptions {
+            custom_io: vec![comp_pos],
+            ..Default::default()
+        };
+
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // Diagnostic: check nodes in graph
+        assert!(world.has_node(comp_pos), "Comparator should be in graph");
+        assert!(world.has_node(lamp_pos), "Lamp should be in graph");
+
+        // Lamp should start off
+        assert!(!world.is_lit(lamp_pos), "Lamp should start off");
+
+        // Inject signal into comparator
+        world.set_signal_strength(comp_pos, 15);
+
+        // Verify comparator was set
+        let comp_signal = world.get_signal_strength(comp_pos);
+        assert_eq!(comp_signal, 15, "Comparator should be 15 after set");
+
+        world.tick(10);
+        world.flush();
+
+        // Lamp should now be lit
+        assert!(
+            world.is_lit(lamp_pos),
+            "Lamp should be lit after injecting signal into comparator"
+        );
+    }
+
+    #[test]
+    fn test_comparator_signal_read_after_circuit() {
+        // Test that get_signal_strength correctly reads a comparator's output
+        // when it's naturally powered by a circuit (barrel -> comparator)
+        let mut schematic = UniversalSchematic::new("Barrel Comparator Read".to_string());
+
+        for x in 0..3 {
+            schematic.set_block(x, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+        }
+
+        // Barrel with signal 10 at x=0
+        schematic
+            .set_block_from_string(0, 1, 0, "minecraft:barrel[facing=north]{signal=10}")
+            .expect("Failed to set barrel");
+
+        // Comparator reading from barrel at x=1, facing west (reading east)
+        schematic.set_block_str(
+            1,
+            1,
+            0,
+            "minecraft:comparator[facing=west,mode=compare,powered=false]",
+        );
+
+        // Wire at x=2 to receive output
+        schematic.set_block_str(
+            2,
+            1,
+            0,
+            "minecraft:redstone_wire[power=0,east=side,west=side,north=none,south=none]",
+        );
+
+        let comp_pos = BlockPos::new(1, 1, 0);
+
+        let options = SimulationOptions {
+            custom_io: vec![comp_pos],
+            ..Default::default()
+        };
+
+        let world = MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // Comparator should read the barrel's signal via get_signal_strength
+        let signal = world.get_signal_strength(comp_pos);
+        assert_eq!(signal, 10, "Comparator should output signal 10 from barrel");
+    }
+
+    #[test]
+    fn test_comparator_analog_values() {
+        // Test that comparators properly handle intermediate signal strengths (0-15)
+        let schematic = create_comparator_to_lamp_circuit();
+        let comp_pos = BlockPos::new(0, 1, 0);
+
+        let options = SimulationOptions {
+            custom_io: vec![comp_pos],
+            ..Default::default()
+        };
+
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // Test various analog values
+        for strength in [0, 1, 5, 7, 10, 14, 15] {
+            world.set_signal_strength(comp_pos, strength);
+            world.tick(2);
+            world.flush();
+
+            let read = world.get_signal_strength(comp_pos);
+            assert_eq!(
+                read, strength,
+                "Comparator should maintain signal strength {}",
+                strength
+            );
+        }
+    }
+
+    #[test]
+    fn test_two_comparators_in_out() {
+        // Test the actual Hardwired IO port use case:
+        // IN comparator -> wire -> OUT comparator
+        // Inject signal into IN, read from OUT
+        let mut schematic = UniversalSchematic::new("IN/OUT Comparator Pair".to_string());
+
+        // Base layer
+        for x in 0..5 {
+            schematic.set_block(x, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+        }
+
+        // IN comparator at x=0, facing west (output goes east into frame)
+        schematic.set_block_str(
+            0,
+            1,
+            0,
+            "minecraft:comparator[facing=west,mode=compare,powered=false]",
+        );
+
+        // Wire chain inside frame
+        for x in 1..4 {
+            schematic.set_block_str(
+                x,
+                1,
+                0,
+                "minecraft:redstone_wire[power=0,east=side,west=side,north=none,south=none]",
+            );
+        }
+
+        // OUT comparator at x=4, facing east (reads from frame interior)
+        schematic.set_block_str(
+            4,
+            1,
+            0,
+            "minecraft:comparator[facing=east,mode=compare,powered=false]",
+        );
+
+        let in_pos = BlockPos::new(0, 1, 0);
+        let out_pos = BlockPos::new(4, 1, 0);
+
+        let options = SimulationOptions {
+            custom_io: vec![in_pos, out_pos],
+            ..Default::default()
+        };
+
+        let mut world =
+            MchprsWorld::with_options(schematic, options).expect("World creation failed");
+
+        // Initially both should be 0
+        assert_eq!(world.get_signal_strength(in_pos), 0);
+        assert_eq!(world.get_signal_strength(out_pos), 0);
+
+        // Inject signal into IN comparator
+        world.set_signal_strength(in_pos, 15);
+        world.tick(10);
+        world.flush();
+
+        // IN should still be 15
+        assert_eq!(world.get_signal_strength(in_pos), 15);
+
+        // OUT comparator should have received signal (minus wire attenuation)
+        let out_signal = world.get_signal_strength(out_pos);
+        assert!(
+            out_signal > 0,
+            "OUT comparator should receive signal from IN comparator, got {}",
+            out_signal
+        );
+    }
+
     #[test]
     fn test_comparator_reading_barrel_signal_strengths() {
         // Test that comparators correctly read signal strength from barrels

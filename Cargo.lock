@@ -1018,9 +1018,9 @@ checksum = "3a3076410a55c90011c298b04d0cfa770b00fa04e1e3c97d3f6c9de105a03844"
 
 [[package]]
 name = "fixedbitset"
-version = "0.5.7"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d674e81391d1e1ab681a28d99df07927c6d4aa5b027d7da16ba32d1d21ecd99"
+checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flate2"
@@ -1484,6 +1484,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "instant"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0242819d153cba4b4b05a5a8f2a7e9bbf97b6055b2a002b395c96b5ff3c0222"
+dependencies = [
+ "cfg-if 1.0.4",
+]
+
+[[package]]
 name = "is-terminal"
 version = "0.4.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1759,7 +1768,7 @@ dependencies = [
 [[package]]
 name = "mchprs_blocks"
 version = "0.4.1"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=541c0b2e96857a6abaa567755c3fbb6c7f5be971#541c0b2e96857a6abaa567755c3fbb6c7f5be971"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=c91e5a7edd8e3d9f1008b11008f1a24caad2f45d#c91e5a7edd8e3d9f1008b11008f1a24caad2f45d"
 dependencies = [
  "hematite-nbt",
  "mchprs_proc_macros",
@@ -1770,19 +1779,21 @@ dependencies = [
 [[package]]
 name = "mchprs_proc_macros"
 version = "0.4.1"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=541c0b2e96857a6abaa567755c3fbb6c7f5be971#541c0b2e96857a6abaa567755c3fbb6c7f5be971"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=c91e5a7edd8e3d9f1008b11008f1a24caad2f45d#c91e5a7edd8e3d9f1008b11008f1a24caad2f45d"
 dependencies = [
  "quote",
- "syn 2.0.111",
+ "syn 1.0.109",
 ]
 
 [[package]]
 name = "mchprs_redpiler"
 version = "0.1.0"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=541c0b2e96857a6abaa567755c3fbb6c7f5be971#541c0b2e96857a6abaa567755c3fbb6c7f5be971"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=c91e5a7edd8e3d9f1008b11008f1a24caad2f45d#c91e5a7edd8e3d9f1008b11008f1a24caad2f45d"
 dependencies = [
+ "console",
  "enum_dispatch",
- "itertools 0.14.0",
+ "instant",
+ "itertools 0.13.0",
  "mchprs_blocks",
  "mchprs_redstone",
  "mchprs_world",
@@ -1792,12 +1803,13 @@ dependencies = [
  "serde_json",
  "smallvec",
  "tracing",
+ "web-sys",
 ]
 
 [[package]]
 name = "mchprs_redstone"
 version = "0.1.0"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=541c0b2e96857a6abaa567755c3fbb6c7f5be971#541c0b2e96857a6abaa567755c3fbb6c7f5be971"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=c91e5a7edd8e3d9f1008b11008f1a24caad2f45d#c91e5a7edd8e3d9f1008b11008f1a24caad2f45d"
 dependencies = [
  "mchprs_blocks",
  "mchprs_world",
@@ -1808,14 +1820,15 @@ dependencies = [
 [[package]]
 name = "mchprs_utils"
 version = "0.4.1"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=541c0b2e96857a6abaa567755c3fbb6c7f5be971#541c0b2e96857a6abaa567755c3fbb6c7f5be971"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=c91e5a7edd8e3d9f1008b11008f1a24caad2f45d#c91e5a7edd8e3d9f1008b11008f1a24caad2f45d"
 
 [[package]]
 name = "mchprs_world"
 version = "0.4.1"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=541c0b2e96857a6abaa567755c3fbb6c7f5be971#541c0b2e96857a6abaa567755c3fbb6c7f5be971"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=c91e5a7edd8e3d9f1008b11008f1a24caad2f45d#c91e5a7edd8e3d9f1008b11008f1a24caad2f45d"
 dependencies = [
  "hematite-nbt",
+ "itertools 0.13.0",
  "mchprs_blocks",
  "rustc-hash 2.1.1",
  "serde",
@@ -2186,9 +2199,9 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
 name = "petgraph"
-version = "0.7.1"
+version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3672b37090dbd86368a4145bc067582552b29c27377cad4e0a306c97f9bd7772"
+checksum = "b4c5cc86750666a3ed20bdaf5ca2a0344f9c67674cae0515bec2da16fbaa47db"
 dependencies = [
  "fixedbitset",
  "indexmap",
@@ -2624,7 +2637,7 @@ dependencies = [
 [[package]]
 name = "redpiler_graph"
 version = "0.4.1"
-source = "git+https://github.com/Nano112/MCHPRS.git?rev=541c0b2e96857a6abaa567755c3fbb6c7f5be971#541c0b2e96857a6abaa567755c3fbb6c7f5be971"
+source = "git+https://github.com/Nano112/MCHPRS.git?rev=c91e5a7edd8e3d9f1008b11008f1a24caad2f45d#c91e5a7edd8e3d9f1008b11008f1a24caad2f45d"
 dependencies = [
  "bincode",
  "serde",

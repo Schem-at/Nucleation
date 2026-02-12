@@ -80,11 +80,11 @@ schematic-mesher = { git = "https://github.com/Schem-at/Schematic-Mesher.git", r
 # Note: These are git dependencies and will be excluded from crates.io publish
 # Using Nano112's MCHPRS fork with custom IO support and bug fixes
 # Networking is disabled to avoid WASM compatibility issues
-# Rev 541c0b2: Latest bug fixes from Nano112's MCHPRS fork
-mchprs_redpiler = { git = "https://github.com/Nano112/MCHPRS.git", rev = "541c0b2e96857a6abaa567755c3fbb6c7f5be971", optional = true }
-mchprs_redstone = { git = "https://github.com/Nano112/MCHPRS.git", rev = "541c0b2e96857a6abaa567755c3fbb6c7f5be971", optional = true }
-mchprs_world = { git = "https://github.com/Nano112/MCHPRS.git", rev = "541c0b2e96857a6abaa567755c3fbb6c7f5be971", optional = true, default-features = false }
-mchprs_blocks = { git = "https://github.com/Nano112/MCHPRS.git", rev = "541c0b2e96857a6abaa567755c3fbb6c7f5be971", optional = true }
+# Rev c91e5a7: Fix constant_fold for custom_io + wire-to-node edges + set/get_signal_strength
+mchprs_redpiler = { git = "https://github.com/Nano112/MCHPRS.git", rev = "c91e5a7edd8e3d9f1008b11008f1a24caad2f45d", optional = true }
+mchprs_redstone = { git = "https://github.com/Nano112/MCHPRS.git", rev = "c91e5a7edd8e3d9f1008b11008f1a24caad2f45d", optional = true }
+mchprs_world = { git = "https://github.com/Nano112/MCHPRS.git", rev = "c91e5a7edd8e3d9f1008b11008f1a24caad2f45d", optional = true, default-features = false }
+mchprs_blocks = { git = "https://github.com/Nano112/MCHPRS.git", rev = "c91e5a7edd8e3d9f1008b11008f1a24caad2f45d", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
