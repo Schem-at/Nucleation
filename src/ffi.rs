@@ -4074,6 +4074,46 @@ pub mod simulation_ffi {
         }
     }
 
+    /// Creates a new MchprsWorld from a Schematic with custom IO positions.
+    ///
+    /// `custom_io_positions`: pointer to array of [x, y, z, x, y, z, ...] i32 values
+    /// `custom_io_count`: number of positions (i.e., array length / 3)
+    /// Returns null on error. Caller must free with `mchprs_world_free`.
+    #[no_mangle]
+    pub extern "C" fn mchprs_world_new_with_custom_io(
+        schematic: *const SchematicWrapper,
+        optimize: c_int,
+        io_only: c_int,
+        custom_io_positions: *const c_int,
+        custom_io_count: c_int,
+    ) -> *mut MchprsWorldWrapper {
+        if schematic.is_null() {
+            return ptr::null_mut();
+        }
+        let s = unsafe { &*(*schematic).0 };
+        let mut custom_io = Vec::new();
+        if !custom_io_positions.is_null() && custom_io_count > 0 {
+            let coords = unsafe {
+                std::slice::from_raw_parts(custom_io_positions, custom_io_count as usize * 3)
+            };
+            for chunk in coords.chunks_exact(3) {
+                custom_io.push(BlockPos::new(chunk[0], chunk[1], chunk[2]));
+            }
+        }
+        let options = SimulationOptions {
+            optimize: optimize != 0,
+            io_only: io_only != 0,
+            custom_io,
+        };
+        match MchprsWorld::with_options(s.clone(), options) {
+            Ok(world) => {
+                let w = Box::into_raw(Box::new(world));
+                Box::into_raw(Box::new(MchprsWorldWrapper(w)))
+            }
+            Err(_) => ptr::null_mut(),
+        }
+    }
+
     /// Frees a MchprsWorld.
     #[no_mangle]
     pub extern "C" fn mchprs_world_free(world: *mut MchprsWorldWrapper) {
