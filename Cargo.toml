@@ -74,7 +74,7 @@ bytemuck = "1.23.1"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 
 # Meshing dependencies - optional
-schematic-mesher = { git = "https://github.com/Schem-at/Schematic-Mesher.git", rev = "492e2cd", optional = true }
+schematic-mesher = { path = "/Users/harrison/.cargo/git/checkouts/schematic-mesher-de67a156e5e9912a/492e2cd", optional = true }
 
 # Simulation (MCHPRS) dependencies - optional
 # Note: These are git dependencies and will be excluded from crates.io publish

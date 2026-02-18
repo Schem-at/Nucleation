@@ -1,13 +1,17 @@
 //! Meshing Python bindings
 //!
-//! Generate 3D meshes (GLB) from schematics using resource packs.
+//! Generate 3D meshes (GLB/USDZ) from schematics using resource packs.
+//!
+//! Exposes [`PyMeshOutput`] (aliased as `PyMeshResult` for backward compat)
+//! with per-layer data, atlas access, `.save()`, and export helpers.
 
+use bytemuck;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use std::collections::HashMap;
 
 use crate::meshing::{
-    ChunkMeshResult, MeshConfig, MeshResult, MultiMeshResult, RawMeshExport, ResourcePackSource,
+    ChunkMeshResult, MeshConfig, MeshOutput, RawMeshExport, ResourcePackSource,
 };
 
 /// Wrapper for a Minecraft resource pack.
@@ -326,63 +330,187 @@ impl PyMeshConfig {
     }
 }
 
+// ─── PyMeshResult (backed by MeshOutput) ────────────────────────────────────
+
 /// Result of mesh generation.
+///
+/// Wraps a [`MeshOutput`] with per-layer data, atlas, GLB/USDZ bytes, and
+/// a convenience `.save(path)` method.
 #[pyclass(name = "MeshResult")]
 #[derive(Clone)]
 pub struct PyMeshResult {
-    pub(crate) inner: MeshResult,
+    pub(crate) inner: MeshOutput,
 }
 
 #[pymethods]
 impl PyMeshResult {
     /// Get the GLB binary data.
     #[getter]
-    pub fn glb_data<'py>(&self, py: Python<'py>) -> Bound<'py, PyBytes> {
-        PyBytes::new(py, &self.inner.glb_data)
+    pub fn glb_data<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
+        let data = self.inner.to_glb()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        Ok(PyBytes::new(py, &data))
     }
 
     /// Get the vertex count.
     #[getter]
     pub fn vertex_count(&self) -> usize {
-        self.inner.vertex_count
+        self.inner.total_vertices()
     }
 
     /// Get the triangle count.
     #[getter]
     pub fn triangle_count(&self) -> usize {
-        self.inner.triangle_count
+        self.inner.total_triangles()
     }
 
     /// Check if the mesh has transparency.
     #[getter]
     pub fn has_transparency(&self) -> bool {
-        self.inner.has_transparency
+        self.inner.has_transparency()
     }
 
     /// Get the bounding box as [minX, minY, minZ, maxX, maxY, maxZ].
     #[getter]
     pub fn bounds(&self) -> Vec<f32> {
-        self.inner.bounds.to_vec()
+        let mut b = Vec::with_capacity(6);
+        b.extend_from_slice(&self.inner.bounds.min);
+        b.extend_from_slice(&self.inner.bounds.max);
+        b
     }
+
+    /// Chunk coordinate [cx, cy, cz] or None if not a chunk mesh.
+    #[getter]
+    pub fn chunk_coord(&self) -> Option<Vec<i32>> {
+        self.inner.chunk_coord.map(|(cx, cy, cz)| vec![cx, cy, cz])
+    }
+
+    /// LOD level (0 = full detail).
+    #[getter]
+    pub fn lod_level(&self) -> u8 {
+        self.inner.lod_level
+    }
+
+    /// Total vertices across all layers.
+    #[getter]
+    pub fn total_vertices(&self) -> usize {
+        self.inner.total_vertices()
+    }
+
+    /// Total triangles across all layers.
+    #[getter]
+    pub fn total_triangles(&self) -> usize {
+        self.inner.total_triangles()
+    }
+
+    /// Whether all layers are empty.
+    #[getter]
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    /// Atlas width in pixels.
+    #[getter]
+    pub fn atlas_width(&self) -> u32 {
+        self.inner.atlas.width
+    }
+
+    /// Atlas height in pixels.
+    #[getter]
+    pub fn atlas_height(&self) -> u32 {
+        self.inner.atlas.height
+    }
+
+    /// Atlas RGBA pixel data.
+    pub fn atlas_rgba<'py>(&self, py: Python<'py>) -> Bound<'py, PyBytes> {
+        PyBytes::new(py, &self.inner.atlas.pixels)
+    }
+
+    // ── Per-layer accessors ─────────────────────────────────────────────
+
+    /// Opaque layer positions as flat list of floats.
+    pub fn opaque_positions(&self) -> Vec<f32> {
+        bytemuck::cast_slice(&self.inner.opaque.positions).to_vec()
+    }
+
+    /// Opaque layer normals as flat list of floats.
+    pub fn opaque_normals(&self) -> Vec<f32> {
+        bytemuck::cast_slice(&self.inner.opaque.normals).to_vec()
+    }
+
+    /// Opaque layer UVs as flat list of floats.
+    pub fn opaque_uvs(&self) -> Vec<f32> {
+        bytemuck::cast_slice(&self.inner.opaque.uvs).to_vec()
+    }
+
+    /// Opaque layer colors as flat list of floats.
+    pub fn opaque_colors(&self) -> Vec<f32> {
+        bytemuck::cast_slice(&self.inner.opaque.colors).to_vec()
+    }
+
+    /// Opaque layer indices.
+    pub fn opaque_indices(&self) -> Vec<u32> {
+        self.inner.opaque.indices.clone()
+    }
+
+    /// Cutout layer positions as flat list of floats.
+    pub fn cutout_positions(&self) -> Vec<f32> {
+        bytemuck::cast_slice(&self.inner.cutout.positions).to_vec()
+    }
+
+    /// Cutout layer indices.
+    pub fn cutout_indices(&self) -> Vec<u32> {
+        self.inner.cutout.indices.clone()
+    }
+
+    /// Transparent layer positions as flat list of floats.
+    pub fn transparent_positions(&self) -> Vec<f32> {
+        bytemuck::cast_slice(&self.inner.transparent.positions).to_vec()
+    }
+
+    /// Transparent layer indices.
+    pub fn transparent_indices(&self) -> Vec<u32> {
+        self.inner.transparent.indices.clone()
+    }
+
+    // ── Export helpers ───────────────────────────────────────────────────
 
     /// Save the GLB data to a file.
     pub fn save(&self, path: &str) -> PyResult<()> {
-        std::fs::write(path, &self.inner.glb_data)
+        let glb = self.inner.to_glb()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        std::fs::write(path, &glb)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))
+    }
+
+    /// Get USDZ data.
+    pub fn usdz_data<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
+        let data = self.inner.to_usdz()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        Ok(PyBytes::new(py, &data))
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "<MeshResult vertices={} triangles={} transparent={}>",
-            self.inner.vertex_count, self.inner.triangle_count, self.inner.has_transparency
+            "<MeshResult vertices={} triangles={} transparent={} layers=[opaque={}, cutout={}, transparent={}]>",
+            self.inner.total_vertices(),
+            self.inner.total_triangles(),
+            self.inner.has_transparency(),
+            self.inner.opaque.vertex_count(),
+            self.inner.cutout.vertex_count(),
+            self.inner.transparent.vertex_count(),
         )
     }
 }
 
+// ─── PyMultiMeshResult ──────────────────────────────────────────────────────
+
 /// Result of mesh generation for multiple regions.
+///
+/// Wraps a `HashMap<String, MeshOutput>`.
 #[pyclass(name = "MultiMeshResult")]
 pub struct PyMultiMeshResult {
-    pub(crate) inner: MultiMeshResult,
+    pub(crate) inner: HashMap<String, MeshOutput>,
 }
 
 #[pymethods]
@@ -390,12 +518,12 @@ impl PyMultiMeshResult {
     /// Get the region names.
     #[getter]
     pub fn region_names(&self) -> Vec<String> {
-        self.inner.meshes.keys().cloned().collect()
+        self.inner.keys().cloned().collect()
     }
 
     /// Get the mesh for a specific region.
     pub fn get_mesh(&self, region_name: &str) -> Option<PyMeshResult> {
-        self.inner.meshes.get(region_name).map(|mesh| PyMeshResult {
+        self.inner.get(region_name).map(|mesh| PyMeshResult {
             inner: mesh.clone(),
         })
     }
@@ -403,7 +531,6 @@ impl PyMultiMeshResult {
     /// Get all meshes as a dictionary.
     pub fn get_all_meshes(&self) -> HashMap<String, PyMeshResult> {
         self.inner
-            .meshes
             .iter()
             .map(|(k, v)| (k.clone(), PyMeshResult { inner: v.clone() }))
             .collect()
@@ -412,27 +539,29 @@ impl PyMultiMeshResult {
     /// Get the total vertex count.
     #[getter]
     pub fn total_vertex_count(&self) -> usize {
-        self.inner.total_vertex_count
+        self.inner.values().map(|m| m.total_vertices()).sum()
     }
 
     /// Get the total triangle count.
     #[getter]
     pub fn total_triangle_count(&self) -> usize {
-        self.inner.total_triangle_count
+        self.inner.values().map(|m| m.total_triangles()).sum()
     }
 
     /// Get the number of meshes.
     #[getter]
     pub fn mesh_count(&self) -> usize {
-        self.inner.meshes.len()
+        self.inner.len()
     }
 
     /// Save all meshes to files with the pattern "{prefix}_{region_name}.glb".
     pub fn save_all(&self, prefix: &str) -> PyResult<Vec<String>> {
         let mut paths = Vec::new();
-        for (name, mesh) in &self.inner.meshes {
+        for (name, mesh) in &self.inner {
             let path = format!("{}_{}.glb", prefix, name);
-            std::fs::write(&path, &mesh.glb_data)
+            let glb = mesh.to_glb()
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            std::fs::write(&path, &glb)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
             paths.push(path);
         }
@@ -440,16 +569,20 @@ impl PyMultiMeshResult {
     }
 
     fn __repr__(&self) -> String {
+        let total_v: usize = self.inner.values().map(|m| m.total_vertices()).sum();
+        let total_t: usize = self.inner.values().map(|m| m.total_triangles()).sum();
         format!(
             "<MultiMeshResult regions={} total_vertices={} total_triangles={}>",
-            self.inner.meshes.len(),
-            self.inner.total_vertex_count,
-            self.inner.total_triangle_count
+            self.inner.len(),
+            total_v,
+            total_t
         )
     }
 }
 
-/// Result of chunk-based mesh generation.
+// ─── PyChunkMeshResult ──────────────────────────────────────────────────────
+
+/// Result of chunk-based mesh generation (eager).
 #[pyclass(name = "ChunkMeshResult")]
 pub struct PyChunkMeshResult {
     pub(crate) inner: ChunkMeshResult,
@@ -505,7 +638,9 @@ impl PyChunkMeshResult {
         let mut paths = Vec::new();
         for ((cx, cy, cz), mesh) in &self.inner.meshes {
             let path = format!("{}_{}_{}_{}_.glb", prefix, cx, cy, cz);
-            std::fs::write(&path, &mesh.glb_data)
+            let glb = mesh.to_glb()
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            std::fs::write(&path, &glb)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
             paths.push(path);
         }
@@ -521,6 +656,8 @@ impl PyChunkMeshResult {
         )
     }
 }
+
+// ─── PyRawMeshExport ────────────────────────────────────────────────────────
 
 /// Result of raw mesh export for custom rendering.
 #[pyclass(name = "RawMeshExport")]

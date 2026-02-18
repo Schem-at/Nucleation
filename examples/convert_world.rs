@@ -68,13 +68,14 @@ fn main() {
                 .expect("Failed to generate mesh");
 
             let glb_path = world_path.replace(".zip", ".glb").replace(".mca", ".glb");
-            std::fs::write(&glb_path, &result.glb_data).expect("Failed to write GLB");
+            let glb_data = result.to_glb().expect("Failed to export GLB");
+            std::fs::write(&glb_path, &glb_data).expect("Failed to write GLB");
             println!(
                 "Saved GLB: {} ({} bytes, {} vertices, {} triangles)",
                 glb_path,
-                result.glb_data.len(),
-                result.vertex_count,
-                result.triangle_count
+                glb_data.len(),
+                result.total_vertices(),
+                result.total_triangles()
             );
         }
 

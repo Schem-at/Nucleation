@@ -4737,7 +4737,10 @@ pub mod meshing_ffi {
             };
         }
         let result = unsafe { &(*ptr).0 };
-        let mut data = result.glb_data.clone();
+        let mut data = match result.to_glb() {
+            Ok(d) => d,
+            Err(_) => return ByteArray { data: ptr::null_mut(), len: 0 },
+        };
         let p = data.as_mut_ptr();
         let len = data.len();
         std::mem::forget(data);
@@ -4750,7 +4753,7 @@ pub mod meshing_ffi {
             return 0;
         }
         let result = unsafe { &(*ptr).0 };
-        result.vertex_count
+        result.total_vertices()
     }
 
     #[no_mangle]
@@ -4759,7 +4762,7 @@ pub mod meshing_ffi {
             return 0;
         }
         let result = unsafe { &(*ptr).0 };
-        result.triangle_count
+        result.total_triangles()
     }
 
     #[no_mangle]
@@ -4768,7 +4771,7 @@ pub mod meshing_ffi {
             return 0;
         }
         let result = unsafe { &(*ptr).0 };
-        if result.has_transparency {
+        if result.has_transparency() {
             1
         } else {
             0
@@ -4784,7 +4787,9 @@ pub mod meshing_ffi {
             };
         }
         let result = unsafe { &(*ptr).0 };
-        let vals = result.bounds.to_vec();
+        let mut vals = Vec::with_capacity(6);
+        vals.extend_from_slice(&result.bounds.min);
+        vals.extend_from_slice(&result.bounds.max);
         let mut boxed = vals.into_boxed_slice();
         let p = boxed.as_mut_ptr();
         let len = boxed.len();
@@ -4812,7 +4817,7 @@ pub mod meshing_ffi {
             };
         }
         let result = unsafe { &(*ptr).0 };
-        let names: Vec<String> = result.meshes.keys().cloned().collect();
+        let names: Vec<String> = result.keys().cloned().collect();
         vec_string_to_string_array(names)
     }
 
@@ -4826,7 +4831,7 @@ pub mod meshing_ffi {
         }
         let result = unsafe { &(*ptr).0 };
         let name = unsafe { CStr::from_ptr(region_name).to_string_lossy() };
-        match result.meshes.get(name.as_ref()) {
+        match result.get(name.as_ref()) {
             Some(mesh) => Box::into_raw(Box::new(FFIMeshResult(mesh.clone()))),
             None => ptr::null_mut(),
         }
@@ -4838,7 +4843,7 @@ pub mod meshing_ffi {
             return 0;
         }
         let result = unsafe { &(*ptr).0 };
-        result.total_vertex_count
+        result.values().map(|m| m.total_vertices()).sum()
     }
 
     #[no_mangle]
@@ -4849,7 +4854,7 @@ pub mod meshing_ffi {
             return 0;
         }
         let result = unsafe { &(*ptr).0 };
-        result.total_triangle_count
+        result.values().map(|m| m.total_triangles()).sum()
     }
 
     #[no_mangle]
@@ -4858,7 +4863,7 @@ pub mod meshing_ffi {
             return 0;
         }
         let result = unsafe { &(*ptr).0 };
-        result.meshes.len()
+        result.len()
     }
 
     // --- ChunkMeshResult FFI ---
