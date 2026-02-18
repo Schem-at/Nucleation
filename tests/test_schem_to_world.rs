@@ -2,6 +2,7 @@ use nucleation::formats::manager::get_manager;
 use nucleation::formats::world;
 
 #[test]
+#[ignore] // Requires local file: /Users/harrison/Downloads/uss-texas.schem
 fn test_uss_texas_to_world() {
     let data = std::fs::read("/Users/harrison/Downloads/uss-texas.schem").unwrap();
     println!("Schematic size: {} bytes", data.len());

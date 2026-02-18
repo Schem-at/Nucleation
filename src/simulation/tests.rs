@@ -1711,6 +1711,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // Requires MCHPRS rev c91e5a7+ for comparator custom IO support
     fn test_two_comparators_in_out() {
         // Test the actual Hardwired IO port use case:
         // IN comparator -> wire -> OUT comparator

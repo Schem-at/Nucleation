@@ -143,6 +143,8 @@ ChunkMeshResult.all_meshes = Python convenience (FFI uses get_mesh)
 MeshExporter.* = Mesh exporter registered via FormatManager (FFI uses schematic_register_mesh_exporter)
 
 # --- Scripting FFI entry points (feature-gated, not in WASM/Python) ---
+[ffi_only]
 run_lua_script = FFI scripting entry point (feature-gated scripting-lua)
 run_js_script = FFI scripting entry point (feature-gated scripting-js)
 run_script = FFI scripting entry point (feature-gated scripting)
+Schematic.last_error = FFI error handling via thread-local (WASM/Python use exceptions)
