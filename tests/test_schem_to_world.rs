@@ -2,9 +2,12 @@ use nucleation::formats::manager::get_manager;
 use nucleation::formats::world;
 
 #[test]
-#[ignore] // Requires local file: /Users/harrison/Downloads/uss-texas.schem
 fn test_uss_texas_to_world() {
-    let data = std::fs::read("/Users/harrison/Downloads/uss-texas.schem").unwrap();
+    let data = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/samples/uss-texas.schem"
+    ))
+    .unwrap();
     println!("Schematic size: {} bytes", data.len());
 
     let manager = get_manager();
@@ -35,16 +38,14 @@ fn test_uss_texas_to_world() {
     };
     let files = world::to_world(&schematic, Some(opts)).expect("Failed to export");
 
-    // Write to saves dir
-    let saves_dir = std::path::Path::new(
-        "/Users/harrison/Library/Application Support/PrismLauncher/instances/1.21.11/minecraft/saves/USS Texas"
-    );
-    if saves_dir.exists() {
-        std::fs::remove_dir_all(saves_dir).unwrap();
+    // Write to temp dir
+    let output_dir = std::env::temp_dir().join("nucleation_test_uss_texas");
+    if output_dir.exists() {
+        std::fs::remove_dir_all(&output_dir).unwrap();
     }
 
     for (path, file_data) in &files {
-        let full_path = saves_dir.join(path);
+        let full_path = output_dir.join(path);
         if let Some(parent) = full_path.parent() {
             std::fs::create_dir_all(parent).unwrap();
         }
@@ -52,6 +53,6 @@ fn test_uss_texas_to_world() {
         println!("Wrote {} ({} bytes)", path, file_data.len());
     }
 
-    println!("\nWorld written to: {}", saves_dir.display());
+    println!("\nWorld written to: {}", output_dir.display());
     println!("Block count: {}", block_count);
 }

@@ -2,10 +2,13 @@ use nucleation::formats::manager::get_manager;
 use nucleation::formats::world;
 
 #[test]
-#[ignore] // Requires local files: /Users/harrison/Downloads/55 3x3.zip
 fn test_55_3x3_roundtrip() {
     // Step 1: Import the world zip
-    let data = std::fs::read("/Users/harrison/Downloads/55 3x3.zip").unwrap();
+    let data = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/samples/55_3x3.zip"
+    ))
+    .unwrap();
     println!("Input zip size: {} bytes", data.len());
 
     let manager = get_manager();
@@ -33,29 +36,25 @@ fn test_55_3x3_roundtrip() {
     // Step 2: Export using to_world (raw files, no zip wrapper)
     let files = world::to_world(&schematic, None).expect("Failed to export to world format");
 
-    // Step 3: Write directly to MC saves directory
-    let saves_dir = std::path::Path::new(
-        "/Users/harrison/Library/Application Support/PrismLauncher/instances/1.21.11/minecraft/saves/Nucleation Export"
-    );
-    // Clean and recreate
-    if saves_dir.exists() {
-        std::fs::remove_dir_all(saves_dir).unwrap();
+    // Step 3: Write to temp directory
+    let output_dir = std::env::temp_dir().join("nucleation_test_roundtrip");
+    if output_dir.exists() {
+        std::fs::remove_dir_all(&output_dir).unwrap();
     }
     for (path, data) in &files {
-        let full_path = saves_dir.join(path);
+        let full_path = output_dir.join(path);
         if let Some(parent) = full_path.parent() {
             std::fs::create_dir_all(parent).unwrap();
         }
         std::fs::write(&full_path, data).unwrap();
         println!("Wrote {} ({} bytes)", path, data.len());
     }
-    println!("\nWorld written directly to: {}", saves_dir.display());
+    println!("\nWorld written to: {}", output_dir.display());
 
     // Also save zip for comparison
     let output = manager
         .write("world", &schematic, None)
         .expect("Failed to export to world format");
-    std::fs::write("/tmp/nucleation_roundtrip_output.zip", &output).unwrap();
 
     // Step 4: Re-import the exported world
     match manager.read(&output) {
@@ -86,7 +85,12 @@ fn test_55_3x3_roundtrip() {
     }
 
     // Step 5: Compare our level.dat with original
-    let cursor = std::io::Cursor::new(&data);
+    let original_data = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/samples/55_3x3.zip"
+    ))
+    .unwrap();
+    let cursor = std::io::Cursor::new(&original_data);
     let mut orig_archive = zip::ZipArchive::new(cursor).unwrap();
     for i in 0..orig_archive.len() {
         let name = orig_archive.by_index_raw(i).unwrap().name().to_string();
