@@ -2,6 +2,7 @@ use nucleation::formats::manager::get_manager;
 use nucleation::formats::world;
 
 #[test]
+#[ignore] // Requires local files: /Users/harrison/Downloads/55 3x3.zip
 fn test_55_3x3_roundtrip() {
     // Step 1: Import the world zip
     let data = std::fs::read("/Users/harrison/Downloads/55 3x3.zip").unwrap();
