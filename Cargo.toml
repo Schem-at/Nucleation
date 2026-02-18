@@ -88,11 +88,11 @@ schematic-mesher = { git = "https://github.com/Schem-at/Schematic-Mesher.git", r
 # Note: These are git dependencies and will be excluded from crates.io publish
 # Using Nano112's MCHPRS fork with custom IO support and bug fixes
 # Networking is disabled to avoid WASM compatibility issues
-# Rev 541c0b2: Custom IO wire propagation support with connected-wire tracking
-mchprs_redpiler = { git = "https://github.com/Nano112/MCHPRS.git", rev = "541c0b2e96857a6abaa567755c3fbb6c7f5be971", optional = true }
-mchprs_redstone = { git = "https://github.com/Nano112/MCHPRS.git", rev = "541c0b2e96857a6abaa567755c3fbb6c7f5be971", optional = true }
-mchprs_world = { git = "https://github.com/Nano112/MCHPRS.git", rev = "541c0b2e96857a6abaa567755c3fbb6c7f5be971", optional = true, default-features = false }
-mchprs_blocks = { git = "https://github.com/Nano112/MCHPRS.git", rev = "541c0b2e96857a6abaa567755c3fbb6c7f5be971", optional = true }
+# Rev aedc588: Custom IO wire propagation + constant fold protection + wire connectivity fix
+mchprs_redpiler = { git = "https://github.com/Nano112/MCHPRS.git", rev = "aedc5884b3aee3300ea30ce844418b652b4a7e5f", optional = true }
+mchprs_redstone = { git = "https://github.com/Nano112/MCHPRS.git", rev = "aedc5884b3aee3300ea30ce844418b652b4a7e5f", optional = true }
+mchprs_world = { git = "https://github.com/Nano112/MCHPRS.git", rev = "aedc5884b3aee3300ea30ce844418b652b4a7e5f", optional = true, default-features = false }
+mchprs_blocks = { git = "https://github.com/Nano112/MCHPRS.git", rev = "aedc5884b3aee3300ea30ce844418b652b4a7e5f", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
