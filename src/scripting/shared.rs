@@ -44,11 +44,7 @@ impl ScriptingSchematic {
     }
 
     pub fn get_author(&self) -> String {
-        self.inner
-            .metadata
-            .author
-            .clone()
-            .unwrap_or_default()
+        self.inner.metadata.author.clone().unwrap_or_default()
     }
 
     pub fn set_author(&mut self, author: &str) {
@@ -56,11 +52,7 @@ impl ScriptingSchematic {
     }
 
     pub fn get_description(&self) -> String {
-        self.inner
-            .metadata
-            .description
-            .clone()
-            .unwrap_or_default()
+        self.inner.metadata.description.clone().unwrap_or_default()
     }
 
     pub fn set_description(&mut self, desc: &str) {
@@ -79,24 +71,14 @@ impl ScriptingSchematic {
 
     // -- Building --
 
-    pub fn fill_cuboid(
-        &mut self,
-        min: (i32, i32, i32),
-        max: (i32, i32, i32),
-        block_name: &str,
-    ) {
+    pub fn fill_cuboid(&mut self, min: (i32, i32, i32), max: (i32, i32, i32), block_name: &str) {
         let shape = Cuboid::new(min, max);
         let brush = SolidBrush::new(BlockState::new(block_name.to_string()));
         let mut tool = BuildingTool::new(&mut self.inner);
         tool.fill(&shape, &brush);
     }
 
-    pub fn fill_sphere(
-        &mut self,
-        center: (i32, i32, i32),
-        radius: f64,
-        block_name: &str,
-    ) {
+    pub fn fill_sphere(&mut self, center: (i32, i32, i32), radius: f64, block_name: &str) {
         let shape = Sphere::new(center, radius);
         let brush = SolidBrush::new(BlockState::new(block_name.to_string()));
         let mut tool = BuildingTool::new(&mut self.inner);

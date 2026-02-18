@@ -155,5 +155,10 @@ fn bench_fill_and_export(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_set_blocks, bench_fill_cuboid, bench_fill_and_export);
+criterion_group!(
+    benches,
+    bench_set_blocks,
+    bench_fill_cuboid,
+    bench_fill_and_export
+);
 criterion_main!(benches);

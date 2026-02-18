@@ -9,16 +9,12 @@ struct LuaSchematic(Rc<RefCell<ScriptingSchematic>>);
 impl LuaUserData for LuaSchematic {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         // -- Metadata getters/setters --
-        methods.add_method("get_name", |_, this, ()| {
-            Ok(this.0.borrow().get_name())
-        });
+        methods.add_method("get_name", |_, this, ()| Ok(this.0.borrow().get_name()));
         methods.add_method_mut("set_name", |_, this, name: String| {
             this.0.borrow_mut().set_name(&name);
             Ok(())
         });
-        methods.add_method("get_author", |_, this, ()| {
-            Ok(this.0.borrow().get_author())
-        });
+        methods.add_method("get_author", |_, this, ()| Ok(this.0.borrow().get_author()));
         methods.add_method_mut("set_author", |_, this, author: String| {
             this.0.borrow_mut().set_author(&author);
             Ok(())
@@ -87,9 +83,7 @@ impl LuaUserData for LuaSchematic {
         methods.add_method("get_block_count", |_, this, ()| {
             Ok(this.0.borrow().get_block_count())
         });
-        methods.add_method("get_volume", |_, this, ()| {
-            Ok(this.0.borrow().get_volume())
-        });
+        methods.add_method("get_volume", |_, this, ()| Ok(this.0.borrow().get_volume()));
 
         // -- Transforms --
         methods.add_method_mut("flip_x", |_, this, ()| {
@@ -119,19 +113,11 @@ impl LuaUserData for LuaSchematic {
 
         // -- Export --
         methods.add_method("to_schematic", |lua, this, ()| {
-            let bytes = this
-                .0
-                .borrow()
-                .to_schematic()
-                .map_err(LuaError::external)?;
+            let bytes = this.0.borrow().to_schematic().map_err(LuaError::external)?;
             Ok(lua.create_string(&bytes)?)
         });
         methods.add_method("to_litematic", |lua, this, ()| {
-            let bytes = this
-                .0
-                .borrow()
-                .to_litematic()
-                .map_err(LuaError::external)?;
+            let bytes = this.0.borrow().to_litematic().map_err(LuaError::external)?;
             Ok(lua.create_string(&bytes)?)
         });
         methods.add_method("save_as", |lua, this, format: String| {
@@ -202,8 +188,8 @@ fn setup_lua(lua: &Lua) -> LuaResult<()> {
 /// Run a Lua script file. If the script assigns to the global `result`, its
 /// inner ScriptingSchematic is returned.
 pub fn run_lua_script(path: &str) -> Result<Option<ScriptingSchematic>, String> {
-    let code = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read Lua script: {}", e))?;
+    let code =
+        std::fs::read_to_string(path).map_err(|e| format!("Failed to read Lua script: {}", e))?;
     run_lua_code(&code)
 }
 

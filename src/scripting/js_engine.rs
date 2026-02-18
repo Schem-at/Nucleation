@@ -189,10 +189,13 @@ fn setup_js(ctx: &Ctx<'_>) -> JsResult<()> {
     let schematic_ctor: Function = ctx.globals().get("JsSchematic")?;
     schematic_ctor.set(
         "load",
-        Function::new(ctx.clone(), |path: String| -> rquickjs::Result<JsSchematic> {
-            let ss = ScriptingSchematic::from_file(&path).map_err(|e| make_js_err(&e))?;
-            Ok(JsSchematic { inner: ss })
-        })?,
+        Function::new(
+            ctx.clone(),
+            |path: String| -> rquickjs::Result<JsSchematic> {
+                let ss = ScriptingSchematic::from_file(&path).map_err(|e| make_js_err(&e))?;
+                Ok(JsSchematic { inner: ss })
+            },
+        )?,
     )?;
 
     // Alias: expose as `Schematic` too (the class registers as `JsSchematic`)
