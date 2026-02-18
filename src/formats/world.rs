@@ -933,7 +933,10 @@ fn generate_level_dat(opts: &WorldExportOptions) -> Result<Vec<u8>, Box<dyn Erro
     // ── Spawn position (1.21+ uses spawn compound) ───────────────────────
     let (sx, sy, sz) = opts.spawn_position.unwrap_or((0, 64, 0));
     let mut spawn = NbtCompound::new();
-    spawn.insert("dimension", NbtTag::String("minecraft:overworld".to_string()));
+    spawn.insert(
+        "dimension",
+        NbtTag::String("minecraft:overworld".to_string()),
+    );
     spawn.insert("pos", NbtTag::IntArray(vec![sx, sy, sz]));
     spawn.insert("yaw", NbtTag::Float(0.0));
     spawn.insert("pitch", NbtTag::Float(0.0));
@@ -1009,10 +1012,7 @@ fn generate_level_dat(opts: &WorldExportOptions) -> Result<Vec<u8>, Box<dyn Erro
         flat_settings.insert("features", NbtTag::Byte(0));
         flat_settings.insert("lakes", NbtTag::Byte(0));
         flat_settings.insert("layers", NbtTag::List(NbtList::new()));
-        flat_settings.insert(
-            "structure_overrides",
-            NbtTag::List(NbtList::new()),
-        );
+        flat_settings.insert("structure_overrides", NbtTag::List(NbtList::new()));
         generator.insert("settings", NbtTag::Compound(flat_settings));
         overworld.insert("generator", NbtTag::Compound(generator));
         dimensions.insert("minecraft:overworld", NbtTag::Compound(overworld));
@@ -1066,7 +1066,10 @@ fn generate_level_dat(opts: &WorldExportOptions) -> Result<Vec<u8>, Box<dyn Erro
     data.insert("DataPacks", NbtTag::Compound(data_packs));
 
     // ── Misc ─────────────────────────────────────────────────────────────
-    data.insert("ServerBrands", NbtTag::List(NbtList::from(vec![NbtTag::String("vanilla".to_string())])));
+    data.insert(
+        "ServerBrands",
+        NbtTag::List(NbtList::from(vec![NbtTag::String("vanilla".to_string())])),
+    );
     data.insert("WasModded", NbtTag::Byte(0));
     data.insert("WanderingTraderSpawnChance", NbtTag::Int(25));
     data.insert("WanderingTraderSpawnDelay", NbtTag::Int(24000));

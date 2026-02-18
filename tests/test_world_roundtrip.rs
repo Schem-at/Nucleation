@@ -51,7 +51,8 @@ fn test_55_3x3_roundtrip() {
     println!("\nWorld written directly to: {}", saves_dir.display());
 
     // Also save zip for comparison
-    let output = manager.write("world", &schematic, None)
+    let output = manager
+        .write("world", &schematic, None)
         .expect("Failed to export to world format");
     std::fs::write("/tmp/nucleation_roundtrip_output.zip", &output).unwrap();
 
@@ -73,7 +74,10 @@ fn test_55_3x3_roundtrip() {
                 }
             }
             println!("Re-imported block count: {}", block_count2);
-            assert_eq!(block_count, block_count2, "Block count mismatch after roundtrip");
+            assert_eq!(
+                block_count, block_count2,
+                "Block count mismatch after roundtrip"
+            );
         }
         Err(e) => {
             panic!("Failed to re-import exported world: {}", e);
@@ -90,7 +94,10 @@ fn test_55_3x3_roundtrip() {
             let mut orig_leveldat = Vec::new();
             std::io::Read::read_to_end(&mut file, &mut orig_leveldat).unwrap();
             println!("\nOriginal level.dat: {} bytes", orig_leveldat.len());
-            println!("Exported level.dat: {} bytes", files.get("level.dat").unwrap().len());
+            println!(
+                "Exported level.dat: {} bytes",
+                files.get("level.dat").unwrap().len()
+            );
             break;
         }
     }

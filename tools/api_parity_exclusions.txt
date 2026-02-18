@@ -141,3 +141,8 @@ ResourcePack.stats = FFI exposes individual stat getters
 MultiMeshResult.all_meshes = Python convenience (FFI uses get_mesh)
 ChunkMeshResult.all_meshes = Python convenience (FFI uses get_mesh)
 MeshExporter.* = Mesh exporter registered via FormatManager (FFI uses schematic_register_mesh_exporter)
+
+# --- Scripting FFI entry points (feature-gated, not in WASM/Python) ---
+run_lua_script = FFI scripting entry point (feature-gated scripting-lua)
+run_js_script = FFI scripting entry point (feature-gated scripting-js)
+run_script = FFI scripting entry point (feature-gated scripting)

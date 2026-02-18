@@ -764,10 +764,7 @@ fn build_chunk_nbt(chunk: &ChunkData) -> NbtCompound {
     root.insert("block_entities", NbtTag::List(NbtList::from(be_list)));
 
     // Heightmaps (required by MC 1.18+ for status "minecraft:full")
-    root.insert(
-        "Heightmaps",
-        NbtTag::Compound(compute_heightmaps(chunk)),
-    );
+    root.insert("Heightmaps", NbtTag::Compound(compute_heightmaps(chunk)));
 
     // isLightOn = 0: tell Minecraft to recalculate lighting on load
     root.insert("isLightOn", NbtTag::Byte(0));
