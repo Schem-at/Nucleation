@@ -14,7 +14,7 @@ echo "INFO: Cleaning previous build artifacts..."
 rm -rf pkg/
 
 echo "INFO: Building WASM package with --target web for explicit initialization..."
-wasm-pack build --target web --out-dir pkg --out-name "${OUT_NAME}" --features wasm,simulation
+wasm-pack build --target web --out-dir pkg --out-name "${OUT_NAME}" --features wasm,simulation,meshing
 echo "INFO: Base package created successfully."
 
 # --- Create universal init wrapper ---

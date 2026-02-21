@@ -4298,8 +4298,10 @@ pub mod simulation_ffi {
 pub mod meshing_ffi {
     use super::*;
     use crate::meshing::{
-        ChunkMeshResult, MeshConfig, MeshResult, MultiMeshResult, RawMeshExport, ResourcePackSource,
+        ChunkMeshResult, MeshConfig, MeshPhase, MeshProgress, MeshResult, MultiMeshResult,
+        RawMeshExport, ResourcePackSource,
     };
+    use schematic_mesher::TextureAtlas;
 
     // --- Wrapper Structs ---
 
@@ -4309,6 +4311,7 @@ pub mod meshing_ffi {
     pub struct FFIMultiMeshResult(MultiMeshResult);
     pub struct FFIChunkMeshResult(ChunkMeshResult);
     pub struct FFIRawMeshExport(RawMeshExport);
+    pub struct FFITextureAtlas(TextureAtlas);
 
     // --- ResourcePack Lifecycle ---
 
@@ -4737,7 +4740,31 @@ pub mod meshing_ffi {
             };
         }
         let result = unsafe { &(*ptr).0 };
-        let mut data = result.glb_data.clone();
+        let mut data = match result.to_glb() {
+            Ok(d) => d,
+            Err(_) => {
+                return ByteArray {
+                    data: ptr::null_mut(),
+                    len: 0,
+                }
+            }
+        };
+        let p = data.as_mut_ptr();
+        let len = data.len();
+        std::mem::forget(data);
+        ByteArray { data: p, len }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn meshresult_nucm_data(ptr: *const FFIMeshResult) -> ByteArray {
+        if ptr.is_null() {
+            return ByteArray {
+                data: ptr::null_mut(),
+                len: 0,
+            };
+        }
+        let result = unsafe { &(*ptr).0 };
+        let mut data = crate::meshing::cache::serialize_meshes(&[result.clone()]);
         let p = data.as_mut_ptr();
         let len = data.len();
         std::mem::forget(data);
@@ -4750,7 +4777,7 @@ pub mod meshing_ffi {
             return 0;
         }
         let result = unsafe { &(*ptr).0 };
-        result.vertex_count
+        result.total_vertices()
     }
 
     #[no_mangle]
@@ -4759,7 +4786,7 @@ pub mod meshing_ffi {
             return 0;
         }
         let result = unsafe { &(*ptr).0 };
-        result.triangle_count
+        result.total_triangles()
     }
 
     #[no_mangle]
@@ -4768,7 +4795,7 @@ pub mod meshing_ffi {
             return 0;
         }
         let result = unsafe { &(*ptr).0 };
-        if result.has_transparency {
+        if result.has_transparency() {
             1
         } else {
             0
@@ -4784,7 +4811,9 @@ pub mod meshing_ffi {
             };
         }
         let result = unsafe { &(*ptr).0 };
-        let vals = result.bounds.to_vec();
+        let mut vals = Vec::with_capacity(6);
+        vals.extend_from_slice(&result.bounds.min);
+        vals.extend_from_slice(&result.bounds.max);
         let mut boxed = vals.into_boxed_slice();
         let p = boxed.as_mut_ptr();
         let len = boxed.len();
@@ -4812,7 +4841,7 @@ pub mod meshing_ffi {
             };
         }
         let result = unsafe { &(*ptr).0 };
-        let names: Vec<String> = result.meshes.keys().cloned().collect();
+        let names: Vec<String> = result.keys().cloned().collect();
         vec_string_to_string_array(names)
     }
 
@@ -4826,7 +4855,7 @@ pub mod meshing_ffi {
         }
         let result = unsafe { &(*ptr).0 };
         let name = unsafe { CStr::from_ptr(region_name).to_string_lossy() };
-        match result.meshes.get(name.as_ref()) {
+        match result.get(name.as_ref()) {
             Some(mesh) => Box::into_raw(Box::new(FFIMeshResult(mesh.clone()))),
             None => ptr::null_mut(),
         }
@@ -4838,7 +4867,7 @@ pub mod meshing_ffi {
             return 0;
         }
         let result = unsafe { &(*ptr).0 };
-        result.total_vertex_count
+        result.values().map(|m| m.total_vertices()).sum()
     }
 
     #[no_mangle]
@@ -4849,7 +4878,7 @@ pub mod meshing_ffi {
             return 0;
         }
         let result = unsafe { &(*ptr).0 };
-        result.total_triangle_count
+        result.values().map(|m| m.total_triangles()).sum()
     }
 
     #[no_mangle]
@@ -4858,7 +4887,7 @@ pub mod meshing_ffi {
             return 0;
         }
         let result = unsafe { &(*ptr).0 };
-        result.meshes.len()
+        result.len()
     }
 
     // --- ChunkMeshResult FFI ---
@@ -4931,6 +4960,23 @@ pub mod meshing_ffi {
         }
         let result = unsafe { &(*ptr).0 };
         result.total_triangle_count
+    }
+
+    #[no_mangle]
+    pub extern "C" fn chunkmeshresult_nucm_data(ptr: *const FFIChunkMeshResult) -> ByteArray {
+        if ptr.is_null() {
+            return ByteArray {
+                data: ptr::null_mut(),
+                len: 0,
+            };
+        }
+        let result = unsafe { &(*ptr).0 };
+        let meshes: Vec<crate::meshing::MeshOutput> = result.meshes.values().cloned().collect();
+        let mut data = crate::meshing::cache::serialize_meshes(&meshes);
+        let p = data.as_mut_ptr();
+        let len = data.len();
+        std::mem::forget(data);
+        ByteArray { data: p, len }
     }
 
     #[no_mangle]
@@ -5215,6 +5261,211 @@ pub mod meshing_ffi {
         };
         manager.register_exporter(mesh_exporter);
         0
+    }
+
+    // --- TextureAtlas Lifecycle ---
+
+    #[no_mangle]
+    pub extern "C" fn textureatlas_free(ptr: *mut FFITextureAtlas) {
+        if !ptr.is_null() {
+            unsafe {
+                let _ = Box::from_raw(ptr);
+            }
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn textureatlas_width(ptr: *const FFITextureAtlas) -> u32 {
+        if ptr.is_null() {
+            return 0;
+        }
+        unsafe { (*ptr).0.width }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn textureatlas_height(ptr: *const FFITextureAtlas) -> u32 {
+        if ptr.is_null() {
+            return 0;
+        }
+        unsafe { (*ptr).0.height }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn textureatlas_rgba_data(ptr: *const FFITextureAtlas) -> ByteArray {
+        if ptr.is_null() {
+            return ByteArray {
+                data: ptr::null_mut(),
+                len: 0,
+            };
+        }
+        let atlas = unsafe { &(*ptr).0 };
+        let mut data = atlas.pixels.clone();
+        let p = data.as_mut_ptr();
+        let len = data.len();
+        std::mem::forget(data);
+        ByteArray { data: p, len }
+    }
+
+    // --- Global Atlas Builder ---
+
+    #[no_mangle]
+    pub extern "C" fn schematic_build_global_atlas(
+        schematic: *const SchematicWrapper,
+        pack: *const FFIResourcePack,
+        config: *const FFIMeshConfig,
+    ) -> *mut FFITextureAtlas {
+        if schematic.is_null() || pack.is_null() || config.is_null() {
+            return ptr::null_mut();
+        }
+        let s = unsafe { &*(*schematic).0 };
+        let p = unsafe { &(*pack).0 };
+        let c = unsafe { &(*config).0 };
+        match crate::meshing::build_global_atlas(s, p, c) {
+            Ok(atlas) => Box::into_raw(Box::new(FFITextureAtlas(atlas))),
+            Err(_) => ptr::null_mut(),
+        }
+    }
+
+    // --- Chunk Meshing with Shared Atlas ---
+
+    #[no_mangle]
+    pub extern "C" fn schematic_mesh_chunks_with_atlas(
+        schematic: *const SchematicWrapper,
+        pack: *const FFIResourcePack,
+        config: *const FFIMeshConfig,
+        chunk_size: c_int,
+        atlas: *const FFITextureAtlas,
+    ) -> *mut FFIChunkMeshResult {
+        if schematic.is_null() || pack.is_null() || config.is_null() || atlas.is_null() {
+            return ptr::null_mut();
+        }
+        let s = unsafe { &*(*schematic).0 };
+        let p = unsafe { &(*pack).0 };
+        let c = unsafe { &(*config).0 };
+        let a = unsafe { &(*atlas).0 };
+
+        let iter = s.mesh_chunks_with_atlas(p, c, chunk_size, a.clone());
+        let mut meshes = std::collections::HashMap::new();
+        let mut total_vertex_count = 0;
+        let mut total_triangle_count = 0;
+
+        for result in iter {
+            match result {
+                Ok(mesh) => {
+                    total_vertex_count += mesh.total_vertices();
+                    total_triangle_count += mesh.total_triangles();
+                    if let Some(coord) = mesh.chunk_coord {
+                        meshes.insert(coord, mesh);
+                    }
+                }
+                Err(_) => return ptr::null_mut(),
+            }
+        }
+
+        Box::into_raw(Box::new(FFIChunkMeshResult(ChunkMeshResult {
+            meshes,
+            total_vertex_count,
+            total_triangle_count,
+        })))
+    }
+
+    // --- NUCM v2 with Shared Atlas ---
+
+    #[no_mangle]
+    pub extern "C" fn chunkmeshresult_nucm_data_with_atlas(
+        ptr: *const FFIChunkMeshResult,
+        atlas: *const FFITextureAtlas,
+    ) -> ByteArray {
+        if ptr.is_null() || atlas.is_null() {
+            return ByteArray {
+                data: ptr::null_mut(),
+                len: 0,
+            };
+        }
+        let result = unsafe { &(*ptr).0 };
+        let atlas = unsafe { &(*atlas).0 };
+        let meshes: Vec<crate::meshing::MeshOutput> = result.meshes.values().cloned().collect();
+        let mut data = crate::meshing::cache::serialize_meshes_with_atlas(&meshes, atlas);
+        let p = data.as_mut_ptr();
+        let len = data.len();
+        std::mem::forget(data);
+        ByteArray { data: p, len }
+    }
+
+    // --- Progress Callback Support ---
+
+    /// C-compatible progress callback signature.
+    /// phase: 0=BuildingAtlas, 1=MeshingChunks, 2=Complete
+    pub type MeshProgressCallback = extern "C" fn(
+        phase: c_int,
+        chunks_done: u32,
+        chunks_total: u32,
+        vertices_so_far: u64,
+        triangles_so_far: u64,
+        user_data: *mut std::ffi::c_void,
+    );
+
+    #[no_mangle]
+    pub extern "C" fn schematic_mesh_chunks_with_atlas_progress(
+        schematic: *const SchematicWrapper,
+        pack: *const FFIResourcePack,
+        config: *const FFIMeshConfig,
+        chunk_size: c_int,
+        atlas: *const FFITextureAtlas,
+        callback: MeshProgressCallback,
+        user_data: *mut std::ffi::c_void,
+    ) -> *mut FFIChunkMeshResult {
+        if schematic.is_null() || pack.is_null() || config.is_null() || atlas.is_null() {
+            return ptr::null_mut();
+        }
+        let s = unsafe { &*(*schematic).0 };
+        let p = unsafe { &(*pack).0 };
+        let c = unsafe { &(*config).0 };
+        let a = unsafe { &(*atlas).0 };
+
+        let mut iter = s.mesh_chunks_with_atlas(p, c, chunk_size, a.clone());
+
+        // Wrap C callback into Rust closure.
+        // Cast user_data to usize so the closure is Send-safe.
+        let ud = user_data as usize;
+        iter.set_progress_callback(Box::new(move |progress: MeshProgress| {
+            let phase = match progress.phase {
+                MeshPhase::BuildingAtlas => 0,
+                MeshPhase::MeshingChunks => 1,
+                MeshPhase::Complete => 2,
+            };
+            callback(
+                phase,
+                progress.chunks_done,
+                progress.chunks_total,
+                progress.vertices_so_far,
+                progress.triangles_so_far,
+                ud as *mut std::ffi::c_void,
+            );
+        }));
+
+        let mut meshes = std::collections::HashMap::new();
+        let mut total_vertex_count = 0;
+        let mut total_triangle_count = 0;
+
+        for result in iter {
+            match result {
+                Ok(mesh) => {
+                    total_vertex_count += mesh.total_vertices();
+                    total_triangle_count += mesh.total_triangles();
+                    if let Some(coord) = mesh.chunk_coord {
+                        meshes.insert(coord, mesh);
+                    }
+                }
+                Err(_) => return ptr::null_mut(),
+            }
+        }
+
+        Box::into_raw(Box::new(FFIChunkMeshResult(ChunkMeshResult {
+            meshes,
+            total_vertex_count,
+            total_triangle_count,
+        })))
     }
 }
 

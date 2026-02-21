@@ -4,3 +4,6 @@
 .history/
 .DS_Store
 .vscode/
+
+# Generated test .nucm files (large binaries, regenerate with gen_test_nucm example)
+examples/nucm-viewer/test-files/

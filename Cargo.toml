@@ -1,6 +1,6 @@
 [package]
 name = "nucleation"
-version = "0.1.163"
+version = "0.1.164"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -82,7 +82,7 @@ bytemuck = "1.23.1"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 
 # Meshing dependencies - optional
-schematic-mesher = { git = "https://github.com/Schem-at/Schematic-Mesher.git", rev = "492e2cd", optional = true }
+schematic-mesher = { git = "https://github.com/Schem-at/Schematic-Mesher.git", branch = "feature/mesh-output-api", optional = true }
 
 # Simulation (MCHPRS) dependencies - optional
 # Note: These are git dependencies and will be excluded from crates.io publish
@@ -98,6 +98,13 @@ mchprs_blocks = { git = "https://github.com/Nano112/MCHPRS.git", rev = "aedc5884
 wasm-bindgen-test = "0.3"
 num-complex = "0.4"
 base64 = "0.22"
+wgpu = "24"
+image = "0.24"
+pollster = "0.4"
+bytemuck = { version = "1", features = ["derive"] }
+rayon = "1.10"
+ffmpeg-sidecar = "2.4"
+winit = "0.30"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 criterion = "0.5.1"
@@ -114,6 +121,31 @@ harness = false
 name = "scripting_bench"
 harness = false
 required-features = ["scripting"]
+
+# Examples requiring the meshing feature
+[[example]]
+name = "render_schematic"
+required-features = ["meshing"]
+
+[[example]]
+name = "compare_formats"
+required-features = ["meshing"]
+
+[[example]]
+name = "gen_test_nucm"
+required-features = ["meshing"]
+
+[[example]]
+name = "quick_mesh_test"
+required-features = ["meshing"]
+
+[[example]]
+name = "nucm_size_test"
+required-features = ["meshing"]
+
+[[example]]
+name = "convert_world"
+required-features = ["meshing"]
 
 [profile.bench]
 debug = true

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NUCM Viewer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #0d0d1a; color: #e0e0e0; overflow: hidden; height: 100vh; }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  #controls {
+    position: absolute; top: 16px; left: 16px;
+    background: rgba(20, 20, 40, 0.9); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; padding: 16px; min-width: 280px;
+    backdrop-filter: blur(8px);
+  }
+  #controls h1 { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #a0c4ff; }
+
+  .control-row { margin-bottom: 10px; }
+  .control-row label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; }
+
+  #drop-zone {
+    border: 2px dashed rgba(160, 196, 255, 0.3); border-radius: 6px;
+    padding: 20px; text-align: center; cursor: pointer; transition: border-color 0.2s;
+  }
+  #drop-zone:hover, #drop-zone.drag-over { border-color: rgba(160, 196, 255, 0.7); }
+  #drop-zone p { font-size: 13px; color: #888; }
+  #drop-zone .filename { font-size: 12px; color: #a0c4ff; margin-top: 4px; word-break: break-all; }
+
+  input[type="range"] {
+    width: 100%; accent-color: #a0c4ff; cursor: pointer;
+  }
+  .range-labels { display: flex; justify-content: space-between; font-size: 11px; color: #666; }
+
+  button {
+    width: 100%; padding: 8px; border: none; border-radius: 6px;
+    background: #a0c4ff; color: #0d0d1a; font-weight: 600; font-size: 13px;
+    cursor: pointer; transition: background 0.2s;
+  }
+  button:hover { background: #c0d8ff; }
+  button:disabled { background: #444; color: #888; cursor: default; }
+
+  #stats {
+    position: absolute; bottom: 16px; left: 16px;
+    background: rgba(20, 20, 40, 0.9); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; padding: 12px 16px; font-size: 12px;
+    backdrop-filter: blur(8px); display: none;
+  }
+  #stats .stat { margin-bottom: 4px; }
+  #stats .stat-label { color: #888; }
+  #stats .stat-value { color: #a0c4ff; font-weight: 600; }
+
+  #progress {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: rgba(20, 20, 40, 0.95); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; padding: 24px 32px; text-align: center; display: none;
+  }
+  #progress .bar { width: 200px; height: 4px; background: #333; border-radius: 2px; margin: 12px auto 8px; }
+  #progress .bar-fill { height: 100%; background: #a0c4ff; border-radius: 2px; width: 0%; transition: width 0.1s; }
+  #progress .label { font-size: 13px; }
+</style>
+</head>
+<body>
+
+<canvas id="viewport"></canvas>
+
+<div id="controls">
+  <h1>NUCM Viewer</h1>
+
+  <div class="control-row">
+    <div id="drop-zone">
+      <p>Drop .nucm file here or click to browse</p>
+      <input type="file" id="file-input" accept=".nucm" hidden>
+    </div>
+  </div>
+
+  <div class="control-row">
+    <label>Max chunks: <span id="chunk-label">50</span></label>
+    <input type="range" id="max-chunks" min="1" max="2000" value="50">
+    <div class="range-labels"><span>1</span><span>2000</span></div>
+  </div>
+
+  <div class="control-row">
+    <button id="load-btn" disabled>Load</button>
+  </div>
+</div>
+
+<div id="stats">
+  <div class="stat"><span class="stat-label">Chunks: </span><span class="stat-value" id="stat-chunks">-</span></div>
+  <div class="stat"><span class="stat-label">Vertices: </span><span class="stat-value" id="stat-verts">-</span></div>
+  <div class="stat"><span class="stat-label">Triangles: </span><span class="stat-value" id="stat-tris">-</span></div>
+  <div class="stat"><span class="stat-label">File size: </span><span class="stat-value" id="stat-size">-</span></div>
+  <div class="stat"><span class="stat-label">Parse time: </span><span class="stat-value" id="stat-parse">-</span></div>
+  <div class="stat"><span class="stat-label">GPU upload: </span><span class="stat-value" id="stat-gpu">-</span></div>
+</div>
+
+<div id="progress">
+  <div class="label" id="progress-label">Loading...</div>
+  <div class="bar"><div class="bar-fill" id="progress-fill"></div></div>
+  <div class="label" id="progress-detail"></div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+    "fflate": "https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js"
+  }
+}
+</script>
+
+<script type="module">
+import { parseNUCM } from './nucm-parser.js';
+import { createScene, addChunk, clearScene, fitCamera } from './renderer.js';
+
+const canvas = document.getElementById('viewport');
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const maxChunksSlider = document.getElementById('max-chunks');
+const chunkLabel = document.getElementById('chunk-label');
+const loadBtn = document.getElementById('load-btn');
+const statsEl = document.getElementById('stats');
+const progressEl = document.getElementById('progress');
+const progressFill = document.getElementById('progress-fill');
+const progressLabel = document.getElementById('progress-label');
+const progressDetail = document.getElementById('progress-detail');
+
+// Resize canvas to fill viewport
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Init Three.js
+const { scene, camera, renderer, controls } = createScene(canvas);
+
+let selectedFile = null;
+
+// File selection
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', (e) => {
+  if (e.target.files.length > 0) selectFile(e.target.files[0]);
+});
+
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files.length > 0) selectFile(e.dataTransfer.files[0]);
+});
+
+function selectFile(file) {
+  selectedFile = file;
+  dropZone.innerHTML = `<p>Selected:</p><div class="filename">${file.name} (${formatBytes(file.size)})</div>`;
+  loadBtn.disabled = false;
+}
+
+maxChunksSlider.addEventListener('input', () => {
+  chunkLabel.textContent = maxChunksSlider.value;
+});
+
+// Load button
+loadBtn.addEventListener('click', async () => {
+  if (!selectedFile) return;
+  loadBtn.disabled = true;
+
+  progressEl.style.display = 'block';
+  progressLabel.textContent = 'Reading file...';
+  progressFill.style.width = '0%';
+  progressDetail.textContent = '';
+
+  try {
+    const buffer = await selectedFile.arrayBuffer();
+
+    progressLabel.textContent = 'Parsing NUCM...';
+    const maxChunks = parseInt(maxChunksSlider.value);
+
+    // Parse in a microtask to let the UI update
+    await new Promise(r => setTimeout(r, 10));
+
+    const parseStart = performance.now();
+    const { chunks, totalChunks } = parseNUCM(buffer, maxChunks, (current, total) => {
+      const pct = Math.round((current / Math.min(maxChunks, total)) * 100);
+      progressFill.style.width = `${Math.min(pct, 100)}%`;
+      progressDetail.textContent = `Chunk ${current} / ${total}`;
+    });
+    const parseTime = performance.now() - parseStart;
+
+    progressLabel.textContent = 'Uploading to GPU...';
+    progressFill.style.width = '100%';
+    await new Promise(r => setTimeout(r, 10));
+
+    // Clear existing scene
+    clearScene(scene);
+
+    const gpuStart = performance.now();
+    let totalVerts = 0;
+    let totalTris = 0;
+
+    for (const chunk of chunks) {
+      const result = addChunk(scene, chunk);
+      totalVerts += result.vertexCount;
+      totalTris += result.triangleCount;
+    }
+    const gpuTime = performance.now() - gpuStart;
+
+    // Fit camera
+    fitCamera(camera, controls, scene);
+
+    // Update stats
+    document.getElementById('stat-chunks').textContent = `${chunks.length} / ${totalChunks}`;
+    document.getElementById('stat-verts').textContent = formatNumber(totalVerts);
+    document.getElementById('stat-tris').textContent = formatNumber(Math.round(totalTris));
+    document.getElementById('stat-size').textContent = formatBytes(buffer.byteLength);
+    document.getElementById('stat-parse').textContent = `${parseTime.toFixed(0)} ms`;
+    document.getElementById('stat-gpu').textContent = `${gpuTime.toFixed(0)} ms`;
+    statsEl.style.display = 'block';
+
+  } catch (err) {
+    progressLabel.textContent = `Error: ${err.message}`;
+    progressDetail.textContent = '';
+    console.error(err);
+    await new Promise(r => setTimeout(r, 3000));
+  }
+
+  progressEl.style.display = 'none';
+  loadBtn.disabled = false;
+});
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+}
+
+function formatNumber(n) {
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return n.toString();
+}
+</script>
+</body>
+</html>

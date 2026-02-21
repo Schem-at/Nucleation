@@ -142,6 +142,78 @@ MultiMeshResult.all_meshes = Python convenience (FFI uses get_mesh)
 ChunkMeshResult.all_meshes = Python convenience (FFI uses get_mesh)
 MeshExporter.* = Mesh exporter registered via FormatManager (FFI uses schematic_register_mesh_exporter)
 
+# --- Global atlas / progress API differences ---
+# TextureAtlas: FFI uses free functions, WASM/Python use wrapper object methods
+[ffi_only]
+textureatlas_* = FFI free functions for TextureAtlas (WASM/Python use wrapper methods)
+Schematic.mesh_chunks_with_atlas_progress = FFI C-callback progress variant (WASM uses setProgressCallback on iterator)
+ChunkMeshResult.nucm_data_with_atlas = FFI separate atlas-aware NUCM export (WASM/Python handle internally)
+
+[wasm_only]
+ChunkMeshIterator.* = WASM-specific lazy iterator with atlas/progress (Python/FFI use eager methods)
+
+[no_python]
+Schematic.chunk_mesh_iterator = WASM-specific lazy iterator (Python uses mesh_chunks)
+Schematic.chunk_mesh_iterator_with_atlas = WASM-specific lazy iterator with atlas (Python uses mesh_chunks_with_atlas)
+Schematic.mesh_chunks_with_atlas_progress = FFI C-callback pattern (Python doesn't need separate progress variant)
+TextureAtlas.to_bytes = WASM naming (Python uses rgba_data)
+ChunkMeshResult.to_nucm = WASM naming (Python uses nucm_data/save_nucm)
+ChunkMeshResult.nucm_data_with_atlas = FFI-specific atlas-aware NUCM export
+
+[no_wasm]
+Schematic.mesh_chunks = Python/FFI eager chunked meshing (WASM uses chunkMeshIterator)
+Schematic.mesh_chunks_with_atlas = Python/FFI eager chunked meshing with atlas (WASM uses chunkMeshIteratorWithAtlas)
+TextureAtlas.region_count = Python convenience property
+TextureAtlas.rgba_data = Python naming (WASM uses toBytes)
+ChunkMeshResult.nucm_data = Python/FFI naming (WASM uses toNucm)
+ChunkMeshResult.nucm_data_with_atlas = FFI-specific atlas-aware NUCM export
+ChunkMeshResult.save_nucm = Python file I/O (no filesystem in WASM)
+
+[no_ffi]
+Schematic.chunk_mesh_iterator = WASM lazy iterator (FFI uses eager schematic_mesh_chunks)
+Schematic.chunk_mesh_iterator_with_atlas = WASM lazy iterator with atlas (FFI uses eager variant)
+Schematic.mesh_chunks = Python eager chunked meshing (FFI uses schematic_mesh_by_chunk_size)
+TextureAtlas.* = FFI uses free functions (textureatlas_*) not methods on a wrapper type
+ChunkMeshResult.to_nucm = WASM naming (FFI uses chunkmeshresult_nucm_data)
+ChunkMeshResult.save_nucm = Python file I/O (FFI does not provide file I/O)
+
+# --- MeshOutput / MeshResult naming divergence ---
+# WASM wraps single-mesh results as MeshOutput; Python wraps them as MeshResult.
+# FFI exposes a subset via meshresult_* free functions.
+# These are the same concept with different wrapper names, not missing implementations.
+
+[wasm_only]
+MeshOutput.* = WASM single-mesh wrapper (Python uses MeshResult, FFI uses meshresult_*)
+
+[no_wasm]
+MeshResult.* = Python single-mesh wrapper (WASM uses MeshOutput)
+MultiMeshResult.nucm_data = Python naming (WASM uses toNucm on iterator)
+MultiMeshResult.save_nucm = Python file I/O (no filesystem in WASM)
+
+[no_ffi]
+MeshOutput.* = WASM wrapper type (FFI uses meshresult_* free functions)
+MeshResult.atlas_height = Python wrapper accessor (FFI uses meshresult_* subset)
+MeshResult.atlas_rgba = Python wrapper accessor
+MeshResult.atlas_width = Python wrapper accessor
+MeshResult.chunk_coord = Python wrapper accessor
+MeshResult.cutout_indices = Python wrapper accessor
+MeshResult.cutout_positions = Python wrapper accessor
+MeshResult.is_empty = Python wrapper accessor
+MeshResult.lod_level = Python wrapper accessor
+MeshResult.opaque_colors = Python wrapper accessor
+MeshResult.opaque_indices = Python wrapper accessor
+MeshResult.opaque_normals = Python wrapper accessor
+MeshResult.opaque_positions = Python wrapper accessor
+MeshResult.opaque_uvs = Python wrapper accessor
+MeshResult.save_nucm = Python file I/O
+MeshResult.total_triangles = Python wrapper accessor
+MeshResult.total_vertices = Python wrapper accessor
+MeshResult.transparent_indices = Python wrapper accessor
+MeshResult.transparent_positions = Python wrapper accessor
+MeshResult.usdz_data = Python wrapper accessor
+MultiMeshResult.nucm_data = Python naming (FFI uses chunkmeshresult_nucm_data)
+MultiMeshResult.save_nucm = Python file I/O
+
 # --- Scripting FFI entry points (feature-gated, not in WASM/Python) ---
 [ffi_only]
 run_lua_script = FFI scripting entry point (feature-gated scripting-lua)

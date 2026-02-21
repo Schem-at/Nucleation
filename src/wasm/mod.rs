@@ -39,8 +39,8 @@ pub use schematic_builder::SchematicBuilderWrapper;
 pub use circuit_builder::{CircuitBuilderWrapper, SortStrategyWrapper, StateModeConstants};
 #[cfg(feature = "meshing")]
 pub use meshing::{
-    ChunkMeshResultWrapper, MeshConfigWrapper, MeshResultWrapper, MultiMeshResultWrapper,
-    ResourcePackWrapper,
+    ChunkMeshIteratorWrapper, ChunkMeshResultWrapper, MeshConfigWrapper, MeshResultWrapper,
+    MultiMeshResultWrapper, ResourcePackWrapper, TextureAtlasWrapper,
 };
 #[cfg(feature = "simulation")]
 pub use simulation::{MchprsWorldWrapper, SimulationOptionsWrapper};

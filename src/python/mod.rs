@@ -69,6 +69,7 @@ pub fn nucleation(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m.add_class::<meshing::PyMultiMeshResult>()?;
         m.add_class::<meshing::PyChunkMeshResult>()?;
         m.add_class::<meshing::PyRawMeshExport>()?;
+        m.add_class::<meshing::PyTextureAtlas>()?;
     }
 
     #[cfg(feature = "simulation")]

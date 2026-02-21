@@ -1639,6 +1639,78 @@ impl PySchematic {
             .map(|result| super::meshing::PyRawMeshExport { inner: result })
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
+
+    /// Lazy chunk mesh iterator. Returns a list of MeshResult, one per chunk.
+    ///
+    /// Yields one MeshResult per chunk of `chunk_size` blocks on each axis.
+    /// For truly lazy streaming in Python, iterate over the returned list.
+    #[cfg(feature = "meshing")]
+    #[pyo3(signature = (pack, config=None, chunk_size=16))]
+    pub fn mesh_chunks(
+        &self,
+        pack: &super::meshing::PyResourcePack,
+        config: Option<&super::meshing::PyMeshConfig>,
+        chunk_size: i32,
+    ) -> PyResult<Vec<super::meshing::PyMeshResult>> {
+        let default_config = crate::meshing::MeshConfig::default();
+        let config = config.map(|c| &c.inner).unwrap_or(&default_config);
+
+        let iter = self.inner.mesh_chunks(&pack.inner, config, chunk_size);
+        let mut results = Vec::new();
+        for chunk_result in iter {
+            let mesh = chunk_result
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            results.push(super::meshing::PyMeshResult { inner: mesh });
+        }
+        Ok(results)
+    }
+
+    /// Build a global texture atlas for the schematic without meshing.
+    ///
+    /// The atlas can be reused across multiple `mesh_chunks_with_atlas` calls,
+    /// avoiding redundant atlas rebuilds for chunked workflows.
+    #[cfg(feature = "meshing")]
+    #[pyo3(signature = (pack, config=None))]
+    pub fn build_global_atlas(
+        &self,
+        pack: &super::meshing::PyResourcePack,
+        config: Option<&super::meshing::PyMeshConfig>,
+    ) -> PyResult<super::meshing::PyTextureAtlas> {
+        let default_config = crate::meshing::MeshConfig::default();
+        let config = config.map(|c| &c.inner).unwrap_or(&default_config);
+
+        crate::meshing::build_global_atlas(&self.inner, &pack.inner, config)
+            .map(|atlas| super::meshing::PyTextureAtlas { inner: atlas })
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    /// Chunk mesh iterator using a pre-built shared atlas.
+    ///
+    /// Like `mesh_chunks`, but every chunk reuses the provided `atlas`
+    /// instead of building its own. Returns a list of MeshResult.
+    #[cfg(feature = "meshing")]
+    #[pyo3(signature = (pack, atlas, config=None, chunk_size=16))]
+    pub fn mesh_chunks_with_atlas(
+        &self,
+        pack: &super::meshing::PyResourcePack,
+        atlas: &super::meshing::PyTextureAtlas,
+        config: Option<&super::meshing::PyMeshConfig>,
+        chunk_size: i32,
+    ) -> PyResult<Vec<super::meshing::PyMeshResult>> {
+        let default_config = crate::meshing::MeshConfig::default();
+        let config = config.map(|c| &c.inner).unwrap_or(&default_config);
+
+        let iter =
+            self.inner
+                .mesh_chunks_with_atlas(&pack.inner, config, chunk_size, atlas.inner.clone());
+        let mut results = Vec::new();
+        for chunk_result in iter {
+            let mesh = chunk_result
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            results.push(super::meshing::PyMeshResult { inner: mesh });
+        }
+        Ok(results)
+    }
 }
 
 // --- NBT Conversion Helpers ---
