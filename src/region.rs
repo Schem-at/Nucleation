@@ -583,8 +583,14 @@ impl Region {
     }
     fn calculate_bits_per_block(&self) -> usize {
         let palette_size = self.palette.len();
-        let bits_per_block = std::cmp::max((palette_size as f64).log2().ceil() as usize, 2);
-        bits_per_block
+        if palette_size <= 1 {
+            2
+        } else {
+            std::cmp::max(
+                (usize::BITS - (palette_size - 1).leading_zeros()) as usize,
+                2,
+            )
+        }
     }
 
     pub fn merge(&mut self, other: &Region) {
@@ -908,29 +914,42 @@ impl Region {
 
     pub fn unpack_block_states(&self, packed_states: &[i64]) -> Vec<usize> {
         let bits_per_block = self.calculate_bits_per_block();
-        let mask = (1 << bits_per_block) - 1;
+        let mask: u64 = (1u64 << bits_per_block) - 1;
         let volume = self.volume();
 
         let mut blocks = Vec::with_capacity(volume);
 
-        for index in 0..volume {
-            let bit_index = index * bits_per_block;
-            let start_long_index = bit_index / 64;
-            let start_offset = bit_index % 64;
+        if 64 % bits_per_block == 0 {
+            // Fast path: entries never cross i64 boundaries (bits_per_block = 2, 4, 8, 16, 32)
+            let entries_per_long = 64 / bits_per_block;
+            let mut remaining = volume;
+            for &packed in packed_states {
+                let packed_u64 = packed as u64;
+                let count = remaining.min(entries_per_long);
+                for i in 0..count {
+                    blocks.push(((packed_u64 >> (i * bits_per_block)) & mask) as usize);
+                }
+                remaining -= count;
+            }
+        } else {
+            // Slow path: entries may cross i64 boundaries
+            for index in 0..volume {
+                let bit_index = index * bits_per_block;
+                let start_long_index = bit_index / 64;
+                let start_offset = bit_index % 64;
 
-            let value = if start_offset + bits_per_block <= 64 {
-                // Block is entirely within one long
-                ((packed_states[start_long_index] as u64) >> start_offset) & (mask as u64)
-            } else {
-                // Block spans two longs
-                let low_bits = ((packed_states[start_long_index] as u64) >> start_offset)
-                    & ((1 << (64 - start_offset)) - 1);
-                let high_bits = (packed_states[start_long_index + 1] as u64)
-                    & ((1 << (bits_per_block - (64 - start_offset))) - 1);
-                low_bits | (high_bits << (64 - start_offset))
-            };
+                let value = if start_offset + bits_per_block <= 64 {
+                    ((packed_states[start_long_index] as u64) >> start_offset) & mask
+                } else {
+                    let low_bits = ((packed_states[start_long_index] as u64) >> start_offset)
+                        & ((1u64 << (64 - start_offset)) - 1);
+                    let high_bits = (packed_states[start_long_index + 1] as u64)
+                        & ((1u64 << (bits_per_block - (64 - start_offset))) - 1);
+                    low_bits | (high_bits << (64 - start_offset))
+                };
 
-            blocks.push(value as usize);
+                blocks.push(value as usize);
+            }
         }
 
         blocks
@@ -939,29 +958,36 @@ impl Region {
     pub(crate) fn create_packed_block_states(&self) -> Vec<i64> {
         let bits_per_block = self.calculate_bits_per_block();
         let size = self.blocks.len();
-        let expected_len = (size * bits_per_block + 63) / 64; // Equivalent to ceil(size * bits_per_block / 64)
+        let expected_len = (size * bits_per_block + 63) / 64;
 
         let mut packed_states = vec![0i64; expected_len];
-        let mask = (1i64 << bits_per_block) - 1;
+        let mask: u64 = (1u64 << bits_per_block) - 1;
 
-        for (index, &block_state) in self.blocks.iter().enumerate() {
-            let bit_index = index * bits_per_block;
-            let start_long_index = bit_index / 64;
-            let end_long_index = (bit_index + bits_per_block - 1) / 64;
-            let start_offset = bit_index % 64;
+        if 64 % bits_per_block == 0 {
+            // Fast path: entries never cross i64 boundaries (bits_per_block = 2, 4, 8, 16, 32)
+            let entries_per_long = 64 / bits_per_block;
+            for (chunk_idx, chunk) in self.blocks.chunks(entries_per_long).enumerate() {
+                let mut packed: u64 = 0;
+                for (i, &block_state) in chunk.iter().enumerate() {
+                    packed |= (block_state as u64 & mask) << (i * bits_per_block);
+                }
+                packed_states[chunk_idx] = packed as i64;
+            }
+        } else {
+            // Slow path: entries may cross i64 boundaries
+            for (index, &block_state) in self.blocks.iter().enumerate() {
+                let bit_index = index * bits_per_block;
+                let start_long_index = bit_index / 64;
+                let end_long_index = (bit_index + bits_per_block - 1) / 64;
+                let start_offset = bit_index % 64;
+                let value = (block_state as u64) & mask;
 
-            let value = (block_state as i64) & mask;
-
-            if start_long_index == end_long_index {
-                packed_states[start_long_index] |= value << start_offset;
-            } else {
-                packed_states[start_long_index] |= value << start_offset;
-                packed_states[end_long_index] |= value >> (64 - start_offset);
+                packed_states[start_long_index] |= (value << start_offset) as i64;
+                if start_long_index != end_long_index {
+                    packed_states[end_long_index] |= (value >> (64 - start_offset)) as i64;
+                }
             }
         }
-
-        // Handle negative numbers
-        packed_states.iter_mut().for_each(|x| *x = *x as u64 as i64);
 
         packed_states
     }

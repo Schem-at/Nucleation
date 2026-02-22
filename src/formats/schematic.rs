@@ -95,6 +95,10 @@ pub fn is_schematic(data: &[u8]) -> bool {
         && root.get::<_, &Vec<i8>>("BlockData").is_ok()
 }
 
+/// Default compression level for schematic serialization.
+/// Level 3 balances speed (~2x faster than L6) with size (~15% larger than L6).
+const DEFAULT_COMPRESSION: Compression = Compression::new(3);
+
 // Default function uses v3 format
 pub fn to_schematic(schematic: &UniversalSchematic) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     to_schematic_version(schematic, SchematicVersion::get_default())
@@ -104,15 +108,24 @@ pub fn to_schematic_version(
     schematic: &UniversalSchematic,
     version: SchematicVersion,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    to_schematic_with_options(schematic, version, DEFAULT_COMPRESSION)
+}
+
+pub fn to_schematic_with_options(
+    schematic: &UniversalSchematic,
+    version: SchematicVersion,
+    compression: Compression,
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     match version {
-        SchematicVersion::V2 => to_schematic_v2(schematic),
-        SchematicVersion::V3 => to_schematic_v3(schematic),
+        SchematicVersion::V2 => to_schematic_v2(schematic, compression),
+        SchematicVersion::V3 => to_schematic_v3(schematic, compression),
     }
 }
 
 // Version 3 format (recommended)
-pub fn to_schematic_v3(
+fn to_schematic_v3(
     schematic: &UniversalSchematic,
+    compression: Compression,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut schematic_data = NbtCompound::new();
 
@@ -171,17 +184,19 @@ pub fn to_schematic_v3(
         })
         .collect();
 
-    // Encode remapped block data
-    let block_data: Vec<u8> = remapped_blocks
-        .iter()
-        .flat_map(|&block_id| encode_varint(block_id))
-        .collect();
+    // Encode remapped block data — preallocated to avoid per-block Vec allocations
+    let mut block_data: Vec<u8> = Vec::with_capacity(remapped_blocks.len() * 2);
+    for &block_id in &remapped_blocks {
+        encode_varint_into(block_id, &mut block_data);
+    }
 
     // Add block data to Blocks container (renamed from "BlockData" to "Data" in v3)
-    blocks_container.insert(
-        "Data",
-        NbtTag::ByteArray(block_data.iter().map(|&x| x as i8).collect()),
-    );
+    // SAFETY: u8 and i8 have identical size, alignment, and representation
+    let block_data_i8: Vec<i8> = unsafe {
+        let mut v = std::mem::ManuallyDrop::new(block_data);
+        Vec::from_raw_parts(v.as_mut_ptr() as *mut i8, v.len(), v.capacity())
+    };
+    blocks_container.insert("Data", NbtTag::ByteArray(block_data_i8));
 
     // Add block entities from compact region (using v3 format)
     let block_entities = convert_block_entities_v3(&compact_region);
@@ -224,8 +239,7 @@ pub fn to_schematic_v3(
     let mut root = NbtCompound::new();
     root.insert("Schematic", NbtTag::Compound(schematic_data));
 
-    // Write NBT with proper compression
-    let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+    let mut encoder = GzEncoder::new(Vec::new(), compression);
     quartz_nbt::io::write_nbt(
         &mut encoder,
         None,
@@ -236,8 +250,9 @@ pub fn to_schematic_v3(
 }
 
 // Version 2 format (legacy compatibility)
-pub fn to_schematic_v2(
+fn to_schematic_v2(
     schematic: &UniversalSchematic,
+    compression: Compression,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut schematic_data = NbtCompound::new();
 
@@ -267,22 +282,22 @@ pub fn to_schematic_v2(
     let offset = vec![offset_pos.0, offset_pos.1, offset_pos.2];
     schematic_data.insert("Offset", NbtTag::IntArray(offset));
 
-    schematic_data.insert("Palette", convert_palette_v2(&compact_region.palette).0);
-    schematic_data.insert(
-        "PaletteMax",
-        convert_palette_v2(&compact_region.palette).1 + 1,
-    );
+    let (palette_nbt, max_id) = convert_palette_v2(&compact_region.palette);
+    schematic_data.insert("Palette", palette_nbt);
+    schematic_data.insert("PaletteMax", max_id + 1);
 
-    let block_data: Vec<u8> = compact_region
-        .blocks
-        .iter()
-        .flat_map(|&block_id| encode_varint(block_id as u32))
-        .collect();
+    // Encode block data — preallocated to avoid per-block Vec allocations
+    let mut block_data: Vec<u8> = Vec::with_capacity(compact_region.blocks.len() * 2);
+    for &block_id in &compact_region.blocks {
+        encode_varint_into(block_id as u32, &mut block_data);
+    }
 
-    schematic_data.insert(
-        "BlockData",
-        NbtTag::ByteArray(block_data.iter().map(|&x| x as i8).collect()),
-    );
+    // SAFETY: u8 and i8 have identical size, alignment, and representation
+    let block_data_i8: Vec<i8> = unsafe {
+        let mut v = std::mem::ManuallyDrop::new(block_data);
+        Vec::from_raw_parts(v.as_mut_ptr() as *mut i8, v.len(), v.capacity())
+    };
+    schematic_data.insert("BlockData", NbtTag::ByteArray(block_data_i8));
 
     // Use block entities and entities from compact region
     let block_entities = convert_block_entities(&compact_region);
@@ -306,7 +321,7 @@ pub fn to_schematic_v2(
     let mut root = NbtCompound::new();
     root.insert("Schematic", NbtTag::Compound(schematic_data));
 
-    let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+    let mut encoder = GzEncoder::new(Vec::new(), compression);
     quartz_nbt::io::write_nbt(
         &mut encoder,
         None,
@@ -598,6 +613,12 @@ fn parse_block_state(input: &str) -> BlockState {
 
 pub fn encode_varint(value: u32) -> Vec<u8> {
     let mut bytes = Vec::new();
+    encode_varint_into(value, &mut bytes);
+    bytes
+}
+
+#[inline]
+fn encode_varint_into(value: u32, buf: &mut Vec<u8>) {
     let mut val = value;
     loop {
         let mut byte = (val & 0b0111_1111) as u8;
@@ -605,12 +626,11 @@ pub fn encode_varint(value: u32) -> Vec<u8> {
         if val != 0 {
             byte |= 0b1000_0000;
         }
-        bytes.push(byte);
+        buf.push(byte);
         if val == 0 {
             break;
         }
     }
-    bytes
 }
 
 fn decode_varint<R: Read>(reader: &mut R) -> Result<u32, Box<dyn std::error::Error>> {
@@ -1015,7 +1035,7 @@ mod tests {
         schematic.default_region.add_entity(entity);
 
         // Export to schematic v3
-        let schem_data = to_schematic_v3(&schematic).unwrap();
+        let schem_data = to_schematic_v3(&schematic, DEFAULT_COMPRESSION).unwrap();
 
         // Parse back the raw NBT
         let reader = std::io::BufReader::new(schem_data.as_slice());
@@ -1046,7 +1066,7 @@ mod tests {
 
         // Test entity positions via v2 (v3 has a pre-existing bug where entities
         // are filtered out due to case-sensitive "Id" vs "id" check)
-        let schem_v2_data = to_schematic_v2(&schematic).unwrap();
+        let schem_v2_data = to_schematic_v2(&schematic, DEFAULT_COMPRESSION).unwrap();
         let reader_v2 = std::io::BufReader::new(schem_v2_data.as_slice());
         let mut gz_v2 = GzDecoder::new(reader_v2);
         let (root_v2, _) = read_nbt(&mut gz_v2, Flavor::Uncompressed).unwrap();
@@ -1104,7 +1124,7 @@ mod tests {
         schematic.default_region.add_entity(creeper);
 
         // Roundtrip through v2 (v3 has a pre-existing entity export filter bug)
-        let schem_data = to_schematic_v2(&schematic).unwrap();
+        let schem_data = to_schematic_v2(&schematic, DEFAULT_COMPRESSION).unwrap();
         let roundtrip = from_schematic(&schem_data).unwrap();
 
         let rt_region = &roundtrip.default_region;

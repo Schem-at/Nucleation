@@ -9,26 +9,31 @@ use std::io::{Cursor, Read};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn is_litematic(data: &[u8]) -> bool {
-    // Decompress the data
-    let mut decoder = GzDecoder::new(data);
-    let mut decompressed = Vec::new();
-    if decoder.read_to_end(&mut decompressed).is_err() {
-        return false;
-    }
-
-    // Read the NBT data
-    let (root, _) =
-        match quartz_nbt::io::read_nbt(&mut Cursor::new(decompressed), Flavor::Uncompressed) {
-            Ok(result) => result,
-            Err(_) => return false,
-        };
+    // Stream-decompress directly into NBT parser (no intermediate buffer)
+    let reader = std::io::BufReader::with_capacity(1 << 20, data);
+    let mut gz = GzDecoder::new(reader);
+    let (root, _) = match quartz_nbt::io::read_nbt(&mut gz, Flavor::Uncompressed) {
+        Ok(result) => result,
+        Err(_) => return false,
+    };
 
     // Check for required fields as per the Litematic format
     root.get::<_, i32>("Version").is_ok()
         && root.get::<_, &NbtCompound>("Metadata").is_ok()
         && root.get::<_, &NbtCompound>("Regions").is_ok()
 }
+/// Default compression level for litematic serialization.
+/// Level 3 balances speed (~2x faster than L6) with size (~15% larger than L6).
+const DEFAULT_COMPRESSION: flate2::Compression = flate2::Compression::new(3);
+
 pub fn to_litematic(schematic: &UniversalSchematic) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    to_litematic_with_compression(schematic, DEFAULT_COMPRESSION)
+}
+
+pub fn to_litematic_with_compression(
+    schematic: &UniversalSchematic,
+    compression: flate2::Compression,
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut root = NbtCompound::new();
 
     // Add Version and SubVersion
@@ -50,7 +55,7 @@ pub fn to_litematic(schematic: &UniversalSchematic) -> Result<Vec<u8>, Box<dyn s
     root.insert("Regions", NbtTag::Compound(regions));
 
     // Compress and return the NBT data
-    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), compression);
     quartz_nbt::io::write_nbt(
         &mut encoder,
         None,
@@ -61,14 +66,10 @@ pub fn to_litematic(schematic: &UniversalSchematic) -> Result<Vec<u8>, Box<dyn s
 }
 
 pub fn from_litematic(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::error::Error>> {
-    let mut decoder = flate2::read::GzDecoder::new(data);
-    let mut decompressed = Vec::new();
-    std::io::Read::read_to_end(&mut decoder, &mut decompressed)?;
-
-    let (root, _) = quartz_nbt::io::read_nbt(
-        &mut std::io::Cursor::new(decompressed),
-        quartz_nbt::io::Flavor::Uncompressed,
-    )?;
+    // Stream-decompress directly into NBT parser (no intermediate buffer)
+    let reader = std::io::BufReader::with_capacity(1 << 20, data);
+    let mut gz = flate2::read::GzDecoder::new(reader);
+    let (root, _) = quartz_nbt::io::read_nbt(&mut gz, quartz_nbt::io::Flavor::Uncompressed)?;
 
     let mut schematic = UniversalSchematic::new("Unnamed".to_string());
 
@@ -179,25 +180,37 @@ fn create_regions(schematic: &UniversalSchematic) -> NbtCompound {
         region_nbt.insert("Size", NbtTag::Compound(size));
 
         // BlockStatePalette
-        // Create a reordered palette with air always at index 0
-        let mut reordered_palette = Vec::new();
+        // Build reordered palette with air at index 0, and index mapping in one pass
+        let mut reordered_palette: Vec<&BlockState> =
+            Vec::with_capacity(compact_region.palette.len() + 1);
+        let mut index_mapping = vec![0usize; compact_region.palette.len()];
 
-        // First, find and add air
-        let air_index = compact_region
+        // Air always at index 0
+        let air_state = BlockState::new("minecraft:air".to_string());
+        let has_air = compact_region
             .palette
             .iter()
-            .position(|block| block.name == "minecraft:air");
-        if let Some(air_idx) = air_index {
-            reordered_palette.push(compact_region.palette[air_idx].clone());
+            .any(|b| b.name == "minecraft:air");
+        // We'll use a reference to air from the palette or a local
+        if has_air {
+            // Find air in original palette and put a reference at index 0
+            let air_ref = compact_region
+                .palette
+                .iter()
+                .find(|b| b.name == "minecraft:air")
+                .unwrap();
+            reordered_palette.push(air_ref);
         } else {
-            // If no air is found, add it
-            reordered_palette.push(BlockState::new("minecraft:air".to_string()));
+            reordered_palette.push(&air_state);
         }
 
-        // Then add all other blocks (skipping air since we already added it)
-        for block in compact_region.palette.iter() {
-            if block.name != "minecraft:air" {
-                reordered_palette.push(block.clone());
+        // Add non-air blocks and build mapping simultaneously
+        for (orig_idx, block) in compact_region.palette.iter().enumerate() {
+            if block.name == "minecraft:air" {
+                index_mapping[orig_idx] = 0;
+            } else {
+                index_mapping[orig_idx] = reordered_palette.len();
+                reordered_palette.push(block);
             }
         }
 
@@ -210,53 +223,49 @@ fn create_regions(schematic: &UniversalSchematic) -> NbtCompound {
         );
         region_nbt.insert("BlockStatePalette", NbtTag::List(palette));
 
-        // BlockStates
-        // We need to map block indices from the original palette to the reordered palette
-        let mut index_mapping = vec![0; compact_region.palette.len()];
-
-        // Build the mapping from original palette indices to reordered indices
-        for (orig_idx, block) in compact_region.palette.iter().enumerate() {
-            if block.name == "minecraft:air" {
-                // Air is always mapped to 0 in the reordered palette
-                index_mapping[orig_idx] = 0;
-            } else {
-                // Find the position of this block in the reordered palette
-                // Air is at 0, so non-air blocks start at index 1
-                let reordered_idx = reordered_palette.iter().position(|b| *b == *block).unwrap();
-                index_mapping[orig_idx] = reordered_idx;
-            }
-        }
-
         // Remap block indices and create packed states
-        let bits_per_block =
-            std::cmp::max((reordered_palette.len() as f64).log2().ceil() as usize, 2);
-        let size = compact_region.blocks.len();
-        let expected_len = (size * bits_per_block + 63) / 64;
+        // Use integer log2 instead of floating-point
+        let bits_per_block = if reordered_palette.len() <= 1 {
+            2 // minimum 2 bits per block per litematic spec
+        } else {
+            std::cmp::max(
+                (usize::BITS - (reordered_palette.len() - 1).leading_zeros()) as usize,
+                2,
+            )
+        };
+        let block_count = compact_region.blocks.len();
+        let expected_len = (block_count * bits_per_block + 63) / 64;
 
         let mut packed_states = vec![0i64; expected_len];
-        let mask = (1i64 << bits_per_block) - 1;
+        let mask = (1u64 << bits_per_block) - 1;
 
-        for (index, &block_state) in compact_region.blocks.iter().enumerate() {
-            // Map the original block state index to the reordered index
-            let mapped_state = index_mapping[block_state];
+        if 64 % bits_per_block == 0 {
+            // Fast path: entries never cross i64 boundaries (bits_per_block = 2, 4, 8, 16, 32)
+            // Batch-pack without per-block division or branching
+            let entries_per_long = 64 / bits_per_block;
+            for (chunk_idx, chunk) in compact_region.blocks.chunks(entries_per_long).enumerate() {
+                let mut packed: u64 = 0;
+                for (i, &block_state) in chunk.iter().enumerate() {
+                    packed |= (index_mapping[block_state] as u64 & mask) << (i * bits_per_block);
+                }
+                packed_states[chunk_idx] = packed as i64;
+            }
+        } else {
+            // Slow path: entries may cross i64 boundaries (bits_per_block = 3, 5, 6, 7, etc.)
+            for (index, &block_state) in compact_region.blocks.iter().enumerate() {
+                let mapped_state = index_mapping[block_state];
+                let bit_index = index * bits_per_block;
+                let start_long_index = bit_index / 64;
+                let end_long_index = (bit_index + bits_per_block - 1) / 64;
+                let start_offset = bit_index % 64;
+                let value = (mapped_state as u64) & mask;
 
-            let bit_index = index * bits_per_block;
-            let start_long_index = bit_index / 64;
-            let end_long_index = (bit_index + bits_per_block - 1) / 64;
-            let start_offset = bit_index % 64;
-
-            let value = (mapped_state as i64) & mask;
-
-            if start_long_index == end_long_index {
-                packed_states[start_long_index] |= value << start_offset;
-            } else {
-                packed_states[start_long_index] |= value << start_offset;
-                packed_states[end_long_index] |= value >> (64 - start_offset);
+                packed_states[start_long_index] |= (value << start_offset) as i64;
+                if start_long_index != end_long_index {
+                    packed_states[end_long_index] |= (value >> (64 - start_offset)) as i64;
+                }
             }
         }
-
-        // Handle negative numbers
-        packed_states.iter_mut().for_each(|x| *x = *x as u64 as i64);
 
         region_nbt.insert("BlockStates", NbtTag::LongArray(packed_states));
 
