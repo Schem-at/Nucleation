@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "nucleation"
-version = "0.1.171"
+version = "0.1.172"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = [{ name = "Nano", email = "nano@schem.at" }]
 license = { text = "AGPL-3.0-only" }
@@ -27,6 +27,6 @@ classifiers = [
 ]
 
 [tool.maturin]
-features = ["python", "simulation", "meshing"]
+features = ["python", "simulation", "meshing", "rendering"]
 module-name = "nucleation"
 include = ["nucleation.pyi", "py.typed"]
