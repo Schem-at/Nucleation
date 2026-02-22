@@ -16,7 +16,10 @@
 [ffi_only]
 *.free = FFI memory management
 free_* = FFI memory management
-mchprs_world_* = FFI simulation world management (WASM/Python use MchprsWorld class methods)
+MchprsWorld.new_with_custom_io = FFI constructor variant with custom IO positions
+MchprsWorld.new_with_options = FFI constructor variant (WASM/Python use with_options)
+Value.as_* = FFI value type accessors (WASM uses to_js, Python uses to_py)
+Value.type_name = FFI value type introspection (WASM/Python use language-native type checks)
 Schematic.print = FFI debug variant (WASM/Python use print_schematic)
 SchematicBuilder.build_with_error = FFI error-via-outpointer pattern (WASM/Python use exceptions)
 
@@ -37,6 +40,11 @@ MeshResult.save = Python file I/O
 MultiMeshResult.save_all = Python file I/O
 ChunkMeshResult.save_all = Python file I/O
 Value.to_py = Python interop
+Value.bool = Python factory naming (FFI uses value_from_bool)
+Value.f32 = Python factory naming (FFI uses value_from_f32)
+Value.i32 = Python factory naming (FFI uses value_from_i32)
+Value.string = Python factory naming (FFI uses value_from_string)
+Value.u32 = Python factory naming (FFI uses value_from_u32)
 
 [wasm_only]
 start = WASM panic hook init
@@ -113,22 +121,12 @@ DefinitionRegion.clone_region = WASM/FFI alias for copy
 
 # --- Methods not expected in FFI ---
 [no_ffi]
-CircuitBuilder.* = Complex builder pattern requiring closures/state machines
-TypedCircuitExecutor.* = Complex stateful executor with callback patterns
-ExecutionMode.* = Circuit execution config, used with TypedCircuitExecutor
-IoLayout.* = Circuit I/O layout, used with CircuitBuilder
-IoLayoutBuilder.* = Complex builder for I/O layouts
-IoType.* = Circuit I/O type definitions
-LayoutFunction.* = Circuit layout mapping functions
-OutputCondition.* = Circuit output condition matching
-SortStrategy.* = Block sorting strategies for circuit I/O
-Value.* = Circuit typed values
-MchprsWorld.* = Simulation world requiring feature gate + complex state
-Schematic.create_circuit = Requires circuit ecosystem
-Schematic.create_circuit_builder = Requires circuit ecosystem
-Schematic.build_executor = Requires circuit ecosystem
-Schematic.create_simulation_world = Requires simulation feature gate
-Schematic.create_simulation_world_with_options = Requires simulation feature gate
+Schematic.create_circuit = Requires circuit ecosystem convenience on Schematic
+Schematic.create_circuit_builder = Requires circuit ecosystem convenience on Schematic
+Schematic.build_executor = Requires circuit ecosystem convenience on Schematic
+Schematic.create_simulation_world = Simulation convenience on Schematic
+Schematic.create_simulation_world_with_options = Simulation convenience on Schematic
+MchprsWorld.into_schematic = FFI uses get_schematic + sync_to_schematic (cannot consume pointer)
 
 # --- Meshing ecosystem: specific exclusions ---
 # RawMeshExport: Python/WASM _flat suffix not in FFI (FFI: rawmeshexport_positions etc.)

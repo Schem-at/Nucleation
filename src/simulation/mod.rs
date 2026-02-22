@@ -31,7 +31,7 @@ mod truth_table;
 pub mod typed_executor;
 
 pub use circuit_builder::CircuitBuilder;
-pub use mchprs_world::{MchprsWorld, MchprsWorldError, SimulationOptions};
+pub use mchprs_world::{CustomIoChange, MchprsWorld, MchprsWorldError, SimulationOptions};
 pub use truth_table::generate_truth_table;
 
 // Re-export commonly used MCHPRS types for convenience

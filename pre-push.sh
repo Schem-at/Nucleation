@@ -44,6 +44,8 @@ echo ""
 # 2. Build checks
 run_check "Build (default features)" "cargo build --release"
 run_check "Build (simulation feature)" "cargo build --release --features simulation"
+run_check "Build (FFI + meshing)" "cargo build --release --features ffi,meshing"
+run_check "Build (FFI + simulation)" "cargo build --release --features ffi,simulation"
 run_check "Build (WASM + simulation)" "cargo build --release --target wasm32-unknown-unknown --features wasm,simulation"
 run_check "Build (Python + simulation)" "cargo build --release --features python,simulation"
 run_check "Build (Python + meshing)" "cargo build --release --features python,meshing"
