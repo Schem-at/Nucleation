@@ -51,7 +51,7 @@ impl SchematicWrapper {
     }
 
     pub fn get_block(&self, x: i32, y: i32, z: i32) -> Option<String> {
-        self.0.get_block(x, y, z).map(|b| b.name.clone())
+        self.0.get_block(x, y, z).map(|b| b.name.to_string())
     }
 
     pub fn blocks(&self) -> Vec<BlockState> {

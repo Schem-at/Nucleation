@@ -367,10 +367,7 @@ pub fn create_executor_from_insign(
     let mut schematic_without_signs = schematic.clone();
     for (pos, _) in &input {
         // Replace sign blocks with air
-        let air_block = crate::BlockState {
-            name: "minecraft:air".to_string(),
-            properties: std::collections::HashMap::new(),
-        };
+        let air_block = crate::BlockState::new("minecraft:air");
         schematic_without_signs.set_block(pos[0], pos[1], pos[2], &air_block);
     }
 
@@ -401,10 +398,7 @@ pub fn create_executor_from_insign_with_options(
     let mut schematic_without_signs = schematic.clone();
     for (pos, _) in &input {
         // Replace sign blocks with air
-        let air_block = crate::BlockState {
-            name: "minecraft:air".to_string(),
-            properties: std::collections::HashMap::new(),
-        };
+        let air_block = crate::BlockState::new("minecraft:air");
         schematic_without_signs.set_block(pos[0], pos[1], pos[2], &air_block);
     }
 

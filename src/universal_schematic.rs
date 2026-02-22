@@ -14,6 +14,7 @@ use crate::BlockState;
 use quartz_nbt::{NbtCompound, NbtTag};
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
+use smol_str::SmolStr;
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -206,7 +207,7 @@ impl UniversalSchematic {
             for (z, row) in rows.iter().enumerate() {
                 for (x, c) in row.chars().enumerate() {
                     if let Some(block_state) = full_mappings.get(&c) {
-                        schematic.set_block(x as i32, y as i32, z as i32, &block_state.clone());
+                        schematic.set_block(x as i32, y as i32, z as i32, block_state);
                     } else if c != ' ' {
                         println!(
                             "Warning: Unknown character '{}' at position ({}, {}, {})",
@@ -229,7 +230,7 @@ impl UniversalSchematic {
                 let block_state = BlockState::new(format!("minecraft:{}", name)).with_properties(
                     props
                         .iter()
-                        .map(|&(k, v)| (k.to_string(), v.to_string()))
+                        .map(|&(k, v)| (SmolStr::from(k), SmolStr::from(v)))
                         .collect(),
                 );
                 (c, block_state)
@@ -329,12 +330,12 @@ impl UniversalSchematic {
         let (block_state, _) = Self::parse_block_string(block_name)?;
 
         // Set the basic block first
-        if !self.set_block(x, y, z, &block_state.clone()) {
+        if !self.set_block(x, y, z, &block_state) {
             return Ok(false);
         }
 
         // Create block entity with NBT data
-        let mut block_entity = BlockEntity::new(block_state.name.clone(), (x, y, z));
+        let mut block_entity = BlockEntity::new(block_state.name.to_string(), (x, y, z));
 
         for (key, value) in nbt_data {
             // Try to parse value as NbtValue
@@ -645,7 +646,7 @@ impl UniversalSchematic {
                     }
 
                     for (dir, val) in connection_states {
-                        new_block.properties.insert(dir.to_string(), val);
+                        new_block.set_property(dir, val);
                     }
 
                     self.set_block_in_region(region_name, x, y, z, &new_block);
@@ -1173,9 +1174,9 @@ impl UniversalSchematic {
 
                         if excluded_blocks.contains(block) {
                             // Set air block instead of skipping
-                            self.set_block(new_x, new_y, new_z, &air_block.clone());
+                            self.set_block(new_x, new_y, new_z, &air_block);
                         } else {
-                            self.set_block(new_x, new_y, new_z, &block.clone());
+                            self.set_block(new_x, new_y, new_z, block);
                         }
                     }
                 }
@@ -1745,20 +1746,18 @@ impl UniversalSchematic {
         if block_state.name.contains("jukebox") {
             if let Some(ref nbt) = nbt_data {
                 let has_record = nbt.contains_key("RecordItem");
-                block_state
-                    .properties
-                    .insert("has_record".to_string(), has_record.to_string());
+                block_state.set_property("has_record", has_record.to_string());
             }
         }
 
         // Set the basic block first
-        if !self.set_block(x, y, z, &block_state.clone()) {
+        if !self.set_block(x, y, z, &block_state) {
             return Ok(false);
         }
 
         // If we have NBT data, create and set the block entity
         if let Some(nbt_data) = nbt_data {
-            let mut block_entity = BlockEntity::new(block_state.name.clone(), (x, y, z));
+            let mut block_entity = BlockEntity::new(block_state.name.to_string(), (x, y, z));
 
             // Add NBT data
             for (key, value) in nbt_data {
@@ -1832,7 +1831,7 @@ impl UniversalSchematic {
                 .ok_or("Missing properties closing bracket")?
                 .trim_end_matches(']');
 
-            let mut properties = HashMap::new();
+            let mut properties = Vec::new();
             for prop in properties_str.split(',') {
                 let mut kv = prop.split('=');
                 let key = kv.next().ok_or("Missing property key")?.trim();
@@ -1841,7 +1840,7 @@ impl UniversalSchematic {
                     .ok_or("Missing property value")?
                     .trim()
                     .trim_matches(|c| c == '\'' || c == '"');
-                properties.insert(key.to_string(), value.to_string());
+                properties.push((SmolStr::from(key), SmolStr::from(value)));
             }
 
             BlockState::new(block_name.to_string()).with_properties(properties)
@@ -1879,7 +1878,7 @@ impl UniversalSchematic {
                         let new_x = x + offset.0;
                         let new_y = y + offset.1;
                         let new_z = z + offset.2;
-                        new_schematic.set_block(new_x, new_y, new_z, &block.clone());
+                        new_schematic.set_block(new_x, new_y, new_z, block);
                     }
                 }
             }
@@ -2152,10 +2151,10 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
         let dirt = BlockState::new("minecraft:dirt".to_string());
 
-        assert!(schematic.set_block(0, 0, 0, &stone.clone()));
+        assert!(schematic.set_block(0, 0, 0, &stone));
         assert_eq!(schematic.get_block(0, 0, 0), Some(&stone));
 
-        assert!(schematic.set_block(5, 5, 5, &dirt.clone()));
+        assert!(schematic.set_block(5, 5, 5, &dirt));
         assert_eq!(schematic.get_block(5, 5, 5), Some(&dirt));
 
         // Check that the default region was expanded
@@ -2163,7 +2162,7 @@ mod tests {
 
         // Test explicit region creation and manipulation
         let obsidian = BlockState::new("minecraft:obsidian".to_string());
-        assert!(schematic.set_block_in_region("Custom", 10, 10, 10, &obsidian.clone()));
+        assert!(schematic.set_block_in_region("Custom", 10, 10, 10, &obsidian));
         assert_eq!(
             schematic.get_block_from_region("Custom", 10, 10, 10),
             Some(&obsidian)
@@ -2202,7 +2201,7 @@ mod tests {
 
         // Add a block to the default region
         let stone = BlockState::new("minecraft:stone".to_string());
-        schematic.set_block(0, 0, 0, &stone.clone());
+        schematic.set_block(0, 0, 0, &stone);
 
         // Create and add another region
         let mut custom_region = Region::new("Custom".to_string(), (10, 10, 10), (5, 5, 5));
@@ -2386,10 +2385,10 @@ mod tests {
         let air = BlockState::new("minecraft:air".to_string());
 
         // Create a 2x2x2 cube with different blocks
-        source.set_block(0, 0, 0, &stone.clone());
-        source.set_block(0, 1, 0, &dirt.clone());
-        source.set_block(1, 0, 0, &diamond.clone());
-        source.set_block(1, 1, 0, &dirt.clone());
+        source.set_block(0, 0, 0, &stone);
+        source.set_block(0, 1, 0, &dirt);
+        source.set_block(1, 0, 0, &diamond);
+        source.set_block(1, 1, 0, &dirt);
 
         // Create target schematic
         let mut target = UniversalSchematic::new("Target".to_string());
@@ -2444,7 +2443,7 @@ mod tests {
         let mut schematic = UniversalSchematic::new("Negative Coordinates Schematic".to_string());
 
         let neg_block = BlockState::new("minecraft:emerald_block".to_string());
-        assert!(schematic.set_block(-10, -10, -10, &neg_block.clone()));
+        assert!(schematic.set_block(-10, -10, -10, &neg_block));
         assert_eq!(schematic.get_block(-10, -10, -10), Some(&neg_block));
 
         let main_region = schematic.get_region("Main").unwrap();
@@ -2800,7 +2799,7 @@ mod tests {
 
         // Verify the block state properties
         let block = schematic.get_block(0, 0, 0).unwrap();
-        assert_eq!(block.get_property("facing"), Some(&"up".to_string()));
+        assert_eq!(block.get_property("facing"), Some(&SmolStr::from("up")));
 
         // Verify the signal strength items
         let barrel_entity = schematic

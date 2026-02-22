@@ -85,7 +85,7 @@ fn main() {
                 for x in 0..s {
                     for y in 0..s {
                         for z in 0..s {
-                            schematic.set_block(x, y, z, &block.clone());
+                            schematic.set_block(x, y, z, &block);
                         }
                     }
                 }
@@ -115,7 +115,7 @@ fn main() {
                     let x = rng.gen_range(0..s);
                     let y = rng.gen_range(0..s);
                     let z = rng.gen_range(0..s);
-                    schematic.set_block(x, y, z, &block.clone());
+                    schematic.set_block(x, y, z, &block);
                 }
             },
             &mut file,

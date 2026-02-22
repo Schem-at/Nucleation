@@ -8,6 +8,7 @@ use crate::universal_schematic::UniversalSchematic;
 use crate::BlockState;
 use blockpedia;
 use blockpedia::block_entity::{BlockEntityTranslator, NbtValue as BpNbtValue};
+use smol_str::SmolStr;
 use std::collections::HashMap;
 use std::io::Cursor;
 
@@ -115,7 +116,7 @@ pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::
                 .and_then(|v| v.as_string())
                 .cloned()
                 .unwrap_or_else(|| "minecraft:air".to_string());
-            let mut properties = HashMap::new();
+            let mut properties = Vec::new();
 
             if let Some(NbtValue::Compound(states)) = block_compound.get("states") {
                 for (key, val) in states.iter() {
@@ -133,21 +134,35 @@ pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::
                         NbtValue::String(s) => s.clone(),
                         _ => format!("{:?}", val), // Fallback
                     };
-                    properties.insert(key.clone(), val_str);
+                    properties.push((key.into(), val_str.into()));
                 }
             }
 
             // Translate Bedrock -> Java using blockpedia
-            let translated_state = if let Ok(bp_state) =
-                blockpedia::BlockState::from_bedrock(&name, properties.clone())
-            {
-                BlockState {
-                    name: bp_state.id().to_string(),
-                    properties: bp_state.properties().clone(),
-                }
-            } else {
-                BlockState { name, properties }
-            };
+            // block_pedia expects HashMap<String, String> for Bedrock state lookup.
+            let bp_props: HashMap<String, String> = properties
+                .iter()
+                .map(|(k, v): &(SmolStr, SmolStr)| (k.to_string(), v.to_string()))
+                .collect();
+
+            let translated_state =
+                if let Ok(bp_state) = blockpedia::BlockState::from_bedrock(&name, bp_props) {
+                    let translated_props: Vec<(smol_str::SmolStr, smol_str::SmolStr)> = bp_state
+                        .properties()
+                        .iter()
+                        .map(|(k, v)| (k.into(), v.into()))
+                        .collect();
+
+                    BlockState {
+                        name: bp_state.id().into(),
+                        properties: translated_props,
+                    }
+                } else {
+                    BlockState {
+                        name: name.into(),
+                        properties,
+                    }
+                };
 
             palette.push(translated_state);
         }
@@ -209,9 +224,7 @@ pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::
                     if let Some(existing_block) = region.get_block(x, y, z) {
                         if existing_block.name != "minecraft:air" {
                             let mut updated_block = existing_block.clone();
-                            updated_block
-                                .properties
-                                .insert("waterlogged".to_string(), "true".to_string());
+                            updated_block.set_property("waterlogged", "true");
                             region.set_block(x, y, z, &updated_block);
                             continue;
                         }
@@ -346,33 +359,36 @@ pub fn to_mcstructure(
 
         // Translate Java -> Bedrock using blockpedia
         let (name, properties) =
-            if let Ok(java_bp_state) = blockpedia::BlockState::parse(&block.to_string()) {
+            if let Ok(java_bp_state) = blockpedia::BlockState::parse(block.name.as_str()) {
                 if let Ok(bedrock_bp_state) = java_bp_state.to_bedrock() {
-                    (
-                        bedrock_bp_state.id().to_string(),
-                        bedrock_bp_state.properties().clone(),
-                    )
+                    let bed_props: Vec<(smol_str::SmolStr, smol_str::SmolStr)> = bedrock_bp_state
+                        .properties()
+                        .iter()
+                        .map(|(k, v)| (k.into(), v.into()))
+                        .collect();
+
+                    (bedrock_bp_state.id().to_string(), bed_props)
                 } else {
-                    (block.name.clone(), block.properties.clone())
+                    (block.name.to_string(), block.properties.clone())
                 }
             } else {
-                (block.name.clone(), block.properties.clone())
+                (block.name.to_string(), block.properties.clone())
             };
 
         block_entry.insert("name".to_string(), NbtValue::String(name));
 
         let mut states = NbtMap::new();
         for (k, v) in &properties {
-            let tag = if v == "true" {
+            let tag = if *v == "true" {
                 NbtValue::Byte(1)
-            } else if v == "false" {
+            } else if *v == "false" {
                 NbtValue::Byte(0)
             } else if let Ok(i) = v.parse::<i32>() {
                 NbtValue::Int(i)
             } else {
-                NbtValue::String(v.clone())
+                NbtValue::String(v.to_string())
             };
-            states.insert(k.clone(), tag);
+            states.insert(k.to_string(), tag);
         }
         block_entry.insert("states".to_string(), NbtValue::Compound(states));
         block_entry.insert("version".to_string(), NbtValue::Int(17959425));

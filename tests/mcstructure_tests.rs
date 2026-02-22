@@ -1,6 +1,5 @@
 use nucleation::formats::mcstructure::{from_mcstructure, to_mcstructure};
 use nucleation::{BlockState, Region, UniversalSchematic};
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 #[test]
@@ -12,9 +11,9 @@ fn test_mcstructure_round_trip() {
     let dirt = BlockState::new("minecraft:dirt".to_string());
 
     // Set blocks
-    region.set_block(0, 0, 0, &stone.clone());
-    region.set_block(1, 1, 1, &dirt.clone());
-    region.set_block(2, 2, 2, &stone.clone());
+    region.set_block(0, 0, 0, &stone);
+    region.set_block(1, 1, 1, &dirt);
+    region.set_block(2, 2, 2, &stone);
 
     schematic.add_region(region);
 
@@ -55,16 +54,11 @@ fn test_mcstructure_properties() {
     let mut schematic = UniversalSchematic::new("Prop Test".to_string());
     let mut region = Region::new("Main".to_string(), (0, 0, 0), (1, 1, 1));
 
-    let mut props = HashMap::new();
-    props.insert("facing".to_string(), "north".to_string());
-    props.insert("powered".to_string(), "true".to_string()); // Should become Byte(1)
-    props.insert("layers".to_string(), "8".to_string()); // Should become Int(8)
-
     // Use a custom block to avoid blockpedia validation stripping invalid properties for vanilla blocks
-    let block = BlockState {
-        name: "custom:snow_variant".to_string(),
-        properties: props,
-    };
+    let mut block = BlockState::new("custom:snow_variant".to_string());
+    block.set_property("facing".to_string(), "north".to_string());
+    block.set_property("powered".to_string(), "true".to_string()); // Should become Byte(1)
+    block.set_property("layers".to_string(), "8".to_string()); // Should become Int(8)
 
     region.set_block(0, 0, 0, &block);
     schematic.add_region(region);
@@ -74,9 +68,9 @@ fn test_mcstructure_properties() {
 
     let loaded_block = loaded.get_block(0, 0, 0).unwrap();
     assert_eq!(loaded_block.name, "custom:snow_variant");
-    assert_eq!(loaded_block.properties.get("facing").unwrap(), "north");
-    assert_eq!(loaded_block.properties.get("powered").unwrap(), "true");
-    assert_eq!(loaded_block.properties.get("layers").unwrap(), "8");
+    assert_eq!(loaded_block.get_property("facing").unwrap(), "north");
+    assert_eq!(loaded_block.get_property("powered").unwrap(), "true");
+    assert_eq!(loaded_block.get_property("layers").unwrap(), "8");
 }
 
 #[test]

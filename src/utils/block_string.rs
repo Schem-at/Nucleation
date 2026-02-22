@@ -1,7 +1,7 @@
 use crate::utils::{NbtMap, NbtValue};
 use crate::BlockState;
 use serde_json::Value;
-use std::collections::HashMap;
+use smol_str::SmolStr;
 
 pub fn parse_block_string(block_string: &str) -> Result<(BlockState, Option<NbtMap>), String> {
     let mut parts = block_string.splitn(2, '{');
@@ -17,7 +17,7 @@ pub fn parse_block_string(block_string: &str) -> Result<(BlockState, Option<NbtM
             .ok_or("Missing properties closing bracket")?
             .trim_end_matches(']');
 
-        let mut properties = HashMap::new();
+        let mut properties = Vec::new();
         for prop in properties_str.split(',') {
             let mut kv = prop.split('=');
             let key = kv.next().ok_or("Missing property key")?.trim();
@@ -26,7 +26,7 @@ pub fn parse_block_string(block_string: &str) -> Result<(BlockState, Option<NbtM
                 .ok_or("Missing property value")?
                 .trim()
                 .trim_matches(|c| c == '\'' || c == '"');
-            properties.insert(key.to_string(), value.to_string());
+            properties.push((SmolStr::from(key), SmolStr::from(value)));
         }
 
         BlockState::new(block_name.to_string()).with_properties(properties)
@@ -237,7 +237,10 @@ mod tests {
 
         // Check block state
         assert_eq!(block_state.get_name(), "minecraft:barrel");
-        assert_eq!(block_state.get_property("facing"), Some(&"up".to_string()));
+        assert_eq!(
+            block_state.get_property("facing"),
+            Some(&SmolStr::from("up"))
+        );
 
         // Check NBT data
         let nbt_data = nbt_data.expect("NBT data should be present");

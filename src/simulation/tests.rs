@@ -19,35 +19,24 @@ mod tests {
         // Redstone wire
         for x in 1..15 {
             let mut wire = BlockState::new("minecraft:redstone_wire".to_string());
-            wire.properties.insert("power".to_string(), "0".to_string());
-            wire.properties
-                .insert("east".to_string(), "side".to_string());
-            wire.properties
-                .insert("west".to_string(), "side".to_string());
-            wire.properties
-                .insert("north".to_string(), "none".to_string());
-            wire.properties
-                .insert("south".to_string(), "none".to_string());
+            wire.set_property("power", "0");
+            wire.set_property("east", "side");
+            wire.set_property("west", "side");
+            wire.set_property("north", "none");
+            wire.set_property("south", "none");
             schematic.set_block(x, 1, 0, &wire);
         }
 
         // Lever at position 0
         let mut lever = BlockState::new("minecraft:lever".to_string());
-        lever
-            .properties
-            .insert("facing".to_string(), "east".to_string());
-        lever
-            .properties
-            .insert("powered".to_string(), "false".to_string());
-        lever
-            .properties
-            .insert("face".to_string(), "floor".to_string());
+        lever.set_property("facing", "east");
+        lever.set_property("powered", "false");
+        lever.set_property("face", "floor");
         schematic.set_block(0, 1, 0, &lever);
 
         // Lamp at position 15
         let mut lamp = BlockState::new("minecraft:redstone_lamp".to_string());
-        lamp.properties
-            .insert("lit".to_string(), "false".to_string());
+        lamp.set_property("lit", "false");
         schematic.set_block(15, 1, 0, &lamp);
 
         schematic
@@ -70,41 +59,28 @@ mod tests {
 
         // Two levers as inputs
         let mut lever_a = BlockState::new("minecraft:lever".to_string());
-        lever_a
-            .properties
-            .insert("powered".to_string(), "false".to_string());
-        lever_a
-            .properties
-            .insert("facing".to_string(), "north".to_string());
-        lever_a
-            .properties
-            .insert("face".to_string(), "floor".to_string());
-        schematic.set_block(0, 1, 0, &lever_a.clone());
+        lever_a.set_property("powered", "false");
+        lever_a.set_property("facing", "north");
+        lever_a.set_property("face", "floor");
+        schematic.set_block(0, 1, 0, &lever_a);
 
         let mut lever_b = BlockState::new("minecraft:lever".to_string());
-        lever_b
-            .properties
-            .insert("powered".to_string(), "false".to_string());
-        lever_b
-            .properties
-            .insert("facing".to_string(), "north".to_string());
-        lever_b
-            .properties
-            .insert("face".to_string(), "floor".to_string());
+        lever_b.set_property("powered", "false");
+        lever_b.set_property("facing", "north");
+        lever_b.set_property("face", "floor");
         schematic.set_block(2, 1, 0, &lever_b);
 
         // AND gate logic with redstone
         let mut wire = BlockState::new("minecraft:redstone_wire".to_string());
-        wire.properties.insert("power".to_string(), "0".to_string());
-        schematic.set_block(0, 1, 1, &wire.clone());
-        schematic.set_block(1, 1, 1, &wire.clone());
-        schematic.set_block(2, 1, 1, &wire.clone());
-        schematic.set_block(1, 1, 2, &wire.clone());
+        wire.set_property("power", "0");
+        schematic.set_block(0, 1, 1, &wire);
+        schematic.set_block(1, 1, 1, &wire);
+        schematic.set_block(2, 1, 1, &wire);
+        schematic.set_block(1, 1, 2, &wire);
 
         // Output lamp
         let mut lamp = BlockState::new("minecraft:redstone_lamp".to_string());
-        lamp.properties
-            .insert("lit".to_string(), "false".to_string());
+        lamp.set_property("lit", "false");
         schematic.set_block(1, 1, 3, &lamp);
 
         schematic
@@ -869,15 +845,11 @@ mod tests {
 
         // Redstone wire with power=0 initially
         let mut wire = BlockState::new("minecraft:redstone_wire".to_string());
-        wire.properties.insert("power".to_string(), "0".to_string());
-        wire.properties
-            .insert("east".to_string(), "side".to_string());
-        wire.properties
-            .insert("west".to_string(), "side".to_string());
-        wire.properties
-            .insert("north".to_string(), "none".to_string());
-        wire.properties
-            .insert("south".to_string(), "none".to_string());
+        wire.set_property("power", "0");
+        wire.set_property("east", "side");
+        wire.set_property("west", "side");
+        wire.set_property("north", "none");
+        wire.set_property("south", "none");
         schematic.set_block(0, 1, 0, &wire);
 
         let custom_io_pos = BlockPos::new(0, 1, 0);
@@ -907,12 +879,12 @@ mod tests {
 
         // Verify the power property is 15 (not 0!)
         let power_value = synced_block
-            .properties
-            .get("power")
+            .get_property("power")
             .expect("Redstone wire should have power property");
 
         assert_eq!(
-            power_value, "15",
+            power_value.as_str(),
+            "15",
             "Synced schematic should have power=15 after custom IO injection, got power={}",
             power_value
         );
@@ -939,21 +911,17 @@ mod tests {
         // Three wires in a row: [0,1,0] (custom IO) -> [1,1,0] (adjacent) -> [2,1,0] (2 blocks away)
         for x in 0..3 {
             let mut wire = BlockState::new("minecraft:redstone_wire".to_string());
-            wire.properties.insert("power".to_string(), "0".to_string());
-            wire.properties
-                .insert("east".to_string(), "side".to_string());
-            wire.properties
-                .insert("west".to_string(), "side".to_string());
-            wire.properties
-                .insert("north".to_string(), "none".to_string());
-            wire.properties
-                .insert("south".to_string(), "none".to_string());
+            wire.set_property("power", "0");
+            wire.set_property("east", "side");
+            wire.set_property("west", "side");
+            wire.set_property("north", "none");
+            wire.set_property("south", "none");
             schematic.set_block(x, 1, 0, &wire);
         }
 
         let custom_io_pos = BlockPos::new(0, 1, 0);
-        let adjacent_pos = BlockPos::new(1, 1, 0);
-        let far_pos = BlockPos::new(2, 1, 0);
+        let _adjacent_pos = BlockPos::new(1, 1, 0);
+        let _far_pos = BlockPos::new(2, 1, 0);
 
         let options = SimulationOptions {
             custom_io: vec![custom_io_pos],
@@ -978,8 +946,7 @@ mod tests {
             .get_block(0, 1, 0)
             .expect("Custom IO block should exist");
         let custom_io_power: u8 = custom_io_block
-            .properties
-            .get("power")
+            .get_property("power")
             .and_then(|p| p.parse().ok())
             .unwrap_or(0);
 
@@ -988,8 +955,7 @@ mod tests {
             .get_block(1, 1, 0)
             .expect("Adjacent block should exist");
         let adjacent_power: u8 = adjacent_block
-            .properties
-            .get("power")
+            .get_property("power")
             .and_then(|p| p.parse().ok())
             .unwrap_or(0);
 
@@ -998,8 +964,7 @@ mod tests {
             .get_block(2, 1, 0)
             .expect("Far block should exist");
         let far_power: u8 = far_block
-            .properties
-            .get("power")
+            .get_property("power")
             .and_then(|p| p.parse().ok())
             .unwrap_or(0);
 
@@ -1040,15 +1005,11 @@ mod tests {
         // Three wires: input -> middle -> output
         for x in 0..3 {
             let mut wire = BlockState::new("minecraft:redstone_wire".to_string());
-            wire.properties.insert("power".to_string(), "0".to_string());
-            wire.properties
-                .insert("east".to_string(), "side".to_string());
-            wire.properties
-                .insert("west".to_string(), "side".to_string());
-            wire.properties
-                .insert("north".to_string(), "none".to_string());
-            wire.properties
-                .insert("south".to_string(), "none".to_string());
+            wire.set_property("power", "0");
+            wire.set_property("east", "side");
+            wire.set_property("west", "side");
+            wire.set_property("north", "none");
+            wire.set_property("south", "none");
             schematic.set_block(x, 1, 0, &wire);
         }
 
@@ -1810,21 +1771,15 @@ mod tests {
 
             // Place comparator facing west (reading from barrel) at x=1
             let mut comparator = BlockState::new("minecraft:comparator".to_string());
-            comparator
-                .properties
-                .insert("facing".to_string(), "west".to_string());
-            comparator
-                .properties
-                .insert("mode".to_string(), "compare".to_string());
-            comparator
-                .properties
-                .insert("powered".to_string(), "false".to_string());
+            comparator.set_property("facing", "west");
+            comparator.set_property("mode", "compare");
+            comparator.set_property("powered", "false");
             schematic.set_block(1, 1, 0, &comparator);
 
             // Place redstone wire at x=2 and x=3
             let mut wire = BlockState::new("minecraft:redstone_wire".to_string());
-            wire.properties.insert("power".to_string(), "0".to_string());
-            schematic.set_block(2, 1, 0, &wire.clone());
+            wire.set_property("power", "0");
+            schematic.set_block(2, 1, 0, &wire);
             schematic.set_block(3, 1, 0, &wire);
 
             // Create simulation
@@ -1883,17 +1838,13 @@ mod tests {
 
             // Place comparator facing west
             let mut comparator = BlockState::new("minecraft:comparator".to_string());
-            comparator
-                .properties
-                .insert("facing".to_string(), "west".to_string());
-            comparator
-                .properties
-                .insert("mode".to_string(), "compare".to_string());
+            comparator.set_property("facing", "west");
+            comparator.set_property("mode", "compare");
             schematic.set_block(1, 1, 0, &comparator);
 
             // Place redstone wire to check output
             let mut wire = BlockState::new("minecraft:redstone_wire".to_string());
-            wire.properties.insert("power".to_string(), "0".to_string());
+            wire.set_property("power", "0");
             schematic.set_block(2, 1, 0, &wire);
 
             // Create simulation

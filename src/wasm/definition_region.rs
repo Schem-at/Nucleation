@@ -730,7 +730,11 @@ impl DefinitionRegionWrapper {
             Reflect::set(&obj, &"z".into(), &JsValue::from(z))?;
 
             if let Some(block) = sch.get_block(x, y, z) {
-                Reflect::set(&obj, &"block".into(), &JsValue::from(block.name.clone()))?;
+                Reflect::set(
+                    &obj,
+                    &"block".into(),
+                    &JsValue::from_str(block.name.as_str()),
+                )?;
             }
 
             arr.push(&obj);

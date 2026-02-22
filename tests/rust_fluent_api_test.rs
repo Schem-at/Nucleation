@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod tests {
-    use nucleation::BlockState;
     use nucleation::UniversalSchematic;
 
     #[test]

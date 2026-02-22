@@ -92,32 +92,27 @@ c
 
     // Parse power levels
     let input_power: u8 = input_wire
-        .properties
-        .get("power")
+        .get_property("power")
         .and_then(|p| p.parse().ok())
         .unwrap_or(0);
 
     let middle_power: u8 = middle_wire
-        .properties
-        .get("power")
+        .get_property("power")
         .and_then(|p| p.parse().ok())
         .unwrap_or(0);
 
     let output_power: u8 = output_wire
-        .properties
-        .get("power")
+        .get_property("power")
         .and_then(|p| p.parse().ok())
         .unwrap_or(0);
 
     let comp1_powered = comp1
-        .properties
-        .get("powered")
+        .get_property("powered")
         .map(|p| p == "true")
         .unwrap_or(false);
 
     let comp2_powered = comp2
-        .properties
-        .get("powered")
+        .get_property("powered")
         .map(|p| p == "true")
         .unwrap_or(false);
 

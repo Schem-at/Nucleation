@@ -4,6 +4,7 @@
 
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyList};
+use smol_str::SmolStr;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -58,12 +59,16 @@ impl PyBlockState {
 
     #[getter]
     pub fn name(&self) -> String {
-        self.inner.name.clone()
+        self.inner.name.to_string()
     }
 
     #[getter]
     pub fn properties(&self) -> HashMap<String, String> {
-        self.inner.properties.clone()
+        self.inner
+            .properties
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
 
     fn __str__(&self) -> String {
@@ -489,8 +494,11 @@ impl PySchematic {
         properties: HashMap<String, String>,
     ) {
         let block_state = BlockState {
-            name: block_name.to_string(),
-            properties,
+            name: block_name.into(),
+            properties: properties
+                .into_iter()
+                .map(|(k, v)| (SmolStr::from(k), SmolStr::from(v)))
+                .collect(),
         };
         self.inner.set_block(x, y, z, &block_state);
     }
@@ -646,7 +654,7 @@ impl PySchematic {
                     region.get_block_name(x, y, z).map(|s| s.to_string())
                 } else {
                     // Fall back to multi-region scan
-                    self.inner.get_block(x, y, z).map(|bs| bs.name.clone())
+                    self.inner.get_block(x, y, z).map(|bs| bs.name.to_string())
                 }
             })
             .collect()
@@ -760,8 +768,13 @@ impl PySchematic {
             dict.set_item("x", pos.x)?;
             dict.set_item("y", pos.y)?;
             dict.set_item("z", pos.z)?;
-            dict.set_item("name", &block.name)?;
-            dict.set_item("properties", block.properties.clone())?;
+            dict.set_item("name", block.name.as_str())?;
+            let props: HashMap<String, String> = block
+                .properties
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect();
+            dict.set_item("properties", props)?;
             list_items.push(dict.into());
         }
 
@@ -813,8 +826,13 @@ impl PySchematic {
                     block_dict.set_item("x", pos.x)?;
                     block_dict.set_item("y", pos.y)?;
                     block_dict.set_item("z", pos.z)?;
-                    block_dict.set_item("name", &block.name)?;
-                    block_dict.set_item("properties", block.properties.clone())?;
+                    block_dict.set_item("name", block.name.as_str())?;
+                    let props: HashMap<String, String> = block
+                        .properties
+                        .iter()
+                        .map(|(k, v)| (k.to_string(), v.to_string()))
+                        .collect();
+                    block_dict.set_item("properties", props)?;
                     block_items.push(block_dict.into());
                 }
             }

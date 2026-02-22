@@ -338,17 +338,54 @@ impl Region {
         let x_off_src = (tb_min_x - self.bbox.min.0) as usize;
         let row_len = compact_w; // tight width = compact width
 
-        for y in tb_min_y..=tb_max_y {
-            let dy_src = (y - self.bbox.min.1) as usize;
-            let dy_dst = (y - tb_min_y) as usize;
-            for z in tb_min_z..=tb_max_z {
-                let dz_src = (z - self.bbox.min.2) as usize;
-                let dz_dst = (z - tb_min_z) as usize;
-                let src_start = dy_src * old_w * old_l + dz_src * old_w + x_off_src;
-                let dst_start = dy_dst * compact_w * compact_l + dz_dst * compact_w;
-                compact.blocks[dst_start..dst_start + row_len]
-                    .copy_from_slice(&self.blocks[src_start..src_start + row_len]);
+        #[cfg(target_arch = "wasm32")]
+        {
+            for y in tb_min_y..=tb_max_y {
+                let dy_src = (y - self.bbox.min.1) as usize;
+                let dy_dst = (y - tb_min_y) as usize;
+                for z in tb_min_z..=tb_max_z {
+                    let dz_src = (z - self.bbox.min.2) as usize;
+                    let dz_dst = (z - tb_min_z) as usize;
+                    let src_start = dy_src * old_w * old_l + dz_src * old_w + x_off_src;
+                    let dst_start = dy_dst * compact_w * compact_l + dz_dst * compact_w;
+                    compact.blocks[dst_start..dst_start + row_len]
+                        .copy_from_slice(&self.blocks[src_start..src_start + row_len]);
+                }
             }
+        }
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            use rayon::prelude::*;
+            use rayon::slice::ParallelSliceMut;
+            // The compact array is structured such that each chunk of `compact_w * compact_l` elements
+            // is exactly one slice parallel to XZ plane (a Y slice).
+            // We can par_chunks_mut over the compact blocks by the Y slice size.
+            let y_slice_size = compact_w * compact_l;
+            let src_blocks = &self.blocks;
+            let bbox_min_y = self.bbox.min.1;
+            let bbox_min_z = self.bbox.min.2;
+
+            compact
+                .blocks
+                .par_chunks_mut(y_slice_size)
+                .enumerate()
+                .for_each(|(dy_dst, dst_y_slice)| {
+                    let y = tb_min_y + dy_dst as i32;
+                    let dy_src = (y - bbox_min_y) as usize;
+
+                    // Within this Y slice, iterate serially over Z rows
+                    for z in tb_min_z..=tb_max_z {
+                        let dz_src = (z - bbox_min_z) as usize;
+                        let dz_dst = (z - tb_min_z) as usize;
+
+                        let src_start = dy_src * old_w * old_l + dz_src * old_w + x_off_src;
+                        let dst_start_in_slice = dz_dst * compact_w;
+
+                        dst_y_slice[dst_start_in_slice..dst_start_in_slice + row_len]
+                            .copy_from_slice(&src_blocks[src_start..src_start + row_len]);
+                    }
+                });
         }
 
         // Rebuild non_air_count and tight_bounds for compact region
@@ -1449,7 +1486,28 @@ impl Region {
                 let row = &mut self.blocks[row_start..row_end];
 
                 // Count air blocks being replaced/created for delta tracking
-                for &old in row.iter() {
+                // Phase 2: Manual SIMD-style chunking (8 elements at a time)
+                let mut chunks = row.chunks_exact(8);
+                for chunk in &mut chunks {
+                    let mut is_air_count = 0;
+                    is_air_count += (chunk[0] == self.cached_air_index) as i64;
+                    is_air_count += (chunk[1] == self.cached_air_index) as i64;
+                    is_air_count += (chunk[2] == self.cached_air_index) as i64;
+                    is_air_count += (chunk[3] == self.cached_air_index) as i64;
+                    is_air_count += (chunk[4] == self.cached_air_index) as i64;
+                    is_air_count += (chunk[5] == self.cached_air_index) as i64;
+                    is_air_count += (chunk[6] == self.cached_air_index) as i64;
+                    is_air_count += (chunk[7] == self.cached_air_index) as i64;
+
+                    if !new_is_air {
+                        air_delta += is_air_count;
+                    } else {
+                        air_delta -= 8 - is_air_count;
+                    }
+                }
+
+                // Handle remainder
+                for &old in chunks.remainder() {
                     let old_is_air = old == self.cached_air_index;
                     if old_is_air && !new_is_air {
                         air_delta += 1;
@@ -1685,8 +1743,8 @@ mod tests {
             assert_eq!(region1.get_block(1, 1, 1), Some(&dirt));
             assert_eq!(region1.get_block(2, 2, 2), Some(&dirt));
         }
-        region1.set_block(0, 0, 0, &stone.clone());
-        region2.set_block(2, 2, 2, &stone.clone());
+        region1.set_block(0, 0, 0, &stone);
+        region2.set_block(2, 2, 2, &stone);
 
         region1.merge(&region2);
 
@@ -1702,8 +1760,8 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
         let dirt = BlockState::new("minecraft:dirt".to_string());
 
-        region1.set_block(0, 0, 0, &stone.clone());
-        region2.set_block(2, 2, 2, &dirt.clone());
+        region1.set_block(0, 0, 0, &stone);
+        region2.set_block(2, 2, 2, &dirt);
 
         region1.merge(&region2);
 
@@ -1719,10 +1777,10 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
         let dirt = BlockState::new("minecraft:dirt".to_string());
 
-        region1.set_block(0, 0, 0, &stone.clone());
-        region1.set_block(1, 1, 1, &dirt.clone());
+        region1.set_block(0, 0, 0, &stone);
+        region1.set_block(1, 1, 1, &dirt);
 
-        region2.set_block(2, 2, 2, &dirt.clone());
+        region2.set_block(2, 2, 2, &dirt);
 
         region1.merge(&region2);
 
@@ -1959,8 +2017,8 @@ mod tests {
         let mut region2 = Region::new("Test2".to_string(), (-2, -2, -2), (-2, -2, -2));
         let stone = BlockState::new("minecraft:stone".to_string());
 
-        region1.set_block(0, 0, 0, &stone.clone());
-        region2.set_block(-2, -2, -2, &stone.clone());
+        region1.set_block(0, 0, 0, &stone);
+        region2.set_block(-2, -2, -2, &stone);
 
         region1.merge(&region2);
 
@@ -1978,11 +2036,11 @@ mod tests {
         let diamond = BlockState::new("minecraft:diamond_block".to_string());
 
         // Set some initial blocks
-        region.set_block(1, 0, 1, &stone.clone());
-        region.set_block(0, 1, 0, &stone.clone());
+        region.set_block(1, 0, 1, &stone);
+        region.set_block(0, 1, 0, &stone);
 
         // Expand the region by setting a block outside the current bounds
-        region.set_block(1, 2, 1, &diamond.clone());
+        region.set_block(1, 2, 1, &diamond);
 
         // Check if the original blocks are preserved
         assert_eq!(region.get_block(1, 0, 1), Some(&stone));

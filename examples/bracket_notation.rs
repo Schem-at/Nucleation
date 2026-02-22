@@ -12,15 +12,9 @@ fn main() {
 
     // Method 1: Using BlockState with properties (verbose but explicit)
     let mut lever = BlockState::new("minecraft:lever".to_string());
-    lever
-        .properties
-        .insert("facing".to_string(), "east".to_string());
-    lever
-        .properties
-        .insert("powered".to_string(), "false".to_string());
-    lever
-        .properties
-        .insert("face".to_string(), "floor".to_string());
+    lever.set_property("facing".to_string(), "east".to_string());
+    lever.set_property("powered".to_string(), "false".to_string());
+    lever.set_property("face".to_string(), "floor".to_string());
     schematic.set_block(0, 1, 0, &lever);
 
     // Method 2: Using bracket notation (concise and readable)

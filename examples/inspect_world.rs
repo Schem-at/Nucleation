@@ -27,7 +27,7 @@ fn main() {
                 if let Some(block) = region.get_block(x, y, z) {
                     if block.name != "minecraft:air" {
                         let key = if block.properties.is_empty() {
-                            block.name.clone()
+                            block.name.to_string()
                         } else {
                             let mut props: Vec<_> = block.properties.iter().collect();
                             props.sort_by_key(|(k, _)| (*k).clone());
@@ -167,7 +167,7 @@ fn main() {
                         row.push('.');
                     } else {
                         let key = if block.properties.is_empty() {
-                            block.name.clone()
+                            block.name.to_string()
                         } else {
                             let mut props: Vec<_> = block.properties.iter().collect();
                             props.sort_by_key(|(k, _)| (*k).clone());

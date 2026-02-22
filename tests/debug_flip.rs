@@ -11,8 +11,8 @@ fn debug_flip_positions() {
     let mut block_west = BlockState::new("minecraft:lever".to_string());
     block_west.set_property("facing".to_string(), "west".to_string());
 
-    region.set_block(1, 0, 0, &block_east.clone());
-    region.set_block(4, 0, 0, &block_west.clone());
+    region.set_block(1, 0, 0, &block_east);
+    region.set_block(4, 0, 0, &block_west);
 
     println!("Before flip:");
     println!(

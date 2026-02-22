@@ -1,4 +1,5 @@
 use nucleation::{BlockState, Region};
+use smol_str::SmolStr;
 
 #[test]
 fn test_repeater_flip_x() {
@@ -9,7 +10,7 @@ fn test_repeater_flip_x() {
     repeater_west.set_property("facing".to_string(), "west".to_string());
     repeater_west.set_property("delay".to_string(), "3".to_string());
 
-    region.set_block(1, 0, 0, &repeater_west.clone());
+    region.set_block(1, 0, 0, &repeater_west);
 
     // Flip along X axis
     region.flip_x();
@@ -18,12 +19,12 @@ fn test_repeater_flip_x() {
     let flipped_repeater = region.get_block(1, 0, 0).unwrap();
     assert_eq!(
         flipped_repeater.get_property("facing"),
-        Some(&"east".to_string()),
+        Some(&SmolStr::from("east")),
         "Repeater facing west should face east after X flip"
     );
     assert_eq!(
         flipped_repeater.get_property("delay"),
-        Some(&"3".to_string()),
+        Some(&SmolStr::from("3")),
         "Repeater delay should be preserved"
     );
 
@@ -39,7 +40,7 @@ fn test_repeater_rotate_y() {
     repeater_north.set_property("facing".to_string(), "north".to_string());
     repeater_north.set_property("delay".to_string(), "2".to_string());
 
-    region.set_block(1, 0, 1, &repeater_north.clone());
+    region.set_block(1, 0, 1, &repeater_north);
 
     // Rotate 90 degrees around Y axis
     region.rotate_y(90);
@@ -48,12 +49,12 @@ fn test_repeater_rotate_y() {
     let rotated_repeater = region.get_block(1, 0, 1).unwrap();
     assert_eq!(
         rotated_repeater.get_property("facing"),
-        Some(&"east".to_string()),
+        Some(&SmolStr::from("east")),
         "Repeater facing north should face east after 90° Y rotation"
     );
     assert_eq!(
         rotated_repeater.get_property("delay"),
-        Some(&"2".to_string()),
+        Some(&SmolStr::from("2")),
         "Repeater delay should be preserved"
     );
 
@@ -70,7 +71,7 @@ fn test_stairs_flip_x() {
     stairs_east.set_property("half".to_string(), "bottom".to_string());
     stairs_east.set_property("shape".to_string(), "straight".to_string());
 
-    region.set_block(1, 0, 0, &stairs_east.clone());
+    region.set_block(1, 0, 0, &stairs_east);
 
     // Flip along X axis
     region.flip_x();
@@ -79,12 +80,12 @@ fn test_stairs_flip_x() {
     let flipped_stairs = region.get_block(1, 0, 0).unwrap();
     assert_eq!(
         flipped_stairs.get_property("facing"),
-        Some(&"west".to_string()),
+        Some(&SmolStr::from("west")),
         "Stairs facing east should face west after X flip"
     );
     assert_eq!(
         flipped_stairs.get_property("half"),
-        Some(&"bottom".to_string()),
+        Some(&SmolStr::from("bottom")),
         "Stairs half property should be preserved"
     );
 
@@ -100,7 +101,7 @@ fn test_stairs_rotate_y() {
     stairs_north.set_property("facing".to_string(), "north".to_string());
     stairs_north.set_property("half".to_string(), "top".to_string());
 
-    region.set_block(1, 0, 1, &stairs_north.clone());
+    region.set_block(1, 0, 1, &stairs_north);
 
     // Rotate 180 degrees around Y axis
     region.rotate_y(180);
@@ -109,7 +110,7 @@ fn test_stairs_rotate_y() {
     let rotated_stairs = region.get_block(1, 0, 1).unwrap();
     assert_eq!(
         rotated_stairs.get_property("facing"),
-        Some(&"south".to_string()),
+        Some(&SmolStr::from("south")),
         "Stairs facing north should face south after 180° Y rotation"
     );
 
@@ -128,7 +129,7 @@ fn test_redstone_wire_connections_flip() {
     wire.set_property("south".to_string(), "none".to_string());
     wire.set_property("power".to_string(), "7".to_string());
 
-    region.set_block(2, 0, 0, &wire.clone());
+    region.set_block(2, 0, 0, &wire);
 
     // Flip along X axis - this should swap east and west connections
     region.flip_x();
@@ -138,17 +139,17 @@ fn test_redstone_wire_connections_flip() {
     // After X flip, east and west should be swapped
     assert_eq!(
         flipped_wire.get_property("west"),
-        Some(&"side".to_string()),
+        Some(&SmolStr::from("side")),
         "East connection should become west after X flip"
     );
     assert_eq!(
         flipped_wire.get_property("east"),
-        Some(&"up".to_string()),
+        Some(&SmolStr::from("up")),
         "West connection should become east after X flip"
     );
     assert_eq!(
         flipped_wire.get_property("power"),
-        Some(&"7".to_string()),
+        Some(&SmolStr::from("7")),
         "Power level should be preserved"
     );
 
@@ -167,7 +168,7 @@ fn test_redstone_wire_connections_rotate() {
     wire.set_property("west".to_string(), "none".to_string());
     wire.set_property("power".to_string(), "15".to_string());
 
-    region.set_block(1, 0, 1, &wire.clone());
+    region.set_block(1, 0, 1, &wire);
 
     // Rotate 90 degrees around Y axis
     region.rotate_y(90);
@@ -177,17 +178,17 @@ fn test_redstone_wire_connections_rotate() {
     // After 90° Y rotation, north should become east
     assert_eq!(
         rotated_wire.get_property("east"),
-        Some(&"side".to_string()),
+        Some(&SmolStr::from("side")),
         "North connection should become east after 90° Y rotation"
     );
     assert_eq!(
         rotated_wire.get_property("north"),
-        Some(&"none".to_string()),
+        Some(&SmolStr::from("none")),
         "North should be none after rotation"
     );
     assert_eq!(
         rotated_wire.get_property("power"),
-        Some(&"15".to_string()),
+        Some(&SmolStr::from("15")),
         "Power level should be preserved"
     );
 
@@ -204,7 +205,7 @@ fn test_comparator_flip() {
     comparator.set_property("mode".to_string(), "compare".to_string());
     comparator.set_property("powered".to_string(), "false".to_string());
 
-    region.set_block(1, 0, 0, &comparator.clone());
+    region.set_block(1, 0, 0, &comparator);
 
     // Flip along X axis
     region.flip_x();
@@ -212,12 +213,12 @@ fn test_comparator_flip() {
     let flipped_comparator = region.get_block(1, 0, 0).unwrap();
     assert_eq!(
         flipped_comparator.get_property("facing"),
-        Some(&"west".to_string()),
+        Some(&SmolStr::from("west")),
         "Comparator facing east should face west after X flip"
     );
     assert_eq!(
         flipped_comparator.get_property("mode"),
-        Some(&"compare".to_string()),
+        Some(&SmolStr::from("compare")),
         "Comparator mode should be preserved"
     );
 
@@ -242,8 +243,8 @@ fn test_full_redstone_circuit_transformation() {
 
     // Wire
     let wire = BlockState::new("minecraft:redstone_wire".to_string());
-    region.set_block(1, 0, 0, &wire.clone());
-    region.set_block(2, 0, 0, &wire.clone());
+    region.set_block(1, 0, 0, &wire);
+    region.set_block(2, 0, 0, &wire);
 
     // Repeater facing east, delay 2
     let mut repeater = BlockState::new("minecraft:repeater".to_string());
@@ -252,8 +253,8 @@ fn test_full_redstone_circuit_transformation() {
     region.set_block(3, 0, 0, &repeater);
 
     // More wire
-    region.set_block(4, 0, 0, &wire.clone());
-    region.set_block(5, 0, 0, &wire.clone());
+    region.set_block(4, 0, 0, &wire);
+    region.set_block(5, 0, 0, &wire);
 
     // Lamp
     let mut lamp = BlockState::new("minecraft:redstone_lamp".to_string());
@@ -279,12 +280,12 @@ fn test_full_redstone_circuit_transformation() {
             if block.name == "minecraft:repeater" {
                 assert_eq!(
                     block.get_property("facing"),
-                    Some(&"west".to_string()),
+                    Some(&SmolStr::from("west")),
                     "Repeater should face west after X flip"
                 );
                 assert_eq!(
                     block.get_property("delay"),
-                    Some(&"2".to_string()),
+                    Some(&SmolStr::from("2")),
                     "Repeater delay should be preserved"
                 );
                 found_repeater = true;
@@ -292,7 +293,7 @@ fn test_full_redstone_circuit_transformation() {
             if block.name == "minecraft:lever" {
                 assert_eq!(
                     block.get_property("facing"),
-                    Some(&"west".to_string()),
+                    Some(&SmolStr::from("west")),
                     "Lever should face west after X flip"
                 );
                 found_lever = true;

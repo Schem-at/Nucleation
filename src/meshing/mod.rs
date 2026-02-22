@@ -524,9 +524,9 @@ impl BlockSource for ChunkBlockSource {
 
 /// Convert a Nucleation BlockState to a schematic-mesher InputBlock.
 fn block_state_to_input_block(block_state: &BlockState) -> InputBlock {
-    let mut input = InputBlock::new(&block_state.name);
+    let mut input = InputBlock::new(block_state.name.to_string());
     for (key, value) in &block_state.properties {
-        input.properties.insert(key.clone(), value.clone());
+        input.properties.insert(key.to_string(), value.to_string());
     }
     input
 }
@@ -1471,13 +1471,9 @@ mod tests {
 
     #[test]
     fn test_block_state_to_input_block() {
-        let mut block_state = BlockState::new("minecraft:oak_stairs".to_string());
-        block_state
-            .properties
-            .insert("facing".to_string(), "north".to_string());
-        block_state
-            .properties
-            .insert("half".to_string(), "bottom".to_string());
+        let block_state = BlockState::new("minecraft:oak_stairs".to_string())
+            .with_property("facing", "north")
+            .with_property("half", "bottom");
 
         let input = block_state_to_input_block(&block_state);
 

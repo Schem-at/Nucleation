@@ -1041,7 +1041,7 @@ fn test_state_mode_manual_reset() {
 #[test]
 fn test_io_layout_builder_auto_inference() {
     // Test automatic layout inference
-    let schematic = create_and_gate_schematic();
+    let _schematic = create_and_gate_schematic();
 
     let layout = IoLayoutBuilder::new()
         .add_input_auto("a", IoType::Boolean, vec![(0, 1, 0)])

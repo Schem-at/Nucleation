@@ -1,13 +1,13 @@
 use quartz_nbt::{NbtCompound, NbtTag};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use smol_str::SmolStr;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlockState {
-    pub name: String,
-    pub properties: HashMap<String, String>,
+    pub name: SmolStr,
+    pub properties: Vec<(SmolStr, SmolStr)>,
 }
 
 impl fmt::Display for BlockState {
@@ -38,46 +38,59 @@ impl Hash for BlockState {
 }
 
 impl BlockState {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: impl Into<SmolStr>) -> Self {
         BlockState {
-            name,
-            properties: HashMap::new(),
+            name: name.into(),
+            properties: Vec::new(),
         }
     }
 
-    pub fn get_name(&self) -> &String {
-        &self.name
+    pub fn get_name(&self) -> &str {
+        self.name.as_str()
     }
 
-    pub fn with_property(mut self, key: String, value: String) -> Self {
-        self.properties.insert(key, value);
+    pub fn with_property(mut self, key: impl Into<SmolStr>, value: impl Into<SmolStr>) -> Self {
+        self.set_property(key, value);
         self
     }
 
-    pub fn with_properties(mut self, properties: HashMap<String, String>) -> Self {
+    pub fn with_properties(mut self, properties: Vec<(SmolStr, SmolStr)>) -> Self {
         self.properties = properties;
         self
     }
 
-    pub fn set_property(&mut self, key: String, value: String) {
-        self.properties.insert(key, value);
+    pub fn set_property(&mut self, key: impl Into<SmolStr>, value: impl Into<SmolStr>) {
+        let key = key.into();
+        let value = value.into();
+        for (k, v) in &mut self.properties {
+            if *k == key {
+                *v = value;
+                return;
+            }
+        }
+        self.properties.push((key, value));
     }
 
     pub fn remove_property(&mut self, key: &str) {
-        self.properties.remove(key);
+        self.properties.retain(|(k, _)| k != key);
     }
 
-    pub fn get_property(&self, key: &str) -> Option<&String> {
-        self.properties.get(key)
+    pub fn get_property(&self, key: &str) -> Option<&SmolStr> {
+        for (k, v) in &self.properties {
+            if k == key {
+                return Some(v);
+            }
+        }
+        None
     }
     pub fn to_nbt(&self) -> NbtTag {
         let mut compound = NbtCompound::new();
-        compound.insert("Name", self.name.clone());
+        compound.insert("Name", self.name.to_string());
 
         if !self.properties.is_empty() {
             let mut properties = NbtCompound::new();
             for (key, value) in &self.properties {
-                properties.insert(key, value.clone());
+                properties.insert(key.to_string(), value.to_string());
             }
             compound.insert("Properties", properties);
         }
@@ -86,16 +99,16 @@ impl BlockState {
     }
 
     pub fn from_nbt(compound: &NbtCompound) -> Result<Self, String> {
-        let name = compound
+        let name: SmolStr = compound
             .get::<_, &String>("Name")
             .map_err(|e| format!("Failed to get Name: {}", e))?
-            .clone();
+            .into();
 
-        let mut properties = HashMap::new();
+        let mut properties = Vec::new();
         if let Ok(props) = compound.get::<_, &NbtCompound>("Properties") {
             for (key, value) in props.inner() {
                 if let NbtTag::String(value_str) = value {
-                    properties.insert(key.clone(), value_str.clone());
+                    properties.push((key.into(), value_str.into()));
                 }
             }
         }
@@ -110,13 +123,12 @@ mod tests {
 
     #[test]
     fn test_block_state_creation() {
-        let block = BlockState::new("minecraft:stone".to_string())
-            .with_property("variant".to_string(), "granite".to_string());
+        let block = BlockState::new("minecraft:stone").with_property("variant", "granite");
 
         assert_eq!(block.name, "minecraft:stone");
         assert_eq!(
-            block.properties.get("variant"),
-            Some(&"granite".to_string())
+            block.get_property("variant").map(|s| s.as_str()),
+            Some("granite")
         );
     }
 }

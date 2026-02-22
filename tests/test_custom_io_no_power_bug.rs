@@ -261,19 +261,16 @@ fn test_custom_io_sync_wire_powers() {
         .expect("Output block should exist");
 
     let power_in_synced: u8 = block_in
-        .properties
-        .get("power")
-        .and_then(|p| p.parse().ok())
+        .get_property("power")
+        .and_then(|p| p.as_str().parse().ok())
         .unwrap_or(0);
     let power_mid_synced: u8 = block_mid
-        .properties
-        .get("power")
-        .and_then(|p| p.parse().ok())
+        .get_property("power")
+        .and_then(|p| p.as_str().parse().ok())
         .unwrap_or(0);
     let power_out_synced: u8 = block_out
-        .properties
-        .get("power")
-        .and_then(|p| p.parse().ok())
+        .get_property("power")
+        .and_then(|p| p.as_str().parse().ok())
         .unwrap_or(0);
 
     println!("\nPowers from synced schematic:");

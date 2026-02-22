@@ -2564,7 +2564,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation"
-version = "0.1.164"
+version = "0.1.165"
 dependencies = [
  "base64",
  "blockpedia",
@@ -2595,10 +2595,12 @@ dependencies = [
  "rand",
  "rayon",
  "rquickjs",
+ "rustc-hash 2.1.1",
  "schematic-mesher",
  "serde",
  "serde-wasm-bindgen 0.4.5",
  "serde_json",
+ "smol_str",
  "thiserror 1.0.69",
  "tracing",
  "tracing-subscriber",

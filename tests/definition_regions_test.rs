@@ -2,7 +2,6 @@ use nucleation::block_entity::BlockEntity;
 use nucleation::definition_region::DefinitionRegion;
 use nucleation::utils::NbtValue;
 use nucleation::{BlockState, UniversalSchematic};
-use std::collections::HashMap;
 
 #[test]
 fn test_definition_regions_roundtrip_chain() {

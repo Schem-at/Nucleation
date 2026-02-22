@@ -177,7 +177,7 @@ pub fn transform_block_state_rotate(block: &BlockState, axis: Axis, degrees: i32
 
     // Transform 'axis' property (logs, pillars, etc.)
     if let Some(axis_val) = block.get_property("axis") {
-        let new_axis = rotate_axis_property(axis_val.as_str(), axis, degrees);
+        let new_axis = rotate_axis_property(&axis_val, axis, degrees);
         new_block.set_property("axis".to_string(), new_axis);
     }
 
@@ -242,7 +242,7 @@ fn transform_special_block_properties(
     // Handle stair shapes
     if let Some(shape) = block.get_property("shape") {
         if is_rotation && axis == Axis::Y {
-            let new_shape = rotate_stair_shape(shape.as_str(), degrees);
+            let new_shape = rotate_stair_shape(&shape, degrees);
             block.set_property("shape".to_string(), new_shape);
         }
     }
@@ -259,14 +259,14 @@ fn transform_special_block_properties(
                 let new_dir = dir.rotate_y(degrees);
                 // Move the connection value to the new direction
                 wire_removals.push(direction);
-                wire_updates.push((new_dir.to_str(), connection_value));
+                wire_updates.push((new_dir.to_str(), connection_value.to_string()));
             } else if !is_rotation {
                 let dir = Direction::from_str(direction).unwrap();
                 let new_dir = dir.flip(axis);
                 if new_dir.to_str() != *direction {
                     // Swap connection values
                     wire_removals.push(direction);
-                    wire_updates.push((new_dir.to_str(), connection_value));
+                    wire_updates.push((new_dir.to_str(), connection_value.to_string()));
                 }
             }
         }
@@ -315,6 +315,7 @@ fn rotate_stair_shape(shape: &str, degrees: i32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use smol_str::SmolStr;
 
     #[test]
     fn test_direction_flip_x() {
@@ -356,7 +357,7 @@ mod tests {
         let transformed = transform_block_state_flip(&block, Axis::X);
         assert_eq!(
             transformed.get_property("facing"),
-            Some(&"west".to_string())
+            Some(&SmolStr::from("west"))
         );
     }
 
@@ -368,13 +369,13 @@ mod tests {
         let transformed = transform_block_state_rotate(&block, Axis::Y, 90);
         assert_eq!(
             transformed.get_property("facing"),
-            Some(&"east".to_string())
+            Some(&SmolStr::from("east"))
         );
 
         let transformed_180 = transform_block_state_rotate(&block, Axis::Y, 180);
         assert_eq!(
             transformed_180.get_property("facing"),
-            Some(&"south".to_string())
+            Some(&SmolStr::from("south"))
         );
     }
 
@@ -392,12 +393,15 @@ mod tests {
         block.set_property("rotation".to_string(), "0".to_string());
 
         let transformed = transform_block_state_rotate(&block, Axis::Y, 90);
-        assert_eq!(transformed.get_property("rotation"), Some(&"4".to_string()));
+        assert_eq!(
+            transformed.get_property("rotation"),
+            Some(&SmolStr::from("4"))
+        );
 
         let transformed_180 = transform_block_state_rotate(&block, Axis::Y, 180);
         assert_eq!(
             transformed_180.get_property("rotation"),
-            Some(&"8".to_string())
+            Some(&SmolStr::from("8"))
         );
     }
 }

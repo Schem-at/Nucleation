@@ -892,6 +892,7 @@ pub fn floor_mod(a: i32, b: i32) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use smol_str::SmolStr;
 
     // ─── Floor division / modulo ────────────────────────────────────────────
 
@@ -1596,13 +1597,13 @@ mod tests {
 
         let redstone = &chunk2.sections[0].palette[1];
         assert_eq!(redstone.name, "minecraft:redstone_wire");
-        assert_eq!(redstone.properties.get("power"), Some(&"15".to_string()));
-        assert_eq!(redstone.properties.get("east"), Some(&"side".to_string()));
+        assert_eq!(redstone.get_property("power"), Some(&SmolStr::from("15")));
+        assert_eq!(redstone.get_property("east"), Some(&SmolStr::from("side")));
 
         let stairs = &chunk2.sections[0].palette[2];
         assert_eq!(stairs.name, "minecraft:oak_stairs");
-        assert_eq!(stairs.properties.get("facing"), Some(&"north".to_string()));
-        assert_eq!(stairs.properties.get("half"), Some(&"top".to_string()));
+        assert_eq!(stairs.get_property("facing"), Some(&SmolStr::from("north")));
+        assert_eq!(stairs.get_property("half"), Some(&SmolStr::from("top")));
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────

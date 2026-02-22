@@ -80,7 +80,7 @@ mod mchprs_state_tests {
         // Check initial lamp state
         if let Some(lamp) = initial_schematic.get_block(1, 0, 0) {
             println!("  Lamp initial: {}", lamp.to_string());
-            assert_eq!(lamp.properties.get("lit"), Some(&"false".to_string()));
+            assert_eq!(lamp.get_property("lit").map(|s| s.as_str()), Some("false"));
         }
 
         println!("\nSTEP 2: Toggle lever at [2,0,3]");
@@ -247,7 +247,7 @@ mod mchprs_state_tests {
             "Synced schematic lamp properties: {:?}",
             synced_lamp.properties
         );
-        let synced_lit = synced_lamp.properties.get("lit").map(|s| s.clone());
+        let synced_lit = synced_lamp.get_property("lit").map(|s| s.to_string());
 
         // Compare
         println!("\nMCHPRS says lit={:?}", mchprs_lit);

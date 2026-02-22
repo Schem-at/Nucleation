@@ -188,13 +188,13 @@ mod tests {
         // After 90° rotation, north should become east
         if let Some(block) = schematic.get_block(0, 0, 0) {
             assert_eq!(
-                block.get_property("facing"),
-                Some(&"east".to_string()),
+                block.get_property("facing").map(|s| s.as_str()),
+                Some("east"),
                 "Repeater should face east after 90° rotation"
             );
             assert_eq!(
-                block.get_property("delay"),
-                Some(&"2".to_string()),
+                block.get_property("delay").map(|s| s.as_str()),
+                Some("2"),
                 "Delay should be preserved"
             );
         } else {

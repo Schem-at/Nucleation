@@ -16,7 +16,7 @@ fn benchmark_block_setting(c: &mut Criterion) {
 
     c.bench_function("set block", |b| {
         b.iter(|| {
-            schematic.set_block(0, 0, 0, block.clone());
+            schematic.set_block(0, 0, 0, &block);
         })
     });
 }
@@ -32,7 +32,7 @@ fn benchmark_big_schematic_creation(c: &mut Criterion) {
                             x,
                             y,
                             z,
-                            BlockState::new("minecraft:stone".to_string()),
+                            &BlockState::new("minecraft:stone".to_string()),
                         );
                     }
                 }
@@ -55,7 +55,7 @@ fn benchmark_big_schematic_creation_with_region_prealloc(c: &mut Criterion) {
                             x,
                             y,
                             z,
-                            BlockState::new("minecraft:stone".to_string()),
+                            &BlockState::new("minecraft:stone".to_string()),
                         );
                     }
                 }

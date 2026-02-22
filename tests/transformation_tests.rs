@@ -1,4 +1,5 @@
 use nucleation::{BlockState, Region, UniversalSchematic};
+use smol_str::SmolStr;
 
 #[test]
 fn test_flip_x_simple() {
@@ -14,11 +15,11 @@ fn test_flip_x_simple() {
     // After flipping X: block at 0 should be at 2, block at 2 should be at 0
     assert_eq!(
         region.get_block(2, 0, 0).map(|b| &b.name),
-        Some(&"minecraft:stone".to_string())
+        Some(&SmolStr::from("minecraft:stone"))
     );
     assert_eq!(
         region.get_block(0, 0, 0).map(|b| &b.name),
-        Some(&"minecraft:diamond_block".to_string())
+        Some(&SmolStr::from("minecraft:diamond_block"))
     );
 }
 
@@ -35,11 +36,11 @@ fn test_flip_y_simple() {
 
     assert_eq!(
         region.get_block(0, 2, 0).map(|b| &b.name),
-        Some(&"minecraft:stone".to_string())
+        Some(&SmolStr::from("minecraft:stone"))
     );
     assert_eq!(
         region.get_block(0, 0, 0).map(|b| &b.name),
-        Some(&"minecraft:diamond_block".to_string())
+        Some(&SmolStr::from("minecraft:diamond_block"))
     );
 }
 
@@ -56,11 +57,11 @@ fn test_flip_z_simple() {
 
     assert_eq!(
         region.get_block(0, 0, 2).map(|b| &b.name),
-        Some(&"minecraft:stone".to_string())
+        Some(&SmolStr::from("minecraft:stone"))
     );
     assert_eq!(
         region.get_block(0, 0, 0).map(|b| &b.name),
-        Some(&"minecraft:diamond_block".to_string())
+        Some(&SmolStr::from("minecraft:diamond_block"))
     );
 }
 
@@ -81,10 +82,16 @@ fn test_flip_x_with_directional_blocks() {
 
     // Check that facing directions were flipped
     let block_at_2 = region.get_block(2, 0, 0).unwrap();
-    assert_eq!(block_at_2.get_property("facing"), Some(&"west".to_string()));
+    assert_eq!(
+        block_at_2.get_property("facing"),
+        Some(&SmolStr::from("west"))
+    );
 
     let block_at_0 = region.get_block(0, 0, 0).unwrap();
-    assert_eq!(block_at_0.get_property("facing"), Some(&"east".to_string()));
+    assert_eq!(
+        block_at_0.get_property("facing"),
+        Some(&SmolStr::from("east"))
+    );
 }
 
 #[test]
@@ -105,13 +112,13 @@ fn test_flip_z_with_directional_blocks() {
     let block_at_2 = region.get_block(0, 0, 2).unwrap();
     assert_eq!(
         block_at_2.get_property("facing"),
-        Some(&"south".to_string())
+        Some(&SmolStr::from("south"))
     );
 
     let block_at_0 = region.get_block(0, 0, 0).unwrap();
     assert_eq!(
         block_at_0.get_property("facing"),
-        Some(&"north".to_string())
+        Some(&SmolStr::from("north"))
     );
 }
 
@@ -130,11 +137,11 @@ fn test_rotate_y_90_simple() {
     // (2,0,0) -> (0,0,0)
     assert_eq!(
         region.get_block(0, 0, 2).map(|b| &b.name),
-        Some(&"minecraft:stone".to_string())
+        Some(&SmolStr::from("minecraft:stone"))
     );
     assert_eq!(
         region.get_block(0, 0, 0).map(|b| &b.name),
-        Some(&"minecraft:stone".to_string())
+        Some(&SmolStr::from("minecraft:stone"))
     );
 }
 
@@ -150,7 +157,7 @@ fn test_rotate_y_180() {
     // 180-degree rotation should put block at opposite corner
     assert_eq!(
         region.get_block(2, 0, 2).map(|b| &b.name),
-        Some(&"minecraft:stone".to_string())
+        Some(&SmolStr::from("minecraft:stone"))
     );
 }
 
@@ -169,7 +176,7 @@ fn test_rotate_y_with_directional_blocks() {
     let rotated_block = region.get_block(0, 0, 1).unwrap();
     assert_eq!(
         rotated_block.get_property("facing"),
-        Some(&"east".to_string())
+        Some(&SmolStr::from("east"))
     );
 }
 
@@ -188,7 +195,7 @@ fn test_rotate_y_270() {
     let rotated_block = region.get_block(1, 0, 1).unwrap();
     assert_eq!(
         rotated_block.get_property("facing"),
-        Some(&"west".to_string())
+        Some(&SmolStr::from("west"))
     );
 }
 
@@ -244,7 +251,10 @@ fn test_flip_with_axis_property() {
 
     // X-axis flip shouldn't change x-axis blocks
     let flipped_block = region.get_block(1, 0, 0).unwrap();
-    assert_eq!(flipped_block.get_property("axis"), Some(&"x".to_string()));
+    assert_eq!(
+        flipped_block.get_property("axis"),
+        Some(&SmolStr::from("x"))
+    );
 }
 
 #[test]
@@ -260,7 +270,10 @@ fn test_rotate_with_axis_property() {
 
     // X-axis should become Z-axis after 90-degree Y rotation
     let rotated_block = region.get_block(1, 1, 1).unwrap();
-    assert_eq!(rotated_block.get_property("axis"), Some(&"z".to_string()));
+    assert_eq!(
+        rotated_block.get_property("axis"),
+        Some(&SmolStr::from("z"))
+    );
 }
 
 #[test]
@@ -315,7 +328,7 @@ fn test_rotation_property_standing_sign() {
     let rotated_block = region.get_block(1, 0, 1).unwrap();
     assert_eq!(
         rotated_block.get_property("rotation"),
-        Some(&"4".to_string())
+        Some(&SmolStr::from("4"))
     );
 }
 
@@ -335,10 +348,16 @@ fn test_flip_y_directional() {
     region.flip_y();
 
     let block_at_2 = region.get_block(0, 2, 0).unwrap();
-    assert_eq!(block_at_2.get_property("facing"), Some(&"down".to_string()));
+    assert_eq!(
+        block_at_2.get_property("facing"),
+        Some(&SmolStr::from("down"))
+    );
 
     let block_at_0 = region.get_block(0, 0, 0).unwrap();
-    assert_eq!(block_at_0.get_property("facing"), Some(&"up".to_string()));
+    assert_eq!(
+        block_at_0.get_property("facing"),
+        Some(&SmolStr::from("up"))
+    );
 }
 
 #[test]
@@ -396,6 +415,6 @@ fn test_redstone_circuit_flip() {
     let lever_block = region.get_block(4, 0, 0).unwrap();
     assert_eq!(
         lever_block.get_property("facing"),
-        Some(&"west".to_string())
+        Some(&SmolStr::from("west"))
     );
 }

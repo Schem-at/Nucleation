@@ -258,7 +258,6 @@ impl MchprsWorld {
 
     fn convert_block_entity(&self, block_entity: UtilBlockEntity) -> Option<BlockEntity> {
         // Convert our NbtValue HashMap to mchprs's nbt::Value HashMap
-        use crate::utils::NbtValue;
         use nbt;
         use std::collections::HashMap as StdHashMap;
 
@@ -277,6 +276,7 @@ impl MchprsWorld {
         BlockEntity::from_nbt(&block_entity.id, &converted)
     }
 
+    #[allow(dead_code)]
     fn replace_custom_io_wires_with_blocks(&mut self) {
         // Replace redstone wires at custom IO positions with redstone blocks
         // This is necessary because the Redpiler's input_search pass only creates
@@ -344,6 +344,7 @@ impl MchprsWorld {
     }
 
     /// Denormalizes a position from MCHPRS coordinates back to schematic coordinates
+    #[allow(dead_code)]
     fn denormalize_pos(&self, pos: BlockPos) -> BlockPos {
         BlockPos::new(
             pos.x + self.min_coords.0,
@@ -606,7 +607,7 @@ impl MchprsWorld {
         let bounding_box = self.schematic.get_bounding_box();
         let (min_x, min_y, min_z) = self.min_coords;
         let (max_x, max_y, max_z) = bounding_box.max;
-        let custom_io_set: std::collections::HashSet<_> =
+        let _custom_io_set: std::collections::HashSet<_> =
             self.options.custom_io.iter().cloned().collect();
 
         // Iterate using actual schematic coordinates
@@ -615,7 +616,7 @@ impl MchprsWorld {
                 for z in min_z..=max_z {
                     // Normalize position for MCHPRS access
                     let normalized_pos = self.normalize_pos(BlockPos::new(x, y, z));
-                    let raw_id = self.get_block_raw(normalized_pos);
+                    let _raw_id = self.get_block_raw(normalized_pos);
                     let block = self.get_block(normalized_pos);
 
                     // Skip air blocks
@@ -627,10 +628,10 @@ impl MchprsWorld {
                     let name = format!("minecraft:{}", block.get_name());
 
                     // Get all properties from the MCHPRS block
-                    let properties: std::collections::HashMap<String, String> = block
+                    let properties: Vec<(smol_str::SmolStr, smol_str::SmolStr)> = block
                         .properties()
                         .iter()
-                        .map(|(k, v)| (k.to_string(), v.to_string()))
+                        .map(|(k, v)| (smol_str::SmolStr::new(k), smol_str::SmolStr::new(v)))
                         .collect();
 
                     // Create BlockState and update schematic

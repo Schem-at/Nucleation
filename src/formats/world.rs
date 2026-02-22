@@ -871,7 +871,7 @@ impl SectionBuilder {
 
     fn block_key(block: &BlockState) -> String {
         if block.properties.is_empty() {
-            block.name.clone()
+            block.name.to_string()
         } else {
             let mut props: Vec<_> = block.properties.iter().collect();
             props.sort_by_key(|(k, _)| (*k).clone());
@@ -1100,6 +1100,7 @@ fn generate_level_dat(opts: &WorldExportOptions) -> Result<Vec<u8>, Box<dyn Erro
 #[cfg(test)]
 mod tests {
     use super::*;
+    use smol_str::SmolStr;
 
     #[test]
     fn test_parse_region_filename() {
@@ -1169,8 +1170,8 @@ mod tests {
         assert!(imported_redstone.is_some());
         assert_eq!(imported_redstone.unwrap().name, "minecraft:redstone_wire");
         assert_eq!(
-            imported_redstone.unwrap().properties.get("power"),
-            Some(&"15".to_string())
+            imported_redstone.unwrap().get_property("power"),
+            Some(&SmolStr::from("15"))
         );
     }
 

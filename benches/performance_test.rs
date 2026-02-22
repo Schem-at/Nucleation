@@ -10,7 +10,7 @@ fn fill_cube_no_cache_small_region(size: i32) {
         for y in 0..size {
             for z in 0..size {
                 let stone = BlockState::new("minecraft:stone".to_string());
-                region.set_block(x, y, z, stone);
+                region.set_block(x, y, z, &stone);
             }
         }
     }
@@ -23,7 +23,7 @@ fn fill_cube_with_cache_small_region(size: i32) {
     for x in 0..size {
         for y in 0..size {
             for z in 0..size {
-                region.set_block(x, y, z, stone.clone());
+                region.set_block(x, y, z, &stone);
             }
         }
     }
@@ -41,7 +41,7 @@ fn fill_cube_with_cache_large_region(size: i32) {
     for x in 0..size {
         for y in 0..size {
             for z in 0..size {
-                region.set_block(x, y, z, stone.clone());
+                region.set_block(x, y, z, &stone);
             }
         }
     }
@@ -137,7 +137,7 @@ fn bench_region_expansion(c: &mut Criterion) {
             let stone = BlockState::new("minecraft:stone".to_string());
 
             for i in 0..20 {
-                region.set_block(i, i, i, stone.clone());
+                region.set_block(i, i, i, &stone);
             }
             black_box(region);
         });
@@ -149,7 +149,7 @@ fn bench_region_expansion(c: &mut Criterion) {
             let stone = BlockState::new("minecraft:stone".to_string());
 
             for i in 0..20 {
-                region.set_block(i, i, i, stone.clone());
+                region.set_block(i, i, i, &stone);
             }
             black_box(region);
         });

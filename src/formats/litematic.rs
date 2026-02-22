@@ -492,8 +492,8 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
         let _air = BlockState::new("minecraft:air".to_string());
 
-        region.set_block(0, 0, 0, &stone.clone());
-        region.set_block(1, 1, 1, &stone.clone());
+        region.set_block(0, 0, 0, &stone);
+        region.set_block(1, 1, 1, &stone);
 
         let entity = Entity::new("minecraft:creeper".to_string(), (0.5, 0.0, 0.5));
         region.add_entity(entity);
@@ -638,8 +638,8 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
         let _air = BlockState::new("minecraft:air".to_string());
 
-        region.set_block(0, 0, 0, &stone.clone());
-        region.set_block(1, 1, 1, &stone.clone());
+        region.set_block(0, 0, 0, &stone);
+        region.set_block(1, 1, 1, &stone);
 
         original_schematic.add_region(region);
 

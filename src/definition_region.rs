@@ -460,7 +460,7 @@ impl DefinitionRegion {
                 if let Some(block) = schematic.get_block(x, y, z) {
                     properties
                         .iter()
-                        .all(|(key, value)| block.properties.get(key).map_or(false, |v| v == value))
+                        .all(|(key, value)| block.get_property(key).map_or(false, |v| v == value))
                 } else {
                     false
                 }

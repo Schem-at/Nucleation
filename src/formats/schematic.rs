@@ -1,3 +1,4 @@
+use smol_str::SmolStr;
 use std::collections::HashMap;
 use std::fmt;
 use std::io::{BufReader, Read};
@@ -344,8 +345,8 @@ fn convert_palette_with_mapping(palette: &Vec<BlockState>) -> (NbtCompound, Vec<
             continue;
         }
 
-        let key = if block_state.properties.is_empty() {
-            block_state.name.clone()
+        let key: String = if block_state.properties.is_empty() {
+            block_state.name.to_string()
         } else {
             format!(
                 "{}[{}]",
@@ -400,8 +401,8 @@ fn convert_palette_v2(palette: &Vec<BlockState>) -> (NbtCompound, i32) {
             continue; // Skip air blocks as we already added it at index 0
         }
 
-        let key = if block_state.properties.is_empty() {
-            block_state.name.clone()
+        let key: String = if block_state.properties.is_empty() {
+            block_state.name.to_string()
         } else {
             format!(
                 "{}[{}]",
@@ -577,15 +578,15 @@ fn parse_block_palette(
 
 fn parse_block_state(input: &str) -> BlockState {
     if let Some((name, properties_str)) = input.split_once('[') {
-        let name = name.to_string();
+        let name: SmolStr = name.into();
         let properties = properties_str
             .trim_end_matches(']')
             .split(',')
             .filter_map(|prop| {
                 let mut parts = prop.splitn(2, '=');
                 Some((
-                    parts.next()?.trim().to_string(),
-                    parts.next()?.trim().to_string(),
+                    SmolStr::from(parts.next()?.trim()),
+                    SmolStr::from(parts.next()?.trim()),
                 ))
             })
             .collect();
@@ -756,9 +757,9 @@ mod tests {
             for y in 0..5 {
                 for z in 0..5 {
                     if (x + y + z) % 2 == 0 {
-                        schematic.set_block(x, y, z, &stone.clone());
+                        schematic.set_block(x, y, z, &stone);
                     } else {
-                        schematic.set_block(x, y, z, &dirt.clone());
+                        schematic.set_block(x, y, z, &dirt);
                     }
                 }
             }
@@ -855,10 +856,8 @@ mod tests {
             BlockState::new("minecraft:stone".to_string()),
             BlockState::new("minecraft:dirt".to_string()),
             BlockState {
-                name: "minecraft:wool".to_string(),
-                properties: [("color".to_string(), "red".to_string())]
-                    .into_iter()
-                    .collect(),
+                name: "minecraft:wool".into(),
+                properties: vec![("color".into(), "red".into())],
             },
         ];
 
@@ -883,10 +882,8 @@ mod tests {
             BlockState::new("minecraft:stone".to_string()),
             BlockState::new("minecraft:dirt".to_string()),
             BlockState {
-                name: "minecraft:wool".to_string(),
-                properties: [("color".to_string(), "red".to_string())]
-                    .into_iter()
-                    .collect(),
+                name: "minecraft:wool".into(),
+                properties: vec![("color".into(), "red".into())],
             },
         ];
 

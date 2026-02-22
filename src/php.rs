@@ -189,7 +189,7 @@ impl NucleationSchematic {
     #[php_method]
     pub fn set_block(&mut self, x: i32, y: i32, z: i32, block_name: String) -> PhpResult<()> {
         let block_state = BlockState::new(block_name);
-        self.inner.set_block(x, y, z, block_state);
+        self.inner.set_block(x, y, z, &block_state);
         Ok(())
     }
 
@@ -224,7 +224,7 @@ impl NucleationSchematic {
         for (key, value) in properties {
             block_state = block_state.with_property(key, value);
         }
-        self.inner.set_block(x, y, z, block_state);
+        self.inner.set_block(x, y, z, &block_state);
         Ok(())
     }
 

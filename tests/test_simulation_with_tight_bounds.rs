@@ -1,5 +1,5 @@
 #[cfg(feature = "simulation")]
-use nucleation::{BlockState, UniversalSchematic};
+use nucleation::UniversalSchematic;
 
 #[cfg(feature = "simulation")]
 use nucleation::simulation::MchprsWorld;

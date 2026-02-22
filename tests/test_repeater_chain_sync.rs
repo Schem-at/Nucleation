@@ -75,15 +75,13 @@ c
             if let Some(block) = synced_schematic.get_block(0, y, z) {
                 if y == 1 && block.name.contains("wire") {
                     let power: u8 = block
-                        .properties
-                        .get("power")
-                        .and_then(|p| p.parse().ok())
+                        .get_property("power")
+                        .and_then(|p| p.as_str().parse().ok())
                         .unwrap_or(0);
                     println!("  [0,1,{}]: {} power={}", z, block.name, power);
                 } else if y == 1 && block.name.contains("repeater") {
                     let powered = block
-                        .properties
-                        .get("powered")
+                        .get_property("powered")
                         .map(|p| p == "true")
                         .unwrap_or(false);
                     println!("  [0,1,{}]: {} powered={}", z, block.name, powered);
@@ -107,24 +105,20 @@ c
         .expect("Wire at [0,1,8] should exist");
 
     let power_2: u8 = wire_2
-        .properties
-        .get("power")
-        .and_then(|p| p.parse().ok())
+        .get_property("power")
+        .and_then(|p| p.as_str().parse().ok())
         .unwrap_or(0);
     let power_4: u8 = wire_4
-        .properties
-        .get("power")
-        .and_then(|p| p.parse().ok())
+        .get_property("power")
+        .and_then(|p| p.as_str().parse().ok())
         .unwrap_or(0);
     let power_6: u8 = wire_6
-        .properties
-        .get("power")
-        .and_then(|p| p.parse().ok())
+        .get_property("power")
+        .and_then(|p| p.as_str().parse().ok())
         .unwrap_or(0);
     let power_8: u8 = wire_8
-        .properties
-        .get("power")
-        .and_then(|p| p.parse().ok())
+        .get_property("power")
+        .and_then(|p| p.as_str().parse().ok())
         .unwrap_or(0);
 
     println!("\nIntermediate wire powers:");

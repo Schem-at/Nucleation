@@ -88,8 +88,7 @@ mod long_wire_test {
         for x in 1..=15 {
             let wire = schematic.get_block(x, 0, 0).unwrap();
             let power = wire
-                .properties
-                .get("power")
+                .get_property("power")
                 .map(|s| s.as_str())
                 .unwrap_or("?");
             println!("  [{},0,0] wire power={}", x, power);
@@ -102,14 +101,14 @@ mod long_wire_test {
         println!("\n--- VERIFICATION ---");
         let lever = schematic.get_block(0, 0, 0).unwrap();
         assert_eq!(
-            lever.properties.get("powered").map(|s| s.as_str()),
+            lever.get_property("powered").map(|s| s.as_str()),
             Some("true"),
             "Lever should be powered"
         );
 
         let lamp = schematic.get_block(16, 0, 0).unwrap();
         assert_eq!(
-            lamp.properties.get("lit").map(|s| s.as_str()),
+            lamp.get_property("lit").map(|s| s.as_str()),
             Some("true"),
             "Lamp should be lit"
         );
@@ -118,7 +117,7 @@ mod long_wire_test {
         let mut wires_with_power = 0;
         for x in 1..=15 {
             let wire = schematic.get_block(x, 0, 0).unwrap();
-            if let Some(power) = wire.properties.get("power") {
+            if let Some(power) = wire.get_property("power") {
                 if power != "0" {
                     wires_with_power += 1;
                 }
@@ -146,7 +145,7 @@ mod long_wire_test {
 
     fn format_block_with_props(block: &nucleation::BlockState) -> String {
         if block.properties.is_empty() {
-            block.name.clone()
+            block.name.to_string()
         } else {
             let props: Vec<String> = block
                 .properties
@@ -232,21 +231,18 @@ mod long_wire_test {
 
         println!(
             "  Wire [1,0,0]: power={}",
-            wire1.properties.get("power").unwrap()
+            wire1.get_property("power").unwrap()
         );
         println!(
             "  Wire [2,0,0]: power={}",
-            wire2.properties.get("power").unwrap()
+            wire2.get_property("power").unwrap()
         );
-        println!(
-            "  Lamp [3,0,0]: lit={}",
-            lamp.properties.get("lit").unwrap()
-        );
+        println!("  Lamp [3,0,0]: lit={}", lamp.get_property("lit").unwrap());
 
         println!("\n=== RESULT ===");
-        if wire1.properties.get("power") == Some(&"0".to_string())
-            && wire2.properties.get("power") == Some(&"0".to_string())
-            && lamp.properties.get("lit") == Some(&"false".to_string())
+        if wire1.get_property("power").map(|s| s.as_str()) == Some("0")
+            && wire2.get_property("power").map(|s| s.as_str()) == Some("0")
+            && lamp.get_property("lit").map(|s| s.as_str()) == Some("false")
         {
             println!("✓ MCHPRS correctly fixed the invalid states!");
         } else {

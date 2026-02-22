@@ -118,8 +118,8 @@ fn test_repeater_middle_wires_power_bug() {
     let get_wire_power = |x, y, z| -> u8 {
         schematic
             .get_block(x, y, z)
-            .and_then(|b| b.properties.get("power"))
-            .and_then(|p| p.parse().ok())
+            .and_then(|b| b.get_property("power").cloned())
+            .and_then(|p| p.as_str().parse().ok())
             .unwrap_or(0)
     };
 

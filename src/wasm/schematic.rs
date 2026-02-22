@@ -2,6 +2,8 @@
 //!
 //! Core schematic operations: loading, saving, block manipulation, iteration.
 
+use smol_str::SmolStr;
+
 use crate::bounding_box::BoundingBox;
 use crate::definition_region::DefinitionRegion;
 use crate::schematic::SchematicVersion;
@@ -530,8 +532,8 @@ impl SchematicWrapper {
         block_name: &str,
         properties: &JsValue,
     ) -> Result<(), JsValue> {
-        // Convert JsValue to HashMap<String, String>
-        let mut props = HashMap::new();
+        // Convert JsValue to Vec<(SmolStr, SmolStr)>
+        let mut props = Vec::new();
 
         if !properties.is_undefined() && !properties.is_null() {
             let obj: Object = properties
@@ -553,13 +555,16 @@ impl SchematicWrapper {
                     .as_string()
                     .ok_or_else(|| JsValue::from_str("Property values should be strings"))?;
 
-                props.insert(key_str, value_str);
+                props.push((
+                    SmolStr::from(key_str.as_str()),
+                    SmolStr::from(value_str.as_str()),
+                ));
             }
         }
 
         // Create BlockState with properties
         let block_state = BlockState {
-            name: block_name.to_string(),
+            name: block_name.into(),
             properties: props,
         };
 
@@ -614,7 +619,7 @@ impl SchematicWrapper {
     pub fn get_block(&self, x: i32, y: i32, z: i32) -> Option<String> {
         self.0
             .get_block(x, y, z)
-            .map(|block_state| block_state.name.clone())
+            .map(|block_state| block_state.name.to_string())
     }
 
     /// Get block as formatted string with properties (e.g., "minecraft:lever[powered=true,facing=north]")
@@ -2053,14 +2058,19 @@ impl BlockStateWrapper {
     }
 
     pub fn name(&self) -> String {
-        self.0.name.clone()
+        self.0.name.to_string()
     }
 
     pub fn properties(&self) -> JsValue {
         let properties = self.0.properties.clone();
         let js_properties = js_sys::Object::new();
         for (key, value) in properties {
-            js_sys::Reflect::set(&js_properties, &key.into(), &value.into()).unwrap();
+            js_sys::Reflect::set(
+                &js_properties,
+                &JsValue::from_str(key.as_str()),
+                &JsValue::from_str(value.as_str()),
+            )
+            .unwrap();
         }
         js_properties.into()
     }

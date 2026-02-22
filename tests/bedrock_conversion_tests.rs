@@ -32,22 +32,22 @@ fn test_auto_register_conversion() {
 
     for comp in comparators {
         assert!(
-            comp.properties.contains_key("facing"),
+            comp.get_property("facing").is_some(),
             "Comparator missing facing: {:?}",
             comp
         );
         assert!(
-            comp.properties.contains_key("mode"),
+            comp.get_property("mode").is_some(),
             "Comparator missing mode: {:?}",
             comp
         );
         assert!(
-            comp.properties.contains_key("powered"),
+            comp.get_property("powered").is_some(),
             "Comparator missing powered: {:?}",
             comp
         );
 
-        let mode = comp.properties.get("mode").unwrap();
+        let mode = comp.get_property("mode").unwrap();
         assert!(
             mode == "compare" || mode == "subtract",
             "Invalid mode: {}",
@@ -90,7 +90,7 @@ fn test_auto_register_conversion() {
         let directions = ["north", "south", "east", "west"];
         let mut connections = 0;
         for dir in directions {
-            if let Some(val) = wire.properties.get(dir) {
+            if let Some(val) = wire.get_property(dir) {
                 if val != "none" {
                     connections += 1;
                 }

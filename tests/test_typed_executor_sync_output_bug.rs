@@ -12,7 +12,6 @@ fn test_typed_executor_sync_output_io_position() {
     use nucleation::schematic_builder::SchematicBuilder;
     use nucleation::simulation::typed_executor::insign_io::create_executor_from_insign;
     use nucleation::simulation::typed_executor::{ExecutionMode, Value};
-    use nucleation::UniversalSchematic;
     use std::collections::HashMap;
 
     println!("=== Testing TypedCircuitExecutor Output Sync Bug ===");
@@ -20,7 +19,7 @@ fn test_typed_executor_sync_output_io_position() {
     // Build a simple NOT gate circuit using SchematicBuilder
     let template = "# Base layer\nc\nc\nc\n\n# Logic layer\n│\n▲\n│\n";
 
-    let mut builder =
+    let builder =
         SchematicBuilder::from_template(template).expect("Failed to create builder from template");
 
     let schematic = builder.build().expect("Failed to build schematic");
