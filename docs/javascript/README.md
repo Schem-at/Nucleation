@@ -96,6 +96,8 @@ class SchematicWrapper {
 	from_schematic(bytes: Uint8Array): void;
 	to_litematic(): Uint8Array;
 	to_schematic(): Uint8Array;
+	toSnapshot(): Uint8Array;
+	fromSnapshot(bytes: Uint8Array): void;
 
 	// Format Support
 	static get_supported_import_formats(): string[];
@@ -267,6 +269,19 @@ console.log(SchematicWrapper.get_default_format_version("schematic"));
 // Save with specific format and version
 const schemBytes = schematic.save_as("schematic", "v2");
 writeFileSync("output.v2.schem", schemBytes);
+```
+
+### Snapshot Format
+
+The snapshot format is a fast binary serialization for caching and worker transfer. Much faster than standard formats but not compatible with Minecraft.
+
+```typescript
+// Serialize to snapshot bytes
+const snapshotData = schematic.toSnapshot();
+
+// Load from snapshot (e.g., received from a Web Worker)
+const schematic2 = new SchematicWrapper();
+schematic2.fromSnapshot(snapshotData);
 ```
 
 ## Block Operations

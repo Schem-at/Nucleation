@@ -76,6 +76,7 @@ All import methods mutate the existing schematic instance.
 | `from_world_zip_bounded` | `from_world_zip_bounded(data: bytes, min_x: int, min_y: int, min_z: int, max_x: int, max_y: int, max_z: int) -> None` | Load zipped world with coordinate bounds. |
 | `from_world_directory` | `from_world_directory(path: str) -> None` | Load from an unzipped world folder on disk. |
 | `from_world_directory_bounded` | `from_world_directory_bounded(path: str, min_x: int, min_y: int, min_z: int, max_x: int, max_y: int, max_z: int) -> None` | Load world folder with coordinate bounds. |
+| `from_snapshot` | `from_snapshot(data: bytes) -> None` | Load from snapshot format (fast binary, `.nusn`). |
 
 #### Format I/O — Export
 
@@ -88,6 +89,8 @@ All import methods mutate the existing schematic instance.
 | `to_world` | `to_world(options_json: Optional[str] = None) -> dict[str, bytes]` | Export as world files. Returns `{path: bytes}`. |
 | `to_world_zip` | `to_world_zip(options_json: Optional[str] = None) -> bytes` | Export as a zipped Minecraft world. |
 | `save_world` | `save_world(directory: str, options_json: Optional[str] = None) -> None` | Write world files to a directory on disk. |
+| `to_snapshot` | `to_snapshot() -> bytes` | Export to snapshot format (fast binary, `.nusn`). |
+| `save` | `save(path: str, format: str = "auto", version: Optional[str] = None, settings: Optional[str] = None) -> None` | Save to file. Auto-detects format from extension when `format="auto"`. |
 | `save_as` | `save_as(format: str, version: Optional[str] = None, settings: Optional[str] = None) -> bytes` | Generic export to any registered format. |
 
 **Static format discovery methods:**

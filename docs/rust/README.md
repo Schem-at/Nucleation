@@ -162,12 +162,44 @@ let bytes = schematic.to_schematic()?;
 std::fs::write("output.schem", bytes)?;
 ```
 
+### Snapshot Format
+
+A fast binary serialization for caching and inter-process transfer. Much faster than standard formats but not compatible with Minecraft.
+
+```rust
+use nucleation::formats::snapshot;
+
+// Serialize
+let bytes = snapshot::to_snapshot(&schematic)?;
+std::fs::write("cache.nusn", &bytes)?;
+
+// Deserialize
+let bytes = std::fs::read("cache.nusn")?;
+let schematic = snapshot::from_snapshot(&bytes)?;
+```
+
 ### Auto-Detection
 
 ```rust
 let bytes = std::fs::read("unknown.file")?;
 let mut schematic = UniversalSchematic::new("loaded".to_string());
 schematic.load_from_data(&bytes)?;  // Auto-detects format
+```
+
+### FormatManager (Unified I/O)
+
+```rust
+use nucleation::formats::manager::get_manager;
+
+let manager = get_manager().lock().unwrap();
+
+// Auto-detect format from file extension
+let bytes = manager.write_auto("output.litematic", &schematic, None)?;
+std::fs::write("output.litematic", bytes)?;
+
+// Auto-detect with settings
+let bytes = manager.write_auto_with_settings("output.schem", &schematic, Some("v2"), None)?;
+std::fs::write("output.schem", bytes)?;
 ```
 
 ## Block Operations

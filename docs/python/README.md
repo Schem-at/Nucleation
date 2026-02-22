@@ -15,9 +15,8 @@ from nucleation import Schematic
 schematic = Schematic("my_schematic")
 schematic.set_block(0, 0, 0, "minecraft:stone")
 
-# Save as litematic
-with open("output.litematic", "wb") as f:
-    f.write(schematic.to_litematic())
+# Save to file (auto-detects format from extension)
+schematic.save("output.litematic")
 ```
 
 ## Table of Contents
@@ -69,6 +68,13 @@ class Schematic:
         """Save as litematic format"""
     def to_schematic(self) -> bytes:
         """Save as WorldEdit schematic format"""
+    def to_snapshot(self) -> bytes:
+        """Fast binary snapshot (for worker transfer, caching)"""
+    def from_snapshot(self, data: bytes) -> None:
+        """Load from snapshot format"""
+    def save(self, path: str, format: str = "auto",
+             version: str = None, settings: str = None) -> None:
+        """Save to file (auto-detects format from extension)"""
 
     # Format Support
     @staticmethod
@@ -193,27 +199,42 @@ print(schematic.get_dimensions())
 ### Save to File
 
 ```python
-# Save as litematic
-with open("output.litematic", "wb") as f:
-    f.write(schematic.to_litematic())
+# One-liner save (auto-detects format from extension)
+schematic.save("output.litematic")
+schematic.save("output.schem")
 
-# Save as WorldEdit schematic
-with open("output.schem", "wb") as f:
-    f.write(schematic.to_schematic())
+# Save with explicit format and version
+schematic.save("output.schem", format="schematic", version="v2")
+
+# Or get bytes directly
+litematic_bytes = schematic.to_litematic()
+schem_bytes = schematic.to_schematic()
 
 # Check export formats and versions
 print(Schematic.get_supported_export_formats())
-# ['litematic', 'schematic', 'mcstructure']
+# ['litematic', 'schematic', 'mcstructure', 'snapshot']
 
 print(Schematic.get_format_versions("schematic"))
 # ['v1', 'v2', 'v3']
 
 print(Schematic.get_default_format_version("schematic"))
 # 'v3'
+```
 
-# Save with specific format and version
-from nucleation import save_schematic
-save_schematic(schematic, "output.v2.schem", format="schematic", version="v2")
+### Snapshot Format
+
+The snapshot format (`.nusn`) is a fast binary serialization designed for caching and worker transfer. It's much faster than standard formats but not compatible with Minecraft.
+
+```python
+# Serialize to snapshot bytes
+snapshot_data = schematic.to_snapshot()
+
+# Load from snapshot
+schematic2 = Schematic("restored")
+schematic2.from_snapshot(snapshot_data)
+
+# Save/load via file
+schematic.save("cache.nusn")  # auto-detects snapshot from .nusn extension
 ```
 
 ## Block Operations
@@ -569,12 +590,10 @@ class ExecutionMode(TypedDict, total=False):
 ### Load and Modify
 
 ```python
-from nucleation import Schematic
+from nucleation import Schematic, load_schematic
 
-# Load existing schematic
-with open("input.litematic", "rb") as f:
-    schematic = Schematic("modified")
-    schematic.load_from_bytes(f.read())
+# Load existing schematic (auto-detects format)
+schematic = load_schematic("input.litematic")
 
 # Modify blocks
 for x in range(10):
@@ -582,8 +601,7 @@ for x in range(10):
         schematic.set_block(x, 0, z, "minecraft:stone")
 
 # Save modified version
-with open("output.litematic", "wb") as f:
-    f.write(schematic.to_litematic())
+schematic.save("output.litematic")
 ```
 
 ### Build and Test Circuit
@@ -629,15 +647,8 @@ def convert_all_schematics(input_dir: str, output_dir: str):
         input_path = os.path.join(input_dir, filename)
         output_path = os.path.join(output_dir, filename.replace('.schematic', '.litematic'))
 
-        # Load
-        with open(input_path, "rb") as f:
-            schematic = Schematic(filename)
-            schematic.load_from_schematic(f.read())
-
-        # Save
-        with open(output_path, "wb") as f:
-            f.write(schematic.to_litematic())
-
+        schematic = load_schematic(input_path)
+        schematic.save(output_path)
         print(f"Converted: {filename}")
 
 convert_all_schematics("input/", "output/")

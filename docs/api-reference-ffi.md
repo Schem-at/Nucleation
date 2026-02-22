@@ -20,6 +20,8 @@ Nucleation provides a comprehensive C Foreign Function Interface for embedding i
   - [World ZIP](#world-zip)
   - [World Directory](#world-directory)
   - [Format Discovery](#format-discovery)
+  - [Snapshot](#snapshot)
+  - [File I/O](#file-io)
   - [Generic Export](#generic-export)
 - [Block Operations](#block-operations)
   - [Single Block](#single-block)
@@ -354,6 +356,35 @@ StringArray schematic_get_format_versions(const char* format);
 char* schematic_get_default_format_version(const char* format);
 char* schematic_get_export_settings_schema(const char* format);
 char* schematic_get_import_settings_schema(const char* format);
+```
+
+### Snapshot
+
+```c
+// Export to fast binary snapshot format (.nusn)
+ByteArray schematic_to_snapshot(const SchematicWrapper* schematic);
+
+// Load from snapshot format
+int schematic_from_snapshot(
+    SchematicWrapper* schematic,
+    const unsigned char* data,
+    size_t data_len
+);
+```
+
+### File I/O
+
+```c
+// Save to file with auto-detection from extension.
+// format: format name or NULL for auto-detect from path extension
+// version: format version or NULL for default
+// Returns: 0 success, -1 null args, -2 serialize error, -3 IO error
+int schematic_save_to_file(
+    const SchematicWrapper* schematic,
+    const char* path,
+    const char* format,
+    const char* version
+);
 ```
 
 ### Generic Export

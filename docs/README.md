@@ -86,6 +86,7 @@ All languages support the same formats:
 - ✅ **Litematic** (`.litematic`) - Full read/write support
 - ✅ **Sponge Schematic v2** (`.schem`) - Full read/write support
 - ✅ **WorldEdit Schematic** (`.schematic`) - Full read/write support
+- ✅ **Snapshot** (`.nusn`) - Fast binary serialization for caching/transfer
 - ✅ **Structure NBT** (`.nbt`) - Read support
 - ✅ **JSON export** - Write support (debugging)
 
@@ -144,8 +145,7 @@ from nucleation import Schematic
 schematic = Schematic("my_schematic")
 schematic.set_block(0, 0, 0, "minecraft:stone")
 
-with open("output.litematic", "wb") as f:
-    f.write(schematic.to_litematic())
+schematic.save("output.litematic")
 ```
 
 ## Feature Highlights

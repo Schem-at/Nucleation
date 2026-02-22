@@ -70,6 +70,7 @@ Load schematics from binary data in any supported format. All `from*` methods mu
 | `fromMcaBounded` | `fromMcaBounded(data: Uint8Array, minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number) → void` | Load MCA with coordinate bounds to limit loaded area. |
 | `fromWorldZip` | `fromWorldZip(data: Uint8Array) → void` | Load from a zipped Minecraft world. |
 | `fromWorldZipBounded` | `fromWorldZipBounded(data: Uint8Array, minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number) → void` | Load zipped world with coordinate bounds. |
+| `fromSnapshot` | `fromSnapshot(data: Uint8Array) → void` | Load from snapshot format (fast binary, `.nusn`). |
 
 Export schematics to binary data.
 
@@ -81,6 +82,7 @@ Export schematics to binary data.
 | `toMcstructure` | `toMcstructure() → Uint8Array` | Export to Bedrock McStructure format. |
 | `toWorld` | `toWorld(optionsJson?: string) → Map<string, Uint8Array>` | Export as Minecraft world files. Returns a map of file paths to byte content. |
 | `toWorldZip` | `toWorldZip(optionsJson?: string) → Uint8Array` | Export as a zipped Minecraft world. |
+| `toSnapshot` | `toSnapshot() → Uint8Array` | Export to snapshot format (fast binary, `.nusn`). |
 | `saveAs` | `saveAs(format: string, version?: string, settings?: string) → Uint8Array` | Generic export to any registered format with optional version and JSON settings. |
 | `getExportSettingsSchema` | `getExportSettingsSchema(format: string) → string \| undefined` | Get JSON schema for a format's export settings. |
 | `getImportSettingsSchema` | `getImportSettingsSchema(format: string) → string \| undefined` | Get JSON schema for a format's import settings. |
