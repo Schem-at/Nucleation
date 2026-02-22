@@ -7,3 +7,6 @@
 
 # Generated test .nucm files (large binaries, regenerate with gen_test_nucm example)
 examples/nucm-viewer/test-files/
+
+# Experimental benchmarks (not part of main build)
+experiments/

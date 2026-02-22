@@ -2564,9 +2564,10 @@ dependencies = [
 
 [[package]]
 name = "nucleation"
-version = "0.1.165"
+version = "0.1.167"
 dependencies = [
  "base64",
+ "bincode",
  "blockpedia",
  "bytemuck",
  "chrono",

@@ -181,6 +181,21 @@ impl SchematicWrapper {
         manager.get_import_settings_schema(format)
     }
 
+    /// Fast binary snapshot serialization — bypasses format manager for maximum speed.
+    #[wasm_bindgen(js_name = toSnapshot)]
+    pub fn to_snapshot(&self) -> Result<Vec<u8>, JsValue> {
+        crate::formats::snapshot::to_snapshot(&self.0)
+            .map_err(|e| JsValue::from_str(&format!("Snapshot export error: {}", e)))
+    }
+
+    /// Fast binary snapshot deserialization — bypasses format manager for maximum speed.
+    #[wasm_bindgen(js_name = fromSnapshot)]
+    pub fn from_snapshot(&mut self, data: &[u8]) -> Result<(), JsValue> {
+        self.0 = crate::formats::snapshot::from_snapshot(data)
+            .map_err(|e| JsValue::from_str(&format!("Snapshot import error: {}", e)))?;
+        Ok(())
+    }
+
     pub fn from_litematic(&mut self, data: &[u8]) -> Result<(), JsValue> {
         self.0 = litematic::from_litematic(data)
             .map_err(|e| JsValue::from_str(&format!("Litematic parsing error: {}", e)))?;

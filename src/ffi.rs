@@ -420,6 +420,53 @@ pub extern "C" fn schematic_to_schematic(schematic: *const SchematicWrapper) -> 
     }
 }
 
+/// Populates a schematic from snapshot (fast binary) data.
+/// Returns 0 on success, negative on error.
+#[no_mangle]
+pub extern "C" fn schematic_from_snapshot(
+    schematic: *mut SchematicWrapper,
+    data: *const c_uchar,
+    data_len: usize,
+) -> c_int {
+    if schematic.is_null() || data.is_null() {
+        return -1;
+    }
+    let data_slice = unsafe { std::slice::from_raw_parts(data, data_len) };
+    let s = unsafe { &mut *(*schematic).0 };
+    match crate::formats::snapshot::from_snapshot(data_slice) {
+        Ok(res) => {
+            *s = res;
+            0
+        }
+        Err(_) => -2,
+    }
+}
+
+/// Converts the schematic to snapshot (fast binary) format.
+/// The returned ByteArray must be freed with `free_byte_array`.
+#[no_mangle]
+pub extern "C" fn schematic_to_snapshot(schematic: *const SchematicWrapper) -> ByteArray {
+    if schematic.is_null() {
+        return ByteArray {
+            data: ptr::null_mut(),
+            len: 0,
+        };
+    }
+    let s = unsafe { &*(*schematic).0 };
+    match crate::formats::snapshot::to_snapshot(s) {
+        Ok(mut data) => {
+            let ptr = data.as_mut_ptr();
+            let len = data.len();
+            std::mem::forget(data);
+            ByteArray { data: ptr, len }
+        }
+        Err(_) => ByteArray {
+            data: ptr::null_mut(),
+            len: 0,
+        },
+    }
+}
+
 /// Populates a schematic from McStructure (Bedrock) data.
 /// Returns 0 on success, negative on error.
 #[no_mangle]

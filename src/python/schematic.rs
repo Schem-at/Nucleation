@@ -237,6 +237,22 @@ impl PySchematic {
         Ok(manager.get_exporter_default_version(format))
     }
 
+    /// Fast binary snapshot serialization — bypasses format manager for maximum speed.
+    pub fn to_snapshot(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let bytes = crate::formats::snapshot::to_snapshot(&self.inner)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
+        Ok(PyBytes::new(py, &bytes).into())
+    }
+
+    /// Fast binary snapshot deserialization — bypasses format manager for maximum speed.
+    pub fn from_snapshot(&mut self, data: &[u8]) -> PyResult<()> {
+        self.inner = crate::formats::snapshot::from_snapshot(data)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+        self.last_block_name.clear();
+        self.default_region_initialized = true;
+        Ok(())
+    }
+
     pub fn from_litematic(&mut self, data: &[u8]) -> PyResult<()> {
         self.inner = litematic::from_litematic(data)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;

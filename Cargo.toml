@@ -1,6 +1,6 @@
 [package]
 name = "nucleation"
-version = "0.1.166"
+version = "0.1.167"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -81,6 +81,7 @@ ext-php-rs = { version = "0.13.1", optional = true }
 mlua = { version = "0.10", features = ["luajit", "vendored"], optional = true }
 rquickjs = { version = "0.9", features = ["macro", "classes", "properties"], optional = true }
 
+bincode = "1"
 bytemuck = "1.23.1"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 
@@ -123,6 +124,10 @@ harness = false
 name = "scripting_bench"
 harness = false
 required-features = ["scripting"]
+
+[[bench]]
+name = "snapshot_bench"
+harness = false
 
 # Examples requiring the meshing feature
 [[example]]
