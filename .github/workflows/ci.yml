@@ -84,7 +84,7 @@ jobs:
       - name: Test Python build
         run: |
           pip install maturin
-          maturin build --features python,simulation
+          maturin build --features python,simulation,rendering
   build-wasm:
     needs: [test, check-version]
     runs-on: ubuntu-latest
@@ -259,7 +259,7 @@ jobs:
       - name: Install maturin & Publish
         run: |
           pip install maturin
-          maturin publish --features python,simulation --username __token__ --password ${{ secrets.PYPI_API_TOKEN }}
+          maturin publish --features python,simulation,rendering --username __token__ --password ${{ secrets.PYPI_API_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

@@ -21,6 +21,7 @@ pub use hdri::HdriData;
 use crate::meshing::MeshOutput;
 
 /// Render configuration.
+#[derive(Clone)]
 pub struct RenderConfig {
     pub width: u32,
     pub height: u32,

@@ -1774,6 +1774,60 @@ impl PySchematic {
         }
         Ok(results)
     }
+
+    // --- Rendering methods ---
+
+    /// Render the schematic to RGBA pixel bytes.
+    #[cfg(feature = "rendering")]
+    #[pyo3(signature = (pack, config=None))]
+    pub fn render<'py>(
+        &self,
+        py: Python<'py>,
+        pack: &super::meshing::PyResourcePack,
+        config: Option<&super::rendering::PyRenderConfig>,
+    ) -> PyResult<PyObject> {
+        let default_config = crate::rendering::RenderConfig::default();
+        let config = config.map(|c| &c.inner).unwrap_or(&default_config);
+        let pixels = self
+            .inner
+            .render(&pack.inner, config)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        Ok(PyBytes::new(py, &pixels).into())
+    }
+
+    /// Render the schematic to PNG bytes.
+    #[cfg(feature = "rendering")]
+    #[pyo3(signature = (pack, config=None))]
+    pub fn render_png<'py>(
+        &self,
+        py: Python<'py>,
+        pack: &super::meshing::PyResourcePack,
+        config: Option<&super::rendering::PyRenderConfig>,
+    ) -> PyResult<PyObject> {
+        let default_config = crate::rendering::RenderConfig::default();
+        let config = config.map(|c| &c.inner).unwrap_or(&default_config);
+        let png = self
+            .inner
+            .render_png(&pack.inner, config)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        Ok(PyBytes::new(py, &png).into())
+    }
+
+    /// Render the schematic and save to a PNG file.
+    #[cfg(feature = "rendering")]
+    #[pyo3(signature = (pack, path, config=None))]
+    pub fn render_to_file(
+        &self,
+        pack: &super::meshing::PyResourcePack,
+        path: &str,
+        config: Option<&super::rendering::PyRenderConfig>,
+    ) -> PyResult<()> {
+        let default_config = crate::rendering::RenderConfig::default();
+        let config = config.map(|c| &c.inner).unwrap_or(&default_config);
+        self.inner
+            .render_to_file(&pack.inner, path, config)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
 }
 
 // --- NBT Conversion Helpers ---
