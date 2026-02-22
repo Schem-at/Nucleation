@@ -802,3 +802,146 @@ impl Brush for ShadedBrush {
             .map(|id| BlockState::new(id))
     }
 }
+
+/// A brush that interpolates a multi-stop color gradient along a parametric curve.
+/// Uses the `t` parameter from ParametricShape when available, falls back to
+/// spatial projection along a direction vector.
+#[derive(Clone)]
+pub struct CurveGradientBrush {
+    stops: Vec<GradientStop>,
+    palette: Arc<BlockPalette>,
+    space: InterpolationSpace,
+    // Fallback spatial projection axis
+    fallback_start: (f64, f64, f64),
+    fallback_end: (f64, f64, f64),
+    fallback_length_sq: f64,
+}
+
+impl CurveGradientBrush {
+    pub fn new(stops: Vec<(f64, (u8, u8, u8))>) -> Self {
+        let mut gradient_stops: Vec<GradientStop> = stops
+            .into_iter()
+            .map(|(pos, rgb)| GradientStop {
+                position: pos.clamp(0.0, 1.0),
+                color: ExtendedColorData::from_rgb(rgb.0, rgb.1, rgb.2),
+            })
+            .collect();
+        gradient_stops.sort_by(|a, b| a.position.partial_cmp(&b.position).unwrap());
+
+        Self {
+            stops: gradient_stops,
+            palette: get_default_palette(),
+            space: InterpolationSpace::Rgb,
+            fallback_start: (0.0, 0.0, 0.0),
+            fallback_end: (0.0, 1.0, 0.0),
+            fallback_length_sq: 1.0,
+        }
+    }
+
+    pub fn with_space(mut self, space: InterpolationSpace) -> Self {
+        self.space = space;
+        self
+    }
+
+    pub fn with_palette(mut self, palette: Arc<BlockPalette>) -> Self {
+        self.palette = palette;
+        self
+    }
+
+    pub fn with_fallback_axis(mut self, start: (f64, f64, f64), end: (f64, f64, f64)) -> Self {
+        let dx = end.0 - start.0;
+        let dy = end.1 - start.1;
+        let dz = end.2 - start.2;
+        self.fallback_start = start;
+        self.fallback_end = end;
+        self.fallback_length_sq = dx * dx + dy * dy + dz * dz;
+        self
+    }
+
+    fn interpolate_color(&self, t: f64) -> Option<ExtendedColorData> {
+        if self.stops.is_empty() {
+            return None;
+        }
+        if t <= self.stops[0].position {
+            return Some(self.stops[0].color);
+        }
+        let last = self.stops.len() - 1;
+        if t >= self.stops[last].position {
+            return Some(self.stops[last].color);
+        }
+
+        let mut start_stop = &self.stops[0];
+        let mut end_stop = &self.stops[last];
+        for i in 0..self.stops.len() - 1 {
+            if t >= self.stops[i].position && t <= self.stops[i + 1].position {
+                start_stop = &self.stops[i];
+                end_stop = &self.stops[i + 1];
+                break;
+            }
+        }
+
+        let local_t = if (end_stop.position - start_stop.position).abs() < 1e-10 {
+            0.0
+        } else {
+            (t - start_stop.position) / (end_stop.position - start_stop.position)
+        };
+
+        Some(match self.space {
+            InterpolationSpace::Rgb => {
+                let r = (start_stop.color.rgb[0] as f64 * (1.0 - local_t)
+                    + end_stop.color.rgb[0] as f64 * local_t) as u8;
+                let g = (start_stop.color.rgb[1] as f64 * (1.0 - local_t)
+                    + end_stop.color.rgb[1] as f64 * local_t) as u8;
+                let b = (start_stop.color.rgb[2] as f64 * (1.0 - local_t)
+                    + end_stop.color.rgb[2] as f64 * local_t) as u8;
+                ExtendedColorData::from_rgb(r, g, b)
+            }
+            InterpolationSpace::Oklab => {
+                let l = start_stop.color.oklab[0] * (1.0 - local_t) as f32
+                    + end_stop.color.oklab[0] * local_t as f32;
+                let a = start_stop.color.oklab[1] * (1.0 - local_t) as f32
+                    + end_stop.color.oklab[1] * local_t as f32;
+                let b_val = start_stop.color.oklab[2] * (1.0 - local_t) as f32
+                    + end_stop.color.oklab[2] * local_t as f32;
+                let mut c = start_stop.color;
+                c.oklab = [l, a, b_val];
+                c
+            }
+        })
+    }
+
+    fn spatial_t(&self, x: i32, y: i32, z: i32) -> f64 {
+        if self.fallback_length_sq == 0.0 {
+            return 0.0;
+        }
+        let dx = self.fallback_end.0 - self.fallback_start.0;
+        let dy = self.fallback_end.1 - self.fallback_start.1;
+        let dz = self.fallback_end.2 - self.fallback_start.2;
+        let vx = x as f64 - self.fallback_start.0;
+        let vy = y as f64 - self.fallback_start.1;
+        let vz = z as f64 - self.fallback_start.2;
+        let dot = vx * dx + vy * dy + vz * dz;
+        (dot / self.fallback_length_sq).clamp(0.0, 1.0)
+    }
+
+    /// Get block using parametric t when available, falling back to spatial projection.
+    pub fn get_block_parametric(
+        &self,
+        x: i32,
+        y: i32,
+        z: i32,
+        _normal: (f64, f64, f64),
+        t: Option<f64>,
+    ) -> Option<BlockState> {
+        let param = t.unwrap_or_else(|| self.spatial_t(x, y, z));
+        self.interpolate_color(param)
+            .and_then(|color| self.palette.find_closest(&color))
+            .map(|id| BlockState::new(id))
+    }
+}
+
+impl Brush for CurveGradientBrush {
+    fn get_block(&self, x: i32, y: i32, z: i32, normal: (f64, f64, f64)) -> Option<BlockState> {
+        self.get_block_parametric(x, y, z, normal, None)
+    }
+}

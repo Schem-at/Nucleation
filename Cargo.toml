@@ -1,6 +1,6 @@
 [package]
 name = "nucleation"
-version = "0.1.169"
+version = "0.1.170"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -24,6 +24,7 @@ wasm = [
     "web-sys",
     "serde-wasm-bindgen",
     "console_error_panic_hook",
+    "wasm-bindgen-futures",
 ]
 python = ["pyo3/extension-module"]
 # New PHP feature
@@ -37,6 +38,8 @@ simulation = [
 ]
 # Meshing support - generate 3D meshes from schematics
 meshing = ["schematic-mesher"]
+# GPU rendering support - render schematics to images
+rendering = ["meshing", "dep:wgpu", "dep:image", "dep:pollster"]
 # Embedded scripting engines
 scripting-lua = ["mlua"]
 scripting-js = ["rquickjs"]
@@ -82,11 +85,17 @@ mlua = { version = "0.10", features = ["luajit", "vendored"], optional = true }
 rquickjs = { version = "0.9", features = ["macro", "classes", "properties"], optional = true }
 
 bincode = "1"
-bytemuck = "1.23.1"
+bytemuck = { version = "1.23.1", features = ["derive"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }
 
 # Meshing dependencies - optional
 schematic-mesher = { git = "https://github.com/Schem-at/Schematic-Mesher.git", branch = "feature/mesh-output-api", optional = true }
+
+# Rendering dependencies - optional
+wgpu = { version = "24", optional = true }
+image = { version = "0.24", optional = true }
+pollster = { version = "0.4", optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
 
 # Simulation (MCHPRS) dependencies - optional
 # Note: These are git dependencies and will be excluded from crates.io publish
@@ -102,10 +111,6 @@ mchprs_blocks = { git = "https://github.com/Nano112/MCHPRS.git", rev = "aedc5884
 wasm-bindgen-test = "0.3"
 num-complex = "0.4"
 base64 = "0.22"
-wgpu = "24"
-image = "0.24"
-pollster = "0.4"
-bytemuck = { version = "1", features = ["derive"] }
 ffmpeg-sidecar = "2.4"
 winit = "0.30"
 
@@ -132,7 +137,7 @@ harness = false
 # Examples requiring the meshing feature
 [[example]]
 name = "render_schematic"
-required-features = ["meshing"]
+required-features = ["rendering"]
 
 [[example]]
 name = "compare_formats"

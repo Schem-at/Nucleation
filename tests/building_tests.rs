@@ -1,7 +1,9 @@
 use nucleation::building::{
-    BilinearGradientBrush, BlockPalette, Brush, BuildingTool, ColorBrush, Cuboid,
-    InterpolationSpace, LinearGradientBrush, MultiPointGradientBrush, PointGradientBrush,
-    ShadedBrush, Sphere,
+    BezierCurve, BilinearGradientBrush, BlockPalette, Brush, BrushEnum, BuildingTool, ColorBrush,
+    Cone, Cuboid, CurveGradientBrush, Cylinder, Difference, Disk, Ellipsoid, Hollow,
+    InterpolationSpace, Intersection, Line, LinearGradientBrush, MultiPointGradientBrush, Plane,
+    PointGradientBrush, Pyramid, ShadedBrush, Shape, ShapeEnum, SolidBrush, Sphere, Torus,
+    Triangle, Union,
 };
 use nucleation::UniversalSchematic;
 use std::sync::Arc;
@@ -282,4 +284,292 @@ fn test_shaded_sphere() {
     println!("Bottom block: {}", bottom.name);
 
     assert_ne!(top.name, bottom.name);
+}
+
+// ============================================================================
+// New shape tests
+// ============================================================================
+
+#[test]
+fn test_ellipsoid_shape() {
+    let e = Ellipsoid::new((0, 0, 0), (5.0, 3.0, 4.0));
+    assert!(e.contains(0, 0, 0)); // center
+    assert!(e.contains(4, 0, 0)); // within x radius
+    assert!(!e.contains(6, 0, 0)); // outside x radius
+    assert!(e.contains(0, 2, 0)); // within y radius
+    assert!(!e.contains(0, 4, 0)); // outside y radius
+
+    let points = e.points();
+    assert!(!points.is_empty());
+
+    let (min_x, min_y, min_z, max_x, max_y, max_z) = e.bounds();
+    assert!(min_x <= -5 && max_x >= 5);
+    assert!(min_y <= -3 && max_y >= 3);
+    assert!(min_z <= -4 && max_z >= 4);
+}
+
+#[test]
+fn test_cylinder_shape() {
+    // Y-axis cylinder at origin
+    let c = Cylinder::new((0.0, 0.0, 0.0), (0.0, 1.0, 0.0), 3.0, 10.0);
+    assert!(c.contains(0, 5, 0)); // on axis
+    assert!(c.contains(2, 5, 0)); // within radius
+    assert!(!c.contains(4, 5, 0)); // outside radius
+    assert!(!c.contains(0, -1, 0)); // below base
+    assert!(!c.contains(0, 11, 0)); // above top
+
+    let points = c.points();
+    assert!(!points.is_empty());
+}
+
+#[test]
+fn test_cylinder_between() {
+    let c = Cylinder::between((0.0, 0.0, 0.0), (10.0, 0.0, 0.0), 2.0);
+    assert!(c.contains(5, 0, 0)); // midpoint on axis
+    assert!(c.contains(5, 1, 0)); // within radius
+    assert!(!c.contains(5, 3, 0)); // outside radius
+}
+
+#[test]
+fn test_cone_shape() {
+    // Apex at origin, axis +Y, base_radius=5, height=10
+    let cone = Cone::new((0.0, 0.0, 0.0), (0.0, 1.0, 0.0), 5.0, 10.0);
+    assert!(!cone.contains(1, 0, 0)); // at apex, radius should be 0
+    assert!(cone.contains(0, 5, 0)); // on axis midpoint
+    assert!(cone.contains(2, 5, 0)); // within radius at midpoint (r=2.5)
+    assert!(!cone.contains(4, 5, 0)); // outside radius at midpoint
+    assert!(cone.contains(4, 9, 0)); // near base, should be within radius
+}
+
+#[test]
+fn test_torus_shape() {
+    // Torus at origin, Y-axis, major=10, minor=3
+    let t = Torus::new((0.0, 0.0, 0.0), 10.0, 3.0, (0.0, 1.0, 0.0));
+    assert!(t.contains(10, 0, 0)); // on the ring
+    assert!(t.contains(12, 0, 0)); // within minor radius
+    assert!(!t.contains(0, 0, 0)); // center hole
+    assert!(!t.contains(14, 0, 0)); // outside
+    assert!(t.contains(0, 0, 10)); // 90 degrees around
+
+    let points = t.points();
+    assert!(!points.is_empty());
+}
+
+#[test]
+fn test_pyramid_shape() {
+    // Base at origin, Y-axis up, half_size 5x5, height 10
+    let p = Pyramid::new((0.0, 0.0, 0.0), (5.0, 5.0), 10.0, (0.0, 1.0, 0.0));
+    assert!(p.contains(0, 0, 0)); // base center
+    assert!(p.contains(4, 0, 4)); // near edge of base
+    assert!(!p.contains(6, 0, 0)); // outside base
+    assert!(p.contains(0, 5, 0)); // midway up, center
+    assert!(!p.contains(4, 5, 0)); // midway up, outside (half_size * 0.5 = 2.5)
+    assert!(p.contains(0, 9, 0)); // near top
+
+    let points = p.points();
+    assert!(!points.is_empty());
+}
+
+#[test]
+fn test_disk_shape() {
+    // Horizontal disk at y=5, radius=5, normal +Y
+    let d = Disk::new((0.0, 5.0, 0.0), 5.0, (0.0, 1.0, 0.0), 1.0);
+    assert!(d.contains(0, 5, 0)); // center
+    assert!(d.contains(4, 5, 0)); // within radius
+    assert!(!d.contains(6, 5, 0)); // outside radius
+    assert!(!d.contains(0, 7, 0)); // outside thickness
+}
+
+#[test]
+fn test_plane_shape() {
+    // Horizontal plane at origin, U=+X, V=+Z, extent 5 in each direction
+    let p = Plane::new(
+        (0.0, 0.0, 0.0),
+        (1.0, 0.0, 0.0),
+        (0.0, 0.0, 1.0),
+        5.0,
+        5.0,
+        1.0,
+    );
+    assert!(p.contains(0, 0, 0)); // center
+    assert!(p.contains(3, 0, 3)); // within extents
+    assert!(!p.contains(6, 0, 0)); // outside u extent
+    assert!(!p.contains(0, 2, 0)); // outside thickness
+}
+
+#[test]
+fn test_triangle_shape() {
+    let t = Triangle::new((0.0, 0.0, 0.0), (10.0, 0.0, 0.0), (5.0, 10.0, 0.0), 1.0);
+    assert!(t.contains(5, 3, 0)); // inside
+    assert!(t.contains(1, 0, 0)); // on edge
+    assert!(!t.contains(0, 10, 0)); // outside
+
+    let points = t.points();
+    assert!(!points.is_empty());
+}
+
+#[test]
+fn test_line_shape() {
+    let l = Line::new((0.0, 0.0, 0.0), (10.0, 0.0, 0.0), 2.0);
+    assert!(l.contains(5, 0, 0)); // on line
+    assert!(!l.contains(5, 2, 0)); // outside thickness
+    assert!(!l.contains(-2, 0, 0)); // before start
+
+    let points = l.points();
+    assert!(!points.is_empty());
+}
+
+#[test]
+fn test_line_thin() {
+    // Thin line uses Bresenham
+    let l = Line::new((0.0, 0.0, 0.0), (10.0, 0.0, 0.0), 0.0);
+    let points = l.points();
+    assert_eq!(points.len(), 11); // 0 to 10 inclusive
+    assert!(points.contains(&(0, 0, 0)));
+    assert!(points.contains(&(10, 0, 0)));
+}
+
+#[test]
+fn test_bezier_curve() {
+    let bez = BezierCurve::new(
+        vec![(0.0, 0.0, 0.0), (5.0, 10.0, 0.0), (10.0, 0.0, 0.0)],
+        2.0,
+        32,
+    );
+    assert!(bez.contains(0, 0, 0)); // start
+    assert!(bez.contains(10, 0, 0)); // end
+
+    let points = bez.points();
+    assert!(!points.is_empty());
+}
+
+#[test]
+fn test_hollow_shape() {
+    let sphere = ShapeEnum::Sphere(Sphere::new((0, 0, 0), 10.0));
+    let hollow = Hollow::new(sphere, 1);
+    assert!(!hollow.contains(0, 0, 0)); // center should be empty
+    assert!(hollow.contains(10, 0, 0)); // edge should be filled
+    assert!(hollow.contains(0, 10, 0)); // edge
+    assert!(hollow.contains(0, 0, 10)); // edge
+
+    let points = hollow.points();
+    // Hollow should have fewer points than the solid
+    let solid_points = Sphere::new((0, 0, 0), 10.0).points();
+    assert!(points.len() < solid_points.len());
+}
+
+#[test]
+fn test_union_shape() {
+    let a = ShapeEnum::Sphere(Sphere::new((0, 0, 0), 3.0));
+    let b = ShapeEnum::Sphere(Sphere::new((5, 0, 0), 3.0));
+    let u = Union::new(a, b);
+    assert!(u.contains(0, 0, 0)); // in A
+    assert!(u.contains(5, 0, 0)); // in B
+    assert!(u.contains(3, 0, 0)); // overlap region
+    assert!(!u.contains(10, 0, 0)); // outside both
+}
+
+#[test]
+fn test_intersection_shape() {
+    let a = ShapeEnum::Sphere(Sphere::new((0, 0, 0), 5.0));
+    let b = ShapeEnum::Sphere(Sphere::new((3, 0, 0), 5.0));
+    let i = Intersection::new(a, b);
+    assert!(i.contains(2, 0, 0)); // in both
+    assert!(!i.contains(-4, 0, 0)); // only in A
+    assert!(!i.contains(7, 0, 0)); // only in B
+}
+
+#[test]
+fn test_difference_shape() {
+    let a = ShapeEnum::Sphere(Sphere::new((0, 0, 0), 5.0));
+    let b = ShapeEnum::Sphere(Sphere::new((3, 0, 0), 5.0));
+    let d = Difference::new(a, b);
+    assert!(d.contains(-4, 0, 0)); // in A but not B
+    assert!(!d.contains(2, 0, 0)); // in both (subtracted)
+    assert!(!d.contains(7, 0, 0)); // only in B
+}
+
+#[test]
+fn test_parametric_line() {
+    use nucleation::building::ParametricShape;
+    let l = Line::new((0.0, 0.0, 0.0), (10.0, 0.0, 0.0), 2.0);
+    assert!((l.parameter_at(0, 0, 0) - 0.0).abs() < 0.01);
+    assert!((l.parameter_at(5, 0, 0) - 0.5).abs() < 0.01);
+    assert!((l.parameter_at(10, 0, 0) - 1.0).abs() < 0.01);
+}
+
+#[test]
+fn test_parametric_cylinder() {
+    use nucleation::building::ParametricShape;
+    let c = Cylinder::new((0.0, 0.0, 0.0), (0.0, 1.0, 0.0), 3.0, 10.0);
+    assert!((c.parameter_at(0, 0, 0) - 0.0).abs() < 0.01);
+    assert!((c.parameter_at(0, 5, 0) - 0.5).abs() < 0.01);
+    assert!((c.parameter_at(0, 10, 0) - 1.0).abs() < 0.01);
+}
+
+#[test]
+fn test_curve_gradient_brush() {
+    let brush = CurveGradientBrush::new(vec![
+        (0.0, (255, 0, 0)),
+        (0.5, (0, 255, 0)),
+        (1.0, (0, 0, 255)),
+    ]);
+    // At t=0 should be red-ish
+    let b0 = brush.get_block_parametric(0, 0, 0, (0.0, 1.0, 0.0), Some(0.0));
+    assert!(b0.is_some());
+    let name0 = b0.unwrap().name;
+    println!("CurveGrad t=0: {}", name0);
+    assert!(name0.contains("red"));
+
+    // At t=1 should be blue-ish
+    let b1 = brush.get_block_parametric(0, 0, 0, (0.0, 1.0, 0.0), Some(1.0));
+    assert!(b1.is_some());
+    let name1 = b1.unwrap().name;
+    println!("CurveGrad t=1: {}", name1);
+    assert!(name1.contains("blue"));
+}
+
+#[test]
+fn test_rstack() {
+    let mut schematic = UniversalSchematic::new("rstack".to_string());
+    let shape = ShapeEnum::Cuboid(Cuboid::new((0, 0, 0), (2, 2, 2)));
+    let brush = BrushEnum::Solid(SolidBrush::new(nucleation::BlockState::new(
+        "minecraft:stone".to_string(),
+    )));
+
+    let mut tool = BuildingTool::new(&mut schematic);
+    tool.rstack(&shape, &brush, 3, (5, 0, 0));
+
+    // Check first copy
+    assert!(schematic.get_block(1, 1, 1).is_some());
+    // Check second copy at offset (5,0,0)
+    assert!(schematic.get_block(6, 1, 1).is_some());
+    // Check third copy at offset (10,0,0)
+    assert!(schematic.get_block(11, 1, 1).is_some());
+    // Gap between copies should be empty
+    assert!(
+        schematic.get_block(3, 1, 1).is_none()
+            || schematic.get_block(3, 1, 1).unwrap().name == "minecraft:air"
+    );
+}
+
+#[test]
+fn test_fill_enum_with_parametric() {
+    let mut schematic = UniversalSchematic::new("fill_enum".to_string());
+    let shape = ShapeEnum::Line(Line::new((0.0, 0.0, 0.0), (20.0, 0.0, 0.0), 2.0));
+    let brush = BrushEnum::CurveGradient(CurveGradientBrush::new(vec![
+        (0.0, (255, 0, 0)),
+        (1.0, (0, 0, 255)),
+    ]));
+
+    let mut tool = BuildingTool::new(&mut schematic);
+    tool.fill_enum(&shape, &brush);
+
+    let start = schematic.get_block(0, 0, 0);
+    let end = schematic.get_block(20, 0, 0);
+    assert!(start.is_some());
+    assert!(end.is_some());
+    // Start should be red, end should be blue
+    println!("Parametric Start: {}", start.unwrap().name);
+    println!("Parametric End: {}", end.unwrap().name);
 }

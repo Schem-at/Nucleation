@@ -21,7 +21,7 @@ use super::schematic::SchematicWrapper;
 /// Wrapper for a Minecraft resource pack.
 #[wasm_bindgen]
 pub struct ResourcePackWrapper {
-    inner: ResourcePackSource,
+    pub(crate) inner: ResourcePackSource,
 }
 
 #[wasm_bindgen]

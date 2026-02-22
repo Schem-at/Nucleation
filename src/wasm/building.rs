@@ -1,7 +1,8 @@
 use crate::building::{
-    BilinearGradientBrush, BlockPalette, BrushEnum, BuildingTool, ColorBrush, Cuboid,
-    InterpolationSpace, LinearGradientBrush, PointGradientBrush, ShadedBrush, ShapeEnum,
-    SolidBrush, Sphere,
+    BezierCurve, BilinearGradientBrush, BlockPalette, BrushEnum, BuildingTool, ColorBrush, Cone,
+    Cuboid, CurveGradientBrush, Cylinder, Difference, Disk, Ellipsoid, Hollow, InterpolationSpace,
+    Intersection, Line, LinearGradientBrush, Plane, PointGradientBrush, Pyramid, ShadedBrush,
+    ShapeEnum, SolidBrush, Sphere, Torus, Triangle, Union,
 };
 use crate::wasm::schematic::SchematicWrapper;
 use crate::BlockState;
@@ -12,7 +13,7 @@ use wasm_bindgen::prelude::*;
 // Shapes
 // ============================================================================
 
-/// A wrapper for any shape (Sphere, Cuboid, etc.)
+/// A wrapper for any shape (Sphere, Cuboid, Line, etc.)
 #[wasm_bindgen]
 pub struct ShapeWrapper {
     pub(crate) inner: ShapeEnum,
@@ -33,13 +34,250 @@ impl ShapeWrapper {
             inner: ShapeEnum::Cuboid(Cuboid::new((min_x, min_y, min_z), (max_x, max_y, max_z))),
         }
     }
+
+    /// Create an Ellipsoid shape
+    pub fn ellipsoid(cx: i32, cy: i32, cz: i32, rx: f64, ry: f64, rz: f64) -> Self {
+        Self {
+            inner: ShapeEnum::Ellipsoid(Ellipsoid::new((cx, cy, cz), (rx, ry, rz))),
+        }
+    }
+
+    /// Create a Cylinder with arbitrary axis
+    pub fn cylinder(
+        bx: f64,
+        by: f64,
+        bz: f64,
+        ax: f64,
+        ay: f64,
+        az: f64,
+        radius: f64,
+        height: f64,
+    ) -> Self {
+        Self {
+            inner: ShapeEnum::Cylinder(Cylinder::new((bx, by, bz), (ax, ay, az), radius, height)),
+        }
+    }
+
+    /// Create a Cylinder between two points
+    #[wasm_bindgen(js_name = cylinderBetween)]
+    pub fn cylinder_between(
+        x1: f64,
+        y1: f64,
+        z1: f64,
+        x2: f64,
+        y2: f64,
+        z2: f64,
+        radius: f64,
+    ) -> Self {
+        Self {
+            inner: ShapeEnum::Cylinder(Cylinder::between((x1, y1, z1), (x2, y2, z2), radius)),
+        }
+    }
+
+    /// Create a Cone shape
+    pub fn cone(
+        ax: f64,
+        ay: f64,
+        az: f64,
+        dx: f64,
+        dy: f64,
+        dz: f64,
+        radius: f64,
+        height: f64,
+    ) -> Self {
+        Self {
+            inner: ShapeEnum::Cone(Cone::new((ax, ay, az), (dx, dy, dz), radius, height)),
+        }
+    }
+
+    /// Create a Torus shape
+    pub fn torus(
+        cx: f64,
+        cy: f64,
+        cz: f64,
+        major_r: f64,
+        minor_r: f64,
+        ax: f64,
+        ay: f64,
+        az: f64,
+    ) -> Self {
+        Self {
+            inner: ShapeEnum::Torus(Torus::new((cx, cy, cz), major_r, minor_r, (ax, ay, az))),
+        }
+    }
+
+    /// Create a Pyramid shape
+    pub fn pyramid(
+        bx: f64,
+        by: f64,
+        bz: f64,
+        half_w: f64,
+        half_d: f64,
+        height: f64,
+        ax: f64,
+        ay: f64,
+        az: f64,
+    ) -> Self {
+        Self {
+            inner: ShapeEnum::Pyramid(Pyramid::new(
+                (bx, by, bz),
+                (half_w, half_d),
+                height,
+                (ax, ay, az),
+            )),
+        }
+    }
+
+    /// Create a Disk shape (flat cylinder)
+    pub fn disk(
+        cx: f64,
+        cy: f64,
+        cz: f64,
+        radius: f64,
+        nx: f64,
+        ny: f64,
+        nz: f64,
+        thickness: Option<f64>,
+    ) -> Self {
+        Self {
+            inner: ShapeEnum::Disk(Disk::new(
+                (cx, cy, cz),
+                radius,
+                (nx, ny, nz),
+                thickness.unwrap_or(1.0),
+            )),
+        }
+    }
+
+    /// Create a bounded Plane shape
+    #[wasm_bindgen(js_name = plane)]
+    pub fn plane(
+        ox: f64,
+        oy: f64,
+        oz: f64,
+        ux: f64,
+        uy: f64,
+        uz: f64,
+        vx: f64,
+        vy: f64,
+        vz: f64,
+        u_ext: f64,
+        v_ext: f64,
+        thickness: Option<f64>,
+    ) -> Self {
+        Self {
+            inner: ShapeEnum::Plane(Plane::new(
+                (ox, oy, oz),
+                (ux, uy, uz),
+                (vx, vy, vz),
+                u_ext,
+                v_ext,
+                thickness.unwrap_or(1.0),
+            )),
+        }
+    }
+
+    /// Create a filled Triangle shape
+    pub fn triangle(
+        ax: f64,
+        ay: f64,
+        az: f64,
+        bx: f64,
+        by: f64,
+        bz: f64,
+        cx: f64,
+        cy: f64,
+        cz: f64,
+        thickness: Option<f64>,
+    ) -> Self {
+        Self {
+            inner: ShapeEnum::Triangle(Triangle::new(
+                (ax, ay, az),
+                (bx, by, bz),
+                (cx, cy, cz),
+                thickness.unwrap_or(1.0),
+            )),
+        }
+    }
+
+    /// Create a 3D Line with thickness
+    pub fn line(
+        x1: f64,
+        y1: f64,
+        z1: f64,
+        x2: f64,
+        y2: f64,
+        z2: f64,
+        thickness: Option<f64>,
+    ) -> Self {
+        Self {
+            inner: ShapeEnum::Line(Line::new(
+                (x1, y1, z1),
+                (x2, y2, z2),
+                thickness.unwrap_or(1.0),
+            )),
+        }
+    }
+
+    /// Create a Bezier curve with thickness
+    pub fn bezier(
+        control_points_flat: Vec<f64>,
+        thickness: Option<f64>,
+        resolution: Option<u32>,
+    ) -> Result<ShapeWrapper, JsValue> {
+        if control_points_flat.len() % 3 != 0 {
+            return Err(JsValue::from_str(
+                "control_points_flat must have length divisible by 3",
+            ));
+        }
+        let points: Vec<(f64, f64, f64)> = control_points_flat
+            .chunks(3)
+            .map(|c| (c[0], c[1], c[2]))
+            .collect();
+        Ok(Self {
+            inner: ShapeEnum::BezierCurve(BezierCurve::new(
+                points,
+                thickness.unwrap_or(1.0),
+                resolution.unwrap_or(32),
+            )),
+        })
+    }
+
+    /// Create a Hollow version of any shape
+    pub fn hollow(shape: &ShapeWrapper, thickness: Option<u32>) -> Self {
+        Self {
+            inner: ShapeEnum::Hollow(Hollow::new(shape.inner.clone(), thickness.unwrap_or(1))),
+        }
+    }
+
+    /// Create a Union of two shapes (a OR b)
+    #[wasm_bindgen(js_name = union)]
+    pub fn union_shapes(a: &ShapeWrapper, b: &ShapeWrapper) -> Self {
+        Self {
+            inner: ShapeEnum::Union(Union::new(a.inner.clone(), b.inner.clone())),
+        }
+    }
+
+    /// Create an Intersection of two shapes (a AND b)
+    pub fn intersection(a: &ShapeWrapper, b: &ShapeWrapper) -> Self {
+        Self {
+            inner: ShapeEnum::Intersection(Intersection::new(a.inner.clone(), b.inner.clone())),
+        }
+    }
+
+    /// Create a Difference of two shapes (a AND NOT b)
+    pub fn difference(a: &ShapeWrapper, b: &ShapeWrapper) -> Self {
+        Self {
+            inner: ShapeEnum::Difference(Difference::new(a.inner.clone(), b.inner.clone())),
+        }
+    }
 }
 
 // ============================================================================
 // Brushes
 // ============================================================================
 
-/// A wrapper for any brush (Solid, Gradient, Shaded, etc.)
+/// A wrapper for any brush (Solid, Gradient, Shaded, CurveGradient, etc.)
 #[wasm_bindgen]
 pub struct BrushWrapper {
     pub(crate) inner: BrushEnum,
@@ -49,7 +287,6 @@ pub struct BrushWrapper {
 impl BrushWrapper {
     /// Create a solid brush with a specific block
     pub fn solid(block_state: &str) -> Result<BrushWrapper, JsValue> {
-        // We need to parse properties if they exist
         let block = if block_state.contains('[') {
             BlockState::new(block_state.to_string())
         } else {
@@ -62,7 +299,6 @@ impl BrushWrapper {
     }
 
     /// Create a color brush (matches closest block to RGB color)
-    /// Palette: optional list of block IDs to restrict matching to.
     pub fn color(r: u8, g: u8, b: u8, palette_filter: Option<Vec<String>>) -> Self {
         let brush = if let Some(keywords) = palette_filter {
             let palette = Arc::new(BlockPalette::new_filtered(|f| {
@@ -118,7 +354,6 @@ impl BrushWrapper {
     }
 
     /// Create a shaded brush (Lambertian shading)
-    /// light_dir: [x, y, z] vector
     pub fn shaded(
         r: u8,
         g: u8,
@@ -197,9 +432,6 @@ impl BrushWrapper {
     }
 
     /// Create a point cloud gradient brush using Inverse Distance Weighting (IDW)
-    /// positions: Flat array [x1, y1, z1, x2, y2, z2, ...]
-    /// colors: Flat array [r1, g1, b1, r2, g2, b2, ...]
-    /// falloff: Power parameter (default 2.0 if None)
     pub fn point_gradient(
         positions: Vec<i32>,
         colors: Vec<u8>,
@@ -246,6 +478,45 @@ impl BrushWrapper {
             inner: BrushEnum::Point(brush),
         })
     }
+
+    /// Create a curve gradient brush that interpolates colors along parametric shapes.
+    /// stops_flat: Flat array [pos1, r1, g1, b1, pos2, r2, g2, b2, ...]
+    /// Space: 0 = RGB, 1 = Oklab
+    #[wasm_bindgen(js_name = curveGradient)]
+    pub fn curve_gradient(
+        stops_flat: Vec<f64>,
+        space: Option<u8>,
+        palette_filter: Option<Vec<String>>,
+    ) -> Result<BrushWrapper, JsValue> {
+        if stops_flat.len() % 4 != 0 {
+            return Err(JsValue::from_str(
+                "stops_flat must have length divisible by 4 (position, r, g, b per stop)",
+            ));
+        }
+
+        let stops: Vec<(f64, (u8, u8, u8))> = stops_flat
+            .chunks(4)
+            .map(|c| (c[0], (c[1] as u8, c[2] as u8, c[3] as u8)))
+            .collect();
+
+        let interp_space = match space {
+            Some(1) => InterpolationSpace::Oklab,
+            _ => InterpolationSpace::Rgb,
+        };
+
+        let mut brush = CurveGradientBrush::new(stops).with_space(interp_space);
+
+        if let Some(keywords) = palette_filter {
+            let palette = Arc::new(BlockPalette::new_filtered(|f| {
+                keywords.iter().any(|k| f.id.contains(k))
+            }));
+            brush = brush.with_palette(palette);
+        }
+
+        Ok(Self {
+            inner: BrushEnum::CurveGradient(brush),
+        })
+    }
 }
 
 // ============================================================================
@@ -260,6 +531,25 @@ impl WasmBuildingTool {
     /// Apply a brush to a shape on the given schematic
     pub fn fill(schematic: &mut SchematicWrapper, shape: &ShapeWrapper, brush: &BrushWrapper) {
         let mut tool = BuildingTool::new(&mut schematic.0);
-        tool.fill(&shape.inner, &brush.inner);
+        tool.fill_enum(&shape.inner, &brush.inner);
+    }
+
+    /// Repeat a shape+brush fill at regular offset intervals
+    pub fn rstack(
+        schematic: &mut SchematicWrapper,
+        shape: &ShapeWrapper,
+        brush: &BrushWrapper,
+        count: usize,
+        offset_x: i32,
+        offset_y: i32,
+        offset_z: i32,
+    ) {
+        let mut tool = BuildingTool::new(&mut schematic.0);
+        tool.rstack(
+            &shape.inner,
+            &brush.inner,
+            count,
+            (offset_x, offset_y, offset_z),
+        );
     }
 }

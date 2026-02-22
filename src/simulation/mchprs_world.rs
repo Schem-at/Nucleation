@@ -628,11 +628,13 @@ impl MchprsWorld {
                     let name = format!("minecraft:{}", block.get_name());
 
                     // Get all properties from the MCHPRS block
-                    let properties: Vec<(smol_str::SmolStr, smol_str::SmolStr)> = block
+                    let mut properties: Vec<(smol_str::SmolStr, smol_str::SmolStr)> = block
                         .properties()
                         .iter()
                         .map(|(k, v)| (smol_str::SmolStr::new(k), smol_str::SmolStr::new(v)))
                         .collect();
+                    // Sort properties for canonical ordering (MCHPRS returns HashMap with non-deterministic order)
+                    properties.sort_by(|a, b| a.0.cmp(&b.0));
 
                     // Create BlockState and update schematic
                     let mut block_state = crate::BlockState::new(name);

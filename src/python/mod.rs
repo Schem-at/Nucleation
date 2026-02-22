@@ -22,6 +22,8 @@ mod schematic_builder;
 mod circuit_builder;
 #[cfg(feature = "meshing")]
 mod meshing;
+#[cfg(feature = "rendering")]
+mod rendering;
 #[cfg(feature = "simulation")]
 mod simulation;
 #[cfg(feature = "simulation")]
@@ -70,6 +72,11 @@ pub fn nucleation(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m.add_class::<meshing::PyChunkMeshResult>()?;
         m.add_class::<meshing::PyRawMeshExport>()?;
         m.add_class::<meshing::PyTextureAtlas>()?;
+    }
+
+    #[cfg(feature = "rendering")]
+    {
+        m.add_class::<rendering::PyRenderConfig>()?;
     }
 
     #[cfg(feature = "simulation")]

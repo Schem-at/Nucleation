@@ -21,6 +21,8 @@ mod schematic_builder;
 mod circuit_builder;
 #[cfg(feature = "meshing")]
 mod meshing;
+#[cfg(feature = "rendering")]
+mod rendering;
 #[cfg(feature = "simulation")]
 mod simulation;
 #[cfg(feature = "simulation")]
@@ -42,6 +44,8 @@ pub use meshing::{
     ChunkMeshIteratorWrapper, ChunkMeshResultWrapper, MeshConfigWrapper, MeshResultWrapper,
     MultiMeshResultWrapper, ResourcePackWrapper, TextureAtlasWrapper,
 };
+#[cfg(feature = "rendering")]
+pub use rendering::RenderConfigWrapper;
 #[cfg(feature = "simulation")]
 pub use simulation::{MchprsWorldWrapper, SimulationOptionsWrapper};
 #[cfg(feature = "simulation")]

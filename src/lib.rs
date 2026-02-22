@@ -30,6 +30,8 @@ pub mod meshing;
 mod php;
 #[cfg(feature = "python")]
 mod python;
+#[cfg(feature = "rendering")]
+pub mod rendering;
 #[cfg(any(feature = "scripting-lua", feature = "scripting-js"))]
 pub mod scripting;
 #[cfg(feature = "simulation")]

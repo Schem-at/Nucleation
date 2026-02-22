@@ -49,6 +49,7 @@ Value.string = Python factory naming (FFI uses value_from_string)
 Value.u32 = Python factory naming (FFI uses value_from_u32)
 
 [wasm_only]
+Shape.union_shapes = WASM naming (Rust fn union_shapes with js_name=union, Python uses union)
 start = WASM panic hook init
 LazyChunkIterator.* = WASM-specific lazy iteration
 Schematic.blocks_indices = WASM JS optimization
@@ -83,6 +84,7 @@ MchprsWorld.truth_table = WASM-specific truth table generation
 
 # --- Methods not expected in WASM ---
 [no_wasm]
+Shape.union = Python/FFI naming (WASM uses union_shapes with js_name=union)
 Schematic.from_world_directory = Filesystem not available in WASM
 Schematic.from_world_directory_bounded = Filesystem not available in WASM
 Schematic.save_world = Filesystem not available in WASM
@@ -108,6 +110,7 @@ Value.string = Python typed value factory
 
 # --- Methods not expected in Python ---
 [no_python]
+Shape.union_shapes = WASM naming (Python uses union)
 Schematic.chunk_blocks = WASM/FFI chunk access (Python has different iteration)
 # RawMeshExport: FFI short names not in Python (Python uses _flat suffix)
 RawMeshExport.positions = FFI naming (Python: positions_flat)
@@ -126,6 +129,7 @@ DefinitionRegion.clone_region = WASM/FFI alias for copy
 
 # --- Methods not expected in FFI ---
 [no_ffi]
+Shape.union_shapes = WASM naming (FFI uses shape_union)
 Schematic.create_circuit = Requires circuit ecosystem convenience on Schematic
 Schematic.create_circuit_builder = Requires circuit ecosystem convenience on Schematic
 Schematic.build_executor = Requires circuit ecosystem convenience on Schematic
@@ -224,3 +228,28 @@ run_lua_script = FFI scripting entry point (feature-gated scripting-lua)
 run_js_script = FFI scripting entry point (feature-gated scripting-js)
 run_script = FFI scripting entry point (feature-gated scripting)
 Schematic.last_error = FFI error handling via thread-local (WASM/Python use exceptions)
+renderconfig_* = FFI free functions for RenderConfig (WASM/Python use wrapper methods)
+render_pixels_free = FFI memory management
+
+# --- Rendering exclusions ---
+[wasm_only]
+Schematic.render_wasm = WASM naming (Python uses render, FFI uses schematic_render)
+Schematic.render_png_wasm = WASM naming (Python uses render_png, FFI uses schematic_render_png)
+
+[no_wasm]
+Schematic.render = Python/FFI naming (WASM uses render_wasm with js_name=render)
+Schematic.render_png = Python/FFI naming (WASM uses render_png_wasm with js_name=renderPng)
+Schematic.render_to_file = No filesystem in WASM
+RenderConfig.fov = WASM uses setFov/getter pattern (different naming)
+
+[python_only]
+RenderConfig.__repr__ = Python dunder method
+
+[no_python]
+Schematic.render_wasm = WASM naming (Python uses render)
+Schematic.render_png_wasm = WASM naming (Python uses render_png)
+
+[no_ffi]
+RenderConfig.* = FFI uses renderconfig_* free functions not methods on wrapper type
+Schematic.render_wasm = WASM naming (FFI uses schematic_render)
+Schematic.render_png_wasm = WASM naming (FFI uses schematic_render_png)

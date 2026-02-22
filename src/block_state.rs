@@ -54,7 +54,8 @@ impl BlockState {
         self
     }
 
-    pub fn with_properties(mut self, properties: Vec<(SmolStr, SmolStr)>) -> Self {
+    pub fn with_properties(mut self, mut properties: Vec<(SmolStr, SmolStr)>) -> Self {
+        properties.sort_by(|a, b| a.0.cmp(&b.0));
         self.properties = properties;
         self
     }
@@ -104,7 +105,7 @@ impl BlockState {
             .map_err(|e| format!("Failed to get Name: {}", e))?
             .into();
 
-        let mut properties = Vec::new();
+        let mut properties: Vec<(SmolStr, SmolStr)> = Vec::new();
         if let Ok(props) = compound.get::<_, &NbtCompound>("Properties") {
             for (key, value) in props.inner() {
                 if let NbtTag::String(value_str) = value {
@@ -112,6 +113,7 @@ impl BlockState {
                 }
             }
         }
+        properties.sort_by(|a, b| a.0.cmp(&b.0));
 
         Ok(BlockState { name, properties })
     }

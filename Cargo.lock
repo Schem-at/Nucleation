@@ -2564,7 +2564,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation"
-version = "0.1.169"
+version = "0.1.170"
 dependencies = [
  "base64",
  "bincode",
@@ -2606,6 +2606,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-bindgen-test",
  "web-sys",
  "wgpu",
