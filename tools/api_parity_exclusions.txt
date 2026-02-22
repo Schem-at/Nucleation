@@ -21,6 +21,7 @@ MchprsWorld.new_with_options = FFI constructor variant (WASM/Python use with_opt
 Value.as_* = FFI value type accessors (WASM uses to_js, Python uses to_py)
 Value.type_name = FFI value type introspection (WASM/Python use language-native type checks)
 Schematic.print = FFI debug variant (WASM/Python use print_schematic)
+Schematic.save_to_file = FFI file I/O convenience (Python uses save, WASM has no filesystem)
 SchematicBuilder.build_with_error = FFI error-via-outpointer pattern (WASM/Python use exceptions)
 
 [python_only]
@@ -35,6 +36,7 @@ save_schematic = Python file I/O convenience
 Schematic.test = Python debug method
 Schematic.cache_info = Python debug method
 Schematic.clear_cache = Python debug method
+Schematic.save = Python file I/O convenience (WASM has no filesystem, FFI uses save_to_file)
 ResourcePack.from_file = Python file I/O
 MeshResult.save = Python file I/O
 MultiMeshResult.save_all = Python file I/O
@@ -85,6 +87,8 @@ Schematic.from_world_directory = Filesystem not available in WASM
 Schematic.from_world_directory_bounded = Filesystem not available in WASM
 Schematic.save_world = Filesystem not available in WASM
 Schematic.from_file = Filesystem not available in WASM
+Schematic.save = Filesystem not available in WASM
+Schematic.save_to_file = Filesystem not available in WASM
 Schematic.all_blocks = FFI/Python naming convention (WASM uses blocks())
 # RawMeshExport: FFI short names not in WASM (WASM uses _flat suffix)
 RawMeshExport.positions = FFI naming (WASM: positions_flat)
@@ -111,6 +115,7 @@ RawMeshExport.normals = FFI naming (Python: normals_flat)
 RawMeshExport.uvs = FFI naming (Python: uvs_flat)
 RawMeshExport.colors = FFI naming (Python: colors_flat)
 Schematic.chunks_with_strategy = WASM/FFI chunk loading strategies
+Schematic.save_to_file = FFI naming (Python uses save)
 ResourcePack.new = WASM constructor (Python uses from_file/from_bytes)
 MchprsWorld.new = WASM constructor (Python creates via Schematic method)
 Schematic.create_simulation_world_with_options = WASM-specific (uses SimulationOptions)
@@ -127,6 +132,7 @@ Schematic.build_executor = Requires circuit ecosystem convenience on Schematic
 Schematic.create_simulation_world = Simulation convenience on Schematic
 Schematic.create_simulation_world_with_options = Simulation convenience on Schematic
 MchprsWorld.into_schematic = FFI uses get_schematic + sync_to_schematic (cannot consume pointer)
+Schematic.save = Python naming (FFI uses save_to_file)
 
 # --- Meshing ecosystem: specific exclusions ---
 # RawMeshExport: Python/WASM _flat suffix not in FFI (FFI: rawmeshexport_positions etc.)

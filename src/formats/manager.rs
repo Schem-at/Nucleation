@@ -144,6 +144,27 @@ impl FormatManager {
         Err(format!("Could not determine format from extension: .{}", extension).into())
     }
 
+    pub fn write_auto_with_settings(
+        &self,
+        path: &str,
+        schematic: &UniversalSchematic,
+        version: Option<&str>,
+        settings: Option<&str>,
+    ) -> Result<Vec<u8>, Box<dyn Error>> {
+        let extension = std::path::Path::new(path)
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+
+        for exporter in &self.exporters {
+            if exporter.extensions().contains(&extension) {
+                return exporter.write_with_settings(schematic, version, settings);
+            }
+        }
+        Err(format!("Could not determine format from extension: .{}", extension).into())
+    }
+
     pub fn list_importers(&self) -> Vec<String> {
         self.importers.iter().map(|i| i.name()).collect()
     }

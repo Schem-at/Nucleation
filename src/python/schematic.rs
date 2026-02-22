@@ -1404,6 +1404,35 @@ impl PySchematic {
         Ok(PyBytes::new(py, &bytes).into())
     }
 
+    /// Save schematic to a file. Format is auto-detected from the file extension by default.
+    #[pyo3(signature = (path, format="auto", version=None, settings=None))]
+    pub fn save(
+        &self,
+        path: &str,
+        format: &str,
+        version: Option<String>,
+        settings: Option<&str>,
+    ) -> PyResult<()> {
+        let manager = get_manager();
+        let manager = manager
+            .lock()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        let bytes = if format == "auto" {
+            manager.write_auto_with_settings(path, &self.inner, version.as_deref(), settings)
+        } else {
+            manager.write_with_settings(format, &self.inner, version.as_deref(), settings)
+        };
+
+        let bytes =
+            bytes.map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
+
+        std::fs::write(path, bytes)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
+
+        Ok(())
+    }
+
     /// Register a mesh exporter with the FormatManager, enabling save_as("mesh", ...).
     #[cfg(feature = "meshing")]
     pub fn register_mesh_exporter(&self, pack: &super::meshing::PyResourcePack) -> PyResult<()> {

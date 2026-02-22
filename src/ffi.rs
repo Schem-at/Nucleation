@@ -2162,6 +2162,60 @@ pub extern "C" fn schematic_save_as(
     }
 }
 
+/// Save a schematic to a file. If `format` is NULL, the format is auto-detected from the file
+/// extension. Returns 0 on success, -1 on null arguments, -2 on serialization error, -3 on IO error.
+#[no_mangle]
+pub extern "C" fn schematic_save_to_file(
+    schematic: *const SchematicWrapper,
+    path: *const c_char,
+    format: *const c_char,
+    version: *const c_char,
+) -> c_int {
+    if schematic.is_null() || path.is_null() {
+        set_last_error("schematic_save_to_file: null schematic or path".into());
+        return -1;
+    }
+    let s = unsafe { &*(*schematic).0 };
+    let path_str = unsafe { CStr::from_ptr(path).to_string_lossy() };
+    let ver = if version.is_null() {
+        None
+    } else {
+        Some(unsafe { CStr::from_ptr(version).to_string_lossy().into_owned() })
+    };
+
+    let manager = get_manager();
+    let manager = match manager.lock() {
+        Ok(m) => m,
+        Err(e) => {
+            set_last_error(format!("schematic_save_to_file: lock error: {}", e));
+            return -2;
+        }
+    };
+
+    let bytes = if format.is_null() {
+        manager.write_auto_with_settings(&path_str, s, ver.as_deref(), None)
+    } else {
+        let fmt = unsafe { CStr::from_ptr(format).to_string_lossy() };
+        manager.write_with_settings(&fmt, s, ver.as_deref(), None)
+    };
+
+    let bytes = match bytes {
+        Ok(b) => b,
+        Err(e) => {
+            set_last_error(format!("schematic_save_to_file: serialize error: {}", e));
+            return -2;
+        }
+    };
+
+    match std::fs::write(path_str.as_ref(), &bytes) {
+        Ok(()) => 0,
+        Err(e) => {
+            set_last_error(format!("schematic_save_to_file: IO error: {}", e));
+            -3
+        }
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn schematic_get_export_settings_schema(format: *const c_char) -> *mut c_char {
     if format.is_null() {
