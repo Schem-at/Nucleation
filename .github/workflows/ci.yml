@@ -204,6 +204,9 @@ jobs:
     needs: [check-version, build-wasm, build-nucleation]
     if: needs.check-version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create GitHub Release
+      id-token: write   # mint OIDC token for npm Trusted Publishing
     steps:
       - uses: actions/checkout@v4
 
@@ -231,8 +234,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
+          node-version: '22.x'
           registry-url: 'https://registry.npmjs.org'
+      - name: Upgrade npm (Trusted Publishing requires npm >= 11.5.1)
+        run: npm install -g npm@latest
       - name: Update and Publish npm package
         run: |
           cd release-artifacts
@@ -248,9 +253,7 @@ jobs:
             pkg.license = 'AGPL-3.0-only';
             fs.writeFileSync(path, JSON.stringify(pkg, null, 2));
           "
-          npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          npm publish --provenance --access public
 
       - name: Setup Python
         uses: actions/setup-python@v5
