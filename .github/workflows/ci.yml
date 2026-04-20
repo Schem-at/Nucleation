@@ -236,8 +236,11 @@ jobs:
         with:
           node-version: '22.x'
           registry-url: 'https://registry.npmjs.org'
-      - name: Upgrade npm (Trusted Publishing requires npm >= 11.5.1)
-        run: npm install -g npm@latest
+      - name: Upgrade npm via corepack (Trusted Publishing needs npm >= 11.5.1)
+        run: |
+          corepack enable
+          corepack prepare npm@latest --activate
+          npm --version
       - name: Update and Publish npm package
         run: |
           cd release-artifacts
