@@ -1,9 +1,11 @@
-# Nucleation v0.1.175
+# Nucleation v0.1.176
 
 Headlined by the new Minecraft item-model export. Also includes two entity
 fixes and a multi-pack resource-pack loader that cuts across every binding.
+Bumps `schematic-mesher` to pick up the 1.21.5 entity-model port (riding,
+equipment, skin resolver).
 
-> **Note:** v0.1.173 and v0.1.174 were partially published (crates.io only)
+> **Note:** v0.1.173–v0.1.175 were partially published (crates.io only)
 > while the CI publish pipeline was being migrated to npm Trusted Publishing.
 > This release ships the same feature set to all three registries (crates.io,
 > npm, PyPI) via the new OIDC flow.

@@ -250,7 +250,7 @@ jobs:
             const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
             pkg.version = '${{ needs.check-version.outputs.version }}';
             pkg.description = 'A high-performance Minecraft schematic parser and utility library';
-            pkg.repository = { type: 'git', url: 'https://github.com/Schem-at/Nucleation' };
+            pkg.repository = { type: 'git', url: 'git+https://github.com/Schem-at/Nucleation.git' };
             pkg.homepage = 'https://github.com/Schem-at/Nucleation';
             pkg.author = 'Nano <nano@schem.at>';
             pkg.license = 'AGPL-3.0-only';
