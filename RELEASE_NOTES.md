@@ -1,7 +1,11 @@
-# Nucleation v0.1.173
+# Nucleation v0.1.174
 
 Headlined by the new Minecraft item-model export. Also includes two entity
 fixes and a multi-pack resource-pack loader that cuts across every binding.
+
+> **Note:** v0.1.173 was tagged and partially published (crates.io only)
+> before the npm automation token expired. This release supersedes it and
+> ships the same feature set plus the CI switch to npm Trusted Publishing.
 
 ## Minecraft Item Model Export
 
