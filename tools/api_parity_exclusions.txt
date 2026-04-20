@@ -38,6 +38,7 @@ Schematic.cache_info = Python debug method
 Schematic.clear_cache = Python debug method
 Schematic.save = Python file I/O convenience (WASM has no filesystem, FFI uses save_to_file)
 ResourcePack.from_file = Python file I/O
+ResourcePack.from_files = Python file I/O (WASM has no filesystem, FFI uses byte buffers)
 MeshResult.save = Python file I/O
 MultiMeshResult.save_all = Python file I/O
 ChunkMeshResult.save_all = Python file I/O
@@ -221,6 +222,30 @@ MeshResult.transparent_positions = Python wrapper accessor
 MeshResult.usdz_data = Python wrapper accessor
 MultiMeshResult.nucm_data = Python naming (FFI uses chunkmeshresult_nucm_data)
 MultiMeshResult.save_nucm = Python file I/O
+
+# --- Item Model exclusions ---
+# ItemModelConfig/Result: naming differences across platforms
+[python_only]
+ItemModelResult.save_resource_pack = Python file I/O convenience
+ItemModelResult.save_model_json = Python file I/O convenience
+ItemModelResult.get_all_textures = Python convenience method
+py_build_resource_pack = Python naming (WASM uses buildResourcePack, FFI uses itemmodel_build_resource_pack)
+
+[wasm_only]
+build_resource_pack_wasm = WASM naming (Python uses build_resource_pack, FFI uses itemmodel_build_resource_pack)
+ItemModelResult.get_texture = WASM typed array return format
+
+[no_wasm]
+ItemModelResult.save_resource_pack = No filesystem in WASM
+ItemModelResult.save_model_json = No filesystem in WASM
+ItemModelResult.get_all_textures = Python convenience (WASM uses getTexture per-name)
+
+[no_ffi]
+ItemModelConfig.* = FFI uses itemmodel_config_* free functions
+ItemModelResult.* = FFI uses itemmodel_result_* free functions
+
+[ffi_only]
+itemmodel_* = FFI free functions for ItemModel (WASM/Python use wrapper methods)
 
 # --- Scripting FFI entry points (feature-gated, not in WASM/Python) ---
 [ffi_only]

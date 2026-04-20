@@ -34,6 +34,22 @@ impl ResourcePackWrapper {
         Ok(Self { inner })
     }
 
+    /// Load and merge multiple resource packs from byte buffers, lowest
+    /// priority first. `datas` must be `Array<Uint8Array>`. Later buffers
+    /// overlay earlier ones on per-key collision (matches Minecraft's own
+    /// pack-ordering semantics).
+    #[wasm_bindgen(js_name = fromBytesList)]
+    pub fn from_bytes_list(datas: Array) -> Result<ResourcePackWrapper, JsValue> {
+        let mut buffers: Vec<Vec<u8>> = Vec::with_capacity(datas.length() as usize);
+        for val in datas.iter() {
+            let arr = js_sys::Uint8Array::new(&val);
+            buffers.push(arr.to_vec());
+        }
+        let inner = ResourcePackSource::from_bytes_list(buffers)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        Ok(Self { inner })
+    }
+
     /// Get the number of blockstates in the resource pack.
     #[wasm_bindgen(getter, js_name = blockstateCount)]
     pub fn blockstate_count(&self) -> usize {
@@ -1067,4 +1083,218 @@ impl SchematicWrapper {
         manager.register_exporter(mesh_exporter);
         Ok(())
     }
+
+    /// Generate a Minecraft item model using the plane-based approach.
+    #[wasm_bindgen(js_name = toItemModel)]
+    pub fn to_item_model(
+        &self,
+        pack: &ResourcePackWrapper,
+        config: &ItemModelConfigWrapper,
+    ) -> Result<ItemModelResultWrapper, JsValue> {
+        self.0
+            .to_item_model(&pack.inner, &config.inner)
+            .map(|result| ItemModelResultWrapper { inner: result })
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+}
+
+// ─── Item Model Wrappers ────────────────────────────────────────────────────
+
+/// Configuration for item model generation.
+#[wasm_bindgen]
+pub struct ItemModelConfigWrapper {
+    inner: crate::meshing::ItemModelConfig,
+}
+
+#[wasm_bindgen]
+impl ItemModelConfigWrapper {
+    #[wasm_bindgen(constructor)]
+    pub fn new(model_name: &str) -> Self {
+        Self {
+            inner: crate::meshing::ItemModelConfig::new(model_name),
+        }
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn model_name(&self) -> String {
+        self.inner.model_name.clone()
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_model_name(&mut self, value: String) {
+        self.inner.model_name = value;
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn namespace(&self) -> String {
+        self.inner.namespace.clone()
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_namespace(&mut self, value: String) {
+        self.inner.namespace = value;
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn center(&self) -> bool {
+        self.inner.center
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_center(&mut self, value: bool) {
+        self.inner.center = value;
+    }
+
+    #[wasm_bindgen(getter, js_name = textureResolution)]
+    pub fn texture_resolution(&self) -> u32 {
+        self.inner.texture_resolution
+    }
+
+    #[wasm_bindgen(setter, js_name = textureResolution)]
+    pub fn set_texture_resolution(&mut self, value: u32) {
+        self.inner.texture_resolution = value;
+    }
+
+    /// Minecraft item to bind to (default: "paper").
+    #[wasm_bindgen(getter)]
+    pub fn item(&self) -> String {
+        self.inner.item.clone()
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_item(&mut self, value: String) {
+        self.inner.item = value;
+    }
+
+    /// Custom model data string value (default: "1").
+    #[wasm_bindgen(getter, js_name = customModelData)]
+    pub fn custom_model_data(&self) -> String {
+        self.inner.custom_model_data.clone()
+    }
+
+    #[wasm_bindgen(setter, js_name = customModelData)]
+    pub fn set_custom_model_data(&mut self, value: String) {
+        self.inner.custom_model_data = value;
+    }
+
+    /// Set uniform scale factor.
+    #[wasm_bindgen(js_name = setScale)]
+    pub fn set_scale(&mut self, scale: f32) {
+        self.inner.scale = crate::meshing::ItemModelScale::Uniform(scale);
+    }
+
+    /// Set per-axis scale factors.
+    #[wasm_bindgen(js_name = setScaleXyz)]
+    pub fn set_scale_xyz(&mut self, sx: f32, sy: f32, sz: f32) {
+        self.inner.scale = crate::meshing::ItemModelScale::NonUniform(sx, sy, sz);
+    }
+
+    /// Set scale to auto-fit mode (default).
+    #[wasm_bindgen(js_name = setScaleAuto)]
+    pub fn set_scale_auto(&mut self) {
+        self.inner.scale = crate::meshing::ItemModelScale::Auto;
+    }
+}
+
+/// Result of item model generation.
+#[wasm_bindgen]
+pub struct ItemModelResultWrapper {
+    inner: crate::meshing::ItemModelResult,
+}
+
+#[wasm_bindgen]
+impl ItemModelResultWrapper {
+    /// Get the Minecraft item model JSON string.
+    #[wasm_bindgen(getter, js_name = modelJson)]
+    pub fn model_json(&self) -> String {
+        self.inner.model_json.clone()
+    }
+
+    /// Get texture names as an array.
+    #[wasm_bindgen(getter, js_name = textureNames)]
+    pub fn texture_names(&self) -> Array {
+        let arr = Array::new();
+        for name in self.inner.textures.keys() {
+            arr.push(&JsValue::from_str(name));
+        }
+        arr
+    }
+
+    /// Get PNG data for a specific texture.
+    #[wasm_bindgen(js_name = getTexture)]
+    pub fn get_texture(&self, name: &str) -> Option<Uint8Array> {
+        self.inner.textures.get(name).map(|data| {
+            let arr = Uint8Array::new_with_length(data.len() as u32);
+            arr.copy_from(data);
+            arr
+        })
+    }
+
+    /// Number of elements in the model.
+    #[wasm_bindgen(getter, js_name = elementCount)]
+    pub fn element_count(&self) -> usize {
+        self.inner.stats.element_count
+    }
+
+    /// Number of textures generated.
+    #[wasm_bindgen(getter, js_name = textureCount)]
+    pub fn texture_count(&self) -> usize {
+        self.inner.stats.texture_count
+    }
+
+    /// Number of planes across all directions.
+    #[wasm_bindgen(getter, js_name = planeCount)]
+    pub fn plane_count(&self) -> usize {
+        self.inner.stats.plane_count
+    }
+
+    /// Schematic dimensions as [width, height, depth].
+    #[wasm_bindgen(getter)]
+    pub fn dimensions(&self) -> Array {
+        let (w, h, d) = self.inner.stats.dimensions;
+        let arr = Array::new();
+        arr.push(&JsValue::from(w));
+        arr.push(&JsValue::from(h));
+        arr.push(&JsValue::from(d));
+        arr
+    }
+
+    /// Resolved scale factors as [sx, sy, sz].
+    #[wasm_bindgen(getter)]
+    pub fn scale(&self) -> Array {
+        let (sx, sy, sz) = self.inner.stats.scale;
+        let arr = Array::new();
+        arr.push(&JsValue::from(sx));
+        arr.push(&JsValue::from(sy));
+        arr.push(&JsValue::from(sz));
+        arr
+    }
+
+    /// Package as a complete resource pack ZIP.
+    #[wasm_bindgen(js_name = toResourcePackZip)]
+    pub fn to_resource_pack_zip(&self) -> Result<Uint8Array, JsValue> {
+        let data = self
+            .inner
+            .to_resource_pack_zip()
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let arr = Uint8Array::new_with_length(data.len() as u32);
+        arr.copy_from(&data);
+        Ok(arr)
+    }
+}
+
+/// Build a resource pack ZIP from multiple item model results.
+///
+/// Merges all models into a single ZIP. Items sharing the same base item
+/// get combined into one item definition with multiple custom_model_data cases.
+#[wasm_bindgen(js_name = buildResourcePack)]
+pub fn build_resource_pack_wasm(
+    results: Vec<ItemModelResultWrapper>,
+) -> Result<Uint8Array, JsValue> {
+    let refs: Vec<&crate::meshing::ItemModelResult> = results.iter().map(|r| &r.inner).collect();
+    let data = crate::meshing::build_resource_pack(&refs)
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let arr = Uint8Array::new_with_length(data.len() as u32);
+    arr.copy_from(&data);
+    Ok(arr)
 }

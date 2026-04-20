@@ -10,3 +10,9 @@ examples/nucm-viewer/test-files/
 
 # Experimental benchmarks (not part of main build)
 experiments/
+
+# Generated test artifacts at repo root (regenerate via `cargo run --example …`)
+/entity_*.schem
+/entity_*.litematic
+/*.glb
+/item_model_pack.zip

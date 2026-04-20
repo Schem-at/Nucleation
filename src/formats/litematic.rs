@@ -124,10 +124,12 @@ fn create_metadata(schematic: &UniversalSchematic) -> NbtCompound {
     metadata.insert("TimeCreated", NbtTag::Long(now));
     metadata.insert("TimeModified", NbtTag::Long(modified));
 
-    // Use tight dimensions for EnclosingSize to avoid huge empty space
+    // Use content bounds (blocks + entities + block entities) for EnclosingSize
+    // so entity positions fall inside the region bbox. Litematica filters out
+    // entities outside the region bbox on load.
     let merged_region = schematic.get_merged_region();
-    let (width, height, length) = if let Some(tight_bounds) = merged_region.get_tight_bounds() {
-        tight_bounds.get_dimensions()
+    let (width, height, length) = if let Some(content_bounds) = merged_region.get_content_bounds() {
+        content_bounds.get_dimensions()
     } else {
         merged_region.get_dimensions()
     };

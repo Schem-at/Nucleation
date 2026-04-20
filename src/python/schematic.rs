@@ -1775,6 +1775,29 @@ impl PySchematic {
         Ok(results)
     }
 
+    // --- Item Model methods ---
+
+    /// Generate a Minecraft item model using the plane-based approach.
+    ///
+    /// Slices the schematic into 2D planes per direction, composites block face
+    /// textures into per-plane PNG images, and generates a JSON item model with
+    /// one thin element per plane.
+    #[cfg(feature = "meshing")]
+    #[pyo3(signature = (pack, config=None))]
+    pub fn to_item_model(
+        &self,
+        pack: &super::meshing::PyResourcePack,
+        config: Option<&super::meshing::PyItemModelConfig>,
+    ) -> PyResult<super::meshing::PyItemModelResult> {
+        let default_config = crate::meshing::ItemModelConfig::default();
+        let config = config.map(|c| &c.inner).unwrap_or(&default_config);
+
+        self.inner
+            .to_item_model(&pack.inner, config)
+            .map(|result| super::meshing::PyItemModelResult { inner: result })
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
     // --- Rendering methods ---
 
     /// Render the schematic to RGBA pixel bytes.

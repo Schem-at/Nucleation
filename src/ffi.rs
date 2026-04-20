@@ -6855,6 +6855,45 @@ pub mod meshing_ffi {
         }
     }
 
+    /// Load and merge multiple resource packs from in-memory byte buffers,
+    /// lowest priority first. `data_ptrs` and `data_lens` are parallel arrays
+    /// of length `count`. Later buffers overlay earlier ones on per-key
+    /// collision (matches Minecraft's own pack-ordering semantics).
+    ///
+    /// Returns null on any load error or if inputs are invalid.
+    #[no_mangle]
+    pub extern "C" fn resourcepack_from_bytes_list(
+        data_ptrs: *const *const c_uchar,
+        data_lens: *const usize,
+        count: usize,
+    ) -> *mut FFIResourcePack {
+        if count == 0 {
+            return match ResourcePackSource::from_bytes_list(Vec::<Vec<u8>>::new()) {
+                Ok(pack) => Box::into_raw(Box::new(FFIResourcePack(pack))),
+                Err(_) => ptr::null_mut(),
+            };
+        }
+        if data_ptrs.is_null() || data_lens.is_null() {
+            return ptr::null_mut();
+        }
+
+        let mut buffers: Vec<Vec<u8>> = Vec::with_capacity(count);
+        for i in 0..count {
+            let ptr = unsafe { *data_ptrs.add(i) };
+            let len = unsafe { *data_lens.add(i) };
+            if ptr.is_null() || len == 0 {
+                return ptr::null_mut();
+            }
+            let slice = unsafe { std::slice::from_raw_parts(ptr, len) };
+            buffers.push(slice.to_vec());
+        }
+
+        match ResourcePackSource::from_bytes_list(buffers) {
+            Ok(pack) => Box::into_raw(Box::new(FFIResourcePack(pack))),
+            Err(_) => ptr::null_mut(),
+        }
+    }
+
     #[no_mangle]
     pub extern "C" fn resourcepack_free(ptr: *mut FFIResourcePack) {
         if !ptr.is_null() {
@@ -8073,6 +8112,299 @@ pub extern "C" fn run_script(path: *const c_char) -> *mut SchematicWrapper {
         Err(e) => {
             set_last_error(e);
             ptr::null_mut()
+        }
+    }
+}
+
+// =============================================================================
+// Item Model FFI (feature-gated)
+// =============================================================================
+
+#[cfg(feature = "meshing")]
+pub mod item_model_ffi {
+    use super::*;
+    use crate::meshing::{ItemModelConfig, ItemModelResult, ResourcePackSource};
+    use std::ffi::CStr;
+
+    pub struct FFIItemModelConfig(ItemModelConfig);
+    pub struct FFIItemModelResult(ItemModelResult);
+
+    #[no_mangle]
+    pub extern "C" fn itemmodel_config_new(model_name: *const c_char) -> *mut FFIItemModelConfig {
+        if model_name.is_null() {
+            return ptr::null_mut();
+        }
+        let name = unsafe { CStr::from_ptr(model_name) }
+            .to_str()
+            .unwrap_or("schematic");
+        Box::into_raw(Box::new(FFIItemModelConfig(ItemModelConfig::new(name))))
+    }
+
+    #[no_mangle]
+    pub extern "C" fn itemmodel_config_set_namespace(
+        config: *mut FFIItemModelConfig,
+        namespace: *const c_char,
+    ) {
+        if config.is_null() || namespace.is_null() {
+            return;
+        }
+        let ns = unsafe { CStr::from_ptr(namespace) }
+            .to_str()
+            .unwrap_or("nucleation");
+        unsafe { (*config).0.namespace = ns.to_string() };
+    }
+
+    #[no_mangle]
+    pub extern "C" fn itemmodel_config_set_center(config: *mut FFIItemModelConfig, center: bool) {
+        if config.is_null() {
+            return;
+        }
+        unsafe { (*config).0.center = center };
+    }
+
+    #[no_mangle]
+    pub extern "C" fn itemmodel_config_set_texture_resolution(
+        config: *mut FFIItemModelConfig,
+        resolution: u32,
+    ) {
+        if config.is_null() {
+            return;
+        }
+        unsafe { (*config).0.texture_resolution = resolution };
+    }
+
+    #[no_mangle]
+    pub extern "C" fn itemmodel_config_set_item(
+        config: *mut FFIItemModelConfig,
+        item: *const c_char,
+    ) {
+        if config.is_null() || item.is_null() {
+            return;
+        }
+        let item = unsafe { CStr::from_ptr(item) }.to_str().unwrap_or("paper");
+        unsafe { (*config).0.item = item.to_string() };
+    }
+
+    #[no_mangle]
+    pub extern "C" fn itemmodel_config_set_custom_model_data(
+        config: *mut FFIItemModelConfig,
+        cmd: *const c_char,
+    ) {
+        if config.is_null() || cmd.is_null() {
+            return;
+        }
+        let cmd = unsafe { CStr::from_ptr(cmd) }.to_str().unwrap_or("1");
+        unsafe { (*config).0.custom_model_data = cmd.to_string() };
+    }
+
+    #[no_mangle]
+    pub extern "C" fn itemmodel_config_set_scale(config: *mut FFIItemModelConfig, scale: f32) {
+        if config.is_null() {
+            return;
+        }
+        unsafe { (*config).0.scale = crate::meshing::ItemModelScale::Uniform(scale) };
+    }
+
+    #[no_mangle]
+    pub extern "C" fn itemmodel_config_set_scale_xyz(
+        config: *mut FFIItemModelConfig,
+        sx: f32,
+        sy: f32,
+        sz: f32,
+    ) {
+        if config.is_null() {
+            return;
+        }
+        unsafe { (*config).0.scale = crate::meshing::ItemModelScale::NonUniform(sx, sy, sz) };
+    }
+
+    #[no_mangle]
+    pub extern "C" fn itemmodel_config_set_scale_auto(config: *mut FFIItemModelConfig) {
+        if config.is_null() {
+            return;
+        }
+        unsafe { (*config).0.scale = crate::meshing::ItemModelScale::Auto };
+    }
+
+    #[no_mangle]
+    pub extern "C" fn itemmodel_result_scale(
+        result: *const FFIItemModelResult,
+        out_sx: *mut f32,
+        out_sy: *mut f32,
+        out_sz: *mut f32,
+    ) {
+        if result.is_null() || out_sx.is_null() || out_sy.is_null() || out_sz.is_null() {
+            return;
+        }
+        let (sx, sy, sz) = unsafe { &(*result) }.0.stats.scale;
+        unsafe {
+            *out_sx = sx;
+            *out_sy = sy;
+            *out_sz = sz;
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn itemmodel_config_free(ptr: *mut FFIItemModelConfig) {
+        if !ptr.is_null() {
+            unsafe {
+                let _ = Box::from_raw(ptr);
+            }
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn schematic_to_item_model(
+        schematic: *const SchematicWrapper,
+        pack: *const meshing_ffi::FFIResourcePack,
+        config: *const FFIItemModelConfig,
+    ) -> *mut FFIItemModelResult {
+        if schematic.is_null() || pack.is_null() || config.is_null() {
+            return ptr::null_mut();
+        }
+        let s = unsafe { &*(*schematic).0 };
+        let p = unsafe { &(*pack).0 };
+        let c = unsafe { &(*config).0 };
+        match s.to_item_model(p, c) {
+            Ok(result) => Box::into_raw(Box::new(FFIItemModelResult(result))),
+            Err(_) => ptr::null_mut(),
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn itemmodel_result_model_json(
+        result: *const FFIItemModelResult,
+        out_len: *mut usize,
+    ) -> *const c_char {
+        if result.is_null() || out_len.is_null() {
+            return ptr::null();
+        }
+        let json = &unsafe { &(*result) }.0.model_json;
+        unsafe { *out_len = json.len() };
+        json.as_ptr() as *const c_char
+    }
+
+    #[no_mangle]
+    pub extern "C" fn itemmodel_result_element_count(result: *const FFIItemModelResult) -> usize {
+        if result.is_null() {
+            return 0;
+        }
+        unsafe { &(*result) }.0.stats.element_count
+    }
+
+    #[no_mangle]
+    pub extern "C" fn itemmodel_result_texture_count(result: *const FFIItemModelResult) -> usize {
+        if result.is_null() {
+            return 0;
+        }
+        unsafe { &(*result) }.0.stats.texture_count
+    }
+
+    #[no_mangle]
+    pub extern "C" fn itemmodel_result_plane_count(result: *const FFIItemModelResult) -> usize {
+        if result.is_null() {
+            return 0;
+        }
+        unsafe { &(*result) }.0.stats.plane_count
+    }
+
+    #[no_mangle]
+    pub extern "C" fn itemmodel_result_dimensions(
+        result: *const FFIItemModelResult,
+        out_width: *mut i32,
+        out_height: *mut i32,
+        out_depth: *mut i32,
+    ) {
+        if result.is_null() || out_width.is_null() || out_height.is_null() || out_depth.is_null() {
+            return;
+        }
+        let (w, h, d) = unsafe { &(*result) }.0.stats.dimensions;
+        unsafe {
+            *out_width = w;
+            *out_height = h;
+            *out_depth = d;
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn itemmodel_result_to_resource_pack_zip(
+        result: *const FFIItemModelResult,
+        out_len: *mut usize,
+    ) -> *mut u8 {
+        if result.is_null() || out_len.is_null() {
+            return ptr::null_mut();
+        }
+        let r = unsafe { &(*result) };
+        match r.0.to_resource_pack_zip() {
+            Ok(data) => {
+                unsafe { *out_len = data.len() };
+                let boxed = data.into_boxed_slice();
+                Box::into_raw(boxed) as *mut u8
+            }
+            Err(_) => {
+                unsafe { *out_len = 0 };
+                ptr::null_mut()
+            }
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn itemmodel_result_free(ptr: *mut FFIItemModelResult) {
+        if !ptr.is_null() {
+            unsafe {
+                let _ = Box::from_raw(ptr);
+            }
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn itemmodel_zip_data_free(data: *mut u8, len: usize) {
+        if !data.is_null() && len > 0 {
+            unsafe {
+                drop(Box::from_raw(std::slice::from_raw_parts_mut(data, len)));
+            }
+        }
+    }
+
+    /// Build a resource pack ZIP from multiple item model results.
+    ///
+    /// `results` is a pointer to an array of `*const FFIItemModelResult` pointers.
+    /// `count` is the number of elements in the array.
+    /// Returns a pointer to the ZIP data and writes the length to `out_len`.
+    /// Free the returned data with `itemmodel_zip_data_free`.
+    #[no_mangle]
+    pub extern "C" fn itemmodel_build_resource_pack(
+        results: *const *const FFIItemModelResult,
+        count: usize,
+        out_len: *mut usize,
+    ) -> *mut u8 {
+        if results.is_null() || out_len.is_null() || count == 0 {
+            if !out_len.is_null() {
+                unsafe { *out_len = 0 };
+            }
+            return ptr::null_mut();
+        }
+        let result_ptrs = unsafe { std::slice::from_raw_parts(results, count) };
+        let refs: Vec<&ItemModelResult> = result_ptrs
+            .iter()
+            .filter_map(|&p| {
+                if p.is_null() {
+                    None
+                } else {
+                    Some(&unsafe { &*p }.0)
+                }
+            })
+            .collect();
+        match crate::meshing::build_resource_pack(&refs) {
+            Ok(data) => {
+                unsafe { *out_len = data.len() };
+                let boxed = data.into_boxed_slice();
+                Box::into_raw(boxed) as *mut u8
+            }
+            Err(_) => {
+                unsafe { *out_len = 0 };
+                ptr::null_mut()
+            }
         }
     }
 }

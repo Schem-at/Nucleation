@@ -202,22 +202,8 @@ fn to_schematic_v3(
     let block_entities = convert_block_entities_v3(&compact_region);
     blocks_container.insert("BlockEntities", NbtTag::List(block_entities));
 
-    // Entities from compact region remain at root level in v3 - with validation
-    let mut entities = NbtList::new();
-    let region_entities = convert_entities(&compact_region);
-
-    // Only add valid entities
-    for entity in region_entities.iter() {
-        if let NbtTag::Compound(compound) = entity {
-            // Validate that entity has required fields
-            if compound.contains_key("Id") && compound.contains_key("Pos") {
-                entities.push(entity.clone());
-            } else {
-                #[cfg(feature = "wasm")]
-                console::log_1(&"Warning: Skipping invalid entity missing Id or Pos".into());
-            }
-        }
-    }
+    // Entities are stored at root (Schematic) level in v3 per Sponge spec.
+    let entities = convert_entities_v3(&compact_region);
 
     // Add the Blocks container to schematic data
     schematic_data.insert("Blocks", NbtTag::Compound(blocks_container));
@@ -301,7 +287,7 @@ fn to_schematic_v2(
 
     // Use block entities and entities from compact region
     let block_entities = convert_block_entities(&compact_region);
-    let entities = convert_entities(&compact_region);
+    let entities = convert_entities_v2(&compact_region);
 
     schematic_data.insert("BlockEntities", NbtTag::List(block_entities));
     schematic_data.insert("Entities", NbtTag::List(entities));
@@ -543,32 +529,91 @@ fn convert_block_entities_v3(region: &Region) -> NbtList {
     block_entities
 }
 
-// Sponge Schematic spec: entity positions are relative to [0,0,0] of the schematic
-// (without the offset applied). We subtract the region position (which becomes the offset).
-fn convert_entities(region: &Region) -> NbtList {
-    let mut entities = NbtList::new();
+// Sponge Schematic spec: entity positions are relative to [0,0,0] of the
+// schematic (without the offset applied). We subtract the region position.
 
-    for entity in &region.entities {
-        let mut entity_nbt = if let NbtTag::Compound(c) = entity.to_nbt() {
-            c
-        } else {
-            NbtCompound::new()
-        };
+fn sponge_entity_id(entity: &Entity) -> String {
+    if entity.id.starts_with("minecraft:") {
+        entity.id.clone()
+    } else {
+        format!("minecraft:{}", entity.id)
+    }
+}
 
-        let rel_x = entity.position.0 - region.position.0 as f64;
-        let rel_y = entity.position.1 - region.position.1 as f64;
-        let rel_z = entity.position.2 - region.position.2 as f64;
+// Vanilla MC chunk-format entity NBT, with Pos rewritten to be relative to
+// the schematic origin and with Motion/Rotation defaults filled in (real
+// loaders like WorldEdit reject entities missing these fields).
+fn vanilla_entity_nbt(entity: &Entity, rel_pos: (f64, f64, f64)) -> NbtCompound {
+    let mut nbt = if let NbtTag::Compound(c) = entity.to_nbt() {
+        c
+    } else {
+        NbtCompound::new()
+    };
 
-        let pos_list = NbtList::from(vec![
-            NbtTag::Double(rel_x),
-            NbtTag::Double(rel_y),
-            NbtTag::Double(rel_z),
+    let pos_list = NbtList::from(vec![
+        NbtTag::Double(rel_pos.0),
+        NbtTag::Double(rel_pos.1),
+        NbtTag::Double(rel_pos.2),
+    ]);
+    nbt.insert("Pos", NbtTag::List(pos_list));
+
+    if !nbt.inner().contains_key("Motion") {
+        let motion = NbtList::from(vec![
+            NbtTag::Double(0.0),
+            NbtTag::Double(0.0),
+            NbtTag::Double(0.0),
         ]);
-        entity_nbt.insert("Pos", NbtTag::List(pos_list));
-
-        entities.push(NbtTag::Compound(entity_nbt));
+        nbt.insert("Motion", NbtTag::List(motion));
+    }
+    if !nbt.inner().contains_key("Rotation") {
+        let rotation = NbtList::from(vec![NbtTag::Float(0.0), NbtTag::Float(0.0)]);
+        nbt.insert("Rotation", NbtTag::List(rotation));
     }
 
+    nbt
+}
+
+// Sponge v2 entity layout: vanilla MC fields flat at top level, with the
+// entity-type resource location under `Id` (capitalised).
+fn convert_entities_v2(region: &Region) -> NbtList {
+    let mut entities = NbtList::new();
+    for entity in &region.entities {
+        let rel = (
+            entity.position.0 - region.position.0 as f64,
+            entity.position.1 - region.position.1 as f64,
+            entity.position.2 - region.position.2 as f64,
+        );
+        let mut nbt = vanilla_entity_nbt(entity, rel);
+        nbt.insert("Id", NbtTag::String(sponge_entity_id(entity)));
+        entities.push(NbtTag::Compound(nbt));
+    }
+    entities
+}
+
+// Sponge v3 entity layout: top-level { Id, Pos, Data }, where Data is the
+// vanilla MC chunk-format entity NBT.
+fn convert_entities_v3(region: &Region) -> NbtList {
+    let mut entities = NbtList::new();
+    for entity in &region.entities {
+        let rel = (
+            entity.position.0 - region.position.0 as f64,
+            entity.position.1 - region.position.1 as f64,
+            entity.position.2 - region.position.2 as f64,
+        );
+        let data = vanilla_entity_nbt(entity, rel);
+
+        let pos_list = NbtList::from(vec![
+            NbtTag::Double(rel.0),
+            NbtTag::Double(rel.1),
+            NbtTag::Double(rel.2),
+        ]);
+
+        let mut wrapper = NbtCompound::new();
+        wrapper.insert("Id", NbtTag::String(sponge_entity_id(entity)));
+        wrapper.insert("Pos", NbtTag::List(pos_list));
+        wrapper.insert("Data", NbtTag::Compound(data));
+        entities.push(NbtTag::Compound(wrapper));
+    }
     entities
 }
 
@@ -747,11 +792,32 @@ fn parse_entities(region_tag: &NbtCompound) -> Result<Vec<Entity>, Box<dyn std::
 
     for tag in entities_list.iter() {
         if let NbtTag::Compound(compound) = tag {
-            entities.push(Entity::from_nbt(compound)?);
+            entities.push(parse_entity_compound(compound)?);
         }
     }
 
     Ok(entities)
+}
+
+// Sponge v3 wraps the vanilla MC entity NBT in a `Data` sub-compound with
+// `Id`/`Pos` hoisted to the top. v2 and legacy Nucleation output put the
+// vanilla NBT directly at the top level. This accepts both shapes.
+fn parse_entity_compound(compound: &NbtCompound) -> Result<Entity, String> {
+    if let Ok(data) = compound.get::<_, &NbtCompound>("Data") {
+        let mut merged = data.clone();
+
+        // Top-level Id/Pos are authoritative per spec.
+        if let Ok(top_id) = compound.get::<_, &str>("Id") {
+            merged.insert("Id", NbtTag::String(top_id.to_string()));
+        }
+        if let Ok(top_pos) = compound.get::<_, &NbtList>("Pos") {
+            merged.insert("Pos", NbtTag::List(top_pos.clone()));
+        }
+
+        Entity::from_nbt(&merged)
+    } else {
+        Entity::from_nbt(compound)
+    }
 }
 
 #[cfg(test)]

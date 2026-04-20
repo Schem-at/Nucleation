@@ -1,6 +1,6 @@
 [package]
 name = "nucleation"
-version = "0.1.172"
+version = "0.1.173"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -157,6 +157,18 @@ required-features = ["meshing"]
 
 [[example]]
 name = "convert_world"
+required-features = ["meshing"]
+
+[[example]]
+name = "item_model_test"
+required-features = ["meshing"]
+
+[[example]]
+name = "multi_item_model"
+required-features = ["meshing"]
+
+[[example]]
+name = "entity_mesh_test"
 required-features = ["meshing"]
 
 [profile.bench]

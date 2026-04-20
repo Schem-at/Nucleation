@@ -2564,7 +2564,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation"
-version = "0.1.172"
+version = "0.1.173"
 dependencies = [
  "base64",
  "bincode",
@@ -3870,7 +3870,7 @@ dependencies = [
 [[package]]
 name = "schematic-mesher"
 version = "0.1.0"
-source = "git+https://github.com/Schem-at/Schematic-Mesher.git?branch=feature%2Fmesh-output-api#83a51c953ffa088f3b78524960b36f351a123a6a"
+source = "git+https://github.com/Schem-at/Schematic-Mesher.git?branch=feature%2Fmesh-output-api#ac8517baaf03edc3c16848df9009dbda0196e9f2"
 dependencies = [
  "glam",
  "gltf-json",

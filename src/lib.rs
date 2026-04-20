@@ -41,6 +41,7 @@ pub mod wasm;
 
 // Public re-exports
 pub use block_state::BlockState;
+pub use entity::Entity;
 pub use formats::{litematic, schematic};
 pub use print_utils::{format_json_schematic, format_schematic};
 pub use region::Region;

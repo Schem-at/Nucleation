@@ -72,6 +72,9 @@ pub fn nucleation(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m.add_class::<meshing::PyChunkMeshResult>()?;
         m.add_class::<meshing::PyRawMeshExport>()?;
         m.add_class::<meshing::PyTextureAtlas>()?;
+        m.add_class::<meshing::PyItemModelConfig>()?;
+        m.add_class::<meshing::PyItemModelResult>()?;
+        m.add_function(wrap_pyfunction!(meshing::py_build_resource_pack, m)?)?;
     }
 
     #[cfg(feature = "rendering")]

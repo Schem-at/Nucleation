@@ -36,6 +36,25 @@ impl PyResourcePack {
         Ok(Self { inner })
     }
 
+    /// Load and merge multiple resource packs from file paths, lowest priority
+    /// first. Later packs overlay earlier ones on per-key collision (matches
+    /// Minecraft's own pack-ordering semantics).
+    #[staticmethod]
+    pub fn from_files(paths: Vec<String>) -> PyResult<Self> {
+        let inner = ResourcePackSource::from_files(paths)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
+        Ok(Self { inner })
+    }
+
+    /// Load and merge multiple resource packs from byte buffers, lowest
+    /// priority first. See `from_files` for semantics.
+    #[staticmethod]
+    pub fn from_bytes_list(datas: Vec<Vec<u8>>) -> PyResult<Self> {
+        let inner = ResourcePackSource::from_bytes_list(datas)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+        Ok(Self { inner })
+    }
+
     /// Get the number of blockstates in the resource pack.
     #[getter]
     pub fn blockstate_count(&self) -> usize {
@@ -820,6 +839,270 @@ impl PyTextureAtlas {
             self.inner.height,
             self.inner.regions.len()
         )
+    }
+}
+
+// ─── PyItemModelConfig ──────────────────────────────────────────────────────
+
+/// Configuration for item model generation.
+#[pyclass(name = "ItemModelConfig")]
+#[derive(Clone)]
+pub struct PyItemModelConfig {
+    pub(crate) inner: crate::meshing::ItemModelConfig,
+}
+
+#[pymethods]
+impl PyItemModelConfig {
+    #[new]
+    #[pyo3(signature = (model_name="schematic", namespace="nucleation", center=true, texture_resolution=16, item="paper", custom_model_data="1", scale=None, scale_x=None, scale_y=None, scale_z=None))]
+    pub fn new(
+        model_name: &str,
+        namespace: &str,
+        center: bool,
+        texture_resolution: u32,
+        item: &str,
+        custom_model_data: &str,
+        scale: Option<f32>,
+        scale_x: Option<f32>,
+        scale_y: Option<f32>,
+        scale_z: Option<f32>,
+    ) -> Self {
+        let scale_mode = if let (Some(sx), Some(sy), Some(sz)) = (scale_x, scale_y, scale_z) {
+            crate::meshing::ItemModelScale::NonUniform(sx, sy, sz)
+        } else if let Some(s) = scale {
+            crate::meshing::ItemModelScale::Uniform(s)
+        } else {
+            crate::meshing::ItemModelScale::Auto
+        };
+        Self {
+            inner: crate::meshing::ItemModelConfig {
+                model_name: model_name.to_string(),
+                namespace: namespace.to_string(),
+                center,
+                texture_resolution,
+                item: item.to_string(),
+                custom_model_data: custom_model_data.to_string(),
+                scale: scale_mode,
+            },
+        }
+    }
+
+    #[getter]
+    pub fn model_name(&self) -> &str {
+        &self.inner.model_name
+    }
+
+    #[setter]
+    pub fn set_model_name(&mut self, value: String) {
+        self.inner.model_name = value;
+    }
+
+    #[getter]
+    pub fn namespace(&self) -> &str {
+        &self.inner.namespace
+    }
+
+    #[setter]
+    pub fn set_namespace(&mut self, value: String) {
+        self.inner.namespace = value;
+    }
+
+    #[getter]
+    pub fn center(&self) -> bool {
+        self.inner.center
+    }
+
+    #[setter]
+    pub fn set_center(&mut self, value: bool) {
+        self.inner.center = value;
+    }
+
+    #[getter]
+    pub fn texture_resolution(&self) -> u32 {
+        self.inner.texture_resolution
+    }
+
+    #[setter]
+    pub fn set_texture_resolution(&mut self, value: u32) {
+        self.inner.texture_resolution = value;
+    }
+
+    #[getter]
+    pub fn item(&self) -> &str {
+        &self.inner.item
+    }
+
+    #[setter]
+    pub fn set_item(&mut self, value: String) {
+        self.inner.item = value;
+    }
+
+    #[getter]
+    pub fn custom_model_data(&self) -> &str {
+        &self.inner.custom_model_data
+    }
+
+    #[setter]
+    pub fn set_custom_model_data(&mut self, value: String) {
+        self.inner.custom_model_data = value;
+    }
+
+    /// Set uniform scale factor.
+    pub fn set_scale(&mut self, scale: f32) {
+        self.inner.scale = crate::meshing::ItemModelScale::Uniform(scale);
+    }
+
+    /// Set per-axis scale factors.
+    pub fn set_scale_xyz(&mut self, sx: f32, sy: f32, sz: f32) {
+        self.inner.scale = crate::meshing::ItemModelScale::NonUniform(sx, sy, sz);
+    }
+
+    /// Set scale to auto-fit mode.
+    pub fn set_scale_auto(&mut self) {
+        self.inner.scale = crate::meshing::ItemModelScale::Auto;
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "<ItemModelConfig name='{}' namespace='{}' item='{}' cmd='{}' center={} resolution={}>",
+            self.inner.model_name,
+            self.inner.namespace,
+            self.inner.item,
+            self.inner.custom_model_data,
+            self.inner.center,
+            self.inner.texture_resolution
+        )
+    }
+}
+
+// ─── PyItemModelResult ──────────────────────────────────────────────────────
+
+/// Result of item model generation.
+#[pyclass(name = "ItemModelResult")]
+pub struct PyItemModelResult {
+    pub(crate) inner: crate::meshing::ItemModelResult,
+}
+
+#[pymethods]
+impl PyItemModelResult {
+    /// Get the Minecraft item model JSON string.
+    #[getter]
+    pub fn model_json(&self) -> &str {
+        &self.inner.model_json
+    }
+
+    /// Get texture names.
+    #[getter]
+    pub fn texture_names(&self) -> Vec<String> {
+        self.inner.textures.keys().cloned().collect()
+    }
+
+    /// Get PNG data for a specific texture.
+    pub fn get_texture<'py>(&self, py: Python<'py>, name: &str) -> Option<Bound<'py, PyBytes>> {
+        self.inner
+            .textures
+            .get(name)
+            .map(|data| PyBytes::new(py, data))
+    }
+
+    /// Get all textures as a dict of name -> bytes.
+    pub fn get_all_textures<'py>(&self, py: Python<'py>) -> HashMap<String, Bound<'py, PyBytes>> {
+        self.inner
+            .textures
+            .iter()
+            .map(|(k, v)| (k.clone(), PyBytes::new(py, v)))
+            .collect()
+    }
+
+    /// Number of elements in the model.
+    #[getter]
+    pub fn element_count(&self) -> usize {
+        self.inner.stats.element_count
+    }
+
+    /// Number of textures generated.
+    #[getter]
+    pub fn texture_count(&self) -> usize {
+        self.inner.stats.texture_count
+    }
+
+    /// Number of planes across all directions.
+    #[getter]
+    pub fn plane_count(&self) -> usize {
+        self.inner.stats.plane_count
+    }
+
+    /// Schematic dimensions as (width, height, depth).
+    #[getter]
+    pub fn dimensions(&self) -> (i32, i32, i32) {
+        self.inner.stats.dimensions
+    }
+
+    /// Resolved scale factors as (sx, sy, sz).
+    #[getter]
+    pub fn scale(&self) -> (f32, f32, f32) {
+        self.inner.stats.scale
+    }
+
+    /// Package as a complete resource pack ZIP.
+    pub fn to_resource_pack_zip<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
+        let data = self
+            .inner
+            .to_resource_pack_zip()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        Ok(PyBytes::new(py, &data))
+    }
+
+    /// Save the resource pack ZIP to a file.
+    pub fn save_resource_pack(&self, path: &str) -> PyResult<()> {
+        let data = self
+            .inner
+            .to_resource_pack_zip()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        std::fs::write(path, &data)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))
+    }
+
+    /// Save the model JSON to a file.
+    pub fn save_model_json(&self, path: &str) -> PyResult<()> {
+        std::fs::write(path, &self.inner.model_json)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "<ItemModelResult elements={} textures={} dimensions={:?}>",
+            self.inner.stats.element_count,
+            self.inner.stats.texture_count,
+            self.inner.stats.dimensions
+        )
+    }
+}
+
+/// Build a resource pack ZIP from one or more item model results.
+///
+/// If `path` is provided, saves directly to file and returns None.
+/// If `path` is omitted, returns the ZIP bytes.
+///
+/// Merges all models into a single ZIP. Items sharing the same base item
+/// (e.g., paper) get combined into one item definition with multiple
+/// custom_model_data cases.
+#[pyfunction]
+#[pyo3(name = "build_resource_pack", signature = (results, path=None))]
+pub fn py_build_resource_pack<'py>(
+    py: Python<'py>,
+    results: Vec<PyRef<'py, PyItemModelResult>>,
+    path: Option<&str>,
+) -> PyResult<Option<Bound<'py, PyBytes>>> {
+    let refs: Vec<&crate::meshing::ItemModelResult> = results.iter().map(|r| &r.inner).collect();
+    let data = crate::meshing::build_resource_pack(&refs)
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+    if let Some(path) = path {
+        std::fs::write(path, &data)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
+        Ok(None)
+    } else {
+        Ok(Some(PyBytes::new(py, &data)))
     }
 }
 

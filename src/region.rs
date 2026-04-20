@@ -298,13 +298,14 @@ impl Region {
             .unwrap_or((0, 0, 0))
     }
 
-    /// Create a compacted region containing only the non-air blocks within tight bounds.
-    /// This is ideal for exporting schematics as it removes all allocated but empty space.
-    /// Block entities and entities are preserved at their correct positions.
-    /// Returns a clone if no tight bounds exist (empty region).
+    /// Create a compacted region sized to cover all content: non-air blocks,
+    /// entities, and block entities. This is used for exporting schematics so
+    /// that Litematica (which filters entities outside the region bbox) keeps
+    /// every entity/block entity that was added.
+    ///
+    /// Returns a minimal 1x1x1 clone if the region has no content at all.
     pub fn to_compact(&self) -> Region {
-        // If no tight bounds, return a minimal clone
-        let Some(tight_bounds) = &self.tight_bounds else {
+        let Some(content_bounds) = self.get_content_bounds() else {
             let mut empty = Region::new(self.name.clone(), (0, 0, 0), (1, 1, 1));
             empty.palette = self.palette.clone();
             empty.rebuild_palette_index();
@@ -312,23 +313,40 @@ impl Region {
             return empty;
         };
 
+        // Fast path: when content_bounds == tight_bounds (no entities or
+        // block entities outside the block envelope — the common case), the
+        // compact region is exactly tight_bounds and the block copy needs no
+        // extra offsets. Preserves the original row-copy layout.
+        if let Some(tight_bounds) = self.tight_bounds.clone() {
+            if tight_bounds == content_bounds {
+                return self.to_compact_tight(&tight_bounds);
+            }
+        }
+
+        // General path: content_bounds may be larger than tight_bounds
+        // because entities or block_entities sit outside the block envelope.
+        // Compact is sized to content_bounds; block-copy rows are written at
+        // (tight.min - content.min) offsets.
+        self.to_compact_with_content_bounds(&content_bounds)
+    }
+
+    /// Fast-path compaction: tight_bounds and content_bounds are identical,
+    /// so the compact region has the same dims as tight_bounds.
+    fn to_compact_tight(&self, tight_bounds: &BoundingBox) -> Region {
         let tight_dims = tight_bounds.get_dimensions();
         let tight_pos = tight_bounds.min;
 
-        // Create new region with exact tight bounds
         let mut compact = Region::new(self.name.clone(), tight_pos, tight_dims);
         compact.palette = self.palette.clone();
         compact.rebuild_palette_index();
         compact.rebuild_air_index();
 
-        // Phase 4: Row-level copy instead of per-block set_block
         let old_w = self.cached_width as usize;
         let old_l = self.cached_length as usize;
         let (compact_w, _, compact_l) = compact.bbox.get_dimensions();
         let compact_w = compact_w as usize;
         let compact_l = compact_l as usize;
 
-        // Tight bounds relative to source region
         let tb_min_x = tight_bounds.min.0;
         let tb_min_y = tight_bounds.min.1;
         let tb_min_z = tight_bounds.min.2;
@@ -336,7 +354,7 @@ impl Region {
         let tb_max_z = tight_bounds.max.2;
 
         let x_off_src = (tb_min_x - self.bbox.min.0) as usize;
-        let row_len = compact_w; // tight width = compact width
+        let row_len = compact_w;
 
         #[cfg(target_arch = "wasm32")]
         {
@@ -358,9 +376,6 @@ impl Region {
         {
             use rayon::prelude::*;
             use rayon::slice::ParallelSliceMut;
-            // The compact array is structured such that each chunk of `compact_w * compact_l` elements
-            // is exactly one slice parallel to XZ plane (a Y slice).
-            // We can par_chunks_mut over the compact blocks by the Y slice size.
             let y_slice_size = compact_w * compact_l;
             let src_blocks = &self.blocks;
             let bbox_min_y = self.bbox.min.1;
@@ -374,7 +389,6 @@ impl Region {
                     let y = tb_min_y + dy_dst as i32;
                     let dy_src = (y - bbox_min_y) as usize;
 
-                    // Within this Y slice, iterate serially over Z rows
                     for z in tb_min_z..=tb_max_z {
                         let dz_src = (z - bbox_min_z) as usize;
                         let dz_dst = (z - tb_min_z) as usize;
@@ -388,27 +402,114 @@ impl Region {
                 });
         }
 
-        // Rebuild non_air_count and tight_bounds for compact region
         compact.rebuild_non_air_count();
         compact.tight_bounds = Some(tight_bounds.clone());
 
-        // Copy block entities within tight bounds
         for (&pos, be) in &self.block_entities {
-            if tight_bounds.contains(pos) {
-                compact.block_entities.insert(pos, be.clone());
+            compact.block_entities.insert(pos, be.clone());
+        }
+        for entity in &self.entities {
+            compact.entities.push(entity.clone());
+        }
+
+        compact
+    }
+
+    /// General-path compaction: content_bounds is the union of tight_bounds
+    /// plus entity and block-entity positions. The compact region is sized
+    /// to content_bounds; block-copy rows are written at offsets relative to
+    /// content_bounds.min. Cells outside tight_bounds stay at palette index 0
+    /// (air — guaranteed by `Region::new`).
+    fn to_compact_with_content_bounds(&self, content_bounds: &BoundingBox) -> Region {
+        let content_dims = content_bounds.get_dimensions();
+        let content_pos = content_bounds.min;
+
+        let mut compact = Region::new(self.name.clone(), content_pos, content_dims);
+        compact.palette = self.palette.clone();
+        compact.rebuild_palette_index();
+        compact.rebuild_air_index();
+
+        let (compact_w, _, compact_l) = compact.bbox.get_dimensions();
+        let compact_w = compact_w as usize;
+        let compact_l = compact_l as usize;
+
+        if let Some(tight_bounds) = &self.tight_bounds {
+            let old_w = self.cached_width as usize;
+            let old_l = self.cached_length as usize;
+
+            let tb_min_x = tight_bounds.min.0;
+            let tb_min_y = tight_bounds.min.1;
+            let tb_min_z = tight_bounds.min.2;
+            let tb_max_y = tight_bounds.max.1;
+            let tb_max_z = tight_bounds.max.2;
+
+            let (tight_w, _, _) = tight_bounds.get_dimensions();
+            let row_len = tight_w as usize;
+
+            let x_off_src = (tb_min_x - self.bbox.min.0) as usize;
+            let x_off_dst = (tb_min_x - content_pos.0) as usize;
+
+            #[cfg(target_arch = "wasm32")]
+            {
+                for y in tb_min_y..=tb_max_y {
+                    let dy_src = (y - self.bbox.min.1) as usize;
+                    let dy_dst = (y - content_pos.1) as usize;
+                    for z in tb_min_z..=tb_max_z {
+                        let dz_src = (z - self.bbox.min.2) as usize;
+                        let dz_dst = (z - content_pos.2) as usize;
+                        let src_start = dy_src * old_w * old_l + dz_src * old_w + x_off_src;
+                        let dst_start =
+                            dy_dst * compact_w * compact_l + dz_dst * compact_w + x_off_dst;
+                        compact.blocks[dst_start..dst_start + row_len]
+                            .copy_from_slice(&self.blocks[src_start..src_start + row_len]);
+                    }
+                }
+            }
+
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                use rayon::prelude::*;
+                use rayon::slice::ParallelSliceMut;
+                let y_slice_size = compact_w * compact_l;
+                let src_blocks = &self.blocks;
+                let bbox_min_y = self.bbox.min.1;
+                let bbox_min_z = self.bbox.min.2;
+                let content_min_y = content_pos.1;
+                let content_min_z = content_pos.2;
+
+                compact
+                    .blocks
+                    .par_chunks_mut(y_slice_size)
+                    .enumerate()
+                    .for_each(|(dy_dst, dst_y_slice)| {
+                        let y = content_min_y + dy_dst as i32;
+                        if y < tb_min_y || y > tb_max_y {
+                            return;
+                        }
+                        let dy_src = (y - bbox_min_y) as usize;
+
+                        for z in tb_min_z..=tb_max_z {
+                            let dz_src = (z - bbox_min_z) as usize;
+                            let dz_dst = (z - content_min_z) as usize;
+
+                            let src_start = dy_src * old_w * old_l + dz_src * old_w + x_off_src;
+                            let dst_start_in_slice = dz_dst * compact_w + x_off_dst;
+
+                            dst_y_slice[dst_start_in_slice..dst_start_in_slice + row_len]
+                                .copy_from_slice(&src_blocks[src_start..src_start + row_len]);
+                        }
+                    });
             }
         }
 
-        // Copy entities within tight bounds
+        compact.rebuild_non_air_count();
+        compact.tight_bounds = self.tight_bounds.clone();
+
+        for (&pos, be) in &self.block_entities {
+            compact.block_entities.insert(pos, be.clone());
+        }
         for entity in &self.entities {
-            let entity_pos = (
-                entity.position.0.floor() as i32,
-                entity.position.1.floor() as i32,
-                entity.position.2.floor() as i32,
-            );
-            if tight_bounds.contains(entity_pos) {
-                compact.entities.push(entity.clone());
-            }
+            compact.entities.push(entity.clone());
         }
 
         compact
@@ -705,6 +806,40 @@ impl Region {
 
     pub fn add_entity(&mut self, entity: Entity) {
         self.entities.push(entity);
+    }
+
+    /// Tight bounding box of all content (non-air blocks, entities, and block
+    /// entities). Entity positions are floored. Returns `None` only if the
+    /// region has no blocks, no entities, and no block entities.
+    ///
+    /// Exporters use this (not `tight_bounds`) to ensure entity and block
+    /// entity positions are covered by the region size written to disk —
+    /// Litematica filters out entities outside the region bounding box.
+    pub fn get_content_bounds(&self) -> Option<BoundingBox> {
+        let mut result = self.tight_bounds.clone();
+
+        let mut expand = |p: (i32, i32, i32)| {
+            result = Some(match result.take() {
+                Some(bb) => BoundingBox::new(
+                    (bb.min.0.min(p.0), bb.min.1.min(p.1), bb.min.2.min(p.2)),
+                    (bb.max.0.max(p.0), bb.max.1.max(p.1), bb.max.2.max(p.2)),
+                ),
+                None => BoundingBox::new(p, p),
+            });
+        };
+
+        for &pos in self.block_entities.keys() {
+            expand(pos);
+        }
+        for entity in &self.entities {
+            expand((
+                entity.position.0.floor() as i32,
+                entity.position.1.floor() as i32,
+                entity.position.2.floor() as i32,
+            ));
+        }
+
+        result
     }
 
     pub fn remove_entity(&mut self, index: usize) -> Option<Entity> {

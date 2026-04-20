@@ -456,6 +456,23 @@ impl UniversalSchematic {
         self.default_region.get_tight_bounds()
     }
 
+    /// Get the bounding box covering all content (non-air blocks, entities,
+    /// block entities) across every region. This is what exporters use so
+    /// that Litematica (and other formats) keep entities/block entities that
+    /// sit outside the block bounds.
+    pub fn get_content_bounds(&self) -> Option<BoundingBox> {
+        let mut result = self.default_region.get_content_bounds();
+        for region in self.other_regions.values() {
+            match (result.take(), region.get_content_bounds()) {
+                (Some(a), Some(b)) => result = Some(a.union(&b)),
+                (Some(a), None) => result = Some(a),
+                (None, Some(b)) => result = Some(b),
+                (None, None) => {}
+            }
+        }
+        result
+    }
+
     /// Get the tight dimensions (width, height, length) of actual block content
     /// Returns (0, 0, 0) if no non-air blocks have been placed yet
     pub fn get_tight_dimensions(&self) -> (i32, i32, i32) {

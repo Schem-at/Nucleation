@@ -64,8 +64,12 @@ use schematic_mesher::{
 };
 
 pub mod cache;
+pub mod item_model;
 
 // Re-export the real MeshOutput and MeshLayer types from schematic-mesher.
+pub use item_model::{
+    build_resource_pack, ItemModelConfig, ItemModelResult, ItemModelScale, ItemModelStats,
+};
 pub use schematic_mesher::{MeshLayer, MeshOutput};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -105,6 +109,33 @@ impl ResourcePackSource {
     /// Load a resource pack from bytes (for WASM compatibility).
     pub fn from_bytes(data: &[u8]) -> Result<Self> {
         let pack = schematic_mesher::load_resource_pack_from_bytes(data)
+            .map_err(|e| MeshError::ResourcePack(e.to_string()))?;
+        Ok(Self { pack })
+    }
+
+    /// Load multiple resource packs from file paths in priority order.
+    ///
+    /// Packs are applied lowest priority first — later packs overlay earlier
+    /// ones on per-key collision, mirroring Minecraft's own pack-ordering
+    /// semantics. An empty iterator yields an empty pack.
+    pub fn from_files<I, P>(paths: I) -> Result<Self>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let pack = schematic_mesher::load_resource_packs(paths)
+            .map_err(|e| MeshError::ResourcePack(e.to_string()))?;
+        Ok(Self { pack })
+    }
+
+    /// Load multiple resource packs from in-memory byte buffers in priority
+    /// order. See [`from_files`](Self::from_files) for semantics.
+    pub fn from_bytes_list<I, B>(datas: I) -> Result<Self>
+    where
+        I: IntoIterator<Item = B>,
+        B: AsRef<[u8]>,
+    {
+        let pack = schematic_mesher::load_resource_packs_from_bytes(datas)
             .map_err(|e| MeshError::ResourcePack(e.to_string()))?;
         Ok(Self { pack })
     }
@@ -1585,6 +1616,56 @@ mod tests {
         // from_bytes with invalid data should error
         let result = ResourcePackSource::from_bytes(&[]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_bytes_list_empty_is_empty_pack() {
+        // An empty iterator yields an empty pack (no error). This exercises
+        // the new multi-pack entry point in ResourcePackSource.
+        let empty: Vec<Vec<u8>> = Vec::new();
+        let pack = ResourcePackSource::from_bytes_list(empty).expect("empty list is valid");
+        let stats = pack.stats();
+        assert_eq!(stats.blockstate_count, 0);
+        assert_eq!(stats.model_count, 0);
+        assert_eq!(stats.texture_count, 0);
+    }
+
+    #[test]
+    fn test_from_bytes_list_rejects_garbage() {
+        // Each buffer must be a valid pack; the first garbage buffer aborts.
+        let bad_data = vec![vec![0u8, 1, 2, 3]];
+        let result = ResourcePackSource::from_bytes_list(bad_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_overlay_via_resource_pack_wins_on_collision() {
+        // End-to-end check that the re-exported ResourcePack type exposes
+        // overlay, and that higher-priority textures replace lower ones in
+        // the wrapped ResourcePackSource. This is what the from_bytes_list
+        // helper ultimately relies on.
+        use schematic_mesher::resource_pack::TextureData;
+
+        let mut low = ResourcePack::new();
+        low.add_texture(
+            "minecraft",
+            "block/stone",
+            TextureData::new(1, 1, vec![10, 10, 10, 255]),
+        );
+
+        let mut high = ResourcePack::new();
+        high.add_texture(
+            "minecraft",
+            "block/stone",
+            TextureData::new(1, 1, vec![250, 0, 0, 255]),
+        );
+
+        low.overlay(high);
+        let source = ResourcePackSource::from_resource_pack(low);
+        let pixels = source
+            .get_texture_pixels("minecraft:block/stone")
+            .expect("texture exists");
+        assert_eq!(pixels, &[250, 0, 0, 255]);
     }
 
     // ─── MeshOutput / MeshLayer tests ──────────────────────────────────────
