@@ -256,7 +256,9 @@ jobs:
             pkg.license = 'AGPL-3.0-only';
             fs.writeFileSync(path, JSON.stringify(pkg, null, 2));
           "
-          npm publish --provenance --access public
+          npm publish --provenance --access public --loglevel verbose
+        env:
+          NPM_CONFIG_LOGLEVEL: verbose
 
       - name: Setup Python
         uses: actions/setup-python@v5
