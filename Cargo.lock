@@ -3870,7 +3870,7 @@ dependencies = [
 [[package]]
 name = "schematic-mesher"
 version = "0.1.0"
-source = "git+https://github.com/Schem-at/Schematic-Mesher.git?branch=feature%2Fmesh-output-api#56421150730227df6bdd17268df65b072913d17f"
+source = "git+https://github.com/Schem-at/Schematic-Mesher.git?branch=feature%2Fmesh-output-api#6b56cbaf6ca914d322472df8a3107cdaddf51139"
 dependencies = [
  "glam",
  "gltf-json",
