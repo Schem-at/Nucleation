@@ -240,7 +240,12 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
-          args: --release --out dist --features python,simulation,rendering
+          # `-i python3.12` is needed for the Linux cross-compile cells —
+          # maturin-action runs inside a manylinux Docker container where
+          # the host's setup-python isn't visible, so we pin the container
+          # interpreter explicitly. Harmless on native builds (picks up the
+          # same version installed by actions/setup-python).
+          args: --release --out dist --features python,simulation,rendering -i python3.12
           sccache: 'true'
       - uses: actions/upload-artifact@v4
         with:
