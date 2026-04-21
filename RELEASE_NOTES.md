@@ -1,3 +1,12 @@
+# Nucleation v0.1.182
+
+Bumps `schematic-mesher` to pick up the GLB greedy-meshing UV fix.
+Production GLBs were rendering merged faces with the entire texture
+atlas smeared across them; the mesher now preserves per-greedy-material
+textures end-to-end so each merged quad samples its own tile with REPEAT
+wrapping. Use `MeshConfig::default().with_greedy_meshing(true)` and
+re-export to confirm.
+
 # Nucleation v0.1.181
 
 Adds a loader for the legacy MCEdit / Classic `.schematic` format, bumps

@@ -373,6 +373,7 @@ fn read_mesh_output_v1(r: &mut impl Read) -> Result<MeshOutput, CacheError> {
         cutout,
         transparent,
         atlas,
+        greedy_materials: Vec::new(),
         animated_textures,
         bounds,
         chunk_coord,
@@ -435,6 +436,7 @@ fn read_mesh_output_v2(
         cutout,
         transparent,
         atlas,
+        greedy_materials: Vec::new(),
         animated_textures,
         bounds,
         chunk_coord,
@@ -971,6 +973,7 @@ mod tests {
                     m
                 },
             },
+            greedy_materials: Vec::new(),
             animated_textures: vec![AnimatedTextureExport {
                 sprite_sheet_png: vec![0xDE, 0xAD, 0xBE, 0xEF],
                 frame_count: 4,
@@ -1103,6 +1106,7 @@ mod tests {
             cutout: MeshLayer::default(),
             transparent: MeshLayer::default(),
             atlas: TextureAtlas::empty(),
+            greedy_materials: Vec::new(),
             animated_textures: Vec::new(),
             bounds: BoundingBox::new([0.0; 3], [0.0; 3]),
             chunk_coord: None,
