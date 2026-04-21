@@ -1,3 +1,25 @@
+# Nucleation v0.1.183
+
+Ships prebuilt Python wheels for every major platform, not just Linux
+x86_64. Windows + macOS users can now `pip install nucleation` without a
+local Rust toolchain.
+
+Wheels are built per-platform in CI via `PyO3/maturin-action` and then
+uploaded together by the publish job. The matrix:
+
+| Platform | Target |
+|---|---|
+| Linux x86_64  | `x86_64-unknown-linux-gnu` (manylinux) |
+| Linux aarch64 | `aarch64-unknown-linux-gnu` (manylinux, cross) |
+| macOS arm64   | `aarch64-apple-darwin` |
+| macOS x86_64  | `x86_64-apple-darwin` |
+| Windows x86_64 | `x86_64-pc-windows-msvc` |
+
+The source distribution (sdist) is still uploaded so anything outside
+that matrix (e.g. Linux armv7, exotic Windows targets, experimental
+Python builds) can still fall back to `pip install --no-binary` source
+builds.
+
 # Nucleation v0.1.182
 
 Bumps `schematic-mesher` to pick up the GLB greedy-meshing UV fix.
