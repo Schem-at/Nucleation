@@ -15,4 +15,5 @@ experiments/
 /entity_*.schem
 /entity_*.litematic
 /*.glb
+/*.schematic
 /item_model_pack.zip

@@ -1,14 +1,56 @@
-# Nucleation v0.1.176
+# Nucleation v0.1.181
 
-Headlined by the new Minecraft item-model export. Also includes two entity
-fixes and a multi-pack resource-pack loader that cuts across every binding.
-Bumps `schematic-mesher` to pick up the 1.21.5 entity-model port (riding,
-equipment, skin resolver).
+Adds a loader for the legacy MCEdit / Classic `.schematic` format, bumps
+`schematic-mesher` to pick up 1.21.5 entity models, and re-ships everything
+that didn't make it to PyPI in 0.1.180.
+
+## Classic `.schematic` format — import only
+
+Old community builds shipped as pre-1.13 `.schematic` files (numeric block
+IDs + 4-bit metadata, `Materials: "Alpha"`) now load through the normal
+FormatManager path:
+
+```rust
+let bytes = std::fs::read("old_build.schematic")?;
+let schem = nucleation::formats::manager::get_manager()
+    .lock().unwrap()
+    .read(&bytes)?;                  // auto-detected
+```
+
+The importer handles:
+- `Blocks` + `Data` + optional `AddBlocks` (nibble-packed upper 4 bits of
+  the block ID for values > 255)
+- TileEntities — rewrites the legacy `id`+`x`+`y`+`z` schema to the
+  modern `Id`+`Pos` one before delegating to `BlockEntity::from_nbt`
+- Entities via `Entity::from_nbt`
+- A ~150-entry 1.12 → modern block-state mapping covering stone variants,
+  wood, wool, slabs, stairs, logs, leaves, glass, stained glass, sandstone,
+  quartz, fences/gates, ores, etc. Unknown ids fall through to
+  `minecraft:stone` so geometry is preserved.
+
+No exporter — the format is deprecated; round-trip out to Sponge v3,
+Litematica, or mcstructure instead.
+
+## Mesher bump — 1.21.5 entity models
+
+`schematic-mesher` updated to pull in the MC 1.21.5 entity model port
+(boats, mounts, equipment, skin resolver, villager layering, sign text
+rendering, decorated pots), plus an atlas fallback tile that makes
+missing-texture cases visible (magenta/black checkerboard + stderr
+warning) and a regression test for the greedy-tile UV leak seen in
+production GLBs.
+
+## Republish of 0.1.180 to PyPI
+
+v0.1.180 went to crates.io and npm successfully but the PyPI step
+failed because `pyproject.toml` was left at 0.1.179, so maturin built a
+0.1.179 wheel that PyPI rejected as a duplicate. This release catches
+PyPI up.
 
 > **Note:** v0.1.173–v0.1.175 were partially published (crates.io only)
 > while the CI publish pipeline was being migrated to npm Trusted Publishing.
-> This release ships the same feature set to all three registries (crates.io,
-> npm, PyPI) via the new OIDC flow.
+> v0.1.180 landed on crates.io and npm but skipped PyPI due to the version
+> mismatch above. 0.1.181 is fully published everywhere.
 
 ## Minecraft Item Model Export
 

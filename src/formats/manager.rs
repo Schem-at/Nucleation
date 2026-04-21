@@ -224,6 +224,8 @@ pub fn get_manager() -> Arc<Mutex<FormatManager>> {
             manager.register_exporter(crate::formats::mcstructure::McStructureFormat);
             manager.register_importer(crate::formats::snapshot::SnapshotFormat);
             manager.register_exporter(crate::formats::snapshot::SnapshotFormat);
+            // Legacy MCEdit .schematic — import only (format is deprecated)
+            manager.register_importer(crate::formats::classic_schematic::ClassicSchematicFormat);
             // MCA and WorldZip importers (registered last since detection is header-based)
             manager.register_importer(crate::formats::world::McaFormat);
             manager.register_importer(crate::formats::world::WorldZipFormat);
