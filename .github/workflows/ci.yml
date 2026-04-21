@@ -200,8 +200,75 @@ jobs:
           path: release-artifacts
 
 
+  # Build Python wheels for every supported platform. Runs on every push so
+  # platform-specific build breakage surfaces in PR / feature-branch CI, not
+  # only on release. Wheels go to artifacts; the publish job uploads them.
+  build-python-wheels:
+    needs: check-version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            label: linux-x86_64
+            manylinux: auto
+          - runner: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            label: linux-aarch64
+            manylinux: auto
+          - runner: macos-14
+            target: aarch64-apple-darwin
+            label: macos-aarch64
+            manylinux: 'off'
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+            label: macos-x86_64
+            manylinux: 'off'
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            label: windows-x86_64
+            manylinux: 'off'
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build wheel (${{ matrix.label }})
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          args: --release --out dist --features python,simulation,rendering
+          sccache: 'true'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-wheels-${{ matrix.label }}
+          path: dist/*.whl
+
+  # Build the sdist once (Linux). Needed so Windows/Mac users without a
+  # prebuilt wheel can still fall back to source install.
+  build-python-sdist:
+    needs: check-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-sdist
+          path: dist/*.tar.gz
+
   publish:
-    needs: [check-version, build-wasm, build-nucleation]
+    needs: [check-version, build-wasm, build-nucleation, build-python-wheels, build-python-sdist]
     if: needs.check-version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -261,14 +328,29 @@ jobs:
         env:
           NPM_CONFIG_LOGLEVEL: verbose
 
+      - name: Download all Python wheels
+        uses: actions/download-artifact@v4
+        with:
+          pattern: python-wheels-*
+          path: python-dist
+          merge-multiple: true
+      - name: Download Python sdist
+        uses: actions/download-artifact@v4
+        with:
+          name: python-sdist
+          path: python-dist
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install maturin & Publish
+      - name: Publish Python wheels + sdist to PyPI
         run: |
-          pip install maturin
-          maturin publish --features python,simulation,rendering --username __token__ --password ${{ secrets.PYPI_API_TOKEN }}
+          python -m pip install --upgrade pip twine
+          ls -la python-dist
+          python -m twine upload --non-interactive --skip-existing python-dist/*
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
