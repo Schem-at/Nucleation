@@ -240,11 +240,11 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
-          # `-i python3.12` is needed for the Linux cross-compile cells —
-          # maturin-action runs inside a manylinux Docker container where
-          # the host's setup-python isn't visible, so we pin the container
-          # interpreter explicitly. Harmless on native builds (picks up the
-          # same version installed by actions/setup-python).
+          # `-i python3.12` pins the interpreter for the Linux
+          # manylinux Docker container (host's setup-python isn't visible
+          # inside). The produced wheel is abi3-tagged (cp38-abi3) thanks
+          # to `pyo3/abi3-py38` in the `python` feature, so a single wheel
+          # per platform works on CPython 3.8+.
           args: --release --out dist --features python,simulation,rendering -i python3.12
           sccache: 'true'
       - uses: actions/upload-artifact@v4

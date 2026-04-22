@@ -1,6 +1,6 @@
 [package]
 name = "nucleation"
-version = "0.1.183"
+version = "0.1.184"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -26,7 +26,7 @@ wasm = [
     "console_error_panic_hook",
     "wasm-bindgen-futures",
 ]
-python = ["pyo3/extension-module"]
+python = ["pyo3/extension-module", "pyo3/abi3-py38"]
 # New PHP feature
 php = ["ext-php-rs"]
 # Redstone simulation support
