@@ -16,6 +16,10 @@
 [ffi_only]
 *.free = FFI memory management
 free_* = FFI memory management
+nbt_chest_build = FFI SNBT builder for chests (Python/JS use chest() helper directly)
+nbt_sign_build = FFI SNBT builder for signs (Python/JS use sign() helper directly)
+nbt_text_build = FFI SNBT builder for text components (Python/JS use text() helper)
+Schematic.simulate_use_block = FFI one-shot simulate convenience (Python uses simulate(events=); WASM exposes a separate simulation world API)
 MchprsWorld.new_with_custom_io = FFI constructor variant with custom IO positions
 MchprsWorld.new_with_options = FFI constructor variant (WASM/Python use with_options)
 Value.as_* = FFI value type accessors (WASM uses to_js, Python uses to_py)
@@ -25,6 +29,8 @@ Schematic.save_to_file = FFI file I/O convenience (Python uses save, WASM has no
 SchematicBuilder.build_with_error = FFI error-via-outpointer pattern (WASM/Python use exceptions)
 
 [python_only]
+Schematic.block_simple = Python strict-signature fast variant (4 i32 + str) for tight loops; WASM/FFI use the polished set_block which already covers this case
+Schematic.blocks_flat = Python flat-array variant of set_blocks accepting [x0,y0,z0,...]; WASM uses &[i32] natively, FFI takes pointer + length
 *.__repr__ = Python dunder method
 *.__str__ = Python dunder method
 *.__bool__ = Python dunder method

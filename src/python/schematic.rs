@@ -549,7 +549,7 @@ impl PySchematic {
     /// Use this in hot loops to skip the per-call name → palette lookup.
     /// Pair with `place(x, y, z, idx)`. The returned index is stable for
     /// the lifetime of the schematic; placing blocks doesn't invalidate it.
-    /// Complex strings (with `[` or `{`) are not supported here — use
+    /// Complex strings with state or NBT brackets are not supported here — use
     /// `set_block` or `set_block_from_string` for those.
     pub fn prepare_block(&mut self, block_name: &str) -> usize {
         self.ensure_default_region(0, 0, 0);
@@ -654,7 +654,7 @@ impl PySchematic {
                     region.set_block_at_index_unchecked(idx, x, y, z);
                     return Ok(slf);
                 }
-                // Complex string with [/{ — full parser path.
+                // Complex string (state or NBT brackets) — full parser path.
                 slf.inner.set_block_str(x, y, z, &s);
                 return Ok(slf);
             }
@@ -724,7 +724,11 @@ impl PySchematic {
                 for (k, val) in dict.iter() {
                     let key: String = k.extract()?;
                     let val_str: String = if let Ok(b) = val.extract::<bool>() {
-                        if b { "true".to_string() } else { "false".to_string() }
+                        if b {
+                            "true".to_string()
+                        } else {
+                            "false".to_string()
+                        }
                     } else if let Ok(i) = val.extract::<i64>() {
                         i.to_string()
                     } else {
@@ -778,7 +782,11 @@ impl PySchematic {
                 )));
             }
             payload.push('{');
-            py_value_to_snbt(nbt_value, &mut payload, /*top_level_dict_no_braces=*/ true)?;
+            py_value_to_snbt(
+                nbt_value,
+                &mut payload,
+                /*top_level_dict_no_braces=*/ true,
+            )?;
             payload.push('}');
         }
         let _ = slf.inner.set_block_from_string(x, y, z, &payload);
@@ -816,7 +824,8 @@ impl PySchematic {
             region.expand_to_fit(x, y, z);
         }
         let palette_index = region.get_or_insert_palette_by_name(block_name);
-        self.name_idx_cache.insert(block_name.to_string(), palette_index);
+        self.name_idx_cache
+            .insert(block_name.to_string(), palette_index);
         region.set_block_at_index_unchecked(palette_index, x, y, z);
         true
     }
@@ -1008,8 +1017,24 @@ impl PySchematic {
             let mut min = (fx, fy, fz);
             let mut max = (fx, fy, fz);
             for &(x, y, z) in &positions[1..] {
-                if x < min.0 { min.0 = x; } if y < min.1 { min.1 = y; } if z < min.2 { min.2 = z; }
-                if x > max.0 { max.0 = x; } if y > max.1 { max.1 = y; } if z > max.2 { max.2 = z; }
+                if x < min.0 {
+                    min.0 = x;
+                }
+                if y < min.1 {
+                    min.1 = y;
+                }
+                if z < min.2 {
+                    min.2 = z;
+                }
+                if x > max.0 {
+                    max.0 = x;
+                }
+                if y > max.1 {
+                    max.1 = y;
+                }
+                if z > max.2 {
+                    max.2 = z;
+                }
             }
 
             // Build the block-entity template once (its NBT will be cloned per
