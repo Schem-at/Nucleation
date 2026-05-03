@@ -63,7 +63,7 @@ fn test_auto_register_conversion() {
         .count();
     assert!(barrels_count > 0, "Should have barrels");
 
-    for (_, be) in &region.block_entities {
+    for (_, be) in region.block_entities.iter() {
         if be.id.to_lowercase().contains("barrel") {
             if let Some(NbtValue::List(items)) = be.nbt.get("Items") {
                 for item in items {

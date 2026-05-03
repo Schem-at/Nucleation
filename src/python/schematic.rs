@@ -679,20 +679,16 @@ impl PySchematic {
                 region.set_block_at_index_unchecked(palette_index, x, y, z);
             }
 
-            // Tile entities (only for blocks that have NBT). Cloning the
-            // pre-built prototype + relocating it is far cheaper than
-            // re-parsing per call. Pre-reserve to avoid HashMap rehash
-            // cycles during a large batch.
-            if let Some(ref template) = proto {
+            // Tile entities (only for blocks that have NBT). Use the store's
+            // template-share fast path: ONE Arc<BlockEntity> in the palette,
+            // N small u32 inserts in the position map. No per-position
+            // BlockEntity clone or palette push.
+            if let Some(template) = proto {
+                let arc_template = std::sync::Arc::new(template);
                 let region = &mut self.inner.default_region;
                 region
                     .block_entities
-                    .reserve(positions.len());
-                for &(x, y, z) in &positions {
-                    let mut be = template.clone();
-                    be.position = (x, y, z);
-                    region.block_entities.insert((x, y, z), be);
-                }
+                    .insert_template(&positions, arc_template);
             }
             return positions.len();
         }

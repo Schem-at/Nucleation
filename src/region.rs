@@ -1,18 +1,17 @@
 use crate::block_entity::BlockEntity;
+use crate::block_entity_store::BlockEntityStore;
 use crate::block_position::BlockPosition;
 use crate::bounding_box::BoundingBox;
 use crate::entity::Entity;
 use crate::BlockState;
 use quartz_nbt::{NbtCompound, NbtList, NbtTag};
 use rustc_hash::FxHashMap;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Storage map type for block entities, keyed by their (x, y, z) position.
-/// Uses FxHash because the keys are small integers and we make millions of
-/// inserts on hot batch paths — the std hasher's strong cryptographic
-/// properties cost cycles we don't need.
-pub type BlockEntityMap = FxHashMap<(i32, i32, i32), BlockEntity>;
+/// Re-exported alias kept for downstream Rust crates that referenced the
+/// previous concrete map type. New code should use `BlockEntityStore`.
+pub type BlockEntityMap = BlockEntityStore;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Region {
@@ -22,11 +21,7 @@ pub struct Region {
     pub blocks: Vec<usize>,
     pub(crate) palette: Vec<BlockState>,
     pub entities: Vec<Entity>,
-    #[serde(
-        serialize_with = "serialize_block_entities",
-        deserialize_with = "deserialize_block_entities"
-    )]
-    pub block_entities: BlockEntityMap,
+    pub block_entities: BlockEntityStore,
     /// Reverse palette lookup keyed by BlockState. FxHashMap because the
     /// palette is hit on every `set_block` call and BlockState's std
     /// hash is wasted cycles on a small-cardinality set.
@@ -55,35 +50,6 @@ pub struct Region {
     non_air_count: usize,
 }
 
-fn serialize_block_entities<S>(
-    block_entities: &BlockEntityMap,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let block_entities_vec: Vec<&BlockEntity> = block_entities.values().collect();
-    block_entities_vec.serialize(serializer)
-}
-
-fn deserialize_block_entities<'de, D>(deserializer: D) -> Result<BlockEntityMap, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let block_entities_vec: Vec<BlockEntity> = Vec::deserialize(deserializer)?;
-    Ok(block_entities_vec
-        .into_iter()
-        .map(|be| {
-            let pos = (
-                be.position.0 as i32,
-                be.position.1 as i32,
-                be.position.2 as i32,
-            );
-            (pos, be)
-        })
-        .collect())
-}
-
 impl Region {
     pub fn new(name: String, position: (i32, i32, i32), size: (i32, i32, i32)) -> Self {
         let bounding_box = BoundingBox::from_position_and_size(position, size);
@@ -105,7 +71,7 @@ impl Region {
             palette,
             palette_index,
             entities: Vec::new(),
-            block_entities: BlockEntityMap::default(),
+            block_entities: BlockEntityStore::default(),
             bbox: bounding_box,
             tight_bounds: None,
             cached_width: 0,
@@ -413,7 +379,7 @@ impl Region {
         compact.rebuild_non_air_count();
         compact.tight_bounds = Some(tight_bounds.clone());
 
-        for (&pos, be) in &self.block_entities {
+        for (pos, be) in self.block_entities.iter() {
             compact.block_entities.insert(pos, be.clone());
         }
         for entity in &self.entities {
@@ -513,7 +479,7 @@ impl Region {
         compact.rebuild_non_air_count();
         compact.tight_bounds = self.tight_bounds.clone();
 
-        for (&pos, be) in &self.block_entities {
+        for (pos, be) in self.block_entities.iter() {
             compact.block_entities.insert(pos, be.clone());
         }
         for entity in &self.entities {
@@ -808,7 +774,7 @@ impl Region {
             other
                 .block_entities
                 .iter()
-                .map(|(&pos, be)| (pos, be.clone())),
+                .map(|(pos, be)| (pos, be.clone())),
         );
     }
 
@@ -906,7 +872,7 @@ impl Region {
         tag.insert("Entities", NbtTag::List(entities_list));
 
         let mut block_entities_tag = NbtCompound::new();
-        for ((x, y, z), block_entity) in &self.block_entities {
+        for ((x, y, z), block_entity) in self.block_entities.iter() {
             block_entities_tag.insert(&format!("{},{},{}", x, y, z), block_entity.to_nbt());
         }
         tag.insert("BlockEntities", NbtTag::Compound(block_entities_tag));
@@ -976,7 +942,7 @@ impl Region {
         let block_entities_tag = nbt
             .get::<_, &NbtCompound>("BlockEntities")
             .map_err(|e| format!("Failed to get BlockEntities: {}", e))?;
-        let mut block_entities: BlockEntityMap = FxHashMap::default();
+        let mut block_entities = BlockEntityStore::default();
         for (key, value) in block_entities_tag.inner() {
             if let NbtTag::Compound(be_compound) = value {
                 let coords: Vec<i32> = key.split(',').map(|s| s.parse::<i32>().unwrap()).collect();
@@ -1197,14 +1163,10 @@ impl Region {
         self.rebuild_air_index();
         self.rebuild_non_air_count();
 
-        // Transform block entities
-        let mut new_block_entities: BlockEntityMap = FxHashMap::default();
-        for ((x, y, z), mut be) in self.block_entities.drain() {
-            let new_x = self.bbox.max.0 - (x - self.bbox.min.0);
-            be.position = (new_x, y, z);
-            new_block_entities.insert((new_x, y, z), be);
-        }
-        self.block_entities = new_block_entities;
+        // Transform block entities — pure position remap, no palette work.
+        let max_x = self.bbox.max.0;
+        let min_x = self.bbox.min.0;
+        self.block_entities.remap_positions(|(x, y, z)| (max_x - (x - min_x), y, z));
 
         // Transform entities
         for entity in &mut self.entities {
@@ -1246,13 +1208,9 @@ impl Region {
         self.rebuild_air_index();
         self.rebuild_non_air_count();
 
-        let mut new_block_entities: BlockEntityMap = FxHashMap::default();
-        for ((x, y, z), mut be) in self.block_entities.drain() {
-            let new_y = self.bbox.max.1 - (y - self.bbox.min.1);
-            be.position = (x, new_y, z);
-            new_block_entities.insert((x, new_y, z), be);
-        }
-        self.block_entities = new_block_entities;
+        let max_y = self.bbox.max.1;
+        let min_y = self.bbox.min.1;
+        self.block_entities.remap_positions(|(x, y, z)| (x, max_y - (y - min_y), z));
 
         for entity in &mut self.entities {
             let rel_y = entity.position.1 - self.bbox.min.1 as f64;
@@ -1296,13 +1254,9 @@ impl Region {
         self.rebuild_air_index();
         self.rebuild_non_air_count();
 
-        let mut new_block_entities: BlockEntityMap = FxHashMap::default();
-        for ((x, y, z), mut be) in self.block_entities.drain() {
-            let new_z = self.bbox.max.2 - (z - self.bbox.min.2);
-            be.position = (x, y, new_z);
-            new_block_entities.insert((x, y, new_z), be);
-        }
-        self.block_entities = new_block_entities;
+        let max_z = self.bbox.max.2;
+        let min_z = self.bbox.min.2;
+        self.block_entities.remap_positions(|(x, y, z)| (x, y, max_z - (z - min_z)));
 
         for entity in &mut self.entities {
             let rel_z = entity.position.2 - self.bbox.min.2 as f64;
@@ -1376,20 +1330,19 @@ impl Region {
         self.rebuild_air_index();
         self.rebuild_non_air_count();
 
-        // Transform block entities
-        let old_bbox_for_be = old_bbox.clone();
-        let mut new_block_entities: BlockEntityMap = FxHashMap::default();
-        for ((x, y, z), mut be) in self.block_entities.drain() {
-            let rel_x = x - old_bbox_for_be.min.0;
-            let rel_z = z - old_bbox_for_be.min.2;
+        // Transform block entities — pure position remap.
+        let old_min_x = old_bbox.min.0;
+        let old_min_z = old_bbox.min.2;
+        let new_min_x = new_bbox_clone.min.0;
+        let new_min_z = new_bbox_clone.min.2;
+        let osize_x = old_size_x;
+        self.block_entities.remap_positions(move |(x, y, z)| {
+            let rel_x = x - old_min_x;
+            let rel_z = z - old_min_z;
             let new_rel_x = rel_z;
-            let new_rel_z = old_size_x - 1 - rel_x;
-            let new_x = new_bbox_clone.min.0 + new_rel_x;
-            let new_z = new_bbox_clone.min.2 + new_rel_z;
-            be.position = (new_x, y, new_z);
-            new_block_entities.insert((new_x, y, new_z), be);
-        }
-        self.block_entities = new_block_entities;
+            let new_rel_z = osize_x - 1 - rel_x;
+            (new_min_x + new_rel_x, y, new_min_z + new_rel_z)
+        });
 
         // Transform entities
         for entity in &mut self.entities {
@@ -1463,18 +1416,18 @@ impl Region {
         self.rebuild_air_index();
         self.rebuild_non_air_count();
 
-        let mut new_block_entities: BlockEntityMap = FxHashMap::default();
-        for ((x, y, z), mut be) in self.block_entities.drain() {
-            let rel_y = y - old_bbox.min.1;
-            let rel_z = z - old_bbox.min.2;
+        let old_min_y = old_bbox.min.1;
+        let old_min_z = old_bbox.min.2;
+        let new_min_y = new_bbox_clone.min.1;
+        let new_min_z = new_bbox_clone.min.2;
+        let osize_y = old_size_y;
+        self.block_entities.remap_positions(move |(x, y, z)| {
+            let rel_y = y - old_min_y;
+            let rel_z = z - old_min_z;
             let new_rel_y = rel_z;
-            let new_rel_z = old_size_y - 1 - rel_y;
-            let new_y = new_bbox_clone.min.1 + new_rel_y;
-            let new_z = new_bbox_clone.min.2 + new_rel_z;
-            be.position = (x, new_y, new_z);
-            new_block_entities.insert((x, new_y, new_z), be);
-        }
-        self.block_entities = new_block_entities;
+            let new_rel_z = osize_y - 1 - rel_y;
+            (x, new_min_y + new_rel_y, new_min_z + new_rel_z)
+        });
 
         for entity in &mut self.entities {
             let rel_y = entity.position.1 - old_bbox.min.1 as f64;
@@ -1547,18 +1500,18 @@ impl Region {
         self.rebuild_air_index();
         self.rebuild_non_air_count();
 
-        let mut new_block_entities: BlockEntityMap = FxHashMap::default();
-        for ((x, y, z), mut be) in self.block_entities.drain() {
-            let rel_x = x - old_bbox.min.0;
-            let rel_y = y - old_bbox.min.1;
+        let old_min_x = old_bbox.min.0;
+        let old_min_y = old_bbox.min.1;
+        let new_min_x = new_bbox_clone.min.0;
+        let new_min_y = new_bbox_clone.min.1;
+        let osize_x = old_size_x;
+        self.block_entities.remap_positions(move |(x, y, z)| {
+            let rel_x = x - old_min_x;
+            let rel_y = y - old_min_y;
             let new_rel_x = rel_y;
-            let new_rel_y = old_size_x - 1 - rel_x;
-            let new_x = new_bbox_clone.min.0 + new_rel_x;
-            let new_y = new_bbox_clone.min.1 + new_rel_y;
-            be.position = (new_x, new_y, z);
-            new_block_entities.insert((new_x, new_y, z), be);
-        }
-        self.block_entities = new_block_entities;
+            let new_rel_y = osize_x - 1 - rel_x;
+            (new_min_x + new_rel_x, new_min_y + new_rel_y, z)
+        });
 
         for entity in &mut self.entities {
             let rel_x = entity.position.0 - old_bbox.min.0 as f64;
@@ -1734,7 +1687,7 @@ mod tests {
             blocks: blocks.clone(),
             palette,
             entities: Vec::new(),
-            block_entities: BlockEntityMap::default(),
+            block_entities: BlockEntityStore::default(),
             palette_index: FxHashMap::default(),
             bbox: BoundingBox::from_position_and_size((0, 0, 0), (16, 1, 1)),
             tight_bounds: None,

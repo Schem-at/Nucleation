@@ -84,7 +84,7 @@ fn main() {
     // Block entities
     if !region.block_entities.is_empty() {
         println!("\nBlock entities ({}):", region.block_entities.len());
-        for (pos, be) in &region.block_entities {
+        for (pos, be) in region.block_entities.iter() {
             println!("  {} at ({}, {}, {})", be.id, pos.0, pos.1, pos.2);
             for (key, value) in be.nbt.iter() {
                 println!("    {}: {:?}", key, value);
