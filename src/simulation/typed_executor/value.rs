@@ -38,7 +38,8 @@ pub enum Value {
 }
 
 impl Value {
-    /// Try to get as u32
+    /// Try to get as u32. Accepts non-negative I32/I64 in range and Bool
+    /// (false → 0, true → 1) so callers don't have to pre-coerce.
     pub fn as_u32(&self) -> Result<u32, String> {
         match self {
             Value::U32(v) => Ok(*v),
@@ -49,15 +50,22 @@ impl Value {
                     Err(format!("Value {} too large for u32", v))
                 }
             }
+            Value::I32(v) if *v >= 0 => Ok(*v as u32),
+            Value::I64(v) if *v >= 0 && *v <= u32::MAX as i64 => Ok(*v as u32),
+            Value::Bool(b) => Ok(if *b { 1 } else { 0 }),
             _ => Err(format!("Cannot convert {:?} to u32", self)),
         }
     }
 
-    /// Try to get as u64
+    /// Try to get as u64. Accepts non-negative signed ints and Bool
+    /// (false → 0, true → 1) for ergonomic input handling.
     pub fn as_u64(&self) -> Result<u64, String> {
         match self {
             Value::U32(v) => Ok(*v as u64),
             Value::U64(v) => Ok(*v),
+            Value::I32(v) if *v >= 0 => Ok(*v as u64),
+            Value::I64(v) if *v >= 0 => Ok(*v as u64),
+            Value::Bool(b) => Ok(if *b { 1 } else { 0 }),
             _ => Err(format!("Cannot convert {:?} to u64", self)),
         }
     }

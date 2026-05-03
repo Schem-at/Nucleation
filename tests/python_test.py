@@ -44,11 +44,11 @@ except ImportError as e:
     sys.exit(1)
 
 
-def test_passed(name):
+def _log_pass(name):
     print(f"✅ {name}")
 
 
-def test_failed(name, error):
+def _log_fail(name, error):
     print(f"❌ {name}: {error}")
 
 
@@ -62,7 +62,7 @@ def test_schematic_creation():
     schematic = Schematic("Test")
     assert schematic is not None
     assert schematic.block_count == 0
-    test_passed("Schematic Creation")
+    _log_pass("Schematic Creation")
 
 
 def test_block_operations():
@@ -84,7 +84,7 @@ def test_block_operations():
     assert block.name == "minecraft:lever"
     assert block.properties.get("powered") == "true"
 
-    test_passed("Block Operations")
+    _log_pass("Block Operations")
 
 
 def test_dimensions():
@@ -98,7 +98,7 @@ def test_dimensions():
     assert dims[1] >= 6  # Height >= 6
     assert dims[2] >= 6  # Length >= 6
 
-    test_passed("Dimensions")
+    _log_pass("Dimensions")
 
 
 # =============================================================================
@@ -116,14 +116,14 @@ def test_definition_region_creation():
     assert not region.is_empty()
     assert region.volume() == 3
 
-    test_passed("DefinitionRegion Creation")
+    _log_pass("DefinitionRegion Creation")
 
 
 def test_definition_region_from_bounds():
     """Test DefinitionRegion.from_bounds."""
     region = DefinitionRegion.from_bounds((0, 0, 0), (2, 2, 2))
     assert region.volume() == 27  # 3x3x3
-    test_passed("DefinitionRegion from_bounds")
+    _log_pass("DefinitionRegion from_bounds")
 
 
 def test_definition_region_boolean_operations():
@@ -153,7 +153,7 @@ def test_definition_region_boolean_operations():
     intersected = region_a.intersected(region_b)
     assert intersected.volume() == 3
 
-    test_passed("DefinitionRegion Boolean Operations")
+    _log_pass("DefinitionRegion Boolean Operations")
 
 
 def test_definition_region_geometric_ops():
@@ -179,7 +179,7 @@ def test_definition_region_geometric_ops():
     assert bounds3["min"] == (5, 5, 5)
     assert bounds3["max"] == (10, 10, 10)
 
-    test_passed("DefinitionRegion Geometric Operations")
+    _log_pass("DefinitionRegion Geometric Operations")
 
 
 def test_definition_region_connectivity():
@@ -198,7 +198,7 @@ def test_definition_region_connectivity():
     assert not disconnected.is_contiguous()
     assert disconnected.connected_components() == 2
 
-    test_passed("DefinitionRegion Connectivity")
+    _log_pass("DefinitionRegion Connectivity")
 
 
 def test_definition_region_positions():
@@ -214,7 +214,7 @@ def test_definition_region_positions():
     # Should be sorted by Y, then X, then Z
     assert sorted_positions[0] == (0, 0, 0)
 
-    test_passed("DefinitionRegion Positions")
+    _log_pass("DefinitionRegion Positions")
 
 
 def test_definition_region_contains():
@@ -227,7 +227,7 @@ def test_definition_region_contains():
     assert not region.contains(6, 6, 6)
     assert not region.contains(-1, 0, 0)
 
-    test_passed("DefinitionRegion Contains")
+    _log_pass("DefinitionRegion Contains")
 
 
 # =============================================================================
@@ -245,7 +245,7 @@ def test_definition_region_from_bounding_boxes():
     assert region.contains(6, 6, 6)
     assert not region.contains(3, 3, 3)
 
-    test_passed("DefinitionRegion from_bounding_boxes")
+    _log_pass("DefinitionRegion from_bounding_boxes")
 
 
 def test_definition_region_from_positions():
@@ -258,7 +258,7 @@ def test_definition_region_from_positions():
     assert region.contains(1, 0, 0)
     assert region.contains(2, 0, 0)
 
-    test_passed("DefinitionRegion from_positions")
+    _log_pass("DefinitionRegion from_positions")
 
 
 def test_definition_region_box_access():
@@ -284,7 +284,7 @@ def test_definition_region_box_access():
     assert all_boxes[0] == ((0, 0, 0), (2, 2, 2))
     assert all_boxes[1] == ((5, 5, 5), (7, 7, 7))
 
-    test_passed("DefinitionRegion Box Access")
+    _log_pass("DefinitionRegion Box Access")
 
 
 def test_definition_region_metadata():
@@ -318,7 +318,7 @@ def test_definition_region_metadata():
     assert "color" in keys
     assert "label" in keys
 
-    test_passed("DefinitionRegion Metadata")
+    _log_pass("DefinitionRegion Metadata")
 
 
 def test_definition_region_dimensions():
@@ -331,7 +331,7 @@ def test_definition_region_dimensions():
     empty = DefinitionRegion()
     assert empty.dimensions() == (0, 0, 0)
 
-    test_passed("DefinitionRegion Dimensions")
+    _log_pass("DefinitionRegion Dimensions")
 
 
 def test_definition_region_center():
@@ -354,7 +354,7 @@ def test_definition_region_center():
     assert empty.center() is None
     assert empty.center_f32() is None
 
-    test_passed("DefinitionRegion Center")
+    _log_pass("DefinitionRegion Center")
 
 
 def test_definition_region_intersects_bounds():
@@ -370,7 +370,7 @@ def test_definition_region_intersects_bounds():
     assert not region.intersects_bounds((20, 20, 20), (30, 30, 30))
     assert not region.intersects_bounds((-10, -10, -10), (-1, -1, -1))
 
-    test_passed("DefinitionRegion Intersects Bounds")
+    _log_pass("DefinitionRegion Intersects Bounds")
 
 
 def test_definition_region_immutable_transforms():
@@ -398,7 +398,7 @@ def test_definition_region_immutable_transforms():
     assert cont_bounds["min"] == (0, 0, 0)
     assert cont_bounds["max"] == (5, 5, 5)
 
-    test_passed("DefinitionRegion Immutable Transforms")
+    _log_pass("DefinitionRegion Immutable Transforms")
 
 
 def test_definition_region_copy():
@@ -428,7 +428,7 @@ def test_definition_region_copy():
     orig2_bounds = original2.get_bounds()
     assert orig2_bounds["min"] == (0, 0, 0)
 
-    test_passed("DefinitionRegion Copy")
+    _log_pass("DefinitionRegion Copy")
 
 
 # =============================================================================
@@ -463,7 +463,7 @@ def test_simulation_basic():
 
     assert world.is_lit(5, 1, 0)
 
-    test_passed("Simulation Basic")
+    _log_pass("Simulation Basic")
 
 
 def test_typed_executor():
@@ -495,7 +495,7 @@ def test_typed_executor():
     assert "outputs" in result
     assert "out" in result["outputs"]
 
-    test_passed("TypedCircuitExecutor")
+    _log_pass("TypedCircuitExecutor")
 
 
 def test_manual_tick_control():
@@ -533,7 +533,7 @@ def test_manual_tick_control():
     output = executor.read_output("lamp")
     assert output == True
 
-    test_passed("Manual Tick Control")
+    _log_pass("Manual Tick Control")
 
 
 def test_circuit_builder():
@@ -570,7 +570,7 @@ def test_circuit_builder():
 
     assert result["outputs"]["out"] == True
 
-    test_passed("CircuitBuilder Flow")
+    _log_pass("CircuitBuilder Flow")
 
 
 def test_io_layout_builder_regions():
@@ -597,7 +597,7 @@ def test_io_layout_builder_regions():
 
     assert "region_in" in layout.input_names()
 
-    test_passed("IoLayoutBuilder Region Methods")
+    _log_pass("IoLayoutBuilder Region Methods")
 
 
 def test_get_layout_info():
@@ -629,7 +629,7 @@ def test_get_layout_info():
     assert "lamp" in layout_info["outputs"]
     assert layout_info["inputs"]["lever"]["bit_count"] == 1
 
-    test_passed("Get Layout Info")
+    _log_pass("Get Layout Info")
 
 
 # =============================================================================
@@ -666,7 +666,7 @@ def test_sort_strategy_creation():
     assert reverse.name == "reverse"
     assert dist.name == "distance_from"
 
-    test_passed("SortStrategy Creation")
+    _log_pass("SortStrategy Creation")
 
 
 def test_sort_strategy_from_string():
@@ -693,7 +693,7 @@ def test_sort_strategy_from_string():
     except ValueError:
         pass
 
-    test_passed("SortStrategy from_string")
+    _log_pass("SortStrategy from_string")
 
 
 def test_circuit_builder_with_sort_strategy():
@@ -719,7 +719,7 @@ def test_circuit_builder_with_sort_strategy():
     builder = CircuitBuilder(schematic)
     builder.with_input_auto("default", IoType.unsigned_int(8), region)
     assert builder.input_count() == 1
-    test_passed("CircuitBuilder default sort")
+    _log_pass("CircuitBuilder default sort")
 
     # Test with Y descending sort
     builder2 = CircuitBuilder(schematic)
@@ -727,7 +727,7 @@ def test_circuit_builder_with_sort_strategy():
         "y_desc", IoType.unsigned_int(8), region, SortStrategy.y_desc_xz()
     )
     assert builder2.input_count() == 1
-    test_passed("CircuitBuilder Y descending sort")
+    _log_pass("CircuitBuilder Y descending sort")
 
     # Test with preserve (box order)
     builder3 = CircuitBuilder(schematic)
@@ -735,7 +735,7 @@ def test_circuit_builder_with_sort_strategy():
         "preserve", IoType.unsigned_int(8), region, SortStrategy.preserve()
     )
     assert builder3.input_count() == 1
-    test_passed("CircuitBuilder preserve sort")
+    _log_pass("CircuitBuilder preserve sort")
 
     # Test with distance-based sort
     builder4 = CircuitBuilder(schematic)
@@ -746,7 +746,7 @@ def test_circuit_builder_with_sort_strategy():
         SortStrategy.distance_from(2, 1, 0),
     )
     assert builder4.input_count() == 1
-    test_passed("CircuitBuilder distance sort")
+    _log_pass("CircuitBuilder distance sort")
 
     # Test output with sort strategy
     builder5 = CircuitBuilder(schematic)
@@ -754,7 +754,7 @@ def test_circuit_builder_with_sort_strategy():
         "out", IoType.unsigned_int(8), region, SortStrategy.xyz()
     )
     assert builder5.output_count() == 1
-    test_passed("CircuitBuilder output with sort")
+    _log_pass("CircuitBuilder output with sort")
 
 
 # =============================================================================

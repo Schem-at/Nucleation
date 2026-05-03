@@ -772,6 +772,14 @@ impl PyTypedCircuitExecutor {
         Ok(result_dict.into())
     }
 
+    /// Sync the executor's internal world back to its schematic and return a
+    /// snapshot. Useful after `execute()` to inspect block states (e.g. lamps
+    /// that lit up) on the resulting schematic.
+    fn sync_to_schematic(&mut self) -> PySchematic {
+        let schem = self.inner.sync_and_get_schematic().clone();
+        PySchematic::from_inner(schem)
+    }
+
     fn __repr__(&self) -> String {
         format!(
             "TypedCircuitExecutor(inputs={}, outputs={})",

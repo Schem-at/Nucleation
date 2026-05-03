@@ -75,6 +75,13 @@ impl PyDefinitionRegion {
         self.clone()
     }
 
+    /// Fluent alias for `set_metadata` — sets a key and returns self for chaining.
+    fn with_metadata(&mut self, key: String, value: String) -> Self {
+        self.inner.set_metadata(key, value);
+        self.sync();
+        self.clone()
+    }
+
     /// Set color of the region (helper for metadata)
     fn set_color(&mut self, color: u32) -> Self {
         let hex = format!("#{:06x}", color);

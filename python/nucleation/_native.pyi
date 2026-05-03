@@ -640,6 +640,10 @@ class DefinitionRegion:
         """Set metadata on this region. Returns self for chaining."""
         ...
 
+    def with_metadata(self, key: str, value: str) -> "DefinitionRegion":
+        """Fluent alias for ``set_metadata``. Returns self for chaining."""
+        ...
+
     def set_metadata_mut(self, key: str, value: str) -> None:
         """Set metadata on this region (in-place)."""
         ...
@@ -1569,6 +1573,10 @@ class TypedCircuitExecutor:
         self, inputs: Dict[str, Any], mode: ExecutionMode
     ) -> Dict[str, Any]:
         """Execute with inputs and return outputs."""
+        ...
+
+    def sync_to_schematic(self) -> "Schematic":
+        """Sync the executor's world back to a schematic snapshot."""
         ...
 
     def __repr__(self) -> str: ...

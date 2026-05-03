@@ -118,17 +118,82 @@ nbt = sign([text("LOOT", color="gold", bold=True), "Inside"], waxed=True)
 
 ## Simulation
 
+`Schematic.simulate()` runs the redstone simulator and syncs the result back
+into the schematic.
+
 ```python
 from nucleation import UseBlock
 
 schem.simulate(
     ticks=4,
-    events=[UseBlock((0, 1, 3))],
+    events=[UseBlock((0, 1, 3))],   # right-click the lever at that position
 )
 ```
 
-Power users wanting multi-stage simulation flows can drop to the
-`schem.create_simulation_world()` API directly.
+### Multi-step simulation
+
+`simulate()` caches its underlying `MchprsWorld` and reuses it across calls,
+so the redstone wavefront advances correctly tick-by-tick:
+
+```python
+schem.simulate(events=[UseBlock(lever)])  # builds the world, ticks once
+schem.simulate(ticks=1)                    # next stage of the wavefront
+schem.simulate(ticks=1)                    # and so on
+```
+
+Without caching, the redpiler's compile-time constant fold would re-propagate
+the steady-state signal each call, lighting the entire chain at once.
+
+### Mutating between calls
+
+If you mutate the schematic (`set_block`, `fill`, ...) between simulations,
+the cached world is now stale. Two options:
+
+```python
+schem.set_block((1, 1, 0), "minecraft:redstone_torch")
+
+# Option 1 — explicit drop:
+schem.invalidate_simulation()
+schem.simulate(ticks=1)
+
+# Option 2 — kwarg on the next call:
+schem.simulate(ticks=1, reset=True)
+```
+
+`simulate(reset=True)` drops the cached world before running. `ticks=0` with
+no events and `reset=False` is a no-op (returns `self`).
+
+### Driving an executor end-to-end
+
+For typed-input/typed-output circuits, build a `TypedCircuitExecutor` from
+the schematic via `build_executor`:
+
+```python
+from nucleation import ExecutionMode, Schematic
+
+schem = Schematic.open("circuit.litematic")
+schem.create_definition_region_from_point("input_src", 0, 1, 0)
+schem.create_definition_region_from_point("output_sink", 7, 1, 0)
+
+executor = schem.build_executor(
+    inputs=[{"name": "switch", "bits": "1", "region": "input_src"}],
+    outputs=[{"name": "lamp",   "bits": "1", "region": "output_sink"}],
+)
+
+result = executor.execute(
+    {"switch": True},
+    ExecutionMode.until_stable(stable_ticks=2, max_ticks=1000),
+)
+assert result["outputs"]["lamp"] == 1
+
+# Read block states (e.g. lit lamps) on the post-simulation schematic.
+synced = executor.sync_to_schematic()
+assert "lit=true" in synced.get_block_string(7, 1, 0)
+```
+
+Power users wanting full control can drop to `schem.create_simulation_world()`
+directly and call `tick()` / `on_use_block()` / `sync_to_schematic()` against
+a long-lived `MchprsWorld`.
 
 ## Save / render / mesh export
 
@@ -477,7 +542,8 @@ print(region.volume())  # Total voxel count
 | `add_point` | `add_point(x: int, y: int, z: int) -> DefinitionRegion` | Add a single point. |
 | `add_filter` | `add_filter(filter: str) -> DefinitionRegion` | Add a block filter. |
 | `exclude_block` | `exclude_block(block_name: str) -> DefinitionRegion` | Exclude positions with a specific block. |
-| `set_metadata` | `set_metadata(key: str, value: str) -> DefinitionRegion` | Set metadata. |
+| `set_metadata` | `set_metadata(key: str, value: str) -> DefinitionRegion` | Set metadata. Returns a new region for chaining. |
+| `with_metadata` | `with_metadata(key: str, value: str) -> DefinitionRegion` | Fluent alias for `set_metadata`. |
 | `set_color` | `set_color(color: int) -> DefinitionRegion` | Set visualization color (ARGB). |
 | `merge` | `merge(other: DefinitionRegion) -> DefinitionRegion` | Merge another region. |
 
@@ -686,7 +752,8 @@ print(result["outputs"]["sum"])  # Read typed output
 | `from_insign` | `@staticmethod from_insign(schematic: Schematic) -> TypedCircuitExecutor` | Create from Insign annotations. |
 | `set_state_mode` | `set_state_mode(mode: str) -> None` | Set `"stateless"`, `"stateful"`, `"manual"`. |
 | `reset` | `reset() -> None` | Reset circuit state. |
-| `execute` | `execute(inputs: dict[str, Any], mode: ExecutionMode) -> dict` | Execute with typed inputs. Returns `{"outputs": dict, "ticks_elapsed": int, "condition_met": bool}`. |
+| `execute` | `execute(inputs: dict[str, Any], mode: ExecutionMode) -> dict` | Execute with typed inputs. Returns `{"outputs": dict, "ticks_elapsed": int, "condition_met": bool}`. Boolean inputs auto-coerce into 1-bit unsigned ports. |
+| `sync_to_schematic` | `sync_to_schematic() -> Schematic` | Snapshot the executor's internal world as a schematic — handy for inspecting block states (lit lamps, lever orientations, …) after `execute()`. |
 | `tick` | `tick(ticks: int) -> None` | Manual: advance ticks. |
 | `flush` | `flush() -> None` | Manual: propagate changes. |
 | `set_input` | `set_input(name: str, value: Value) -> None` | Manual: set input. |
