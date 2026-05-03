@@ -101,11 +101,13 @@ wasm-bindgen-futures = { version = "0.4", optional = true }
 # Note: These are git dependencies and will be excluded from crates.io publish
 # Using Nano112's MCHPRS fork with custom IO support and bug fixes
 # Networking is disabled to avoid WASM compatibility issues
-# Rev aedc588: Custom IO wire propagation + constant fold protection + wire connectivity fix
-mchprs_redpiler = { git = "https://github.com/Nano112/MCHPRS.git", rev = "aedc5884b3aee3300ea30ce844418b652b4a7e5f", optional = true }
-mchprs_redstone = { git = "https://github.com/Nano112/MCHPRS.git", rev = "aedc5884b3aee3300ea30ce844418b652b4a7e5f", optional = true }
-mchprs_world = { git = "https://github.com/Nano112/MCHPRS.git", rev = "aedc5884b3aee3300ea30ce844418b652b4a7e5f", optional = true, default-features = false }
-mchprs_blocks = { git = "https://github.com/Nano112/MCHPRS.git", rev = "aedc5884b3aee3300ea30ce844418b652b4a7e5f", optional = true }
+# Rev 94f981f: branch fix/torch-symmetry-non-cross-wires —
+# preserves coalesced world positions on flush so mirror-image torches
+# both update (in addition to existing custom IO + wire connectivity fixes)
+mchprs_redpiler = { git = "https://github.com/Nano112/MCHPRS.git", rev = "94f981f", optional = true }
+mchprs_redstone = { git = "https://github.com/Nano112/MCHPRS.git", rev = "94f981f", optional = true }
+mchprs_world = { git = "https://github.com/Nano112/MCHPRS.git", rev = "94f981f", optional = true, default-features = false }
+mchprs_blocks = { git = "https://github.com/Nano112/MCHPRS.git", rev = "94f981f", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
@@ -185,3 +187,4 @@ opt-level = 3
 # Patch for MCHPRS compatibility
 [patch.crates-io]
 hematite-nbt = { git = "https://github.com/StackDoubleFlow/hematite_nbt" }
+
