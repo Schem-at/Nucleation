@@ -4748,6 +4748,47 @@ pub mod simulation_ffi {
         Box::into_raw(Box::new(SchematicWrapper(boxed)))
     }
 
+    /// One-shot redstone simulation convenience.
+    ///
+    /// Creates a simulation world from `schematic`, fires `n_events` `on_use_block`
+    /// events read from `events_xyz` (a flat `[x,y,z, x,y,z, ...]` array of
+    /// length `n_events * 3`), runs `ticks` ticks, syncs the result back, and
+    /// writes the simulated schematic state into the original `*mut SchematicWrapper`.
+    ///
+    /// Pass a null `events_xyz` (with `n_events == 0`) to just tick the world.
+    ///
+    /// Returns 0 on success, negative on error.
+    #[no_mangle]
+    pub extern "C" fn schematic_simulate_use_block(
+        schematic: *mut SchematicWrapper,
+        ticks: u32,
+        events_xyz: *const c_int,
+        n_events: usize,
+    ) -> c_int {
+        if schematic.is_null() {
+            set_last_error("schematic pointer is null".to_string());
+            return -1;
+        }
+        let s = unsafe { &mut *(*schematic).0 };
+        let mut world = match MchprsWorld::new(s.clone()) {
+            Ok(w) => w,
+            Err(e) => {
+                set_last_error(format!("MchprsWorld::new failed: {}", e));
+                return -2;
+            }
+        };
+        if !events_xyz.is_null() && n_events > 0 {
+            let slice = unsafe { std::slice::from_raw_parts(events_xyz, n_events * 3) };
+            for ev in slice.chunks_exact(3) {
+                world.on_use_block(BlockPos::new(ev[0], ev[1], ev[2]));
+            }
+        }
+        world.tick(ticks);
+        world.sync_to_schematic();
+        *s = world.into_schematic();
+        0
+    }
+
     // =========================================================================
     // Value FFI Bindings
     // =========================================================================

@@ -5,6 +5,11 @@
 .DS_Store
 .vscode/
 
+# maturin develop artifact inside the Python package source dir
+/python/nucleation/_native*.so
+/python/nucleation/_native*.pyd
+/python/nucleation/__pycache__/
+
 # Generated test .nucm files (large binaries, regenerate with gen_test_nucm example)
 examples/nucm-viewer/test-files/
 

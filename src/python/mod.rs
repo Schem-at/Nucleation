@@ -50,7 +50,7 @@ pub use schematic::{debug_json_schematic, debug_schematic, load_schematic, save_
 use pyo3::prelude::*;
 
 #[pymodule]
-pub fn nucleation(m: &Bound<'_, PyModule>) -> PyResult<()> {
+pub fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySchematic>()?;
     m.add_class::<PyBlockState>()?;
     m.add_class::<PyDefinitionRegion>()?;

@@ -86,6 +86,12 @@ export * from './${OUT_NAME}-original.js';
 EOF
 echo "INFO: CDN loader created."
 
+# --- Copy polished JS API wrapper (sub-export 'nucleation/api') ---
+if [ -f "js/nucleation-api.mjs" ]; then
+  echo "INFO: Copying polished JS API to pkg/api.js..."
+  cp js/nucleation-api.mjs pkg/api.js
+fi
+
 # --- Configure package.json for publishing ---
 echo "INFO: Configuring pkg/package.json for bundler and CDN exports..."
 node -e "
@@ -102,6 +108,7 @@ pkg.files = [
     '${OUT_NAME}_bg.wasm',
     '${OUT_NAME}_bg.d.ts',
     '${CDN_LOADER_FILENAME}',
+    'api.js',
     'README.md'
 ];
 pkg.files = [...new Set(pkg.files)]; // Ensure no duplicates.
@@ -122,6 +129,10 @@ pkg.exports = {
     // The entry for CDN users: 'import init from \"nucleation/cdn-loader\"'
     './cdn-loader': {
         'import': './${CDN_LOADER_FILENAME}'
+    },
+    // Polished ergonomic API: 'import { Schematic } from \"nucleation/api\"'
+    './api': {
+        'import': './api.js'
     },
     './package.json': './package.json'
 };
