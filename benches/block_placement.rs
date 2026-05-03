@@ -103,6 +103,71 @@ fn bench_clone_block_entity(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_transform_with_block_entities(c: &mut Criterion) {
+    // Simulates a "schematic with N chests, then transform" workflow —
+    // every transform clones every block entity into a fresh map. The
+    // Arc-shared NBT change should make this dramatically cheaper.
+    let chest =
+        "minecraft:chest[facing=west]{Items:[{Slot:0b,id:\"minecraft:diamond\",Count:64b}]}";
+    let n: usize = 5_000;
+
+    let mut group = c.benchmark_group("transform_with_chests");
+    group.throughput(Throughput::Elements(n as u64));
+
+    group.bench_function("flip_x_5k_chests", |b| {
+        let mut s = UniversalSchematic::new("bench".into());
+        for i in 0..n as i32 {
+            let _ = s.set_block_from_string(i, 0, 0, chest);
+        }
+        b.iter_batched(
+            || s.clone(),
+            |mut schem| {
+                schem.flip_x();
+                black_box(schem);
+            },
+            criterion::BatchSize::SmallInput,
+        )
+    });
+
+    group.bench_function("rotate_y_5k_chests", |b| {
+        let mut s = UniversalSchematic::new("bench".into());
+        for i in 0..n as i32 {
+            let _ = s.set_block_from_string(i, 0, 0, chest);
+        }
+        b.iter_batched(
+            || s.clone(),
+            |mut schem| {
+                schem.rotate_y(90);
+                black_box(schem);
+            },
+            criterion::BatchSize::SmallInput,
+        )
+    });
+    group.finish();
+}
+
+fn bench_clone_schematic_with_chests(c: &mut Criterion) {
+    // Cloning a schematic clones every BlockEntity. With Arc'd NBT this
+    // should be dramatically cheaper than baseline.
+    let chest =
+        "minecraft:chest[facing=west]{Items:[{Slot:0b,id:\"minecraft:diamond\",Count:64b}]}";
+    let n: usize = 10_000;
+    let mut s = UniversalSchematic::new("bench".into());
+    for i in 0..n as i32 {
+        let _ = s.set_block_from_string(i, 0, 0, chest);
+    }
+
+    let mut group = c.benchmark_group("schematic_clone");
+    group.throughput(Throughput::Elements(n as u64));
+    group.bench_function("clone_10k_chests", |b| {
+        b.iter(|| {
+            let cloned = black_box(s.clone());
+            black_box(cloned);
+        })
+    });
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_set_block_plain,
@@ -110,5 +175,7 @@ criterion_group!(
     bench_set_block_chest_per_call,
     bench_axis_aligned_run,
     bench_clone_block_entity,
+    bench_transform_with_block_entities,
+    bench_clone_schematic_with_chests,
 );
 criterion_main!(benches);

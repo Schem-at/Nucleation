@@ -27,8 +27,11 @@ pub struct Region {
         deserialize_with = "deserialize_block_entities"
     )]
     pub block_entities: BlockEntityMap,
-    #[serde(skip, default = "HashMap::new")]
-    palette_index: HashMap<BlockState, usize>,
+    /// Reverse palette lookup keyed by BlockState. FxHashMap because the
+    /// palette is hit on every `set_block` call and BlockState's std
+    /// hash is wasted cycles on a small-cardinality set.
+    #[serde(skip, default = "FxHashMap::default")]
+    palette_index: FxHashMap<BlockState, usize>,
 
     #[serde(skip)]
     bbox: BoundingBox,
@@ -88,7 +91,7 @@ impl Region {
         let position_and_size = bounding_box.to_position_and_size();
 
         let mut palette = Vec::new();
-        let mut palette_index = HashMap::new();
+        let mut palette_index: FxHashMap<BlockState, usize> = FxHashMap::default();
 
         let air = BlockState::new("minecraft:air".to_string());
         palette.push(air.clone());
@@ -179,7 +182,7 @@ impl Region {
     }
 
     pub(crate) fn rebuild_palette_index(&mut self) {
-        self.palette_index = HashMap::with_capacity(self.palette.len());
+        self.palette_index = FxHashMap::with_capacity_and_hasher(self.palette.len(), Default::default());
         for (index, block) in self.palette.iter().enumerate() {
             self.palette_index.insert(block.clone(), index);
         }
@@ -992,7 +995,7 @@ impl Region {
             palette,
             entities,
             block_entities,
-            palette_index: HashMap::new(),
+            palette_index: FxHashMap::default(),
             bbox: BoundingBox::from_position_and_size(position, size),
             tight_bounds: None,
             cached_width: 0,
@@ -1732,7 +1735,7 @@ mod tests {
             palette,
             entities: Vec::new(),
             block_entities: BlockEntityMap::default(),
-            palette_index: HashMap::new(),
+            palette_index: FxHashMap::default(),
             bbox: BoundingBox::from_position_and_size((0, 0, 0), (16, 1, 1)),
             tight_bounds: None,
             cached_width: 16,

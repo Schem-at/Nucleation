@@ -13,6 +13,7 @@ use crate::utils::NbtValue;
 use crate::BlockState;
 use quartz_nbt::{NbtCompound, NbtTag};
 use rand::SeedableRng;
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 use std::collections::HashMap;
@@ -25,8 +26,12 @@ pub struct UniversalSchematic {
     pub default_region_name: String,
     #[serde(default = "HashMap::new")]
     pub definition_regions: HashMap<String, DefinitionRegion>,
-    #[serde(skip, default = "HashMap::new")]
-    block_state_cache: HashMap<String, BlockState>,
+    /// String-keyed cache used by `set_block_str` to skip BlockState
+    /// allocation on repeated placements of the same plain id. FxHashMap is
+    /// the right hasher here — keys are short ASCII strings and we hit this
+    /// on every set_block call.
+    #[serde(skip, default = "FxHashMap::default")]
+    block_state_cache: FxHashMap<String, BlockState>,
 }
 
 #[derive(Debug, Clone)]
@@ -65,7 +70,7 @@ impl UniversalSchematic {
             other_regions: HashMap::new(),
             default_region_name,
             definition_regions: HashMap::new(),
-            block_state_cache: HashMap::new(),
+            block_state_cache: FxHashMap::default(),
         }
     }
 
@@ -900,7 +905,7 @@ impl UniversalSchematic {
             other_regions,
             default_region_name,
             definition_regions,
-            block_state_cache: HashMap::new(),
+            block_state_cache: FxHashMap::default(),
         })
     }
 
