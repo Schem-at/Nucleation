@@ -662,13 +662,17 @@ impl PySchematic {
 
             // Tile entities (only for blocks that have NBT). Cloning the
             // pre-built prototype + relocating it is far cheaper than
-            // re-parsing per call.
+            // re-parsing per call. Pre-reserve to avoid HashMap rehash
+            // cycles during a large batch.
             if let Some(ref template) = proto {
+                let region = &mut self.inner.default_region;
+                region
+                    .block_entities
+                    .reserve(positions.len());
                 for &(x, y, z) in &positions {
                     let mut be = template.clone();
                     be.position = (x, y, z);
-                    self.inner
-                        .set_block_entity(crate::block_position::BlockPosition { x, y, z }, be);
+                    region.block_entities.insert((x, y, z), be);
                 }
             }
             return positions.len();
