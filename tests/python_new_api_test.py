@@ -288,6 +288,184 @@ class TestSimulate:
         world = s.create_simulation_world()
         world.tick(1)
 
+    # --- Bug reproductions: world rebuild leaks redpiler constant-fold ---
+    #
+    # The polished `simulate()` rebuilds an MchprsWorld on every call (see
+    # __init__.py: simulate() -> create_simulation_world). Building the world
+    # invokes the redpiler's compile-time constant fold, which propagates any
+    # currently-on signal through the graph BEFORE any ticks run. As a result,
+    # `simulate(ticks=0)` with no events isn't a no-op: the schematic gets
+    # overwritten with the post-fold state.
+    #
+    # These tests assert the property the API documents ("Run a redstone
+    # simulation for ``ticks`` ticks, then sync results back") — namely that
+    # zero ticks plus zero events leaves the world unchanged.
+
+    @staticmethod
+    def _build_repeater_chain(name: str, length: int) -> Schematic:
+        """Lever (off) at x=-1, then `length` repeaters facing west, then a lamp.
+        All on a stone base. No initial power: the lever is in `powered=false`."""
+        s = Schematic.new(name)
+        for x in range(-1, length + 1):
+            s.set_block((x, 0, 0), "minecraft:stone")
+        s.set_block(
+            (-1, 1, 0),
+            "minecraft:lever",
+            state={"face": "floor", "facing": "east", "powered": False},
+        )
+        s.set_blocks(
+            [(x, 1, 0) for x in range(length)],
+            "minecraft:repeater",
+            state={"facing": "west", "delay": 1},
+        )
+        s.set_block((length, 1, 0), "minecraft:redstone_lamp")
+        return s
+
+    @staticmethod
+    def _powered_pattern(s: Schematic, length: int) -> list[str]:
+        return [s.get_block(x, 1, 0).properties.get("powered", "?") for x in range(length)]
+
+    def test_simulate_ticks_zero_no_events_is_noop_after_simulation(self):
+        """After running a simulation, calling `simulate(ticks=0)` with no
+        events must not mutate any block state. Reproduces the bug where the
+        world rebuild applies redpiler constant-fold to every repeater."""
+        length = 8
+        s = self._build_repeater_chain("rebuild_bug", length)
+
+        # First simulation: toggle the lever and run one tick. After this only
+        # the first delay-1 repeater (closest to the lever) should be powered.
+        s.simulate(events=[UseBlock((-1, 1, 0))])
+        before = self._powered_pattern(s, length)
+
+        # The contended call: zero ticks, zero events.
+        s.simulate(ticks=0)
+        after = self._powered_pattern(s, length)
+
+        assert before == after, (
+            "simulate(ticks=0) altered repeater states.\n"
+            f"before: {before}\nafter:  {after}"
+        )
+
+    def test_simulate_ticks_zero_idempotent_on_active_circuit(self):
+        """Two simulate(ticks=0) calls in a row must produce identical state."""
+        length = 4
+        s = self._build_repeater_chain("idempotent", length)
+
+        s.simulate(events=[UseBlock((-1, 1, 0))])
+        s.simulate(ticks=0)
+        first = self._powered_pattern(s, length)
+        s.simulate(ticks=0)
+        second = self._powered_pattern(s, length)
+
+        assert first == second, (
+            "simulate(ticks=0) is not idempotent.\n"
+            f"first:  {first}\nsecond: {second}"
+        )
+
+    def test_simulate_one_tick_only_advances_first_delay_stage(self):
+        """After flipping the lever and running exactly one tick, only the
+        first repeater (delay=1, closest to the lever) should be powered.
+        The whole chain lighting up indicates the redpiler folded the
+        steady-state signal at compile time."""
+        length = 4
+        s = self._build_repeater_chain("one_tick", length)
+
+        s.simulate(events=[UseBlock((-1, 1, 0))])
+        powered = [p == "true" for p in self._powered_pattern(s, length)]
+
+        # Strict assertion: only the first repeater on at tick 1.
+        assert powered == [True, False, False, False], (
+            f"expected only stage 0 powered; got {powered}"
+        )
+
+    def test_simulate_advances_signal_one_stage_per_tick(self):
+        """Calling simulate(ticks=1) repeatedly should advance the redstone
+        wavefront one delay-1 repeater per call. If the world rebuild folds
+        constants, the second call lights the entire chain at once."""
+        length = 4
+        s = self._build_repeater_chain("advance", length)
+
+        # Toggle the lever and tick exactly once at a time.
+        s.simulate(events=[UseBlock((-1, 1, 0))], ticks=1)
+        progression = [self._powered_pattern(s, length)]
+        for _ in range(length - 1):
+            s.simulate(ticks=1)
+            progression.append(self._powered_pattern(s, length))
+
+        expected = [
+            ["true",  "false", "false", "false"],
+            ["true",  "true",  "false", "false"],
+            ["true",  "true",  "true",  "false"],
+            ["true",  "true",  "true",  "true"],
+        ]
+        assert progression == expected, (
+            "redstone wavefront did not advance one repeater per tick.\n"
+            f"got:\n  " + "\n  ".join(repr(p) for p in progression) +
+            "\nexpected:\n  " + "\n  ".join(repr(p) for p in expected)
+        )
+
+    def test_simulate_reset_rebuilds_world_after_mutation(self):
+        """``simulate(reset=True)`` must drop the cached world and rebuild
+        from the current schematic, so post-``set_block`` mutations are
+        respected on the next call."""
+        length = 4
+        s = self._build_repeater_chain("reset_kwarg", length)
+        s.simulate(events=[UseBlock((-1, 1, 0))])  # primes the cached world
+
+        # Mutate the layout. The cached world doesn't know about this yet.
+        s.set_block((0, 1, 0), "minecraft:stone")
+        assert s._sim_world is not None  # cache still alive
+
+        # reset=True drops the cache and rebuilds from current self.
+        s.simulate(reset=True, ticks=0, events=[])
+        assert s._sim_world is not None  # rebuilt
+        # The rebuild reads stone at (0, 1, 0) and the round-trip preserves
+        # it; without reset, sync_to_schematic would overwrite the stone
+        # with the cached world's repeater.
+        assert s.get_block(0, 1, 0).name == "minecraft:stone", (
+            f"reset=True should respect the set_block stone; got "
+            f"{s.get_block(0, 1, 0).name}"
+        )
+
+    def test_simulate_without_reset_does_not_see_mutation(self):
+        """Documents the inverse: without ``reset=True``, ``simulate()``
+        keeps using the cached world and overwrites the user's mutation
+        on sync_to_schematic. Users are expected to opt into
+        ``reset=True`` (or call :py:meth:`invalidate_simulation`) when
+        they've mutated the schematic."""
+        length = 4
+        s = self._build_repeater_chain("no_reset", length)
+        s.simulate(events=[UseBlock((-1, 1, 0))])
+
+        s.set_block((0, 1, 0), "minecraft:stone")
+        s.simulate(ticks=1)  # NO reset — uses cached world
+        assert s.get_block(0, 1, 0).name == "minecraft:repeater", (
+            "stale cache should overwrite mutation; got "
+            f"{s.get_block(0, 1, 0).name}"
+        )
+
+    def test_invalidate_simulation_returns_self_and_drops_world(self):
+        s = Schematic.new("inv").set_block((0, 0, 0), "minecraft:stone")
+        s.simulate(ticks=1)
+        assert s._sim_world is not None
+        assert s.invalidate_simulation() is s
+        assert s._sim_world is None
+
+    def test_simulate_zero_ticks_zero_events_on_inert_schematic(self):
+        """A schematic with no active power source must not gain power from
+        a simulate() round-trip."""
+        s = Schematic.new("inert")
+        s.set_block((0, 0, 0), "minecraft:stone")
+        s.set_block((0, 1, 0), "minecraft:redstone_wire")
+        before = s.get_block_string(0, 1, 0)
+
+        s.simulate(ticks=0)
+        after = s.get_block_string(0, 1, 0)
+
+        assert before == after, (
+            f"inert wire mutated by simulate(ticks=0): {before!r} -> {after!r}"
+        )
+
 
 # --------------------------------------------------------------- Re-exports
 

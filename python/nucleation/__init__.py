@@ -513,6 +513,11 @@ class Schematic(_native.Schematic):
         # Lazy template-builder state (only set by from_template).
         "_pending_builder",
         "_pending_name",
+        # Cached redstone world; built lazily on first simulate() call and
+        # reused across calls so the redpiler doesn't constant-fold a
+        # mid-simulation snapshot back through the graph each time. Cleared
+        # by invalidate_simulation() and recreated automatically when None.
+        "_sim_world",
     )
 
     # ------------------------------------------------------------------ ctor
@@ -526,6 +531,7 @@ class Schematic(_native.Schematic):
         # Native __new__(name_or_path) already ran. Set polished attrs and
         # detect path-vs-name for backwards-compat constructor.
         self.pack = pack
+        self._sim_world = None
         if name_or_path.lower().endswith(_LOAD_EXTENSIONS) and Path(name_or_path).exists():
             _load_into(self, name_or_path)
             self.name = Path(name_or_path).stem
@@ -695,11 +701,59 @@ class Schematic(_native.Schematic):
         *,
         ticks: int = 1,
         events: Optional[Iterable[Event]] = None,
+        reset: bool = False,
     ) -> "Schematic":
-        """Run a redstone simulation for ``ticks`` ticks, then sync results back."""
+        """Run a redstone simulation for ``ticks`` ticks, then sync results back.
+
+        The underlying ``MchprsWorld`` is built on the first call and reused
+        on subsequent calls so the redstone wavefront advances correctly
+        across multiple ``simulate()`` invocations.
+
+        Parameters
+        ----------
+        ticks
+            How many redstone ticks to advance. ``0`` with no events is a
+            no-op and returns ``self`` untouched.
+        events
+            Iterable of :class:`UseBlock` / :class:`ButtonPress` events
+            applied before ticking.
+        reset
+            If ``True``, drop any cached simulation world and rebuild it
+            from the current schematic before running. Equivalent to calling
+            :py:meth:`invalidate_simulation` immediately before
+            ``simulate()``. Use this after mutating the schematic
+            (``set_block``, ``fill``, ...) between calls; otherwise the
+            cached world reflects the pre-mutation circuit.
+
+        Notes
+        -----
+        Rebuilding the world is destructive: the redpiler runs a
+        compile-time constant fold that propagates any active signals
+        through the graph immediately. That's why we cache the world
+        across calls, and why ``reset=True`` should be used deliberately —
+        a mid-simulation reset will collapse the wavefront to its steady
+        state.
+        """
         self._ensure_built()
-        world = self.create_simulation_world()
-        for ev in events or ():
+        # Materialize so we can both validate events and short-circuit
+        # cleanly when there's nothing to do.
+        event_list = list(events or ())
+        if ticks <= 0 and not event_list and not reset:
+            # Building an MchprsWorld is destructive: the redpiler runs a
+            # compile-time constant fold and `sync_to_schematic` writes the
+            # canonicalized state back. With nothing to simulate, that's
+            # silent state mutation — return self untouched.
+            return self
+
+        if reset:
+            self._sim_world = None
+
+        world = self._sim_world
+        if world is None:
+            world = self.create_simulation_world()
+            self._sim_world = world
+
+        for ev in event_list:
             if isinstance(ev, (UseBlock, ButtonPress)):
                 x, y, z = ev.pos
                 world.on_use_block(x, y, z)
@@ -709,9 +763,21 @@ class Schematic(_native.Schematic):
                 )
         world.tick(ticks)
         world.sync_to_schematic()
-        # Transfer the simulated state back into self via byte round-trip.
-        synced = world.into_schematic()
+        # Pull the simulated state back into self without consuming the
+        # world — keep it alive so the next simulate() call resumes from
+        # the live tick state instead of a re-folded snapshot.
+        synced = world.get_schematic()
         self.from_data(bytes(synced.to_litematic()))
+        return self
+
+    def invalidate_simulation(self) -> "Schematic":
+        """Drop the cached simulation world.
+
+        Call this after manually mutating the schematic (``set_block``,
+        ``fill``, ...) when you intend to call ``simulate()`` again — the
+        next call will rebuild a fresh world from the current state.
+        """
+        self._sim_world = None
         return self
 
     # ----------------------------------------------------------------- save

@@ -207,7 +207,9 @@ class Schematic:
         *,
         ticks: int = ...,
         events: Optional[Iterable[Event]] = ...,
+        reset: bool = ...,
     ) -> "Schematic": ...
+    def invalidate_simulation(self) -> "Schematic": ...
     def save(
         self,
         path: Union[str, Path],
