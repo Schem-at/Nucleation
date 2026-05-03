@@ -146,6 +146,109 @@ function dictToSnbt(d) {
     .join(',');
 }
 
+// --- Minecraft helpers (chest, sign, text, Item) -------------------------
+//
+// Modern (1.20+) NBT schemas. For pre-1.20 layouts, build the dict by hand
+// or use the `__snbt__` escape hatch in setBlock.
+
+export function text(s, opts = {}) {
+  const out = { text: s };
+  if (opts.color !== undefined) out.color = opts.color;
+  for (const k of ['bold', 'italic', 'underlined', 'strikethrough', 'obfuscated']) {
+    if (opts[k] !== undefined) out[k] = opts[k];
+  }
+  return JSON.stringify(out);
+}
+
+export class Item {
+  constructor(id, { count = 1, slot = null, components = null } = {}) {
+    this.id = id;
+    this.count = count;
+    this.slot = slot;
+    this.components = components;
+    Object.freeze(this);
+  }
+}
+
+function coerceItem(x, defaultSlot) {
+  if (x instanceof Item) {
+    const d = {
+      Slot: x.slot != null ? x.slot : defaultSlot,
+      id: x.id,
+      Count: x.count,
+    };
+    if (x.components) d.components = { ...x.components };
+    return d;
+  }
+  if (typeof x === 'string') {
+    return { Slot: defaultSlot, id: x, Count: 1 };
+  }
+  if (Array.isArray(x)) {
+    if (x.length === 2) {
+      const [id, count] = x;
+      return { Slot: defaultSlot, id, Count: count };
+    }
+    if (x.length === 3) {
+      const [id, count, components] = x;
+      const d = { Slot: defaultSlot, id, Count: count };
+      if (components) d.components = { ...components };
+      return d;
+    }
+  }
+  throw new TypeError(
+    `Unsupported chest item: ${JSON.stringify(x)}. ` +
+    `Use Item(...), 'minecraft:foo', or [id, count, components?].`
+  );
+}
+
+export function chest(items, { name = null, lock = null, lootTable = null } = {}) {
+  const out = [];
+  if (items && !Array.isArray(items) && typeof items === 'object') {
+    // Plain object → explicit-slot map.
+    for (const [slotStr, x] of Object.entries(items)) {
+      const slot = parseInt(slotStr, 10);
+      const d = coerceItem(x, slot);
+      d.Slot = slot;
+      out.push(d);
+    }
+  } else {
+    let i = 0;
+    for (const x of items || []) {
+      out.push(coerceItem(x, i));
+      i++;
+    }
+  }
+  const nbt = { Items: out };
+  if (name !== null) nbt.CustomName = name.startsWith('{') ? name : text(name);
+  if (lock !== null) nbt.Lock = lock;
+  if (lootTable !== null) nbt.LootTable = lootTable;
+  return nbt;
+}
+
+function signMessages(lines) {
+  const msgs = [];
+  for (const line of lines || []) {
+    if (line == null || line === '') {
+      msgs.push('""');
+    } else if (typeof line === 'string') {
+      msgs.push(line.startsWith('{') ? line : text(line));
+    } else {
+      throw new TypeError('Sign line must be string (plain or JSON-component)');
+    }
+  }
+  while (msgs.length < 4) msgs.push('""');
+  if (msgs.length > 4) throw new RangeError('A sign has at most 4 lines per side');
+  return msgs;
+}
+
+export function sign(lines = [], { back = [], color = 'black', glowing = false, waxed = false } = {}) {
+  return {
+    front_text: { messages: signMessages(lines), color, has_glowing_text: glowing },
+    back_text:  { messages: signMessages(back),  color, has_glowing_text: glowing },
+    is_waxed: waxed,
+  };
+}
+
 // --- Events ---------------------------------------------------------------
 
 export class UseBlock {

@@ -4,7 +4,7 @@
 // Prereq: build-wasm.sh has been run so pkg/ is populated.
 
 import init, * as raw from '../pkg/nucleation.js';
-import { Schematic, Block, Cursor, UseBlock, ButtonPress } from '../pkg/api.js';
+import { Schematic, Block, Cursor, UseBlock, ButtonPress, Item, chest, sign, text } from '../pkg/api.js';
 
 let pass = 0;
 let fail = 0;
@@ -197,6 +197,82 @@ test('raw SchematicWrapper still importable', () => {
 test('Schematic.raw exposes the wrapper', () => {
   const s = Schematic.new('raw');
   if (!(s.raw instanceof raw.SchematicWrapper)) throw new Error('raw is not SchematicWrapper');
+});
+
+// --- Minecraft helpers ---------------------------------------------------
+
+console.log('\nMinecraft helpers:');
+
+test('text() basic', () => {
+  assertEq(text('Hello'), '{"text":"Hello"}');
+});
+
+test('text() with formatting', () => {
+  const t = text('Warn', { color: 'red', bold: true });
+  if (!t.includes('"color":"red"')) throw new Error(t);
+  if (!t.includes('"bold":true')) throw new Error(t);
+});
+
+test('chest() list of tuples', () => {
+  const n = chest([['minecraft:diamond', 64], 'minecraft:elytra']);
+  if (n.Items.length !== 2) throw new Error('expected 2 items');
+  assertEq(n.Items[0].Slot, 0);
+  assertEq(n.Items[0].id, 'minecraft:diamond');
+  assertEq(n.Items[0].Count, 64);
+  assertEq(n.Items[1].Slot, 1);
+  assertEq(n.Items[1].id, 'minecraft:elytra');
+});
+
+test('chest() dict with gaps', () => {
+  const n = chest({ 0: ['minecraft:diamond', 64], 13: 'minecraft:elytra' });
+  const slots = n.Items.map((it) => it.Slot).sort((a, b) => a - b);
+  assertDeep(slots, [0, 13]);
+});
+
+test('chest() Item class', () => {
+  const n = chest([new Item('minecraft:netherite_ingot', { count: 3 })]);
+  assertEq(n.Items[0].Count, 3);
+});
+
+test('chest() name auto-wraps as JSON text', () => {
+  const n = chest([['minecraft:diamond', 1]], { name: 'Loot' });
+  if (!n.CustomName.includes('"text":"Loot"')) throw new Error(n.CustomName);
+});
+
+test('sign() basic produces front + back + waxed', () => {
+  const n = sign(['Hi']);
+  assertEq(n.front_text.messages.length, 4);
+  assertEq(n.back_text.messages.length, 4);
+  assertEq(n.is_waxed, false);
+});
+
+test('sign() rejects > 4 lines', () => {
+  let threw = false;
+  try { sign(['a', 'b', 'c', 'd', 'e']); } catch { threw = true; }
+  if (!threw) throw new Error('should have thrown');
+});
+
+test('end-to-end: chest helper places via setBlock', () => {
+  const s = Schematic.new('e2e');
+  s.setBlock([0, 0, 0], 'minecraft:chest',
+    { state: { facing: 'west' },
+      nbt: chest([['minecraft:diamond', 64], 'minecraft:elytra'], { name: 'Loot' }) });
+  const bs = s.raw.get_block_string(0, 0, 0);
+  if (!bs.includes('minecraft:chest')) throw new Error('chest not placed');
+});
+
+test('end-to-end: Block instance reuse', () => {
+  const loot = new Block('minecraft:chest', {
+    state: { facing: 'west' },
+    nbt: chest([['minecraft:diamond', 64]]),
+  });
+  const s = Schematic.new('reuse');
+  for (const x of [0, 5, 10]) s.setBlock([x, 0, 0], loot);
+  for (const x of [0, 5, 10]) {
+    if (!s.raw.get_block_string(x, 0, 0).includes('minecraft:chest')) {
+      throw new Error('reuse failed at x=' + x);
+    }
+  }
 });
 
 // --- Summary --------------------------------------------------------------

@@ -204,6 +204,172 @@ BlockLike = Union[str, Block]
 
 
 # ---------------------------------------------------------------------------
+# Minecraft helpers — chest, sign, text, Item
+#
+# These produce ready-to-use ``nbt=`` dicts (or, for ``text``, JSON strings).
+# They target the modern (1.20+) schemas. For pre-1.20 NBT layouts, build the
+# dict yourself or use the ``__snbt__`` escape hatch in ``set_block``.
+# ---------------------------------------------------------------------------
+
+
+def text(
+    s: str,
+    *,
+    color: Optional[str] = None,
+    bold: Optional[bool] = None,
+    italic: Optional[bool] = None,
+    underlined: Optional[bool] = None,
+    strikethrough: Optional[bool] = None,
+    obfuscated: Optional[bool] = None,
+) -> str:
+    """Build a Minecraft JSON text-component string.
+
+    >>> text("Hello")
+    '{"text":"Hello"}'
+    >>> text("Warn", color="red", bold=True)
+    '{"text":"Warn","color":"red","bold":true}'
+    """
+    import json as _json
+
+    payload: dict = {"text": s}
+    if color is not None:
+        payload["color"] = color
+    for k, v in (
+        ("bold", bold),
+        ("italic", italic),
+        ("underlined", underlined),
+        ("strikethrough", strikethrough),
+        ("obfuscated", obfuscated),
+    ):
+        if v is not None:
+            payload[k] = v
+    return _json.dumps(payload, separators=(",", ":"))
+
+
+@dataclass(frozen=True)
+class Item:
+    """An item stack for inventories.
+
+    ``components`` covers the 1.20.5+ data-components map (e.g.
+    ``{"minecraft:enchantments": {"levels": {"minecraft:sharpness": 5}}}``).
+    For pre-1.20.5 ``tag``-style NBT, set the matching key directly.
+    """
+
+    id: str
+    count: int = 1
+    slot: Optional[int] = None
+    components: Optional[Mapping[str, Any]] = None
+
+
+def _coerce_item(x: Any, default_slot: int) -> dict:
+    """Normalize chest-input shapes into a single dict ready for SNBT."""
+    if isinstance(x, Item):
+        d: dict = {"Slot": x.slot if x.slot is not None else default_slot,
+                   "id": x.id, "Count": x.count}
+        if x.components:
+            d["components"] = dict(x.components)
+        return d
+    if isinstance(x, str):
+        return {"Slot": default_slot, "id": x, "Count": 1}
+    if isinstance(x, tuple):
+        if len(x) == 2:
+            iid, count = x
+            return {"Slot": default_slot, "id": iid, "Count": int(count)}
+        if len(x) == 3:
+            iid, count, components = x
+            d = {"Slot": default_slot, "id": iid, "Count": int(count)}
+            if components:
+                d["components"] = dict(components)
+            return d
+    raise TypeError(
+        f"Unsupported chest item shape: {x!r}. "
+        "Use Item(...), 'minecraft:foo', or (id, count[, components])."
+    )
+
+
+def chest(
+    items: Union[Iterable[Any], Mapping[int, Any]],
+    *,
+    name: Optional[str] = None,
+    lock: Optional[str] = None,
+    loot_table: Optional[str] = None,
+) -> dict:
+    """Build a chest NBT dict suitable for ``set_block(... nbt=chest(...))``.
+
+    Accepted ``items`` shapes:
+      - list / iterable of ``Item`` | ``"minecraft:foo"`` | ``("id", count)``
+        | ``("id", count, components)`` — slots auto-assigned 0..N
+      - dict ``{slot_int: item}`` — explicit slots
+    """
+    out: list = []
+    if isinstance(items, Mapping):
+        for slot, x in items.items():
+            d = _coerce_item(x, slot)
+            d["Slot"] = int(slot)  # explicit slot wins over Item.slot
+            out.append(d)
+    else:
+        for i, x in enumerate(items):
+            d = _coerce_item(x, i)
+            out.append(d)
+
+    nbt: dict = {"Items": out}
+    if name is not None:
+        nbt["CustomName"] = text(name) if not name.startswith("{") else name
+    if lock is not None:
+        nbt["Lock"] = lock
+    if loot_table is not None:
+        nbt["LootTable"] = loot_table
+    return nbt
+
+
+def _sign_messages(lines: Optional[Iterable[Any]]) -> list:
+    msgs: list = []
+    for line in (lines or []):
+        if line is None or line == "":
+            msgs.append('""')
+        elif isinstance(line, str):
+            # Already a JSON text component? leave it. Otherwise wrap.
+            msgs.append(line if line.startswith("{") else text(line))
+        else:
+            raise TypeError(
+                f"Sign line must be str (plain or JSON-component), got {type(line).__name__}"
+            )
+    while len(msgs) < 4:
+        msgs.append('""')
+    if len(msgs) > 4:
+        raise ValueError("A sign has at most 4 lines per side")
+    return msgs
+
+
+def sign(
+    lines: Optional[Iterable[Any]] = None,
+    *,
+    back: Optional[Iterable[Any]] = None,
+    color: str = "black",
+    glowing: bool = False,
+    waxed: bool = False,
+) -> dict:
+    """Build a modern (1.20+) sign NBT dict.
+
+    Each line may be a plain string (auto-wrapped via ``text(...)``) or an
+    already-built JSON text-component string from ``text(...)``.
+    """
+    return {
+        "front_text": {
+            "messages": _sign_messages(lines),
+            "color": color,
+            "has_glowing_text": glowing,
+        },
+        "back_text": {
+            "messages": _sign_messages(back),
+            "color": color,
+            "has_glowing_text": glowing,
+        },
+        "is_waxed": waxed,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Simulation events
 # ---------------------------------------------------------------------------
 
@@ -720,15 +886,19 @@ __all__ = [
     "Cursor",
     "DefinitionRegion",
     "Event",
+    "Item",
     "Schematic",
     "SchematicBuilder",
     "Shape",
     "UseBlock",
     "_native",
+    "chest",
     "debug_json_schematic",
     "debug_schematic",
     "load_schematic",
     "save_schematic",
+    "sign",
+    "text",
 ]
 
 # Add feature-gated names if compiled in.

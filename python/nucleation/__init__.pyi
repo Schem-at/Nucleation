@@ -69,6 +69,49 @@ class Block:
     def with_nbt(self, **kwargs: Any) -> "Block": ...
     def to_string(self) -> str: ...
 
+# ----- Minecraft helpers ---------------------------------------------------
+
+def text(
+    s: str,
+    *,
+    color: Optional[str] = ...,
+    bold: Optional[bool] = ...,
+    italic: Optional[bool] = ...,
+    underlined: Optional[bool] = ...,
+    strikethrough: Optional[bool] = ...,
+    obfuscated: Optional[bool] = ...,
+) -> str: ...
+
+class Item:
+    id: str
+    count: int
+    slot: Optional[int]
+    components: Optional[Mapping[str, Any]]
+    def __init__(
+        self,
+        id: str,
+        count: int = ...,
+        slot: Optional[int] = ...,
+        components: Optional[Mapping[str, Any]] = ...,
+    ) -> None: ...
+
+def chest(
+    items: Union[Iterable[Any], Mapping[int, Any]],
+    *,
+    name: Optional[str] = ...,
+    lock: Optional[str] = ...,
+    loot_table: Optional[str] = ...,
+) -> dict: ...
+
+def sign(
+    lines: Optional[Iterable[Any]] = ...,
+    *,
+    back: Optional[Iterable[Any]] = ...,
+    color: str = ...,
+    glowing: bool = ...,
+    waxed: bool = ...,
+) -> dict: ...
+
 # ----- Events --------------------------------------------------------------
 
 class UseBlock:

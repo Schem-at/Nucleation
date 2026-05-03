@@ -18,9 +18,13 @@ from nucleation import (
     BlockState,
     ButtonPress,
     Cursor,
+    Item,
     Schematic,
     SchematicBuilder,
     UseBlock,
+    chest,
+    sign,
+    text,
 )
 
 
@@ -299,3 +303,108 @@ class TestReExports:
     def test_native_module_accessible(self):
         assert hasattr(nucleation, "_native")
         assert hasattr(nucleation._native, "Schematic")
+
+
+# ----------------------------------------------------- Minecraft helpers
+
+
+class TestText:
+    def test_plain(self):
+        assert text("Hello") == '{"text":"Hello"}'
+
+    def test_with_formatting(self):
+        s = text("Warn", color="red", bold=True)
+        assert '"color":"red"' in s
+        assert '"bold":true' in s
+        assert '"text":"Warn"' in s
+
+    def test_quotes_escaped(self):
+        s = text('He said "hi"')
+        # JSON encoding handles escaping correctly.
+        assert '\\"' in s
+
+
+class TestChest:
+    def test_list_of_tuples(self):
+        s = Schematic.new("ch1")
+        s.set_block((0, 0, 0), "minecraft:chest",
+                    state={"facing": "west"},
+                    nbt=chest([("minecraft:diamond", 64), "minecraft:elytra"]))
+        be = s.get_block_entity(0, 0, 0)
+        items = sorted(be["nbt"]["Items"], key=lambda x: x["Slot"])
+        assert items[0]["Slot"] == 0
+        assert items[0]["id"] == "minecraft:diamond"
+        assert items[1]["Slot"] == 1
+        assert items[1]["id"] == "minecraft:elytra"
+
+    def test_dict_with_gaps(self):
+        s = Schematic.new("ch2")
+        s.set_block((0, 0, 0), "minecraft:chest", state={"facing": "east"},
+                    nbt=chest({0: ("minecraft:diamond", 64), 13: "minecraft:elytra"}))
+        slots = sorted(it["Slot"] for it in s.get_block_entity(0, 0, 0)["nbt"]["Items"])
+        assert slots == [0, 13]
+
+    def test_item_dataclass(self):
+        s = Schematic.new("ch3")
+        s.set_block((0, 0, 0), "minecraft:chest", state={"facing": "north"},
+                    nbt=chest([Item("minecraft:netherite_ingot", count=3)]))
+        items = s.get_block_entity(0, 0, 0)["nbt"]["Items"]
+        assert items[0]["id"] == "minecraft:netherite_ingot"
+        # Count comes back lowercase 'count' from the modern parser; either is OK.
+        cnt = items[0].get("Count") or items[0].get("count")
+        assert cnt == 3
+
+    def test_custom_name_wraps_plain_string_as_json(self):
+        s = Schematic.new("ch4")
+        s.set_block((0, 0, 0), "minecraft:chest", state={"facing": "south"},
+                    nbt=chest([("minecraft:diamond", 1)], name="Loot Stash"))
+        cn = s.get_block_entity(0, 0, 0)["nbt"]["CustomName"]
+        assert "Loot Stash" in cn and "{" in cn  # JSON text component
+
+    def test_block_instance_reuse(self):
+        loot = Block("minecraft:chest",
+                     state={"facing": "west"},
+                     nbt=chest([("minecraft:diamond", 64)]))
+        s = Schematic.new("ch5")
+        for x in (0, 5, 10):
+            s.set_block((x, 0, 0), loot)
+        for x in (0, 5, 10):
+            be = s.get_block_entity(x, 0, 0)
+            assert be["nbt"]["Items"][0]["id"] == "minecraft:diamond"
+
+
+class TestSign:
+    def test_basic(self):
+        s = Schematic.new("sg1")
+        s.set_block((0, 0, 0), "minecraft:oak_sign", state={"rotation": 8},
+                    nbt=sign(["Welcome", "to the", "Loot Room"]))
+        be = s.get_block_entity(0, 0, 0)
+        front = be["nbt"]["front_text"]
+        # Stored as raw SNBT-ish string by the schematic parser; check substring.
+        assert "Welcome" in str(front)
+        assert "Loot Room" in str(front)
+
+    def test_with_text_component(self):
+        s = Schematic.new("sg2")
+        s.set_block((0, 0, 0), "minecraft:oak_sign", state={"rotation": 0},
+                    nbt=sign([text("LOOT", color="gold", bold=True), "Inside"]))
+        front = str(s.get_block_entity(0, 0, 0)["nbt"]["front_text"])
+        assert "gold" in front
+        assert "bold" in front
+
+    def test_waxed_glowing(self):
+        s = Schematic.new("sg3")
+        s.set_block((0, 0, 0), "minecraft:oak_sign", state={"rotation": 0},
+                    nbt=sign(["Hi"], waxed=True, glowing=True))
+        nbt = s.get_block_entity(0, 0, 0)["nbt"]
+        # Stored as 1 / "1b" depending on writer; both indicate true.
+        assert str(nbt.get("is_waxed", "")) in ("1", "True", "1b", "True")
+
+    def test_at_most_four_lines(self):
+        with pytest.raises(ValueError):
+            sign(["a", "b", "c", "d", "e"])
+
+    def test_empty_lines_padded(self):
+        n = sign(["one"])
+        assert len(n["front_text"]["messages"]) == 4
+        assert n["back_text"]["messages"] == ['""', '""', '""', '""']

@@ -261,6 +261,227 @@ pub extern "C" fn free_chunk_array(array: CChunkArray) {
     }
 }
 
+// --- NBT helpers (chest / sign / text builders) ---
+//
+// These return owned C strings the caller must release with `free_string`.
+// Output targets the modern (1.20+) Minecraft NBT schemas.
+
+/// A single inventory item for `nbt_chest_build`.
+/// `count <= 0` defaults to 1; `slot < 0` auto-assigns positionally.
+#[repr(C)]
+pub struct CItem {
+    pub id: *const c_char,
+    pub count: c_int,
+    pub slot: c_int,
+}
+
+fn json_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    for ch in s.chars() {
+        match ch {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+fn snbt_string(s: &str) -> String {
+    format!("\"{}\"", json_escape(s))
+}
+
+fn cstr_opt(p: *const c_char) -> Option<String> {
+    if p.is_null() {
+        None
+    } else {
+        Some(unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned())
+    }
+}
+
+fn build_text_json(
+    s: &str,
+    color: Option<&str>,
+    bold: c_int,
+    italic: c_int,
+) -> String {
+    let mut parts = vec![format!("\"text\":\"{}\"", json_escape(s))];
+    if let Some(c) = color {
+        parts.push(format!("\"color\":\"{}\"", json_escape(c)));
+    }
+    if bold >= 0 {
+        parts.push(format!("\"bold\":{}", bold != 0));
+    }
+    if italic >= 0 {
+        parts.push(format!("\"italic\":{}", italic != 0));
+    }
+    format!("{{{}}}", parts.join(","))
+}
+
+/// Build a Minecraft JSON text-component string.
+///
+/// `color` may be null. `bold` and `italic` use `-1` for unset, `0` for false,
+/// nonzero for true. The caller must free the returned string with
+/// `free_string`.
+#[no_mangle]
+pub extern "C" fn nbt_text_build(
+    s: *const c_char,
+    color: *const c_char,
+    bold: c_int,
+    italic: c_int,
+) -> *mut c_char {
+    if s.is_null() {
+        return ptr::null_mut();
+    }
+    let text = unsafe { CStr::from_ptr(s) }.to_string_lossy().into_owned();
+    let color_owned = cstr_opt(color);
+    let json = build_text_json(&text, color_owned.as_deref(), bold, italic);
+    CString::new(json).map(|c| c.into_raw()).unwrap_or(ptr::null_mut())
+}
+
+/// Build a chest-NBT SNBT string for use as the `{...}` portion of a block
+/// string. Returns null on error.
+///
+/// `items` is an array of `n` `CItem` entries. `name` is an optional plain
+/// text custom name (null = no CustomName); it is wrapped in a JSON text
+/// component automatically.
+///
+/// Caller frees with `free_string`.
+#[no_mangle]
+pub extern "C" fn nbt_chest_build(
+    items: *const CItem,
+    n: usize,
+    name: *const c_char,
+) -> *mut c_char {
+    if items.is_null() && n > 0 {
+        return ptr::null_mut();
+    }
+    let slice = if n > 0 {
+        unsafe { std::slice::from_raw_parts(items, n) }
+    } else {
+        &[]
+    };
+
+    let mut entries = Vec::with_capacity(slice.len());
+    for (i, it) in slice.iter().enumerate() {
+        if it.id.is_null() {
+            return ptr::null_mut();
+        }
+        let id = unsafe { CStr::from_ptr(it.id) }.to_string_lossy();
+        let count = if it.count <= 0 { 1 } else { it.count };
+        let slot: i32 = if it.slot < 0 { i as i32 } else { it.slot };
+        entries.push(format!(
+            "{{Slot:{}b,id:\"{}\",Count:{}b}}",
+            slot,
+            json_escape(&id),
+            count
+        ));
+    }
+
+    let mut parts = vec![format!("Items:[{}]", entries.join(","))];
+    if let Some(n) = cstr_opt(name) {
+        let already_json = n.starts_with('{');
+        let inner = if already_json {
+            n
+        } else {
+            build_text_json(&n, None, -1, -1)
+        };
+        // CustomName is stored as a string holding JSON.
+        parts.push(format!("CustomName:{}", snbt_string(&inner)));
+    }
+    let snbt = format!("{{{}}}", parts.join(","));
+    CString::new(snbt).map(|c| c.into_raw()).unwrap_or(ptr::null_mut())
+}
+
+/// Build a modern (1.20+) sign-NBT SNBT string.
+///
+/// `front` and `back` are arrays of up to 4 C strings. Each line may be a
+/// plain string (auto-wrapped via `nbt_text_build`) or an already-built JSON
+/// component (starts with `{`). Either pointer may be null (treated as empty).
+///
+/// `color` is the dye color string (null defaults to `"black"`).
+/// `glowing` and `waxed` are 0/non-zero booleans.
+///
+/// Caller frees with `free_string`.
+#[no_mangle]
+pub extern "C" fn nbt_sign_build(
+    front: *const *const c_char,
+    front_n: usize,
+    back: *const *const c_char,
+    back_n: usize,
+    color: *const c_char,
+    glowing: c_int,
+    waxed: c_int,
+) -> *mut c_char {
+    fn collect(p: *const *const c_char, n: usize) -> Result<Vec<String>, ()> {
+        if n > 4 {
+            return Err(());
+        }
+        if p.is_null() && n > 0 {
+            return Err(());
+        }
+        let slice = if n > 0 {
+            unsafe { std::slice::from_raw_parts(p, n) }
+        } else {
+            &[]
+        };
+        let mut out = Vec::with_capacity(4);
+        for sp in slice {
+            if sp.is_null() {
+                out.push(String::from("\"\""));
+                continue;
+            }
+            let s = unsafe { CStr::from_ptr(*sp) }.to_string_lossy().into_owned();
+            if s.is_empty() {
+                out.push(String::from("\"\""));
+            } else if s.starts_with('{') {
+                out.push(s);
+            } else {
+                out.push(build_text_json(&s, None, -1, -1));
+            }
+        }
+        while out.len() < 4 {
+            out.push(String::from("\"\""));
+        }
+        Ok(out)
+    }
+
+    let front_msgs = match collect(front, front_n) {
+        Ok(v) => v,
+        Err(_) => return ptr::null_mut(),
+    };
+    let back_msgs = match collect(back, back_n) {
+        Ok(v) => v,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    let color_owned = cstr_opt(color).unwrap_or_else(|| "black".to_string());
+    let g = if glowing != 0 { "1b" } else { "0b" };
+    let w = if waxed != 0 { "1b" } else { "0b" };
+
+    let messages = |msgs: &[String]| -> String {
+        // Each message must be stored as a *string* containing JSON.
+        let quoted: Vec<String> = msgs.iter().map(|m| snbt_string(m)).collect();
+        format!("[{}]", quoted.join(","))
+    };
+
+    let snbt = format!(
+        "{{front_text:{{messages:{},color:\"{}\",has_glowing_text:{}}},back_text:{{messages:{},color:\"{}\",has_glowing_text:{}}},is_waxed:{}}}",
+        messages(&front_msgs),
+        json_escape(&color_owned),
+        g,
+        messages(&back_msgs),
+        json_escape(&color_owned),
+        g,
+        w,
+    );
+    CString::new(snbt).map(|c| c.into_raw()).unwrap_or(ptr::null_mut())
+}
+
 // --- Schematic Lifecycle ---
 
 /// Creates a new, empty schematic.
