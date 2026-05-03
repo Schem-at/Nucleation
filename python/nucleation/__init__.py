@@ -173,6 +173,19 @@ class Block:
         return bool(self.state) or bool(self.nbt)
 
 
+def _unpack_coord(method: str, args: Tuple[Any, ...]) -> Coord:
+    """Accept ``(x, y, z)`` or a single ``(x, y, z)`` tuple."""
+    if len(args) == 1 and isinstance(args[0], tuple) and len(args[0]) == 3:
+        x, y, z = args[0]
+    elif len(args) == 3:
+        x, y, z = args
+    else:
+        raise TypeError(
+            f"{method}() expected (x, y, z) or a single (x, y, z) tuple"
+        )
+    return int(x), int(y), int(z)
+
+
 def _coerce_state_value(v: str) -> StateValue:
     if v == "true":
         return True
@@ -408,7 +421,19 @@ class ButtonPress:
     pos: Coord
 
 
-Event = Union[UseBlock, ButtonPress]
+@dataclass(frozen=True)
+class LeverState:
+    """Force a lever to a specific powered state (idempotent — no toggle).
+
+    Use this when you want "lever ON" / "lever OFF" semantics rather than
+    the right-click / :class:`UseBlock` toggle.
+    """
+
+    pos: Coord
+    state: bool = True
+
+
+Event = Union[UseBlock, ButtonPress, LeverState]
 
 
 # ---------------------------------------------------------------------------
@@ -675,6 +700,56 @@ class Schematic(_native.Schematic):
         self.fill_cuboid(x1, y1, z1, x2, y2, z2, block_id)
         return self
 
+    # ----------------------------------------------------- simulation queries
+
+    def _get_or_build_sim_world(self) -> Any:
+        """Internal: return the cached MchprsWorld, building it on demand."""
+        self._ensure_built()
+        if self._sim_world is None:
+            self._sim_world = self.create_simulation_world()
+        return self._sim_world
+
+    def is_lit(self, *args: Any) -> bool:
+        """``True`` if the redstone lamp at this position is lit.
+
+        Reads from the cached simulation world — no schematic round-trip.
+        """
+        x, y, z = _unpack_coord("is_lit", args)
+        return self._get_or_build_sim_world().is_lit(x, y, z)
+
+    def is_powered(self, *args: Any) -> bool:
+        """``True`` if anything at this position is currently powered.
+
+        Unified power check: returns ``True`` when the position is a lit
+        redstone lamp, a powered lever or button, or carries a non-zero
+        redstone signal (wire, repeater, comparator, etc.).
+        """
+        x, y, z = _unpack_coord("is_powered", args)
+        w = self._get_or_build_sim_world()
+        return (
+            w.get_lever_power(x, y, z)
+            or w.is_lit(x, y, z)
+            or w.get_redstone_power(x, y, z) > 0
+        )
+
+    def signal_strength(self, *args: Any) -> int:
+        """Redstone signal strength (0–15) at this position."""
+        x, y, z = _unpack_coord("signal_strength", args)
+        return self._get_or_build_sim_world().get_redstone_power(x, y, z)
+
+    # ---------------------------------------------------------------- get_block
+
+    def get_block(self, *args: Any) -> Optional[BlockState]:
+        """Read a block. Accepts ``(x, y, z)`` or a single ``(x, y, z)`` tuple
+        for symmetry with ``set_block``."""
+        x, y, z = _unpack_coord("get_block", args)
+        return _native.Schematic.get_block(self, x, y, z)
+
+    def get_block_string(self, *args: Any) -> Optional[str]:
+        """String form of :py:meth:`get_block`. Same coord conventions."""
+        x, y, z = _unpack_coord("get_block_string", args)
+        return _native.Schematic.get_block_string(self, x, y, z)
+
     def cursor(
         self, *, origin: Coord = (0, 0, 0), step: Coord = (1, 0, 0)
     ) -> Cursor:
@@ -702,6 +777,7 @@ class Schematic(_native.Schematic):
         ticks: int = 1,
         events: Optional[Iterable[Event]] = None,
         reset: bool = False,
+        sync: bool = True,
     ) -> "Schematic":
         """Run a redstone simulation for ``ticks`` ticks, then sync results back.
 
@@ -715,8 +791,8 @@ class Schematic(_native.Schematic):
             How many redstone ticks to advance. ``0`` with no events is a
             no-op and returns ``self`` untouched.
         events
-            Iterable of :class:`UseBlock` / :class:`ButtonPress` events
-            applied before ticking.
+            Iterable of :class:`UseBlock`, :class:`ButtonPress`, or
+            :class:`LeverState` events applied before ticking.
         reset
             If ``True``, drop any cached simulation world and rebuild it
             from the current schematic before running. Equivalent to calling
@@ -724,6 +800,14 @@ class Schematic(_native.Schematic):
             ``simulate()``. Use this after mutating the schematic
             (``set_block``, ``fill``, ...) between calls; otherwise the
             cached world reflects the pre-mutation circuit.
+        sync
+            If ``True`` (default), copy the simulated state back into the
+            schematic via the byte round-trip — slower, but ``save()`` /
+            ``render()`` see the updated block states.
+            If ``False``, skip the round-trip; query state through the
+            polished accessors instead (``is_lit`` / ``is_powered`` /
+            ``signal_strength``), which read directly from the cached
+            simulation world. Much faster for tight tick loops.
 
         Notes
         -----
@@ -757,17 +841,28 @@ class Schematic(_native.Schematic):
             if isinstance(ev, (UseBlock, ButtonPress)):
                 x, y, z = ev.pos
                 world.on_use_block(x, y, z)
+            elif isinstance(ev, LeverState):
+                x, y, z = ev.pos
+                world.set_lever_power(x, y, z, bool(ev.state))
             else:
                 raise TypeError(
-                    f"Unsupported event {type(ev).__name__}; use UseBlock or ButtonPress"
+                    f"Unsupported event {type(ev).__name__}; "
+                    f"use UseBlock, ButtonPress, or LeverState"
                 )
         world.tick(ticks)
-        world.sync_to_schematic()
-        # Pull the simulated state back into self without consuming the
-        # world — keep it alive so the next simulate() call resumes from
-        # the live tick state instead of a re-folded snapshot.
-        synced = world.get_schematic()
-        self.from_data(bytes(synced.to_litematic()))
+        # Flush the redpiler's pending state so the polished accessors
+        # (is_lit / is_powered / signal_strength) return current values
+        # whether or not the user opts into the schematic round-trip.
+        world.flush()
+        if sync:
+            world.sync_to_schematic()
+            # Pull the simulated state back into self without consuming the
+            # world — keep it alive so the next simulate() call resumes from
+            # the live tick state instead of a re-folded snapshot.
+            synced = world.get_schematic()
+            self.from_data(bytes(synced.to_litematic()))
+        # When sync=False the schematic is not updated; query state via the
+        # cached world (is_lit / is_powered / signal_strength).
         return self
 
     def invalidate_simulation(self) -> "Schematic":
@@ -875,6 +970,13 @@ def _make_render_config(**kwargs: Any) -> Any:
         raise RuntimeError(
             "RenderConfig is not available; the wheel was built without the rendering feature"
         )
+    target = kwargs.pop("target", None)
+    if target is not None:
+        if not (isinstance(target, tuple) and len(target) == 3):
+            raise TypeError(
+                "render(): target must be an (x, y, z) tuple"
+            )
+        target = (float(target[0]), float(target[1]), float(target[2]))
     cfg = _native.RenderConfig(
         kwargs.pop("width", 1920),
         kwargs.pop("height", 1080),
@@ -882,6 +984,7 @@ def _make_render_config(**kwargs: Any) -> Any:
         float(kwargs.pop("pitch", 45.0)),
         float(kwargs.pop("zoom", 1.0)),
         float(kwargs.pop("fov", 45.0)),
+        target,
     )
     if kwargs:
         raise TypeError(f"render(): unexpected kwargs {list(kwargs)}")
@@ -935,6 +1038,7 @@ __all__ = [
     "BuildingTool",
     "Brush",
     "ButtonPress",
+    "LeverState",
     "Coord",
     "Cursor",
     "DefinitionRegion",

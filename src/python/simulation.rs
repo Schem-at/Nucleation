@@ -28,6 +28,14 @@ impl PyMchprsWorld {
         self.inner.on_use_block(pos);
     }
 
+    /// Force a lever's powered state directly (idempotent — no toggle).
+    /// Use when you want "lever ON" / "lever OFF" semantics rather than
+    /// the right-click / `on_use_block` toggle.
+    pub fn set_lever_power(&mut self, x: i32, y: i32, z: i32, powered: bool) {
+        let pos = BlockPos::new(x, y, z);
+        self.inner.set_lever_power(pos, powered);
+    }
+
     pub fn tick(&mut self, ticks: u32) {
         self.inner.tick(ticks);
     }

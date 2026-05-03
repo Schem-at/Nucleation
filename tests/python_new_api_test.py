@@ -265,6 +265,31 @@ class TestBackcompatSchematicBuilder:
         assert isinstance(schem, Schematic)
 
 
+# ----------------------------------------------------- get_block tuple shorthand
+
+
+class TestGetBlockTupleShorthand:
+    def test_get_block_accepts_tuple(self):
+        s = Schematic.new("getblk")
+        s.set_block((1, 2, 3), "minecraft:stone")
+        assert s.get_block((1, 2, 3)).name == "minecraft:stone"
+
+    def test_get_block_string_accepts_tuple(self):
+        s = Schematic.new("getblkstr")
+        s.set_block((1, 2, 3), "minecraft:stone")
+        assert s.get_block_string((1, 2, 3)) == "minecraft:stone"
+
+    def test_get_block_positional_still_works(self):
+        s = Schematic.new("getblk_pos")
+        s.set_block((1, 2, 3), "minecraft:stone")
+        assert s.get_block(1, 2, 3).name == "minecraft:stone"
+
+    def test_get_block_rejects_bad_signature(self):
+        s = Schematic.new("getblk_bad")
+        with pytest.raises(TypeError, match="get_block"):
+            s.get_block(1, 2)
+
+
 # ------------------------------------------------------------- Simulation
 
 
@@ -444,12 +469,105 @@ class TestSimulate:
             f"{s.get_block(0, 1, 0).name}"
         )
 
+    def test_lever_state_event_sets_lever_directly(self):
+        """``LeverState(pos, state=...)`` sets the lever's powered state
+        idempotently — calling it twice with the same state must not flip
+        the lever back."""
+        from nucleation import LeverState
+
+        s = self._build_repeater_chain("lever_state", 2)
+        # Drive the lever ON twice; the chain should not toggle off.
+        s.simulate(events=[LeverState((-1, 1, 0), state=True)], ticks=1)
+        first = self._powered_pattern(s, 2)
+        s.simulate(events=[LeverState((-1, 1, 0), state=True)], ticks=0)
+        second = self._powered_pattern(s, 2)
+        assert first == second, (
+            "LeverState(state=True) should be idempotent; "
+            f"first={first} second={second}"
+        )
+
+        # Driving OFF must clear power from the chain.
+        s.simulate(events=[LeverState((-1, 1, 0), state=False)], ticks=4)
+        powered_after_off = [
+            p == "true" for p in self._powered_pattern(s, 2)
+        ]
+        assert not any(powered_after_off), (
+            f"LeverState(state=False) should drop power; got {powered_after_off}"
+        )
+
     def test_invalidate_simulation_returns_self_and_drops_world(self):
         s = Schematic.new("inv").set_block((0, 0, 0), "minecraft:stone")
         s.simulate(ticks=1)
         assert s._sim_world is not None
         assert s.invalidate_simulation() is s
         assert s._sim_world is None
+
+    def test_polished_state_accessors_via_cached_world(self):
+        """is_lit / is_powered / signal_strength delegate to the cached
+        simulation world and work without sync=True."""
+        from nucleation import LeverState
+
+        # Direct lever → wire → lamp on a stone base.
+        s = Schematic.new("accessors")
+        for x in range(3):
+            s.set_block((x, 0, 0), "minecraft:stone")
+        s.set_block(
+            (0, 1, 0), "minecraft:lever",
+            state={"face": "floor", "facing": "east", "powered": False},
+        )
+        s.set_block((1, 1, 0), "minecraft:redstone_wire")
+        s.set_block((2, 1, 0), "minecraft:redstone_lamp")
+
+        # Lever off — nothing powered, lamp dark, wire signal is 0.
+        s.simulate(events=[LeverState((0, 1, 0), state=False)], ticks=2, sync=False)
+        assert s.is_powered((0, 1, 0)) is False
+        assert s.is_lit((2, 1, 0)) is False
+        assert s.signal_strength((1, 1, 0)) == 0
+
+        # Lever on — lamp lights, wire signal hot.
+        s.simulate(events=[LeverState((0, 1, 0), state=True)], ticks=4, sync=False)
+        assert s.is_powered((0, 1, 0)) is True
+        assert s.is_lit((2, 1, 0)) is True
+        assert s.signal_strength((1, 1, 0)) > 0
+
+    def test_is_powered_works_for_lamps_and_wires_not_just_levers(self):
+        """is_powered() is a unified power check: returns True for lit
+        lamps, powered levers/buttons, and any non-zero redstone signal."""
+        from nucleation import LeverState
+
+        s = Schematic.new("unified_powered")
+        for x in range(3):
+            s.set_block((x, 0, 0), "minecraft:stone")
+        s.set_block(
+            (0, 1, 0), "minecraft:lever",
+            state={"face": "floor", "facing": "east", "powered": False},
+        )
+        s.set_block((1, 1, 0), "minecraft:redstone_wire")
+        s.set_block((2, 1, 0), "minecraft:redstone_lamp")
+
+        s.simulate(events=[LeverState((0, 1, 0), state=True)], ticks=4, sync=False)
+        # Same predicate works for all three positions.
+        assert s.is_powered((0, 1, 0))   # lever
+        assert s.is_powered((1, 1, 0))   # wire (signal_strength > 0)
+        assert s.is_powered((2, 1, 0))   # lamp (is_lit)
+
+        s.simulate(events=[LeverState((0, 1, 0), state=False)], ticks=4, sync=False)
+        # Lever and wire drop instantly. (Lamp's `is_lit` can lag by a few
+        # ticks in MCHPRS — that's an upstream simulation detail, not the
+        # is_powered helper.)
+        assert not s.is_powered((0, 1, 0))
+        assert not s.is_powered((1, 1, 0))
+
+    def test_simulate_sync_false_does_not_round_trip_into_self(self):
+        """With sync=False, the schematic state is not overwritten by the
+        simulator's view, so user-set blocks are preserved (until the next
+        sync=True call)."""
+        s = Schematic.new("nosync")
+        s.set_block((0, 0, 0), "minecraft:stone")
+        s.set_block((0, 1, 0), "minecraft:redstone_wire")
+        s.simulate(ticks=1, sync=False)
+        # Wire blockstate kept its original (un-canonicalized) form.
+        assert s.get_block_string(0, 1, 0) == "minecraft:redstone_wire"
 
     def test_simulate_zero_ticks_zero_events_on_inert_schematic(self):
         """A schematic with no active power source must not gain power from

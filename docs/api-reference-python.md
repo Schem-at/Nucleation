@@ -122,13 +122,46 @@ nbt = sign([text("LOOT", color="gold", bold=True), "Inside"], waxed=True)
 into the schematic.
 
 ```python
-from nucleation import UseBlock
+from nucleation import UseBlock, LeverState
 
 schem.simulate(
     ticks=4,
     events=[UseBlock((0, 1, 3))],   # right-click the lever at that position
 )
+
+# Idempotent "lever ON / OFF" rather than a toggle:
+schem.simulate(events=[LeverState((0, 1, 3), state=True)], ticks=2)
 ```
+
+### Reading simulated state directly
+
+For the common cases — "is this lever on?", "is this lamp lit?", "what's
+the signal level on this wire?" — query the polished accessors instead
+of poking at blockstate strings:
+
+```python
+schem.is_powered((0, 1, 0))      # bool — unified power check
+schem.is_lit((2, 1, 0))          # bool — redstone-lamp lit state
+schem.signal_strength((1, 1, 0)) # int 0..15 — wire / power level
+```
+
+`is_powered((x, y, z))` returns ``True`` when the position is a lit lamp,
+a powered lever / button, or carries a non-zero redstone signal — the
+same predicate works whatever block is there.
+
+These read from the cached simulation world and lazily build it on
+first call. Combine with `simulate(sync=False)` to skip the schematic
+round-trip in tight tick loops:
+
+```python
+schem.simulate(events=[LeverState((0, 1, 0), state=True)],
+               ticks=4, sync=False)
+assert schem.is_lit((2, 1, 0))
+```
+
+`sync=True` (the default) still copies the simulated state back into
+the schematic so `save()` / `render()` see updated blocks. `sync=False`
+is the fast path when you only need to query state via the accessors.
 
 ### Multi-step simulation
 
@@ -205,6 +238,9 @@ schem.save("/tmp/scratch", format="schem")
 # Render to PNG — kwargs build a RenderConfig, or pass an explicit one.
 schem.with_pack(pack)                       # bind once
 schem.render("out.png", width=3840, height=2160, yaw=45, pitch=45, zoom=0.7)
+
+# Aim the orbit at a custom point instead of the model's centroid.
+schem.render("zoomed.png", target=(8.0, 1.0, 0.0), zoom=0.4, yaw=30, pitch=20)
 
 # Export a mesh.
 schem.export_mesh("out.glb")                # also accepts .nucm
@@ -325,8 +361,8 @@ All import methods mutate the existing schematic instance.
 | `set_block_from_string` | `set_block_from_string(x: int, y: int, z: int, block_string: str) -> None` | Parse a full block string with properties and NBT, e.g. `"minecraft:chest[facing=north]{Items:[...]}"`. |
 | `set_block_with_properties` | `set_block_with_properties(x: int, y: int, z: int, block_name: str, properties: dict[str, str]) -> None` | Set a block with a property dict. |
 | `set_block_with_nbt` | `set_block_with_nbt(x: int, y: int, z: int, block_name: str, nbt_data: dict) -> None` | Set a block with block entity NBT data. |
-| `get_block` | `get_block(x: int, y: int, z: int) -> Optional[BlockState]` | Get the BlockState at a position. |
-| `get_block_string` | `get_block_string(x: int, y: int, z: int) -> Optional[str]` | Get the full block string with properties. |
+| `get_block` | `get_block(x, y, z)` or `get_block((x, y, z)) -> Optional[BlockState]` | Get the BlockState at a position. Accepts a tuple for symmetry with `set_block`. |
+| `get_block_string` | `get_block_string(x, y, z)` or `get_block_string((x, y, z)) -> Optional[str]` | String form. Same coord conventions. |
 | `get_block_with_properties` | `get_block_with_properties(x: int, y: int, z: int) -> Optional[BlockState]` | Get the full BlockState. |
 
 #### Batch Block Operations

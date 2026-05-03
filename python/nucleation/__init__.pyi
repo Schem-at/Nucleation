@@ -122,7 +122,12 @@ class ButtonPress:
     pos: Coord
     def __init__(self, pos: Coord) -> None: ...
 
-Event = Union[UseBlock, ButtonPress]
+class LeverState:
+    pos: Coord
+    state: bool
+    def __init__(self, pos: Coord, state: bool = True) -> None: ...
+
+Event = Union[UseBlock, ButtonPress, LeverState]
 
 # ----- Cursor --------------------------------------------------------------
 
@@ -208,8 +213,12 @@ class Schematic:
         ticks: int = ...,
         events: Optional[Iterable[Event]] = ...,
         reset: bool = ...,
+        sync: bool = ...,
     ) -> "Schematic": ...
     def invalidate_simulation(self) -> "Schematic": ...
+    def is_lit(self, *args: Any) -> bool: ...
+    def is_powered(self, *args: Any) -> bool: ...
+    def signal_strength(self, *args: Any) -> int: ...
     def save(
         self,
         path: Union[str, Path],

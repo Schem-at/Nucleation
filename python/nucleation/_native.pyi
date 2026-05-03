@@ -987,6 +987,10 @@ class MchprsWorld:
         """Simulate right-clicking a block (e.g., toggling a lever)."""
         ...
 
+    def set_lever_power(self, x: int, y: int, z: int, powered: bool) -> None:
+        """Force a lever's powered state directly (idempotent — no toggle)."""
+        ...
+
     def tick(self, ticks: int) -> None:
         """Advance the simulation by a number of ticks."""
         ...
