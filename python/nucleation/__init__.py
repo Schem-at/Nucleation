@@ -98,6 +98,10 @@ class Block:
         ``"__snbt__"`` so the native layer can re-emit it. Most users should
         prefer the structured kwargs form.
         """
+        if not isinstance(s, str):
+            raise TypeError(
+                f"Block.parse() expects a string, got {type(s).__name__}"
+            )
         rest = s.strip()
         snbt: Optional[str] = None
         if rest.endswith("}"):
@@ -531,6 +535,10 @@ class Schematic(_native.Schematic):
     @classmethod
     def new(cls, name: str = "untitled", *, pack: Optional[Any] = None) -> "Schematic":
         """Create a blank schematic."""
+        if not isinstance(name, str):
+            raise TypeError(
+                f"Schematic.new() name must be a string, got {type(name).__name__}"
+            )
         return cls(name, pack=pack)
 
     @classmethod
@@ -755,6 +763,15 @@ class Schematic(_native.Schematic):
 
         Output format inferred from extension (``.glb`` or ``.nucm``).
         """
+        # Validate extension first so the user gets a precise error
+        # before any heavy mesh work or pack-loading.
+        p = Path(path)
+        suffix = p.suffix.lower()
+        if suffix not in (".glb", ".nucm"):
+            raise ValueError(
+                f"export_mesh: unsupported extension {p.suffix!r}; use .glb or .nucm"
+            )
+
         self._ensure_built()
         pack = pack or self.pack
         if pack is None:
@@ -763,16 +780,7 @@ class Schematic(_native.Schematic):
             )
         # to_mesh is inherited from native.
         result = super().to_mesh(pack, config) if config is not None else super().to_mesh(pack)
-        p = Path(path)
-        suffix = p.suffix.lower()
-        if suffix == ".glb":
-            data = result.glb_data()
-        elif suffix == ".nucm":
-            data = result.nucm_data()
-        else:
-            raise ValueError(
-                f"export_mesh: unsupported extension {p.suffix!r}; use .glb or .nucm"
-            )
+        data = result.glb_data() if suffix == ".glb" else result.nucm_data()
         p.write_bytes(bytes(data))
 
     # ------------------------------------------------------------- ctx manager

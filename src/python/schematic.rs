@@ -598,20 +598,38 @@ impl PySchematic {
         // ---- argument shape ----
         let nargs = args.len();
         let (x, y, z, block_obj) = if nargs == 4 {
-            let x: i32 = args.get_item(0)?.extract()?;
-            let y: i32 = args.get_item(1)?.extract()?;
-            let z: i32 = args.get_item(2)?.extract()?;
+            let x: i32 = args.get_item(0)?.extract().map_err(|_| {
+                PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "set_block(x, y, z, block): x must be int",
+                )
+            })?;
+            let y: i32 = args.get_item(1)?.extract().map_err(|_| {
+                PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "set_block(x, y, z, block): y must be int",
+                )
+            })?;
+            let z: i32 = args.get_item(2)?.extract().map_err(|_| {
+                PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "set_block(x, y, z, block): z must be int",
+                )
+            })?;
             let b = args.get_item(3)?;
             (x, y, z, b)
         } else if nargs == 2 {
             let pos = args.get_item(0)?;
-            let (x, y, z): (i32, i32, i32) = pos.extract()?;
+            let (x, y, z): (i32, i32, i32) = pos.extract().map_err(|_| {
+                PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "set_block((x, y, z), block): first arg must be a 3-tuple of ints",
+                )
+            })?;
             let b = args.get_item(1)?;
             (x, y, z, b)
         } else {
-            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "set_block(x, y, z, block) or set_block((x, y, z), block, *, state, nbt)",
-            ));
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
+                "set_block expected 2 or 4 positional args, got {}. \
+                 Use set_block(x, y, z, block) or set_block((x, y, z), block, *, state, nbt)",
+                nargs
+            )));
         };
 
         // ---- ultra-fast path: plain string id, no kwargs ----
@@ -748,17 +766,20 @@ impl PySchematic {
             }
             payload.push(']');
         }
-        if let Some(nbt_dict) = nbt {
-            // Accept either a pre-formatted SNBT string or a Python dict.
-            if let Ok(snbt_str) = nbt_dict.extract::<String>() {
-                payload.push('{');
-                payload.push_str(&snbt_str);
-                payload.push('}');
-            } else {
-                payload.push('{');
-                py_value_to_snbt(nbt_dict, &mut payload, /*top_level_dict_no_braces=*/ true)?;
-                payload.push('}');
+        if let Some(nbt_value) = nbt {
+            // nbt= must be a dict (with optional __snbt__ escape hatch).
+            // Bare strings are rejected to catch typos like nbt='{...}'.
+            if !nbt_value.is_instance_of::<PyDict>() {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
+                    "nbt= must be a dict, got {}. \
+                     Use a Python dict; the wrapper serializes it to SNBT for you. \
+                     For raw SNBT strings, pass nbt={{'__snbt__': '<your-snbt>'}}.",
+                    nbt_value.get_type().name()?
+                )));
             }
+            payload.push('{');
+            py_value_to_snbt(nbt_value, &mut payload, /*top_level_dict_no_braces=*/ true)?;
+            payload.push('}');
         }
         let _ = slf.inner.set_block_from_string(x, y, z, &payload);
         Ok(slf)

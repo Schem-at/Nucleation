@@ -292,6 +292,109 @@ class TestSimulate:
 # --------------------------------------------------------------- Re-exports
 
 
+class TestErrorMessages:
+    """The polished API should raise clear, actionable errors. These tests
+    pin the message shape so refactors don't degrade DX."""
+
+    def test_set_block_too_few_args(self):
+        s = Schematic.new("err")
+        with pytest.raises(TypeError, match="2 or 4 positional"):
+            s.set_block(1)
+        with pytest.raises(TypeError, match="2 or 4 positional"):
+            s.set_block(1, 2, 3)
+
+    def test_set_block_too_many_args(self):
+        s = Schematic.new("err")
+        with pytest.raises(TypeError, match="2 or 4 positional"):
+            s.set_block(1, 2, 3, "minecraft:stone", 99)
+
+    def test_set_block_two_arg_first_must_be_tuple(self):
+        s = Schematic.new("err")
+        with pytest.raises(TypeError, match="3-tuple of ints"):
+            s.set_block(1, "minecraft:stone")  # 2 args, but first isn't a tuple
+
+    def test_set_block_2tuple_pos_rejected(self):
+        s = Schematic.new("err")
+        with pytest.raises((TypeError, ValueError)):
+            s.set_block((1, 2), "minecraft:stone")  # only 2 coords
+
+    def test_set_block_block_must_be_str_or_block(self):
+        s = Schematic.new("err")
+        with pytest.raises(TypeError, match="block must be"):
+            s.set_block(1, 2, 3, 42)
+
+    def test_set_block_state_must_be_dict(self):
+        s = Schematic.new("err")
+        with pytest.raises(TypeError, match="state must be a dict"):
+            s.set_block(0, 0, 0, "minecraft:stone", state=42)
+
+    def test_set_block_nbt_must_be_dict(self):
+        # Strings used to be silently accepted, hiding typos. Now rejected.
+        s = Schematic.new("err")
+        with pytest.raises(TypeError, match="nbt= must be a dict"):
+            s.set_block((0, 0, 0), "minecraft:chest", nbt="raw_string")
+
+    def test_set_block_nbt_dict_works(self):
+        # Sanity: the corrected path still accepts a real dict.
+        s = Schematic.new("ok")
+        s.set_block((0, 0, 0), "minecraft:chest",
+                    nbt={"Items": [{"Slot": 0, "id": "minecraft:diamond", "Count": 64}]})
+
+    def test_set_block_nbt_snbt_escape_works(self):
+        # __snbt__ escape hatch still allowed — it's a dict, not a string.
+        s = Schematic.new("ok")
+        s.set_block((0, 0, 0), "minecraft:jukebox",
+                    nbt={"__snbt__": "signal:5"})
+
+    def test_save_unknown_format_message(self):
+        s = Schematic.new("err").set_block(0, 0, 0, "minecraft:stone")
+        with pytest.raises(ValueError, match="Cannot infer save format"):
+            s.save("/tmp/no_such_ext.unknown")
+
+    def test_render_without_pack_clear_error(self):
+        s = Schematic.new("err").set_block(0, 0, 0, "minecraft:stone")
+        with pytest.raises(ValueError, match=r"render\(\) requires a ResourcePack"):
+            s.render("/tmp/x.png")
+
+    def test_export_mesh_unknown_extension_first(self):
+        # Should report bad extension BEFORE complaining about missing pack.
+        s = Schematic.new("err").set_block(0, 0, 0, "minecraft:stone")
+        with pytest.raises(ValueError, match="unsupported extension"):
+            s.export_mesh("/tmp/x.bad")
+
+    def test_export_mesh_missing_pack_when_extension_ok(self):
+        s = Schematic.new("err").set_block(0, 0, 0, "minecraft:stone")
+        with pytest.raises(ValueError, match=r"export_mesh\(\) requires a ResourcePack"):
+            s.export_mesh("/tmp/x.glb")
+
+    def test_schematic_new_non_str_name(self):
+        with pytest.raises(TypeError, match="name must be a string"):
+            Schematic.new(123)
+
+    def test_block_parse_non_str(self):
+        with pytest.raises(TypeError, match="expects a string"):
+            Block.parse(123)
+
+    def test_sign_too_many_lines(self):
+        with pytest.raises(ValueError, match="at most 4 lines"):
+            sign(["a", "b", "c", "d", "e"])
+
+    def test_sign_non_string_line_rejected(self):
+        with pytest.raises(TypeError, match="Sign line must be"):
+            sign([1, 2, 3])
+
+    def test_chained_error_does_not_corrupt_state(self):
+        # An error mid-chain should not leave the schematic in a weird state.
+        s = Schematic.new("err")
+        s.set_block(0, 0, 0, "minecraft:stone")
+        with pytest.raises(TypeError):
+            s.set_block(1, 2, 3, 42)  # bad block type
+        # Schematic should still work after the error.
+        s.set_block(0, 1, 0, "minecraft:dirt")
+        assert s.get_block_string(0, 0, 0) == "minecraft:stone"
+        assert s.get_block_string(0, 1, 0) == "minecraft:dirt"
+
+
 class TestBatchPerf:
     """The set_blocks parse-once batch path must produce identical results to
     per-call set_block_from_string for complex blocks (state + NBT)."""
