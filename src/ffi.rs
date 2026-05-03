@@ -1177,18 +1177,22 @@ pub extern "C" fn schematic_prepare_block(
     schematic: *mut SchematicWrapper,
     block_name: *const c_char,
 ) -> c_int {
-    if schematic.is_null() || block_name.is_null() {
+    if schematic.is_null() {
+        set_last_error("schematic_prepare_block: schematic pointer is null".into());
         return -1;
+    }
+    if block_name.is_null() {
+        set_last_error("schematic_prepare_block: block_name pointer is null".into());
+        return -2;
     }
     let s = unsafe { &mut *(*schematic).0 };
     let name = unsafe { CStr::from_ptr(block_name).to_string_lossy() };
-    // Don't reset the region — that would clobber palette entries from
-    // previous prepare_block calls.
     s.default_region.get_or_insert_palette_by_name(&name) as c_int
 }
 
 /// Place a block by pre-resolved palette index. Pair with
 /// `schematic_prepare_block`. Returns 0 on success, negative on error.
+/// On error, call `schematic_last_error` for details.
 #[no_mangle]
 pub extern "C" fn schematic_place(
     schematic: *mut SchematicWrapper,
@@ -1197,11 +1201,27 @@ pub extern "C" fn schematic_place(
     z: c_int,
     palette_index: c_int,
 ) -> c_int {
-    if schematic.is_null() || palette_index < 0 {
+    if schematic.is_null() {
+        set_last_error("schematic_place: schematic pointer is null".into());
         return -1;
+    }
+    if palette_index < 0 {
+        set_last_error(format!(
+            "schematic_place: palette_index must be >= 0, got {}",
+            palette_index
+        ));
+        return -2;
     }
     let s = unsafe { &mut *(*schematic).0 };
     let region = &mut s.default_region;
+    if (palette_index as usize) >= region.palette.len() {
+        set_last_error(format!(
+            "schematic_place: palette_index {} out of range (palette size {})",
+            palette_index,
+            region.palette.len()
+        ));
+        return -3;
+    }
     if !region.is_in_region(x, y, z) {
         region.expand_to_fit(x, y, z);
     }

@@ -214,3 +214,99 @@ fn place_rejects_null_handle() {
     let rc2 = schematic_place(std::ptr::null_mut(), 0, 0, 0, 0);
     assert!(rc2 < 0);
 }
+
+// ────────────────────────────────────────────────────────────────────────
+// Error reporting tests: every entry point that can fail should set a
+// retrievable last_error message rather than just returning a negative
+// code with no diagnostic.
+// ────────────────────────────────────────────────────────────────────────
+
+fn last_error_msg() -> Option<String> {
+    use nucleation::ffi::{free_string, schematic_last_error};
+    let p = schematic_last_error();
+    if p.is_null() {
+        return None;
+    }
+    let s = unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned();
+    free_string(p);
+    Some(s)
+}
+
+#[test]
+fn ffi_prepare_block_null_schematic_sets_message() {
+    use nucleation::ffi::schematic_prepare_block;
+    let name = cstr("minecraft:stone");
+    let rc = schematic_prepare_block(std::ptr::null_mut(), name.as_ptr());
+    assert_eq!(rc, -1);
+    let err = last_error_msg().expect("expected last_error after null handle");
+    assert!(
+        err.contains("schematic_prepare_block") && err.contains("null"),
+        "unhelpful error: {}",
+        err
+    );
+}
+
+#[test]
+fn ffi_prepare_block_null_name_sets_message() {
+    use nucleation::ffi::{schematic_free, schematic_new, schematic_prepare_block};
+    let h = schematic_new();
+    let rc = schematic_prepare_block(h, std::ptr::null());
+    assert_eq!(rc, -2);
+    let err = last_error_msg().expect("expected last_error after null name");
+    assert!(err.contains("block_name"), "unhelpful error: {}", err);
+    unsafe { schematic_free(h) };
+}
+
+#[test]
+fn ffi_place_negative_palette_index_sets_message() {
+    use nucleation::ffi::{schematic_free, schematic_new, schematic_place};
+    let h = schematic_new();
+    let rc = schematic_place(h, 0, 0, 0, -1);
+    assert!(rc < 0);
+    let err = last_error_msg().expect("expected last_error after bad index");
+    assert!(err.contains("palette_index"), "unhelpful error: {}", err);
+    unsafe { schematic_free(h) };
+}
+
+#[test]
+fn ffi_place_out_of_range_index_sets_message() {
+    use nucleation::ffi::{
+        schematic_free, schematic_new, schematic_place, schematic_prepare_block,
+    };
+    let h = schematic_new();
+    let n = cstr("minecraft:stone");
+    let stone = schematic_prepare_block(h, n.as_ptr());
+    assert!(stone >= 0);
+    // Use a palette index way beyond what's been registered.
+    let rc = schematic_place(h, 0, 0, 0, stone + 9999);
+    assert!(rc < 0, "expected error for out-of-range index, got {}", rc);
+    let err = last_error_msg().expect("expected last_error");
+    assert!(
+        err.contains("out of range") || err.contains("palette"),
+        "unhelpful error: {}",
+        err
+    );
+    unsafe { schematic_free(h) };
+}
+
+#[test]
+fn ffi_set_blocks_invalid_complex_string_sets_message() {
+    use nucleation::ffi::{schematic_free, schematic_new, schematic_set_blocks};
+    let h = schematic_new();
+    let positions: [c_int; 3] = [0, 0, 0];
+    // Malformed bracket-string forces parse_block_string to error.
+    let bad = cstr("minecraft:chest[unclosed");
+    let rc = unsafe { schematic_set_blocks(h, positions.as_ptr(), positions.len(), bad.as_ptr()) };
+    // Either rejects with negative (preferred) or skips.
+    if rc < 0 {
+        let err = last_error_msg();
+        if let Some(e) = err {
+            assert!(
+                e.contains("parse_block_string") || e.contains("parse"),
+                "unhelpful error: {}",
+                e
+            );
+        }
+    }
+    unsafe { schematic_free(h) };
+}

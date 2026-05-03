@@ -295,6 +295,89 @@ test('set_blocks parse-once preserves chest NBT', () => {
   if (!bs15.includes('minecraft:chest')) throw new Error('mid chest missing');
 });
 
+// --- Error messages ------------------------------------------------------
+
+console.log('\nError messages:');
+
+function expectErr(label, fn, msgPattern) {
+  try {
+    fn();
+    fail++;
+    failures.push({ name: label, err: new Error('expected error, got none') });
+    console.log('  FAIL ' + label + ': expected error, got none');
+  } catch (err) {
+    if (msgPattern && !msgPattern.test(err.message)) {
+      fail++;
+      failures.push({ name: label, err: new Error(`message mismatch: ${err.message}`) });
+      console.log('  FAIL ' + label + ': message mismatch: ' + err.message);
+    } else {
+      pass++;
+      console.log('  ok  ' + label);
+    }
+  }
+}
+
+expectErr('Schematic.new(123) — non-string name',
+  () => Schematic.new(123), /must be a string/);
+
+expectErr('setBlock(1) — too few args',
+  () => Schematic.new('e').setBlock(1), /expected/);
+
+expectErr('setBlock(1, 2, 3) — three args, no array',
+  () => Schematic.new('e').setBlock(1, 2, 3), /expected/);
+
+expectErr('setBlock([1, 2], "id") — pos len 2',
+  () => Schematic.new('e').setBlock([1, 2], 'minecraft:stone'),
+  /3-tuple/);
+
+expectErr('setBlock(1, 2, 3, 42) — block must be string|Block',
+  () => Schematic.new('e').setBlock(1, 2, 3, 42), /must be a string or Block/);
+
+expectErr('setBlock(..., {state: 42}) — state must be object',
+  () => Schematic.new('e').setBlock([0, 0, 0], 'minecraft:stone', { state: 42 }),
+  /opts\.state must be/);
+
+expectErr('setBlock(..., {nbt: "raw_string"}) — bare string rejected',
+  () => Schematic.new('e').setBlock([0, 0, 0], 'minecraft:chest', { nbt: 'raw_string' }),
+  /opts\.nbt must be|raw SNBT/);
+
+expectErr('Block.parse(123) — non-string',
+  () => Block.parse(123), /expects a string/);
+
+expectErr('text(123) — non-string',
+  () => text(123), /expects a string/);
+
+expectErr('sign 5 lines',
+  () => sign(['a', 'b', 'c', 'd', 'e']), /at most 4/);
+
+expectErr('sign non-string lines',
+  () => sign([1, 2, 3]), /must be string/);
+
+expectErr('chest with bad item shape',
+  () => chest([42]), /Unsupported chest item/);
+
+// Sanity: the corrected paths still work.
+test('setBlock with valid nbt dict', () => {
+  Schematic.new('ok').setBlock([0, 0, 0], 'minecraft:chest', {
+    nbt: { Items: [{ Slot: 0, id: 'minecraft:diamond', Count: 64 }] },
+  });
+});
+
+test('setBlock with __snbt__ escape hatch', () => {
+  Schematic.new('ok').setBlock([0, 0, 0], 'minecraft:jukebox', {
+    nbt: { __snbt__: 'signal:5' },
+  });
+});
+
+test('chained error does not corrupt state', () => {
+  const s = Schematic.new('e');
+  s.setBlock(0, 0, 0, 'minecraft:stone');
+  try { s.setBlock(1, 2, 3, 42); } catch {}  // raises but absorbed
+  s.setBlock(0, 1, 0, 'minecraft:dirt');
+  if (s.raw.get_block_string(0, 0, 0) !== 'minecraft:stone') throw new Error('stone lost');
+  if (s.raw.get_block_string(0, 1, 0) !== 'minecraft:dirt') throw new Error('dirt missing');
+});
+
 // --- Summary --------------------------------------------------------------
 
 console.log(`\n${pass} passed, ${fail} failed`);

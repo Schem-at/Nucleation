@@ -42,7 +42,10 @@ export class Block {
 
   /** Parse "id[k=v,...]{snbt}" form. */
   static parse(s) {
-    let rest = String(s).trim();
+    if (typeof s !== 'string') {
+      throw new TypeError(`Block.parse() expects a string, got ${typeof s}`);
+    }
+    let rest = s.trim();
     let snbt = null;
     if (rest.endsWith('}')) {
       let depth = 0;
@@ -157,6 +160,9 @@ function dictToSnbt(d) {
 // or use the `__snbt__` escape hatch in setBlock.
 
 export function text(s, opts = {}) {
+  if (typeof s !== 'string') {
+    throw new TypeError(`text() expects a string, got ${typeof s}`);
+  }
   const out = { text: s };
   if (opts.color !== undefined) out.color = opts.color;
   for (const k of ['bold', 'italic', 'underlined', 'strikethrough', 'obfuscated']) {
@@ -327,6 +333,9 @@ export class Schematic {
 
   /** Create a blank schematic. */
   static new(name = 'untitled', { pack = null } = {}) {
+    if (typeof name !== 'string') {
+      throw new TypeError(`Schematic.new() name must be a string, got ${typeof name}`);
+    }
     const w = new raw.SchematicWrapper();
     if (typeof w.set_name === 'function') {
       try { w.set_name(name); } catch {}
@@ -405,11 +414,32 @@ export class Schematic {
     if (args.length === 4 && typeof args[0] === 'number') {
       [x, y, z, block] = args;
       opts = null;
-    } else if (args.length >= 2 && Array.isArray(args[0])) {
+    } else if ((args.length === 2 || args.length === 3) && Array.isArray(args[0])) {
+      const pos = args[0];
+      if (pos.length !== 3 || !pos.every((v) => typeof v === 'number')) {
+        throw new TypeError(
+          `setBlock((x, y, z), block): first arg must be a 3-tuple of numbers, got [${pos.join(', ')}]`
+        );
+      }
       [[x, y, z], block, opts = null] = args;
     } else {
       throw new TypeError(
-        'setBlock([x,y,z], block, opts?) or setBlock(x,y,z, block)'
+        `setBlock expected (x, y, z, block) or ([x, y, z], block, opts?), got ${args.length} args`
+      );
+    }
+    if (typeof block !== 'string' && !(block instanceof Block)) {
+      throw new TypeError(`block must be a string or Block, got ${typeof block}`);
+    }
+    if (opts && typeof opts !== 'object') {
+      throw new TypeError(`setBlock opts must be an object, got ${typeof opts}`);
+    }
+    if (opts && opts.state != null && (typeof opts.state !== 'object' || Array.isArray(opts.state))) {
+      throw new TypeError(`setBlock opts.state must be an object, got ${typeof opts.state}`);
+    }
+    if (opts && opts.nbt != null && (typeof opts.nbt !== 'object' || Array.isArray(opts.nbt))) {
+      throw new TypeError(
+        `setBlock opts.nbt must be an object, got ${typeof opts.nbt}. ` +
+        `For raw SNBT pass nbt: { __snbt__: '<your-snbt>' }.`
       );
     }
     const inner = this.raw || this._ensureBuilt();
