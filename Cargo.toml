@@ -46,7 +46,7 @@ scripting-js = ["rquickjs"]
 scripting = ["scripting-lua", "scripting-js"]
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 quartz_nbt = "0.2.9"
@@ -116,6 +116,10 @@ winit = "0.30"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 criterion = "0.5.1"
+
+[[bench]]
+name = "block_placement"
+harness = false
 
 [[bench]]
 name = "performance_test"

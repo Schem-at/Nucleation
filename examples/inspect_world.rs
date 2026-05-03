@@ -86,7 +86,7 @@ fn main() {
         println!("\nBlock entities ({}):", region.block_entities.len());
         for (pos, be) in &region.block_entities {
             println!("  {} at ({}, {}, {})", be.id, pos.0, pos.1, pos.2);
-            for (key, value) in &be.nbt {
+            for (key, value) in be.nbt.iter() {
                 println!("    {}: {:?}", key, value);
             }
         }

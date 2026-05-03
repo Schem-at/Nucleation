@@ -456,7 +456,7 @@ fn parse_block_entity(nbt: &NbtCompound) -> Result<BlockEntity, Box<dyn Error>> 
             "x" | "y" | "z" | "id" => continue,
             _ => {
                 block_entity
-                    .nbt
+                    .nbt_mut()
                     .insert(key.clone(), crate::utils::NbtValue::from_quartz_nbt(value));
             }
         }
@@ -1378,7 +1378,7 @@ mod tests {
     #[test]
     fn test_block_entity_roundtrip() {
         let mut be = BlockEntity::new("minecraft:chest".to_string(), (10, 64, 20));
-        be.nbt.insert(
+        be.nbt_mut().insert(
             "CustomName".to_string(),
             crate::utils::NbtValue::String("Test Chest".to_string()),
         );

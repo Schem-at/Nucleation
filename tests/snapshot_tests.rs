@@ -82,7 +82,7 @@ fn snapshot_roundtrip_block_entities() {
     schematic.set_block(0, 0, 0, &chest);
 
     let mut block_entity = BlockEntity::new("minecraft:chest".to_string(), (0, 0, 0));
-    block_entity.nbt.insert(
+    block_entity.nbt_mut().insert(
         "CustomName".to_string(),
         NbtValue::String("Test Chest".to_string()),
     );

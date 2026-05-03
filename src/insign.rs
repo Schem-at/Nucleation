@@ -130,11 +130,11 @@ mod tests {
         let mut block_entity = BlockEntity::new("minecraft:sign".to_string(), (0, 0, 0));
 
         // Add legacy sign text (1.7-1.19)
-        block_entity.nbt.insert(
+        block_entity.nbt_mut().insert(
             "Text1".to_string(),
             NbtValue::String(r#"{"text":"Hello"}"#.to_string()),
         );
-        block_entity.nbt.insert(
+        block_entity.nbt_mut().insert(
             "Text2".to_string(),
             NbtValue::String(r#"{"text":"World"}"#.to_string()),
         );
@@ -148,15 +148,15 @@ mod tests {
         let mut block_entity = BlockEntity::new("minecraft:sign".to_string(), (5, 10, 15));
 
         // Sign with empty lines
-        block_entity.nbt.insert(
+        block_entity.nbt_mut().insert(
             "Text1".to_string(),
             NbtValue::String(r#"{"text":"Line1"}"#.to_string()),
         );
-        block_entity.nbt.insert(
+        block_entity.nbt_mut().insert(
             "Text2".to_string(),
             NbtValue::String(r#"{"text":""}"#.to_string()),
         );
-        block_entity.nbt.insert(
+        block_entity.nbt_mut().insert(
             "Text3".to_string(),
             NbtValue::String(r#"{"text":"Line3"}"#.to_string()),
         );
@@ -170,11 +170,11 @@ mod tests {
         let mut block_entity = BlockEntity::new("minecraft:sign".to_string(), (0, 0, 0));
 
         // All empty lines
-        block_entity.nbt.insert(
+        block_entity.nbt_mut().insert(
             "Text1".to_string(),
             NbtValue::String(r#"{"text":""}"#.to_string()),
         );
-        block_entity.nbt.insert(
+        block_entity.nbt_mut().insert(
             "Text2".to_string(),
             NbtValue::String(r#"{"text":""}"#.to_string()),
         );
@@ -196,19 +196,19 @@ mod tests {
 
         // Add a sign block entity with Insign annotations
         let mut sign = BlockEntity::new("minecraft:sign".to_string(), (10, 64, 10));
-        sign.nbt.insert(
+        sign.nbt_mut().insert(
             "Text1".to_string(),
             NbtValue::String(r#"{"text":"@rc([0,0,0],"}"#.to_string()),
         );
-        sign.nbt.insert(
+        sign.nbt_mut().insert(
             "Text2".to_string(),
             NbtValue::String(r#"{"text":"[3,2,1])"}"#.to_string()),
         );
-        sign.nbt.insert(
+        sign.nbt_mut().insert(
             "Text3".to_string(),
             NbtValue::String("{\"text\":\"#doc.label=\"\"}".to_string()),
         );
-        sign.nbt.insert(
+        sign.nbt_mut().insert(
             "Text4".to_string(),
             NbtValue::String(r#"{"text":"\"Patch A\""}"#.to_string()),
         );
@@ -229,7 +229,7 @@ mod tests {
 
         // Add first sign
         let mut sign1 = BlockEntity::new("minecraft:sign".to_string(), (0, 0, 0));
-        sign1.nbt.insert(
+        sign1.nbt_mut().insert(
             "Text1".to_string(),
             NbtValue::String(r#"{"text":"@region1"}"#.to_string()),
         );
@@ -238,7 +238,7 @@ mod tests {
 
         // Add second sign
         let mut sign2 = BlockEntity::new("minecraft:wall_sign".to_string(), (10, 5, 20));
-        sign2.nbt.insert(
+        sign2.nbt_mut().insert(
             "Text1".to_string(),
             NbtValue::String(r#"{"text":"@region2"}"#.to_string()),
         );
@@ -523,19 +523,19 @@ mod tests {
 
         // Add sign with custom IO annotations
         let mut sign = BlockEntity::new("minecraft:sign".to_string(), (0, 0, 0));
-        sign.nbt.insert(
+        sign.nbt_mut().insert(
             "Text1".to_string(),
             NbtValue::String(r#"{"text":"@io.input_a"}"#.to_string()),
         );
-        sign.nbt.insert(
+        sign.nbt_mut().insert(
             "Text2".to_string(),
             NbtValue::String(r#"{"text":"=rc([0,1,0],"}"#.to_string()),
         );
-        sign.nbt.insert(
+        sign.nbt_mut().insert(
             "Text3".to_string(),
             NbtValue::String(r#"{"text":"[0,1,0])"}"#.to_string()),
         );
-        sign.nbt.insert(
+        sign.nbt_mut().insert(
             "Text4".to_string(),
             NbtValue::String("{\"text\":\"#io.type=\\\"i\\\"\"}".to_string()),
         );

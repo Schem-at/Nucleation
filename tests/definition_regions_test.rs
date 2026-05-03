@@ -85,19 +85,19 @@ fn test_insign_integration() {
     // @region_name=rc([min],[max])
     // #region_name:key=value
     let mut sign = BlockEntity::new("minecraft:sign".to_string(), (0, 0, 0));
-    sign.nbt.insert(
+    sign.nbt_mut().insert(
         "Text1".to_string(),
         NbtValue::String(r##"{"text":"@my_region"}"##.to_string()),
     );
-    sign.nbt.insert(
+    sign.nbt_mut().insert(
         "Text2".to_string(),
         NbtValue::String(r##"{"text":"=rc([0,0,0],"}"##.to_string()),
     );
-    sign.nbt.insert(
+    sign.nbt_mut().insert(
         "Text3".to_string(),
         NbtValue::String(r##"{"text":"[5,5,5])"}"##.to_string()),
     );
-    sign.nbt.insert(
+    sign.nbt_mut().insert(
         "Text4".to_string(),
         NbtValue::String(r##"{"text":"#my_region:k=\"v\""}"##.to_string()),
     );

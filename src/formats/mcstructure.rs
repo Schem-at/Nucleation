@@ -286,7 +286,7 @@ pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::
                             // Note: BlockEntity::from_nbt expects quartz_nbt::NbtCompound.
                             // We should construct it manually to avoid unnecessary conversions.
                             let mut be = BlockEntity::new(id, (x, y, z));
-                            be.nbt = be_nbt;
+                            be.set_nbt(be_nbt);
 
                             region.add_block_entity(be);
                         }
