@@ -109,25 +109,48 @@ println!("{:?}", schematic.get_info());
 #### JavaScript (WASM)
 
 ```ts
-import { SchematicParser } from "nucleation";
+import init from "nucleation";
+import { Schematic } from "nucleation/api";
+await init();
 
 const bytes = await fetch("example.litematic").then((r) => r.arrayBuffer());
-const parser = new SchematicParser();
-await parser.fromData(new Uint8Array(bytes));
-console.log(parser.getDimensions());
+const schem = Schematic.open(new Uint8Array(bytes), { hint: "example.litematic" });
+schem.setBlock([0, 0, 0], "minecraft:gold_block");
+await schem.save("out.schem");
 ```
 
 #### Python
 
 ```python
-from nucleation import Schematic
+from nucleation import Schematic, sign, text
 
-with open("example.litematic", "rb") as f:
-    data = f.read()
+# Three explicit constructors (legacy `Schematic("file.schem")` still works):
+schem = Schematic.open("example.litematic")        # load
+fresh = Schematic.new("my_schematic")              # blank
+templ = Schematic.from_template("ab\ncd")          # ASCII template
 
-schem = Schematic("my_schematic")
-schem.load_from_bytes(data)
-print(schem.get_info())
+# Polished set_block: tuple coords, structured state and NBT, chainable.
+schem.set_block((0, 0, 0), "minecraft:repeater",
+                state={"delay": 4, "facing": "east"})
+schem.set_block((0, 1, 0), "minecraft:oak_sign",
+                state={"rotation": 8},
+                nbt=sign([text("Hello", color="gold"), "world"]))
+
+# Format inferred from extension.
+schem.save("out.litematic")
+```
+
+For hot loops placing many blocks, prefer the batch / fast-path APIs:
+
+```python
+# 30+ M placements/sec — one native call.
+schem.set_blocks([(x, 0, 0) for x in range(1_000_000)], "minecraft:stone")
+
+# 10+ M placements/sec — pre-resolve once, place by index.
+stone = schem.prepare_block("minecraft:stone")
+place = schem.place
+for x, y, z in positions:
+    place(x, y, z, stone)
 ```
 
 ### Building Schematics with ASCII Art

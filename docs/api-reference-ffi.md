@@ -447,6 +447,9 @@ Positions are flat arrays: `[x0, y0, z0, x1, y1, z1, ...]` with `positions_len =
 
 ```c
 // Set same block at multiple positions. Returns count set, or negative on error.
+// Complex strings (with [state] or {nbt}) are parsed once and applied to every
+// position — orders of magnitude faster than per-call set_block_from_string for
+// repeated tile entities like chests with identical contents.
 int schematic_set_blocks(
     SchematicWrapper* schematic,
     const int* positions, size_t positions_len,
@@ -457,6 +460,90 @@ int schematic_set_blocks(
 StringArray schematic_get_blocks(
     const SchematicWrapper* schematic,
     const int* positions, size_t positions_len
+);
+```
+
+### Hot-Loop Fast Path
+
+For tight per-block loops with multiple unique block ids (e.g.
+procedural / multi-color generative content), use the prepare+place
+pattern to skip the per-call name → palette lookup entirely.
+
+```c
+// Pre-resolve a plain block name to a palette index. Returns the index,
+// or negative on error. Sets last_error on failure.
+int schematic_prepare_block(SchematicWrapper* schematic, const char* block_name);
+
+// Place a block by pre-resolved palette index. Pair with
+// schematic_prepare_block. Returns 0 on success, negative on error.
+int schematic_place(SchematicWrapper* schematic, int x, int y, int z, int palette_index);
+
+// Example: build a 200k-position striped pattern at native speed.
+int stone = schematic_prepare_block(s, "minecraft:stone");
+int dirt  = schematic_prepare_block(s, "minecraft:dirt");
+for (int x = 0; x < 200000; x++) {
+    schematic_place(s, x, 0, 0, (x & 1) ? dirt : stone);
+}
+```
+
+### NBT String Builders
+
+Build SNBT payloads in C without hand-writing escape-prone strings.
+Each returns an owned `char*` — free with `free_string`.
+
+```c
+// JSON text component: {"text":"...","color":"...","bold":true,...}
+// color may be NULL. bold/italic use -1 for unset, 0=false, !0=true.
+char* nbt_text_build(const char* s, const char* color, int bold, int italic);
+
+// Inventory NBT for chests / barrels / hoppers. items[] is an array of
+// CItem structs (see Data Structures). name= NULL leaves CustomName off.
+typedef struct {
+    const char* id;
+    int count;       // <= 0 defaults to 1
+    int slot;        // < 0 auto-assigns positionally
+} CItem;
+
+char* nbt_chest_build(const CItem* items, size_t n, const char* name);
+
+// Modern (1.20+) sign NBT. front/back are arrays of up to 4 line strings;
+// pass NULL for an empty side. Lines that start with '{' are treated as
+// pre-built JSON text components; otherwise they're auto-wrapped via
+// nbt_text_build.
+char* nbt_sign_build(
+    const char* const* front, size_t front_n,
+    const char* const* back,  size_t back_n,
+    const char* color,         // NULL = "black"
+    int glowing,               // 0/1
+    int waxed                  // 0/1
+);
+
+// Example: place a chest with a single diamond using the helpers.
+const CItem items[] = { { .id = "minecraft:diamond", .count = 64, .slot = -1 } };
+char* nbt = nbt_chest_build(items, 1, "Loot");
+char block[1024];
+snprintf(block, sizeof(block), "minecraft:chest[facing=west]%s", nbt);
+schematic_set_block_from_string(handle, 0, 0, 0, block);
+free_string(nbt);
+```
+
+### One-shot simulation
+
+Convenience wrapper that creates a simulation world, fires use-block
+events, ticks, and syncs the result back into the schematic in one
+call. For multi-stage flows, drop down to `mchprs_world_*`.
+
+```c
+// Run a redstone simulation, fire `n_events` use-block events from
+// events_xyz (a flat [x,y,z, x,y,z, ...] array), tick `ticks` times,
+// and sync the simulated state back into `schematic`.
+// Pass NULL events_xyz with n_events=0 to just tick.
+// Returns 0 on success, negative on error.
+int schematic_simulate_use_block(
+    SchematicWrapper* schematic,
+    uint32_t ticks,
+    const int* events_xyz,
+    size_t n_events
 );
 ```
 

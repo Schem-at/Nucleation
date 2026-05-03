@@ -2,6 +2,149 @@
 
 Nucleation provides native Python bindings via PyO3. Install with `pip install nucleation` and import as `import nucleation`. All types follow Python naming conventions (snake_case methods, PascalCase types).
 
+The polished `Schematic` is a Python subclass of the compiled extension class — every native method is callable directly with no wrapper overhead. Chainable methods return `self`, so `schem.set_block(...).set_block(...).save(...)` works.
+
+---
+
+## Quick start
+
+```python
+from nucleation import Schematic, sign, text
+
+# Three explicit constructors. The legacy Schematic("file.schem") form
+# still works (it auto-detects path-vs-name from the extension).
+schem  = Schematic.new("my_build")                  # blank
+loaded = Schematic.open("example.litematic")        # load file (format inferred)
+templ  = Schematic.from_template("ab\ncd")          # ASCII template
+
+# Polished set_block — tuple coords, structured state/NBT, chainable.
+schem.set_block((0, 0, 0), "minecraft:repeater",
+                state={"delay": 4, "facing": "east"})
+schem.set_block((0, 1, 0), "minecraft:oak_sign",
+                state={"rotation": 8},
+                nbt=sign([text("Hello", color="gold"), "world"]))
+
+# Format inferred from extension.
+schem.save("out.litematic")
+```
+
+## Per-block placement performance tiers
+
+| API | Throughput | When to use |
+|-----|-----------:|-------------|
+| `schem.fill_cuboid(x1,y1,z1, x2,y2,z2, "id")` | 1,100+ M/s | One block id, axis-aligned cuboid |
+| `schem.set_blocks(positions, "id")` | 30+ M/s | Many positions, one block id |
+| `schem.set_blocks(positions, "id[s]{nbt}")` | ~20 M/s | Many positions, identical tile entity (chest, sign) |
+| `prepare_block("id")` + `place(x,y,z,idx)` | ~9 M/s | Hot loop with multiple unique ids |
+| `schem.set_block(...)` | ~5 M/s | Single placement; polished form supports state/NBT/Block |
+
+For "place many of the same thing" workloads, `set_blocks` and `fill_cuboid` are 5-200× faster than per-call `set_block`.
+
+## Polished set_block forms
+
+```python
+# Legacy 4-arg form (still supported).
+schem.set_block(0, 0, 0, "minecraft:stone")
+
+# Tuple coords.
+schem.set_block((0, 0, 0), "minecraft:stone")
+
+# State as Python dict (real types in — bools, ints, strings).
+schem.set_block((0, 0, 0), "minecraft:repeater",
+                state={"delay": 4, "facing": "east", "powered": False})
+
+# NBT as Python dict (recursive — lists, nested dicts).
+schem.set_block((0, 0, 0), "minecraft:chest",
+                state={"facing": "west"},
+                nbt={"Items": [{"Slot": 0, "id": "minecraft:diamond", "Count": 64}]})
+
+# Reusable Block instance — payload is cached after first use.
+diamond = Block("minecraft:diamond_block")
+loot    = Block("minecraft:chest", state={"facing": "west"},
+                nbt=chest([("minecraft:diamond", 64)]))
+for x in (0, 5, 10):
+    schem.set_block((x, 0, 0), loot)
+
+# Raw SNBT escape hatch (when the wrapper's serializer doesn't cover an
+# exotic type — Long arrays, custom suffixes, etc.).
+schem.set_block((0, 0, 0), "minecraft:jukebox",
+                nbt={"__snbt__": "{signal:5L}"})
+```
+
+## Cursor — sequential placement
+
+```python
+cursor = schem.cursor(origin=(0, 0, 0), step=(3, 0, 0))
+for s in signals:
+    cursor.place("minecraft:jukebox",
+                 state={"has_record": True},
+                 nbt={"signal": s - 1})
+    cursor.place(wools[s], offset=(0, 1, 0))
+    cursor.advance()
+```
+
+## Block helper
+
+`Block(id, state=None, nbt=None)` — a frozen dataclass that caches its
+serialized payload after first use. Pass directly to `set_block` /
+`set_blocks` to skip per-call serialization.
+
+`Block.parse("minecraft:repeater[delay=4]{signal:5}")` — parse the
+stringly-typed form into structured fields.
+
+`block.with_state(facing="west")` / `block.with_nbt(...)` — derive a
+new Block.
+
+## Tile-entity helpers
+
+| Helper | Returns | Use |
+|--------|---------|-----|
+| `text(s, color=, bold=, italic=, ...)` | JSON text-component string | sign messages, custom names |
+| `chest(items, *, name=None, lock=None, loot_table=None)` | NBT dict | inventory containers |
+| `sign(lines, *, back=None, color="black", glowing=False, waxed=False)` | NBT dict | modern (1.20+) signs |
+| `Item(id, count=1, slot=None, components=None)` | dataclass | rich item entries (used inside `chest()`) |
+
+```python
+# Chest with mixed shapes.
+nbt = chest([
+    ("minecraft:diamond", 64),                    # tuple
+    "minecraft:netherite_ingot",                  # bare string = count 1
+    Item("minecraft:elytra", count=1),            # explicit
+])
+
+# Sign with formatted text.
+nbt = sign([text("LOOT", color="gold", bold=True), "Inside"], waxed=True)
+```
+
+## Simulation
+
+```python
+from nucleation import UseBlock
+
+schem.simulate(
+    ticks=4,
+    events=[UseBlock((0, 1, 3))],
+)
+```
+
+Power users wanting multi-stage simulation flows can drop to the
+`schem.create_simulation_world()` API directly.
+
+## Save / render / mesh export
+
+```python
+# Save — format inferred from extension. Pass format= to override.
+schem.save("out.litematic")
+schem.save("/tmp/scratch", format="schem")
+
+# Render to PNG — kwargs build a RenderConfig, or pass an explicit one.
+schem.with_pack(pack)                       # bind once
+schem.render("out.png", width=3840, height=2160, yaw=45, pitch=45, zoom=0.7)
+
+# Export a mesh.
+schem.export_mesh("out.glb")                # also accepts .nucm
+```
+
 ---
 
 ## Table of Contents
@@ -43,22 +186,25 @@ Nucleation provides native Python bindings via PyO3. Install with `pip install n
 
 ### Schematic
 
-The primary class for creating, loading, editing, and exporting Minecraft schematics.
+The primary class for creating, loading, editing, and exporting Minecraft schematics. Subclasses the compiled extension class so every native method works on it directly; chains of polished methods preserve the subclass identity.
 
 ```python
 from nucleation import Schematic
 
-schematic = Schematic()
-schematic = Schematic(name="My Build")
+schem = Schematic.new("my_build")              # blank
+schem = Schematic.open("example.litematic")    # load file (format inferred)
+schem = Schematic.from_template("ab\ncd")      # ASCII template (build later)
+schem = Schematic("legacy")                    # legacy form: name OR path-with-known-ext
 ```
 
-#### Constructor
+#### Constructors
 
-```python
-Schematic(name: Optional[str] = None) -> Schematic
-```
-
-Creates a new empty schematic with an optional name.
+| Form | Purpose |
+|------|---------|
+| `Schematic.new(name="untitled", *, pack=None)` | Blank schematic, optional `ResourcePack` bind for later `render()` calls. |
+| `Schematic.open(path, *, pack=None)` | Load an existing file. Format inferred from `path` extension. |
+| `Schematic.from_template(template, *, name="untitled", pack=None)` | Build from an ASCII-art template. Use `.map(char, block)` before any other mutation; the schematic materializes lazily on first non-`map()` call. |
+| `Schematic(name_or_path, *, pack=None)` | Backwards-compat polymorphic form: loads if `name_or_path` ends in a known extension and the file exists, else creates blank. |
 
 #### Format I/O — Import
 

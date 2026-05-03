@@ -2,25 +2,75 @@
 
 Complete API reference and guide for using Nucleation in JavaScript and TypeScript (via WebAssembly).
 
+Two import surfaces ship side by side:
+
+- **`nucleation`** — the raw wasm-bindgen output (`SchematicWrapper`, `init`,
+  etc.). Lowest overhead, snake_case Rust names.
+- **`nucleation/api`** — a polished facade with `Schematic`, `Block`,
+  `Cursor`, `UseBlock`, `ButtonPress`, `Item`, plus `chest()`, `sign()`,
+  `text()` helpers. Camel-case JS conventions, structured state/NBT,
+  chainable returns. The underlying raw instance is always available as
+  `schem.raw`.
+
 ## Quick Start
 
 ```bash
 npm install nucleation
 ```
 
-```typescript
-import init, { SchematicWrapper } from "nucleation";
+### Polished API (recommended)
 
-// Initialize WASM module
+```typescript
+import init from "nucleation";
+import { Schematic, sign, text } from "nucleation/api";
 await init();
 
-// Create schematic
+const schem = Schematic.new("my_build");
+
+// Tuple coordinates, structured state and NBT, chainable.
+schem.setBlock([0, 0, 0], "minecraft:repeater", {
+  state: { delay: 4, facing: "east" },
+});
+schem.setBlock([0, 1, 0], "minecraft:oak_sign", {
+  state: { rotation: 8 },
+  nbt: sign([text("Hello", { color: "gold" }), "world"]),
+});
+
+await schem.save("out.litematic");          // Node: writes to disk
+const bytes = await schem.save("x.litematic");  // Browser: returns Uint8Array
+```
+
+### Per-block placement performance
+
+| API | Throughput | When to use |
+|-----|-----------:|-------------|
+| `schem.raw.fill_cuboid(...)` | very fast | One block, axis-aligned cuboid |
+| `schem.raw.set_blocks(positions, "id")` | ~10 M/s | Many positions, one block id |
+| `prepareBlock("id")` + `place(...)` | **~85 M/s** | Hot loop, multiple unique ids |
+| `schem.setBlock([x,y,z], "id")` | ~7 M/s | Single placement, polished |
+
+Hot-loop pattern:
+
+```typescript
+const stone = schem.prepareBlock("minecraft:stone");
+const place = schem.raw.place.bind(schem.raw);
+for (const [x, y, z] of positions) place(x, y, z, stone);
+```
+
+WASM has dramatically lower per-call overhead than PyO3 — the JS
+prepare+place path runs at near-native-Rust speed.
+
+### Raw API
+
+The raw wasm-bindgen output remains available without the polished facade:
+
+```typescript
+import init, { SchematicWrapper } from "nucleation";
+await init();
+
 const schematic = new SchematicWrapper();
 schematic.set_block(0, 0, 0, "minecraft:stone");
-
-// Save as litematic
 const bytes = schematic.to_litematic();
-// Download or save bytes...
 ```
 
 ## Table of Contents
