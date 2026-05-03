@@ -86,7 +86,10 @@ fn bench_clone_block_entity(c: &mut Criterion) {
     let item = {
         let mut m = nucleation::nbt::NbtMap::new();
         m.insert("Slot".to_string(), NbtValue::Byte(0));
-        m.insert("id".to_string(), NbtValue::String("minecraft:diamond".into()));
+        m.insert(
+            "id".to_string(),
+            NbtValue::String("minecraft:diamond".into()),
+        );
         m.insert("Count".to_string(), NbtValue::Byte(64));
         NbtValue::Compound(m)
     };
@@ -184,7 +187,10 @@ fn bench_chest_batch_components(c: &mut Criterion) {
         let item = {
             let mut m = nucleation::nbt::NbtMap::new();
             m.insert("Slot".to_string(), NbtValue::Byte(0));
-            m.insert("id".to_string(), NbtValue::String("minecraft:diamond".into()));
+            m.insert(
+                "id".to_string(),
+                NbtValue::String("minecraft:diamond".into()),
+            );
             m.insert("Count".to_string(), NbtValue::Byte(64));
             NbtValue::Compound(m)
         };

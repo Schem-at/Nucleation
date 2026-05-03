@@ -303,12 +303,7 @@ fn cstr_opt(p: *const c_char) -> Option<String> {
     }
 }
 
-fn build_text_json(
-    s: &str,
-    color: Option<&str>,
-    bold: c_int,
-    italic: c_int,
-) -> String {
+fn build_text_json(s: &str, color: Option<&str>, bold: c_int, italic: c_int) -> String {
     let mut parts = vec![format!("\"text\":\"{}\"", json_escape(s))];
     if let Some(c) = color {
         parts.push(format!("\"color\":\"{}\"", json_escape(c)));
@@ -340,7 +335,9 @@ pub extern "C" fn nbt_text_build(
     let text = unsafe { CStr::from_ptr(s) }.to_string_lossy().into_owned();
     let color_owned = cstr_opt(color);
     let json = build_text_json(&text, color_owned.as_deref(), bold, italic);
-    CString::new(json).map(|c| c.into_raw()).unwrap_or(ptr::null_mut())
+    CString::new(json)
+        .map(|c| c.into_raw())
+        .unwrap_or(ptr::null_mut())
 }
 
 /// Build a chest-NBT SNBT string for use as the `{...}` portion of a block
@@ -394,7 +391,9 @@ pub extern "C" fn nbt_chest_build(
         parts.push(format!("CustomName:{}", snbt_string(&inner)));
     }
     let snbt = format!("{{{}}}", parts.join(","));
-    CString::new(snbt).map(|c| c.into_raw()).unwrap_or(ptr::null_mut())
+    CString::new(snbt)
+        .map(|c| c.into_raw())
+        .unwrap_or(ptr::null_mut())
 }
 
 /// Build a modern (1.20+) sign-NBT SNBT string.
@@ -435,7 +434,9 @@ pub extern "C" fn nbt_sign_build(
                 out.push(String::from("\"\""));
                 continue;
             }
-            let s = unsafe { CStr::from_ptr(*sp) }.to_string_lossy().into_owned();
+            let s = unsafe { CStr::from_ptr(*sp) }
+                .to_string_lossy()
+                .into_owned();
             if s.is_empty() {
                 out.push(String::from("\"\""));
             } else if s.starts_with('{') {
@@ -479,7 +480,9 @@ pub extern "C" fn nbt_sign_build(
         g,
         w,
     );
-    CString::new(snbt).map(|c| c.into_raw()).unwrap_or(ptr::null_mut())
+    CString::new(snbt)
+        .map(|c| c.into_raw())
+        .unwrap_or(ptr::null_mut())
 }
 
 // --- Schematic Lifecycle ---
@@ -1272,14 +1275,29 @@ pub extern "C" fn schematic_set_blocks(
         let (mut max_x, mut max_y, mut max_z) = (min_x, min_y, min_z);
         for i in 1..count {
             let (x, y, z) = (pos_slice[i * 3], pos_slice[i * 3 + 1], pos_slice[i * 3 + 2]);
-            if x < min_x { min_x = x; } if y < min_y { min_y = y; } if z < min_z { min_z = z; }
-            if x > max_x { max_x = x; } if y > max_y { max_y = y; } if z > max_z { max_z = z; }
+            if x < min_x {
+                min_x = x;
+            }
+            if y < min_y {
+                min_y = y;
+            }
+            if z < min_z {
+                min_z = z;
+            }
+            if x > max_x {
+                max_x = x;
+            }
+            if y > max_y {
+                max_y = y;
+            }
+            if z > max_z {
+                max_z = z;
+            }
         }
 
         let block_name_owned = block_state.name.to_string();
         let proto: Option<crate::block_entity::BlockEntity> = nbt_data.as_ref().map(|nbt| {
-            let mut be =
-                crate::block_entity::BlockEntity::new(block_name_owned.clone(), (0, 0, 0));
+            let mut be = crate::block_entity::BlockEntity::new(block_name_owned.clone(), (0, 0, 0));
             for (k, v) in nbt {
                 be = be.with_nbt_data(k.clone(), v.clone());
             }
@@ -1299,10 +1317,7 @@ pub extern "C" fn schematic_set_blocks(
                 let (x, y, z) = (pos_slice[i * 3], pos_slice[i * 3 + 1], pos_slice[i * 3 + 2]);
                 let mut be = template.clone();
                 be.position = (x, y, z);
-                s.set_block_entity(
-                    crate::block_position::BlockPosition { x, y, z },
-                    be,
-                );
+                s.set_block_entity(crate::block_position::BlockPosition { x, y, z }, be);
             }
         }
         return count as c_int;

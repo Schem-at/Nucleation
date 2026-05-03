@@ -703,7 +703,7 @@ pub fn to_world(
         }
 
         // Collect block entities
-        for (pos, be) in &region.block_entities {
+        for (pos, be) in region.block_entities.iter() {
             let world_x = pos.0 + opts.offset.0;
             let world_y = pos.1 + opts.offset.1;
             let world_z = pos.2 + opts.offset.2;

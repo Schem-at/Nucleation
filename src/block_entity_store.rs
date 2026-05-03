@@ -53,11 +53,7 @@ impl BlockEntityStore {
     /// palette entry — use `insert_template` if you want template sharing.
     /// Returns the previously-stored BlockEntity at this position, if any.
     #[inline]
-    pub fn insert(
-        &mut self,
-        pos: (i32, i32, i32),
-        be: BlockEntity,
-    ) -> Option<BlockEntity> {
+    pub fn insert(&mut self, pos: (i32, i32, i32), be: BlockEntity) -> Option<BlockEntity> {
         let idx = self.palette.len() as u32;
         self.palette.push(Arc::new(be));
         let prev = self.by_pos.insert(pos, idx);
@@ -66,11 +62,7 @@ impl BlockEntityStore {
 
     /// Hot batch path: store ONE shared template at all `positions`.
     /// Skips the per-position BlockEntity clone and palette push entirely.
-    pub fn insert_template(
-        &mut self,
-        positions: &[(i32, i32, i32)],
-        template: Arc<BlockEntity>,
-    ) {
+    pub fn insert_template(&mut self, positions: &[(i32, i32, i32)], template: Arc<BlockEntity>) {
         if positions.is_empty() {
             return;
         }

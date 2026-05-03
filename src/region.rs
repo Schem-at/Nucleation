@@ -148,7 +148,8 @@ impl Region {
     }
 
     pub(crate) fn rebuild_palette_index(&mut self) {
-        self.palette_index = FxHashMap::with_capacity_and_hasher(self.palette.len(), Default::default());
+        self.palette_index =
+            FxHashMap::with_capacity_and_hasher(self.palette.len(), Default::default());
         for (index, block) in self.palette.iter().enumerate() {
             self.palette_index.insert(block.clone(), index);
         }
@@ -1166,7 +1167,8 @@ impl Region {
         // Transform block entities — pure position remap, no palette work.
         let max_x = self.bbox.max.0;
         let min_x = self.bbox.min.0;
-        self.block_entities.remap_positions(|(x, y, z)| (max_x - (x - min_x), y, z));
+        self.block_entities
+            .remap_positions(|(x, y, z)| (max_x - (x - min_x), y, z));
 
         // Transform entities
         for entity in &mut self.entities {
@@ -1210,7 +1212,8 @@ impl Region {
 
         let max_y = self.bbox.max.1;
         let min_y = self.bbox.min.1;
-        self.block_entities.remap_positions(|(x, y, z)| (x, max_y - (y - min_y), z));
+        self.block_entities
+            .remap_positions(|(x, y, z)| (x, max_y - (y - min_y), z));
 
         for entity in &mut self.entities {
             let rel_y = entity.position.1 - self.bbox.min.1 as f64;
@@ -1256,7 +1259,8 @@ impl Region {
 
         let max_z = self.bbox.max.2;
         let min_z = self.bbox.min.2;
-        self.block_entities.remap_positions(|(x, y, z)| (x, y, max_z - (z - min_z)));
+        self.block_entities
+            .remap_positions(|(x, y, z)| (x, y, max_z - (z - min_z)));
 
         for entity in &mut self.entities {
             let rel_z = entity.position.2 - self.bbox.min.2 as f64;

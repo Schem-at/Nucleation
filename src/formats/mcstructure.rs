@@ -402,7 +402,7 @@ pub fn to_mcstructure(
     );
 
     // Block Entities Data
-    for ((x, y, z), be) in &compact_region.block_entities {
+    for ((x, y, z), be) in compact_region.block_entities.iter() {
         let rel_x = x - compact_region.position.0;
         let rel_y = y - compact_region.position.1;
         let rel_z = z - compact_region.position.2;

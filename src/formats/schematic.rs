@@ -499,7 +499,7 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::er
 fn convert_block_entities(region: &Region) -> NbtList {
     let mut block_entities = NbtList::new();
 
-    for (_, block_entity) in &region.block_entities {
+    for (_, block_entity) in region.block_entities.iter() {
         let mut nbt = block_entity.to_nbt();
         let rel_x = block_entity.position.0 - region.position.0;
         let rel_y = block_entity.position.1 - region.position.1;
@@ -517,7 +517,7 @@ fn convert_block_entities(region: &Region) -> NbtList {
 fn convert_block_entities_v3(region: &Region) -> NbtList {
     let mut block_entities = NbtList::new();
 
-    for (_, block_entity) in &region.block_entities {
+    for (_, block_entity) in region.block_entities.iter() {
         let mut nbt = block_entity.to_nbt_v3();
         let rel_x = block_entity.position.0 - region.position.0;
         let rel_y = block_entity.position.1 - region.position.1;

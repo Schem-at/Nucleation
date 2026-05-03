@@ -48,10 +48,22 @@ fn chest_basic() {
     let id_diamond = cstr("minecraft:diamond");
     let id_elytra = cstr("minecraft:elytra");
     let items = [
-        CItem { id: id_diamond.as_ptr(), count: 64, slot: -1 },
-        CItem { id: id_elytra.as_ptr(),  count: 1,  slot: -1 },
+        CItem {
+            id: id_diamond.as_ptr(),
+            count: 64,
+            slot: -1,
+        },
+        CItem {
+            id: id_elytra.as_ptr(),
+            count: 1,
+            slot: -1,
+        },
     ];
-    let out = read_owned(nbt_chest_build(items.as_ptr(), items.len(), std::ptr::null()));
+    let out = read_owned(nbt_chest_build(
+        items.as_ptr(),
+        items.len(),
+        std::ptr::null(),
+    ));
     assert!(out.contains("Items:[{Slot:0b"), "got: {}", out);
     assert!(out.contains("minecraft:diamond"), "got: {}", out);
     assert!(out.contains("minecraft:elytra"), "got: {}", out);
@@ -62,7 +74,11 @@ fn chest_basic() {
 #[test]
 fn chest_with_explicit_slots_and_name() {
     let id = cstr("minecraft:diamond");
-    let items = [CItem { id: id.as_ptr(), count: 1, slot: 13 }];
+    let items = [CItem {
+        id: id.as_ptr(),
+        count: 1,
+        slot: 13,
+    }];
     let name = cstr("Loot");
     let out = read_owned(nbt_chest_build(items.as_ptr(), items.len(), name.as_ptr()));
     assert!(out.contains("Slot:13b"), "got: {}", out);
@@ -90,7 +106,12 @@ fn sign_basic() {
     // escaped form of `{"text":"Welcome"}`.
     assert!(out.contains(r#"\"text\":\"Welcome\""#), "got: {}", out);
     assert!(out.contains(r#"\"text\":\"home\""#), "got: {}", out);
-    assert_eq!(out.matches("messages:[").count(), 2, "wrong messages count: {}", out);
+    assert_eq!(
+        out.matches("messages:[").count(),
+        2,
+        "wrong messages count: {}",
+        out
+    );
 }
 
 #[test]
@@ -130,9 +151,7 @@ fn sign_rejects_more_than_four_lines() {
 
 #[test]
 fn batch_chest_via_set_blocks_complex() {
-    use nucleation::ffi::{
-        schematic_free, schematic_new, schematic_set_blocks,
-    };
+    use nucleation::ffi::{schematic_free, schematic_new, schematic_set_blocks};
 
     let handle = schematic_new();
     assert!(!handle.is_null());
@@ -142,9 +161,8 @@ fn batch_chest_via_set_blocks_complex() {
     for i in 0..count {
         positions.extend_from_slice(&[i as i32, 0, 0]);
     }
-    let chest_str = cstr(
-        r#"minecraft:chest[facing=west]{Items:[{Slot:0b,id:"minecraft:diamond",Count:64b}]}"#,
-    );
+    let chest_str =
+        cstr(r#"minecraft:chest[facing=west]{Items:[{Slot:0b,id:"minecraft:diamond",Count:64b}]}"#);
     let rc = schematic_set_blocks(
         handle,
         positions.as_ptr(),
@@ -161,8 +179,16 @@ fn end_to_end_chest_placement() {
     use nucleation::ffi::{schematic_free, schematic_new, schematic_set_block_from_string};
 
     let id = cstr("minecraft:diamond");
-    let items = [CItem { id: id.as_ptr(), count: 64, slot: -1 }];
-    let nbt = read_owned(nbt_chest_build(items.as_ptr(), items.len(), std::ptr::null()));
+    let items = [CItem {
+        id: id.as_ptr(),
+        count: 64,
+        slot: -1,
+    }];
+    let nbt = read_owned(nbt_chest_build(
+        items.as_ptr(),
+        items.len(),
+        std::ptr::null(),
+    ));
 
     let block_str = format!("minecraft:chest[facing=west]{}", nbt);
     let c = cstr(&block_str);

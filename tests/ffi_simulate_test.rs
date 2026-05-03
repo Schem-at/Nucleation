@@ -13,7 +13,8 @@ use std::ffi::CString;
 use std::os::raw::c_int;
 
 use nucleation::ffi::{
-    schematic_free, schematic_new, schematic_set_block, simulation_ffi::schematic_simulate_use_block,
+    schematic_free, schematic_new, schematic_set_block,
+    simulation_ffi::schematic_simulate_use_block,
 };
 
 fn put(handle: *mut nucleation::ffi::SchematicWrapper, x: i32, y: i32, z: i32, name: &str) {

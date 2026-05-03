@@ -78,7 +78,7 @@ pub fn extract_signs(schematic: &UniversalSchematic) -> Vec<SignInput> {
     let all_regions = schematic.get_all_regions();
 
     for region in all_regions.values() {
-        for (pos, block_entity) in &region.block_entities {
+        for (pos, block_entity) in region.block_entities.iter() {
             // Check if this is a sign block entity
             if block_entity.id.contains("sign") {
                 if let Some(text) = extract_sign_text(block_entity) {

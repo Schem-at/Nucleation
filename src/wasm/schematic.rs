@@ -695,10 +695,25 @@ impl SchematicWrapper {
             let (mut min_x, mut min_y, mut min_z) = (positions[0], positions[1], positions[2]);
             let (mut max_x, mut max_y, mut max_z) = (min_x, min_y, min_z);
             for i in 1..count {
-                let (x, y, z) =
-                    (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
-                if x < min_x { min_x = x; } if y < min_y { min_y = y; } if z < min_z { min_z = z; }
-                if x > max_x { max_x = x; } if y > max_y { max_y = y; } if z > max_z { max_z = z; }
+                let (x, y, z) = (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+                if x < min_x {
+                    min_x = x;
+                }
+                if y < min_y {
+                    min_y = y;
+                }
+                if z < min_z {
+                    min_z = z;
+                }
+                if x > max_x {
+                    max_x = x;
+                }
+                if y > max_y {
+                    max_y = y;
+                }
+                if z > max_z {
+                    max_z = z;
+                }
             }
 
             let block_name_owned = block_state.name.to_string();
@@ -715,21 +730,17 @@ impl SchematicWrapper {
             region.ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
             let palette_index = region.get_or_insert_palette_by_state(&block_state);
             for i in 0..count {
-                let (x, y, z) =
-                    (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+                let (x, y, z) = (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
                 region.set_block_at_index_unchecked(palette_index, x, y, z);
             }
 
             if let Some(ref template) = proto {
                 for i in 0..count {
-                    let (x, y, z) =
-                        (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+                    let (x, y, z) = (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
                     let mut be = template.clone();
                     be.position = (x, y, z);
-                    self.0.set_block_entity(
-                        crate::block_position::BlockPosition { x, y, z },
-                        be,
-                    );
+                    self.0
+                        .set_block_entity(crate::block_position::BlockPosition { x, y, z }, be);
                 }
             }
             return count;
