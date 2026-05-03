@@ -1,3 +1,246 @@
+# Nucleation v0.2.0
+
+The Python API gets a structural redesign — same import name, much
+nicer ergonomics, and substantially faster on the hot paths users
+actually hit. JS/WASM and C/FFI gain matching upgrades. One small
+behavior change is described under "Breaking" below.
+
+## What's new
+
+### Polished `Schematic` is a true Python subclass of the native class
+
+`nucleation.Schematic` no longer wraps the compiled extension as a
+separate Python object. It now subclasses it directly, so every native
+method is available with no wrapper layer, and chains of polished calls
+preserve the polished class identity:
+
+```python
+schem = (
+    Schematic.new("loot_room")
+        .set_block((0, 0, 0), "minecraft:chest",
+                   state={"facing": "west"},
+                   nbt=chest([("minecraft:diamond", 64), "minecraft:elytra"], name="Loot"))
+        .set_block((0, 1, 0), "minecraft:oak_sign",
+                   state={"rotation": 8},
+                   nbt=sign([text("LOOT", color="gold", bold=True), "Inside"]))
+)
+schem.save("out.litematic")
+```
+
+### Three explicit constructors
+
+```python
+Schematic.new("name")                # blank schematic
+Schematic.open("file.litematic")     # load file (format inferred)
+Schematic.from_template("ab\ncd")    # ASCII template (build later via map())
+Schematic("legacy.schem")            # legacy polymorphic form still works
+```
+
+### `set_block` accepts every reasonable form, in one method
+
+The polished `set_block` lives in Rust and dispatches every shape
+internally — no Python wrapper overhead.
+
+```python
+schem.set_block(0, 0, 0, "minecraft:stone")                    # 4-arg legacy
+schem.set_block((0, 0, 0), "minecraft:stone")                  # tuple coords
+schem.set_block((0, 0, 0), "minecraft:repeater", state={...})  # state kwargs
+schem.set_block((0, 0, 0), "minecraft:chest", nbt={...})       # nbt kwargs
+schem.set_block((0, 0, 0), Block("minecraft:chest", state=..., nbt=...))
+```
+
+Reusable `Block` instances cache their full payload; place the same
+block at many positions without re-serializing.
+
+### Tile-entity helpers
+
+```python
+from nucleation import chest, sign, text, Item
+
+schem.set_block((0, 0, 0), "minecraft:chest",
+                state={"facing": "west"},
+                nbt=chest([
+                    ("minecraft:diamond", 64),
+                    "minecraft:elytra",
+                    Item("minecraft:netherite_sword", components={
+                        "minecraft:enchantments": {"levels": {"minecraft:sharpness": 5}},
+                        "minecraft:custom_name": text("Soulrender", color="dark_purple"),
+                    }),
+                ], name="Loot Stash"))
+
+schem.set_block((0, 1, 0), "minecraft:oak_sign",
+                state={"rotation": 8},
+                nbt=sign(["Welcome", text("LOOT", color="gold", bold=True)]))
+```
+
+### Cursor for sequential placement
+
+```python
+cursor = schem.cursor(step=(3, 0, 0))
+for s in signals:
+    cursor.place("minecraft:jukebox",
+                 state={"has_record": True},
+                 nbt={"signal": s - 1})
+    cursor.place(wools[s], offset=(0, 1, 0))
+    cursor.advance()
+```
+
+### Hot-loop fast path: `prepare_block` + `place`
+
+For multi-color generative content, pre-resolve names once and place
+by palette index for ~10× speedup over `set_block` calls:
+
+```python
+red  = schem.prepare_block("minecraft:red_concrete")
+blue = schem.prepare_block("minecraft:blue_concrete")
+place = schem.place
+for x, y, z, color in voxels:
+    place(x, y, z, color)
+```
+
+Available across all bindings — `prepareBlock`/`place` in JS,
+`schematic_prepare_block`/`schematic_place` in FFI.
+
+### `simulate(events=...)` collapses the redstone round-trip
+
+The 5-step `create_simulation_world` → `on_use_block` → `tick` →
+`sync_to_schematic` → `get_schematic` flow becomes one call:
+
+```python
+from nucleation import UseBlock
+
+schem.simulate(ticks=4, events=[UseBlock((0, 1, 3))])
+```
+
+The legacy `create_simulation_world()` API still works for multi-stage
+flows.
+
+### One-shot simulate convenience in FFI
+
+`schematic_simulate_use_block(handle, ticks, events_xyz, n_events)`
+runs the same end-to-end flow from C without managing a separate
+world handle.
+
+### Format inference for `save()` / `export_mesh()`
+
+```python
+schem.save("out.litematic")   # litematic
+schem.save("out.schem")       # sponge schematic
+schem.save("out.mcstructure") # bedrock mcstructure
+schem.save("/tmp/x", format="schem")  # explicit override
+
+schem.export_mesh("out.glb")  # or .nucm
+```
+
+### Render with kwargs
+
+```python
+schem.with_pack(pack)
+schem.render("out.png", width=3840, height=2160, yaw=45, pitch=45, zoom=0.7)
+# or:
+schem.render("out.png", config=RenderConfig(...))
+```
+
+## Performance
+
+Real workloads (release builds, measured against the pre-session 0.1.x
+baseline on the same hardware):
+
+### Python — 200,337-voxel Mandelbulb (`bench_python.py`)
+
+| Operation | Before | After | Speedup |
+|---|---:|---:|---:|
+| `set_block` loop, 16 colors | 5.0 M/s | 4.8 M/s | within ~3% |
+| `set_blocks` batch | 14.9 M/s | 32 M/s | **2.1×** |
+| `prepare_block + place` (new) | n/a | 9 M/s | **1.8× over old set_block** |
+| `fill_cuboid` | 82 M/s | 1,100 M/s | **13×** |
+| `flip_x` (5k chests) | n/a | 80 M/s | huge improvement on transforms |
+| `rotate_y 90°` (5k chests) | n/a | 89 M/s |  |
+| Schematic clone (10k chests) | n/a | 240 M/s |  |
+
+### Python — 1M chests with NBT (`set_blocks` parse-once batch)
+
+| Stage | Throughput | 1B chests ETA |
+|---|---:|---:|
+| Pre-session per-call SNBT loop | 28 K/s | ~10 hours |
+| Final, after structural changes | **20 M/s** | **~50 seconds** |
+
+The chest-batch case improved ~700× thanks to:
+- Parse-once batch path (one SNBT parse, applied to N positions)
+- `BlockEntityStore` (palette of `Arc<BlockEntity>` templates +
+  position index, with `insert_template` fast path that shares one
+  Arc across all positions)
+- `Arc<NbtMap>` so cloning a `BlockEntity` is a refcount bump (~16 ns)
+  instead of a deep tree walk (~250 ns)
+- FxHashMap on `palette_index` and `block_state_cache`
+
+### JS / WASM — per-block placement
+
+WASM has dramatically lower per-call overhead than PyO3:
+
+| API | Throughput |
+|-----|---:|
+| `s.raw.set_block` | 10.8 M/s |
+| `s.setBlock([x,y,z], "id")` | 7.7 M/s |
+| `prepareBlock` + `place` (single id) | 60.6 M/s |
+| `prepareBlock` + `place` (16 colors) | **85.8 M/s** |
+
+JS users hitting the prepare+place pattern get near-native-Rust speed.
+
+## Errors
+
+Every binding gained tighter, tested error messages. Selected
+improvements:
+
+- Python: `set_block(1, 2)` now says `first arg must be a 3-tuple of
+  ints` instead of leaking `'int' object cannot be converted to
+  'PyTuple'`.
+- Python: `nbt="raw_string"` now raises `TypeError` (was silently
+  accepted, hiding typo bugs). Use `nbt={"__snbt__": "..."}` for raw
+  SNBT.
+- Python: `Schematic.new(123)` says `name must be a string`.
+- Python: `Block.parse(123)` says `expects a string`.
+- Python: `export_mesh("x.bad")` reports the bad extension before
+  complaining about a missing pack.
+- JS: matching validation across the board, including bare-string nbt
+  rejection.
+- FFI: `schematic_prepare_block` / `schematic_place` set thread-local
+  `last_error` with actionable messages on null handles, negative
+  indices, or out-of-range palette indices.
+
+35 new error-handling tests across the bindings (18 pytest, 12 node, 5 ffi).
+
+## Breaking
+
+Only one — and it caught a class of silent bugs:
+
+```python
+# Used to silently slip through into the SNBT parser:
+schem.set_block((0, 0, 0), "minecraft:chest", nbt="raw_string")
+# Now raises TypeError. Either pass a real dict:
+schem.set_block((0, 0, 0), "minecraft:chest", nbt={"Items": [...]})
+# ...or use the explicit __snbt__ escape hatch:
+schem.set_block((0, 0, 0), "minecraft:chest", nbt={"__snbt__": "{...}"})
+```
+
+All other previously-working call patterns continue to work unchanged
+(legacy 4-arg `set_block`, `Schematic("name.schem")` polymorphic form,
+the deprecated `SchematicBuilder` shim with `DeprecationWarning`,
+every native method like `set_block_with_properties`,
+`set_block_from_string`, `fill_cuboid`, format I/O, etc.).
+
+## Tests
+
+- cargo test (default): 401 passing
+- cargo test --features simulation: 596 passing
+- pytest: 71 passing (was 53)
+- node: 45 passing (was 30)
+- FFI helpers: 17 passing (was 12)
+- FFI simulate: 3 passing
+- API parity check: 0 missing across all bindings
+
+Pre-push: 15/15 functional checks passing.
+
 # Nucleation v0.1.183
 
 Ships prebuilt Python wheels for every major platform, not just Linux
