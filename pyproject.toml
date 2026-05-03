@@ -8,7 +8,7 @@ version = "0.2.1"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = [{ name = "Nano", email = "nano@schem.at" }]
 license = { text = "AGPL-3.0-only" }
-readme = "README.md"
+readme = "README-python.md"
 requires-python = ">=3.8"
 keywords = ["minecraft", "schematic", "parser", "voxel"]
 classifiers = [

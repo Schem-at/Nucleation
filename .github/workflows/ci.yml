@@ -3,11 +3,7 @@ name: Nucleation CI/CD
 on:
   push:
     branches: [ main, master ]
-    paths:
-      - 'src/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - '.github/workflows/**'
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
@@ -23,37 +19,26 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
-      should_release: ${{ steps.check.outputs.should_release }}
+      should_release: ${{ steps.version.outputs.should_release }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
 
-      - name: Get current version
+      - name: Determine version
         id: version
         run: |
-          VERSION=$(grep -m1 'version = ' Cargo.toml | cut -d '"' -f2)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Found version: $VERSION"
-
-      - name: Check if version changed
-        id: check
-        run: |
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" =~ ^refs/heads/(main|master)$ ]]; then
-            if git diff HEAD^ HEAD --name-only | grep -q "Cargo.toml"; then
-              OLD_VERSION=$(git show HEAD^:Cargo.toml | grep -m1 'version = ' | cut -d '"' -f2)
-              CURRENT_VERSION=$(grep -m1 'version = ' Cargo.toml | cut -d '"' -f2)
-              if [[ "$OLD_VERSION" != "$CURRENT_VERSION" ]]; then
-                echo "should_release=true" >> $GITHUB_OUTPUT
-              else
-                echo "should_release=false" >> $GITHUB_OUTPUT
-              fi
-            else
-              echo "should_release=false" >> $GITHUB_OUTPUT
+          CARGO_VERSION=$(grep -m1 'version = ' Cargo.toml | cut -d '"' -f2)
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+            if [[ "$CARGO_VERSION" != "$TAG_VERSION" ]]; then
+              echo "Tag $TAG_VERSION does not match Cargo.toml version $CARGO_VERSION" >&2
+              exit 1
             fi
+            echo "should_release=true" >> $GITHUB_OUTPUT
           else
             echo "should_release=false" >> $GITHUB_OUTPUT
           fi
+          echo "version=$CARGO_VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $CARGO_VERSION (release: $([[ "${{ github.ref }}" == refs/tags/v* ]] && echo yes || echo no))"
 
   test:
     runs-on: ubuntu-latest
@@ -116,7 +101,8 @@ jobs:
           mkdir -p release-artifacts
           cp -r pkg/* release-artifacts/
           cp target/release/libnucleation.* release-artifacts/ || true
-          cp README.md LICENSE release-artifacts/
+          cp README-npm.md release-artifacts/README.md
+          cp LICENSE release-artifacts/
       - name: Upload nucleation WASM artifacts
         uses: actions/upload-artifact@v4
         with:
