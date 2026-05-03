@@ -22,8 +22,16 @@ pub struct PyRenderConfig {
 impl PyRenderConfig {
     /// Create a new RenderConfig with default settings.
     #[new]
-    #[pyo3(signature = (width=1024, height=1024, yaw=45.0, pitch=30.0, zoom=1.0, fov=45.0))]
-    pub fn new(width: u32, height: u32, yaw: f32, pitch: f32, zoom: f32, fov: f32) -> Self {
+    #[pyo3(signature = (width=1024, height=1024, yaw=45.0, pitch=30.0, zoom=1.0, fov=45.0, target=None))]
+    pub fn new(
+        width: u32,
+        height: u32,
+        yaw: f32,
+        pitch: f32,
+        zoom: f32,
+        fov: f32,
+        target: Option<(f32, f32, f32)>,
+    ) -> Self {
         Self {
             inner: RenderConfig {
                 width,
@@ -32,6 +40,7 @@ impl PyRenderConfig {
                 pitch,
                 zoom,
                 fov,
+                target: target.map(|(x, y, z)| [x, y, z]),
             },
         }
     }
@@ -94,6 +103,18 @@ impl PyRenderConfig {
     #[setter]
     pub fn set_fov(&mut self, value: f32) {
         self.inner.fov = value;
+    }
+
+    /// Optional explicit orbit target (world coords). ``None`` aims at the
+    /// model's bounding-box centroid.
+    #[getter]
+    pub fn target(&self) -> Option<(f32, f32, f32)> {
+        self.inner.target.map(|t| (t[0], t[1], t[2]))
+    }
+
+    #[setter]
+    pub fn set_target(&mut self, value: Option<(f32, f32, f32)>) {
+        self.inner.target = value.map(|(x, y, z)| [x, y, z]);
     }
 
     fn __repr__(&self) -> String {

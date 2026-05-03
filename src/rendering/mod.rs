@@ -29,6 +29,9 @@ pub struct RenderConfig {
     pub pitch: f32,
     pub zoom: f32,
     pub fov: f32,
+    /// Optional explicit orbit target in world coordinates. When ``None``
+    /// the camera aims at the model's bounding-box centroid.
+    pub target: Option<[f32; 3]>,
 }
 
 impl Default for RenderConfig {
@@ -40,6 +43,7 @@ impl Default for RenderConfig {
             pitch: 30.0,
             zoom: 1.0,
             fov: 45.0,
+            target: None,
         }
     }
 }
@@ -51,6 +55,7 @@ impl RenderConfig {
             pitch_deg: self.pitch,
             zoom: self.zoom,
             fov_deg: self.fov,
+            target: self.target,
         }
     }
 }

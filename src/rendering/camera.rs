@@ -8,6 +8,9 @@ pub struct CameraConfig {
     pub pitch_deg: f32,
     pub zoom: f32,
     pub fov_deg: f32,
+    /// Optional explicit orbit target. When set, the camera orbits and
+    /// aims at this point instead of the model's bounding-box centroid.
+    pub target: Option<[f32; 3]>,
 }
 
 impl Default for CameraConfig {
@@ -17,6 +20,7 @@ impl Default for CameraConfig {
             pitch_deg: 30.0,
             zoom: 1.0,
             fov_deg: 45.0,
+            target: None,
         }
     }
 }
@@ -41,11 +45,11 @@ pub fn compute_view_proj(
     aspect: f32,
     camera: &CameraConfig,
 ) -> ([[f32; 4]; 4], [[f32; 4]; 4]) {
-    let center = [
+    let center = camera.target.unwrap_or([
         (bounds_min[0] + bounds_max[0]) * 0.5,
         (bounds_min[1] + bounds_max[1]) * 0.5,
         (bounds_min[2] + bounds_max[2]) * 0.5,
-    ];
+    ]);
 
     let yaw = camera.yaw_deg.to_radians();
     let pitch = camera.pitch_deg.to_radians();
