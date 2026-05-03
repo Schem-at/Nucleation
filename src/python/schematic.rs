@@ -185,7 +185,7 @@ impl PyBlockState {
     }
 }
 
-#[pyclass(name = "Schematic")]
+#[pyclass(name = "Schematic", subclass)]
 pub struct PySchematic {
     pub(crate) inner: UniversalSchematic,
     // ── Cached fields for fast-path Python bindings ──

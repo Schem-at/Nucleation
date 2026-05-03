@@ -494,31 +494,18 @@ def _save_to(native_schem: Any, path: Union[str, Path], fmt: Optional[str]) -> N
     p.write_bytes(data)
 
 
-class Schematic:
+class Schematic(_native.Schematic):
     """A mutable, chainable Minecraft schematic.
 
-    Replaces the previous split between ``Schematic`` (imperative) and
-    ``SchematicBuilder`` (fluent). Every mutating method returns ``self`` for
-    chaining. The underlying compiled instance is available as ``.raw`` for
-    power users.
+    Subclass of the compiled extension class. Native methods (set_block,
+    set_blocks, fill_cuboid, get_block, format I/O, etc.) are inherited
+    directly — chaining preserves the polished class. Polished features
+    (classmethods, save/render with format inference, simulate, cursor,
+    copy, with_pack, ...) are defined here as Python methods.
     """
 
     __slots__ = (
-        "_inner",
         "pack",
-        # Cached bound methods of the compiled extension.
-        "_fast_set_block",
-        "_fast_set_block_p",
-        "_fast_set_block_with_properties",
-        "_fast_set_block_from_string",
-        "_fast_place",
-        "_fast_prepare_block",
-        "_fast_get_block",
-        "_fast_get_blocks",
-        # Per-instance name→palette-index cache so repeated set_block calls
-        # with the same plain id skip even the FxHashMap palette lookup on
-        # the native side. ~30 ns/call saved on the multi-id common case.
-        "_name_idx_cache",
         # Lazy template-builder state (only set by from_template).
         "_pending_builder",
         "_pending_name",
@@ -526,52 +513,32 @@ class Schematic:
 
     # ------------------------------------------------------------------ ctor
 
-    def __init__(
-        self,
-        name_or_path: str = "untitled",
-        *,
-        pack: Optional[Any] = None,
-        _native_inner: Optional[Any] = None,
-    ) -> None:
-        if _native_inner is not None:
-            self._inner = _native_inner
-        else:
-            inner = _native.Schematic(name_or_path)
-            looks_like_path = name_or_path.lower().endswith(_LOAD_EXTENSIONS) and Path(
-                name_or_path
-            ).exists()
-            if looks_like_path:
-                _load_into(inner, name_or_path)
-                inner.name = Path(name_or_path).stem
-            self._inner = inner
+    def __new__(cls, name_or_path: str = "untitled", **kwargs: Any) -> "Schematic":
+        # Native PyO3 #[new] only accepts `name`. Strip kwargs here so they
+        # can flow through to __init__.
+        return super().__new__(cls, name_or_path)
+
+    def __init__(self, name_or_path: str = "untitled", *, pack: Optional[Any] = None) -> None:
+        # Native __new__(name_or_path) already ran. Set polished attrs and
+        # detect path-vs-name for backwards-compat constructor.
         self.pack = pack
-        # Cache hot-path bound methods so set_block doesn't pay the
-        # __dict__/attribute-lookup cost on every call. ~50 ns saved per
-        # placement.
-        if self._inner is not None:
-            self._fast_set_block = self._inner.set_block_simple
-            self._fast_set_block_p = self._inner.set_block
-            self._fast_set_block_with_properties = self._inner.set_block_with_properties
-            self._fast_set_block_from_string = self._inner.set_block_from_string
-            self._fast_place = self._inner.place
-            self._fast_prepare_block = self._inner.prepare_block
-            self._fast_get_block = self._inner.get_block
-            self._fast_get_blocks = self._inner.get_blocks
-            self._name_idx_cache = {}
+        if name_or_path.lower().endswith(_LOAD_EXTENSIONS) and Path(name_or_path).exists():
+            _load_into(self, name_or_path)
+            self.name = Path(name_or_path).stem
 
     # ------------------------------------------------------------ classmethod
 
     @classmethod
     def new(cls, name: str = "untitled", *, pack: Optional[Any] = None) -> "Schematic":
-        """Create a blank schematic. Unambiguous alternative to ``Schematic("name")``."""
-        return cls(_native_inner=_native.Schematic(name), pack=pack)
+        """Create a blank schematic."""
+        return cls(name, pack=pack)
 
     @classmethod
     def open(cls, path: Union[str, Path], *, pack: Optional[Any] = None) -> "Schematic":
         """Load a schematic file. Format is inferred from the extension."""
-        inner = _native.Schematic(Path(path).stem)
-        _load_into(inner, path)
-        return cls(_native_inner=inner, pack=pack)
+        s = cls(Path(path).stem, pack=pack)
+        _load_into(s, path)
+        return s
 
     @classmethod
     def from_template(
@@ -581,135 +548,34 @@ class Schematic:
         name: str = "untitled",
         pack: Optional[Any] = None,
     ) -> "Schematic":
-        """Build from an ASCII-art template (see ``SchematicBuilder.from_template``)."""
-        builder = _native.SchematicBuilder.from_template(template)
-        builder.name(name)
-        # Keep the builder alive on the wrapper so .map() can extend it before
-        # the first build. We materialize lazily in _ensure_built().
-        wrapper = cls(_native_inner=None, pack=pack)
-        wrapper._inner = None  # type: ignore[assignment]
-        wrapper._pending_builder = builder  # type: ignore[attr-defined]
-        wrapper._pending_name = name  # type: ignore[attr-defined]
-        return wrapper
+        """Build from an ASCII-art template (see ``SchematicBuilder.from_template``).
+
+        Map characters via ``.map(char, block)`` before any mutation. The
+        template is materialized lazily on first non-map call.
+        """
+        s = cls(name, pack=pack)
+        s._pending_builder = _native.SchematicBuilder.from_template(template)
+        s._pending_builder.name(name)
+        s._pending_name = name
+        return s
 
     # --------------------------------------------------------------- internals
 
-    def _ensure_built(self) -> Any:
-        """Materialize a pending template-builder into a real native schematic."""
+    def _ensure_built(self) -> None:
+        """Materialize a pending template-builder into self via byte transfer."""
         pending = getattr(self, "_pending_builder", None)
         if pending is not None:
-            self._inner = pending.build()
-            self._rebind_fast()
+            built = pending.build()  # native Schematic
+            self.from_data(bytes(built.to_litematic()))
             del self._pending_builder
-        return self._inner
-
-    def _rebind_fast(self) -> None:
-        """Refresh the cached bound methods after `_inner` is replaced."""
-        inner = self._inner
-        if inner is not None:
-            self._fast_set_block = inner.set_block_simple
-            self._fast_set_block_p = inner.set_block
-            self._fast_set_block_with_properties = inner.set_block_with_properties
-            self._fast_set_block_from_string = inner.set_block_from_string
-            self._fast_place = inner.place
-            self._fast_prepare_block = inner.prepare_block
-            self._fast_get_block = inner.get_block
-            self._fast_get_blocks = inner.get_blocks
-            self._name_idx_cache = {}
-
-    def __getattr__(self, name: str) -> Any:
-        # Forward unknown attributes to the underlying native instance.
-        # Avoids enumerating every legacy method (set_block_with_properties,
-        # fill_cuboid, get_palette, format I/O, etc.).
-        if name.startswith("_"):
-            raise AttributeError(name)
-        # Use object.__getattribute__ since slots leaves no __dict__.
-        try:
-            inner = object.__getattribute__(self, "_inner")
-        except AttributeError:
-            inner = None
-        if inner is None:
-            inner = self._ensure_built()
-        return getattr(inner, name)
 
     @property
-    def raw(self) -> Any:
-        """The underlying ``_native.Schematic`` instance."""
-        return self._ensure_built()
+    def raw(self) -> "Schematic":
+        """Compatibility shim. ``self`` is already the native class — return it."""
+        self._ensure_built()
+        return self
 
     # ------------------------------------------------------------- mutation API
-
-    def get_block(self, x: int, y: int, z: int) -> Any:
-        """Fast block lookup at a position. Cached bound method on the
-        underlying native instance — no __getattr__ overhead."""
-        if self._inner is None:
-            self._ensure_built()
-        return self._fast_get_block(x, y, z)
-
-    def get_blocks(self, positions: Any) -> Any:
-        """Batch block lookup. Same fast-bound-method shortcut as
-        :py:meth:`get_block`."""
-        if self._inner is None:
-            self._ensure_built()
-        return self._fast_get_blocks(list(positions))
-
-    def prepare_block(self, name: str) -> int:
-        """Pre-resolve a plain block id to a palette index.
-
-        Use ``prepare_block`` once per unique id in setup, then call
-        :py:meth:`place` in the hot loop — it skips the per-call name
-        lookup entirely and runs at the absolute Python ceiling for
-        per-block placement.
-
-        Example::
-
-            stone_idx = schem.prepare_block("minecraft:stone")
-            place = schem.place
-            for x, y, z in positions:
-                place(x, y, z, stone_idx)
-
-        Throughput on this path is ~8 M/s (vs ~3 M/s for ``set_block``).
-        Complex strings with ``[`` or ``{`` are not allowed here — use
-        ``set_block`` for those.
-        """
-        if self._inner is None:
-            self._ensure_built()
-        return self._inner.prepare_block(name)
-
-    @property
-    def place(self):
-        """Bound fast-path placement method.
-
-        Pair with :py:meth:`prepare_block`. Cache the property once::
-
-            place = schem.place
-            for ... :
-                place(x, y, z, idx)
-
-        Internally this is the underlying native ``place`` — no Python
-        wrapper between you and the array write.
-        """
-        if self._inner is None:
-            self._ensure_built()
-        return self._inner.place
-
-    def set_block(
-        self,
-        *args: Any,
-        state: Optional[Mapping[str, StateValue]] = None,
-        nbt: Optional[Mapping[str, Any]] = None,
-    ) -> "Schematic":
-        """Place a block. Accepts 4-arg, 2-arg-tuple, Block instance, or
-        kwargs. The hot path delegates to native ``set_block`` (polished)
-        which handles every form in Rust with an internal name cache.
-        """
-        if self._inner is None:
-            self._ensure_built()
-        if state is None and nbt is None:
-            self._fast_set_block_p(*args)
-        else:
-            self._fast_set_block_p(*args, state=state, nbt=nbt)
-        return self
 
     def map(
         self,
@@ -767,7 +633,7 @@ class Schematic:
         else:
             payload = block
 
-        inner = self._ensure_built()
+        self._ensure_built()
 
         # Flat-array dispatch: faster boundary crossing.
         if positions is not None and len(positions) > 0:
@@ -780,22 +646,19 @@ class Schematic:
                     if not isinstance(positions, list)
                     else positions
                 )
-                inner.set_blocks_flat(flat, payload)
+                super().set_blocks_flat(flat, payload)
                 return self
 
         # Tuple-list path.
-        inner.set_blocks(list(positions), payload)
+        super().set_blocks(list(positions), payload)
         return self
 
     def fill(self, region: Tuple[Coord, Coord], block: BlockLike) -> "Schematic":
         """Fill a cuboid region (inclusive) with the given block."""
         (x1, y1, z1), (x2, y2, z2) = region
-        if isinstance(block, Block):
-            block_id = block.to_string()
-        else:
-            block_id = block
-        inner = self._ensure_built()
-        inner.fill_cuboid(x1, y1, z1, x2, y2, z2, block_id)
+        block_id = block.to_string() if isinstance(block, Block) else block
+        self._ensure_built()
+        self.fill_cuboid(x1, y1, z1, x2, y2, z2, block_id)
         return self
 
     def cursor(
@@ -812,10 +675,10 @@ class Schematic:
 
     def copy(self) -> "Schematic":
         """Return an independent copy of this schematic."""
-        inner = self._ensure_built()
-        new_inner = _native.Schematic(inner.name or "untitled")
-        new_inner.from_data(inner.to_litematic())
-        return Schematic(_native_inner=new_inner, pack=self.pack)
+        self._ensure_built()
+        new = type(self)(self.name or "untitled", pack=self.pack)
+        new.from_data(bytes(self.to_litematic()))
+        return new
 
     # --------------------------------------------------------------- simulate
 
@@ -825,36 +688,30 @@ class Schematic:
         ticks: int = 1,
         events: Optional[Iterable[Event]] = None,
     ) -> "Schematic":
-        """Run a redstone simulation for ``ticks`` ticks, then sync results back.
-
-        Collapses the create-world / on-use-block / tick / sync round-trip
-        into a single call. Power users wanting multi-stage flows should
-        keep using ``create_simulation_world()`` directly.
-        """
-        inner = self._ensure_built()
-        world = inner.create_simulation_world()
+        """Run a redstone simulation for ``ticks`` ticks, then sync results back."""
+        self._ensure_built()
+        world = self.create_simulation_world()
         for ev in events or ():
             if isinstance(ev, (UseBlock, ButtonPress)):
                 x, y, z = ev.pos
                 world.on_use_block(x, y, z)
             else:
                 raise TypeError(
-                    f"Unsupported event {type(ev).__name__}; "
-                    "use UseBlock or ButtonPress"
+                    f"Unsupported event {type(ev).__name__}; use UseBlock or ButtonPress"
                 )
         world.tick(ticks)
         world.sync_to_schematic()
-        # The world syncs *into* its own schematic snapshot. Replace ours.
-        self._inner = world.into_schematic()
-        self._rebind_fast()
+        # Transfer the simulated state back into self via byte round-trip.
+        synced = world.into_schematic()
+        self.from_data(bytes(synced.to_litematic()))
         return self
 
     # ----------------------------------------------------------------- save
 
     def save(self, path: Union[str, Path], *, format: Optional[str] = None) -> None:
         """Save to a file. Format inferred from extension unless overridden."""
-        inner = self._ensure_built()
-        _save_to(inner, path, format)
+        self._ensure_built()
+        _save_to(self, path, format)
 
     # ----------------------------------------------------------------- render
 
@@ -872,7 +729,7 @@ class Schematic:
         (``width``, ``height``, ``yaw``, ``pitch``, ``zoom``, ``fov``).
         ``pack`` defaults to the pack bound via ``with_pack`` or the constructor.
         """
-        inner = self._ensure_built()
+        self._ensure_built()
         pack = pack or self.pack
         if pack is None:
             raise ValueError(
@@ -881,19 +738,9 @@ class Schematic:
         if config is None:
             config = _make_render_config(**kwargs)
         elif kwargs:
-            raise TypeError(
-                "render() takes either config= or kwargs, not both"
-            )
-        inner.render_to_file(pack, str(path), config)
-
-    def render_to_file(self, pack: Any, path: Union[str, Path], config: Any) -> None:
-        """Deprecated. Use ``render(path, config, pack=pack)``."""
-        warnings.warn(
-            "render_to_file is deprecated; use .render(path, config, pack=pack)",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self._ensure_built().render_to_file(pack, str(path), config)
+            raise TypeError("render() takes either config= or kwargs, not both")
+        # render_to_file is inherited from native.
+        super().render_to_file(pack, str(path), config)
 
     # ------------------------------------------------------------- export_mesh
 
@@ -908,13 +755,14 @@ class Schematic:
 
         Output format inferred from extension (``.glb`` or ``.nucm``).
         """
-        inner = self._ensure_built()
+        self._ensure_built()
         pack = pack or self.pack
         if pack is None:
             raise ValueError(
                 "export_mesh() requires a ResourcePack — pass pack= or bind via with_pack()"
             )
-        result = inner.to_mesh(pack, config) if config is not None else inner.to_mesh(pack)
+        # to_mesh is inherited from native.
+        result = super().to_mesh(pack, config) if config is not None else super().to_mesh(pack)
         p = Path(path)
         suffix = p.suffix.lower()
         if suffix == ".glb":
@@ -940,14 +788,10 @@ class Schematic:
     # --------------------------------------------------------------- dunder
 
     def __repr__(self) -> str:
+        if hasattr(self, "_pending_builder"):
+            return "<Schematic (template-pending)>"
         try:
-            inner = object.__getattribute__(self, "_inner")
-        except AttributeError:
-            inner = None
-        if inner is None:
-            return f"<Schematic (template-pending)>"
-        try:
-            return f"<Schematic name={inner.name!r}>"
+            return f"<Schematic name={self.name!r}>"
         except Exception:
             return "<Schematic>"
 
@@ -1004,8 +848,10 @@ class SchematicBuilder:
         return self
 
     def build(self) -> Schematic:
-        inner = self._native.build()
-        return Schematic(_native_inner=inner)
+        built = self._native.build()  # _native.Schematic
+        s = Schematic(built.name or "untitled")
+        s.from_data(bytes(built.to_litematic()))
+        return s
 
 
 __all__ = [
