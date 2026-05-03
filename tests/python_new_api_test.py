@@ -292,6 +292,37 @@ class TestSimulate:
 # --------------------------------------------------------------- Re-exports
 
 
+class TestBatchPerf:
+    """The set_blocks parse-once batch path must produce identical results to
+    per-call set_block_from_string for complex blocks (state + NBT)."""
+
+    def test_chest_batch_preserves_nbt(self):
+        s = Schematic.new("batch")
+        positions = [(i, 0, 0) for i in range(50)]
+        chest_str = (
+            'minecraft:chest[facing=west]'
+            '{Items:[{Slot:0b,id:"minecraft:diamond",Count:64b}]}'
+        )
+        count = s.set_blocks(positions, chest_str)
+        assert count == 50
+        # Spot-check: middle and last chest got both state and NBT.
+        for x in (0, 25, 49):
+            be = s.get_block_entity(x, 0, 0)
+            assert be is not None, f"missing block entity at x={x}"
+            assert "Items" in be["nbt"], f"missing Items at x={x}"
+            assert be["nbt"]["Items"][0]["id"] == "minecraft:diamond"
+
+    def test_state_only_batch(self):
+        s = Schematic.new("batch-state")
+        positions = [(i, 0, 0) for i in range(20)]
+        count = s.set_blocks(positions, "minecraft:repeater[delay=4,facing=east]")
+        assert count == 20
+        for x in (0, 10, 19):
+            bs = s.get_block_string(x, 0, 0)
+            assert "minecraft:repeater" in bs
+            assert "delay=4" in bs
+
+
 class TestReExports:
     def test_native_classes_visible(self):
         assert nucleation.BlockState is BlockState

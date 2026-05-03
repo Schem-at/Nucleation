@@ -129,6 +129,34 @@ fn sign_rejects_more_than_four_lines() {
 }
 
 #[test]
+fn batch_chest_via_set_blocks_complex() {
+    use nucleation::ffi::{
+        schematic_free, schematic_new, schematic_set_blocks,
+    };
+
+    let handle = schematic_new();
+    assert!(!handle.is_null());
+
+    let count = 30usize;
+    let mut positions: Vec<i32> = Vec::with_capacity(count * 3);
+    for i in 0..count {
+        positions.extend_from_slice(&[i as i32, 0, 0]);
+    }
+    let chest_str = cstr(
+        r#"minecraft:chest[facing=west]{Items:[{Slot:0b,id:"minecraft:diamond",Count:64b}]}"#,
+    );
+    let rc = schematic_set_blocks(
+        handle,
+        positions.as_ptr(),
+        positions.len(),
+        chest_str.as_ptr(),
+    );
+    assert_eq!(rc, count as c_int, "expected {}, got {}", count, rc);
+
+    schematic_free(handle);
+}
+
+#[test]
 fn end_to_end_chest_placement() {
     use nucleation::ffi::{schematic_free, schematic_new, schematic_set_block_from_string};
 

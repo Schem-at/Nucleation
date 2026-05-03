@@ -603,20 +603,75 @@ impl PySchematic {
 
     /// Batch set blocks at multiple positions with the same block name.
     /// Crosses the FFI boundary once. Returns the number of blocks set.
+    ///
+    /// Complex strings (with `[state]` or `{nbt}`) are parsed *once* up front
+    /// and then applied to every position — orders of magnitude faster than
+    /// per-call `set_block_from_string` for repeated tile entities like
+    /// chests with identical contents.
     pub fn set_blocks(&mut self, positions: Vec<(i32, i32, i32)>, block_name: &str) -> usize {
         if positions.is_empty() {
             return 0;
         }
 
-        // Complex block strings fall back to per-call path
+        // Complex block strings: parse once, apply many.
         if block_name.contains('[') || block_name.ends_with('}') {
-            let mut count = 0;
-            for &(x, y, z) in &positions {
-                if self.inner.set_block_str(x, y, z, block_name) {
-                    count += 1;
+            let (mut block_state, nbt_data) =
+                match crate::UniversalSchematic::parse_block_string(block_name) {
+                    Ok(p) => p,
+                    Err(_) => return 0,
+                };
+            // Match set_block_from_string's jukebox special case.
+            if block_state.name.contains("jukebox") {
+                if let Some(ref nbt) = nbt_data {
+                    let has_record = nbt.contains_key("RecordItem");
+                    block_state.set_property("has_record", has_record.to_string());
                 }
             }
-            return count;
+
+            // Pre-expand region to fit all positions (single bounds calc).
+            let (fx, fy, fz) = positions[0];
+            self.ensure_default_region(fx, fy, fz);
+            let mut min = (fx, fy, fz);
+            let mut max = (fx, fy, fz);
+            for &(x, y, z) in &positions[1..] {
+                if x < min.0 { min.0 = x; } if y < min.1 { min.1 = y; } if z < min.2 { min.2 = z; }
+                if x > max.0 { max.0 = x; } if y > max.1 { max.1 = y; } if z > max.2 { max.2 = z; }
+            }
+
+            // Build the block-entity template once (its NBT will be cloned per
+            // position). We avoid the per-call HashMap-rebuild from
+            // `with_nbt_data` by inserting the parsed map straight into a
+            // clone of the prototype.
+            let block_name_owned: String = block_state.name.to_string();
+            let proto: Option<crate::block_entity::BlockEntity> = nbt_data.as_ref().map(|nbt| {
+                let mut be =
+                    crate::block_entity::BlockEntity::new(block_name_owned.clone(), (0, 0, 0));
+                for (k, v) in nbt {
+                    be = be.with_nbt_data(k.clone(), v.clone());
+                }
+                be
+            });
+
+            // Reserve palette index once.
+            let region = &mut self.inner.default_region;
+            region.ensure_bounds(min, max);
+            let palette_index = region.get_or_insert_palette_by_state(&block_state);
+            for &(x, y, z) in &positions {
+                region.set_block_at_index_unchecked(palette_index, x, y, z);
+            }
+
+            // Tile entities (only for blocks that have NBT). Cloning the
+            // pre-built prototype + relocating it is far cheaper than
+            // re-parsing per call.
+            if let Some(ref template) = proto {
+                for &(x, y, z) in &positions {
+                    let mut be = template.clone();
+                    be.position = (x, y, z);
+                    self.inner
+                        .set_block_entity(crate::block_position::BlockPosition { x, y, z }, be);
+                }
+            }
+            return positions.len();
         }
 
         // Initialize default region with first position

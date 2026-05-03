@@ -1583,6 +1583,20 @@ impl Region {
         index
     }
 
+    /// Look up or insert a block in the palette by full BlockState
+    /// (id + properties). Mirrors `get_or_insert_palette_by_name` but for the
+    /// case where we have a complete state (e.g. from parsing a block string).
+    #[inline]
+    pub fn get_or_insert_palette_by_state(&mut self, state: &BlockState) -> usize {
+        if let Some(&i) = self.palette_index.get(state) {
+            return i;
+        }
+        let index = self.palette.len();
+        self.palette_index.insert(state.clone(), index);
+        self.palette.push(state.clone());
+        index
+    }
+
     /// Direct array write with air-count and tight-bounds bookkeeping.
     /// Caller must ensure (x, y, z) is within region bounds.
     #[inline(always)]

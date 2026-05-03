@@ -1189,16 +1189,61 @@ pub extern "C" fn schematic_set_blocks(
     let block_name_str = unsafe { CStr::from_ptr(block_name).to_string_lossy() };
     let pos_slice = unsafe { std::slice::from_raw_parts(positions, positions_len) };
 
-    // Complex block strings fall back to per-call path
+    // Complex block strings: parse once, apply many.
     if block_name_str.contains('[') || block_name_str.ends_with('}') {
-        let mut set = 0i32;
-        for i in 0..count {
-            let (x, y, z) = (pos_slice[i * 3], pos_slice[i * 3 + 1], pos_slice[i * 3 + 2]);
-            if s.set_block_str(x, y, z, &block_name_str) {
-                set += 1;
+        let (mut block_state, nbt_data) =
+            match crate::UniversalSchematic::parse_block_string(&block_name_str) {
+                Ok(p) => p,
+                Err(e) => {
+                    set_last_error(format!("parse_block_string: {}", e));
+                    return -3;
+                }
+            };
+        if block_state.name.contains("jukebox") {
+            if let Some(ref nbt) = nbt_data {
+                let has_record = nbt.contains_key("RecordItem");
+                block_state.set_property("has_record", has_record.to_string());
             }
         }
-        return set;
+
+        let (mut min_x, mut min_y, mut min_z) = (pos_slice[0], pos_slice[1], pos_slice[2]);
+        let (mut max_x, mut max_y, mut max_z) = (min_x, min_y, min_z);
+        for i in 1..count {
+            let (x, y, z) = (pos_slice[i * 3], pos_slice[i * 3 + 1], pos_slice[i * 3 + 2]);
+            if x < min_x { min_x = x; } if y < min_y { min_y = y; } if z < min_z { min_z = z; }
+            if x > max_x { max_x = x; } if y > max_y { max_y = y; } if z > max_z { max_z = z; }
+        }
+
+        let block_name_owned = block_state.name.to_string();
+        let proto: Option<crate::block_entity::BlockEntity> = nbt_data.as_ref().map(|nbt| {
+            let mut be =
+                crate::block_entity::BlockEntity::new(block_name_owned.clone(), (0, 0, 0));
+            for (k, v) in nbt {
+                be = be.with_nbt_data(k.clone(), v.clone());
+            }
+            be
+        });
+
+        let region = &mut s.default_region;
+        region.ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
+        let palette_index = region.get_or_insert_palette_by_state(&block_state);
+        for i in 0..count {
+            let (x, y, z) = (pos_slice[i * 3], pos_slice[i * 3 + 1], pos_slice[i * 3 + 2]);
+            region.set_block_at_index_unchecked(palette_index, x, y, z);
+        }
+
+        if let Some(ref template) = proto {
+            for i in 0..count {
+                let (x, y, z) = (pos_slice[i * 3], pos_slice[i * 3 + 1], pos_slice[i * 3 + 2]);
+                let mut be = template.clone();
+                be.position = (x, y, z);
+                s.set_block_entity(
+                    crate::block_position::BlockPosition { x, y, z },
+                    be,
+                );
+            }
+        }
+        return count as c_int;
     }
 
     // Pre-expand to fit all positions

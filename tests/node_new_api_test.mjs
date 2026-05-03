@@ -275,6 +275,26 @@ test('end-to-end: Block instance reuse', () => {
   }
 });
 
+// --- Batch-NBT correctness -----------------------------------------------
+
+console.log('\nBatch with NBT:');
+
+test('set_blocks parse-once preserves chest NBT', () => {
+  const s = Schematic.new('batch');
+  const positions = new Int32Array(30 * 3);
+  for (let i = 0; i < 30; i++) {
+    positions[i * 3] = i;
+  }
+  const chestStr =
+    'minecraft:chest[facing=west]{Items:[{Slot:0b,id:"minecraft:diamond",Count:64b}]}';
+  const count = s.raw.set_blocks(positions, chestStr);
+  if (count !== 30) throw new Error('expected 30, got ' + count);
+  const bs0 = s.raw.get_block_string(0, 0, 0);
+  const bs15 = s.raw.get_block_string(15, 0, 0);
+  if (!bs0.includes('minecraft:chest')) throw new Error('first chest missing');
+  if (!bs15.includes('minecraft:chest')) throw new Error('mid chest missing');
+});
+
 // --- Summary --------------------------------------------------------------
 
 console.log(`\n${pass} passed, ${fail} failed`);

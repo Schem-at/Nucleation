@@ -655,16 +655,62 @@ impl SchematicWrapper {
             return 0;
         }
 
-        // Complex block strings fall back to per-call path
+        // Complex block strings: parse once, apply many.
         if block_name.contains('[') || block_name.ends_with('}') {
-            let mut set = 0;
-            for i in 0..count {
-                let (x, y, z) = (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
-                if self.0.set_block_str(x, y, z, block_name) {
-                    set += 1;
+            let (mut block_state, nbt_data) =
+                match crate::UniversalSchematic::parse_block_string(block_name) {
+                    Ok(p) => p,
+                    Err(_) => return 0,
+                };
+            if block_state.name.contains("jukebox") {
+                if let Some(ref nbt) = nbt_data {
+                    let has_record = nbt.contains_key("RecordItem");
+                    block_state.set_property("has_record", has_record.to_string());
                 }
             }
-            return set;
+
+            // Pre-expand to fit all positions.
+            let (mut min_x, mut min_y, mut min_z) = (positions[0], positions[1], positions[2]);
+            let (mut max_x, mut max_y, mut max_z) = (min_x, min_y, min_z);
+            for i in 1..count {
+                let (x, y, z) =
+                    (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+                if x < min_x { min_x = x; } if y < min_y { min_y = y; } if z < min_z { min_z = z; }
+                if x > max_x { max_x = x; } if y > max_y { max_y = y; } if z > max_z { max_z = z; }
+            }
+
+            let block_name_owned = block_state.name.to_string();
+            let proto: Option<crate::block_entity::BlockEntity> = nbt_data.as_ref().map(|nbt| {
+                let mut be =
+                    crate::block_entity::BlockEntity::new(block_name_owned.clone(), (0, 0, 0));
+                for (k, v) in nbt {
+                    be = be.with_nbt_data(k.clone(), v.clone());
+                }
+                be
+            });
+
+            let region = &mut self.0.default_region;
+            region.ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
+            let palette_index = region.get_or_insert_palette_by_state(&block_state);
+            for i in 0..count {
+                let (x, y, z) =
+                    (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+                region.set_block_at_index_unchecked(palette_index, x, y, z);
+            }
+
+            if let Some(ref template) = proto {
+                for i in 0..count {
+                    let (x, y, z) =
+                        (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+                    let mut be = template.clone();
+                    be.position = (x, y, z);
+                    self.0.set_block_entity(
+                        crate::block_position::BlockPosition { x, y, z },
+                        be,
+                    );
+                }
+            }
+            return count;
         }
 
         // Pre-expand to fit all positions
