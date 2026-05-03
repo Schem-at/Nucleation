@@ -174,3 +174,43 @@ fn end_to_end_chest_placement() {
 
     schematic_free(handle);
 }
+
+#[test]
+fn prepare_block_and_place_roundtrip() {
+    use nucleation::ffi::{
+        schematic_free, schematic_get_block_with_properties, schematic_new, schematic_place,
+        schematic_prepare_block,
+    };
+
+    let handle = schematic_new();
+    assert!(!handle.is_null());
+
+    let stone = cstr("minecraft:stone");
+    let dirt = cstr("minecraft:dirt");
+    let stone_idx = schematic_prepare_block(handle, stone.as_ptr());
+    let dirt_idx = schematic_prepare_block(handle, dirt.as_ptr());
+    assert!(stone_idx >= 0 && dirt_idx >= 0);
+    assert_ne!(stone_idx, dirt_idx, "different names → different indices");
+
+    let rc1 = schematic_place(handle, 0, 0, 0, stone_idx);
+    let rc2 = schematic_place(handle, 1, 0, 0, dirt_idx);
+    assert_eq!(rc1, 0);
+    assert_eq!(rc2, 0);
+
+    let bs0 = schematic_get_block_with_properties(handle, 0, 0, 0);
+    let bs1 = schematic_get_block_with_properties(handle, 1, 0, 0);
+    assert!(!bs0.is_null());
+    assert!(!bs1.is_null());
+
+    unsafe { schematic_free(handle) };
+}
+
+#[test]
+fn place_rejects_null_handle() {
+    use nucleation::ffi::{schematic_place, schematic_prepare_block};
+    let name = cstr("minecraft:stone");
+    let rc1 = schematic_prepare_block(std::ptr::null_mut(), name.as_ptr());
+    assert!(rc1 < 0);
+    let rc2 = schematic_place(std::ptr::null_mut(), 0, 0, 0, 0);
+    assert!(rc2 < 0);
+}

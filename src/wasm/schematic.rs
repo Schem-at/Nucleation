@@ -467,6 +467,28 @@ impl SchematicWrapper {
         self.0.set_block_str(x, y, z, block_name);
     }
 
+    /// Pre-resolve a plain block id to a palette index. Pair with
+    /// `place(x, y, z, idx)` for the absolute fastest per-block placement
+    /// in tight loops with multiple unique ids.
+    #[wasm_bindgen(js_name = prepareBlock)]
+    pub fn prepare_block(&mut self, block_name: &str) -> u32 {
+        // Use u32 (not usize) because wasm-bindgen marshals u32 cheaper
+        // than usize across the JS boundary. Same bit width on wasm32.
+        self.0
+            .default_region
+            .get_or_insert_palette_by_name(block_name) as u32
+    }
+
+    /// Place a block by pre-resolved palette index. Caller must have called
+    /// `prepareBlock(name)` first to obtain `palette_index`.
+    pub fn place(&mut self, x: i32, y: i32, z: i32, palette_index: u32) {
+        let region = &mut self.0.default_region;
+        if !region.is_in_region(x, y, z) {
+            region.expand_to_fit(x, y, z);
+        }
+        region.set_block_at_index_unchecked(palette_index as usize, x, y, z);
+    }
+
     pub fn set_block_in_region(
         &mut self,
         region_name: &str,

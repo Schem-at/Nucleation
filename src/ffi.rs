@@ -1167,6 +1167,48 @@ pub extern "C" fn schematic_set_block_from_string(
 
 /// Batch-sets blocks at multiple positions to the same block name.
 /// `positions` is a flat array of [x0,y0,z0, x1,y1,z1, ...] with `positions_len` elements (must be a multiple of 3).
+/// Pre-resolve a plain block name to a palette index for use with
+/// `schematic_place`. Pair them in hot loops with many unique block
+/// names to skip the per-call name → palette lookup.
+///
+/// Returns the palette index, or negative on error.
+#[no_mangle]
+pub extern "C" fn schematic_prepare_block(
+    schematic: *mut SchematicWrapper,
+    block_name: *const c_char,
+) -> c_int {
+    if schematic.is_null() || block_name.is_null() {
+        return -1;
+    }
+    let s = unsafe { &mut *(*schematic).0 };
+    let name = unsafe { CStr::from_ptr(block_name).to_string_lossy() };
+    // Don't reset the region — that would clobber palette entries from
+    // previous prepare_block calls.
+    s.default_region.get_or_insert_palette_by_name(&name) as c_int
+}
+
+/// Place a block by pre-resolved palette index. Pair with
+/// `schematic_prepare_block`. Returns 0 on success, negative on error.
+#[no_mangle]
+pub extern "C" fn schematic_place(
+    schematic: *mut SchematicWrapper,
+    x: c_int,
+    y: c_int,
+    z: c_int,
+    palette_index: c_int,
+) -> c_int {
+    if schematic.is_null() || palette_index < 0 {
+        return -1;
+    }
+    let s = unsafe { &mut *(*schematic).0 };
+    let region = &mut s.default_region;
+    if !region.is_in_region(x, y, z) {
+        region.expand_to_fit(x, y, z);
+    }
+    region.set_block_at_index_unchecked(palette_index as usize, x, y, z);
+    0
+}
+
 /// Returns the number of blocks set, or negative on error.
 #[no_mangle]
 pub extern "C" fn schematic_set_blocks(

@@ -369,6 +369,30 @@ export class Schematic {
   }
 
   /**
+   * Pre-resolve a plain block id to a palette index. Pair with `place()`
+   * in hot loops to skip the per-call name lookup. Returns the index.
+   */
+  prepareBlock(name) {
+    this._ensureBuilt();
+    return this.raw.prepareBlock(name);
+  }
+
+  /**
+   * Place a block by pre-resolved palette index. Pair with `prepareBlock`.
+   *
+   * Hot-loop pattern (~10 M placements/sec):
+   *
+   *   const stone = schem.prepareBlock('minecraft:stone');
+   *   const place = schem.raw.place.bind(schem.raw);
+   *   for (const [x, y, z] of positions) place(x, y, z, stone);
+   */
+  place(x, y, z, paletteIndex) {
+    this._ensureBuilt();
+    this.raw.place(x, y, z, paletteIndex);
+    return this;
+  }
+
+  /**
    * setBlock([x, y, z], "id" | Block, { state?, nbt? })
    * setBlock(x, y, z, "id")           — legacy form
    *
