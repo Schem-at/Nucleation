@@ -184,10 +184,19 @@ mod tests {
 
     #[test]
     fn test_value_conversion_errors() {
-        let v = Value::Bool(true);
-        assert!(v.as_u32().is_err());
+        // Bool is intentionally widened to u32/u64 (false → 0, true → 1) so
+        // 1-bit unsigned ports accept Python booleans transparently.
+        assert_eq!(Value::Bool(true).as_u32().unwrap(), 1);
+        assert_eq!(Value::Bool(false).as_u64().unwrap(), 0);
 
-        let v = Value::U64(u64::MAX);
-        assert!(v.as_u32().is_err()); // Too large
+        // Negative signed values still fail u32/u64 coercion.
+        assert!(Value::I32(-1).as_u32().is_err());
+        assert!(Value::I32(-1).as_u64().is_err());
+
+        // Out-of-range values still fail.
+        assert!(Value::U64(u64::MAX).as_u32().is_err());
+
+        // String, Array, etc. still fail.
+        assert!(Value::String("nope".into()).as_u32().is_err());
     }
 }
