@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass, replace
+from functools import cached_property
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Optional, Tuple, Union
 
@@ -140,7 +141,17 @@ class Block:
         return replace(self, nbt=merged)
 
     def to_string(self) -> str:
-        """Serialize back to the ``id[k=v,...]{snbt}`` string form."""
+        """Serialize back to the ``id[k=v,...]{snbt}`` string form (cached)."""
+        return self._payload
+
+    @cached_property
+    def _payload(self) -> str:
+        """Memoized full ``id[state]{nbt}`` payload — computed once per Block.
+
+        Frozen dataclass means the source data can't change, so it's safe to
+        cache. Reusing a Block across many ``set_block`` calls drops the
+        SNBT/state serialization to zero on every call after the first.
+        """
         out = self.id
         if self.state:
             parts = ",".join(f"{k}={_state_to_str(v)}" for k, v in self.state.items())
@@ -151,6 +162,11 @@ class Block:
             else:
                 out += "{" + _dict_to_snbt(self.nbt) + "}"
         return out
+
+    @cached_property
+    def _has_extras(self) -> bool:
+        """True if this block has any state or nbt — used for hot-path routing."""
+        return bool(self.state) or bool(self.nbt)
 
 
 def _coerce_state_value(v: str) -> StateValue:
@@ -579,23 +595,55 @@ class Schematic:
             set_block((x, y, z), "minecraft:stone")           # new
             set_block((x, y, z), "minecraft:repeater", state={"delay": 4})
             set_block((x, y, z), Block("minecraft:chest", nbt={...}))
-        """
-        state = kwargs.pop("state", None)
-        nbt = kwargs.pop("nbt", None)
-        if kwargs:
-            raise TypeError(f"set_block(): unexpected kwargs {list(kwargs)}")
 
-        if len(args) == 4:
+        Performance notes
+        -----------------
+        - Plain string ids take a fast path straight to native.
+        - Reused ``Block`` instances cache their full payload, so repeated
+          placements skip state/NBT serialization after the first call.
+        - For uniform regions, prefer ``fill()`` / ``fill_cuboid`` (orders of
+          magnitude faster than per-block calls).
+        """
+        # ----- argument shape -----
+        nargs = len(args)
+        if nargs == 4:
             x, y, z, block = args
-        elif len(args) == 2:
-            pos, block = args
-            x, y, z = pos
+        elif nargs == 2:
+            (x, y, z), block = args[0], args[1]
         else:
             raise TypeError(
                 "set_block(x, y, z, block) or set_block((x, y, z), block, *, state, nbt)"
             )
 
-        inner = self._ensure_built()
+        inner = self.__dict__.get("_inner") or self._ensure_built()
+
+        # ----- ultra-fast path: plain id string, no extras -----
+        if not kwargs and isinstance(block, str):
+            if "[" not in block and "{" not in block:
+                inner.set_block(x, y, z, block)
+                return self
+            # String already encodes state/NBT — go straight to the parser.
+            inner.set_block_from_string(x, y, z, block)
+            return self
+
+        # ----- fast path: reused Block instance, no override kwargs -----
+        if not kwargs and isinstance(block, Block):
+            if not block._has_extras:
+                inner.set_block(x, y, z, block.id)
+            elif block.nbt:
+                inner.set_block_from_string(x, y, z, block._payload)
+            else:
+                # State only → use the typed properties API.
+                props = {k: _state_to_str(v) for k, v in block.state.items()}
+                inner.set_block_with_properties(x, y, z, block.id, props)
+            return self
+
+        # ----- slow path: kwargs may augment a Block or a string -----
+        state = kwargs.pop("state", None)
+        nbt = kwargs.pop("nbt", None)
+        if kwargs:
+            raise TypeError(f"set_block(): unexpected kwargs {list(kwargs)}")
+
         if isinstance(block, Block):
             block_struct = block
         elif isinstance(block, str):
@@ -606,7 +654,18 @@ class Schematic:
         else:
             raise TypeError(f"block must be str or Block, got {type(block).__name__}")
 
-        # Merge any extra kwargs over Block's own state/nbt.
+        # If there are no override kwargs and nothing to merge, use the cache.
+        if state is None and nbt is None:
+            if not block_struct._has_extras:
+                inner.set_block(x, y, z, block_struct.id)
+            elif block_struct.nbt:
+                inner.set_block_from_string(x, y, z, block_struct._payload)
+            else:
+                props = {k: _state_to_str(v) for k, v in block_struct.state.items()}
+                inner.set_block_with_properties(x, y, z, block_struct.id, props)
+            return self
+
+        # Merge override kwargs over the Block's own state/nbt.
         eff_state = dict(block_struct.state or {})
         if state:
             eff_state.update(state)

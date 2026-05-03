@@ -34,7 +34,10 @@ export class Block {
     this.id = id;
     this.state = state;
     this.nbt = nbt;
-    Object.freeze(this);
+    // Cached lazily on first toString() call. Block is otherwise frozen below.
+    this._payload = null;
+    this._hasExtras = !!(state && Object.keys(state).length) || !!(nbt && Object.keys(nbt).length);
+    Object.seal(this);  // allow _payload assignment, prevent new props
   }
 
   /** Parse "id[k=v,...]{snbt}" form. */
@@ -96,6 +99,7 @@ export class Block {
   }
 
   toString() {
+    if (this._payload !== null) return this._payload;
     let out = this.id;
     if (this.state) {
       const parts = Object.entries(this.state).map(
@@ -110,6 +114,7 @@ export class Block {
         out += `{${dictToSnbt(this.nbt)}}`;
       }
     }
+    this._payload = out;
     return out;
   }
 }
@@ -366,20 +371,51 @@ export class Schematic {
   /**
    * setBlock([x, y, z], "id" | Block, { state?, nbt? })
    * setBlock(x, y, z, "id")           — legacy form
+   *
+   * Performance: plain id strings and reused `Block` instances take fast
+   * paths (Block payloads cache after first use). For uniform regions or
+   * many positions of one block, prefer fill() / raw set_blocks().
    */
   setBlock(...args) {
     let x, y, z, block, opts;
     if (args.length === 4 && typeof args[0] === 'number') {
       [x, y, z, block] = args;
-      opts = {};
+      opts = null;
     } else if (args.length >= 2 && Array.isArray(args[0])) {
-      [[x, y, z], block, opts = {}] = args;
+      [[x, y, z], block, opts = null] = args;
     } else {
       throw new TypeError(
         'setBlock([x,y,z], block, opts?) or setBlock(x,y,z, block)'
       );
     }
-    const inner = this._ensureBuilt();
+    const inner = this.raw || this._ensureBuilt();
+
+    // Ultra-fast path: plain id, no opts.
+    if (!opts && typeof block === 'string') {
+      if (block.indexOf('[') < 0 && block.indexOf('{') < 0) {
+        inner.set_block(x, y, z, block);
+        return this;
+      }
+      inner.set_block_from_string(x, y, z, block);
+      return this;
+    }
+
+    // Fast path: reused Block, no override opts.
+    if (!opts && block instanceof Block) {
+      if (!block._hasExtras) {
+        inner.set_block(x, y, z, block.id);
+      } else if (block.nbt) {
+        inner.set_block_from_string(x, y, z, block.toString());
+      } else {
+        const props = {};
+        for (const [k, v] of Object.entries(block.state)) props[k] = stateToStr(v);
+        inner.set_block_with_properties(x, y, z, block.id, props);
+      }
+      return this;
+    }
+
+    // Slow path: opts may augment.
+    opts = opts || {};
     let blockObj;
     if (block instanceof Block) blockObj = block;
     else if (typeof block === 'string') {
