@@ -168,6 +168,60 @@ fn bench_clone_schematic_with_chests(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_chest_batch_components(c: &mut Criterion) {
+    // Profile sub-phases of the chest-batch hot path to identify the
+    // remaining floor.
+    use nucleation::block_entity::BlockEntity;
+    use nucleation::block_entity_store::BlockEntityStore;
+    use nucleation::utils::NbtValue;
+    use std::sync::Arc;
+
+    const N: usize = 100_000;
+
+    let positions: Vec<(i32, i32, i32)> = (0..N as i32).map(|i| (i, 0, 0)).collect();
+    let template = {
+        let mut be = BlockEntity::new("minecraft:chest".to_string(), (0, 0, 0));
+        let item = {
+            let mut m = nucleation::nbt::NbtMap::new();
+            m.insert("Slot".to_string(), NbtValue::Byte(0));
+            m.insert("id".to_string(), NbtValue::String("minecraft:diamond".into()));
+            m.insert("Count".to_string(), NbtValue::Byte(64));
+            NbtValue::Compound(m)
+        };
+        be = be.with_nbt_data("Items".to_string(), NbtValue::List(vec![item]));
+        Arc::new(be)
+    };
+
+    let mut group = c.benchmark_group("chest_batch_phases");
+    group.throughput(Throughput::Elements(N as u64));
+
+    group.bench_function("store_insert_template_only", |b| {
+        b.iter_batched(
+            || (BlockEntityStore::default(), template.clone()),
+            |(mut store, tpl)| {
+                store.insert_template(black_box(&positions), tpl);
+                black_box(store);
+            },
+            criterion::BatchSize::SmallInput,
+        )
+    });
+
+    group.bench_function("set_blocks_full_batch_chest", |b| {
+        b.iter(|| {
+            let mut s = UniversalSchematic::new("bench".into());
+            let chest =
+                "minecraft:chest[facing=west]{Items:[{Slot:0b,id:\"minecraft:diamond\",Count:64b}]}";
+            // Use UniversalSchematic's parse-once batch at the core API
+            // by going through set_block_from_string repeatedly.
+            for &(x, y, z) in &positions {
+                let _ = s.set_block_from_string(black_box(x), y, z, chest);
+            }
+        })
+    });
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_set_block_plain,
@@ -177,5 +231,6 @@ criterion_group!(
     bench_clone_block_entity,
     bench_transform_with_block_entities,
     bench_clone_schematic_with_chests,
+    bench_chest_batch_components,
 );
 criterion_main!(benches);
