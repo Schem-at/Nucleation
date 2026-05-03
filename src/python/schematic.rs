@@ -3,7 +3,7 @@
 //! Core schematic operations: loading, saving, block manipulation, iteration.
 
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyList};
+use pyo3::types::{PyBytes, PyDict, PyList, PyTuple};
 use smol_str::SmolStr;
 use std::collections::HashMap;
 use std::fs;
@@ -87,6 +87,11 @@ pub struct PySchematic {
     last_block_name: String,
     last_palette_index: usize,
     default_region_initialized: bool,
+    /// Name → palette-index cache for the polished `set_block` hot path.
+    /// Lets repeated calls with different ids skip the per-call FxHashMap
+    /// palette lookup AND the Python-level dict cache that the polished
+    /// wrapper used to maintain.
+    name_idx_cache: rustc_hash::FxHashMap<String, usize>,
 }
 
 impl PySchematic {
@@ -98,6 +103,7 @@ impl PySchematic {
             last_block_name: String::new(),
             last_palette_index: 0,
             default_region_initialized: false,
+            name_idx_cache: rustc_hash::FxHashMap::default(),
         }
     }
 
@@ -462,6 +468,202 @@ impl PySchematic {
         region.set_block_at_index_unchecked(palette_index, x, y, z);
     }
 
+    /// Polished set_block: handles all call shapes natively. The hot path
+    /// (4-arg or 2-arg-tuple positional with a plain string id, no kwargs)
+    /// goes straight to a name → palette-index cache and a single array
+    /// write — no Python wrapper, no per-call FxHashMap palette lookup.
+    ///
+    /// Accepted forms::
+    ///
+    ///     set_block(x, y, z, "minecraft:stone")
+    ///     set_block((x, y, z), "minecraft:stone")
+    ///     set_block(x, y, z, "minecraft:repeater[delay=4,facing=east]")
+    ///     set_block((x, y, z), "minecraft:chest", state={"facing":"west"})
+    ///     set_block((x, y, z), "minecraft:chest", nbt={...})
+    ///
+    /// Returns the schematic itself for chaining.
+    #[pyo3(signature = (*args, state=None, nbt=None))]
+    pub fn set_block_p<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        py: Python<'_>,
+        args: &Bound<'_, PyTuple>,
+        state: Option<&Bound<'_, PyAny>>,
+        nbt: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        // ---- argument shape ----
+        let nargs = args.len();
+        let (x, y, z, block_obj) = if nargs == 4 {
+            let x: i32 = args.get_item(0)?.extract()?;
+            let y: i32 = args.get_item(1)?.extract()?;
+            let z: i32 = args.get_item(2)?.extract()?;
+            let b = args.get_item(3)?;
+            (x, y, z, b)
+        } else if nargs == 2 {
+            let pos = args.get_item(0)?;
+            let (x, y, z): (i32, i32, i32) = pos.extract()?;
+            let b = args.get_item(1)?;
+            (x, y, z, b)
+        } else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "set_block(x, y, z, block) or set_block((x, y, z), block, *, state, nbt)",
+            ));
+        };
+
+        // ---- ultra-fast path: plain string id, no kwargs ----
+        if state.is_none() && nbt.is_none() {
+            if let Ok(s) = block_obj.extract::<String>() {
+                if !s.contains('[') && !s.contains('}') {
+                    let cached = slf.name_idx_cache.get(&s).copied();
+                    slf.ensure_default_region(x, y, z);
+                    let idx = match cached {
+                        Some(i) => i,
+                        None => {
+                            let region = &mut slf.inner.default_region;
+                            let i = region.get_or_insert_palette_by_name(&s);
+                            slf.name_idx_cache.insert(s.clone(), i);
+                            i
+                        }
+                    };
+                    let region = &mut slf.inner.default_region;
+                    if !region.is_in_region(x, y, z) {
+                        region.expand_to_fit(x, y, z);
+                    }
+                    region.set_block_at_index_unchecked(idx, x, y, z);
+                    return Ok(slf);
+                }
+                // Complex string with [/{ — full parser path.
+                slf.inner.set_block_str(x, y, z, &s);
+                return Ok(slf);
+            }
+
+            // ---- Block instance fast path ----
+            // Try to extract via duck-typing: object with .id (str), .state, .nbt.
+            if let Ok(id_attr) = block_obj.getattr("id") {
+                if let Ok(id_str) = id_attr.extract::<String>() {
+                    let has_extras = block_obj
+                        .getattr("_has_extras")
+                        .ok()
+                        .and_then(|v| v.extract::<bool>().ok())
+                        .unwrap_or(false);
+                    if !has_extras {
+                        // Block with no state/nbt — same as plain id.
+                        let cached = slf.name_idx_cache.get(&id_str).copied();
+                        slf.ensure_default_region(x, y, z);
+                        let idx = match cached {
+                            Some(i) => i,
+                            None => {
+                                let region = &mut slf.inner.default_region;
+                                let i = region.get_or_insert_palette_by_name(&id_str);
+                                slf.name_idx_cache.insert(id_str.clone(), i);
+                                i
+                            }
+                        };
+                        let region = &mut slf.inner.default_region;
+                        if !region.is_in_region(x, y, z) {
+                            region.expand_to_fit(x, y, z);
+                        }
+                        region.set_block_at_index_unchecked(idx, x, y, z);
+                        return Ok(slf);
+                    }
+                    // Block with state/nbt — use its cached payload.
+                    if let Ok(payload) = block_obj
+                        .getattr("_payload")
+                        .and_then(|p| p.extract::<String>())
+                    {
+                        slf.inner.set_block_str(x, y, z, &payload);
+                        return Ok(slf);
+                    }
+                }
+            }
+        }
+
+        // ---- slow path: state/nbt kwargs override or augment ----
+        // Coerce block to id string.
+        let id_str: String = if let Ok(s) = block_obj.extract::<String>() {
+            s
+        } else if let Ok(id_attr) = block_obj.getattr("id") {
+            id_attr.extract::<String>()?
+        } else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "block must be a string or Block instance",
+            ));
+        };
+
+        // Build the payload string and route through set_block_from_string.
+        // Helper: convert a python state dict (str -> str|int|bool) into
+        // SmolStr pairs, stringifying values.
+        let state_pairs: Option<Vec<(SmolStr, SmolStr)>> = match state {
+            Some(d) => {
+                let dict = d.downcast::<PyDict>().map_err(|_| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>("state must be a dict")
+                })?;
+                let mut v = Vec::with_capacity(dict.len());
+                for (k, val) in dict.iter() {
+                    let key: String = k.extract()?;
+                    let val_str: String = if let Ok(b) = val.extract::<bool>() {
+                        if b { "true".to_string() } else { "false".to_string() }
+                    } else if let Ok(i) = val.extract::<i64>() {
+                        i.to_string()
+                    } else {
+                        val.extract::<String>()
+                            .or_else(|_| Ok::<_, PyErr>(val.str()?.to_string()))?
+                    };
+                    v.push((SmolStr::from(key), SmolStr::from(val_str)));
+                }
+                Some(v)
+            }
+            None => None,
+        };
+
+        // Properties-only path (state without nbt): use the typed
+        // properties API directly — avoids SNBT parser overhead.
+        if state_pairs.is_some() && nbt.is_none() {
+            let props = state_pairs.unwrap();
+            let block_state = crate::BlockState {
+                name: id_str.into(),
+                properties: props,
+            };
+            slf.inner.set_block(x, y, z, &block_state);
+            return Ok(slf);
+        }
+
+        // NBT (with optional state): build full id[k=v]{snbt} payload.
+        let mut payload = id_str;
+        if let Some(props) = state_pairs {
+            payload.push('[');
+            let mut first = true;
+            for (k, v) in &props {
+                if !first {
+                    payload.push(',');
+                }
+                payload.push_str(k);
+                payload.push('=');
+                payload.push_str(v);
+                first = false;
+            }
+            payload.push(']');
+        }
+        if let Some(nbt_dict) = nbt {
+            // Convert the Python NBT dict to SNBT via Python repr fallback.
+            // For full structured NBT support we delegate to the Python helper
+            // by calling json/snbt-encoding logic — for now, accept a string
+            // already in SNBT form.
+            if let Ok(snbt) = nbt_dict.extract::<String>() {
+                payload.push('{');
+                payload.push_str(&snbt);
+                payload.push('}');
+            } else {
+                // Convert dict to SNBT via Python's str(). Best-effort.
+                let s = nbt_dict.str()?.to_string();
+                payload.push('{');
+                payload.push_str(&s);
+                payload.push('}');
+            }
+        }
+        let _ = slf.inner.set_block_from_string(x, y, z, &payload);
+        Ok(slf)
+    }
+
     pub fn set_block(&mut self, x: i32, y: i32, z: i32, block_name: &str) -> bool {
         // Fast path: simple block names (no properties/NBT) go directly to Region
         if block_name.contains('[') || block_name.ends_with('}') {
@@ -469,28 +671,29 @@ impl PySchematic {
             return self.inner.set_block_str(x, y, z, block_name);
         }
 
-        // One-time default region initialization
+        // Multi-entry name → palette-index cache. For workloads with N
+        // unique block ids interleaved (procedural / multi-color content),
+        // the 1-entry last_block_name cache misses ~(N-1)/N of the time
+        // and forces the palette FxHashMap lookup. The multi-entry cache
+        // hits 100% after warmup.
+        if let Some(&cached) = self.name_idx_cache.get(block_name) {
+            self.ensure_default_region(x, y, z);
+            let region = &mut self.inner.default_region;
+            if !region.is_in_region(x, y, z) {
+                region.expand_to_fit(x, y, z);
+            }
+            region.set_block_at_index_unchecked(cached, x, y, z);
+            return true;
+        }
+
+        // Cache miss: resolve via palette and populate the cache.
         self.ensure_default_region(x, y, z);
-
         let region = &mut self.inner.default_region;
-
-        // Expand region if coordinate is outside bounds
         if !region.is_in_region(x, y, z) {
             region.expand_to_fit(x, y, z);
         }
-
-        // Check block name cache — avoid palette lookup on repeated block names
-        let palette_index = if block_name == self.last_block_name {
-            self.last_palette_index
-        } else {
-            let idx = region.get_or_insert_palette_by_name(block_name);
-            self.last_block_name.clear();
-            self.last_block_name.push_str(block_name);
-            self.last_palette_index = idx;
-            idx
-        };
-
-        // Direct array write with bookkeeping
+        let palette_index = region.get_or_insert_palette_by_name(block_name);
+        self.name_idx_cache.insert(block_name.to_string(), palette_index);
         region.set_block_at_index_unchecked(palette_index, x, y, z);
         true
     }

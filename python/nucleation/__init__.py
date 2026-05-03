@@ -509,6 +509,7 @@ class Schematic:
         # Cached bound methods of the compiled extension. Caching at __init__
         # eliminates ~50 ns of attribute lookup on the per-call hot path.
         "_fast_set_block",
+        "_fast_set_block_p",
         "_fast_set_block_with_properties",
         "_fast_set_block_from_string",
         "_fast_place",
@@ -550,6 +551,7 @@ class Schematic:
         # placement.
         if self._inner is not None:
             self._fast_set_block = self._inner.set_block
+            self._fast_set_block_p = self._inner.set_block_p
             self._fast_set_block_with_properties = self._inner.set_block_with_properties
             self._fast_set_block_from_string = self._inner.set_block_from_string
             self._fast_place = self._inner.place
@@ -607,10 +609,13 @@ class Schematic:
         inner = self._inner
         if inner is not None:
             self._fast_set_block = inner.set_block
+            self._fast_set_block_p = inner.set_block_p
             self._fast_set_block_with_properties = inner.set_block_with_properties
             self._fast_set_block_from_string = inner.set_block_from_string
             self._fast_place = inner.place
             self._fast_prepare_block = inner.prepare_block
+            self._fast_get_block = inner.get_block
+            self._fast_get_blocks = inner.get_blocks
             self._name_idx_cache = {}
 
     def __getattr__(self, name: str) -> Any:
@@ -704,25 +709,16 @@ class Schematic:
             set_block((x, y, z), "minecraft:repeater", state={"delay": 4})
             set_block((x, y, z), Block("minecraft:chest", nbt={...}))
 
-        Performance notes
-        -----------------
-        - Plain string ids take a fast path straight to native.
-        - Reused ``Block`` instances cache their full payload, so repeated
-          placements skip state/NBT serialization after the first call.
-        - For uniform regions, prefer ``fill()`` / ``fill_cuboid`` (orders of
-          magnitude faster than per-block calls).
-        - For hot loops placing many independent blocks, batch via
-          ``set_blocks(positions, "id")`` (20-30M/s) instead of per-call
-          (~2M/s, capped by PyO3 boundary cost). If you must use per-call,
-          cache the bound method::
-
-              place = schem.raw.set_block
-              for x, y, z, id in blocks:
-                  place(x, y, z, id)
-
-          This skips the polished wrapper and runs at ~3.5M/s.
+        The no-kwargs hot path (the vast majority of calls) delegates to
+        the native ``set_block_p`` method which handles all argument
+        shapes in Rust — single FFI crossing, internal name-cache.
         """
-        # ----- argument shape (most-common form first) -----
+        if self._inner is None:
+            self._ensure_built()
+        if state is None and nbt is None:
+            self._fast_set_block_p(*args)
+            return self
+        # Slow path: state/nbt kwargs.
         if len(args) == 2:
             (x, y, z), block = args[0], args[1]
         elif len(args) == 4:
@@ -731,70 +727,18 @@ class Schematic:
             raise TypeError(
                 "set_block(x, y, z, block) or set_block((x, y, z), block, *, state, nbt)"
             )
-
-        # Lazy-materialize a template-pending schematic on first mutation.
-        if self._inner is None:
-            self._ensure_built()
-
-        # ----- ultra-fast path: plain string id, no kwargs -----
-        # Use a per-instance name→palette-index cache so repeated calls
-        # with the same id skip even the native palette lookup. Complex
-        # strings (with [ or {) bypass the cache and go through the
-        # full parser path.
-        if state is None and nbt is None and block.__class__ is str:
-            cache = self._name_idx_cache
-            idx = cache.get(block)
-            if idx is None:
-                if "[" in block or "{" in block:
-                    self._fast_set_block(x, y, z, block)
-                    return self
-                idx = self._fast_prepare_block(block)
-                cache[block] = idx
-            self._fast_place(x, y, z, idx)
-            return self
-
-        # ----- fast path: reused Block instance, no override kwargs -----
-        if state is None and nbt is None and isinstance(block, Block):
-            if not block._has_extras:
-                self._fast_set_block(x, y, z, block.id)
-            elif block.nbt:
-                self._fast_set_block_from_string(x, y, z, block._payload)
-            else:
-                # State only → use the typed properties API.
-                props = {k: _state_to_str(v) for k, v in block.state.items()}
-                self._fast_set_block_with_properties(x, y, z, block.id, props)
-            return self
-
-        # ----- slow path: kwargs may augment a Block or a string -----
         if isinstance(block, Block):
             block_struct = block
         elif isinstance(block, str):
-            if state is None and nbt is None and ("[" in block or "{" in block):
-                block_struct = Block.parse(block)
-            else:
-                block_struct = Block(id=block, state=state, nbt=nbt)
+            block_struct = Block(id=block, state=state, nbt=nbt)
         else:
             raise TypeError(f"block must be str or Block, got {type(block).__name__}")
-
-        # If there are no override kwargs and nothing to merge, use the cache.
-        if state is None and nbt is None:
-            if not block_struct._has_extras:
-                self._fast_set_block(x, y, z, block_struct.id)
-            elif block_struct.nbt:
-                self._fast_set_block_from_string(x, y, z, block_struct._payload)
-            else:
-                props = {k: _state_to_str(v) for k, v in block_struct.state.items()}
-                self._fast_set_block_with_properties(x, y, z, block_struct.id, props)
-            return self
-
-        # Merge override kwargs over the Block's own state/nbt.
         eff_state = dict(block_struct.state or {})
         if state:
             eff_state.update(state)
         eff_nbt = dict(block_struct.nbt or {})
         if nbt:
             eff_nbt.update(nbt)
-
         if eff_nbt:
             snbt = _dict_to_snbt(eff_nbt)
             payload = block_struct.id
