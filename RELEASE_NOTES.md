@@ -1,3 +1,74 @@
+# Nucleation v0.2.2
+
+A correctness release for the Python simulation API plus quality-of-life
+fixes across the typed circuit executor surface. CI also moves to a
+tag-driven publish flow, and PyPI / npm now ship per-package READMEs.
+
+## What's new
+
+### Multi-step `simulate()` actually advances the wavefront
+
+`Schematic.simulate()` previously rebuilt a fresh `MchprsWorld` on every
+call. The redpiler's compile-time constant fold ran on each rebuild,
+which propagated any active signals through the whole graph before any
+ticks fired — `simulate(events=[lever_on], ticks=1)` followed by
+`simulate(ticks=1)` would light an entire repeater chain at once instead
+of advancing one delay-1 stage per call.
+
+Fixes:
+
+- The polished `Schematic` now caches the underlying `MchprsWorld` and
+  reuses it across `simulate()` calls. Repeated `simulate(ticks=1)`
+  walks the wavefront one stage per tick, as expected.
+- `simulate(ticks=0, events=None)` short-circuits and returns `self`
+  untouched — no more silent state mutation from a no-op call.
+- New `simulate(reset=True)` and `Schematic.invalidate_simulation()`
+  give you an explicit way to drop the cached world after mutating the
+  schematic between runs (`set_block`, `fill`, …).
+- The constant-fold leak and the cache-invalidation contract are now
+  pinned by 11 dedicated tests in `TestSimulate`.
+
+### Typed circuit executor — finishing touches
+
+- New `TypedCircuitExecutor.sync_to_schematic()` returns a `Schematic`
+  snapshot of the executor's internal world. Useful for inspecting
+  block states (lit lamps, lever orientation, …) after `execute()`.
+- `Value` coercion is friendlier: `as_u32` / `as_u64` now accept
+  non-negative `I32` / `I64` and `Bool`, so passing `True` / `1` to a
+  1-bit unsigned port "just works."
+- `DefinitionRegion.with_metadata(key, value)` is now exposed as a
+  fluent alias of `set_metadata` for chaining-style metadata setup.
+
+### Per-package READMEs
+
+PyPI no longer shows the umbrella Rust-flavoured README. The Python
+package now ships `README-python.md` (pip install, Python examples,
+links back to the repo); the npm package ships `README-npm.md` (npm
+install, JS examples). Both are far less confusing for consumers
+landing from those registries.
+
+### CI: tag-driven publishing
+
+The CI workflow now triggers builds on every push and PR, and only
+publishes when a `v*` tag is pushed (`tags: ['v*']`). The previous
+"diff Cargo.toml across HEAD^..HEAD" heuristic is gone — `check-version`
+now derives the release version directly from the tag name and verifies
+it matches `Cargo.toml`. Tag a release with `git tag v0.2.2 && git push
+--tags` and the matrix builds + publishes everything in one run.
+
+## Breaking
+
+None. `simulate()` keeps its existing signature; the new `reset=` is a
+keyword-only parameter that defaults to `False`.
+
+## Tests
+
+- Python: 108 passed (was 102; new TestSimulate cases plus the four
+  pre-existing failures are now fixed).
+- Rust: 258 lib tests pass.
+
+---
+
 # Nucleation v0.2.0
 
 The Python API gets a structural redesign — same import name, much
