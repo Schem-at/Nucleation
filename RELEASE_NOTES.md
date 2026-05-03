@@ -1,3 +1,111 @@
+# Nucleation v0.2.3
+
+Simulation surface gets a polished read API, the renderer learns to
+aim at custom targets, and one nasty redstone bug we tracked into the
+MCHPRS redpiler is now fixed at the source.
+
+## What's new
+
+### Direct lever control + idempotent simulate events
+
+`simulate(events=...)` now accepts a third event type alongside
+`UseBlock` and `ButtonPress`:
+
+```python
+from nucleation import LeverState
+
+# Idempotent — calling twice with state=True does NOT toggle.
+schem.simulate(events=[LeverState((0, 1, 3), state=True)], ticks=2)
+schem.simulate(events=[LeverState((0, 1, 3), state=False)], ticks=2)
+```
+
+Backed by a new `MchprsWorld.set_lever_power(x, y, z, powered)`
+pymethod that wires straight into the redpiler.
+
+### Polished state accessors — read what's actually happening
+
+The common questions about a simulated circuit have direct methods on
+the schematic now, and they all read from the cached simulation world
+(no schematic round-trip):
+
+```python
+schem.is_powered((0, 1, 0))      # bool — unified power check
+schem.is_lit((2, 1, 0))          # bool — redstone-lamp lit state
+schem.signal_strength((1, 1, 0)) # int 0..15 — wire signal level
+```
+
+`is_powered` is a single predicate that returns `True` for a lit
+lamp, a powered lever or button, or any non-zero redstone signal —
+the same call works whatever block is at that position.
+
+### `simulate(sync=False)` — fast tight tick loops
+
+The default `sync=True` keeps the existing behavior (copy the
+simulator's state back into the schematic so `save()`/`render()` see
+updated blocks). Passing `sync=False` skips that round-trip; query
+state through the polished accessors instead. Every `simulate()` now
+flushes the redpiler's pending state after `tick()` so the accessors
+return current values regardless of `sync`.
+
+### `get_block` accepts tuples
+
+Mirrors the polished `set_block` coord shape:
+
+```python
+schem.get_block((1, 2, 3))            # in addition to (1, 2, 3)
+schem.get_block_string((1, 2, 3))
+```
+
+### Custom render target
+
+The orbit camera previously always aimed at the model's bounding-box
+centroid. `render(target=(x, y, z), ...)` lets you frame a specific
+corner / region of large schematics. yaw/pitch/zoom continue to
+orbit around whichever target is chosen; default behaviour is
+unchanged.
+
+```python
+schem.render("zoomed.png", target=(8.0, 1.0, 0.0),
+             zoom=0.4, yaw=30, pitch=20)
+```
+
+## Fixed
+
+### Mirror-symmetric torches now both update on lever toggle
+
+A user-reported asymmetry: a wall lever feeding two redstone wires
+that fan out N/S to two redstone torches mounted on solid blocks at
+each end. After toggling the lever, only one torch turned off; the
+other stayed lit even though both wires reached signal strength 15
+symmetrically.
+
+Tracked into MCHPRS: the redpiler's `Coalesce` pass was merging two
+simulation-equivalent torch nodes (same type, same single incoming
+edge from the shared lever, both removable) into one node. The
+optimization is sound for the simulation graph, but each merged node
+backs a *distinct world block position* whose blockstate the JIT
+must sync on `flush()` — collapsing them dropped one of those
+positions.
+
+Fixed in the MCHPRS fork at commit `94f981f` (branch
+`fix/torch-symmetry-non-cross-wires`): `CompileNode` now carries an
+`aliased_positions` list, the `Coalesce` pass appends merged-away
+positions onto the survivor, and the direct backend writes the same
+block to every alias on `flush()` and `reset()`. `pos_map` resolves
+each alias to the surviving NodeId so per-position lookups still
+work. Per-tick simulation cost is unchanged.
+
+Pinned in Nucleation by `tests/test_redstone_torch_symmetry.rs` —
+the user's exact circuit run through the polished schematic API.
+
+## Tests
+
+- Python: 87 passed (TestSimulate gains 4 new cases for the cache
+  contract; TestGetBlockTupleShorthand pins the tuple-input shape).
+- Rust lib (sim feature): 424 passed.
+
+---
+
 # Nucleation v0.2.2
 
 A correctness release for the Python simulation API plus quality-of-life
