@@ -117,4 +117,75 @@ mod tests {
             "torches at (0,2,0) and (0,2,4) should be in the same lit state"
         );
     }
+
+    /// Companion regression for the orientation half of the same Coalesce
+    /// bug: two mirror-image redstone repeaters fed by a shared powered
+    /// block must each keep their own `facing` after the simulation runs.
+    /// Without preserving the alias's own block on flush, the survivor's
+    /// `facing` would clobber the other repeater's orientation.
+    #[test]
+    fn symmetric_repeaters_keep_facing_after_lever_toggle() {
+        let mut s = UniversalSchematic::new("repeater-facing".to_string());
+
+        for z in 0..5 {
+            s.set_block_from_string(0, 0, z, "minecraft:stone_bricks")
+                .unwrap();
+        }
+        s.set_block_from_string(0, 1, 2, "minecraft:stone_bricks").unwrap();
+        s.set_block_from_string(
+            -1,
+            1,
+            2,
+            "minecraft:lever[face=wall,facing=west,powered=false]",
+        )
+        .unwrap();
+
+        // Mirror-image repeaters; their `facing` points at the host
+        // (the input side in MCHPRS convention).
+        s.set_block_from_string(
+            0,
+            1,
+            1,
+            "minecraft:repeater[facing=south,delay=1,powered=false]",
+        )
+        .unwrap();
+        s.set_block_from_string(
+            0,
+            1,
+            3,
+            "minecraft:repeater[facing=north,delay=1,powered=false]",
+        )
+        .unwrap();
+
+        let mut world = MchprsWorld::new(s).expect("build sim world");
+        world.on_use_block(nucleation::simulation::BlockPos::new(-1, 1, 2));
+        world.tick(4);
+        world.flush();
+        world.sync_to_schematic();
+
+        let synced = world.get_schematic();
+        let north_facing = synced
+            .get_block(0, 1, 1)
+            .expect("north repeater")
+            .get_property("facing")
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        let south_facing = synced
+            .get_block(0, 1, 3)
+            .expect("south repeater")
+            .get_property("facing")
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+
+        assert_eq!(
+            north_facing, "south",
+            "north repeater (z=1) should still face south; got {:?}",
+            north_facing
+        );
+        assert_eq!(
+            south_facing, "north",
+            "south repeater (z=3) should still face north; got {:?}",
+            south_facing
+        );
+    }
 }

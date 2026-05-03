@@ -1,6 +1,6 @@
 [package]
 name = "nucleation"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -101,13 +101,13 @@ wasm-bindgen-futures = { version = "0.4", optional = true }
 # Note: These are git dependencies and will be excluded from crates.io publish
 # Using Nano112's MCHPRS fork with custom IO support and bug fixes
 # Networking is disabled to avoid WASM compatibility issues
-# Rev 94f981f: branch fix/torch-symmetry-non-cross-wires —
+# Rev f70621e: branch fix/torch-symmetry-non-cross-wires —
 # preserves coalesced world positions on flush so mirror-image torches
 # both update (in addition to existing custom IO + wire connectivity fixes)
-mchprs_redpiler = { git = "https://github.com/Nano112/MCHPRS.git", rev = "94f981f", optional = true }
-mchprs_redstone = { git = "https://github.com/Nano112/MCHPRS.git", rev = "94f981f", optional = true }
-mchprs_world = { git = "https://github.com/Nano112/MCHPRS.git", rev = "94f981f", optional = true, default-features = false }
-mchprs_blocks = { git = "https://github.com/Nano112/MCHPRS.git", rev = "94f981f", optional = true }
+mchprs_redpiler = { git = "https://github.com/Nano112/MCHPRS.git", rev = "f70621e", optional = true }
+mchprs_redstone = { git = "https://github.com/Nano112/MCHPRS.git", rev = "f70621e", optional = true }
+mchprs_world = { git = "https://github.com/Nano112/MCHPRS.git", rev = "f70621e", optional = true, default-features = false }
+mchprs_blocks = { git = "https://github.com/Nano112/MCHPRS.git", rev = "f70621e", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

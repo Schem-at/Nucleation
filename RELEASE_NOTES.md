@@ -1,3 +1,40 @@
+# Nucleation v0.2.4
+
+Patch release for the 0.2.3 torch-symmetry fix: the alias-write was
+clobbering orientation-only fields on coalesced blocks (a mirror-image
+repeater's `facing` would inherit the survivor's facing instead of
+keeping its own).
+
+## Fixed
+
+### Mirror-image repeaters keep their own `facing`
+
+The 0.2.3 alias fix wrote the *survivor's* whole `Block` to every
+merged-away position. Two repeaters with the same `delay` are
+NodeType-equal in the redpiler regardless of which way they point, so
+Coalesce merges them — and a circuit with two repeaters facing
+opposite directions ended up with both pointing the same way after
+the simulation ran.
+
+Fixed in the MCHPRS fork at `f70621e` (same branch
+`fix/torch-symmetry-non-cross-wires`): each alias now stores its
+*own* original Block id, and a small `stamp_simulation_state` helper
+applies just `powered` / `lit` / wire `power` / repeater `locked` to
+that block before writing it back. Orientation, decorative state,
+and anything else stays put.
+
+Pinned by:
+- MCHPRS `tests/components.rs` — `symmetric_repeaters_keep_facing`
+- Nucleation `tests/test_redstone_torch_symmetry.rs` —
+  `symmetric_repeaters_keep_facing_after_lever_toggle`
+
+## Tests
+
+- Nucleation Rust (sim feature): 425 lib + 2 torch-symmetry integration tests.
+- MCHPRS components suite: 21 passed (incl. both symmetry regression tests).
+
+---
+
 # Nucleation v0.2.3
 
 Simulation surface gets a polished read API, the renderer learns to
