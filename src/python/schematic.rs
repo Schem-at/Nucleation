@@ -3,7 +3,112 @@
 //! Core schematic operations: loading, saving, block manipulation, iteration.
 
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyList, PyTuple};
+use pyo3::types::{PyBool, PyBytes, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
+
+/// Recursively serialize a Python value into Minecraft SNBT.
+///
+/// Handles the common types: str (quoted, with escaping), bool (1b/0b),
+/// int (bare), float (with `f` suffix), list ([...]) and dict ({...}).
+/// Honors the `__snbt__` escape hatch (single-key dict whose value is a
+/// pre-formatted SNBT string).
+fn py_value_to_snbt(
+    value: &Bound<'_, PyAny>,
+    out: &mut String,
+    top_level_dict_no_braces: bool,
+) -> PyResult<()> {
+    // bool first — bool is also int in Python.
+    if let Ok(b) = value.downcast::<PyBool>() {
+        out.push_str(if b.is_true() { "1b" } else { "0b" });
+        return Ok(());
+    }
+    if let Ok(s) = value.downcast::<PyString>() {
+        let raw: &str = &s.to_string_lossy();
+        out.push('"');
+        for ch in raw.chars() {
+            match ch {
+                '"' => out.push_str("\\\""),
+                '\\' => out.push_str("\\\\"),
+                c => out.push(c),
+            }
+        }
+        out.push('"');
+        return Ok(());
+    }
+    if let Ok(d) = value.downcast::<PyDict>() {
+        // Escape hatch: {"__snbt__": "<raw>"} → emit raw verbatim.
+        if d.len() == 1 {
+            if let Some(raw) = d.get_item("__snbt__")? {
+                let s: String = raw.extract()?;
+                if !top_level_dict_no_braces {
+                    out.push('{');
+                }
+                out.push_str(&s);
+                if !top_level_dict_no_braces {
+                    out.push('}');
+                }
+                return Ok(());
+            }
+        }
+        if !top_level_dict_no_braces {
+            out.push('{');
+        }
+        let mut first = true;
+        for (k, v) in d.iter() {
+            if !first {
+                out.push(',');
+            }
+            let key: String = k.extract()?;
+            out.push_str(&key);
+            out.push(':');
+            py_value_to_snbt(&v, out, false)?;
+            first = false;
+        }
+        if !top_level_dict_no_braces {
+            out.push('}');
+        }
+        return Ok(());
+    }
+    if let Ok(l) = value.downcast::<PyList>() {
+        out.push('[');
+        let mut first = true;
+        for item in l.iter() {
+            if !first {
+                out.push(',');
+            }
+            py_value_to_snbt(&item, out, false)?;
+            first = false;
+        }
+        out.push(']');
+        return Ok(());
+    }
+    // int (after bool check)
+    if let Ok(i) = value.extract::<i64>() {
+        out.push_str(&i.to_string());
+        return Ok(());
+    }
+    if let Ok(f) = value.extract::<f64>() {
+        out.push_str(&format!("{}f", f));
+        return Ok(());
+    }
+    // Tuple → list (best-effort)
+    if let Ok(t) = value.downcast::<PyTuple>() {
+        out.push('[');
+        let mut first = true;
+        for item in t.iter() {
+            if !first {
+                out.push(',');
+            }
+            py_value_to_snbt(&item, out, false)?;
+            first = false;
+        }
+        out.push(']');
+        return Ok(());
+    }
+    Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
+        "cannot serialize {} to SNBT",
+        value.get_type().name()?
+    )))
+}
 use smol_str::SmolStr;
 use std::collections::HashMap;
 use std::fs;
@@ -468,22 +573,22 @@ impl PySchematic {
         region.set_block_at_index_unchecked(palette_index, x, y, z);
     }
 
-    /// Polished set_block: handles all call shapes natively. The hot path
-    /// (4-arg or 2-arg-tuple positional with a plain string id, no kwargs)
-    /// goes straight to a name → palette-index cache and a single array
-    /// write — no Python wrapper, no per-call FxHashMap palette lookup.
+    /// Place a block. Single entry point, all shapes — fast.
     ///
-    /// Accepted forms::
+    /// Handles every call form natively in Rust:
     ///
     ///     set_block(x, y, z, "minecraft:stone")
     ///     set_block((x, y, z), "minecraft:stone")
     ///     set_block(x, y, z, "minecraft:repeater[delay=4,facing=east]")
     ///     set_block((x, y, z), "minecraft:chest", state={"facing":"west"})
     ///     set_block((x, y, z), "minecraft:chest", nbt={...})
+    ///     set_block((x, y, z), Block(...))
     ///
-    /// Returns the schematic itself for chaining.
+    /// Internal name → palette-index cache means repeated calls with the
+    /// same plain id skip the FxHashMap palette lookup. Returns the
+    /// schematic itself for chaining.
     #[pyo3(signature = (*args, state=None, nbt=None))]
-    pub fn set_block_p<'py>(
+    pub fn set_block<'py>(
         mut slf: PyRefMut<'py, Self>,
         py: Python<'_>,
         args: &Bound<'_, PyTuple>,
@@ -644,19 +749,14 @@ impl PySchematic {
             payload.push(']');
         }
         if let Some(nbt_dict) = nbt {
-            // Convert the Python NBT dict to SNBT via Python repr fallback.
-            // For full structured NBT support we delegate to the Python helper
-            // by calling json/snbt-encoding logic — for now, accept a string
-            // already in SNBT form.
-            if let Ok(snbt) = nbt_dict.extract::<String>() {
+            // Accept either a pre-formatted SNBT string or a Python dict.
+            if let Ok(snbt_str) = nbt_dict.extract::<String>() {
                 payload.push('{');
-                payload.push_str(&snbt);
+                payload.push_str(&snbt_str);
                 payload.push('}');
             } else {
-                // Convert dict to SNBT via Python's str(). Best-effort.
-                let s = nbt_dict.str()?.to_string();
                 payload.push('{');
-                payload.push_str(&s);
+                py_value_to_snbt(nbt_dict, &mut payload, /*top_level_dict_no_braces=*/ true)?;
                 payload.push('}');
             }
         }
@@ -664,7 +764,9 @@ impl PySchematic {
         Ok(slf)
     }
 
-    pub fn set_block(&mut self, x: i32, y: i32, z: i32, block_name: &str) -> bool {
+    /// Strict-signature alternative when you know you have 4 i32 + 1 str
+    /// and want the absolute minimum PyO3 boundary cost.
+    pub fn set_block_simple(&mut self, x: i32, y: i32, z: i32, block_name: &str) -> bool {
         // Fast path: simple block names (no properties/NBT) go directly to Region
         if block_name.contains('[') || block_name.ends_with('}') {
             // Complex block string — fall back to full parsing path

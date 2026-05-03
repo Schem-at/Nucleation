@@ -506,8 +506,7 @@ class Schematic:
     __slots__ = (
         "_inner",
         "pack",
-        # Cached bound methods of the compiled extension. Caching at __init__
-        # eliminates ~50 ns of attribute lookup on the per-call hot path.
+        # Cached bound methods of the compiled extension.
         "_fast_set_block",
         "_fast_set_block_p",
         "_fast_set_block_with_properties",
@@ -550,8 +549,8 @@ class Schematic:
         # __dict__/attribute-lookup cost on every call. ~50 ns saved per
         # placement.
         if self._inner is not None:
-            self._fast_set_block = self._inner.set_block
-            self._fast_set_block_p = self._inner.set_block_p
+            self._fast_set_block = self._inner.set_block_simple
+            self._fast_set_block_p = self._inner.set_block
             self._fast_set_block_with_properties = self._inner.set_block_with_properties
             self._fast_set_block_from_string = self._inner.set_block_from_string
             self._fast_place = self._inner.place
@@ -608,8 +607,8 @@ class Schematic:
         """Refresh the cached bound methods after `_inner` is replaced."""
         inner = self._inner
         if inner is not None:
-            self._fast_set_block = inner.set_block
-            self._fast_set_block_p = inner.set_block_p
+            self._fast_set_block = inner.set_block_simple
+            self._fast_set_block_p = inner.set_block
             self._fast_set_block_with_properties = inner.set_block_with_properties
             self._fast_set_block_from_string = inner.set_block_from_string
             self._fast_place = inner.place
@@ -700,58 +699,16 @@ class Schematic:
         state: Optional[Mapping[str, StateValue]] = None,
         nbt: Optional[Mapping[str, Any]] = None,
     ) -> "Schematic":
-        """Place a block.
-
-        Accepted call patterns::
-
-            set_block(x, y, z, "minecraft:stone")             # legacy
-            set_block((x, y, z), "minecraft:stone")           # new
-            set_block((x, y, z), "minecraft:repeater", state={"delay": 4})
-            set_block((x, y, z), Block("minecraft:chest", nbt={...}))
-
-        The no-kwargs hot path (the vast majority of calls) delegates to
-        the native ``set_block_p`` method which handles all argument
-        shapes in Rust — single FFI crossing, internal name-cache.
+        """Place a block. Accepts 4-arg, 2-arg-tuple, Block instance, or
+        kwargs. The hot path delegates to native ``set_block`` (polished)
+        which handles every form in Rust with an internal name cache.
         """
         if self._inner is None:
             self._ensure_built()
         if state is None and nbt is None:
             self._fast_set_block_p(*args)
-            return self
-        # Slow path: state/nbt kwargs.
-        if len(args) == 2:
-            (x, y, z), block = args[0], args[1]
-        elif len(args) == 4:
-            x, y, z, block = args
         else:
-            raise TypeError(
-                "set_block(x, y, z, block) or set_block((x, y, z), block, *, state, nbt)"
-            )
-        if isinstance(block, Block):
-            block_struct = block
-        elif isinstance(block, str):
-            block_struct = Block(id=block, state=state, nbt=nbt)
-        else:
-            raise TypeError(f"block must be str or Block, got {type(block).__name__}")
-        eff_state = dict(block_struct.state or {})
-        if state:
-            eff_state.update(state)
-        eff_nbt = dict(block_struct.nbt or {})
-        if nbt:
-            eff_nbt.update(nbt)
-        if eff_nbt:
-            snbt = _dict_to_snbt(eff_nbt)
-            payload = block_struct.id
-            if eff_state:
-                parts = ",".join(f"{k}={_state_to_str(v)}" for k, v in eff_state.items())
-                payload += f"[{parts}]"
-            payload += "{" + snbt + "}"
-            self._fast_set_block_from_string(x, y, z, payload)
-        elif eff_state:
-            props = {k: _state_to_str(v) for k, v in eff_state.items()}
-            self._fast_set_block_with_properties(x, y, z, block_struct.id, props)
-        else:
-            self._fast_set_block(x, y, z, block_struct.id)
+            self._fast_set_block_p(*args, state=state, nbt=nbt)
         return self
 
     def map(
