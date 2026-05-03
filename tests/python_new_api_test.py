@@ -303,8 +303,8 @@ class TestBatchPerf:
             'minecraft:chest[facing=west]'
             '{Items:[{Slot:0b,id:"minecraft:diamond",Count:64b}]}'
         )
-        count = s.set_blocks(positions, chest_str)
-        assert count == 50
+        # Polished set_blocks is chainable; raw count is on s.raw.
+        s.set_blocks(positions, chest_str)
         # Spot-check: middle and last chest got both state and NBT.
         for x in (0, 25, 49):
             be = s.get_block_entity(x, 0, 0)
@@ -315,12 +315,22 @@ class TestBatchPerf:
     def test_state_only_batch(self):
         s = Schematic.new("batch-state")
         positions = [(i, 0, 0) for i in range(20)]
-        count = s.set_blocks(positions, "minecraft:repeater[delay=4,facing=east]")
-        assert count == 20
+        s.set_blocks(positions, "minecraft:repeater[delay=4,facing=east]")
         for x in (0, 10, 19):
             bs = s.get_block_string(x, 0, 0)
             assert "minecraft:repeater" in bs
             assert "delay=4" in bs
+
+    def test_flat_positions_path(self):
+        # Flat list of ints (numpy-friendly) takes the faster set_blocks_flat
+        # path internally and produces the same result.
+        s = Schematic.new("flat")
+        flat = []
+        for i in range(20):
+            flat.extend([i, 0, 0])
+        s.set_blocks(flat, "minecraft:stone")
+        for x in (0, 10, 19):
+            assert s.get_block_string(x, 0, 0) == "minecraft:stone"
 
 
 class TestReExports:

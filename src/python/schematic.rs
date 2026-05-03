@@ -601,6 +601,25 @@ impl PySchematic {
         self.inner.get_block(x, y, z).map(|bs| bs.to_string())
     }
 
+    /// Batch set blocks at flat-array positions `[x0,y0,z0, x1,y1,z1, ...]`.
+    ///
+    /// Faster than `set_blocks(Vec<(i32,i32,i32)>)` for large batches because
+    /// PyO3 unmarshals a flat `Vec<i32>` from a Python list/numpy array
+    /// without unwrapping each tuple. Same parse-once-apply-many semantics.
+    pub fn set_blocks_flat(&mut self, positions: Vec<i32>, block_name: &str) -> usize {
+        if positions.len() < 3 || positions.len() % 3 != 0 {
+            return 0;
+        }
+        // Materialize into the existing tuple-shaped Vec just once (one
+        // allocation, no per-element PyO3 work). The big saved cost is the
+        // per-tuple unmarshal at the boundary.
+        let mut tuples: Vec<(i32, i32, i32)> = Vec::with_capacity(positions.len() / 3);
+        for chunk in positions.chunks_exact(3) {
+            tuples.push((chunk[0], chunk[1], chunk[2]));
+        }
+        self.set_blocks(tuples, block_name)
+    }
+
     /// Batch set blocks at multiple positions with the same block name.
     /// Crosses the FFI boundary once. Returns the number of blocks set.
     ///

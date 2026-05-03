@@ -717,6 +717,53 @@ class Schematic:
             )
         return self
 
+    def set_blocks(
+        self,
+        positions: Any,
+        block: BlockLike,
+        *,
+        state: Optional[Mapping[str, StateValue]] = None,
+        nbt: Optional[Mapping[str, Any]] = None,
+    ) -> "Schematic":
+        """Place the same block at many positions.
+
+        Accepts ``positions`` as:
+          - list of ``(x, y, z)`` tuples
+          - flat list / numpy array of ints ``[x0, y0, z0, x1, y1, z1, ...]``
+
+        The flat form is faster for very large batches because PyO3 doesn't
+        unwrap each tuple at the boundary. For uniform regions, prefer
+        :py:meth:`fill`. For repeated NBT-bearing tile entities (chests,
+        signs, ...) the parse-once batch path applies the template to all
+        positions in one native call.
+        """
+        if isinstance(block, Block):
+            payload = block.to_string()
+        elif state is not None or nbt is not None:
+            payload = Block(id=block, state=state, nbt=nbt).to_string()
+        else:
+            payload = block
+
+        inner = self._ensure_built()
+
+        # Flat-array dispatch: faster boundary crossing.
+        if positions is not None and len(positions) > 0:
+            first = positions[0] if not hasattr(positions, "dtype") else positions[0]
+            if isinstance(first, (int,)) or (
+                hasattr(positions, "dtype") and getattr(positions, "ndim", 1) == 1
+            ):
+                flat = (
+                    list(positions)
+                    if not isinstance(positions, list)
+                    else positions
+                )
+                inner.set_blocks_flat(flat, payload)
+                return self
+
+        # Tuple-list path.
+        inner.set_blocks(list(positions), payload)
+        return self
+
     def fill(self, region: Tuple[Coord, Coord], block: BlockLike) -> "Schematic":
         """Fill a cuboid region (inclusive) with the given block."""
         (x1, y1, z1), (x2, y2, z2) = region
