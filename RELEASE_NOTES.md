@@ -1,3 +1,52 @@
+# Nucleation v0.2.5
+
+Two redstone-correctness fixes plus a small Python ergonomics gap.
+
+## Fixed
+
+### `simulate(events=[UseBlock(pos)])` works on buttons, not just levers
+
+`MchprsWorld.on_use_block` previously rejected anything other than a
+lever and silently no-op'd, with `Tried to use block at ... which is
+not a lever` printed to stderr. The redpiler itself happily handles
+buttons; we just weren't passing them through. Now any block whose
+name ends in `_button` (stone, oak, polished_blackstone, …) is
+delegated to the redpiler's button-press path.
+
+### Wire visual direction now respected when finding power sources
+
+A wire that visually connects only east/west must NOT weakly power a
+solid block to its north or south — a circuit like
+`lever → E/W wire → [perpendicular solid block] → repeater rear input`
+should leave the repeater unpowered. The redpiler in our MCHPRS fork
+had been walking *every* wire adjacent to a solid block during
+`InputSearch`, regardless of visual side. That regression was
+introduced in fork rev `aedc588` ("Add wire connectivity fix and
+constant fold protection for custom IO"); upstream MCHPR/MCHPRS still
+checks `!get_current_side(...).is_none()` and that's what we restored.
+
+MCHPRS fork bumped to commit `18c0c76` on branch
+`fix/torch-symmetry-non-cross-wires`.
+
+Side benefit: this also unblocks the previously-failing
+`pulse_gen_1t_rp_direct` test in MCHPRS's own `tests/timings.rs` —
+same root cause.
+
+Pinned by:
+- MCHPRS `tests/components.rs` —
+  `wire_does_not_power_perpendicular_solid` (test_all_backends).
+- Nucleation `tests/test_redstone_torch_symmetry.rs` —
+  `wire_does_not_power_block_outside_its_visual_direction`.
+
+## Tests
+
+- Nucleation Rust (sim feature): all lib tests + 3 redstone-symmetry
+  integration tests pass.
+- MCHPRS components suite: 23 / 23.
+- MCHPRS timings: 6 / 6 (was 5 / 6 on the old pin).
+
+---
+
 # Nucleation v0.2.4
 
 Patch release for the 0.2.3 torch-symmetry fix: the alias-write was

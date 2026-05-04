@@ -118,6 +118,64 @@ mod tests {
         );
     }
 
+    /// User-reported case: a wire with explicit `east=side, west=side`
+    /// (no N/S connections) sits next to a solid block to its north.
+    /// In vanilla Minecraft the wire is pointing east/west only, so it
+    /// does NOT weakly power the northern neighbour — and a repeater
+    /// reading from that block via its rear should stay unpowered.
+    #[test]
+    fn wire_does_not_power_block_outside_its_visual_direction() {
+        let mut s = UniversalSchematic::new("wire-direction".to_string());
+
+        s.set_block_from_string(0, 0, 0, "minecraft:lime_concrete").unwrap();
+        s.set_block_from_string(
+            0,
+            1,
+            0,
+            "minecraft:lever[face=floor,facing=south,powered=false]",
+        )
+        .unwrap();
+        s.set_block_from_string(1, 0, 0, "minecraft:lime_concrete").unwrap();
+        s.set_block_from_string(
+            1,
+            1,
+            0,
+            "minecraft:redstone_wire[east=side,west=side]",
+        )
+        .unwrap();
+        s.set_block_from_string(1, 1, 1, "minecraft:lime_concrete").unwrap();
+        s.set_block_from_string(1, 0, 2, "minecraft:lime_concrete").unwrap();
+        s.set_block_from_string(
+            1,
+            1,
+            2,
+            "minecraft:repeater[facing=north,delay=1,powered=false]",
+        )
+        .unwrap();
+
+        let mut world = MchprsWorld::new(s).expect("build sim world");
+        world.on_use_block(nucleation::simulation::BlockPos::new(0, 1, 0));
+        world.tick(4);
+        world.flush();
+        world.sync_to_schematic();
+
+        let synced = world.get_schematic();
+        let powered = synced
+            .get_block(1, 1, 2)
+            .expect("repeater")
+            .get_property("powered")
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+
+        assert_eq!(
+            powered, "false",
+            "repeater should NOT be powered (wire only points E/W, the block at \
+             (1,1,1) sits north of the wire and shouldn't receive weak power); \
+             got powered={:?}",
+            powered
+        );
+    }
+
     /// Companion regression for the orientation half of the same Coalesce
     /// bug: two mirror-image redstone repeaters fed by a shared powered
     /// block must each keep their own `facing` after the simulation runs.

@@ -518,26 +518,40 @@ impl MchprsWorld {
         self.compiler.get_signal_strength(pos).is_some()
     }
 
-    /// Simulates a right-click on a block (typically a lever, in schematic coordinates)
+    /// Simulates a right-click on a block in schematic coordinates.
     ///
-    /// # Errors
-    /// Logs a warning if the block is not a lever
+    /// Levers toggle their `powered` state (mirrored into the schematic
+    /// so subsequent reads see the new state). Buttons press for one
+    /// pulse via the redpiler's own scheduling. Other blocks log a
+    /// warning and are ignored.
     pub fn on_use_block(&mut self, pos: BlockPos) {
         let normalized_pos = self.normalize_pos(pos);
         let block = self.get_block(normalized_pos);
-        if block.get_name() == "lever" {
+        let name = block.get_name();
+
+        if name == "lever" {
             let current_state = self.get_lever_power(pos);
             self.set_lever_power(pos, !current_state);
             self.compiler.on_use_block(normalized_pos);
             return;
         }
 
+        // Any button — Minecraft has a dozen wood variants plus stone,
+        // polished_blackstone, etc. The redpiler treats them all the
+        // same; just delegate.
+        if name.ends_with("_button") {
+            self.compiler.on_use_block(normalized_pos);
+            return;
+        }
+
         #[cfg(target_arch = "wasm32")]
-        web_sys::console::error_1(&format!("Tried to use non-lever block at {:?}", pos).into());
+        web_sys::console::error_1(
+            &format!("Tried to use non-interactable block at {:?}", pos).into(),
+        );
         #[cfg(not(target_arch = "wasm32"))]
         eprintln!(
-            "Error: Tried to use block at {:?} which is not a lever",
-            pos
+            "Error: Tried to use block at {:?} ({}); only levers and buttons are supported",
+            pos, name
         );
     }
 
