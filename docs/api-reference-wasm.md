@@ -275,10 +275,36 @@ A fluent ASCII art builder for constructing schematics layer-by-layer using char
 |--------|-----------|-------------|
 | `new` | `new() → SchematicBuilderWrapper` | Create a new builder. |
 | `name` | `name(name: string) → SchematicBuilderWrapper` | Set the schematic name (chainable). |
-| `map` | `map(ch: string, block: string) → SchematicBuilderWrapper` | Map a character to a block type (chainable). |
-| `layers` | `layers(layers: string[][][]) → SchematicBuilderWrapper` | Set the 3D layer array. Each layer is a 2D array of strings. (chainable). |
+| `map` | `map(ch: string, block: string) → SchematicBuilderWrapper` | Map a single character to a block type (chainable). |
+| `palette` | `palette(mappings: object \| Array<[string, string]>) → SchematicBuilderWrapper` | Bulk-register character→block mappings. Accepts an object literal `{c: "minecraft:stone"}` or an array of pairs. |
+| `layer` | `layer(rows: string[]) → SchematicBuilderWrapper` | Append a single Y-layer (chainable). |
+| `layers` | `layers(layers: string[][]) → SchematicBuilderWrapper` | Set/replace all layers — outer array is Y, inner array is rows of characters. |
+| `offset` | `offset(x: number, y: number, z: number) → SchematicBuilderWrapper` | Shift the origin where blocks are placed (chainable). |
+| `useStandardPalette` | `useStandardPalette() → SchematicBuilderWrapper` | Apply built-in palette (`#`=stone bricks, `.`/space=air, `D`=oak door, etc.). |
+| `useMinimalPalette` | `useMinimalPalette() → SchematicBuilderWrapper` | Apply tiny palette (`#`=stone, ` `=air). |
+| `useCompactPalette` | `useCompactPalette() → SchematicBuilderWrapper` | Apply mid-size palette (stone, glass, oak planks…). |
+| `validate` | `validate() → void` | Throws if any layer character is unmapped. |
+| `toTemplate` | `toTemplate() → string` | Serialise the builder state to the text template format. |
 | `build` | `build() → SchematicWrapper` | Build the final schematic. |
-| `fromTemplate` | `static fromTemplate(template: string) → SchematicBuilderWrapper` | Create from a named template. |
+| `fromTemplate` | `static fromTemplate(template: string) → SchematicBuilderWrapper` | Parse a template string into a builder. |
+
+**Template format** — layers are separated by a blank line; an optional
+`[palette]` section maps characters to block IDs. Anything before the first
+blank line is treated as a layer.
+
+```
+###
+#.#
+###
+
+###
+#.#
+###
+
+[palette]
+# = minecraft:stone_bricks
+. = minecraft:air
+```
 
 ---
 

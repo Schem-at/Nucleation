@@ -1,3 +1,70 @@
+# Nucleation v0.2.6
+
+Unify the `SchematicBuilder` API across Python, JS/WASM, and the C FFI so
+the same surface area is available everywhere — and document the template
+format that was previously implicit.
+
+## Added — full builder parity across bindings
+
+All three bindings now expose the same builder methods. Previously only
+`name` / `map` / `layers` / `from_template` / `build` were on every
+binding; the rest were Rust-only.
+
+| Method | Python | JS/WASM | FFI |
+|--------|--------|---------|-----|
+| `name`, `map`, `layers`, `from_template`, `build` | ✅ | ✅ | ✅ |
+| `palette(mappings)` — bulk register chars | new | new | new (`schematicbuilder_palette`, JSON pairs) |
+| `layer(rows)` — append a single Y-layer | new | new | new (`schematicbuilder_layer`, JSON rows) |
+| `offset(x, y, z)` | new | new | new |
+| `use_standard_palette` / `use_minimal_palette` / `use_compact_palette` | new | new | new |
+| `validate()` | new | new | new (returns NULL or malloc-d error) |
+| `to_template()` | new | new | new (returns malloc-d C string) |
+
+JS `palette` accepts either an object literal `{c: "minecraft:stone"}` or
+an array of pairs `[["c", "minecraft:stone"]]`. Python takes a list of
+tuples. FFI takes JSON.
+
+The deprecated `nucleation.SchematicBuilder` Python shim forwards each
+new method to the native builder, so existing code keeps working.
+
+## Documented — text template format
+
+`from_template` / `to_template` round-trip via this format. It used to be
+undocumented; now it's in all three API references:
+
+```
+###
+#.#
+###
+
+###
+#.#
+###
+
+[palette]
+# = minecraft:stone_bricks
+. = minecraft:air
+```
+
+Layers are separated by a blank line; an optional `[palette]` section
+maps single characters to block IDs.
+
+## Other small unifications
+
+- `RenderConfig.target` now has a matching `clear_target()` on Python
+  (parity with the JS `clearTarget()` already present).
+- `DefinitionRegion.with_metadata` exposed on JS as a fluent alias of
+  `setMetadata` (parity with Python/Rust).
+- `definitionregion_with_metadata` added to the C FFI (parity).
+
+## Tests
+
+- `tests/python_new_api_test.py` — 7 new cases covering `palette`,
+  `layer`, `offset`, `use_standard_palette`, `to_template` round-trip,
+  and `validate` (both passing and rejecting paths). 94 / 94 pass.
+
+---
+
 # Nucleation v0.2.5
 
 Two redstone-correctness fixes plus a small Python ergonomics gap.

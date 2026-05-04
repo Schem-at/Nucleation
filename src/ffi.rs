@@ -3213,6 +3213,17 @@ pub extern "C" fn definitionregion_set_metadata(
     0
 }
 
+/// Fluent alias for `definitionregion_set_metadata`. Same semantics —
+/// mutates in place and returns 0 on success.
+#[no_mangle]
+pub extern "C" fn definitionregion_with_metadata(
+    ptr: *mut DefinitionRegionWrapper,
+    key: *const c_char,
+    value: *const c_char,
+) -> c_int {
+    definitionregion_set_metadata(ptr, key, value)
+}
+
 #[no_mangle]
 pub extern "C" fn definitionregion_get_metadata(
     ptr: *const DefinitionRegionWrapper,
@@ -4799,6 +4810,134 @@ pub extern "C" fn schematicbuilder_from_template(
         Ok(builder) => Box::into_raw(Box::new(SchematicBuilderWrapper(builder))),
         Err(_) => ptr::null_mut(),
     }
+}
+
+/// Append a single layer of rows. `rows_json` is a JSON array of strings,
+/// e.g. `["abc", "def"]`. Equivalent to a one-element layers array.
+/// Returns 0 on success, negative on error.
+#[no_mangle]
+pub extern "C" fn schematicbuilder_layer(
+    ptr: *mut SchematicBuilderWrapper,
+    rows_json: *const c_char,
+) -> c_int {
+    if ptr.is_null() || rows_json.is_null() {
+        return -1;
+    }
+    let builder = unsafe { &mut (*ptr).0 };
+    let json_str = unsafe { CStr::from_ptr(rows_json).to_string_lossy() };
+    let rows: Vec<String> = match serde_json::from_str(&json_str) {
+        Ok(r) => r,
+        Err(_) => return -2,
+    };
+    let row_refs: Vec<&str> = rows.iter().map(|s| s.as_str()).collect();
+    let old = std::mem::replace(builder, SchematicBuilder::new());
+    *builder = old.layer(&row_refs);
+    0
+}
+
+/// Bulk-register palette characters. `pairs_json` is a JSON array of
+/// `[char, block]` two-element arrays, e.g.
+/// `[["c", "minecraft:gray_concrete"], [" ", "minecraft:air"]]`.
+/// Returns 0 on success, negative on error.
+#[no_mangle]
+pub extern "C" fn schematicbuilder_palette(
+    ptr: *mut SchematicBuilderWrapper,
+    pairs_json: *const c_char,
+) -> c_int {
+    if ptr.is_null() || pairs_json.is_null() {
+        return -1;
+    }
+    let builder = unsafe { &mut (*ptr).0 };
+    let json_str = unsafe { CStr::from_ptr(pairs_json).to_string_lossy() };
+    let raw: Vec<(String, String)> = match serde_json::from_str(&json_str) {
+        Ok(p) => p,
+        Err(_) => return -2,
+    };
+    let pairs: Vec<(char, &str)> = raw
+        .iter()
+        .filter_map(|(k, v)| k.chars().next().map(|c| (c, v.as_str())))
+        .collect();
+    let old = std::mem::replace(builder, SchematicBuilder::new());
+    *builder = old.palette(&pairs);
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn schematicbuilder_offset(
+    ptr: *mut SchematicBuilderWrapper,
+    x: c_int,
+    y: c_int,
+    z: c_int,
+) -> c_int {
+    if ptr.is_null() {
+        return -1;
+    }
+    let builder = unsafe { &mut (*ptr).0 };
+    let old = std::mem::replace(builder, SchematicBuilder::new());
+    *builder = old.offset(x, y, z);
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn schematicbuilder_use_standard_palette(
+    ptr: *mut SchematicBuilderWrapper,
+) -> c_int {
+    if ptr.is_null() {
+        return -1;
+    }
+    let builder = unsafe { &mut (*ptr).0 };
+    let old = std::mem::replace(builder, SchematicBuilder::new());
+    *builder = old.use_standard_palette();
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn schematicbuilder_use_minimal_palette(ptr: *mut SchematicBuilderWrapper) -> c_int {
+    if ptr.is_null() {
+        return -1;
+    }
+    let builder = unsafe { &mut (*ptr).0 };
+    let old = std::mem::replace(builder, SchematicBuilder::new());
+    *builder = old.use_minimal_palette();
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn schematicbuilder_use_compact_palette(ptr: *mut SchematicBuilderWrapper) -> c_int {
+    if ptr.is_null() {
+        return -1;
+    }
+    let builder = unsafe { &mut (*ptr).0 };
+    let old = std::mem::replace(builder, SchematicBuilder::new());
+    *builder = old.use_compact_palette();
+    0
+}
+
+/// Run pre-build validation. Returns NULL on success or a malloc-d
+/// error string (caller frees with `free_string`) on failure.
+#[no_mangle]
+pub extern "C" fn schematicbuilder_validate(ptr: *const SchematicBuilderWrapper) -> *mut c_char {
+    if ptr.is_null() {
+        return CString::new("null pointer").unwrap().into_raw();
+    }
+    let builder = unsafe { &(*ptr).0 };
+    match builder.validate() {
+        Ok(()) => ptr::null_mut(),
+        Err(e) => CString::new(e).unwrap().into_raw(),
+    }
+}
+
+/// Serialize the builder back into the canonical template format.
+/// Returns a malloc-d C string (caller frees with `free_string`).
+#[no_mangle]
+pub extern "C" fn schematicbuilder_to_template(ptr: *const SchematicBuilderWrapper) -> *mut c_char {
+    if ptr.is_null() {
+        return ptr::null_mut();
+    }
+    let builder = unsafe { &(*ptr).0 };
+    CString::new(builder.to_template())
+        .map(|c| c.into_raw())
+        .unwrap_or(ptr::null_mut())
 }
 
 // =============================================================================

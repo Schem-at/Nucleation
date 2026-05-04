@@ -264,6 +264,94 @@ class TestBackcompatSchematicBuilder:
             )
         assert isinstance(schem, Schematic)
 
+    # ── Methods bridged to all bindings in 0.2.6 ─────────────────────────
+
+    def _quiet_builder(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            return SchematicBuilder()
+
+    def test_palette_bulk_register(self):
+        schem = (
+            self._quiet_builder()
+            .name("bulk-palette")
+            .palette([
+                ("#", "minecraft:stone_bricks"),
+                (".", "minecraft:air"),
+            ])
+            .layers([["#.", ".#"]])
+            .build()
+        )
+        assert schem.get_block(0, 0, 0).name == "minecraft:stone_bricks"
+        assert schem.get_block(1, 0, 0).name == "minecraft:air"
+
+    def test_layer_appends_single_layer(self):
+        schem = (
+            self._quiet_builder()
+            .map("a", "minecraft:stone")
+            .map("b", "minecraft:dirt")
+            .layer(["ab", "ba"])
+            .build()
+        )
+        assert schem.get_block(0, 0, 0).name == "minecraft:stone"
+        assert schem.get_block(1, 0, 1).name == "minecraft:stone"
+
+    def test_offset_shifts_origin(self):
+        schem = (
+            self._quiet_builder()
+            .map("a", "minecraft:stone")
+            .layer(["a"])
+            .offset(10, 5, 7)
+            .build()
+        )
+        # Block ends up at the offset coords.
+        assert schem.get_block(10, 5, 7).name == "minecraft:stone"
+
+    def test_use_standard_palette_recognises_c_and_space(self):
+        # `c` defaults to gray_concrete, ` ` to air in the standard palette.
+        schem = (
+            self._quiet_builder()
+            .use_standard_palette()
+            .layer(["c c"])
+            .build()
+        )
+        assert schem.get_block(0, 0, 0).name == "minecraft:gray_concrete"
+        assert schem.get_block(1, 0, 0).name == "minecraft:air"
+
+    def test_to_template_round_trips(self):
+        b = (
+            self._quiet_builder()
+            .name("rt")
+            .map("a", "minecraft:stone")
+            .layer(["a"])
+        )
+        text = b.to_template()
+        # Round-trip via the static factory.
+        b2 = self._quiet_builder().from_template(text)
+        # Re-applying the same map (since from_template loses the
+        # palette section unless the template includes it) and rebuilding
+        # should still produce a Schematic.
+        schem = b2.map("a", "minecraft:stone").build()
+        assert isinstance(schem, Schematic)
+
+    def test_validate_passes_for_well_formed_template(self):
+        # validate() returns self for chaining; raising means malformed.
+        builder = (
+            self._quiet_builder()
+            .map("a", "minecraft:stone")
+            .layer(["a"])
+        )
+        # Should not raise:
+        builder.validate()
+
+    def test_validate_rejects_unmapped_character(self):
+        builder = (
+            self._quiet_builder()
+            .layer(["q"])  # `q` has no palette entry
+        )
+        with pytest.raises(ValueError):
+            builder.validate()
+
 
 # ----------------------------------------------------- get_block tuple shorthand
 

@@ -529,8 +529,10 @@ from nucleation import SchematicBuilder
 
 schematic = (SchematicBuilder()
     .name("Wall")
-    .map('#', "minecraft:stone_bricks")
-    .map('.', "minecraft:air")
+    .palette([
+        ("#", "minecraft:stone_bricks"),
+        (".", "minecraft:air"),
+    ])
     .layers([
         ["###", "#.#", "###"],
         ["###", "#.#", "###"],
@@ -542,10 +544,38 @@ schematic = (SchematicBuilder()
 |--------|-----------|-------------|
 | `__init__` | `SchematicBuilder()` | Create a new builder. |
 | `name` | `name(name: str) -> SchematicBuilder` | Set schematic name (chainable). |
-| `map` | `map(ch: str, block: str) -> SchematicBuilder` | Map a character to a block (chainable). |
-| `layers` | `layers(layers: list[list[str]]) -> SchematicBuilder` | Set 3D layers (chainable). |
-| `build` | `build() -> Schematic` | Build the schematic. |
-| `from_template` | `@staticmethod from_template(template: str) -> SchematicBuilder` | Create from a named template. |
+| `map` | `map(ch: str, block: str) -> SchematicBuilder` | Map a single character to a block (chainable). |
+| `palette` | `palette(mappings: list[tuple[str, str]]) -> SchematicBuilder` | Bulk-register character→block mappings (chainable). |
+| `layer` | `layer(rows: list[str]) -> SchematicBuilder` | Append a single Y-layer (chainable). |
+| `layers` | `layers(layers: list[list[str]]) -> SchematicBuilder` | Set/replace all layers (chainable). |
+| `offset` | `offset(x: int, y: int, z: int) -> SchematicBuilder` | Shift the origin where blocks are placed (chainable). |
+| `use_standard_palette` | `use_standard_palette() -> SchematicBuilder` | Apply built-in palette (`#`=stone bricks, `.`/space=air, `D`=oak door, etc.). |
+| `use_minimal_palette` | `use_minimal_palette() -> SchematicBuilder` | Apply tiny palette (`#`=stone, ` `=air). |
+| `use_compact_palette` | `use_compact_palette() -> SchematicBuilder` | Apply mid-size palette (stone, glass, oak planks…). |
+| `validate` | `validate() -> None` | Raise `ValueError` if any layer character is unmapped. |
+| `to_template` | `to_template() -> str` | Serialise the current state to the text template format. |
+| `build` | `build() -> Schematic` | Materialise the schematic. |
+| `from_template` | `@staticmethod from_template(template: str) -> SchematicBuilder` | Parse a template string into a builder. |
+
+#### Template format
+
+`from_template` / `to_template` use a small text format: layers are separated
+by a blank line; an optional `[palette]` section maps characters to block IDs.
+Anything before the first blank line is treated as a layer.
+
+```
+###
+#.#
+###
+
+###
+#.#
+###
+
+[palette]
+# = minecraft:stone_bricks
+. = minecraft:air
+```
 
 ---
 

@@ -1024,6 +1024,44 @@ class SchematicBuilder:
         self._native.layers(layers)
         return self
 
+    def layer(self, rows: Any) -> "SchematicBuilder":
+        """Append a single layer (``list[str]`` of rows)."""
+        self._native.layer(rows)
+        return self
+
+    def palette(self, mappings: Any) -> "SchematicBuilder":
+        """Bulk-register palette characters. ``mappings`` is a list of
+        ``(char, block)`` two-element tuples."""
+        self._native.palette(mappings)
+        return self
+
+    def offset(self, x: int, y: int, z: int) -> "SchematicBuilder":
+        """Set the world offset of the resulting schematic."""
+        self._native.offset(x, y, z)
+        return self
+
+    def use_standard_palette(self) -> "SchematicBuilder":
+        self._native.use_standard_palette()
+        return self
+
+    def use_minimal_palette(self) -> "SchematicBuilder":
+        self._native.use_minimal_palette()
+        return self
+
+    def use_compact_palette(self) -> "SchematicBuilder":
+        self._native.use_compact_palette()
+        return self
+
+    def validate(self) -> "SchematicBuilder":
+        """Run pre-build validation. Raises ``ValueError`` if the
+        layered template is malformed."""
+        self._native.validate()
+        return self
+
+    def to_template(self) -> str:
+        """Serialize back into the canonical template format."""
+        return self._native.to_template()
+
     def build(self) -> Schematic:
         built = self._native.build()  # _native.Schematic
         s = Schematic(built.name or "untitled")

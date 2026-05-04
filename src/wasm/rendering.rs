@@ -91,6 +91,27 @@ impl RenderConfigWrapper {
     pub fn fov(&self) -> f32 {
         self.inner.fov
     }
+
+    /// Set an explicit orbit target (world-space coordinates). When set,
+    /// the camera aims at this point instead of the model's bounding-box
+    /// centroid; yaw / pitch / zoom continue to orbit around it.
+    #[wasm_bindgen(js_name = setTarget)]
+    pub fn set_target(&mut self, x: f32, y: f32, z: f32) {
+        self.inner.target = Some([x, y, z]);
+    }
+
+    /// Clear any custom orbit target — camera reverts to aiming at the
+    /// model's bounding-box centroid.
+    #[wasm_bindgen(js_name = clearTarget)]
+    pub fn clear_target(&mut self) {
+        self.inner.target = None;
+    }
+
+    /// Returns the current target as `[x, y, z]`, or `null` if none.
+    #[wasm_bindgen(getter, js_name = target)]
+    pub fn target(&self) -> Option<Vec<f32>> {
+        self.inner.target.map(|t| t.to_vec())
+    }
 }
 
 // Rendering methods on SchematicWrapper
@@ -111,6 +132,7 @@ impl SchematicWrapper {
             pitch: config.inner.pitch,
             zoom: config.inner.zoom,
             fov: config.inner.fov,
+            target: config.inner.target,
         };
 
         future_to_promise(async move {
@@ -140,6 +162,7 @@ impl SchematicWrapper {
             pitch: config.inner.pitch,
             zoom: config.inner.zoom,
             fov: config.inner.fov,
+            target: config.inner.target,
         };
 
         future_to_promise(async move {

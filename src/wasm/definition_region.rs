@@ -74,6 +74,14 @@ impl DefinitionRegionWrapper {
         self
     }
 
+    /// Fluent alias for `setMetadata` — returns the region for chaining.
+    #[wasm_bindgen(js_name = withMetadata)]
+    pub fn with_metadata(mut self, key: String, value: String) -> Self {
+        self.inner.with_metadata(key, value);
+        self.sync();
+        self
+    }
+
     #[wasm_bindgen(js_name = setColor)]
     pub fn set_color(mut self, color: u32) -> Self {
         let hex = format!("#{:06x}", color);

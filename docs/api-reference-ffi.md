@@ -1053,8 +1053,33 @@ int schematicbuilder_name(SchematicBuilderWrapper* ptr, const char* name);
 // Map a character to a block type
 int schematicbuilder_map(SchematicBuilderWrapper* ptr, char ch, const char* block);
 
-// Set layers as a JSON array of string arrays
+// Set layers as JSON. Format: [["###","#.#"], ["###","#.#"]]
+//   outer array = Y-layers, inner array = rows of single-character cells.
 int schematicbuilder_layers(SchematicBuilderWrapper* ptr, const char* layers_json);
+
+// Append a single Y-layer. rows_json is a JSON array of strings,
+// e.g. ["###", "#.#", "###"].
+int schematicbuilder_layer(SchematicBuilderWrapper* ptr, const char* rows_json);
+
+// Bulk-register character→block mappings. pairs_json is a JSON array of
+// [char, block] tuples, e.g. [["#","minecraft:stone"], [".","minecraft:air"]].
+int schematicbuilder_palette(SchematicBuilderWrapper* ptr, const char* pairs_json);
+
+// Shift the origin where blocks are placed.
+int schematicbuilder_offset(SchematicBuilderWrapper* ptr, int x, int y, int z);
+
+// Apply built-in palettes.
+int schematicbuilder_use_standard_palette(SchematicBuilderWrapper* ptr);
+int schematicbuilder_use_minimal_palette(SchematicBuilderWrapper* ptr);
+int schematicbuilder_use_compact_palette(SchematicBuilderWrapper* ptr);
+
+// Pre-build validation. Returns NULL on success, or a malloc-d error
+// string (caller must free_string()) describing the first issue.
+char* schematicbuilder_validate(const SchematicBuilderWrapper* ptr);
+
+// Serialise the builder state to the text template format.
+// Returns a malloc-d C string (caller must free_string()).
+char* schematicbuilder_to_template(const SchematicBuilderWrapper* ptr);
 
 // Build the schematic. Returns NULL on error.
 SchematicWrapper* schematicbuilder_build(SchematicBuilderWrapper* ptr);
@@ -1064,8 +1089,26 @@ SchematicWrapper* schematicbuilder_build(SchematicBuilderWrapper* ptr);
 // On error: returns error string (caller must free_string()), *out is NULL.
 char* schematicbuilder_build_with_error(SchematicBuilderWrapper* ptr, SchematicWrapper** out);
 
-// Create from a named template
-SchematicBuilderWrapper* schematicbuilder_from_template(const char* template_name);
+// Parse a template string into a builder. Returns NULL on parse error.
+SchematicBuilderWrapper* schematicbuilder_from_template(const char* template);
+```
+
+**Template format** — layers separated by a blank line; an optional
+`[palette]` section maps characters to block IDs. Round-trips via
+`schematicbuilder_to_template` / `schematicbuilder_from_template`:
+
+```
+###
+#.#
+###
+
+###
+#.#
+###
+
+[palette]
+# = minecraft:stone_bricks
+. = minecraft:air
 ```
 
 ---

@@ -117,6 +117,12 @@ impl PyRenderConfig {
         self.inner.target = value.map(|(x, y, z)| [x, y, z]);
     }
 
+    /// Clear any custom orbit target — camera reverts to aiming at the
+    /// model's bounding-box centroid. Equivalent to ``self.target = None``.
+    pub fn clear_target(&mut self) {
+        self.inner.target = None;
+    }
+
     fn __repr__(&self) -> String {
         format!(
             "<RenderConfig {}x{} yaw={} pitch={} zoom={} fov={}>",

@@ -522,34 +522,49 @@ See [SchematicBuilder Guide](../shared/guide/schematic-builder.md) for complete 
 import init, { SchematicBuilder } from "nucleation";
 await init();
 
-const circuit = SchematicBuilder.new()
-	.from_template(
-		`
-    # Base layer
-    ccc
-    ccc
-    
-    # Logic layer
-    ─→─
-    │█│
-  `
-	)
+const wall = new SchematicBuilder()
+	.name("Wall")
+	.palette({ "#": "minecraft:stone_bricks", ".": "minecraft:air" })
+	.layers([
+		["###", "#.#", "###"],
+		["###", "#.#", "###"],
+	])
 	.build();
 ```
 
-### Compositional Design
+### Builder Methods
 
-```typescript
-// Build basic gates
-const andGate = createAndGate();
-const xorGate = createXorGate();
+| Method | Description |
+|--------|-------------|
+| `name(name)` | Set the schematic name. |
+| `map(ch, block)` | Map a single character to a block id. |
+| `palette(mappings)` | Bulk-register character→block mappings. Accepts `{c: "minecraft:stone"}` or `[["c", "minecraft:stone"]]`. |
+| `layer(rows)` | Append a single Y-layer (`string[]`). |
+| `layers(layers)` | Set/replace all layers (`string[][]` — outer Y, inner rows). |
+| `offset(x, y, z)` | Shift the origin where blocks are placed. |
+| `useStandardPalette()` / `useMinimalPalette()` / `useCompactPalette()` | Built-in palettes. |
+| `validate()` | Throws if any layer character is unmapped. |
+| `toTemplate()` | Serialise to the text template format. |
+| `static fromTemplate(template)` | Parse a template string into a builder. |
+| `build()` | Materialise the `SchematicWrapper`. |
 
-// Compose into larger circuit
-const halfAdder = SchematicBuilder.new()
-	.map_schematic("A", andGate)
-	.map_schematic("X", xorGate)
-	.layers([["AX"]])
-	.build();
+### Template Format
+
+Layers are separated by a blank line; an optional `[palette]` section maps
+characters to block IDs. Round-trips via `toTemplate` / `fromTemplate`.
+
+```
+###
+#.#
+###
+
+###
+#.#
+###
+
+[palette]
+# = minecraft:stone_bricks
+. = minecraft:air
 ```
 
 ## Simulation
