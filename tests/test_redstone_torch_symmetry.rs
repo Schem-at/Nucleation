@@ -33,7 +33,8 @@ mod tests {
         }
 
         // Central stone block + lever attached to its west face.
-        s.set_block_from_string(0, 1, 2, "minecraft:stone_bricks").unwrap();
+        s.set_block_from_string(0, 1, 2, "minecraft:stone_bricks")
+            .unwrap();
         s.set_block_from_string(
             -1,
             1,
@@ -43,24 +44,16 @@ mod tests {
         .unwrap();
 
         // Wires fanning out north and south from the central block.
-        s.set_block_from_string(
-            0,
-            1,
-            1,
-            "minecraft:redstone_wire[north=side,south=side]",
-        )
-        .unwrap();
-        s.set_block_from_string(
-            0,
-            1,
-            3,
-            "minecraft:redstone_wire[north=side,south=side]",
-        )
-        .unwrap();
+        s.set_block_from_string(0, 1, 1, "minecraft:redstone_wire[north=side,south=side]")
+            .unwrap();
+        s.set_block_from_string(0, 1, 3, "minecraft:redstone_wire[north=side,south=side]")
+            .unwrap();
 
         // Concrete blocks the torches sit on top of.
-        s.set_block_from_string(0, 1, 0, "minecraft:white_concrete").unwrap();
-        s.set_block_from_string(0, 1, 4, "minecraft:white_concrete").unwrap();
+        s.set_block_from_string(0, 1, 0, "minecraft:white_concrete")
+            .unwrap();
+        s.set_block_from_string(0, 1, 4, "minecraft:white_concrete")
+            .unwrap();
 
         // Both standing torches initially LIT.
         s.set_block_from_string(0, 2, 0, "minecraft:redstone_torch[lit=true]")
@@ -127,7 +120,8 @@ mod tests {
     fn wire_does_not_power_block_outside_its_visual_direction() {
         let mut s = UniversalSchematic::new("wire-direction".to_string());
 
-        s.set_block_from_string(0, 0, 0, "minecraft:lime_concrete").unwrap();
+        s.set_block_from_string(0, 0, 0, "minecraft:lime_concrete")
+            .unwrap();
         s.set_block_from_string(
             0,
             1,
@@ -135,16 +129,14 @@ mod tests {
             "minecraft:lever[face=floor,facing=south,powered=false]",
         )
         .unwrap();
-        s.set_block_from_string(1, 0, 0, "minecraft:lime_concrete").unwrap();
-        s.set_block_from_string(
-            1,
-            1,
-            0,
-            "minecraft:redstone_wire[east=side,west=side]",
-        )
-        .unwrap();
-        s.set_block_from_string(1, 1, 1, "minecraft:lime_concrete").unwrap();
-        s.set_block_from_string(1, 0, 2, "minecraft:lime_concrete").unwrap();
+        s.set_block_from_string(1, 0, 0, "minecraft:lime_concrete")
+            .unwrap();
+        s.set_block_from_string(1, 1, 0, "minecraft:redstone_wire[east=side,west=side]")
+            .unwrap();
+        s.set_block_from_string(1, 1, 1, "minecraft:lime_concrete")
+            .unwrap();
+        s.set_block_from_string(1, 0, 2, "minecraft:lime_concrete")
+            .unwrap();
         s.set_block_from_string(
             1,
             1,
@@ -189,7 +181,8 @@ mod tests {
             s.set_block_from_string(0, 0, z, "minecraft:stone_bricks")
                 .unwrap();
         }
-        s.set_block_from_string(0, 1, 2, "minecraft:stone_bricks").unwrap();
+        s.set_block_from_string(0, 1, 2, "minecraft:stone_bricks")
+            .unwrap();
         s.set_block_from_string(
             -1,
             1,
