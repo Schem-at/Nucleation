@@ -1,0 +1,46 @@
+cabal-version:      3.0
+name:               nucleation-example
+version:            0.1.0.0
+synopsis:           Tiny Haskell example using the Nucleation FFI
+description:        Builds a small Minecraft schematic via the Nucleation
+                    C FFI and writes it to demo.litematic.
+license:            AGPL-3.0-only
+build-type:         Simple
+
+library
+    exposed-modules:  Nucleation
+    hs-source-dirs:   src
+    build-depends:    base       >= 4.14 && < 5
+                    , bytestring >= 0.10
+    default-language: Haskell2010
+
+    -- Tiny C shim for ByteArray-returning FFI calls (GHC can't return
+    -- structs by value across `foreign import ccall`).
+    c-sources:        cbits/nucleation_shim.c
+    include-dirs:     cbits
+
+    -- Link against the Nucleation cdylib.
+    -- Override these with `--extra-lib-dirs=...` at configure time if the
+    -- build artifact lives somewhere else on your machine.
+    extra-libraries:    nucleation
+    -- Pass the dylib's location at the command line; cabal's
+    -- pre-build configure step doesn't honour ${pkgroot} (which is
+    -- only resolved at install time), and embedded relative paths
+    -- can't reach outside the source tree. See README for the
+    -- recommended `--extra-lib-dirs=...` invocation.
+
+executable nucleation-example
+    main-is:          Main.hs
+    hs-source-dirs:   app
+    build-depends:    base               >= 4.14 && < 5
+                    , bytestring         >= 0.10
+                    , nucleation-example
+    default-language: Haskell2010
+    -- The executable also links libnucleation directly (cabal doesn't
+    -- propagate `extra-libraries` from the library stanza). Pass
+    -- `--extra-lib-dirs=...` at the command line — see the README.
+    extra-libraries:  nucleation
+    -- Runtime lookup: cabal's `dist-newstyle/...` build dir is many
+    -- levels deep so an embedded rpath would be brittle. Instead, set
+    -- DYLD_LIBRARY_PATH (macOS) / LD_LIBRARY_PATH (Linux) when running
+    -- — see the README.
