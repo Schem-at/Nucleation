@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "com.github.schemat"
-version = providers.gradleProperty("nucleationVersion").orElse("0.2.9").get()
+version = providers.gradleProperty("nucleationVersion").orElse("0.2.10").get()
 
 java {
     toolchain {
@@ -57,17 +57,21 @@ val collectNatives by tasks.registering(Copy::class) {
         into(platform)
     }
 
-    // Also pick up any pre-staged platform binaries from
-    // src/main/resources/native/<platform>/ (CI populates this).
-    val preStaged = layout.projectDirectory.dir("src/main/resources/native")
-    from(preStaged) {
-        include("**/*.so", "**/*.dylib", "**/*.dll")
-    }
+    // Note: pre-staged binaries under src/main/resources/native/<platform>/
+    // are already on the default resources path, so we do NOT re-copy them
+    // here. Doing so would produce duplicate entries in the JAR when CI
+    // populates that directory from the build-jvm-cdylib matrix. Gradle 9+
+    // treats duplicates as a hard error.
 }
 
 tasks.processResources {
     dependsOn(collectNatives)
     from(layout.buildDirectory.dir("native-staging"))
+    // Safety net: if the host cargo target ever overlaps a pre-staged cdylib
+    // for the same platform (e.g. someone runs cargo build on a linux-x64
+    // CI host while linux-x64 is also in src/main/resources), keep the
+    // first-encountered binary and silently drop the duplicate.
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 tasks.test {

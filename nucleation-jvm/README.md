@@ -99,7 +99,7 @@ For now (GitHub Releases distribution):
 
 ```kotlin
 dependencies {
-    implementation(files("libs/nucleation-0.2.9.jar"))
+    implementation(files("libs/nucleation-0.2.10.jar"))
 }
 ```
 
@@ -173,7 +173,7 @@ Tagged releases attach the JAR to GitHub Releases. This is the artifact
 to use in production.
 
 ```bash
-gh release download v0.2.9 -p '*.jar' -R Schem-at/Nucleation
+gh release download v0.2.10 -p '*.jar' -R Schem-at/Nucleation
 # Or: download from https://github.com/Schem-at/Nucleation/releases
 ```
 
