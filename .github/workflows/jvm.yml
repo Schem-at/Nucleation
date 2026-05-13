@@ -85,14 +85,12 @@ jobs:
           EOF
 
       - name: Build nucleation-jvm cdylib
+        shell: bash
         env:
           CC_aarch64_unknown_linux_gnu: ${{ matrix.cross && 'aarch64-linux-gnu-gcc' || '' }}
           CXX_aarch64_unknown_linux_gnu: ${{ matrix.cross && 'aarch64-linux-gnu-g++' || '' }}
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.cross && 'aarch64-linux-gnu-gcc' || '' }}
-        run: |
-          cargo build --release \
-            --manifest-path nucleation-jvm/Cargo.toml \
-            --target ${{ matrix.target }}
+        run: cargo build --release --manifest-path nucleation-jvm/Cargo.toml --target ${{ matrix.target }}
 
       - name: Stage artifact
         shell: bash
@@ -147,7 +145,9 @@ jobs:
           toolchain: stable
           override: true
       - name: Build parity tool
-        run: rustc tools/check_jvm_parity.rs -o target/check_jvm_parity
+        run: |
+          mkdir -p target
+          rustc tools/check_jvm_parity.rs -o target/check_jvm_parity
       - name: Run parity check
         run: ./target/check_jvm_parity
 
