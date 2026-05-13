@@ -9,7 +9,7 @@ java {
 repositories { mavenCentral() }
 
 dependencies {
-    implementation(files("../../nucleation-jvm/jvm/build/libs/nucleation-0.2.8.jar"))
+    implementation(files("../../nucleation-jvm/jvm/build/libs/nucleation-0.2.9.jar"))
 }
 
 application {
