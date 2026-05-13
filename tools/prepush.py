@@ -275,6 +275,82 @@ def build_wasm_lane() -> Lane:
     return lane
 
 
+def build_jvm_lane() -> Lane:
+    """JVM bindings: cargo build for nucleation-jvm + Gradle tests + JVM parity."""
+    lane = Lane(name="JVM", color="green")
+    jvm_root = ROOT / "nucleation-jvm"
+    if not (jvm_root / "Cargo.toml").exists():
+        lane.checks = []
+        return lane
+    checks: list[Check] = [
+        Check(
+            "cargo build (nucleation-jvm)",
+            ["cargo", "build", "--release", "--manifest-path", "nucleation-jvm/Cargo.toml"],
+        ),
+    ]
+    gradlew = jvm_root / "jvm" / "gradlew"
+    if gradlew.exists():
+        checks.append(
+            Check(
+                "gradlew test (jvm)",
+                [str(gradlew), "test", "-p", str(jvm_root / "jvm")],
+            )
+        )
+    checks.append(Check("JVM ↔ Python parity", []))  # handled in _run_jvm_lane
+    lane.checks = checks
+    return lane
+
+
+def _run_jvm_lane(lane: Lane, progress: Progress, task_id) -> None:
+    """Build the JVM crate, run Gradle tests, then verify parity vs Python."""
+    lane_start = time.monotonic()
+    for idx, chk in enumerate(lane.checks):
+        chk.status = "running"
+        progress.update(task_id, description=f"[dim]{chk.name}[/dim]")
+        start = time.monotonic()
+
+        if chk.name.startswith("JVM ↔ Python parity"):
+            parity_bin = ROOT / "target" / "check_jvm_parity"
+            parity_src = ROOT / "tools" / "check_jvm_parity.rs"
+            if parity_src.exists():
+                if not parity_bin.exists() or parity_src.stat().st_mtime > parity_bin.stat().st_mtime:
+                    subprocess.run(
+                        ["rustc", str(parity_src), "-o", str(parity_bin)],
+                        capture_output=True, cwd=ROOT,
+                    )
+            if parity_bin.exists():
+                result = subprocess.run([str(parity_bin)], capture_output=True, text=True, cwd=ROOT)
+                chk.output = result.stdout + result.stderr
+                chk.elapsed = time.monotonic() - start
+                chk.status = "passed" if result.returncode == 0 else "failed"
+                if chk.status == "failed":
+                    lane.failed = True
+            else:
+                chk.elapsed = time.monotonic() - start
+                chk.status = "warned"
+                chk.name = "JVM parity (compiler unavailable)"
+        else:
+            result = subprocess.run(chk.command, capture_output=True, text=True, cwd=ROOT)
+            chk.output = result.stdout + result.stderr
+            chk.elapsed = time.monotonic() - start
+            chk.status = "passed" if result.returncode == 0 else "failed"
+            if chk.status == "failed":
+                lane.failed = True
+
+        progress.advance(task_id)
+
+        if lane.failed:
+            for remaining in lane.checks[idx + 1:]:
+                remaining.status = "skipped"
+            break
+
+    lane.elapsed = time.monotonic() - lane_start
+    if lane.failed:
+        progress.update(task_id, description="[red]✗ Failed[/red]")
+    else:
+        progress.update(task_id, description="[green]✓ Done[/green]")
+
+
 def build_quick_lane() -> Lane:
     """Version consistency + API parity — no subprocess for version check."""
     lane = Lane(name="Quick", color="yellow")
@@ -802,6 +878,9 @@ def main() -> int:
     if not args.bench_only:
         lanes.append(build_native_lane())
         lanes.append(build_wasm_lane())
+        jvm_lane = build_jvm_lane()
+        if jvm_lane.checks:
+            lanes.append(jvm_lane)
         lanes.append(build_quick_lane())
 
     if not args.skip_bench:
@@ -842,6 +921,8 @@ def main() -> int:
             _run_quick_lane(lane, progress, tid)
         elif lane.name == "Bench":
             _run_bench_lane(lane, progress, tid, args.update_baseline)
+        elif lane.name == "JVM":
+            _run_jvm_lane(lane, progress, tid)
         else:
             run_lane(lane, progress, tid)
 

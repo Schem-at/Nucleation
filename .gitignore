@@ -35,3 +35,13 @@ experiments/
 /*.glb
 /*.schematic
 /item_model_pack.zip
+
+# JVM bindings — Cargo target / Gradle build / wrapper caches
+/nucleation-jvm/target/
+/nucleation-jvm/jvm/build/
+/nucleation-jvm/jvm/.gradle/
+/nucleation-jvm/jvm/src/main/resources/native/
+
+# Java consumer example build output
+/examples/java/build/
+/examples/java/.gradle/

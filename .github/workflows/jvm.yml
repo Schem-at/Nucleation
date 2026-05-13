@@ -1,0 +1,223 @@
+name: Nucleation JVM
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  NUCLEATION_JVM_VERSION: "0.2.6"  # Mirrors nucleation-jvm/Cargo.toml
+
+jobs:
+  # ── Build one cdylib per (os, arch). Each runner publishes its artifact;
+  #    the assemble-jar job collects them all into the fat JAR.
+  build-cdylib:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            platform: linux-x64
+            ext: so
+            prefix: lib
+            cross: false
+          - runner: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            platform: linux-arm64
+            ext: so
+            prefix: lib
+            cross: true
+          - runner: macos-13
+            target: x86_64-apple-darwin
+            platform: macos-x64
+            ext: dylib
+            prefix: lib
+            cross: false
+          - runner: macos-14
+            target: aarch64-apple-darwin
+            platform: macos-arm64
+            ext: dylib
+            prefix: lib
+            cross: false
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform: windows-x64
+            ext: dll
+            prefix: ''
+            cross: false
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+
+      - name: Cache cargo registry + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            nucleation-jvm/target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-jvm-${{ hashFiles('nucleation-jvm/Cargo.toml', 'Cargo.toml', 'Cargo.lock') }}
+
+      - name: Install cross-compilation tools (ARM64 Linux)
+        if: matrix.cross
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          mkdir -p ~/.cargo
+          cat >> ~/.cargo/config.toml << EOF
+          [target.aarch64-unknown-linux-gnu]
+          linker = "aarch64-linux-gnu-gcc"
+          EOF
+
+      - name: Build nucleation-jvm cdylib
+        env:
+          CC_aarch64_unknown_linux_gnu: ${{ matrix.cross && 'aarch64-linux-gnu-gcc' || '' }}
+          CXX_aarch64_unknown_linux_gnu: ${{ matrix.cross && 'aarch64-linux-gnu-g++' || '' }}
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.cross && 'aarch64-linux-gnu-gcc' || '' }}
+        run: |
+          cargo build --release \
+            --manifest-path nucleation-jvm/Cargo.toml \
+            --target ${{ matrix.target }}
+
+      - name: Stage artifact
+        shell: bash
+        run: |
+          mkdir -p staging/${{ matrix.platform }}
+          cp nucleation-jvm/target/${{ matrix.target }}/release/${{ matrix.prefix }}nucleation_jvm.${{ matrix.ext }} \
+             staging/${{ matrix.platform }}/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nucleation-jvm-cdylib-${{ matrix.platform }}
+          path: staging/${{ matrix.platform }}/*
+
+  # ── Run Rust + Java tests on the host platform. Independent of the matrix
+  #    so CI feedback is fast on PR pushes.
+  test-host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Build cdylib (host)
+        run: cargo build --release --manifest-path nucleation-jvm/Cargo.toml
+
+      - name: Run JUnit tests
+        run: ./gradlew test --no-daemon
+        working-directory: nucleation-jvm/jvm
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jvm-test-reports
+          path: nucleation-jvm/jvm/build/reports/tests/test
+
+  # ── Verify JVM ↔ Python parity on every push.
+  parity-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Build parity tool
+        run: rustc tools/check_jvm_parity.rs -o target/check_jvm_parity
+      - name: Run parity check
+        run: ./target/check_jvm_parity
+
+  # ── Pull every cdylib artifact, drop them into the resources tree, and
+  #    let Gradle assemble the fat JAR.
+  assemble-jar:
+    needs: [build-cdylib, test-host, parity-check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Download all cdylib artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: nucleation-jvm-cdylib-*
+          path: nucleation-jvm/jvm/src/main/resources/native/
+          merge-multiple: false
+
+      - name: Flatten artifact directory layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd nucleation-jvm/jvm/src/main/resources/native
+          # download-artifact gives us nucleation-jvm-cdylib-<platform>/<platform>/<file>
+          # We want <platform>/<file>.
+          for d in nucleation-jvm-cdylib-*; do
+            platform=${d#nucleation-jvm-cdylib-}
+            mkdir -p "$platform"
+            cp -r "$d/$platform/"* "$platform/" 2>/dev/null || cp -r "$d/"* "$platform/" || true
+            rm -rf "$d"
+          done
+          ls -la
+
+      - name: Build fat JAR
+        run: ./gradlew jar javadocJar sourcesJar --no-daemon
+        working-directory: nucleation-jvm/jvm
+
+      - name: Stage JAR for release
+        shell: bash
+        run: |
+          mkdir -p release-artifacts
+          cp nucleation-jvm/jvm/build/libs/*.jar release-artifacts/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nucleation-jvm-jar-v${{ env.NUCLEATION_JVM_VERSION }}
+          path: release-artifacts/*.jar
+
+  # ── Attach the JAR(s) to the GitHub Release when a tag is pushed.
+  release:
+    needs: assemble-jar
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: nucleation-jvm-jar-v${{ env.NUCLEATION_JVM_VERSION }}
+          path: release-artifacts/
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: release-artifacts/*.jar
+          fail_on_unmatched_files: false

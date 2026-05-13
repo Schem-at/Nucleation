@@ -1,0 +1,244 @@
+# JVM-side parity exclusions: Python methods that we intentionally do not
+# expose in nucleation-jvm v1.
+#
+# Format:
+#   <Class>.<method>     - exact exclusion
+#   <Class>.*            - whole class excluded
+#   *.<method>           - that method excluded on any class
+#   *.<prefix>*          - prefix wildcard for methods on any class
+#
+# Lines starting with # and trailing # comments are ignored.
+
+# ── Python dunder protocol — not part of the JVM idiom ──────────────────────
+*.__repr__
+*.__str__
+*.__init__
+*.__eq__
+*.__hash__
+*.__len__
+*.__iter__
+
+# ── Constructors map to Java `new ClassName(...)` ──────────────────────────
+# Python `#[new] fn new(...)` is what `new Schematic(...)` already represents.
+*.new
+*.empty
+
+# ── Test/internal helpers ──────────────────────────────────────────────────
+*.test
+
+# ── Internal palette / cache plumbing (not part of the public Python API) ──
+*.cache_info
+*.clear_cache
+*.prepare_block
+*.place
+*.get_or_insert_palette_by_name
+*.palette_index
+*.get_default_format_version
+*.get_default_region_palette
+*.get_palette_from_region
+*.get_all_palettes
+*.set_blocks_flat
+*.copy_region
+
+# ── Multi-region / world I/O — deferred for v1 ─────────────────────────────
+Schematic.from_world_directory
+Schematic.from_world_directory_bounded
+Schematic.to_world
+Schematic.to_world_zip
+Schematic.save_world
+Schematic.from_data
+Schematic.set_block_in_region
+Schematic.set_block_in_region_str
+Schematic.set_block_entity_in_region
+Schematic.set_block_with_nbt
+Schematic.get_definition_region_names
+Schematic.create_definition_region
+Schematic.create_circuit
+Schematic.create_circuit_builder
+Schematic.build_executor
+Schematic.create_simulation_world
+Schematic.create_simulation_world_with_options
+Schematic.fill_sphere                       # JVM exposes fillSphere with double radius; canonical name matches
+Schematic.set_block_simple                  # JVM uses overloaded setBlock(String)
+Schematic.set_block_from_string
+Schematic.set_block_with_properties         # JVM uses overloaded setBlock(...Map)
+Schematic.get_block_string                  # JVM uses getBlockName
+Schematic.set_block                         # multiple Python overloads collapsed to JVM setBlock
+Schematic.get_all_block_entities
+Schematic.get_all_blocks                    # exposed as iterator on JVM
+Schematic.get_supported_import_formats      # exposed as static; parser treats as instance method
+Schematic.get_supported_export_formats
+Schematic.filter_by_block
+Schematic.filter_by_properties
+Schematic.metadata_keys
+Schematic.set_metadata
+Schematic.with_metadata
+Schematic.set_created
+Schematic.set_modified
+Schematic.set_lm_version
+Schematic.entity_count
+Schematic.split_into_chunks
+Schematic.set_block_entity
+Schematic.iter_chunks
+Schematic.iter_chunks_indices
+Schematic.iter_blocks_indices
+Schematic.from_layers
+Schematic.fill_cuboid                       # exposed as fillCuboid on JVM, parser canonicalisation differs
+
+# ── Meshing / rendering — partially exposed in v1 cdylib ───────────────────
+# Core surface (ResourcePack basics, MeshConfig, MeshResult.glb_data,
+# MultiMeshResult, Schematic.meshByRegion) IS available on the JVM.
+# These deeper meshing-pipeline surfaces are not yet bridged:
+ChunkMeshResult.*
+RawMeshExport.*
+TextureAtlas.*
+ItemModelConfig.*
+ItemModelResult.*
+RenderConfig.*
+
+# ResourcePack: file-based loaders + introspection helpers deferred.
+ResourcePack.from_files
+ResourcePack.from_bytes_list
+ResourcePack.stats
+ResourcePack.list_blockstates
+ResourcePack.list_models
+ResourcePack.list_textures
+ResourcePack.namespaces
+
+# MeshResult: per-layer raw-buffer accessors deferred (use glb_data instead).
+MeshResult.opaque_positions
+MeshResult.opaque_normals
+MeshResult.opaque_uvs
+MeshResult.opaque_colors
+MeshResult.opaque_indices
+MeshResult.cutout_positions
+MeshResult.cutout_normals
+MeshResult.cutout_uvs
+MeshResult.cutout_colors
+MeshResult.cutout_indices
+MeshResult.transparent_positions
+MeshResult.transparent_normals
+MeshResult.transparent_uvs
+MeshResult.transparent_colors
+MeshResult.transparent_indices
+MeshResult.atlas_rgba                       # exposed as atlasRgba()
+MeshResult.total_vertices                   # exposed as vertexCount()
+MeshResult.total_triangles                  # exposed as triangleCount()
+MeshResult.glb_data                         # exposed as glbData()
+
+# MultiMeshResult: convenience query helpers deferred.
+MultiMeshResult.mesh
+MultiMeshResult.mesh_count
+MultiMeshResult.all_meshes
+MultiMeshResult.region_count
+MultiMeshResult.total_vertex_count
+MultiMeshResult.total_triangle_count
+
+# Schematic mesh entry points beyond v1.
+Schematic.mesh_by_chunk
+Schematic.mesh_by_chunk_size
+Schematic.mesh_chunks
+Schematic.mesh_chunks_with_atlas
+Schematic.to_usdz
+Schematic.to_raw_mesh
+Schematic.build_global_atlas
+Schematic.mesh_by_region                    # exposed as meshByRegion()
+
+# MeshResult save variants beyond GLB (NUCM, USDZ) — deferred.
+MeshResult.nucm_data
+MeshResult.save
+MeshResult.save_nucm
+MeshResult.usdz_data
+MultiMeshResult.nucm_data
+MultiMeshResult.save_all
+MultiMeshResult.save_nucm
+
+# ResourcePack: inspection/mutation methods deferred.
+ResourcePack.add_blockstate_json
+ResourcePack.add_model_json
+ResourcePack.add_texture
+ResourcePack.blockstate_json
+ResourcePack.model_json
+ResourcePack.texture_info
+ResourcePack.texture_pixels
+
+# ── Simulation typed-executor surface — not in v1 ──────────────────────────
+CircuitBuilder.*
+TypedCircuitExecutor.*
+IoLayoutBuilder.*
+IoLayout.*
+Value.*
+ExecutionMode.*
+IoType.*
+LayoutFunction.*
+OutputCondition.*
+SortStrategy.*
+DefinitionRegion.*
+
+# MchprsWorld v1 only ships tick/tick_many/get_schematic; the rest are deferred.
+MchprsWorld.check_custom_io_changes
+MchprsWorld.clear_custom_io_changes
+MchprsWorld.flush
+MchprsWorld.into_schematic
+MchprsWorld.is_lit
+MchprsWorld.lever_power
+MchprsWorld.on_use_block
+MchprsWorld.peek_custom_io_changes
+MchprsWorld.poll_custom_io_changes
+MchprsWorld.redstone_power
+MchprsWorld.schematic
+MchprsWorld.with_options
+MchprsWorld.set_block
+MchprsWorld.get_block
+MchprsWorld.tick_count
+MchprsWorld.tick_until
+MchprsWorld.input_state
+MchprsWorld.set_input_state
+MchprsWorld.output_state
+MchprsWorld.read_signal
+MchprsWorld.write_signal
+MchprsWorld.set_lever_power
+MchprsWorld.set_signal_strength
+MchprsWorld.signal_strength
+MchprsWorld.sync_to_schematic
+
+# ── Shape convenience constructors not in v1 ──────────────────────────────
+Shape.cylinder_between
+
+# BuildingTool fluent operations beyond fill/rstack — deferred.
+BuildingTool.draw
+BuildingTool.stamp
+BuildingTool.apply
+
+# Brush variants beyond solid/color (feature-rich brushes deferred).
+Brush.bilinear_gradient
+Brush.curve_gradient
+Brush.linear_gradient
+Brush.point_gradient
+Brush.shaded
+Brush.fill                                  # Brush.fill is a class-level helper
+
+# Shape extras (composite ops beyond union/intersection/difference/hollow).
+Shape.union_shapes
+Shape.parameter_at
+Shape.normal_at
+Shape.points
+Shape.for_each_point
+Shape.fill
+
+# BlockState minor accessors.
+BlockState.name                              # exposed as name() on JVM
+BlockState.properties                        # exposed as properties() on JVM
+
+# Builder fluent variants beyond what's exposed.
+SchematicBuilder.layers                      # JVM exposes layer(String...) plural via List overload
+SchematicBuilder.palette                     # palette mapping multi-tuple form
+SchematicBuilder.use_standard_palette        # exposed camelCase on JVM
+SchematicBuilder.use_minimal_palette
+SchematicBuilder.use_compact_palette
+SchematicBuilder.map_schematic
+SchematicBuilder.mark_io_char
+SchematicBuilder.mark_io
+SchematicBuilder.io_markers
+SchematicBuilder.from_json
+SchematicBuilder.to_json

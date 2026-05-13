@@ -1,0 +1,32 @@
+[package]
+name = "nucleation-jvm"
+version = "0.2.6"
+edition = "2021"
+description = "JNI bindings for the Nucleation Minecraft schematic library"
+authors = ["Nano <nano@schem.at>"]
+license = "AGPL-3.0-only"
+repository = "https://github.com/Schem-at/Nucleation"
+
+[lib]
+name = "nucleation_jvm"
+crate-type = ["cdylib"]
+
+[features]
+default = ["meshing"]
+simulation = ["nucleation/simulation"]
+meshing = ["nucleation/meshing"]
+
+[dependencies]
+nucleation = { path = ".." }
+jni = "0.21"
+serde_json = "1.0"
+
+# Patch must be replicated here because path-dependency parents do not
+# share patches with their dependents.
+[patch.crates-io]
+hematite-nbt = { git = "https://github.com/StackDoubleFlow/hematite_nbt" }
+
+[profile.release]
+lto = true
+opt-level = 3
+codegen-units = 1
