@@ -357,28 +357,58 @@ pub fn to_mcstructure(
     for block in &compact_region.palette {
         let mut block_entry = NbtMap::new();
 
-        // Translate Java -> Bedrock using blockpedia
-        let (name, properties) =
-            if let Ok(java_bp_state) = blockpedia::BlockState::parse(block.name.as_str()) {
-                if let Ok(bedrock_bp_state) = java_bp_state.to_bedrock() {
-                    let bed_props: Vec<(smol_str::SmolStr, smol_str::SmolStr)> = bedrock_bp_state
-                        .properties()
-                        .iter()
-                        .map(|(k, v)| (k.into(), v.into()))
-                        .collect();
+        // Translate Java -> Bedrock using blockpedia.
+        //
+        // IMPORTANT: blockpedia::BlockState::parse expects the full
+        // "name[k=v,k2=v2]" form. Passing only `block.name` strips every
+        // property before translation, so the Bedrock side ends up with
+        // defaults (hopper→facing_direction=0, repeater→delay=1, etc.).
+        // Rebuild the bracketed form here.
+        let full_id = if block.properties.is_empty() {
+            block.name.to_string()
+        } else {
+            let mut parts: Vec<String> = block
+                .properties
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect();
+            parts.sort();
+            format!("{}[{}]", block.name, parts.join(","))
+        };
 
-                    (bedrock_bp_state.id().to_string(), bed_props)
-                } else {
-                    (block.name.to_string(), block.properties.clone())
-                }
+        let (name, properties) = if let Ok(java_bp_state) = blockpedia::BlockState::parse(&full_id)
+        {
+            if let Ok(bedrock_bp_state) = java_bp_state.to_bedrock() {
+                let bed_props: Vec<(smol_str::SmolStr, smol_str::SmolStr)> = bedrock_bp_state
+                    .properties()
+                    .iter()
+                    .map(|(k, v)| (k.into(), v.into()))
+                    .collect();
+
+                (bedrock_bp_state.id().to_string(), bed_props)
             } else {
                 (block.name.to_string(), block.properties.clone())
-            };
+            }
+        } else {
+            (block.name.to_string(), block.properties.clone())
+        };
 
         block_entry.insert("name".to_string(), NbtValue::String(name));
 
         let mut states = NbtMap::new();
         for (k, v) in &properties {
+            // Bedrock structure NBT typing rules:
+            //   - "true"/"false" booleans (`*_bit`, `waterlogged`, etc.) → Byte
+            //   - Integer-valued state ints (`facing_direction`, `age`,
+            //     `redstone_signal`, `power`, `delay`, `layers`,
+            //     `upper_block_bit` even when serialised as int) → Int
+            //   - String enums (`minecraft:facing_direction`,
+            //     `minecraft:cardinal_direction`) → String
+            //
+            // The heuristic below selects the right type for every state
+            // property in the current Geyser mapping table. If a new state
+            // appears that needs a different encoding (e.g. a Short-typed
+            // property), explicit cases can be added before the fallback.
             let tag = if *v == "true" {
                 NbtValue::Byte(1)
             } else if *v == "false" {
@@ -418,12 +448,28 @@ pub fn to_mcstructure(
 
             let mut be_compound = NbtMap::new();
             // be.to_nbt() returns NbtCompound (quartz). We need NbtMap.
-            // But we can construct NbtMap from BlockEntity data directly
             let be_data_map = NbtMap::from_quartz_nbt(&be.to_nbt());
+
+            // Translate Java-shaped BE NBT (e.g. `id: "minecraft:hopper"`,
+            // Java item layout) into the Bedrock-shaped equivalent that
+            // mcstructure consumers expect (`id: "Hopper"`, etc.).
+            // Pass through unknown BE ids unchanged.
+            let translated_map = {
+                let mut bp_compound = HashMap::new();
+                for (k, v) in be_data_map.iter() {
+                    bp_compound.insert(k.clone(), to_bp_nbt(v));
+                }
+                let translated = BlockEntityTranslator::translate_java_to_bedrock(&bp_compound);
+                let mut out = NbtMap::new();
+                for (k, v) in translated.iter() {
+                    out.insert(k.clone(), from_bp_nbt(v));
+                }
+                out
+            };
 
             be_compound.insert(
                 "block_entity_data".to_string(),
-                NbtValue::Compound(be_data_map),
+                NbtValue::Compound(translated_map),
             );
 
             block_position_data.insert(index.to_string(), NbtValue::Compound(be_compound));

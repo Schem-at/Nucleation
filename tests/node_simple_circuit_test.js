@@ -1,21 +1,40 @@
-
-const { SchematicWrapper, ExecutionModeWrapper, BlockPosition } = require('../pkg/nucleation');
+const path = require('path');
 const assert = require('assert');
 
-function testSimpleCircuit() {
+const wasmPath = path.join(__dirname, '../pkg/nucleation.js');
+
+async function testSimpleCircuit() {
     console.log("Testing Simple Circuit Simulation...");
+
+    // Load the WASM module — `pkg/nucleation.js` is an async initialiser
+    // that reads the .wasm file and returns the wrapped exports. Tests that
+    // construct types synchronously crash with
+    // `Cannot read properties of undefined (reading 'schematicwrapper_new')`.
+    let nucleation;
+    try {
+        nucleation = require(wasmPath);
+        if (nucleation.default && typeof nucleation.default === 'function') {
+            await nucleation.default();
+        }
+    } catch (error) {
+        console.error('❌ Failed to load WASM module:', error);
+        console.log('Make sure to build the WASM package first with: ./build-wasm.sh');
+        process.exit(1);
+    }
+
+    const { SchematicWrapper, ExecutionModeWrapper } = nucleation;
 
     // 1. Build the Schematic
     const schematic = new SchematicWrapper("SimpleCircuit");
 
     // Place blocks: Lever (0,1,0) -> Wire (1,1,0) -> Lamp (2,1,0)
     // Support blocks underneath
-    schematic.setBlock(0, 1, 0, "minecraft:lever[facing=east,face=floor,powered=false]");
-    schematic.setBlock(1, 1, 0, "minecraft:redstone_wire[power=0,east=side,west=side]");
-    schematic.setBlock(2, 1, 0, "minecraft:redstone_lamp[lit=false]");
-    
-    for(let i = 0; i < 3; i++){
-        schematic.setBlock(i, 0, 0, "minecraft:gray_concrete");
+    schematic.set_block_from_string(0, 1, 0, "minecraft:lever[facing=east,face=floor,powered=false]");
+    schematic.set_block_from_string(1, 1, 0, "minecraft:redstone_wire[power=0,east=side,west=side]");
+    schematic.set_block_from_string(2, 1, 0, "minecraft:redstone_lamp[lit=false]");
+
+    for (let i = 0; i < 3; i++) {
+        schematic.set_block_from_string(i, 0, 0, "minecraft:gray_concrete");
     }
 
     // 2. Define Regions
@@ -25,39 +44,42 @@ function testSimpleCircuit() {
     // 3. Create & Configure Executor
     const executor = schematic.buildExecutor({
         inputs: [
-            { name: "switch", bits: 1, region: "input_src" }
+            { name: "switch", bits: 1, region: "input_src" },
         ],
         outputs: [
-            { name: "lamp", bits: 1, region: "output_sink" }
-        ]
+            { name: "lamp", bits: 1, region: "output_sink" },
+        ],
     });
 
-    // 4. Run Simulation
-    // Turn switch ON
-    const inputs = { "switch": 1 };
+    // 4. Run Simulation — turn switch ON
+    const inputs = { switch: 1 };
     const mode = ExecutionModeWrapper.untilStable(2, 1000);
 
     const result = executor.execute(inputs, mode);
     console.log("Simulation Result:", result);
 
-    // Assertions
-    // Lamp should be ON (1)
-    assert.strictEqual(result.lamp, 1, "Lamp should be ON when switch is ON");
+    // Lamp should be ON (1). The executor wraps output values in `outputs`
+    // alongside `ticksElapsed` / `conditionMet`.
+    assert.strictEqual(
+        result.outputs.lamp,
+        1,
+        "Lamp should be ON when switch is ON",
+    );
 
     // 5. Sync & Verify
     const syncedSchematic = executor.syncToSchematic();
-    const lampState = syncedSchematic.getBlockString(2, 1, 0);
+    const lampState = syncedSchematic.get_block_string(2, 1, 0);
     console.log("Synced Lamp State:", lampState);
-    
-    assert.ok(lampState.includes("lit=true"), "Lamp block state should be lit=true after sync");
+
+    assert.ok(
+        lampState.includes("lit=true"),
+        "Lamp block state should be lit=true after sync",
+    );
 
     console.log("Simple Circuit Test Passed!");
 }
 
-// Run the test
-try {
-    testSimpleCircuit();
-} catch (e) {
+testSimpleCircuit().catch((e) => {
     console.error("Test Failed:", e);
     process.exit(1);
-}
+});

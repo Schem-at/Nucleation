@@ -270,8 +270,46 @@ def build_wasm_lane() -> Lane:
     ]
     if (ROOT / "build-wasm.sh").exists():
         lane.checks.append(Check("build-wasm.sh", ["./build-wasm.sh"]))
-    if (ROOT / "tests" / "node_wasm_test.js").exists():
-        lane.checks.append(Check("node WASM tests", ["node", "tests/node_wasm_test.js"]))
+    # JS tests — drive the WASM/Node bindings end-to-end.
+    js_tests = [
+        ("node WASM tests", "tests/node_wasm_test.js"),
+        ("node Connect4 test", "tests/connect4_test.js"),
+        ("node ExecutorConfig test", "tests/executor_config_test.js"),
+        ("node SimpleCircuit test", "tests/node_simple_circuit_test.js"),
+    ]
+    for name, rel in js_tests:
+        if (ROOT / rel).exists():
+            lane.checks.append(Check(name, ["node", rel]))
+    return lane
+
+
+def build_python_lane() -> Lane:
+    """Run the Python bindings tests against the locally-built wheel.
+    Requires `maturin develop` to have been run at least once so the
+    Python module loads.
+
+    Prefers `${ROOT}/.venv/bin/python` over the system `python3` because
+    `maturin develop` from this project installs into that venv when it
+    exists. Falls back to system `python3` otherwise. If neither is
+    available the lane skips itself.
+    """
+    lane = Lane(name="Python", color="cyan")
+    venv_python = ROOT / ".venv" / "bin" / "python"
+    if venv_python.exists():
+        python_cmd = str(venv_python)
+    elif shutil.which("python3"):
+        python_cmd = "python3"
+    else:
+        lane.checks = []
+        return lane
+    py_tests = [
+        ("python_test.py", "tests/python_test.py"),
+        ("python_new_api_test.py", "tests/python_new_api_test.py"),
+        ("python_simple_circuit_test.py", "tests/python_simple_circuit_test.py"),
+    ]
+    for name, rel in py_tests:
+        if (ROOT / rel).exists():
+            lane.checks.append(Check(name, [python_cmd, rel]))
     return lane
 
 
@@ -878,6 +916,9 @@ def main() -> int:
     if not args.bench_only:
         lanes.append(build_native_lane())
         lanes.append(build_wasm_lane())
+        py_lane = build_python_lane()
+        if py_lane.checks:
+            lanes.append(py_lane)
         jvm_lane = build_jvm_lane()
         if jvm_lane.checks:
             lanes.append(jvm_lane)

@@ -299,11 +299,11 @@ def test_definition_region_metadata():
     assert region.get_metadata("label") == "Input A"
     assert region.get_metadata("nonexistent") is None
 
-    # Test with_metadata chaining
+    # Test set_metadata chaining (returns self)
     region2 = (
         DefinitionRegion.from_bounds((0, 0, 0), (1, 1, 1))
-        .with_metadata("type", "input")
-        .with_metadata("index", "0")
+        .set_metadata("type", "input")
+        .set_metadata("index", "0")
     )
     assert region2.get_metadata("type") == "input"
     assert region2.get_metadata("index") == "0"

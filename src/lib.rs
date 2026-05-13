@@ -3,7 +3,7 @@
 // Core modules
 pub mod block_entity;
 pub mod block_entity_store;
-mod block_position;
+pub mod block_position;
 mod block_state;
 mod bounding_box;
 pub mod building;
