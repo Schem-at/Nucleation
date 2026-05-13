@@ -1,6 +1,6 @@
 [package]
 name = "nucleation"
-version = "0.2.6"
+version = "0.2.7"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -54,7 +54,7 @@ flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
 log = "0.4.22"
 console = "0.15.8"
 insign = "0.1.1"
-blockpedia = { version = "0.1.8", default-features = false, features = ["wasm"] }
+blockpedia = { version = "0.1.9", default-features = false, features = ["wasm"] }
 
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 hematite-nbt = "*"

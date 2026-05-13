@@ -321,9 +321,9 @@ dependencies = [
 
 [[package]]
 name = "blockpedia"
-version = "0.1.8"
+version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "616422e09c183aa4dca9b226ac5a12766df2bb69f7a570ea3a9785e3a8d35ba1"
+checksum = "6a80b1d41a3a35b8697be65b08bd6b00d407186569b02b0dffbeccce15ef2cfc"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
@@ -2605,7 +2605,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "base64",
  "bincode",

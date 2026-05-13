@@ -135,9 +135,9 @@ checksum = "c4512299f36f043ab09a583e57bceb5a5aab7a73db1805848e8fef3c9e8c78b3"
 
 [[package]]
 name = "blockpedia"
-version = "0.1.8"
+version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "616422e09c183aa4dca9b226ac5a12766df2bb69f7a570ea3a9785e3a8d35ba1"
+checksum = "6a80b1d41a3a35b8697be65b08bd6b00d407186569b02b0dffbeccce15ef2cfc"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",

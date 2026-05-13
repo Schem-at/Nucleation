@@ -13,7 +13,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  NUCLEATION_JVM_VERSION: "0.2.6"  # Mirrors nucleation-jvm/Cargo.toml
+  NUCLEATION_JVM_VERSION: "0.2.7"  # Mirrors nucleation-jvm/Cargo.toml
 
 jobs:
   # ── Build one cdylib per (os, arch). Each runner publishes its artifact;

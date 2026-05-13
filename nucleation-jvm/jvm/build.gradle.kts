@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "com.github.schemat"
-version = providers.gradleProperty("nucleationVersion").orElse("0.2.6").get()
+version = providers.gradleProperty("nucleationVersion").orElse("0.2.7").get()
 
 java {
     toolchain {
