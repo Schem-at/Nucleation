@@ -1,6 +1,6 @@
 [package]
 name = "nucleation-jvm"
-version = "0.2.7"
+version = "0.2.8"
 edition = "2021"
 description = "JNI bindings for the Nucleation Minecraft schematic library"
 authors = ["Nano <nano@schem.at>"]

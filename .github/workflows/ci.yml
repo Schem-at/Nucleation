@@ -258,8 +258,172 @@ jobs:
           name: python-sdist
           path: dist/*.tar.gz
 
+  # ──────────────────────────────────────────────────────────────────────────
+  #  JVM (nucleation-jvm) — JNI cdylib matrix + Gradle test + parity + fat-JAR
+  # ──────────────────────────────────────────────────────────────────────────
+
+  build-jvm-cdylib:
+    needs: check-version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            platform: linux-x64
+            ext: so
+            prefix: lib
+            cross: false
+          - runner: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            platform: linux-arm64
+            ext: so
+            prefix: lib
+            cross: true
+          - runner: macos-13
+            target: x86_64-apple-darwin
+            platform: macos-x64
+            ext: dylib
+            prefix: lib
+            cross: false
+          - runner: macos-14
+            target: aarch64-apple-darwin
+            platform: macos-arm64
+            ext: dylib
+            prefix: lib
+            cross: false
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform: windows-x64
+            ext: dll
+            prefix: ''
+            cross: false
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            nucleation-jvm/target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-jvm-${{ hashFiles('nucleation-jvm/Cargo.toml', 'Cargo.toml', 'Cargo.lock') }}
+      - name: Install cross-compilation tools (ARM64 Linux)
+        if: matrix.cross
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          mkdir -p ~/.cargo
+          cat >> ~/.cargo/config.toml << EOF
+          [target.aarch64-unknown-linux-gnu]
+          linker = "aarch64-linux-gnu-gcc"
+          EOF
+      - name: Build nucleation-jvm cdylib
+        shell: bash
+        env:
+          CC_aarch64_unknown_linux_gnu: ${{ matrix.cross && 'aarch64-linux-gnu-gcc' || '' }}
+          CXX_aarch64_unknown_linux_gnu: ${{ matrix.cross && 'aarch64-linux-gnu-g++' || '' }}
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.cross && 'aarch64-linux-gnu-gcc' || '' }}
+        run: cargo build --release --manifest-path nucleation-jvm/Cargo.toml --target ${{ matrix.target }}
+      - name: Stage artifact
+        shell: bash
+        run: |
+          mkdir -p staging/${{ matrix.platform }}
+          cp nucleation-jvm/target/${{ matrix.target }}/release/${{ matrix.prefix }}nucleation_jvm.${{ matrix.ext }} staging/${{ matrix.platform }}/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nucleation-jvm-cdylib-${{ matrix.platform }}
+          path: staging/${{ matrix.platform }}/*
+
+  test-jvm:
+    needs: check-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Build cdylib (host)
+        run: cargo build --release --manifest-path nucleation-jvm/Cargo.toml
+      - name: Run JUnit tests
+        run: ./gradlew test --no-daemon
+        working-directory: nucleation-jvm/jvm
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jvm-test-reports
+          path: nucleation-jvm/jvm/build/reports/tests/test
+
+  parity-jvm:
+    needs: check-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Build parity tool
+        run: |
+          mkdir -p target
+          rustc tools/check_jvm_parity.rs -o target/check_jvm_parity
+      - name: Run parity check
+        run: ./target/check_jvm_parity
+
+  assemble-jvm-jar:
+    needs: [check-version, build-jvm-cdylib, test-jvm, parity-jvm]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Download all cdylib artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: nucleation-jvm-cdylib-*
+          path: nucleation-jvm/jvm/src/main/resources/native/
+          merge-multiple: false
+      - name: Flatten artifact directory layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd nucleation-jvm/jvm/src/main/resources/native
+          for d in nucleation-jvm-cdylib-*; do
+            platform=${d#nucleation-jvm-cdylib-}
+            mkdir -p "$platform"
+            cp -r "$d/$platform/"* "$platform/" 2>/dev/null || cp -r "$d/"* "$platform/" || true
+            rm -rf "$d"
+          done
+          ls -la
+      - name: Build fat JAR
+        run: ./gradlew jar javadocJar sourcesJar --no-daemon
+        working-directory: nucleation-jvm/jvm
+      - name: Stage JARs
+        shell: bash
+        run: |
+          mkdir -p release-artifacts
+          cp nucleation-jvm/jvm/build/libs/*.jar release-artifacts/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nucleation-jvm-jar-v${{ needs.check-version.outputs.version }}
+          path: release-artifacts/*.jar
+
   publish:
-    needs: [check-version, build-wasm, build-nucleation, build-python-wheels, build-python-sdist]
+    needs: [check-version, build-wasm, build-nucleation, build-python-wheels, build-python-sdist, assemble-jvm-jar]
     if: needs.check-version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -281,6 +445,12 @@ jobs:
           pattern: nucleation-v${{ needs.check-version.outputs.version }}-*
           path: release-artifacts
           merge-multiple: true
+
+      - name: Download JVM fat JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: nucleation-jvm-jar-v${{ needs.check-version.outputs.version }}
+          path: release-artifacts
 
       - name: Publish to crates.io
         uses: actions-rs/cargo@v1
