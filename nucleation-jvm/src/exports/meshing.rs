@@ -78,6 +78,11 @@ pub fn register(env: &mut JNIEnv) -> jni::errors::Result<()> {
         // ── Schematic.mesh_* ────────────────────────────────────────────
         nm("nSchematicMeshByRegion", "(JJJ)J", n_mesh_by_region as *mut _),
         nm("nSchematicMeshSingle", "(JJJ)J", n_mesh_single as *mut _),
+        nm(
+            "nSchematicMeshAnimated",
+            "(JJLjava/lang/String;)[B",
+            n_mesh_animated as *mut _,
+        ),
     ];
     env.register_native_methods(&class, methods)
 }
@@ -643,5 +648,26 @@ unsafe extern "system" fn n_mesh_single<'l>(
             Some((_, mesh)) => Ok(to_handle(mesh)),
             None => Ok(0),
         }
+    })
+}
+
+/// Build an animated GLB replaying a captured scenario. The schematic is the
+/// initial state; `timeline_json` is the decoded MCAP event timeline. Returns
+/// the GLB bytes directly (no handle — animated GLBs aren't reused).
+unsafe extern "system" fn n_mesh_animated<'l>(
+    mut env: JNIEnv<'l>,
+    _class: JClass<'l>,
+    schematic_handle: jlong,
+    pack_handle: jlong,
+    timeline_json: JString<'l>,
+) -> jbyteArray {
+    with_jni_context(&mut env, std::ptr::null_mut(), |env| {
+        let schematic = as_ref::<UniversalSchematic>(schematic_handle);
+        let pack = as_ref::<ResourcePackSource>(pack_handle);
+        let json = jstring_to_string(env, &timeline_json)?;
+        let glb = schematic
+            .to_animated_glb(pack, &json)
+            .map_err(|e| JvmError::Generic(format!("to_animated_glb: {e}")))?;
+        vec_to_jbytearray(env, &glb)
     })
 }

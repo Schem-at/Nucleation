@@ -195,6 +195,21 @@ public final class Schematic implements AutoCloseable, Iterable<Block> {
         return new MultiMeshResult(h);
     }
 
+    /**
+     * Build an <em>animated</em> GLB replaying a captured scenario. This
+     * schematic is the initial world state; {@code timelineJson} is the decoded
+     * MCAP event timeline — JSON with {@code origin}, {@code tick_ms}, and a
+     * list of {@code set_block} / {@code piston} events. Returns the GLB bytes
+     * directly (block-state variants toggle via STEP scale tracks, piston-pushed
+     * blocks slide via LINEAR translation tracks).
+     */
+    public byte[] meshAnimated(ResourcePack pack, String timelineJson) {
+        ensureMeshing();
+        checkOpen();
+        return NucleationNative.nSchematicMeshAnimated(
+                handle, pack.handle(), Objects.requireNonNull(timelineJson));
+    }
+
     private static void ensureMeshing() {
         if (!Nucleation.hasMeshing()) {
             throw new UnsupportedFeatureException(

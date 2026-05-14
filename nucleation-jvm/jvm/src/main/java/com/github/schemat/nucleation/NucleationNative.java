@@ -200,4 +200,5 @@ final class NucleationNative {
 
     static native long    nSchematicMeshByRegion(long schematicHandle, long packHandle, long configHandle);
     static native long    nSchematicMeshSingle(long schematicHandle, long packHandle, long configHandle);
+    static native byte[]  nSchematicMeshAnimated(long schematicHandle, long packHandle, String timelineJson);
 }

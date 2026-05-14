@@ -858,6 +858,35 @@ impl UniversalSchematic {
         Ok(mesh_output_from_mesher(&output, None))
     }
 
+    /// Build an *animated* GLB replaying a captured scenario.
+    ///
+    /// The schematic is the initial world state; `timeline_json` is the decoded
+    /// MCAP event timeline (a [`schematic_mesher::Timeline`] serialised as JSON
+    /// — `origin`, `tick_ms`, and a list of `set_block` / `piston` events). The
+    /// mesher emits one node per static base, one node per block-state variant
+    /// (toggled with a STEP `scale` track), and one node per piston-pushed block
+    /// (a LINEAR `translation` track).
+    pub fn to_animated_glb(
+        &self,
+        pack: &ResourcePackSource,
+        timeline_json: &str,
+    ) -> Result<Vec<u8>> {
+        let timeline: schematic_mesher::Timeline = serde_json::from_str(timeline_json)
+            .map_err(|e| MeshError::Meshing(format!("timeline parse: {e}")))?;
+
+        let mut blocks: HashMap<MesherBlockPosition, InputBlock> = HashMap::new();
+        let mut min = [f32::MAX; 3];
+        let mut max = [f32::MIN; 3];
+        collect_region_blocks(&self.default_region, &mut blocks, &mut min, &mut max);
+        for region in self.other_regions.values() {
+            collect_region_blocks(region, &mut blocks, &mut min, &mut max);
+        }
+
+        let initial: Vec<(MesherBlockPosition, InputBlock)> = blocks.into_iter().collect();
+        schematic_mesher::build_animated_glb(&pack.pack, &initial, &timeline)
+            .map_err(|e| MeshError::Meshing(e.to_string()))
+    }
+
     /// Generate a USDZ mesh for the entire schematic.
     pub fn to_usdz(&self, pack: &ResourcePackSource, config: &MeshConfig) -> Result<MeshOutput> {
         let output = self.compute_mesh_output(pack, config)?;

@@ -89,7 +89,10 @@ bytemuck = { version = "1.23.1", features = ["derive"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }
 
 # Meshing dependencies - optional
-schematic-mesher = { git = "https://github.com/Schem-at/Schematic-Mesher.git", branch = "feature/mesh-output-api", optional = true }
+# LOCAL ITERATION: path dep to the local Schematic-Mesher checkout (branch
+# feature/mesh-output-api) so the whole chain builds from local source with no
+# CI round-trip. Restore the git dep before publishing.
+schematic-mesher = { path = "/Users/harrison/Documents/code/Schematic-Mesher", optional = true }
 
 # Rendering dependencies - optional
 wgpu = { version = "24", optional = true }
