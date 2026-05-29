@@ -2,6 +2,21 @@
 
 use crate::meshing::MeshOutput;
 
+/// Camera projection mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Projection {
+    /// Standard perspective projection (default).
+    Perspective,
+    /// Parallel (orthographic) projection — no perspective foreshortening.
+    Orthographic,
+}
+
+impl Default for Projection {
+    fn default() -> Self {
+        Projection::Perspective
+    }
+}
+
 /// Camera configuration for rendering.
 pub struct CameraConfig {
     pub yaw_deg: f32,
@@ -11,6 +26,11 @@ pub struct CameraConfig {
     /// Optional explicit orbit target. When set, the camera orbits and
     /// aims at this point instead of the model's bounding-box centroid.
     pub target: Option<[f32; 3]>,
+    /// Projection mode.
+    pub projection: Projection,
+    /// Optional solid RGBA clear color (linear 0.0–1.0). `None` uses the
+    /// default sky / HDRI behavior.
+    pub background: Option<[f32; 4]>,
 }
 
 impl Default for CameraConfig {
@@ -21,6 +41,8 @@ impl Default for CameraConfig {
             zoom: 1.0,
             fov_deg: 45.0,
             target: None,
+            projection: Projection::Perspective,
+            background: None,
         }
     }
 }
@@ -65,9 +87,6 @@ pub fn compute_view_proj(
     let right = normalize3(cross3(forward, [0.0, 1.0, 0.0]));
     let up = cross3(right, forward);
 
-    let half_fov_y = fov * 0.5;
-    let half_fov_x = (half_fov_y.tan() * aspect).atan();
-
     let corners = [
         [bounds_min[0], bounds_min[1], bounds_min[2]],
         [bounds_max[0], bounds_min[1], bounds_min[2]],
@@ -79,30 +98,68 @@ pub fn compute_view_proj(
         [bounds_max[0], bounds_max[1], bounds_max[2]],
     ];
 
-    let mut max_dist = 1.0f32;
-    for c in &corners {
-        let rel = sub3(*c, center);
-        let proj_right = dot3(rel, right).abs();
-        let proj_up = dot3(rel, up).abs();
-        let proj_depth = -dot3(rel, forward);
-        let dist_h = proj_right / half_fov_x.tan() + proj_depth;
-        let dist_v = proj_up / half_fov_y.tan() + proj_depth;
-        max_dist = max_dist.max(dist_h).max(dist_v);
-    }
+    let (view_proj, inv_view_proj) = match camera.projection {
+        Projection::Perspective => {
+            let half_fov_y = fov * 0.5;
+            let half_fov_x = (half_fov_y.tan() * aspect).atan();
 
-    let distance = max_dist * 1.1 * camera.zoom;
-    let eye = [
-        center[0] - dir[0] * distance,
-        center[1] - dir[1] * distance,
-        center[2] - dir[2] * distance,
-    ];
+            let mut max_dist = 1.0f32;
+            for c in &corners {
+                let rel = sub3(*c, center);
+                let proj_right = dot3(rel, right).abs();
+                let proj_up = dot3(rel, up).abs();
+                let proj_depth = -dot3(rel, forward);
+                let dist_h = proj_right / half_fov_x.tan() + proj_depth;
+                let dist_v = proj_up / half_fov_y.tan() + proj_depth;
+                max_dist = max_dist.max(dist_h).max(dist_v);
+            }
 
-    let view = look_at(eye, center, [0.0, 1.0, 0.0]);
-    let near = distance * 0.01;
-    let far = distance * 10.0;
-    let proj = perspective(fov, aspect, near, far);
-    let view_proj = mat4_mul(proj, view);
-    let inv_view_proj = mat4_inverse(view_proj);
+            let distance = max_dist * 1.1 * camera.zoom;
+            let eye = [
+                center[0] - dir[0] * distance,
+                center[1] - dir[1] * distance,
+                center[2] - dir[2] * distance,
+            ];
+
+            let view = look_at(eye, center, [0.0, 1.0, 0.0]);
+            let near = distance * 0.01;
+            let far = distance * 10.0;
+            let proj = perspective(fov, aspect, near, far);
+            let view_proj = mat4_mul(proj, view);
+            (view_proj, mat4_inverse(view_proj))
+        }
+        Projection::Orthographic => {
+            let mut ext_h = 0.0f32;
+            let mut ext_v = 0.0f32;
+            let mut ext_depth = 0.0f32;
+            for c in &corners {
+                let rel = sub3(*c, center);
+                ext_h = ext_h.max(dot3(rel, right).abs());
+                ext_v = ext_v.max(dot3(rel, up).abs());
+                ext_depth = ext_depth.max(dot3(rel, forward).abs());
+            }
+
+            // Half-extents of the ortho window, fitting both axes, scaled by zoom.
+            let half_h = (ext_v.max(ext_h / aspect)).max(0.5) * 1.1 * camera.zoom;
+            let half_w = half_h * aspect;
+
+            // Stand far enough back that all geometry sits between near and far.
+            let standoff = ext_depth + ext_h + ext_v + 1.0;
+            let eye = [
+                center[0] - dir[0] * standoff,
+                center[1] - dir[1] * standoff,
+                center[2] - dir[2] * standoff,
+            ];
+
+            let view = look_at(eye, center, [0.0, 1.0, 0.0]);
+            let near = 0.01;
+            let far = standoff * 2.0 + 1.0;
+            let proj = ortho(-half_w, half_w, -half_h, half_h, near, far);
+            let view_proj = mat4_mul(proj, view);
+            (view_proj, mat4_inverse(view_proj))
+        }
+    };
+
     (view_proj, inv_view_proj)
 }
 
@@ -126,6 +183,21 @@ pub fn perspective(fov_y: f32, aspect: f32, near: f32, far: f32) -> [[f32; 4]; 4
         [0.0, f, 0.0, 0.0],
         [0.0, 0.0, far * nf, -1.0],
         [0.0, 0.0, near * far * nf, 0.0],
+    ]
+}
+
+/// Orthographic projection matrix matching the wgpu NDC convention (z in
+/// [0, 1]) and the same right-handed, looking-down-`-z` view space as
+/// [`perspective`]. Column-major storage to match the rest of this module.
+pub fn ortho(left: f32, right: f32, bottom: f32, top: f32, near: f32, far: f32) -> [[f32; 4]; 4] {
+    let rl = 1.0 / (right - left);
+    let tb = 1.0 / (top - bottom);
+    let nf = 1.0 / (near - far);
+    [
+        [2.0 * rl, 0.0, 0.0, 0.0],
+        [0.0, 2.0 * tb, 0.0, 0.0],
+        [0.0, 0.0, nf, 0.0],
+        [-(right + left) * rl, -(top + bottom) * tb, near * nf, 1.0],
     ]
 }
 
@@ -235,4 +307,90 @@ pub fn normalize3(v: [f32; 3]) -> [f32; 3] {
         return [0.0, 0.0, 0.0];
     }
     [v[0] / len, v[1] / len, v[2] / len]
+}
+
+#[cfg(test)]
+mod ortho_tests {
+    use super::*;
+
+    // Matrices are column-major: ndc[j] = Σ_i m[i][j] * v[i].
+    fn transform(m: [[f32; 4]; 4], v: [f32; 4]) -> [f32; 4] {
+        let mut out = [0.0f32; 4];
+        for j in 0..4 {
+            out[j] = m[0][j] * v[0] + m[1][j] * v[1] + m[2][j] * v[2] + m[3][j] * v[3];
+        }
+        out
+    }
+
+    #[test]
+    fn ortho_maps_box_to_ndc() {
+        // left/right/bottom/top = ±1, near=1, far=3. View-space looks down -z,
+        // so view z = -near maps to NDC z 0, view z = -far maps to NDC z 1.
+        let m = ortho(-1.0, 1.0, -1.0, 1.0, 1.0, 3.0);
+        let ndc = transform(m, [0.5, -0.5, -2.0, 1.0]);
+        assert!((ndc[0] - 0.5).abs() < 1e-5, "x={}", ndc[0]);
+        assert!((ndc[1] + 0.5).abs() < 1e-5, "y={}", ndc[1]);
+        assert!((ndc[2] - 0.5).abs() < 1e-5, "z={}", ndc[2]); // mid-depth
+        assert!((ndc[3] - 1.0).abs() < 1e-5, "w={}", ndc[3]); // no perspective divide
+    }
+
+    #[test]
+    fn ortho_near_and_far_planes() {
+        let m = ortho(-2.0, 2.0, -2.0, 2.0, 1.0, 5.0);
+        let near = transform(m, [0.0, 0.0, -1.0, 1.0]);
+        let far = transform(m, [0.0, 0.0, -5.0, 1.0]);
+        assert!((near[2] - 0.0).abs() < 1e-5, "near z={}", near[2]);
+        assert!((far[2] - 1.0).abs() < 1e-5, "far z={}", far[2]);
+    }
+}
+
+#[cfg(test)]
+mod view_proj_tests {
+    use super::*;
+
+    fn transform(m: [[f32; 4]; 4], v: [f32; 4]) -> [f32; 4] {
+        let mut out = [0.0f32; 4];
+        for j in 0..4 {
+            out[j] = m[0][j] * v[0] + m[1][j] * v[1] + m[2][j] * v[2] + m[3][j] * v[3];
+        }
+        out
+    }
+
+    #[test]
+    fn orthographic_fits_all_corners_in_ndc() {
+        let cam = CameraConfig {
+            yaw_deg: 30.0,
+            pitch_deg: 25.0,
+            zoom: 1.0,
+            fov_deg: 45.0,
+            target: None,
+            projection: Projection::Orthographic,
+            background: None,
+        };
+        let (vp, _) = compute_view_proj([0.0, 0.0, 0.0], [4.0, 2.0, 6.0], 16.0 / 9.0, &cam);
+
+        let corners = [
+            [0.0, 0.0, 0.0],
+            [4.0, 0.0, 0.0],
+            [0.0, 2.0, 0.0],
+            [4.0, 2.0, 0.0],
+            [0.0, 0.0, 6.0],
+            [4.0, 0.0, 6.0],
+            [0.0, 2.0, 6.0],
+            [4.0, 2.0, 6.0],
+        ];
+        let mut max_xy = 0.0f32;
+        for c in &corners {
+            let ndc = transform(vp, [c[0], c[1], c[2], 1.0]);
+            // Orthographic: w stays 1 (no perspective divide).
+            assert!((ndc[3] - 1.0).abs() < 1e-4, "w={}", ndc[3]);
+            // All geometry inside the clip box.
+            assert!(ndc[0].abs() <= 1.05, "x out of range: {}", ndc[0]);
+            assert!(ndc[1].abs() <= 1.05, "y out of range: {}", ndc[1]);
+            assert!(ndc[2] >= -0.001 && ndc[2] <= 1.001, "z out of range: {}", ndc[2]);
+            max_xy = max_xy.max(ndc[0].abs()).max(ndc[1].abs());
+        }
+        // The framing should roughly fill the viewport (1/1.1 ≈ 0.9).
+        assert!(max_xy > 0.8, "geometry too small in frame: {}", max_xy);
+    }
 }

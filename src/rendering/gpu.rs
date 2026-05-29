@@ -13,6 +13,34 @@ use super::RenderError;
 
 const SHADER_SRC: &str = include_str!("shader.wgsl");
 
+/// Choose the render-pass clear color. A custom `background` (linear RGBA)
+/// always wins; otherwise black when an HDRI sky is drawn, else the default
+/// sky-blue.
+fn clear_color_for(background: Option<[f32; 4]>, hdri_enabled: bool) -> wgpu::Color {
+    if let Some(bg) = background {
+        wgpu::Color {
+            r: bg[0] as f64,
+            g: bg[1] as f64,
+            b: bg[2] as f64,
+            a: bg[3] as f64,
+        }
+    } else if hdri_enabled {
+        wgpu::Color {
+            r: 0.0,
+            g: 0.0,
+            b: 0.0,
+            a: 1.0,
+        }
+    } else {
+        wgpu::Color {
+            r: 0.529,
+            g: 0.808,
+            b: 0.922,
+            a: 1.0,
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct Uniforms {
@@ -727,21 +755,7 @@ impl GpuRenderer {
         let (_tb, transparent_bg) = make_ub(&transparent_u, "transparent_ub");
         let (_sb, sky_bg) = make_ub(&sky_u, "sky_ub");
 
-        let clear_color = if self.hdri_enabled {
-            wgpu::Color {
-                r: 0.0,
-                g: 0.0,
-                b: 0.0,
-                a: 1.0,
-            }
-        } else {
-            wgpu::Color {
-                r: 0.529,
-                g: 0.808,
-                b: 0.922,
-                a: 1.0,
-            }
-        };
+        let clear_color = clear_color_for(camera.background, self.hdri_enabled);
 
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("render_pass"),
@@ -1016,5 +1030,41 @@ impl GpuRenderer {
         }
 
         Ok(pixels)
+    }
+}
+
+#[cfg(test)]
+mod clear_color_tests {
+    use super::*;
+
+    #[test]
+    fn custom_background_used_verbatim() {
+        let c = clear_color_for(Some([0.2, 0.4, 0.6, 0.0]), false);
+        assert!((c.r - 0.2).abs() < 1e-6);
+        assert!((c.g - 0.4).abs() < 1e-6);
+        assert!((c.b - 0.6).abs() < 1e-6);
+        assert!((c.a - 0.0).abs() < 1e-6); // transparent
+    }
+
+    #[test]
+    fn custom_background_wins_over_hdri() {
+        let c = clear_color_for(Some([1.0, 1.0, 1.0, 1.0]), true);
+        assert!((c.r - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn default_no_hdri_is_sky_blue() {
+        let c = clear_color_for(None, false);
+        assert!((c.r - 0.529).abs() < 1e-3);
+        assert!((c.g - 0.808).abs() < 1e-3);
+        assert!((c.b - 0.922).abs() < 1e-3);
+        assert!((c.a - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn default_with_hdri_is_black() {
+        let c = clear_color_for(None, true);
+        assert!((c.r) < 1e-6 && (c.g) < 1e-6 && (c.b) < 1e-6);
+        assert!((c.a - 1.0).abs() < 1e-6);
     }
 }

@@ -15,6 +15,7 @@ pub mod gpu;
 pub mod hdri;
 
 pub use camera::CameraConfig;
+pub use camera::Projection;
 pub use gpu::GpuRenderer;
 pub use hdri::HdriData;
 
@@ -32,6 +33,12 @@ pub struct RenderConfig {
     /// Optional explicit orbit target in world coordinates. When ``None``
     /// the camera aims at the model's bounding-box centroid.
     pub target: Option<[f32; 3]>,
+    /// Optional solid RGBA clear color (linear 0.0–1.0). `None` keeps the
+    /// default sky-blue clear (or the HDRI sky when HDRI is enabled). An
+    /// alpha below 1.0 produces a transparent PNG. Ignored when HDRI is on.
+    pub background: Option<[f32; 4]>,
+    /// Camera projection mode (default `Perspective`).
+    pub projection: Projection,
 }
 
 impl Default for RenderConfig {
@@ -44,6 +51,8 @@ impl Default for RenderConfig {
             zoom: 1.0,
             fov: 45.0,
             target: None,
+            background: None,
+            projection: Projection::Perspective,
         }
     }
 }
@@ -56,6 +65,19 @@ impl RenderConfig {
             zoom: self.zoom,
             fov_deg: self.fov,
             target: self.target,
+            projection: self.projection,
+            background: self.background,
+        }
+    }
+
+    /// A config preset for a true isometric view: orthographic projection at
+    /// yaw 45° and pitch ≈35.264° (`arctan(1/√2)`).
+    pub fn isometric() -> Self {
+        Self {
+            yaw: 45.0,
+            pitch: 35.264,
+            projection: Projection::Orthographic,
+            ..Self::default()
         }
     }
 }
@@ -192,4 +214,35 @@ fn num_cpus() -> usize {
     std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(4)
+}
+
+#[cfg(test)]
+mod config_tests {
+    use super::*;
+    use crate::rendering::camera::Projection;
+
+    #[test]
+    fn default_config_is_perspective_no_background() {
+        let c = RenderConfig::default();
+        assert_eq!(c.projection, Projection::Perspective);
+        assert!(c.background.is_none());
+    }
+
+    #[test]
+    fn isometric_sets_ortho_and_angles() {
+        let c = RenderConfig::isometric();
+        assert_eq!(c.projection, Projection::Orthographic);
+        assert!((c.yaw - 45.0).abs() < 1e-4);
+        assert!((c.pitch - 35.264).abs() < 1e-3);
+    }
+
+    #[test]
+    fn to_camera_propagates_projection_and_background() {
+        let mut c = RenderConfig::default();
+        c.projection = Projection::Orthographic;
+        c.background = Some([1.0, 0.0, 0.0, 0.5]);
+        let cam = c.to_camera();
+        assert_eq!(cam.projection, Projection::Orthographic);
+        assert_eq!(cam.background, Some([1.0, 0.0, 0.0, 0.5]));
+    }
 }
