@@ -38,12 +38,16 @@ pub struct Region {
     tight_bounds: Option<BoundingBox>,
 
     // ── Cached fields for hot-path performance ──
+    // i64 (not i32) so that index arithmetic doesn't overflow for large
+    // regions. `cached_width_x_length` alone exceeds i32::MAX once a region
+    // is roughly 50k × 50k, and multiplying it by a Y offset overflows much
+    // sooner; the resulting wrap caused a `blocks[index]` OOB panic.
     #[serde(skip)]
-    cached_width: i32,
+    cached_width: i64,
     #[serde(skip)]
-    cached_length: i32,
+    cached_length: i64,
     #[serde(skip)]
-    cached_width_x_length: i32,
+    cached_width_x_length: i64,
     #[serde(skip)]
     cached_air_index: usize,
     #[serde(skip)]
@@ -89,9 +93,12 @@ impl Region {
     pub fn rebuild_bbox(&mut self) {
         self.bbox = BoundingBox::from_position_and_size(self.position, self.size);
         let (w, _, l) = self.bbox.get_dimensions();
-        self.cached_width = w;
-        self.cached_length = l;
-        self.cached_width_x_length = w * l;
+        let w64 = w as i64;
+        let l64 = l as i64;
+        self.cached_width = w64;
+        self.cached_length = l64;
+        // i64 multiplication: w × l can exceed i32::MAX (e.g. 50k × 50k = 2.5e9).
+        self.cached_width_x_length = w64 * l64;
     }
 
     /// Recompute cached_air_index from the palette.
@@ -203,9 +210,14 @@ impl Region {
 
     #[inline(always)]
     pub fn coords_to_index(&self, x: i32, y: i32, z: i32) -> usize {
-        let dx = x - self.bbox.min.0;
-        let dy = y - self.bbox.min.1;
-        let dz = z - self.bbox.min.2;
+        // Promote to i64 before the multiplications: for a 600M-block region
+        // the Y-axis term `dy * cached_width_x_length` is ~5e11, which
+        // overflows i32 silently and wraps to a negative — the resulting
+        // `as usize` cast then produced a near-`usize::MAX` index and an OOB
+        // panic in `set_block`. See nucleation issue #__ for the repro.
+        let dx = (x - self.bbox.min.0) as i64;
+        let dy = (y - self.bbox.min.1) as i64;
+        let dz = (z - self.bbox.min.2) as i64;
         (dx + dz * self.cached_width + dy * self.cached_width_x_length) as usize
     }
 
@@ -1611,16 +1623,16 @@ impl Region {
         let base_y = self.bbox.min.1;
         let base_z = self.bbox.min.2;
 
-        let dx_min = min.0 - base_x;
-        let dx_max = max.0 - base_x;
+        let dx_min = (min.0 - base_x) as i64;
+        let dx_max = (max.0 - base_x) as i64;
         let row_len = (dx_max - dx_min + 1) as usize;
 
         let mut air_delta: i64 = 0;
 
         for y in min.1..=max.1 {
-            let dy = y - base_y;
+            let dy = (y - base_y) as i64;
             for z in min.2..=max.2 {
-                let dz = z - base_z;
+                let dz = (z - base_z) as i64;
                 let row_start = (dx_min + dz * w + dy * wl) as usize;
                 let row_end = row_start + row_len;
                 let row = &mut self.blocks[row_start..row_end];
@@ -1707,6 +1719,58 @@ mod tests {
 
         let unpacked_blocks = region.unpack_block_states(&packed_states);
         assert_eq!(unpacked_blocks, blocks);
+    }
+
+    /// Regression: with the old i32-typed `cached_width_x_length` and
+    /// i32 multiplication in `coords_to_index`, asking for an index inside
+    /// a region whose footprint exceeded 50k × 19k blocks would silently
+    /// overflow and wrap to a negative i32. `as usize` then produced a
+    /// near-`usize::MAX` value and `blocks[index]` panicked OOB.
+    ///
+    /// We construct a `Region` with tiny `blocks` but cached fields that
+    /// match a real >500M-block region observed in the wild. The math
+    /// must produce a sane (large) index, not a wrapped one.
+    #[test]
+    fn coords_to_index_does_not_overflow_for_huge_regions() {
+        // Dimensions from the build-extractor mega-terrain repro:
+        // bounds (-47472, -64, -5216) .. (34975, 319, 13727)
+        let width: i64 = 82448;
+        let length: i64 = 18944;
+        let wl: i64 = width * length; // 1_561_754_112 — just barely fits i32
+        assert!(wl > 0 && wl < i64::from(i32::MAX));
+
+        let region = Region {
+            name: "huge".to_string(),
+            position: (-47472, -64, -5216),
+            size: (82448, 384, 18944),
+            blocks: Vec::new(), // we never actually index into this
+            palette: vec![BlockState::new("minecraft:air".to_string())],
+            entities: Vec::new(),
+            block_entities: BlockEntityStore::default(),
+            palette_index: FxHashMap::default(),
+            bbox: BoundingBox::new((-47472, -64, -5216), (34975, 319, 13727)),
+            tight_bounds: None,
+            cached_width: width,
+            cached_length: length,
+            cached_width_x_length: wl,
+            cached_air_index: 0,
+            non_air_count: 0,
+        };
+
+        // The problematic point: dy=300 makes `dy * wl ≈ 4.7e11` — well past
+        // i32::MAX. Pre-fix this returned ~usize::MAX-N; post-fix the index
+        // is the expected linear position.
+        let idx = region.coords_to_index(-47472, 236, -5216);
+        let expected: usize = (300i64 * wl) as usize;
+        assert_eq!(
+            idx, expected,
+            "coords_to_index overflowed (got {idx}, expected {expected})"
+        );
+
+        // Spot-check the opposite corner of the bbox: every term contributes.
+        let idx_far = region.coords_to_index(34975, 319, 13727);
+        let expected_far: usize = ((width - 1) + (length - 1) * width + (384i64 - 1) * wl) as usize;
+        assert_eq!(idx_far, expected_far);
     }
 
     #[test]
