@@ -246,6 +246,36 @@ schem.render("zoomed.png", target=(8.0, 1.0, 0.0), zoom=0.4, yaw=30, pitch=20)
 schem.export_mesh("out.glb")                # also accepts .nucm
 ```
 
+### Backgrounds & projection
+
+`RenderConfig` takes an optional solid background and a projection mode:
+
+- `background=(r, g, b, a)` — linear RGBA in `0.0–1.0`. An alpha below `1.0`
+  produces a transparent PNG. Defaults to `None` (sky-blue, or the HDRI sky
+  when an HDRI is set — in which case `background` is ignored).
+- `projection=Projection.Perspective | Projection.Orthographic`.
+
+Methods/attributes: `set_background(r, g, b, a)`, `clear_background()`,
+`background` (getter), `projection` (read/write property), and the static
+preset `RenderConfig.isometric(width=1024, height=1024)` (orthographic at
+yaw 45° / pitch ≈35.264°).
+
+```python
+from nucleation import Schematic, ResourcePack, RenderConfig, Projection
+
+pack = ResourcePack.from_file("pack.zip")
+schem = Schematic.open("f-117-nighthawk.litematic")
+
+# Transparent PNG, isometric framing.
+cfg = RenderConfig.isometric(width=1024, height=768)
+cfg.set_background(0.0, 0.0, 0.0, 0.0)      # fully transparent
+schem.render_to_file(pack, "night.png", cfg)
+
+# Or via render() kwargs (perspective, solid dark background):
+schem.render("solid.png", projection=Projection.Perspective,
+             background=(0.05, 0.05, 0.08, 1.0), fov=28)
+```
+
 ---
 
 ## Table of Contents

@@ -886,3 +886,24 @@ Top-level functions available at the module level.
 | `start` | `start() → void` | Initialize the WASM module (called automatically). |
 | `debug_schematic` | `debug_schematic(schematic: SchematicWrapper) → string` | Formatted debug output. |
 | `debug_json_schematic` | `debug_json_schematic(schematic: SchematicWrapper) → string` | JSON-formatted debug output. |
+
+## Rendering (feature-gated: `rendering`)
+
+`RenderConfig` configures GPU rendering. Beyond `width`/`height`/`yaw`/`pitch`/
+`zoom`/`fov`/`setTarget`, it supports a custom background and orthographic
+projection:
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `setBackground` | `setBackground(r, g, b, a) → void` | Solid clear color, linear `0.0–1.0`. Alpha `< 1.0` yields a transparent PNG. Ignored when HDRI is enabled. |
+| `clearBackground` | `clearBackground() → void` | Revert to the default sky / HDRI background. |
+| `background` | `get background() → [r,g,b,a] \| null` | Current background, or `null`. |
+| `setOrthographic` | `setOrthographic(value: boolean) → void` | Enable/disable orthographic projection (default perspective). |
+| `orthographic` | `get orthographic() → boolean` | Whether orthographic projection is on. |
+| `RenderConfig.isometric` | `static isometric() → RenderConfig` | Preset: orthographic at yaw 45° / pitch ≈35.264°. |
+
+```js
+const cfg = RenderConfig.isometric();
+cfg.setBackground(0, 0, 0, 0);            // transparent
+const png = await schem.renderPng(pack, cfg);
+```

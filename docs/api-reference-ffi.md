@@ -1277,3 +1277,27 @@ void sort_strategy_free(SortStrategyWrapper* ptr);
 ```
 
 > Note: The FFI currently exposes three basic sort strategies. For more advanced sorting (descending, distance-based), use the WASM or Python bindings.
+
+## Rendering (feature-gated: `rendering`)
+
+`renderconfig_new(width, height)` creates a config; setters tune it. Beyond
+`renderconfig_set_yaw/pitch/zoom/fov`, the following configure a custom
+background and orthographic/isometric projection:
+
+```c
+// Solid clear color, linear 0.0-1.0. Alpha < 1.0 -> transparent PNG.
+// Ignored when HDRI is enabled.
+void renderconfig_set_background(RenderConfig* cfg, float r, float g, float b, float a);
+
+// Revert to the default sky / HDRI background.
+void renderconfig_clear_background(RenderConfig* cfg);
+
+// Enable (true) or disable orthographic projection.
+void renderconfig_set_orthographic(RenderConfig* cfg, bool orthographic);
+
+// Configure a true isometric view: orthographic at yaw 45 / pitch ~35.264
+// (preserves the current width/height).
+void renderconfig_set_isometric(RenderConfig* cfg);
+```
+
+All setters are null-pointer safe (a null `cfg` is a no-op).
