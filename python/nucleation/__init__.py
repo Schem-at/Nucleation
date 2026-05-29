@@ -47,6 +47,7 @@ for _name in (
     "ItemModelConfig",
     "ItemModelResult",
     "RenderConfig",
+    "Projection",
     "MchprsWorld",
     "Value",
     "IoType",
@@ -977,6 +978,19 @@ def _make_render_config(**kwargs: Any) -> Any:
                 "render(): target must be an (x, y, z) tuple"
             )
         target = (float(target[0]), float(target[1]), float(target[2]))
+    background = kwargs.pop("background", None)
+    if background is not None:
+        if not (isinstance(background, (tuple, list)) and len(background) == 4):
+            raise TypeError(
+                "render(): background must be an (r, g, b, a) tuple of linear 0.0–1.0 floats"
+            )
+        background = (
+            float(background[0]),
+            float(background[1]),
+            float(background[2]),
+            float(background[3]),
+        )
+    projection = kwargs.pop("projection", None)
     cfg = _native.RenderConfig(
         kwargs.pop("width", 1920),
         kwargs.pop("height", 1080),
@@ -985,6 +999,8 @@ def _make_render_config(**kwargs: Any) -> Any:
         float(kwargs.pop("zoom", 1.0)),
         float(kwargs.pop("fov", 45.0)),
         target,
+        background,
+        projection,
     )
     if kwargs:
         raise TypeError(f"render(): unexpected kwargs {list(kwargs)}")
@@ -1108,6 +1124,7 @@ for _opt in (
     "ItemModelConfig",
     "ItemModelResult",
     "RenderConfig",
+    "Projection",
     "MchprsWorld",
     "Value",
     "IoType",

@@ -936,3 +936,32 @@ class TestSign:
         n = sign(["one"])
         assert len(n["front_text"]["messages"]) == 4
         assert n["back_text"]["messages"] == ['""', '""', '""', '""']
+
+
+def test_render_config_background_and_projection():
+    try:
+        from nucleation import RenderConfig, Projection
+    except ImportError:
+        import pytest
+
+        pytest.skip("rendering feature not built into nucleation")
+
+    # Background round-trips; alpha < 1 allowed.
+    cfg = RenderConfig(width=64, height=64, background=(1.0, 0.0, 0.0, 0.5))
+    assert cfg.background == (1.0, 0.0, 0.0, 0.5)
+    cfg.clear_background()
+    assert cfg.background is None
+    cfg.set_background(0.0, 1.0, 0.0, 1.0)
+    assert cfg.background == (0.0, 1.0, 0.0, 1.0)
+
+    # Projection enum round-trips (property assignment).
+    assert cfg.projection == Projection.Perspective
+    cfg.projection = Projection.Orthographic
+    assert cfg.projection == Projection.Orthographic
+
+    # Isometric preset.
+    iso = RenderConfig.isometric(width=128, height=128)
+    assert iso.width == 128
+    assert iso.projection == Projection.Orthographic
+    assert abs(iso.yaw - 45.0) < 1e-4
+    assert abs(iso.pitch - 35.264) < 1e-3

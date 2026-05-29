@@ -35,6 +35,7 @@ TextureAtlas = _native.TextureAtlas
 ItemModelConfig = _native.ItemModelConfig
 ItemModelResult = _native.ItemModelResult
 RenderConfig = _native.RenderConfig
+Projection = _native.Projection
 MchprsWorld = _native.MchprsWorld
 
 # ----- Module helpers ------------------------------------------------------

@@ -80,6 +80,7 @@ pub fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     #[cfg(feature = "rendering")]
     {
         m.add_class::<rendering::PyRenderConfig>()?;
+        m.add_class::<rendering::PyProjection>()?;
     }
 
     #[cfg(feature = "simulation")]
