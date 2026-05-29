@@ -387,7 +387,11 @@ mod view_proj_tests {
             // All geometry inside the clip box.
             assert!(ndc[0].abs() <= 1.05, "x out of range: {}", ndc[0]);
             assert!(ndc[1].abs() <= 1.05, "y out of range: {}", ndc[1]);
-            assert!(ndc[2] >= -0.001 && ndc[2] <= 1.001, "z out of range: {}", ndc[2]);
+            assert!(
+                ndc[2] >= -0.001 && ndc[2] <= 1.001,
+                "z out of range: {}",
+                ndc[2]
+            );
             max_xy = max_xy.max(ndc[0].abs()).max(ndc[1].abs());
         }
         // The framing should roughly fill the viewport (1/1.1 ≈ 0.9).
