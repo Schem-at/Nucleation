@@ -272,6 +272,7 @@ Schematic.render = Python/FFI naming (WASM uses render_wasm with js_name=render)
 Schematic.render_png = Python/FFI naming (WASM uses render_png_wasm with js_name=renderPng)
 Schematic.render_to_file = No filesystem in WASM
 RenderConfig.fov = WASM uses setFov/getter pattern (different naming)
+RenderConfig.projection = Python exposes a Projection enum (projection getter); WASM uses an orthographic bool (setOrthographic/orthographic)
 
 [python_only]
 RenderConfig.__repr__ = Python dunder method
@@ -279,6 +280,7 @@ RenderConfig.__repr__ = Python dunder method
 [no_python]
 Schematic.render_wasm = WASM naming (Python uses render)
 Schematic.render_png_wasm = WASM naming (Python uses render_png)
+RenderConfig.orthographic = WASM bool API (setOrthographic/orthographic); Python uses the Projection enum (projection)
 
 [no_ffi]
 RenderConfig.* = FFI uses renderconfig_* free functions not methods on wrapper type
