@@ -8994,6 +8994,59 @@ pub mod rendering_ffi {
         }
     }
 
+    /// Set a solid RGBA clear color (linear 0.0–1.0). Alpha < 1.0 yields a
+    /// transparent PNG. Ignored when HDRI is enabled.
+    #[no_mangle]
+    pub extern "C" fn renderconfig_set_background(
+        ptr: *mut FFIRenderConfig,
+        r: f32,
+        g: f32,
+        b: f32,
+        a: f32,
+    ) {
+        if !ptr.is_null() {
+            unsafe { (*ptr).0.background = Some([r, g, b, a]) };
+        }
+    }
+
+    /// Clear the custom background — revert to default sky / HDRI.
+    #[no_mangle]
+    pub extern "C" fn renderconfig_clear_background(ptr: *mut FFIRenderConfig) {
+        if !ptr.is_null() {
+            unsafe { (*ptr).0.background = None };
+        }
+    }
+
+    /// Enable (`true`) or disable orthographic projection.
+    #[no_mangle]
+    pub extern "C" fn renderconfig_set_orthographic(ptr: *mut FFIRenderConfig, orthographic: bool) {
+        if !ptr.is_null() {
+            unsafe {
+                (*ptr).0.projection = if orthographic {
+                    rendering::Projection::Orthographic
+                } else {
+                    rendering::Projection::Perspective
+                };
+            }
+        }
+    }
+
+    /// Configure a true isometric view: orthographic at yaw 45° / pitch ≈35.264°
+    /// (preserves the current width/height).
+    #[no_mangle]
+    pub extern "C" fn renderconfig_set_isometric(ptr: *mut FFIRenderConfig) {
+        if !ptr.is_null() {
+            unsafe {
+                let w = (*ptr).0.width;
+                let h = (*ptr).0.height;
+                let mut iso = rendering::RenderConfig::isometric();
+                iso.width = w;
+                iso.height = h;
+                (*ptr).0 = iso;
+            }
+        }
+    }
+
     // --- Render Functions ---
 
     /// Render a schematic to RGBA pixel bytes.
@@ -9028,14 +9081,7 @@ pub mod rendering_ffi {
             }
         };
 
-        let render_config = RenderConfig {
-            width: config.width,
-            height: config.height,
-            yaw: config.yaw,
-            pitch: config.pitch,
-            zoom: config.zoom,
-            fov: config.fov,
-        };
+        let render_config = config.clone();
 
         match rendering::render_meshes(&[mesh], &render_config, None) {
             Ok(pixels) => {
@@ -9087,14 +9133,7 @@ pub mod rendering_ffi {
             }
         };
 
-        let render_config = RenderConfig {
-            width: config.width,
-            height: config.height,
-            yaw: config.yaw,
-            pitch: config.pitch,
-            zoom: config.zoom,
-            fov: config.fov,
-        };
+        let render_config = config.clone();
 
         match rendering::render_meshes_png(&[mesh], &render_config, None) {
             Ok(png) => {
@@ -9137,14 +9176,7 @@ pub mod rendering_ffi {
             }
         };
 
-        let render_config = RenderConfig {
-            width: config.width,
-            height: config.height,
-            yaw: config.yaw,
-            pitch: config.pitch,
-            zoom: config.zoom,
-            fov: config.fov,
-        };
+        let render_config = config.clone();
 
         match schematic.render_to_file(pack, path, &render_config) {
             Ok(()) => 0,

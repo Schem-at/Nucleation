@@ -336,3 +336,26 @@ fn ffi_set_blocks_invalid_complex_string_sets_message() {
     }
     unsafe { schematic_free(h) };
 }
+
+#[cfg(feature = "rendering")]
+#[test]
+fn ffi_renderconfig_background_and_projection() {
+    use nucleation::ffi::rendering_ffi::*;
+
+    unsafe {
+        let cfg = renderconfig_new(64, 64);
+        assert!(!cfg.is_null());
+
+        // These must not panic and must be null-safe.
+        renderconfig_set_background(cfg, 1.0, 0.0, 0.0, 0.5);
+        renderconfig_clear_background(cfg);
+        renderconfig_set_orthographic(cfg, true);
+        renderconfig_set_isometric(cfg);
+
+        // Null-pointer safety.
+        renderconfig_set_background(std::ptr::null_mut(), 0.0, 0.0, 0.0, 1.0);
+        renderconfig_set_orthographic(std::ptr::null_mut(), true);
+
+        renderconfig_free(cfg);
+    }
+}
