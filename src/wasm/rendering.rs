@@ -112,6 +112,52 @@ impl RenderConfigWrapper {
     pub fn target(&self) -> Option<Vec<f32>> {
         self.inner.target.map(|t| t.to_vec())
     }
+
+    /// Set a solid RGBA clear color (linear 0.0–1.0). An alpha below 1.0
+    /// produces a transparent PNG. Ignored when HDRI is enabled.
+    #[wasm_bindgen(js_name = setBackground)]
+    pub fn set_background(&mut self, r: f32, g: f32, b: f32, a: f32) {
+        self.inner.background = Some([r, g, b, a]);
+    }
+
+    /// Clear the custom background — revert to the default sky / HDRI.
+    #[wasm_bindgen(js_name = clearBackground)]
+    pub fn clear_background(&mut self) {
+        self.inner.background = None;
+    }
+
+    /// Current background as `[r, g, b, a]`, or `null` if none.
+    #[wasm_bindgen(getter, js_name = background)]
+    pub fn background(&self) -> Option<Vec<f32>> {
+        self.inner.background.map(|c| c.to_vec())
+    }
+
+    /// Enable or disable orthographic projection (default: perspective).
+    #[wasm_bindgen(js_name = setOrthographic)]
+    pub fn set_orthographic(&mut self, value: bool) {
+        self.inner.projection = if value {
+            crate::rendering::Projection::Orthographic
+        } else {
+            crate::rendering::Projection::Perspective
+        };
+    }
+
+    /// Whether orthographic projection is enabled.
+    #[wasm_bindgen(getter, js_name = orthographic)]
+    pub fn orthographic(&self) -> bool {
+        matches!(
+            self.inner.projection,
+            crate::rendering::Projection::Orthographic
+        )
+    }
+
+    /// Preset for a true isometric view: orthographic at yaw 45° / pitch ≈35.264°.
+    #[wasm_bindgen(js_name = isometric)]
+    pub fn isometric() -> RenderConfigWrapper {
+        RenderConfigWrapper {
+            inner: crate::rendering::RenderConfig::isometric(),
+        }
+    }
 }
 
 // Rendering methods on SchematicWrapper
@@ -133,6 +179,8 @@ impl SchematicWrapper {
             zoom: config.inner.zoom,
             fov: config.inner.fov,
             target: config.inner.target,
+            background: config.inner.background,
+            projection: config.inner.projection,
         };
 
         future_to_promise(async move {
@@ -163,6 +211,8 @@ impl SchematicWrapper {
             zoom: config.inner.zoom,
             fov: config.inner.fov,
             target: config.inner.target,
+            background: config.inner.background,
+            projection: config.inner.projection,
         };
 
         future_to_promise(async move {

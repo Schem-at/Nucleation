@@ -378,6 +378,36 @@ test('chained error does not corrupt state', () => {
   if (s.raw.get_block_string(0, 1, 0) !== 'minecraft:dirt') throw new Error('dirt missing');
 });
 
+// --- RenderConfig: background + projection --------------------------------
+
+test('RenderConfig background + orthographic', () => {
+  if (typeof raw.RenderConfigWrapper !== 'function') {
+    console.log('    (skipped — rendering feature not in this WASM build)');
+    return;
+  }
+  const cfg = new raw.RenderConfigWrapper();
+
+  // Background setter/getter round-trips, alpha < 1 allowed.
+  cfg.setBackground(1.0, 0.0, 0.0, 0.5);
+  const bg = cfg.background;
+  if (!bg) throw new Error('background should be set');
+  assertEq(bg.length, 4, 'background length');
+  if (Math.abs(bg[3] - 0.5) > 1e-6) throw new Error('alpha not preserved');
+  cfg.clearBackground();
+  if (cfg.background != null) throw new Error('background should be cleared (null/undefined)');
+
+  // Orthographic toggle.
+  assertEq(cfg.orthographic, false, 'default perspective');
+  cfg.setOrthographic(true);
+  assertEq(cfg.orthographic, true, 'orthographic enabled');
+
+  // Isometric static constructor.
+  const iso = raw.RenderConfigWrapper.isometric();
+  assertEq(iso.orthographic, true, 'isometric is orthographic');
+  if (Math.abs(iso.yaw - 45.0) > 1e-4) throw new Error('iso yaw');
+  if (Math.abs(iso.pitch - 35.264) > 1e-3) throw new Error('iso pitch');
+});
+
 // --- Summary --------------------------------------------------------------
 
 console.log(`\n${pass} passed, ${fail} failed`);
