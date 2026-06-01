@@ -169,6 +169,10 @@ required-features = ["scripting"]
 name = "snapshot_bench"
 harness = false
 
+[[bench]]
+name = "fingerprint_bench"
+harness = false
+
 # Examples requiring the meshing feature
 [[example]]
 name = "render_schematic"
