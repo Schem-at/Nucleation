@@ -7,8 +7,12 @@
 //! compiling on its own commit).
 
 pub mod classifier;
+pub mod footprint;
 pub mod rulesets;
 pub mod symmetry;
+pub mod voxel;
+
+pub use footprint::{footprint, Footprint};
 
 #[cfg(test)]
 mod testgen;
