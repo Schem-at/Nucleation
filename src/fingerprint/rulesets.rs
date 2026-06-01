@@ -43,18 +43,15 @@ const REDSTONE_COMPONENTS: &[&str] = &[
 fn component_rules(keep: &[&str]) -> Vec<Rule> {
     REDSTONE_COMPONENTS
         .iter()
-        .map(|n| {
-            rule(
-                names(&[n]),
-                &n.replace("minecraft:", ""),
-                keep,
-            )
-        })
+        .map(|n| rule(names(&[n]), &n.replace("minecraft:", ""), keep))
         .collect()
 }
 
 fn glass_match() -> Match {
-    Match::Any(vec![Match::Glob("*glass".into()), names(&["minecraft:glass"])])
+    Match::Any(vec![
+        Match::Glob("*glass".into()),
+        names(&["minecraft:glass"]),
+    ])
 }
 
 fn top_slab_match() -> Match {
@@ -91,8 +88,12 @@ mod tests {
     use crate::block_state::BlockState;
 
     fn bs(name: &str, props: &[(&str, &str)]) -> BlockState {
-        BlockState::new(name)
-            .with_properties(props.iter().map(|(k, v)| ((*k).into(), (*v).into())).collect())
+        BlockState::new(name).with_properties(
+            props
+                .iter()
+                .map(|(k, v)| ((*k).into(), (*v).into()))
+                .collect(),
+        )
     }
 
     #[test]

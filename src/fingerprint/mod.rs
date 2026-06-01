@@ -22,7 +22,10 @@ use crate::fingerprint::classifier::{Classifier, Token};
 use crate::fingerprint::symmetry::Symmetry;
 
 fn is_air(name: &str) -> bool {
-    matches!(name, "minecraft:air" | "minecraft:cave_air" | "minecraft:void_air")
+    matches!(
+        name,
+        "minecraft:air" | "minecraft:cave_air" | "minecraft:void_air"
+    )
 }
 
 /// How a blockstate is reduced to a token before canonicalization.
@@ -51,8 +54,11 @@ impl BlockPolicy {
                 if is_air(b.get_name()) {
                     return None;
                 }
-                let mut props: Vec<(&str, &str)> =
-                    b.properties.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+                let mut props: Vec<(&str, &str)> = b
+                    .properties
+                    .iter()
+                    .map(|(k, v)| (k.as_str(), v.as_str()))
+                    .collect();
                 props.sort_unstable();
                 let mut s = b.get_name().to_string();
                 for (k, v) in props {
@@ -76,13 +82,22 @@ pub struct FingerprintSpec {
 
 impl FingerprintSpec {
     pub fn exact() -> Self {
-        Self { symmetry: Symmetry::None, blocks: BlockPolicy::Exact }
+        Self {
+            symmetry: Symmetry::None,
+            blocks: BlockPolicy::Exact,
+        }
     }
     pub fn shape() -> Self {
-        Self { symmetry: Symmetry::Octahedral, blocks: BlockPolicy::IdOnly }
+        Self {
+            symmetry: Symmetry::Octahedral,
+            blocks: BlockPolicy::IdOnly,
+        }
     }
     pub fn structural() -> Self {
-        Self { symmetry: Symmetry::YawMirror, blocks: BlockPolicy::Classify(rulesets::structural()) }
+        Self {
+            symmetry: Symmetry::YawMirror,
+            blocks: BlockPolicy::Classify(rulesets::structural()),
+        }
     }
     pub fn redstone_computational() -> Self {
         Self {
@@ -136,7 +151,11 @@ pub fn signature(schem: &UniversalSchematic, spec: &FingerprintSpec) -> Signatur
         ]
     };
     dims.sort_unstable();
-    Signature { dims_sorted: dims, histogram, count }
+    Signature {
+        dims_sorted: dims,
+        histogram,
+        count,
+    }
 }
 
 /// Exact canonical content fingerprint (128-bit).
@@ -162,9 +181,11 @@ pub fn fingerprint(schem: &UniversalSchematic, spec: &FingerprintSpec) -> Finger
         if cells.is_empty() {
             continue;
         }
-        let mn = cells.iter().fold((i32::MAX, i32::MAX, i32::MAX), |m, (p, _)| {
-            (m.0.min(p.0), m.1.min(p.1), m.2.min(p.2))
-        });
+        let mn = cells
+            .iter()
+            .fold((i32::MAX, i32::MAX, i32::MAX), |m, (p, _)| {
+                (m.0.min(p.0), m.1.min(p.1), m.2.min(p.2))
+            });
         for (p, _) in cells.iter_mut() {
             *p = (p.0 - mn.0, p.1 - mn.1, p.2 - mn.2);
         }
@@ -255,7 +276,10 @@ mod spec_tests {
             BlockPolicy::IdOnly.tokenize(&repeater).as_deref(),
             Some("minecraft:repeater")
         );
-        assert_eq!(BlockPolicy::Exact.tokenize(&BlockState::new("minecraft:air")), None);
+        assert_eq!(
+            BlockPolicy::Exact.tokenize(&BlockState::new("minecraft:air")),
+            None
+        );
     }
 
     #[test]

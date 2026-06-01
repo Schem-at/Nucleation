@@ -16,7 +16,10 @@ pub fn occupancy_grid(schem: &UniversalSchematic, spec: &FingerprintSpec) -> Gri
         .map(|(p, _)| (p.x, p.y, p.z))
         .collect();
     if cells.is_empty() {
-        return Grid { dims: [0, 0, 0], data: vec![] };
+        return Grid {
+            dims: [0, 0, 0],
+            data: vec![],
+        };
     }
     let mn = cells.iter().fold((i32::MAX, i32::MAX, i32::MAX), |m, p| {
         (m.0.min(p.0), m.1.min(p.1), m.2.min(p.2))
@@ -31,7 +34,11 @@ pub fn occupancy_grid(schem: &UniversalSchematic, spec: &FingerprintSpec) -> Gri
     ];
     let mut data = vec![0.0f32; dims[0] * dims[1] * dims[2]];
     for (x, y, z) in cells {
-        let (i, j, k) = ((x - mn.0) as usize, (y - mn.1) as usize, (z - mn.2) as usize);
+        let (i, j, k) = (
+            (x - mn.0) as usize,
+            (y - mn.1) as usize,
+            (z - mn.2) as usize,
+        );
         data[i + dims[0] * (j + dims[1] * k)] = 1.0;
     }
     Grid { dims, data }

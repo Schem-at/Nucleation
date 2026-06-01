@@ -118,6 +118,9 @@ mod tests {
         let fo = footprint(&other, &spec);
 
         assert!(fa.distance(&fa2) < 1e-3, "shift should be ~invariant");
-        assert!(fa.distance(&fo) > fa.distance(&fa2), "unrelated build is farther");
+        assert!(
+            fa.distance(&fo) > fa.distance(&fa2),
+            "unrelated build is farther"
+        );
     }
 }
