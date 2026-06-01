@@ -6,6 +6,7 @@
 //! Submodules are declared as they are implemented (each keeps the crate
 //! compiling on its own commit).
 
+pub mod classifier;
 pub mod symmetry;
 
 #[cfg(test)]
