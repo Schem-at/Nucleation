@@ -23,6 +23,7 @@ extern "C" {
 /* ========================================================================== */
 
 typedef struct SchematicWrapper SchematicWrapper;
+typedef struct StoreHandle StoreHandle;
 typedef struct BlockStateWrapper BlockStateWrapper;
 typedef struct DefinitionRegionWrapper DefinitionRegionWrapper;
 typedef struct ShapeWrapper ShapeWrapper;
@@ -143,6 +144,30 @@ ByteArray schematic_to_litematic(const SchematicWrapper *schematic);
 int schematic_from_schematic(SchematicWrapper *schematic,
                              const unsigned char *data, size_t data_len);
 ByteArray schematic_to_schematic(const SchematicWrapper *schematic);
+
+/* Transparent store-backed open/save.
+ *
+ * URI form: a local path, "file://...", or "s3://bucket/key.schem"; the format
+ * is auto-detected from the URI extension. Single-string "redis://",
+ * "postgres://", and "mem://" URIs are rejected by the core resolver -- use the
+ * store+key variants below for those backends. schematic_open returns a new
+ * wrapper (free with schematic_free) or NULL on error; schematic_save returns 0
+ * on success, -1 on null arguments, -2 on error. On any failure call
+ * schematic_last_error(). version may be NULL. */
+SchematicWrapper *schematic_open(const char *uri);
+int schematic_save(const SchematicWrapper *handle, const char *uri,
+                   const char *version);
+
+/* Store+key variants: bridge an explicit StoreHandle (from nuc_store_open) and
+ * work for every backend, including redis/postgres/mem. schematic_open_from_store
+ * returns a new wrapper (free with schematic_free) or NULL on error;
+ * schematic_save_to_store returns 0 on success, -1 on null arguments, -2 on
+ * error. On any failure call schematic_last_error(). version may be NULL. */
+SchematicWrapper *schematic_open_from_store(const StoreHandle *store,
+                                            const char *key);
+int schematic_save_to_store(const SchematicWrapper *handle,
+                            const StoreHandle *store, const char *key,
+                            const char *version);
 
 /* ========================================================================== */
 /* Format Management                                                          */
@@ -507,6 +532,69 @@ int schematicbuilder_layers(SchematicBuilderWrapper *ptr,
 SchematicWrapper *schematicbuilder_build(SchematicBuilderWrapper *ptr);
 SchematicBuilderWrapper *schematicbuilder_from_template(
     const char *template_str);
+
+/* ========================================================================== */
+/* Store                                                                      */
+/* ========================================================================== */
+
+/*
+ * Blob store backends (mem / file / s3 / redis / postgres) behind a uniform
+ * key-value API. Requires the `ffi` Cargo feature plus the relevant `store-*`
+ * feature(s) for the backends you need.
+ *
+ * NOTE: the store functions use a DIFFERENT status-code convention from the
+ * schematic_* functions documented at the top of this file (0 / -1 / -2).
+ * Store functions returning `int` use:
+ *     0   success
+ *     1   not found (for get / exists-style queries only)
+ *    -1   error -- call nuc_store_last_error() for a message
+ *
+ * Keys are `/`-delimited UTF-8 paths; list(prefix) returns keys starting with
+ * prefix. S3/MinIO read AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_REGION
+ * / AWS_ENDPOINT_URL / AWS_S3_FORCE_PATH_STYLE; Postgres table via
+ * NUC_STORE_PG_TABLE.
+ */
+
+/* StoreHandle is forward-declared in the Opaque Types section above. */
+
+/* Open from a URL: "mem://", "file:///abs/path", "s3://bucket/prefix",
+   "redis://host:6379/0", "postgres://user:pass@host/db" (schemes depend on
+   the store-* Cargo features compiled in). Returns NULL on error. */
+StoreHandle *nuc_store_open(const char *url);
+
+/* Free a handle from nuc_store_open. */
+void nuc_store_free(StoreHandle *handle);
+
+/* Fetch key. Returns 0 found (sets *out_ptr / *out_len to a buffer the caller
+   frees with nuc_store_bytes_free), 1 if absent, -1 on error. */
+int nuc_store_get(const StoreHandle *handle, const char *key,
+                  uint8_t **out_ptr, size_t *out_len);
+
+/* Store len bytes at key (overwrites). Returns 0 / -1. */
+int nuc_store_put(const StoreHandle *handle, const char *key,
+                  const uint8_t *data, size_t len);
+
+/* Whether key exists. Returns 1 yes, 0 no, -1 error. */
+int nuc_store_exists(const StoreHandle *handle, const char *key);
+
+/* Delete key (idempotent). Returns 0 / -1. */
+int nuc_store_delete(const StoreHandle *handle, const char *key);
+
+/* Keys under prefix as a JSON array string (caller frees with
+   nuc_store_string_free). Returns NULL on error. */
+char *nuc_store_list(const StoreHandle *handle, const char *prefix);
+
+/* Health check. Returns 0 usable, -1 otherwise. */
+int nuc_store_health(const StoreHandle *handle);
+
+/* Last error on this thread, or NULL. Caller frees with nuc_store_string_free. */
+char *nuc_store_last_error(void);
+
+/* Free a string returned by nuc_store_list / nuc_store_last_error. */
+void nuc_store_string_free(char *s);
+
+/* Free a byte buffer returned by nuc_store_get. */
+void nuc_store_bytes_free(uint8_t *ptr, size_t len);
 
 #ifdef __cplusplus
 }

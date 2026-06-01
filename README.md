@@ -51,6 +51,13 @@
 - **Ambient occlusion** with configurable intensity
 - **Resource pack querying** — list/get/add blockstates, models, and textures
 
+### Storage
+
+- **Pluggable byte storage** — a `Store` moves opaque bytes by `/`-delimited key (get, put, exists, delete, list, health)
+- **Multiple backends behind feature flags**: in-memory, filesystem, S3/MinIO, Redis, Postgres
+- **One synchronous API** — networked backends wrap async SDKs behind an internal runtime, so calls stay blocking
+- **Built for moving artifacts** — ship schematics, renders, and previews to S3 (and friends) with a single URL
+
 ### Developer Experience
 
 - **Bracket notation** for blocks: `"minecraft:lever[facing=east,powered=false]"`
@@ -215,6 +222,51 @@ schematic-builder -i circuit.txt -o circuit.schem --format schem
 # Export as mcstructure
 schematic-builder -i circuit.txt -o circuit.mcstructure --format mcstructure
 ```
+
+### Pluggable Storage
+
+Open and save schematics transparently from local files **or** remote stores —
+the same `open`/`save` calls, with the format inferred from the extension:
+
+```rust
+use nucleation::UniversalSchematic;
+
+// transparent: a path, file://, or s3://bucket/key.schem
+let schem = UniversalSchematic::open("s3://my-bucket/builds/adder.schem")?;
+schem.save("adder.litematic", None)?;
+
+// explicit store + key — works for ANY backend (redis/postgres too)
+let store = nucleation::store::open("redis://localhost:6379")?;
+let schem = UniversalSchematic::from_store(store.as_ref(), "builds/adder.schem")?;
+schem.save_to_store(store.as_ref(), "out/adder.schem", None)?;
+```
+
+`redis://`/`postgres://` can't carry a key in one string (their URL path is the
+DB), so use the explicit-store form for those. This transparent open/save is
+available in every binding (Python `Schematic.open("s3://…")`, the FFI
+`schematic_open`, WASM `openFromStore`, JVM/PHP `open`).
+
+For raw byte storage (PNG renders, arbitrary artifacts) use the `Store` directly:
+
+```rust
+use nucleation::store::{self, Store};
+
+let s = store::open("s3://my-bucket/previews")?; // Box<dyn Store>
+s.put("build/abc.png", &png_bytes)?;
+let bytes: Option<Vec<u8>> = s.get("build/abc.png")?;
+let keys: Vec<String> = s.list("build/")?;
+s.delete("build/abc.png")?;
+s.health()?;
+```
+
+The backend is chosen entirely by the URL scheme: `mem://` (always available),
+`file:///abs/path`, `s3://bucket/prefix`, `redis://host:6379/0`, and
+`postgres://user:pass@host/db`. Each non-memory backend is gated behind a Cargo
+feature — `store-fs` (on by default), `store-s3`, `store-redis`, `store-pg`, and
+`store-callback` — so you only compile in the backends you use. S3/MinIO reads
+credentials from the standard `AWS_*` environment variables (`AWS_ENDPOINT_URL` +
+`AWS_S3_FORCE_PATH_STYLE=true` for MinIO), and the Postgres table name can be
+overridden with `NUC_STORE_PG_TABLE` (default `nucleation_store`).
 
 ---
 

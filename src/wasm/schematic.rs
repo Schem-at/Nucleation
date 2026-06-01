@@ -114,6 +114,34 @@ impl SchematicWrapper {
         }
     }
 
+    /// Open a schematic directly from a [`StoreWrapper`] at `key`. The format is
+    /// inferred from the stored bytes. This is the meaningful way to load from
+    /// host/remote storage on the web: it works with `mem://` stores and with
+    /// the JS-callback store created via `Store.fromCallbacks(...)`.
+    #[wasm_bindgen(js_name = openFromStore)]
+    pub fn open_from_store(
+        store: &super::store::StoreWrapper,
+        key: &str,
+    ) -> Result<SchematicWrapper, JsValue> {
+        UniversalSchematic::from_store(store.as_store(), key)
+            .map(SchematicWrapper)
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    /// Save this schematic into a [`StoreWrapper`] at `key`. The export format is
+    /// inferred from the `key`'s extension (e.g. `.litematic`, `.schem`). Works
+    /// with `mem://` stores and the `Store.fromCallbacks(...)` JS-callback store.
+    #[wasm_bindgen(js_name = saveToStore)]
+    pub fn save_to_store(
+        &self,
+        store: &super::store::StoreWrapper,
+        key: &str,
+    ) -> Result<(), JsValue> {
+        self.0
+            .save_to_store(store.as_store(), key, None)
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
     pub fn get_supported_import_formats() -> Array {
         let manager = get_manager();
         let manager = manager.lock().unwrap();

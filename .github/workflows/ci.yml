@@ -70,6 +70,31 @@ jobs:
         run: |
           pip install maturin
           maturin build --features python,simulation,rendering
+
+  # Exercise the networked Store backends (S3/Redis/Postgres) against real
+  # services. testcontainers spins throwaway containers via the runner's docker,
+  # so no service-container declarations are needed.
+  test-store-backends:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-store-${{ hashFiles('**/Cargo.lock') }}
+      - name: Store backend contract suites (testcontainers)
+        run: |
+          cargo test --features store-s3,store-redis,store-pg,store-testkit \
+            --test store_testcontainers
+
   build-wasm:
     needs: [test, check-version]
     runs-on: ubuntu-latest

@@ -59,6 +59,7 @@ Nucleation provides a comprehensive C Foreign Function Interface for embedding i
   - [OutputCondition](#outputcondition)
   - [ExecutionMode](#executionmode)
   - [SortStrategy](#sortstrategy)
+- [Store](#store)
 
 ---
 
@@ -386,6 +387,69 @@ int schematic_save_to_file(
     const char* version
 );
 ```
+
+### Transparent Store-Backed Open / Save
+
+These functions open and save schematics through the same storage layer used by
+the rest of the crate, so a single call works against local files or remote
+object stores. The format is auto-detected from the URI's extension.
+
+#### URI form
+
+```c
+// Open from a URI. Returns a new wrapper (free with schematic_free), or NULL on error.
+SchematicWrapper* schematic_open(const char* uri);
+
+// Save to a URI. version: format version or NULL for default.
+// Returns: 0 success, -1 null args, -2 error.
+int schematic_save(
+    const SchematicWrapper* handle,
+    const char* uri,
+    const char* version
+);
+```
+
+Accepted URI schemes:
+
+- a bare local path, e.g. `"out/build.schem"`
+- `file://...`, e.g. `"file:///abs/path/build.litematic"`
+- `s3://bucket/key.schem` (S3 / MinIO; credentials come from the standard
+  `AWS_*` environment variables)
+
+The single-string URI form intentionally **rejects** `redis://`, `postgres://`,
+and `mem://` — those backends are not addressable by a self-contained URI. The
+error from the core resolver is surfaced via `schematic_last_error()`. To use
+those backends, open a store handle with `nuc_store_open` and call the store+key
+variants below.
+
+#### Store + key form
+
+```c
+// Open from an explicit store handle (from nuc_store_open) at `key`.
+// Works for every backend, including redis/postgres/mem.
+// Returns a new wrapper (free with schematic_free), or NULL on error.
+SchematicWrapper* schematic_open_from_store(
+    const StoreHandle* store,
+    const char* key
+);
+
+// Save to an explicit store handle at `key`. version: format version or NULL.
+// Returns: 0 success, -1 null args, -2 error.
+int schematic_save_to_store(
+    const SchematicWrapper* handle,
+    const StoreHandle* store,
+    const char* key,
+    const char* version
+);
+```
+
+On any failure (`NULL` from the open functions, or a negative return from the
+save functions), call `schematic_last_error()` for a human-readable message.
+
+**Ownership:** wrappers returned by `schematic_open` and
+`schematic_open_from_store` are owned by the caller and must be freed with
+`schematic_free`. The `StoreHandle*` passed in is borrowed — it is not consumed
+and remains owned by the caller (free it with `nuc_store_free`).
 
 ### Generic Export
 
@@ -1301,3 +1365,125 @@ void renderconfig_set_isometric(RenderConfig* cfg);
 ```
 
 All setters are null-pointer safe (a null `cfg` is a no-op).
+
+---
+
+## Store
+
+Pluggable blob-store backends behind a uniform key-value API: in-memory, local
+filesystem, S3/MinIO, Redis, and Postgres. Requires the `ffi` Cargo feature
+plus whichever `store-*` feature(s) enable the backends you need.
+
+> **Status codes differ from the rest of this file.** The schematic functions
+> use `0 / -1 / -2` (see [Return Codes](#return-codes)). The store functions
+> use a distinct convention:
+>
+> | Code | Meaning |
+> |------|---------|
+> | `0` | Success |
+> | `1` | Not found — for `get` / `exists`-style queries only |
+> | `-1` | Error — call `nuc_store_last_error()` for a message |
+
+Keys are `/`-delimited UTF-8 paths. `nuc_store_list(prefix)` returns every key
+starting with `prefix`.
+
+### Opaque Type
+
+```c
+// Forward-declared handle. Pass as a pointer; access only via nuc_store_* funcs.
+typedef struct StoreHandle StoreHandle;
+```
+
+### URL Schemes
+
+`nuc_store_open` selects the backend from the URL scheme. Which schemes are
+available depends on the `store-*` Cargo features compiled in.
+
+| URL | Backend |
+|-----|---------|
+| `mem://` | In-memory (volatile) |
+| `file:///abs/path` | Local filesystem rooted at an absolute path |
+| `s3://bucket/prefix` | S3 / MinIO object store |
+| `redis://host:6379/0` | Redis |
+| `postgres://user:pass@host/db` | Postgres |
+
+**Environment variables.** S3/MinIO read `AWS_ACCESS_KEY_ID`,
+`AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_ENDPOINT_URL`, and
+`AWS_S3_FORCE_PATH_STYLE`. Postgres selects its table via `NUC_STORE_PG_TABLE`.
+
+### Lifecycle
+
+```c
+// Open a store from a URL. Returns NULL on error (call nuc_store_last_error()).
+StoreHandle* nuc_store_open(const char* url);
+
+// Free a handle returned by nuc_store_open.
+void nuc_store_free(StoreHandle* handle);
+```
+
+### Operations
+
+```c
+// Fetch the value at key.
+//   Returns 0 found  — sets *out_ptr / *out_len to a heap buffer the caller
+//                      must free with nuc_store_bytes_free(*out_ptr, *out_len).
+//   Returns 1 absent — *out_ptr / *out_len are left untouched.
+//   Returns -1 error.
+int nuc_store_get(const StoreHandle* handle, const char* key,
+                  uint8_t** out_ptr, size_t* out_len);
+
+// Store len bytes at key (overwrites any existing value). Returns 0 / -1.
+int nuc_store_put(const StoreHandle* handle, const char* key,
+                  const uint8_t* data, size_t len);
+
+// Test for existence. Returns 1 yes, 0 no, -1 error.
+int nuc_store_exists(const StoreHandle* handle, const char* key);
+
+// Delete key. Idempotent — deleting an absent key still returns 0. Returns 0 / -1.
+int nuc_store_delete(const StoreHandle* handle, const char* key);
+
+// List keys under prefix as a JSON array string (e.g. ["a/b","a/c"]).
+// Returns NULL on error. Caller must free with nuc_store_string_free().
+char* nuc_store_list(const StoreHandle* handle, const char* prefix);
+
+// Health check — verifies the backend is reachable/usable.
+// Returns 0 usable, -1 otherwise.
+int nuc_store_health(const StoreHandle* handle);
+```
+
+### Error Handling
+
+```c
+// Last error on the current thread, or NULL if there is none.
+// Caller must free with nuc_store_string_free().
+char* nuc_store_last_error(void);
+```
+
+After any function signals an error (`-1`, or `NULL` from `nuc_store_open` /
+`nuc_store_list`), call `nuc_store_last_error()` for a human-readable message.
+The error is thread-local.
+
+### Memory Management
+
+Buffers and strings handed back by the store API have their **own** free
+functions — do **not** use the schematic `free_*` helpers on them.
+
+```c
+// Free a string returned by nuc_store_list / nuc_store_last_error.
+void nuc_store_string_free(char* s);
+
+// Free a byte buffer returned (via out params) by nuc_store_get.
+void nuc_store_bytes_free(uint8_t* ptr, size_t len);
+```
+
+**Ownership summary**
+
+| Function | Returns | Free with |
+|----------|---------|-----------|
+| `nuc_store_open` | `StoreHandle*` (owned) | `nuc_store_free` |
+| `nuc_store_get` | buffer via `*out_ptr` (owned, only when it returns `0`) | `nuc_store_bytes_free` |
+| `nuc_store_list` | `char*` JSON (owned) | `nuc_store_string_free` |
+| `nuc_store_last_error` | `char*` (owned) | `nuc_store_string_free` |
+
+The `const StoreHandle*` passed to `get` / `put` / `exists` / `delete` /
+`list` / `health` is borrowed, not consumed.

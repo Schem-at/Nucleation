@@ -17,6 +17,8 @@ Nucleation provides first-class WebAssembly bindings for use in browsers and Nod
   - [ShapeWrapper](#shapewrapper)
   - [BrushWrapper](#brushwrapper)
   - [WasmBuildingTool](#wasmbuildingtool)
+- [Storage](#storage)
+  - [Store (StoreWrapper)](#store-storewrapper)
 - [Simulation](#simulation-feature-gated) *(feature: `simulation`)*
   - [SimulationOptionsWrapper](#simulationoptionswrapper)
   - [MchprsWorldWrapper](#mchprsworldwrapper)
@@ -457,6 +459,63 @@ Applies a brush to a shape within a schematic.
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `fill` | `static fill(schematic: SchematicWrapper, shape: ShapeWrapper, brush: BrushWrapper) → void` | Fill the shape with the brush pattern in the schematic. |
+
+---
+
+## Storage
+
+### Store (StoreWrapper)
+
+Pluggable byte storage — *where bytes live*, independent of the schematic format. A `Store` is opened from a URL and addressed by `/`-delimited UTF-8 path keys. All errors are thrown as JS exceptions (the error message string).
+
+> **Web = `mem://` only.** On `wasm32` the in-memory backend is the only one available. The filesystem, S3, Redis, and Postgres backends are native-only and compiled out of the WASM build, so in browser/Node-WASM contexts the practical use is `new Store("mem://")`.
+
+#### Constructor
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `new` | `new(url: string) → Store` | Open a store from a URL (e.g. `"mem://"`). Throws on error. |
+| `fromCallbacks` *(static)* | `Store.fromCallbacks(handlers) → Store` | Build a store backed by host-supplied **synchronous** JS functions (host owns IO). `handlers` is an object with `get(key) → Uint8Array \| null`, `put(key, Uint8Array)`, `has(key) → boolean`, `delete(key)`, `list(prefix) → string[]`, `health()`. Thrown JS errors surface as store errors. The WASM analogue of the native `CallbackStore`. |
+
+#### Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `put` | `put(key: string, data: Uint8Array) → void` | Store bytes at a key, overwriting any existing value. |
+| `get` | `get(key: string) → Uint8Array \| undefined` | Read the bytes at a key, or `undefined` if absent. |
+| `has` | `has(key: string) → boolean` | Whether a key exists. |
+| `delete` | `delete(key: string) → void` | Remove a key. Idempotent — no error if the key is absent. |
+| `list` | `list(prefix: string) → string[]` | List all keys beginning with `prefix`. |
+| `health` | `health() → void` | Throws if the store is unusable. |
+
+```js
+import { Store } from "nucleation";
+
+const store = new Store("mem://");
+store.put("schems/base.litematic", bytes);
+const data = store.get("schems/base.litematic"); // Uint8Array | undefined
+store.has("schems/base.litematic");              // true
+store.list("schems/");                            // ["schems/base.litematic"]
+store.delete("schems/base.litematic");            // idempotent
+```
+
+#### Store-backed open / save
+
+`SchematicWrapper` can read and write a `Store` directly, inferring the format from the key's extension. On the web this is the meaningful way to use remote/host storage: it works with `mem://` stores **and** with the `Store.fromCallbacks(...)` JS-callback store (where the host owns IO). The generic `open(uri)` / `save(uri, version)` URI forms only resolve `mem://` on WASM — local filesystem is unavailable — so prefer these explicit store methods.
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `openFromStore` *(static)* | `SchematicWrapper.openFromStore(store: Store, key: string) → SchematicWrapper` | Open a schematic from `store` at `key`. Format inferred from the stored bytes. Throws if the key is absent or unparseable. |
+| `saveToStore` | `saveToStore(store: Store, key: string) → void` | Write this schematic into `store` at `key`. Export format inferred from the key's extension (e.g. `.litematic`, `.schem`). |
+
+```js
+import { SchematicWrapper, Store } from "nucleation";
+
+const store = new Store("mem://"); // or Store.fromCallbacks({ get, put, has, delete: del, list, health })
+
+const schem = SchematicWrapper.openFromStore(store, "schems/base.litematic");
+schem.saveToStore(store, "schems/copy.schem"); // format from extension
+```
 
 ---
 

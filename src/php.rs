@@ -97,6 +97,29 @@ impl NucleationSchematic {
         NucleationSchematic { inner }
     }
 
+    /// Open a schematic from a URI (local path, `file://`, or `s3://bucket/key.schem`).
+    ///
+    /// The format is auto-detected. Remote backends such as `s3://` require the
+    /// corresponding store feature (e.g. `store-s3`) to be enabled at build time;
+    /// local paths and `file://` work with the default build.
+    pub fn open(uri: String) -> PhpResult<NucleationSchematic> {
+        let inner = UniversalSchematic::open(&uri)
+            .map_err(|e| PhpException::default(format!("Failed to open '{}': {}", uri, e)))?;
+        Ok(NucleationSchematic { inner })
+    }
+
+    /// Save this schematic to a URI (local path, `file://`, or `s3://bucket/key.schem`).
+    ///
+    /// The output format is inferred from the URI extension. Remote backends such
+    /// as `s3://` require the corresponding store feature (e.g. `store-s3`) to be
+    /// enabled at build time; local paths and `file://` work with the default build.
+    pub fn save(&self, uri: String) -> PhpResult<()> {
+        self.inner
+            .save(&uri, None)
+            .map_err(|e| PhpException::default(format!("Failed to save '{}': {}", uri, e)))?;
+        Ok(())
+    }
+
     /// Load from binary data (auto-detect format)
     pub fn load_from_data(&mut self, data: String) -> PhpResult<bool> {
         self.inner = load_universal(data.as_bytes())?;

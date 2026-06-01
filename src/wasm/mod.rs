@@ -16,6 +16,7 @@ mod definition_region;
 mod palettes;
 mod schematic;
 mod schematic_builder;
+mod store;
 
 #[cfg(feature = "simulation")]
 mod circuit_builder;
@@ -36,6 +37,7 @@ pub use schematic::{
     debug_json_schematic, debug_schematic, BlockStateWrapper, LazyChunkIterator, SchematicWrapper,
 };
 pub use schematic_builder::SchematicBuilderWrapper;
+pub use store::StoreWrapper;
 
 #[cfg(feature = "simulation")]
 pub use circuit_builder::{CircuitBuilderWrapper, SortStrategyWrapper, StateModeConstants};

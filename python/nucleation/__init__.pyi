@@ -148,6 +148,23 @@ class Cursor:
 
 # ----- Schematic -----------------------------------------------------------
 
+class Store:
+    """Pluggable byte storage keyed by ``/``-delimited paths.
+
+    Backends are selected by URL: ``mem://``, ``file:///path``,
+    ``s3://bucket/prefix``, ``redis://host``, ``postgres://...`` (subject to the
+    ``store-*`` features the extension was built with).
+    """
+
+    @staticmethod
+    def open(url: str) -> "Store": ...
+    def get(self, key: str) -> Optional[bytes]: ...
+    def put(self, key: str, data: bytes) -> None: ...
+    def exists(self, key: str) -> bool: ...
+    def delete(self, key: str) -> None: ...
+    def list(self, prefix: str) -> List[str]: ...
+    def health(self) -> None: ...
+
 class Schematic:
     pack: Optional[ResourcePack]
 
@@ -164,10 +181,14 @@ class Schematic:
     @classmethod
     def open(
         cls,
-        path: Union[str, Path],
+        target: Union[str, Path, "Store"],
+        key: Optional[str] = ...,
         *,
         pack: Optional[ResourcePack] = ...,
-    ) -> "Schematic": ...
+    ) -> "Schematic":
+        """Open from a file path, a store URI (``s3://bucket/key.schem``), or an
+        explicit ``Store`` + key (``Schematic.open(store, "key.schem")``)."""
+        ...
     @classmethod
     def from_template(
         cls,
@@ -222,10 +243,14 @@ class Schematic:
     def signal_strength(self, *args: Any) -> int: ...
     def save(
         self,
-        path: Union[str, Path],
+        target: Union[str, Path, "Store"],
+        key: Optional[str] = ...,
         *,
         format: Optional[str] = ...,
-    ) -> None: ...
+    ) -> None:
+        """Save to a file path, a store URI (``s3://bucket/key.schem``), or an
+        explicit ``Store`` + key (``schem.save(store, "key.schem")``)."""
+        ...
     def render(
         self,
         path: Union[str, Path],

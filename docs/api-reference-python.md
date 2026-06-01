@@ -278,6 +278,129 @@ schem.render("solid.png", projection=Projection.Perspective,
 
 ---
 
+## Store
+
+Nucleation can read and write schematics directly to remote storage. The
+recommended path is the transparent `Schematic.open` / `schem.save` API below —
+the raw `Store` class is an escape hatch for when you need arbitrary bytes
+rather than schematics.
+
+### Transparent remote open/save
+
+`Schematic.open` and `schem.save` accept either a scheme'd URI or an explicit
+`(store, key)` pair, with the exact same call shape you already use for local
+files:
+
+```python
+from nucleation import Schematic, Store
+
+# local file (unchanged)
+schem = Schematic.open("build.schem")
+schem.save("build.litematic")
+
+# transparent remote: a scheme'd URI, no Store object needed
+schem = Schematic.open("s3://my-bucket/builds/adder.schem")
+schem.save("s3://my-bucket/out/adder.schem")
+schem.save("file:///tmp/adder.litematic")   # file:// = local path
+
+# explicit Store + key: works for ANY backend (incl. redis/postgres)
+# and reuses a single connection
+store = Store.open("redis://localhost:6379")
+schem = Schematic.open(store, "builds/adder.schem")
+schem.save(store, "out/adder.schem")
+```
+
+| Form | Signature | Notes |
+|------|-----------|-------|
+| URI | `Schematic.open(uri: str)` / `schem.save(uri: str, format=None)` | `uri` is a scheme'd path-like URI such as `s3://bucket/key` or `file:///abs/path`. |
+| Store + key | `Schematic.open(store: Store, key: str)` / `schem.save(store: Store, key: str, format=None)` | Reuses one connection; works for every backend, including `redis://` and `postgres://`. |
+
+Rules:
+
+- **Format inference.** The format is read from the key/path extension
+  (`.schem`, `.litematic`, `.mcstructure`). Pass `format="litematic"` (etc.) to
+  `save` to override it.
+- **Single-string restriction.** The single-string URI form works only for
+  path-like backends — `s3://bucket/key` and `file://` (→ local). A
+  `redis://` or `postgres://` single-string raises `ValueError`, because the
+  URL path of those schemes is the database/connection target, leaving no slot
+  for a key. Open them with an explicit store instead:
+  `Schematic.open(Store.open(url), key)`.
+- **Feature builds.** Which backends are reachable depends on the `store-*`
+  Cargo features the extension was built with. The default wheel ships
+  `mem://` + `file://`; for S3/Redis/Postgres rebuild it:
+
+  ```bash
+  maturin develop --features python,store-s3,store-redis,store-pg
+  ```
+
+### Store (raw byte access)
+
+`Store` is a pluggable byte store — "where bytes live", separate from any
+schematic format. Reach for it when you want raw bytes rather than schematics
+(PNG renders, arbitrary artifacts), or to drive a backend directly. Keys are
+`/`-delimited UTF-8 paths; `list(prefix)` returns every key that begins with
+`prefix`. The concrete backend is chosen by the URL passed to `Store.open`.
+
+```python
+from nucleation import Store
+
+s = Store.open("file:///tmp/cache")
+
+s.put("regions/r.0.0.bin", b"...bytes...")
+data = s.get("regions/r.0.0.bin")     # bytes, or None if absent
+if s.exists("regions/r.0.0.bin"):
+    keys = s.list("regions/")         # ["regions/r.0.0.bin", ...]
+s.delete("regions/r.0.0.bin")         # idempotent — no error if absent
+s.health()                            # raises if the store is unusable
+```
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `open` | `@staticmethod open(url: str) -> Store` | Open a store for the backend named by `url`'s scheme (see table below). |
+| `get` | `get(key: str) -> Optional[bytes]` | Read the bytes at `key`, or `None` if no such key exists. Non-`NotFound` failures raise `IOError`. |
+| `put` | `put(key: str, data: bytes) -> None` | Write `data` at `key`, overwriting any existing value. |
+| `exists` | `exists(key: str) -> bool` | Whether `key` is present. |
+| `list` | `list(prefix: str) -> list[str]` | All keys that start with `prefix` (pass `""` for every key). |
+| `delete` | `delete(key: str) -> None` | Remove `key`. Idempotent — deleting an absent key is a no-op. |
+| `health` | `health() -> None` | Probe the backend; raises if the store is unreachable or unusable. |
+
+#### URL schemes
+
+| Scheme | Example | Feature |
+|--------|---------|---------|
+| `mem://` | `mem://` | always available |
+| `file://` | `file:///abs/path` | default |
+| `s3://` | `s3://bucket/prefix` | `store-s3` |
+| `redis://` | `redis://host:6379/0` | `store-redis` |
+| `postgres://` | `postgres://user:pass@host/db` | `store-pg` |
+
+Scheme availability depends on which `store-*` Cargo features the wheel was
+built with. The default wheel ships `mem://` + `file://` only. To reach
+S3/Redis/Postgres from Python, rebuild the extension with the matching features:
+
+```bash
+maturin develop --features python,store-s3,store-redis,store-pg
+```
+
+S3/MinIO backends honor the standard environment variables
+`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_ENDPOINT_URL`,
+and `AWS_S3_FORCE_PATH_STYLE`. The Postgres table name can be set with
+`NUC_STORE_PG_TABLE`.
+
+#### Error mapping
+
+| Condition | Python exception |
+|-----------|------------------|
+| Key not found (where surfaced as an error) | `KeyError` |
+| Any other backend failure | `IOError` |
+
+Note that `get` returns `None` for a missing key rather than raising; the
+`NotFound → KeyError` mapping applies to operations that surface a missing key
+as an error.
+
+---
+
 ## Table of Contents
 
 - [Core](#core)

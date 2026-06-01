@@ -18,6 +18,9 @@ pub mod nbt;
 mod print_utils;
 mod region;
 pub mod schematic_builder;
+pub mod selection;
+pub mod store;
+pub mod store_io;
 mod transforms;
 mod universal_schematic;
 pub mod utils;
@@ -42,6 +45,7 @@ pub mod wasm;
 
 // Public re-exports
 pub use block_state::BlockState;
+pub use bounding_box::BoundingBox;
 pub use entity::Entity;
 pub use formats::{litematic, schematic};
 pub use print_utils::{format_json_schematic, format_schematic};
@@ -49,6 +53,11 @@ pub use region::Region;
 pub use schematic_builder::{
     palettes, IoMarker, IoType as BuilderIoType, PaletteEntry, SchematicBuilder,
 };
+pub use selection::{
+    connected_components, connected_components_collect, flood, AndMask, BlocklistMask, Component,
+    Connectivity, Continue, Limits, Mask, NotAirMask, NotMask, OrMask, StopReason, VisitedSet,
+};
+pub use store::{MemStore, Store, StoreError};
 pub use universal_schematic::UniversalSchematic;
 
 // Re-export WASM types when building with WASM feature

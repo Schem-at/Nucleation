@@ -493,11 +493,43 @@ class Cursor:
 
 _LOAD_EXTENSIONS = (".schem", ".litematic", ".nbt", ".schematic", ".mcstructure")
 
+# Store URI schemes routed through the Store layer. `file://` and bare paths are
+# treated as the local filesystem.
+_STORE_SCHEMES = ("s3://", "redis://", "rediss://", "postgres://", "postgresql://", "mem://")
 
-def _load_into(native_schem: Any, path: Union[str, Path]) -> None:
-    p = Path(path)
-    data = p.read_bytes()
-    suffix = p.suffix.lower()
+
+def _is_store_uri(target: Any) -> bool:
+    return isinstance(target, str) and target.startswith(_STORE_SCHEMES)
+
+
+def _normalize_local(target: str) -> str:
+    """Strip a ``file://`` scheme to a local path; leave bare paths untouched."""
+    return target[len("file://"):] if target.startswith("file://") else target
+
+
+def _split_store_uri(uri: str) -> "tuple[Any, str]":
+    """Split a single-string store URI into ``(Store, key)``.
+
+    Only path-like backends (``s3://``) can be expressed as one string. For
+    ``redis``/``postgres`` (whose URL path is the DB) open with an explicit
+    store instead: ``Schematic.open(Store.open(url), key)``.
+    """
+    if uri.startswith("s3://"):
+        bucket, _, key = uri[len("s3://"):].partition("/")
+        if not key:
+            raise ValueError(
+                f"S3 URI needs an object key, e.g. 's3://{bucket}/path/build.schem'"
+            )
+        return _native.Store.open(f"s3://{bucket}"), key
+    scheme = uri.split("://", 1)[0]
+    raise ValueError(
+        f"{scheme}:// URIs can't carry an object key in one string; open with an "
+        "explicit store: Schematic.open(Store.open(url), key)"
+    )
+
+
+def _dispatch_load(native_schem: Any, data: bytes, suffix: str) -> None:
+    suffix = suffix.lower()
     if suffix == ".litematic":
         native_schem.from_litematic(data)
     elif suffix in (".schem", ".schematic"):
@@ -508,20 +540,38 @@ def _load_into(native_schem: Any, path: Union[str, Path]) -> None:
         native_schem.from_data(data)
 
 
-def _save_to(native_schem: Any, path: Union[str, Path], fmt: Optional[str]) -> None:
-    p = Path(path)
-    suffix = (fmt or p.suffix.lstrip(".")).lower()
+def _serialize(native_schem: Any, suffix: str, fmt: Optional[str], where: Any) -> bytes:
+    suffix = (fmt or suffix.lstrip(".")).lower()
     if suffix == "litematic":
-        data = native_schem.to_litematic()
-    elif suffix in ("schem", "schematic"):
-        data = native_schem.to_schematic()
-    elif suffix == "mcstructure":
-        data = native_schem.to_mcstructure()
-    else:
-        raise ValueError(
-            f"Cannot infer save format from {path!r}; pass format='litematic'/'schem'/'mcstructure'"
-        )
-    p.write_bytes(data)
+        return native_schem.to_litematic()
+    if suffix in ("schem", "schematic"):
+        return native_schem.to_schematic()
+    if suffix == "mcstructure":
+        return native_schem.to_mcstructure()
+    raise ValueError(
+        f"Cannot infer save format from {where!r}; pass format='litematic'/'schem'/'mcstructure'"
+    )
+
+
+def _load_into(native_schem: Any, path: Union[str, Path]) -> None:
+    p = Path(_normalize_local(str(path)))
+    _dispatch_load(native_schem, p.read_bytes(), p.suffix)
+
+
+def _save_to(native_schem: Any, path: Union[str, Path], fmt: Optional[str]) -> None:
+    p = Path(_normalize_local(str(path)))
+    p.write_bytes(_serialize(native_schem, p.suffix, fmt, path))
+
+
+def _load_from_store(native_schem: Any, store: Any, key: str) -> None:
+    data = store.get(key)
+    if data is None:
+        raise FileNotFoundError(f"key not found in store: {key!r}")
+    _dispatch_load(native_schem, bytes(data), Path(key).suffix)
+
+
+def _save_to_store(native_schem: Any, store: Any, key: str, fmt: Optional[str]) -> None:
+    store.put(key, bytes(_serialize(native_schem, Path(key).suffix, fmt, key)))
 
 
 class Schematic(_native.Schematic):
@@ -574,10 +624,35 @@ class Schematic(_native.Schematic):
         return cls(name, pack=pack)
 
     @classmethod
-    def open(cls, path: Union[str, Path], *, pack: Optional[Any] = None) -> "Schematic":
-        """Load a schematic file. Format is inferred from the extension."""
-        s = cls(Path(path).stem, pack=pack)
-        _load_into(s, path)
+    def open(
+        cls,
+        target: Union[str, Path, Any],
+        key: Optional[str] = None,
+        *,
+        pack: Optional[Any] = None,
+    ) -> "Schematic":
+        """Load a schematic from a file, a store URI, or an explicit store.
+
+        - ``Schematic.open("build.schem")`` — local file
+        - ``Schematic.open("s3://bucket/build.schem")`` — transparent remote store
+        - ``Schematic.open(store, "build.schem")`` — explicit ``Store`` + key
+          (works for any backend, incl. ``redis``/``postgres``)
+
+        Format is inferred from the key/path extension.
+        """
+        if isinstance(target, _native.Store):
+            if key is None:
+                raise TypeError("Schematic.open(store, key): a key string is required")
+            s = cls(Path(key).stem, pack=pack)
+            _load_from_store(s, target, key)
+            return s
+        if _is_store_uri(target):
+            store, store_key = _split_store_uri(str(target))
+            s = cls(Path(store_key).stem, pack=pack)
+            _load_from_store(s, store, store_key)
+            return s
+        s = cls(Path(_normalize_local(str(target))).stem, pack=pack)
+        _load_into(s, target)
         return s
 
     @classmethod
@@ -878,10 +953,31 @@ class Schematic(_native.Schematic):
 
     # ----------------------------------------------------------------- save
 
-    def save(self, path: Union[str, Path], *, format: Optional[str] = None) -> None:
-        """Save to a file. Format inferred from extension unless overridden."""
+    def save(
+        self,
+        target: Union[str, Path, Any],
+        key: Optional[str] = None,
+        *,
+        format: Optional[str] = None,
+    ) -> None:
+        """Save to a file, a store URI, or an explicit store.
+
+        - ``schem.save("build.litematic")`` — local file
+        - ``schem.save("s3://bucket/build.schem")`` — transparent remote store
+        - ``schem.save(store, "build.schem")`` — explicit ``Store`` + key
+
+        Format is inferred from the key/path extension unless ``format`` is given.
+        """
         self._ensure_built()
-        _save_to(self, path, format)
+        if isinstance(target, _native.Store):
+            if key is None:
+                raise TypeError("save(store, key): a key string is required")
+            _save_to_store(self, target, key, format)
+        elif _is_store_uri(target):
+            store, store_key = _split_store_uri(str(target))
+            _save_to_store(self, store, store_key, format)
+        else:
+            _save_to(self, target, format)
 
     # ----------------------------------------------------------------- render
 
@@ -1085,6 +1181,10 @@ class SchematicBuilder:
         return s
 
 
+# Re-export the native Store class (pluggable byte storage) at the top level so
+# `from nucleation import Store` works and `Schematic.open(store, key)` is typed.
+Store = _native.Store
+
 __all__ = [
     "Block",
     "BlockLike",
@@ -1101,6 +1201,7 @@ __all__ = [
     "Schematic",
     "SchematicBuilder",
     "Shape",
+    "Store",
     "UseBlock",
     "_native",
     "chest",

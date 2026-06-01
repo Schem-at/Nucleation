@@ -15,8 +15,19 @@ exclude = ["web/", "examples/", "test-schematics/"]
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = []
+default = ["store-fs"]
 ffi = []
+
+# Storage backends (the `store` module). `mem` is always available; the rest
+# are feature-gated so you only pull the deps you enable. Networked backends
+# wrap async SDKs behind an internal `block_on` so the trait stays sync.
+store-fs = []
+store-s3 = ["dep:aws-sdk-s3", "dep:tokio", "dep:futures-util"]
+store-redis = ["dep:redis", "dep:tokio"]
+store-pg = ["dep:tokio-postgres", "dep:tokio"]
+store-callback = []
+# Exposes the backend-agnostic contract suite + testcontainers for integration tests.
+store-testkit = ["dep:testcontainers-modules"]
 serde = []
 wasm = [
     "wasm-bindgen",
@@ -87,6 +98,21 @@ rquickjs = { version = "0.9", features = ["macro", "classes", "properties"], opt
 bincode = "1"
 bytemuck = { version = "1.23.1", features = ["derive"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }
+
+# Storage backend dependencies - optional, behind store-* features.
+# Networked backends use async SDKs wrapped with an internal tokio runtime.
+tokio = { version = "1", features = ["rt-multi-thread", "net", "time"], optional = true }
+aws-sdk-s3 = { version = "1", optional = true }
+futures-util = { version = "0.3", optional = true }
+redis = { version = "0.27", features = ["tokio-comp"], optional = true }
+tokio-postgres = { version = "0.7", optional = true }
+# Test-only (behind store-testkit): spin real backends in integration tests.
+testcontainers-modules = { version = "0.11", features = [
+    "minio",
+    "redis",
+    "postgres",
+    "blocking",
+], optional = true }
 
 # Meshing dependencies - optional
 schematic-mesher = { git = "https://github.com/Schem-at/Schematic-Mesher.git", branch = "feature/mesh-output-api", optional = true }
@@ -176,6 +202,11 @@ required-features = ["meshing"]
 [[example]]
 name = "entity_mesh_test"
 required-features = ["meshing"]
+
+# Store backends against real services via testcontainers (docker required).
+[[test]]
+name = "store_testcontainers"
+required-features = ["store-s3", "store-redis", "store-pg", "store-testkit"]
 
 [profile.bench]
 debug = true

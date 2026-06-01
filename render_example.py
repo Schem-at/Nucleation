@@ -1,16 +1,14 @@
-from nucleation import Schematic, ResourcePack, RenderConfig, Projection
+from nucleation import Schematic, ResourcePack, RenderConfig
 
+# Textures come from a Minecraft resource pack; the schematic is any
+# supported format (.schem, .litematic, .nbt, .mcstructure, ...).
 pack = ResourcePack.from_file("pack.zip")
-schem = Schematic.open("f-117-nighthawk.litematic")
+schem = Schematic.open("build.schem")
 
-# Isometric framing with a fully transparent background.
-cfg = RenderConfig.isometric(width=1024, height=768)
-cfg.zoom = 0.85                          # tighten framing (smaller zoom => bigger object)
-cfg.set_background(0.0, 0.0, 0.0, 0.0)   # transparent PNG (alpha 0)
+# Isometric (orthographic at yaw 45 / pitch 35.26) with a transparent
+# background. Set an opaque colour instead for a solid backdrop, e.g.
+# config.set_background(0.05, 0.05, 0.08, 1.0).
+config = RenderConfig.isometric(width=1024, height=1024)
+config.set_background(0.0, 0.0, 0.0, 0.0)
 
-# render_to_file(pack, path, config). For a perspective view with a solid
-# background instead:
-#   cfg = RenderConfig(width=1024, height=768, fov=28.0,
-#                      background=(0.05, 0.05, 0.08, 1.0),
-#                      projection=Projection.Perspective)
-schem.render_to_file(pack, "night.png", cfg)
+schem.render("build.png", config=config, pack=pack)

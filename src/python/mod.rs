@@ -17,6 +17,7 @@ mod building;
 mod definition_region;
 mod schematic;
 mod schematic_builder;
+mod store;
 
 #[cfg(feature = "simulation")]
 mod circuit_builder;
@@ -33,6 +34,7 @@ mod typed_executor;
 pub use definition_region::PyDefinitionRegion;
 pub use schematic::{PyBlockState, PySchematic};
 pub use schematic_builder::PySchematicBuilder;
+pub use store::PyStore;
 
 #[cfg(feature = "simulation")]
 pub use circuit_builder::{PyCircuitBuilder, PySortStrategy};
@@ -58,6 +60,7 @@ pub fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<building::PyShape>()?;
     m.add_class::<building::PyBrush>()?;
     m.add_class::<PySchematicBuilder>()?;
+    m.add_class::<PyStore>()?;
     m.add_function(wrap_pyfunction!(debug_schematic, m)?)?;
     m.add_function(wrap_pyfunction!(debug_json_schematic, m)?)?;
     m.add_function(wrap_pyfunction!(load_schematic, m)?)?;

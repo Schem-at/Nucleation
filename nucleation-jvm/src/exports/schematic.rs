@@ -27,6 +27,8 @@ pub fn register(env: &mut JNIEnv) -> jni::errors::Result<()> {
     let class = env.find_class(NATIVE_CLASS)?;
     let methods: &[NativeMethod] = &[
         nm("nSchematicCreate", "(Ljava/lang/String;)J", n_create as *mut _),
+        nm("nSchematicOpen", "(Ljava/lang/String;)J", n_open as *mut _),
+        nm("nSchematicSave", "(JLjava/lang/String;Ljava/lang/String;)V", n_save as *mut _),
         nm("nSchematicFree", "(J)V", n_free as *mut _),
         nm("nSchematicGetName", "(J)Ljava/lang/String;", n_get_name as *mut _),
         nm("nSchematicSetName", "(JLjava/lang/String;)V", n_set_name as *mut _),
@@ -84,6 +86,44 @@ unsafe extern "system" fn n_create<'l>(
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| "Untitled".to_string());
         Ok(to_handle(UniversalSchematic::new(name)))
+    })
+}
+
+/// Open a schematic from a store URI — a local path, `file://…`, or (when the
+/// cdylib is built with the `store-s3` feature) `s3://bucket/key.schem`. The
+/// format is auto-detected from the bytes/extension by the core. Returns a new
+/// handle, mirroring the static `n_create` factory.
+unsafe extern "system" fn n_open<'l>(
+    mut env: JNIEnv<'l>,
+    _class: JClass<'l>,
+    uri: JString<'l>,
+) -> jlong {
+    with_jni_context(&mut env, 0, |env| {
+        let uri = jstring_to_string(env, &uri)?;
+        let schematic = UniversalSchematic::open(&uri)
+            .map_err(|e| JvmError::Parse(format!("open '{uri}': {e}")))?;
+        Ok(to_handle(schematic))
+    })
+}
+
+/// Save this schematic to a store URI — a local path, `file://…`, or (with the
+/// `store-s3` feature) `s3://bucket/key.schem`. The output format is chosen from
+/// the URI's file extension. `version` may be null to use the default data
+/// version for the target format.
+unsafe extern "system" fn n_save<'l>(
+    mut env: JNIEnv<'l>,
+    _class: JClass<'l>,
+    handle: jlong,
+    uri: JString<'l>,
+    version: JString<'l>,
+) {
+    with_jni_context(&mut env, (), |env| {
+        let uri = jstring_to_string(env, &uri)?;
+        let version = jstring_opt_to_string(env, &version)?;
+        let s = as_ref::<UniversalSchematic>(handle);
+        s.save(&uri, version.as_deref())
+            .map_err(|e| JvmError::Generic(format!("save '{uri}': {e}")))?;
+        Ok(())
     })
 }
 

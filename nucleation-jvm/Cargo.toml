@@ -15,6 +15,10 @@ crate-type = ["cdylib"]
 default = ["meshing"]
 simulation = ["nucleation/simulation"]
 meshing = ["nucleation/meshing"]
+# Store-backed open()/save() support local paths and `file://` out of the box
+# (the core's default `store-fs` feature). Enable `store-s3` to additionally
+# resolve `s3://bucket/key.schem` URIs — pulls in aws-sdk-s3 + tokio.
+store-s3 = ["nucleation/store-s3"]
 
 [dependencies]
 nucleation = { path = ".." }

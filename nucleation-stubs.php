@@ -81,6 +81,32 @@ namespace Nucleation {
         public function __construct(?string $name = null) {}
 
         /**
+         * Open a schematic from a URI (local path, file://, or s3://bucket/key.schem).
+         *
+         * The format is auto-detected. Remote backends such as s3:// require the
+         * corresponding store feature (e.g. store-s3) to be enabled at build time;
+         * local paths and file:// work with the default build.
+         *
+         * @param string $uri Local path, file:// URI, or s3:// URI
+         * @return \Nucleation\Schematic Opened schematic
+         * @throws Exception On read or parse failure
+         */
+        public static function open(string $uri): \Nucleation\Schematic {}
+
+        /**
+         * Save this schematic to a URI (local path, file://, or s3://bucket/key.schem).
+         *
+         * The output format is inferred from the URI extension. Remote backends such
+         * as s3:// require the corresponding store feature (e.g. store-s3) to be
+         * enabled at build time; local paths and file:// work with the default build.
+         *
+         * @param string $uri Local path, file:// URI, or s3:// URI
+         * @return void
+         * @throws Exception On save failure
+         */
+        public function save(string $uri): void {}
+
+        /**
          * Load from binary data (auto-detect format)
          *
          * @param string $data Binary schematic data

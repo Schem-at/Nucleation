@@ -48,4 +48,5 @@ experiments/
 
 # Pytest temp directories + ad-hoc world-IO test outputs at repo root
 /pytest-of-*/
-/nucleation_test_*/
+/nucleation_test_*/render_work/
+/render_work

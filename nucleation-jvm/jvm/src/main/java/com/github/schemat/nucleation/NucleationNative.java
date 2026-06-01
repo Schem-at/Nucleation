@@ -28,6 +28,8 @@ final class NucleationNative {
 
     // ── Schematic ───────────────────────────────────────────────────────────
     static native long    nSchematicCreate(String name);
+    static native long    nSchematicOpen(String uri);
+    static native void    nSchematicSave(long handle, String uri, String version);
     static native void    nSchematicFree(long handle);
     static native long    nSchematicCopy(long handle);
     static native String  nSchematicGetName(long handle);

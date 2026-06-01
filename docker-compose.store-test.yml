@@ -1,0 +1,35 @@
+# Local services for exercising the networked Store backends' contract suites.
+#
+#   docker compose -f docker-compose.store-test.yml up -d
+#   cargo test --features store-s3,store-redis,store-pg store::
+#   docker compose -f docker-compose.store-test.yml down
+#
+# Each backend's test skips itself if its service isn't reachable (health-gated),
+# so these are only needed to actually run the networked suites.
+services:
+  minio:
+    image: minio/minio
+    command: server /data
+    ports:
+      - "9000:9000"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  postgres:
+    image: postgres:16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nucleation

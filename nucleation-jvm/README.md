@@ -55,6 +55,33 @@ try (Schematic schem = new Schematic("dome");
 }
 ```
 
+### Store-backed open / save (URIs)
+
+`Schematic.open(uri)` and `schem.save(uri)` resolve a store URI and
+auto-detect the format. The URI may be a local path, a `file://…` URL, or an
+`s3://bucket/key.schem` URL. On save, the output format is chosen from the
+URI's file extension; pass an optional data `version` to override it.
+
+```java
+import com.github.schemat.nucleation.*;
+
+// Open by path, file://, or s3:// — format auto-detected.
+try (Schematic s = Schematic.open("builds/castle.litematic")) {
+    s.setBlock(0, 64, 0, "minecraft:beacon");
+
+    // Format from extension; version null = format default.
+    s.save("out/castle.schem");
+    s.save("out/castle.schem", "3700");   // override data version
+}
+```
+
+Local paths and `file://` work with the default build. `s3://` URIs require
+building the cdylib with the `store-s3` Cargo feature
+(`--features store-s3`), which pulls in `aws-sdk-s3` + `tokio`; credentials
+come from the standard AWS environment. Single-string `redis://`, `postgres://`
+and `mem://` URIs are rejected by the core and surface as a
+`SchematicParseException` / `NucleationException`.
+
 ### Export GLB meshes
 
 ```java

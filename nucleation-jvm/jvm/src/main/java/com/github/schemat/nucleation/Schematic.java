@@ -75,6 +75,25 @@ public final class Schematic implements AutoCloseable, Iterable<Block> {
         return s;
     }
 
+    /**
+     * Open a schematic from a store URI with format auto-detection.
+     *
+     * <p>The {@code uri} may be a local filesystem path, a {@code file://…}
+     * URL, or — when the loaded cdylib was built with the {@code store-s3}
+     * feature — an {@code s3://bucket/key.schem} URL. Local paths and
+     * {@code file://} work with the default build. The format is detected from
+     * the content/extension by the core.
+     *
+     * @throws SchematicParseException if the URI cannot be resolved or the
+     *         content cannot be parsed.
+     */
+    public static Schematic open(String uri) {
+        Objects.requireNonNull(uri, "uri");
+        long h = NucleationNative.nSchematicOpen(uri);
+        if (h == 0) throw new SchematicParseException("open failed: " + uri);
+        return new Schematic(h);
+    }
+
     public static Schematic fromLitematic(byte[] data) { return load(data, NucleationNative::nSchematicFromLitematic, "litematic"); }
     public static Schematic fromSchematic(byte[] data) { return load(data, NucleationNative::nSchematicFromSchematic, "schematic"); }
     public static Schematic fromMcStructure(byte[] data) { return load(data, NucleationNative::nSchematicFromMcStructure, "mcstructure"); }
@@ -89,6 +108,31 @@ public final class Schematic implements AutoCloseable, Iterable<Block> {
     }
 
     // ── Save ────────────────────────────────────────────────────────────────
+
+    /**
+     * Save this schematic to a store URI. The output format is chosen from the
+     * URI's file extension (e.g. {@code .litematic}, {@code .schem},
+     * {@code .mcstructure}).
+     *
+     * <p>The {@code uri} may be a local filesystem path, a {@code file://…}
+     * URL, or — when the loaded cdylib was built with the {@code store-s3}
+     * feature — an {@code s3://bucket/key.schem} URL. Local paths and
+     * {@code file://} work with the default build.
+     */
+    public void save(String uri) { save(uri, null); }
+
+    /**
+     * Save this schematic to a store URI, overriding the Minecraft data version
+     * written into the output. Pass {@code null} for {@code version} to use the
+     * target format's default.
+     *
+     * @see #save(String)
+     */
+    public void save(String uri, String version) {
+        checkOpen();
+        Objects.requireNonNull(uri, "uri");
+        NucleationNative.nSchematicSave(handle, uri, version);
+    }
 
     public byte[] toLitematic()   { checkOpen(); return NucleationNative.nSchematicToLitematic(handle); }
     public byte[] toSchematic()   { checkOpen(); return NucleationNative.nSchematicToSchematic(handle); }
