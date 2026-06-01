@@ -48,6 +48,16 @@ impl Store for MemStore {
         Ok(self.read()?.contains_key(key))
     }
 
+    fn put_if_absent(&self, key: &str, bytes: &[u8]) -> Result<bool> {
+        let mut map = self.write()?;
+        if map.contains_key(key) {
+            Ok(false)
+        } else {
+            map.insert(key.to_string(), bytes.to_vec());
+            Ok(true)
+        }
+    }
+
     fn delete(&self, key: &str) -> Result<()> {
         self.write()?.remove(key);
         Ok(())

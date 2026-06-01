@@ -42,3 +42,65 @@ pub fn rotated_y(src: &UniversalSchematic, degrees: i32) -> UniversalSchematic {
     }
     s
 }
+
+/// Apply `k` deterministic edits (alternating add / remove / change) to a copy.
+/// Returns (edited schematic, exact counts (adds, removes, changes)).
+pub fn edited(src: &UniversalSchematic, k: usize) -> (UniversalSchematic, (usize, usize, usize)) {
+    let mut s = UniversalSchematic::new("gen".to_string());
+    // Only real (non-air) blocks are edit targets — `iter_blocks` includes the
+    // region's air-padding cells, which must not be treated as build cells.
+    let cells: Vec<(i32, i32, i32)> = src
+        .iter_blocks()
+        .filter(|(_, b)| b.get_name() != "minecraft:air")
+        .map(|(p, _)| (p.x, p.y, p.z))
+        .collect();
+    for (p, b) in src.iter_blocks() {
+        s.set_block(p.x, p.y, p.z, b);
+    }
+    let air = BlockState::new("minecraft:air");
+    let other = BlockState::new("minecraft:glass");
+    let (mut adds, mut removes, mut changes) = (0, 0, 0);
+    let max_x = cells.iter().map(|c| c.0).max().unwrap_or(0);
+    for i in 0..k {
+        match i % 3 {
+            0 => {
+                s.set_block(max_x + 2 + i as i32, 0, 0, &other);
+                adds += 1;
+            }
+            1 => {
+                if let Some(c) = cells.get(i) {
+                    s.set_block(c.0, c.1, c.2, &air);
+                    removes += 1;
+                }
+            }
+            _ => {
+                if let Some(c) = cells.get(i) {
+                    // Distinct target per change so they don't look like one
+                    // consistent palette swap (which the diff would collapse).
+                    let blk = if changes % 2 == 0 {
+                        BlockState::new("minecraft:glass")
+                    } else {
+                        BlockState::new("minecraft:sand")
+                    };
+                    s.set_block(c.0, c.1, c.2, &blk);
+                    changes += 1;
+                }
+            }
+        }
+    }
+    (s, (adds, removes, changes))
+}
+
+/// Replace every block named `from` with `to` (a global palette swap).
+pub fn repalette(src: &UniversalSchematic, from: &str, to: &str) -> UniversalSchematic {
+    let mut s = UniversalSchematic::new("gen".to_string());
+    let repl = BlockState::new(to);
+    for (p, b) in src.iter_blocks() {
+        if b.get_name() == from {
+            s.set_block(p.x, p.y, p.z, &repl);
+        } else {
+            s.set_block(p.x, p.y, p.z, b);
+        }
+    }
+    s
+}

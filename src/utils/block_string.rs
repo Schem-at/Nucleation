@@ -206,7 +206,7 @@ fn extract_balanced_substring(s: &str, open: char, close: char) -> Option<&str> 
     let mut depth = 0;
     let mut start = None;
 
-    for (i, c) in s.chars().enumerate() {
+    for (i, c) in s.char_indices() {
         match c {
             c if c == open => {
                 if depth == 0 {

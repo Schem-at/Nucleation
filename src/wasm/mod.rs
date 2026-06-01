@@ -13,6 +13,8 @@
 
 mod building;
 mod definition_region;
+mod diff;
+mod fingerprint;
 mod palettes;
 mod schematic;
 mod schematic_builder;
@@ -32,6 +34,7 @@ mod typed_executor;
 // Re-export all public types to maintain the same JS API
 pub use building::{BrushWrapper, ShapeWrapper, WasmBuildingTool};
 pub use definition_region::DefinitionRegionWrapper;
+pub use diff::DiffWrapper;
 pub use palettes::PaletteManager;
 pub use schematic::{
     debug_json_schematic, debug_schematic, BlockStateWrapper, LazyChunkIterator, SchematicWrapper,

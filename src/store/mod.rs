@@ -89,6 +89,50 @@ pub trait Store: Send + Sync {
     /// Cheap reachability/credentials check. `Ok(())` means usable.
     fn health(&self) -> Result<()>;
 
+    /// Atomically write `bytes` at `key` only if no object exists there.
+    /// Returns `true` if it was written, `false` if the key already existed.
+    ///
+    /// The default is a non-atomic `exists`-then-`put`, safe only without
+    /// concurrent writers. Networked backends override it with a genuinely
+    /// atomic operation (S3 `If-None-Match`, Redis `SET NX`, Postgres
+    /// `ON CONFLICT DO NOTHING`).
+    fn put_if_absent(&self, key: &str, bytes: &[u8]) -> Result<bool> {
+        if self.exists(key)? {
+            Ok(false)
+        } else {
+            self.put(key, bytes)?;
+            Ok(true)
+        }
+    }
+
+    /// A keyset page of keys under `prefix`, sorted ascending, starting strictly
+    /// after `after` (exclusive), at most `limit` keys. Returns the page plus a
+    /// cursor to pass as the next `after` when more keys may remain (`None` once
+    /// exhausted). `limit == 0` yields an empty page.
+    ///
+    /// The default lists everything and slices in memory; S3 and Postgres
+    /// override it with native keyset pagination (`start-after` / `key > $after`).
+    fn list_paginated(
+        &self,
+        prefix: &str,
+        after: Option<&str>,
+        limit: usize,
+    ) -> Result<(Vec<String>, Option<String>)> {
+        let mut all = self.list(prefix)?;
+        all.sort();
+        let start = match after {
+            Some(a) => all.partition_point(|k| k.as_str() <= a),
+            None => 0,
+        };
+        let page: Vec<String> = all.into_iter().skip(start).take(limit).collect();
+        let next = if limit > 0 && page.len() == limit {
+            page.last().cloned()
+        } else {
+            None
+        };
+        Ok((page, next))
+    }
+
     /// Streaming read of `key`. The default buffers via [`Store::get`];
     /// backends with native streaming may override.
     fn reader(&self, key: &str) -> Result<Box<dyn Read + '_>> {
@@ -147,8 +191,54 @@ impl<S: Store + ?Sized> Write for BufferingWriter<'_, S> {
 impl<S: Store + ?Sized> Drop for BufferingWriter<'_, S> {
     fn drop(&mut self) {
         if !self.committed {
-            let _ = self.commit();
+            if let Err(e) = self.commit() {
+                // `Drop` can't return a `Result`, so a commit-on-drop failure
+                // would otherwise be silent data loss. Make it loud, and trip in
+                // debug builds — callers who need to handle errors should
+                // `flush()` explicitly before dropping the writer.
+                eprintln!(
+                    "nucleation::store: writer for key {:?} failed to commit on drop \
+                     ({e}); data was NOT persisted. Call flush() to handle this error.",
+                    self.key
+                );
+                debug_assert!(false, "store writer failed to commit on drop: {e}");
+            }
         }
+    }
+}
+
+/// Drive a future to completion, blocking the current thread.
+///
+/// Safe to call from *within* a Tokio runtime: if it detects an active runtime
+/// it offloads to a scoped thread, so `Runtime::block_on` never panics with
+/// "Cannot start a runtime from within a runtime". Used by the async-SDK
+/// backends (`s3`/`redis`/`pg`) to present a sync `Store` API.
+#[cfg(any(feature = "store-s3", feature = "store-redis", feature = "store-pg"))]
+pub(crate) fn block_on<F>(rt: &tokio::runtime::Runtime, fut: F) -> F::Output
+where
+    F: std::future::Future + Send,
+    F::Output: Send,
+{
+    if tokio::runtime::Handle::try_current().is_ok() {
+        // We're on a runtime thread — blocking here would panic. Run the future
+        // on a separate (non-runtime) thread and wait for it.
+        std::thread::scope(|s| s.spawn(|| rt.block_on(fut)).join().unwrap())
+    } else {
+        rt.block_on(fut)
+    }
+}
+
+#[cfg(test)]
+#[cfg(any(feature = "store-s3", feature = "store-redis", feature = "store-pg"))]
+mod block_on_tests {
+    #[test]
+    fn block_on_from_within_a_runtime_does_not_panic() {
+        let outer = tokio::runtime::Runtime::new().unwrap();
+        let inner = tokio::runtime::Runtime::new().unwrap();
+        // Inside `outer`'s context, the guarded block_on must offload rather than
+        // panic with "Cannot start a runtime from within a runtime".
+        let result = outer.block_on(async { super::block_on(&inner, async { 21 + 21 }) });
+        assert_eq!(result, 42);
     }
 }
 

@@ -15,7 +15,7 @@ pub mod voxel;
 pub use footprint::{footprint, Footprint};
 
 #[cfg(test)]
-mod testgen;
+pub(crate) mod testgen;
 
 use crate::block_state::BlockState;
 use crate::fingerprint::classifier::{Classifier, Token};
@@ -114,9 +114,31 @@ impl FingerprintSpec {
     pub fn custom(symmetry: Symmetry, blocks: BlockPolicy) -> Self {
         Self { symmetry, blocks }
     }
+
+    /// Canonical preset names. `redstone` aliases `redstone_computational`.
+    pub const PRESETS: &'static [&'static str] = &[
+        "exact",
+        "shape",
+        "structural",
+        "redstone_computational",
+        "redstone",
+        "redstone_survival",
+    ];
+
+    /// Resolve a preset name to a spec. Returns `None` for unknown names.
+    pub fn from_preset(name: &str) -> Option<Self> {
+        Some(match name {
+            "exact" => Self::exact(),
+            "shape" => Self::shape(),
+            "structural" => Self::structural(),
+            "redstone" | "redstone_computational" => Self::redstone_computational(),
+            "redstone_survival" => Self::redstone_survival(),
+            _ => return None,
+        })
+    }
 }
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::universal_schematic::UniversalSchematic;
 
@@ -168,14 +190,73 @@ impl std::fmt::Display for Fingerprint {
     }
 }
 
+impl Fingerprint {
+    /// Lowercase 32-char hex of the 128-bit fingerprint.
+    pub fn to_hex(&self) -> String {
+        format!("{:032x}", self.0)
+    }
+}
+
+/// True if `a` and `b` share a fingerprint under `spec`.
+pub fn is_duplicate(
+    a: &UniversalSchematic,
+    b: &UniversalSchematic,
+    spec: &FingerprintSpec,
+) -> bool {
+    fingerprint(a, spec) == fingerprint(b, spec)
+}
+
+/// Translation-invariant fuzzy distance between two builds' FFT footprints
+/// (0.0 = identical occupancy shape). Cheaper-to-compare than exact fingerprints.
+pub fn footprint_distance(
+    a: &UniversalSchematic,
+    b: &UniversalSchematic,
+    spec: &FingerprintSpec,
+) -> f32 {
+    footprint(a, spec).distance(&footprint(b, spec))
+}
+
+impl Signature {
+    /// JSON: sorted dims, block count, and the token histogram.
+    pub fn to_json(&self) -> String {
+        let hist: serde_json::Map<String, serde_json::Value> = self
+            .histogram
+            .iter()
+            .map(|(k, v)| (k.to_string(), serde_json::json!(v)))
+            .collect();
+        serde_json::json!({
+            "dims_sorted": self.dims_sorted,
+            "count": self.count,
+            "histogram": hist,
+        })
+        .to_string()
+    }
+}
+
 pub fn fingerprint(schem: &UniversalSchematic, spec: &FingerprintSpec) -> Fingerprint {
+    // Resolve the palette once — builds repeat blockstates heavily, so each
+    // orbit element only tokenizes the distinct entries, not every cell.
+    let mut palette: Vec<&BlockState> = Vec::new();
+    let mut index: HashMap<&BlockState, usize> = HashMap::new();
+    let mut cell_list: Vec<((i32, i32, i32), usize)> = Vec::new();
+    for (pos, block) in schem.iter_blocks() {
+        let id = *index.entry(block).or_insert_with(|| {
+            palette.push(block);
+            palette.len() - 1
+        });
+        cell_list.push(((pos.x, pos.y, pos.z), id));
+    }
+
     let mut best: Option<Vec<u8>> = None;
     for g in spec.symmetry.elements() {
-        let mut cells: Vec<((i32, i32, i32), Token)> = Vec::new();
-        for (pos, block) in schem.iter_blocks() {
-            let rotated_block = g.apply_block(block);
-            if let Some(tok) = spec.blocks.tokenize(&rotated_block) {
-                cells.push((g.apply_pos((pos.x, pos.y, pos.z)), tok));
+        let toks: Vec<Option<Token>> = palette
+            .iter()
+            .map(|b| spec.blocks.tokenize(&g.apply_block(b)))
+            .collect();
+        let mut cells: Vec<((i32, i32, i32), Token)> = Vec::with_capacity(cell_list.len());
+        for (pos, id) in &cell_list {
+            if let Some(tok) = &toks[*id] {
+                cells.push((g.apply_pos(*pos), tok.clone()));
             }
         }
         if cells.is_empty() {
@@ -289,6 +370,42 @@ mod spec_tests {
         let _ = FingerprintSpec::exact();
         let _ = FingerprintSpec::shape();
         let _ = FingerprintSpec::redstone_survival();
+    }
+
+    #[test]
+    fn preset_names_resolve() {
+        for name in FingerprintSpec::PRESETS {
+            assert!(FingerprintSpec::from_preset(name).is_some(), "{name}");
+        }
+        assert!(FingerprintSpec::from_preset("nope").is_none());
+    }
+
+    #[test]
+    fn fingerprint_hex_and_dup() {
+        use crate::fingerprint::testgen::filled_box;
+        let spec = FingerprintSpec::structural();
+        let a = filled_box((0, 0, 0), (2, 2, 2), "minecraft:stone");
+        let b = filled_box((10, 0, 0), (12, 2, 2), "minecraft:stone"); // translated copy
+        let hx = fingerprint(&a, &spec).to_hex();
+        assert_eq!(hx.len(), 32);
+        assert!(hx.chars().all(|c| c.is_ascii_hexdigit()));
+        assert!(
+            is_duplicate(&a, &b, &spec),
+            "translation-invariant structural dup"
+        );
+    }
+
+    #[test]
+    fn signature_json_and_footprint_distance() {
+        use crate::fingerprint::testgen::filled_box;
+        let spec = FingerprintSpec::structural();
+        let a = filled_box((0, 0, 0), (2, 2, 2), "minecraft:stone");
+        let b = filled_box((10, 0, 0), (12, 2, 2), "minecraft:stone");
+        let sig: serde_json::Value = serde_json::from_str(&signature(&a, &spec).to_json()).unwrap();
+        assert!(sig["count"].as_u64().is_some());
+        assert!(sig["histogram"].is_object());
+        // identical occupancy shape (translated) → ~zero footprint distance
+        assert!(footprint_distance(&a, &b, &spec) < 1e-3);
     }
 }
 

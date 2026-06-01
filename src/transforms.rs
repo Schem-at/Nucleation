@@ -1,7 +1,7 @@
 use crate::BlockState;
 
 /// Axis enum for transformations
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Axis {
     X,
     Y,

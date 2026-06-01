@@ -181,6 +181,66 @@ pack.add_texture("mymod:block/custom", 16, 16, rgba_bytes)
 
 ---
 
+## 7. Diff & Fingerprint
+
+Fingerprint a build, dedup near-duplicates, and structurally diff two builds.
+Each call takes a **preset name** that decides what "the same" means:
+
+| Preset | Equivalence |
+| ------ | ----------- |
+| `"exact"` | Material- and orientation-sensitive (identical blockstates only). |
+| `"shape"` | Occupancy only; palette and orientation ignored. |
+| `"structural"` | Functional shape, rotation- and material-agnostic. |
+| `"redstone_computational"` (alias `"redstone"`) | Redstone-logic equivalence; rotation- and cosmetic-material-agnostic. |
+| `"redstone_survival"` | Like `"redstone"`, keeping survival material constraints. |
+
+```python
+from nucleation import Schematic, Diff
+
+a = Schematic.open("a.litematic")
+b = Schematic.open("b.litematic")
+
+# Canonical 32-hex hash (rotation/translation/palette-agnostic per preset).
+print(a.fingerprint("structural"))
+
+# Dedup (exact-equivalence) and a fuzzy FFT shape distance (0.0 == same shape).
+print(a.is_duplicate_of(b, "structural"))
+print(a.footprint_distance(b, "structural"))
+
+# Dims + token histogram as JSON.
+print(a.signature("structural"))
+
+# Structural diff; optional cost_add/cost_delete/cost_change/cost_swap/symmetry.
+d = a.diff(b, "redstone")
+print("distance:", d.distance())     # total edit cost
+print("support:", d.support())       # fraction of the larger build that aligned
+                                      # (confidence, NOT a similarity %)
+
+# Each delta projected back to its own Schematic.
+added   = d.added()     # blocks only in B
+removed = d.removed()   # blocks only in A
+changed = d.changed()   # B's version at changed cells
+swapped = d.swapped()   # palette-only swaps
+markers = d.markers()   # colored overlay (lime/red/yellow/light-blue)
+
+# Lossless JSON (round-trips) + a compact summary.
+full = d.to_json()
+restored = Diff.from_json(full)
+print(d.summary_json())
+```
+
+**Glowing overlay GLB** (requires a wheel built with the `meshing` feature) —
+paint the diff on top of the already-meshed "after" build:
+
+```python
+with open("after.glb", "rb") as f:
+    glb = d.to_overlay_glb(f.read())   # -> bytes (a new GLB)
+with open("diff_overlay.glb", "wb") as f:
+    f.write(glb)
+```
+
+---
+
 ### Gotchas & tips
 
 * **Everything is immutable-copy except `set_block*`** – methods that start with `set_` mutate the schematic; others usually return a fresh object or `dict`.

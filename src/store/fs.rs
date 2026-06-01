@@ -77,6 +77,26 @@ impl Store for FsStore {
         Ok(self.path_for(key)?.is_file())
     }
 
+    fn put_if_absent(&self, key: &str, bytes: &[u8]) -> Result<bool> {
+        use std::io::Write;
+        let path = self.path_for(key)?;
+        let parent = path.parent().unwrap_or(&self.root);
+        std::fs::create_dir_all(parent)?;
+        // `create_new` is O_EXCL: the existence check + create is atomic.
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+        {
+            Ok(mut f) => {
+                f.write_all(bytes)?;
+                Ok(true)
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Ok(false),
+            Err(e) => Err(e.into()),
+        }
+    }
+
     fn delete(&self, key: &str) -> Result<()> {
         let path = self.path_for(key)?;
         match std::fs::remove_file(&path) {

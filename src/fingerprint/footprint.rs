@@ -28,18 +28,51 @@ impl Footprint {
     }
 }
 
+/// Source sample range `[s0, s1)` for target voxel `t` of `td` along an axis of
+/// `d` source voxels. Width is always ≥1 (nearest sample when upscaling).
+fn resample_range(t: usize, td: usize, d: usize) -> (usize, usize) {
+    let s0 = t * d / td;
+    let s1 = ((t + 1) * d / td).max(s0 + 1).min(d);
+    (s0, s1)
+}
+
 pub fn footprint(schem: &UniversalSchematic, spec: &FingerprintSpec) -> Footprint {
     let grid = occupancy_grid(schem, spec);
-    let mut cube = vec![Complex::<f32>::new(0.0, 0.0); N * N * N];
     let [dx, dy, dz] = grid.dims;
-    for k in 0..dz.min(N) {
-        for j in 0..dy.min(N) {
-            for i in 0..dx.min(N) {
-                let v = grid.data[i + dx * (j + dy * k)];
-                cube[i + N * (j + N * k)] = Complex::new(v, 0.0);
+    let mut cube = vec![Complex::<f32>::new(0.0, 0.0); N * N * N];
+
+    // Uniformly scale the build to fit the longest axis into N (box-filter
+    // resample — averages, so no voxels are dropped even for builds > N). One
+    // scale factor for all axes preserves aspect ratio, and fitting to N makes
+    // the descriptor scale-invariant. Placement is irrelevant: the FFT
+    // magnitude is translation-invariant.
+    if dx > 0 && dy > 0 && dz > 0 {
+        let maxd = dx.max(dy).max(dz);
+        let fit = |d: usize| (d * N).div_ceil(maxd).clamp(1, N); // scale to fit, ≤ N
+        let (tx, ty, tz) = (fit(dx), fit(dy), fit(dz));
+        let src = |i: usize, j: usize, k: usize| grid.data[i + dx * (j + dy * k)];
+        for tk in 0..tz {
+            let (k0, k1) = resample_range(tk, tz, dz);
+            for tj in 0..ty {
+                let (j0, j1) = resample_range(tj, ty, dy);
+                for ti in 0..tx {
+                    let (i0, i1) = resample_range(ti, tx, dx);
+                    let mut sum = 0.0f32;
+                    let mut cnt = 0u32;
+                    for k in k0..k1 {
+                        for j in j0..j1 {
+                            for i in i0..i1 {
+                                sum += src(i, j, k);
+                                cnt += 1;
+                            }
+                        }
+                    }
+                    cube[ti + N * (tj + N * tk)] = Complex::new(sum / cnt as f32, 0.0);
+                }
             }
         }
     }
+
     fft3d(&mut cube);
     let mut feat = Vec::with_capacity(LOW * LOW * LOW);
     for k in 0..LOW {
@@ -49,6 +82,11 @@ pub fn footprint(schem: &UniversalSchematic, spec: &FingerprintSpec) -> Footprin
             }
         }
     }
+    // Drop the DC bin (index 0 = total occupancy / "mass"). It otherwise
+    // dominates the L2 distance, making the metric track size more than shape;
+    // size already lives in `signature`. The footprint is now a pure shape
+    // descriptor.
+    feat[0] = 0.0;
     let norm = feat.iter().map(|x| x * x).sum::<f32>().sqrt();
     if norm > 0.0 {
         for x in feat.iter_mut() {
@@ -121,6 +159,23 @@ mod tests {
         assert!(
             fa.distance(&fo) > fa.distance(&fa2),
             "unrelated build is farther"
+        );
+    }
+
+    #[test]
+    fn footprint_is_scale_invariant_and_aspect_aware() {
+        let spec = FingerprintSpec::structural();
+        // Same shape (a line), two scales; vs a different aspect (a flat slab).
+        let line_a = footprint(&filled_box((0, 0, 0), (0, 0, 7), "minecraft:stone"), &spec);
+        let line_b = footprint(&filled_box((0, 0, 0), (1, 1, 15), "minecraft:stone"), &spec);
+        let flat = footprint(&filled_box((0, 0, 0), (7, 7, 0), "minecraft:stone"), &spec);
+
+        // 2x-scaled line ≈ the line; the flat slab is much farther (aspect ratio
+        // is preserved, absolute size is not).
+        assert!(line_a.distance(&line_b) < 1e-2, "scale-invariant");
+        assert!(
+            line_a.distance(&flat) > 10.0 * line_a.distance(&line_b).max(1e-6),
+            "different aspect ratio is clearly farther"
         );
     }
 }

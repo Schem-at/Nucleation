@@ -10,13 +10,13 @@ use crate::transforms::{transform_block_state_flip, transform_block_state_rotate
 
 pub type Pos = (i32, i32, i32);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Step {
     Rotate(Axis, i32), // degrees in {90,180,270}
     Flip(Axis),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Symmetry {
     None,
     Yaw,
@@ -25,8 +25,22 @@ pub enum Symmetry {
     OctahedralFull,
 }
 
+impl Symmetry {
+    /// Parse a symmetry-group name (lowercase). Inverse of the canonical names.
+    pub fn from_name(name: &str) -> Option<Symmetry> {
+        Some(match name {
+            "none" => Symmetry::None,
+            "yaw" => Symmetry::Yaw,
+            "yaw_mirror" => Symmetry::YawMirror,
+            "octahedral" => Symmetry::Octahedral,
+            "octahedral_full" => Symmetry::OctahedralFull,
+            _ => return None,
+        })
+    }
+}
+
 /// A composed rigid operation: a sequence of steps applied left-to-right.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct RigidOp {
     steps: Vec<Step>,
 }
@@ -60,6 +74,11 @@ fn flip_pos(p: Pos, axis: Axis) -> Pos {
 }
 
 impl RigidOp {
+    /// The identity operation (no rotation/flip).
+    pub fn identity() -> RigidOp {
+        RigidOp { steps: vec![] }
+    }
+
     pub fn apply_pos(&self, p: Pos) -> Pos {
         self.steps.iter().fold(p, |acc, s| match *s {
             Step::Rotate(a, d) => rot_pos(acc, a, d),
@@ -191,5 +210,24 @@ mod tests {
         assert_ne!(once.get_property("facing"), north.get_property("facing"));
         let four = (0..4).fold(north.clone(), |b, _| yaw90.apply_block(&b));
         assert_eq!(four.get_property("facing"), north.get_property("facing"));
+    }
+
+    #[test]
+    fn rigidop_round_trips_via_serde() {
+        let op = Symmetry::YawMirror.elements().into_iter().nth(2).unwrap();
+        let j = serde_json::to_string(&op).unwrap();
+        let back: RigidOp = serde_json::from_str(&j).unwrap();
+        assert_eq!(format!("{:?}", op), format!("{:?}", back));
+    }
+
+    #[test]
+    fn symmetry_from_name() {
+        assert_eq!(Symmetry::from_name("none"), Some(Symmetry::None));
+        assert_eq!(Symmetry::from_name("yaw_mirror"), Some(Symmetry::YawMirror));
+        assert_eq!(
+            Symmetry::from_name("octahedral"),
+            Some(Symmetry::Octahedral)
+        );
+        assert_eq!(Symmetry::from_name("bogus"), None);
     }
 }

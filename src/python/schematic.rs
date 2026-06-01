@@ -1887,6 +1887,93 @@ impl PySchematic {
         Ok(())
     }
 
+    // ── Fingerprint + diff ──────────────────────────────────────────────
+
+    /// Compute the schematic fingerprint as a hex string.
+    ///
+    /// `preset` is one of: "exact", "shape", "structural",
+    /// "redstone_computational", "redstone", "redstone_survival".
+    /// Raises ValueError on an unknown preset.
+    #[pyo3(signature = (preset="exact"))]
+    pub fn fingerprint(&self, preset: &str) -> PyResult<String> {
+        let spec = crate::fingerprint::FingerprintSpec::from_preset(preset).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("unknown preset: '{}'", preset))
+        })?;
+        Ok(crate::fingerprint::fingerprint(&self.inner, &spec).to_hex())
+    }
+
+    /// Compute the schematic signature as a JSON string.
+    ///
+    /// Raises ValueError on an unknown preset.
+    #[pyo3(signature = (preset="exact"))]
+    pub fn signature(&self, preset: &str) -> PyResult<String> {
+        let spec = crate::fingerprint::FingerprintSpec::from_preset(preset).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("unknown preset: '{}'", preset))
+        })?;
+        Ok(crate::fingerprint::signature(&self.inner, &spec).to_json())
+    }
+
+    /// Footprint distance between this schematic and `other`.
+    ///
+    /// Raises ValueError on an unknown preset.
+    #[pyo3(signature = (other, preset="exact"))]
+    pub fn footprint_distance(&self, other: &PySchematic, preset: &str) -> PyResult<f32> {
+        let spec = crate::fingerprint::FingerprintSpec::from_preset(preset).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("unknown preset: '{}'", preset))
+        })?;
+        Ok(crate::fingerprint::footprint_distance(
+            &self.inner,
+            &other.inner,
+            &spec,
+        ))
+    }
+
+    /// Whether this schematic is a duplicate of `other` under `preset`.
+    ///
+    /// Raises ValueError on an unknown preset.
+    #[pyo3(signature = (other, preset="exact"))]
+    pub fn is_duplicate_of(&self, other: &PySchematic, preset: &str) -> PyResult<bool> {
+        let spec = crate::fingerprint::FingerprintSpec::from_preset(preset).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("unknown preset: '{}'", preset))
+        })?;
+        Ok(crate::fingerprint::is_duplicate(
+            &self.inner,
+            &other.inner,
+            &spec,
+        ))
+    }
+
+    /// Structurally diff this schematic against `other`, returning a `Diff`.
+    ///
+    /// `preset` selects the cost model. Optional `cost_*` kwargs override the
+    /// individual edit costs and `symmetry` overrides the symmetry group by
+    /// name. Raises ValueError on an unknown preset or symmetry name.
+    #[pyo3(signature = (
+        other,
+        preset="exact",
+        cost_add=None,
+        cost_delete=None,
+        cost_change=None,
+        cost_swap=None,
+        symmetry=None,
+    ))]
+    pub fn diff(
+        &self,
+        other: &PySchematic,
+        preset: &str,
+        cost_add: Option<u32>,
+        cost_delete: Option<u32>,
+        cost_change: Option<u32>,
+        cost_swap: Option<u32>,
+        symmetry: Option<&str>,
+    ) -> PyResult<super::diff::PyDiff> {
+        let ov =
+            super::diff::build_overrides(cost_add, cost_delete, cost_change, cost_swap, symmetry)?;
+        let spec = super::diff::resolve_spec(preset, &ov)?;
+        let inner = crate::diff::diff(&self.inner, &other.inner, &spec);
+        Ok(super::diff::PyDiff { inner })
+    }
+
     /// Register a mesh exporter with the FormatManager, enabling save_as("mesh", ...).
     #[cfg(feature = "meshing")]
     pub fn register_mesh_exporter(&self, pack: &super::meshing::PyResourcePack) -> PyResult<()> {

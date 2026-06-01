@@ -118,6 +118,65 @@ try (Schematic s = Schematic.fromLitematic(Files.readAllBytes(Path.of("circuit.l
 }
 ```
 
+### Diff & Fingerprint
+
+Canonically fingerprint a build, dedup near-duplicates, and structurally diff two
+builds — all under an equivalence ruleset chosen by **preset name**:
+
+| Preset | Equivalence |
+|--------|-------------|
+| `"exact"` | Material- and orientation-sensitive (identical blockstates only). |
+| `"shape"` | Occupancy only; palette and orientation ignored. |
+| `"structural"` | Functional shape, rotation- and material-agnostic. |
+| `"redstone_computational"` (alias `"redstone"`) | Redstone-logic equivalence, rotation- and cosmetic-material-agnostic. |
+| `"redstone_survival"` | Like `"redstone"`, keeping survival material constraints. |
+
+`diff` also accepts opt-in overrides: per-edit cost weights and a symmetry group.
+
+```java
+try (Schematic a = Schematic.fromLitematic(Files.readAllBytes(Path.of("a.litematic")));
+     Schematic b = Schematic.fromLitematic(Files.readAllBytes(Path.of("b.litematic")))) {
+
+    // 32-hex canonical hash (rotation/translation/palette-agnostic per preset).
+    System.out.println(a.fingerprint("structural"));
+
+    // Cheap exact dedup + fuzzy FFT shape distance (0.0 == same shape).
+    if (a.isDuplicateOf(b, "structural")) System.out.println("duplicate build");
+    System.out.println("footprint distance: " + a.footprintDistance(b, "structural"));
+
+    // Dims + token histogram as JSON.
+    System.out.println(a.signature("structural"));
+
+    // Structural diff -> Diff (AutoCloseable).
+    try (Diff d = a.diff(b, "redstone")) {
+        System.out.println("distance: " + d.distance());
+        // support = fraction of the larger build's cells that aligned
+        // (confidence, NOT a similarity %).
+        System.out.println("support: " + d.support());
+
+        // Each delta as its own Schematic.
+        try (Schematic added = d.added(); Schematic markers = d.markers()) { /* ... */ }
+
+        // Lossless JSON round-trips via Diff.fromJson; summaryJson() is compact.
+        String full = d.toJson();
+        System.out.println(d.summaryJson());
+
+        // Glowing-overlay GLB (requires the meshing feature).
+        if (Nucleation.hasMeshing()) {
+            byte[] glb = d.toOverlayGlb(Files.readAllBytes(Path.of("after.glb")));
+            Files.write(Path.of("diff_overlay.glb"), glb);
+        }
+    }
+}
+```
+
+> **Status:** the native engine ships these as JNI entry points
+> (`nFingerprint`, `nSignature`, `nFootprintDistance`, `nIsDuplicateOf`,
+> `nDiff` / `nDiffWithOverrides`, and the `nDiff*` accessors incl.
+> `nDiffToOverlayGlb`). The high-level `Schematic` / `Diff` Java wrappers shown
+> above are the intended surface and may not all be wired up yet in this JAR —
+> check `Schematic` and `Diff` for availability.
+
 ## Consuming the JAR
 
 ### Gradle (local)
@@ -164,6 +223,7 @@ System.setProperty(
 | `MeshConfig`     | `PyMeshConfig`     | Mesh-build parameters (fluent)        |
 | `MeshResult`     | `PyMeshResult`     | `glbData()`, counts, bounds, atlas    |
 | `MultiMeshResult`| `PyMultiMeshResult`| Iterable per-region mesh results      |
+| `Diff`           | `PyDiff`           | `AutoCloseable`; structural diff result |
 | `Nucleation`     | (entry point)      | `version()`, `hasSimulation()`, `hasMeshing()` |
 
 API parity with `nucleation-py` is verified by

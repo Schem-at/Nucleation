@@ -203,4 +203,34 @@ final class NucleationNative {
     static native long    nSchematicMeshByRegion(long schematicHandle, long packHandle, long configHandle);
     static native long    nSchematicMeshSingle(long schematicHandle, long packHandle, long configHandle);
     static native byte[]  nSchematicMeshAnimated(long schematicHandle, long packHandle, String timelineJson);
+
+    // ── Fingerprint (stateless; takes schematic handle(s) as leading args) ──
+    static native String  nFingerprint(long handle, String preset);
+    static native String  nSignature(long handle, String preset);
+    static native float   nFootprintDistance(long handleA, long handleB, String preset);
+    static native boolean nIsDuplicateOf(long handleA, long handleB, String preset);
+
+    // ── Diff ────────────────────────────────────────────────────────────────
+    static native long    nDiff(long handleA, long handleB, String preset);
+    // Registered with descriptor (JJLjava/lang/String;IIIILjava/lang/String;)J.
+    // Negative cost ints mean "use the preset default"; null symmetry = unset.
+    static native long    nDiffWithOverrides(
+            long handleA, long handleB, String preset,
+            int costAdd, int costDelete, int costChange, int costSwap,
+            String symmetry);
+    static native void    nDiffFree(long handle);
+    static native int     nDiffDistance(long handle);
+    static native float   nDiffSupport(long handle);
+    static native String  nDiffToJson(long handle);
+    static native String  nDiffSummaryJson(long handle);
+    static native long    nDiffFromJson(String json);
+    static native long    nDiffAdded(long handle);
+    static native long    nDiffRemoved(long handle);
+    static native long    nDiffChanged(long handle);
+    static native long    nDiffSwapped(long handle);
+    static native long    nDiffMarkers(long handle);
+
+    // Meshing-gated: present only when the cdylib is built with the meshing
+    // feature; calling without it raises UnsatisfiedLinkError.
+    static native byte[]  nDiffToOverlayGlb(long handle, byte[] afterGlb);
 }

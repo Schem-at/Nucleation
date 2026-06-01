@@ -81,6 +81,96 @@ schem.setBlock([0, 1, 0], "minecraft:oak_sign", {
 });
 ```
 
+### Storage
+
+The `Store` class is pluggable byte storage — it decides *where bytes live*,
+independent of the schematic format. Keys are `/`-delimited UTF-8 paths.
+
+```ts
+import { Store } from "nucleation";
+
+const store = new Store("mem://"); // throws on error
+
+store.put("schems/base.litematic", out); // (key, data: Uint8Array) -> void
+const data = store.get("schems/base.litematic"); // -> Uint8Array | undefined
+store.has("schems/base.litematic"); // -> boolean
+store.list("schems/"); // -> string[] (keys with this prefix)
+store.delete("schems/base.litematic"); // -> void (idempotent)
+```
+
+A schematic can read/write a `Store` directly — the format is inferred from the
+key's extension. This is the way to use remote/host storage on the web; it works
+with `mem://` and with `Store.fromCallbacks({ get, put, has, delete, list, health })`.
+
+```ts
+const schem = SchematicWrapper.openFromStore(store, "schems/base.litematic");
+schem.saveToStore(store, "schems/copy.schem"); // format from extension
+```
+
+> **Web = `mem://` only.** On `wasm32` the in-memory backend is the only one
+> available — the filesystem, S3, Redis, and Postgres backends are native-only
+> and compiled out of the WASM build. Errors surface as thrown JS exceptions.
+
+---
+
+## Diff & Fingerprint
+
+Canonically fingerprint a build, dedup near-duplicates, and structurally diff two
+builds — all under an equivalence ruleset chosen by **preset name**:
+
+- `"exact"` — material- and orientation-sensitive (identical blockstates only).
+- `"shape"` — occupancy only; palette and orientation ignored.
+- `"structural"` — functional shape, rotation- and material-agnostic.
+- `"redstone_computational"` (alias `"redstone"`) — redstone-logic equivalence,
+  rotation- and cosmetic-material-agnostic.
+- `"redstone_survival"` — like `"redstone"`, keeping survival material constraints.
+
+`diff()` also takes an optional overrides object with per-edit cost weights and a
+symmetry group: `{ cost_add?, cost_delete?, cost_change?, cost_swap?, symmetry? }`.
+
+```ts
+import { SchematicWrapper } from "nucleation";
+
+const a = new SchematicWrapper();
+a.from_litematic(aBytes);
+const b = new SchematicWrapper();
+b.from_litematic(bBytes);
+
+// 32-hex canonical hash (rotation/translation/palette-agnostic per preset).
+console.log(a.fingerprint("structural"));
+
+// Cheap exact dedup + fuzzy FFT shape distance (0.0 == same shape).
+if (a.isDuplicateOf(b, "structural")) console.log("duplicate build");
+console.log("footprint distance:", a.footprintDistance(b, "structural"));
+
+// Dims + token histogram as JSON.
+console.log(a.signature("structural"));
+
+// Structural diff -> DiffWrapper. `preset` defaults to "exact".
+const d = a.diff(b, "redstone");
+console.log("distance:", d.distance);
+// support = fraction of the larger build's cells that aligned (confidence,
+// NOT a similarity %).
+console.log("support:", d.support);
+
+// Each delta as its own SchematicWrapper.
+d.added(); d.removed(); d.changed(); d.swapped(); d.markers();
+
+// Lossless JSON round-trips via DiffWrapper.fromJson; summaryJson() is compact.
+import { DiffWrapper } from "nucleation";
+const full = d.toJson();
+const restored = DiffWrapper.fromJson(full);
+console.log(d.summaryJson());
+```
+
+The glowing-overlay GLB requires a build compiled with the `meshing` feature
+(the published WASM bundle includes it):
+
+```ts
+// `afterGlb` is the meshed "after" build (Uint8Array); returns a new GLB.
+const glb = d.toOverlayGlb(afterGlb); // -> Uint8Array
+```
+
 ---
 
 ## Documentation

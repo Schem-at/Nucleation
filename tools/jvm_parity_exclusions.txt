@@ -242,3 +242,12 @@ SchematicBuilder.mark_io
 SchematicBuilder.io_markers
 SchematicBuilder.from_json
 SchematicBuilder.to_json
+
+# ── Store: no JVM Store binding in v1 (JVM uses transparent IO via
+#    Schematic.open/save; the Store primitive is Python/WASM/FFI only) ────────
+Store.*
+
+# ── Diff: convenience accessors not in the JVM Diff (the same data is in
+#    to_json / summary_json). Mirrors FFI/WASM, which omit these too. ──────────
+Diff.regions_json     # FFI/JVM read regions from summary_json
+Diff.transform_json   # Python-only convenience; transform is inside to_json

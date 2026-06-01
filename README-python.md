@@ -83,6 +83,113 @@ schem.set_block((0, 1, 0), "minecraft:oak_sign",
                 nbt=sign([text("Loot", color="gold"), "this way →"]))
 ```
 
+### Remote storage
+
+`Schematic.open` and `schem.save` work transparently against remote backends —
+no extra object, no manual byte-shuffling. The same calls you use for local
+files take a scheme'd URI or an explicit `Store`:
+
+```python
+from nucleation import Schematic, Store
+
+# local file (unchanged)
+schem = Schematic.open("build.schem")
+schem.save("build.litematic")
+
+# transparent remote: a scheme'd URI, no Store object needed
+schem = Schematic.open("s3://my-bucket/builds/adder.schem")
+schem.save("s3://my-bucket/out/adder.schem")
+schem.save("file:///tmp/adder.litematic")   # file:// = local path
+
+# explicit Store + key: works for ANY backend (incl. redis/postgres)
+# and reuses a single connection
+store = Store.open("redis://localhost:6379")
+schem = Schematic.open(store, "builds/adder.schem")
+schem.save(store, "out/adder.schem")
+```
+
+The format is inferred from the key/path extension (`.schem`, `.litematic`,
+`.mcstructure`); pass `format="litematic"` etc. to `save` to override it.
+
+The single-string form works for path-like backends — `s3://bucket/key` (and
+`file://` → local). `redis://` and `postgres://` single-strings raise
+`ValueError`, because their URL path is the database, leaving no slot for the
+key; open those with an explicit store instead:
+`Schematic.open(Store.open(url), key)`.
+
+Which backends are reachable depends on the `store-*` features the extension was
+built with. The default wheel ships `mem://` + `file://`; for S3/Redis/Postgres
+rebuild it:
+
+```bash
+maturin develop --features python,store-s3,store-redis,store-pg
+```
+
+**Raw byte store.** When you want raw bytes rather than schematics — PNG renders,
+arbitrary artifacts — use the [`Store`](docs/api-reference-python.md#store) class
+directly (`get`/`put`/`exists`/`delete`/`list`/`health`).
+
+---
+
+## Diff & Fingerprint
+
+Canonically fingerprint a build, dedup near-duplicates, and compute a structural
+diff between two builds — all under a configurable equivalence ruleset chosen by
+**preset name**:
+
+- `exact` — material- and orientation-sensitive (identical blockstates only).
+- `shape` — occupancy only; palette and orientation ignored.
+- `structural` — functional shape, rotation- and material-agnostic.
+- `redstone_computational` (alias `redstone`) — redstone-logic equivalence,
+  rotation-agnostic, cosmetic-material-agnostic.
+- `redstone_survival` — like `redstone`, but keeps survival material constraints.
+
+`diff` additionally accepts opt-in overrides: per-edit cost weights
+(`cost_add` / `cost_delete` / `cost_change` / `cost_swap`) and a `symmetry` group.
+
+```python
+from nucleation import Schematic
+
+a = Schematic.open("a.litematic")
+b = Schematic.open("b.litematic")
+
+# 32-hex canonical hash (rotation/translation/palette-agnostic per preset).
+print(a.fingerprint("structural"))
+
+# Cheap exact-equivalence dedup, and fuzzy FFT shape distance (0.0 == same shape).
+if a.is_duplicate_of(b, "structural"):
+    print("duplicate build")
+print("footprint distance:", a.footprint_distance(b, "structural"))
+
+# Dims + token histogram as JSON.
+print(a.signature("structural"))
+
+# Structural diff (optionally pass cost_*/symmetry overrides).
+d = a.diff(b, "redstone")
+print("distance:", d.distance())
+# support = fraction of the larger build's cells that aligned (confidence,
+# NOT a similarity %).
+print("support:", d.support())
+
+# Each delta as its own Schematic.
+d.added(); d.removed(); d.changed(); d.swapped(); d.markers()
+
+# Lossless JSON round-trips via Diff.from_json; summary_json() is compact.
+from nucleation import Diff
+full = d.to_json()
+restored = Diff.from_json(full)
+print(d.summary_json())
+```
+
+The glowing-overlay GLB requires the `meshing` feature in your wheel:
+
+```python
+# `after_glb` is the meshed "after" build (bytes); returns a new GLB.
+glb = d.to_overlay_glb(after_glb)
+with open("diff_overlay.glb", "wb") as f:
+    f.write(glb)
+```
+
 ---
 
 ## Documentation

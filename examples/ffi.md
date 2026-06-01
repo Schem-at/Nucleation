@@ -29,7 +29,8 @@ Complete reference for the Nucleation C FFI. All symbols are exported from the s
 21. [Sign Extraction and InSign](#21--sign-extraction-and-insign)
 22. [Debug and Print Utilities](#22--debug-and-print-utilities)
 23. [Meshing (feature = "meshing")](#23--meshing-feature--meshing)
-24. [C Code Examples](#24--c-code-examples)
+24. [Diff & Fingerprint](#24--diff--fingerprint)
+25. [C Code Examples](#25--c-code-examples)
 
 ---
 
@@ -212,6 +213,7 @@ These are opaque Rust types. Always use the corresponding `*_free` function when
 | `ShapeWrapper*`            | Wraps a building shape          |
 | `BrushWrapper*`            | Wraps a building brush          |
 | `SchematicBuilderWrapper*` | Wraps a `SchematicBuilder`      |
+| `DiffWrapper*`             | Wraps a structural `Diff`       |
 
 ---
 
@@ -1631,7 +1633,82 @@ uint32_t    rawmeshexport_texture_height(const FFIRawMeshExport* ptr);
 
 ---
 
-## 24 -- C Code Examples
+## 24 -- Diff & Fingerprint
+
+Canonically fingerprint a build, dedup near-duplicates, and structurally diff
+two builds. Each call takes a **preset** string that decides what "the same"
+means: `"exact"` (material- and orientation-sensitive), `"shape"` (occupancy
+only), `"structural"` (rotation/material-agnostic functional shape),
+`"redstone_computational"` (alias `"redstone"`, redstone-logic equivalence), or
+`"redstone_survival"`. Unknown presets/symmetries set the last error and return
+`NULL` (or `0`); check `schematic_last_error()`.
+
+### Fingerprint
+
+```c
+// 32-hex canonical hash (rotation/translation/palette-agnostic per preset).
+char* schematic_fingerprint(const SchematicWrapper* schematic, const char* preset);
+// Dims + token histogram, as JSON.
+char* schematic_signature(const SchematicWrapper* schematic, const char* preset);
+// Free both char* with free_string. Return NULL on NULL ptr or unknown preset.
+
+// Fuzzy FFT footprint distance (0.0 == identical occupancy shape).
+float schematic_footprint_distance(const SchematicWrapper* a,
+    const SchematicWrapper* b, const char* preset);
+// Exact-equivalence dedup: fingerprint(a) == fingerprint(b).
+bool  schematic_is_duplicate_of(const SchematicWrapper* a,
+    const SchematicWrapper* b, const char* preset);
+```
+
+### Diff
+
+```c
+// Diff with preset defaults. Returns an opaque DiffWrapper* (free with diff_free).
+DiffWrapper* schematic_diff(const SchematicWrapper* a,
+    const SchematicWrapper* b, const char* preset);
+
+// Diff with optional overrides. Negative cost ints mean "use preset default";
+// a NULL symmetry means "use preset default".
+DiffWrapper* schematic_diff_opts(const SchematicWrapper* a,
+    const SchematicWrapper* b, const char* preset,
+    int cost_add, int cost_delete, int cost_change, int cost_swap,
+    const char* symmetry);
+
+void diff_free(DiffWrapper* diff);
+
+// Scalars
+uint32_t diff_distance(const DiffWrapper* diff);  // total edit cost
+float    diff_support(const DiffWrapper* diff);   // fraction of the larger build
+                                                  // that aligned (confidence,
+                                                  // NOT a similarity %)
+
+// JSON: to_json is lossless and round-trips via diff_from_json; summary is compact.
+char*        diff_to_json(const DiffWrapper* diff);       // free with free_string
+char*        diff_summary_json(const DiffWrapper* diff);  // free with free_string
+DiffWrapper* diff_from_json(const char* json);            // free with diff_free
+
+// Each delta as its own schematic (free each with schematic_free).
+SchematicWrapper* diff_added(const DiffWrapper* diff);    // blocks only in B
+SchematicWrapper* diff_removed(const DiffWrapper* diff);  // blocks only in A
+SchematicWrapper* diff_changed(const DiffWrapper* diff);  // B's version at changes
+SchematicWrapper* diff_swapped(const DiffWrapper* diff);  // palette-only swaps
+SchematicWrapper* diff_markers(const DiffWrapper* diff);  // colored overlay
+```
+
+### Overlay GLB (feature = "meshing")
+
+```c
+// Paint the diff on top of the already-meshed "after" GLB; returns a new GLB.
+// Writes the length to *out_len. Returns NULL on error (see schematic_last_error).
+unsigned char* diff_to_overlay_glb(const DiffWrapper* diff,
+    const unsigned char* after_glb, size_t after_len, size_t* out_len);
+// Free the returned buffer with diff_free_glb (NOT free_byte_array).
+void diff_free_glb(unsigned char* data, size_t len);
+```
+
+---
+
+## 25 -- C Code Examples
 
 ### Example 1: Create a schematic, place blocks, and save
 

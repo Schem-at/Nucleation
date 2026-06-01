@@ -186,6 +186,7 @@ fn parse_jvm(base: &str) -> BTreeMap<Class, BTreeSet<Method>> {
         ("MeshConfig", "MeshConfig"),
         ("MeshResult", "MeshResult"),
         ("MultiMesh", "MultiMeshResult"),
+        ("Diff", "Diff"),
     ];
     for entry in fs::read_dir(&dir).unwrap().flatten() {
         let p = entry.path();

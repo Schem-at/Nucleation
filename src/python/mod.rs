@@ -15,6 +15,7 @@
 
 mod building;
 mod definition_region;
+mod diff;
 mod schematic;
 mod schematic_builder;
 mod store;
@@ -32,6 +33,7 @@ mod typed_executor;
 
 // Re-export all public types
 pub use definition_region::PyDefinitionRegion;
+pub use diff::PyDiff;
 pub use schematic::{PyBlockState, PySchematic};
 pub use schematic_builder::PySchematicBuilder;
 pub use store::PyStore;
@@ -56,6 +58,7 @@ pub fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySchematic>()?;
     m.add_class::<PyBlockState>()?;
     m.add_class::<PyDefinitionRegion>()?;
+    m.add_class::<PyDiff>()?;
     m.add_class::<building::PyBuildingTool>()?;
     m.add_class::<building::PyShape>()?;
     m.add_class::<building::PyBrush>()?;

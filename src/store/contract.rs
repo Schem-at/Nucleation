@@ -23,6 +23,8 @@ pub fn run_contract(store: &dyn Store) {
     reader_streams_bytes(store);
     reader_missing_is_not_found(store);
     writer_commits_on_flush(store);
+    put_if_absent_is_atomic(store);
+    list_paginated_walks_keyset(store);
 }
 
 fn health_reports_usable(store: &dyn Store) {
@@ -139,4 +141,67 @@ fn writer_commits_on_flush(store: &dyn Store) {
         "bytes written through writer must be readable after flush"
     );
     store.delete(key).expect("cleanup");
+}
+
+fn put_if_absent_is_atomic(store: &dyn Store) {
+    let key = "contract/cas";
+    assert!(
+        store.put_if_absent(key, b"first").expect("cas first"),
+        "first put_if_absent must win"
+    );
+    assert!(
+        !store.put_if_absent(key, b"second").expect("cas second"),
+        "put_if_absent on an existing key must return false"
+    );
+    assert_eq!(
+        store.get(key).expect("get"),
+        Some(b"first".to_vec()),
+        "put_if_absent must not overwrite the existing value"
+    );
+    store.delete(key).expect("cleanup");
+}
+
+fn list_paginated_walks_keyset(store: &dyn Store) {
+    let keys: Vec<String> = (0..5).map(|i| format!("page/{i}")).collect();
+    for k in &keys {
+        store.put(k, b"x").expect("put");
+    }
+
+    // First page of 2: sorted, with a cursor signalling more.
+    let (p1, n1) = store.list_paginated("page/", None, 2).expect("page1");
+    assert_eq!(p1.len(), 2, "page honours the limit");
+    assert!(
+        p1.windows(2).all(|w| w[0] < w[1]),
+        "page is sorted ascending"
+    );
+    assert!(n1.is_some(), "more keys remain after the first page");
+
+    // The next page starts strictly after the cursor (no overlap).
+    let (p2, _) = store
+        .list_paginated("page/", n1.as_deref(), 2)
+        .expect("page2");
+    assert!(
+        p2.iter().all(|k| k > p1.last().unwrap()),
+        "page 2 is strictly after page 1"
+    );
+
+    // Walking to exhaustion visits every key exactly once.
+    let mut seen = Vec::new();
+    let mut cursor: Option<String> = None;
+    loop {
+        let (page, next) = store
+            .list_paginated("page/", cursor.as_deref(), 2)
+            .expect("walk");
+        seen.extend(page);
+        match next {
+            Some(c) => cursor = Some(c),
+            None => break,
+        }
+    }
+    seen.sort();
+    assert_eq!(seen, keys, "pagination must cover every key exactly once");
+
+    for k in &keys {
+        store.delete(k).expect("cleanup");
+    }
 }

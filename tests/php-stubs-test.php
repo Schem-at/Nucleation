@@ -17,7 +17,32 @@ $functions = [
 ];
 
 $classes = [
-    'Nucleation\\Schematic'
+    'Nucleation\\Schematic',
+    'Nucleation\\Diff'
+];
+
+// Diff + fingerprint methods on the Schematic / Diff classes
+$methods = [
+    'Nucleation\\Schematic' => [
+        'fingerprint',
+        'signature',
+        'footprintDistance',
+        'isDuplicateOf',
+        'diff',
+    ],
+    'Nucleation\\Diff' => [
+        'fromJson',
+        'distance',
+        'support',
+        'toJson',
+        'summaryJson',
+        'added',
+        'removed',
+        'changed',
+        'swapped',
+        'markers',
+        'toOverlayGlb',
+    ],
 ];
 
 echo "Testing PHP stubs...\n";
@@ -33,6 +58,15 @@ foreach ($classes as $class) {
     if (!class_exists($class)) {
         echo "❌ Class $class not found in stubs\n";
         exit(1);
+    }
+}
+
+foreach ($methods as $class => $classMethods) {
+    foreach ($classMethods as $method) {
+        if (!method_exists($class, $method)) {
+            echo "❌ Method $class::$method not found in stubs\n";
+            exit(1);
+        }
     }
 }
 

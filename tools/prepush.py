@@ -246,13 +246,35 @@ def build_native_lane() -> Lane:
         Check("cargo check (ffi+simulation)", ["cargo", "check", "--features", "ffi,simulation"]),
         Check("cargo check (python+simulation)", ["cargo", "check", "--features", "python,simulation"]),
         Check("cargo check (python+meshing)", ["cargo", "check", "--features", "python,meshing"]),
+        # Store backends compile (s3/redis/pg pull their async SDKs).
+        Check(
+            "cargo check (store backends)",
+            ["cargo", "check", "--features", "store-s3,store-redis,store-pg"],
+        ),
         Check("cargo test (default)", ["cargo", "test"]),
         Check("cargo test (simulation)", ["cargo", "test", "--features", "simulation"]),
         Check(
             "cargo test (insign IO)",
             ["cargo", "test", "--lib", "--features", "simulation", "typed_executor::insign_io"],
         ),
+        # Store contract (mem/fs/callback incl. put_if_absent + list_paginated)
+        # and the block_on-within-runtime guard. Networked unit tests are
+        # health-gated and skip without a live service.
+        Check(
+            "cargo test (store)",
+            [
+                "cargo", "test", "--lib",
+                "--features", "store-s3,store-redis,store-pg,store-testkit",
+                "store::",
+            ],
+        ),
     ]
+    # NOTE: live S3/Redis/Postgres verification (the native CAS/pagination paths
+    # — If-None-Match / SET NX / ON CONFLICT / start-after) runs in the dedicated
+    # `test-store-backends` CI job via tests/store_testcontainers.rs. It is kept
+    # out of the parallel pre-push: it needs Docker on every push and its CPU
+    # load skews the concurrent benchmark lane. The contract semantics are
+    # already covered above on mem/fs/callback.
     if shutil.which("maturin"):
         lane.checks.append(
             Check("maturin build", ["maturin", "build", "--features", "python,simulation"])
@@ -276,6 +298,8 @@ def build_wasm_lane() -> Lane:
         ("node Connect4 test", "tests/connect4_test.js"),
         ("node ExecutorConfig test", "tests/executor_config_test.js"),
         ("node SimpleCircuit test", "tests/node_simple_circuit_test.js"),
+        # Store + transparent-IO bindings (open/new, CAS, pagination, callbacks).
+        ("node Store test", "tests/node_store_test.mjs"),
     ]
     for name, rel in js_tests:
         if (ROOT / rel).exists():
@@ -306,6 +330,10 @@ def build_python_lane() -> Lane:
         ("python_test.py", "tests/python_test.py"),
         ("python_new_api_test.py", "tests/python_new_api_test.py"),
         ("python_simple_circuit_test.py", "tests/python_simple_circuit_test.py"),
+        # Store + transparent-IO bindings (CAS, pagination, callbacks, save/open).
+        ("python_store_test.py", "tests/python_store_test.py"),
+        # Diff + fingerprint bindings, end-to-end (overlay GLB step self-skips).
+        ("diff_fingerprint example", "examples/diff_fingerprint.py"),
     ]
     for name, rel in py_tests:
         if (ROOT / rel).exists():

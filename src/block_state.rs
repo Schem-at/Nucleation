@@ -49,6 +49,38 @@ impl BlockState {
         self.name.as_str()
     }
 
+    /// Parse the `Display` form: `name` or `name[k=v,k=v]`. Inverse of `to_string`.
+    pub fn from_block_string(s: &str) -> Result<Self, String> {
+        let s = s.trim();
+        let Some(open) = s.find('[') else {
+            if s.is_empty() {
+                return Err("empty block string".into());
+            }
+            return Ok(BlockState::new(s));
+        };
+        if !s.ends_with(']') {
+            return Err(format!("unterminated properties in {s:?}"));
+        }
+        let name = &s[..open];
+        let body = &s[open + 1..s.len() - 1];
+        let mut properties: Vec<(SmolStr, SmolStr)> = Vec::new();
+        for pair in body.split(',') {
+            if pair.is_empty() {
+                continue;
+            }
+            let mut it = pair.splitn(2, '=');
+            let key = it.next().unwrap();
+            let value = it
+                .next()
+                .ok_or_else(|| format!("property {pair:?} missing '='"))?;
+            properties.push((key.into(), value.into()));
+        }
+        Ok(BlockState {
+            name: name.into(),
+            properties,
+        })
+    }
+
     pub fn with_property(mut self, key: impl Into<SmolStr>, value: impl Into<SmolStr>) -> Self {
         self.set_property(key, value);
         self
@@ -132,5 +164,26 @@ mod tests {
             block.get_property("variant").map(|s| s.as_str()),
             Some("granite")
         );
+    }
+
+    #[test]
+    fn block_string_round_trips() {
+        let plain = BlockState::new("minecraft:glass");
+        assert_eq!(
+            BlockState::from_block_string(&plain.to_string()).unwrap(),
+            plain
+        );
+
+        let props = BlockState::new("minecraft:redstone_wire")
+            .with_property("east", "side")
+            .with_property("power", "0");
+        let s = props.to_string();
+        assert_eq!(BlockState::from_block_string(&s).unwrap(), props);
+    }
+
+    #[test]
+    fn block_string_rejects_malformed() {
+        assert!(BlockState::from_block_string("minecraft:foo[bad").is_err());
+        assert!(BlockState::from_block_string("minecraft:foo[a]").is_err());
     }
 }

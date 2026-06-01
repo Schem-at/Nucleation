@@ -848,7 +848,7 @@ fn parse_python_impl_block(
 
 fn parse_ffi_surface(base_dir: &str) -> ApiSurface {
     let ffi_path = format!("{}/src/ffi.rs", base_dir);
-    let content = match fs::read_to_string(&ffi_path) {
+    let mut content = match fs::read_to_string(&ffi_path) {
         Ok(c) => c,
         Err(_) => {
             return ApiSurface {
@@ -858,6 +858,11 @@ fn parse_ffi_surface(base_dir: &str) -> ApiSurface {
             }
         }
     };
+    // The Store FFI surface lives in its own module file; scan it too.
+    if let Ok(store_ffi) = fs::read_to_string(format!("{}/src/store/ffi.rs", base_dir)) {
+        content.push('\n');
+        content.push_str(&store_ffi);
+    }
 
     let mut class_methods: BTreeMap<String, Vec<ApiMethod>> = BTreeMap::new();
     let mut free_functions: Vec<ApiMethod> = Vec::new();
@@ -879,6 +884,8 @@ fn parse_ffi_surface(base_dir: &str) -> ApiSurface {
         ("sort_strategy_", "SortStrategy"),
         ("circuit_builder_", "CircuitBuilder"),
         ("typed_executor_", "TypedCircuitExecutor"),
+        ("nuc_store_", "Store"),
+        ("diff_", "Diff"),
         ("meshresult_", "MeshResult"),
         ("multimeshresult_", "MultiMeshResult"),
         ("chunkmeshresult_", "ChunkMeshResult"),
@@ -926,8 +933,10 @@ fn parse_ffi_surface(base_dir: &str) -> ApiSurface {
             }
             if j < lines.len() {
                 let fn_line = lines[j].trim();
-                if fn_line.starts_with("pub extern \"C\" fn ") {
-                    let after = &fn_line[18..]; // Skip "pub extern \"C\" fn "
+                if let Some(after) = fn_line
+                    .strip_prefix("pub extern \"C\" fn ")
+                    .or_else(|| fn_line.strip_prefix("pub unsafe extern \"C\" fn "))
+                {
                     if let Some(paren) = after.find('(') {
                         let fn_name = after[..paren].trim().to_string();
 

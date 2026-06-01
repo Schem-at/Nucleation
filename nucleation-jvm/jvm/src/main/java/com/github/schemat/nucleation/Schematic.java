@@ -275,6 +275,106 @@ public final class Schematic implements AutoCloseable, Iterable<Block> {
         return parseCountsJson(json);
     }
 
+    // ── Fingerprint / Diff ──────────────────────────────────────────────────
+
+    /**
+     * Compute a content fingerprint for this schematic under the named preset,
+     * returned as a lowercase hex string. Two schematics with equal fingerprints
+     * are considered the same under that preset's equivalence rules.
+     *
+     * @throws com.github.schemat.nucleation.exceptions.NucleationException
+     *         if {@code preset} is not a known fingerprint preset.
+     */
+    public String fingerprint(String preset) {
+        checkOpen();
+        return NucleationNative.nFingerprint(handle, Objects.requireNonNull(preset, "preset"));
+    }
+
+    /** Fingerprint under the {@code "exact"} preset. */
+    public String fingerprint() { return fingerprint("exact"); }
+
+    /**
+     * Compute a structured signature (JSON) for this schematic under the named
+     * preset — a richer, human-inspectable companion to {@link #fingerprint}.
+     *
+     * @throws com.github.schemat.nucleation.exceptions.NucleationException
+     *         if {@code preset} is not a known fingerprint preset.
+     */
+    public String signature(String preset) {
+        checkOpen();
+        return NucleationNative.nSignature(handle, Objects.requireNonNull(preset, "preset"));
+    }
+
+    /** Signature under the {@code "exact"} preset. */
+    public String signature() { return signature("exact"); }
+
+    /**
+     * Distance between this schematic's footprint and {@code other}'s under the
+     * named preset, in {@code [0, 1]} (0 = identical footprint).
+     *
+     * @throws com.github.schemat.nucleation.exceptions.NucleationException
+     *         if {@code preset} is not a known fingerprint preset.
+     */
+    public float footprintDistance(Schematic other, String preset) {
+        checkOpen();
+        Objects.requireNonNull(other, "other");
+        Objects.requireNonNull(preset, "preset");
+        return NucleationNative.nFootprintDistance(handle, other.handle(), preset);
+    }
+
+    /**
+     * Whether {@code other} is a duplicate of this schematic under the named
+     * preset's equivalence rules.
+     *
+     * @throws com.github.schemat.nucleation.exceptions.NucleationException
+     *         if {@code preset} is not a known fingerprint preset.
+     */
+    public boolean isDuplicateOf(Schematic other, String preset) {
+        checkOpen();
+        Objects.requireNonNull(other, "other");
+        Objects.requireNonNull(preset, "preset");
+        return NucleationNative.nIsDuplicateOf(handle, other.handle(), preset);
+    }
+
+    /**
+     * Compute the diff from this schematic to {@code other} under the named
+     * preset. The returned {@link Diff} owns a native handle and should be used
+     * with try-with-resources.
+     *
+     * @throws com.github.schemat.nucleation.exceptions.NucleationException
+     *         if {@code preset} is not a known diff preset.
+     */
+    public Diff diff(Schematic other, String preset) {
+        checkOpen();
+        Objects.requireNonNull(other, "other");
+        Objects.requireNonNull(preset, "preset");
+        long h = NucleationNative.nDiff(handle, other.handle(), preset);
+        return new Diff(h);
+    }
+
+    /**
+     * Diff with explicit cost / symmetry overrides on top of the named preset.
+     * Pass a negative value for any {@code cost*} argument to keep the preset's
+     * default for that cost; non-negative values override it. Pass {@code null}
+     * for {@code symmetry} to keep the preset's symmetry group, else name a valid
+     * group ({@code none}, {@code yaw}, {@code yaw_mirror}, {@code octahedral},
+     * {@code octahedral_full}).
+     *
+     * @throws com.github.schemat.nucleation.exceptions.NucleationException
+     *         if {@code preset} is unknown or {@code symmetry} names no group.
+     */
+    public Diff diff(Schematic other, String preset,
+                     int costAdd, int costDelete, int costChange, int costSwap,
+                     String symmetry) {
+        checkOpen();
+        Objects.requireNonNull(other, "other");
+        Objects.requireNonNull(preset, "preset");
+        long h = NucleationNative.nDiffWithOverrides(
+                handle, other.handle(), preset,
+                costAdd, costDelete, costChange, costSwap, symmetry);
+        return new Diff(h);
+    }
+
     // ── Iteration ───────────────────────────────────────────────────────────
 
     @Override

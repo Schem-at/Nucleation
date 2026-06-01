@@ -204,6 +204,73 @@ pub unsafe extern "C" fn nuc_store_list(
     }
 }
 
+/// Atomically write `len` bytes at `key` only if it does not already exist.
+/// Returns `1` if written, `0` if the key existed, `-1` on error.
+///
+/// # Safety
+/// `handle` valid; `key` a valid C string; `data` points to `len` bytes.
+#[no_mangle]
+pub unsafe extern "C" fn nuc_store_put_if_absent(
+    handle: *const StoreHandle,
+    key: *const c_char,
+    data: *const u8,
+    len: usize,
+) -> c_int {
+    let (Some(h), Some(key)) = (handle.as_ref(), as_str(key)) else {
+        set_err("nuc_store_put_if_absent: invalid argument");
+        return -1;
+    };
+    let bytes = if len == 0 {
+        &[][..]
+    } else {
+        std::slice::from_raw_parts(data, len)
+    };
+    match h.0.put_if_absent(key, bytes) {
+        Ok(true) => 1,
+        Ok(false) => 0,
+        Err(e) => {
+            set_err(e.to_string());
+            -1
+        }
+    }
+}
+
+/// A keyset page of keys under `prefix`. `after` is the exclusive cursor (NULL
+/// for the first page); at most `limit` keys are returned. Result is a JSON
+/// object string `{"keys":[...],"next":"…"|null}`, freed with
+/// [`nuc_store_string_free`]; NULL on error.
+///
+/// # Safety
+/// `handle` valid; `prefix` a valid C string; `after` NULL or a valid C string.
+#[no_mangle]
+pub unsafe extern "C" fn nuc_store_list_paginated(
+    handle: *const StoreHandle,
+    prefix: *const c_char,
+    after: *const c_char,
+    limit: usize,
+) -> *mut c_char {
+    let (Some(h), Some(prefix)) = (handle.as_ref(), as_str(prefix)) else {
+        set_err("nuc_store_list_paginated: invalid argument");
+        return std::ptr::null_mut();
+    };
+    let after = as_str(after); // None when NULL
+    match h.0.list_paginated(prefix, after, limit) {
+        Ok((keys, next)) => {
+            match serde_json::to_string(&serde_json::json!({ "keys": keys, "next": next })) {
+                Ok(json) => cstring_raw(json),
+                Err(e) => {
+                    set_err(e.to_string());
+                    std::ptr::null_mut()
+                }
+            }
+        }
+        Err(e) => {
+            set_err(e.to_string());
+            std::ptr::null_mut()
+        }
+    }
+}
+
 /// Health check. Returns `0` usable, `-1` otherwise.
 ///
 /// # Safety

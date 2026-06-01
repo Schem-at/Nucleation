@@ -42,8 +42,7 @@ impl RedisStore {
         let rt = Runtime::new().map_err(|e| StoreError::Connection(e.to_string()))?;
         let client =
             redis::Client::open(cfg.url).map_err(|e| StoreError::Connection(e.to_string()))?;
-        let conn = rt
-            .block_on(client.get_multiplexed_async_connection())
+        let conn = crate::store::block_on(&rt, client.get_multiplexed_async_connection())
             .map_err(|e| StoreError::Connection(e.to_string()))?;
         Ok(Self {
             rt: Arc::new(rt),
@@ -61,7 +60,7 @@ impl Store for RedisStore {
     fn get(&self, key: &str) -> Result<Option<Vec<u8>>> {
         let full = self.full(key);
         let mut conn = self.conn.clone();
-        self.rt.block_on(async move {
+        crate::store::block_on(&self.rt, async move {
             let v: Option<Vec<u8>> = conn
                 .get(&full)
                 .await
@@ -73,7 +72,7 @@ impl Store for RedisStore {
     fn put(&self, key: &str, bytes: &[u8]) -> Result<()> {
         let full = self.full(key);
         let mut conn = self.conn.clone();
-        self.rt.block_on(async move {
+        crate::store::block_on(&self.rt, async move {
             let _: () = conn
                 .set(&full, bytes)
                 .await
@@ -82,10 +81,26 @@ impl Store for RedisStore {
         })
     }
 
+    fn put_if_absent(&self, key: &str, bytes: &[u8]) -> Result<bool> {
+        let full = self.full(key);
+        let mut conn = self.conn.clone();
+        crate::store::block_on(&self.rt, async move {
+            // SET key value NX → "OK" when written, nil when the key existed.
+            let r: Option<String> = redis::cmd("SET")
+                .arg(&full)
+                .arg(bytes)
+                .arg("NX")
+                .query_async(&mut conn)
+                .await
+                .map_err(|e| StoreError::Connection(e.to_string()))?;
+            Ok(r.is_some())
+        })
+    }
+
     fn exists(&self, key: &str) -> Result<bool> {
         let full = self.full(key);
         let mut conn = self.conn.clone();
-        self.rt.block_on(async move {
+        crate::store::block_on(&self.rt, async move {
             let e: bool = conn
                 .exists(&full)
                 .await
@@ -97,7 +112,7 @@ impl Store for RedisStore {
     fn delete(&self, key: &str) -> Result<()> {
         let full = self.full(key);
         let mut conn = self.conn.clone();
-        self.rt.block_on(async move {
+        crate::store::block_on(&self.rt, async move {
             let _: i64 = conn
                 .del(&full)
                 .await
@@ -110,7 +125,7 @@ impl Store for RedisStore {
         let pattern = format!("{}{}*", self.prefix, prefix);
         let strip_len = self.prefix.len();
         let mut conn = self.conn.clone();
-        self.rt.block_on(async move {
+        crate::store::block_on(&self.rt, async move {
             let mut keys = Vec::new();
             let mut cursor: u64 = 0;
             loop {
@@ -137,7 +152,7 @@ impl Store for RedisStore {
 
     fn health(&self) -> Result<()> {
         let mut conn = self.conn.clone();
-        self.rt.block_on(async move {
+        crate::store::block_on(&self.rt, async move {
             let pong: String = redis::cmd("PING")
                 .query_async(&mut conn)
                 .await

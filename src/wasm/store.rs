@@ -40,6 +40,49 @@ impl StoreWrapper {
         })
     }
 
+    /// Open a store from a URL (canonical name, matching Python/FFI `open`).
+    /// Equivalent to `new Store(url)`.
+    #[wasm_bindgen(js_name = open)]
+    pub fn open(url: &str) -> Result<StoreWrapper, JsValue> {
+        StoreWrapper::new(url)
+    }
+
+    /// Atomically write `data` at `key` only if it does not already exist.
+    /// Returns `true` if written, `false` if the key already existed.
+    #[wasm_bindgen(js_name = putIfAbsent)]
+    pub fn put_if_absent(&self, key: &str, data: &[u8]) -> Result<bool, JsValue> {
+        self.inner.put_if_absent(key, data).map_err(to_js)
+    }
+
+    /// A keyset page of keys under `prefix`, sorted, starting strictly after
+    /// `after` (pass `null`/`undefined` for the first page), at most `limit`.
+    /// Returns `{ keys: string[], next: string | null }`; pass `next` back as
+    /// `after` to continue, or stop when it is `null`.
+    #[wasm_bindgen(js_name = listPaginated)]
+    pub fn list_paginated(
+        &self,
+        prefix: &str,
+        after: Option<String>,
+        limit: usize,
+    ) -> Result<JsValue, JsValue> {
+        let (keys, next) = self
+            .inner
+            .list_paginated(prefix, after.as_deref(), limit)
+            .map_err(to_js)?;
+        let arr = js_sys::Array::new();
+        for k in keys {
+            arr.push(&JsValue::from_str(&k));
+        }
+        let obj = js_sys::Object::new();
+        js_sys::Reflect::set(&obj, &JsValue::from_str("keys"), &arr)?;
+        let next_val = match next {
+            Some(n) => JsValue::from_str(&n),
+            None => JsValue::NULL,
+        };
+        js_sys::Reflect::set(&obj, &JsValue::from_str("next"), &next_val)?;
+        Ok(obj.into())
+    }
+
     /// Fetch `key`, or `undefined` if absent.
     #[wasm_bindgen(js_name = get)]
     pub fn get(&self, key: &str) -> Result<Option<Vec<u8>>, JsValue> {

@@ -50,3 +50,6 @@ experiments/
 /pytest-of-*/
 /nucleation_test_*/render_work/
 /render_work
+CLAUDE.md
+/docs/superpowers
+/node-compile-cache/

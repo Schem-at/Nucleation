@@ -342,5 +342,156 @@ namespace Nucleation {
             int $targetZ,
             ?array $excludedBlocks = null
         ): void {}
+
+        /**
+         * Compute the structural fingerprint of this schematic as a hex string.
+         *
+         * @param string $preset Fingerprint preset: "exact", "shape",
+         *   "structural", "redstone_computational", "redstone",
+         *   "redstone_survival".
+         * @return string Hex-encoded fingerprint
+         * @throws Exception On unknown preset
+         */
+        public function fingerprint(string $preset): string {}
+
+        /**
+         * Compute the structural signature of this schematic as JSON.
+         *
+         * @param string $preset Fingerprint preset (see fingerprint())
+         * @return string JSON signature
+         * @throws Exception On unknown preset
+         */
+        public function signature(string $preset): string {}
+
+        /**
+         * Translation-invariant fuzzy footprint distance to another schematic
+         * (0.0 = identical occupancy shape).
+         *
+         * @param \Nucleation\Schematic $other Other schematic
+         * @param string $preset Fingerprint preset (see fingerprint())
+         * @return float Footprint distance
+         * @throws Exception On unknown preset
+         */
+        public function footprintDistance(\Nucleation\Schematic $other, string $preset): float {}
+
+        /**
+         * Returns true if this schematic shares the same fingerprint as another.
+         *
+         * @param \Nucleation\Schematic $other Other schematic
+         * @param string $preset Fingerprint preset (see fingerprint())
+         * @return bool Whether the two are duplicates
+         */
+        public function isDuplicateOf(\Nucleation\Schematic $other, string $preset): bool {}
+
+        /**
+         * Compute the structural diff between this schematic and another.
+         *
+         * @param \Nucleation\Schematic $other Target schematic
+         * @param string $preset Diff preset
+         * @param int|null $costAdd Optional cost override for additions
+         * @param int|null $costDelete Optional cost override for deletions
+         * @param int|null $costChange Optional cost override for changes
+         * @param int|null $costSwap Optional cost override for swaps
+         * @param string|null $symmetry Optional symmetry: "none", "yaw",
+         *   "yaw_mirror", "octahedral", "octahedral_full".
+         * @return \Nucleation\Diff The computed diff
+         * @throws Exception On unknown preset or symmetry
+         */
+        public function diff(
+            \Nucleation\Schematic $other,
+            string $preset,
+            ?int $costAdd = null,
+            ?int $costDelete = null,
+            ?int $costChange = null,
+            ?int $costSwap = null,
+            ?string $symmetry = null
+        ): \Nucleation\Diff {}
+    }
+
+    /**
+     * Result of a structural diff between two schematics.
+     */
+    class Diff {
+        /**
+         * Reconstruct a Diff from its JSON representation.
+         *
+         * @param string $json JSON produced by toJson()
+         * @return \Nucleation\Diff The reconstructed diff
+         * @throws Exception On parse error
+         */
+        public static function fromJson(string $json): \Nucleation\Diff {}
+
+        /**
+         * The edit distance (total cost) of this diff.
+         *
+         * @return int Edit distance
+         */
+        public function distance(): int {}
+
+        /**
+         * The alignment support / confidence of this diff.
+         *
+         * @return float Support value
+         */
+        public function support(): float {}
+
+        /**
+         * Serialize this diff to its full JSON representation.
+         *
+         * @return string JSON
+         */
+        public function toJson(): string {}
+
+        /**
+         * Serialize this diff to its compact summary JSON.
+         *
+         * @return string Summary JSON
+         */
+        public function summaryJson(): string {}
+
+        /**
+         * A new schematic containing only the blocks added in this diff.
+         *
+         * @return \Nucleation\Schematic Added blocks
+         */
+        public function added(): \Nucleation\Schematic {}
+
+        /**
+         * A new schematic containing only the blocks removed in this diff.
+         *
+         * @return \Nucleation\Schematic Removed blocks
+         */
+        public function removed(): \Nucleation\Schematic {}
+
+        /**
+         * A new schematic containing only the blocks changed in this diff.
+         *
+         * @return \Nucleation\Schematic Changed blocks
+         */
+        public function changed(): \Nucleation\Schematic {}
+
+        /**
+         * A new schematic containing only the blocks swapped in this diff.
+         *
+         * @return \Nucleation\Schematic Swapped blocks
+         */
+        public function swapped(): \Nucleation\Schematic {}
+
+        /**
+         * A new schematic with marker blocks summarizing this diff.
+         *
+         * @return \Nucleation\Schematic Marker schematic
+         */
+        public function markers(): \Nucleation\Schematic {}
+
+        /**
+         * Render a diff overlay on top of an "after" GLB buffer, returning a
+         * new GLB buffer. Requires the meshing feature.
+         *
+         * @param string $afterGlb The "after" GLB binary data
+         * @return string New GLB binary data
+         * @throws Exception On overlay error
+         */
+        public function toOverlayGlb(string $afterGlb): string {}
     }
 }

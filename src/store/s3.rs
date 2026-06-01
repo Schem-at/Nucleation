@@ -11,6 +11,7 @@ use std::io::{Read, Write};
 use std::sync::Arc;
 
 use aws_sdk_s3::config::{BehaviorVersion, Credentials, Region};
+use aws_sdk_s3::error::ProvideErrorMetadata;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use aws_sdk_s3::Client;
@@ -125,7 +126,7 @@ impl S3Store {
 
     /// Create the bucket if it does not already exist (helper for setup/tests).
     pub fn ensure_bucket(&self) -> Result<()> {
-        self.rt.block_on(async {
+        crate::store::block_on(&self.rt, async {
             match self
                 .client
                 .create_bucket()
@@ -162,7 +163,7 @@ fn normalize_prefix(prefix: &str) -> String {
 impl Store for S3Store {
     fn get(&self, key: &str) -> Result<Option<Vec<u8>>> {
         let full = self.full(key);
-        self.rt.block_on(async {
+        crate::store::block_on(&self.rt, async {
             match self
                 .client
                 .get_object()
@@ -193,7 +194,7 @@ impl Store for S3Store {
     fn put(&self, key: &str, bytes: &[u8]) -> Result<()> {
         let full = self.full(key);
         let body = ByteStream::from(bytes.to_vec());
-        self.rt.block_on(async {
+        crate::store::block_on(&self.rt, async {
             self.client
                 .put_object()
                 .bucket(&self.bucket)
@@ -208,7 +209,7 @@ impl Store for S3Store {
 
     fn exists(&self, key: &str) -> Result<bool> {
         let full = self.full(key);
-        self.rt.block_on(async {
+        crate::store::block_on(&self.rt, async {
             match self
                 .client
                 .head_object()
@@ -231,7 +232,7 @@ impl Store for S3Store {
 
     fn delete(&self, key: &str) -> Result<()> {
         let full = self.full(key);
-        self.rt.block_on(async {
+        crate::store::block_on(&self.rt, async {
             self.client
                 .delete_object()
                 .bucket(&self.bucket)
@@ -245,7 +246,7 @@ impl Store for S3Store {
 
     fn list(&self, prefix: &str) -> Result<Vec<String>> {
         let s3_prefix = self.full(prefix);
-        self.rt.block_on(async {
+        crate::store::block_on(&self.rt, async {
             let mut keys = Vec::new();
             let mut token: Option<String> = None;
             loop {
@@ -281,8 +282,76 @@ impl Store for S3Store {
         })
     }
 
+    fn put_if_absent(&self, key: &str, bytes: &[u8]) -> Result<bool> {
+        let full = self.full(key);
+        let body = ByteStream::from(bytes.to_vec());
+        crate::store::block_on(&self.rt, async {
+            match self
+                .client
+                .put_object()
+                .bucket(&self.bucket)
+                .key(&full)
+                .if_none_match("*") // conditional create
+                .body(body)
+                .send()
+                .await
+            {
+                Ok(_) => Ok(true),
+                Err(e) => {
+                    // 412 PreconditionFailed → the object already existed.
+                    if e.as_service_error().and_then(|se| se.code()) == Some("PreconditionFailed") {
+                        Ok(false)
+                    } else {
+                        Err(StoreError::Connection(e.to_string()))
+                    }
+                }
+            }
+        })
+    }
+
+    fn list_paginated(
+        &self,
+        prefix: &str,
+        after: Option<&str>,
+        limit: usize,
+    ) -> Result<(Vec<String>, Option<String>)> {
+        let s3_prefix = self.full(prefix);
+        let start_after = after.map(|a| self.full(a));
+        let max = (limit as i32).max(1); // max_keys ≥ 1; we trim to `limit` below
+        crate::store::block_on(&self.rt, async {
+            let mut req = self
+                .client
+                .list_objects_v2()
+                .bucket(&self.bucket)
+                .prefix(&s3_prefix)
+                .max_keys(max);
+            if let Some(sa) = &start_after {
+                req = req.start_after(sa);
+            }
+            let resp = req
+                .send()
+                .await
+                .map_err(|e| StoreError::Connection(e.to_string()))?;
+            let mut page = Vec::new();
+            for obj in resp.contents() {
+                if let Some(k) = obj.key() {
+                    if let Some(logical) = k.strip_prefix(&self.prefix) {
+                        page.push(logical.to_string());
+                    }
+                }
+            }
+            page.truncate(limit);
+            let next = if limit > 0 && page.len() == limit {
+                page.last().cloned()
+            } else {
+                None
+            };
+            Ok((page, next))
+        })
+    }
+
     fn health(&self) -> Result<()> {
-        self.rt.block_on(async {
+        crate::store::block_on(&self.rt, async {
             self.client
                 .head_bucket()
                 .bucket(&self.bucket)
@@ -297,7 +366,7 @@ impl Store for S3Store {
     /// buffering the whole object in memory.
     fn reader(&self, key: &str) -> Result<Box<dyn Read + '_>> {
         let full = self.full(key);
-        let body = self.rt.block_on(async {
+        let body = crate::store::block_on(&self.rt, async {
             match self
                 .client
                 .get_object()
@@ -353,7 +422,7 @@ struct S3Reader {
 impl Read for S3Reader {
     fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
         if self.pos >= self.leftover.len() {
-            match self.rt.block_on(self.body.try_next()) {
+            match crate::store::block_on(&self.rt, self.body.try_next()) {
                 Ok(Some(chunk)) => {
                     self.leftover = chunk.to_vec();
                     self.pos = 0;
@@ -390,18 +459,17 @@ impl S3Writer {
         if let Some(id) = &self.upload_id {
             return Ok(id.clone());
         }
-        let id = self
-            .rt
-            .block_on(
-                self.client
-                    .create_multipart_upload()
-                    .bucket(&self.bucket)
-                    .key(&self.key)
-                    .send(),
-            )
-            .map_err(|e| std::io::Error::other(e.to_string()))?
-            .upload_id
-            .ok_or_else(|| std::io::Error::other("S3 returned no upload id"))?;
+        let id = crate::store::block_on(
+            &self.rt,
+            self.client
+                .create_multipart_upload()
+                .bucket(&self.bucket)
+                .key(&self.key)
+                .send(),
+        )
+        .map_err(|e| std::io::Error::other(e.to_string()))?
+        .upload_id
+        .ok_or_else(|| std::io::Error::other("S3 returned no upload id"))?;
         self.upload_id = Some(id.clone());
         Ok(id)
     }
@@ -410,20 +478,19 @@ impl S3Writer {
         let upload_id = self.ensure_multipart()?;
         let part_number = self.next_part;
         self.next_part += 1;
-        let etag = self
-            .rt
-            .block_on(
-                self.client
-                    .upload_part()
-                    .bucket(&self.bucket)
-                    .key(&self.key)
-                    .upload_id(&upload_id)
-                    .part_number(part_number)
-                    .body(ByteStream::from(bytes))
-                    .send(),
-            )
-            .map_err(|e| std::io::Error::other(e.to_string()))?
-            .e_tag;
+        let etag = crate::store::block_on(
+            &self.rt,
+            self.client
+                .upload_part()
+                .bucket(&self.bucket)
+                .key(&self.key)
+                .upload_id(&upload_id)
+                .part_number(part_number)
+                .body(ByteStream::from(bytes))
+                .send(),
+        )
+        .map_err(|e| std::io::Error::other(e.to_string()))?
+        .e_tag;
         self.parts.push(
             CompletedPart::builder()
                 .part_number(part_number)
@@ -440,16 +507,16 @@ impl S3Writer {
         if self.upload_id.is_none() {
             // Small object — single PUT.
             let body = ByteStream::from(std::mem::take(&mut self.buf));
-            self.rt
-                .block_on(
-                    self.client
-                        .put_object()
-                        .bucket(&self.bucket)
-                        .key(&self.key)
-                        .body(body)
-                        .send(),
-                )
-                .map_err(|e| std::io::Error::other(e.to_string()))?;
+            crate::store::block_on(
+                &self.rt,
+                self.client
+                    .put_object()
+                    .bucket(&self.bucket)
+                    .key(&self.key)
+                    .body(body)
+                    .send(),
+            )
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
         } else {
             if !self.buf.is_empty() {
                 let last = std::mem::take(&mut self.buf);
@@ -459,17 +526,17 @@ impl S3Writer {
                 .set_parts(Some(self.parts.clone()))
                 .build();
             let upload_id = self.upload_id.clone().unwrap();
-            self.rt
-                .block_on(
-                    self.client
-                        .complete_multipart_upload()
-                        .bucket(&self.bucket)
-                        .key(&self.key)
-                        .upload_id(upload_id)
-                        .multipart_upload(completed)
-                        .send(),
-                )
-                .map_err(|e| std::io::Error::other(e.to_string()))?;
+            crate::store::block_on(
+                &self.rt,
+                self.client
+                    .complete_multipart_upload()
+                    .bucket(&self.bucket)
+                    .key(&self.key)
+                    .upload_id(upload_id)
+                    .multipart_upload(completed)
+                    .send(),
+            )
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
         }
         self.committed = true;
         Ok(())

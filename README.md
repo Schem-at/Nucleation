@@ -357,6 +357,107 @@ println!("Vertices: {}, Triangles: {}", raw.vertex_count(), raw.triangle_count()
 
 ---
 
+## Diff & Fingerprint
+
+Nucleation can canonically *fingerprint* a build, dedup near-identical builds, and
+compute a structural *diff* (edit distance) between two builds — all under a
+configurable equivalence ruleset selected by a **preset name**.
+
+### Presets
+
+Every fingerprint/diff call takes a preset string that decides what "the same"
+means:
+
+| Preset | Equivalence |
+|--------|-------------|
+| `exact` | Material- and orientation-sensitive: only identical blockstates in the same orientation match. |
+| `shape` | Occupancy only — any solid block counts, palette and orientation ignored. |
+| `structural` | Functional shape under symmetry: rotation- and material-agnostic per the structural ruleset. |
+| `redstone_computational` (alias `redstone`) | Redstone-logic equivalence: tokenizes components by function, rotation-agnostic, ignores cosmetic materials. |
+| `redstone_survival` | Like `redstone`, but distinguishes survival-relevant material constraints. |
+
+Presets are the baseline; you can **opt into overrides** — per-edit cost weights
+(`add`/`delete`/`change`/`swap`) and the symmetry group — on the `diff` call.
+
+### Fingerprint & dedup
+
+```rust
+use nucleation::UniversalSchematic;
+use nucleation::fingerprint::{FingerprintSpec, fingerprint, signature, footprint_distance, is_duplicate};
+
+let a = UniversalSchematic::from_litematic_bytes(&a_bytes)?;
+let b = UniversalSchematic::from_litematic_bytes(&b_bytes)?;
+
+let spec = FingerprintSpec::from_preset("structural").expect("known preset");
+
+// 32-hex canonical hash — rotation/translation/palette-agnostic per the preset.
+let hash: String = fingerprint(&a, &spec).to_hex();
+println!("fingerprint = {hash}");
+
+// Cheap exact-equivalence dedup (fingerprint(a) == fingerprint(b)).
+if is_duplicate(&a, &b, &spec) {
+    println!("a and b are duplicates under `structural`");
+}
+
+// Dims + token histogram as JSON (a coarse descriptor / pre-filter).
+let sig_json: String = signature(&a, &spec).to_json();
+
+// Fuzzy FFT footprint distance — 0.0 means identical occupancy shape.
+let fuzzy: f32 = footprint_distance(&a, &b, &spec);
+println!("footprint distance = {fuzzy}");
+```
+
+### Diff
+
+```rust
+use nucleation::diff::{DiffSpec, SpecOverrides, diff};
+
+// Resolve a preset (optionally with cost/symmetry overrides) to a DiffSpec.
+let spec = DiffSpec::resolve("redstone", &SpecOverrides::default()).expect("known preset");
+let d = diff(&a, &b, &spec);
+
+println!("edit distance = {}", d.distance);
+// `support` = fraction of the larger build's cells that aligned
+// (alignment confidence, NOT a similarity percentage).
+println!("support = {:.3}", d.support);
+
+// Each delta projected back to a schematic you can save or mesh.
+let added = d.added();      // blocks present only in B
+let removed = d.removed();  // blocks present only in A
+let changed = d.changed();  // B's version at changed cells
+let swapped = d.swapped();  // palette-only swaps
+let markers = d.markers();  // colored overlay (lime/red/yellow/light-blue)
+
+// Lossless JSON (round-trips via `Diff::from_json`) and a compact summary.
+let full = d.to_json();
+let summary = d.summary_json();
+let restored = nucleation::diff::Diff::from_json(&full)?;
+```
+
+### Glowing overlay GLB *(requires the `meshing` feature)*
+
+Given the "after" build already meshed to GLB, paint the diff on top of it as a
+glowing overlay:
+
+```rust
+# #[cfg(feature = "meshing")]
+# fn overlay(d: &nucleation::diff::Diff, after_glb: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+use nucleation::diff::OverlayOptions;
+
+let glb: Vec<u8> = d.to_overlay_glb(after_glb, &OverlayOptions::default())?;
+std::fs::write("diff_overlay.glb", &glb)?;
+# Ok(())
+# }
+```
+
+The same API is available from every binding — see
+[Python](README-python.md#diff--fingerprint),
+[JavaScript/WASM](README-npm.md#diff--fingerprint),
+[JVM](nucleation-jvm/README.md#diff--fingerprint), and
+[C/FFI](examples/ffi.md).
+
+---
+
 ## Development
 
 ```bash

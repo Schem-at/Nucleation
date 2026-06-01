@@ -219,6 +219,60 @@ options.clearCustomIo();
 
 ---
 
+## 6 · Diff & Fingerprint
+
+Fingerprint a build, dedup near-duplicates, and structurally diff two builds.
+Each call takes a **preset name** that decides what counts as "the same":
+
+| Preset | Equivalence |
+| ------ | ----------- |
+| `"exact"` | Material- and orientation-sensitive (identical blockstates only). |
+| `"shape"` | Occupancy only; palette and orientation ignored. |
+| `"structural"` | Functional shape, rotation- and material-agnostic. |
+| `"redstone_computational"` (alias `"redstone"`) | Redstone-logic equivalence; rotation- and cosmetic-material-agnostic. |
+| `"redstone_survival"` | Like `"redstone"`, keeping survival material constraints. |
+
+```js
+import init, { SchematicWrapper, DiffWrapper } from "nucleation";
+await init();
+
+const a = new SchematicWrapper(); a.from_litematic(aBytes);
+const b = new SchematicWrapper(); b.from_litematic(bBytes);
+
+// Canonical 32-hex hash (rotation/translation/palette-agnostic per preset).
+console.log(a.fingerprint("structural"));
+
+// Dedup (exact-equivalence) + fuzzy FFT shape distance (0.0 == same shape).
+console.log(a.isDuplicateOf(b, "structural"));
+console.log(a.footprintDistance(b, "structural"));
+
+// Dims + token histogram as JSON.
+console.log(a.signature("structural"));
+
+// Structural diff -> DiffWrapper. `preset` defaults to "exact"; an optional
+// 3rd arg overrides costs/symmetry: { cost_add, cost_delete, cost_change,
+// cost_swap, symmetry }.
+const d = a.diff(b, "redstone");
+console.log("distance:", d.distance);   // total edit cost (getter)
+console.log("support:", d.support);     // fraction of the larger build that
+                                        // aligned (confidence, NOT a similarity %)
+
+// Each delta as its own SchematicWrapper.
+const added = d.added(), removed = d.removed(), changed = d.changed(),
+      swapped = d.swapped(), markers = d.markers();
+
+// Lossless JSON (round-trips) + a compact summary.
+const full = d.toJson();
+const restored = DiffWrapper.fromJson(full);
+console.log(d.summaryJson());
+
+// Glowing overlay GLB (published WASM bundle includes the meshing feature):
+// `afterGlb` is the meshed "after" build as a Uint8Array.
+const overlay = d.toOverlayGlb(afterGlb);   // -> Uint8Array (a new GLB)
+```
+
+---
+
 ### Final notes
 
 * **Universal wrapper** (`nucleation.js`) hides environment quirks—use it unless you **must** supply your own bytes.

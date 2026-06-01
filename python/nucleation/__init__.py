@@ -28,6 +28,7 @@ DefinitionRegion = _native.DefinitionRegion
 BuildingTool = _native.BuildingTool
 Shape = _native.Shape
 Brush = _native.Brush
+Diff = _native.Diff
 
 # Module-level helper functions
 debug_schematic = _native.debug_schematic
@@ -1191,6 +1192,7 @@ __all__ = [
     "BlockState",
     "BuildingTool",
     "Brush",
+    "Diff",
     "ButtonPress",
     "LeverState",
     "Coord",

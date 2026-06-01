@@ -286,3 +286,42 @@ RenderConfig.orthographic = WASM bool API (setOrthographic/orthographic); Python
 RenderConfig.* = FFI uses renderconfig_* free functions not methods on wrapper type
 Schematic.render_wasm = WASM naming (FFI uses schematic_render)
 Schematic.render_png_wasm = WASM naming (FFI uses schematic_render_png)
+
+# --- Diff + Fingerprint engines ---
+# FFI exposes the Diff type as diff_* free functions (mapped to the Diff class via
+# the known-prefix table); WASM/Python expose it as a wrapper object. The entries
+# below are genuine, intended idiom divergences.
+[ffi_only]
+Schematic.diff_opts = FFI override variant (WASM/Python pass an options arg to diff())
+*.free_glb = FFI memory management for returned GLB buffers
+
+[python_only]
+Diff.transform_json = Python convenience (transform is also inside to_json; WASM/FFI read it there)
+
+[no_ffi]
+Diff.regions_json = Python/WASM convenience (FFI consumers read regions from summary_json)
+
+# --- Store + transparent I/O ---
+# The Store byte-backend is exposed in all three; constructor naming and memory
+# management differ by idiom. Schematic.open/open_from_store/save_to_store are
+# transparent-I/O sugar: FFI exposes them natively, WASM has openFromStore (no
+# filesystem), and Python implements them in the pure-Python facade
+# (nucleation/__init__.py), which the Rust-parsing checker can't see.
+[ffi_only]
+Store.bytes_free = FFI memory management for returned byte buffers
+Store.string_free = FFI memory management for returned strings
+Store.last_error = FFI thread-local error string (WASM/Python raise exceptions)
+
+[wasm_only]
+Store.new = WASM JS constructor (`new Store(url)`); Python/FFI use Store.open(url)
+
+[no_ffi]
+Store.from_callbacks = host-closure store (Py/JS callables); FFI users pass a backend URL to nuc_store_open
+
+[no_wasm]
+Schematic.open = No filesystem in WASM; use openFromStore(store, key)
+
+[no_python]
+Schematic.open = Python provides this in the pure-Python facade (nucleation/__init__.py Schematic.open)
+Schematic.open_from_store = Python facade folds this into Schematic.open(store, key)
+Schematic.save_to_store = Python facade folds this into Schematic.save(store, key)

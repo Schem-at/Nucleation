@@ -56,9 +56,9 @@ impl PgStore {
         }
 
         let rt = Runtime::new().map_err(|e| StoreError::Connection(e.to_string()))?;
-        let (client, connection) = rt
-            .block_on(tokio_postgres::connect(&cfg.url, NoTls))
-            .map_err(|e| StoreError::Connection(e.to_string()))?;
+        let (client, connection) =
+            crate::store::block_on(&rt, tokio_postgres::connect(&cfg.url, NoTls))
+                .map_err(|e| StoreError::Connection(e.to_string()))?;
         // Drive the connection on the runtime for the life of the store.
         rt.spawn(async move {
             let _ = connection.await;
@@ -79,8 +79,7 @@ impl PgStore {
             "CREATE TABLE IF NOT EXISTS {} (key TEXT PRIMARY KEY, data BYTEA NOT NULL)",
             self.table
         );
-        self.rt
-            .block_on(self.client.execute(&sql, &[]))
+        crate::store::block_on(&self.rt, self.client.execute(&sql, &[]))
             .map(|_| ())
             .map_err(|e| StoreError::Connection(e.to_string()))
     }
@@ -94,7 +93,7 @@ impl Store for PgStore {
     fn get(&self, key: &str) -> Result<Option<Vec<u8>>> {
         let full = self.full(key);
         let sql = format!("SELECT data FROM {} WHERE key = $1", self.table);
-        self.rt.block_on(async {
+        crate::store::block_on(&self.rt, async {
             let row = self
                 .client
                 .query_opt(&sql, &[&full])
@@ -112,7 +111,7 @@ impl Store for PgStore {
              ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data",
             self.table
         );
-        self.rt.block_on(async {
+        crate::store::block_on(&self.rt, async {
             self.client
                 .execute(&sql, &[&full, &data])
                 .await
@@ -124,7 +123,7 @@ impl Store for PgStore {
     fn exists(&self, key: &str) -> Result<bool> {
         let full = self.full(key);
         let sql = format!("SELECT 1 FROM {} WHERE key = $1", self.table);
-        self.rt.block_on(async {
+        crate::store::block_on(&self.rt, async {
             let row = self
                 .client
                 .query_opt(&sql, &[&full])
@@ -134,10 +133,27 @@ impl Store for PgStore {
         })
     }
 
+    fn put_if_absent(&self, key: &str, bytes: &[u8]) -> Result<bool> {
+        let full = self.full(key);
+        let data = bytes.to_vec();
+        let sql = format!(
+            "INSERT INTO {} (key, data) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING",
+            self.table
+        );
+        crate::store::block_on(&self.rt, async {
+            let n = self
+                .client
+                .execute(&sql, &[&full, &data])
+                .await
+                .map_err(|e| StoreError::Connection(e.to_string()))?;
+            Ok(n == 1) // 1 row inserted = written; 0 = key already existed
+        })
+    }
+
     fn delete(&self, key: &str) -> Result<()> {
         let full = self.full(key);
         let sql = format!("DELETE FROM {} WHERE key = $1", self.table);
-        self.rt.block_on(async {
+        crate::store::block_on(&self.rt, async {
             self.client
                 .execute(&sql, &[&full])
                 .await
@@ -150,7 +166,7 @@ impl Store for PgStore {
         let full_prefix = self.full(prefix);
         let strip_len = self.prefix.len();
         let sql = format!("SELECT key FROM {} WHERE starts_with(key, $1)", self.table);
-        self.rt.block_on(async {
+        crate::store::block_on(&self.rt, async {
             let rows = self
                 .client
                 .query(&sql, &[&full_prefix])
@@ -163,9 +179,47 @@ impl Store for PgStore {
         })
     }
 
+    fn list_paginated(
+        &self,
+        prefix: &str,
+        after: Option<&str>,
+        limit: usize,
+    ) -> Result<(Vec<String>, Option<String>)> {
+        let full_prefix = self.full(prefix);
+        let strip_len = self.prefix.len();
+        let after_full = after.map(|a| self.full(a));
+        let lim = limit as i64;
+        crate::store::block_on(&self.rt, async {
+            let rows = if let Some(af) = &after_full {
+                let sql = format!(
+                    "SELECT key FROM {} WHERE starts_with(key, $1) AND key > $2 \
+                     ORDER BY key LIMIT $3",
+                    self.table
+                );
+                self.client.query(&sql, &[&full_prefix, af, &lim]).await
+            } else {
+                let sql = format!(
+                    "SELECT key FROM {} WHERE starts_with(key, $1) ORDER BY key LIMIT $2",
+                    self.table
+                );
+                self.client.query(&sql, &[&full_prefix, &lim]).await
+            }
+            .map_err(|e| StoreError::Connection(e.to_string()))?;
+            let page: Vec<String> = rows
+                .iter()
+                .map(|r| r.get::<_, String>(0)[strip_len..].to_string())
+                .collect();
+            let next = if limit > 0 && page.len() == limit {
+                page.last().cloned()
+            } else {
+                None
+            };
+            Ok((page, next))
+        })
+    }
+
     fn health(&self) -> Result<()> {
-        self.rt
-            .block_on(self.client.execute("SELECT 1", &[]))
+        crate::store::block_on(&self.rt, self.client.execute("SELECT 1", &[]))
             .map(|_| ())
             .map_err(|e| StoreError::Connection(e.to_string()))
     }
@@ -199,6 +253,6 @@ mod tests {
         crate::store::contract::run_contract(&store);
         // Drop the per-process test table.
         let sql = format!("DROP TABLE IF EXISTS {}", store.table);
-        let _ = store.rt.block_on(store.client.execute(&sql, &[]));
+        let _ = crate::store::block_on(&store.rt, store.client.execute(&sql, &[]));
     }
 }
