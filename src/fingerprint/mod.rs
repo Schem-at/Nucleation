@@ -7,6 +7,7 @@
 //! compiling on its own commit).
 
 pub mod classifier;
+pub mod rulesets;
 pub mod symmetry;
 
 #[cfg(test)]
