@@ -96,6 +96,9 @@ mlua = { version = "0.10", features = ["luajit", "vendored"], optional = true }
 rquickjs = { version = "0.9", features = ["macro", "classes", "properties"], optional = true }
 
 bincode = "1"
+blake3 = "1"
+ron = "0.8"
+rustfft = "6"
 bytemuck = { version = "1.23.1", features = ["derive"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }
 

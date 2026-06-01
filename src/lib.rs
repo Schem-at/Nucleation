@@ -18,6 +18,7 @@ pub mod nbt;
 mod print_utils;
 mod region;
 pub mod schematic_builder;
+pub mod fingerprint;
 pub mod selection;
 pub mod store;
 pub mod store_io;
