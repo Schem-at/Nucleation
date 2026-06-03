@@ -2082,7 +2082,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation"
-version = "0.2.12"
+version = "0.2.13"
 dependencies = [
  "aws-sdk-s3",
  "bincode",
@@ -2120,7 +2120,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation-jvm"
-version = "0.2.12"
+version = "0.2.13"
 dependencies = [
  "jni",
  "nucleation",

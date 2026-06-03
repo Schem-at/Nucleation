@@ -7,8 +7,9 @@
 use wasm_bindgen::prelude::*;
 
 use crate::fingerprint::{
-    fingerprint as core_fingerprint, footprint_distance as core_footprint_distance,
-    is_duplicate as core_is_duplicate, signature as core_signature, FingerprintSpec,
+    fingerprint as core_fingerprint, footprint as core_footprint,
+    footprint_distance as core_footprint_distance, is_duplicate as core_is_duplicate,
+    signature as core_signature, FingerprintSpec,
 };
 
 use super::schematic::SchematicWrapper;
@@ -38,6 +39,16 @@ impl SchematicWrapper {
     pub fn signature(&self, preset: Option<String>) -> Result<String, JsValue> {
         let spec = resolve_spec(preset)?;
         Ok(core_signature(&self.0, &spec).to_json())
+    }
+
+    /// The translation/scale-invariant FFT shape footprint as a fixed-length
+    /// vector (the raw feature for clustering / nearest-neighbour search).
+    ///
+    /// `preset` defaults to `"exact"`. Unknown preset → Err.
+    #[wasm_bindgen]
+    pub fn footprint(&self, preset: Option<String>) -> Result<Vec<f32>, JsValue> {
+        let spec = resolve_spec(preset)?;
+        Ok(core_footprint(&self.0, &spec).0)
     }
 
     /// Footprint distance between this schematic and `other` (0.0 = identical).

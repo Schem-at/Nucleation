@@ -1913,6 +1913,18 @@ impl PySchematic {
         Ok(crate::fingerprint::signature(&self.inner, &spec).to_json())
     }
 
+    /// Translation/scale-invariant FFT shape footprint as a fixed-length
+    /// vector (the raw feature for clustering / nearest-neighbour search).
+    ///
+    /// Raises ValueError on an unknown preset.
+    #[pyo3(signature = (preset="exact"))]
+    pub fn footprint(&self, preset: &str) -> PyResult<Vec<f32>> {
+        let spec = crate::fingerprint::FingerprintSpec::from_preset(preset).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("unknown preset: '{}'", preset))
+        })?;
+        Ok(crate::fingerprint::footprint(&self.inner, &spec).0)
+    }
+
     /// Footprint distance between this schematic and `other`.
     ///
     /// Raises ValueError on an unknown preset.

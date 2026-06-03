@@ -9151,6 +9151,36 @@ pub extern "C" fn schematic_footprint_distance(
     crate::fingerprint::footprint_distance(sa, sb, &spec)
 }
 
+/// The schematic's translation/scale-invariant FFT shape footprint as a JSON
+/// array of floats. Returns NULL on null pointer or unknown preset. Free the
+/// returned string with `free_string`.
+#[no_mangle]
+pub extern "C" fn schematic_footprint(
+    ptr: *const SchematicWrapper,
+    preset: *const c_char,
+) -> *mut c_char {
+    if ptr.is_null() || preset.is_null() {
+        return std::ptr::null_mut();
+    }
+    let s = unsafe { &*(*ptr).0 };
+    let preset_str = unsafe { CStr::from_ptr(preset) }.to_string_lossy();
+    let spec = match crate::fingerprint::FingerprintSpec::from_preset(&preset_str) {
+        Some(spec) => spec,
+        None => {
+            set_last_error(format!(
+                "schematic_footprint: unknown preset '{}'",
+                preset_str
+            ));
+            return std::ptr::null_mut();
+        }
+    };
+    let v = crate::fingerprint::footprint(s, &spec).0;
+    match serde_json::to_string(&v) {
+        Ok(json) => CString::new(json).unwrap_or_default().into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
 /// Returns true if two schematics share the same fingerprint for the given
 /// preset. Returns false on null pointer or unknown preset.
 #[no_mangle]
