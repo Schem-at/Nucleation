@@ -311,6 +311,116 @@ with open("out.zip", "wb") as f:
     f.write(schem.to_world_zip())
 ```
 
+### Streaming (constant memory)
+
+The `WorldSource` / `WorldSink` classes process worlds one chunk at a time —
+peak memory is O(one chunk) for directory/MCA sources, O(one region file) for
+zip. Corrupt chunks raise `IOError` for that item; iteration continues.
+
+```python
+from nucleation import WorldSource, WorldSink, diff_worlds
+
+# Iterate all chunks in a world directory
+src = WorldSource.open_dir("saves/my_world")
+for chunk in src:                             # __iter__ calls chunks() internally
+    print(f"chunk ({chunk.cx}, {chunk.cz}), y={chunk.y_range()}")
+    for x, y, z, name in chunk.blocks():     # full block scan
+        if "sign" in name:
+            schem = chunk.to_schematic()     # bridge chunk to UniversalSchematic
+            # ... process schem ...
+
+# Bounded scan: only chunks intersecting the given block-coordinate box
+src = WorldSource.open_dir("saves/my_world")
+for chunk in WorldSource.open_dir("saves/my_world").chunks_bounded(-128, 0, -128, 128, 256, 128):
+    pass
+
+# Sink round-trip: copy a world
+sink = WorldSink.create("out_world")
+for chunk in WorldSource.open_dir("saves/my_world"):
+    sink.write_chunk(chunk)
+sink.finish()
+
+# diff_worlds + put_chunk replay (mod-ore replay pattern)
+# Correct workflow: copy BEFORE world, open_existing the COPY, apply diffs → transforms before→after.
+# chunks_bounded filters on X/Z only (full-height columns); Y values are accepted for
+# API symmetry with eager importers but do not exclude chunks.
+import shutil, json
+shutil.copytree("saves/before", "saves/replay")
+diffs = diff_worlds(
+    WorldSource.open_dir("saves/before"),
+    WorldSource.open_dir("saves/after"),
+    "exact",          # preset: exact | shape | structural | redstone | redstone_survival
+)                     # returns an eager list; raises IOError on first corrupt chunk
+
+# Build a lookup: (cx, cz) -> ChunkDiff
+diff_map = {(cd.cx, cd.cz): cd for cd in diffs}
+
+src  = WorldSource.open_dir("saves/replay")
+sink = WorldSink.open_existing("saves/replay")
+for chunk in src:
+    cd = diff_map.get((chunk.cx, chunk.cz))
+    if cd is not None:
+        d = json.loads(cd.diff_json())
+        # removed+added+changed drive replay; swapped/palette_swaps are analysis-only
+        # diff_json fields: removed/added → [{pos:[x,y,z], block:"..."}]
+        #                   changed       → [{pos:[x,y,z], from:"...", to:"..."}]
+        for cell in d.get("removed", []):
+            chunk.set_block(*cell["pos"], "minecraft:air")
+        for cell in d.get("added", []):
+            chunk.set_block(*cell["pos"], cell["block"])
+        for cell in d.get("changed", []):
+            chunk.set_block(*cell["pos"], cell["to"])
+    sink.put_chunk(chunk)   # put_chunk takes a WorldChunkView, not a ChunkDiff
+sink.finish()
+```
+
+**Error semantics:** a corrupt chunk raises `IOError` mid-iteration; catch it
+and `continue` to skip. `diff_worlds` is fail-fast and raises on the first bad
+chunk. `StopIteration` is raised normally at the end of a `WorldChunkIter`.
+
+#### Generating worlds from scratch
+
+`WorldChunkView(cx, cz)` creates an empty chunk at the given chunk coordinates.
+Call `set_block(x, y, z, name)` with world-space coordinates and a namespaced
+block ID; sections are created on demand. Hand each finished chunk to a
+`WorldSink` — memory stays constant regardless of world size.
+
+```python
+import json
+import nucleation
+
+options = json.dumps({
+    "spawn_position": [0, 64, 0],   # x, y, z — all other fields use defaults
+    # "void_world": true by default; Minecraft won't generate terrain around written chunks
+})
+sink = nucleation.WorldSink.create("out_world", options_json=options)
+
+# Iterate region-major (outer cz, inner cx) for sequential writes and minimal I/O.
+for cz in range(-8, 8):
+    for cx in range(-8, 8):
+        chunk = nucleation.WorldChunkView(cx, cz)
+        for bx in range(cx * 16, cx * 16 + 16):
+            for bz in range(cz * 16, cz * 16 + 16):
+                h = 60 + (bx + bz) % 8          # trivial height function
+                chunk.set_block(bx, h, bz, "minecraft:grass_block")
+                for by in range(0, h):
+                    chunk.set_block(bx, by, bz, "minecraft:stone")
+        chunk.set_biome("minecraft:plains")  # optional; call AFTER set_block (lazy section alloc)
+        sink.write_chunk(chunk)
+        # chunk goes out of scope here — constant memory across the entire loop
+
+sink.finish()   # writes level.dat and flushes all region files
+```
+
+**Biomes:**
+- `chunk.set_biome("minecraft:desert")` overwrites every section in the chunk with a single-entry palette. Call after `set_block`, since sections are allocated lazily.
+- `chunk.biome_palette()` returns a `list[str]` of the deduped biome ids present across all sections (empty if no biome data has been set).
+- The `"biome"` key in `WorldExportOptions` JSON (default `"minecraft:plains"`) is the fallback stamped onto freshly created sections with no biome data.
+- Biome data in chunks you read and re-stream is preserved verbatim; only new sections without biome data receive the default.
+- Limitation: chunk-level granularity only. Sub-chunk 3D biome editing is future work.
+
+**Limitations:** lighting is recalculated by Minecraft on first load.
+
 ---
 
 ### Gotchas & tips

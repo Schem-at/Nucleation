@@ -317,3 +317,121 @@ world::save_world(&schematic, std::path::Path::new("out_world"), Some(WorldExpor
 Complete programs: [`examples/convert_world.rs`](convert_world.rs) (world zip →
 litematic + GLB) and [`examples/inspect_world.rs`](inspect_world.rs).
 
+### Streaming (constant memory)
+
+The `world_stream` module processes worlds one chunk at a time — peak memory is
+O(one chunk) for directory/MCA sources and O(one region file) for zip. Corrupt
+chunks surface as per-item `Err` values; the iterator keeps going.
+
+```rust
+use nucleation::formats::world_stream::{WorldSource, WorldSink, diff_worlds};
+
+// Iterate all chunks in a directory
+let src = WorldSource::open_dir("saves/my_world")?;
+for result in src.chunks() {
+    let view = result?;          // Err = corrupt chunk; continue the loop to skip
+    println!("chunk ({}, {}), y {:?}", view.cx(), view.cz(), view.y_range());
+    for (x, y, z, name) in view.blocks() {
+        // full block scan — name is the namespaced block ID
+    }
+}
+
+// Bounded scan: only chunks that intersect the given block-coordinate box
+let src = WorldSource::open_dir("saves/my_world")?;
+for result in src.chunks_bounded(-128, 0, -128, 128, 256, 128) {
+    let view = result?;
+    // bridge a single chunk into a UniversalSchematic for diffing/meshing/export
+    let schem = view.to_schematic();
+}
+
+// Sink round-trip: create a fresh world, write chunks
+let mut sink = WorldSink::create("out_world", None)?;
+let src = WorldSource::open_dir("saves/my_world")?;
+for result in src.chunks() {
+    sink.write_chunk(result?)?;
+}
+sink.finish()?;      // flushes all buffered region files; sink is consumed here
+
+// diff_worlds + patch_chunk replay (mod-ore replay pattern)
+// Correct workflow: copy BEFORE, open_existing the COPY, apply diffs → transforms before→after.
+// chunks_bounded filters on X/Z only (chunks are full-height columns); Y values are accepted
+// for API symmetry with the eager importers but do not exclude chunks.
+use std::fs;
+fs::copy_dir_all("saves/before", "saves/replay")?;  // copy before-world; edit the copy
+let diffs = diff_worlds(
+    &WorldSource::open_dir("saves/before")?,
+    &WorldSource::open_dir("saves/after")?,
+    "exact",          // preset: exact | shape | structural | redstone | redstone_survival
+)?;
+let air = BlockState::new("minecraft:air".to_string());
+let mut sink = WorldSink::open_existing("saves/replay")?;  // patch_chunk requires open_existing
+for cd in diffs {
+    let cd = cd?;
+    // removed+added+changed drive replay; swapped/palette_swaps are analysis-only
+    sink.patch_chunk(cd.cx, cd.cz, |view| {
+        for (pos, _)    in &cd.diff.removed  { view.set_block(pos.0, pos.1, pos.2, &air); }
+        for (pos, b)    in &cd.diff.added    { view.set_block(pos.0, pos.1, pos.2, b); }
+        for (pos, _, b) in &cd.diff.changed  { view.set_block(pos.0, pos.1, pos.2, b); }
+    })?;
+}
+sink.finish()?;
+```
+
+**Semantics:**
+- **Iteration order**: regions in `(rx, rz)` order, chunks within a region in `(cz, cx)` order (`chunk_order_key`).
+- **Per-item errors**: a corrupt chunk yields `Err` for that item; the stream continues. FFI skips corrupt chunks silently.
+- **Memory model**: directory and MCA sources hold at most one chunk at a time; zip sources buffer one region file at a time.
+- **Sink merge**: `open_existing` reads existing region data before writing, so out-of-order chunk writes are safe. `patch_chunk` is only valid on `open_existing`.
+- **`chunks_bounded` Y axis**: selection filters on X/Z chunk columns only; Y values are accepted for API symmetry with the eager bounded importers but do not exclude chunks.
+
+#### Generating worlds from scratch
+
+`WorldChunkView::new(cx, cz)` creates an empty chunk that sections fill on demand;
+each chunk is dropped after `write_chunk`, so peak memory is O(one chunk) regardless
+of world size.
+
+```rust
+use nucleation::formats::world_stream::{WorldChunkView, WorldSink};
+use nucleation::formats::world::WorldExportOptions;
+use nucleation::BlockState;
+
+// WorldExportOptions fields are all optional; void_world defaults to true so
+// Minecraft will not generate terrain around the written chunks.
+let options = WorldExportOptions {
+    spawn_position: Some((0, 64, 0)),
+    ..Default::default()
+};
+let mut sink = WorldSink::create("out_world", Some(options))?;
+
+// Iterate in region-major order (rz → rx → cz → cx) for fastest sequential
+// writes; out-of-order is safe via read-merge but does extra I/O per region.
+for cz in -16..16_i32 {
+    for cx in -16..16_i32 {
+        let mut chunk = WorldChunkView::new(cx, cz);
+        for bx in (cx * 16)..(cx * 16 + 16) {
+            for bz in (cz * 16)..(cz * 16 + 16) {
+                // Trivial height function — replace with your noise/heightmap logic.
+                let h = 60 + ((bx + bz) % 8) as i32;
+                chunk.set_block(bx, h, bz, &BlockState::new("minecraft:grass_block".to_string()));
+                for by in 0..h {
+                    chunk.set_block(bx, by, bz, &BlockState::new("minecraft:stone".to_string()));
+                }
+            }
+        }
+        chunk.set_biome("minecraft:plains");  // optional; call AFTER set_block (lazy section alloc)
+        sink.write_chunk(chunk)?;
+        // `chunk` is dropped here — constant memory across the entire loop.
+    }
+}
+sink.finish()?;  // flushes all region files and writes level.dat
+```
+
+**Semantics (biomes):**
+- `WorldExportOptions::biome` (default `"minecraft:plains"`) is stamped onto any freshly created section that carries no biome data.
+- `chunk.set_biome("minecraft:desert")` overwrites all currently-present sections with a single-entry palette. Call it after `set_block` calls, since sections are allocated lazily.
+- `chunk.biome_palette()` returns the deduped list of biome ids present across all sections.
+- Biome data in chunks you read and re-stream (patch/replay workflows) is preserved verbatim — only sections with no biome data receive the default.
+- Limitation: chunk-level granularity only. Sub-chunk 3D biome editing (4×4×4 cells, caves vs. surface) is future work; existing multi-biome detail in parsed chunks survives untouched as long as you don't call `set_biome` on that chunk.
+
+**Limitations:** lighting is recalculated by Minecraft on first load.
+

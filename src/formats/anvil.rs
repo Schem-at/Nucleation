@@ -7,7 +7,7 @@ use flate2::Compression;
 use quartz_nbt::io::Flavor;
 use quartz_nbt::{NbtCompound, NbtList, NbtTag};
 use std::error::Error;
-use std::io::{Cursor, Read, Write};
+use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 
 // ─── Data Structures ────────────────────────────────────────────────────────
 
@@ -37,6 +37,11 @@ pub struct ChunkSection {
     pub palette: Vec<BlockState>,
     /// 4096 entries (16x16x16), each is an index into `palette`.
     pub block_states: Vec<u16>,
+    /// Raw per-section biome NBT compound (1.18+ `biomes` tag: palette list of
+    /// biome ids plus optional packed `data` array), preserved verbatim for
+    /// lossless round-trips. `None` means "no biome data" — the writer falls
+    /// back to a single-entry plains palette.
+    pub biomes: Option<NbtCompound>,
 }
 
 #[derive(Debug, Clone)]
@@ -345,6 +350,7 @@ fn parse_section(section_nbt: &NbtCompound) -> Result<ChunkSection, Box<dyn Erro
                 y,
                 palette: vec![BlockState::new("minecraft:air".to_string())],
                 block_states: vec![0; 4096],
+                biomes: section_nbt.get::<_, &NbtCompound>("biomes").ok().cloned(),
             });
         }
     };
@@ -380,7 +386,17 @@ fn parse_section(section_nbt: &NbtCompound) -> Result<ChunkSection, Box<dyn Erro
         y,
         palette,
         block_states,
+        biomes: section_nbt.get::<_, &NbtCompound>("biomes").ok().cloned(),
     })
+}
+
+/// Build a `biomes` compound holding a single-entry palette of `biome` —
+/// i.e. the whole 16x16x16 section is that one biome (no `data` array needed).
+pub fn single_biome_compound(biome: &str) -> NbtCompound {
+    let mut biomes = NbtCompound::new();
+    let biome_palette = vec![NbtTag::String(biome.to_string())];
+    biomes.insert("palette", NbtTag::List(NbtList::from(biome_palette)));
+    biomes
 }
 
 /// Unpack block states from Minecraft's chunk format.
@@ -859,13 +875,129 @@ fn build_section_nbt(section: &ChunkSection) -> NbtCompound {
 
     section_nbt.insert("block_states", NbtTag::Compound(block_states_compound));
 
-    // Add empty biomes section (required for MC to accept chunks)
-    let mut biomes = NbtCompound::new();
-    let biome_palette = vec![NbtTag::String("minecraft:plains".to_string())];
-    biomes.insert("palette", NbtTag::List(NbtList::from(biome_palette)));
+    // Biomes (required for MC to accept chunks): preserve any parsed biome
+    // data verbatim; otherwise fall back to a single-entry plains palette.
+    let biomes = match &section.biomes {
+        Some(b) => b.clone(),
+        None => single_biome_compound("minecraft:plains"),
+    };
     section_nbt.insert("biomes", NbtTag::Compound(biomes));
 
     section_nbt
+}
+
+// ─── Lazy Read Path ─────────────────────────────────────────────────────────
+
+/// Lazily reads chunks from an MCA region file. Parses only the 4 KiB
+/// location header up front; each chunk payload is seeked, decompressed,
+/// and NBT-parsed on demand. Peak memory ≈ one decompressed chunk.
+pub struct RegionReader<R: Read + Seek> {
+    reader: R,
+    region_x: i32,
+    region_z: i32,
+    /// (local index 0..1024, absolute byte offset) for present chunks.
+    locations: Vec<(u32, u64)>,
+}
+
+impl<R: Read + Seek> RegionReader<R> {
+    pub fn new(mut reader: R, region_x: i32, region_z: i32) -> Result<Self, Box<dyn Error>> {
+        let mut header = [0u8; 4096];
+        reader
+            .read_exact(&mut header)
+            .map_err(|_| "MCA file too small (< 4096 byte header)")?;
+        let mut locations = Vec::new();
+        for i in 0..1024u32 {
+            let o = (i as usize) * 4;
+            let loc =
+                ((header[o] as u32) << 16) | ((header[o + 1] as u32) << 8) | (header[o + 2] as u32);
+            let sector_count = header[o + 3];
+            if loc >= 2 && sector_count > 0 {
+                locations.push((i, (loc as u64) * 4096));
+            }
+        }
+        Ok(Self {
+            reader,
+            region_x,
+            region_z,
+            locations,
+        })
+    }
+
+    /// Like `new`, but infers region coordinates from the first parseable
+    /// chunk's xPos/zPos (mirrors `McaFile::from_bytes_auto`).
+    pub fn new_auto(reader: R) -> Result<Self, Box<dyn Error>> {
+        let mut rr = Self::new(reader, 0, 0)?;
+        let indices: Vec<u32> = rr.locations.iter().map(|(i, _)| *i).collect();
+        for i in indices {
+            if let Ok(Some(nbt)) = rr.read_chunk_nbt_at(i) {
+                if let (Ok(cx), Ok(cz)) = (nbt.get::<_, i32>("xPos"), nbt.get::<_, i32>("zPos")) {
+                    rr.region_x = floor_div(cx, 32);
+                    rr.region_z = floor_div(cz, 32);
+                    return Ok(rr);
+                }
+            }
+        }
+        Err("Could not determine region coordinates from MCA data".into())
+    }
+
+    pub fn region_position(&self) -> (i32, i32) {
+        (self.region_x, self.region_z)
+    }
+
+    /// Chunk coordinates present in the location table (may include chunks
+    /// that later fail to parse).
+    pub fn chunk_positions(&self) -> Vec<(i32, i32)> {
+        self.locations
+            .iter()
+            .map(|(i, _)| {
+                (
+                    self.region_x * 32 + (*i % 32) as i32,
+                    self.region_z * 32 + (*i / 32) as i32,
+                )
+            })
+            .collect()
+    }
+
+    /// Read and parse one chunk by absolute chunk coordinates.
+    /// Ok(None) if the chunk is absent from this region.
+    pub fn read_chunk(&mut self, cx: i32, cz: i32) -> Result<Option<ChunkData>, Box<dyn Error>> {
+        let local_x = cx - self.region_x * 32;
+        let local_z = cz - self.region_z * 32;
+        if !(0..32).contains(&local_x) || !(0..32).contains(&local_z) {
+            return Ok(None);
+        }
+        let index = (local_z * 32 + local_x) as u32;
+        debug_assert!(index < 1024, "local chunk index out of range");
+        match self.read_chunk_nbt_at(index)? {
+            None => Ok(None),
+            Some(nbt) => Ok(Some(parse_chunk_nbt(&nbt, cx, cz)?)),
+        }
+    }
+
+    /// Seek to a chunk payload, decompress, and parse the raw NBT.
+    fn read_chunk_nbt_at(
+        &mut self,
+        index: u32,
+    ) -> Result<Option<quartz_nbt::NbtCompound>, Box<dyn Error>> {
+        let offset = match self.locations.iter().find(|(i, _)| *i == index) {
+            Some((_, off)) => *off,
+            None => return Ok(None),
+        };
+        self.reader.seek(SeekFrom::Start(offset))?;
+        let mut head = [0u8; 5];
+        self.reader.read_exact(&mut head)?;
+        let chunk_len = u32::from_be_bytes([head[0], head[1], head[2], head[3]]);
+        if chunk_len <= 1 {
+            return Ok(None);
+        }
+        let compression = CompressionType::from_byte(head[4])?;
+        let mut compressed = vec![0u8; (chunk_len as usize) - 1];
+        self.reader.read_exact(&mut compressed)?;
+        let decompressed = decompress_chunk(&compressed, compression)?;
+        let (nbt, _) =
+            quartz_nbt::io::read_nbt(&mut Cursor::new(&decompressed), Flavor::Uncompressed)?;
+        Ok(Some(nbt))
+    }
 }
 
 // ─── Utility ────────────────────────────────────────────────────────────────
@@ -1303,6 +1435,7 @@ mod tests {
                 BlockState::new("minecraft:stone".to_string()),
             ],
             block_states: vec![0u16; 4096],
+            biomes: None,
         };
         let nbt = build_section_nbt(&section);
 
@@ -1324,6 +1457,7 @@ mod tests {
             y: 0,
             palette: vec![BlockState::new("minecraft:air".to_string())],
             block_states: vec![0u16; 4096],
+            biomes: None,
         };
         let nbt = build_section_nbt(&section);
         let bs = nbt.get::<_, &NbtCompound>("block_states").unwrap();
@@ -1346,6 +1480,7 @@ mod tests {
                     .with_property("half".to_string(), "bottom".to_string()),
             ],
             block_states: vec![0u16; 4096],
+            biomes: None,
         };
         let nbt = build_section_nbt(&section);
         let bs = nbt.get::<_, &NbtCompound>("block_states").unwrap();
@@ -1394,6 +1529,7 @@ mod tests {
                 bs[0] = 1;
                 bs
             },
+            biomes: None,
         };
 
         let chunk = ChunkData {
@@ -1503,6 +1639,7 @@ mod tests {
                 BlockState::new("minecraft:stone".to_string()),
             ],
             block_states: vec![0u16; 4096],
+            biomes: None,
         };
         section.block_states[0] = 1;
         section.block_states[1] = 1;
@@ -1569,6 +1706,7 @@ mod tests {
                 bs[1] = 2;
                 bs
             },
+            biomes: None,
         };
 
         let chunk = ChunkData {
@@ -1625,6 +1763,7 @@ mod tests {
                     bs[0] = 1;
                     bs
                 },
+                biomes: None,
             }],
             block_entities: Vec::new(),
             entities: Vec::new(),
@@ -1644,6 +1783,7 @@ mod tests {
                 bs[0] = 1;
                 bs
             },
+            biomes: None,
         }
     }
 

@@ -2212,7 +2212,7 @@ int schematic_from_world_directory_bounded(SchematicWrapper *schematic, const ch
 `options_json` may be `NULL` for defaults, or a JSON string with any of:
 `world_name`, `game_mode` (0–3), `difficulty` (0–3), `spawn_position` (`[x,y,z]`),
 `data_version`, `version_name`, `void_world`, `offset` (`[x,y,z]`),
-`allow_commands`, `day_time`.
+`allow_commands`, `day_time`, `biome` (default `"minecraft:plains"` — applied to sections with no biome data).
 
 ```c
 // File-path -> bytes map of the world contents (region/r.0.0.mca, level.dat, ...)
@@ -2245,6 +2245,143 @@ fwrite(out.data, 1, out.len, fp);
 free_byte_array(out);
 schematic_free(sch);
 ```
+
+### Streaming (constant memory)
+
+The streaming API processes one chunk at a time — peak memory is O(one chunk)
+for directory/MCA sources, O(one region file) for zip. `worldstream_next`
+returns `NULL` at end **and silently skips corrupt chunks** (no per-item error;
+corrupt chunks are simply omitted with no diagnostic). Status codes: `0` success, `-1` NULL
+arg, `-2` IO/parse failure. The bounded variants (`_bounded`) filter on X/Z chunk columns
+only — Y values are accepted for API symmetry but do not exclude chunks.
+
+```c
+// --- Opaque handle types (defined in nucleation.h) ---
+// WorldStreamHandle  -- iterator over world chunks
+// WorldChunkViewHandle -- caller-owned view of one chunk; remains valid until worldchunkview_free()
+// WorldSinkHandle    -- buffered writer for .mca region files
+
+// Open sources
+WorldStreamHandle *worldstream_open_dir(const char *path);
+WorldStreamHandle *worldstream_open_dir_bounded(const char *path,
+    int min_x, int min_y, int min_z, int max_x, int max_y, int max_z);
+WorldStreamHandle *worldstream_from_zip(const unsigned char *data, size_t len);
+WorldStreamHandle *worldstream_from_zip_bounded(const unsigned char *data, size_t len,
+    int min_x, int min_y, int min_z, int max_x, int max_y, int max_z);
+
+// Iterate -- returns NULL at end AND silently skips corrupt chunks
+WorldChunkViewHandle *worldstream_next(WorldStreamHandle *stream);
+void worldstream_free(WorldStreamHandle *stream);
+
+// Inspect or fabricate a chunk view (caller owns; free with worldchunkview_free when done)
+WorldChunkViewHandle *worldchunkview_new(int32_t cx, int32_t cz);  // empty chunk, fabricated from scratch
+int32_t worldchunkview_cx(const WorldChunkViewHandle *view);
+int32_t worldchunkview_cz(const WorldChunkViewHandle *view);
+SchematicWrapper *worldchunkview_to_schematic(const WorldChunkViewHandle *view); // caller frees
+int worldchunkview_set_block(WorldChunkViewHandle *view,
+    int32_t x, int32_t y, int32_t z, const char *block_name);
+void worldchunkview_free(WorldChunkViewHandle *view);
+
+// Sink -- buffered writer for .mca region files
+WorldSinkHandle *worldsink_create(const char *path, const char *options_json);   // options_json may be NULL
+WorldSinkHandle *worldsink_open_existing(const char *path);
+int worldsink_write_chunk(WorldSinkHandle *sink, WorldChunkViewHandle *view);
+int worldsink_put_chunk(WorldSinkHandle *sink, WorldChunkViewHandle *view);      // open_existing only
+int worldsink_finish(WorldSinkHandle *sink);  // flushes + frees; do NOT call worldsink_free after
+void worldsink_free(WorldSinkHandle *sink);   // only if finish() was NOT called
+```
+
+Example — iterate a world directory, convert each chunk to a schematic:
+
+```c
+WorldStreamHandle *stream = worldstream_open_dir("saves/my_world");
+if (!stream) { /* handle error */ }
+
+WorldChunkViewHandle *view;
+while ((view = worldstream_next(stream)) != NULL) {
+    // corrupt chunks are silently skipped; view is caller-owned, valid until worldchunkview_free()
+    int32_t cx = worldchunkview_cx(view);
+    int32_t cz = worldchunkview_cz(view);
+
+    SchematicWrapper *schem = worldchunkview_to_schematic(view);
+    // ... process schem ...
+    schematic_free(schem);
+
+    worldchunkview_free(view);
+}
+worldstream_free(stream);
+
+// Sink copy: open source, write all chunks, finish
+WorldSinkHandle *sink = worldsink_create("out_world", NULL);
+WorldStreamHandle *src = worldstream_open_dir("saves/my_world");
+while ((view = worldstream_next(src)) != NULL) {
+    worldsink_write_chunk(sink, view);
+    worldchunkview_free(view);
+}
+worldstream_free(src);
+worldsink_finish(sink);   // IMPORTANT: finish() consumes the sink; do not call worldsink_free()
+```
+
+> **finish() vs free()**: `worldsink_finish` flushes all buffered region data
+> and frees the handle. Call `worldsink_free` only if you abandon the sink
+> before finishing (e.g. on error). Calling both is a double-free.
+
+#### Generating worlds from scratch
+
+Use `worldchunkview_new` to fabricate an empty chunk, fill it with
+`worldchunkview_set_block` (world-space coordinates; returns 1 on success),
+then pass it to `worldsink_write_chunk`. Memory stays O(one chunk) at any world size.
+
+```c
+// options_json may be NULL for defaults (void_world=true, plains biome, data_version 4671).
+const char *opts = "{\"spawn_position\":[0,64,0]}";
+WorldSinkHandle *sink = worldsink_create("out_world", opts);
+if (!sink) { /* handle error */ }
+
+for (int cz = -8; cz < 8; cz++) {
+    for (int cx = -8; cx < 8; cx++) {   // region-major order = fastest sequential writes
+        WorldChunkViewHandle *view = worldchunkview_new(cx, cz);
+        for (int bx = cx * 16; bx < cx * 16 + 16; bx++) {
+            for (int bz = cz * 16; bz < cz * 16 + 16; bz++) {
+                int h = 60 + (bx + bz) % 8;   // trivial height function
+                worldchunkview_set_block(view, bx, h,   bz, "minecraft:grass_block");
+                for (int by = 0; by < h; by++)
+                    worldchunkview_set_block(view, bx, by, bz, "minecraft:stone");
+            }
+        }
+        worldsink_write_chunk(sink, view);   // view is NOT consumed; free it yourself
+        worldchunkview_free(view);           // drop after write — constant memory
+    }
+}
+worldsink_finish(sink);   // flushes region files + writes level.dat; do NOT call worldsink_free after
+```
+
+**Biomes:**
+```c
+// Overwrite the biome of every currently-present section with a single-entry palette.
+// Call AFTER worldchunkview_set_block — sections are created lazily.
+// Returns 0 on success, -1 if view or biome_name is NULL.
+int worldchunkview_set_biome(WorldChunkViewHandle *view, const char *biome_name);
+
+// Deduped union of all sections' biome palette entries, in order of first appearance.
+// Returns an empty StringArray if no section carries biome data.
+// Free the result with free_string_array().
+StringArray worldchunkview_biome_palette(const WorldChunkViewHandle *view);
+```
+
+Usage:
+```c
+worldchunkview_set_biome(view, "minecraft:desert");   // after set_block calls
+
+StringArray palette = worldchunkview_biome_palette(view);
+for (size_t i = 0; i < palette.len; i++)
+    printf("biome: %s\n", palette.data[i]);
+free_string_array(palette);   // free_string_array — NOT free() or free_string()
+```
+
+The `"biome"` key in `options_json` (default `"minecraft:plains"`) is the fallback stamped onto freshly created sections with no biome data. Biome data in chunks read from an existing world is preserved verbatim. Chunk-level granularity only; sub-chunk 3D biome editing is future work.
+
+**Limitations:** lighting is recalculated by Minecraft on first load.
 
 ---
 

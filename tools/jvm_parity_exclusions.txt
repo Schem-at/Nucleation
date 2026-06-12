@@ -251,3 +251,11 @@ Store.*
 #    to_json / summary_json). Mirrors FFI/WASM, which omit these too. ──────────
 Diff.regions_json     # FFI/JVM read regions from summary_json
 Diff.transform_json   # Python-only convenience; transform is inside to_json
+
+# ── Streaming world API (2026-06-13) — not yet exposed in nucleation-jvm ────
+# Follow-up: implement JVM bindings for the streaming world API, then remove.
+WorldSource.*        # streaming world API not in JVM yet
+WorldChunkIter.*     # streaming world API not in JVM yet
+WorldChunkView.*     # streaming world API not in JVM yet
+WorldSink.*          # streaming world API not in JVM yet
+ChunkDiff.*          # streaming world API not in JVM yet

@@ -236,6 +236,91 @@ World export accepts an options object (JSON in WASM/Python) with fields like `w
 
 See [`examples/convert_world.rs`](examples/convert_world.rs) (world zip → litematic + GLB) and [`examples/inspect_world.rs`](examples/inspect_world.rs) for complete programs, and the per-language docs ([Rust](examples/rust.md), [WASM](examples/wasm.md), [Python](examples/python.md), [FFI](examples/ffi.md)) for the full API.
 
+#### Streaming massive worlds (constant memory)
+
+For worlds too large to load at once, the streaming API processes one chunk at a time — peak memory is O(one chunk) for directory/MCA sources, O(one region file) for zip:
+
+```rust
+use nucleation::formats::world_stream::{WorldSource, WorldSink, diff_worlds};
+
+// Walk every chunk in a world directory; extract all sign block-entities
+let src = WorldSource::open_dir("saves/my_world")?;
+for result in src.chunks() {
+    let view = result?;                   // per-chunk Err = corrupt chunk; stream continues
+    for be in view.block_entities() {
+        if be.id.contains("sign") {
+            let schem = view.to_schematic();   // bridge to UniversalSchematic for a single chunk
+            // … process schem …
+        }
+    }
+}
+
+// Replay: copy the BEFORE world, then apply each ChunkDiff to transform before→after.
+// (Applying diffs to "saves/after" directly would double-apply already-present changes.)
+std::fs::copy_dir_all("saves/before", "saves/replay")?;  // or use fs_extra / your own copy
+let diffs = diff_worlds(
+    &WorldSource::open_dir("saves/before")?,
+    &WorldSource::open_dir("saves/after")?,
+    "exact",
+)?;
+let air = BlockState::new("minecraft:air".to_string());
+let mut sink = WorldSink::open_existing("saves/replay")?;
+for cd in diffs? {
+    let cd = cd?;
+    // removed+added+changed are what replay applies; swapped/palette_swaps are analysis-only
+    sink.patch_chunk(cd.cx, cd.cz, |view| {
+        for (pos, _) in &cd.diff.removed  { view.set_block(pos.0, pos.1, pos.2, &air); }
+        for (pos, b) in &cd.diff.added    { view.set_block(pos.0, pos.1, pos.2, b); }
+        for (pos, _, b) in &cd.diff.changed { view.set_block(pos.0, pos.1, pos.2, b); }
+    })?;
+}
+sink.finish()?;
+```
+
+Memory model: the streaming path never materialises more than one chunk (directory/MCA) or one region file (zip) at a time. For per-language streaming docs see [Rust §9](examples/rust.md#9--world--region-parsing-anvil--mca), [Python §8](examples/python.md#8-world--region-parsing-anvil--mca), [WASM §7](examples/wasm.md#7--world--region-parsing-anvil--mca), [FFI §26](examples/ffi.md#26----world--region-parsing-anvil--mca).
+
+##### Generating worlds from scratch
+
+`WorldChunkView::new(cx, cz)` creates an empty chunk that you fill with blocks,
+then hand to a `WorldSink`. Sections are allocated on demand, so memory stays
+constant no matter how large the world is.
+
+```rust
+use nucleation::formats::world_stream::{WorldChunkView, WorldSink};
+use nucleation::formats::world::WorldExportOptions;
+use nucleation::BlockState;
+
+let options = WorldExportOptions {
+    spawn_position: Some((0, 64, 0)),
+    biome: "minecraft:plains".to_string(),  // default applied to sections with no biome data
+    ..Default::default()
+};
+let mut sink = WorldSink::create("out_world", Some(options))?;
+
+// Canonical region-major order is fastest; out-of-order works via read-merge.
+for cz in -8..8_i32 {
+    for cx in -8..8_i32 {
+        let mut chunk = WorldChunkView::new(cx, cz);
+        for bx in (cx * 16)..(cx * 16 + 16) {
+            for bz in (cz * 16)..(cz * 16 + 16) {
+                let h = 60 + ((bx + bz) % 8) as i32;
+                chunk.set_block(bx, h, bz, &BlockState::new("minecraft:grass_block".to_string()));
+                for by in 0..h {
+                    chunk.set_block(bx, by, bz, &BlockState::new("minecraft:stone".to_string()));
+                }
+            }
+        }
+        chunk.set_biome("minecraft:plains");  // call AFTER set_block; sections are created lazily
+        sink.write_chunk(chunk)?;
+    }
+}
+sink.finish()?;  // writes level.dat; void_world: true by default (nothing else generates)
+```
+
+**Biomes:** sections with no biome data get the `WorldExportOptions::biome` default (`"minecraft:plains"` unless overridden). Override per-chunk with `chunk.set_biome("minecraft:desert")` — call it after placing blocks, since sections are allocated lazily. Biome data in chunks you read and re-stream is preserved verbatim; only freshly created sections without biome data receive the default. Chunk-level granularity only — sub-chunk 3D biome editing (4×4×4 cells) is future work. Use `chunk.biome_palette()` to inspect which biomes are present in a chunk.
+
+**Limitations:** lighting is recalculated by Minecraft on first load. Spawn point, game rules, and other level settings come from `WorldExportOptions`. See per-language docs for [Rust §9](examples/rust.md#9--world--region-parsing-anvil--mca), [Python §8](examples/python.md#8-world--region-parsing-anvil--mca), [WASM §7](examples/wasm.md#7--world--region-parsing-anvil--mca), [FFI §26](examples/ffi.md#26----world--region-parsing-anvil--mca).
+
 ### Building Schematics with ASCII Art
 
 ```rust

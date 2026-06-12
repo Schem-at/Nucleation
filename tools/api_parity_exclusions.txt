@@ -325,3 +325,39 @@ Schematic.open = No filesystem in WASM; use openFromStore(store, key)
 Schematic.open = Python provides this in the pure-Python facade (nucleation/__init__.py Schematic.open)
 Schematic.open_from_store = Python facade folds this into Schematic.open(store, key)
 Schematic.save_to_store = Python facade folds this into Schematic.save(store, key)
+
+# --- Streaming World API ---
+# WorldSource/WorldSink/WorldChunkView/WorldChunkIter/ChunkDiff are the streaming
+# world API. FFI exposes all operations as worldstream_*/worldchunkview_*/worldsink_*
+# free functions. WASM has no filesystem so open_dir/sink/diff_worlds are absent.
+# Iterator protocol differs by idiom: Python uses __iter__/__next__ (for-loop),
+# WASM uses has_next/next (poll loop), FFI uses worldstream_next (NULL sentinel).
+[ffi_only]
+worldstream_* = FFI free functions for WorldSource streaming (WASM/Python use wrapper methods)
+worldchunkview_* = FFI free functions for WorldChunkView (WASM/Python use wrapper methods)
+worldsink_* = FFI free functions for WorldSink (WASM/Python use wrapper methods)
+
+[no_ffi]
+WorldSource.* = FFI uses worldstream_* free functions
+WorldChunkView.* = FFI uses worldchunkview_* free functions
+WorldSink.* = FFI uses worldsink_* free functions
+WorldChunkIter.* = FFI uses worldstream_next free function (NULL sentinel)
+ChunkDiff.* = FFI uses worldstream_next+worldchunkview_* free functions; no ChunkDiff wrapper
+diff_worlds = FFI has no diff_worlds; callers use worldstream_next on two sources manually
+
+[no_wasm]
+WorldSource.open_dir = No filesystem in WASM
+WorldSource.region_positions = Not exposed in WASM (enumerate via chunks instead)
+WorldSink.* = No filesystem in WASM; sink requires writing .mca files
+WorldChunkView.blocks = Not exposed in WASM WorldChunkViewWrapper
+ChunkDiff.* = diff_worlds not available in WASM (no sink to apply to)
+diff_worlds = diff_worlds not available in WASM
+
+[python_only]
+WorldSource.__iter__ = Python protocol (__iter__ → for chunk in source); WASM uses chunks()/has_next/next
+WorldChunkIter.__iter__ = Python iterator protocol dunder
+WorldChunkIter.__next__ = Python iterator protocol dunder
+
+[wasm_only]
+WorldChunkIter.has_next = WASM poll-style iteration; Python uses __next__, FFI uses NULL sentinel
+WorldChunkIter.next = WASM poll-style iteration; Python uses __next__, FFI uses NULL sentinel

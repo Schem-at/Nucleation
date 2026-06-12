@@ -325,6 +325,79 @@ const zip = wrapper.to_world_zip(JSON.stringify({
 const blob = new Blob([zip], { type: "application/zip" });
 ```
 
+### Streaming (constant memory)
+
+The `WorldSourceWrapper` / `WorldChunkIterWrapper` classes stream a zip or MCA
+byte array one chunk at a time — peak memory is O(one region file) for zip and
+O(one chunk) for MCA. Use `has_next()` / `next()` to poll the iterator;
+`next()` returns `undefined` at end and **throws** on a corrupt chunk.
+
+> `open_dir`, `WorldSink`, and `diff_worlds` are **not** available in WASM —
+> there is no filesystem. Use the Rust, Python, or FFI bindings for sink and
+> diff operations.
+
+```ts
+import init, { WorldSourceWrapper } from "nucleation";
+await init();
+
+// Stream all chunks from a zipped world (e.g. from a file input or fetch)
+const zipBytes = new Uint8Array(await file.arrayBuffer());
+const src = WorldSourceWrapper.from_zip_bytes(zipBytes);
+const iter = src.chunks();
+
+while (iter.has_next()) {
+    let view;
+    try {
+        view = iter.next();          // throws on corrupt chunk
+    } catch (e) {
+        console.warn("corrupt chunk, skipping:", e);
+        continue;
+    }
+    console.log(`chunk (${view.cx()}, ${view.cz()})`);
+    const schem = view.to_schematic();   // bridge to SchematicWrapper for full API
+    // ... process schem ...
+}
+
+// Bounded scan over a single .mca file
+// Note: chunks_bounded filters on X/Z only (chunks are full-height columns);
+// Y values are accepted for API symmetry but do not exclude chunks.
+const mcaBytes = new Uint8Array(await fetch("r.0.0.mca").then(r => r.arrayBuffer()));
+const src2 = WorldSourceWrapper.from_mca_bytes(mcaBytes);
+const iter2 = src2.chunks_bounded(-128, 0, -128, 128, 256, 128);
+while (iter2.has_next()) { /* ... */ }
+```
+
+> **`get_block` and air**: `view.get_block(x, y, z)` returns the stored palette name for every
+> block including `"minecraft:air"`. It returns `undefined` only when the coordinates fall outside
+> the chunk's loaded sections (not because the block is air).
+
+#### Generating worlds from scratch (WASM)
+
+`new WorldChunkViewWrapper(cx, cz)` creates an empty chunk; `set_block(x, y, z, name)` fills it using world-space coordinates and returns `true` on success.
+
+```ts
+import init, { WorldChunkViewWrapper } from "nucleation";
+await init();
+
+const chunk = new WorldChunkViewWrapper(0, 0);   // chunk at (cx=0, cz=0)
+for (let bx = 0; bx < 16; bx++) {
+    for (let bz = 0; bz < 16; bz++) {
+        const h = 60 + (bx + bz) % 8;
+        chunk.set_block(bx, h, bz, "minecraft:grass_block");
+        for (let by = 0; by < h; by++) {
+            chunk.set_block(bx, by, bz, "minecraft:stone");
+        }
+    }
+}
+const schem = chunk.to_schematic();   // bridge to SchematicWrapper for meshing / export
+```
+
+> **No `WorldSink` in WASM.** The browser has no filesystem, so `WorldSink`, `open_dir`, and `diff_worlds` are not available. To produce a `.zip` world archive from the browser, build a `SchematicWrapper` and call `schematic.to_world_zip(optionsJson)` — that path is eager (loads the whole schematic) but works entirely in-memory. For large procedural worlds use the Rust, Python, or FFI bindings.
+
+**Biomes:** `WorldChunkViewWrapper` exposes `set_biome(name: string)` and `biome_palette(): string[]`, matching the Rust/Python API. Call `set_biome` after `set_block` calls (sections are allocated lazily). Biome data in chunks read from an existing world is preserved verbatim through any round-trip; only freshly created sections with no biome data receive the `WorldExportOptions` default (`"minecraft:plains"` unless overridden via `schematic.to_world_zip(optionsJson)` with a `"biome"` field). Chunk-level granularity only — sub-chunk 3D biome editing is future work.
+
+**Limitations:** lighting is recalculated by Minecraft on first load.
+
 ---
 
 ### Final notes

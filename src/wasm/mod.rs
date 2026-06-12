@@ -19,6 +19,7 @@ mod palettes;
 mod schematic;
 mod schematic_builder;
 mod store;
+mod world_stream;
 
 #[cfg(feature = "simulation")]
 mod circuit_builder;
@@ -41,6 +42,7 @@ pub use schematic::{
 };
 pub use schematic_builder::SchematicBuilderWrapper;
 pub use store::StoreWrapper;
+pub use world_stream::{WorldChunkIterWrapper, WorldChunkViewWrapper, WorldSourceWrapper};
 
 #[cfg(feature = "simulation")]
 pub use circuit_builder::{CircuitBuilderWrapper, SortStrategyWrapper, StateModeConstants};

@@ -6,3 +6,4 @@ pub mod mcstructure;
 pub mod schematic;
 pub mod snapshot;
 pub mod world;
+pub mod world_stream;

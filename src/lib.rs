@@ -49,7 +49,7 @@ pub mod wasm;
 pub use block_state::BlockState;
 pub use bounding_box::BoundingBox;
 pub use entity::Entity;
-pub use formats::{litematic, schematic};
+pub use formats::{litematic, schematic, world_stream};
 pub use print_utils::{format_json_schematic, format_schematic};
 pub use region::Region;
 pub use schematic_builder::{

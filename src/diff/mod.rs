@@ -256,8 +256,15 @@ fn diff_for_rotation(
             }
         }
     }
-    let raw = compare(&a_cells, t, b_cells);
-    let (swaps, changed, swapped) = collapse_swaps(&a_cells, t, b_cells, raw.changed);
+    diff_at(&a_cells, b_cells, g, t, spec)
+}
+
+/// Diff A-cells against B-cells at a FIXED translation `t` (no alignment
+/// search). Used by `diff_for_rotation` after choosing `t`, and by
+/// `diff_identity` with `t = (0, 0, 0)`.
+fn diff_at(a_cells: &[Cell], b_cells: &[Cell], g: &RigidOp, t: IVec3, spec: &DiffSpec) -> Diff {
+    let raw = compare(a_cells, t, b_cells);
+    let (swaps, changed, swapped) = collapse_swaps(a_cells, t, b_cells, raw.changed);
     let max_cells = a_cells.len().max(b_cells.len()).max(1);
     let distance = spec.costs.add * raw.added.len() as u32
         + spec.costs.delete * raw.removed.len() as u32
@@ -304,6 +311,18 @@ pub fn diff(a: &UniversalSchematic, b: &UniversalSchematic, spec: &DiffSpec) -> 
         palette_swaps: Vec::new(),
         support: 0.0,
     })
+}
+
+/// Diff two schematics that share an absolute coordinate frame: no
+/// rotation/symmetry search AND no translation alignment — the diff is
+/// computed at the fixed identity transform, so added/removed/changed are
+/// reported in absolute coordinates (used by world_stream's per-chunk diff,
+/// where both worlds use the same world coordinates).
+pub fn diff_identity(a: &UniversalSchematic, b: &UniversalSchematic, spec: &DiffSpec) -> Diff {
+    let id = RigidOp::identity();
+    let a_cells = cells(a, &id, &spec.fingerprint);
+    let b_cells = cells(b, &id, &spec.fingerprint);
+    diff_at(&a_cells, &b_cells, &id, (0, 0, 0), spec)
 }
 
 impl Diff {

@@ -19,6 +19,7 @@ mod diff;
 mod schematic;
 mod schematic_builder;
 mod store;
+mod world_stream;
 
 #[cfg(feature = "simulation")]
 mod circuit_builder;
@@ -37,6 +38,9 @@ pub use diff::PyDiff;
 pub use schematic::{PyBlockState, PySchematic};
 pub use schematic_builder::PySchematicBuilder;
 pub use store::PyStore;
+pub use world_stream::{
+    PyChunkDiff, PyWorldChunkIter, PyWorldChunkView, PyWorldSink, PyWorldSource,
+};
 
 #[cfg(feature = "simulation")]
 pub use circuit_builder::{PyCircuitBuilder, PySortStrategy};
@@ -64,6 +68,12 @@ pub fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<building::PyBrush>()?;
     m.add_class::<PySchematicBuilder>()?;
     m.add_class::<PyStore>()?;
+    m.add_class::<PyWorldSource>()?;
+    m.add_class::<PyWorldChunkIter>()?;
+    m.add_class::<PyWorldChunkView>()?;
+    m.add_class::<PyWorldSink>()?;
+    m.add_class::<PyChunkDiff>()?;
+    m.add_function(wrap_pyfunction!(world_stream::diff_worlds, m)?)?;
     m.add_function(wrap_pyfunction!(debug_schematic, m)?)?;
     m.add_function(wrap_pyfunction!(debug_json_schematic, m)?)?;
     m.add_function(wrap_pyfunction!(load_schematic, m)?)?;

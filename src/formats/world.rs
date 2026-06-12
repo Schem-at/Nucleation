@@ -59,6 +59,11 @@ pub struct WorldExportOptions {
     /// Disable mob spawning
     #[serde(default = "default_true")]
     pub disable_mob_spawning: bool,
+    /// Biome applied to every generated section that has no biome data of its
+    /// own (e.g. `"minecraft:plains"`). Sections carrying biome data parsed
+    /// from an existing world are never overwritten.
+    #[serde(default = "default_biome")]
+    pub biome: String,
 }
 
 fn default_world_name() -> String {
@@ -67,7 +72,7 @@ fn default_world_name() -> String {
 fn default_game_mode() -> i32 {
     1
 }
-fn default_data_version() -> i32 {
+pub(crate) fn default_data_version() -> i32 {
     4671
 }
 fn default_version_name() -> String {
@@ -78,6 +83,9 @@ fn default_true() -> bool {
 }
 fn default_day_time() -> Option<i64> {
     Some(6000)
+}
+fn default_biome() -> String {
+    "minecraft:plains".to_string()
 }
 
 impl Default for WorldExportOptions {
@@ -94,6 +102,7 @@ impl Default for WorldExportOptions {
             allow_commands: true,
             day_time: default_day_time(),
             disable_mob_spawning: true,
+            biome: default_biome(),
         }
     }
 }
@@ -503,90 +512,94 @@ fn load_mca_into_schematic(
     bounds: Option<(i32, i32, i32, i32, i32, i32)>,
 ) {
     for chunk_opt in &mca.chunks {
-        let chunk = match chunk_opt {
-            Some(c) => c,
-            None => continue,
-        };
+        if let Some(chunk) = chunk_opt {
+            load_chunk_into_schematic(chunk, schematic, bounds);
+        }
+    }
+}
 
-        let chunk_world_x = chunk.x * 16;
-        let chunk_world_z = chunk.z * 16;
+/// Load one parsed chunk into a schematic at absolute world coordinates.
+pub(crate) fn load_chunk_into_schematic(
+    chunk: &ChunkData,
+    schematic: &mut UniversalSchematic,
+    bounds: Option<(i32, i32, i32, i32, i32, i32)>,
+) {
+    let chunk_world_x = chunk.x * 16;
+    let chunk_world_z = chunk.z * 16;
 
-        for section in &chunk.sections {
-            let section_world_y = (section.y as i32) * 16;
+    for section in &chunk.sections {
+        let section_world_y = (section.y as i32) * 16;
 
-            for local_y in 0..16 {
-                for local_z in 0..16 {
-                    for local_x in 0..16 {
-                        let world_x = chunk_world_x + local_x;
-                        let world_y = section_world_y + local_y;
-                        let world_z = chunk_world_z + local_z;
+        for local_y in 0..16 {
+            for local_z in 0..16 {
+                for local_x in 0..16 {
+                    let world_x = chunk_world_x + local_x;
+                    let world_y = section_world_y + local_y;
+                    let world_z = chunk_world_z + local_z;
 
-                        // Check bounds if specified
-                        if let Some((min_x, min_y, min_z, max_x, max_y, max_z)) = bounds {
-                            if world_x < min_x
-                                || world_x > max_x
-                                || world_y < min_y
-                                || world_y > max_y
-                                || world_z < min_z
-                                || world_z > max_z
-                            {
-                                continue;
-                            }
-                        }
-
-                        let idx = (local_y * 16 * 16 + local_z * 16 + local_x) as usize;
-                        let palette_idx = section.block_states[idx] as usize;
-
-                        if palette_idx >= section.palette.len() {
+                    // Check bounds if specified
+                    if let Some((min_x, min_y, min_z, max_x, max_y, max_z)) = bounds {
+                        if world_x < min_x
+                            || world_x > max_x
+                            || world_y < min_y
+                            || world_y > max_y
+                            || world_z < min_z
+                            || world_z > max_z
+                        {
                             continue;
                         }
-
-                        let block = &section.palette[palette_idx];
-                        // Skip air blocks
-                        if is_air(&block.name) {
-                            continue;
-                        }
-
-                        schematic.set_block(world_x, world_y, world_z, block);
                     }
+
+                    let idx = (local_y * 16 * 16 + local_z * 16 + local_x) as usize;
+                    let palette_idx = section.block_states[idx] as usize;
+
+                    if palette_idx >= section.palette.len() {
+                        continue;
+                    }
+
+                    let block = &section.palette[palette_idx];
+                    // Skip air blocks
+                    if is_air(&block.name) {
+                        continue;
+                    }
+
+                    schematic.set_block(world_x, world_y, world_z, block);
                 }
             }
         }
+    }
 
-        // Add block entities
-        for be in &chunk.block_entities {
-            if let Some((min_x, min_y, min_z, max_x, max_y, max_z)) = bounds {
-                let (bx, by, bz) = be.position;
-                if bx < min_x || bx > max_x || by < min_y || by > max_y || bz < min_z || bz > max_z
-                {
-                    continue;
-                }
+    // Add block entities
+    for be in &chunk.block_entities {
+        if let Some((min_x, min_y, min_z, max_x, max_y, max_z)) = bounds {
+            let (bx, by, bz) = be.position;
+            if bx < min_x || bx > max_x || by < min_y || by > max_y || bz < min_z || bz > max_z {
+                continue;
             }
-            schematic.default_region.set_block_entity(
-                BlockPosition {
-                    x: be.position.0,
-                    y: be.position.1,
-                    z: be.position.2,
-                },
-                be.clone(),
+        }
+        schematic.default_region.set_block_entity(
+            BlockPosition {
+                x: be.position.0,
+                y: be.position.1,
+                z: be.position.2,
+            },
+            be.clone(),
+        );
+    }
+
+    // Add entities
+    for entity in &chunk.entities {
+        if let Some((min_x, min_y, min_z, max_x, max_y, max_z)) = bounds {
+            let (ex, ey, ez) = (
+                entity.position.0 as i32,
+                entity.position.1 as i32,
+                entity.position.2 as i32,
             );
-        }
-
-        // Add entities
-        for entity in &chunk.entities {
-            if let Some((min_x, min_y, min_z, max_x, max_y, max_z)) = bounds {
-                let (ex, ey, ez) = (
-                    entity.position.0 as i32,
-                    entity.position.1 as i32,
-                    entity.position.2 as i32,
-                );
-                if ex < min_x || ex > max_x || ey < min_y || ey > max_y || ez < min_z || ez > max_z
-                {
-                    continue;
-                }
+            if ex < min_x || ex > max_x || ey < min_y || ey > max_y || ez < min_z || ez > max_z {
+                continue;
             }
-            schematic.default_region.add_entity(entity.clone());
         }
+        schematic.default_region.add_entity(entity.clone());
     }
 }
 
@@ -621,7 +634,7 @@ fn is_air(name: &str) -> bool {
     )
 }
 
-fn parse_region_filename(name: &str) -> Option<(i32, i32)> {
+pub(crate) fn parse_region_filename(name: &str) -> Option<(i32, i32)> {
     // Handle both "r.0.-1.mca" and "path/to/region/r.0.-1.mca"
     let basename = name.rsplit('/').next().unwrap_or(name);
     let basename = basename.rsplit('\\').next().unwrap_or(basename);
@@ -752,6 +765,13 @@ pub fn to_world(
             .map(|(_, builder)| builder.build())
             .collect();
         sections.sort_by_key(|s| s.y);
+
+        // World-default biome for freshly built sections (none carry biome data).
+        for section in &mut sections {
+            if section.biomes.is_none() {
+                section.biomes = Some(crate::formats::anvil::single_biome_compound(&opts.biome));
+            }
+        }
 
         let block_entities = chunk_block_entities
             .remove(&(*chunk_x, *chunk_z))
@@ -898,13 +918,14 @@ impl SectionBuilder {
             y: self.y,
             palette: self.palette.clone(),
             block_states: self.block_states.clone(),
+            biomes: None,
         }
     }
 }
 
 // ─── level.dat Generation ───────────────────────────────────────────────────
 
-fn generate_level_dat(opts: &WorldExportOptions) -> Result<Vec<u8>, Box<dyn Error>> {
+pub(crate) fn generate_level_dat(opts: &WorldExportOptions) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut data = NbtCompound::new();
 
     // ── Core identity ────────────────────────────────────────────────────
