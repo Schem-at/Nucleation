@@ -258,3 +258,62 @@ new_region.exclude_block(&schematic, "minecraft:air");
 schematic.definition_regions.insert("non_air".to_string(), new_region);
 ```
 
+---
+
+## 9 · World & Region Parsing (Anvil / `.mca`)
+
+`nucleation::formats::world` imports whole Minecraft worlds into a
+`UniversalSchematic`, so the full crate API (blocks, diffing, fingerprinting,
+meshing, re-export to any format) applies unchanged. No extra cargo feature is
+required — it's part of the core.
+
+```rust
+use nucleation::formats::world;
+
+// 1. Single region file (r.0.0.mca) — all chunks
+let data = std::fs::read("r.0.0.mca")?;
+let schematic = world::from_mca(&data)?;
+
+// 2. Zipped world folder — reads region/*.mca + entities/*.mca (1.17+)
+let zip = std::fs::read("my_world.zip")?;
+let schematic = world::from_world_zip(&zip)?;
+
+// 3. World save directory on disk (not available on wasm32 targets)
+let schematic = world::from_world_directory(std::path::Path::new("saves/my_world"))?;
+```
+
+Every importer has a `_bounded` variant taking inclusive **block** coordinates
+(`min_x, min_y, min_z, max_x, max_y, max_z`) — use it to carve out just the area
+you need instead of loading the whole world:
+
+```rust
+// Just the 256×256 area around spawn
+let spawn = world::from_world_zip_bounded(&zip, -128, 0, -128, 128, 256, 128)?;
+```
+
+For lower-level access, `nucleation::formats::anvil` exposes the raw MCA parser
+(`McaFile`, `ChunkData`, `ChunkSection`) if you need per-chunk control.
+
+### Exporting back to a world
+
+```rust
+use nucleation::formats::world::{self, WorldExportOptions};
+
+// Zipped, playable world as bytes
+let zip_bytes = world::to_world_zip(&schematic, None)?;
+
+// Raw file map: path (e.g. "region/r.0.0.mca", "level.dat") -> bytes
+let files = world::to_world(&schematic, None)?;
+
+// Write a world folder straight to disk
+world::save_world(&schematic, std::path::Path::new("out_world"), Some(WorldExportOptions {
+    world_name: "Generated".into(),
+    game_mode: 1,                       // 0 Survival, 1 Creative, 2 Adventure, 3 Spectator
+    spawn_position: Some((0, 64, 0)),
+    ..Default::default()                // void_world, data_version, day_time, …
+}))?;
+```
+
+Complete programs: [`examples/convert_world.rs`](convert_world.rs) (world zip →
+litematic + GLB) and [`examples/inspect_world.rs`](inspect_world.rs).
+

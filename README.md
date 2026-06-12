@@ -17,6 +17,7 @@
 ### Core
 
 - **Multi-format support**: `.schematic`, `.litematic`, `.nbt`, `.mcstructure`, and more
+- **World parsing**: import whole Minecraft worlds (Anvil `.mca` region files, zipped or on-disk world folders), optionally bounded to a coordinate box — and export schematics back out as playable worlds
 - **Memory-safe Rust core** with zero-copy deserialization
 - **Cross-platform**: Linux, macOS, Windows (x86_64 + ARM64)
 - **Multi-language**: Rust, JavaScript/TypeScript (WASM), Python, C/FFI
@@ -159,6 +160,81 @@ place = schem.place
 for x, y, z in positions:
     place(x, y, z, stone)
 ```
+
+### Parsing Worlds and Region Files (Anvil / `.mca`)
+
+Whole worlds load into the same `UniversalSchematic` as any other format, so everything downstream (diffing, fingerprinting, meshing, re-export) just works. Three inputs are supported:
+
+- a **single region file** (`r.0.0.mca`)
+- a **zipped world folder** (reads `region/*.mca` plus `entities/*.mca` on 1.17+)
+- a **world directory on disk** (native targets only, not WASM)
+
+Every importer has a `_bounded` variant taking `min_x, min_y, min_z, max_x, max_y, max_z` block coordinates — use it to carve out just the area you care about instead of loading the entire world.
+
+#### Rust
+
+```rust
+use nucleation::formats::world;
+
+// Single .mca region file
+let data = std::fs::read("r.0.0.mca")?;
+let schematic = world::from_mca(&data)?;
+
+// Zipped world folder, restricted to a bounding box
+let zip = std::fs::read("my_world.zip")?;
+let spawn_area = world::from_world_zip_bounded(&zip, -128, 0, -128, 128, 256, 128)?;
+
+// World directory on disk (not available on WASM)
+let world_dir = world::from_world_directory(std::path::Path::new("saves/my_world"))?;
+
+// And back out: export a schematic as a playable world
+let zip_bytes = world::to_world_zip(&schematic, None)?; // or Some(WorldExportOptions { .. })
+```
+
+#### JavaScript (WASM)
+
+```ts
+import init, { SchematicWrapper } from "nucleation";
+await init();
+
+const wrapper = new SchematicWrapper();
+
+// Single .mca region file
+wrapper.from_mca(new Uint8Array(mcaBytes));
+
+// Zipped world folder (bounded variant shown)
+wrapper.from_world_zip_bounded(new Uint8Array(zipBytes), -128, 0, -128, 128, 256, 128);
+
+// Export as a zipped world; options are passed as a JSON string
+const worldZip = wrapper.to_world_zip(JSON.stringify({ world_name: "Generated" }));
+```
+
+#### Python
+
+```python
+from nucleation import Schematic
+
+schem = Schematic.new("world_import")
+
+# Single .mca region file
+schem.from_mca(open("r.0.0.mca", "rb").read())
+
+# Zipped world folder, bounded to a box
+schem.from_world_zip_bounded(open("my_world.zip", "rb").read(),
+                             -128, 0, -128, 128, 256, 128)
+
+# World directory on disk
+schem.from_world_directory("saves/my_world")
+
+# Export back to a playable world
+zip_bytes = schem.to_world_zip()                 # bytes of a zipped world
+schem.save_world("out_world")                    # write world folder to disk
+files = schem.to_world()                         # dict[str, bytes] of world files
+```
+
+World export accepts an options object (JSON in WASM/Python) with fields like `world_name`, `game_mode`, `difficulty`, `spawn_position`, `data_version`, `version_name`, `void_world`, `offset`, `allow_commands`, and `day_time` — all optional with sensible defaults.
+
+See [`examples/convert_world.rs`](examples/convert_world.rs) (world zip → litematic + GLB) and [`examples/inspect_world.rs`](examples/inspect_world.rs) for complete programs, and the per-language docs ([Rust](examples/rust.md), [WASM](examples/wasm.md), [Python](examples/python.md), [FFI](examples/ffi.md)) for the full API.
 
 ### Building Schematics with ASCII Art
 
@@ -515,6 +591,7 @@ These guides apply to all languages:
 
 - [Main Documentation Index](docs/) - Overview and comparison
 - [Examples Directory](examples/) - Working code examples
+- [World & Region Parsing](#parsing-worlds-and-region-files-anvil--mca) - Import `.mca` files and whole worlds
 
 ---
 

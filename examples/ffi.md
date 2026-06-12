@@ -31,6 +31,7 @@ Complete reference for the Nucleation C FFI. All symbols are exported from the s
 23. [Meshing (feature = "meshing")](#23--meshing-feature--meshing)
 24. [Diff & Fingerprint](#24--diff--fingerprint)
 25. [C Code Examples](#25--c-code-examples)
+26. [World & Region Parsing (Anvil / .mca)](#26--world--region-parsing-anvil--mca)
 
 ---
 
@@ -2169,6 +2170,80 @@ int main(void) {
     schematic_free(sch);
     return 0;
 }
+```
+
+---
+
+## 26 -- World & Region Parsing (Anvil / .mca)
+
+Import whole Minecraft worlds into a `SchematicWrapper`. All importers **replace**
+the schematic's contents and return the usual status codes (`0` success, `-1` NULL
+argument, `-2` parse/IO failure). Bounds are inclusive block coordinates, not
+chunk coordinates.
+
+```c
+// Single region file (r.0.0.mca) -- all chunks
+int schematic_from_mca(SchematicWrapper *schematic,
+                       const unsigned char *data, size_t data_len);
+
+// Single region file, restricted to a block-coordinate box
+int schematic_from_mca_bounded(SchematicWrapper *schematic,
+                               const unsigned char *data, size_t data_len,
+                               int min_x, int min_y, int min_z,
+                               int max_x, int max_y, int max_z);
+
+// Zipped world folder (reads region/*.mca + entities/*.mca on 1.17+)
+int schematic_from_world_zip(SchematicWrapper *schematic,
+                             const unsigned char *data, size_t data_len);
+int schematic_from_world_zip_bounded(SchematicWrapper *schematic,
+                                     const unsigned char *data, size_t data_len,
+                                     int min_x, int min_y, int min_z,
+                                     int max_x, int max_y, int max_z);
+
+// World save directory on disk (path is a NUL-terminated UTF-8 string)
+int schematic_from_world_directory(SchematicWrapper *schematic, const char *path);
+int schematic_from_world_directory_bounded(SchematicWrapper *schematic, const char *path,
+                                           int min_x, int min_y, int min_z,
+                                           int max_x, int max_y, int max_z);
+```
+
+### World export
+
+`options_json` may be `NULL` for defaults, or a JSON string with any of:
+`world_name`, `game_mode` (0–3), `difficulty` (0–3), `spawn_position` (`[x,y,z]`),
+`data_version`, `version_name`, `void_world`, `offset` (`[x,y,z]`),
+`allow_commands`, `day_time`.
+
+```c
+// File-path -> bytes map of the world contents (region/r.0.0.mca, level.dat, ...)
+typedef struct { char *path; unsigned char *data; size_t data_len; } CFileEntry;
+typedef struct { CFileEntry *entries; size_t len; } CFileMap;
+
+CFileMap  schematic_to_world(const SchematicWrapper *schematic, const char *options_json);
+void      free_file_map(CFileMap map);            // must be called on the result
+
+// Zipped, playable world as bytes
+ByteArray schematic_to_world_zip(const SchematicWrapper *schematic, const char *options_json);
+// free with free_byte_array()
+
+// Write the world folder directly to disk
+int       schematic_save_world(const SchematicWrapper *schematic,
+                               const char *directory, const char *options_json);
+```
+
+Example -- load a zipped world bounded to spawn, then re-export:
+
+```c
+SchematicWrapper *sch = schematic_new();
+if (schematic_from_world_zip_bounded(sch, zip_bytes, zip_len,
+                                     -128, 0, -128, 128, 256, 128) != 0) {
+    /* handle error */
+}
+
+ByteArray out = schematic_to_world_zip(sch, "{\"world_name\":\"Generated\"}");
+fwrite(out.data, 1, out.len, fp);
+free_byte_array(out);
+schematic_free(sch);
 ```
 
 ---

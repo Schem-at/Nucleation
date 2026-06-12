@@ -273,6 +273,60 @@ const overlay = d.toOverlayGlb(afterGlb);   // -> Uint8Array (a new GLB)
 
 ---
 
+## 7 · World & Region Parsing (Anvil / `.mca`)
+
+Whole Minecraft worlds load into a regular `SchematicWrapper` — afterwards the
+full API (blocks, meshing, diffing, re-export) applies unchanged. All importers
+**replace** the wrapper's contents.
+
+| Method | Input | Notes |
+|--------|-------|-------|
+| `from_mca(data)` | `Uint8Array` of one region file (`r.0.0.mca`) | All chunks in the file |
+| `from_mca_bounded(data, minX, minY, minZ, maxX, maxY, maxZ)` | same | Only blocks inside the box (inclusive block coords) |
+| `from_world_zip(data)` | `Uint8Array` of a zipped world folder | Reads `region/*.mca` + `entities/*.mca` (1.17+) |
+| `from_world_zip_bounded(data, ...)` | same | Bounded variant |
+
+> Directory-based loading (`from_world_directory`) is **not** available in WASM —
+> there is no filesystem. Zip the world folder (or use the Rust/Python/FFI
+> bindings) instead.
+
+```ts
+import init, { SchematicWrapper } from "nucleation";
+await init();
+
+const wrapper = new SchematicWrapper();
+
+// Browser: from a file input or fetch
+const zipBytes = new Uint8Array(await file.arrayBuffer());
+wrapper.from_world_zip_bounded(zipBytes, -128, 0, -128, 128, 256, 128);
+
+console.log(wrapper.get_dimensions());
+```
+
+### Exporting back to a world
+
+| Method | Returns |
+|--------|---------|
+| `to_world(optionsJson?)` | `Map<string, Uint8Array>` of file paths (`region/r.0.0.mca`, `level.dat`, …) |
+| `to_world_zip(optionsJson?)` | `Uint8Array` of a zipped, playable world |
+
+`optionsJson` is a JSON **string**; every field is optional — `world_name`,
+`game_mode` (0–3), `difficulty` (0–3), `spawn_position` (`[x, y, z]`),
+`data_version`, `version_name`, `void_world`, `offset`, `allow_commands`,
+`day_time`:
+
+```ts
+const zip = wrapper.to_world_zip(JSON.stringify({
+  world_name: "Generated",
+  game_mode: 1,
+  spawn_position: [0, 64, 0],
+}));
+// e.g. trigger a download in the browser
+const blob = new Blob([zip], { type: "application/zip" });
+```
+
+---
+
 ### Final notes
 
 * **Universal wrapper** (`nucleation.js`) hides environment quirks—use it unless you **must** supply your own bytes.

@@ -241,6 +241,78 @@ with open("diff_overlay.glb", "wb") as f:
 
 ---
 
+## 8. World & Region Parsing (Anvil / `.mca`)
+
+Whole Minecraft worlds load into a regular `Schematic`, so everything else in this
+guide (block access, meshing, diffing, re-export) applies unchanged. All importers
+**replace** the schematic's contents.
+
+| Method | Input | Notes |
+|--------|-------|-------|
+| `from_mca(data)` | `bytes` of one region file (`r.0.0.mca`) | All chunks in the file |
+| `from_mca_bounded(data, min_x, min_y, min_z, max_x, max_y, max_z)` | same | Only blocks inside the box |
+| `from_world_zip(data)` | `bytes` of a zipped world folder | Reads `region/*.mca` + `entities/*.mca` (1.17+) |
+| `from_world_zip_bounded(data, ...)` | same | Bounded variant |
+| `from_world_directory(path)` | `str` path to a world save | Reads the folder directly from disk |
+| `from_world_directory_bounded(path, ...)` | same | Bounded variant |
+
+Bounds are inclusive block coordinates (`i32`), not chunk coordinates.
+
+```python
+from nucleation import Schematic
+
+schem = Schematic.new("world_import")
+
+# Whole world from a zip
+schem.from_world_zip(open("my_world.zip", "rb").read())
+
+# Or carve out just spawn from a world folder on disk
+schem.from_world_directory_bounded("saves/my_world",
+                                   -128, 0, -128, 128, 256, 128)
+
+print(schem.dimensions)   # (width, height, depth)
+```
+
+### Exporting back to a world
+
+| Method | Returns |
+|--------|---------|
+| `to_world(options_json=None)` | `dict[str, bytes]` mapping file paths (e.g. `region/r.0.0.mca`, `level.dat`) to contents |
+| `to_world_zip(options_json=None)` | `bytes` of a zipped, playable world |
+| `save_world(directory, options_json=None)` | writes the world folder to disk |
+
+`options_json` is a JSON **string**; every field is optional:
+
+```python
+import json
+
+opts = json.dumps({
+    "world_name": "Generated",
+    "game_mode": 1,                  # 0 Survival, 1 Creative, 2 Adventure, 3 Spectator
+    "difficulty": 2,                 # 0 Peaceful … 3 Hard
+    "spawn_position": [0, 64, 0],
+    "data_version": 4671,            # 1.21.4
+    "version_name": "1.21.4",
+    "void_world": True,              # superflat/void generation
+    "offset": [0, 0, 0],             # block offset for placement
+    "allow_commands": True,
+    "day_time": 6000,                # fixed time; omit for normal cycle
+})
+schem.save_world("out_world", opts)
+```
+
+Round-trip example — import a world, edit it, save a playable copy:
+
+```python
+schem = Schematic.new("edit")
+schem.from_world_zip(open("in.zip", "rb").read())
+schem.set_block((0, 100, 0), "minecraft:beacon")
+with open("out.zip", "wb") as f:
+    f.write(schem.to_world_zip())
+```
+
+---
+
 ### Gotchas & tips
 
 * **Everything is immutable-copy except `set_block*`** – methods that start with `set_` mutate the schematic; others usually return a fresh object or `dict`.
