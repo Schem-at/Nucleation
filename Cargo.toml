@@ -226,3 +226,7 @@ opt-level = 3
 [patch.crates-io]
 hematite-nbt = { git = "https://github.com/StackDoubleFlow/hematite_nbt" }
 
+# Local editable checkout of schematic-mesher for performance work.
+[patch."https://github.com/Schem-at/Schematic-Mesher.git"]
+schematic-mesher = { path = "../Schematic-Mesher" }
+

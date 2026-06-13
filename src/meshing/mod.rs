@@ -452,7 +452,7 @@ impl RawMeshExport {
 
 /// Build a [`MeshOutput`] from a [`MesherOutput`], optionally setting a chunk coordinate.
 fn mesh_output_from_mesher(
-    output: &MesherOutput,
+    output: MesherOutput,
     chunk_coord: Option<(i32, i32, i32)>,
 ) -> MeshOutput {
     let mut mesh = MeshOutput::from(output);
@@ -460,42 +460,23 @@ fn mesh_output_from_mesher(
     mesh
 }
 
-/// Adapter to convert a Nucleation Region into a BlockSource.
+/// Adapter to convert a single Nucleation Region into a BlockSource
+/// (palette-indexed flat Vec; the mesher only iterates it).
 struct RegionBlockSource {
-    blocks: HashMap<MesherBlockPosition, InputBlock>,
+    palette: Vec<InputBlock>,
+    blocks: Vec<(MesherBlockPosition, u32)>,
     bounds: MesherBoundingBox,
 }
 
 impl RegionBlockSource {
     fn new(region: &Region) -> Self {
-        let mut blocks = HashMap::new();
         let bbox = region.get_bounding_box();
-
+        let mut palette: Vec<InputBlock> = Vec::new();
+        let mut blocks: Vec<(MesherBlockPosition, u32)> = Vec::new();
         let mut min = [f32::MAX; 3];
         let mut max = [f32::MIN; 3];
 
-        // Iterate through all non-air blocks in the region
-        for index in 0..region.volume() {
-            let (x, y, z) = region.index_to_coords(index);
-            if let Some(block_state) = region.get_block(x, y, z) {
-                if block_state.name != "minecraft:air" {
-                    let pos = MesherBlockPosition::new(x, y, z);
-                    let input_block = block_state_to_input_block(block_state);
-                    blocks.insert(pos, input_block);
-
-                    // Update bounds
-                    min[0] = min[0].min(x as f32);
-                    min[1] = min[1].min(y as f32);
-                    min[2] = min[2].min(z as f32);
-                    max[0] = max[0].max(x as f32 + 1.0);
-                    max[1] = max[1].max(y as f32 + 1.0);
-                    max[2] = max[2].max(z as f32 + 1.0);
-                }
-            }
-        }
-
-        // Also collect entities as entity: blocks
-        collect_region_entities(region, &mut blocks, &mut min, &mut max);
+        collect_region_blocks(region, &mut blocks, &mut palette, &mut min, &mut max);
 
         // Use region bounds if no blocks found
         if blocks.is_empty() {
@@ -509,17 +490,28 @@ impl RegionBlockSource {
 
         let bounds = MesherBoundingBox::new(min, max);
 
-        Self { blocks, bounds }
+        Self {
+            palette,
+            blocks,
+            bounds,
+        }
     }
 }
 
 impl BlockSource for RegionBlockSource {
     fn get_block(&self, pos: MesherBlockPosition) -> Option<&InputBlock> {
-        self.blocks.get(&pos)
+        self.blocks
+            .iter()
+            .find(|(p, _)| *p == pos)
+            .map(|(_, idx)| &self.palette[*idx as usize])
     }
 
     fn iter_blocks(&self) -> Box<dyn Iterator<Item = (MesherBlockPosition, &InputBlock)> + '_> {
-        Box::new(self.blocks.iter().map(|(pos, block)| (*pos, block)))
+        Box::new(
+            self.blocks
+                .iter()
+                .map(|(pos, idx)| (*pos, &self.palette[*idx as usize])),
+        )
     }
 
     fn bounds(&self) -> MesherBoundingBox {
@@ -545,7 +537,64 @@ impl BlockSource for ChunkBlockSource {
     }
 
     fn iter_blocks(&self) -> Box<dyn Iterator<Item = (MesherBlockPosition, &InputBlock)> + '_> {
-        Box::new(self.blocks.iter().map(|(pos, block)| (*pos, block)))
+        // Yield in sorted order so per-chunk meshes are deterministic (this source
+        // is hash-map-backed; the whole-schematic VecBlockSource is already
+        // ordered). Chunks are small, so the sort is cheap.
+        let mut v: Vec<(MesherBlockPosition, &InputBlock)> = self
+            .blocks
+            .iter()
+            .map(|(pos, block)| (*pos, block))
+            .collect();
+        v.sort_unstable_by_key(|(p, _)| (p.x, p.y, p.z));
+        Box::new(v.into_iter())
+    }
+
+    fn bounds(&self) -> MesherBoundingBox {
+        self.bounds
+    }
+}
+
+/// Flat, palette-indexed block source for whole-schematic meshing.
+///
+/// The mesher only *iterates* the source, so a `Vec` beats a hash map (no
+/// per-block hashing / re-collection). On top of that, blocks store a `u32`
+/// index into a shared `palette` of unique `InputBlock`s instead of owning their
+/// own `InputBlock` — a 512³ region has millions of blocks but only thousands of
+/// distinct states, so this avoids millions of `String`/property allocations.
+struct VecBlockSource {
+    palette: Vec<InputBlock>,
+    blocks: Vec<(MesherBlockPosition, u32)>,
+    bounds: MesherBoundingBox,
+}
+
+impl VecBlockSource {
+    fn new(
+        palette: Vec<InputBlock>,
+        blocks: Vec<(MesherBlockPosition, u32)>,
+        bounds: MesherBoundingBox,
+    ) -> Self {
+        Self {
+            palette,
+            blocks,
+            bounds,
+        }
+    }
+}
+
+impl BlockSource for VecBlockSource {
+    fn get_block(&self, pos: MesherBlockPosition) -> Option<&InputBlock> {
+        self.blocks
+            .iter()
+            .find(|(p, _)| *p == pos)
+            .map(|(_, idx)| &self.palette[*idx as usize])
+    }
+
+    fn iter_blocks(&self) -> Box<dyn Iterator<Item = (MesherBlockPosition, &InputBlock)> + '_> {
+        Box::new(
+            self.blocks
+                .iter()
+                .map(|(pos, idx)| (*pos, &self.palette[*idx as usize])),
+        )
     }
 
     fn bounds(&self) -> MesherBoundingBox {
@@ -687,12 +736,19 @@ fn dye_color_name(color: u8) -> String {
 /// Collect entities from a region and insert them into a block map as `entity:` blocks.
 fn collect_region_entities(
     region: &Region,
-    blocks: &mut HashMap<MesherBlockPosition, InputBlock>,
+    blocks: &mut Vec<(MesherBlockPosition, u32)>,
+    palette: &mut Vec<InputBlock>,
     min: &mut [f32; 3],
     max: &mut [f32; 3],
 ) {
+    // Entities are few and almost always occupy air positions, so we append them
+    // directly (each gets its own palette entry). (Previously blocks took priority
+    // via a hash-map membership check; with the flat Vec source we skip that — a
+    // coincident block+entity now renders both, which is rare and harmless.)
     for entity in &region.entities {
         let input_block = entity_to_input_block(entity);
+        let idx = palette.len() as u32;
+        palette.push(input_block);
 
         // Use floored entity position as block position
         let x = entity.position.0.floor() as i32;
@@ -700,18 +756,14 @@ fn collect_region_entities(
         let z = entity.position.2.floor() as i32;
         let pos = MesherBlockPosition::new(x, y, z);
 
-        // Only insert if there isn't already a block at this position
-        // (blocks take priority over entities for rendering)
-        if !blocks.contains_key(&pos) {
-            blocks.insert(pos, input_block);
+        blocks.push((pos, idx));
 
-            min[0] = min[0].min(x as f32);
-            min[1] = min[1].min(y as f32);
-            min[2] = min[2].min(z as f32);
-            max[0] = max[0].max(x as f32 + 1.0);
-            max[1] = max[1].max(y as f32 + 1.0);
-            max[2] = max[2].max(z as f32 + 1.0);
-        }
+        min[0] = min[0].min(x as f32);
+        min[1] = min[1].min(y as f32);
+        min[2] = min[2].min(z as f32);
+        max[0] = max[0].max(x as f32 + 1.0);
+        max[1] = max[1].max(y as f32 + 1.0);
+        max[2] = max[2].max(z as f32 + 1.0);
     }
 }
 
@@ -821,32 +873,59 @@ impl UniversalSchematic {
         pack: &ResourcePackSource,
         config: &MeshConfig,
     ) -> Result<MesherOutput> {
+        let _prof = std::env::var("NUCLEATION_MESH_PROFILE").is_ok();
+        macro_rules! phase {
+            ($t:expr, $label:expr) => {
+                if _prof {
+                    eprintln!("PROFILE\t{}\t{}", $label, $t.elapsed().as_micros());
+                }
+            };
+        }
+
+        let t0 = std::time::Instant::now();
         let mesher_config = config.to_mesher_config();
         let mesher = Mesher::with_config(pack.pack.clone(), mesher_config);
+        phase!(t0, "config+pack_clone");
 
-        // Collect all blocks from all regions
-        let mut all_blocks = HashMap::new();
+        // Collect all blocks from all regions into a flat, palette-indexed Vec
+        // (not a HashMap): the mesher only iterates the source, and storing palette
+        // indices avoids both per-block hashing and per-block InputBlock allocation.
+        let t1 = std::time::Instant::now();
+        let mut all_blocks: Vec<(MesherBlockPosition, u32)> = Vec::new();
+        let mut palette: Vec<InputBlock> = Vec::new();
         let mut min = [f32::MAX; 3];
         let mut max = [f32::MIN; 3];
 
         // Process default region
-        collect_region_blocks(&self.default_region, &mut all_blocks, &mut min, &mut max);
+        collect_region_blocks(
+            &self.default_region,
+            &mut all_blocks,
+            &mut palette,
+            &mut min,
+            &mut max,
+        );
 
         // Process other regions
         for region in self.other_regions.values() {
-            collect_region_blocks(region, &mut all_blocks, &mut min, &mut max);
+            collect_region_blocks(region, &mut all_blocks, &mut palette, &mut min, &mut max);
         }
+        phase!(t1, "collect_region_blocks");
 
         if all_blocks.is_empty() {
             return Err(MeshError::Meshing("No blocks to mesh".to_string()));
         }
 
+        let t2 = std::time::Instant::now();
         let bounds = MesherBoundingBox::new(min, max);
-        let source = ChunkBlockSource::new(all_blocks, bounds);
+        let source = VecBlockSource::new(palette, all_blocks, bounds);
+        phase!(t2, "build_source");
 
-        mesher
+        let t3 = std::time::Instant::now();
+        let out = mesher
             .mesh(&source)
-            .map_err(|e| MeshError::Meshing(e.to_string()))
+            .map_err(|e| MeshError::Meshing(e.to_string()));
+        phase!(t3, "mesher.mesh");
+        out
     }
 
     /// Generate a single mesh for the entire schematic.
@@ -855,7 +934,7 @@ impl UniversalSchematic {
     /// per-layer typed arrays, a shared texture atlas, and export helpers.
     pub fn to_mesh(&self, pack: &ResourcePackSource, config: &MeshConfig) -> Result<MeshOutput> {
         let output = self.compute_mesh_output(pack, config)?;
-        Ok(mesh_output_from_mesher(&output, None))
+        Ok(mesh_output_from_mesher(output, None))
     }
 
     /// Build an *animated* GLB replaying a captured scenario.
@@ -874,15 +953,27 @@ impl UniversalSchematic {
         let timeline: schematic_mesher::Timeline = serde_json::from_str(timeline_json)
             .map_err(|e| MeshError::Meshing(format!("timeline parse: {e}")))?;
 
-        let mut blocks: HashMap<MesherBlockPosition, InputBlock> = HashMap::new();
+        let mut blocks: Vec<(MesherBlockPosition, u32)> = Vec::new();
+        let mut palette: Vec<InputBlock> = Vec::new();
         let mut min = [f32::MAX; 3];
         let mut max = [f32::MIN; 3];
-        collect_region_blocks(&self.default_region, &mut blocks, &mut min, &mut max);
+        collect_region_blocks(
+            &self.default_region,
+            &mut blocks,
+            &mut palette,
+            &mut min,
+            &mut max,
+        );
         for region in self.other_regions.values() {
-            collect_region_blocks(region, &mut blocks, &mut min, &mut max);
+            collect_region_blocks(region, &mut blocks, &mut palette, &mut min, &mut max);
         }
 
-        let initial: Vec<(MesherBlockPosition, InputBlock)> = blocks.into_iter().collect();
+        // Materialize owned InputBlocks for the animated-GLB builder (rare path).
+        let initial: Vec<(MesherBlockPosition, InputBlock)> = blocks
+            .iter()
+            .map(|(pos, idx)| (*pos, palette[*idx as usize].clone()))
+            .collect();
+
         schematic_mesher::build_animated_glb(&pack.pack, &initial, &timeline)
             .map_err(|e| MeshError::Meshing(e.to_string()))
     }
@@ -890,7 +981,7 @@ impl UniversalSchematic {
     /// Generate a USDZ mesh for the entire schematic.
     pub fn to_usdz(&self, pack: &ResourcePackSource, config: &MeshConfig) -> Result<MeshOutput> {
         let output = self.compute_mesh_output(pack, config)?;
-        Ok(mesh_output_from_mesher(&output, None))
+        Ok(mesh_output_from_mesher(output, None))
     }
 
     /// Generate raw mesh data for the entire schematic.
@@ -1001,7 +1092,7 @@ impl UniversalSchematic {
                 .mesh(&source)
                 .map_err(|e| MeshError::Meshing(e.to_string()))?;
 
-            let result = mesh_output_from_mesher(&output, Some(chunk_coord));
+            let result = mesh_output_from_mesher(output, Some(chunk_coord));
 
             total_vertex_count += result.total_vertices();
             total_triangle_count += result.total_triangles();
@@ -1102,7 +1193,7 @@ impl UniversalSchematic {
                             let mesher = Mesher::with_config(pack_ref.clone(), config_ref.clone());
 
                             match mesher.mesh(&source) {
-                                Ok(output) => Ok(mesh_output_from_mesher(&output, Some(coord))),
+                                Ok(output) => Ok(mesh_output_from_mesher(output, Some(coord))),
                                 Err(e) => Err(MeshError::Meshing(e.to_string())),
                             }
                         })
@@ -1274,7 +1365,7 @@ impl Iterator for NucleationChunkIter {
             Err(e) => return Some(Err(MeshError::Meshing(e.to_string()))),
         };
 
-        let mesh = mesh_output_from_mesher(&output, Some(chunk_coord));
+        let mesh = mesh_output_from_mesher(output, Some(chunk_coord));
 
         // Update running totals and fire progress callback
         self.vertices_so_far += mesh.total_vertices() as u64;
@@ -1320,36 +1411,77 @@ fn mesh_region(
         .mesh(&source)
         .map_err(|e| MeshError::Meshing(e.to_string()))?;
 
-    Ok(Some(mesh_output_from_mesher(&output, None)))
+    Ok(Some(mesh_output_from_mesher(output, None)))
 }
 
-/// Helper function to collect blocks and entities from a region.
+/// Collect a region's non-air blocks as `(position, palette_index)` pairs,
+/// extending a shared `palette` of unique `InputBlock`s.
+///
+/// The region already stores blocks as indices into a small palette of unique
+/// states, so we build one `InputBlock` per palette entry (thousands) instead of
+/// one per block (millions) — eliminating the per-block `String`/property
+/// allocations that dominated this function. Palette indices are offset by the
+/// caller's current `palette.len()` so multiple regions share one flat palette.
 fn collect_region_blocks(
     region: &Region,
-    blocks: &mut HashMap<MesherBlockPosition, InputBlock>,
+    blocks: &mut Vec<(MesherBlockPosition, u32)>,
+    palette: &mut Vec<InputBlock>,
     min: &mut [f32; 3],
     max: &mut [f32; 3],
 ) {
-    for index in 0..region.volume() {
-        let (x, y, z) = region.index_to_coords(index);
-        if let Some(block_state) = region.get_block(x, y, z) {
-            if block_state.name != "minecraft:air" {
-                let pos = MesherBlockPosition::new(x, y, z);
-                let input_block = block_state_to_input_block(block_state);
-                blocks.insert(pos, input_block);
+    use rayon::prelude::*;
+    let _prof = std::env::var("NUCLEATION_MESH_PROFILE").is_ok();
 
-                min[0] = min[0].min(x as f32);
-                min[1] = min[1].min(y as f32);
-                min[2] = min[2].min(z as f32);
-                max[0] = max[0].max(x as f32 + 1.0);
-                max[1] = max[1].max(y as f32 + 1.0);
-                max[2] = max[2].max(z as f32 + 1.0);
+    // Build this region's palette of InputBlocks once (and an air mask to skip).
+    let base = palette.len() as u32;
+    let mut is_air: Vec<bool> = Vec::with_capacity(region.palette.len());
+    for state in &region.palette {
+        is_air.push(state.name == "minecraft:air");
+        palette.push(block_state_to_input_block(state));
+    }
+
+    // Parallel volume scan: emit (pos, global_palette_index) for each non-air
+    // block. No per-block InputBlock construction — just an index lookup.
+    let t_scan = std::time::Instant::now();
+    let collected: Vec<(MesherBlockPosition, u32, i32, i32, i32)> = (0..region.volume())
+        .into_par_iter()
+        .filter_map(|index| {
+            let (x, y, z) = region.index_to_coords(index);
+            let idx = region.get_block_index(x, y, z)?;
+            if is_air[idx] {
+                return None;
             }
-        }
+            Some((
+                MesherBlockPosition::new(x, y, z),
+                base + idx as u32,
+                x,
+                y,
+                z,
+            ))
+        })
+        .collect();
+    if _prof {
+        eprintln!("PROFILE\t  scan\t{}", t_scan.elapsed().as_micros());
+    }
+
+    let t_ins = std::time::Instant::now();
+    blocks.reserve(collected.len());
+    for (pos, gidx, x, y, z) in collected {
+        blocks.push((pos, gidx));
+
+        min[0] = min[0].min(x as f32);
+        min[1] = min[1].min(y as f32);
+        min[2] = min[2].min(z as f32);
+        max[0] = max[0].max(x as f32 + 1.0);
+        max[1] = max[1].max(y as f32 + 1.0);
+        max[2] = max[2].max(z as f32 + 1.0);
+    }
+    if _prof {
+        eprintln!("PROFILE\t  vec_push\t{}", t_ins.elapsed().as_micros());
     }
 
     // Also collect entities as entity: blocks
-    collect_region_entities(region, blocks, min, max);
+    collect_region_entities(region, blocks, palette, min, max);
 }
 
 /// Helper function to collect blocks and entities from a region into chunk buckets.

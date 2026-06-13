@@ -29,6 +29,10 @@ examples/haskell/dist-newstyle/
 # Experimental benchmarks (not part of main build)
 experiments/
 
+# Meshing-bench WIP: large .schem region fixtures + generated output artifacts
+benches/fixtures/
+benches/meshing-bench/
+
 # Generated test artifacts at repo root (regenerate via `cargo run --example …`)
 /*.schem
 /*.litematic
