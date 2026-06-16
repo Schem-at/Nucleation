@@ -873,6 +873,7 @@ fn parse_ffi_surface(base_dir: &str) -> ApiSurface {
     // Known class prefixes for FFI functions: (prefix, canonical class name)
     // Order matters: longer prefixes first so "definitionregion_" matches before shorter ones
     let known_prefixes: &[(&str, &str)] = &[
+        ("redstonegraph_", "RedstoneGraph"),
         ("definitionregion_", "DefinitionRegion"),
         ("simulationoptions_", "SimulationOptions"),
         ("io_layout_builder_", "IoLayoutBuilder"),

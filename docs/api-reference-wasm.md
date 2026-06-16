@@ -22,6 +22,7 @@ Nucleation provides first-class WebAssembly bindings for use in browsers and Nod
 - [Simulation](#simulation-feature-gated) *(feature: `simulation`)*
   - [SimulationOptionsWrapper](#simulationoptionswrapper)
   - [MchprsWorldWrapper](#mchprsworldwrapper)
+  - [RedstoneGraphWrapper](#redstonegraphwrapper)
   - [CircuitBuilderWrapper](#circuitbuilderwrapper)
   - [TypedCircuitExecutorWrapper](#typedcircuitexecutorwrapper)
   - [IoLayoutBuilderWrapper](#iolayoutbuilderwrapper)
@@ -42,6 +43,10 @@ Nucleation provides first-class WebAssembly bindings for use in browsers and Nod
   - [ChunkMeshIteratorWrapper](#chunkmeshiteratorwrapper)
   - [TextureAtlasWrapper](#textureatlaswrapper)
   - [RawMeshExportWrapper](#rawmeshexportwrapper)
+- [Auto-stack](#auto-stack-feature-autostack) *(feature: `autostack`)*
+  - [detectStructures](#schematicwrapperdetectstructures)
+  - [detectStructuresGraph](#schematicwrapperdetectstructuresgraph)
+  - [autostackResize1d / autostackResize2d](#schematicwrapperautostackresize1d--autostackresize2d)
 - [Module Functions](#module-functions)
 
 ---
@@ -561,6 +566,42 @@ A live redstone simulation world. Create from a schematic, toggle levers, advanc
 | `syncToSchematic` | `syncToSchematic() → void` | Write simulation state back to the schematic. |
 | `getSchematic` | `getSchematic() → SchematicWrapper` | Get a copy of the current schematic state. |
 | `intoSchematic` | `intoSchematic() → SchematicWrapper` | Consume the world and return the schematic. |
+| `exportGraph` | `exportGraph() → RedstoneGraphWrapper` | Extract the compiled redstone logic graph (optimized). |
+| `exportGraphStructural` | `exportGraphStructural() → RedstoneGraphWrapper` | Extract the structural (pre-fold, as-built) graph. |
+
+---
+
+### RedstoneGraphWrapper
+
+The redstone logic graph extracted from a simulation world via
+`exportGraph()` / `exportGraphStructural()`. Nodes are redstone components
+(repeaters, comparators, torches, lamps, levers, wires, …) and edges are the
+signal-flow links between them. The same logical surface exists in Python
+(`RedstoneGraph`) and FFI (`redstonegraph_*`).
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `nodes` | `get nodes: Array<object>` | Nodes as plain objects: `{ id, kind, delay?, comparator_mode?, comparator_far_input?, pos, aliased_blocks, powered, repeater_locked, output_strength, facing_diode }`. |
+| `edges` | `get edges: Array<object>` | Directed edges: `{ source, target, kind: "Default"\|"Side", strength }`. |
+| `nodeCount` | `get nodeCount: number` | Number of nodes. |
+| `edgeCount` | `get edgeCount: number` | Number of directed edges. |
+| `features` | `features() → object` | Computed graph features (counts, depth, cycles, histograms). |
+| `featuresJson` | `featuresJson() → string` | The features as a JSON string. |
+| `fingerprint` | `fingerprint(preset?: "structural" \| "functional" \| "exact") → string` | Hex fingerprint (default `"structural"`); throws on an unknown preset. |
+| `toJson` | `toJson() → string` | Serialize the graph to JSON. |
+| `fromJson` | `static fromJson(json: string) → RedstoneGraphWrapper` | Deserialize a graph from JSON. |
+
+```js
+const world = schematic.create_simulation_world();
+const graph = world.exportGraph();
+
+console.log(graph.nodeCount, "nodes,", graph.edgeCount, "edges");
+console.log(graph.nodes[0]);                 // { id: 0, kind: "Lever", ... }
+const fp = graph.fingerprint("structural");  // hex string, stable per topology
+
+// round-trip
+const restored = RedstoneGraphWrapper.fromJson(graph.toJson());
+```
 
 ---
 
@@ -933,6 +974,100 @@ These methods are available on `SchematicWrapper` when the `meshing` feature is 
 | `toUsdz` | `toUsdz(pack: ResourcePackWrapper, config: MeshConfigWrapper) → MeshOutputWrapper` | Generate mesh and export as USDZ. |
 | `toRawMesh` | `toRawMesh(pack: ResourcePackWrapper, config: MeshConfigWrapper) → RawMeshExportWrapper` | Generate raw mesh data. |
 | `registerMeshExporter` | `registerMeshExporter(pack: ResourcePackWrapper) → void` | Register mesh export as a `saveAs` format. |
+
+---
+
+## Auto-stack (feature: `autostack`)
+
+> Requires the `autostack` feature flag (enabled by default in every published
+> build, including the npm WASM package). Detects the repeating structure(s) in a
+> build and resizes them by re-stamping the fundamental domain a different number
+> of times along its lattice vector — a 4-bit adder becomes 8-bit, a 32×32 screen
+> becomes 64×64. These methods live on [`SchematicWrapper`](#schematicwrapper).
+>
+> Full design, maths, and worked examples: [`autostack.md`](autostack.md) and the
+> companion `autostack-design.pdf`.
+
+### SchematicWrapper.detectStructures
+
+`detectStructures() → Structure[]`
+
+Returns the repeating structures in the build, ranked by **region coverage** (how
+much of the build is locally periodic under a candidate period). Robust to
+surrounding non-periodic infrastructure — a screen is still found even when a
+decoder breaks the global run. Each `Structure` is a plain JS object:
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `mode` | `"1d"` \| `"2d"` | One lattice vector (1D) or two (2D). |
+| `vectors` | `number[][]` | Period vector(s) `[x,y,z]`; one for 1D, two for 2D. |
+| `coverage` | `number` | Fraction of the build (0–1) explained by this period. |
+| `region_min` / `region_max` | `number[]` | Bounding box `[x,y,z]` of the periodic region. |
+| `cell_min` / `cell_max` | `number[]` | Bounding box of one representative unit cell. |
+| `label` | `string` | e.g. `"2D array · Z×Y · 92% of build"`. |
+
+### SchematicWrapper.detectStructuresGraph
+
+`detectStructuresGraph() → Structure[]` *(feature: `simulation`)*
+
+Graph-based detection: recovers **diagonal** lattice periods (e.g. a diagonal
+carry-chain adder) that `detectStructures` can't see, by extracting the redstone
+logic graph (3-round Weisfeiler-Lehman labels → dominant same-label displacement
+→ translation-invariant period). Returns the **same `Structure` shape**; `[]` for
+non-redstone builds. Merge with `detectStructures` and dedup by `vectors`:
+
+```js
+const seen = new Set(), all = [];
+for (const st of [...s.detectStructuresGraph(), ...s.detectStructures()]) {
+  const k = JSON.stringify(st.vectors);
+  if (!seen.has(k)) { seen.add(k); all.push(st); }
+}
+all.sort((a, b) => b.coverage - a.coverage);   // diagonal (high coverage) first
+```
+
+### SchematicWrapper.autostackResize1d / autostackResize2d
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `autostackResize1d` | `autostackResize1d(vx, vy, vz, units: number) → SchematicWrapper` | Re-stamp the 1D/diagonal period `[vx,vy,vz]` to `units` cells. Throws on error. |
+| `autostackResize2d` | `autostackResize2d(v1x, v1y, v1z, v2x, v2y, v2z, n1, n2) → SchematicWrapper` | Re-stamp a 2D array along two periods to `n1 × n2` cells (nine-slice: corners fixed, edges scale 1D, interior tiles 2D). Throws on error. |
+
+Resizing keeps the boundary and reproduces the input exactly when the unit count
+is unchanged. The returned `SchematicWrapper` is a fresh schematic — mesh it,
+inspect it, or export it (`to_schematic()` / `to_litematic()`) like any other.
+
+### Example
+
+```javascript
+import init, { SchematicWrapper } from "nucleation";
+await init();
+
+const s = new SchematicWrapper();
+s.from_data(bytes);                         // a .schem / .litematic / .nbt
+
+// 1. detect — ranked by coverage
+const structs = s.detectStructures();
+const top = structs[0];
+console.log(top.label);                     // "1D run · X · 100% of build"
+
+// 2. resize the selected structure
+let out;
+if (top.mode === "2d") {
+  const [v1, v2] = top.vectors;
+  out = s.autostackResize2d(...v1, ...v2, 16, 16);   // → 16 × 16 array
+} else {
+  out = s.autostackResize1d(...top.vectors[0], 8);   // → 8 cells
+}
+
+// 3. use the result — export or mesh
+const resized = out.to_schematic();         // Uint8Array (.schem bytes)
+console.log(out.get_block_count(), "blocks");
+```
+
+The same logical methods exist across Python (`detect_structures`,
+`autostack_resize_1d`, `autostack_resize_2d`), FFI, and PHP — see
+[`autostack.md`](autostack.md). The Python/WASM/FFI trio is checked by
+`tools/check_api_parity.rs`.
 
 ---
 

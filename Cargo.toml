@@ -15,8 +15,8 @@ exclude = ["web/", "examples/", "test-schematics/"]
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["store-fs"]
-ffi = []
+default = ["store-fs", "autostack"]
+ffi = ["autostack"]
 
 # Storage backends (the `store` module). `mem` is always available; the rest
 # are feature-gated so you only pull the deps you enable. Networked backends
@@ -36,10 +36,11 @@ wasm = [
     "serde-wasm-bindgen",
     "console_error_panic_hook",
     "wasm-bindgen-futures",
+    "autostack",
 ]
-python = ["pyo3/extension-module", "pyo3/abi3-py38"]
+python = ["pyo3/extension-module", "pyo3/abi3-py38", "autostack"]
 # New PHP feature
-php = ["ext-php-rs"]
+php = ["ext-php-rs", "autostack"]
 # Redstone simulation support
 simulation = [
     "mchprs_redpiler",
@@ -47,6 +48,8 @@ simulation = [
     "mchprs_world",
     "mchprs_blocks",
 ]
+# Auto-stack: detect repeating structures + resize them (pure-voxel core)
+autostack = []
 # Meshing support - generate 3D meshes from schematics
 meshing = ["schematic-mesher"]
 # GPU rendering support - render schematics to images
@@ -133,10 +136,10 @@ wasm-bindgen-futures = { version = "0.4", optional = true }
 # Rev 18c0c76: branch fix/torch-symmetry-non-cross-wires —
 # preserves coalesced world positions on flush so mirror-image torches
 # both update (in addition to existing custom IO + wire connectivity fixes)
-mchprs_redpiler = { git = "https://github.com/Nano112/MCHPRS.git", rev = "18c0c76", optional = true }
-mchprs_redstone = { git = "https://github.com/Nano112/MCHPRS.git", rev = "18c0c76", optional = true }
-mchprs_world = { git = "https://github.com/Nano112/MCHPRS.git", rev = "18c0c76", optional = true, default-features = false }
-mchprs_blocks = { git = "https://github.com/Nano112/MCHPRS.git", rev = "18c0c76", optional = true }
+mchprs_redpiler = { git = "https://github.com/Nano112/MCHPRS.git", rev = "2e62496", optional = true }
+mchprs_redstone = { git = "https://github.com/Nano112/MCHPRS.git", rev = "2e62496", optional = true }
+mchprs_world = { git = "https://github.com/Nano112/MCHPRS.git", rev = "2e62496", optional = true, default-features = false }
+mchprs_blocks = { git = "https://github.com/Nano112/MCHPRS.git", rev = "2e62496", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
@@ -177,6 +180,10 @@ harness = false
 [[example]]
 name = "render_schematic"
 required-features = ["rendering"]
+
+[[example]]
+name = "bench_mesh_timing"
+required-features = ["meshing"]
 
 [[example]]
 name = "compare_formats"

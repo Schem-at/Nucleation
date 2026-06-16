@@ -1,7 +1,7 @@
 use crate::block_entity::BlockEntity as UtilBlockEntity;
 use crate::UniversalSchematic;
 use mchprs_blocks::{block_entities::BlockEntity, blocks::Block, BlockPos};
-use mchprs_redpiler::{BackendVariant, Compiler, CompilerOptions};
+use mchprs_redpiler::Compiler;
 use mchprs_world::{storage::Chunk, TickEntry, TickPriority, World};
 use std::collections::HashMap;
 use thiserror::Error;
@@ -53,14 +53,14 @@ pub struct MchprsWorld {
     chunks: HashMap<(i32, i32), Chunk>,
     to_be_ticked: Vec<TickEntry>,
     compiler: Compiler,
-    options: SimulationOptions,
+    pub(crate) options: SimulationOptions,
     /// Previous state of custom IO positions for change detection
     custom_io_states: HashMap<BlockPos, u8>,
     /// Queue of custom IO changes since last poll
     custom_io_changes: Vec<CustomIoChange>,
     /// Minimum coordinates of the schematic for coordinate normalization
     /// MCHPRS expects coordinates starting from 0, so we normalize schematic coords
-    min_coords: (i32, i32, i32),
+    pub(crate) min_coords: (i32, i32, i32),
 }
 
 impl MchprsWorld {
@@ -119,33 +119,7 @@ impl MchprsWorld {
     }
 
     fn initialize_compiler(&mut self) -> Result<(), String> {
-        let bounding_box = self.schematic.get_bounding_box();
-        // Normalize coordinates to start from (0, 0, 0) for MCHPRS
-        let bounds = (
-            BlockPos::new(0, 0, 0),
-            BlockPos::new(
-                bounding_box.max.0 - self.min_coords.0,
-                bounding_box.max.1 - self.min_coords.1,
-                bounding_box.max.2 - self.min_coords.2,
-            ),
-        );
-
-        // Normalize custom IO positions for the compiler
-        let normalized_custom_io: Vec<BlockPos> = self
-            .options
-            .custom_io
-            .iter()
-            .map(|&pos| self.normalize_pos(pos))
-            .collect();
-
-        let compiler_options = CompilerOptions {
-            optimize: self.options.optimize,
-            io_only: self.options.io_only,
-            wire_dot_out: true,
-            backend_variant: BackendVariant::Direct,
-            custom_io: normalized_custom_io,
-            ..Default::default()
-        };
+        let (bounds, compiler_options) = self.build_compile_inputs();
 
         let ticks = self.to_be_ticked.drain(..).collect();
         let monitor = Default::default();
@@ -335,7 +309,7 @@ impl MchprsWorld {
 
     /// Normalizes a position from schematic coordinates to MCHPRS coordinates
     /// MCHPRS expects coordinates starting from 0, while schematics may have negative coords
-    fn normalize_pos(&self, pos: BlockPos) -> BlockPos {
+    pub(crate) fn normalize_pos(&self, pos: BlockPos) -> BlockPos {
         BlockPos::new(
             pos.x - self.min_coords.0,
             pos.y - self.min_coords.1,

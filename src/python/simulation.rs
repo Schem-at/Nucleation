@@ -28,6 +28,26 @@ impl PyMchprsWorld {
         self.inner.on_use_block(pos);
     }
 
+    /// Extract the compiled redstone logic graph for this world.
+    pub fn export_graph(&self) -> PyResult<super::PyRedstoneGraph> {
+        self.inner
+            .export_graph()
+            .map(|g| super::PyRedstoneGraph { inner: g })
+            .map_err(pyo3::exceptions::PyRuntimeError::new_err)
+    }
+
+    /// Extract the structural (pre-fold, as-built) redstone logic graph.
+    ///
+    /// Runs only the redpiler's pre-fold passes with optimization disabled, so
+    /// wires/repeaters/torches survive as individual nodes — recovering a graph
+    /// that closely matches the physically-placed components.
+    pub fn export_graph_structural(&self) -> PyResult<super::PyRedstoneGraph> {
+        self.inner
+            .export_graph_structural()
+            .map(|g| super::PyRedstoneGraph { inner: g })
+            .map_err(pyo3::exceptions::PyRuntimeError::new_err)
+    }
+
     /// Force a lever's powered state directly (idempotent — no toggle).
     /// Use when you want "lever ON" / "lever OFF" semantics rather than
     /// the right-click / `on_use_block` toggle.

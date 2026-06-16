@@ -23,14 +23,22 @@
 //! let is_lit = world.is_lit(BlockPos::new(15, 1, 0));
 //! ```
 
+pub mod analysis;
 pub mod circuit_builder;
+pub mod fingerprint;
+pub mod graph;
 mod mchprs_world;
 #[cfg(test)]
 mod tests;
 mod truth_table;
 pub mod typed_executor;
 
+pub use analysis::GraphFeatures;
 pub use circuit_builder::CircuitBuilder;
+pub use fingerprint::{GraphFingerprintSpec, RedstoneFingerprint};
+pub use graph::{
+    ComparatorMode, LinkKind, RedstoneGraph, RedstoneLink, RedstoneNode, RedstoneNodeKind,
+};
 pub use mchprs_world::{CustomIoChange, MchprsWorld, MchprsWorldError, SimulationOptions};
 pub use truth_table::generate_truth_table;
 

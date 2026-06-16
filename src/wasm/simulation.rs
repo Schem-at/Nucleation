@@ -105,6 +105,24 @@ impl MchprsWorldWrapper {
         self.world.on_use_block(BlockPos::new(x, y, z));
     }
 
+    /// Extract the compiled redstone logic graph for this world.
+    #[wasm_bindgen(js_name = exportGraph)]
+    pub fn export_graph(&self) -> Result<super::graph::RedstoneGraphWrapper, JsValue> {
+        self.world
+            .export_graph()
+            .map(|inner| super::graph::RedstoneGraphWrapper { inner })
+            .map_err(|e| JsValue::from_str(&e))
+    }
+
+    /// Extract the structural (pre-fold, as-built) redstone logic graph.
+    #[wasm_bindgen(js_name = exportGraphStructural)]
+    pub fn export_graph_structural(&self) -> Result<super::graph::RedstoneGraphWrapper, JsValue> {
+        self.world
+            .export_graph_structural()
+            .map(|inner| super::graph::RedstoneGraphWrapper { inner })
+            .map_err(|e| JsValue::from_str(&e))
+    }
+
     /// Advances the simulation by the specified number of ticks
     pub fn tick(&mut self, number_of_ticks: u32) {
         self.world.tick(number_of_ticks);

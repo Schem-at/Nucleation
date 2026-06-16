@@ -23,6 +23,8 @@ mod world_stream;
 
 #[cfg(feature = "simulation")]
 mod circuit_builder;
+#[cfg(feature = "simulation")]
+mod graph;
 #[cfg(feature = "meshing")]
 mod meshing;
 #[cfg(feature = "rendering")]
@@ -44,6 +46,8 @@ pub use world_stream::{
 
 #[cfg(feature = "simulation")]
 pub use circuit_builder::{PyCircuitBuilder, PySortStrategy};
+#[cfg(feature = "simulation")]
+pub use graph::PyRedstoneGraph;
 #[cfg(feature = "simulation")]
 pub use simulation::PyMchprsWorld;
 #[cfg(feature = "simulation")]
@@ -102,6 +106,7 @@ pub fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     #[cfg(feature = "simulation")]
     {
         m.add_class::<PyMchprsWorld>()?;
+        m.add_class::<PyRedstoneGraph>()?;
         m.add_class::<PyValue>()?;
         m.add_class::<PyIoType>()?;
         m.add_class::<PyLayoutFunction>()?;

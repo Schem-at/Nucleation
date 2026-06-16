@@ -2384,3 +2384,98 @@ fn parse_js_io_type(config: &JsValue) -> Result<IoType, JsValue> {
         _ => Err(JsValue::from_str(&format!("Unknown IO type: {}", type_str))),
     }
 }
+
+// ---------------------------------------------------------------------------
+// Auto-stack: periodicity detection + resize
+// ---------------------------------------------------------------------------
+#[cfg(feature = "autostack")]
+fn autostack_int3(v: &[i32; 3]) -> Array {
+    let a = Array::new();
+    for c in v {
+        a.push(&JsValue::from(*c));
+    }
+    a
+}
+
+#[cfg(feature = "autostack")]
+fn autostack_structs_to_js(structs: &[crate::autostack::Structure]) -> JsValue {
+    let arr = Array::new();
+    for st in structs {
+        let o = Object::new();
+        let _ = Reflect::set(&o, &"mode".into(), &JsValue::from_str(&st.mode));
+        let vecs = Array::new();
+        for v in &st.vectors {
+            vecs.push(&autostack_int3(v));
+        }
+        let _ = Reflect::set(&o, &"vectors".into(), &vecs);
+        let _ = Reflect::set(&o, &"coverage".into(), &JsValue::from(st.coverage));
+        let _ = Reflect::set(&o, &"region_min".into(), &autostack_int3(&st.region_min));
+        let _ = Reflect::set(&o, &"region_max".into(), &autostack_int3(&st.region_max));
+        let _ = Reflect::set(&o, &"cell_min".into(), &autostack_int3(&st.cell_min));
+        let _ = Reflect::set(&o, &"cell_max".into(), &autostack_int3(&st.cell_max));
+        let _ = Reflect::set(&o, &"label".into(), &JsValue::from_str(&st.label));
+        arr.push(&o);
+    }
+    arr.into()
+}
+
+#[cfg(feature = "autostack")]
+#[wasm_bindgen]
+impl SchematicWrapper {
+    /// Detect repeating structures (by region coverage). Returns an array of
+    /// objects: `{ mode, vectors, coverage, region_min, region_max, cell_min,
+    /// cell_max, label }`.
+    #[wasm_bindgen(js_name = detectStructures)]
+    pub fn detect_structures(&self) -> JsValue {
+        autostack_structs_to_js(&crate::autostack::detect_structures(&self.0))
+    }
+
+    /// Graph-based detection: recovers **diagonal** lattice periods (e.g. a
+    /// diagonal carry-chain adder) that the pure-voxel `detectStructures` misses,
+    /// by extracting the redstone logic graph. Returns the same object shape.
+    /// Requires the `simulation` feature; returns `[]` for non-redstone builds.
+    #[cfg(feature = "simulation")]
+    #[wasm_bindgen(js_name = detectStructuresGraph)]
+    pub fn detect_structures_graph(&self) -> JsValue {
+        autostack_structs_to_js(&crate::autostack::detect_structures_graph(&self.0))
+    }
+
+    /// Resize a 1D / diagonal periodic structure along its period vector,
+    /// producing `units` repeating cells.
+    #[wasm_bindgen(js_name = autostackResize1d)]
+    pub fn autostack_resize_1d(
+        &self,
+        vx: i32,
+        vy: i32,
+        vz: i32,
+        units: u32,
+    ) -> Result<SchematicWrapper, JsValue> {
+        crate::autostack::resize_1d(&self.0, [vx, vy, vz], units as usize)
+            .map(SchematicWrapper)
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    /// Resize a 2D periodic structure to `n1`×`n2` cells along the two vectors.
+    #[wasm_bindgen(js_name = autostackResize2d)]
+    pub fn autostack_resize_2d(
+        &self,
+        v1x: i32,
+        v1y: i32,
+        v1z: i32,
+        v2x: i32,
+        v2y: i32,
+        v2z: i32,
+        n1: u32,
+        n2: u32,
+    ) -> Result<SchematicWrapper, JsValue> {
+        crate::autostack::resize_2d(
+            &self.0,
+            [v1x, v1y, v1z],
+            [v2x, v2y, v2z],
+            n1 as usize,
+            n2 as usize,
+        )
+        .map(SchematicWrapper)
+        .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+}

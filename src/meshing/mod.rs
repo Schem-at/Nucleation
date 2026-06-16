@@ -877,12 +877,14 @@ impl UniversalSchematic {
         macro_rules! phase {
             ($t:expr, $label:expr) => {
                 if _prof {
-                    eprintln!("PROFILE\t{}\t{}", $label, $t.elapsed().as_micros());
+                    if let Some(t) = $t {
+                        eprintln!("PROFILE\t{}\t{}", $label, t.elapsed().as_micros());
+                    }
                 }
             };
         }
 
-        let t0 = std::time::Instant::now();
+        let t0 = prof_now();
         let mesher_config = config.to_mesher_config();
         let mesher = Mesher::with_config(pack.pack.clone(), mesher_config);
         phase!(t0, "config+pack_clone");
@@ -890,7 +892,7 @@ impl UniversalSchematic {
         // Collect all blocks from all regions into a flat, palette-indexed Vec
         // (not a HashMap): the mesher only iterates the source, and storing palette
         // indices avoids both per-block hashing and per-block InputBlock allocation.
-        let t1 = std::time::Instant::now();
+        let t1 = prof_now();
         let mut all_blocks: Vec<(MesherBlockPosition, u32)> = Vec::new();
         let mut palette: Vec<InputBlock> = Vec::new();
         let mut min = [f32::MAX; 3];
@@ -915,12 +917,12 @@ impl UniversalSchematic {
             return Err(MeshError::Meshing("No blocks to mesh".to_string()));
         }
 
-        let t2 = std::time::Instant::now();
+        let t2 = prof_now();
         let bounds = MesherBoundingBox::new(min, max);
         let source = VecBlockSource::new(palette, all_blocks, bounds);
         phase!(t2, "build_source");
 
-        let t3 = std::time::Instant::now();
+        let t3 = prof_now();
         let out = mesher
             .mesh(&source)
             .map_err(|e| MeshError::Meshing(e.to_string()));
@@ -1422,6 +1424,22 @@ fn mesh_region(
 /// one per block (millions) — eliminating the per-block `String`/property
 /// allocations that dominated this function. Palette indices are offset by the
 /// caller's current `palette.len()` so multiple regions share one flat palette.
+/// Wasm-safe profiling clock. `std::time::Instant::now()` panics on
+/// `wasm32-unknown-unknown` ("time not implemented on this platform"), so return
+/// `None` there. Profiling output is gated on `NUCLEATION_MESH_PROFILE`, which is
+/// never set on wasm (`std::env::var` returns `Err`), so this is a pure no-op.
+#[inline]
+fn prof_now() -> Option<std::time::Instant> {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        Some(std::time::Instant::now())
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        None
+    }
+}
+
 fn collect_region_blocks(
     region: &Region,
     blocks: &mut Vec<(MesherBlockPosition, u32)>,
@@ -1442,7 +1460,7 @@ fn collect_region_blocks(
 
     // Parallel volume scan: emit (pos, global_palette_index) for each non-air
     // block. No per-block InputBlock construction — just an index lookup.
-    let t_scan = std::time::Instant::now();
+    let t_scan = prof_now();
     let collected: Vec<(MesherBlockPosition, u32, i32, i32, i32)> = (0..region.volume())
         .into_par_iter()
         .filter_map(|index| {
@@ -1461,10 +1479,12 @@ fn collect_region_blocks(
         })
         .collect();
     if _prof {
-        eprintln!("PROFILE\t  scan\t{}", t_scan.elapsed().as_micros());
+        if let Some(t) = t_scan {
+            eprintln!("PROFILE\t  scan\t{}", t.elapsed().as_micros());
+        }
     }
 
-    let t_ins = std::time::Instant::now();
+    let t_ins = prof_now();
     blocks.reserve(collected.len());
     for (pos, gidx, x, y, z) in collected {
         blocks.push((pos, gidx));
@@ -1477,7 +1497,9 @@ fn collect_region_blocks(
         max[2] = max[2].max(z as f32 + 1.0);
     }
     if _prof {
-        eprintln!("PROFILE\t  vec_push\t{}", t_ins.elapsed().as_micros());
+        if let Some(t) = t_ins {
+            eprintln!("PROFILE\t  vec_push\t{}", t.elapsed().as_micros());
+        }
     }
 
     // Also collect entities as entity: blocks

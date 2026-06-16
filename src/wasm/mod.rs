@@ -23,6 +23,8 @@ mod world_stream;
 
 #[cfg(feature = "simulation")]
 mod circuit_builder;
+#[cfg(feature = "simulation")]
+mod graph;
 #[cfg(feature = "meshing")]
 mod meshing;
 #[cfg(feature = "rendering")]
@@ -46,6 +48,8 @@ pub use world_stream::{WorldChunkIterWrapper, WorldChunkViewWrapper, WorldSource
 
 #[cfg(feature = "simulation")]
 pub use circuit_builder::{CircuitBuilderWrapper, SortStrategyWrapper, StateModeConstants};
+#[cfg(feature = "simulation")]
+pub use graph::RedstoneGraphWrapper;
 #[cfg(feature = "meshing")]
 pub use meshing::{
     ChunkMeshIteratorWrapper, ChunkMeshResultWrapper, MeshConfigWrapper, MeshResultWrapper,

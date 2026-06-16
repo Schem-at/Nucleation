@@ -10199,3 +10199,280 @@ mod store_io_tests {
         assert!(!err.is_null(), "expected an error message");
     }
 }
+
+// ---------------------------------------------------------------------------
+// Auto-stack: periodicity detection + resize
+// ---------------------------------------------------------------------------
+/// Detect repeating structures (region coverage). Returns a JSON array string
+/// (free with `free_string`); each element has `mode`, `vectors`, `coverage`,
+/// `region_min`/`region_max`, `cell_min`/`cell_max`, `label`.
+#[cfg(feature = "autostack")]
+#[no_mangle]
+pub extern "C" fn schematic_detect_structures(schematic: *const SchematicWrapper) -> *mut c_char {
+    if schematic.is_null() {
+        return ptr::null_mut();
+    }
+    let s = unsafe { &*(*schematic).0 };
+    let json = crate::autostack::detect_structures_json(s);
+    CString::new(json).unwrap_or_default().into_raw()
+}
+
+/// Graph-based detection: recovers diagonal lattice periods (e.g. a diagonal
+/// carry-chain adder) that `schematic_detect_structures` misses, via the redstone
+/// logic graph. Returns a JSON array string (free with `free_string`); `"[]"` for
+/// non-redstone builds. Requires the `simulation` feature.
+#[cfg(all(feature = "autostack", feature = "simulation"))]
+#[no_mangle]
+pub extern "C" fn schematic_detect_structures_graph(
+    schematic: *const SchematicWrapper,
+) -> *mut c_char {
+    if schematic.is_null() {
+        return ptr::null_mut();
+    }
+    let s = unsafe { &*(*schematic).0 };
+    let json = crate::autostack::detect_structures_graph_json(s);
+    CString::new(json).unwrap_or_default().into_raw()
+}
+
+/// Resize a 1D / diagonal structure along its period vector. Returns a new
+/// schematic (free with `schematic_free`), or null on error.
+#[cfg(feature = "autostack")]
+#[no_mangle]
+pub extern "C" fn schematic_autostack_resize_1d(
+    schematic: *const SchematicWrapper,
+    vx: c_int,
+    vy: c_int,
+    vz: c_int,
+    units: u32,
+) -> *mut SchematicWrapper {
+    if schematic.is_null() {
+        return ptr::null_mut();
+    }
+    let s = unsafe { &*(*schematic).0 };
+    match crate::autostack::resize_1d(s, [vx, vy, vz], units as usize) {
+        Ok(new) => Box::into_raw(Box::new(SchematicWrapper(Box::into_raw(Box::new(new))))),
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+/// Resize a 2D structure to `n1`×`n2` cells along the two period vectors.
+/// Returns a new schematic (free with `schematic_free`), or null on error.
+#[cfg(feature = "autostack")]
+#[no_mangle]
+pub extern "C" fn schematic_autostack_resize_2d(
+    schematic: *const SchematicWrapper,
+    v1x: c_int,
+    v1y: c_int,
+    v1z: c_int,
+    v2x: c_int,
+    v2y: c_int,
+    v2z: c_int,
+    n1: u32,
+    n2: u32,
+) -> *mut SchematicWrapper {
+    if schematic.is_null() {
+        return ptr::null_mut();
+    }
+    let s = unsafe { &*(*schematic).0 };
+    match crate::autostack::resize_2d(
+        s,
+        [v1x, v1y, v1z],
+        [v2x, v2y, v2z],
+        n1 as usize,
+        n2 as usize,
+    ) {
+        Ok(new) => Box::into_raw(Box::new(SchematicWrapper(Box::into_raw(Box::new(new))))),
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Redstone graph: extraction + analysis (feature `simulation`)
+// ---------------------------------------------------------------------------
+/// Opaque handle to an extracted redstone logic graph.
+/// Free with `redstonegraph_free`.
+#[cfg(feature = "simulation")]
+pub struct RedstoneGraphWrapper(*mut crate::simulation::graph::RedstoneGraph);
+
+/// Extract the compiled redstone logic graph for a world.
+/// Returns null on error. Caller frees with `redstonegraph_free`.
+#[cfg(feature = "simulation")]
+#[no_mangle]
+pub extern "C" fn mchprs_world_export_graph(
+    world: *const MchprsWorldWrapper,
+) -> *mut RedstoneGraphWrapper {
+    if world.is_null() {
+        return ptr::null_mut();
+    }
+    let w = unsafe { &*(*world).0 };
+    match w.export_graph() {
+        Ok(g) => Box::into_raw(Box::new(RedstoneGraphWrapper(Box::into_raw(Box::new(g))))),
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+/// Extract the structural (pre-fold, as-built) redstone logic graph for a world.
+/// Returns null on error. Caller frees with `redstonegraph_free`.
+#[cfg(feature = "simulation")]
+#[no_mangle]
+pub extern "C" fn mchprs_world_export_graph_structural(
+    world: *const MchprsWorldWrapper,
+) -> *mut RedstoneGraphWrapper {
+    if world.is_null() {
+        return ptr::null_mut();
+    }
+    let w = unsafe { &*(*world).0 };
+    match w.export_graph_structural() {
+        Ok(g) => Box::into_raw(Box::new(RedstoneGraphWrapper(Box::into_raw(Box::new(g))))),
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+/// Frees a RedstoneGraph handle.
+#[cfg(feature = "simulation")]
+#[no_mangle]
+pub extern "C" fn redstonegraph_free(graph: *mut RedstoneGraphWrapper) {
+    if !graph.is_null() {
+        unsafe {
+            let w = Box::from_raw(graph);
+            if !w.0.is_null() {
+                let _ = Box::from_raw(w.0);
+            }
+        }
+    }
+}
+
+/// Number of nodes in the graph (0 on null).
+#[cfg(feature = "simulation")]
+#[no_mangle]
+pub extern "C" fn redstonegraph_node_count(graph: *const RedstoneGraphWrapper) -> usize {
+    if graph.is_null() {
+        return 0;
+    }
+    unsafe { (*(*graph).0).node_count() }
+}
+
+/// Total number of directed edges in the graph (0 on null).
+#[cfg(feature = "simulation")]
+#[no_mangle]
+pub extern "C" fn redstonegraph_edge_count(graph: *const RedstoneGraphWrapper) -> usize {
+    if graph.is_null() {
+        return 0;
+    }
+    unsafe { (*(*graph).0).edge_count() }
+}
+
+/// The nodes as a JSON array string (free with `free_string`). Null on error.
+#[cfg(feature = "simulation")]
+#[no_mangle]
+pub extern "C" fn redstonegraph_nodes(graph: *const RedstoneGraphWrapper) -> *mut c_char {
+    if graph.is_null() {
+        return ptr::null_mut();
+    }
+    let g = unsafe { &*(*graph).0 };
+    match g.nodes_json() {
+        Ok(json) => CString::new(json).unwrap_or_default().into_raw(),
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+/// The directed edges as a JSON array string (free with `free_string`). Null on error.
+#[cfg(feature = "simulation")]
+#[no_mangle]
+pub extern "C" fn redstonegraph_edges(graph: *const RedstoneGraphWrapper) -> *mut c_char {
+    if graph.is_null() {
+        return ptr::null_mut();
+    }
+    let g = unsafe { &*(*graph).0 };
+    match g.edges_json() {
+        Ok(json) => CString::new(json).unwrap_or_default().into_raw(),
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+/// Computed graph features as a JSON object string (free with `free_string`). Null on error.
+#[cfg(feature = "simulation")]
+#[no_mangle]
+pub extern "C" fn redstonegraph_features(graph: *const RedstoneGraphWrapper) -> *mut c_char {
+    if graph.is_null() {
+        return ptr::null_mut();
+    }
+    let g = unsafe { &*(*graph).0 };
+    match g.features().to_json() {
+        Ok(json) => CString::new(json).unwrap_or_default().into_raw(),
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+/// Computed graph features as a JSON string (alias of `redstonegraph_features`;
+/// free with `free_string`). Null on error.
+#[cfg(feature = "simulation")]
+#[no_mangle]
+pub extern "C" fn redstonegraph_features_json(graph: *const RedstoneGraphWrapper) -> *mut c_char {
+    redstonegraph_features(graph)
+}
+
+/// Fingerprint (hex string) for `preset` ("structural"/"functional"/"exact";
+/// null/empty defaults to "structural"). Free with `free_string`. Null on error.
+#[cfg(feature = "simulation")]
+#[no_mangle]
+pub extern "C" fn redstonegraph_fingerprint(
+    graph: *const RedstoneGraphWrapper,
+    preset: *const c_char,
+) -> *mut c_char {
+    if graph.is_null() {
+        return ptr::null_mut();
+    }
+    let g = unsafe { &*(*graph).0 };
+    let preset = if preset.is_null() {
+        "structural".to_string()
+    } else {
+        unsafe { CStr::from_ptr(preset) }
+            .to_str()
+            .unwrap_or("structural")
+            .to_string()
+    };
+    let preset = if preset.is_empty() {
+        "structural".to_string()
+    } else {
+        preset
+    };
+    match crate::simulation::fingerprint::GraphFingerprintSpec::from_preset(&preset) {
+        Some(spec) => CString::new(g.fingerprint(&spec).to_hex())
+            .unwrap_or_default()
+            .into_raw(),
+        None => ptr::null_mut(),
+    }
+}
+
+/// Serialize the graph to JSON (free with `free_string`). Null on error.
+#[cfg(feature = "simulation")]
+#[no_mangle]
+pub extern "C" fn redstonegraph_to_json(graph: *const RedstoneGraphWrapper) -> *mut c_char {
+    if graph.is_null() {
+        return ptr::null_mut();
+    }
+    let g = unsafe { &*(*graph).0 };
+    match g.to_json() {
+        Ok(json) => CString::new(json).unwrap_or_default().into_raw(),
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+/// Deserialize a graph from a JSON string. Returns null on error.
+/// Caller frees with `redstonegraph_free`.
+#[cfg(feature = "simulation")]
+#[no_mangle]
+pub extern "C" fn redstonegraph_from_json(json: *const c_char) -> *mut RedstoneGraphWrapper {
+    if json.is_null() {
+        return ptr::null_mut();
+    }
+    let s = match unsafe { CStr::from_ptr(json) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
+    };
+    match crate::simulation::graph::RedstoneGraph::from_json(s) {
+        Ok(g) => Box::into_raw(Box::new(RedstoneGraphWrapper(Box::into_raw(Box::new(g))))),
+        Err(_) => ptr::null_mut(),
+    }
+}

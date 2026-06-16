@@ -2404,6 +2404,91 @@ impl PySchematic {
             .render_to_file(&pack.inner, path, config)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
+
+    // ---- Auto-stack: periodicity detection + resize ----
+
+    /// Detect the repeating structure(s) in the build (by region coverage).
+    /// Returns a list of dicts: `mode` ("1d"/"2d"), `vectors`, `coverage`,
+    /// `region_min`/`region_max`, `cell_min`/`cell_max`, `label`.
+    #[cfg(feature = "autostack")]
+    pub fn detect_structures(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let structs = crate::autostack::detect_structures(&self.inner);
+        let list = PyList::empty(py);
+        for st in &structs {
+            let d = PyDict::new(py);
+            d.set_item("mode", &st.mode)?;
+            let vecs: Vec<Vec<i32>> = st.vectors.iter().map(|v| v.to_vec()).collect();
+            d.set_item("vectors", vecs)?;
+            d.set_item("coverage", st.coverage)?;
+            d.set_item("region_min", st.region_min.to_vec())?;
+            d.set_item("region_max", st.region_max.to_vec())?;
+            d.set_item("cell_min", st.cell_min.to_vec())?;
+            d.set_item("cell_max", st.cell_max.to_vec())?;
+            d.set_item("label", &st.label)?;
+            list.append(d)?;
+        }
+        Ok(list.into())
+    }
+
+    /// Graph-based detection: recovers **diagonal** lattice periods (e.g. a
+    /// diagonal carry-chain adder) that the pure-voxel `detect_structures`
+    /// misses, by extracting the redstone logic graph. Same dict shape.
+    /// Requires the `simulation` feature; returns `[]` for non-redstone builds.
+    #[cfg(all(feature = "autostack", feature = "simulation"))]
+    pub fn detect_structures_graph(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let structs = crate::autostack::detect_structures_graph(&self.inner);
+        let list = PyList::empty(py);
+        for st in &structs {
+            let d = PyDict::new(py);
+            d.set_item("mode", &st.mode)?;
+            let vecs: Vec<Vec<i32>> = st.vectors.iter().map(|v| v.to_vec()).collect();
+            d.set_item("vectors", vecs)?;
+            d.set_item("coverage", st.coverage)?;
+            d.set_item("region_min", st.region_min.to_vec())?;
+            d.set_item("region_max", st.region_max.to_vec())?;
+            d.set_item("cell_min", st.cell_min.to_vec())?;
+            d.set_item("cell_max", st.cell_max.to_vec())?;
+            d.set_item("label", &st.label)?;
+            list.append(d)?;
+        }
+        Ok(list.into())
+    }
+
+    /// Resize a 1D / diagonal periodic structure along its period vector,
+    /// producing `units` repeating cells. Returns a new schematic.
+    #[cfg(feature = "autostack")]
+    pub fn autostack_resize_1d(
+        &self,
+        vx: i32,
+        vy: i32,
+        vz: i32,
+        units: usize,
+    ) -> PyResult<PySchematic> {
+        let new = crate::autostack::resize_1d(&self.inner, [vx, vy, vz], units)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        Ok(PySchematic::from_inner(new))
+    }
+
+    /// Resize a 2D periodic structure to `n1`×`n2` cells along the two period
+    /// vectors. Returns a new schematic.
+    #[cfg(feature = "autostack")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn autostack_resize_2d(
+        &self,
+        v1x: i32,
+        v1y: i32,
+        v1z: i32,
+        v2x: i32,
+        v2y: i32,
+        v2z: i32,
+        n1: usize,
+        n2: usize,
+    ) -> PyResult<PySchematic> {
+        let new =
+            crate::autostack::resize_2d(&self.inner, [v1x, v1y, v1z], [v2x, v2y, v2z], n1, n2)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        Ok(PySchematic::from_inner(new))
+    }
 }
 
 // --- NBT Conversion Helpers ---

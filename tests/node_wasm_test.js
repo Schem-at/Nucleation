@@ -3,6 +3,21 @@
 
 const fs = require('fs');
 const path = require('path');
+const util = require('util');
+
+// ── Anti-cheat failure recorder ──────────────────────────────────────────────
+// Previously, tests caught their own errors, logged a ❌ line, and let the
+// process exit 0 — so the pre-push WASM lane stayed green while real binding
+// regressions slipped through. Centralize detection: any line containing ❌ is a
+// hard failure (⚠️ "feature not available" is allowed). The suite exits non-zero
+// at the end if ANY ❌ was emitted, so this lane genuinely gates pushes.
+const _hardFailures = [];
+const _origLog = console.log.bind(console);
+console.log = (...args) => {
+    const line = args.map(a => (typeof a === 'string' ? a : util.inspect(a))).join(' ');
+    if (line.includes('❌')) _hardFailures.push(line.trim());
+    _origLog(...args);
+};
 
 // You'll need to adjust this path based on where your built WASM is located
 const wasmPath = path.join(__dirname, '../pkg/nucleation.js');
@@ -633,10 +648,10 @@ async function runTests() {
 
             // Create DefinitionRegion
             let region = new DefinitionRegionWrapper();
-            // First 4 bits: 0,0,0 -> 3,0,0
-            region.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(3, 0, 0));
+            // First 4 bits: 0,0,0 -> 3,0,0  (addBounds consumes self → reassign)
+            region = region.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(3, 0, 0));
             // Next 4 bits: 0,0,2 -> 3,0,2 (disjoint!)
-            region.addBounds(new BlockPosition(0, 0, 2), new BlockPosition(3, 0, 2));
+            region = region.addBounds(new BlockPosition(0, 0, 2), new BlockPosition(3, 0, 2));
 
             // Add input with auto layout (should infer OneToOne for 8 bits)
             builder = builder.addInputFromRegionAuto("split_byte", ioType, region);
@@ -684,7 +699,7 @@ async function runTests() {
 
             // Create a region covering the whole 3x3x2 area
             let fullRegion = new DefinitionRegionWrapper();
-            fullRegion.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(2, 0, 1));
+            fullRegion = fullRegion.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(2, 0, 1));
 
             // Filter for "redstone"
             let filteredRegion = fullRegion.filterByBlock(schematic, "redstone");
@@ -713,7 +728,7 @@ async function runTests() {
 
             // Test Add Point
             let pointRegion = new DefinitionRegionWrapper();
-            pointRegion.addPoint(10, 10, 10);
+            pointRegion = pointRegion.addPoint(10, 10, 10);
 
             let builder2 = new IoLayoutBuilderWrapper();
             // 1 bit
@@ -724,11 +739,11 @@ async function runTests() {
 
             // Test Merge
             let regionA = new DefinitionRegionWrapper();
-            regionA.addPoint(0, 0, 0);
+            regionA = regionA.addPoint(0, 0, 0);
             let regionB = new DefinitionRegionWrapper();
-            regionB.addPoint(1, 0, 0);
+            regionB = regionB.addPoint(1, 0, 0);
 
-            regionA.merge(regionB);
+            regionA = regionA.merge(regionB);
 
             let builder3 = new IoLayoutBuilderWrapper();
             // 2 bits
@@ -752,15 +767,15 @@ async function runTests() {
 
             // Create two overlapping regions
             let regionA = new DefinitionRegionWrapper();
-            regionA.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(5, 0, 0)); // 0-5
+            regionA = regionA.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(5, 0, 0)); // 0-5
 
             let regionB = new DefinitionRegionWrapper();
-            regionB.addBounds(new BlockPosition(3, 0, 0), new BlockPosition(7, 0, 0)); // 3-7
+            regionB = regionB.addBounds(new BlockPosition(3, 0, 0), new BlockPosition(7, 0, 0)); // 3-7
 
             // Test subtract
             let subtractRegion = new DefinitionRegionWrapper();
-            subtractRegion.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(5, 0, 0));
-            subtractRegion.subtract(regionB);
+            subtractRegion = subtractRegion.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(5, 0, 0));
+            subtractRegion = subtractRegion.subtract(regionB);
             console.log(`   - Subtract: [0-5] - [3-7] = volume ${subtractRegion.volume()}`);
             if (subtractRegion.volume() === 3) { // 0, 1, 2
                 console.log('   ✅ Subtract working correctly');
@@ -770,8 +785,8 @@ async function runTests() {
 
             // Test intersect
             let intersectRegion = new DefinitionRegionWrapper();
-            intersectRegion.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(5, 0, 0));
-            intersectRegion.intersect(regionB);
+            intersectRegion = intersectRegion.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(5, 0, 0));
+            intersectRegion = intersectRegion.intersect(regionB);
             console.log(`   - Intersect: [0-5] ∩ [3-7] = volume ${intersectRegion.volume()}`);
             if (intersectRegion.volume() === 3) { // 3, 4, 5
                 console.log('   ✅ Intersect working correctly');
@@ -802,14 +817,14 @@ async function runTests() {
             const { DefinitionRegionWrapper, BlockPosition } = nucleation;
 
             let region = new DefinitionRegionWrapper();
-            region.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(2, 2, 2));
+            region = region.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(2, 2, 2));
 
             // Get initial bounds
             const initialBounds = region.getBounds();
             console.log(`   - Initial bounds: min=[${initialBounds.min}], max=[${initialBounds.max}]`);
 
             // Shift by 10, 20, 30
-            region.shift(10, 20, 30);
+            region = region.shift(10, 20, 30);
             const shiftedBounds = region.getBounds();
             console.log(`   - After shift(10,20,30): min=[${shiftedBounds.min}], max=[${shiftedBounds.max}]`);
 
@@ -821,8 +836,8 @@ async function runTests() {
 
             // Test expand
             let expandRegion = new DefinitionRegionWrapper();
-            expandRegion.addBounds(new BlockPosition(5, 5, 5), new BlockPosition(10, 10, 10));
-            expandRegion.expand(2, 2, 2);
+            expandRegion = expandRegion.addBounds(new BlockPosition(5, 5, 5), new BlockPosition(10, 10, 10));
+            expandRegion = expandRegion.expand(2, 2, 2);
             const expandedBounds = expandRegion.getBounds();
             console.log(`   - After expand(2,2,2): min=[${expandedBounds.min}], max=[${expandedBounds.max}]`);
 
@@ -833,7 +848,7 @@ async function runTests() {
             }
 
             // Test contract
-            expandRegion.contract(2);
+            expandRegion = expandRegion.contract(2);
             const contractedBounds = expandRegion.getBounds();
             console.log(`   - After contract(2): min=[${contractedBounds.min}], max=[${contractedBounds.max}]`);
 
@@ -864,7 +879,7 @@ async function runTests() {
 
             // Create region covering all three
             let region = new DefinitionRegionWrapper();
-            region.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(2, 0, 0));
+            region = region.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(2, 0, 0));
 
             // Filter for lit=true
             const litRegion = region.filterByProperties(schematic, { lit: "true" });
@@ -902,10 +917,10 @@ async function runTests() {
 
             // Create regions
             let inputRegion = new DefinitionRegionWrapper();
-            inputRegion.addPoint(0, 1, 0);
+            inputRegion = inputRegion.addPoint(0, 1, 0);
 
             let outputRegion = new DefinitionRegionWrapper();
-            outputRegion.addPoint(9, 1, 0);
+            outputRegion = outputRegion.addPoint(9, 1, 0);
 
             // Create circuit builder
             let builder = new CircuitBuilderWrapper(schematic);
@@ -995,8 +1010,8 @@ async function runTests() {
 
             // Contiguous region (L-shape)
             let contiguousRegion = new DefinitionRegionWrapper();
-            contiguousRegion.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(3, 0, 0));
-            contiguousRegion.addBounds(new BlockPosition(3, 0, 0), new BlockPosition(3, 3, 0));
+            contiguousRegion = contiguousRegion.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(3, 0, 0));
+            contiguousRegion = contiguousRegion.addBounds(new BlockPosition(3, 0, 0), new BlockPosition(3, 3, 0));
 
             const isContiguous = contiguousRegion.isContiguous();
             console.log(`   - L-shape region isContiguous: ${isContiguous}`);
@@ -1008,8 +1023,8 @@ async function runTests() {
 
             // Non-contiguous region (two separate points)
             let nonContiguousRegion = new DefinitionRegionWrapper();
-            nonContiguousRegion.addPoint(0, 0, 0);
-            nonContiguousRegion.addPoint(10, 10, 10);
+            nonContiguousRegion = nonContiguousRegion.addPoint(0, 0, 0);
+            nonContiguousRegion = nonContiguousRegion.addPoint(10, 10, 10);
 
             const isNotContiguous = !nonContiguousRegion.isContiguous();
             const components = nonContiguousRegion.connectedComponents();
@@ -1072,8 +1087,8 @@ async function runTests() {
 
                 // Create region with multiple Y levels (to test Y sorting)
                 let region = new DefinitionRegionWrapper();
-                region.addBounds(new BlockPosition(0, 1, 0), new BlockPosition(3, 1, 0));  // Y=1
-                region.addBounds(new BlockPosition(0, 2, 0), new BlockPosition(3, 2, 0));  // Y=2
+                region = region.addBounds(new BlockPosition(0, 1, 0), new BlockPosition(3, 1, 0));  // Y=1
+                region = region.addBounds(new BlockPosition(0, 2, 0), new BlockPosition(3, 2, 0));  // Y=2
 
                 // Test default sorting (YXZ)
                 let builder = new CircuitBuilderWrapper(schematic);
@@ -1174,7 +1189,7 @@ async function runTests() {
 
             // Test metadata
             let metaRegion = new DefinitionRegionWrapper();
-            metaRegion.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(1, 1, 1));
+            metaRegion = metaRegion.addBounds(new BlockPosition(0, 0, 0), new BlockPosition(1, 1, 1));
             metaRegion = metaRegion.setMetadata("color", "red").setMetadata("label", "Input A");
 
             const color = metaRegion.getMetadata("color");
@@ -1262,8 +1277,8 @@ async function runTests() {
             );
             copyRegion = copyRegion.setMetadata("test", "value");
 
-            const cloned = copyRegion.clone();
-            cloned.shift(100, 100, 100);
+            let cloned = copyRegion.clone();
+            cloned = cloned.shift(100, 100, 100);
 
             const copyBounds = copyRegion.getBounds();
             const clonedBounds = cloned.getBounds();
@@ -1285,9 +1300,151 @@ async function runTests() {
         console.log('   ⚠️  DefinitionRegionWrapper not available');
     }
 
+    // Test 22: Auto-stack (detect + resize), feature: autostack
+    console.log('\n🧪 Test 22: Auto-stack detect + resize');
+    if (typeof SchematicWrapper.prototype.detectStructures === 'function') {
+        try {
+            // --- 1D: a clean period-2 run along X (8 cells × 2 rows = 16 blocks) ---
+            const lin = new SchematicWrapper();
+            for (let i = 0; i < 8; i++) {
+                lin.set_block(i, 0, 0, "minecraft:stone");
+                lin.set_block(i, 1, 0, "minecraft:redstone_wire");
+            }
+
+            const structs = lin.detectStructures();
+            if (!Array.isArray(structs) || structs.length === 0) {
+                throw new Error('detectStructures returned no structures for a periodic build');
+            }
+            const top = structs[0];
+            const fields = ["mode", "vectors", "coverage", "region_min", "region_max", "cell_min", "cell_max", "label"];
+            const missing = fields.filter(f => !(f in top));
+            if (missing.length) throw new Error(`Structure missing fields: ${missing.join(', ')}`);
+            console.log(`   - Detected: "${top.label}" (mode=${top.mode}, coverage=${top.coverage.toFixed(2)})`);
+
+            // Resize the 1D run to 16 cells and round-trip through .schem bytes
+            const v = top.vectors[0];
+            const bigger = lin.autostackResize1d(v[0], v[1], v[2], 16);
+            const grew = bigger.get_block_count();
+            console.log(`   - autostackResize1d → ${grew} blocks`);
+            if (grew <= lin.get_block_count()) throw new Error('1D resize did not grow the build');
+
+            const bytes = bigger.to_schematic();
+            if (!(bytes instanceof Uint8Array) || bytes.length === 0) {
+                throw new Error('to_schematic() did not return non-empty bytes');
+            }
+            // Re-open the exported bytes to prove the round-trip is valid
+            const reopened = new SchematicWrapper();
+            reopened.from_data(bytes);
+            if (reopened.get_block_count() !== grew) {
+                throw new Error(`round-trip block count mismatch: ${reopened.get_block_count()} != ${grew}`);
+            }
+            console.log('   ✅ 1D detect → resize → export → reopen round-trip OK');
+
+            // --- 2D: a Z×Y grid so detect yields a 2d structure ---
+            const grid = new SchematicWrapper();
+            for (let z = 0; z < 6; z++) {
+                for (let y = 0; y < 6; y++) {
+                    grid.set_block(0, y * 2, z * 2, "minecraft:stone");
+                }
+            }
+            const gstructs = grid.detectStructures();
+            const twoD = gstructs.find(s => s.mode === "2d");
+            if (twoD) {
+                const [a, b] = twoD.vectors;
+                const big2 = grid.autostackResize2d(a[0], a[1], a[2], b[0], b[1], b[2], 4, 4);
+                console.log(`   - 2D "${twoD.label}" → autostackResize2d(4,4) = ${big2.get_block_count()} blocks`);
+                console.log('   ✅ 2D detect + resize OK');
+            } else {
+                console.log('   ⚠️  No 2D structure detected on grid fixture (acceptable; 1D path validated)');
+            }
+
+            console.log('   ✅ Auto-stack tests passed');
+        } catch (error) {
+            console.log(`   ❌ Auto-stack test failed: ${error.message}`);
+            throw error;
+        }
+    } else {
+        console.log('   ⚠️  detectStructures not available (build with --features wasm → autostack)');
+    }
+
+    // Test 23: Redstone graph extraction (feature: simulation)
+    console.log('\n🧪 Test 23: Redstone graph extraction');
+    if (typeof nucleation.MchprsWorldWrapper !== 'undefined'
+        && typeof SchematicWrapper.prototype.create_simulation_world === 'function') {
+        try {
+            // lever → wire → lamp
+            const gs = new SchematicWrapper();
+            for (let x = 0; x <= 5; x++) gs.set_block(x, 0, 0, "minecraft:gray_concrete");
+            gs.set_block(0, 1, 0, "minecraft:lever[facing=east,powered=false,face=floor]");
+            for (let x = 1; x <= 4; x++) {
+                gs.set_block(x, 1, 0, "minecraft:redstone_wire[power=0,east=side,west=side,north=none,south=none]");
+            }
+            gs.set_block(5, 1, 0, "minecraft:redstone_lamp[lit=false]");
+
+            const world = gs.create_simulation_world();
+            const graph = world.exportGraph();
+            if (typeof graph.nodeCount !== 'number' || graph.nodeCount <= 0) {
+                throw new Error(`expected nodeCount > 0, got ${graph.nodeCount}`);
+            }
+            const nodes = graph.nodes, edges = graph.edges;
+            if (!Array.isArray(nodes) || !Array.isArray(edges)) {
+                throw new Error('nodes/edges should be arrays');
+            }
+            console.log(`   - exportGraph: ${graph.nodeCount} nodes, ${graph.edgeCount} edges`);
+            if (nodes.length) {
+                const n = nodes[0];
+                if (!('id' in n) || !('kind' in n)) throw new Error('node missing id/kind');
+            }
+
+            // fingerprint presets + structural variant
+            const fp = graph.fingerprint();              // default "structural"
+            const fpFunc = graph.fingerprint("functional");
+            if (typeof fp !== 'string' || !/^[0-9a-f]+$/.test(fp)) {
+                throw new Error(`fingerprint not hex: ${fp}`);
+            }
+            console.log(`   - fingerprint(structural)=${fp.slice(0, 16)}… functional=${fpFunc.slice(0, 16)}…`);
+
+            // JSON round-trip via fromJson
+            const json = graph.toJson();
+            const reopened = nucleation.RedstoneGraphWrapper.fromJson(json);
+            if (reopened.nodeCount !== graph.nodeCount || reopened.edgeCount !== graph.edgeCount) {
+                throw new Error('toJson/fromJson round-trip changed node/edge counts');
+            }
+            // features is a plain object
+            const feats = graph.features();
+            if (typeof feats !== 'object' || feats === null) throw new Error('features should be an object');
+
+            const structural = world.exportGraphStructural();
+            console.log(`   - exportGraphStructural: ${structural.nodeCount} nodes`);
+
+            // graph-based (diagonal-capable) autostack detection must be wired up
+            // and return an array (empty is fine for this small line).
+            if (typeof gs.detectStructuresGraph === 'function') {
+                const ds = gs.detectStructuresGraph();
+                if (!Array.isArray(ds)) throw new Error('detectStructuresGraph should return an array');
+                console.log(`   - detectStructuresGraph: ${ds.length} structure(s)`);
+            } else {
+                throw new Error('detectStructuresGraph missing (graph-based diagonal detection)');
+            }
+            console.log('   ✅ Redstone graph tests passed');
+        } catch (error) {
+            console.log(`   ❌ Redstone graph test failed: ${error.message}`);
+            throw error;
+        }
+    } else {
+        console.log('   ⚠️  Simulation feature not available (build with --features wasm,simulation)');
+    }
+
+    // ── Anti-cheat gate: fail the lane if ANY ❌ was emitted ─────────────────
+    if (_hardFailures.length > 0) {
+        _origLog(`\n💥 ${_hardFailures.length} hard failure(s) detected — pre-push must NOT pass:`);
+        _hardFailures.forEach(f => _origLog('   ' + f));
+        process.exit(1);
+    }
+
     console.log('\n=== Test Summary ===');
     console.log('✅ All basic functionality tests completed');
-    console.log('📊 Check the output above for any ❌ ERROR messages');
+    console.log('📊 Review the output above for any ERROR messages');
     console.log('🔍 Pay attention to palette index validation and duplicate detection');
 
     if (duplicates.length > 0 || invalidIndices.length > 0) {

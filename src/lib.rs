@@ -28,6 +28,8 @@ mod universal_schematic;
 pub mod utils;
 
 // Feature-specific modules
+#[cfg(feature = "autostack")]
+pub mod autostack;
 #[cfg(feature = "ffi")]
 pub mod ffi;
 #[cfg(feature = "meshing")]

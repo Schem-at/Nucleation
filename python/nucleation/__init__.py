@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Optional, Tuple, Union
 
 from . import _native
+from .redstone import to_networkx
 
 # ---------------------------------------------------------------------------
 # Re-exports for backwards compatibility.
@@ -50,6 +51,7 @@ for _name in (
     "RenderConfig",
     "Projection",
     "MchprsWorld",
+    "RedstoneGraph",
     "Value",
     "IoType",
     "LayoutFunction",
@@ -786,6 +788,25 @@ class Schematic(_native.Schematic):
             self._sim_world = self.create_simulation_world()
         return self._sim_world
 
+    def redstone_graph(self) -> Any:
+        """Extract the compiled redstone graph (``RedstoneGraph``) from this schematic.
+
+        Returns a native ``RedstoneGraph`` whose ``nodes`` / ``edges`` are plain
+        lists of dicts, plus ``features()`` / ``fingerprint()`` analyses. Use
+        :func:`nucleation.to_networkx` to convert it into a ``networkx.DiGraph``.
+        """
+        return self._get_or_build_sim_world().export_graph()
+
+    def redstone_graph_structural(self) -> Any:
+        """Extract the *structural* (pre-fold, as-built) redstone graph.
+
+        Like :func:`redstone_graph`, but runs only the redpiler's pre-fold passes
+        with optimization disabled, so wires/repeaters/torches survive as
+        individual nodes — recovering a graph that closely matches the physically
+        placed redstone components rather than the optimized/folded residue.
+        """
+        return self._get_or_build_sim_world().export_graph_structural()
+
     def is_lit(self, *args: Any) -> bool:
         """``True`` if the redstone lamp at this position is lit.
 
@@ -1213,6 +1234,7 @@ __all__ = [
     "save_schematic",
     "sign",
     "text",
+    "to_networkx",
 ]
 
 # Add feature-gated names if compiled in.
@@ -1229,6 +1251,7 @@ for _opt in (
     "RenderConfig",
     "Projection",
     "MchprsWorld",
+    "RedstoneGraph",
     "Value",
     "IoType",
     "LayoutFunction",

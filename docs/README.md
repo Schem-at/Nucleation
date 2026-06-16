@@ -51,6 +51,7 @@ These guides apply to all languages:
 - **[SchematicBuilder Guide](shared/guide/schematic-builder.md)** - Build schematics with ASCII art and compositional design
 - **[TypedCircuitExecutor Guide](shared/guide/typed-executor.md)** - High-level circuit simulation with typed IO
 - **[Circuit API Guide](shared/guide/circuit-api.md)** - Advanced region operations and CircuitBuilder pattern
+- **[Auto-stack Guide](autostack.md)** - Detect repeating structures and resize them (4-bit → 8-bit adder, 32×32 → 64×64 screen). Cross-binding API (Rust/JS/Python/FFI/PHP); design in [`autostack-design.pdf`](autostack-design.pdf)
 - **[Insign IO Integration](insign-io-integration.md)** - Auto-create TypedCircuitExecutor from sign annotations
 - **[Unicode Palette Reference](shared/unicode-palette.md)** - Visual circuit design characters
 
@@ -65,6 +66,7 @@ These guides apply to all languages:
 | SchematicBuilder     | ✅   | ✅         | ✅     |
 | Unicode Palettes     | ✅   | ✅         | ✅     |
 | Compositional Design | ✅   | ✅         | ✅     |
+| Auto-stack Resize    | ✅   | ✅         | ✅     |
 | CLI Tool             | ✅   | ❌         | ❌     |
 | Redstone Simulation  | ✅   | ✅         | ⚠️     |
 | TypedCircuitExecutor | ✅   | ✅         | ⚠️     |
@@ -197,6 +199,23 @@ let result = executor.execute(
     inputs,  // HashMap<String, Value>
     ExecutionMode::FixedTicks { ticks: 100 }
 )?;
+```
+
+### Auto-stack Resize
+
+Detect the repeating structure in a build and re-stamp it to a new size — a 4-bit
+adder becomes 8-bit, a 32×32 screen becomes 64×64. Pure-voxel, no simulation
+needed. Full guide: **[autostack.md](autostack.md)**.
+
+```javascript
+const structs = schematic.detectStructures();   // ranked by coverage
+const top = structs[0];                          // { mode, vectors, coverage, label, ... }
+
+const bigger = top.mode === "2d"
+  ? schematic.autostackResize2d(...top.vectors[0], ...top.vectors[1], 16, 16)
+  : schematic.autostackResize1d(...top.vectors[0], 8);
+
+const bytes = bigger.to_schematic();             // export the resized build
 ```
 
 ## Contributing

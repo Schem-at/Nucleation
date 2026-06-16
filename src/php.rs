@@ -407,6 +407,54 @@ impl NucleationSchematic {
 
         Ok(())
     }
+
+    // ---- Auto-stack: periodicity detection + resize ----
+
+    /// Detect repeating structures (region coverage). Returns a JSON array
+    /// string; decode with `json_decode`.
+    pub fn detect_structures(&self) -> String {
+        crate::autostack::detect_structures_json(&self.inner)
+    }
+
+    /// Resize a 1D / diagonal structure along its period vector.
+    pub fn autostack_resize_1d(
+        &self,
+        vx: i64,
+        vy: i64,
+        vz: i64,
+        units: i64,
+    ) -> PhpResult<NucleationSchematic> {
+        let inner = crate::autostack::resize_1d(
+            &self.inner,
+            [vx as i32, vy as i32, vz as i32],
+            units.max(1) as usize,
+        )
+        .map_err(|e| PhpException::default(e.to_string()))?;
+        Ok(NucleationSchematic { inner })
+    }
+
+    /// Resize a 2D structure to `n1`×`n2` cells along the two period vectors.
+    pub fn autostack_resize_2d(
+        &self,
+        v1x: i64,
+        v1y: i64,
+        v1z: i64,
+        v2x: i64,
+        v2y: i64,
+        v2z: i64,
+        n1: i64,
+        n2: i64,
+    ) -> PhpResult<NucleationSchematic> {
+        let inner = crate::autostack::resize_2d(
+            &self.inner,
+            [v1x as i32, v1y as i32, v1z as i32],
+            [v2x as i32, v2y as i32, v2z as i32],
+            n1.max(1) as usize,
+            n2.max(1) as usize,
+        )
+        .map_err(|e| PhpException::default(e.to_string()))?;
+        Ok(NucleationSchematic { inner })
+    }
 }
 
 /// Create a new schematic
