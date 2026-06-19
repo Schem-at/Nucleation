@@ -682,7 +682,7 @@ These guides apply to all languages:
 
 ## License
 
-Licensed under the **GNU AGPL-3.0-only**.
+Licensed under the **MIT License**.
 See [`LICENSE`](./LICENSE) for full terms.
 
 Made by [@Nano112](https://github.com/Nano112)

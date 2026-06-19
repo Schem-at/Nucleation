@@ -8,7 +8,7 @@ JVM citizen alongside `nucleation-py` and the WASM bindings.
 
 - Group / artifact: `com.github.schemat:nucleation`
 - Minimum JDK: 21
-- License: AGPL-3.0-only (inherited)
+- License: MIT (inherited)
 - Distribution: GitHub Releases (fat JAR, all platforms)
 
 ## Decisions locked in (all delivered)
@@ -200,6 +200,6 @@ purely additive in both Rust JNI exports and the Java class hierarchy.
 
 ## Re-licensing note
 
-The library inherits **AGPL-3.0-only** from upstream. The repository owner
-(Schem-at) is the rights-holder and may re-license or dual-license. Mods
-that bundle the JAR are subject to AGPL unless granted a separate license.
+The library inherits **MIT** from upstream. The repository owner
+(Schem-at) is the rights-holder. Mods that bundle the JAR may do so under
+the permissive MIT terms (retain the copyright/permission notice).

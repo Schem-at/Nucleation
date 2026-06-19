@@ -4,7 +4,7 @@ version:            0.1.0.0
 synopsis:           Tiny Haskell example using the Nucleation FFI
 description:        Builds a small Minecraft schematic via the Nucleation
                     C FFI and writes it to demo.litematic.
-license:            AGPL-3.0-only
+license:            MIT
 build-type:         Simple
 
 library

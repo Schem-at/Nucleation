@@ -314,7 +314,7 @@ N-1 (pass props to blockpedia) ───────────┘   │
 - Nucleation repo has **7 untracked top-level items** (the JVM bindings
   work). They should be committed separately under the user's direction
   — do not commit them as part of mcstructure fixes.
-- Both repos use the same author; license is AGPL-3.0 for nucleation and
+- Both repos use the same author; license is MIT for nucleation and
   (check) for blockpedia.
 - When testing locally, point nucleation at the local blockpedia via
   the `[patch.crates-io]` trick above so you don't need to publish for

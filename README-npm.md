@@ -194,5 +194,5 @@ and meshing.
 
 ## License
 
-AGPL-3.0-only. See the [main repository](https://github.com/Schem-at/Nucleation)
+MIT. See the [main repository](https://github.com/Schem-at/Nucleation)
 for details.

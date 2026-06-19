@@ -141,8 +141,8 @@ publishing {
                 url.set("https://github.com/Schem-at/Nucleation")
                 licenses {
                     license {
-                        name.set("AGPL-3.0-only")
-                        url.set("https://www.gnu.org/licenses/agpl-3.0.txt")
+                        name.set("MIT")
+                        url.set("https://opensource.org/licenses/MIT")
                     }
                 }
             }

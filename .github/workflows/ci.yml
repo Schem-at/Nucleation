@@ -507,7 +507,7 @@ jobs:
             pkg.repository = { type: 'git', url: 'git+https://github.com/Schem-at/Nucleation.git' };
             pkg.homepage = 'https://github.com/Schem-at/Nucleation';
             pkg.author = 'Nano <nano@schem.at>';
-            pkg.license = 'AGPL-3.0-only';
+            pkg.license = 'MIT';
             fs.writeFileSync(path, JSON.stringify(pkg, null, 2));
           "
           npm publish --provenance --access public --loglevel verbose

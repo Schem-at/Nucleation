@@ -10,7 +10,7 @@ API.
 - **Minimum JDK**: 21
 - **Platforms bundled in the fat JAR**: `linux-x64`, `linux-arm64`,
   `macos-x64`, `macos-arm64`, `windows-x64`
-- **License**: AGPL-3.0-only (inherits from the upstream library)
+- **License**: MIT (inherits from the upstream library)
 
 ## Quick start
 
@@ -346,6 +346,6 @@ Override knobs:
 
 ## License
 
-AGPL-3.0-only. The upstream rights-holder is Schem-at; if you need to
-ship a closed-source mod or distribute under a different license, contact
-<nano@schem.at> about dual-licensing.
+MIT. The upstream rights-holder is Schem-at. See the
+[LICENSE](https://github.com/Schem-at/Nucleation/blob/master/LICENSE) for
+full terms.

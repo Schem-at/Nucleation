@@ -224,4 +224,4 @@ See the main repository [CONTRIBUTING.md](../CONTRIBUTING.md) for development se
 
 ## License
 
-Licensed under the **GNU AGPL-3.0-only**. See [LICENSE](../LICENSE) for details.
+Licensed under the **MIT License**. See [LICENSE](../LICENSE) for details.
