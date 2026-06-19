@@ -455,8 +455,7 @@ fn mesh_output_from_mesher(
     output: MesherOutput,
     chunk_coord: Option<(i32, i32, i32)>,
 ) -> MeshOutput {
-    // `schematic-mesher` implements `From<&MesherOutput>` (not by value).
-    let mut mesh = MeshOutput::from(&output);
+    let mut mesh = MeshOutput::from(output);
     mesh.chunk_coord = chunk_coord;
     mesh
 }
