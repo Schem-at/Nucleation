@@ -154,6 +154,127 @@ impl NucleationSchematic {
         Ok(String::from_utf8_lossy(&data).to_string())
     }
 
+    // ----- Data-version conversion (datafixers) -----
+
+    /// Convert data between Minecraft data versions. Forward is lossless;
+    /// reverse returns a JSON loss report (`[]` when lossless).
+    pub fn convert_to_data_version(
+        &mut self,
+        target_data_version: i32,
+        source_data_version: i32,
+    ) -> String {
+        if target_data_version == source_data_version {
+            return "[]".to_string();
+        }
+        if target_data_version > source_data_version {
+            crate::dataconverter::convert_schematic(
+                &mut self.inner,
+                source_data_version,
+                target_data_version,
+            );
+            "[]".to_string()
+        } else {
+            crate::dataconverter::convert_schematic_reverse(
+                &mut self.inner,
+                source_data_version,
+                target_data_version,
+            )
+            .to_json()
+        }
+    }
+
+    /// Convert to `target_data_version` using the captured source version as
+    /// origin. Returns the JSON loss report (`[]` when lossless).
+    pub fn convert_to_version(&mut self, target_data_version: i32) -> String {
+        self.inner
+            .convert_to_data_version(target_data_version)
+            .to_json()
+    }
+
+    /// The data version this schematic was loaded from, or `null` if none.
+    pub fn get_source_data_version(&self) -> Option<i32> {
+        self.inner.metadata.source_data_version
+    }
+
+    /// Override the source data version for versionless formats.
+    pub fn set_source_data_version(&mut self, version: i32) {
+        self.inner.metadata.source_data_version = Some(version);
+    }
+
+    /// The canonical in-memory data version (the forward-conversion target).
+    pub fn canonical_data_version() -> i32 {
+        crate::dataconverter::CANONICAL_DATA_VERSION
+    }
+
+    /// Serialize a `.litematic` for a specific data version. Returns a map with
+    /// `bytes` (the file content) and `loss` (the JSON data-loss report). The
+    /// schematic itself is left unchanged.
+    pub fn to_litematic_for_version(
+        &self,
+        target_data_version: i32,
+    ) -> PhpResult<HashMap<String, String>> {
+        let (bytes, report) =
+            litematic::to_litematic_for_data_version(&self.inner, target_data_version).map_err(
+                |e| PhpException::default(format!("Failed to export to litematic: {}", e)),
+            )?;
+        let mut map = HashMap::new();
+        map.insert("bytes".to_string(), String::from_utf8_lossy(&bytes).to_string());
+        map.insert("loss".to_string(), report.to_json());
+        Ok(map)
+    }
+
+    // ----- Faithful (SNBT) block-entity / entity access -----
+
+    /// The block entity's NBT as a typed SNBT string, or `null` if none.
+    pub fn get_block_entity_snbt(&self, x: i32, y: i32, z: i32) -> Option<String> {
+        self.inner
+            .get_block_entity(crate::block_position::BlockPosition { x, y, z })
+            .map(|be| quartz_nbt::NbtTag::Compound(be.nbt.to_quartz_nbt()).to_snbt())
+    }
+
+    /// Remove the block entity at a position. Returns true if one was removed.
+    pub fn remove_block_entity(&mut self, x: i32, y: i32, z: i32) -> bool {
+        self.inner.remove_block_entity((x, y, z)).is_some()
+    }
+
+    /// Every block entity as a JSON array of `{id, position, snbt}`.
+    pub fn get_all_block_entities_snbt(&self) -> String {
+        let items: Vec<serde_json::Value> = self
+            .inner
+            .get_block_entities_as_list()
+            .into_iter()
+            .map(|be| {
+                let snbt = quartz_nbt::NbtTag::Compound(be.nbt.to_quartz_nbt()).to_snbt();
+                serde_json::json!({
+                    "id": be.id,
+                    "position": [be.position.0, be.position.1, be.position.2],
+                    "snbt": snbt,
+                })
+            })
+            .collect();
+        serde_json::to_string(&items).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    /// Every mobile entity as a typed SNBT string (full compound incl. id/Pos).
+    pub fn get_entities_snbt(&self) -> Vec<String> {
+        self.inner
+            .get_entities_as_list()
+            .iter()
+            .map(|entity| entity.to_nbt().to_snbt())
+            .collect()
+    }
+
+    /// Add a mobile entity from a full SNBT entity compound (must contain `id`
+    /// and `Pos`).
+    pub fn add_entity_from_snbt(&mut self, snbt: String) -> PhpResult<bool> {
+        let compound = quartz_nbt::snbt::parse(&snbt)
+            .map_err(|e| PhpException::default(format!("Invalid SNBT: {}", e)))?;
+        let entity = crate::entity::Entity::from_nbt(&compound)
+            .map_err(|e| PhpException::default(format!("Invalid entity NBT: {}", e)))?;
+        self.inner.add_entity(entity);
+        Ok(true)
+    }
+
     /// Set a block at coordinates
     pub fn set_block(&mut self, x: i32, y: i32, z: i32, block_name: String) -> PhpResult<()> {
         let block_state = BlockState::new(block_name);

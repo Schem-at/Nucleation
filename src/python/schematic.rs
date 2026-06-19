@@ -1230,6 +1230,132 @@ impl PySchematic {
         self.inner.remove_entity(index).is_some()
     }
 
+    // ----- Data-version conversion (datafixers) --------------------------------
+
+    /// Convert block/item/entity data between Minecraft data versions. Forward
+    /// (`target >= source`) is lossless; reverse is lossy and returns a JSON
+    /// array of `{version, kind, severity, path, detail}` loss entries (`[]`
+    /// when nothing was lost). Mirrors the WASM `convertToDataVersion`.
+    pub fn convert_to_data_version(
+        &mut self,
+        target_data_version: i32,
+        source_data_version: i32,
+    ) -> String {
+        if target_data_version == source_data_version {
+            return "[]".to_string();
+        }
+        if target_data_version > source_data_version {
+            crate::dataconverter::convert_schematic(
+                &mut self.inner,
+                source_data_version,
+                target_data_version,
+            );
+            "[]".to_string()
+        } else {
+            crate::dataconverter::convert_schematic_reverse(
+                &mut self.inner,
+                source_data_version,
+                target_data_version,
+            )
+            .to_json()
+        }
+    }
+
+    /// Convert to `target_data_version` using the schematic's captured source
+    /// version (else `mc_version`, else canonical) as origin, updating metadata
+    /// to the target. Returns the JSON loss report (`[]` when lossless).
+    pub fn convert_to_version(&mut self, target_data_version: i32) -> String {
+        self.inner.convert_to_data_version(target_data_version).to_json()
+    }
+
+    /// The Minecraft data version of the file this schematic was loaded from
+    /// (captured by importers), or `None` for versionless/fresh schematics.
+    pub fn get_source_data_version(&self) -> Option<i32> {
+        self.inner.metadata.source_data_version
+    }
+
+    /// Override the source data version for formats that carry no Java data
+    /// version, so the converter knows what to convert *from*.
+    pub fn set_source_data_version(&mut self, version: i32) {
+        self.inner.metadata.source_data_version = Some(version);
+    }
+
+    /// The canonical in-memory data version (the forward-conversion target).
+    #[staticmethod]
+    pub fn canonical_data_version() -> i32 {
+        crate::dataconverter::CANONICAL_DATA_VERSION
+    }
+
+    /// Serialize a `.litematic` targeting a specific Minecraft data version. A
+    /// COPY is converted to `target_data_version` and the matching schematic
+    /// Version header is written; the schematic itself is unchanged. Returns
+    /// `(bytes, loss_json)` where `loss_json` is the data-loss report.
+    pub fn to_litematic_for_version(
+        &self,
+        py: Python<'_>,
+        target_data_version: i32,
+    ) -> PyResult<PyObject> {
+        let (bytes, report) =
+            litematic::to_litematic_for_data_version(&self.inner, target_data_version)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;
+        let tuple = (PyBytes::new(py, &bytes), report.to_json());
+        Ok(tuple.into_pyobject(py)?.into())
+    }
+
+    // ----- Faithful (SNBT) block-entity / entity access ------------------------
+
+    /// The block entity's NBT as a typed SNBT string (`123L`, `1b`, …), or
+    /// `None` if there is none. Round-trips losslessly, unlike the JS-number
+    /// `nbt` dict from `get_block_entity`.
+    pub fn get_block_entity_snbt(&self, x: i32, y: i32, z: i32) -> Option<String> {
+        self.inner
+            .get_block_entity(BlockPosition { x, y, z })
+            .map(|be| quartz_nbt::NbtTag::Compound(be.nbt.to_quartz_nbt()).to_snbt())
+    }
+
+    /// Remove the block entity at a position. Returns true if one was removed.
+    pub fn remove_block_entity(&mut self, x: i32, y: i32, z: i32) -> bool {
+        self.inner.remove_block_entity((x, y, z)).is_some()
+    }
+
+    /// Every block entity as `{id, position, snbt}`; `snbt` is the inner data
+    /// only (no `Id`/`Pos`). Pair with `id` + position to write back.
+    pub fn get_all_block_entities_snbt<'py>(&self, py: Python<'py>) -> PyResult<PyObject> {
+        let mut list_items: Vec<PyObject> = Vec::new();
+        for be in self.inner.get_block_entities_as_list() {
+            let dict = PyDict::new(py);
+            dict.set_item("id", &be.id)?;
+            dict.set_item("position", (be.position.0, be.position.1, be.position.2))?;
+            let snbt = quartz_nbt::NbtTag::Compound(be.nbt.to_quartz_nbt()).to_snbt();
+            dict.set_item("snbt", snbt)?;
+            list_items.push(dict.into());
+        }
+        Ok(PyList::new(py, list_items)?.into())
+    }
+
+    /// Every mobile entity as a typed SNBT string (the full compound incl.
+    /// `id`/`Pos`). Mirrors `get_block_entity_snbt`.
+    pub fn get_entities_snbt(&self) -> Vec<String> {
+        self.inner
+            .get_entities_as_list()
+            .iter()
+            .map(|entity| entity.to_nbt().to_snbt())
+            .collect()
+    }
+
+    /// Add a mobile entity from a full SNBT entity compound (must contain `id`
+    /// and `Pos`). The faithful, fully-typed entity write path.
+    pub fn add_entity_from_snbt(&mut self, snbt: &str) -> PyResult<()> {
+        let compound = quartz_nbt::snbt::parse(snbt).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid SNBT: {}", e))
+        })?;
+        let entity = crate::entity::Entity::from_nbt(&compound).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid entity NBT: {}", e))
+        })?;
+        self.inner.add_entity(entity);
+        Ok(())
+    }
+
     pub fn get_all_blocks<'py>(&self, py: Python<'py>) -> PyResult<PyObject> {
         let mut list_items: Vec<PyObject> = Vec::new();
 

@@ -2044,6 +2044,243 @@ pub extern "C" fn schematic_remove_entity(schematic: *mut SchematicWrapper, inde
     }
 }
 
+// --- Data-version conversion (datafixers) ---
+
+/// The canonical in-memory data version (the forward-conversion target).
+#[no_mangle]
+pub extern "C" fn schematic_canonical_data_version() -> c_int {
+    crate::dataconverter::CANONICAL_DATA_VERSION
+}
+
+/// Convert block/item/entity data between Minecraft data versions. Forward
+/// (`target >= source`) is lossless; reverse is lossy. Returns a freshly
+/// allocated JSON loss report string (`[]` when lossless) that the caller must
+/// free with `free_string`; returns NULL on a null pointer.
+#[no_mangle]
+pub extern "C" fn schematic_convert_to_data_version(
+    schematic: *mut SchematicWrapper,
+    target_data_version: c_int,
+    source_data_version: c_int,
+) -> *mut c_char {
+    if schematic.is_null() {
+        return ptr::null_mut();
+    }
+    let s = unsafe { &mut *(*schematic).0 };
+    let json = if target_data_version == source_data_version {
+        "[]".to_string()
+    } else if target_data_version > source_data_version {
+        crate::dataconverter::convert_schematic(s, source_data_version, target_data_version);
+        "[]".to_string()
+    } else {
+        crate::dataconverter::convert_schematic_reverse(s, source_data_version, target_data_version)
+            .to_json()
+    };
+    CString::new(json)
+        .map(|c| c.into_raw())
+        .unwrap_or(ptr::null_mut())
+}
+
+/// Convert to `target_data_version` using the schematic's captured source
+/// version (else `mc_version`, else canonical) as origin, updating metadata to
+/// the target. Returns a freshly allocated JSON loss report (`[]` when
+/// lossless), freed with `free_string`; NULL on a null pointer.
+#[no_mangle]
+pub extern "C" fn schematic_convert_to_version(
+    schematic: *mut SchematicWrapper,
+    target_data_version: c_int,
+) -> *mut c_char {
+    if schematic.is_null() {
+        return ptr::null_mut();
+    }
+    let s = unsafe { &mut *(*schematic).0 };
+    let json = s.convert_to_data_version(target_data_version).to_json();
+    CString::new(json)
+        .map(|c| c.into_raw())
+        .unwrap_or(ptr::null_mut())
+}
+
+/// The Minecraft data version of the file this schematic was loaded from, or
+/// `-1` if none was captured (versionless / freshly built).
+#[no_mangle]
+pub extern "C" fn schematic_get_source_data_version(schematic: *const SchematicWrapper) -> c_int {
+    if schematic.is_null() {
+        return -1;
+    }
+    let s = unsafe { &*(*schematic).0 };
+    s.metadata.source_data_version.unwrap_or(-1)
+}
+
+/// Override the source data version for formats that carry no Java data version,
+/// so the converter knows what to convert *from*.
+#[no_mangle]
+pub extern "C" fn schematic_set_source_data_version(
+    schematic: *mut SchematicWrapper,
+    version: c_int,
+) {
+    if schematic.is_null() {
+        return;
+    }
+    let s = unsafe { &mut *(*schematic).0 };
+    s.metadata.source_data_version = Some(version);
+}
+
+/// Serialize a `.litematic` targeting a specific Minecraft data version. A COPY
+/// is converted to `target_data_version` and the matching schematic Version
+/// header written; the schematic is left unchanged. The byte payload is
+/// returned (free with `free_byte_array`); the JSON loss report is written to
+/// `*out_loss` (free with `free_string`, may be set to NULL on error).
+#[no_mangle]
+pub extern "C" fn schematic_to_litematic_for_version(
+    schematic: *const SchematicWrapper,
+    target_data_version: c_int,
+    out_loss: *mut *mut c_char,
+) -> ByteArray {
+    if !out_loss.is_null() {
+        unsafe { *out_loss = ptr::null_mut() };
+    }
+    if schematic.is_null() {
+        return ByteArray {
+            data: ptr::null_mut(),
+            len: 0,
+        };
+    }
+    let s = unsafe { &*(*schematic).0 };
+    match litematic::to_litematic_for_data_version(s, target_data_version) {
+        Ok((mut data, report)) => {
+            if !out_loss.is_null() {
+                if let Ok(c) = CString::new(report.to_json()) {
+                    unsafe { *out_loss = c.into_raw() };
+                }
+            }
+            let ptr = data.as_mut_ptr();
+            let len = data.len();
+            std::mem::forget(data);
+            ByteArray { data: ptr, len }
+        }
+        Err(_) => ByteArray {
+            data: ptr::null_mut(),
+            len: 0,
+        },
+    }
+}
+
+// --- Faithful (SNBT) block-entity / entity access ---
+
+/// The block entity's NBT as a typed SNBT string, or NULL if none. Round-trips
+/// losslessly. Caller frees with `free_string`.
+#[no_mangle]
+pub extern "C" fn schematic_get_block_entity_snbt(
+    schematic: *const SchematicWrapper,
+    x: c_int,
+    y: c_int,
+    z: c_int,
+) -> *mut c_char {
+    if schematic.is_null() {
+        return ptr::null_mut();
+    }
+    let s = unsafe { &*(*schematic).0 };
+    match s.get_block_entity(BlockPosition { x, y, z }) {
+        Some(be) => {
+            let snbt = quartz_nbt::NbtTag::Compound(be.nbt.to_quartz_nbt()).to_snbt();
+            CString::new(snbt)
+                .map(|c| c.into_raw())
+                .unwrap_or(ptr::null_mut())
+        }
+        None => ptr::null_mut(),
+    }
+}
+
+/// Remove the block entity at a position. Returns 0 if one was removed, -1 otherwise.
+#[no_mangle]
+pub extern "C" fn schematic_remove_block_entity(
+    schematic: *mut SchematicWrapper,
+    x: c_int,
+    y: c_int,
+    z: c_int,
+) -> c_int {
+    if schematic.is_null() {
+        return -1;
+    }
+    let s = unsafe { &mut *(*schematic).0 };
+    if s.remove_block_entity((x, y, z)).is_some() {
+        0
+    } else {
+        -1
+    }
+}
+
+/// Every block entity as a JSON array of `{id, position:[x,y,z], snbt}`. The
+/// `snbt` is the inner data only (no `Id`/`Pos`). Caller frees with `free_string`.
+#[no_mangle]
+pub extern "C" fn schematic_get_all_block_entities_snbt(
+    schematic: *const SchematicWrapper,
+) -> *mut c_char {
+    if schematic.is_null() {
+        return ptr::null_mut();
+    }
+    let s = unsafe { &*(*schematic).0 };
+    let items: Vec<serde_json::Value> = s
+        .get_block_entities_as_list()
+        .into_iter()
+        .map(|be| {
+            let snbt = quartz_nbt::NbtTag::Compound(be.nbt.to_quartz_nbt()).to_snbt();
+            serde_json::json!({
+                "id": be.id,
+                "position": [be.position.0, be.position.1, be.position.2],
+                "snbt": snbt,
+            })
+        })
+        .collect();
+    let json = serde_json::to_string(&items).unwrap_or_else(|_| "[]".to_string());
+    CString::new(json)
+        .map(|c| c.into_raw())
+        .unwrap_or(ptr::null_mut())
+}
+
+/// Every mobile entity as a JSON array of typed SNBT strings (full compound
+/// incl. `id`/`Pos`). Caller frees with `free_string`.
+#[no_mangle]
+pub extern "C" fn schematic_get_entities_snbt(schematic: *const SchematicWrapper) -> *mut c_char {
+    if schematic.is_null() {
+        return ptr::null_mut();
+    }
+    let s = unsafe { &*(*schematic).0 };
+    let snbts: Vec<String> = s
+        .get_entities_as_list()
+        .iter()
+        .map(|entity| entity.to_nbt().to_snbt())
+        .collect();
+    let json = serde_json::to_string(&snbts).unwrap_or_else(|_| "[]".to_string());
+    CString::new(json)
+        .map(|c| c.into_raw())
+        .unwrap_or(ptr::null_mut())
+}
+
+/// Add a mobile entity from a full SNBT entity compound (must contain `id` and
+/// `Pos`). Returns 0 on success, -1 on error.
+#[no_mangle]
+pub extern "C" fn schematic_add_entity_from_snbt(
+    schematic: *mut SchematicWrapper,
+    snbt: *const c_char,
+) -> c_int {
+    if schematic.is_null() || snbt.is_null() {
+        return -1;
+    }
+    let s = unsafe { &mut *(*schematic).0 };
+    let snbt_str = unsafe { CStr::from_ptr(snbt) }.to_string_lossy().to_string();
+    let compound = match quartz_nbt::snbt::parse(&snbt_str) {
+        Ok(c) => c,
+        Err(_) => return -1,
+    };
+    match crate::entity::Entity::from_nbt(&compound) {
+        Ok(entity) => {
+            s.add_entity(entity);
+            0
+        }
+        Err(_) => -1,
+    }
+}
+
 /// Frees a CEntityArray returned by `schematic_get_entities`.
 #[no_mangle]
 pub extern "C" fn free_entity_array(arr: CEntityArray) {
