@@ -513,6 +513,14 @@ fn load_mca_into_schematic(
 ) {
     for chunk_opt in &mca.chunks {
         if let Some(chunk) = chunk_opt {
+            // Propagate the chunk's Minecraft data version as the schematic's
+            // source version (chunks in one region share it); first one wins.
+            if schematic.metadata.source_data_version.is_none() {
+                schematic.metadata.source_data_version = Some(chunk.data_version);
+                if schematic.metadata.mc_version.is_none() {
+                    schematic.metadata.mc_version = Some(chunk.data_version);
+                }
+            }
             load_chunk_into_schematic(chunk, schematic, bounds);
         }
     }

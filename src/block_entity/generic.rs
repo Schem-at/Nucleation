@@ -93,16 +93,33 @@ impl BlockEntity {
 
     pub fn from_nbt(nbt: &NbtCompound) -> Self {
         let nbt_map = NbtMap::from_quartz_nbt(nbt);
+        // The id key is `Id` in Sponge v3 / Nucleation's own litematic writer, but
+        // vanilla and Litematica use lowercase `id` — accept both.
         let id = nbt_map
             .get("Id")
+            .or_else(|| nbt_map.get("id"))
             .and_then(|v| v.as_string())
             .cloned()
             .unwrap_or_else(|| "unknown".to_string());
+        // Position is `Pos` (int[3]) in Sponge/Nucleation, but Litematica's
+        // TileEntities carry relative `x`/`y`/`z` ints instead — fall back to those
+        // (the caller adds the region offset). Without this, every block entity in a
+        // Litematica region parsed to (0,0,0) and collapsed onto the region origin.
         let position = nbt_map
             .get("Pos")
             .and_then(|v| v.as_int_array())
             .map(|v| (v[0], v[1], v[2]))
-            .unwrap_or_else(|| (0, 0, 0));
+            .or_else(|| {
+                match (
+                    nbt_map.get("x").and_then(|v| v.as_i32()),
+                    nbt_map.get("y").and_then(|v| v.as_i32()),
+                    nbt_map.get("z").and_then(|v| v.as_i32()),
+                ) {
+                    (Some(x), Some(y), Some(z)) => Some((x, y, z)),
+                    _ => None,
+                }
+            })
+            .unwrap_or((0, 0, 0));
         BlockEntity {
             nbt: Arc::new(nbt_map),
             id,
@@ -135,7 +152,18 @@ impl BlockEntity {
     /// - Data: compound (optional) - contains all block-specific NBT data
     ///
     /// This differs from to_nbt() which puts all data at root level (used for litematic)
-    pub fn to_nbt_v3(&self) -> NbtCompound {
+    ///
+    /// `data_version` is the target Minecraft data version: the empty
+    /// `components`/`id` fields are a 1.20.5+ container convention, so they are
+    /// only injected when the target is ≥ 1.20.5 (3837), or when the version is
+    /// unknown (`None`, preserving the historical default). For an older target
+    /// — e.g. a schematic reverse-converted down past the components rework —
+    /// they are omitted so the export does not re-introduce shape the converter
+    /// deliberately removed.
+    pub fn to_nbt_v3(&self, data_version: Option<i32>) -> NbtCompound {
+        const COMPONENTS_VERSION: i32 = 3837; // 1.20.5
+        let inject_components = data_version.map_or(true, |dv| dv >= COMPONENTS_VERSION);
+
         let mut nbt = NbtCompound::new();
 
         // Required fields at root level
@@ -160,7 +188,7 @@ impl BlockEntity {
                 || self.id.contains("dispenser")
                 || self.id.contains("jukebox");
 
-            if is_container {
+            if is_container && inject_components {
                 // Add empty components compound (required in 1.20.5+)
                 data_compound.insert(
                     "components",
@@ -204,5 +232,32 @@ mod tests {
             block_entity.nbt.get("CustomName"),
             Some(&NbtValue::String("Test".to_string()))
         );
+    }
+
+    // Litematica / vanilla TileEntities use lowercase `id` and relative `x`/`y`/`z`
+    // ints rather than the `Id`/`Pos` keys Nucleation's own writer emits. from_nbt
+    // must read both spellings, else block entities parse as id="unknown" at (0,0,0)
+    // (which collapsed every block entity in a region onto the region origin).
+    #[test]
+    fn from_nbt_reads_litematica_lowercase_id_and_xyz() {
+        let mut compound = NbtCompound::new();
+        compound.insert("id", quartz_nbt::NbtTag::String("minecraft:dispenser".to_string()));
+        compound.insert("x", quartz_nbt::NbtTag::Int(3));
+        compound.insert("y", quartz_nbt::NbtTag::Int(4));
+        compound.insert("z", quartz_nbt::NbtTag::Int(5));
+        let be = BlockEntity::from_nbt(&compound);
+        assert_eq!(be.id, "minecraft:dispenser");
+        assert_eq!(be.position, (3, 4, 5));
+    }
+
+    // The `Id`/`Pos` spelling (Sponge v3 / Nucleation's writer) must still win.
+    #[test]
+    fn from_nbt_still_reads_capitalized_id_and_pos() {
+        let mut compound = NbtCompound::new();
+        compound.insert("Id", quartz_nbt::NbtTag::String("minecraft:chest".to_string()));
+        compound.insert("Pos", quartz_nbt::NbtTag::IntArray(vec![7, 8, 9]));
+        let be = BlockEntity::from_nbt(&compound);
+        assert_eq!(be.id, "minecraft:chest");
+        assert_eq!(be.position, (7, 8, 9));
     }
 }

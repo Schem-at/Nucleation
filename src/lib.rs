@@ -8,6 +8,7 @@ mod block_state;
 mod bounding_box;
 pub mod building;
 mod chunk;
+pub mod dataconverter;
 pub mod definition_region;
 pub mod diff;
 mod entity;

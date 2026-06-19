@@ -30,28 +30,71 @@ pub fn to_litematic(schematic: &UniversalSchematic) -> Result<Vec<u8>, Box<dyn s
     to_litematic_with_compression(schematic, DEFAULT_COMPRESSION)
 }
 
+// Minecraft data-version breakpoints that move the .litematic schematic Version
+// (see LITEMATIC_FORMAT.md). The format is otherwise stable across these.
+const DATA_VERSION_1_13_2: i32 = 1631; // Flattening → schematic Version 5
+const DATA_VERSION_1_18: i32 = 2860; // negative-Y height → Version 6
+const DATA_VERSION_1_19_2: i32 = 3120; // SubVersion=1 first written (within v6)
+const DATA_VERSION_1_20_5: i32 = 3837; // item Components → Version 7
+/// Default target data version when a schematic carries none (latest canonical).
+const DEFAULT_TARGET_DATA_VERSION: i32 = 4790; // 26.1.2
+
+/// The `.litematic` `Version` (and optional `SubVersion`) that Litematica writes
+/// for a given Minecraft data version. v4 (1.12) < 1631 ≤ v5 (1.13–1.17) < 2860 ≤
+/// v6 (1.18–1.20.4) < 3837 ≤ v7 (1.20.5+). SubVersion=1 is cosmetic/write-only and
+/// first appears at 1.19.2 (within v6) and at v7.
+pub fn schematic_version_for_data_version(data_version: i32) -> (i32, Option<i32>) {
+    if data_version < DATA_VERSION_1_13_2 {
+        (4, None)
+    } else if data_version < DATA_VERSION_1_18 {
+        (5, None)
+    } else if data_version < DATA_VERSION_1_20_5 {
+        (6, if data_version >= DATA_VERSION_1_19_2 { Some(1) } else { None })
+    } else {
+        (7, Some(1))
+    }
+}
+
+/// Serialize a `.litematic` targeting a specific Minecraft data version: converts
+/// a COPY of the schematic's block/item content to `target_data_version` (forward
+/// flatten / reverse un-flatten + component squash via the DataConverter) and
+/// writes the matching schematic Version header. Returns the bytes plus a
+/// `LossReport` describing anything the down-conversion couldn't preserve (so it
+/// can be surfaced to the user). The input schematic is left unmodified.
+pub fn to_litematic_for_data_version(
+    schematic: &UniversalSchematic,
+    target_data_version: i32,
+) -> Result<(Vec<u8>, crate::dataconverter::LossReport), Box<dyn std::error::Error>> {
+    let mut converted = schematic.clone();
+    let report = converted.convert_to_data_version(target_data_version);
+    let bytes = to_litematic(&converted)?;
+    Ok((bytes, report))
+}
+
 pub fn to_litematic_with_compression(
     schematic: &UniversalSchematic,
     compression: flate2::Compression,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut root = NbtCompound::new();
 
-    // Add Version and SubVersion
-    root.insert("Version", NbtTag::Int(6));
-    root.insert("SubVersion", NbtTag::Int(1));
+    // Derive the schematic Version from the target Minecraft data version so the
+    // header matches the block/item content (pair with convert_to_data_version to
+    // also downgrade the content). Falls back to the latest canonical version.
+    let data_version = schematic.metadata.mc_version.unwrap_or(DEFAULT_TARGET_DATA_VERSION);
+    let (version, sub_version) = schematic_version_for_data_version(data_version);
 
-    // Add MinecraftDataVersion
-    root.insert(
-        "MinecraftDataVersion",
-        NbtTag::Int(schematic.metadata.mc_version.unwrap_or(3700)),
-    );
+    root.insert("Version", NbtTag::Int(version));
+    if let Some(sub) = sub_version {
+        root.insert("SubVersion", NbtTag::Int(sub));
+    }
+    root.insert("MinecraftDataVersion", NbtTag::Int(data_version));
 
     // Add Metadata
-    let metadata = create_metadata(schematic);
+    let metadata = create_metadata(schematic, version);
     root.insert("Metadata", NbtTag::Compound(metadata));
 
     // Add Regions
-    let regions = create_regions(schematic);
+    let regions = create_regions(schematic, version);
     root.insert("Regions", NbtTag::Compound(regions));
 
     // Compress and return the NBT data
@@ -82,7 +125,7 @@ pub fn from_litematic(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::er
     Ok(schematic)
 }
 
-fn create_metadata(schematic: &UniversalSchematic) -> NbtCompound {
+fn create_metadata(schematic: &UniversalSchematic, version: i32) -> NbtCompound {
     let mut metadata = NbtCompound::new();
 
     metadata.insert(
@@ -140,8 +183,14 @@ fn create_metadata(schematic: &UniversalSchematic) -> NbtCompound {
     enclosing_size.insert("z", NbtTag::Int(length as i32));
     metadata.insert("EnclosingSize", NbtTag::Compound(enclosing_size));
 
-    metadata.insert("TotalVolume", NbtTag::Int(schematic.total_volume() as i32));
-    metadata.insert("TotalBlocks", NbtTag::Int(schematic.total_blocks() as i32));
+    // v4 (1.12) wrote these as TAG_Long; v5+ switched to TAG_Int.
+    if version <= 4 {
+        metadata.insert("TotalVolume", NbtTag::Long(schematic.total_volume() as i64));
+        metadata.insert("TotalBlocks", NbtTag::Long(schematic.total_blocks() as i64));
+    } else {
+        metadata.insert("TotalVolume", NbtTag::Int(schematic.total_volume() as i32));
+        metadata.insert("TotalBlocks", NbtTag::Int(schematic.total_blocks() as i32));
+    }
     metadata.insert(
         "RegionCount",
         NbtTag::Int(schematic.other_regions.len() as i32 + 1),
@@ -158,7 +207,7 @@ fn create_metadata(schematic: &UniversalSchematic) -> NbtCompound {
 
     metadata
 }
-fn create_regions(schematic: &UniversalSchematic) -> NbtCompound {
+fn create_regions(schematic: &UniversalSchematic, version: i32) -> NbtCompound {
     let mut regions = NbtCompound::new();
 
     for (name, region) in &schematic.get_all_regions() {
@@ -323,9 +372,13 @@ fn create_regions(schematic: &UniversalSchematic) -> NbtCompound {
         );
         region_nbt.insert("TileEntities", NbtTag::List(tile_entities));
 
-        // PendingBlockTicks and PendingFluidTicks (not fully supported, using empty lists)
+        // PendingBlockTicks (since schematic v3) and PendingFluidTicks (since v5 /
+        // MC 1.13 — fluids did not exist in 1.12, so a v4 file must NOT carry it).
+        // Not yet round-tripped; written as empty lists.
         region_nbt.insert("PendingBlockTicks", NbtTag::List(NbtList::new()));
-        region_nbt.insert("PendingFluidTicks", NbtTag::List(NbtList::new()));
+        if version >= 5 {
+            region_nbt.insert("PendingFluidTicks", NbtTag::List(NbtList::new()));
+        }
 
         regions.insert(name, NbtTag::Compound(region_nbt));
     }
@@ -337,6 +390,13 @@ fn parse_metadata(
     root: &NbtCompound,
     schematic: &mut UniversalSchematic,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // Capture the file's Minecraft data version (root-level, written by Litematica
+    // as `MinecraftDataVersion`) so importers know what to forward-convert from.
+    if let Ok(dv) = root.get::<_, i32>("MinecraftDataVersion") {
+        schematic.metadata.mc_version = Some(dv);
+        schematic.metadata.source_data_version = Some(dv);
+    }
+
     let metadata = root.get::<_, &NbtCompound>("Metadata")?;
 
     schematic.metadata.name = metadata.get::<_, &str>("Name").ok().map(String::from);
@@ -417,7 +477,20 @@ fn parse_regions(
             region.rebuild_non_air_count();
             region.rebuild_tight_bounds();
 
-            // Parse Entities - Litematic stores positions relative to region Position
+            // Litematic entity/tile-entity coordinates are relative to the region's
+            // MIN CORNER, which is NOT `Position` when `Size` is negative (Litematica
+            // stores a region as an origin + signed extent — see
+            // PositionUtils.getMinCorner(regionPos, posEndRel)). The block grid already
+            // uses this min corner (region.bbox.min, via BoundingBox::from_position_and_size),
+            // so block entities/entities must add the SAME corner to land on their
+            // blocks. Adding raw `position` shifted everything by the region height/depth
+            // on negative-extent schematics and pushed every container off its block.
+            let min_corner = region.get_bounding_box().min;
+
+            // Parse Entities - positions relative to the region Position/origin
+            // corner. This intentionally differs from block entities below:
+            // Litematica saves entities from `entityPos - box.getPos1()` and
+            // places them back with `origin + regionPos + entityPos`.
             if let Ok(entities_list) = region_nbt.get::<_, &NbtList>("Entities") {
                 region.entities = entities_list
                     .iter()
@@ -436,15 +509,15 @@ fn parse_regions(
                     .collect();
             }
 
-            // Parse TileEntities - Litematic stores positions relative to region Position
+            // Parse TileEntities - positions relative to the region min corner.
             if let Ok(tile_entities_list) = region_nbt.get::<_, &NbtList>("TileEntities") {
                 for tag in tile_entities_list.iter() {
                     if let NbtTag::Compound(compound) = tag {
                         let mut block_entity = BlockEntity::from_nbt(compound);
                         // Convert from relative to absolute position
-                        block_entity.position.0 += position.0;
-                        block_entity.position.1 += position.1;
-                        block_entity.position.2 += position.2;
+                        block_entity.position.0 += min_corner.0;
+                        block_entity.position.1 += min_corner.1;
+                        block_entity.position.2 += min_corner.2;
                         region
                             .block_entities
                             .insert(block_entity.position, block_entity);
@@ -467,6 +540,250 @@ mod tests {
     use std::fs::File;
     use std::io::Write;
 
+    // Build the gzipped litematic bytes for a hand-crafted root compound.
+    fn gzip_litematic(root: &NbtCompound) -> Vec<u8> {
+        use flate2::{write::GzEncoder, Compression};
+        let mut uncompressed = Vec::new();
+        quartz_nbt::io::write_nbt(&mut uncompressed, None, root, Flavor::Uncompressed).unwrap();
+        let mut enc = GzEncoder::new(Vec::new(), Compression::default());
+        std::io::Write::write_all(&mut enc, &uncompressed).unwrap();
+        enc.finish().unwrap()
+    }
+
+    // Read the root NBT compound back out of produced .litematic bytes (header check).
+    fn read_root(bytes: &[u8]) -> NbtCompound {
+        let mut gz = GzDecoder::new(bytes);
+        let (root, _) = quartz_nbt::io::read_nbt(&mut gz, Flavor::Uncompressed).unwrap();
+        root
+    }
+
+    #[test]
+    fn schematic_version_maps_data_versions_correctly() {
+        assert_eq!(schematic_version_for_data_version(1343), (4, None)); // 1.12.2
+        assert_eq!(schematic_version_for_data_version(1631), (5, None)); // 1.13.2
+        assert_eq!(schematic_version_for_data_version(2586), (5, None)); // 1.16.5
+        assert_eq!(schematic_version_for_data_version(2860), (6, None)); // 1.18
+        assert_eq!(schematic_version_for_data_version(3120), (6, Some(1))); // 1.19.2
+        assert_eq!(schematic_version_for_data_version(3700), (6, Some(1))); // 1.20.4
+        assert_eq!(schematic_version_for_data_version(3837), (7, Some(1))); // 1.20.5
+        assert_eq!(schematic_version_for_data_version(4189), (7, Some(1))); // 1.21.x
+    }
+
+    #[test]
+    fn writes_version_header_matching_target_data_version() {
+        let cases = [
+            (1343, 4, false, false), // (data_version, expected Version, expect SubVersion, expect PendingFluidTicks)
+            (1631, 5, false, true),
+            (2860, 6, false, true),
+            (3120, 6, true, true),
+            (3837, 7, true, true),
+            (4189, 7, true, true),
+        ];
+        for (dv, want_ver, want_sub, want_fluid) in cases {
+            let mut schem = UniversalSchematic::new("v".to_string());
+            schem.metadata.mc_version = Some(dv);
+            schem.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+            let bytes = to_litematic(&schem).unwrap();
+            let root = read_root(&bytes);
+            assert_eq!(root.get::<_, i32>("Version").unwrap(), want_ver, "Version for dv={}", dv);
+            assert_eq!(root.get::<_, i32>("MinecraftDataVersion").unwrap(), dv);
+            assert_eq!(root.get::<_, i32>("SubVersion").is_ok(), want_sub, "SubVersion presence for dv={}", dv);
+            // PendingFluidTicks presence is gated on Version>=5.
+            let regions = root.get::<_, &NbtCompound>("Regions").unwrap();
+            let (_, rtag) = regions.inner().iter().next().unwrap();
+            if let NbtTag::Compound(region) = rtag {
+                assert_eq!(
+                    region.get::<_, &NbtList>("PendingFluidTicks").is_ok(),
+                    want_fluid,
+                    "PendingFluidTicks presence for dv={}",
+                    dv
+                );
+                // v4 wrote Total... only in Metadata; here just confirm block round-trips.
+            }
+            // The bytes re-parse and keep the block + source data version.
+            let reparsed = from_litematic(&bytes).unwrap();
+            assert_eq!(reparsed.get_block(0, 0, 0).map(|b| b.name.as_str()), Some("minecraft:stone"));
+            assert_eq!(reparsed.metadata.source_data_version, Some(dv));
+        }
+    }
+
+    #[test]
+    fn to_litematic_for_data_version_converts_and_writes_matching_header() {
+        let mut schem = UniversalSchematic::new("conv".to_string());
+        schem.metadata.mc_version = Some(4189); // a modern (1.21) source
+        schem.metadata.source_data_version = Some(4189);
+        schem.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+
+        // Target 1.12 (v4): a COPY is down-converted; the input is untouched.
+        let (bytes, _loss) = to_litematic_for_data_version(&schem, 1343).unwrap();
+        let root = read_root(&bytes);
+        assert_eq!(root.get::<_, i32>("Version").unwrap(), 4);
+        assert_eq!(root.get::<_, i32>("MinecraftDataVersion").unwrap(), 1343);
+        assert_eq!(schem.metadata.mc_version, Some(4189), "input schematic must be unchanged");
+        // It re-reads and stone (unchanged by flattening) survives.
+        let reparsed = from_litematic(&bytes).unwrap();
+        assert_eq!(reparsed.get_block(0, 0, 0).map(|b| b.name.as_str()), Some("minecraft:stone"));
+    }
+
+    #[test]
+    fn v4_writes_total_volume_as_long() {
+        let mut schem = UniversalSchematic::new("v4".to_string());
+        schem.metadata.mc_version = Some(1343);
+        schem.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+        let meta = read_root(&to_litematic(&schem).unwrap());
+        let m = meta.get::<_, &NbtCompound>("Metadata").unwrap();
+        assert!(matches!(m.get::<_, &NbtTag>("TotalVolume").unwrap(), NbtTag::Long(_)));
+        // v7 uses Int.
+        let mut schem7 = UniversalSchematic::new("v7".to_string());
+        schem7.metadata.mc_version = Some(4189);
+        schem7.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+        let m7root = read_root(&to_litematic(&schem7).unwrap());
+        let m7 = m7root.get::<_, &NbtCompound>("Metadata").unwrap();
+        assert!(matches!(m7.get::<_, &NbtTag>("TotalVolume").unwrap(), NbtTag::Int(_)));
+    }
+
+    // A region with a NEGATIVE Size: Position is the origin corner, Size the signed
+    // extent, so the MIN corner is below Position. Litematica stores blocks AND tile
+    // entities relative to that min corner — the loader must add the min corner, not
+    // Position, or every container lands off its block. Regression for the VIP /
+    // negative-size schematics where item contents "didn't load".
+    #[test]
+    fn negative_size_region_places_block_entity_on_its_block() {
+        // 1×2×1 region: Position (0,5,0), Size (1,-2,1) → min corner (0,4,0); the two
+        // cells are world (0,4,0) [local idx 0] and (0,5,0) [local idx 1].
+        let mut palette = NbtList::new();
+        let mut air = NbtCompound::new();
+        air.insert("Name", NbtTag::String("minecraft:air".to_string()));
+        palette.push(NbtTag::Compound(air));
+        let mut chest = NbtCompound::new();
+        chest.insert("Name", NbtTag::String("minecraft:chest".to_string()));
+        palette.push(NbtTag::Compound(chest));
+
+        // blocks = [palette 1 (chest) @ idx0, palette 0 (air) @ idx1]; 2 bits each → 0b01.
+        let block_states = NbtTag::LongArray(vec![1]);
+
+        // The chest tile entity at local (0,0,0) = world (0,4,0), holding a stone.
+        let mut item = NbtCompound::new();
+        item.insert("id", NbtTag::String("minecraft:stone".to_string()));
+        item.insert("count", NbtTag::Int(1));
+        item.insert("Slot", NbtTag::Byte(0));
+        let mut items = NbtList::new();
+        items.push(NbtTag::Compound(item));
+        let mut te = NbtCompound::new();
+        te.insert("id", NbtTag::String("minecraft:chest".to_string()));
+        te.insert("x", NbtTag::Int(0));
+        te.insert("y", NbtTag::Int(0));
+        te.insert("z", NbtTag::Int(0));
+        te.insert("Items", NbtTag::List(items));
+        let mut tile_entities = NbtList::new();
+        tile_entities.push(NbtTag::Compound(te));
+
+        let mut pos = NbtCompound::new();
+        pos.insert("x", NbtTag::Int(0));
+        pos.insert("y", NbtTag::Int(5));
+        pos.insert("z", NbtTag::Int(0));
+        let mut size = NbtCompound::new();
+        size.insert("x", NbtTag::Int(1));
+        size.insert("y", NbtTag::Int(-2));
+        size.insert("z", NbtTag::Int(1));
+
+        let mut region = NbtCompound::new();
+        region.insert("Position", NbtTag::Compound(pos));
+        region.insert("Size", NbtTag::Compound(size));
+        region.insert("BlockStatePalette", NbtTag::List(palette));
+        region.insert("BlockStates", block_states);
+        region.insert("TileEntities", NbtTag::List(tile_entities));
+
+        let mut regions = NbtCompound::new();
+        regions.insert("r", NbtTag::Compound(region));
+        let mut root = NbtCompound::new();
+        root.insert("MinecraftDataVersion", NbtTag::Int(4189));
+        root.insert("Version", NbtTag::Int(7));
+        root.insert("Metadata", NbtTag::Compound(NbtCompound::new()));
+        root.insert("Regions", NbtTag::Compound(regions));
+
+        let schem = from_litematic(&gzip_litematic(&root)).expect("parse");
+
+        // The chest block sits at world (0,4,0)...
+        assert_eq!(schem.get_block(0, 4, 0).map(|b| b.name.as_str()), Some("minecraft:chest"));
+        assert_eq!(schem.get_block(0, 5, 0).map(|b| b.name.as_str()), Some("minecraft:air"));
+        // ...and its block entity must land on it (NOT at Position-offset (0,5,0)).
+        let bes = schem.get_block_entities_as_list();
+        assert_eq!(bes.len(), 1);
+        assert_eq!(bes[0].id, "minecraft:chest");
+        assert_eq!(bes[0].position, (0, 4, 0), "block entity must sit on the min-corner-relative cell");
+        // And its item survived.
+        let items_len = bes[0]
+            .nbt
+            .get("Items")
+            .and_then(|v| if let crate::nbt::NbtValue::List(l) = v { Some(l.len()) } else { None })
+            .unwrap_or(0);
+        assert_eq!(items_len, 1);
+    }
+
+    // Litematica stores mobile entity Pos relative to the region Position/origin
+    // corner, not the min corner used by the block array. For negative-size
+    // regions those corners differ. Regression for sheep_test.litematic: a boat
+    // saved at relative (-0.5, 1, -1.3125) inside Position (2,0,3), Size
+    // (-3,2,-4) must load at (1.5,1,1.6875), not off-platform at
+    // (-0.5,1,-1.3125).
+    #[test]
+    fn negative_size_region_places_entity_from_region_position() {
+        let mut palette = NbtList::new();
+        let mut air = NbtCompound::new();
+        air.insert("Name", NbtTag::String("minecraft:air".to_string()));
+        palette.push(NbtTag::Compound(air));
+        let mut grass = NbtCompound::new();
+        grass.insert("Name", NbtTag::String("minecraft:grass_block".to_string()));
+        palette.push(NbtTag::Compound(grass));
+
+        // 3x2x4 region, all bottom-layer cells are grass so content bounds make a platform.
+        let mut block_states = 0i64;
+        for index in 0..12 {
+            block_states |= 1i64 << (index * 2);
+        }
+
+        let mut pos = NbtCompound::new();
+        pos.insert("x", NbtTag::Int(2));
+        pos.insert("y", NbtTag::Int(0));
+        pos.insert("z", NbtTag::Int(3));
+        let mut size = NbtCompound::new();
+        size.insert("x", NbtTag::Int(-3));
+        size.insert("y", NbtTag::Int(2));
+        size.insert("z", NbtTag::Int(-4));
+
+        let mut entity_pos = NbtList::new();
+        entity_pos.push(NbtTag::Double(-0.5));
+        entity_pos.push(NbtTag::Double(1.0));
+        entity_pos.push(NbtTag::Double(-1.3125));
+        let mut entity = NbtCompound::new();
+        entity.insert("id", NbtTag::String("minecraft:oak_boat".to_string()));
+        entity.insert("Pos", NbtTag::List(entity_pos));
+        let mut entities = NbtList::new();
+        entities.push(NbtTag::Compound(entity));
+
+        let mut region = NbtCompound::new();
+        region.insert("Position", NbtTag::Compound(pos));
+        region.insert("Size", NbtTag::Compound(size));
+        region.insert("BlockStatePalette", NbtTag::List(palette));
+        region.insert("BlockStates", NbtTag::LongArray(vec![block_states]));
+        region.insert("Entities", NbtTag::List(entities));
+
+        let mut regions = NbtCompound::new();
+        regions.insert("r", NbtTag::Compound(region));
+        let mut root = NbtCompound::new();
+        root.insert("MinecraftDataVersion", NbtTag::Int(4189));
+        root.insert("Version", NbtTag::Int(7));
+        root.insert("Metadata", NbtTag::Compound(NbtCompound::new()));
+        root.insert("Regions", NbtTag::Compound(regions));
+
+        let schem = from_litematic(&gzip_litematic(&root)).expect("parse");
+        let entity = &schem.default_region.entities[0];
+        assert!((entity.position.0 - 1.5).abs() < 0.001, "x={}", entity.position.0);
+        assert!((entity.position.1 - 1.0).abs() < 0.001, "y={}", entity.position.1);
+        assert!((entity.position.2 - 1.6875).abs() < 0.001, "z={}", entity.position.2);
+    }
+
     #[test]
     fn test_create_metadata() {
         let mut schematic = UniversalSchematic::new("Test Schematic".to_string());
@@ -475,7 +792,7 @@ mod tests {
         schematic.metadata.created = Some(1000);
         schematic.metadata.modified = Some(2000);
 
-        let metadata = create_metadata(&schematic);
+        let metadata = create_metadata(&schematic, 7);
 
         assert_eq!(metadata.get::<_, &str>("Name").unwrap(), "Test Schematic");
         assert_eq!(metadata.get::<_, &str>("Author").unwrap(), "Test Author");
@@ -514,7 +831,7 @@ mod tests {
 
         schematic.add_region(region);
 
-        let regions = create_regions(&schematic);
+        let regions = create_regions(&schematic, 7);
 
         assert!(regions.contains_key("TestRegion"));
         let region_nbt = regions.get::<_, &NbtCompound>("TestRegion").unwrap();
