@@ -232,6 +232,25 @@ impl NucleationSchematic {
             .map(|be| quartz_nbt::NbtTag::Compound(be.nbt.to_quartz_nbt()).to_snbt())
     }
 
+    /// Set (or replace) a block entity at a position from a typed SNBT string.
+    pub fn set_block_entity(
+        &mut self,
+        x: i32,
+        y: i32,
+        z: i32,
+        id: String,
+        snbt: String,
+    ) -> PhpResult<()> {
+        let compound = quartz_nbt::snbt::parse(&snbt)
+            .map_err(|e| PhpException::default(format!("Invalid SNBT: {}", e)))?;
+        let nbt = crate::nbt::NbtMap::from_quartz_nbt(&compound);
+        let mut be = crate::block_entity::BlockEntity::new(id, (x, y, z));
+        be.set_nbt(nbt);
+        self.inner
+            .set_block_entity(crate::block_position::BlockPosition { x, y, z }, be);
+        Ok(())
+    }
+
     /// Remove the block entity at a position. Returns true if one was removed.
     pub fn remove_block_entity(&mut self, x: i32, y: i32, z: i32) -> bool {
         self.inner.remove_block_entity((x, y, z)).is_some()

@@ -2190,6 +2190,34 @@ pub extern "C" fn schematic_get_block_entity_snbt(
     }
 }
 
+/// Set (or replace) a block entity at a position from a typed SNBT string.
+/// Returns 0 on success, -1 on error (null pointer or invalid SNBT).
+#[no_mangle]
+pub extern "C" fn schematic_set_block_entity(
+    schematic: *mut SchematicWrapper,
+    x: c_int,
+    y: c_int,
+    z: c_int,
+    id: *const c_char,
+    snbt: *const c_char,
+) -> c_int {
+    if schematic.is_null() || id.is_null() || snbt.is_null() {
+        return -1;
+    }
+    let s = unsafe { &mut *(*schematic).0 };
+    let id_str = unsafe { CStr::from_ptr(id) }.to_string_lossy().to_string();
+    let snbt_str = unsafe { CStr::from_ptr(snbt) }.to_string_lossy().to_string();
+    let compound = match quartz_nbt::snbt::parse(&snbt_str) {
+        Ok(c) => c,
+        Err(_) => return -1,
+    };
+    let nbt = crate::nbt::NbtMap::from_quartz_nbt(&compound);
+    let mut be = crate::block_entity::BlockEntity::new(id_str, (x, y, z));
+    be.set_nbt(nbt);
+    s.set_block_entity(BlockPosition { x, y, z }, be);
+    0
+}
+
 /// Remove the block entity at a position. Returns 0 if one was removed, -1 otherwise.
 #[no_mangle]
 pub extern "C" fn schematic_remove_block_entity(
