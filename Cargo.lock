@@ -4791,6 +4791,7 @@ dependencies = [
  "byteorder",
  "cesu8",
  "flate2",
+ "indexmap 2.12.1",
  "quartz_nbt_macros",
 ]
 

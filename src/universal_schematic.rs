@@ -74,6 +74,49 @@ impl UniversalSchematic {
         }
     }
 
+    /// Convert this schematic's block states, block entities, and items to
+    /// `target_data_version`, returning a [`LossReport`](crate::dataconverter::LossReport)
+    /// describing any data loss (empty when lossless).
+    ///
+    /// The `from` version is `metadata.source_data_version` (captured by
+    /// importers), falling back to `mc_version`, then the canonical version.
+    /// Forward (`target >= from`) is faithful and lossless; reverse
+    /// (`target < from`, i.e. saving for an older version) may approximate and
+    /// reports every loss so callers can warn before writing. The metadata
+    /// version fields are updated to `target` so a subsequent export stamps it.
+    pub fn convert_to_data_version(
+        &mut self,
+        target_data_version: i32,
+    ) -> crate::dataconverter::LossReport {
+        use crate::dataconverter::{
+            convert_schematic, convert_schematic_reverse, LossReport, CANONICAL_DATA_VERSION,
+        };
+        let from = self
+            .metadata
+            .source_data_version
+            .or(self.metadata.mc_version)
+            .unwrap_or(CANONICAL_DATA_VERSION);
+
+        let report = if target_data_version == from {
+            LossReport::default()
+        } else if target_data_version > from {
+            convert_schematic(self, from, target_data_version);
+            LossReport::default()
+        } else {
+            convert_schematic_reverse(self, from, target_data_version)
+        };
+
+        self.metadata.mc_version = Some(target_data_version);
+        self.metadata.source_data_version = Some(target_data_version);
+        report
+    }
+
+    /// Forward-convert to the canonical (in-memory target) data version. A
+    /// convenience for load-time normalization; lossless.
+    pub fn convert_to_canonical(&mut self) {
+        let _ = self.convert_to_data_version(crate::dataconverter::CANONICAL_DATA_VERSION);
+    }
+
     pub fn get_all_regions(&self) -> HashMap<String, &Region> {
         let mut all_regions = HashMap::new();
         all_regions.insert(self.default_region_name.clone(), &self.default_region);
@@ -2166,6 +2209,36 @@ mod tests {
     use std::io::Cursor;
 
     #[test]
+    fn litematic_load_captures_source_data_version() {
+        // Stamp a known data version, round-trip through litematic, and confirm
+        // the importer captures it as the source version for conversion.
+        let mut schematic = UniversalSchematic::new("VersionTest".to_string());
+        schematic.metadata.mc_version = Some(1343);
+        schematic.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+
+        let bytes = crate::formats::litematic::to_litematic(&schematic).expect("write litematic");
+        let loaded = crate::formats::litematic::from_litematic(&bytes).expect("read litematic");
+        assert_eq!(loaded.metadata.source_data_version, Some(1343));
+    }
+
+    #[test]
+    fn convert_to_data_version_forward_then_reverse_round_trips() {
+        // melon_block -> melon at V1490; forward to canonical-ish, then back.
+        let mut schematic = UniversalSchematic::new("ConvTest".to_string());
+        schematic.metadata.source_data_version = Some(1489);
+        schematic.set_block(0, 0, 0, &BlockState::new("minecraft:melon_block".to_string()));
+
+        let report = schematic.convert_to_data_version(1490);
+        assert!(report.is_empty(), "forward rename is lossless");
+        assert_eq!(schematic.get_block(0, 0, 0).unwrap().get_name(), "minecraft:melon");
+        assert_eq!(schematic.metadata.source_data_version, Some(1490));
+
+        let report = schematic.convert_to_data_version(1489);
+        assert!(report.is_empty(), "reverse rename is lossless");
+        assert_eq!(schematic.get_block(0, 0, 0).unwrap().get_name(), "minecraft:melon_block");
+    }
+
+    #[test]
     fn test_schematic_operations() {
         let mut schematic = UniversalSchematic::new("Test Schematic".to_string());
 
@@ -2492,6 +2565,25 @@ mod tests {
         assert_eq!(removed_entity, entity);
 
         assert_eq!(schematic.default_region.entities.len(), 0);
+    }
+
+    #[test]
+    fn get_entities_as_list_includes_non_default_regions() {
+        // Regression: a multi-region .litematic can put its entity in a region
+        // other than the (HashMap-arbitrary) default one. get_entities_as_list —
+        // which the WASM `get_entities()` exporter relies on — must enumerate
+        // every region, or the entity is silently (and non-deterministically)
+        // dropped on load. See formats/litematic.rs region parsing.
+        let mut schematic = UniversalSchematic::new("Multi".to_string());
+        // Default region stays empty (like a "lever" sub-region with no entities).
+        let mut other = Region::new("with_entity".to_string(), (0, 0, 0), (4, 4, 4));
+        other.add_entity(Entity::new("minecraft:boat".to_string(), (1.5, 0.0, 1.5)));
+        assert!(schematic.add_region(other));
+
+        assert_eq!(schematic.default_region.entities.len(), 0);
+        let all = schematic.get_entities_as_list();
+        assert_eq!(all.len(), 1, "entity in a non-default region must be listed");
+        assert_eq!(all[0].id, "minecraft:boat");
     }
 
     #[test]

@@ -11,6 +11,15 @@ pub struct Metadata {
     pub lm_version: Option<i32>,
     pub mc_version: Option<i32>,
     pub we_version: Option<i32>,
+    /// The Minecraft data version of the *file this schematic was loaded from*,
+    /// captured by importers. Distinct from `mc_version` (which doubles as the
+    /// export fallback). Drives forward-conversion to canonical on load and is
+    /// the `from` version for reverse-conversion on save. `None` for formats with
+    /// no Java data version (classic `.schematic`, Bedrock `.mcstructure`) or a
+    /// freshly-constructed schematic. Not serialized — it is purely transient
+    /// load-time provenance.
+    #[serde(default, skip)]
+    pub source_data_version: Option<i32>,
 }
 impl Default for Metadata {
     fn default() -> Self {
@@ -23,6 +32,7 @@ impl Default for Metadata {
             lm_version: None,
             mc_version: None,
             we_version: None,
+            source_data_version: None,
         }
     }
 }
@@ -47,6 +57,7 @@ impl Metadata {
             lm_version,
             mc_version,
             we_version,
+            source_data_version: None,
         }
     }
 

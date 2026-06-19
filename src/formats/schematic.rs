@@ -199,7 +199,7 @@ fn to_schematic_v3(
     blocks_container.insert("Data", NbtTag::ByteArray(block_data_i8));
 
     // Add block entities from compact region (using v3 format)
-    let block_entities = convert_block_entities_v3(&compact_region);
+    let block_entities = convert_block_entities_v3(&compact_region, schematic.metadata.mc_version);
     blocks_container.insert("BlockEntities", NbtTag::List(block_entities));
 
     // Entities are stored at root (Schematic) level in v3 per Sponge spec.
@@ -451,6 +451,8 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::er
     let mut schematic = UniversalSchematic::new(name);
     schematic.definition_regions = definition_regions;
     schematic.metadata.mc_version = mc_version;
+    // The Sponge `DataVersion` is the file's source version for conversion.
+    schematic.metadata.source_data_version = mc_version;
 
     let width = schem.get::<_, i16>("Width")? as u32;
     let height = schem.get::<_, i16>("Height")? as u32;
@@ -514,11 +516,11 @@ fn convert_block_entities(region: &Region) -> NbtList {
 // Convert block entities for Sponge Schematic v3 format
 // Uses to_nbt_v3() which wraps block-specific data in a "Data" compound
 // Positions are relative to [0,0,0] of the schematic (without offset applied)
-fn convert_block_entities_v3(region: &Region) -> NbtList {
+fn convert_block_entities_v3(region: &Region, data_version: Option<i32>) -> NbtList {
     let mut block_entities = NbtList::new();
 
     for (_, block_entity) in region.block_entities.iter() {
-        let mut nbt = block_entity.to_nbt_v3();
+        let mut nbt = block_entity.to_nbt_v3(data_version);
         let rel_x = block_entity.position.0 - region.position.0;
         let rel_y = block_entity.position.1 - region.position.1;
         let rel_z = block_entity.position.2 - region.position.2;

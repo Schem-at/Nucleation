@@ -1688,6 +1688,49 @@ mod tests {
     use super::*;
     use crate::BlockState;
 
+    // Litematica's EXACT continuous-stream packing (LitematicaBitArray.setAt) — the
+    // on-disk BlockStates format. Proves nucleation's unpack_block_states reads a
+    // genuine Litematica long array byte-for-byte, for EVERY bit width including the
+    // power-of-two widths that use the "fast path".
+    fn litematica_pack(values: &[usize], bits: usize) -> Vec<i64> {
+        let len = ((values.len() * bits + 63) / 64).max(1);
+        let mut longs = vec![0i64; len];
+        let mask = (1u64 << bits) - 1;
+        for (i, &v) in values.iter().enumerate() {
+            let start_offset = i * bits;
+            let start_arr = start_offset >> 6;
+            let end_arr = ((i + 1) * bits - 1) >> 6;
+            let start_bit = start_offset & 63;
+            let mut s = longs[start_arr] as u64;
+            s = (s & !(mask << start_bit)) | ((v as u64 & mask) << start_bit);
+            longs[start_arr] = s as i64;
+            if start_arr != end_arr {
+                let end_offset = 64 - start_bit;
+                let j1 = bits - end_offset;
+                let mut e = longs[end_arr] as u64;
+                e = ((e >> j1) << j1) | ((v as u64 & mask) >> end_offset);
+                longs[end_arr] = e as i64;
+            }
+        }
+        longs
+    }
+
+    #[test]
+    fn unpack_matches_litematica_continuous_stream_all_bit_widths() {
+        for (bits, palette_len) in [(2usize, 4usize), (3, 8), (4, 16), (5, 32), (6, 64), (7, 128), (8, 256)] {
+            let volume = 200usize; // spans many longs
+            let values: Vec<usize> = (0..volume).map(|i| (i * 7 + 1) % palette_len).collect();
+            let packed = litematica_pack(&values, bits);
+            let mut region = Region::new("t".to_string(), (0, 0, 0), (volume as i32, 1, 1));
+            region.palette = (0..palette_len).map(|i| BlockState::new(format!("minecraft:b{}", i))).collect();
+            assert_eq!(region.calculate_bits_per_block(), bits, "bits setup for palette_len={}", palette_len);
+            // Litematica long-count is ceil(volume*bits/64); confirm nucleation reads exactly that.
+            assert_eq!(packed.len(), (volume * bits + 63) / 64);
+            let unpacked = region.unpack_block_states(&packed);
+            assert_eq!(unpacked, values, "unpack mismatch at bits={}", bits);
+        }
+    }
+
     #[test]
     fn test_pack_block_states_to_long_array() {
         //array from 1 to 16

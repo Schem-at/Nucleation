@@ -195,6 +195,74 @@ impl SchematicWrapper {
             .map_err(|e| JsValue::from_str(&format!("Export error: {}", e)))
     }
 
+    /// Convert this schematic's block states / block entities / items between
+    /// Minecraft data versions, in place, returning a JSON array describing any
+    /// data loss (empty `[]` when lossless).
+    ///
+    /// Forward (target >= source) is faithful and lossless — the report is always
+    /// `[]`. Reverse (target < source, used to save for an older version) can be
+    /// lossy (the 1.13 Flattening, 1.20.5 components, item `Damage`, …); each
+    /// approximation/drop is reported as `{version, kind, severity, path, detail}`
+    /// so the tool can warn the user before saving. Conversion is never silent
+    /// about loss.
+    #[wasm_bindgen(js_name = convertToDataVersion)]
+    pub fn convert_to_data_version(
+        &mut self,
+        target_data_version: i32,
+        source_data_version: i32,
+    ) -> String {
+        if target_data_version == source_data_version {
+            return "[]".to_string();
+        }
+        if target_data_version > source_data_version {
+            crate::dataconverter::convert_schematic(
+                &mut self.0,
+                source_data_version,
+                target_data_version,
+            );
+            "[]".to_string()
+        } else {
+            let report = crate::dataconverter::convert_schematic_reverse(
+                &mut self.0,
+                source_data_version,
+                target_data_version,
+            );
+            report.to_json()
+        }
+    }
+
+    /// Convert to `target_data_version` using the schematic's *captured* source
+    /// version (`source_data_version`, else `mc_version`, else canonical) as the
+    /// origin, updating the metadata version to the target. Returns the JSON loss
+    /// report (empty `[]` when lossless). This is the ergonomic save/load entry:
+    /// `convertToVersion(CANONICAL)` on load, `convertToVersion(target)` before
+    /// exporting for an older version.
+    #[wasm_bindgen(js_name = convertToVersion)]
+    pub fn convert_to_version(&mut self, target_data_version: i32) -> String {
+        self.0.convert_to_data_version(target_data_version).to_json()
+    }
+
+    /// The Minecraft data version of the file this schematic was loaded from
+    /// (captured by importers), or `None` for versionless/freshly-built schematics.
+    #[wasm_bindgen(js_name = getSourceDataVersion)]
+    pub fn get_source_data_version(&self) -> Option<i32> {
+        self.0.metadata.source_data_version
+    }
+
+    /// Override the source data version — for formats that carry no Java data
+    /// version (classic `.schematic` ≈ 1343, raw imports), so the caller can tell
+    /// the converter what to convert *from*.
+    #[wasm_bindgen(js_name = setSourceDataVersion)]
+    pub fn set_source_data_version(&mut self, version: i32) {
+        self.0.metadata.source_data_version = Some(version);
+    }
+
+    /// The canonical in-memory data version (the forward-conversion target).
+    #[wasm_bindgen(js_name = canonicalDataVersion)]
+    pub fn canonical_data_version() -> i32 {
+        crate::dataconverter::CANONICAL_DATA_VERSION
+    }
+
     /// Get the settings schema for an export format (returns JSON string or undefined).
     pub fn get_export_settings_schema(format: &str) -> Option<String> {
         let manager = get_manager();
@@ -233,6 +301,22 @@ impl SchematicWrapper {
     pub fn to_litematic(&self) -> Result<Vec<u8>, JsValue> {
         litematic::to_litematic(&self.0)
             .map_err(|e| JsValue::from_str(&format!("Litematic conversion error: {}", e)))
+    }
+
+    /// Serialize a `.litematic` targeting a specific Minecraft data version: a COPY
+    /// of the schematic's content is converted to `target_data_version` and the
+    /// matching schematic Version header (4=1.12 / 5=1.13–1.17 / 6=1.18–1.20.4 /
+    /// 7=1.20.5+) is written. Returns `{ bytes: Uint8Array, loss: <json> }`; `loss`
+    /// is the data-loss report from any down-conversion (empty `{}` when lossless),
+    /// so the UI can warn the user. The schematic itself is left unchanged.
+    #[wasm_bindgen(js_name = toLitematicForVersion)]
+    pub fn to_litematic_for_version(&self, target_data_version: i32) -> Result<JsValue, JsValue> {
+        let (bytes, report) = litematic::to_litematic_for_data_version(&self.0, target_data_version)
+            .map_err(|e| JsValue::from_str(&format!("Litematic conversion error: {}", e)))?;
+        let obj = Object::new();
+        Reflect::set(&obj, &"bytes".into(), &js_sys::Uint8Array::from(&bytes[..]).into()).unwrap();
+        Reflect::set(&obj, &"loss".into(), &JsValue::from_str(&report.to_json())).unwrap();
+        Ok(obj.into())
     }
 
     pub fn from_schematic(&mut self, data: &[u8]) -> Result<(), JsValue> {
@@ -839,29 +923,92 @@ impl SchematicWrapper {
         result
     }
 
+    /// Get the structured block entity at a position as `{id, position, nbt}`,
+    /// or NULL if there is none. Returns *every* block-entity type (chests,
+    /// signs, furnaces, banners, spawners, …) — not just chests — so the editor
+    /// can read all the NBT nucleation preserves. (For a precision-faithful
+    /// representation of `Long`/`LongArray` fields, see `getBlockEntitySnbt`.)
     pub fn get_block_entity(&self, x: i32, y: i32, z: i32) -> JsValue {
         let block_position = BlockPosition { x, y, z };
         if let Some(block_entity) = self.0.get_block_entity(block_position) {
-            if block_entity.id.contains("chest") {
-                let obj = Object::new();
-                Reflect::set(&obj, &"id".into(), &JsValue::from_str(&block_entity.id)).unwrap();
+            let obj = Object::new();
+            Reflect::set(&obj, &"id".into(), &JsValue::from_str(&block_entity.id)).unwrap();
 
-                let position = Array::new();
-                position.push(&JsValue::from(block_entity.position.0));
-                position.push(&JsValue::from(block_entity.position.1));
-                position.push(&JsValue::from(block_entity.position.2));
-                Reflect::set(&obj, &"position".into(), &position).unwrap();
+            let position = Array::new();
+            position.push(&JsValue::from(block_entity.position.0));
+            position.push(&JsValue::from(block_entity.position.1));
+            position.push(&JsValue::from(block_entity.position.2));
+            Reflect::set(&obj, &"position".into(), &position).unwrap();
 
-                // Use the new to_js_value method
-                Reflect::set(&obj, &"nbt".into(), &block_entity.nbt.to_js_value()).unwrap();
+            Reflect::set(&obj, &"nbt".into(), &block_entity.nbt.to_js_value()).unwrap();
 
-                obj.into()
-            } else {
-                JsValue::NULL
-            }
+            obj.into()
         } else {
             JsValue::NULL
         }
+    }
+
+    /// Faithful, precision-safe block-entity read: the block entity's NBT as an
+    /// SNBT string (typed — `123L`, `1b`, etc.), or NULL if none. Unlike the
+    /// structured `nbt` object (which collapses `Long` to a JS double), SNBT
+    /// round-trips losslessly through `setBlockEntity`, so the editor can carry
+    /// untouched block entities verbatim.
+    #[wasm_bindgen(js_name = getBlockEntitySnbt)]
+    pub fn get_block_entity_snbt(&self, x: i32, y: i32, z: i32) -> JsValue {
+        match self.0.get_block_entity(BlockPosition { x, y, z }) {
+            Some(be) => {
+                let compound = be.nbt.to_quartz_nbt();
+                JsValue::from_str(&quartz_nbt::NbtTag::Compound(compound).to_snbt())
+            }
+            None => JsValue::NULL,
+        }
+    }
+
+    /// Set (or replace) a block entity at a position from an SNBT string. This is
+    /// the faithful, fully-typed write path the editor uses to persist
+    /// container contents, sign text, banner patterns, item components, etc.
+    /// SNBT preserves every NBT tag type with no precision loss.
+    #[wasm_bindgen(js_name = setBlockEntity)]
+    pub fn set_block_entity(&mut self, x: i32, y: i32, z: i32, id: &str, snbt: &str) -> Result<(), JsValue> {
+        let compound = quartz_nbt::snbt::parse(snbt)
+            .map_err(|e| JsValue::from_str(&format!("Invalid SNBT: {}", e)))?;
+        let nbt = crate::nbt::NbtMap::from_quartz_nbt(&compound);
+        let mut be = crate::block_entity::BlockEntity::new(id.to_string(), (x, y, z));
+        be.set_nbt(nbt);
+        self.0.set_block_entity(BlockPosition { x, y, z }, be);
+        Ok(())
+    }
+
+    /// Remove the block entity at a position. Returns true if one was removed.
+    #[wasm_bindgen(js_name = removeBlockEntity)]
+    pub fn remove_block_entity(&mut self, x: i32, y: i32, z: i32) -> bool {
+        self.0.remove_block_entity((x, y, z)).is_some()
+    }
+
+    /// Every block entity as `{id, position:[x,y,z], snbt}` — the batch,
+    /// precision-faithful read the editor bridge uses on load to attach each
+    /// block entity's full NBT (as a typed SNBT string) to its block. The `snbt`
+    /// is the block entity's inner data only (no `Id`/`Pos`); pair it with `id`
+    /// and the position when writing back via `setBlockEntity`.
+    #[wasm_bindgen(js_name = getAllBlockEntitiesSnbt)]
+    pub fn get_all_block_entities_snbt(&self) -> Array {
+        let arr = Array::new();
+        for be in self.0.get_block_entities_as_list() {
+            let obj = Object::new();
+            Reflect::set(&obj, &"id".into(), &JsValue::from_str(&be.id)).unwrap();
+
+            let position = Array::new();
+            position.push(&JsValue::from(be.position.0));
+            position.push(&JsValue::from(be.position.1));
+            position.push(&JsValue::from(be.position.2));
+            Reflect::set(&obj, &"position".into(), &position).unwrap();
+
+            let snbt = quartz_nbt::NbtTag::Compound(be.nbt.to_quartz_nbt()).to_snbt();
+            Reflect::set(&obj, &"snbt".into(), &JsValue::from_str(&snbt)).unwrap();
+
+            arr.push(&obj);
+        }
+        arr
     }
 
     pub fn get_all_block_entities(&self) -> JsValue {
@@ -887,14 +1034,19 @@ impl SchematicWrapper {
 
     /// Get the number of mobile entities (not block entities).
     pub fn entity_count(&self) -> usize {
-        self.0.default_region.entities.len()
+        self.0.get_entities_as_list().len()
     }
 
     /// Get all mobile entities as a JS array of objects.
     pub fn get_entities(&self) -> JsValue {
-        let entities = &self.0.default_region.entities;
+        // Mirror `blocks()` / `get_all_block_entities()`: enumerate EVERY region,
+        // not just the default one. A `.litematic` can hold several named regions
+        // (the entity may live in any of them), and which region quartz_nbt makes
+        // "default" is non-deterministic (NbtCompound is a HashMap), so reading
+        // only `default_region.entities` randomly drops a file's entities.
+        let entities = self.0.get_entities_as_list();
         let js_entities = Array::new();
-        for entity in entities {
+        for entity in &entities {
             let obj = Object::new();
             Reflect::set(&obj, &"id".into(), &JsValue::from_str(&entity.id)).unwrap();
 
@@ -926,6 +1078,33 @@ impl SchematicWrapper {
             entity.nbt = serde_json::from_str(json)
                 .map_err(|e| JsValue::from_str(&format!("Invalid NBT JSON: {}", e)))?;
         }
+        self.0.add_entity(entity);
+        Ok(())
+    }
+
+    /// Faithful, precision-safe read of every mobile entity as an SNBT string
+    /// (the full entity compound incl. `id`/`Pos`, typed). Mirrors
+    /// `getBlockEntitySnbt` so the editor can carry entity NBT verbatim.
+    #[wasm_bindgen(js_name = getEntitiesSnbt)]
+    pub fn get_entities_snbt(&self) -> Array {
+        let arr = Array::new();
+        // All regions, not just the default — see `get_entities`.
+        for entity in &self.0.get_entities_as_list() {
+            let snbt = entity.to_nbt().to_snbt();
+            arr.push(&JsValue::from_str(&snbt));
+        }
+        arr
+    }
+
+    /// Add a mobile entity from a full SNBT entity compound (must contain `id`
+    /// and `Pos`). The faithful, fully-typed entity write path — mirrors
+    /// `setBlockEntity` for block entities.
+    #[wasm_bindgen(js_name = addEntityFromSnbt)]
+    pub fn add_entity_from_snbt(&mut self, snbt: &str) -> Result<(), JsValue> {
+        let compound = quartz_nbt::snbt::parse(snbt)
+            .map_err(|e| JsValue::from_str(&format!("Invalid SNBT: {}", e)))?;
+        let entity = crate::entity::Entity::from_nbt(&compound)
+            .map_err(|e| JsValue::from_str(&format!("Invalid entity NBT: {}", e)))?;
         self.0.add_entity(entity);
         Ok(())
     }
