@@ -259,3 +259,8 @@ WorldChunkIter.*     # streaming world API not in JVM yet
 WorldChunkView.*     # streaming world API not in JVM yet
 WorldSink.*          # streaming world API not in JVM yet
 ChunkDiff.*          # streaming world API not in JVM yet
+# ── Redstone graph export / fingerprint (2026-06-16) — not yet in nucleation-jvm ──
+# Follow-up: implement JVM bindings for the RedstoneGraph API, then remove.
+RedstoneGraph.*                       # redstone graph API not in JVM yet
+MchprsWorld.export_graph              # redstone graph API not in JVM yet
+MchprsWorld.export_graph_structural   # redstone graph API not in JVM yet
