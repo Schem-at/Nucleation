@@ -3712,7 +3712,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation"
-version = "0.2.14"
+version = "0.2.15"
 dependencies = [
  "aws-sdk-s3",
  "base64 0.22.1",
@@ -5387,6 +5387,7 @@ dependencies = [
 [[package]]
 name = "schematic-mesher"
 version = "0.1.0"
+source = "git+https://github.com/Schem-at/Schematic-Mesher.git?rev=253d2b6#253d2b63815bcf78f54ec7e5f9bbf92912864fda"
 dependencies = [
  "glam",
  "gltf-json",

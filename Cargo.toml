@@ -1,6 +1,6 @@
 [package]
 name = "nucleation"
-version = "0.2.14"
+version = "0.2.15"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -121,7 +121,7 @@ testcontainers-modules = { version = "0.11", features = [
 ], optional = true }
 
 # Meshing dependencies - optional
-schematic-mesher = { git = "https://github.com/Schem-at/Schematic-Mesher.git", branch = "feature/mesh-output-api", optional = true }
+schematic-mesher = { git = "https://github.com/Schem-at/Schematic-Mesher.git", rev = "253d2b6", optional = true }
 
 # Rendering dependencies - optional
 wgpu = { version = "24", optional = true }
@@ -232,8 +232,4 @@ opt-level = 3
 # Patch for MCHPRS compatibility
 [patch.crates-io]
 hematite-nbt = { git = "https://github.com/StackDoubleFlow/hematite_nbt" }
-
-# Local editable checkout of schematic-mesher for performance work.
-[patch."https://github.com/Schem-at/Schematic-Mesher.git"]
-schematic-mesher = { path = "../Schematic-Mesher" }
 

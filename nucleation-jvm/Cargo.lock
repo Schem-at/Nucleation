@@ -1783,6 +1783,8 @@ checksum = "d466e9454f08e4a911e14806c24e16fba1b4c121d1ea474396f396069cf949d9"
 dependencies = [
  "equivalent",
  "hashbrown 0.17.1",
+ "serde",
+ "serde_core",
 ]
 
 [[package]]
@@ -2082,7 +2084,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation"
-version = "0.2.14"
+version = "0.2.15"
 dependencies = [
  "aws-sdk-s3",
  "bincode",
@@ -2120,7 +2122,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation-jvm"
-version = "0.2.13"
+version = "0.2.15"
 dependencies = [
  "jni",
  "nucleation",
@@ -2421,6 +2423,7 @@ dependencies = [
  "byteorder",
  "cesu8",
  "flate2",
+ "indexmap",
  "quartz_nbt_macros",
 ]
 
@@ -2699,11 +2702,13 @@ dependencies = [
 [[package]]
 name = "schematic-mesher"
 version = "0.1.0"
-source = "git+https://github.com/Schem-at/Schematic-Mesher.git?branch=feature%2Fmesh-output-api#b88fe96bbf5a3d3616c88f9521b9018a1056c20b"
+source = "git+https://github.com/Schem-at/Schematic-Mesher.git?rev=253d2b6#253d2b63815bcf78f54ec7e5f9bbf92912864fda"
 dependencies = [
  "glam",
  "gltf-json",
  "image 0.25.10",
+ "rayon",
+ "rustc-hash",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
