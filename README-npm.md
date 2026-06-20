@@ -81,6 +81,31 @@ schem.setBlock([0, 1, 0], "minecraft:oak_sign", {
 });
 ```
 
+For lossless, fully-typed reads/writes (64-bit NBT, item components), use the
+SNBT accessors: `getBlockEntitySnbt(x, y, z)` / `setBlockEntity(x, y, z, id, snbt)`
+and `getEntitiesSnbt()` / `addEntityFromSnbt(snbt)`.
+
+### Version conversion (datafixers)
+
+Convert block / block-entity / item / entity data **between Minecraft data
+versions** — a Rust port of PaperMC's DataConverter. Forward conversion is
+lossless; down-converting to an older version returns a JSON **loss report** so
+you can warn before saving. Importers capture the source data version (set it
+manually for versionless formats; classic `.schematic` ≈ `1343`).
+
+```ts
+schem.fromLitematic(bytes);
+console.log(schem.getSourceDataVersion());          // e.g. 3953 (1.21)
+console.log(SchematicWrapper.canonicalDataVersion()); // 4790 (in-memory target)
+
+// Save a copy for 1.16.5 (data version 2586); schem itself is untouched.
+const { bytes: out, loss } = schem.toLitematicForVersion(2586);
+const report = JSON.parse(loss);                     // [] when lossless
+for (const e of report) {                            // {version, kind, severity, path, detail}
+  console.warn(`[${e.severity}] ${e.path}: ${e.detail}`);
+}
+```
+
 ### Storage
 
 The `Store` class is pluggable byte storage — it decides *where bytes live*,

@@ -5,15 +5,16 @@
 //!
 //! Forward conversion (old -> new) mirrors the Java engine exactly. Reverse
 //! conversion (new -> old), needed to save schematics for older versions, is
-//! built on top in [`reverse`] (forthcoming) using inverse rename tables and
-//! hand-written / best-effort inverses.
+//! built on the same engine ([`engine::walk_with_breakpoints_reverse`]) using
+//! inverse rename tables and hand-written / best-effort inverses, and reports
+//! every approximation or dropped field via [`loss::LossReport`].
 //!
-//! See `DATA_CONVERSION_FINDINGS.md` / `DATA_CONVERSION_PLAN.md` at the repo
-//! root for the design.
+//! See `src/dataconverter/README.md` for the design overview and module map,
+//! and `REVERSE_CHEATSHEET.md` for authoring reverse converters.
 
 /// The in-memory canonical Minecraft data version — MC "26.1.2". All loaded data
 /// is forward-converted to here; "save as current" stamps this. (See
-/// DATA_CONVERSION_PLAN.md §2.)
+/// `src/dataconverter/README.md`.)
 pub const CANONICAL_DATA_VERSION: i32 = 4790;
 
 /// The highest data version with a registered forward converter in this port

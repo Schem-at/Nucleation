@@ -104,6 +104,34 @@ Export schematics to binary data.
 | `getDefaultFormatVersion` | `static getDefaultFormatVersion(format: string) → string \| undefined` | Get the default version for a format. |
 | `getAvailableSchematicVersions` | `static getAvailableSchematicVersions() → string[]` | List available Sponge Schematic versions. |
 
+#### Version Conversion (Datafixers)
+
+Convert a schematic's block, block-entity, item, and entity data **between Minecraft data versions**, using a Rust port of PaperMC's DataConverter. Forward conversion (old → new) is lossless; reverse conversion (new → old, e.g. saving for an older version) approximates where it must and returns a **JSON loss report** so you can warn before writing. The canonical in-memory version is `4790`.
+
+Importers capture the file's source data version automatically — `getSourceDataVersion` reads it; set it manually for versionless formats (raw imports, classic `.schematic` ≈ `1343`).
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `canonicalDataVersion` | `static canonicalDataVersion() → number` | The canonical in-memory data version (the forward-conversion target, `4790`). |
+| `getSourceDataVersion` | `getSourceDataVersion() → number \| undefined` | The data version this schematic was loaded from (captured by importers), or `undefined`. |
+| `setSourceDataVersion` | `setSourceDataVersion(version: number) → void` | Override the source data version for formats that carry none. |
+| `convertToDataVersion` | `convertToDataVersion(target: number, source: number) → string` | Convert from `source` to `target`. Returns a JSON loss array (`"[]"` when lossless). |
+| `convertToVersion` | `convertToVersion(target: number) → string` | Convert to `target` using the captured source version as origin, updating metadata. Returns the JSON loss report. |
+| `toLitematicForVersion` | `toLitematicForVersion(target: number) → { bytes: Uint8Array, loss: string }` | Serialize a `.litematic` for a specific data version: converts a **copy** and writes the matching schematic Version header (4 = 1.12 / 5 = 1.13–1.17 / 6 = 1.18–1.20.4 / 7 = 1.20.5+). The schematic itself is left unchanged. |
+
+Each entry in a loss report is `{version, kind, severity, path, detail}` (`severity` is `"Loss"` or `"Approximated"`).
+
+**Example:**
+
+```js
+// Load a current-version schematic, save it for 1.16.5 (data version 2586)
+schem.fromLitematic(bytes);
+const { bytes: out, loss } = schem.toLitematicForVersion(2586);
+const report = JSON.parse(loss);
+if (report.length) console.warn(`${report.length} data losses on down-convert`, report);
+// `out` is the down-converted .litematic; `schem` is unchanged.
+```
+
 #### Block Operations
 
 Set and get individual blocks. Block names follow the `minecraft:block_name` namespace format.
@@ -138,12 +166,20 @@ Efficient batch operations using flat integer arrays for positions (`[x0, y0, z0
 
 #### Block Entities
 
+Block entities (tile entities) carry per-block NBT — chest contents, sign text, banner patterns, item components, etc. The `*Snbt` variants use typed SNBT strings (`123L`, `1b`, …) that round-trip **losslessly**, unlike the structured `nbt` object (which collapses 64-bit `Long` values to JS numbers).
+
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `getBlockEntity` | `getBlockEntity(x: number, y: number, z: number) → object \| undefined` | Get the block entity (tile entity) at a position. Returns `{id, position, nbt}`. |
-| `getAllBlockEntities` | `getAllBlockEntities() → object[]` | Get all block entities in the schematic. |
+| `getBlockEntity` | `getBlockEntity(x: number, y: number, z: number) → object \| undefined` | Get the block entity at a position as `{id, position, nbt}` (NBT as a JS object; lossy for 64-bit ints). |
+| `getAllBlockEntities` | `getAllBlockEntities() → object[]` | Get all block entities as objects. |
+| `getBlockEntitySnbt` | `getBlockEntitySnbt(x: number, y: number, z: number) → string \| null` | Get the block entity's NBT as a typed SNBT string, or `null` if none. Lossless. |
+| `setBlockEntity` | `setBlockEntity(x: number, y: number, z: number, id: string, snbt: string) → void` | Set/replace a block entity from a typed SNBT string. Throws on invalid SNBT. |
+| `removeBlockEntity` | `removeBlockEntity(x: number, y: number, z: number) → boolean` | Remove the block entity at a position. Returns `true` if one was removed. |
+| `getAllBlockEntitiesSnbt` | `getAllBlockEntitiesSnbt() → object[]` | All block entities as `[{id, position: [x,y,z], snbt}, ...]` — `snbt` is the inner data only (no `Id`/`Pos`); pair it with `id` + position to write back via `setBlockEntity`. |
 
 #### Mobile Entities
+
+The `*Snbt` variants carry the full, typed entity compound (incl. `id`/`Pos`) losslessly; the object/JSON variants are convenient but lossy for 64-bit ints.
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
@@ -151,6 +187,8 @@ Efficient batch operations using flat integer arrays for positions (`[x0, y0, z0
 | `getEntities` | `getEntities() → object[]` | Get all entities as `[{id, position: [x,y,z], nbt}, ...]`. |
 | `addEntity` | `addEntity(id: string, x: number, y: number, z: number, nbtJson?: string) → void` | Add a mobile entity with optional NBT JSON. |
 | `removeEntity` | `removeEntity(index: number) → boolean` | Remove an entity by its index. |
+| `getEntitiesSnbt` | `getEntitiesSnbt() → string[]` | All entities as typed SNBT strings (full compound incl. `id`/`Pos`). Lossless. |
+| `addEntityFromSnbt` | `addEntityFromSnbt(snbt: string) → void` | Add an entity from a full SNBT compound (must contain `id` and `Pos`). Throws on invalid SNBT. |
 
 #### Transformations
 

@@ -505,6 +505,35 @@ All import methods mutate the existing schematic instance.
 | `get_import_settings_schema` | `@staticmethod get_import_settings_schema(format: str) -> Optional[str]` | JSON schema for import settings. |
 | `get_available_schematic_versions` | `@staticmethod get_available_schematic_versions() -> list[str]` | Available Sponge Schematic versions. |
 
+#### Version Conversion (Datafixers)
+
+Convert a schematic's block, block-entity, item, and entity data **between Minecraft data versions**, using a Rust port of PaperMC's DataConverter. Forward conversion (old → new) is lossless; reverse conversion (new → old, e.g. saving for an older version) approximates where it must and returns a **JSON loss report** so you can warn before writing. The canonical in-memory version is `4790`.
+
+Importers capture the file's source data version automatically — `get_source_data_version()` reads it; set it manually for versionless formats (raw imports, classic `.schematic` ≈ `1343`).
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `canonical_data_version` | `@staticmethod canonical_data_version() -> int` | The canonical in-memory data version (the forward-conversion target, `4790`). |
+| `get_source_data_version` | `get_source_data_version() -> Optional[int]` | The data version this schematic was loaded from (captured by importers), or `None`. |
+| `set_source_data_version` | `set_source_data_version(version: int) -> None` | Override the source data version for formats that carry none. |
+| `convert_to_data_version` | `convert_to_data_version(target_data_version: int, source_data_version: int) -> str` | Convert from `source` to `target`. Returns a JSON loss array (`"[]"` when lossless). |
+| `convert_to_version` | `convert_to_version(target_data_version: int) -> str` | Convert to `target` using the captured source version as origin, updating metadata. Returns the JSON loss report. |
+| `to_litematic_for_version` | `to_litematic_for_version(target_data_version: int) -> tuple[bytes, str]` | Serialize a `.litematic` for a specific data version: converts a **copy** and writes the matching schematic Version header (4 = 1.12 / 5 = 1.13–1.17 / 6 = 1.18–1.20.4 / 7 = 1.20.5+). Returns `(bytes, loss_json)`; the schematic itself is unchanged. |
+
+Each entry in a loss report is `{"version", "kind", "severity", "path", "detail"}` (`severity` is `"Loss"` or `"Approximated"`).
+
+```python
+import json
+
+# Load a current-version schematic, save it for 1.16.5 (data version 2586)
+schem.from_litematic(data)
+out, loss = schem.to_litematic_for_version(2586)
+report = json.loads(loss)
+if report:
+    print(f"{len(report)} data losses on down-convert:", report)
+# `out` is the down-converted .litematic; `schem` is unchanged.
+```
+
 #### Block Operations
 
 | Method | Signature | Description |
@@ -535,12 +564,20 @@ All import methods mutate the existing schematic instance.
 
 #### Block Entities
 
+Block entities (tile entities) carry per-block NBT — chest contents, sign text, banner patterns, item components, etc. The `*_snbt` variants use typed SNBT strings (`123L`, `1b`, …) that round-trip **losslessly**, unlike the `nbt` dict (which collapses 64-bit `Long` values to Python floats).
+
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `get_block_entity` | `get_block_entity(x: int, y: int, z: int) -> Optional[dict]` | Get block entity at position. Returns `{"id": str, "position": (int, int, int), "nbt": dict}`. |
-| `get_all_block_entities` | `get_all_block_entities() -> list[dict]` | Get all block entities. |
+| `get_block_entity` | `get_block_entity(x: int, y: int, z: int) -> Optional[dict]` | Get block entity at position as `{"id", "position", "nbt"}` (NBT as a dict; lossy for 64-bit ints). |
+| `get_all_block_entities` | `get_all_block_entities() -> list[dict]` | Get all block entities as dicts. |
+| `get_block_entity_snbt` | `get_block_entity_snbt(x: int, y: int, z: int) -> Optional[str]` | Get the block entity's NBT as a typed SNBT string, or `None` if none. Lossless. |
+| `set_block_entity` | `set_block_entity(x: int, y: int, z: int, id: str, snbt: str) -> None` | Set/replace a block entity from a typed SNBT string. Raises `ValueError` on invalid SNBT. |
+| `remove_block_entity` | `remove_block_entity(x: int, y: int, z: int) -> bool` | Remove the block entity at a position. Returns `True` if one was removed. |
+| `get_all_block_entities_snbt` | `get_all_block_entities_snbt() -> list[dict]` | All block entities as `[{"id", "position", "snbt"}, ...]` — `snbt` is the inner data only (no `Id`/`Pos`); pair it with `id` + position to write back via `set_block_entity`. |
 
 #### Mobile Entities
+
+The `*_snbt` variants carry the full, typed entity compound (incl. `id`/`Pos`) losslessly; the dict/JSON variants are convenient but lossy for 64-bit ints.
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
@@ -548,6 +585,8 @@ All import methods mutate the existing schematic instance.
 | `get_entities` | `get_entities() -> list[dict]` | Get all entities as `[{"id": str, "position": (float, float, float), "nbt": dict}, ...]`. |
 | `add_entity` | `add_entity(id: str, x: float, y: float, z: float, nbt_json: Optional[str] = None) -> None` | Add a mobile entity. |
 | `remove_entity` | `remove_entity(index: int) -> bool` | Remove an entity by index. |
+| `get_entities_snbt` | `get_entities_snbt() -> list[str]` | All entities as typed SNBT strings (full compound incl. `id`/`Pos`). Lossless. |
+| `add_entity_from_snbt` | `add_entity_from_snbt(snbt: str) -> None` | Add an entity from a full SNBT compound (must contain `id` and `Pos`). Raises `ValueError` on invalid SNBT. |
 
 #### Transformations
 

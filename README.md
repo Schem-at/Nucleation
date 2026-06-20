@@ -18,6 +18,7 @@
 
 - **Multi-format support**: `.schematic`, `.litematic`, `.nbt`, `.mcstructure`, and more
 - **World parsing**: import whole Minecraft worlds (Anvil `.mca` region files, zipped or on-disk world folders), optionally bounded to a coordinate box — and export schematics back out as playable worlds
+- **Cross-version conversion (datafixers)**: convert block / block-entity / item / entity data between Minecraft data versions — a Rust port of PaperMC's DataConverter — with a loss report on lossy down-converts
 - **Memory-safe Rust core** with zero-copy deserialization
 - **Cross-platform**: Linux, macOS, Windows (x86_64 + ARM64)
 - **Multi-language**: Rust, JavaScript/TypeScript (WASM), Python, C/FFI
@@ -515,6 +516,47 @@ let usdz = schematic.to_usdz(&pack, &config)?;
 let raw = schematic.to_raw_mesh(&pack, &config)?;
 println!("Vertices: {}, Triangles: {}", raw.vertex_count(), raw.triangle_count());
 ```
+
+---
+
+## Version Conversion (Datafixers)
+
+Nucleation can convert a schematic's block, block-entity, item, and entity data
+**between Minecraft data versions**, using a Rust port of
+[PaperMC's DataConverter](https://github.com/PaperMC/DataConverter). On load,
+data is forward-converted (lossless) to a canonical in-memory version
+(`4790`); on save, you can target any older version. Down-converts are inherently
+lossy, so every approximation or dropped field is returned as a structured **loss
+report** — conversion is never silently destructive.
+
+Importers capture the file's source data version automatically (set it manually
+for versionless formats like classic `.schematic`, which is ≈ `1343`).
+
+```python
+import json
+from nucleation import Schematic
+
+schem = Schematic.open("modern.litematic")          # captures its source data version
+print(schem.get_source_data_version())              # e.g. 3953 (1.21)
+
+# Save a copy targeting 1.16.5 (data version 2586) — schem itself is untouched.
+data, loss = schem.to_litematic_for_version(2586)
+report = json.loads(loss)
+if report:
+    print(f"{len(report)} data losses on down-convert:")
+    for e in report:                                # {version, kind, severity, path, detail}
+        print(f"  [{e['severity']}] {e['path']}: {e['detail']}")
+```
+
+The same surface exists in every binding — e.g. WASM
+`schem.toLitematicForVersion(2586)` → `{ bytes, loss }`,
+`Schematic.canonicalDataVersion()`, `convertToVersion(target)` — see the
+[API reference](docs/).
+
+Block entities and entities also gained **faithful, typed SNBT** accessors
+(`getBlockEntitySnbt` / `setBlockEntity` / `getEntitiesSnbt` /
+`addEntityFromSnbt`, and the `*_snbt` equivalents in Python) that round-trip
+64-bit NBT values losslessly, unlike the JS/dict views.
 
 ---
 
