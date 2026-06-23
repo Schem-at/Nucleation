@@ -52,7 +52,7 @@ benches/meshing-bench/
 
 # Pytest temp directories + ad-hoc world-IO test outputs at repo root
 /pytest-of-*/
-/nucleation_test_*/render_work/
+/nucleation_test_*/
 /render_work
 CLAUDE.md
 /docs/superpowers
