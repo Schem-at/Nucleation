@@ -109,7 +109,8 @@ const ENTITY_ID_UPDATE: &[(&str, &str)] = &[
 ];
 
 fn register_throwable_projectile(reg: &mut RegistryBuilder, id: &str) {
-    reg.entity.add_walker(VERSION, 0, id, block_names(&["inTile"]));
+    reg.entity
+        .add_walker(VERSION, 0, id, block_names(&["inTile"]));
 }
 
 pub fn register(reg: &mut RegistryBuilder) {
@@ -121,48 +122,135 @@ pub fn register(reg: &mut RegistryBuilder) {
         "minecraft:area_effect_cloud",
         Arc::new(|reg, data, from, to| convert(reg, &reg.particle, data, "Particle", from, to)),
     );
-    reg.entity.add_walker(VERSION, 0, "minecraft:arrow", block_names(&["inTile"]));
-    reg.entity.add_walker(VERSION, 0, "minecraft:chest_minecart", block_names(&["DisplayTile"]));
-    reg.entity.add_walker(VERSION, 0, "minecraft:chest_minecart", item_lists(&["Items"]));
-    reg.entity.add_walker(VERSION, 0, "minecraft:commandblock_minecart", block_names(&["DisplayTile"]));
+    reg.entity
+        .add_walker(VERSION, 0, "minecraft:arrow", block_names(&["inTile"]));
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "minecraft:chest_minecart",
+        block_names(&["DisplayTile"]),
+    );
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "minecraft:chest_minecart",
+        item_lists(&["Items"]),
+    );
     reg.entity.add_walker(
         VERSION,
         0,
         "minecraft:commandblock_minecart",
-        Arc::new(|reg, data, from, to| convert(reg, &reg.text_component, data, "LastOutput", from, to)),
+        block_names(&["DisplayTile"]),
     );
-    reg.entity.add_walker(VERSION, 0, "minecraft:donkey", item_lists(&["Items"]));
-    reg.entity.add_walker(VERSION, 0, "minecraft:donkey", items(&["SaddleItem"]));
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "minecraft:commandblock_minecart",
+        Arc::new(|reg, data, from, to| {
+            convert(reg, &reg.text_component, data, "LastOutput", from, to)
+        }),
+    );
+    reg.entity
+        .add_walker(VERSION, 0, "minecraft:donkey", item_lists(&["Items"]));
+    reg.entity
+        .add_walker(VERSION, 0, "minecraft:donkey", items(&["SaddleItem"]));
     register_throwable_projectile(reg, "minecraft:egg");
-    reg.entity.add_walker(VERSION, 0, "minecraft:enderman", block_names(&["carried"]));
+    reg.entity
+        .add_walker(VERSION, 0, "minecraft:enderman", block_names(&["carried"]));
     register_throwable_projectile(reg, "minecraft:ender_pearl");
-    reg.entity.add_walker(VERSION, 0, "minecraft:falling_block", block_names(&["Block"]));
-    reg.entity.add_walker(VERSION, 0, "minecraft:falling_block", tile_entities(&["TileEntityData"]));
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "minecraft:falling_block",
+        block_names(&["Block"]),
+    );
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "minecraft:falling_block",
+        tile_entities(&["TileEntityData"]),
+    );
     register_throwable_projectile(reg, "minecraft:fireball");
-    reg.entity.add_walker(VERSION, 0, "minecraft:fireworks_rocket", items(&["FireworksItem"]));
-    reg.entity.add_walker(VERSION, 0, "minecraft:furnace_minecart", block_names(&["DisplayTile"]));
-    reg.entity.add_walker(VERSION, 0, "minecraft:hopper_minecart", block_names(&["DisplayTile"]));
-    reg.entity.add_walker(VERSION, 0, "minecraft:hopper_minecart", item_lists(&["Items"]));
-    reg.entity.add_walker(VERSION, 0, "minecraft:horse", items(&["ArmorItem", "SaddleItem"]));
-    reg.entity.add_walker(VERSION, 0, "minecraft:item", items(&["Item"]));
-    reg.entity.add_walker(VERSION, 0, "minecraft:item_frame", items(&["Item"]));
-    reg.entity.add_walker(VERSION, 0, "minecraft:minecart", block_names(&["DisplayTile"]));
-    reg.entity.add_walker(VERSION, 0, "minecraft:mule", item_lists(&["Items"]));
-    reg.entity.add_walker(VERSION, 0, "minecraft:mule", items(&["SaddleItem"]));
-    reg.entity.add_walker(VERSION, 0, "minecraft:potion", items(&["Potion"]));
-    reg.entity.add_walker(VERSION, 0, "minecraft:potion", block_names(&["inTile"]));
-    reg.entity.add_walker(VERSION, 0, "minecraft:skeleton_horse", items(&["SaddleItem"]));
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "minecraft:fireworks_rocket",
+        items(&["FireworksItem"]),
+    );
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "minecraft:furnace_minecart",
+        block_names(&["DisplayTile"]),
+    );
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "minecraft:hopper_minecart",
+        block_names(&["DisplayTile"]),
+    );
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "minecraft:hopper_minecart",
+        item_lists(&["Items"]),
+    );
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "minecraft:horse",
+        items(&["ArmorItem", "SaddleItem"]),
+    );
+    reg.entity
+        .add_walker(VERSION, 0, "minecraft:item", items(&["Item"]));
+    reg.entity
+        .add_walker(VERSION, 0, "minecraft:item_frame", items(&["Item"]));
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "minecraft:minecart",
+        block_names(&["DisplayTile"]),
+    );
+    reg.entity
+        .add_walker(VERSION, 0, "minecraft:mule", item_lists(&["Items"]));
+    reg.entity
+        .add_walker(VERSION, 0, "minecraft:mule", items(&["SaddleItem"]));
+    reg.entity
+        .add_walker(VERSION, 0, "minecraft:potion", items(&["Potion"]));
+    reg.entity
+        .add_walker(VERSION, 0, "minecraft:potion", block_names(&["inTile"]));
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "minecraft:skeleton_horse",
+        items(&["SaddleItem"]),
+    );
     register_throwable_projectile(reg, "minecraft:small_fireball");
     register_throwable_projectile(reg, "minecraft:snowball");
-    reg.entity.add_walker(VERSION, 0, "minecraft:spawner_minecart", block_names(&["DisplayTile"]));
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "minecraft:spawner_minecart",
+        block_names(&["DisplayTile"]),
+    );
     reg.entity.add_walker(
         VERSION,
         0,
         "minecraft:spawner_minecart",
         Arc::new(|reg, data, from, to| reg.untagged_spawner.convert(reg, data, from, to)),
     );
-    reg.entity.add_walker(VERSION, 0, "minecraft:spectral_arrow", block_names(&["inTile"]));
-    reg.entity.add_walker(VERSION, 0, "minecraft:tnt_minecart", block_names(&["DisplayTile"]));
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "minecraft:spectral_arrow",
+        block_names(&["inTile"]),
+    );
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "minecraft:tnt_minecart",
+        block_names(&["DisplayTile"]),
+    );
     // Villager: recurses Inventory (ITEM_STACK) and Offers.Recipes (VILLAGER_TRADE).
     reg.entity.add_walker(
         VERSION,
@@ -177,7 +265,8 @@ pub fn register(reg: &mut RegistryBuilder) {
     );
     register_throwable_projectile(reg, "minecraft:wither_skull");
     register_throwable_projectile(reg, "minecraft:xp_bottle");
-    reg.entity.add_walker(VERSION, 0, "minecraft:zombie_horse", items(&["SaddleItem"]));
+    reg.entity
+        .add_walker(VERSION, 0, "minecraft:zombie_horse", items(&["SaddleItem"]));
     // zombie_villager: recurses only Offers.Recipes (VILLAGER_TRADE).
     reg.entity.add_walker(
         VERSION,
@@ -189,10 +278,18 @@ pub fn register(reg: &mut RegistryBuilder) {
             }
         }),
     );
-    reg.entity.add_walker(VERSION, 0, "minecraft:llama", item_lists(&["Items"]));
-    reg.entity.add_walker(VERSION, 0, "minecraft:llama", items(&["SaddleItem", "DecorItem"]));
+    reg.entity
+        .add_walker(VERSION, 0, "minecraft:llama", item_lists(&["Items"]));
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "minecraft:llama",
+        items(&["SaddleItem", "DecorItem"]),
+    );
 
     // Enforce namespace for ids.
-    reg.entity.add_structure_hook(VERSION, 0, enforce_namespaced_id_hook("id"));
-    reg.entity_name.add_structure_hook(VERSION, 0, enforce_namespaced_value_hook());
+    reg.entity
+        .add_structure_hook(VERSION, 0, enforce_namespaced_id_hook("id"));
+    reg.entity_name
+        .add_structure_hook(VERSION, 0, enforce_namespaced_value_hook());
 }

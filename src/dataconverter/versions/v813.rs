@@ -44,7 +44,9 @@ pub fn register(reg: &mut RegistryBuilder) {
         0,
         Box::new(|data, _from, _to| {
             // Need tag.BlockEntityTag; bail if either is missing (Java returns null).
-            let color = match data.get_map_mut("tag").and_then(|t| t.get_map_mut("BlockEntityTag"))
+            let color = match data
+                .get_map_mut("tag")
+                .and_then(|t| t.get_map_mut("BlockEntityTag"))
             {
                 Some(block_entity) => {
                     // getInt returns 0 when absent/non-numeric, like vanilla.

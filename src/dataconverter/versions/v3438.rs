@@ -4,19 +4,31 @@
 //! the legacy lowercase loot_table/loot_table_seed fields on brushable_block
 //! (V3438.java:19-33). Cites V3438.java.
 
-use crate::nbt::NbtMap;
 use super::super::helpers::{map_renamer, register_item_rename};
 use super::super::registry::RegistryBuilder;
 use super::super::types::MapExt;
+use crate::nbt::NbtMap;
 
 const VERSION: i32 = 3438;
 
 /// `(old, new)` pottery-shard renames. Exposed so the reverse engine can invert.
 pub const POTTERY_SHARD_RENAMES: &[(&str, &str)] = &[
-    ("minecraft:pottery_shard_archer", "minecraft:archer_pottery_shard"),
-    ("minecraft:pottery_shard_prize", "minecraft:prize_pottery_shard"),
-    ("minecraft:pottery_shard_arms_up", "minecraft:arms_up_pottery_shard"),
-    ("minecraft:pottery_shard_skull", "minecraft:skull_pottery_shard"),
+    (
+        "minecraft:pottery_shard_archer",
+        "minecraft:archer_pottery_shard",
+    ),
+    (
+        "minecraft:pottery_shard_prize",
+        "minecraft:prize_pottery_shard",
+    ),
+    (
+        "minecraft:pottery_shard_arms_up",
+        "minecraft:arms_up_pottery_shard",
+    ),
+    (
+        "minecraft:pottery_shard_skull",
+        "minecraft:skull_pottery_shard",
+    ),
 ];
 
 pub fn register(reg: &mut RegistryBuilder) {
@@ -24,8 +36,12 @@ pub fn register(reg: &mut RegistryBuilder) {
 
     // brushable block rename (V3438.java:19): copy the suspicious_sand walker
     // onto the new brushable_block id.
-    reg.tile_entity
-        .copy_walkers(VERSION, 0, "minecraft:suspicious_sand", "minecraft:brushable_block");
+    reg.tile_entity.copy_walkers(
+        VERSION,
+        0,
+        "minecraft:suspicious_sand",
+        "minecraft:brushable_block",
+    );
 
     // ConverterAbstractTileEntityRename (V3438.java:21-23): rename the
     // tile-entity id suspicious_sand -> brushable_block.

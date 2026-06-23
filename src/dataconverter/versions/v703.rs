@@ -58,15 +58,22 @@ pub fn register(reg: &mut RegistryBuilder) {
         );
     }
 
-    reg.entity.add_walker(VERSION, 0, "Horse", items(&["ArmorItem", "SaddleItem"]));
+    reg.entity
+        .add_walker(VERSION, 0, "Horse", items(&["ArmorItem", "SaddleItem"]));
 
-    reg.entity.add_walker(VERSION, 0, "Donkey", items(&["SaddleItem"]));
-    reg.entity.add_walker(VERSION, 0, "Donkey", item_lists(&["Items"]));
+    reg.entity
+        .add_walker(VERSION, 0, "Donkey", items(&["SaddleItem"]));
+    reg.entity
+        .add_walker(VERSION, 0, "Donkey", item_lists(&["Items"]));
 
-    reg.entity.add_walker(VERSION, 0, "Mule", items(&["SaddleItem"]));
-    reg.entity.add_walker(VERSION, 0, "Mule", item_lists(&["Items"]));
+    reg.entity
+        .add_walker(VERSION, 0, "Mule", items(&["SaddleItem"]));
+    reg.entity
+        .add_walker(VERSION, 0, "Mule", item_lists(&["Items"]));
 
-    reg.entity.add_walker(VERSION, 0, "ZombieHorse", items(&["SaddleItem"]));
+    reg.entity
+        .add_walker(VERSION, 0, "ZombieHorse", items(&["SaddleItem"]));
 
-    reg.entity.add_walker(VERSION, 0, "SkeletonHorse", items(&["SaddleItem"]));
+    reg.entity
+        .add_walker(VERSION, 0, "SkeletonHorse", items(&["SaddleItem"]));
 }

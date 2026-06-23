@@ -33,7 +33,13 @@ const VERSION: i32 = 4314;
 /// `V4309.makeBlockPosition` + `convertBlockPosition` (V4309.java:704-723): read
 /// three numeric coords, remove them, and write a 3-int array at `to_path`. A
 /// missing coord aborts (leaving the originals in place).
-fn convert_block_position(data: &mut NbtMap, x_path: &str, y_path: &str, z_path: &str, to_path: &str) {
+fn convert_block_position(
+    data: &mut NbtMap,
+    x_path: &str,
+    y_path: &str,
+    z_path: &str,
+    to_path: &str,
+) {
     let x = match data.get_i32(x_path) {
         Some(v) => v,
         None => return,
@@ -56,7 +62,13 @@ fn convert_block_position(data: &mut NbtMap, x_path: &str, y_path: &str, z_path:
 /// `[x,y,z]`, remove it and write the three split `x_path/y_path/z_path` ints.
 /// Lossless (bucket B) — the array uniquely encodes the three ints the old split
 /// fields held; a missing/wrong-length array aborts (leaving data untouched).
-fn unconvert_block_position(data: &mut NbtMap, x_path: &str, y_path: &str, z_path: &str, to_path: &str) {
+fn unconvert_block_position(
+    data: &mut NbtMap,
+    x_path: &str,
+    y_path: &str,
+    z_path: &str,
+    to_path: &str,
+) {
     let (x, y, z) = match data.get(to_path) {
         Some(NbtValue::IntArray(v)) if v.len() == 3 => (v[0], v[1], v[2]),
         _ => return,
@@ -159,7 +171,12 @@ pub fn register(reg: &mut RegistryBuilder) {
     );
 
     // Attached-block entities: TileX/Y/Z -> block_pos.
-    for id in ["minecraft:item_frame", "minecraft:glow_item_frame", "minecraft:painting", "minecraft:leash_knot"] {
+    for id in [
+        "minecraft:item_frame",
+        "minecraft:glow_item_frame",
+        "minecraft:painting",
+        "minecraft:leash_knot",
+    ] {
         reg.entity.add_converter_for_id(
             id,
             VERSION,

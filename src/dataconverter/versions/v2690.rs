@@ -22,26 +22,86 @@ const VERSION: i32 = 2690;
 
 /// `(old, new)` copper-oxidation renames (V2690.java:15-36).
 pub const COPPER_RENAMES: &[(&str, &str)] = &[
-    ("minecraft:weathered_copper_block", "minecraft:oxidized_copper_block"),
-    ("minecraft:semi_weathered_copper_block", "minecraft:weathered_copper_block"),
-    ("minecraft:lightly_weathered_copper_block", "minecraft:exposed_copper_block"),
-    ("minecraft:weathered_cut_copper", "minecraft:oxidized_cut_copper"),
-    ("minecraft:semi_weathered_cut_copper", "minecraft:weathered_cut_copper"),
-    ("minecraft:lightly_weathered_cut_copper", "minecraft:exposed_cut_copper"),
-    ("minecraft:weathered_cut_copper_stairs", "minecraft:oxidized_cut_copper_stairs"),
-    ("minecraft:semi_weathered_cut_copper_stairs", "minecraft:weathered_cut_copper_stairs"),
-    ("minecraft:lightly_weathered_cut_copper_stairs", "minecraft:exposed_cut_copper_stairs"),
-    ("minecraft:weathered_cut_copper_slab", "minecraft:oxidized_cut_copper_slab"),
-    ("minecraft:semi_weathered_cut_copper_slab", "minecraft:weathered_cut_copper_slab"),
-    ("minecraft:lightly_weathered_cut_copper_slab", "minecraft:exposed_cut_copper_slab"),
-    ("minecraft:waxed_semi_weathered_copper", "minecraft:waxed_weathered_copper"),
-    ("minecraft:waxed_lightly_weathered_copper", "minecraft:waxed_exposed_copper"),
-    ("minecraft:waxed_semi_weathered_cut_copper", "minecraft:waxed_weathered_cut_copper"),
-    ("minecraft:waxed_lightly_weathered_cut_copper", "minecraft:waxed_exposed_cut_copper"),
-    ("minecraft:waxed_semi_weathered_cut_copper_stairs", "minecraft:waxed_weathered_cut_copper_stairs"),
-    ("minecraft:waxed_lightly_weathered_cut_copper_stairs", "minecraft:waxed_exposed_cut_copper_stairs"),
-    ("minecraft:waxed_semi_weathered_cut_copper_slab", "minecraft:waxed_weathered_cut_copper_slab"),
-    ("minecraft:waxed_lightly_weathered_cut_copper_slab", "minecraft:waxed_exposed_cut_copper_slab"),
+    (
+        "minecraft:weathered_copper_block",
+        "minecraft:oxidized_copper_block",
+    ),
+    (
+        "minecraft:semi_weathered_copper_block",
+        "minecraft:weathered_copper_block",
+    ),
+    (
+        "minecraft:lightly_weathered_copper_block",
+        "minecraft:exposed_copper_block",
+    ),
+    (
+        "minecraft:weathered_cut_copper",
+        "minecraft:oxidized_cut_copper",
+    ),
+    (
+        "minecraft:semi_weathered_cut_copper",
+        "minecraft:weathered_cut_copper",
+    ),
+    (
+        "minecraft:lightly_weathered_cut_copper",
+        "minecraft:exposed_cut_copper",
+    ),
+    (
+        "minecraft:weathered_cut_copper_stairs",
+        "minecraft:oxidized_cut_copper_stairs",
+    ),
+    (
+        "minecraft:semi_weathered_cut_copper_stairs",
+        "minecraft:weathered_cut_copper_stairs",
+    ),
+    (
+        "minecraft:lightly_weathered_cut_copper_stairs",
+        "minecraft:exposed_cut_copper_stairs",
+    ),
+    (
+        "minecraft:weathered_cut_copper_slab",
+        "minecraft:oxidized_cut_copper_slab",
+    ),
+    (
+        "minecraft:semi_weathered_cut_copper_slab",
+        "minecraft:weathered_cut_copper_slab",
+    ),
+    (
+        "minecraft:lightly_weathered_cut_copper_slab",
+        "minecraft:exposed_cut_copper_slab",
+    ),
+    (
+        "minecraft:waxed_semi_weathered_copper",
+        "minecraft:waxed_weathered_copper",
+    ),
+    (
+        "minecraft:waxed_lightly_weathered_copper",
+        "minecraft:waxed_exposed_copper",
+    ),
+    (
+        "minecraft:waxed_semi_weathered_cut_copper",
+        "minecraft:waxed_weathered_cut_copper",
+    ),
+    (
+        "minecraft:waxed_lightly_weathered_cut_copper",
+        "minecraft:waxed_exposed_cut_copper",
+    ),
+    (
+        "minecraft:waxed_semi_weathered_cut_copper_stairs",
+        "minecraft:waxed_weathered_cut_copper_stairs",
+    ),
+    (
+        "minecraft:waxed_lightly_weathered_cut_copper_stairs",
+        "minecraft:waxed_exposed_cut_copper_stairs",
+    ),
+    (
+        "minecraft:waxed_semi_weathered_cut_copper_slab",
+        "minecraft:waxed_weathered_cut_copper_slab",
+    ),
+    (
+        "minecraft:waxed_lightly_weathered_cut_copper_slab",
+        "minecraft:waxed_exposed_cut_copper_slab",
+    ),
 ];
 
 pub fn register(reg: &mut RegistryBuilder) {

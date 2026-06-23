@@ -20,9 +20,7 @@ pub fn register(reg: &mut RegistryBuilder) {
         0,
         Box::new(|data, _from, _to| {
             // Number healF = data.getNumber("HealF");
-            let heal_f = data
-                .get("HealF")
-                .and_then(|v| v.as_number_f64());
+            let heal_f = data.get("HealF").and_then(|v| v.as_number_f64());
 
             let new_health: f32 = if let Some(heal_f) = heal_f {
                 // healF != null: remove HealF, use its float value.

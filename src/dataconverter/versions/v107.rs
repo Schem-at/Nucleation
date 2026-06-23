@@ -21,12 +21,12 @@ pub fn register(reg: &mut RegistryBuilder) {
         Box::new(|data: &mut NbtMap, _from, _to| {
             // Java MINECART_IDS, indexed by Type (0..6).
             const MINECART_IDS: [&str; 7] = [
-                "MinecartRideable",    // 0
-                "MinecartChest",       // 1
-                "MinecartFurnace",     // 2
-                "MinecartTNT",         // 3
-                "MinecartSpawner",     // 4
-                "MinecartHopper",      // 5
+                "MinecartRideable",     // 0
+                "MinecartChest",        // 1
+                "MinecartFurnace",      // 2
+                "MinecartTNT",          // 3
+                "MinecartSpawner",      // 4
+                "MinecartHopper",       // 5
                 "MinecartCommandBlock", // 6
             ];
 

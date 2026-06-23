@@ -15,8 +15,14 @@ const VERSION: i32 = 2691;
 
 const RENAMES: &[(&str, &str)] = &[
     ("minecraft:waxed_copper", "minecraft:waxed_copper_block"),
-    ("minecraft:oxidized_copper_block", "minecraft:oxidized_copper"),
-    ("minecraft:weathered_copper_block", "minecraft:weathered_copper"),
+    (
+        "minecraft:oxidized_copper_block",
+        "minecraft:oxidized_copper",
+    ),
+    (
+        "minecraft:weathered_copper_block",
+        "minecraft:weathered_copper",
+    ),
     ("minecraft:exposed_copper_block", "minecraft:exposed_copper"),
 ];
 

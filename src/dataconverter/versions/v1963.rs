@@ -26,10 +26,7 @@ pub fn register(reg: &mut RegistryBuilder) {
         Box::new(|data, _from, _to| {
             if let Some(gossips) = data.get_list_mut("Gossips") {
                 gossips.retain(|gossip| {
-                    gossip
-                        .as_compound_ref()
-                        .and_then(|m| m.get_string("Type"))
-                        != Some("golem")
+                    gossip.as_compound_ref().and_then(|m| m.get_string("Type")) != Some("golem")
                 });
             }
         }),

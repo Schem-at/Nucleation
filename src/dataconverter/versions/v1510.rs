@@ -35,11 +35,26 @@ const RENAMED_BLOCKS: &[(&str, &str)] = &[
     ("minecraft:acacia_bark", "minecraft:acacia_wood"),
     ("minecraft:dark_oak_bark", "minecraft:dark_oak_wood"),
     ("minecraft:stripped_oak_bark", "minecraft:stripped_oak_wood"),
-    ("minecraft:stripped_spruce_bark", "minecraft:stripped_spruce_wood"),
-    ("minecraft:stripped_birch_bark", "minecraft:stripped_birch_wood"),
-    ("minecraft:stripped_jungle_bark", "minecraft:stripped_jungle_wood"),
-    ("minecraft:stripped_acacia_bark", "minecraft:stripped_acacia_wood"),
-    ("minecraft:stripped_dark_oak_bark", "minecraft:stripped_dark_oak_wood"),
+    (
+        "minecraft:stripped_spruce_bark",
+        "minecraft:stripped_spruce_wood",
+    ),
+    (
+        "minecraft:stripped_birch_bark",
+        "minecraft:stripped_birch_wood",
+    ),
+    (
+        "minecraft:stripped_jungle_bark",
+        "minecraft:stripped_jungle_wood",
+    ),
+    (
+        "minecraft:stripped_acacia_bark",
+        "minecraft:stripped_acacia_wood",
+    ),
+    (
+        "minecraft:stripped_dark_oak_bark",
+        "minecraft:stripped_dark_oak_wood",
+    ),
     ("minecraft:mob_spawner", "minecraft:spawner"),
 ];
 
@@ -55,23 +70,50 @@ const RENAMED_ITEMS: &[(&str, &str)] = &[
     ("minecraft:acacia_bark", "minecraft:acacia_wood"),
     ("minecraft:dark_oak_bark", "minecraft:dark_oak_wood"),
     ("minecraft:stripped_oak_bark", "minecraft:stripped_oak_wood"),
-    ("minecraft:stripped_spruce_bark", "minecraft:stripped_spruce_wood"),
-    ("minecraft:stripped_birch_bark", "minecraft:stripped_birch_wood"),
-    ("minecraft:stripped_jungle_bark", "minecraft:stripped_jungle_wood"),
-    ("minecraft:stripped_acacia_bark", "minecraft:stripped_acacia_wood"),
-    ("minecraft:stripped_dark_oak_bark", "minecraft:stripped_dark_oak_wood"),
+    (
+        "minecraft:stripped_spruce_bark",
+        "minecraft:stripped_spruce_wood",
+    ),
+    (
+        "minecraft:stripped_birch_bark",
+        "minecraft:stripped_birch_wood",
+    ),
+    (
+        "minecraft:stripped_jungle_bark",
+        "minecraft:stripped_jungle_wood",
+    ),
+    (
+        "minecraft:stripped_acacia_bark",
+        "minecraft:stripped_acacia_wood",
+    ),
+    (
+        "minecraft:stripped_dark_oak_bark",
+        "minecraft:stripped_dark_oak_wood",
+    ),
     ("minecraft:mob_spawner", "minecraft:spawner"),
     // item-only extras
     ("minecraft:clownfish", "minecraft:tropical_fish"),
-    ("minecraft:chorus_fruit_popped", "minecraft:popped_chorus_fruit"),
-    ("minecraft:evocation_illager_spawn_egg", "minecraft:evoker_spawn_egg"),
-    ("minecraft:vindication_illager_spawn_egg", "minecraft:vindicator_spawn_egg"),
+    (
+        "minecraft:chorus_fruit_popped",
+        "minecraft:popped_chorus_fruit",
+    ),
+    (
+        "minecraft:evocation_illager_spawn_egg",
+        "minecraft:evoker_spawn_egg",
+    ),
+    (
+        "minecraft:vindication_illager_spawn_egg",
+        "minecraft:vindicator_spawn_egg",
+    ),
 ];
 
 /// `RENAMED_ENTITY_IDS` (V1510.java:16-31), used both by the entity renamer and
 /// to drive `copyWalkers`.
 const RENAMED_ENTITY_IDS: &[(&str, &str)] = &[
-    ("minecraft:commandblock_minecart", "minecraft:command_block_minecart"),
+    (
+        "minecraft:commandblock_minecart",
+        "minecraft:command_block_minecart",
+    ),
     ("minecraft:ender_crystal", "minecraft:end_crystal"),
     ("minecraft:snowman", "minecraft:snow_golem"),
     ("minecraft:evocation_illager", "minecraft:evoker"),
@@ -111,7 +153,11 @@ pub fn register(reg: &mut RegistryBuilder) {
             .find(|(_, new)| *new == input)
             .map(|(old, _)| (*old).to_string())
     });
-    register_entity_rename(reg, VERSION, RenameSpec::custom(entity_renamer, reverse_renamer));
+    register_entity_rename(
+        reg,
+        VERSION,
+        RenameSpec::custom(entity_renamer, reverse_renamer),
+    );
 
     // copyWalkers for each renamed entity id (V1510.java:96-107).
     for (old_id, new_id) in RENAMED_ENTITY_IDS {

@@ -141,13 +141,25 @@ fn remove_defaults(config: &mut NbtMap) {
     if config.get("total_mobs").and_then(ValueExt::as_number_f64) == Some(6.0) {
         config.take("total_mobs");
     }
-    if config.get("simultaneous_mobs").and_then(ValueExt::as_number_f64) == Some(2.0) {
+    if config
+        .get("simultaneous_mobs")
+        .and_then(ValueExt::as_number_f64)
+        == Some(2.0)
+    {
         config.take("simultaneous_mobs");
     }
-    if config.get("total_mobs_added_per_player").and_then(ValueExt::as_number_f64) == Some(2.0) {
+    if config
+        .get("total_mobs_added_per_player")
+        .and_then(ValueExt::as_number_f64)
+        == Some(2.0)
+    {
         config.take("total_mobs_added_per_player");
     }
-    if config.get("simultaneous_mobs_added_per_player").and_then(ValueExt::as_number_f64) == Some(1.0) {
+    if config
+        .get("simultaneous_mobs_added_per_player")
+        .and_then(ValueExt::as_number_f64)
+        == Some(1.0)
+    {
         config.take("simultaneous_mobs_added_per_player");
     }
     if config.get_i32("ticks_between_spawn") == Some(40) {

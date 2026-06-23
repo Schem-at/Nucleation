@@ -117,7 +117,10 @@ impl LossReport {
     }
     /// Number of entries that represent genuine (unrecoverable) data loss.
     pub fn loss_count(&self) -> usize {
-        self.entries.iter().filter(|e| e.severity == Severity::Loss).count()
+        self.entries
+            .iter()
+            .filter(|e| e.severity == Severity::Loss)
+            .count()
     }
     /// Serialize to a JSON array of `{version, kind, severity, path, detail}`
     /// objects, for surfacing across the WASM boundary to the tool's user.
@@ -157,7 +160,10 @@ impl LossReport {
                 Severity::Loss => "LOSS",
                 Severity::Approximated => "APPROX",
             };
-            out.push_str(&format!("  [{tag}] v{} {} — {}\n", e.version, e.path, e.detail));
+            out.push_str(&format!(
+                "  [{tag}] v{} {} — {}\n",
+                e.version, e.path, e.detail
+            ));
         }
         out
     }
@@ -174,7 +180,12 @@ struct Ctx {
 
 impl Default for Ctx {
     fn default() -> Self {
-        Self { direction: Direction::Forward, collecting: false, path: Vec::new(), losses: Vec::new() }
+        Self {
+            direction: Direction::Forward,
+            collecting: false,
+            path: Vec::new(),
+            losses: Vec::new(),
+        }
     }
 }
 
@@ -230,7 +241,13 @@ pub fn report_loss(version: i32, kind: LossKind, severity: Severity, detail: imp
             return;
         }
         let path = c.path.join(" > ");
-        c.losses.push(LossEntry { version, kind, severity, path, detail: detail.into() });
+        c.losses.push(LossEntry {
+            version,
+            kind,
+            severity,
+            path,
+            detail: detail.into(),
+        });
     });
 }
 
@@ -278,7 +295,11 @@ pub fn run_reverse<R>(f: impl FnOnce() -> R) -> (R, LossReport) {
         // Capture previous state for restoration. (Previous direction is whatever
         // it was before this call; previous collecting mirrors `!outermost`.)
         SessionGuard {
-            prev_direction: if outermost { Direction::Forward } else { Direction::Reverse },
+            prev_direction: if outermost {
+                Direction::Forward
+            } else {
+                Direction::Reverse
+            },
             prev_collecting: !outermost,
             outermost,
         }
@@ -288,7 +309,9 @@ pub fn run_reverse<R>(f: impl FnOnce() -> R) -> (R, LossReport) {
     let result = f();
 
     let report = if outermost {
-        CTX.with(|c| LossReport { entries: std::mem::take(&mut c.borrow_mut().losses) })
+        CTX.with(|c| LossReport {
+            entries: std::mem::take(&mut c.borrow_mut().losses),
+        })
     } else {
         LossReport::default()
     };

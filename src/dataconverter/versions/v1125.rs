@@ -63,5 +63,6 @@ pub fn register(reg: &mut RegistryBuilder) {
     );
 
     // Enforce namespacing for biome ids.
-    reg.biome.add_structure_hook(VERSION, 0, enforce_namespaced_value_hook());
+    reg.biome
+        .add_structure_hook(VERSION, 0, enforce_namespaced_value_hook());
 }

@@ -25,6 +25,9 @@ pub fn register(reg: &mut RegistryBuilder) {
     register_item_rename(
         reg,
         VERSION,
-        map_renamer(&[("minecraft:illager_beast_spawn_egg", "minecraft:ravager_spawn_egg")]),
+        map_renamer(&[(
+            "minecraft:illager_beast_spawn_egg",
+            "minecraft:ravager_spawn_egg",
+        )]),
     );
 }

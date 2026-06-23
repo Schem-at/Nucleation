@@ -53,18 +53,26 @@ const ITEM_ID_TO_TILE_ENTITY_ID: &[(&str, &str)] = &[
 ];
 
 fn register_inventory(reg: &mut RegistryBuilder, id: &str) {
-    reg.tile_entity.add_walker(VERSION, 0, id, item_lists(&["Items"]));
+    reg.tile_entity
+        .add_walker(VERSION, 0, id, item_lists(&["Items"]));
 }
 
 fn register_projectile(reg: &mut RegistryBuilder, id: &str) {
-    reg.entity.add_walker(VERSION, 0, id, block_names(&["inTile"]));
+    reg.entity
+        .add_walker(VERSION, 0, id, block_names(&["inTile"]));
 }
 
 /// Sign text walker (V99.java:80-95). Shared by later sign id renames.
 pub fn sign_walker() -> Walker {
     Arc::new(|reg, data, from, to| {
         for p in [
-            "Text1", "Text2", "Text3", "Text4", "FilteredText1", "FilteredText2", "FilteredText3",
+            "Text1",
+            "Text2",
+            "Text3",
+            "Text4",
+            "FilteredText1",
+            "FilteredText2",
+            "FilteredText3",
             "FilteredText4",
         ] {
             convert(reg, &reg.text_component, data, p, from, to);
@@ -82,54 +90,103 @@ pub fn register(reg: &mut RegistryBuilder) {
             reg.entity_equipment.convert(reg, data, from, to);
         }),
     );
-    reg.entity_equipment.add_structure_walker(VERSION, 0, item_lists(&["Equipment"]));
+    reg.entity_equipment
+        .add_structure_walker(VERSION, 0, item_lists(&["Equipment"]));
 
     reg.entity.add_walker(VERSION, 0, "Item", items(&["Item"]));
     register_projectile(reg, "ThrownEgg");
-    reg.entity.add_walker(VERSION, 0, "Arrow", block_names(&["inTile"]));
-    reg.entity.add_walker(VERSION, 0, "TippedArrow", block_names(&["inTile"]));
-    reg.entity.add_walker(VERSION, 0, "SpectralArrow", block_names(&["inTile"]));
+    reg.entity
+        .add_walker(VERSION, 0, "Arrow", block_names(&["inTile"]));
+    reg.entity
+        .add_walker(VERSION, 0, "TippedArrow", block_names(&["inTile"]));
+    reg.entity
+        .add_walker(VERSION, 0, "SpectralArrow", block_names(&["inTile"]));
     register_projectile(reg, "Snowball");
     register_projectile(reg, "Fireball");
     register_projectile(reg, "SmallFireball");
     register_projectile(reg, "ThrownEnderpearl");
-    reg.entity.add_walker(VERSION, 0, "ThrownPotion", block_names(&["inTile"]));
-    reg.entity.add_walker(VERSION, 0, "ThrownPotion", items(&["Potion"]));
+    reg.entity
+        .add_walker(VERSION, 0, "ThrownPotion", block_names(&["inTile"]));
+    reg.entity
+        .add_walker(VERSION, 0, "ThrownPotion", items(&["Potion"]));
     register_projectile(reg, "ThrownExpBottle");
-    reg.entity.add_walker(VERSION, 0, "ItemFrame", items(&["Item"]));
+    reg.entity
+        .add_walker(VERSION, 0, "ItemFrame", items(&["Item"]));
     register_projectile(reg, "WitherSkull");
-    reg.entity.add_walker(VERSION, 0, "FallingSand", block_names(&["Block"]));
-    reg.entity.add_walker(VERSION, 0, "FallingSand", tile_entities(&["TileEntityData"]));
-    reg.entity.add_walker(VERSION, 0, "FireworksRocketEntity", items(&["FireworksItem"]));
+    reg.entity
+        .add_walker(VERSION, 0, "FallingSand", block_names(&["Block"]));
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "FallingSand",
+        tile_entities(&["TileEntityData"]),
+    );
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "FireworksRocketEntity",
+        items(&["FireworksItem"]),
+    );
 
     // Minecart family (generic + specific subtypes).
     let spawner_walker: Walker = Arc::new(|reg, data, from, to| {
         reg.untagged_spawner.convert(reg, data, from, to);
     });
-    reg.entity.add_walker(VERSION, 0, "Minecart", block_names(&["DisplayTile"]));
-    reg.entity.add_walker(VERSION, 0, "Minecart", item_lists(&["Items"]));
-    reg.entity.add_walker(VERSION, 0, "Minecart", spawner_walker.clone());
-    reg.entity.add_walker(VERSION, 0, "MinecartRideable", block_names(&["DisplayTile"]));
-    reg.entity.add_walker(VERSION, 0, "MinecartChest", block_names(&["DisplayTile"]));
-    reg.entity.add_walker(VERSION, 0, "MinecartChest", item_lists(&["Items"]));
-    reg.entity.add_walker(VERSION, 0, "MinecartFurnace", block_names(&["DisplayTile"]));
-    reg.entity.add_walker(VERSION, 0, "MinecartTNT", block_names(&["DisplayTile"]));
-    reg.entity.add_walker(VERSION, 0, "MinecartSpawner", block_names(&["DisplayTile"]));
-    reg.entity.add_walker(VERSION, 0, "MinecartSpawner", spawner_walker);
-    reg.entity.add_walker(VERSION, 0, "MinecartHopper", block_names(&["DisplayTile"]));
-    reg.entity.add_walker(VERSION, 0, "MinecartHopper", item_lists(&["Items"]));
-    reg.entity.add_walker(VERSION, 0, "MinecartCommandBlock", block_names(&["DisplayTile"]));
+    reg.entity
+        .add_walker(VERSION, 0, "Minecart", block_names(&["DisplayTile"]));
+    reg.entity
+        .add_walker(VERSION, 0, "Minecart", item_lists(&["Items"]));
+    reg.entity
+        .add_walker(VERSION, 0, "Minecart", spawner_walker.clone());
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "MinecartRideable",
+        block_names(&["DisplayTile"]),
+    );
+    reg.entity
+        .add_walker(VERSION, 0, "MinecartChest", block_names(&["DisplayTile"]));
+    reg.entity
+        .add_walker(VERSION, 0, "MinecartChest", item_lists(&["Items"]));
+    reg.entity
+        .add_walker(VERSION, 0, "MinecartFurnace", block_names(&["DisplayTile"]));
+    reg.entity
+        .add_walker(VERSION, 0, "MinecartTNT", block_names(&["DisplayTile"]));
+    reg.entity
+        .add_walker(VERSION, 0, "MinecartSpawner", block_names(&["DisplayTile"]));
+    reg.entity
+        .add_walker(VERSION, 0, "MinecartSpawner", spawner_walker);
+    reg.entity
+        .add_walker(VERSION, 0, "MinecartHopper", block_names(&["DisplayTile"]));
+    reg.entity
+        .add_walker(VERSION, 0, "MinecartHopper", item_lists(&["Items"]));
     reg.entity.add_walker(
         VERSION,
         0,
         "MinecartCommandBlock",
-        Arc::new(|reg, data, from, to| convert(reg, &reg.text_component, data, "LastOutput", from, to)),
+        block_names(&["DisplayTile"]),
+    );
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "MinecartCommandBlock",
+        Arc::new(|reg, data, from, to| {
+            convert(reg, &reg.text_component, data, "LastOutput", from, to)
+        }),
     );
 
-    reg.entity.add_walker(VERSION, 0, "Enderman", block_names(&["carried"]));
-    reg.entity.add_walker(VERSION, 0, "EntityHorse", item_lists(&["Items"]));
-    reg.entity.add_walker(VERSION, 0, "EntityHorse", items(&["ArmorItem", "SaddleItem"]));
-    reg.entity.add_walker(VERSION, 0, "Villager", item_lists(&["Inventory"]));
+    reg.entity
+        .add_walker(VERSION, 0, "Enderman", block_names(&["carried"]));
+    reg.entity
+        .add_walker(VERSION, 0, "EntityHorse", item_lists(&["Items"]));
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "EntityHorse",
+        items(&["ArmorItem", "SaddleItem"]),
+    );
+    reg.entity
+        .add_walker(VERSION, 0, "Villager", item_lists(&["Inventory"]));
     reg.entity.add_walker(
         VERSION,
         0,
@@ -158,10 +215,12 @@ pub fn register(reg: &mut RegistryBuilder) {
 
     register_inventory(reg, "Furnace");
     register_inventory(reg, "Chest");
-    reg.tile_entity.add_walker(VERSION, 0, "RecordPlayer", items(&["RecordItem"]));
+    reg.tile_entity
+        .add_walker(VERSION, 0, "RecordPlayer", items(&["RecordItem"]));
     register_inventory(reg, "Trap");
     register_inventory(reg, "Dropper");
-    reg.tile_entity.add_walker(VERSION, 0, "Sign", sign_walker());
+    reg.tile_entity
+        .add_walker(VERSION, 0, "Sign", sign_walker());
     reg.tile_entity.add_walker(
         VERSION,
         0,
@@ -173,13 +232,17 @@ pub fn register(reg: &mut RegistryBuilder) {
         VERSION,
         0,
         "Control",
-        Arc::new(|reg, data, from, to| convert(reg, &reg.text_component, data, "LastOutput", from, to)),
+        Arc::new(|reg, data, from, to| {
+            convert(reg, &reg.text_component, data, "LastOutput", from, to)
+        }),
     );
     register_inventory(reg, "Hopper");
-    reg.tile_entity.add_walker(VERSION, 0, "FlowerPot", item_names(&["Item"]));
+    reg.tile_entity
+        .add_walker(VERSION, 0, "FlowerPot", item_names(&["Item"]));
 
     // --- item stacks --------------------------------------------------------
-    reg.item_stack.add_structure_walker(VERSION, 0, Arc::new(item_stack_walker));
+    reg.item_stack
+        .add_structure_walker(VERSION, 0, Arc::new(item_stack_walker));
 
     // --- structure (schematic root) ----------------------------------------
     reg.structure.add_structure_walker(
@@ -204,15 +267,23 @@ pub fn register(reg: &mut RegistryBuilder) {
     );
 
     // --- id namespace enforcement ------------------------------------------
-    reg.block_name.add_structure_hook(VERSION, 0, enforce_namespaced_value_hook());
-    reg.item_name.add_structure_hook(VERSION, 0, enforce_namespaced_value_hook());
-    reg.item_stack.add_structure_hook(VERSION, 0, enforce_namespaced_id_hook("id"));
+    reg.block_name
+        .add_structure_hook(VERSION, 0, enforce_namespaced_value_hook());
+    reg.item_name
+        .add_structure_hook(VERSION, 0, enforce_namespaced_value_hook());
+    reg.item_stack
+        .add_structure_hook(VERSION, 0, enforce_namespaced_id_hook("id"));
 }
 
 /// The ITEM_STACK structure walker (V99.java:224-317): recurse `id`→ITEM_NAME and
 /// everything nested in `tag` (contained items, written-book pages, EntityTag,
 /// BlockEntityTag, CanDestroy/CanPlaceOn).
-fn item_stack_walker(reg: &super::super::registry::Registry, data: &mut NbtMap, from: EncodedVersion, to: EncodedVersion) {
+fn item_stack_walker(
+    reg: &super::super::registry::Registry,
+    data: &mut NbtMap,
+    from: EncodedVersion,
+    to: EncodedVersion,
+) {
     convert_value(&reg.item_name, data, "id", from, to);
 
     let item_id = data.get_string("id").map(|s| s.to_string());
@@ -252,9 +323,12 @@ fn item_stack_walker(reg: &super::super::registry::Registry, data: &mut NbtMap, 
 
     // BlockEntityTag -> TILE_ENTITY, injecting the resolved legacy id.
     if let Some(block_entity_tag) = tag.get_map_mut("BlockEntityTag") {
-        let resolved = item_id
-            .as_deref()
-            .and_then(|id| ITEM_ID_TO_TILE_ENTITY_ID.iter().find(|(k, _)| *k == id).map(|(_, v)| *v));
+        let resolved = item_id.as_deref().and_then(|id| {
+            ITEM_ID_TO_TILE_ENTITY_ID
+                .iter()
+                .find(|(k, _)| *k == id)
+                .map(|(_, v)| *v)
+        });
         let mut remove_id = false;
         if let Some(id) = resolved {
             remove_id = !block_entity_tag.has_key("id");

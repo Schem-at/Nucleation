@@ -126,8 +126,12 @@ pub fn register(reg: &mut RegistryBuilder) {
     // into a single RecipesUsed compound (V2501.java:27-59).
     reg.tile_entity
         .add_converter_for_id("minecraft:furnace", VERSION, 0, recipes_used_converter());
-    reg.tile_entity
-        .add_converter_for_id("minecraft:blast_furnace", VERSION, 0, recipes_used_converter());
+    reg.tile_entity.add_converter_for_id(
+        "minecraft:blast_furnace",
+        VERSION,
+        0,
+        recipes_used_converter(),
+    );
     reg.tile_entity
         .add_converter_for_id("minecraft:smoker", VERSION, 0, recipes_used_converter());
 

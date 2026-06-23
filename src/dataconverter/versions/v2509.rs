@@ -12,10 +12,13 @@ use super::super::registry::RegistryBuilder;
 
 const VERSION: i32 = 2509;
 
-const ITEM_RENAMES: &[(&str, &str)] =
-    &[("minecraft:zombie_pigman_spawn_egg", "minecraft:zombified_piglin_spawn_egg")];
+const ITEM_RENAMES: &[(&str, &str)] = &[(
+    "minecraft:zombie_pigman_spawn_egg",
+    "minecraft:zombified_piglin_spawn_egg",
+)];
 
-const ENTITY_RENAMES: &[(&str, &str)] = &[("minecraft:zombie_pigman", "minecraft:zombified_piglin")];
+const ENTITY_RENAMES: &[(&str, &str)] =
+    &[("minecraft:zombie_pigman", "minecraft:zombified_piglin")];
 
 pub fn register(reg: &mut RegistryBuilder) {
     register_item_rename(reg, VERSION, map_renamer(ITEM_RENAMES));

@@ -14,5 +14,10 @@ use super::super::walker::item_lists;
 const VERSION: i32 = 4070;
 
 pub fn register(reg: &mut RegistryBuilder) {
-    reg.entity.add_walker(VERSION, 0, "minecraft:pale_oak_chest_boat", item_lists(&["Items"]));
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "minecraft:pale_oak_chest_boat",
+        item_lists(&["Items"]),
+    );
 }

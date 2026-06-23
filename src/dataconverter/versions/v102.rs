@@ -6,11 +6,11 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-use crate::nbt::{NbtMap, NbtValue};
-use super::super::registry::RegistryBuilder;
-use super::super::types::{MapExt, ValueExt};
 use super::super::flattening::{get_name_from_id, get_potion_name_from_id};
 use super::super::loss::{report_loss, LossKind, Severity};
+use super::super::registry::RegistryBuilder;
+use super::super::types::{MapExt, ValueExt};
+use crate::nbt::{NbtMap, NbtValue};
 
 const VERSION: i32 = 102;
 
@@ -38,7 +38,13 @@ static POTION_BASE_ID_BY_NAME: LazyLock<HashMap<&'static str, i16>> = LazyLock::
     let mut m: HashMap<&'static str, i16> = HashMap::new();
     for id in 0..=127i16 {
         if let Some(name) = get_potion_name_from_id(id) {
-            m.entry(name).and_modify(|e| { if id < *e { *e = id; } }).or_insert(id);
+            m.entry(name)
+                .and_modify(|e| {
+                    if id < *e {
+                        *e = id;
+                    }
+                })
+                .or_insert(id);
         }
     }
     m

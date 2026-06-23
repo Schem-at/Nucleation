@@ -21,7 +21,7 @@ use crate::block_state::BlockState;
 use crate::fingerprint::classifier::{Classifier, Token};
 use crate::fingerprint::symmetry::Symmetry;
 
-fn is_air(name: &str) -> bool {
+pub(crate) fn is_air(name: &str) -> bool {
     matches!(
         name,
         "minecraft:air" | "minecraft:cave_air" | "minecraft:void_air"

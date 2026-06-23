@@ -12,8 +12,7 @@ use super::super::registry::RegistryBuilder;
 const VERSION: i32 = 2680;
 
 /// `(old, new)` rename, shared by the item and block renamers.
-pub const GRASS_PATH_RENAME: &[(&str, &str)] =
-    &[("minecraft:grass_path", "minecraft:dirt_path")];
+pub const GRASS_PATH_RENAME: &[(&str, &str)] = &[("minecraft:grass_path", "minecraft:dirt_path")];
 
 pub fn register(reg: &mut RegistryBuilder) {
     register_item_rename(reg, VERSION, map_renamer(GRASS_PATH_RENAME));

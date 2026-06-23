@@ -22,7 +22,10 @@ const ITEM_RENAMES: &[(&str, &str)] = &[
 
 const BLOCK_RENAMES: &[(&str, &str)] = &[
     ("minecraft:soul_fire_torch", "minecraft:soul_torch"),
-    ("minecraft:soul_fire_wall_torch", "minecraft:soul_wall_torch"),
+    (
+        "minecraft:soul_fire_wall_torch",
+        "minecraft:soul_wall_torch",
+    ),
     ("minecraft:soul_fire_lantern", "minecraft:soul_lantern"),
 ];
 

@@ -14,5 +14,6 @@ use super::super::walker::items;
 const VERSION: i32 = 2688;
 
 pub fn register(reg: &mut RegistryBuilder) {
-    reg.entity.add_walker(VERSION, 0, "minecraft:glow_item_frame", items(&["Item"]));
+    reg.entity
+        .add_walker(VERSION, 0, "minecraft:glow_item_frame", items(&["Item"]));
 }

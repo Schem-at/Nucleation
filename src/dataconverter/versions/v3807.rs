@@ -31,7 +31,14 @@ pub fn register(reg: &mut RegistryBuilder) {
                 convert(reg, &reg.item_stack, config, "key_item", from, to);
             }
             if let Some(server_data) = root.get_map_mut("server_data") {
-                convert_list(reg, &reg.item_stack, server_data, "items_to_eject", from, to);
+                convert_list(
+                    reg,
+                    &reg.item_stack,
+                    server_data,
+                    "items_to_eject",
+                    from,
+                    to,
+                );
             }
             if let Some(shared_data) = root.get_map_mut("shared_data") {
                 convert(reg, &reg.item_stack, shared_data, "display_item", from, to);

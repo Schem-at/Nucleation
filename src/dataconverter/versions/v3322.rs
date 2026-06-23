@@ -53,7 +53,9 @@ fn update_effect_list(root: &mut NbtMap, path: &str) {
             None => continue,
         };
 
-        let timestamp = factor_data.get_i32("effect_changed_timestamp").unwrap_or(-1);
+        let timestamp = factor_data
+            .get_i32("effect_changed_timestamp")
+            .unwrap_or(-1);
         factor_data.take("effect_changed_timestamp");
 
         let ticks_active = timestamp - duration;

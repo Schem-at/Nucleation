@@ -5,7 +5,6 @@
 
 use super::registry::RegistryBuilder;
 
-mod v99;
 mod v100;
 mod v101;
 mod v102;
@@ -16,29 +15,16 @@ mod v108;
 mod v109;
 mod v110;
 mod v111;
+mod v1125;
 mod v113;
 mod v135;
 mod v143;
-mod v147;
-mod v165;
-mod v502;
-mod v700;
-mod v701;
-mod v702;
-mod v703;
-mod v704;
-mod v705;
-mod v804;
-mod v806;
-mod v808;
-mod v813;
-mod v820;
-mod v1125;
 mod v1450;
 mod v1451;
 mod v1456;
 mod v1458;
 mod v1460;
+mod v147;
 mod v1470;
 mod v1474;
 mod v1475;
@@ -53,6 +39,7 @@ mod v1494;
 mod v1500;
 mod v1510;
 mod v1515;
+mod v165;
 mod v1800;
 mod v1802;
 mod v1803;
@@ -181,6 +168,19 @@ mod v4535;
 mod v4541;
 mod v4649;
 mod v4763;
+mod v502;
+mod v700;
+mod v701;
+mod v702;
+mod v703;
+mod v704;
+mod v705;
+mod v804;
+mod v806;
+mod v808;
+mod v813;
+mod v820;
+mod v99;
 
 // Used by tests and by later sign-rename version files respectively.
 #[allow(unused_imports)]

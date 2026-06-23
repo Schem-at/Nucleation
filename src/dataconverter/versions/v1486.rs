@@ -24,14 +24,19 @@ pub const RENAMED_ENTITY_IDS: &[(&str, &str)] = &[
 
 /// `RENAMED_ITEM_IDS` (V1486.java:22-27).
 pub const RENAMED_ITEM_IDS: &[(&str, &str)] = &[
-    ("minecraft:salmon_mob_spawn_egg", "minecraft:salmon_spawn_egg"),
+    (
+        "minecraft:salmon_mob_spawn_egg",
+        "minecraft:salmon_spawn_egg",
+    ),
     ("minecraft:cod_mob_spawn_egg", "minecraft:cod_spawn_egg"),
 ];
 
 pub fn register(reg: &mut RegistryBuilder) {
     // copyWalkers from the old entity ids onto the new ones (V1486.java:31-32).
-    reg.entity.copy_walkers(VERSION, 0, "minecraft:cod_mob", "minecraft:cod");
-    reg.entity.copy_walkers(VERSION, 0, "minecraft:salmon_mob", "minecraft:salmon");
+    reg.entity
+        .copy_walkers(VERSION, 0, "minecraft:cod_mob", "minecraft:cod");
+    reg.entity
+        .copy_walkers(VERSION, 0, "minecraft:salmon_mob", "minecraft:salmon");
 
     register_entity_rename(reg, VERSION, map_renamer(RENAMED_ENTITY_IDS));
     register_item_rename(reg, VERSION, map_renamer(RENAMED_ITEM_IDS));

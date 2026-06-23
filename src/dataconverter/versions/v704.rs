@@ -93,7 +93,10 @@ const ITEM_ID_TO_TILE_ENTITY_ID: &[(&str, &str)] = &[
     ("minecraft:hopper", "minecraft:hopper"),
     ("minecraft:banner", "minecraft:banner"),
     ("minecraft:flower_pot", "minecraft:flower_pot"),
-    ("minecraft:repeating_command_block", "minecraft:command_block"),
+    (
+        "minecraft:repeating_command_block",
+        "minecraft:command_block",
+    ),
     ("minecraft:chain_command_block", "minecraft:command_block"),
     ("minecraft:shulker_box", "minecraft:shulker_box"),
     ("minecraft:white_shulker_box", "minecraft:shulker_box"),
@@ -133,7 +136,10 @@ const ITEM_ID_TO_TILE_ENTITY_ID: &[(&str, &str)] = &[
     ("minecraft:standing_sign", "minecraft:sign"),
     ("minecraft:wall_sign", "minecraft:sign"),
     ("minecraft:piston_head", "minecraft:piston"),
-    ("minecraft:daylight_detector_inverted", "minecraft:daylight_detector"),
+    (
+        "minecraft:daylight_detector_inverted",
+        "minecraft:daylight_detector",
+    ),
     ("minecraft:unpowered_comparator", "minecraft:comparator"),
     ("minecraft:powered_comparator", "minecraft:comparator"),
     ("minecraft:wall_banner", "minecraft:banner"),
@@ -194,7 +200,10 @@ const ITEM_ID_TO_TILE_ENTITY_ID: &[(&str, &str)] = &[
     ("minecraft:sculk_catalyst", "minecraft:sculk_catalyst"),
     ("minecraft:mangrove_sign", "minecraft:sign"),
     ("minecraft:sculk_shrieker", "minecraft:sculk_shrieker"),
-    ("minecraft:chiseled_bookshelf", "minecraft:chiseled_bookshelf"),
+    (
+        "minecraft:chiseled_bookshelf",
+        "minecraft:chiseled_bookshelf",
+    ),
     ("minecraft:bamboo_sign", "minecraft:sign"),
     ("minecraft:oak_hanging_sign", "minecraft:sign"),
     ("minecraft:spruce_hanging_sign", "minecraft:sign"),
@@ -211,7 +220,10 @@ const ITEM_ID_TO_TILE_ENTITY_ID: &[(&str, &str)] = &[
     ("minecraft:cherry_sign", "minecraft:sign"),
     ("minecraft:cherry_hanging_sign", "minecraft:sign"),
     ("minecraft:suspicious_gravel", "minecraft:brushable_block"),
-    ("minecraft:calibrated_sculk_sensor", "minecraft:calibrated_sculk_sensor"),
+    (
+        "minecraft:calibrated_sculk_sensor",
+        "minecraft:calibrated_sculk_sensor",
+    ),
     ("minecraft:trial_spawner", "minecraft:trial_spawner"),
     ("minecraft:vault", "minecraft:vault"),
 ];
@@ -220,48 +232,153 @@ const ITEM_ID_TO_TILE_ENTITY_ID: &[(&str, &str)] = &[
 /// Each entry lists `(version, id)` pairs in ascending version order; resolution
 /// picks the value whose version is the greatest `<= fromVersion` (`getFloor`).
 const ITEM_ID_TO_ENTITY_ID: &[(&str, &[(i32, &str)])] = &[
-    ("minecraft:armor_stand", &[(V99_VERSION, "ArmorStand"), (V705_VERSION, "minecraft:armor_stand")]),
-    ("minecraft:painting", &[(V99_VERSION, "Painting"), (V705_VERSION, "minecraft:painting")]),
-    ("minecraft:boat", &[(V99_VERSION, "Boat"), (V705_VERSION, "minecraft:boat")]),
+    (
+        "minecraft:armor_stand",
+        &[
+            (V99_VERSION, "ArmorStand"),
+            (V705_VERSION, "minecraft:armor_stand"),
+        ],
+    ),
+    (
+        "minecraft:painting",
+        &[
+            (V99_VERSION, "Painting"),
+            (V705_VERSION, "minecraft:painting"),
+        ],
+    ),
+    (
+        "minecraft:boat",
+        &[(V99_VERSION, "Boat"), (V705_VERSION, "minecraft:boat")],
+    ),
     ("minecraft:oak_boat", &[(V705_VERSION, "minecraft:boat")]),
-    ("minecraft:oak_chest_boat", &[(V705_VERSION, "minecraft:chest_boat")]),
+    (
+        "minecraft:oak_chest_boat",
+        &[(V705_VERSION, "minecraft:chest_boat")],
+    ),
     ("minecraft:spruce_boat", &[(V705_VERSION, "minecraft:boat")]),
-    ("minecraft:spruce_chest_boat", &[(V705_VERSION, "minecraft:chest_boat")]),
+    (
+        "minecraft:spruce_chest_boat",
+        &[(V705_VERSION, "minecraft:chest_boat")],
+    ),
     ("minecraft:birch_boat", &[(V705_VERSION, "minecraft:boat")]),
-    ("minecraft:birch_chest_boat", &[(V705_VERSION, "minecraft:chest_boat")]),
+    (
+        "minecraft:birch_chest_boat",
+        &[(V705_VERSION, "minecraft:chest_boat")],
+    ),
     ("minecraft:jungle_boat", &[(V705_VERSION, "minecraft:boat")]),
-    ("minecraft:jungle_chest_boat", &[(V705_VERSION, "minecraft:chest_boat")]),
+    (
+        "minecraft:jungle_chest_boat",
+        &[(V705_VERSION, "minecraft:chest_boat")],
+    ),
     ("minecraft:acacia_boat", &[(V705_VERSION, "minecraft:boat")]),
-    ("minecraft:acacia_chest_boat", &[(V705_VERSION, "minecraft:chest_boat")]),
+    (
+        "minecraft:acacia_chest_boat",
+        &[(V705_VERSION, "minecraft:chest_boat")],
+    ),
     ("minecraft:cherry_boat", &[(V705_VERSION, "minecraft:boat")]),
-    ("minecraft:cherry_chest_boat", &[(V705_VERSION, "minecraft:chest_boat")]),
-    ("minecraft:dark_oak_boat", &[(V705_VERSION, "minecraft:boat")]),
-    ("minecraft:dark_oak_chest_boat", &[(V705_VERSION, "minecraft:chest_boat")]),
-    ("minecraft:mangrove_boat", &[(V705_VERSION, "minecraft:boat")]),
-    ("minecraft:mangrove_chest_boat", &[(V705_VERSION, "minecraft:chest_boat")]),
+    (
+        "minecraft:cherry_chest_boat",
+        &[(V705_VERSION, "minecraft:chest_boat")],
+    ),
+    (
+        "minecraft:dark_oak_boat",
+        &[(V705_VERSION, "minecraft:boat")],
+    ),
+    (
+        "minecraft:dark_oak_chest_boat",
+        &[(V705_VERSION, "minecraft:chest_boat")],
+    ),
+    (
+        "minecraft:mangrove_boat",
+        &[(V705_VERSION, "minecraft:boat")],
+    ),
+    (
+        "minecraft:mangrove_chest_boat",
+        &[(V705_VERSION, "minecraft:chest_boat")],
+    ),
     ("minecraft:bamboo_raft", &[(V705_VERSION, "minecraft:boat")]),
-    ("minecraft:bamboo_chest_raft", &[(V705_VERSION, "minecraft:chest_boat")]),
-    ("minecraft:minecart", &[(V99_VERSION, "MinecartRideable"), (V705_VERSION, "minecraft:minecart")]),
-    ("minecraft:chest_minecart", &[(V99_VERSION, "MinecartChest"), (V705_VERSION, "minecraft:chest_minecart")]),
-    ("minecraft:furnace_minecart", &[(V99_VERSION, "MinecartFurnace"), (V705_VERSION, "minecraft:furnace_minecart")]),
-    ("minecraft:tnt_minecart", &[(V99_VERSION, "MinecartTNT"), (V705_VERSION, "minecraft:tnt_minecart")]),
-    ("minecraft:hopper_minecart", &[(V99_VERSION, "MinecartHopper"), (V705_VERSION, "minecraft:hopper_minecart")]),
-    ("minecraft:item_frame", &[(V99_VERSION, "ItemFrame"), (V705_VERSION, "minecraft:item_frame")]),
-    ("minecraft:glow_item_frame", &[(V705_VERSION, "minecraft:glow_item_frame")]),
+    (
+        "minecraft:bamboo_chest_raft",
+        &[(V705_VERSION, "minecraft:chest_boat")],
+    ),
+    (
+        "minecraft:minecart",
+        &[
+            (V99_VERSION, "MinecartRideable"),
+            (V705_VERSION, "minecraft:minecart"),
+        ],
+    ),
+    (
+        "minecraft:chest_minecart",
+        &[
+            (V99_VERSION, "MinecartChest"),
+            (V705_VERSION, "minecraft:chest_minecart"),
+        ],
+    ),
+    (
+        "minecraft:furnace_minecart",
+        &[
+            (V99_VERSION, "MinecartFurnace"),
+            (V705_VERSION, "minecraft:furnace_minecart"),
+        ],
+    ),
+    (
+        "minecraft:tnt_minecart",
+        &[
+            (V99_VERSION, "MinecartTNT"),
+            (V705_VERSION, "minecraft:tnt_minecart"),
+        ],
+    ),
+    (
+        "minecraft:hopper_minecart",
+        &[
+            (V99_VERSION, "MinecartHopper"),
+            (V705_VERSION, "minecraft:hopper_minecart"),
+        ],
+    ),
+    (
+        "minecraft:item_frame",
+        &[
+            (V99_VERSION, "ItemFrame"),
+            (V705_VERSION, "minecraft:item_frame"),
+        ],
+    ),
+    (
+        "minecraft:glow_item_frame",
+        &[(V705_VERSION, "minecraft:glow_item_frame")],
+    ),
     // Mojang missed these
-    ("minecraft:pufferfish_bucket", &[(V705_VERSION, "minecraft:pufferfish")]),
-    ("minecraft:salmon_bucket", &[(V705_VERSION, "minecraft:salmon")]),
+    (
+        "minecraft:pufferfish_bucket",
+        &[(V705_VERSION, "minecraft:pufferfish")],
+    ),
+    (
+        "minecraft:salmon_bucket",
+        &[(V705_VERSION, "minecraft:salmon")],
+    ),
     ("minecraft:cod_bucket", &[(V705_VERSION, "minecraft:cod")]),
-    ("minecraft:tropical_fish_bucket", &[(V705_VERSION, "minecraft:tropical_fish")]),
-    ("minecraft:axolotl_bucket", &[(V705_VERSION, "minecraft:axolotl")]),
-    ("minecraft:tadpole_bucket", &[(V705_VERSION, "minecraft:tadpole")]),
+    (
+        "minecraft:tropical_fish_bucket",
+        &[(V705_VERSION, "minecraft:tropical_fish")],
+    ),
+    (
+        "minecraft:axolotl_bucket",
+        &[(V705_VERSION, "minecraft:axolotl")],
+    ),
+    (
+        "minecraft:tadpole_bucket",
+        &[(V705_VERSION, "minecraft:tadpole")],
+    ),
 ];
 
 /// `getFloor(fromVersion)` over [`ITEM_ID_TO_ENTITY_ID`]: the value for the
 /// greatest registered version `<= from_version` (the version is encoded with
 /// step 0, matching Java's `encodeVersions(k, 0)`).
 fn entity_id_floor(item_id: &str, from: EncodedVersion) -> Option<&'static str> {
-    let pairs = ITEM_ID_TO_ENTITY_ID.iter().find(|(k, _)| *k == item_id).map(|(_, v)| *v)?;
+    let pairs = ITEM_ID_TO_ENTITY_ID
+        .iter()
+        .find(|(k, _)| *k == item_id)
+        .map(|(_, v)| *v)?;
     let mut best: Option<&'static str> = None;
     for (v, id) in pairs {
         if encode_versions(*v, 0) <= from {
@@ -313,10 +430,12 @@ pub fn register(reg: &mut RegistryBuilder) {
     }
 
     // ITEM_STACK structure walker (replaces the V99 one).
-    reg.item_stack.add_structure_walker(VERSION, 0, Arc::new(item_stack_walker));
+    reg.item_stack
+        .add_structure_walker(VERSION, 0, Arc::new(item_stack_walker));
 
     // Enforce namespace for tile-entity ids.
-    reg.tile_entity.add_structure_hook(VERSION, 0, enforce_namespaced_id_hook("id"));
+    reg.tile_entity
+        .add_structure_hook(VERSION, 0, enforce_namespaced_id_hook("id"));
 }
 
 /// The V704 ITEM_STACK structure walker (V704.java:365-460).
@@ -392,16 +511,20 @@ fn item_stack_walker(reg: &Registry, data: &mut NbtMap, from: EncodedVersion, to
 
     // BlockEntityTag -> TILE_ENTITY, with the suspicious_sand special case.
     if tag.has_key("BlockEntityTag") {
-        let resolved: Option<&'static str> =
-            if from < encode_versions(V3438_VERSION, 0) && item_id_ref == Some("minecraft:suspicious_sand") {
-                // Renamed after this version; the map value is just a string so
-                // we special-case it.
-                Some("minecraft:suspicious_sand")
-            } else {
-                item_id_ref.and_then(|id| {
-                    ITEM_ID_TO_TILE_ENTITY_ID.iter().find(|(k, _)| *k == id).map(|(_, v)| *v)
-                })
-            };
+        let resolved: Option<&'static str> = if from < encode_versions(V3438_VERSION, 0)
+            && item_id_ref == Some("minecraft:suspicious_sand")
+        {
+            // Renamed after this version; the map value is just a string so
+            // we special-case it.
+            Some("minecraft:suspicious_sand")
+        } else {
+            item_id_ref.and_then(|id| {
+                ITEM_ID_TO_TILE_ENTITY_ID
+                    .iter()
+                    .find(|(k, _)| *k == id)
+                    .map(|(_, v)| *v)
+            })
+        };
 
         if let Some(block_entity_tag) = tag.get_map_mut("BlockEntityTag") {
             if let Some(entity_id) = resolved {

@@ -24,7 +24,10 @@ const BLOCK_RENAMES: &[(&str, &str)] = &[("minecraft:melon_block", "minecraft:me
 const ITEM_RENAMES: &[(&str, &str)] = &[
     ("minecraft:melon_block", "minecraft:melon"),
     ("minecraft:melon", "minecraft:melon_slice"),
-    ("minecraft:speckled_melon", "minecraft:glistering_melon_slice"),
+    (
+        "minecraft:speckled_melon",
+        "minecraft:glistering_melon_slice",
+    ),
 ];
 
 pub fn register(reg: &mut RegistryBuilder) {

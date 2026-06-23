@@ -88,7 +88,10 @@ pub fn register(reg: &mut RegistryBuilder) {
 /// Keys present in the modern state's `Properties` that the chosen pre-1.13 form
 /// does not carry (i.e. dropped on downgrade).
 fn dropped_property_keys(modern: &NbtMap, old: &NbtMap) -> Vec<String> {
-    let old_keys: Vec<String> = old.get_map("Properties").map(|p| p.keys()).unwrap_or_default();
+    let old_keys: Vec<String> = old
+        .get_map("Properties")
+        .map(|p| p.keys())
+        .unwrap_or_default();
     match modern.get_map("Properties") {
         Some(mp) => mp
             .keys()

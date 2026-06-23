@@ -16,8 +16,9 @@ use super::schematic::SchematicWrapper;
 
 /// Parse the optional `options` JS object into [`SpecOverrides`].
 ///
-/// Accepts an object `{cost_add?, cost_delete?, cost_change?, cost_swap?, symmetry?}`.
-/// `null`/`undefined` yields default (empty) overrides. Unknown symmetry name → Err.
+/// Accepts an object `{cost_add?, cost_delete?, cost_change?, cost_swap?,
+/// swap_dominance_pct?, symmetry?}`. `null`/`undefined` yields default (empty)
+/// overrides. Unknown symmetry name → Err.
 fn parse_overrides(options: JsValue) -> Result<SpecOverrides, JsValue> {
     if options.is_null() || options.is_undefined() {
         return Ok(SpecOverrides::default());
@@ -59,6 +60,7 @@ fn parse_overrides(options: JsValue) -> Result<SpecOverrides, JsValue> {
         cost_delete: read_u32("cost_delete")?,
         cost_change: read_u32("cost_change")?,
         cost_swap: read_u32("cost_swap")?,
+        swap_dominance_pct: read_u32("swap_dominance_pct")?,
         symmetry,
     })
 }
@@ -70,9 +72,12 @@ pub struct DiffWrapper(pub(crate) Diff);
 #[wasm_bindgen]
 impl DiffWrapper {
     /// Total edit distance (sum of weighted add/delete/change/swap costs).
+    ///
+    /// Surfaced as a JS `number` (f64). Edit distances stay well within f64's
+    /// exact-integer range; the core value is `u64`.
     #[wasm_bindgen(getter)]
-    pub fn distance(&self) -> u32 {
-        self.0.distance
+    pub fn distance(&self) -> f64 {
+        self.0.distance as f64
     }
 
     /// Match support score (fraction of cells explained by the alignment).
@@ -128,7 +133,7 @@ impl DiffWrapper {
 
     /// Connected change regions as a JSON array.
     ///
-    /// Each region: `{min:[x,y,z], max:[x,y,z], kind:"added|removed|changed|mixed", count}`.
+    /// Each region: `{min:[x,y,z], max:[x,y,z], kind:"added|removed|changed|swapped|mixed", count}`.
     #[wasm_bindgen(js_name = regionsJson)]
     pub fn regions_json(&self) -> String {
         let regs = regions(&self.0);
@@ -141,6 +146,7 @@ impl DiffWrapper {
                 RegionKind::Added => "added",
                 RegionKind::Removed => "removed",
                 RegionKind::Changed => "changed",
+                RegionKind::Swapped => "swapped",
                 RegionKind::Mixed => "mixed",
             };
             out.push_str(&format!(
@@ -170,8 +176,8 @@ impl SchematicWrapper {
     /// Structurally diff this schematic against `other`.
     ///
     /// `preset` defaults to `"exact"`. `options` is an optional object
-    /// `{cost_add?, cost_delete?, cost_change?, cost_swap?, symmetry?}`.
-    /// Returns a [`DiffWrapper`]. Unknown preset/symmetry → Err.
+    /// `{cost_add?, cost_delete?, cost_change?, cost_swap?, swap_dominance_pct?,
+    /// symmetry?}`. Returns a [`DiffWrapper`]. Unknown preset/symmetry → Err.
     #[wasm_bindgen]
     pub fn diff(
         &self,

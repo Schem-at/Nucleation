@@ -25,8 +25,7 @@ pub type Converter = Box<dyn Fn(&mut NbtMap, EncodedVersion, EncodedVersion) + S
 pub type ValueConverter = Box<dyn Fn(&mut NbtValue, EncodedVersion, EncodedVersion) + Send + Sync>;
 /// A walker: recurses into nested typed sub-structures by calling other types'
 /// `convert`. Stored as `Arc` so `copy_walkers` (id renames) can share it.
-pub type Walker =
-    Arc<dyn Fn(&Registry, &mut NbtMap, EncodedVersion, EncodedVersion) + Send + Sync>;
+pub type Walker = Arc<dyn Fn(&Registry, &mut NbtMap, EncodedVersion, EncodedVersion) + Send + Sync>;
 
 type HookFn = Box<dyn Fn(&mut NbtMap, EncodedVersion, EncodedVersion) + Send + Sync>;
 type ValueHookFn = Box<dyn Fn(&mut NbtValue, EncodedVersion, EncodedVersion) + Send + Sync>;
@@ -73,16 +72,21 @@ impl MCValueType {
     }
 
     pub fn add_converter(&mut self, version: i32, step: i32, converter: ValueConverter) {
-        self.converters.push((encode_versions(version, step), converter));
+        self.converters
+            .push((encode_versions(version, step), converter));
     }
 
     /// Register the inverse of a value converter for reverse (new -> old) walks.
     pub fn add_reverse_converter(&mut self, version: i32, step: i32, converter: ValueConverter) {
-        self.reverse_converters.push((encode_versions(version, step), converter));
+        self.reverse_converters
+            .push((encode_versions(version, step), converter));
     }
 
     pub fn add_structure_hook(&mut self, version: i32, step: i32, hook: ValueHook) {
-        self.hooks.entry(encode_versions(version, step)).or_default().push(hook);
+        self.hooks
+            .entry(encode_versions(version, step))
+            .or_default()
+            .push(hook);
     }
 
     /// Sort converters into ascending encoded-version order (stable, so equal
@@ -172,14 +176,16 @@ impl DataType {
     }
 
     pub fn add_structure_converter(&mut self, version: i32, step: i32, converter: Converter) {
-        self.converters.push((encode_versions(version, step), converter));
+        self.converters
+            .push((encode_versions(version, step), converter));
     }
 
     /// Register an inverse structure converter (new -> old) for reverse walks.
     /// It should undo the forward converter registered at the same `(version,
     /// step)`; see [`super::loss`] for how to report unrecoverable data.
     pub fn add_reverse_converter(&mut self, version: i32, step: i32, converter: Converter) {
-        self.reverse_converters.push((encode_versions(version, step), converter));
+        self.reverse_converters
+            .push((encode_versions(version, step), converter));
     }
 
     /// Register a converter that only runs for compounds whose `"id"` matches —
@@ -225,7 +231,10 @@ impl DataType {
     }
 
     pub fn add_structure_walker(&mut self, version: i32, step: i32, walker: Walker) {
-        self.walkers.entry(encode_versions(version, step)).or_default().push(walker);
+        self.walkers
+            .entry(encode_versions(version, step))
+            .or_default()
+            .push(walker);
     }
 
     pub fn add_walker(&mut self, version: i32, step: i32, id: &str, walker: Walker) {
@@ -254,7 +263,10 @@ impl DataType {
     }
 
     pub fn add_structure_hook(&mut self, version: i32, step: i32, hook: Hook) {
-        self.hooks.entry(encode_versions(version, step)).or_default().push(hook);
+        self.hooks
+            .entry(encode_versions(version, step))
+            .or_default()
+            .push(hook);
     }
 
     pub fn finalize(&mut self) {
@@ -262,7 +274,13 @@ impl DataType {
         self.reverse_converters.sort_by_key(|(v, _)| *v);
     }
 
-    fn run_pre_hooks(&self, at: EncodedVersion, data: &mut NbtMap, from: EncodedVersion, to: EncodedVersion) {
+    fn run_pre_hooks(
+        &self,
+        at: EncodedVersion,
+        data: &mut NbtMap,
+        from: EncodedVersion,
+        to: EncodedVersion,
+    ) {
         if let Some(hooks) = floor(&self.hooks, at) {
             for h in hooks {
                 if let Some(pre) = &h.pre {
@@ -272,7 +290,13 @@ impl DataType {
         }
     }
 
-    fn run_post_hooks(&self, at: EncodedVersion, data: &mut NbtMap, from: EncodedVersion, to: EncodedVersion) {
+    fn run_post_hooks(
+        &self,
+        at: EncodedVersion,
+        data: &mut NbtMap,
+        from: EncodedVersion,
+        to: EncodedVersion,
+    ) {
         if let Some(hooks) = floor(&self.hooks, at) {
             // Post-hooks run in reverse registration order (MCDataType.java:92).
             for h in hooks.iter().rev() {
@@ -289,7 +313,13 @@ impl DataType {
     /// descent helpers, and direct `reg.<type>.convert(...)` calls inside
     /// converter/walker bodies — routes through here, so direction propagates
     /// uniformly without touching any version file.
-    pub fn convert(&self, reg: &Registry, data: &mut NbtMap, from: EncodedVersion, to: EncodedVersion) {
+    pub fn convert(
+        &self,
+        reg: &Registry,
+        data: &mut NbtMap,
+        from: EncodedVersion,
+        to: EncodedVersion,
+    ) {
         match loss::direction() {
             Direction::Forward => self.convert_forward(reg, data, from, to),
             Direction::Reverse => self.convert_reverse(reg, data, from, to),
@@ -298,7 +328,13 @@ impl DataType {
 
     /// Port of `IDDataType.convert` (the superset of `MCDataType.convert`; the
     /// id-walker block is a no-op when this type has no id walkers).
-    fn convert_forward(&self, reg: &Registry, data: &mut NbtMap, from: EncodedVersion, to: EncodedVersion) {
+    fn convert_forward(
+        &self,
+        reg: &Registry,
+        data: &mut NbtMap,
+        from: EncodedVersion,
+        to: EncodedVersion,
+    ) {
         // 1. Structure converters (incl. id-guarded), each wrapped in floor hooks.
         for (cv, converter) in &self.converters {
             let cv = *cv;
@@ -353,7 +389,13 @@ impl DataType {
     /// direction-independent (they only locate sub-structures); the recursive
     /// `convert` calls inside them re-enter this reverse path via the
     /// thread-local direction.
-    fn convert_reverse(&self, reg: &Registry, data: &mut NbtMap, from: EncodedVersion, to: EncodedVersion) {
+    fn convert_reverse(
+        &self,
+        reg: &Registry,
+        data: &mut NbtMap,
+        from: EncodedVersion,
+        to: EncodedVersion,
+    ) {
         // Namespace-enforce hooks on entry. They only *add* a `minecraft:`
         // prefix to a parseable unnamespaced id and no-op on legacy CamelCase
         // ids, so they are safe (and usually inert) on the newer-schema data.
@@ -455,7 +497,10 @@ pub fn walk_with_breakpoints_reverse(
 /// does: clamp the source up to ≥ V99 and use step `Integer.MAX_VALUE` on both
 /// ends (MCDataConverter.java:43-49).
 #[inline]
-pub fn encode_endpoints(from_data_version: i32, to_data_version: i32) -> (EncodedVersion, EncodedVersion) {
+pub fn encode_endpoints(
+    from_data_version: i32,
+    to_data_version: i32,
+) -> (EncodedVersion, EncodedVersion) {
     (
         encode_versions(from_data_version.max(V99), MAX_STEP),
         encode_versions(to_data_version, MAX_STEP),

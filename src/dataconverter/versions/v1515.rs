@@ -17,8 +17,14 @@ const VERSION: i32 = 1515;
 /// `RENAMED_BLOCK_IDS` (V1515.java:13-21).
 const RENAMED_BLOCK_IDS: &[(&str, &str)] = &[
     ("minecraft:tube_coral_fan", "minecraft:tube_coral_wall_fan"),
-    ("minecraft:brain_coral_fan", "minecraft:brain_coral_wall_fan"),
-    ("minecraft:bubble_coral_fan", "minecraft:bubble_coral_wall_fan"),
+    (
+        "minecraft:brain_coral_fan",
+        "minecraft:brain_coral_wall_fan",
+    ),
+    (
+        "minecraft:bubble_coral_fan",
+        "minecraft:bubble_coral_wall_fan",
+    ),
     ("minecraft:fire_coral_fan", "minecraft:fire_coral_wall_fan"),
     ("minecraft:horn_coral_fan", "minecraft:horn_coral_wall_fan"),
 ];

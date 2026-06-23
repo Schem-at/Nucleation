@@ -18,15 +18,19 @@ use super::super::registry::RegistryBuilder;
 const VERSION: i32 = 1483;
 
 /// `RENAMED_ENTITY_IDS` (V1483.java:15-19).
-pub const RENAMED_ENTITY_IDS: &[(&str, &str)] = &[("minecraft:puffer_fish", "minecraft:pufferfish")];
+pub const RENAMED_ENTITY_IDS: &[(&str, &str)] =
+    &[("minecraft:puffer_fish", "minecraft:pufferfish")];
 
 /// `RENAMED_ITEM_IDS` (V1483.java:20-24).
-pub const RENAMED_ITEM_IDS: &[(&str, &str)] =
-    &[("minecraft:puffer_fish_spawn_egg", "minecraft:pufferfish_spawn_egg")];
+pub const RENAMED_ITEM_IDS: &[(&str, &str)] = &[(
+    "minecraft:puffer_fish_spawn_egg",
+    "minecraft:pufferfish_spawn_egg",
+)];
 
 pub fn register(reg: &mut RegistryBuilder) {
     // copyWalkers from the old entity id onto the new one (V1483.java:26).
-    reg.entity.copy_walkers(VERSION, 0, "minecraft:puffer_fish", "minecraft:pufferfish");
+    reg.entity
+        .copy_walkers(VERSION, 0, "minecraft:puffer_fish", "minecraft:pufferfish");
 
     register_entity_rename(reg, VERSION, map_renamer(RENAMED_ENTITY_IDS));
     register_item_rename(reg, VERSION, map_renamer(RENAMED_ITEM_IDS));

@@ -13,9 +13,10 @@ use super::super::registry::RegistryBuilder;
 
 const VERSION: i32 = 2717;
 
-const RENAMES: &[(&str, &str)] = &[
-    ("minecraft:azalea_leaves_flowers", "minecraft:flowering_azalea_leaves"),
-];
+const RENAMES: &[(&str, &str)] = &[(
+    "minecraft:azalea_leaves_flowers",
+    "minecraft:flowering_azalea_leaves",
+)];
 
 pub fn register(reg: &mut RegistryBuilder) {
     register_item_rename(reg, VERSION, map_renamer(RENAMES));

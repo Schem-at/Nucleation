@@ -98,7 +98,8 @@ fn named(reg: &mut RegistryBuilder, id: &'static str) {
 /// `DataWalkerItemLists("Items")`.
 fn named_inventory(reg: &mut RegistryBuilder, id: &'static str) {
     named(reg, id);
-    reg.tile_entity.add_walker(VERSION, 0, id, item_lists(&["Items"]));
+    reg.tile_entity
+        .add_walker(VERSION, 0, id, item_lists(&["Items"]));
 }
 
 pub fn register(reg: &mut RegistryBuilder) {

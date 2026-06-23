@@ -35,8 +35,7 @@ pub fn register(reg: &mut RegistryBuilder) {
         VERSION,
         0,
         Box::new(|data, _from, _to| {
-            if data.get_string("LootTable")
-                == Some("minecraft:chests/village/village_weaponsmith")
+            if data.get_string("LootTable") == Some("minecraft:chests/village/village_weaponsmith")
             {
                 data.set_string("LootTable", "minecraft:chests/village_blacksmith");
             }

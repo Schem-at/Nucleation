@@ -322,7 +322,10 @@ mod tests {
         let back = &schem.default_region.entities[0];
         assert_eq!(back.id, "Minecart");
         assert_eq!(back.nbt.get("Type"), Some(&EntityNbtValue::Int(2)));
-        assert!(report.is_empty(), "minecart type split is a lossless inverse");
+        assert!(
+            report.is_empty(),
+            "minecart type split is a lossless inverse"
+        );
     }
 
     #[test]

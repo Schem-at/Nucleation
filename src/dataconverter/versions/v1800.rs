@@ -27,5 +27,6 @@ pub const RENAMED_ITEM_IDS: &[(&str, &str)] = &[
 pub fn register(reg: &mut RegistryBuilder) {
     register_item_rename(reg, VERSION, map_renamer(RENAMED_ITEM_IDS));
 
-    reg.entity.add_walker(VERSION, 0, "minecraft:pillager", item_lists(&["Inventory"]));
+    reg.entity
+        .add_walker(VERSION, 0, "minecraft:pillager", item_lists(&["Inventory"]));
 }

@@ -7,10 +7,10 @@
 
 use crate::nbt::NbtMap;
 
-use super::super::registry::RegistryBuilder;
-use super::super::types::MapExt;
 use super::super::helpers::convert_from_lenient;
 use super::super::loss::{report_loss, LossKind, Severity};
+use super::super::registry::RegistryBuilder;
+use super::super::types::MapExt;
 
 const VERSION: i32 = 101;
 

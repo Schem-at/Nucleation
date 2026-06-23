@@ -35,8 +35,6 @@ pub fn register(reg: &mut RegistryBuilder) {
         VERSION,
         0,
         "minecraft:text_display",
-        Arc::new(|reg, data, from, to| {
-            convert(reg, &reg.text_component, data, "text", from, to)
-        }),
+        Arc::new(|reg, data, from, to| convert(reg, &reg.text_component, data, "text", from, to)),
     );
 }

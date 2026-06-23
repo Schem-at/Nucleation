@@ -19,8 +19,11 @@ pub fn register(reg: &mut RegistryBuilder) {
         VERSION,
         0,
         "minecraft:crafter",
-        Arc::new(|reg, data, from, to| convert(reg, &reg.text_component, data, "CustomName", from, to)),
+        Arc::new(|reg, data, from, to| {
+            convert(reg, &reg.text_component, data, "CustomName", from, to)
+        }),
     );
     // + Items itemstack list.
-    reg.tile_entity.add_walker(VERSION, 0, "minecraft:crafter", item_lists(&["Items"]));
+    reg.tile_entity
+        .add_walker(VERSION, 0, "minecraft:crafter", item_lists(&["Items"]));
 }

@@ -56,8 +56,22 @@ fn lookup_fish_pattern(variant: i32) -> &'static str {
 
 /// `V3818.getBannerColour` (V3818.java:22-43); out-of-range -> "white".
 const BANNER_COLOURS: &[&str] = &[
-    "white", "orange", "magenta", "light_blue", "yellow", "lime", "pink", "gray", "light_gray",
-    "cyan", "purple", "blue", "brown", "green", "red", "black",
+    "white",
+    "orange",
+    "magenta",
+    "light_blue",
+    "yellow",
+    "lime",
+    "pink",
+    "gray",
+    "light_gray",
+    "cyan",
+    "purple",
+    "blue",
+    "brown",
+    "green",
+    "red",
+    "black",
 ];
 
 fn banner_colour(id: i32) -> &'static str {
@@ -110,7 +124,9 @@ fn fish_pattern_code(pattern: &str) -> i32 {
 /// out-of-range ids to "white" (0), but every modern colour name round-trips to
 /// its real id; unknown names fold back to white (0, the canonical preimage).
 fn banner_colour_id(name: &str) -> i32 {
-    (0..BANNER_COLOURS.len() as i32).find(|&i| banner_colour(i) == name).unwrap_or(0)
+    (0..BANNER_COLOURS.len() as i32)
+        .find(|&i| banner_colour(i) == name)
+        .unwrap_or(0)
 }
 
 pub fn register(reg: &mut RegistryBuilder) {
@@ -256,7 +272,9 @@ pub fn register(reg: &mut RegistryBuilder) {
                     if components.get_map("minecraft:bucket_entity_data").is_none() {
                         components.set_map("minecraft:bucket_entity_data", NbtMap::new());
                     }
-                    let bucket = components.get_map_mut("minecraft:bucket_entity_data").unwrap();
+                    let bucket = components
+                        .get_map_mut("minecraft:bucket_entity_data")
+                        .unwrap();
                     bucket.set_i32("Variant", variant);
                 }
                 "minecraft:salmon_bucket" => {
@@ -269,7 +287,9 @@ pub fn register(reg: &mut RegistryBuilder) {
                     if components.get_map("minecraft:bucket_entity_data").is_none() {
                         components.set_map("minecraft:bucket_entity_data", NbtMap::new());
                     }
-                    let bucket = components.get_map_mut("minecraft:bucket_entity_data").unwrap();
+                    let bucket = components
+                        .get_map_mut("minecraft:bucket_entity_data")
+                        .unwrap();
                     bucket.set_generic("type", size);
                 }
                 "minecraft:tropical_fish_bucket" => {
@@ -316,7 +336,9 @@ pub fn register(reg: &mut RegistryBuilder) {
                     if components.get_map("minecraft:bucket_entity_data").is_none() {
                         components.set_map("minecraft:bucket_entity_data", NbtMap::new());
                     }
-                    let bucket = components.get_map_mut("minecraft:bucket_entity_data").unwrap();
+                    let bucket = components
+                        .get_map_mut("minecraft:bucket_entity_data")
+                        .unwrap();
                     bucket.set_i32("BucketVariantTag", variant as i32);
                 }
                 "minecraft:painting" => {

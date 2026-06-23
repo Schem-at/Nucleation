@@ -2206,7 +2206,9 @@ pub extern "C" fn schematic_set_block_entity(
     }
     let s = unsafe { &mut *(*schematic).0 };
     let id_str = unsafe { CStr::from_ptr(id) }.to_string_lossy().to_string();
-    let snbt_str = unsafe { CStr::from_ptr(snbt) }.to_string_lossy().to_string();
+    let snbt_str = unsafe { CStr::from_ptr(snbt) }
+        .to_string_lossy()
+        .to_string();
     let compound = match quartz_nbt::snbt::parse(&snbt_str) {
         Ok(c) => c,
         Err(_) => return -1,
@@ -2295,7 +2297,9 @@ pub extern "C" fn schematic_add_entity_from_snbt(
         return -1;
     }
     let s = unsafe { &mut *(*schematic).0 };
-    let snbt_str = unsafe { CStr::from_ptr(snbt) }.to_string_lossy().to_string();
+    let snbt_str = unsafe { CStr::from_ptr(snbt) }
+        .to_string_lossy()
+        .to_string();
     let compound = match quartz_nbt::snbt::parse(&snbt_str) {
         Ok(c) => c,
         Err(_) => return -1,
@@ -9970,7 +9974,7 @@ pub extern "C" fn diff_free(diff: *mut DiffWrapper) {
 
 /// Returns the edit distance of a diff (0 on null pointer).
 #[no_mangle]
-pub extern "C" fn diff_distance(diff: *const DiffWrapper) -> u32 {
+pub extern "C" fn diff_distance(diff: *const DiffWrapper) -> u64 {
     if diff.is_null() {
         return 0;
     }

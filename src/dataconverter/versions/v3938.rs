@@ -26,7 +26,8 @@ fn register_arrow(reg: &mut RegistryBuilder, id: &str) {
         }),
     );
     // DataWalkerItems("item", "weapon").
-    reg.entity.add_walker(VERSION, 0, id, items(&["item", "weapon"]));
+    reg.entity
+        .add_walker(VERSION, 0, id, items(&["item", "weapon"]));
 }
 
 pub fn register(reg: &mut RegistryBuilder) {

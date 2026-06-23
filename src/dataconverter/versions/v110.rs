@@ -10,10 +10,10 @@
 //! Damage:0s}`. No walker is added here — the `SaddleItem` item walker already
 //! exists in V99 (per the Java comment).
 
-use crate::nbt::{NbtMap, NbtValue};
+use super::super::loss::{report_loss, LossKind, Severity};
 use super::super::registry::RegistryBuilder;
 use super::super::types::MapExt;
-use super::super::loss::{report_loss, LossKind, Severity};
+use crate::nbt::{NbtMap, NbtValue};
 
 const VERSION: i32 = 110;
 
@@ -64,9 +64,10 @@ pub fn register(reg: &mut RegistryBuilder) {
             let is_saddle_id = saddle.get_string("id") == Some("minecraft:saddle");
             let count_ok = matches!(saddle.get("Count"), Some(NbtValue::Byte(1)) | None);
             let damage_ok = matches!(saddle.get("Damage"), Some(NbtValue::Short(0)) | None);
-            let extra_keys = saddle.keys().iter().any(|k| {
-                k != "id" && k != "Count" && k != "Damage"
-            });
+            let extra_keys = saddle
+                .keys()
+                .iter()
+                .any(|k| k != "id" && k != "Count" && k != "Damage");
             if !is_saddle_id || !count_ok || !damage_ok || extra_keys {
                 report_loss(
                     VERSION,

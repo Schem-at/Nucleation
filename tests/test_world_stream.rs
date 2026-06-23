@@ -90,20 +90,35 @@ fn streaming_collect_equals_eager_import() {
         chunk_count
     );
 
-    // Same non-air blocks at the same world coordinates.
+    // Same non-air blocks at the same world coordinates. Compare only non-air:
+    // regions densely materialize air across their bounding box, so a synthesized
+    // air cell that is in-bounds for one world but out-of-bounds for the other
+    // would read `Some(air)` vs `None` — a meaningless, non-deterministic
+    // mismatch. Air is absence; only real blocks must round-trip.
+    let is_air = |n: &str| {
+        matches!(
+            n,
+            "minecraft:air" | "minecraft:cave_air" | "minecraft:void_air"
+        )
+    };
+    let nonair = |s: &UniversalSchematic, x: i32, y: i32, z: i32| -> Option<String> {
+        s.default_region
+            .get_block(x, y, z)
+            .map(|b| b.name.to_string())
+            .filter(|n| !is_air(n))
+    };
     let bb = eager.default_region.get_bounding_box();
     for y in bb.min.1..=bb.max.1 {
         for z in bb.min.2..=bb.max.2 {
             for x in bb.min.0..=bb.max.0 {
-                let a = eager
-                    .default_region
-                    .get_block(x, y, z)
-                    .map(|b| b.name.clone());
-                let b = streamed
-                    .default_region
-                    .get_block(x, y, z)
-                    .map(|b| b.name.clone());
-                assert_eq!(a, b, "block mismatch at ({}, {}, {})", x, y, z);
+                assert_eq!(
+                    nonair(&eager, x, y, z),
+                    nonair(&streamed, x, y, z),
+                    "block mismatch at ({}, {}, {})",
+                    x,
+                    y,
+                    z
+                );
             }
         }
     }
@@ -244,13 +259,35 @@ fn sink_round_trips_streamed_chunks() {
     // Re-stream and compare block content via eager import equivalence.
     let original = world::from_world_zip(&world_zip_fixture()).expect("orig");
     let rewritten = world::from_world_directory(&dir).expect("reread");
+
+    // Compare only *non-air* blocks: air is absence, not a block. A region
+    // densely materializes air across its whole bounding box, so `get_block`
+    // returns `Some("minecraft:air")` for any in-bounds empty cell and `None`
+    // outside the box. The two worlds' bounding boxes can legitimately differ
+    // (e.g. the sink writing slightly different chunk/section extents), which
+    // would make a synthesized-air cell read `Some(air)` on one side and `None`
+    // on the other — a meaningless, non-deterministic mismatch. Normalizing air
+    // to absence keeps the round-trip invariant (every real block survives)
+    // while staying deterministic across HashMap iteration orders.
+    let is_air = |n: &str| {
+        matches!(
+            n,
+            "minecraft:air" | "minecraft:cave_air" | "minecraft:void_air"
+        )
+    };
+    let nonair = |s: &UniversalSchematic, x: i32, y: i32, z: i32| -> Option<String> {
+        s.default_region
+            .get_block(x, y, z)
+            .map(|b| b.name.to_string())
+            .filter(|n| !is_air(n))
+    };
     let bb = original.default_region.get_bounding_box();
     for y in bb.min.1..=bb.max.1 {
         for z in bb.min.2..=bb.max.2 {
             for x in bb.min.0..=bb.max.0 {
                 assert_eq!(
-                    original.default_region.get_block(x, y, z).map(|b| &b.name),
-                    rewritten.default_region.get_block(x, y, z).map(|b| &b.name),
+                    nonair(&original, x, y, z),
+                    nonair(&rewritten, x, y, z),
                     "mismatch at ({}, {}, {})",
                     x,
                     y,
