@@ -59,7 +59,7 @@ public final class Diff implements AutoCloseable {
     }
 
     /** Total edit distance (number of weighted operations) between the two schematics. */
-    public int distance() {
+    public long distance() {
         checkOpen();
         return NucleationNative.nDiffDistance(handle);
     }

@@ -187,7 +187,9 @@ fn replace_uuid_string(data: &mut NbtMap, old_path: &str, new_path: &str) {
 /// `replaceUUIDMLTag(data, oldPath, newPath)`: read the `M`/`L` compound at
 /// `oldPath`, remove it, then write the int-array (if non-zero) at `newPath`.
 fn replace_uuid_ml_tag(data: &mut NbtMap, old_path: &str, new_path: &str) {
-    let uuid = data.get_map(old_path).and_then(|m| create_uuid_from_longs(m, "M", "L"));
+    let uuid = data
+        .get_map(old_path)
+        .and_then(|m| create_uuid_from_longs(m, "M", "L"));
     data.take(old_path);
     if let Some(uuid) = uuid {
         data.set_generic(new_path, NbtValue::IntArray(uuid));
@@ -518,60 +520,204 @@ pub fn register(reg: &mut RegistryBuilder) {
     );
 
     for id in ABSTRACT_HORSES.iter().chain(TAMEABLE_ANIMALS.iter()) {
-        reg.entity.add_converter_for_id(*id, VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| update_animal_owner(data)));
+        reg.entity.add_converter_for_id(
+            *id,
+            VERSION,
+            0,
+            Box::new(|data: &mut NbtMap, _from, _to| update_animal_owner(data)),
+        );
         // Reverse: int-array UUIDs -> least/most (LoveCause, Leash, Attributes) and Owner -> OwnerUUID string (lossless).
-        reg.entity.add_reverse_converter_for_id(*id, VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| restore_animal_owner(data)));
+        reg.entity.add_reverse_converter_for_id(
+            *id,
+            VERSION,
+            0,
+            Box::new(|data: &mut NbtMap, _from, _to| restore_animal_owner(data)),
+        );
     }
     for id in ANIMALS {
-        reg.entity.add_converter_for_id(*id, VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| update_animal(data)));
-        reg.entity.add_reverse_converter_for_id(*id, VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| restore_animal(data)));
+        reg.entity.add_converter_for_id(
+            *id,
+            VERSION,
+            0,
+            Box::new(|data: &mut NbtMap, _from, _to| update_animal(data)),
+        );
+        reg.entity.add_reverse_converter_for_id(
+            *id,
+            VERSION,
+            0,
+            Box::new(|data: &mut NbtMap, _from, _to| restore_animal(data)),
+        );
     }
     for id in MOBS {
-        reg.entity.add_converter_for_id(*id, VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| update_mob(data)));
-        reg.entity.add_reverse_converter_for_id(*id, VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| restore_mob(data)));
+        reg.entity.add_converter_for_id(
+            *id,
+            VERSION,
+            0,
+            Box::new(|data: &mut NbtMap, _from, _to| update_mob(data)),
+        );
+        reg.entity.add_reverse_converter_for_id(
+            *id,
+            VERSION,
+            0,
+            Box::new(|data: &mut NbtMap, _from, _to| restore_mob(data)),
+        );
     }
     for id in LIVING_ENTITIES {
-        reg.entity.add_converter_for_id(*id, VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| update_living_entity(data)));
-        reg.entity.add_reverse_converter_for_id(*id, VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| restore_living_entity(data)));
+        reg.entity.add_converter_for_id(
+            *id,
+            VERSION,
+            0,
+            Box::new(|data: &mut NbtMap, _from, _to| update_living_entity(data)),
+        );
+        reg.entity.add_reverse_converter_for_id(
+            *id,
+            VERSION,
+            0,
+            Box::new(|data: &mut NbtMap, _from, _to| restore_living_entity(data)),
+        );
     }
     for id in PROJECTILES {
-        reg.entity.add_converter_for_id(*id, VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| update_projectile(data)));
+        reg.entity.add_converter_for_id(
+            *id,
+            VERSION,
+            0,
+            Box::new(|data: &mut NbtMap, _from, _to| update_projectile(data)),
+        );
         // Reverse: rename generic Owner -> OwnerUUID (no format change; lossless).
-        reg.entity.add_reverse_converter_for_id(*id, VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| restore_projectile(data)));
+        reg.entity.add_reverse_converter_for_id(
+            *id,
+            VERSION,
+            0,
+            Box::new(|data: &mut NbtMap, _from, _to| restore_projectile(data)),
+        );
     }
 
-    reg.entity.add_converter_for_id("minecraft:bee", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| update_hurt_by(data)));
-    reg.entity.add_reverse_converter_for_id("minecraft:bee", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| restore_hurt_by(data)));
-    reg.entity.add_converter_for_id("minecraft:zombified_piglin", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| update_hurt_by(data)));
-    reg.entity.add_reverse_converter_for_id("minecraft:zombified_piglin", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| restore_hurt_by(data)));
-    reg.entity.add_converter_for_id("minecraft:fox", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| update_fox(data)));
-    reg.entity.add_reverse_converter_for_id("minecraft:fox", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| restore_fox(data)));
-    reg.entity.add_converter_for_id("minecraft:item", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| update_item(data)));
-    reg.entity.add_reverse_converter_for_id("minecraft:item", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| restore_item(data)));
-    reg.entity.add_converter_for_id("minecraft:shulker_bullet", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| update_shulker_bullet(data)));
-    reg.entity.add_reverse_converter_for_id("minecraft:shulker_bullet", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| restore_shulker_bullet(data)));
-    reg.entity.add_converter_for_id("minecraft:area_effect_cloud", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| update_area_effect_cloud(data)));
-    reg.entity.add_reverse_converter_for_id("minecraft:area_effect_cloud", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| restore_area_effect_cloud(data)));
-    reg.entity.add_converter_for_id("minecraft:zombie_villager", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| update_zombie_villager(data)));
-    reg.entity.add_reverse_converter_for_id("minecraft:zombie_villager", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| restore_zombie_villager(data)));
-    reg.entity.add_converter_for_id("minecraft:evoker_fangs", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| update_evoker_fangs(data)));
-    reg.entity.add_reverse_converter_for_id("minecraft:evoker_fangs", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| restore_evoker_fangs(data)));
-    reg.entity.add_converter_for_id("minecraft:piglin", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| update_piglin(data)));
-    reg.entity.add_reverse_converter_for_id("minecraft:piglin", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| restore_piglin(data)));
+    reg.entity.add_converter_for_id(
+        "minecraft:bee",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| update_hurt_by(data)),
+    );
+    reg.entity.add_reverse_converter_for_id(
+        "minecraft:bee",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| restore_hurt_by(data)),
+    );
+    reg.entity.add_converter_for_id(
+        "minecraft:zombified_piglin",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| update_hurt_by(data)),
+    );
+    reg.entity.add_reverse_converter_for_id(
+        "minecraft:zombified_piglin",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| restore_hurt_by(data)),
+    );
+    reg.entity.add_converter_for_id(
+        "minecraft:fox",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| update_fox(data)),
+    );
+    reg.entity.add_reverse_converter_for_id(
+        "minecraft:fox",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| restore_fox(data)),
+    );
+    reg.entity.add_converter_for_id(
+        "minecraft:item",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| update_item(data)),
+    );
+    reg.entity.add_reverse_converter_for_id(
+        "minecraft:item",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| restore_item(data)),
+    );
+    reg.entity.add_converter_for_id(
+        "minecraft:shulker_bullet",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| update_shulker_bullet(data)),
+    );
+    reg.entity.add_reverse_converter_for_id(
+        "minecraft:shulker_bullet",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| restore_shulker_bullet(data)),
+    );
+    reg.entity.add_converter_for_id(
+        "minecraft:area_effect_cloud",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| update_area_effect_cloud(data)),
+    );
+    reg.entity.add_reverse_converter_for_id(
+        "minecraft:area_effect_cloud",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| restore_area_effect_cloud(data)),
+    );
+    reg.entity.add_converter_for_id(
+        "minecraft:zombie_villager",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| update_zombie_villager(data)),
+    );
+    reg.entity.add_reverse_converter_for_id(
+        "minecraft:zombie_villager",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| restore_zombie_villager(data)),
+    );
+    reg.entity.add_converter_for_id(
+        "minecraft:evoker_fangs",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| update_evoker_fangs(data)),
+    );
+    reg.entity.add_reverse_converter_for_id(
+        "minecraft:evoker_fangs",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| restore_evoker_fangs(data)),
+    );
+    reg.entity.add_converter_for_id(
+        "minecraft:piglin",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| update_piglin(data)),
+    );
+    reg.entity.add_reverse_converter_for_id(
+        "minecraft:piglin",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| restore_piglin(data)),
+    );
 
     // TILE_ENTITY.
     reg.tile_entity.add_converter_for_id(
         "minecraft:conduit",
         VERSION,
         0,
-        Box::new(|data: &mut NbtMap, _from, _to| replace_uuid_ml_tag(data, "target_uuid", "Target")),
+        Box::new(|data: &mut NbtMap, _from, _to| {
+            replace_uuid_ml_tag(data, "target_uuid", "Target")
+        }),
     );
     // Reverse: int-array Target -> {M, L} compound at target_uuid (lossless).
     reg.tile_entity.add_reverse_converter_for_id(
         "minecraft:conduit",
         VERSION,
         0,
-        Box::new(|data: &mut NbtMap, _from, _to| restore_uuid_ml_tag(data, "target_uuid", "Target")),
+        Box::new(|data: &mut NbtMap, _from, _to| {
+            restore_uuid_ml_tag(data, "target_uuid", "Target")
+        }),
     );
     reg.tile_entity.add_converter_for_id(
         "minecraft:skull",

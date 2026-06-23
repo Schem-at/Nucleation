@@ -9,6 +9,7 @@ pub enum RegionKind {
     Added,
     Removed,
     Changed,
+    Swapped,
     Mixed,
 }
 
@@ -30,6 +31,9 @@ pub fn regions(diff: &Diff) -> Vec<Region> {
     }
     for (p, _, _) in &diff.changed {
         kind_of.insert(*p, RegionKind::Changed);
+    }
+    for (p, _, _) in &diff.swapped {
+        kind_of.insert(*p, RegionKind::Swapped);
     }
 
     let all: HashSet<IVec3> = kind_of.keys().copied().collect();
@@ -88,6 +92,40 @@ mod tests {
     use crate::diff::{diff, DiffSpec};
     use crate::fingerprint::testgen::filled_box;
     use crate::fingerprint::FingerprintSpec;
+
+    #[test]
+    fn swapped_cells_form_a_swapped_region() {
+        use crate::fingerprint::testgen::repalette;
+        let a = filled_box((0, 0, 0), (2, 0, 0), "minecraft:stone");
+        let b = repalette(&a, "minecraft:stone", "minecraft:cobblestone");
+        let spec = DiffSpec::from_preset(FingerprintSpec::exact());
+        let d = diff(&a, &b, &spec);
+        assert!(
+            !d.swapped.is_empty(),
+            "pure re-palette yields swapped cells"
+        );
+        let regs = regions(&d);
+        let covered: usize = regs.iter().map(|r| r.count as usize).sum();
+        assert_eq!(covered, d.swapped.len(), "every swapped cell is clustered");
+        assert!(
+            regs.iter().any(|r| r.kind == RegionKind::Swapped),
+            "a region reports kind Swapped"
+        );
+    }
+
+    #[test]
+    fn swapped_adjacent_to_added_is_mixed() {
+        let a = filled_box((0, 0, 0), (0, 0, 0), "minecraft:stone");
+        let mut b = filled_box((0, 0, 0), (0, 0, 0), "minecraft:cobblestone"); // swap at origin
+        b.set_block(1, 0, 0, &BlockState::new("minecraft:glass")); // added, face-adjacent
+        let spec = DiffSpec::from_preset(FingerprintSpec::exact());
+        let d = diff(&a, &b, &spec);
+        assert_eq!(d.swapped.len(), 1);
+        assert_eq!(d.added.len(), 1);
+        let regs = regions(&d);
+        assert_eq!(regs.len(), 1, "adjacent swapped+added → one cluster");
+        assert_eq!(regs[0].kind, RegionKind::Mixed);
+    }
 
     #[test]
     fn two_separate_added_blobs_make_two_regions() {

@@ -37,7 +37,7 @@ pub fn register(env: &mut JNIEnv) -> jni::errors::Result<()> {
             n_diff_with_overrides as *mut _,
         ),
         nm("nDiffFree", "(J)V", n_diff_free as *mut _),
-        nm("nDiffDistance", "(J)I", n_diff_distance as *mut _),
+        nm("nDiffDistance", "(J)J", n_diff_distance as *mut _),
         nm("nDiffSupport", "(J)F", n_diff_support as *mut _),
         nm("nDiffToJson", "(J)Ljava/lang/String;", n_diff_to_json as *mut _),
         nm("nDiffSummaryJson", "(J)Ljava/lang/String;", n_diff_summary_json as *mut _),
@@ -129,6 +129,8 @@ unsafe extern "system" fn n_diff_with_overrides<'l>(
             cost_delete: opt_cost(cost_delete),
             cost_change: opt_cost(cost_change),
             cost_swap: opt_cost(cost_swap),
+            // Not yet surfaced over JNI; keeps the preset default (80%).
+            swap_dominance_pct: None,
             symmetry: sym,
         };
         let spec = resolve_spec(env, &preset, ov)?;
@@ -152,9 +154,9 @@ unsafe extern "system" fn n_diff_distance<'l>(
     mut env: JNIEnv<'l>,
     _class: JClass<'l>,
     handle: jlong,
-) -> jint {
+) -> jlong {
     with_jni_context(&mut env, 0, |_env| {
-        Ok(as_ref::<Diff>(handle).distance as jint)
+        Ok(as_ref::<Diff>(handle).distance as jlong)
     })
 }
 

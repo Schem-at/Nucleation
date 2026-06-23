@@ -15,7 +15,11 @@ use super::super::types::MapExt;
 
 const VERSION: i32 = 2702;
 
-fn convert_arrow(data: &mut NbtMap, _from: super::super::version::EncodedVersion, _to: super::super::version::EncodedVersion) {
+fn convert_arrow(
+    data: &mut NbtMap,
+    _from: super::super::version::EncodedVersion,
+    _to: super::super::version::EncodedVersion,
+) {
     if data.has_key("pickup") {
         return;
     }
@@ -33,7 +37,11 @@ fn convert_arrow(data: &mut NbtMap, _from: super::super::version::EncodedVersion
 /// representation in the pre-2702 boolean `player`; we best-effort it as
 /// `player = (pickup != 0)` -> `true` and report the dropped distinction
 /// (rule 11: the modern value genuinely can't be encoded in the old boolean).
-fn revert_arrow(data: &mut NbtMap, _from: super::super::version::EncodedVersion, _to: super::super::version::EncodedVersion) {
+fn revert_arrow(
+    data: &mut NbtMap,
+    _from: super::super::version::EncodedVersion,
+    _to: super::super::version::EncodedVersion,
+) {
     // Forward removed `player` and always wrote `pickup`; if `pickup` is somehow
     // absent, mirror the forward default (player=true).
     let pickup = data.get_i32("pickup").unwrap_or(1);
@@ -51,10 +59,28 @@ fn revert_arrow(data: &mut NbtMap, _from: super::super::version::EncodedVersion,
 }
 
 pub fn register(reg: &mut RegistryBuilder) {
-    reg.entity.add_converter_for_id("minecraft:arrow", VERSION, 0, Box::new(convert_arrow));
-    reg.entity.add_reverse_converter_for_id("minecraft:arrow", VERSION, 0, Box::new(revert_arrow));
-    reg.entity.add_converter_for_id("minecraft:spectral_arrow", VERSION, 0, Box::new(convert_arrow));
-    reg.entity.add_reverse_converter_for_id("minecraft:spectral_arrow", VERSION, 0, Box::new(revert_arrow));
-    reg.entity.add_converter_for_id("minecraft:trident", VERSION, 0, Box::new(convert_arrow));
-    reg.entity.add_reverse_converter_for_id("minecraft:trident", VERSION, 0, Box::new(revert_arrow));
+    reg.entity
+        .add_converter_for_id("minecraft:arrow", VERSION, 0, Box::new(convert_arrow));
+    reg.entity
+        .add_reverse_converter_for_id("minecraft:arrow", VERSION, 0, Box::new(revert_arrow));
+    reg.entity.add_converter_for_id(
+        "minecraft:spectral_arrow",
+        VERSION,
+        0,
+        Box::new(convert_arrow),
+    );
+    reg.entity.add_reverse_converter_for_id(
+        "minecraft:spectral_arrow",
+        VERSION,
+        0,
+        Box::new(revert_arrow),
+    );
+    reg.entity
+        .add_converter_for_id("minecraft:trident", VERSION, 0, Box::new(convert_arrow));
+    reg.entity.add_reverse_converter_for_id(
+        "minecraft:trident",
+        VERSION,
+        0,
+        Box::new(revert_arrow),
+    );
 }

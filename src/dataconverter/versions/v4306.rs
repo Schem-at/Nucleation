@@ -24,9 +24,7 @@ pub fn register(reg: &mut RegistryBuilder) {
         VERSION,
         0,
         Box::new(|data, _from, _to| {
-            let is_lingering = data
-                .get_map("Item")
-                .and_then(|item| item.get_string("id"))
+            let is_lingering = data.get_map("Item").and_then(|item| item.get_string("id"))
                 == Some("minecraft:lingering_potion");
             data.set_string(
                 "id",
@@ -61,7 +59,14 @@ pub fn register(reg: &mut RegistryBuilder) {
         }),
     );
 
-    reg.entity.copy_walkers(VERSION, 0, "minecraft:potion", "minecraft:splash_potion");
-    reg.entity.copy_walkers(VERSION, 0, "minecraft:potion", "minecraft:lingering_potion");
-    reg.entity.add_walker(VERSION, 0, "minecraft:potion", Arc::new(|_reg, _data, _from, _to| {}));
+    reg.entity
+        .copy_walkers(VERSION, 0, "minecraft:potion", "minecraft:splash_potion");
+    reg.entity
+        .copy_walkers(VERSION, 0, "minecraft:potion", "minecraft:lingering_potion");
+    reg.entity.add_walker(
+        VERSION,
+        0,
+        "minecraft:potion",
+        Arc::new(|_reg, _data, _from, _to| {}),
+    );
 }

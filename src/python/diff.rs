@@ -10,11 +10,13 @@ use crate::diff::{Diff, DiffSpec, SpecOverrides};
 use crate::fingerprint::symmetry::Symmetry;
 
 /// Build a [`SpecOverrides`] from optional kwargs, parsing `symmetry` by name.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn build_overrides(
     cost_add: Option<u32>,
     cost_delete: Option<u32>,
     cost_change: Option<u32>,
     cost_swap: Option<u32>,
+    swap_dominance_pct: Option<u32>,
     symmetry: Option<&str>,
 ) -> PyResult<SpecOverrides> {
     let symmetry = match symmetry {
@@ -28,6 +30,7 @@ pub(crate) fn build_overrides(
         cost_delete,
         cost_change,
         cost_swap,
+        swap_dominance_pct,
         symmetry,
     })
 }
@@ -53,7 +56,7 @@ pub struct PyDiff {
 impl PyDiff {
     /// Edit distance between the two schematics under the cost model.
     #[getter]
-    pub fn distance(&self) -> u32 {
+    pub fn distance(&self) -> u64 {
         self.inner.distance
     }
 

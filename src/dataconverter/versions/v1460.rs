@@ -8,10 +8,10 @@
 //! The Java comment notes the many redundant type redefinitions in this version
 //! are no-ops (no data-structure change), so nothing else is ported.
 
-use super::super::registry::RegistryBuilder;
-use super::super::types::MapExt;
 use super::super::helpers::correct_namespace;
 use super::super::loss::{report_loss, LossKind, Severity};
+use super::super::registry::RegistryBuilder;
+use super::super::types::MapExt;
 
 const VERSION: i32 = 1460;
 

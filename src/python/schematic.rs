@@ -1265,7 +1265,9 @@ impl PySchematic {
     /// version (else `mc_version`, else canonical) as origin, updating metadata
     /// to the target. Returns the JSON loss report (`[]` when lossless).
     pub fn convert_to_version(&mut self, target_data_version: i32) -> String {
-        self.inner.convert_to_data_version(target_data_version).to_json()
+        self.inner
+            .convert_to_data_version(target_data_version)
+            .to_json()
     }
 
     /// The Minecraft data version of the file this schematic was loaded from
@@ -2105,8 +2107,11 @@ impl PySchematic {
     /// Structurally diff this schematic against `other`, returning a `Diff`.
     ///
     /// `preset` selects the cost model. Optional `cost_*` kwargs override the
-    /// individual edit costs and `symmetry` overrides the symmetry group by
-    /// name. Raises ValueError on an unknown preset or symmetry name.
+    /// individual edit costs, `swap_dominance_pct` overrides the palette-swap
+    /// dominance threshold (percent, 0–100), and `symmetry` overrides the
+    /// symmetry group by name. Raises ValueError on an unknown preset or
+    /// symmetry name.
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
         other,
         preset="exact",
@@ -2114,6 +2119,7 @@ impl PySchematic {
         cost_delete=None,
         cost_change=None,
         cost_swap=None,
+        swap_dominance_pct=None,
         symmetry=None,
     ))]
     pub fn diff(
@@ -2124,10 +2130,17 @@ impl PySchematic {
         cost_delete: Option<u32>,
         cost_change: Option<u32>,
         cost_swap: Option<u32>,
+        swap_dominance_pct: Option<u32>,
         symmetry: Option<&str>,
     ) -> PyResult<super::diff::PyDiff> {
-        let ov =
-            super::diff::build_overrides(cost_add, cost_delete, cost_change, cost_swap, symmetry)?;
+        let ov = super::diff::build_overrides(
+            cost_add,
+            cost_delete,
+            cost_change,
+            cost_swap,
+            swap_dominance_pct,
+            symmetry,
+        )?;
         let spec = super::diff::resolve_spec(preset, &ov)?;
         let inner = crate::diff::diff(&self.inner, &other.inner, &spec);
         Ok(super::diff::PyDiff { inner })

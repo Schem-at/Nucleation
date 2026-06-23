@@ -23,7 +23,10 @@ pub fn register(reg: &mut RegistryBuilder) {
         VERSION,
         0,
         "minecraft:trident",
-        Arc::new(|reg, data, from, to| convert(reg, &reg.block_state, data, "inBlockState", from, to)),
+        Arc::new(|reg, data, from, to| {
+            convert(reg, &reg.block_state, data, "inBlockState", from, to)
+        }),
     );
-    reg.entity.add_walker(VERSION, 0, "minecraft:trident", items(&["Trident"]));
+    reg.entity
+        .add_walker(VERSION, 0, "minecraft:trident", items(&["Trident"]));
 }

@@ -18,7 +18,8 @@ use super::super::walker::{convert_value, item_lists};
 const VERSION: i32 = 3083;
 
 pub fn register(reg: &mut RegistryBuilder) {
-    reg.entity.add_walker(VERSION, 0, "minecraft:allay", item_lists(&["Inventory"]));
+    reg.entity
+        .add_walker(VERSION, 0, "minecraft:allay", item_lists(&["Inventory"]));
     reg.entity.add_walker(
         VERSION,
         0,

@@ -22,26 +22,47 @@ const VERSION: i32 = 2523;
 const RENAMES: &[(&str, &str)] = &[
     ("generic.maxHealth", "minecraft:generic.max_health"),
     ("Max Health", "minecraft:generic.max_health"),
-    ("zombie.spawnReinforcements", "minecraft:zombie.spawn_reinforcements"),
-    ("Spawn Reinforcements Chance", "minecraft:zombie.spawn_reinforcements"),
+    (
+        "zombie.spawnReinforcements",
+        "minecraft:zombie.spawn_reinforcements",
+    ),
+    (
+        "Spawn Reinforcements Chance",
+        "minecraft:zombie.spawn_reinforcements",
+    ),
     ("horse.jumpStrength", "minecraft:horse.jump_strength"),
     ("Jump Strength", "minecraft:horse.jump_strength"),
     ("generic.followRange", "minecraft:generic.follow_range"),
     ("Follow Range", "minecraft:generic.follow_range"),
-    ("generic.knockbackResistance", "minecraft:generic.knockback_resistance"),
-    ("Knockback Resistance", "minecraft:generic.knockback_resistance"),
+    (
+        "generic.knockbackResistance",
+        "minecraft:generic.knockback_resistance",
+    ),
+    (
+        "Knockback Resistance",
+        "minecraft:generic.knockback_resistance",
+    ),
     ("generic.movementSpeed", "minecraft:generic.movement_speed"),
     ("Movement Speed", "minecraft:generic.movement_speed"),
     ("generic.flyingSpeed", "minecraft:generic.flying_speed"),
     ("Flying Speed", "minecraft:generic.flying_speed"),
     ("generic.attackDamage", "minecraft:generic.attack_damage"),
-    ("generic.attackKnockback", "minecraft:generic.attack_knockback"),
+    (
+        "generic.attackKnockback",
+        "minecraft:generic.attack_knockback",
+    ),
     ("generic.attackSpeed", "minecraft:generic.attack_speed"),
-    ("generic.armorToughness", "minecraft:generic.armor_toughness"),
+    (
+        "generic.armorToughness",
+        "minecraft:generic.armor_toughness",
+    ),
 ];
 
 fn rename(name: &str) -> Option<&'static str> {
-    RENAMES.iter().find(|(old, _)| *old == name).map(|(_, new)| *new)
+    RENAMES
+        .iter()
+        .find(|(old, _)| *old == name)
+        .map(|(_, new)| *new)
 }
 
 /// Reverse rename table (modern -> old). The forward map is many-to-one: most
@@ -55,16 +76,52 @@ fn rename(name: &str) -> Option<&'static str> {
 /// `armor_toughness`) had a unique preimage -> lossless.
 const REVERSE_RENAMES: &[(&str, &str, bool)] = &[
     ("minecraft:generic.max_health", "generic.maxHealth", true),
-    ("minecraft:zombie.spawn_reinforcements", "zombie.spawnReinforcements", true),
+    (
+        "minecraft:zombie.spawn_reinforcements",
+        "zombie.spawnReinforcements",
+        true,
+    ),
     ("minecraft:horse.jump_strength", "horse.jumpStrength", true),
-    ("minecraft:generic.follow_range", "generic.followRange", true),
-    ("minecraft:generic.knockback_resistance", "generic.knockbackResistance", true),
-    ("minecraft:generic.movement_speed", "generic.movementSpeed", true),
-    ("minecraft:generic.flying_speed", "generic.flyingSpeed", true),
-    ("minecraft:generic.attack_damage", "generic.attackDamage", false),
-    ("minecraft:generic.attack_knockback", "generic.attackKnockback", false),
-    ("minecraft:generic.attack_speed", "generic.attackSpeed", false),
-    ("minecraft:generic.armor_toughness", "generic.armorToughness", false),
+    (
+        "minecraft:generic.follow_range",
+        "generic.followRange",
+        true,
+    ),
+    (
+        "minecraft:generic.knockback_resistance",
+        "generic.knockbackResistance",
+        true,
+    ),
+    (
+        "minecraft:generic.movement_speed",
+        "generic.movementSpeed",
+        true,
+    ),
+    (
+        "minecraft:generic.flying_speed",
+        "generic.flyingSpeed",
+        true,
+    ),
+    (
+        "minecraft:generic.attack_damage",
+        "generic.attackDamage",
+        false,
+    ),
+    (
+        "minecraft:generic.attack_knockback",
+        "generic.attackKnockback",
+        false,
+    ),
+    (
+        "minecraft:generic.attack_speed",
+        "generic.attackSpeed",
+        false,
+    ),
+    (
+        "minecraft:generic.armor_toughness",
+        "generic.armorToughness",
+        false,
+    ),
 ];
 
 fn rename_back(name: &str) -> Option<(&'static str, bool)> {

@@ -14,22 +14,64 @@ const VERSION: i32 = 2696;
 
 const RENAMES: &[(&str, &str)] = &[
     ("minecraft:grimstone", "minecraft:deepslate"),
-    ("minecraft:grimstone_slab", "minecraft:cobbled_deepslate_slab"),
-    ("minecraft:grimstone_stairs", "minecraft:cobbled_deepslate_stairs"),
-    ("minecraft:grimstone_wall", "minecraft:cobbled_deepslate_wall"),
-    ("minecraft:polished_grimstone", "minecraft:polished_deepslate"),
-    ("minecraft:polished_grimstone_slab", "minecraft:polished_deepslate_slab"),
-    ("minecraft:polished_grimstone_stairs", "minecraft:polished_deepslate_stairs"),
-    ("minecraft:polished_grimstone_wall", "minecraft:polished_deepslate_wall"),
+    (
+        "minecraft:grimstone_slab",
+        "minecraft:cobbled_deepslate_slab",
+    ),
+    (
+        "minecraft:grimstone_stairs",
+        "minecraft:cobbled_deepslate_stairs",
+    ),
+    (
+        "minecraft:grimstone_wall",
+        "minecraft:cobbled_deepslate_wall",
+    ),
+    (
+        "minecraft:polished_grimstone",
+        "minecraft:polished_deepslate",
+    ),
+    (
+        "minecraft:polished_grimstone_slab",
+        "minecraft:polished_deepslate_slab",
+    ),
+    (
+        "minecraft:polished_grimstone_stairs",
+        "minecraft:polished_deepslate_stairs",
+    ),
+    (
+        "minecraft:polished_grimstone_wall",
+        "minecraft:polished_deepslate_wall",
+    ),
     ("minecraft:grimstone_tiles", "minecraft:deepslate_tiles"),
-    ("minecraft:grimstone_tile_slab", "minecraft:deepslate_tile_slab"),
-    ("minecraft:grimstone_tile_stairs", "minecraft:deepslate_tile_stairs"),
-    ("minecraft:grimstone_tile_wall", "minecraft:deepslate_tile_wall"),
+    (
+        "minecraft:grimstone_tile_slab",
+        "minecraft:deepslate_tile_slab",
+    ),
+    (
+        "minecraft:grimstone_tile_stairs",
+        "minecraft:deepslate_tile_stairs",
+    ),
+    (
+        "minecraft:grimstone_tile_wall",
+        "minecraft:deepslate_tile_wall",
+    ),
     ("minecraft:grimstone_bricks", "minecraft:deepslate_bricks"),
-    ("minecraft:grimstone_brick_slab", "minecraft:deepslate_brick_slab"),
-    ("minecraft:grimstone_brick_stairs", "minecraft:deepslate_brick_stairs"),
-    ("minecraft:grimstone_brick_wall", "minecraft:deepslate_brick_wall"),
-    ("minecraft:chiseled_grimstone", "minecraft:chiseled_deepslate"),
+    (
+        "minecraft:grimstone_brick_slab",
+        "minecraft:deepslate_brick_slab",
+    ),
+    (
+        "minecraft:grimstone_brick_stairs",
+        "minecraft:deepslate_brick_stairs",
+    ),
+    (
+        "minecraft:grimstone_brick_wall",
+        "minecraft:deepslate_brick_wall",
+    ),
+    (
+        "minecraft:chiseled_grimstone",
+        "minecraft:chiseled_deepslate",
+    ),
 ];
 
 pub fn register(reg: &mut RegistryBuilder) {

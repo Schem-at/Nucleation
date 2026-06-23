@@ -41,7 +41,9 @@ pub fn register(reg: &mut RegistryBuilder) {
             let sound_variant = tag.get_i32("SoundVariant").unwrap_or(0);
             tag.take("SoundVariant");
 
-            let idx = if sound_variant < 0 || sound_variant as usize >= SOUND_VARIANT_TO_INSTRUMENT.len() {
+            let idx = if sound_variant < 0
+                || sound_variant as usize >= SOUND_VARIANT_TO_INSTRUMENT.len()
+            {
                 0
             } else {
                 sound_variant as usize

@@ -85,8 +85,28 @@ fn restore_gossips(data: &mut NbtMap) {
 }
 
 pub fn register(reg: &mut RegistryBuilder) {
-    reg.entity.add_converter_for_id("minecraft:villager", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| convert_gossips(data)));
-    reg.entity.add_reverse_converter_for_id("minecraft:villager", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| restore_gossips(data)));
-    reg.entity.add_converter_for_id("minecraft:zombie_villager", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| convert_gossips(data)));
-    reg.entity.add_reverse_converter_for_id("minecraft:zombie_villager", VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| restore_gossips(data)));
+    reg.entity.add_converter_for_id(
+        "minecraft:villager",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| convert_gossips(data)),
+    );
+    reg.entity.add_reverse_converter_for_id(
+        "minecraft:villager",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| restore_gossips(data)),
+    );
+    reg.entity.add_converter_for_id(
+        "minecraft:zombie_villager",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| convert_gossips(data)),
+    );
+    reg.entity.add_reverse_converter_for_id(
+        "minecraft:zombie_villager",
+        VERSION,
+        0,
+        Box::new(|data: &mut NbtMap, _from, _to| restore_gossips(data)),
+    );
 }

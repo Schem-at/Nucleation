@@ -219,7 +219,7 @@ final class NucleationNative {
             int costAdd, int costDelete, int costChange, int costSwap,
             String symmetry);
     static native void    nDiffFree(long handle);
-    static native int     nDiffDistance(long handle);
+    static native long    nDiffDistance(long handle);
     static native float   nDiffSupport(long handle);
     static native String  nDiffToJson(long handle);
     static native String  nDiffSummaryJson(long handle);

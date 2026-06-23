@@ -39,7 +39,10 @@ fn convert_drop_chances(data: &NbtMap, src_path: &str, names: &[&str], dst: &mut
     let len = old_chances.len().min(names.len());
     for (i, name) in names.iter().enumerate().take(len) {
         // getFloat(i, DEFAULT): a non-float element falls back to the default.
-        let chance = old_chances[i].as_number_f64().map(|v| v as f32).unwrap_or(DEFAULT);
+        let chance = old_chances[i]
+            .as_number_f64()
+            .map(|v| v as f32)
+            .unwrap_or(DEFAULT);
         if chance != DEFAULT {
             dst.set_f32(name, chance);
         }

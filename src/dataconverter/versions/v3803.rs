@@ -22,8 +22,7 @@ const VERSION: i32 = 3803;
 
 /// `(old, new)` enchantment renames (V3803.java:16-18). Matched against the
 /// namespace-corrected id.
-const ENCHANTMENT_RENAMES: &[(&str, &str)] =
-    &[("minecraft:sweeping", "minecraft:sweeping_edge")];
+const ENCHANTMENT_RENAMES: &[(&str, &str)] = &[("minecraft:sweeping", "minecraft:sweeping_edge")];
 
 /// Port of `NamespaceUtil.correctNamespace`: default-namespace an unnamespaced,
 /// parseable resource location; otherwise return the input unchanged.

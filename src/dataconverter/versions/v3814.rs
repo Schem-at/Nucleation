@@ -19,17 +19,25 @@ use super::super::types::{MapExt, ValueExt};
 const VERSION: i32 = 3814;
 
 /// `(old, new)` attribute renames (V3814.java:14-16).
-const ATTRIBUTE_RENAMES: &[(&str, &str)] =
-    &[("minecraft:horse.jump_strength", "minecraft:generic.jump_strength")];
+const ATTRIBUTE_RENAMES: &[(&str, &str)] = &[(
+    "minecraft:horse.jump_strength",
+    "minecraft:generic.jump_strength",
+)];
 
 fn rename(name: &str) -> Option<&'static str> {
-    ATTRIBUTE_RENAMES.iter().find(|(old, _)| *old == name).map(|(_, new)| *new)
+    ATTRIBUTE_RENAMES
+        .iter()
+        .find(|(old, _)| *old == name)
+        .map(|(_, new)| *new)
 }
 
 /// Inverse lookup: map the new name back to the old name. The forward rename is
 /// one-to-one, so this is exact (lossless).
 fn rename_inverse(name: &str) -> Option<&'static str> {
-    ATTRIBUTE_RENAMES.iter().find(|(_, new)| *new == name).map(|(old, _)| *old)
+    ATTRIBUTE_RENAMES
+        .iter()
+        .find(|(_, new)| *new == name)
+        .map(|(old, _)| *old)
 }
 
 /// Inverse of `rename_list_field`: rename `data[list][].key` new -> old.

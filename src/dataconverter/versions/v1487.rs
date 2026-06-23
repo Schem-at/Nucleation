@@ -18,8 +18,14 @@ const VERSION: i32 = 1487;
 
 /// `remap` (V1487.java:15-20) — shared by both the item and block renames.
 pub const RENAMED_IDS: &[(&str, &str)] = &[
-    ("minecraft:prismarine_bricks_slab", "minecraft:prismarine_brick_slab"),
-    ("minecraft:prismarine_bricks_stairs", "minecraft:prismarine_brick_stairs"),
+    (
+        "minecraft:prismarine_bricks_slab",
+        "minecraft:prismarine_brick_slab",
+    ),
+    (
+        "minecraft:prismarine_bricks_stairs",
+        "minecraft:prismarine_brick_stairs",
+    ),
 ];
 
 pub fn register(reg: &mut RegistryBuilder) {

@@ -20,10 +20,7 @@ use super::super::types::MapExt;
 const VERSION: i32 = 1474;
 
 /// Rename `purple_shulker_box` -> `shulker_box` (V1474.java:25-30).
-const RENAMES: &[(&str, &str)] = &[(
-    "minecraft:purple_shulker_box",
-    "minecraft:shulker_box",
-)];
+const RENAMES: &[(&str, &str)] = &[("minecraft:purple_shulker_box", "minecraft:shulker_box")];
 
 pub fn register(reg: &mut RegistryBuilder) {
     // ENTITY shulker Color migration (V1474.java:15-23).

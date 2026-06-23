@@ -60,14 +60,15 @@ impl From<Renamer> for RenameSpec {
         // No safe automatic inverse for an opaque closure; default to a no-op
         // reverse (leave the value unchanged on downgrade). The two closure-based
         // rename sites that need a real inverse build a `RenameSpec::custom`.
-        RenameSpec::Custom { forward, reverse: Arc::new(|_| None) }
+        RenameSpec::Custom {
+            forward,
+            reverse: Arc::new(|_| None),
+        }
     }
 }
 
 /// Build a renamer from `(from, to)` pairs, first-wins on duplicate `from` keys.
-fn map_table_renamer(
-    pairs: impl Iterator<Item = (&'static str, &'static str)>,
-) -> Renamer {
+fn map_table_renamer(pairs: impl Iterator<Item = (&'static str, &'static str)>) -> Renamer {
     let mut map: HashMap<&'static str, &'static str> = HashMap::new();
     for (from, to) in pairs {
         map.entry(from).or_insert(to);
@@ -170,7 +171,11 @@ pub fn register_item_rename(reg: &mut RegistryBuilder, version: i32, spec: impl 
 
 /// `ConverterAbstractEntityRename.register` — rename the entity `id` field and
 /// the ENTITY_NAME value type, plus the inverses.
-pub fn register_entity_rename(reg: &mut RegistryBuilder, version: i32, spec: impl Into<RenameSpec>) {
+pub fn register_entity_rename(
+    reg: &mut RegistryBuilder,
+    version: i32,
+    spec: impl Into<RenameSpec>,
+) {
     let spec = spec.into();
     reg.entity
         .add_structure_converter(version, 0, id_field_rename_converter(spec.forward()));
@@ -184,17 +189,28 @@ pub fn register_entity_rename(reg: &mut RegistryBuilder, version: i32, spec: imp
 pub fn register_block_rename(reg: &mut RegistryBuilder, version: i32, spec: impl Into<RenameSpec>) {
     let spec = spec.into();
 
-    register_value_rename(&mut reg.block_name, version, 0, RenameSpec::custom(spec.forward(), spec.reverse()));
+    register_value_rename(
+        &mut reg.block_name,
+        version,
+        0,
+        RenameSpec::custom(spec.forward(), spec.reverse()),
+    );
 
-    reg.block_state
-        .add_structure_converter(version, 0, name_field_rename_converter(spec.forward()));
+    reg.block_state.add_structure_converter(
+        version,
+        0,
+        name_field_rename_converter(spec.forward()),
+    );
     reg.block_state
         .add_reverse_converter(version, 0, name_field_rename_converter(spec.reverse()));
 
     reg.flat_block_state
         .add_converter(version, 0, flat_state_rename_converter(spec.forward()));
-    reg.flat_block_state
-        .add_reverse_converter(version, 0, flat_state_rename_converter(spec.reverse()));
+    reg.flat_block_state.add_reverse_converter(
+        version,
+        0,
+        flat_state_rename_converter(spec.reverse()),
+    );
 }
 
 // --- namespace enforcement (hooks/DataHook*EnforceNamespaced) ---------------

@@ -148,7 +148,9 @@ impl MapExt for NbtMap {
         self.get_mut(key).and_then(ValueExt::as_list_mut)
     }
     fn get_i32(&self, key: &str) -> Option<i32> {
-        self.get(key).and_then(ValueExt::as_number_i64).map(|v| v as i32)
+        self.get(key)
+            .and_then(ValueExt::as_number_i64)
+            .map(|v| v as i32)
     }
     fn get_i64(&self, key: &str) -> Option<i64> {
         self.get(key).and_then(ValueExt::as_number_i64)
@@ -157,7 +159,9 @@ impl MapExt for NbtMap {
         self.get(key).and_then(ValueExt::as_number_f64)
     }
     fn get_bool(&self, key: &str) -> Option<bool> {
-        self.get(key).and_then(ValueExt::as_number_i64).map(|v| v != 0)
+        self.get(key)
+            .and_then(ValueExt::as_number_i64)
+            .map(|v| v != 0)
     }
 
     fn set_string(&mut self, key: &str, v: impl Into<String>) {

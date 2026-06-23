@@ -38,7 +38,10 @@ fn create_uuid_array(most: i64, least: i64) -> Vec<i32> {
 /// halves are non-zero.
 fn set_uuid(data: &mut NbtMap, most: i64, least: i64) {
     if most != 0 && least != 0 {
-        data.set_generic("OwnerUUID", NbtValue::IntArray(create_uuid_array(most, least)));
+        data.set_generic(
+            "OwnerUUID",
+            NbtValue::IntArray(create_uuid_array(most, least)),
+        );
     }
 }
 
@@ -58,7 +61,11 @@ fn read_uuid_array(data: &NbtMap, path: &str) -> Option<(i64, i64)> {
     Some((most, least))
 }
 
-fn throwable(data: &mut NbtMap, _from: super::super::version::EncodedVersion, _to: super::super::version::EncodedVersion) {
+fn throwable(
+    data: &mut NbtMap,
+    _from: super::super::version::EncodedVersion,
+    _to: super::super::version::EncodedVersion,
+) {
     let owner = match data.take("owner") {
         Some(NbtValue::Compound(m)) => m,
         _ => {
@@ -72,21 +79,33 @@ fn throwable(data: &mut NbtMap, _from: super::super::version::EncodedVersion, _t
 }
 
 pub fn register(reg: &mut RegistryBuilder) {
-    for id in ["minecraft:egg", "minecraft:ender_pearl", "minecraft:experience_bottle", "minecraft:snowball", "minecraft:potion"] {
-        reg.entity.add_converter_for_id(id, VERSION, 0, Box::new(throwable));
+    for id in [
+        "minecraft:egg",
+        "minecraft:ender_pearl",
+        "minecraft:experience_bottle",
+        "minecraft:snowball",
+        "minecraft:potion",
+    ] {
+        reg.entity
+            .add_converter_for_id(id, VERSION, 0, Box::new(throwable));
         // Reverse: int-array `OwnerUUID` -> the `owner` compound with `M`/`L` longs
         // (exact inverse of create_uuid_array; lossless). The forward only wrote
         // OwnerUUID when both halves were non-zero, so a missing/short array means
         // there is no owner to restore — matching the forward's drop of all-zero UUIDs.
-        reg.entity.add_reverse_converter_for_id(id, VERSION, 0, Box::new(|data: &mut NbtMap, _from, _to| {
-            if let Some((most, least)) = read_uuid_array(data, "OwnerUUID") {
-                data.take("OwnerUUID");
-                let mut owner = NbtMap::new();
-                owner.set_i64("M", most);
-                owner.set_i64("L", least);
-                data.set_map("owner", owner);
-            }
-        }));
+        reg.entity.add_reverse_converter_for_id(
+            id,
+            VERSION,
+            0,
+            Box::new(|data: &mut NbtMap, _from, _to| {
+                if let Some((most, least)) = read_uuid_array(data, "OwnerUUID") {
+                    data.take("OwnerUUID");
+                    let mut owner = NbtMap::new();
+                    owner.set_i64("M", most);
+                    owner.set_i64("L", least);
+                    data.set_map("owner", owner);
+                }
+            }),
+        );
     }
 
     // potion: move Potion -> Item (empty map if absent).
@@ -153,7 +172,11 @@ pub fn register(reg: &mut RegistryBuilder) {
     );
 
     // arrow family: lift OwnerUUIDMost/Least into OwnerUUID; drop the old longs.
-    for id in ["minecraft:arrow", "minecraft:spectral_arrow", "minecraft:trident"] {
+    for id in [
+        "minecraft:arrow",
+        "minecraft:spectral_arrow",
+        "minecraft:trident",
+    ] {
         reg.entity.add_converter_for_id(
             id,
             VERSION,
@@ -184,5 +207,6 @@ pub fn register(reg: &mut RegistryBuilder) {
     }
 
     // ENTITY walker for potion's Item itemstack.
-    reg.entity.add_walker(VERSION, 0, "minecraft:potion", items(&["Item"]));
+    reg.entity
+        .add_walker(VERSION, 0, "minecraft:potion", items(&["Item"]));
 }

@@ -110,8 +110,13 @@ struct Tables {
     /// Flattened block *name* -> every `(flat_props, pres)` registered under it,
     /// so a modern state carrying extra properties (waterlogged, shape, …) the
     /// flattening never set can still be matched by property subset.
-    variants_by_flat_name:
-        HashMap<&'static str, Vec<(&'static [(&'static str, &'static str)], &'static [FlatState])>>,
+    variants_by_flat_name: HashMap<
+        &'static str,
+        Vec<(
+            &'static [(&'static str, &'static str)],
+            &'static [FlatState],
+        )>,
+    >,
     /// Flattened block name -> canonical pre-flattening name (inverse of
     /// `getNewBlockName`). First registration wins.
     old_name_by_new: HashMap<&'static str, &'static str>,
@@ -127,7 +132,10 @@ static TABLES: LazyLock<Tables> = LazyLock::new(|| {
     let mut pre_by_flat: HashMap<String, &'static [FlatState]> = HashMap::new();
     let mut variants_by_flat_name: HashMap<
         &'static str,
-        Vec<(&'static [(&'static str, &'static str)], &'static [FlatState])>,
+        Vec<(
+            &'static [(&'static str, &'static str)],
+            &'static [FlatState],
+        )>,
     > = HashMap::new();
     let mut old_name_by_new: HashMap<&'static str, &'static str> = HashMap::new();
 
@@ -147,8 +155,13 @@ static TABLES: LazyLock<Tables> = LazyLock::new(|| {
         // Reverse: keep this registration's full preimage list so the closest
         // pre to a given modern state can be chosen at reverse time.
         if let Some(first) = r.pres.first() {
-            pre_by_flat.entry(canon_key(r.flat.name, r.flat.props)).or_insert(r.pres);
-            variants_by_flat_name.entry(r.flat.name).or_default().push((r.flat.props, r.pres));
+            pre_by_flat
+                .entry(canon_key(r.flat.name, r.flat.props))
+                .or_insert(r.pres);
+            variants_by_flat_name
+                .entry(r.flat.name)
+                .or_default()
+                .push((r.flat.props, r.pres));
             old_name_by_new.entry(r.flat.name).or_insert(first.name);
         }
     }
@@ -221,7 +234,9 @@ pub fn get_nbt_for_id(block: i32) -> NbtMap {
     match nbt_for_id_raw(block) {
         Some(fs) => fs.to_nbt(),
         // FLATTENED_BY_ID[0] is air (registered at id 0).
-        None => nbt_for_id_raw(0).expect("id 0 (air) is always registered").to_nbt(),
+        None => nbt_for_id_raw(0)
+            .expect("id 0 (air) is always registered")
+            .to_nbt(),
     }
 }
 
@@ -250,7 +265,10 @@ pub enum Unflatten {
 /// carries extra properties the Flattening never set).
 pub fn unflatten_nbt(modern: &NbtMap) -> Unflatten {
     let modern_props: Vec<(&str, &str)> = match modern.get_map("Properties") {
-        Some(p) => p.iter().filter_map(|(k, v)| v.as_str().map(|s| (k.as_str(), s))).collect(),
+        Some(p) => p
+            .iter()
+            .filter_map(|(k, v)| v.as_str().map(|s| (k.as_str(), s)))
+            .collect(),
         None => Vec::new(),
     };
 
@@ -310,7 +328,11 @@ fn best_pre(pres: &'static [FlatState], modern_props: &[(&str, &str)]) -> &'stat
 /// Inverse of [`get_new_block_name`]: modern block name -> canonical pre-1.13
 /// name (returns the input unchanged when there is no known older name).
 pub fn get_old_block_name(new: &str) -> String {
-    TABLES.old_name_by_new.get(new).map(|s| s.to_string()).unwrap_or_else(|| new.to_string())
+    TABLES
+        .old_name_by_new
+        .get(new)
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| new.to_string())
 }
 
 /// Inverse of `getNBTForId((id << 4) | data)`: a modern flattened `{Name,
@@ -351,7 +373,9 @@ pub fn flatten_item(old_name: &str, data: i32) -> Option<&'static str> {
     if !IDS_REQUIRING_FLATTENING.contains(old_name) {
         return None;
     }
-    let exact = FLATTEN_ITEM.get(format!("{old_name}.{data}").as_str()).copied();
+    let exact = FLATTEN_ITEM
+        .get(format!("{old_name}.{data}").as_str())
+        .copied();
     exact.or_else(|| FLATTEN_ITEM.get(format!("{old_name}.0").as_str()).copied())
 }
 
@@ -394,7 +418,10 @@ static SPAWN_EGG: LazyLock<HashMap<&'static str, &'static str>> =
 
 /// `ENTITY_ID_TO_NEW_EGG_ID.getOrDefault(id, "minecraft:pig_spawn_egg")`.
 pub fn spawn_egg_for_entity(id: &str) -> &'static str {
-    SPAWN_EGG.get(id).copied().unwrap_or("minecraft:pig_spawn_egg")
+    SPAWN_EGG
+        .get(id)
+        .copied()
+        .unwrap_or("minecraft:pig_spawn_egg")
 }
 
 /// Inverse of [`spawn_egg_for_entity`]: a flattened spawn-egg id -> the entity id
@@ -499,7 +526,10 @@ mod tests {
         // getNBTForId default is air
         assert_eq!(get_nbt_for_id(-1).get_string("Name"), Some("minecraft:air"));
         // id 128 = water level 0 (block 8 = flowing_water defaults), id 144*... not used
-        assert_eq!(get_nbt_for_id(128).get_string("Name"), Some("minecraft:water"));
+        assert_eq!(
+            get_nbt_for_id(128).get_string("Name"),
+            Some("minecraft:water")
+        );
     }
 
     #[test]
@@ -517,15 +547,27 @@ mod tests {
     #[test]
     fn name_lookup() {
         // legacy name that was renamed by the Flattening: grass -> grass_block.
-        assert_eq!(get_new_block_name("minecraft:grass"), "minecraft:grass_block");
+        assert_eq!(
+            get_new_block_name("minecraft:grass"),
+            "minecraft:grass_block"
+        );
         // unknown name is returned unchanged.
-        assert_eq!(get_new_block_name("minecraft:unknown_zzz"), "minecraft:unknown_zzz");
+        assert_eq!(
+            get_new_block_name("minecraft:unknown_zzz"),
+            "minecraft:unknown_zzz"
+        );
     }
 
     #[test]
     fn item_flatten() {
-        assert_eq!(flatten_item("minecraft:wool", 14), Some("minecraft:red_wool"));
-        assert_eq!(flatten_item("minecraft:wool", 99), Some("minecraft:white_wool")); // .0 fallback
+        assert_eq!(
+            flatten_item("minecraft:wool", 14),
+            Some("minecraft:red_wool")
+        );
+        assert_eq!(
+            flatten_item("minecraft:wool", 99),
+            Some("minecraft:white_wool")
+        ); // .0 fallback
         assert_eq!(flatten_item("minecraft:diamond_sword", 0), None); // not a subtype id
         assert!(item_has_damage("minecraft:diamond_sword"));
         assert!(!item_has_damage("minecraft:wool"));
@@ -533,8 +575,14 @@ mod tests {
 
     #[test]
     fn spawn_egg_and_entity_block_id() {
-        assert_eq!(spawn_egg_for_entity("minecraft:creeper"), "minecraft:creeper_spawn_egg");
-        assert_eq!(spawn_egg_for_entity("minecraft:unknown"), "minecraft:pig_spawn_egg");
+        assert_eq!(
+            spawn_egg_for_entity("minecraft:creeper"),
+            "minecraft:creeper_spawn_egg"
+        );
+        assert_eq!(
+            spawn_egg_for_entity("minecraft:unknown"),
+            "minecraft:pig_spawn_egg"
+        );
         assert_eq!(entity_block_id("minecraft:chest"), 54);
         assert_eq!(entity_block_id("minecraft:unknown"), 0);
     }
@@ -552,7 +600,10 @@ mod tests {
         match unflatten_nbt(&flat) {
             Unflatten::Exact(old) => {
                 assert_eq!(old.get_string("Name"), Some("minecraft:stone"));
-                assert_eq!(old.get_map("Properties").unwrap().get_string("variant"), Some("granite"));
+                assert_eq!(
+                    old.get_map("Properties").unwrap().get_string("variant"),
+                    Some("granite")
+                );
             }
             _ => panic!("granite should reverse exactly"),
         }
@@ -576,11 +627,16 @@ mod tests {
         match unflatten_nbt(&stairs) {
             Unflatten::Exact(old) | Unflatten::Approximated(old) => {
                 assert_eq!(old.get_string("Name"), Some("minecraft:oak_stairs"));
-                let p = old.get_map("Properties").expect("stairs keep facing/half/shape");
+                let p = old
+                    .get_map("Properties")
+                    .expect("stairs keep facing/half/shape");
                 assert_eq!(p.get_string("facing"), Some("east"));
                 assert_eq!(p.get_string("half"), Some("bottom"));
                 assert_eq!(p.get_string("shape"), Some("straight"));
-                assert!(p.get_string("waterlogged").is_none(), "modern-only waterlogged dropped");
+                assert!(
+                    p.get_string("waterlogged").is_none(),
+                    "modern-only waterlogged dropped"
+                );
             }
             Unflatten::Unknown => panic!("oak_stairs should reverse"),
         }
@@ -596,8 +652,14 @@ mod tests {
 
     #[test]
     fn unflatten_item_inverts_subtype() {
-        assert_eq!(flatten_item("minecraft:wool", 14), Some("minecraft:red_wool"));
-        assert_eq!(unflatten_item("minecraft:red_wool"), Some(("minecraft:wool", 14)));
+        assert_eq!(
+            flatten_item("minecraft:wool", 14),
+            Some("minecraft:red_wool")
+        );
+        assert_eq!(
+            unflatten_item("minecraft:red_wool"),
+            Some(("minecraft:wool", 14))
+        );
         assert_eq!(unflatten_item("minecraft:diamond_sword"), None);
     }
 }

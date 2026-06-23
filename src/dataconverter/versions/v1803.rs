@@ -68,7 +68,10 @@ pub fn register(reg: &mut RegistryBuilder) {
         VERSION,
         0,
         Box::new(|data, _from, _to| {
-            let display = match data.get_map_mut("tag").and_then(|tag| tag.get_map_mut("display")) {
+            let display = match data
+                .get_map_mut("tag")
+                .and_then(|tag| tag.get_map_mut("display"))
+            {
                 Some(d) => d,
                 None => return,
             };

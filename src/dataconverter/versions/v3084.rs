@@ -50,15 +50,27 @@ const GAME_EVENT_RENAMES: &[(&str, &str)] = &[
 /// `block_change`; reversing it to `ring_bell` is best-effort, hence flagged.
 const GAME_EVENT_REVERSES: &[(&str, &str, bool)] = &[
     ("minecraft:block_activate", "minecraft:block_press", true), // also <- block_switch
-    ("minecraft:block_deactivate", "minecraft:block_unpress", true), // also <- block_unswitch
+    (
+        "minecraft:block_deactivate",
+        "minecraft:block_unpress",
+        true,
+    ), // also <- block_unswitch
     ("minecraft:drink", "minecraft:drinking_finish", false),
-    ("minecraft:elytra_glide", "minecraft:elytra_free_fall", false),
+    (
+        "minecraft:elytra_glide",
+        "minecraft:elytra_free_fall",
+        false,
+    ),
     ("minecraft:entity_damage", "minecraft:entity_damaged", false),
     ("minecraft:entity_die", "minecraft:entity_dying", true), // also <- entity_killed
     ("minecraft:entity_interact", "minecraft:mob_interact", false),
     ("minecraft:entity_roar", "minecraft:ravager_roar", false),
     ("minecraft:block_change", "minecraft:ring_bell", true), // block_change also a real pre-rename event
-    ("minecraft:container_close", "minecraft:shulker_close", false),
+    (
+        "minecraft:container_close",
+        "minecraft:shulker_close",
+        false,
+    ),
     ("minecraft:container_open", "minecraft:shulker_open", false),
     ("minecraft:entity_shake", "minecraft:wolf_shaking", false),
 ];

@@ -26,14 +26,17 @@ fn register_named(reg: &mut RegistryBuilder, id: &str) {
         VERSION,
         0,
         id,
-        Arc::new(|reg, data, from, to| convert(reg, &reg.text_component, data, "CustomName", from, to)),
+        Arc::new(|reg, data, from, to| {
+            convert(reg, &reg.text_component, data, "CustomName", from, to)
+        }),
     );
 }
 
 /// `V1458.namedInventory(version, id)` — `named` + an `Items` item-list walker.
 fn register_named_inventory(reg: &mut RegistryBuilder, id: &str) {
     register_named(reg, id);
-    reg.tile_entity.add_walker(VERSION, 0, id, item_lists(&["Items"]));
+    reg.tile_entity
+        .add_walker(VERSION, 0, id, item_lists(&["Items"]));
 }
 
 pub fn register(reg: &mut RegistryBuilder) {
@@ -41,5 +44,6 @@ pub fn register(reg: &mut RegistryBuilder) {
     register_named_inventory(reg, "minecraft:smoker");
     register_named_inventory(reg, "minecraft:blast_furnace");
 
-    reg.tile_entity.add_walker(VERSION, 0, "minecraft:lectern", items(&["Book"]));
+    reg.tile_entity
+        .add_walker(VERSION, 0, "minecraft:lectern", items(&["Book"]));
 }

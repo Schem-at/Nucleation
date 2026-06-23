@@ -39,7 +39,8 @@ const BOAT_TYPES: &[(&str, &str)] = &[
 ];
 
 fn register_chest_boat(reg: &mut RegistryBuilder, id: &str) {
-    reg.entity.add_walker(VERSION, 0, id, item_lists(&["Items"]));
+    reg.entity
+        .add_walker(VERSION, 0, id, item_lists(&["Items"]));
 }
 
 /// Look up the wood name for an item id, matching the Java map's *un-namespaced*

@@ -174,8 +174,9 @@ console.log(a.signature("structural"));
 // Structural diff -> DiffWrapper. `preset` defaults to "exact".
 const d = a.diff(b, "redstone");
 console.log("distance:", d.distance);
-// support = fraction of the larger build's cells that aligned (confidence,
-// NOT a similarity %).
+// support = fraction of cells that aligned: (matched+changed+swapped)/max(|A|,|B|).
+// Edited/re-paletted cells count as aligned; only added/removed are unaligned, so
+// a pure re-palette scores 1.0. Alignment confidence, NOT a similarity %.
 console.log("support:", d.support);
 
 // Each delta as its own SchematicWrapper.

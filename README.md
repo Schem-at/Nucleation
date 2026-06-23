@@ -620,8 +620,10 @@ let spec = DiffSpec::resolve("redstone", &SpecOverrides::default()).expect("know
 let d = diff(&a, &b, &spec);
 
 println!("edit distance = {}", d.distance);
-// `support` = fraction of the larger build's cells that aligned
-// (alignment confidence, NOT a similarity percentage).
+// `support` = fraction of the larger build's cells that aligned, i.e.
+// (matched + changed + swapped) / max(|A|, |B|). Edited or re-paletted cells
+// still count as aligned; only added/removed are unaligned. So a pure
+// re-palette scores 1.0. Alignment confidence, NOT a similarity percentage.
 println!("support = {:.3}", d.support);
 
 // Each delta projected back to a schematic you can save or mesh.
