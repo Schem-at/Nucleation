@@ -148,10 +148,23 @@ final class NucleationNative {
 
     // ── Simulation (feature-gated; throws UnsatisfiedLinkError if absent) ──
     static native long    nMchprsCreate(long schematicHandle);
+    static native long    nMchprsCreateWithOptions(long schematicHandle, boolean optimize, boolean ioOnly, int[] customIo);
     static native void    nMchprsFree(long handle);
     static native void    nMchprsTick(long handle);
     static native void    nMchprsTickMany(long handle, int count);
+    static native void    nMchprsFlush(long handle);
     static native long    nMchprsGetSchematic(long handle);
+    static native void    nMchprsSyncToSchematic(long handle);
+    static native void    nMchprsSetSignalStrength(long handle, int x, int y, int z, int strength);
+    static native int     nMchprsGetSignalStrength(long handle, int x, int y, int z);
+    static native void    nMchprsSetLeverPower(long handle, int x, int y, int z, boolean powered);
+    static native boolean nMchprsGetLeverPower(long handle, int x, int y, int z);
+    static native boolean nMchprsIsLit(long handle, int x, int y, int z);
+    static native void    nMchprsOnUseBlock(long handle, int x, int y, int z);
+    static native int     nMchprsGetRedstonePower(long handle, int x, int y, int z);
+    static native void    nMchprsCheckCustomIoChanges(long handle);
+    static native int[]   nMchprsPollCustomIoChanges(long handle);
+    static native void    nMchprsClearCustomIoChanges(long handle);
 
     // ── Meshing (feature-gated) ────────────────────────────────────────────
     static native long    nResourcePackFromFile(String path);
