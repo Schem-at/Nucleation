@@ -177,6 +177,21 @@ public final class MchprsWorld implements AutoCloseable {
         NucleationNative.nMchprsClearCustomIoChanges(handle);
     }
 
+    /** Export the compiled circuit as an analyzable {@link RedstoneGraph}. */
+    public RedstoneGraph exportGraph() {
+        checkOpen();
+        return new RedstoneGraph(NucleationNative.nMchprsExportGraph(handle));
+    }
+
+    /**
+     * Export the circuit graph without recompiling for IO — faster, purely
+     * structural view (positions/kinds/links only).
+     */
+    public RedstoneGraph exportGraphStructural() {
+        checkOpen();
+        return new RedstoneGraph(NucleationNative.nMchprsExportGraphStructural(handle));
+    }
+
     private void checkOpen() {
         if (handle == 0) throw new IllegalStateException("MchprsWorld is closed");
     }

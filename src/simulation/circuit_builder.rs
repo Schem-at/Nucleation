@@ -374,11 +374,23 @@ impl CircuitBuilder {
     pub fn build(self) -> Result<TypedCircuitExecutor, String> {
         let layout = self.layout_builder.build();
 
-        // Create the world
-        let world = MchprsWorld::with_options(self.schematic, self.simulation_options)?;
+        // Register all IO positions as custom IO nodes so the compiler keeps
+        // them addressable from the very first execution. Without this the
+        // world only gained custom IO after the first reset(), so manual or
+        // stateful use of a fresh executor could not drive its inputs.
+        let mut options = self.simulation_options;
+        for mapping in layout.inputs.values().chain(layout.outputs.values()) {
+            for &(x, y, z) in &mapping.positions {
+                let pos = crate::simulation::BlockPos::new(x, y, z);
+                if !options.custom_io.contains(&pos) {
+                    options.custom_io.push(pos);
+                }
+            }
+        }
 
-        // Create executor
-        let mut executor = TypedCircuitExecutor::from_layout(world, layout);
+        let world = MchprsWorld::with_options(self.schematic, options.clone())?;
+
+        let mut executor = TypedCircuitExecutor::from_layout_with_options(world, layout, options);
         executor.set_state_mode(self.state_mode);
 
         Ok(executor)
@@ -387,13 +399,7 @@ impl CircuitBuilder {
     /// Build with validation (convenience method)
     pub fn build_validated(self) -> Result<TypedCircuitExecutor, String> {
         self.validate().map_err(|e| e.to_string())?;
-
-        // Need to move self after validation
-        let layout = self.layout_builder.build();
-        let world = MchprsWorld::with_options(self.schematic, self.simulation_options)?;
-        let mut executor = TypedCircuitExecutor::from_layout(world, layout);
-        executor.set_state_mode(self.state_mode);
-        Ok(executor)
+        self.build()
     }
 
     /// Get the current number of inputs

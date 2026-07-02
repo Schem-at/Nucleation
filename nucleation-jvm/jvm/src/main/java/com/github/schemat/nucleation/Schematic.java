@@ -275,6 +275,20 @@ public final class Schematic implements AutoCloseable, Iterable<Block> {
         return new ItemModelResult(h);
     }
 
+    /**
+     * Simulate every lever/lamp combination and return the truth table as a
+     * JSON array of objects mapping IO name to boolean state. Requires the
+     * {@code simulation} feature.
+     */
+    public String generateTruthTableJson() {
+        checkOpen();
+        if (!Nucleation.hasSimulation()) {
+            throw new UnsupportedFeatureException(
+                    "Loaded Nucleation cdylib was not built with simulation support");
+        }
+        return NucleationNative.nSchematicGenerateTruthTableJson(handle);
+    }
+
     private static void ensureMeshing() {
         if (!Nucleation.hasMeshing()) {
             throw new UnsupportedFeatureException(

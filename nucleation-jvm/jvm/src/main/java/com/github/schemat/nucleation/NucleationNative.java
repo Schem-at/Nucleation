@@ -166,6 +166,110 @@ final class NucleationNative {
     static native int[]   nMchprsPollCustomIoChanges(long handle);
     static native void    nMchprsClearCustomIoChanges(long handle);
 
+    // ── Redstone graph (feature-gated with simulation) ─────────────────────
+    static native long    nMchprsExportGraph(long worldHandle);
+    static native long    nMchprsExportGraphStructural(long worldHandle);
+    static native void    nGraphFree(long handle);
+    static native int     nGraphNodeCount(long handle);
+    static native int     nGraphEdgeCount(long handle);
+    static native String  nGraphToJson(long handle);
+    static native long    nGraphFromJson(String json);
+    static native String  nGraphNodesJson(long handle);
+    static native String  nGraphEdgesJson(long handle);
+    static native String  nGraphNodeKindCountsJson(long handle);
+    static native boolean nGraphHasCycles(long handle);
+    static native boolean nGraphIsCombinational(long handle);
+    static native String  nGraphSccsJson(long handle);
+    static native int     nGraphWeaklyConnectedComponents(long handle);
+    static native int     nGraphCriticalPath(long handle);
+    static native int     nGraphDelayWeightedDepth(long handle);
+    static native int     nGraphMaxFanIn(long handle);
+    static native int     nGraphMaxFanOut(long handle);
+    static native String  nGraphFeaturesJson(long handle);
+    static native String  nGraphFingerprint(long handle, String preset);
+    static native boolean nGraphIsStructurallyEqual(long a, long b);
+    static native String  nSchematicGenerateTruthTableJson(long schematicHandle);
+
+    // ── Circuit: Value / IoType / LayoutFunction / DefinitionRegion ────────
+    static native long    nValueU32(int value);
+    static native long    nValueU64(long value);
+    static native long    nValueI32(int value);
+    static native long    nValueI64(long value);
+    static native long    nValueF32(float value);
+    static native long    nValueBool(boolean value);
+    static native long    nValueString(String value);
+    static native long    nValueBits(boolean[] bits);
+    static native long    nValueBytes(byte[] bytes);
+    static native String  nValueTypeName(long handle);
+    static native long    nValueAsI64(long handle);
+    static native float   nValueAsF32(long handle);
+    static native boolean nValueAsBool(long handle);
+    static native String  nValueAsString(long handle);
+    static native boolean[] nValueAsBits(long handle);
+    static native byte[]  nValueAsBytes(long handle);
+    static native String  nValueDebug(long handle);
+    static native void    nValueFree(long handle);
+
+    static native long    nIoTypeUnsignedInt(int bits);
+    static native long    nIoTypeSignedInt(int bits);
+    static native long    nIoTypeFloat32();
+    static native long    nIoTypeBoolean();
+    static native long    nIoTypeAscii(int chars);
+    static native long    nIoTypeBitArray(int bits);
+    static native int     nIoTypeBitCount(long handle);
+    static native void    nIoTypeFree(long handle);
+
+    static native long    nLayoutOneToOne();
+    static native long    nLayoutPacked4();
+    static native long    nLayoutCustom(int[] mapping);
+    static native long    nLayoutRowMajor(int rows, int cols, int bitsPerElement);
+    static native long    nLayoutColumnMajor(int rows, int cols, int bitsPerElement);
+    static native long    nLayoutScanline(int width, int height, int bitsPerPixel);
+    static native void    nLayoutFree(long handle);
+
+    static native long    nRegionFromPositions(int[] flatXyz);
+    static native long    nRegionFromBounds(int minX, int minY, int minZ, int maxX, int maxY, int maxZ);
+    static native void    nRegionAddPoint(long handle, int x, int y, int z);
+    static native void    nRegionAddBounds(long handle, int minX, int minY, int minZ, int maxX, int maxY, int maxZ);
+    static native long    nRegionVolume(long handle);
+    static native void    nRegionFree(long handle);
+
+    // ── CircuitBuilder / TypedCircuitExecutor ───────────────────────────────
+    static native long    nCircuitBuilderNew(long schematicHandle);
+    static native long    nCircuitBuilderFromInsign(long schematicHandle);
+    static native void    nCircuitBuilderWithInput(long handle, String name, long ioType, long layout, long region);
+    static native void    nCircuitBuilderWithInputAuto(long handle, String name, long ioType, long region);
+    static native void    nCircuitBuilderWithOutput(long handle, String name, long ioType, long layout, long region);
+    static native void    nCircuitBuilderWithOutputAuto(long handle, String name, long ioType, long region);
+    static native void    nCircuitBuilderWithOptions(long handle, boolean optimize, boolean ioOnly);
+    static native void    nCircuitBuilderWithStateMode(long handle, int mode);
+    static native String  nCircuitBuilderValidate(long handle);
+    static native long    nCircuitBuilderBuild(long handle);
+    static native int     nCircuitBuilderInputCount(long handle);
+    static native int     nCircuitBuilderOutputCount(long handle);
+    static native String[] nCircuitBuilderInputNames(long handle);
+    static native String[] nCircuitBuilderOutputNames(long handle);
+    static native void    nCircuitBuilderFree(long handle);
+
+    static native void    nExecutorSetInput(long handle, String name, long valueHandle);
+    static native long    nExecutorReadOutput(long handle, String name);
+    static native long    nExecutorExecute(long handle, String[] names, long[] valueHandles, int mode, int p1, int p2);
+    static native void    nExecutorTick(long handle, int ticks);
+    static native void    nExecutorFlush(long handle);
+    static native void    nExecutorReset(long handle);
+    static native String[] nExecutorInputNames(long handle);
+    static native String[] nExecutorOutputNames(long handle);
+    static native void    nExecutorSetStateMode(long handle, int mode);
+    static native String  nExecutorLayoutInfoJson(long handle);
+    static native long    nExecutorSyncAndGetSchematic(long handle);
+    static native void    nExecutorFree(long handle);
+
+    static native int     nExecResultTicks(long handle);
+    static native boolean nExecResultConditionMet(long handle);
+    static native String[] nExecResultOutputNames(long handle);
+    static native long    nExecResultOutput(long handle, String name);
+    static native void    nExecResultFree(long handle);
+
     // ── Meshing (feature-gated) ────────────────────────────────────────────
     static native long    nResourcePackFromFile(String path);
     static native long    nResourcePackFromBytes(byte[] data);

@@ -15,3 +15,9 @@ pub mod itemmodel;
 
 #[cfg(feature = "simulation")]
 pub mod simulation;
+
+#[cfg(feature = "simulation")]
+pub mod graph;
+
+#[cfg(feature = "simulation")]
+pub mod circuit;

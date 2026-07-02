@@ -53,6 +53,10 @@ pub extern "system" fn JNI_OnLoad(vm: JavaVM, _reserved: *mut c_void) -> jint {
 
     #[cfg(feature = "simulation")]
     let _ = exports::simulation::register(&mut env);
+    #[cfg(feature = "simulation")]
+    let _ = exports::graph::register(&mut env);
+    #[cfg(feature = "simulation")]
+    let _ = exports::circuit::register(&mut env);
 
     JNI_VERSION_1_8
 }
