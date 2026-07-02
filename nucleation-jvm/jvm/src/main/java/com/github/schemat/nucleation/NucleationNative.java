@@ -174,6 +174,20 @@ final class NucleationNative {
     static native int     nResourcePackModelCount(long handle);
     static native int     nResourcePackTextureCount(long handle);
 
+    static native long    nSchematicToItemModel(long schematicHandle, long packHandle,
+                                                String modelName, String namespace, boolean center,
+                                                int textureResolution, String item, String customModelData,
+                                                int scaleMode, float sx, float sy, float sz);
+    static native void    nItemModelResultFree(long handle);
+    static native String  nItemModelResultModelJson(long handle);
+    static native int     nItemModelResultElementCount(long handle);
+    static native int     nItemModelResultTextureCount(long handle);
+    static native int     nItemModelResultPlaneCount(long handle);
+    static native int[]   nItemModelResultDimensions(long handle);
+    static native float[] nItemModelResultScale(long handle);
+    static native byte[]  nItemModelResultToResourcePackZip(long handle);
+    static native byte[]  nItemModelBuildResourcePack(long[] resultHandles);
+
     static native long    nMeshConfigCreate(
             boolean cullHiddenFaces, boolean ambientOcclusion, float aoIntensity,
             String biome, int atlasMaxSize, boolean cullOccludedBlocks, boolean greedyMeshing);

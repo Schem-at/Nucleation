@@ -254,6 +254,27 @@ public final class Schematic implements AutoCloseable, Iterable<Block> {
                 handle, pack.handle(), Objects.requireNonNull(timelineJson));
     }
 
+    /**
+     * Generate a Minecraft item model from this schematic: slices it into 2D
+     * planes per direction, composites block-face textures into per-plane PNGs,
+     * and produces an item model JSON with one thin element per plane.
+     *
+     * <p>The schematic must fit within 48x48x48 blocks after scaling. Requires
+     * the {@code meshing} feature in the loaded cdylib.
+     */
+    public ItemModelResult toItemModel(ResourcePack pack, ItemModelConfig config) {
+        ensureMeshing();
+        checkOpen();
+        Objects.requireNonNull(pack, "pack");
+        Objects.requireNonNull(config, "config");
+        long h = NucleationNative.nSchematicToItemModel(
+                handle, pack.handle(),
+                config.modelName(), config.namespaceValue(), config.centerValue(),
+                config.textureResolutionValue(), config.itemValue(), config.customModelDataValue(),
+                config.scaleModeValue(), config.sxValue(), config.syValue(), config.szValue());
+        return new ItemModelResult(h);
+    }
+
     private static void ensureMeshing() {
         if (!Nucleation.hasMeshing()) {
             throw new UnsupportedFeatureException(

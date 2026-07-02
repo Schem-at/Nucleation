@@ -10,5 +10,8 @@ pub mod shape;
 #[cfg(feature = "meshing")]
 pub mod meshing;
 
+#[cfg(feature = "meshing")]
+pub mod itemmodel;
+
 #[cfg(feature = "simulation")]
 pub mod simulation;
