@@ -116,6 +116,15 @@ impl CircuitBuilder {
         let layout_builder = insign_io::parse_io_layout_from_insign(&input, &schematic)
             .map_err(|e| e.to_string())?;
 
+        // Strip the annotation signs before the schematic reaches MCHPRS —
+        // sign blocks are not simulable and panic redpiler's block mapping
+        // (same treatment as create_executor_from_insign).
+        let mut schematic = schematic;
+        let air_block = crate::BlockState::new("minecraft:air");
+        for (pos, _) in &input {
+            schematic.set_block(pos[0], pos[1], pos[2], &air_block);
+        }
+
         // Extract regions from the layout for validation
         let layout = layout_builder.build();
         let mut input_regions = HashMap::new();

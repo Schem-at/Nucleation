@@ -43,6 +43,7 @@ final class NucleationNative {
     static native String  nSchematicPrintJson(long handle);
 
     static native boolean nSchematicSetBlockSimple(long handle, int x, int y, int z, String name);
+    static native boolean nSchematicSetBlockEntity(long handle, int x, int y, int z, String id, String snbt);
     static native boolean nSchematicSetBlockState(long handle, int x, int y, int z, long stateHandle);
     static native boolean nSchematicSetBlockWithProperties(
             long handle, int x, int y, int z, String name, Map<String, String> properties);

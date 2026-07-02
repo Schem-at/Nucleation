@@ -189,6 +189,18 @@ public final class Schematic implements AutoCloseable, Iterable<Block> {
 
     // ── Block manipulation ─────────────────────────────────────────────────
 
+    /**
+     * Set (or replace) the block entity at a position from a typed SNBT
+     * compound (e.g. sign text). The block itself must be set separately via
+     * {@link #setBlock}. Returns whether the SNBT parsed and applied.
+     */
+    public boolean setBlockEntity(int x, int y, int z, String id, String snbt) {
+        checkOpen();
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(snbt, "snbt");
+        return NucleationNative.nSchematicSetBlockEntity(handle, x, y, z, id, snbt);
+    }
+
     /** Set a block by name (e.g. {@code "minecraft:stone"}). Returns whether anything changed. */
     public boolean setBlock(int x, int y, int z, String name) {
         checkOpen();

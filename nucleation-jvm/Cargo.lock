@@ -2126,6 +2126,7 @@ version = "0.2.15"
 dependencies = [
  "jni",
  "nucleation",
+ "quartz_nbt",
  "serde_json",
 ]
 

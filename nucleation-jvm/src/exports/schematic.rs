@@ -40,6 +40,7 @@ pub fn register(env: &mut JNIEnv) -> jni::errors::Result<()> {
         nm("nSchematicPrint", "(J)Ljava/lang/String;", n_print as *mut _),
         nm("nSchematicPrintJson", "(J)Ljava/lang/String;", n_print_json as *mut _),
         nm("nSchematicSetBlockSimple", "(JIIILjava/lang/String;)Z", n_set_block_simple as *mut _),
+        nm("nSchematicSetBlockEntity", "(JIIILjava/lang/String;Ljava/lang/String;)Z", n_set_block_entity as *mut _),
         nm("nSchematicSetBlockState", "(JIIIJ)Z", n_set_block_state as *mut _),
         nm("nSchematicSetBlockWithProperties", "(JIIILjava/lang/String;Ljava/util/Map;)Z", n_set_block_with_properties as *mut _),
         nm("nSchematicGetBlock", "(JIII)J", n_get_block as *mut _),
@@ -260,6 +261,32 @@ unsafe extern "system" fn n_set_block_simple<'l>(
         let s = as_mut::<UniversalSchematic>(handle);
         let name = jstring_to_string(env, &name)?;
         Ok(s.set_block_str(x, y, z, &name) as u8)
+    })
+}
+
+/// Set (or replace) a block entity at a position from a typed SNBT string
+/// (the block itself must be set separately via setBlock).
+unsafe extern "system" fn n_set_block_entity<'l>(
+    mut env: JNIEnv<'l>,
+    _class: JClass<'l>,
+    handle: jlong,
+    x: jint,
+    y: jint,
+    z: jint,
+    id: JString<'l>,
+    snbt: JString<'l>,
+) -> jboolean {
+    with_jni_context(&mut env, 0u8, |env| {
+        let s = as_mut::<UniversalSchematic>(handle);
+        let id_str = jstring_to_string(env, &id)?;
+        let snbt_str = jstring_to_string(env, &snbt)?;
+        let compound = quartz_nbt::snbt::parse(&snbt_str)
+            .map_err(|e| JvmError::Generic(format!("invalid SNBT: {e}")))?;
+        let nbt = nucleation::nbt::NbtMap::from_quartz_nbt(&compound);
+        let mut be = nucleation::block_entity::BlockEntity::new(id_str, (x, y, z));
+        be.set_nbt(nbt);
+        s.set_block_entity(nucleation::block_position::BlockPosition { x, y, z }, be);
+        Ok(1u8)
     })
 }
 
