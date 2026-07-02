@@ -12,7 +12,7 @@ name = "nucleation_jvm"
 crate-type = ["cdylib"]
 
 [features]
-default = ["meshing"]
+default = ["meshing", "simulation"]
 simulation = ["nucleation/simulation"]
 meshing = ["nucleation/meshing"]
 # Store-backed open()/save() support local paths and `file://` out of the box
