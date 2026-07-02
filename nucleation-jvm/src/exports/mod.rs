@@ -5,6 +5,7 @@ pub mod diff;
 pub mod fingerprint;
 pub mod nucleation;
 pub mod schematic;
+pub mod sdf;
 pub mod shape;
 
 #[cfg(feature = "meshing")]

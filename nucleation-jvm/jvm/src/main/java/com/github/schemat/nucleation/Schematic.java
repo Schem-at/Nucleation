@@ -94,6 +94,33 @@ public final class Schematic implements AutoCloseable, Iterable<Block> {
         return new Schematic(h);
     }
 
+    /**
+     * Build a schematic by sampling an SDF tree (JSON, see {@link Sdf}) with
+     * material rules (JSON, see {@link SdfRules}). Sampling bounds come from
+     * the tree's own bounding box; unbounded trees (planes, uncounted
+     * repeats) require {@link #fromSdf(String, String, int[])}.
+     */
+    public static Schematic fromSdf(String sdfJson, String rulesJson) {
+        return fromSdf(sdfJson, rulesJson, null);
+    }
+
+    /**
+     * @param bounds inclusive sampling bounds {@code [minX, minY, minZ, maxX, maxY, maxZ]},
+     *               or {@code null} to derive them from the tree
+     */
+    public static Schematic fromSdf(String sdfJson, String rulesJson, int[] bounds) {
+        Objects.requireNonNull(sdfJson, "sdfJson");
+        Objects.requireNonNull(rulesJson, "rulesJson");
+        long h = NucleationNative.nSchematicFromSdf(sdfJson, rulesJson, bounds);
+        return adopt(h);
+    }
+
+    /** Evaluate an SDF tree (JSON) at a point; returns the signed distance. */
+    public static float sdfEval(String sdfJson, float x, float y, float z) {
+        Objects.requireNonNull(sdfJson, "sdfJson");
+        return NucleationNative.nSdfEval(sdfJson, x, y, z);
+    }
+
     public static Schematic fromLitematic(byte[] data) { return load(data, NucleationNative::nSchematicFromLitematic, "litematic"); }
     public static Schematic fromSchematic(byte[] data) { return load(data, NucleationNative::nSchematicFromSchematic, "schematic"); }
     public static Schematic fromMcStructure(byte[] data) { return load(data, NucleationNative::nSchematicFromMcStructure, "mcstructure"); }

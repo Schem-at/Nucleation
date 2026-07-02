@@ -372,6 +372,39 @@ impl PySchematic {
         Ok(())
     }
 
+    /// Replace this schematic by sampling an SDF JSON tree with material
+    /// rules JSON. `bounds` is an optional (minX, minY, minZ, maxX, maxY,
+    /// maxZ) tuple; omitted, the tree's own AABB is used.
+    #[pyo3(signature = (sdf_json, rules_json, bounds=None))]
+    pub fn from_sdf(
+        &mut self,
+        sdf_json: &str,
+        rules_json: &str,
+        bounds: Option<(i32, i32, i32, i32, i32, i32)>,
+    ) -> PyResult<()> {
+        let node = crate::sdf::SdfNode::from_json(sdf_json)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
+        let rules = crate::sdf::MaterialRules::from_json(rules_json)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
+        let bounds = bounds.map(|(ax, ay, az, bx, by, bz)| crate::sdf::SampleBounds {
+            min: [ax, ay, az],
+            max: [bx, by, bz],
+        });
+        self.inner = crate::sdf::sample_to_schematic(&node, &rules, bounds, "sdf")
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
+        self.last_block_name.clear();
+        self.default_region_initialized = true;
+        Ok(())
+    }
+
+    /// Evaluate an SDF JSON tree at a point; returns the signed distance.
+    #[staticmethod]
+    pub fn sdf_eval(sdf_json: &str, x: f32, y: f32, z: f32) -> PyResult<f32> {
+        let node = crate::sdf::SdfNode::from_json(sdf_json)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
+        Ok(node.eval(x, y, z))
+    }
+
     pub fn to_litematic(&self, py: Python<'_>) -> PyResult<PyObject> {
         let bytes = litematic::to_litematic(&self.inner)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(e.to_string()))?;

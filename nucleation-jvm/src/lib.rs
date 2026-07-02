@@ -45,6 +45,7 @@ pub extern "system" fn JNI_OnLoad(vm: JavaVM, _reserved: *mut c_void) -> jint {
     let _ = exports::nucleation::register(&mut env);
     let _ = exports::fingerprint::register(&mut env);
     let _ = exports::diff::register(&mut env);
+    let _ = exports::sdf::register(&mut env);
 
     #[cfg(feature = "meshing")]
     let _ = exports::meshing::register(&mut env);

@@ -292,6 +292,51 @@ impl SchematicWrapper {
         Ok(())
     }
 
+    /// Replace this schematic by sampling an SDF JSON tree with material
+    /// rules JSON (auto bounds from the tree's AABB).
+    #[wasm_bindgen(js_name = fromSdf)]
+    pub fn from_sdf(&mut self, sdf_json: &str, rules_json: &str) -> Result<(), JsValue> {
+        self.from_sdf_impl(sdf_json, rules_json, None)
+    }
+
+    /// Same as `fromSdf` with explicit inclusive sampling bounds.
+    #[wasm_bindgen(js_name = fromSdfBounded)]
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_sdf_bounded(
+        &mut self,
+        sdf_json: &str,
+        rules_json: &str,
+        min_x: i32,
+        min_y: i32,
+        min_z: i32,
+        max_x: i32,
+        max_y: i32,
+        max_z: i32,
+    ) -> Result<(), JsValue> {
+        self.from_sdf_impl(
+            sdf_json,
+            rules_json,
+            Some(crate::sdf::SampleBounds {
+                min: [min_x, min_y, min_z],
+                max: [max_x, max_y, max_z],
+            }),
+        )
+    }
+
+    fn from_sdf_impl(
+        &mut self,
+        sdf_json: &str,
+        rules_json: &str,
+        bounds: Option<crate::sdf::SampleBounds>,
+    ) -> Result<(), JsValue> {
+        let node = crate::sdf::SdfNode::from_json(sdf_json).map_err(|e| JsValue::from_str(&e))?;
+        let rules =
+            crate::sdf::MaterialRules::from_json(rules_json).map_err(|e| JsValue::from_str(&e))?;
+        self.0 = crate::sdf::sample_to_schematic(&node, &rules, bounds, "sdf")
+            .map_err(|e| JsValue::from_str(&e))?;
+        Ok(())
+    }
+
     pub fn from_litematic(&mut self, data: &[u8]) -> Result<(), JsValue> {
         self.0 = litematic::from_litematic(data)
             .map_err(|e| JsValue::from_str(&format!("Litematic parsing error: {}", e)))?;
@@ -2657,4 +2702,11 @@ impl SchematicWrapper {
         .map(SchematicWrapper)
         .map_err(|e| JsValue::from_str(&e.to_string()))
     }
+}
+
+/// Evaluate an SDF JSON tree at a point; returns the signed distance.
+#[wasm_bindgen(js_name = sdfEval)]
+pub fn sdf_eval(sdf_json: &str, x: f32, y: f32, z: f32) -> Result<f32, JsValue> {
+    let node = crate::sdf::SdfNode::from_json(sdf_json).map_err(|e| JsValue::from_str(&e))?;
+    Ok(node.eval(x, y, z))
 }

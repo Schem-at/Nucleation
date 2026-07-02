@@ -146,6 +146,10 @@ final class NucleationNative {
     static native String  nBuilderToTemplate(long handle);
     static native long    nBuilderFromTemplate(String template);
 
+    // ── SDF generation ─────────────────────────────────────────────────────
+    static native long    nSchematicFromSdf(String sdfJson, String rulesJson, int[] bounds);
+    static native float   nSdfEval(String sdfJson, float x, float y, float z);
+
     // ── Simulation (feature-gated; throws UnsatisfiedLinkError if absent) ──
     static native long    nMchprsCreate(long schematicHandle);
     static native long    nMchprsCreateWithOptions(long schematicHandle, boolean optimize, boolean ioOnly, int[] customIo);
