@@ -31,6 +31,25 @@ public final class TypedCircuitExecutor implements AutoCloseable {
         this.cleanable = CLEANER.register(this, new HandleCleaner(handle));
     }
 
+    /**
+     * Serialize this executor into the portable compiled-circuit container.
+     * Restoring via {@link #fromCompiled(byte[])} skips schematic parsing,
+     * insign sign extraction, and IO-layout building. The redpiler compile
+     * itself still runs on restore (its graph is not yet serializable), so
+     * for large circuits the start cost is essentially unchanged — measure
+     * before caching. The container is versioned; a mismatch throws.
+     */
+    public byte[] serialize() {
+        checkOpen();
+        return NucleationNative.nExecutorSerialize(handle);
+    }
+
+    /** Restore an executor from {@link #serialize()} output. */
+    public static TypedCircuitExecutor fromCompiled(byte[] compiled) {
+        return new TypedCircuitExecutor(
+                NucleationNative.nExecutorFromCompiled(java.util.Objects.requireNonNull(compiled)));
+    }
+
     /** Result of one {@link #execute} call. Owns the output {@link Value}s. */
     public static final class ExecutionResult implements AutoCloseable {
         private static final Cleaner CLEANER = Cleaner.create();

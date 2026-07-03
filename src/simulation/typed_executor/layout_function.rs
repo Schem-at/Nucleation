@@ -2,8 +2,10 @@
 //!
 //! Defines how logical bits are spread across physical redstone positions (nibbles 0-15).
 
+use serde::{Deserialize, Serialize};
+
 /// Defines how bits are mapped to physical redstone positions
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum LayoutFunction {
     /// One bit per position: false=0, true=15
     /// Most common for traditional redstone circuits

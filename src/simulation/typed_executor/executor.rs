@@ -279,6 +279,30 @@ impl TypedCircuitExecutor {
         self.state_mode = mode;
     }
 
+    /// Serialize this executor's pre-digested build inputs into the portable
+    /// compiled-circuit container (see [`super::compiled`] for the format and
+    /// its honest boundary). Restore with [`Self::from_compiled_bytes`].
+    pub fn to_compiled_bytes(&self) -> Result<Vec<u8>, String> {
+        super::compiled::encode(
+            &self.original_schematic,
+            &self.inputs,
+            &self.outputs,
+            self.state_mode,
+            &self.simulation_options,
+        )
+    }
+
+    /// Restore an executor from [`Self::to_compiled_bytes`] output — skips
+    /// schematic-format parsing, insign extraction, and layout building.
+    /// The redpiler compile still runs (see the module docs).
+    pub fn from_compiled_bytes(bytes: &[u8]) -> Result<Self, String> {
+        let (schematic, inputs, outputs, state_mode, options) = super::compiled::decode(bytes)?;
+        let world = MchprsWorld::with_options(schematic, options.clone())?;
+        let mut executor = Self::with_options(world, inputs, outputs, options);
+        executor.set_state_mode(state_mode);
+        Ok(executor)
+    }
+
     /// Execute the circuit
     pub fn execute(
         &mut self,

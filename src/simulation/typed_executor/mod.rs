@@ -114,6 +114,7 @@
 //!     .build();
 //! ```
 
+mod compiled;
 mod executor;
 pub mod insign_io;
 mod io_layout_builder;
@@ -130,6 +131,7 @@ mod tests;
 mod integration_tests;
 
 // Public API
+pub use compiled::{COMPILED_MAGIC, COMPILED_VERSION};
 pub use executor::{
     ExecutionMode, ExecutionResult, IoLayoutInfo, LayoutInfo, OutputCondition, StateMode,
     TypedCircuitExecutor,

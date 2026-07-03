@@ -157,6 +157,8 @@ pub fn register(env: &mut JNIEnv) -> jni::errors::Result<()> {
             "(J)J",
             n_executor_sync_and_get_schematic as *mut _,
         ),
+        nm("nExecutorSerialize", "(J)[B", n_executor_serialize as *mut _),
+        nm("nExecutorFromCompiled", "([B)J", n_executor_from_compiled as *mut _),
         nm("nExecutorFree", "(J)V", n_executor_free as *mut _),
         // ── ExecutionResult ──────────────────────────────────────────────
         nm("nExecResultTicks", "(J)I", n_result_ticks as *mut _),
@@ -1093,6 +1095,40 @@ unsafe extern "system" fn n_executor_free<'l>(_env: JNIEnv<'l>, _class: JClass<'
     if handle != 0 {
         let _ = consume::<TypedCircuitExecutor>(handle);
     }
+}
+
+/// Portable compiled-circuit container: one blob that restores an executor
+/// without re-running insign extraction or layout building (the redpiler
+/// compile still runs — see nucleation's typed_executor::compiled docs).
+unsafe extern "system" fn n_executor_serialize<'l>(
+    mut env: JNIEnv<'l>,
+    _class: JClass<'l>,
+    handle: jlong,
+) -> jni::sys::jbyteArray {
+    with_jni_context(&mut env, std::ptr::null_mut(), |env| {
+        let bytes = as_ref::<TypedCircuitExecutor>(handle)
+            .to_compiled_bytes()
+            .map_err(JvmError::Generic)?;
+        let arr = env
+            .byte_array_from_slice(&bytes)
+            .map_err(|e| JvmError::Generic(format!("byte array: {}", e)))?;
+        Ok(arr.into_raw())
+    })
+}
+
+unsafe extern "system" fn n_executor_from_compiled<'l>(
+    mut env: JNIEnv<'l>,
+    _class: JClass<'l>,
+    data: jni::objects::JByteArray<'l>,
+) -> jlong {
+    with_jni_context(&mut env, 0, |env| {
+        let bytes = env
+            .convert_byte_array(&data)
+            .map_err(|e| JvmError::Generic(format!("byte array: {}", e)))?;
+        let executor =
+            TypedCircuitExecutor::from_compiled_bytes(&bytes).map_err(JvmError::Generic)?;
+        Ok(to_handle(executor))
+    })
 }
 
 // ════════════════════════════════════════════════════════════════════════

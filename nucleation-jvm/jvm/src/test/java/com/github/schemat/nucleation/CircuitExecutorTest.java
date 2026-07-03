@@ -91,6 +91,32 @@ class CircuitExecutorTest {
     }
 
     @Test
+    void compiledRoundTripBehavesIdentically() {
+        byte[] compiled;
+        try (Schematic s = andGate(); TypedCircuitExecutor exec = buildAndGateExecutor(s)) {
+            compiled = exec.serialize();
+            assertTrue(compiled.length > 8, "compiled blob too small");
+            // header: magic NCCK + version
+            assertEquals('N', compiled[0]);
+            assertEquals('C', compiled[1]);
+            assertEquals('C', compiled[2]);
+            assertEquals('K', compiled[3]);
+        }
+        try (TypedCircuitExecutor restored = TypedCircuitExecutor.fromCompiled(compiled)) {
+            assertEquals(java.util.List.of("a", "b"), restored.inputNames());
+            assertEquals(java.util.List.of("output"), restored.outputNames());
+            assertFalse(runAndGate(restored, false, false), "restored false AND false");
+            assertFalse(runAndGate(restored, true, false), "restored true AND false");
+            assertFalse(runAndGate(restored, false, true), "restored false AND true");
+            assertTrue(runAndGate(restored, true, true), "restored true AND true");
+        }
+        // corrupt header refuses cleanly
+        byte[] bad = compiled.clone();
+        bad[0] = 'X';
+        assertThrows(RuntimeException.class, () -> TypedCircuitExecutor.fromCompiled(bad));
+    }
+
+    @Test
     void manualModeSetInputReadOutput() {
         try (Schematic s = andGate(); TypedCircuitExecutor exec = buildAndGateExecutor(s)) {
             exec.setStateMode(StateMode.MANUAL);

@@ -268,6 +268,8 @@ final class NucleationNative {
     static native String  nExecutorLayoutInfoJson(long handle);
     static native long    nExecutorSyncAndGetSchematic(long handle);
     static native void    nExecutorFree(long handle);
+    static native byte[]  nExecutorSerialize(long handle);
+    static native long    nExecutorFromCompiled(byte[] compiled);
 
     static native int     nExecResultTicks(long handle);
     static native boolean nExecResultConditionMet(long handle);

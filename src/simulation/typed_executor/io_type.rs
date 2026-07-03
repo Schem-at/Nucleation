@@ -4,9 +4,10 @@
 //! conversion functions to/from binary representations.
 
 use super::value::Value;
+use serde::{Deserialize, Serialize};
 
 /// Semantic type for circuit IO
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum IoType {
     /// Unsigned integer with specified bit width
     UnsignedInt { bits: usize },
