@@ -55,6 +55,7 @@ pub fn register(env: &mut JNIEnv) -> jni::errors::Result<()> {
         nm("nSchematicToSnapshot", "(J)[B", n_to_snapshot as *mut _),
         nm("nSchematicFromSnapshot", "(J[B)I", n_from_snapshot as *mut _),
         nm("nSchematicGetAllBlocksJson", "(J)Ljava/lang/String;", n_get_all_blocks_json as *mut _),
+        nm("nSchematicExportPacked", "(J)[Ljava/lang/Object;", n_export_packed as *mut _),
         nm("nSchematicGetSupportedImportFormats", "()[Ljava/lang/String;", n_get_supported_import_formats as *mut _),
         nm("nSchematicGetSupportedExportFormats", "()[Ljava/lang/String;", n_get_supported_export_formats as *mut _),
         nm("nSchematicCountBlockTypesJson", "(J)Ljava/lang/String;", n_count_block_types_json as *mut _),
@@ -496,6 +497,77 @@ unsafe extern "system" fn n_from_snapshot<'l>(
         let s = as_mut::<UniversalSchematic>(handle);
         *s = new;
         Ok(0)
+    })
+}
+
+/// Bulk export: one call returns `[String[] palette, int[] data]` where
+/// data is stride-4 `(x, y, z, paletteIndex)`. Palette entries are full
+/// block strings (`name[k=v,...]`). Air-family blocks are skipped, matching
+/// `nSchematicGetAllBlocksJson`. This is the fast path for large terrain
+/// schematics — no JSON, no per-block JNI crossings.
+unsafe extern "system" fn n_export_packed<'l>(
+    mut env: JNIEnv<'l>,
+    _class: JClass<'l>,
+    handle: jlong,
+) -> jni::sys::jobjectArray {
+    with_jni_context(&mut env, std::ptr::null_mut(), |env| {
+        let s = as_ref::<UniversalSchematic>(handle);
+        let mut palette: Vec<String> = Vec::new();
+        let mut lookup: std::collections::HashMap<String, i32> = std::collections::HashMap::new();
+        let mut data: Vec<i32> = Vec::new();
+        for (pos, block) in s.iter_blocks() {
+            if block.name.ends_with(":air")
+                || block.name == "air"
+                || block.name.ends_with("cave_air")
+                || block.name.ends_with("void_air")
+            {
+                continue;
+            }
+            // format once per distinct state (terrain palettes are tiny)
+            let key: String = if block.properties.is_empty() {
+                block.name.to_string()
+            } else {
+                let mut props: Vec<_> = block.properties.iter().collect();
+                props.sort_by(|a, b| a.0.cmp(&b.0));
+                let body: Vec<String> = props.iter().map(|(k, v)| format!("{}={}", k, v)).collect();
+                format!("{}[{}]", block.name, body.join(","))
+            };
+            let idx = *lookup.entry(key.clone()).or_insert_with(|| {
+                palette.push(key);
+                (palette.len() - 1) as i32
+            });
+            data.push(pos.x);
+            data.push(pos.y);
+            data.push(pos.z);
+            data.push(idx);
+        }
+        let string_class = env
+            .find_class("java/lang/String")
+            .map_err(|e| JvmError::Generic(format!("find String: {e}")))?;
+        let pal_arr = env
+            .new_object_array(palette.len() as i32, &string_class, jni::objects::JObject::null())
+            .map_err(|e| JvmError::Generic(format!("palette array: {e}")))?;
+        for (i, p) in palette.iter().enumerate() {
+            let js = env.new_string(p).map_err(|e| JvmError::Generic(format!("jstring: {e}")))?;
+            env.set_object_array_element(&pal_arr, i as i32, js)
+                .map_err(|e| JvmError::Generic(format!("palette set: {e}")))?;
+        }
+        let data_arr = env
+            .new_int_array(data.len() as i32)
+            .map_err(|e| JvmError::Generic(format!("data array: {e}")))?;
+        env.set_int_array_region(&data_arr, 0, &data)
+            .map_err(|e| JvmError::Generic(format!("data fill: {e}")))?;
+        let obj_class = env
+            .find_class("java/lang/Object")
+            .map_err(|e| JvmError::Generic(format!("find Object: {e}")))?;
+        let out = env
+            .new_object_array(2, &obj_class, jni::objects::JObject::null())
+            .map_err(|e| JvmError::Generic(format!("out array: {e}")))?;
+        env.set_object_array_element(&out, 0, pal_arr)
+            .map_err(|e| JvmError::Generic(format!("out[0]: {e}")))?;
+        env.set_object_array_element(&out, 1, data_arr)
+            .map_err(|e| JvmError::Generic(format!("out[1]: {e}")))?;
+        Ok(out.into_raw())
     })
 }
 

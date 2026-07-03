@@ -283,6 +283,7 @@ final class NucleationNative {
     static native int     nResourcePackModelCount(long handle);
     static native int     nResourcePackTextureCount(long handle);
 
+    static native Object[] nSchematicExportPacked(long handle);
     static native long    nSchematicToItemModel(long schematicHandle, long packHandle,
                                                 String modelName, String namespace, boolean center,
                                                 int textureResolution, String item, String customModelData,

@@ -461,6 +461,22 @@ public final class Schematic implements AutoCloseable, Iterable<Block> {
         return blocks.iterator();
     }
 
+    /**
+     * Bulk export for large schematics: the palette (full block strings) and
+     * a packed stride-4 {@code (x, y, z, paletteIndex)} array, produced in a
+     * single native call — no JSON, no per-block crossings. Air is skipped.
+     */
+    public PackedBlocks exportPacked() {
+        checkOpen();
+        Object[] out = NucleationNative.nSchematicExportPacked(handle);
+        return new PackedBlocks((String[]) out[0], (int[]) out[1]);
+    }
+
+    /** @see #exportPacked() */
+    public record PackedBlocks(String[] palette, int[] data) {
+        public int count() { return data.length / 4; }
+    }
+
     public Stream<Block> stream() {
         return StreamSupport.stream(
                 Spliterators.spliteratorUnknownSize(iterator(), Spliterator.ORDERED | Spliterator.NONNULL),
