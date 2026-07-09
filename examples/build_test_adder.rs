@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Unique block types: {}", block_types.len());
 
     // Save to file
-    let output_path = "test_adder.litematic";
+    let output_path = "tests/fixtures/test_adder.litematic";
     let bytes = litematic::to_litematic(&four_bit_adder)?;
     std::fs::write(output_path, bytes)?;
 

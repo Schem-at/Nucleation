@@ -23,7 +23,7 @@ PRESET_DIFF = "exact"     # material- + orientation-sensitive edit distance
 
 
 def load_pair(argv):
-    path_a = argv[1] if len(argv) > 1 else "4bit_adder.litematic"
+    path_a = argv[1] if len(argv) > 1 else "tests/fixtures/4bit_adder.litematic"
     a = Schematic.open(path_a)
     if len(argv) > 2:
         return a, Schematic.open(argv[2]), argv[2]
@@ -36,7 +36,7 @@ def load_pair(argv):
 
 def main():
     a, b, b_label = load_pair(sys.argv)
-    print(f"A = {sys.argv[1] if len(sys.argv) > 1 else '4bit_adder.litematic'}")
+    print(f"A = {sys.argv[1] if len(sys.argv) > 1 else 'tests/fixtures/4bit_adder.litematic'}")
     print(f"B = {b_label}\n")
 
     # ── Fingerprint: canonical hash + fuzzy/dedup helpers ──

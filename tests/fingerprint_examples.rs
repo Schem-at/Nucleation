@@ -10,7 +10,7 @@ fn open(path: &str) -> Option<UniversalSchematic> {
 #[test]
 fn fingerprint_is_stable_and_distinguishes() {
     let spec = FingerprintSpec::redstone_computational();
-    let adder = open("4bit_adder.litematic");
+    let adder = open("tests/fixtures/4bit_adder.litematic");
     let cube = open("simple_cube.litematic");
     match (adder, cube) {
         (Some(a), Some(c)) => {

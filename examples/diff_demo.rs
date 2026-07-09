@@ -2,7 +2,7 @@
 //! add/remove blocks), diff them, and write a markdown report + the marker /
 //! added / removed schematics you can load in-game or render.
 //!
-//!   cargo run --example diff_demo -- [schematic.litematic]   (default: 4bit_adder.litematic)
+//!   cargo run --example diff_demo -- [schematic.litematic]   (default: tests/fixtures/4bit_adder.litematic)
 
 use nucleation::diff::regions::regions;
 use nucleation::diff::{diff, Diff, DiffSpec};
@@ -188,7 +188,7 @@ fn report_section(md: &mut String, label: &str, d: &Diff) {
 fn main() {
     let path = std::env::args()
         .nth(1)
-        .unwrap_or_else(|| "4bit_adder.litematic".to_string());
+        .unwrap_or_else(|| "tests/fixtures/4bit_adder.litematic".to_string());
     let a = match UniversalSchematic::open(&path) {
         Ok(s) => s,
         Err(e) => {
