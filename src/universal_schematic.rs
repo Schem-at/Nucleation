@@ -1187,11 +1187,11 @@ impl UniversalSchematic {
     }
 
     pub fn to_schematic(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-        crate::formats::schematic::to_schematic(self)
+        Ok(crate::formats::schematic::to_schematic(self)?)
     }
 
     pub fn from_schematic(data: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
-        crate::formats::schematic::from_schematic(data)
+        Ok(crate::formats::schematic::from_schematic(data)?)
     }
 
     pub fn count_block_types(&self) -> HashMap<BlockState, usize> {

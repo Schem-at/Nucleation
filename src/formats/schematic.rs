@@ -5,6 +5,7 @@ use std::io::{BufReader, Read};
 
 use crate::block_entity::BlockEntity;
 use crate::entity::Entity;
+use crate::formats::error::Result;
 use crate::region::Region;
 use crate::{BlockState, UniversalSchematic};
 use flate2::read::GzDecoder;
@@ -64,7 +65,8 @@ pub fn is_schematic(data: &[u8]) -> bool {
         Ok(result) => result,
         Err(_) => {
             #[cfg(feature = "wasm")]
-            let _: Result<(), JsValue> = Err(JsValue::from_str("Failed to read NBT data"));
+            let _: std::result::Result<(), JsValue> =
+                Err(JsValue::from_str("Failed to read NBT data"));
             return false;
         }
     };
@@ -100,14 +102,14 @@ pub fn is_schematic(data: &[u8]) -> bool {
 const DEFAULT_COMPRESSION: Compression = Compression::new(3);
 
 // Default function uses v3 format
-pub fn to_schematic(schematic: &UniversalSchematic) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+pub fn to_schematic(schematic: &UniversalSchematic) -> Result<Vec<u8>> {
     to_schematic_version(schematic, SchematicVersion::get_default())
 }
 
 pub fn to_schematic_version(
     schematic: &UniversalSchematic,
     version: SchematicVersion,
-) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+) -> Result<Vec<u8>> {
     to_schematic_with_options(schematic, version, DEFAULT_COMPRESSION)
 }
 
@@ -115,7 +117,7 @@ pub fn to_schematic_with_options(
     schematic: &UniversalSchematic,
     version: SchematicVersion,
     compression: Compression,
-) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+) -> Result<Vec<u8>> {
     match version {
         SchematicVersion::V2 => to_schematic_v2(schematic, compression),
         SchematicVersion::V3 => to_schematic_v3(schematic, compression),
@@ -126,7 +128,7 @@ pub fn to_schematic_with_options(
 fn to_schematic_v3(
     schematic: &UniversalSchematic,
     compression: Compression,
-) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+) -> Result<Vec<u8>> {
     let mut schematic_data = NbtCompound::new();
 
     // Version 3 format
@@ -239,7 +241,7 @@ fn to_schematic_v3(
 fn to_schematic_v2(
     schematic: &UniversalSchematic,
     compression: Compression,
-) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+) -> Result<Vec<u8>> {
     let mut schematic_data = NbtCompound::new();
 
     schematic_data.insert("Version", NbtTag::Int(2)); // Schematic format version 2
@@ -424,7 +426,7 @@ fn convert_palette_v2(palette: &Vec<BlockState>) -> (NbtCompound, i32) {
 
     (nbt_palette, max_id)
 }
-pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::error::Error>> {
+pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic> {
     let reader = BufReader::with_capacity(1 << 20, data); // 1 MiB buf
     let mut gz = GzDecoder::new(reader);
     let (root, _) = read_nbt(&mut gz, Flavor::Uncompressed)?;
@@ -621,7 +623,7 @@ fn convert_entities_v3(region: &Region) -> NbtList {
 
 fn parse_block_palette(
     region_tag: &NbtCompound,
-) -> Result<Vec<BlockState>, Box<dyn std::error::Error>> {
+) -> Result<Vec<BlockState>> {
     let palette_compound = region_tag.get::<_, &NbtCompound>("Palette")?;
     let palette_max = region_tag
         .get::<_, i32>("PaletteMax") // V2
@@ -680,7 +682,7 @@ fn encode_varint_into(value: u32, buf: &mut Vec<u8>) {
     }
 }
 
-fn decode_varint<R: Read>(reader: &mut R) -> Result<u32, Box<dyn std::error::Error>> {
+fn decode_varint<R: Read>(reader: &mut R) -> Result<u32> {
     let mut result = 0u32;
     let mut shift = 0;
     loop {
@@ -702,7 +704,7 @@ fn parse_block_data(
     width: u32,
     height: u32,
     length: u32,
-) -> Result<Vec<u32>, Box<dyn std::error::Error>> {
+) -> Result<Vec<u32>> {
     // V2 = BlockData, V3 = Data
     let block_data_i8 = region_tag
         .get::<_, &Vec<i8>>("BlockData")
@@ -750,7 +752,7 @@ fn parse_block_data(
 
 fn parse_block_entities(
     region_tag: &NbtCompound,
-) -> Result<Vec<BlockEntity>, Box<dyn std::error::Error>> {
+) -> Result<Vec<BlockEntity>> {
     let block_entities_list = region_tag.get::<_, &NbtList>("BlockEntities")?;
     let mut block_entities = Vec::new();
 
@@ -785,7 +787,7 @@ fn parse_block_entities(
     Ok(block_entities)
 }
 
-fn parse_entities(region_tag: &NbtCompound) -> Result<Vec<Entity>, Box<dyn std::error::Error>> {
+fn parse_entities(region_tag: &NbtCompound) -> Result<Vec<Entity>> {
     if !region_tag.contains_key("Entities") {
         return Ok(Vec::new());
     }
@@ -804,7 +806,7 @@ fn parse_entities(region_tag: &NbtCompound) -> Result<Vec<Entity>, Box<dyn std::
 // Sponge v3 wraps the vanilla MC entity NBT in a `Data` sub-compound with
 // `Id`/`Pos` hoisted to the top. v2 and legacy Nucleation output put the
 // vanilla NBT directly at the top level. This accepts both shapes.
-fn parse_entity_compound(compound: &NbtCompound) -> Result<Entity, String> {
+fn parse_entity_compound(compound: &NbtCompound) -> std::result::Result<Entity, String> {
     if let Ok(data) = compound.get::<_, &NbtCompound>("Data") {
         let mut merged = data.clone();
 
@@ -835,7 +837,7 @@ impl SchematicImporter for SchematicFormat {
         is_schematic(data)
     }
 
-    fn read(&self, data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::error::Error>> {
+    fn read(&self, data: &[u8]) -> Result<UniversalSchematic> {
         from_schematic(data)
     }
 }
@@ -864,7 +866,7 @@ impl SchematicExporter for SchematicFormat {
         &self,
         schematic: &UniversalSchematic,
         version: Option<&str>,
-    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<u8>> {
         if let Some(v) = version {
             match SchematicVersion::from_str(v) {
                 Some(ver) => to_schematic_version(schematic, ver),

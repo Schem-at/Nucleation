@@ -1628,7 +1628,7 @@ impl SchematicExporter for MeshExporter {
         &self,
         schematic: &crate::UniversalSchematic,
         version: Option<&str>,
-    ) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
+    ) -> crate::formats::error::Result<Vec<u8>> {
         self.write_with_settings(schematic, version, None)
     }
 
@@ -1637,7 +1637,7 @@ impl SchematicExporter for MeshExporter {
         schematic: &crate::UniversalSchematic,
         version: Option<&str>,
         settings: Option<&str>,
-    ) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
+    ) -> crate::formats::error::Result<Vec<u8>> {
         let config: MeshConfig = match settings {
             Some(s) => serde_json::from_str(s)?,
             None => MeshConfig::default(),
@@ -1645,14 +1645,18 @@ impl SchematicExporter for MeshExporter {
         let format = version.unwrap_or("glb");
         match format {
             "glb" => {
-                let mesh = schematic.to_mesh(&self.pack, &config)?;
+                let mesh = schematic
+                    .to_mesh(&self.pack, &config)
+                    .map_err(|e| crate::formats::error::FormatError::Parse(e.to_string()))?;
                 mesh.to_glb()
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+                    .map_err(|e| crate::formats::error::FormatError::Parse(e.to_string()))
             }
             "usdz" => {
-                let mesh = schematic.to_usdz(&self.pack, &config)?;
+                let mesh = schematic
+                    .to_usdz(&self.pack, &config)
+                    .map_err(|e| crate::formats::error::FormatError::Parse(e.to_string()))?;
                 mesh.to_usdz()
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+                    .map_err(|e| crate::formats::error::FormatError::Parse(e.to_string()))
             }
             _ => Err(format!("Unknown mesh format: {}. Use 'glb' or 'usdz'", format).into()),
         }

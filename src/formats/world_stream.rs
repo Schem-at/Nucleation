@@ -13,7 +13,6 @@
 //!   derived from it is alive.
 
 use std::collections::HashMap;
-use std::error::Error;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 #[cfg(not(target_arch = "wasm32"))]
 use std::path::{Path, PathBuf};
@@ -24,6 +23,7 @@ use crate::entity::Entity;
 use crate::formats::anvil::{floor_div, parse_entity_mca, ChunkData, RegionReader};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::formats::anvil::{write_entity_mca, EntityChunkData, McaFile};
+use crate::formats::error::Result;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::formats::world::{generate_level_dat, WorldExportOptions};
 use crate::formats::world::{load_chunk_into_schematic, parse_region_filename};
@@ -128,7 +128,7 @@ pub struct WorldChunkView {
 
 impl WorldSource {
     #[cfg(not(target_arch = "wasm32"))]
-    pub fn open_dir(path: &Path) -> Result<Self, Box<dyn Error>> {
+    pub fn open_dir(path: &Path) -> Result<Self> {
         if !path.join("region").is_dir() {
             return Err(format!("{} has no region/ subdirectory", path.display()).into());
         }
@@ -137,7 +137,7 @@ impl WorldSource {
         })
     }
 
-    pub fn from_zip_bytes(data: Vec<u8>) -> Result<Self, Box<dyn Error>> {
+    pub fn from_zip_bytes(data: Vec<u8>) -> Result<Self> {
         // validate it opens as a zip containing region/*.mca
         let mut found = false;
         let mut archive = zip::ZipArchive::new(Cursor::new(&data))?;
@@ -158,7 +158,7 @@ impl WorldSource {
         })
     }
 
-    pub fn from_mca_bytes(data: Vec<u8>) -> Result<Self, Box<dyn Error>> {
+    pub fn from_mca_bytes(data: Vec<u8>) -> Result<Self> {
         if data.len() < 8192 {
             return Err("MCA file too small".into());
         }
@@ -168,7 +168,7 @@ impl WorldSource {
     }
 
     /// Region positions discovered from file/entry names — no chunk decode.
-    pub fn region_positions(&self) -> Result<Vec<(i32, i32)>, Box<dyn Error>> {
+    pub fn region_positions(&self) -> Result<Vec<(i32, i32)>> {
         let mut positions: Vec<(i32, i32)> = match &self.kind {
             #[cfg(not(target_arch = "wasm32"))]
             SourceKind::Directory(dir) => {
@@ -213,7 +213,7 @@ impl WorldSource {
         Ok(positions)
     }
 
-    pub fn chunks(&self) -> Result<ChunkIter, Box<dyn Error>> {
+    pub fn chunks(&self) -> Result<ChunkIter> {
         self.chunks_impl(None)
     }
 
@@ -221,11 +221,11 @@ impl WorldSource {
         &self,
         min: (i32, i32, i32),
         max: (i32, i32, i32),
-    ) -> Result<ChunkIter, Box<dyn Error>> {
+    ) -> Result<ChunkIter> {
         self.chunks_impl(Some((min.0, min.1, min.2, max.0, max.1, max.2)))
     }
 
-    fn chunks_impl(&self, bounds: Option<Bounds>) -> Result<ChunkIter, Box<dyn Error>> {
+    fn chunks_impl(&self, bounds: Option<Bounds>) -> Result<ChunkIter> {
         let mut regions = self.region_positions()?;
         if let Some((min_x, _, min_z, max_x, _, max_z)) = bounds {
             // A region spans 512 blocks; keep regions whose footprint intersects.
@@ -262,7 +262,7 @@ fn read_zip_region_entry(
     subdir: &str,
     rx: i32,
     rz: i32,
-) -> Result<Option<Vec<u8>>, Box<dyn Error>> {
+) -> Result<Option<Vec<u8>>> {
     let wanted = format!("r.{}.{}.mca", rx, rz);
     let needle = format!("{}/", subdir);
     let slash_wanted = format!("/{}", wanted);
@@ -289,7 +289,7 @@ fn read_zip_region_entry(
 }
 
 impl ChunkIter {
-    fn open_region(&self, rx: i32, rz: i32) -> Result<CurrentRegion, Box<dyn Error>> {
+    fn open_region(&self, rx: i32, rz: i32) -> Result<CurrentRegion> {
         let (reader, entity_chunks): (RegionReader<Box<dyn ReadSeek>>, Vec<_>) = match &self.kind {
             #[cfg(not(target_arch = "wasm32"))]
             SourceKind::Directory(dir) => {
@@ -355,7 +355,7 @@ impl ChunkIter {
 }
 
 impl Iterator for ChunkIter {
-    type Item = Result<WorldChunkView, Box<dyn Error>>;
+    type Item = Result<WorldChunkView>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -598,7 +598,7 @@ pub struct WorldSink {
 impl WorldSink {
     /// Start a new world at `dir`. `finish` writes a `level.dat` generated
     /// from `options` (defaults if `None`).
-    pub fn create(dir: &Path, options: Option<WorldExportOptions>) -> Result<Self, Box<dyn Error>> {
+    pub fn create(dir: &Path, options: Option<WorldExportOptions>) -> Result<Self> {
         std::fs::create_dir_all(dir.join("region"))?;
         Ok(Self {
             dir: dir.to_path_buf(),
@@ -609,7 +609,7 @@ impl WorldSink {
     }
 
     /// Open an existing world for in-place patching. Does not touch level.dat.
-    pub fn open_existing(dir: &Path) -> Result<Self, Box<dyn Error>> {
+    pub fn open_existing(dir: &Path) -> Result<Self> {
         if !dir.join("region").is_dir() {
             return Err(format!("{} has no region/ subdirectory", dir.display()).into());
         }
@@ -625,7 +625,7 @@ impl WorldSink {
     /// region changes, at which point the buffered region is flushed (with a
     /// read-merge if the file already exists, so earlier writes to the same
     /// region are preserved across out-of-order sequences).
-    pub fn write_chunk(&mut self, view: &WorldChunkView) -> Result<(), Box<dyn Error>> {
+    pub fn write_chunk(&mut self, view: &WorldChunkView) -> Result<()> {
         let rx = floor_div(view.cx(), 32);
         let rz = floor_div(view.cz(), 32);
         match &mut self.current {
@@ -654,7 +654,7 @@ impl WorldSink {
         cx: i32,
         cz: i32,
         f: impl FnOnce(&mut WorldChunkView),
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<()> {
         if self.write_level_dat {
             return Err("patch_chunk is only supported on WorldSink::open_existing sinks".into());
         }
@@ -674,7 +674,7 @@ impl WorldSink {
         Ok(())
     }
 
-    fn flush_current(&mut self) -> Result<(), Box<dyn Error>> {
+    fn flush_current(&mut self) -> Result<()> {
         if let Some((rx, rz, mut buffered_chunks)) = self.current.take() {
             // World-default biome (create-mode sinks only): fill in sections
             // that carry no biome data. Sections with existing biome data are
@@ -769,7 +769,7 @@ impl WorldSink {
     /// Flush the buffered region and (for `create` sinks) write `level.dat`.
     /// Dropping a sink without calling `finish` discards any unflushed region
     /// buffer and skips `level.dat` generation.
-    pub fn finish(mut self) -> Result<(), Box<dyn Error>> {
+    pub fn finish(mut self) -> Result<()> {
         self.flush_current()?;
         if self.write_level_dat {
             let opts = self.options.clone().unwrap_or_default();
@@ -796,7 +796,7 @@ pub fn diff_worlds(
     a: &WorldSource,
     b: &WorldSource,
     preset: &str,
-) -> Result<impl Iterator<Item = Result<ChunkDiff, Box<dyn Error>>>, Box<dyn Error>> {
+) -> Result<impl Iterator<Item = Result<ChunkDiff>>> {
     let spec = crate::diff::DiffSpec::resolve(preset, &Default::default())
         .ok_or_else(|| format!("unknown diff preset: {}", preset))?;
     let mut ia = a.chunks()?.peekable();

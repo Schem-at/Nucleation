@@ -1,5 +1,6 @@
 use crate::block_entity::BlockEntity;
 use crate::entity::Entity;
+use crate::formats::error::Result;
 use crate::formats::manager::{SchematicExporter, SchematicImporter};
 use crate::nbt::io::{read_nbt, write_nbt};
 use crate::nbt::{Endian, NbtMap, NbtValue};
@@ -31,7 +32,7 @@ impl SchematicImporter for McStructureFormat {
         }
     }
 
-    fn read(&self, data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::error::Error>> {
+    fn read(&self, data: &[u8]) -> Result<UniversalSchematic> {
         from_mcstructure(data)
     }
 }
@@ -57,12 +58,12 @@ impl SchematicExporter for McStructureFormat {
         &self,
         schematic: &UniversalSchematic,
         _version: Option<&str>,
-    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<u8>> {
         to_mcstructure(schematic)
     }
 }
 
-pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::error::Error>> {
+pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic> {
     let mut cursor = Cursor::new(data);
     let root_val = read_nbt(&mut cursor, Endian::Little)?;
     let root = match root_val {
@@ -323,7 +324,7 @@ pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::
 
 pub fn to_mcstructure(
     schematic: &UniversalSchematic,
-) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+) -> Result<Vec<u8>> {
     let merged_region = schematic.get_merged_region();
     let compact_region = merged_region.to_compact();
     let (width, height, length) = compact_region.get_dimensions();

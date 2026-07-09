@@ -1,5 +1,6 @@
 use crate::block_entity::BlockEntity;
 use crate::entity::Entity;
+use crate::formats::error::Result;
 use crate::region::Region;
 use crate::{BlockState, UniversalSchematic};
 use flate2::read::GzDecoder;
@@ -25,7 +26,7 @@ pub fn is_litematic(data: &[u8]) -> bool {
 /// Level 3 balances speed (~2x faster than L6) with size (~15% larger than L6).
 const DEFAULT_COMPRESSION: flate2::Compression = flate2::Compression::new(3);
 
-pub fn to_litematic(schematic: &UniversalSchematic) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+pub fn to_litematic(schematic: &UniversalSchematic) -> Result<Vec<u8>> {
     to_litematic_with_compression(schematic, DEFAULT_COMPRESSION)
 }
 
@@ -63,7 +64,7 @@ pub fn schematic_version_for_data_version(data_version: i32) -> (i32, Option<i32
 pub fn to_litematic_for_data_version(
     schematic: &UniversalSchematic,
     target_data_version: i32,
-) -> Result<(Vec<u8>, crate::dataconverter::LossReport), Box<dyn std::error::Error>> {
+) -> Result<(Vec<u8>, crate::dataconverter::LossReport)> {
     let mut converted = schematic.clone();
     let report = converted.convert_to_data_version(target_data_version);
     let bytes = to_litematic(&converted)?;
@@ -73,7 +74,7 @@ pub fn to_litematic_for_data_version(
 pub fn to_litematic_with_compression(
     schematic: &UniversalSchematic,
     compression: flate2::Compression,
-) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+) -> Result<Vec<u8>> {
     let mut root = NbtCompound::new();
 
     // Derive the schematic Version from the target Minecraft data version so the
@@ -107,7 +108,7 @@ pub fn to_litematic_with_compression(
     Ok(encoder.finish()?)
 }
 
-pub fn from_litematic(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::error::Error>> {
+pub fn from_litematic(data: &[u8]) -> Result<UniversalSchematic> {
     // Stream-decompress directly into NBT parser (no intermediate buffer)
     let reader = std::io::BufReader::with_capacity(1 << 20, data);
     let mut gz = flate2::read::GzDecoder::new(reader);
@@ -388,7 +389,7 @@ fn create_regions(schematic: &UniversalSchematic, version: i32) -> NbtCompound {
 fn parse_metadata(
     root: &NbtCompound,
     schematic: &mut UniversalSchematic,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<()> {
     // Capture the file's Minecraft data version (root-level, written by Litematica
     // as `MinecraftDataVersion`) so importers know what to forward-convert from.
     if let Ok(dv) = root.get::<_, i32>("MinecraftDataVersion") {
@@ -425,7 +426,7 @@ fn parse_metadata(
 fn parse_regions(
     root: &NbtCompound,
     schematic: &mut UniversalSchematic,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<()> {
     let regions = root.get::<_, &NbtCompound>("Regions")?;
     let mut loop_count = 0;
     for (name, region_tag) in regions.inner() {
@@ -544,7 +545,7 @@ impl SchematicImporter for LitematicFormat {
         is_litematic(data)
     }
 
-    fn read(&self, data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::error::Error>> {
+    fn read(&self, data: &[u8]) -> Result<UniversalSchematic> {
         from_litematic(data)
     }
 }
@@ -570,7 +571,7 @@ impl SchematicExporter for LitematicFormat {
         &self,
         schematic: &UniversalSchematic,
         _version: Option<&str>,
-    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<u8>> {
         to_litematic(schematic)
     }
 }

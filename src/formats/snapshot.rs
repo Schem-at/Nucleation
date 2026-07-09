@@ -1,6 +1,6 @@
+use crate::formats::error::Result;
 use crate::formats::manager::{SchematicExporter, SchematicImporter};
 use crate::universal_schematic::UniversalSchematic;
-use std::error::Error;
 
 const MAGIC: &[u8; 4] = b"NUSN";
 const VERSION: u32 = 1;
@@ -16,7 +16,7 @@ impl SchematicImporter for SnapshotFormat {
         data.len() >= 4 && &data[0..4] == MAGIC
     }
 
-    fn read(&self, data: &[u8]) -> Result<UniversalSchematic, Box<dyn Error>> {
+    fn read(&self, data: &[u8]) -> Result<UniversalSchematic> {
         from_snapshot(data)
     }
 }
@@ -42,12 +42,12 @@ impl SchematicExporter for SnapshotFormat {
         &self,
         schematic: &UniversalSchematic,
         _version: Option<&str>,
-    ) -> Result<Vec<u8>, Box<dyn Error>> {
+    ) -> Result<Vec<u8>> {
         to_snapshot(schematic)
     }
 }
 
-pub fn to_snapshot(schematic: &UniversalSchematic) -> Result<Vec<u8>, Box<dyn Error>> {
+pub fn to_snapshot(schematic: &UniversalSchematic) -> Result<Vec<u8>> {
     let payload = bincode::serialize(schematic)?;
     let mut buf = Vec::with_capacity(8 + payload.len());
     buf.extend_from_slice(MAGIC);
@@ -56,7 +56,7 @@ pub fn to_snapshot(schematic: &UniversalSchematic) -> Result<Vec<u8>, Box<dyn Er
     Ok(buf)
 }
 
-pub fn from_snapshot(data: &[u8]) -> Result<UniversalSchematic, Box<dyn Error>> {
+pub fn from_snapshot(data: &[u8]) -> Result<UniversalSchematic> {
     if data.len() < 8 {
         return Err("Snapshot data too short".into());
     }

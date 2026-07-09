@@ -1,5 +1,6 @@
 pub mod anvil;
 pub mod classic_schematic;
+pub mod error;
 pub mod litematic;
 pub mod manager;
 pub mod mcstructure;

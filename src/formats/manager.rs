@@ -1,16 +1,16 @@
+use crate::formats::error::Result;
 use crate::universal_schematic::UniversalSchematic;
-use std::error::Error;
 use std::sync::{Arc, Mutex, OnceLock};
 
 pub trait SchematicImporter: Send + Sync {
     fn name(&self) -> String;
     fn detect(&self, data: &[u8]) -> bool;
-    fn read(&self, data: &[u8]) -> Result<UniversalSchematic, Box<dyn Error>>;
+    fn read(&self, data: &[u8]) -> Result<UniversalSchematic>;
     fn read_with_settings(
         &self,
         data: &[u8],
         settings: Option<&str>,
-    ) -> Result<UniversalSchematic, Box<dyn Error>> {
+    ) -> Result<UniversalSchematic> {
         let _ = settings;
         self.read(data)
     }
@@ -28,13 +28,13 @@ pub trait SchematicExporter: Send + Sync {
         &self,
         schematic: &UniversalSchematic,
         version: Option<&str>,
-    ) -> Result<Vec<u8>, Box<dyn Error>>;
+    ) -> Result<Vec<u8>>;
     fn write_with_settings(
         &self,
         schematic: &UniversalSchematic,
         version: Option<&str>,
         settings: Option<&str>,
-    ) -> Result<Vec<u8>, Box<dyn Error>> {
+    ) -> Result<Vec<u8>> {
         let _ = settings;
         self.write(schematic, version)
     }
@@ -79,7 +79,7 @@ impl FormatManager {
         None
     }
 
-    pub fn read(&self, data: &[u8]) -> Result<UniversalSchematic, Box<dyn Error>> {
+    pub fn read(&self, data: &[u8]) -> Result<UniversalSchematic> {
         for importer in &self.importers {
             if importer.detect(data) {
                 return importer.read(data);
@@ -92,7 +92,7 @@ impl FormatManager {
         &self,
         data: &[u8],
         settings: Option<&str>,
-    ) -> Result<UniversalSchematic, Box<dyn Error>> {
+    ) -> Result<UniversalSchematic> {
         for importer in &self.importers {
             if importer.detect(data) {
                 return importer.read_with_settings(data, settings);
@@ -106,7 +106,7 @@ impl FormatManager {
         format: &str,
         schematic: &UniversalSchematic,
         version: Option<&str>,
-    ) -> Result<Vec<u8>, Box<dyn Error>> {
+    ) -> Result<Vec<u8>> {
         for exporter in &self.exporters {
             if exporter.name().eq_ignore_ascii_case(format) {
                 return exporter.write(schematic, version);
@@ -121,7 +121,7 @@ impl FormatManager {
         schematic: &UniversalSchematic,
         version: Option<&str>,
         settings: Option<&str>,
-    ) -> Result<Vec<u8>, Box<dyn Error>> {
+    ) -> Result<Vec<u8>> {
         for exporter in &self.exporters {
             if exporter.name().eq_ignore_ascii_case(format) {
                 return exporter.write_with_settings(schematic, version, settings);
@@ -135,7 +135,7 @@ impl FormatManager {
         path: &str,
         schematic: &UniversalSchematic,
         version: Option<&str>,
-    ) -> Result<Vec<u8>, Box<dyn Error>> {
+    ) -> Result<Vec<u8>> {
         let extension = std::path::Path::new(path)
             .extension()
             .and_then(|s| s.to_str())
@@ -156,7 +156,7 @@ impl FormatManager {
         schematic: &UniversalSchematic,
         version: Option<&str>,
         settings: Option<&str>,
-    ) -> Result<Vec<u8>, Box<dyn Error>> {
+    ) -> Result<Vec<u8>> {
         let extension = std::path::Path::new(path)
             .extension()
             .and_then(|s| s.to_str())

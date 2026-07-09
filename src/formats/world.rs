@@ -4,6 +4,7 @@ use crate::formats::anvil::{
     floor_div, floor_mod, is_mca, parse_entity_mca, write_entity_mca, ChunkData, ChunkSection,
     EntityChunkData, McaFile,
 };
+use crate::formats::error::Result;
 use crate::formats::manager::{SchematicExporter, SchematicImporter};
 use crate::universal_schematic::UniversalSchematic;
 use crate::BlockState;
@@ -13,7 +14,6 @@ use quartz_nbt::io::Flavor;
 use quartz_nbt::{NbtCompound, NbtList, NbtTag};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::error::Error;
 use std::io::Write;
 #[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
@@ -144,7 +144,7 @@ impl SchematicImporter for McaFormat {
         is_mca(data)
     }
 
-    fn read(&self, data: &[u8]) -> Result<UniversalSchematic, Box<dyn Error>> {
+    fn read(&self, data: &[u8]) -> Result<UniversalSchematic> {
         from_mca(data)
     }
 
@@ -152,7 +152,7 @@ impl SchematicImporter for McaFormat {
         &self,
         data: &[u8],
         settings: Option<&str>,
-    ) -> Result<UniversalSchematic, Box<dyn Error>> {
+    ) -> Result<UniversalSchematic> {
         let bounds = settings
             .map(serde_json::from_str::<WorldImportSettings>)
             .transpose()?
@@ -181,7 +181,7 @@ impl SchematicImporter for WorldZipFormat {
         is_world_zip(data)
     }
 
-    fn read(&self, data: &[u8]) -> Result<UniversalSchematic, Box<dyn Error>> {
+    fn read(&self, data: &[u8]) -> Result<UniversalSchematic> {
         from_world_zip(data)
     }
 
@@ -189,7 +189,7 @@ impl SchematicImporter for WorldZipFormat {
         &self,
         data: &[u8],
         settings: Option<&str>,
-    ) -> Result<UniversalSchematic, Box<dyn Error>> {
+    ) -> Result<UniversalSchematic> {
         let bounds = settings
             .map(serde_json::from_str::<WorldImportSettings>)
             .transpose()?
@@ -230,7 +230,7 @@ impl SchematicExporter for WorldFormat {
         &self,
         schematic: &UniversalSchematic,
         _version: Option<&str>,
-    ) -> Result<Vec<u8>, Box<dyn Error>> {
+    ) -> Result<Vec<u8>> {
         let opts = WorldExportOptions::default();
         let files = to_world(schematic, None)?;
         let prefixed = prefix_world_files(&files, &opts.world_name);
@@ -242,7 +242,7 @@ impl SchematicExporter for WorldFormat {
         schematic: &UniversalSchematic,
         _version: Option<&str>,
         settings: Option<&str>,
-    ) -> Result<Vec<u8>, Box<dyn Error>> {
+    ) -> Result<Vec<u8>> {
         let options: Option<WorldExportOptions> =
             settings.map(serde_json::from_str).transpose()?;
         let world_name = options
@@ -268,7 +268,7 @@ fn prefix_world_files(files: &WorldFiles, world_name: &str) -> WorldFiles {
 }
 
 /// Zip a WorldFiles HashMap into a single byte buffer.
-pub fn zip_world_files(files: &WorldFiles) -> Result<Vec<u8>, Box<dyn Error>> {
+pub fn zip_world_files(files: &WorldFiles) -> Result<Vec<u8>> {
     use std::io::Cursor;
     use zip::write::SimpleFileOptions;
     use zip::ZipWriter;
@@ -295,7 +295,7 @@ pub fn zip_world_files(files: &WorldFiles) -> Result<Vec<u8>, Box<dyn Error>> {
 pub fn to_world_zip(
     schematic: &UniversalSchematic,
     options: Option<WorldExportOptions>,
-) -> Result<Vec<u8>, Box<dyn Error>> {
+) -> Result<Vec<u8>> {
     let world_name = options
         .as_ref()
         .map(|o| o.world_name.clone())
@@ -308,7 +308,7 @@ pub fn to_world_zip(
 // ─── Import: Single MCA ────────────────────────────────────────────────────
 
 /// Import all chunks from a single MCA file.
-pub fn from_mca(data: &[u8]) -> Result<UniversalSchematic, Box<dyn Error>> {
+pub fn from_mca(data: &[u8]) -> Result<UniversalSchematic> {
     let mca = McaFile::from_bytes_auto(data)?;
     let mut schematic = UniversalSchematic::new("MCA Import".to_string());
     load_mca_into_schematic(&mca, &mut schematic, None);
@@ -324,7 +324,7 @@ pub fn from_mca_bounded(
     max_x: i32,
     max_y: i32,
     max_z: i32,
-) -> Result<UniversalSchematic, Box<dyn Error>> {
+) -> Result<UniversalSchematic> {
     let mca = McaFile::from_bytes_auto(data)?;
     let mut schematic = UniversalSchematic::new("MCA Import".to_string());
     let bounds = (min_x, min_y, min_z, max_x, max_y, max_z);
@@ -356,7 +356,7 @@ fn is_world_zip(data: &[u8]) -> bool {
 }
 
 /// Import from a zipped Minecraft world folder.
-pub fn from_world_zip(data: &[u8]) -> Result<UniversalSchematic, Box<dyn Error>> {
+pub fn from_world_zip(data: &[u8]) -> Result<UniversalSchematic> {
     from_world_zip_impl(data, None)
 }
 
@@ -369,7 +369,7 @@ pub fn from_world_zip_bounded(
     max_x: i32,
     max_y: i32,
     max_z: i32,
-) -> Result<UniversalSchematic, Box<dyn Error>> {
+) -> Result<UniversalSchematic> {
     let bounds = (min_x, min_y, min_z, max_x, max_y, max_z);
     from_world_zip_impl(data, Some(bounds))
 }
@@ -377,7 +377,7 @@ pub fn from_world_zip_bounded(
 fn from_world_zip_impl(
     data: &[u8],
     bounds: Option<(i32, i32, i32, i32, i32, i32)>,
-) -> Result<UniversalSchematic, Box<dyn Error>> {
+) -> Result<UniversalSchematic> {
     let cursor = std::io::Cursor::new(data);
     let mut archive = zip::ZipArchive::new(cursor)?;
     let mut schematic = UniversalSchematic::new("World Import".to_string());
@@ -436,7 +436,7 @@ fn from_world_zip_impl(
 
 /// Import from a Minecraft world directory.
 #[cfg(not(target_arch = "wasm32"))]
-pub fn from_world_directory(path: &Path) -> Result<UniversalSchematic, Box<dyn Error>> {
+pub fn from_world_directory(path: &Path) -> Result<UniversalSchematic> {
     from_world_directory_impl(path, None)
 }
 
@@ -450,7 +450,7 @@ pub fn from_world_directory_bounded(
     max_x: i32,
     max_y: i32,
     max_z: i32,
-) -> Result<UniversalSchematic, Box<dyn Error>> {
+) -> Result<UniversalSchematic> {
     let bounds = (min_x, min_y, min_z, max_x, max_y, max_z);
     from_world_directory_impl(path, Some(bounds))
 }
@@ -459,7 +459,7 @@ pub fn from_world_directory_bounded(
 fn from_world_directory_impl(
     path: &Path,
     bounds: Option<(i32, i32, i32, i32, i32, i32)>,
-) -> Result<UniversalSchematic, Box<dyn Error>> {
+) -> Result<UniversalSchematic> {
     let region_dir = path.join("region");
     if !region_dir.exists() {
         return Err(format!("No 'region' directory found at {}", path.display()).into());
@@ -662,7 +662,7 @@ pub(crate) fn parse_region_filename(name: &str) -> Option<(i32, i32)> {
 pub fn to_world(
     schematic: &UniversalSchematic,
     options: Option<WorldExportOptions>,
-) -> Result<WorldFiles, Box<dyn Error>> {
+) -> Result<WorldFiles> {
     let opts = options.unwrap_or_default();
     let mut files = WorldFiles::new();
 
@@ -859,7 +859,7 @@ pub fn save_world(
     schematic: &UniversalSchematic,
     directory: &Path,
     options: Option<WorldExportOptions>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     let files = to_world(schematic, options)?;
 
     for (path, data) in &files {
@@ -931,7 +931,7 @@ impl SectionBuilder {
 
 // ─── level.dat Generation ───────────────────────────────────────────────────
 
-pub(crate) fn generate_level_dat(opts: &WorldExportOptions) -> Result<Vec<u8>, Box<dyn Error>> {
+pub(crate) fn generate_level_dat(opts: &WorldExportOptions) -> Result<Vec<u8>> {
     let mut data = NbtCompound::new();
 
     // ── Core identity ────────────────────────────────────────────────────

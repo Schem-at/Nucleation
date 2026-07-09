@@ -60,7 +60,7 @@ fn read_manager(bytes: &[u8]) -> Result<UniversalSchematic, Box<dyn Error>> {
     let manager = arc
         .lock()
         .map_err(|_| "format manager lock poisoned".to_string())?;
-    manager.read(bytes)
+    Ok(manager.read(bytes)?)
 }
 
 fn write_manager(
@@ -72,7 +72,7 @@ fn write_manager(
     let manager = arc
         .lock()
         .map_err(|_| "format manager lock poisoned".to_string())?;
-    manager.write_auto(key_or_path, schematic, version)
+    Ok(manager.write_auto(key_or_path, schematic, version)?)
 }
 
 impl UniversalSchematic {

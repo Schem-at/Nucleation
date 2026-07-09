@@ -33,6 +33,7 @@ use std::io::{Cursor, Read};
 use crate::block_entity::BlockEntity;
 use crate::block_state::BlockState;
 use crate::entity::Entity;
+use crate::formats::error::Result;
 use crate::formats::manager::SchematicImporter;
 use crate::region::Region;
 use crate::universal_schematic::UniversalSchematic;
@@ -48,7 +49,7 @@ impl SchematicImporter for ClassicSchematicFormat {
         is_classic_schematic(data)
     }
 
-    fn read(&self, data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::error::Error>> {
+    fn read(&self, data: &[u8]) -> Result<UniversalSchematic> {
         from_classic_schematic(data)
     }
 }
@@ -67,7 +68,7 @@ pub fn is_classic_schematic(data: &[u8]) -> bool {
     has_blocks_bytearr && has_materials && no_sponge_version && no_data_version
 }
 
-fn decompress_and_parse(data: &[u8]) -> Result<NbtCompound, Box<dyn std::error::Error>> {
+fn decompress_and_parse(data: &[u8]) -> Result<NbtCompound> {
     let mut decoder = GzDecoder::new(data);
     let mut raw = Vec::new();
     decoder.read_to_end(&mut raw)?;
@@ -78,7 +79,7 @@ fn decompress_and_parse(data: &[u8]) -> Result<NbtCompound, Box<dyn std::error::
 /// Read a legacy MCEdit `.schematic` into a `UniversalSchematic`.
 pub fn from_classic_schematic(
     data: &[u8],
-) -> Result<UniversalSchematic, Box<dyn std::error::Error>> {
+) -> Result<UniversalSchematic> {
     let root = decompress_and_parse(data)?;
 
     let width = root.get::<_, i16>("Width")? as i32;

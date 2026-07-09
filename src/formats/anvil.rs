@@ -6,7 +6,7 @@ use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use quartz_nbt::io::Flavor;
 use quartz_nbt::{NbtCompound, NbtList, NbtTag};
-use std::error::Error;
+use crate::formats::error::Result;
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 
 // ─── Data Structures ────────────────────────────────────────────────────────
@@ -20,7 +20,7 @@ pub enum CompressionType {
 }
 
 impl CompressionType {
-    pub fn from_byte(b: u8) -> Result<Self, Box<dyn Error>> {
+    pub fn from_byte(b: u8) -> Result<Self> {
         match b {
             1 => Ok(CompressionType::Gzip),
             2 => Ok(CompressionType::Zlib),
@@ -94,7 +94,7 @@ pub fn is_mca(data: &[u8]) -> bool {
 
 impl McaFile {
     /// Parse an MCA region file from raw bytes.
-    pub fn from_bytes(data: &[u8], region_x: i32, region_z: i32) -> Result<Self, Box<dyn Error>> {
+    pub fn from_bytes(data: &[u8], region_x: i32, region_z: i32) -> Result<Self> {
         if data.len() < 8192 {
             return Err("MCA file too small (< 8192 bytes)".into());
         }
@@ -172,7 +172,7 @@ impl McaFile {
     }
 
     /// Parse an MCA file without known region coordinates (inferred from chunk data).
-    pub fn from_bytes_auto(data: &[u8]) -> Result<Self, Box<dyn Error>> {
+    pub fn from_bytes_auto(data: &[u8]) -> Result<Self> {
         // First pass: find any chunk to determine region coordinates
         let mut region_x = 0i32;
         let mut region_z = 0i32;
@@ -252,7 +252,7 @@ impl McaFile {
     }
 }
 
-fn decompress_chunk(data: &[u8], compression: CompressionType) -> Result<Vec<u8>, Box<dyn Error>> {
+fn decompress_chunk(data: &[u8], compression: CompressionType) -> Result<Vec<u8>> {
     let mut decompressed = Vec::new();
     match compression {
         CompressionType::Zlib => {
@@ -277,7 +277,7 @@ fn parse_chunk_nbt(
     nbt: &NbtCompound,
     chunk_x: i32,
     chunk_z: i32,
-) -> Result<ChunkData, Box<dyn Error>> {
+) -> Result<ChunkData> {
     let data_version = nbt.get::<_, i32>("DataVersion").unwrap_or(3700);
 
     // Status can be at root level or under "Status"
@@ -338,7 +338,7 @@ fn parse_chunk_nbt(
     })
 }
 
-fn parse_section(section_nbt: &NbtCompound) -> Result<ChunkSection, Box<dyn Error>> {
+fn parse_section(section_nbt: &NbtCompound) -> Result<ChunkSection> {
     let y = section_nbt.get::<_, i8>("Y")?;
 
     // Parse block_states compound
@@ -454,7 +454,7 @@ pub fn pack_block_states(indices: &[u16], palette_size: usize) -> Vec<i64> {
     packed
 }
 
-fn parse_block_entity(nbt: &NbtCompound) -> Result<BlockEntity, Box<dyn Error>> {
+fn parse_block_entity(nbt: &NbtCompound) -> Result<BlockEntity> {
     let id = nbt
         .get::<_, &str>("id")
         .map(|s| s.to_string())
@@ -499,7 +499,7 @@ pub fn parse_entity_mca(
     data: &[u8],
     region_x: i32,
     region_z: i32,
-) -> Result<Vec<EntityChunkData>, Box<dyn Error>> {
+) -> Result<Vec<EntityChunkData>> {
     if data.len() < 8192 {
         return Err("Entity MCA file too small (< 8192 bytes)".into());
     }
@@ -615,7 +615,7 @@ pub fn write_entity_mca(
     _region_x: i32,
     _region_z: i32,
     data_version: i32,
-) -> Result<Vec<u8>, Box<dyn Error>> {
+) -> Result<Vec<u8>> {
     let mut chunk_data_parts: Vec<(u32, Vec<u8>)> = Vec::new();
 
     for chunk in chunks {
@@ -682,7 +682,7 @@ pub fn write_entity_mca(
 
 impl McaFile {
     /// Write the MCA file to bytes.
-    pub fn to_bytes(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut chunk_data_parts: Vec<(u32, Vec<u8>)> = Vec::new(); // (index, compressed_nbt)
 
         for (i, chunk_opt) in self.chunks.iter().enumerate() {
@@ -900,7 +900,7 @@ pub struct RegionReader<R: Read + Seek> {
 }
 
 impl<R: Read + Seek> RegionReader<R> {
-    pub fn new(mut reader: R, region_x: i32, region_z: i32) -> Result<Self, Box<dyn Error>> {
+    pub fn new(mut reader: R, region_x: i32, region_z: i32) -> Result<Self> {
         let mut header = [0u8; 4096];
         reader
             .read_exact(&mut header)
@@ -925,7 +925,7 @@ impl<R: Read + Seek> RegionReader<R> {
 
     /// Like `new`, but infers region coordinates from the first parseable
     /// chunk's xPos/zPos (mirrors `McaFile::from_bytes_auto`).
-    pub fn new_auto(reader: R) -> Result<Self, Box<dyn Error>> {
+    pub fn new_auto(reader: R) -> Result<Self> {
         let mut rr = Self::new(reader, 0, 0)?;
         let indices: Vec<u32> = rr.locations.iter().map(|(i, _)| *i).collect();
         for i in indices {
@@ -960,7 +960,7 @@ impl<R: Read + Seek> RegionReader<R> {
 
     /// Read and parse one chunk by absolute chunk coordinates.
     /// Ok(None) if the chunk is absent from this region.
-    pub fn read_chunk(&mut self, cx: i32, cz: i32) -> Result<Option<ChunkData>, Box<dyn Error>> {
+    pub fn read_chunk(&mut self, cx: i32, cz: i32) -> Result<Option<ChunkData>> {
         let local_x = cx - self.region_x * 32;
         let local_z = cz - self.region_z * 32;
         if !(0..32).contains(&local_x) || !(0..32).contains(&local_z) {
@@ -978,7 +978,7 @@ impl<R: Read + Seek> RegionReader<R> {
     fn read_chunk_nbt_at(
         &mut self,
         index: u32,
-    ) -> Result<Option<quartz_nbt::NbtCompound>, Box<dyn Error>> {
+    ) -> Result<Option<quartz_nbt::NbtCompound>> {
         let offset = match self.locations.iter().find(|(i, _)| *i == index) {
             Some((_, off)) => *off,
             None => return Ok(None),
