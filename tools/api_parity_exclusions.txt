@@ -361,3 +361,20 @@ WorldChunkIter.__next__ = Python iterator protocol dunder
 [wasm_only]
 WorldChunkIter.has_next = WASM poll-style iteration; Python uses __next__, FFI uses NULL sentinel
 WorldChunkIter.next = WASM poll-style iteration; Python uses __next__, FFI uses NULL sentinel
+
+# --- SDF sampling ---
+# WASM exposes a separate fromSdfBounded method; Python/FFI fold the same
+# capability into from_sdf via an optional bounds argument / has_bounds flag.
+# WASM's sdfEval is a free function; Python exposes the same thing as the
+# staticmethod Schematic.sdf_eval (FFI's sdf_eval free function matches WASM).
+[wasm_only]
+Schematic.from_sdf_bounded = WASM-specific separate method; Python takes from_sdf(bounds=...), FFI uses schematic_from_sdf's has_bounds flag
+
+[no_python]
+sdf_eval = Python exposes this as the staticmethod Schematic.sdf_eval, not a free function
+
+[no_wasm]
+Schematic.sdf_eval = WASM exposes this as the free function sdfEval, not a Schematic method
+
+[no_ffi]
+Schematic.sdf_eval = FFI exposes this as the free function sdf_eval, not a Schematic method

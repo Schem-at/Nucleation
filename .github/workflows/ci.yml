@@ -438,6 +438,25 @@ jobs:
       - name: Run parity check
         run: ./target/check_jvm_parity
 
+  # WASM/Python/FFI binding-surface parity. Previously only ran from the local
+  # pre-push hook (tools/prepush.py); promoted to a real CI gate so drift
+  # across those three bindings can't slip through a PR.
+  parity-api:
+    needs: check-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Build parity tool
+        run: |
+          mkdir -p target
+          rustc tools/check_api_parity.rs -o target/check_api_parity
+      - name: Run parity check
+        run: ./target/check_api_parity
+
   assemble-jvm-jar:
     needs: [check-version, build-jvm-cdylib, test-jvm, parity-jvm]
     runs-on: ubuntu-latest
