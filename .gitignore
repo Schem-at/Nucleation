@@ -39,6 +39,9 @@ benches/meshing-bench/
 /*.glb
 /*.schematic
 /item_model_pack.zip
+/diff_report.md
+/diff_*.schem
+/fingerprint_report.md
 
 # JVM bindings — Cargo target / Gradle build / wrapper caches
 /nucleation-jvm/target/
