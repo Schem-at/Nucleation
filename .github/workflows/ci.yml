@@ -137,6 +137,7 @@ jobs:
   build-nucleation:
     needs: [ test, check-version ]
     strategy:
+      max-parallel: 3
       matrix:
         include:
           - os: ubuntu-latest
@@ -218,6 +219,7 @@ jobs:
     needs: check-version
     strategy:
       fail-fast: false
+      max-parallel: 3
       matrix:
         include:
           - runner: ubuntu-latest
@@ -291,6 +293,7 @@ jobs:
     needs: check-version
     strategy:
       fail-fast: false
+      max-parallel: 3
       matrix:
         include:
           - runner: ubuntu-latest
