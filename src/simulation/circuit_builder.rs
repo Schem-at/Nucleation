@@ -141,13 +141,11 @@ impl CircuitBuilder {
         let mut new_builder = IoLayoutBuilder::new();
         for (name, mapping) in layout.inputs {
             new_builder = new_builder
-                .add_input(name, mapping.io_type, mapping.layout, mapping.positions)
-                .map_err(|e| e)?;
+                .add_input(name, mapping.io_type, mapping.layout, mapping.positions)?;
         }
         for (name, mapping) in layout.outputs {
             new_builder = new_builder
-                .add_output(name, mapping.io_type, mapping.layout, mapping.positions)
-                .map_err(|e| e)?;
+                .add_output(name, mapping.io_type, mapping.layout, mapping.positions)?;
         }
 
         Ok(Self {

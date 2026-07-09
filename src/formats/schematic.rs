@@ -261,7 +261,7 @@ fn to_schematic_v2(
 
     schematic_data.insert(
         "Size",
-        NbtTag::IntArray(vec![width as i32, height as i32, length as i32]),
+        NbtTag::IntArray(vec![width, height, length]),
     );
 
     // Set offset to the minimum position of the compact region
@@ -422,7 +422,7 @@ fn convert_palette_v2(palette: &Vec<BlockState>) -> (NbtCompound, i32) {
         next_id += 1;
     }
 
-    (nbt_palette, max_id as i32)
+    (nbt_palette, max_id)
 }
 pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::error::Error>> {
     let reader = BufReader::with_capacity(1 << 20, data); // 1 MiB buf
@@ -434,7 +434,7 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::er
 
     let mut definition_regions = HashMap::new();
 
-    let name = if let Some(metadata) = schem.get::<_, &NbtCompound>("Metadata").ok() {
+    let name = if let Ok(metadata) = schem.get::<_, &NbtCompound>("Metadata") {
         if let Ok(json) = metadata.get::<_, &str>("NucleationDefinitions") {
             if let Ok(regions) = serde_json::from_str(json) {
                 definition_regions = regions;
@@ -464,9 +464,9 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::er
         schem.get::<_, &NbtCompound>("Blocks")?
     };
 
-    let block_palette = parse_block_palette(&block_container)?;
+    let block_palette = parse_block_palette(block_container)?;
 
-    let block_data = parse_block_data(&block_container, width, height, length)?;
+    let block_data = parse_block_data(block_container, width, height, length)?;
 
     let mut region = Region::new(
         "Main".to_string(),
@@ -482,12 +482,12 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::er
     region.rebuild_non_air_count();
     region.rebuild_tight_bounds();
 
-    let block_entities = parse_block_entities(&block_container)?;
+    let block_entities = parse_block_entities(block_container)?;
     for block_entity in block_entities {
         region.add_block_entity(block_entity);
     }
 
-    let entities = parse_entities(&schem)?;
+    let entities = parse_entities(schem)?;
     for entity in entities {
         region.add_entity(entity);
     }
@@ -822,6 +822,60 @@ fn parse_entity_compound(compound: &NbtCompound) -> Result<Entity, String> {
     }
 }
 
+use crate::formats::manager::{SchematicExporter, SchematicImporter};
+
+pub struct SchematicFormat;
+
+impl SchematicImporter for SchematicFormat {
+    fn name(&self) -> String {
+        "schematic".to_string()
+    }
+
+    fn detect(&self, data: &[u8]) -> bool {
+        is_schematic(data)
+    }
+
+    fn read(&self, data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::error::Error>> {
+        from_schematic(data)
+    }
+}
+
+impl SchematicExporter for SchematicFormat {
+    fn name(&self) -> String {
+        "schematic".to_string()
+    }
+
+    fn extensions(&self) -> Vec<String> {
+        vec!["schem".to_string(), "schematic".to_string()]
+    }
+
+    fn available_versions(&self) -> Vec<String> {
+        SchematicVersion::get_all()
+            .iter()
+            .map(|v| v.as_str().to_string())
+            .collect()
+    }
+
+    fn default_version(&self) -> String {
+        SchematicVersion::get_default().as_str().to_string()
+    }
+
+    fn write(
+        &self,
+        schematic: &UniversalSchematic,
+        version: Option<&str>,
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        if let Some(v) = version {
+            match SchematicVersion::from_str(v) {
+                Some(ver) => to_schematic_version(schematic, ver),
+                None => Err(format!("Unsupported version: {}", v).into()),
+            }
+        } else {
+            to_schematic(schematic)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -925,7 +979,7 @@ mod tests {
     #[test]
     fn test_parse_block_data() {
         let mut nbt = NbtCompound::new();
-        let block_data = vec![0, 1, 2, 1, 0, 2, 1, 0]; // 8 blocks
+        let block_data = [0, 1, 2, 1, 0, 2, 1, 0]; // 8 blocks
         let encoded_block_data: Vec<u8> =
             block_data.iter().flat_map(|&v| encode_varint(v)).collect();
 
@@ -1034,7 +1088,7 @@ mod tests {
         let schem_path = Path::new(&input_path_str);
         assert!(schem_path.exists(), "Sample .schem file not found");
         let schem_data =
-            fs::read(schem_path).expect(format!("Failed to read {}", input_path_str).as_str());
+            fs::read(schem_path).unwrap_or_else(|_| panic!("Failed to read {}", input_path_str));
 
         let schematic = from_schematic(&schem_data).expect("Failed to parse schematic");
         assert_eq!(schematic.metadata.name, Some("Unnamed".to_string()));
@@ -1225,59 +1279,5 @@ mod tests {
             "Entity Z should be 1.5 relative, got {}",
             rt_entity.position.2
         );
-    }
-}
-
-use crate::formats::manager::{SchematicExporter, SchematicImporter};
-
-pub struct SchematicFormat;
-
-impl SchematicImporter for SchematicFormat {
-    fn name(&self) -> String {
-        "schematic".to_string()
-    }
-
-    fn detect(&self, data: &[u8]) -> bool {
-        is_schematic(data)
-    }
-
-    fn read(&self, data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::error::Error>> {
-        from_schematic(data)
-    }
-}
-
-impl SchematicExporter for SchematicFormat {
-    fn name(&self) -> String {
-        "schematic".to_string()
-    }
-
-    fn extensions(&self) -> Vec<String> {
-        vec!["schem".to_string(), "schematic".to_string()]
-    }
-
-    fn available_versions(&self) -> Vec<String> {
-        SchematicVersion::get_all()
-            .iter()
-            .map(|v| v.as_str().to_string())
-            .collect()
-    }
-
-    fn default_version(&self) -> String {
-        SchematicVersion::get_default().as_str().to_string()
-    }
-
-    fn write(
-        &self,
-        schematic: &UniversalSchematic,
-        version: Option<&str>,
-    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-        if let Some(v) = version {
-            match SchematicVersion::from_str(v) {
-                Some(ver) => to_schematic_version(schematic, ver),
-                None => Err(format!("Unsupported version: {}", v).into()),
-            }
-        } else {
-            to_schematic(schematic)
-        }
     }
 }

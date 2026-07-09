@@ -9,7 +9,7 @@ fn test_barrel_hopper_simulation() {
     let mut schematic = UniversalSchematic::new("test".to_string());
 
     // Test blocks from the Python script
-    let test_blocks = vec!["minecraft:barrel[facing=north]", "minecraft:hopper"];
+    let test_blocks = ["minecraft:barrel[facing=north]", "minecraft:hopper"];
 
     // Helper to set a block with support
     fn set_block_supported(
@@ -26,7 +26,7 @@ fn test_barrel_hopper_simulation() {
     fn place_block_with_signal(
         schematic: &mut UniversalSchematic,
         block: &str,
-        signal: i32,
+        _signal: i32,
         pos: (i32, i32, i32),
     ) {
         // Just place the block with facing, NBT handling is complex and not the focus of this test

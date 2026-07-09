@@ -180,11 +180,10 @@ fn sign_tile_reverter(data: &mut NbtMap, version: i32) {
                 }
             }
         }
-        if !data.has_key("GlowingText") {
-            if front.get_bool("has_glowing_text").unwrap_or(false) {
+        if !data.has_key("GlowingText")
+            && front.get_bool("has_glowing_text").unwrap_or(false) {
                 data.set_bool("GlowingText", true);
             }
-        }
     }
 
     // back_text has no legacy representation: a 1.19.4 sign is single-sided.
@@ -196,7 +195,7 @@ fn sign_tile_reverter(data: &mut NbtMap, version: i32) {
             .map(|msgs| {
                 msgs.iter().any(|m| {
                     m.as_str()
-                        .map_or(false, |s| !s.is_empty() && s != EMPTY_COMPONENT)
+                        .is_some_and(|s| !s.is_empty() && s != EMPTY_COMPONENT)
                 })
             })
             .unwrap_or(false);
@@ -213,7 +212,7 @@ fn sign_tile_reverter(data: &mut NbtMap, version: i32) {
             .map(|msgs| {
                 msgs.iter().any(|m| {
                     m.as_str()
-                        .map_or(false, |s| !s.is_empty() && s != EMPTY_COMPONENT)
+                        .is_some_and(|s| !s.is_empty() && s != EMPTY_COMPONENT)
                 })
             })
             .unwrap_or(false);
@@ -227,7 +226,7 @@ fn sign_tile_reverter(data: &mut NbtMap, version: i32) {
         }
         if back
             .get_string("color")
-            .map_or(false, |color| color != DEFAULT_COLOR)
+            .is_some_and(|color| color != DEFAULT_COLOR)
         {
             report_loss(
                 version,

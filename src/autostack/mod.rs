@@ -303,7 +303,7 @@ fn best_phase(grid: &Grid, v: Vec3, o: Vec3) -> (i64, Vec<i64>, usize, usize) {
         let phase = pmin - t;
         let byk = lattice_slabs(grid, v, o, phase);
         let (ks, rs, rl) = lattice_run(&byk);
-        if best.as_ref().map_or(true, |b| rl > b.3) {
+        if best.as_ref().is_none_or(|b| rl > b.3) {
             best = Some((phase, ks, rs, rl));
         }
     }
@@ -541,7 +541,7 @@ mod tests {
         let stone = BlockState::new("minecraft:stone");
         let glass = BlockState::new("minecraft:glass");
         for i in 0..6 {
-            let (x, y) = (i * 2, i * 1);
+            let (x, y) = (i * 2, i);
             s.set_block(x, y, 0, &stone);
             s.set_block(x + 1, y, 0, &glass);
         }

@@ -66,7 +66,7 @@ impl Direction {
 
     /// Rotate direction around Y axis (horizontal plane)
     pub fn rotate_y(&self, degrees: i32) -> Direction {
-        let rotations = ((degrees % 360 + 360) % 360) / 90;
+        let rotations = degrees.rem_euclid(360) / 90;
 
         let mut current = *self;
         for _ in 0..rotations {
@@ -83,7 +83,7 @@ impl Direction {
 
     /// Rotate direction around X axis
     pub fn rotate_x(&self, degrees: i32) -> Direction {
-        let rotations = ((degrees % 360 + 360) % 360) / 90;
+        let rotations = degrees.rem_euclid(360) / 90;
 
         let mut current = *self;
         for _ in 0..rotations {
@@ -100,7 +100,7 @@ impl Direction {
 
     /// Rotate direction around Z axis
     pub fn rotate_z(&self, degrees: i32) -> Direction {
-        let rotations = ((degrees % 360 + 360) % 360) / 90;
+        let rotations = degrees.rem_euclid(360) / 90;
 
         let mut current = *self;
         for _ in 0..rotations {
@@ -177,14 +177,14 @@ pub fn transform_block_state_rotate(block: &BlockState, axis: Axis, degrees: i32
 
     // Transform 'axis' property (logs, pillars, etc.)
     if let Some(axis_val) = block.get_property("axis") {
-        let new_axis = rotate_axis_property(&axis_val, axis, degrees);
+        let new_axis = rotate_axis_property(axis_val, axis, degrees);
         new_block.set_property("axis".to_string(), new_axis);
     }
 
     // Transform 'rotation' property (0-15, used by standing signs, banners, etc.)
     if let Some(rotation) = block.get_property("rotation") {
         if let Ok(rot_val) = rotation.parse::<i32>() {
-            let rotations = ((degrees % 360 + 360) % 360) / 90;
+            let rotations = degrees.rem_euclid(360) / 90;
             let new_rotation = match axis {
                 Axis::Y => (rot_val + rotations * 4) % 16,
                 Axis::X | Axis::Z => rot_val, // Rotation around these axes doesn't change standing rotation
@@ -201,7 +201,7 @@ pub fn transform_block_state_rotate(block: &BlockState, axis: Axis, degrees: i32
 
 /// Rotate axis property value
 fn rotate_axis_property(axis_val: &str, rotation_axis: Axis, degrees: i32) -> String {
-    let rotations = ((degrees % 360 + 360) % 360) / 90;
+    let rotations = degrees.rem_euclid(360) / 90;
 
     if rotations == 0 || rotations == 2 {
         // 0° or 180° rotation
@@ -242,7 +242,7 @@ fn transform_special_block_properties(
     // Handle stair shapes
     if let Some(shape) = block.get_property("shape") {
         if is_rotation && axis == Axis::Y {
-            let new_shape = rotate_stair_shape(&shape, degrees);
+            let new_shape = rotate_stair_shape(shape, degrees);
             block.set_property("shape".to_string(), new_shape);
         }
     }
@@ -295,7 +295,7 @@ fn transform_special_block_properties(
 
 /// Rotate stair shape
 fn rotate_stair_shape(shape: &str, degrees: i32) -> String {
-    let rotations = ((degrees % 360 + 360) % 360) / 90;
+    let rotations = degrees.rem_euclid(360) / 90;
 
     if rotations == 0 || rotations == 2 {
         return shape.to_string();

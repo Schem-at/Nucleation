@@ -792,16 +792,16 @@ fn create_adder_schematic() -> UniversalSchematic {
     // Stack 4 full-adders side by side
     // Note: Don't mix single-block characters with schematics - all palette entries
     // in a layer should have matching dimensions for proper tiling
-    let four_bit_adder = SchematicBuilder::new()
+    
+
+    SchematicBuilder::new()
         .name("four_bit_adder")
         .map_schematic('A', full_adder)
         .layers(&[
             &["AAAA"], // 4 full-adders in a row
         ])
         .build()
-        .expect("Failed to build 4-bit adder");
-
-    four_bit_adder
+        .expect("Failed to build 4-bit adder")
 }
 
 fn create_adder_io() -> (HashMap<String, IoMapping>, HashMap<String, IoMapping>) {

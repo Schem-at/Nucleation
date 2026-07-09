@@ -12,7 +12,7 @@ fn litematic_to_schem_conversion(name: &str) {
 
     // Read the .litematic file
     let litematic_data =
-        fs::read(litematic_path).expect(format!("Failed to read {}", input_path_str).as_str());
+        fs::read(litematic_path).unwrap_or_else(|_| panic!("Failed to read {}", input_path_str));
 
     // Parse the .litematic data into a UniversalSchematic
     let schematic = litematic::from_litematic(&litematic_data).expect("Failed to parse litematic");
@@ -82,7 +82,7 @@ fn _schema_to_litematic_conversion(name: &str) {
 
     // Read the .schem file
     let schem_data =
-        fs::read(schem_path).expect(format!("Failed to read {}", input_path_str).as_str());
+        fs::read(schem_path).unwrap_or_else(|_| panic!("Failed to read {}", input_path_str));
 
     // Parse the .schem data into a UniversalSchematic
     let schematic = schematic::from_schematic(&schem_data).expect("Failed to parse schem");
@@ -100,10 +100,10 @@ fn _schema_to_litematic_conversion(name: &str) {
 
 #[test]
 fn load_evaluator_schematic() {
-    let input_path_str = format!("tests/samples/Evaluator.schem");
+    let input_path_str = "tests/samples/Evaluator.schem".to_string();
     let schem_path = Path::new(&input_path_str);
     let schem_data =
-        fs::read(schem_path).expect(format!("Failed to read {}", input_path_str).as_str());
+        fs::read(schem_path).unwrap_or_else(|_| panic!("Failed to read {}", input_path_str));
     let schematic = schematic::from_schematic(&schem_data).expect("Failed to parse schem");
     let block_entities = schematic.get_block_entities_as_list();
     let entities = schematic.get_entities_as_list();
@@ -113,27 +113,27 @@ fn load_evaluator_schematic() {
 
 #[test]
 fn test_cube_schematic() {
-    let input_path_str = format!("tests/samples/test_cube.schem");
+    let input_path_str = "tests/samples/test_cube.schem".to_string();
 
     let schem_path = Path::new(&input_path_str);
     let schem_data =
-        fs::read(schem_path).expect(format!("Failed to read {}", input_path_str).as_str());
+        fs::read(schem_path).unwrap_or_else(|_| panic!("Failed to read {}", input_path_str));
     let schematic = schematic::from_schematic(&schem_data).expect("Failed to parse schem");
 
     //save the schematic as litematic
     let litematic_data =
         litematic::to_litematic(&schematic).expect("Failed to convert to litematic");
-    let output_litematic_path = format!("tests/output/test_cube.litematic");
+    let output_litematic_path = "tests/output/test_cube.litematic".to_string();
     let litematic_path = Path::new(&output_litematic_path);
     fs::write(litematic_path, &litematic_data).expect("Failed to write litematic file");
 }
 
 // #[test]
 fn _time_load_large_schematic() {
-    let input_path_str = format!("tests/samples/large_schematic.schem");
+    let input_path_str = "tests/samples/large_schematic.schem".to_string();
     let schem_path = Path::new(&input_path_str);
     let schem_data =
-        fs::read(schem_path).expect(format!("Failed to read {}", input_path_str).as_str());
+        fs::read(schem_path).unwrap_or_else(|_| panic!("Failed to read {}", input_path_str));
     let start_time = std::time::Instant::now();
     let _schematic = schematic::from_schematic(&schem_data).expect("Failed to parse schem");
     let elapsed_time = start_time.elapsed();
@@ -201,15 +201,13 @@ impl<'a> Iterator for TestFiles<'a> {
     type Item = String;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(entry) = self.reader.next() {
-            if let Ok(entry) = entry {
-                let path = entry.path();
-                if path.is_file()
-                    && path.extension().and_then(|ext| ext.to_str()) == Some(self.extension)
-                {
-                    if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                        return Some(stem.to_string());
-                    }
+        for entry in self.reader.by_ref().flatten() {
+            let path = entry.path();
+            if path.is_file()
+                && path.extension().and_then(|ext| ext.to_str()) == Some(self.extension)
+            {
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                    return Some(stem.to_string());
                 }
             }
         }
@@ -217,7 +215,7 @@ impl<'a> Iterator for TestFiles<'a> {
     }
 }
 
-fn list_test_file(extension: &str) -> TestFiles {
+fn list_test_file(extension: &str) -> TestFiles<'_> {
     const DIR_PATH: &str = "./tests/samples";
     TestFiles {
         extension,

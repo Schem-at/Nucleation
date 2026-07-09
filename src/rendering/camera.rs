@@ -4,18 +4,15 @@ use crate::meshing::MeshOutput;
 
 /// Camera projection mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum Projection {
     /// Standard perspective projection (default).
+    #[default]
     Perspective,
     /// Parallel (orthographic) projection — no perspective foreshortening.
     Orthographic,
 }
 
-impl Default for Projection {
-    fn default() -> Self {
-        Projection::Perspective
-    }
-}
 
 /// Camera configuration for rendering.
 pub struct CameraConfig {

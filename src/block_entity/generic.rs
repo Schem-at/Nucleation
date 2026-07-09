@@ -77,7 +77,7 @@ impl BlockEntity {
                     vec![]
                 }
             })
-            .unwrap_or_else(|| vec![]);
+            .unwrap_or_default();
         items.push(item.to_nbt());
         self.nbt_mut()
             .insert("Items".to_string(), NbtValue::List(items));
@@ -162,7 +162,7 @@ impl BlockEntity {
     /// deliberately removed.
     pub fn to_nbt_v3(&self, data_version: Option<i32>) -> NbtCompound {
         const COMPONENTS_VERSION: i32 = 3837; // 1.20.5
-        let inject_components = data_version.map_or(true, |dv| dv >= COMPONENTS_VERSION);
+        let inject_components = data_version.is_none_or(|dv| dv >= COMPONENTS_VERSION);
 
         let mut nbt = NbtCompound::new();
 
@@ -212,7 +212,7 @@ impl BlockEntity {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::item::ItemStack;
+    
 
     #[test]
     fn test_block_entity_creation() {

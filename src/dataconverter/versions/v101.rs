@@ -18,7 +18,7 @@ fn update_line(data: &mut NbtMap, path: &str) {
     // Java: getString returns null when absent; only rewrite present lines.
     let text = data.get_string(path).map(str::to_string);
     if let Some(text) = text {
-        data.set_string(path, &convert_from_lenient(&text));
+        data.set_string(path, convert_from_lenient(&text));
     }
 }
 

@@ -48,6 +48,12 @@ pub struct FormatManager {
     exporters: Vec<Box<dyn SchematicExporter>>,
 }
 
+impl Default for FormatManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FormatManager {
     pub fn new() -> Self {
         Self {

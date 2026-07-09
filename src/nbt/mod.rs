@@ -55,11 +55,11 @@ impl NbtMap {
         self.0.remove(key)
     }
 
-    pub fn iter(&self) -> std::collections::hash_map::Iter<String, NbtValue> {
+    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, String, NbtValue> {
         self.0.iter()
     }
 
-    pub fn iter_mut(&mut self) -> std::collections::hash_map::IterMut<String, NbtValue> {
+    pub fn iter_mut(&mut self) -> std::collections::hash_map::IterMut<'_, String, NbtValue> {
         self.0.iter_mut()
     }
 

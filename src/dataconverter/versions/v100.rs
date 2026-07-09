@@ -44,7 +44,7 @@ pub fn register(reg: &mut RegistryBuilder) {
             };
 
             if let Some(equipment) = equipment {
-                if equipment.len() > 0 && data.get_list("HandItems").is_none() {
+                if !equipment.is_empty() && data.get_list("HandItems").is_none() {
                     let mut hand_items: Vec<NbtValue> = Vec::new();
                     hand_items.push(NbtValue::Compound(equipment[0].clone()));
                     hand_items.push(NbtValue::Compound(NbtMap::new()));
@@ -84,7 +84,7 @@ pub fn register(reg: &mut RegistryBuilder) {
             if let Some(drop_chances) = drop_chances {
                 if data.get_list("HandDropChances").is_none() {
                     let mut hand_drop_chances: Vec<NbtValue> = Vec::new();
-                    if 0 < drop_chances.len() {
+                    if !drop_chances.is_empty() {
                         hand_drop_chances.push(NbtValue::Float(drop_chances[0]));
                     } else {
                         hand_drop_chances.push(NbtValue::Float(0.0));
@@ -158,7 +158,7 @@ pub fn register(reg: &mut RegistryBuilder) {
                         .unwrap_or_else(|| NbtValue::Compound(NbtMap::new())),
                 );
                 // Equipment[1..] = the armor slots, in order.
-                equipment.extend(armor.into_iter());
+                equipment.extend(armor);
 
                 data.set_list("Equipment", equipment);
             }

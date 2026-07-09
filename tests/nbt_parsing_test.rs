@@ -50,7 +50,7 @@ fn test_signal_barrel_default_item() {
     let items = get_items_from_data(&be);
 
     // Should create items for signal strength 14
-    assert!(items.len() > 0, "Should have items for signal=14");
+    assert!(!items.is_empty(), "Should have items for signal=14");
 
     // Check first item uses default (redstone_block)
     if let NbtTag::Compound(item) = &items[0] {
@@ -69,7 +69,7 @@ fn test_signal_chest() {
     let be = get_first_block_entity("minecraft:chest[facing=north]{signal=10}");
     let items = get_items_from_data(&be);
 
-    assert!(items.len() > 0, "Chest should support signal shorthand");
+    assert!(!items.is_empty(), "Chest should support signal shorthand");
 }
 
 #[test]
@@ -77,7 +77,7 @@ fn test_signal_hopper() {
     let be = get_first_block_entity("minecraft:hopper[facing=down]{signal=8}");
     let items = get_items_from_data(&be);
 
-    assert!(items.len() > 0, "Hopper should support signal shorthand");
+    assert!(!items.is_empty(), "Hopper should support signal shorthand");
 
     // Hopper has only 5 slots, so shouldn't exceed that
     assert!(items.len() <= 5, "Hopper should not exceed 5 slots");
@@ -88,7 +88,7 @@ fn test_signal_dispenser() {
     let be = get_first_block_entity("minecraft:dispenser[facing=north]{signal=5}");
     let items = get_items_from_data(&be);
 
-    assert!(items.len() > 0, "Dispenser should support signal shorthand");
+    assert!(!items.is_empty(), "Dispenser should support signal shorthand");
     assert!(items.len() <= 9, "Dispenser should not exceed 9 slots");
 }
 
@@ -98,7 +98,7 @@ fn test_signal_with_custom_item() {
         get_first_block_entity("minecraft:barrel[facing=north]{signal=14,item=minecraft:diamond}");
     let items = get_items_from_data(&be);
 
-    assert!(items.len() > 0, "Should have items");
+    assert!(!items.is_empty(), "Should have items");
 
     // Check that items use the custom item
     if let NbtTag::Compound(item) = &items[0] {
@@ -148,7 +148,7 @@ fn test_signal_zero() {
 
     // signal=0 means empty container - may or may not create a block entity
     // If it does, it should have no items
-    if block_entities_list.len() > 0 {
+    if !block_entities_list.is_empty() {
         if let NbtTag::Compound(be) = &block_entities_list[0] {
             if let Ok(data) = be.get::<_, &NbtCompound>("Data") {
                 if let Ok(items) = data.get::<_, &quartz_nbt::NbtList>("Items") {
@@ -342,7 +342,7 @@ fn test_count_field_format() {
     let be = get_first_block_entity("minecraft:barrel{signal=14}");
     let items = get_items_from_data(&be);
 
-    assert!(items.len() > 0, "Should have items");
+    assert!(!items.is_empty(), "Should have items");
 
     if let NbtTag::Compound(item) = &items[0] {
         // Should have lowercase 'count', not uppercase 'Count' (modern format)

@@ -253,7 +253,7 @@ mod tests {
     fn empty_glb() -> Vec<u8> {
         let json = br#"{"asset":{"version":"2.0"},"buffers":[{"byteLength":0}],"bufferViews":[],"accessors":[],"materials":[],"meshes":[],"nodes":[{"mesh":0}],"scenes":[{"nodes":[0]}],"scene":0,"extensionsUsed":[]}"#;
         let mut j = json.to_vec();
-        while j.len() % 4 != 0 {
+        while !j.len().is_multiple_of(4) {
             j.push(b' ');
         }
         let bin: Vec<u8> = Vec::new();

@@ -101,25 +101,22 @@ mod tests {
         let lever_pos = BlockPos::new(0, 1, 0);
 
         // Initial state should be unpowered
-        assert_eq!(
-            world.get_lever_power(lever_pos),
-            false,
+        assert!(
+            !world.get_lever_power(lever_pos),
             "Lever should start unpowered"
         );
 
         // Toggle lever on
         world.on_use_block(lever_pos);
-        assert_eq!(
+        assert!(
             world.get_lever_power(lever_pos),
-            true,
             "Lever should be powered after toggle"
         );
 
         // Toggle lever off
         world.on_use_block(lever_pos);
-        assert_eq!(
-            world.get_lever_power(lever_pos),
-            false,
+        assert!(
+            !world.get_lever_power(lever_pos),
             "Lever should be unpowered after second toggle"
         );
     }
@@ -133,7 +130,7 @@ mod tests {
         let lamp_pos = BlockPos::new(15, 1, 0);
 
         // Initially lamp should be off
-        assert_eq!(world.is_lit(lamp_pos), false, "Lamp should start off");
+        assert!(!world.is_lit(lamp_pos), "Lamp should start off");
 
         // Toggle lever on
         world.on_use_block(lever_pos);
@@ -141,9 +138,8 @@ mod tests {
         world.flush();
 
         // Lamp should now be lit
-        assert_eq!(
+        assert!(
             world.is_lit(lamp_pos),
-            true,
             "Lamp should be lit after lever is toggled on"
         );
 
@@ -153,9 +149,8 @@ mod tests {
         world.flush();
 
         // Lamp should be off again
-        assert_eq!(
-            world.is_lit(lamp_pos),
-            false,
+        assert!(
+            !world.is_lit(lamp_pos),
             "Lamp should be off after lever is toggled off"
         );
     }
@@ -219,9 +214,8 @@ mod tests {
         world.tick(20); // Wait longer
         world.flush();
 
-        assert_eq!(
+        assert!(
             world.is_lit(lamp_pos),
-            true,
             "Lamp should be lit after sufficient ticks"
         );
     }
@@ -378,7 +372,7 @@ mod tests {
             MchprsWorld::with_options(schematic, options).expect("World creation failed");
 
         // Lamp should start off
-        assert_eq!(world.is_lit(lamp_pos), false, "Lamp should start off");
+        assert!(!world.is_lit(lamp_pos), "Lamp should start off");
 
         // Toggle lever and verify custom IO still works
         world.on_use_block(lever_pos);
@@ -386,9 +380,8 @@ mod tests {
         world.flush();
 
         // Lamp should be on from lever
-        assert_eq!(
+        assert!(
             world.is_lit(lamp_pos),
-            true,
             "Lamp should light up from lever"
         );
 
@@ -585,7 +578,7 @@ mod tests {
         let lamp_pos = BlockPos::new(15, 1, 0);
 
         // Initially lamp should be off
-        assert_eq!(world.is_lit(lamp_pos), false, "Lamp should start off");
+        assert!(!world.is_lit(lamp_pos), "Lamp should start off");
 
         // Toggle lever on
         world.on_use_block(lever_pos);
@@ -593,9 +586,8 @@ mod tests {
         world.flush();
 
         // Lamp should now be lit
-        assert_eq!(
+        assert!(
             world.is_lit(lamp_pos),
-            true,
             "Lamp should be lit after lever is toggled with bracket notation blocks"
         );
     }
@@ -1086,7 +1078,7 @@ mod tests {
             changes.len()
         );
         // In a connected circuit, setting one wire may affect others instantly
-        assert!(changes.len() >= 1, "Should detect at least input A change");
+        assert!(!changes.is_empty(), "Should detect at least input A change");
         let input_a_change = changes.iter().find(|c| c.x == 0 && c.y == 1 && c.z == 1);
         assert!(input_a_change.is_some(), "Should detect input A change");
         assert_eq!(
@@ -1115,7 +1107,7 @@ mod tests {
 
         let changes = world.poll_custom_io_changes();
         eprintln!("  Changes detected: {}", changes.len());
-        assert!(changes.len() >= 1, "Should detect input B change");
+        assert!(!changes.is_empty(), "Should detect input B change");
 
         let input_b_change = changes.iter().find(|c| c.x == 2 && c.y == 1 && c.z == 1);
         assert!(input_b_change.is_some(), "Should detect input B change");
@@ -1183,7 +1175,7 @@ mod tests {
         let changes = world.poll_custom_io_changes();
         eprintln!("  Changes detected: {}", changes.len());
         // In a connected circuit, changes may propagate to multiple wires
-        assert!(changes.len() >= 1, "Should detect at least input A change");
+        assert!(!changes.is_empty(), "Should detect at least input A change");
         let input_a_change = changes.iter().find(|c| c.x == 0 && c.y == 1 && c.z == 1);
         assert!(input_a_change.is_some(), "Should detect input A change");
 
@@ -1201,7 +1193,7 @@ mod tests {
         world.check_custom_io_changes();
         let changes = world.poll_custom_io_changes();
         eprintln!("  Changes detected: {}", changes.len());
-        assert!(changes.len() >= 1, "Should detect at least input B change");
+        assert!(!changes.is_empty(), "Should detect at least input B change");
         let input_b_change = changes.iter().find(|c| c.x == 2 && c.y == 1 && c.z == 1);
         assert!(input_b_change.is_some(), "Should detect input B change");
 
@@ -1220,7 +1212,7 @@ mod tests {
         let changes = world.poll_custom_io_changes();
         eprintln!("  Changes detected: {}", changes.len());
         assert!(
-            changes.len() >= 1,
+            !changes.is_empty(),
             "Should detect at least input A change back to 0"
         );
         let input_a_change = changes.iter().find(|c| c.x == 0 && c.y == 1 && c.z == 1);

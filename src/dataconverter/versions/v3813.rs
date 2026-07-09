@@ -134,7 +134,7 @@ pub fn register(reg: &mut RegistryBuilder) {
     );
     for id in PATROLLING_MOBS {
         reg.entity.add_converter_for_id(
-            *id,
+            id,
             VERSION,
             0,
             Box::new(|data: &mut NbtMap, _from, _to| {
@@ -143,7 +143,7 @@ pub fn register(reg: &mut RegistryBuilder) {
         );
         // Reverse (lossless, bucket B): patrol_target -> PatrolTarget.
         reg.entity.add_reverse_converter_for_id(
-            *id,
+            id,
             VERSION,
             0,
             Box::new(|data: &mut NbtMap, _from, _to| {

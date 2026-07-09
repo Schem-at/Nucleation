@@ -329,12 +329,12 @@ pub fn parse_io_layout_from_insign(
             "input" => {
                 builder = builder
                     .add_input(name.to_string(), io_type, layout, positions)
-                    .map_err(|e| InsignIoError::LayoutBuildError(e))?;
+                    .map_err(InsignIoError::LayoutBuildError)?;
             }
             "output" => {
                 builder = builder
                     .add_output(name.to_string(), io_type, layout, positions)
-                    .map_err(|e| InsignIoError::LayoutBuildError(e))?;
+                    .map_err(InsignIoError::LayoutBuildError)?;
             }
             _ => {
                 return Err(InsignIoError::InvalidMetadataValue(

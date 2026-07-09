@@ -18,9 +18,7 @@ fn build_and_save(path: &str, description: &str, build: impl FnOnce(&mut Univers
         .map(|b| format!("{:?}", b))
         .unwrap_or_else(|| "<empty>".into());
     let entity_count: usize = schem
-        .get_all_regions()
-        .iter()
-        .map(|(_, r)| r.entities.len())
+        .get_all_regions().values().map(|r| r.entities.len())
         .sum();
 
     println!("-- {}", description);
@@ -35,9 +33,7 @@ fn build_and_save(path: &str, description: &str, build: impl FnOnce(&mut Univers
     let reloaded_bytes = std::fs::read(path).unwrap();
     let reloaded = litematic::from_litematic(&reloaded_bytes).expect("reload failed");
     let reloaded_count: usize = reloaded
-        .get_all_regions()
-        .iter()
-        .map(|(_, r)| r.entities.len())
+        .get_all_regions().values().map(|r| r.entities.len())
         .sum();
     println!("   reloaded count: {}\n", reloaded_count);
 }

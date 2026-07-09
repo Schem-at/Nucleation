@@ -48,7 +48,7 @@ pub fn register(reg: &mut RegistryBuilder) {
 
             // Vanilla leaves the `VillagerProfession` tag in place, so we do too.
             let mut profession = data.get_i32("VillagerProfession").unwrap_or(-1);
-            if profession < 0 || profession >= 6 {
+            if !(0..6).contains(&profession) {
                 profession = rand::thread_rng().gen_range(0..6);
             }
 

@@ -100,7 +100,7 @@ fn test_simulation_with_simple_barrel() {
     }
 
     println!("\nAttempting to create simulation world...");
-    let world = MchprsWorld::new(schematic).expect("Failed to create simulation");
+    let _world = MchprsWorld::new(schematic).expect("Failed to create simulation");
     println!("✓ Simulation created successfully!");
 }
 

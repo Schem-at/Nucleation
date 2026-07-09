@@ -151,7 +151,7 @@ fn snapshot_roundtrip_diverse_palette() {
     for (i, name) in block_names.iter().enumerate() {
         let block = restored
             .get_block(i as i32, 0, 0)
-            .expect(&format!("block at x={} not found", i));
+            .unwrap_or_else(|| panic!("block at x={} not found", i));
         assert_eq!(block.name.as_str(), *name, "block name mismatch at x={}", i);
     }
 }
@@ -181,7 +181,7 @@ fn snapshot_roundtrip_solid_cube() {
             for z in 0..size {
                 let block = restored
                     .get_block(x, y, z)
-                    .expect(&format!("block at ({},{},{}) not found", x, y, z));
+                    .unwrap_or_else(|| panic!("block at ({},{},{}) not found", x, y, z));
                 assert_eq!(
                     block.name.as_str(),
                     "minecraft:stone",

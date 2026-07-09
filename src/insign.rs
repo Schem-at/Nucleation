@@ -118,7 +118,7 @@ pub fn compile_schematic_insign(schematic: &UniversalSchematic) -> Result<JsonVa
 mod tests {
     use super::*;
     use crate::block_entity::BlockEntity;
-    use crate::region::Region;
+    
     use crate::utils::NbtValue;
 
     // ====================================================================================
@@ -592,7 +592,7 @@ mod tests {
             expected_name
         );
         assert_eq!(metadata.get("version").unwrap().as_i64().unwrap(), 2);
-        assert_eq!(metadata.get("active").unwrap().as_bool().unwrap(), true);
+        assert!(metadata.get("active").unwrap().as_bool().unwrap());
 
         let config = metadata.get("config").unwrap().as_object().unwrap();
         assert_eq!(config.get("speed").unwrap().as_i64().unwrap(), 100);

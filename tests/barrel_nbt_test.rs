@@ -90,7 +90,7 @@ fn test_block_entity_structure(
         .expect("No BlockEntities list in Blocks compound");
 
     assert!(
-        block_entities_list.len() > 0,
+        !block_entities_list.is_empty(),
         "Expected at least one block entity"
     );
 
@@ -219,7 +219,7 @@ fn print_nbt_structure(compound: &NbtCompound, indent: usize) {
             }
             NbtTag::List(list) => {
                 println!("{}{}: List[{}]", indent_str, key, list.len());
-                if list.len() > 0 && list.len() <= 3 {
+                if !list.is_empty() && list.len() <= 3 {
                     for (i, item) in list.iter().enumerate() {
                         if let NbtTag::Compound(c) = item {
                             println!("{}  [{}]:", indent_str, i);

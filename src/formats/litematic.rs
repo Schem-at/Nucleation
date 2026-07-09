@@ -5,7 +5,6 @@ use crate::{BlockState, UniversalSchematic};
 use flate2::read::GzDecoder;
 use quartz_nbt::io::Flavor;
 use quartz_nbt::{NbtCompound, NbtList, NbtTag};
-use std::io::{Cursor, Read};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn is_litematic(data: &[u8]) -> bool {
@@ -178,9 +177,9 @@ fn create_metadata(schematic: &UniversalSchematic, version: i32) -> NbtCompound 
     };
 
     let mut enclosing_size = NbtCompound::new();
-    enclosing_size.insert("x", NbtTag::Int(width as i32));
-    enclosing_size.insert("y", NbtTag::Int(height as i32));
-    enclosing_size.insert("z", NbtTag::Int(length as i32));
+    enclosing_size.insert("x", NbtTag::Int(width));
+    enclosing_size.insert("y", NbtTag::Int(height));
+    enclosing_size.insert("z", NbtTag::Int(length));
     metadata.insert("EnclosingSize", NbtTag::Compound(enclosing_size));
 
     // v4 (1.12) wrote these as TAG_Long; v5+ switched to TAG_Int.
@@ -188,8 +187,8 @@ fn create_metadata(schematic: &UniversalSchematic, version: i32) -> NbtCompound 
         metadata.insert("TotalVolume", NbtTag::Long(schematic.total_volume() as i64));
         metadata.insert("TotalBlocks", NbtTag::Long(schematic.total_blocks() as i64));
     } else {
-        metadata.insert("TotalVolume", NbtTag::Int(schematic.total_volume() as i32));
-        metadata.insert("TotalBlocks", NbtTag::Int(schematic.total_blocks() as i32));
+        metadata.insert("TotalVolume", NbtTag::Int(schematic.total_volume()));
+        metadata.insert("TotalBlocks", NbtTag::Int(schematic.total_blocks()));
     }
     metadata.insert(
         "RegionCount",
@@ -285,7 +284,7 @@ fn create_regions(schematic: &UniversalSchematic, version: i32) -> NbtCompound {
             )
         };
         let block_count = compact_region.blocks.len();
-        let expected_len = (block_count * bits_per_block + 63) / 64;
+        let expected_len = (block_count * bits_per_block).div_ceil(64);
 
         let mut packed_states = vec![0i64; expected_len];
         let mask = (1u64 << bits_per_block) - 1;
@@ -532,11 +531,55 @@ fn parse_regions(
     Ok(())
 }
 
+use crate::formats::manager::{SchematicExporter, SchematicImporter};
+
+pub struct LitematicFormat;
+
+impl SchematicImporter for LitematicFormat {
+    fn name(&self) -> String {
+        "litematic".to_string()
+    }
+
+    fn detect(&self, data: &[u8]) -> bool {
+        is_litematic(data)
+    }
+
+    fn read(&self, data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::error::Error>> {
+        from_litematic(data)
+    }
+}
+
+impl SchematicExporter for LitematicFormat {
+    fn name(&self) -> String {
+        "litematic".to_string()
+    }
+
+    fn extensions(&self) -> Vec<String> {
+        vec!["litematic".to_string()]
+    }
+
+    fn available_versions(&self) -> Vec<String> {
+        vec!["default".to_string()]
+    }
+
+    fn default_version(&self) -> String {
+        "default".to_string()
+    }
+
+    fn write(
+        &self,
+        schematic: &UniversalSchematic,
+        _version: Option<&str>,
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        to_litematic(schematic)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{BlockState, UniversalSchematic};
-    use num_complex::Complex;
+    
     use std::fs::File;
     use std::io::Write;
 
@@ -1198,49 +1241,5 @@ mod tests {
                 }
             }
         }
-    }
-}
-
-use crate::formats::manager::{SchematicExporter, SchematicImporter};
-
-pub struct LitematicFormat;
-
-impl SchematicImporter for LitematicFormat {
-    fn name(&self) -> String {
-        "litematic".to_string()
-    }
-
-    fn detect(&self, data: &[u8]) -> bool {
-        is_litematic(data)
-    }
-
-    fn read(&self, data: &[u8]) -> Result<UniversalSchematic, Box<dyn std::error::Error>> {
-        from_litematic(data)
-    }
-}
-
-impl SchematicExporter for LitematicFormat {
-    fn name(&self) -> String {
-        "litematic".to_string()
-    }
-
-    fn extensions(&self) -> Vec<String> {
-        vec!["litematic".to_string()]
-    }
-
-    fn available_versions(&self) -> Vec<String> {
-        vec!["default".to_string()]
-    }
-
-    fn default_version(&self) -> String {
-        "default".to_string()
-    }
-
-    fn write(
-        &self,
-        schematic: &UniversalSchematic,
-        _version: Option<&str>,
-    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-        to_litematic(schematic)
     }
 }

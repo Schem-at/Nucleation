@@ -57,9 +57,9 @@ fn main() -> Result<(), String> {
     // Print some sample blocks to verify
     println!("\n🔍 Sample blocks (first 15 non-air):");
     let mut count = 0;
-    'outer: for y in 0..height as i32 {
-        for z in 0..depth as i32 {
-            for x in 0..width as i32 {
+    'outer: for y in 0..height {
+        for z in 0..depth {
+            for x in 0..width {
                 if let Some(block) = half_adder.get_block(x, y, z) {
                     let block_str = block.to_string();
                     if !block_str.contains("air") {
@@ -113,8 +113,8 @@ fn main() -> Result<(), String> {
 
     // Show what blocks were created
     println!("\n   Blocks in repeater chain:");
-    for y in 0..h as i32 {
-        for x in 0..w as i32 {
+    for y in 0..h {
+        for x in 0..w {
             if let Some(block) = repeater_chain.get_block(x, y, 0) {
                 let block_str = block.to_string();
                 if !block_str.contains("air") {

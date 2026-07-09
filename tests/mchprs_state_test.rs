@@ -79,7 +79,7 @@ mod mchprs_state_tests {
 
         // Check initial lamp state
         if let Some(lamp) = initial_schematic.get_block(1, 0, 0) {
-            println!("  Lamp initial: {}", lamp.to_string());
+            println!("  Lamp initial: {}", lamp);
             assert_eq!(lamp.get_property("lit").map(|s| s.as_str()), Some("false"));
         }
 
@@ -163,13 +163,13 @@ mod mchprs_state_tests {
 
         println!("\nSTEP 7: Check synced schematic properties");
         if let Some(lamp) = synced.get_block(1, 0, 0) {
-            println!("  Synced lamp: {}", lamp.to_string());
+            println!("  Synced lamp: {}", lamp);
         }
         if let Some(wire) = synced.get_block(2, 1, 1) {
-            println!("  Synced wire: {}", wire.to_string());
+            println!("  Synced wire: {}", wire);
         }
         if let Some(torch) = synced.get_block(2, 1, 2) {
-            println!("  Synced torch: {}", torch.to_string());
+            println!("  Synced torch: {}", torch);
         }
 
         println!("\n=== KEY FINDINGS ===");

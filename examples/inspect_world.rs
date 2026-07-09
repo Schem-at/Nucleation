@@ -122,7 +122,7 @@ fn main() {
     let chars = "SsOoPpRrLlDdNnCcQqBbWwEeFfGgHhIiJjKkMm";
     let mut char_idx = 0;
     for (name, _) in &sorted {
-        let short = name
+        let _short = name
             .strip_prefix("minecraft:")
             .unwrap_or(name)
             .split('[')
@@ -144,7 +144,7 @@ fn main() {
 
     for y in tight_min_y..=tight_max_y {
         let mut has_blocks = false;
-        for (bx, by, bz, _) in &block_positions {
+        for (_bx, by, _bz, _) in &block_positions {
             if *by == y {
                 has_blocks = true;
                 break;

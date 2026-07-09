@@ -63,7 +63,7 @@ fn test_unsigned_int_binary_conversion() {
 
     // Test 1
     let bits = io_type.to_binary(&Value::U32(1)).unwrap();
-    assert_eq!(bits[0], true);
+    assert!(bits[0]);
     assert_eq!(bits[1..], vec![false; 7]);
     assert_eq!(io_type.from_binary(&bits).unwrap(), Value::U32(1));
 
@@ -169,9 +169,9 @@ fn test_float32_binary_conversion() {
     }
 
     // Test pi
-    let bits = io_type.to_binary(&Value::F32(3.14159)).unwrap();
+    let bits = io_type.to_binary(&Value::F32(std::f32::consts::PI)).unwrap();
     if let Value::F32(f) = io_type.from_binary(&bits).unwrap() {
-        assert!((f - 3.14159).abs() < 0.00001);
+        assert!((f - std::f32::consts::PI).abs() < 0.00001);
     } else {
         panic!("Expected F32");
     }

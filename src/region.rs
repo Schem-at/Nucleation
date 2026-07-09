@@ -337,7 +337,7 @@ impl Region {
         let tb_min_x = tight_bounds.min.0;
         let tb_min_y = tight_bounds.min.1;
         let tb_min_z = tight_bounds.min.2;
-        let tb_max_y = tight_bounds.max.1;
+        let _tb_max_y = tight_bounds.max.1;
         let tb_max_z = tight_bounds.max.2;
 
         let x_off_src = (tb_min_x - self.bbox.min.0) as usize;
@@ -862,7 +862,7 @@ impl Region {
         for (index, &block_index) in self.blocks.iter().enumerate() {
             let (x, y, z) = self.index_to_coords(index);
             blocks_tag.insert(
-                &format!("{},{},{}", x, y, z),
+                format!("{},{},{}", x, y, z),
                 NbtTag::Int(block_index as i32),
             );
         }
@@ -886,7 +886,7 @@ impl Region {
 
         let mut block_entities_tag = NbtCompound::new();
         for ((x, y, z), block_entity) in self.block_entities.iter() {
-            block_entities_tag.insert(&format!("{},{},{}", x, y, z), block_entity.to_nbt());
+            block_entities_tag.insert(format!("{},{},{}", x, y, z), block_entity.to_nbt());
         }
         tag.insert("BlockEntities", NbtTag::Compound(block_entities_tag));
 
@@ -1080,7 +1080,7 @@ impl Region {
     pub(crate) fn create_packed_block_states(&self) -> Vec<i64> {
         let bits_per_block = self.calculate_bits_per_block();
         let size = self.blocks.len();
-        let expected_len = (size * bits_per_block + 63) / 64;
+        let expected_len = (size * bits_per_block).div_ceil(64);
 
         let mut packed_states = vec![0i64; expected_len];
         let mask: u64 = (1u64 << bits_per_block) - 1;
@@ -1287,7 +1287,7 @@ impl Region {
             return; // Only support 90-degree rotations
         }
 
-        let normalized_degrees = ((degrees % 360 + 360) % 360) as i32;
+        let normalized_degrees = degrees.rem_euclid(360);
         let rotations = normalized_degrees / 90;
 
         for _ in 0..rotations {
@@ -1378,7 +1378,7 @@ impl Region {
             return;
         }
 
-        let normalized_degrees = ((degrees % 360 + 360) % 360) as i32;
+        let normalized_degrees = degrees.rem_euclid(360);
         let rotations = normalized_degrees / 90;
 
         for _ in 0..rotations {
@@ -1462,7 +1462,7 @@ impl Region {
             return;
         }
 
-        let normalized_degrees = ((degrees % 360 + 360) % 360) as i32;
+        let normalized_degrees = degrees.rem_euclid(360);
         let rotations = normalized_degrees / 90;
 
         for _ in 0..rotations {
@@ -1693,7 +1693,7 @@ mod tests {
     // genuine Litematica long array byte-for-byte, for EVERY bit width including the
     // power-of-two widths that use the "fast path".
     fn litematica_pack(values: &[usize], bits: usize) -> Vec<i64> {
-        let len = ((values.len() * bits + 63) / 64).max(1);
+        let len = (values.len() * bits).div_ceil(64).max(1);
         let mut longs = vec![0i64; len];
         let mask = (1u64 << bits) - 1;
         for (i, &v) in values.iter().enumerate() {
@@ -1725,7 +1725,7 @@ mod tests {
             region.palette = (0..palette_len).map(|i| BlockState::new(format!("minecraft:b{}", i))).collect();
             assert_eq!(region.calculate_bits_per_block(), bits, "bits setup for palette_len={}", palette_len);
             // Litematica long-count is ceil(volume*bits/64); confirm nucleation reads exactly that.
-            assert_eq!(packed.len(), (volume * bits + 63) / 64);
+            assert_eq!(packed.len(), (volume * bits).div_ceil(64));
             let unpacked = region.unpack_block_states(&packed);
             assert_eq!(unpacked, values, "unpack mismatch at bits={}", bits);
         }
@@ -2243,7 +2243,7 @@ mod tests {
         for i in 0..8 {
             let coords = region2.index_to_coords(i);
             let index = region2.coords_to_index(coords.0, coords.1, coords.2);
-            assert!(index >= 0 && index < volume2);
+            assert!(index < volume2);
             assert_eq!(index, i);
         }
 
@@ -2253,7 +2253,7 @@ mod tests {
         for i in 0..27 {
             let coords = region.index_to_coords(i);
             let index = region.coords_to_index(coords.0, coords.1, coords.2);
-            assert!(index >= 0 && index < volume3);
+            assert!(index < volume3);
             assert_eq!(index, i);
         }
     }

@@ -2,6 +2,7 @@ use quartz_nbt::{NbtCompound, NbtTag};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Default)]
 pub struct Metadata {
     pub name: Option<String>,
     pub author: Option<String>,
@@ -20,21 +21,6 @@ pub struct Metadata {
     /// load-time provenance.
     #[serde(default, skip)]
     pub source_data_version: Option<i32>,
-}
-impl Default for Metadata {
-    fn default() -> Self {
-        Metadata {
-            name: None,
-            author: None,
-            description: None,
-            created: None,
-            modified: None,
-            lm_version: None,
-            mc_version: None,
-            we_version: None,
-            source_data_version: None,
-        }
-    }
 }
 
 impl Metadata {

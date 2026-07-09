@@ -887,7 +887,7 @@ cc
         assert_eq!(builder.layers.len(), 1);
         // Standard palette is loaded by default (63 chars)
         assert!(
-            builder.palette.len() > 0,
+            !builder.palette.is_empty(),
             "Should have standard palette loaded"
         );
     }

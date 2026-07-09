@@ -201,14 +201,14 @@ impl IoLayoutBuilder {
         // Infer layout based on position count
         let layout = if positions.len() == bit_count {
             LayoutFunction::OneToOne
-        } else if positions.len() == (bit_count + 3) / 4 {
+        } else if positions.len() == bit_count.div_ceil(4) {
             LayoutFunction::Packed4
         } else {
             return Err(format!(
                 "Cannot infer layout: {} bits need {} positions (OneToOne) or {} positions (Packed4), but got {}",
                 bit_count,
                 bit_count,
-                (bit_count + 3) / 4,
+                bit_count.div_ceil(4),
                 positions.len()
             ));
         };
@@ -228,14 +228,14 @@ impl IoLayoutBuilder {
         // Infer layout based on position count
         let layout = if positions.len() == bit_count {
             LayoutFunction::OneToOne
-        } else if positions.len() == (bit_count + 3) / 4 {
+        } else if positions.len() == bit_count.div_ceil(4) {
             LayoutFunction::Packed4
         } else {
             return Err(format!(
                 "Cannot infer layout: {} bits need {} positions (OneToOne) or {} positions (Packed4), but got {}",
                 bit_count,
                 bit_count,
-                (bit_count + 3) / 4,
+                bit_count.div_ceil(4),
                 positions.len()
             ));
         };

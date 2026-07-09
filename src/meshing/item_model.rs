@@ -32,8 +32,10 @@ const ATLAS_PAGE_SIZE: u32 = 4096;
 /// - `1.0` = 1 block = 1 model unit (max 48 blocks per axis)
 /// - `2.0` = 2 blocks per model unit (max 96 blocks, everything half-size)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum ItemModelScale {
     /// Automatically compute uniform scale to fit within 48 model units.
+    #[default]
     Auto,
     /// Same scale factor on all axes (clamped to >= 1.0).
     Uniform(f32),
@@ -41,11 +43,6 @@ pub enum ItemModelScale {
     NonUniform(f32, f32, f32),
 }
 
-impl Default for ItemModelScale {
-    fn default() -> Self {
-        Self::Auto
-    }
-}
 
 /// Resolve scale enum to concrete (sx, sy, sz) tuple.
 fn resolve_scale(scale: &ItemModelScale, w: i32, h: i32, d: i32) -> (f32, f32, f32) {
@@ -722,8 +719,8 @@ fn split_plane_grid(grid: &PlaneGrid, tex_resolution: u32) -> Vec<PlaneChunk> {
         }];
     }
 
-    let chunks_u = (grid.width + max_blocks - 1) / max_blocks;
-    let chunks_v = (grid.height + max_blocks - 1) / max_blocks;
+    let chunks_u = grid.width.div_ceil(max_blocks);
+    let chunks_v = grid.height.div_ceil(max_blocks);
     let mut chunks = Vec::new();
 
     for cu in 0..chunks_u {
@@ -1932,7 +1929,7 @@ impl UniversalSchematic {
                             * (grid.height as u64 * candidate as u64);
                     }
 
-                    let pages = (total_px + EFFECTIVE_PAGE_PX - 1) / EFFECTIVE_PAGE_PX;
+                    let pages = total_px.div_ceil(EFFECTIVE_PAGE_PX);
                     if total_px <= MAX_ATLAS_PX && pages <= MAX_PAGES {
                         best = candidate;
                     }

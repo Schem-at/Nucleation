@@ -6,6 +6,12 @@ use nucleation::UniversalSchematic;
 // Mocking SchematicWrapper from src/wasm/schematic.rs
 pub struct SchematicWrapper(pub(crate) UniversalSchematic);
 
+impl Default for SchematicWrapper {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SchematicWrapper {
     pub fn new() -> Self {
         SchematicWrapper(UniversalSchematic::new("Default".to_string()))

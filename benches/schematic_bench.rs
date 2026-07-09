@@ -4,8 +4,8 @@ use nucleation::{BlockState, Region, UniversalSchematic};
 fn benchmark_schematic_creation(c: &mut Criterion) {
     c.bench_function("create schematic", |b| {
         b.iter(|| {
-            let schematic = UniversalSchematic::new("Test Schematic".to_string());
-            schematic
+            
+            UniversalSchematic::new("Test Schematic".to_string())
         })
     });
 }

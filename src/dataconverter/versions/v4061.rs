@@ -206,7 +206,7 @@ pub fn register(reg: &mut RegistryBuilder) {
             };
 
             let matched = PRESETS.iter().find(|p| {
-                p.normal == normal_config && p.ominous_variants.iter().any(|v| *v == ominous_config)
+                p.normal == normal_config && p.ominous_variants.contains(&ominous_config)
             });
 
             if let Some(preset) = matched {

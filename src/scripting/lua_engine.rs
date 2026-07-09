@@ -114,11 +114,11 @@ impl LuaUserData for LuaSchematic {
         // -- Export --
         methods.add_method("to_schematic", |lua, this, ()| {
             let bytes = this.0.borrow().to_schematic().map_err(LuaError::external)?;
-            Ok(lua.create_string(&bytes)?)
+            lua.create_string(&bytes)
         });
         methods.add_method("to_litematic", |lua, this, ()| {
             let bytes = this.0.borrow().to_litematic().map_err(LuaError::external)?;
-            Ok(lua.create_string(&bytes)?)
+            lua.create_string(&bytes)
         });
         methods.add_method("save_as", |lua, this, format: String| {
             let bytes = this
@@ -126,7 +126,7 @@ impl LuaUserData for LuaSchematic {
                 .borrow()
                 .save_as(&format)
                 .map_err(LuaError::external)?;
-            Ok(lua.create_string(&bytes)?)
+            lua.create_string(&bytes)
         });
         methods.add_method("save_to_file", |_, this, path: String| {
             this.0

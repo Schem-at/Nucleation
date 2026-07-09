@@ -176,7 +176,7 @@ impl WorldSource {
                 for entry in std::fs::read_dir(dir.join("region"))? {
                     let entry = entry?;
                     let path = entry.path();
-                    if path.extension().map_or(false, |ext| ext == "mca") {
+                    if path.extension().is_some_and(|ext| ext == "mca") {
                         let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
                         if let Some(pos) = parse_region_filename(filename) {
                             out.push(pos);

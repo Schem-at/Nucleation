@@ -113,7 +113,7 @@ fn main() {
                 }
             });
             let c = done.fetch_add(1, Ordering::Relaxed) + 1;
-            if c % 500 == 0 {
+            if c.is_multiple_of(500) {
                 let el = t_all.elapsed().as_secs_f64();
                 eprintln!("  …{c}/{n}  ({:.0}/s, {:.0}s)", c as f64 / el, el);
             }

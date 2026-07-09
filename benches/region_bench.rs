@@ -42,7 +42,7 @@ fn bench_set_block(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(3));
 
     for &size in &[16, 32] {
-        group.bench_function(&format!("{}_solid", size), |b| {
+        group.bench_function(format!("{}_solid", size), |b| {
             b.iter(|| {
                 let mut r = Region::new("bench".to_string(), (0, 0, 0), (size, size, size));
                 let stone = BlockState::new("minecraft:stone".to_string());
@@ -66,7 +66,7 @@ fn bench_get_block(c: &mut Criterion) {
 
     for &size in &[16, 32] {
         let region = make_region_solid(size);
-        group.bench_function(&format!("{}_solid", size), |b| {
+        group.bench_function(format!("{}_solid", size), |b| {
             b.iter(|| {
                 let mut sum = 0usize;
                 for y in 0..size {
@@ -109,7 +109,7 @@ fn bench_flips(c: &mut Criterion) {
     for &size in &[16, 32] {
         let region = make_region_solid(size);
 
-        group.bench_function(&format!("x_{}", size), |b| {
+        group.bench_function(format!("x_{}", size), |b| {
             b.iter_batched(
                 || region.clone(),
                 |mut r| {
@@ -120,7 +120,7 @@ fn bench_flips(c: &mut Criterion) {
             );
         });
 
-        group.bench_function(&format!("y_{}", size), |b| {
+        group.bench_function(format!("y_{}", size), |b| {
             b.iter_batched(
                 || region.clone(),
                 |mut r| {
@@ -131,7 +131,7 @@ fn bench_flips(c: &mut Criterion) {
             );
         });
 
-        group.bench_function(&format!("z_{}", size), |b| {
+        group.bench_function(format!("z_{}", size), |b| {
             b.iter_batched(
                 || region.clone(),
                 |mut r| {
@@ -151,7 +151,7 @@ fn bench_rotate_y(c: &mut Criterion) {
 
     for &size in &[16, 32] {
         let region = make_region_solid(size);
-        group.bench_function(&format!("{}", size), |b| {
+        group.bench_function(format!("{}", size), |b| {
             b.iter_batched(
                 || region.clone(),
                 |mut r| {
@@ -169,14 +169,15 @@ fn bench_to_compact(c: &mut Criterion) {
     let mut group = c.benchmark_group("to_compact");
     group.measurement_time(Duration::from_secs(3));
 
-    for &size in &[32] {
+    {
+        let &size = &32;
         let region_sparse = make_region_sparse(size, 0.1);
-        group.bench_function(&format!("{}_sparse10", size), |b| {
+        group.bench_function(format!("{}_sparse10", size), |b| {
             b.iter(|| black_box(region_sparse.to_compact()));
         });
 
         let region_half = make_region_sparse(size, 0.5);
-        group.bench_function(&format!("{}_half", size), |b| {
+        group.bench_function(format!("{}_half", size), |b| {
             b.iter(|| black_box(region_half.to_compact()));
         });
     }

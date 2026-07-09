@@ -47,7 +47,7 @@ pub struct RigidOp {
 
 fn rot_pos(p: Pos, axis: Axis, deg: i32) -> Pos {
     let (x, y, z) = p;
-    let d = ((deg % 360) + 360) % 360;
+    let d = deg.rem_euclid(360);
     // Right-handed. MUST match transforms::Direction rotation handedness — the
     // rotation-invariance test in the fingerprint module is the oracle.
     match (axis, d) {

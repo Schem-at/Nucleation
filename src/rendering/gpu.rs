@@ -662,7 +662,7 @@ impl GpuRenderer {
             let bytes_per_pixel = 4u32;
             let unpadded_bytes_per_row = bytes_per_pixel * width;
             let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
-            let padded = (unpadded_bytes_per_row + align - 1) / align * align;
+            let padded = unpadded_bytes_per_row.div_ceil(align) * align;
             let sb = device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("staging"),
                 size: (padded * height) as u64,
@@ -967,7 +967,7 @@ impl GpuRenderer {
         let bpp = 4u32;
         let unpadded = bpp * self.width;
         let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
-        let padded = (unpadded + align - 1) / align * align;
+        let padded = unpadded.div_ceil(align) * align;
 
         let staging = self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("screenshot_staging"),

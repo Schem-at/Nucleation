@@ -27,7 +27,7 @@ pub fn translated(src: &UniversalSchematic, by: (i32, i32, i32)) -> UniversalSch
 
 pub fn rotated_y(src: &UniversalSchematic, degrees: i32) -> UniversalSchematic {
     use crate::transforms::{transform_block_state_rotate, Axis};
-    let d = ((degrees % 360) + 360) % 360;
+    let d = degrees.rem_euclid(360);
     let mut s = UniversalSchematic::new("gen".to_string());
     for (p, b) in src.iter_blocks() {
         let (x, y, z) = (p.x, p.y, p.z);

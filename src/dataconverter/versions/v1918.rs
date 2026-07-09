@@ -176,25 +176,25 @@ pub fn register(reg: &mut RegistryBuilder) {
         "minecraft:villager",
         VERSION,
         0,
-        Box::new(|data, from, to| convert(data, from, to)),
+        Box::new(convert),
     );
     reg.entity.add_reverse_converter_for_id(
         "minecraft:villager",
         VERSION,
         0,
-        Box::new(|data, from, to| revert(data, from, to)),
+        Box::new(revert),
     );
     reg.entity.add_converter_for_id(
         "minecraft:zombie_villager",
         VERSION,
         0,
-        Box::new(|data, from, to| convert(data, from, to)),
+        Box::new(convert),
     );
     reg.entity.add_reverse_converter_for_id(
         "minecraft:zombie_villager",
         VERSION,
         0,
-        Box::new(|data, from, to| revert(data, from, to)),
+        Box::new(revert),
     );
 }
 

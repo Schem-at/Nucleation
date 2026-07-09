@@ -176,7 +176,7 @@ mod tests {
         assert_eq!(v.as_i64().unwrap(), -42);
 
         let v = Value::Bool(true);
-        assert_eq!(v.as_bool().unwrap(), true);
+        assert!(v.as_bool().unwrap());
 
         let v = Value::String("hello".to_string());
         assert_eq!(v.as_str().unwrap(), "hello");

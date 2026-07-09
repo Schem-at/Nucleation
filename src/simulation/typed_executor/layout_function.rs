@@ -69,7 +69,7 @@ impl LayoutFunction {
     pub fn position_count(&self, bit_count: usize) -> usize {
         match self {
             LayoutFunction::OneToOne => bit_count,
-            LayoutFunction::Packed4 => (bit_count + 3) / 4,
+            LayoutFunction::Packed4 => bit_count.div_ceil(4),
             LayoutFunction::Custom(mapping) => mapping.len(),
             LayoutFunction::RowMajor {
                 rows,
@@ -77,7 +77,7 @@ impl LayoutFunction {
                 bits_per_element,
             } => {
                 let total_bits = rows * cols * bits_per_element;
-                (total_bits + 3) / 4 // Assuming packed4 for elements
+                total_bits.div_ceil(4) // Assuming packed4 for elements
             }
             LayoutFunction::ColumnMajor {
                 rows,
@@ -85,7 +85,7 @@ impl LayoutFunction {
                 bits_per_element,
             } => {
                 let total_bits = rows * cols * bits_per_element;
-                (total_bits + 3) / 4
+                total_bits.div_ceil(4)
             }
             LayoutFunction::Scanline {
                 width,
@@ -93,7 +93,7 @@ impl LayoutFunction {
                 bits_per_pixel,
             } => {
                 let total_bits = width * height * bits_per_pixel;
-                (total_bits + 3) / 4
+                total_bits.div_ceil(4)
             }
             LayoutFunction::Tiled {
                 tile_width,
@@ -104,14 +104,14 @@ impl LayoutFunction {
             } => {
                 let total_pixels = tile_width * tile_height * tiles_x * tiles_y;
                 let total_bits = total_pixels * bits_per_pixel;
-                (total_bits + 3) / 4
+                total_bits.div_ceil(4)
             }
             LayoutFunction::Chunked {
                 chunk_size,
                 num_chunks,
             } => {
                 let total_bits = chunk_size * num_chunks;
-                (total_bits + 3) / 4
+                total_bits.div_ceil(4)
             }
         }
     }
@@ -126,7 +126,7 @@ impl LayoutFunction {
 
             LayoutFunction::Packed4 => {
                 // 4 bits per nibble
-                let mut nibbles = Vec::with_capacity((bits.len() + 3) / 4);
+                let mut nibbles = Vec::with_capacity(bits.len().div_ceil(4));
                 for chunk in bits.chunks(4) {
                     let nibble = chunk
                         .iter()
@@ -212,7 +212,7 @@ impl LayoutFunction {
 
     // Helper methods
     fn spread_bits_packed4(&self, bits: &[bool]) -> Result<Vec<u8>, String> {
-        let mut nibbles = Vec::with_capacity((bits.len() + 3) / 4);
+        let mut nibbles = Vec::with_capacity(bits.len().div_ceil(4));
         for chunk in bits.chunks(4) {
             let nibble = chunk
                 .iter()

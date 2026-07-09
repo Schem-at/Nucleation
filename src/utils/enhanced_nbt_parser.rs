@@ -73,8 +73,7 @@ fn parse_nbt_value(value_str: &str) -> Result<NbtValue, String> {
     }
 
     // Long (ends with 'L')
-    if value_str.ends_with('L') {
-        let num_str = &value_str[..value_str.len() - 1];
+    if let Some(num_str) = value_str.strip_suffix('L') {
         if let Ok(long_val) = num_str.parse::<i64>() {
             return Ok(NbtValue::Long(long_val));
         }
@@ -236,7 +235,7 @@ pub fn create_container_items_nbt(
 
         items.push(NbtValue::Compound(item_nbt));
 
-        remaining_items -= stack_size as u32;
+        remaining_items -= stack_size;
         slot += 1;
     }
 
@@ -364,6 +363,6 @@ mod tests {
     fn test_create_container_items_hopper() {
         let items = create_container_items_nbt(5, 10, None);
         assert!(items.len() <= 5, "Hopper should not exceed 5 slots");
-        assert!(items.len() > 0, "Should generate items for signal=10");
+        assert!(!items.is_empty(), "Should generate items for signal=10");
     }
 }

@@ -206,7 +206,7 @@ impl UniversalSchematic {
     pub fn get_default_region_palette(&self) -> Vec<BlockState> {
         let default_region_name = self.default_region_name.clone();
         self.get_palette_from_region(&default_region_name)
-            .unwrap_or_else(Vec::new)
+            .unwrap_or_default()
     }
 
     pub fn set_block_in_region_str(
@@ -450,14 +450,14 @@ impl UniversalSchematic {
         // Add blocks from default region
         let default_palette = self.default_region.get_palette();
         for block_index in &self.default_region.blocks {
-            blocks.push(default_palette[*block_index as usize].clone());
+            blocks.push(default_palette[*block_index ].clone());
         }
 
         // Add blocks from other regions
         for region in self.other_regions.values() {
             let region_palette = region.get_palette();
             for block_index in &region.blocks {
-                blocks.push(region_palette[*block_index as usize].clone());
+                blocks.push(region_palette[*block_index ].clone());
             }
         }
         blocks
@@ -1150,7 +1150,7 @@ impl UniversalSchematic {
         // Collect all blocks and entities from the original (instance 0)
         let original_blocks: Vec<_> = self
             .iter_blocks()
-            .map(|(pos, block)| (pos.clone(), block.clone()))
+            .map(|(pos, block)| (pos, block.clone()))
             .collect();
 
         let original_entities: Vec<_> = self.default_region.get_block_entities_as_list();
@@ -1354,7 +1354,7 @@ impl UniversalSchematic {
 
             chunk_map
                 .entry(chunk_key)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(BlockPosition { x, y, z });
         }
 
@@ -1373,7 +1373,7 @@ impl UniversalSchematic {
 
                 chunk_map
                     .entry(chunk_key)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(BlockPosition { x, y, z });
             }
         }
@@ -1396,7 +1396,7 @@ impl UniversalSchematic {
                 let (x, y, z) = self.default_region.index_to_coords(index);
                 Some((
                     BlockPosition { x, y, z },
-                    &self.default_region.palette[*block_index as usize],
+                    &self.default_region.palette[*block_index ],
                 ))
             },
         );
@@ -1410,7 +1410,7 @@ impl UniversalSchematic {
                     let (x, y, z) = region.index_to_coords(index);
                     Some((
                         BlockPosition { x, y, z },
-                        &region.palette[*block_index as usize],
+                        &region.palette[*block_index ],
                     ))
                 })
         });
@@ -1563,7 +1563,7 @@ impl UniversalSchematic {
 
             chunk_map
                 .entry(chunk_key)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push((BlockPosition { x, y, z }, palette_index));
         }
 
@@ -1582,7 +1582,7 @@ impl UniversalSchematic {
 
                 chunk_map
                     .entry(chunk_key)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push((BlockPosition { x, y, z }, palette_index));
             }
         }
@@ -2203,7 +2203,7 @@ pub fn is_opaque(block: &BlockState) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block_entity;
+    
     use crate::item::ItemStack;
     use quartz_nbt::io::{read_nbt, write_nbt};
     use std::io::Cursor;
@@ -2892,7 +2892,7 @@ mod tests {
 
             // Verify the total items matches what's needed for signal strength 13
             let expected_items = UniversalSchematic::calculate_items_for_signal(13);
-            assert_eq!(total_items as u32, expected_items);
+            assert_eq!(total_items, expected_items);
         }
 
         // Test invalid signal strength
@@ -2935,7 +2935,7 @@ mod tests {
                 }
             }
             let expected_items = UniversalSchematic::calculate_items_for_signal(7);
-            assert_eq!(total_items as u32, expected_items);
+            assert_eq!(total_items, expected_items);
         }
     }
 
@@ -2992,7 +2992,7 @@ mod tests {
 
         // Verify both methods return the same number of non-empty chunks
         assert!(
-            chunks.len() > 0,
+            !chunks.is_empty(),
             "Should have at least one chunk with blocks"
         );
         assert_eq!(
@@ -3133,7 +3133,7 @@ mod tests {
             "Should not exceed 8 chunks for blocks in 32x32x32 space"
         );
         assert!(
-            chunks4.len() > 0,
+            !chunks4.is_empty(),
             "Should have at least one chunk with blocks"
         );
     }
@@ -3255,6 +3255,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::approx_constant)]
     fn test_parse_nbt_value() {
         // Test JSON string (should stay as string)
         let json_value = UniversalSchematic::parse_nbt_value(r#"{"text":"Hello"}"#);

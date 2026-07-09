@@ -32,7 +32,7 @@ pub fn register(reg: &mut RegistryBuilder) {
             data.take("ZombieType");
 
             match zombie_type {
-                1 | 2 | 3 | 4 | 5 => {
+                1..=5 => {
                     data.set_string("id", "ZombieVillager");
                     data.set_i32("Profession", zombie_type - 1);
                 }

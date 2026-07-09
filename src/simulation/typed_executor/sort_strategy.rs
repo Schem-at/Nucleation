@@ -9,12 +9,14 @@
 /// The sort strategy controls how positions are ordered when assigned to bits.
 /// Position 0 corresponds to bit 0 (LSB), position 1 to bit 1, etc.
 #[derive(Debug, Clone, PartialEq)]
+#[derive(Default)]
 pub enum SortStrategy {
     // ========================================================================
     // Axis-first sorting (ascending)
     // ========================================================================
     /// Sort by Y first (ascending), then X, then Z
     /// Standard Minecraft layer-based ordering.
+    #[default]
     YXZ,
 
     /// Sort by X first (ascending), then Y, then Z
@@ -87,11 +89,6 @@ pub enum Direction {
     Descending,
 }
 
-impl Default for SortStrategy {
-    fn default() -> Self {
-        SortStrategy::YXZ
-    }
-}
 
 impl SortStrategy {
     /// Sort positions according to this strategy

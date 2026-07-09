@@ -439,7 +439,7 @@ pub fn pack_block_states(indices: &[u16], palette_size: usize) -> Vec<i64> {
     let bits_per_entry = std::cmp::max((palette_size as f64).log2().ceil() as u32, 4);
 
     let entries_per_long = 64 / bits_per_entry;
-    let num_longs = (4096 + entries_per_long as usize - 1) / entries_per_long as usize;
+    let num_longs = 4096_usize.div_ceil(entries_per_long as usize);
     let mask = (1u64 << bits_per_entry) - 1;
 
     let mut packed = vec![0i64; num_longs];
@@ -647,7 +647,7 @@ pub fn write_entity_mca(
     for (index, compressed) in &chunk_data_parts {
         let chunk_payload_len = compressed.len() as u32 + 1;
         let total_len = 4 + chunk_payload_len;
-        let sector_count = ((total_len as usize) + 4095) / 4096;
+        let sector_count = (total_len as usize).div_ceil(4096);
 
         let loc_offset = *index as usize * 4;
         location_table[loc_offset] = ((current_sector >> 16) & 0xFF) as u8;
@@ -712,7 +712,7 @@ impl McaFile {
             let chunk_payload_len = compressed.len() as u32 + 1; // +1 for compression byte
             let total_len = 4 + chunk_payload_len; // 4-byte length prefix + payload
 
-            let sector_count = ((total_len as usize) + 4095) / 4096;
+            let sector_count = (total_len as usize).div_ceil(4096);
 
             // Write location table entry
             let loc_offset = *index as usize * 4;
@@ -841,7 +841,7 @@ fn compute_heightmaps(chunk: &ChunkData) -> NbtCompound {
 fn pack_heightmap(values: &[i32]) -> Vec<i64> {
     let bits_per_entry: usize = 9;
     let entries_per_long = 64 / bits_per_entry; // 7
-    let num_longs = (256 + entries_per_long - 1) / entries_per_long; // 37
+    let num_longs = 256_usize.div_ceil(entries_per_long); // 37
     let mask = (1u64 << bits_per_entry) - 1;
 
     let mut packed = vec![0i64; num_longs];
@@ -858,7 +858,7 @@ fn pack_heightmap(values: &[i32]) -> Vec<i64> {
 
 fn build_section_nbt(section: &ChunkSection) -> NbtCompound {
     let mut section_nbt = NbtCompound::new();
-    section_nbt.insert("Y", NbtTag::Byte(section.y as i8));
+    section_nbt.insert("Y", NbtTag::Byte(section.y));
 
     // Block states
     let mut block_states_compound = NbtCompound::new();

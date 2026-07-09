@@ -1058,7 +1058,7 @@ mod tests {
             m.set_string("id", id);
             m
         }
-        let mut c = ent("C");
+        let c = ent("C");
         let mut b = ent("B");
         b.set_map("Riding", c);
         let mut a = ent("A");

@@ -154,7 +154,7 @@ impl SchematicImporter for McaFormat {
         settings: Option<&str>,
     ) -> Result<UniversalSchematic, Box<dyn Error>> {
         let bounds = settings
-            .map(|s| serde_json::from_str::<WorldImportSettings>(s))
+            .map(serde_json::from_str::<WorldImportSettings>)
             .transpose()?
             .and_then(|s| s.bounds());
         match bounds {
@@ -191,7 +191,7 @@ impl SchematicImporter for WorldZipFormat {
         settings: Option<&str>,
     ) -> Result<UniversalSchematic, Box<dyn Error>> {
         let bounds = settings
-            .map(|s| serde_json::from_str::<WorldImportSettings>(s))
+            .map(serde_json::from_str::<WorldImportSettings>)
             .transpose()?
             .and_then(|s| s.bounds());
         match bounds {
@@ -244,7 +244,7 @@ impl SchematicExporter for WorldFormat {
         settings: Option<&str>,
     ) -> Result<Vec<u8>, Box<dyn Error>> {
         let options: Option<WorldExportOptions> =
-            settings.map(|s| serde_json::from_str(s)).transpose()?;
+            settings.map(serde_json::from_str).transpose()?;
         let world_name = options
             .as_ref()
             .map(|o| o.world_name.clone())
@@ -471,7 +471,7 @@ fn from_world_directory_impl(
     for entry in std::fs::read_dir(&region_dir)? {
         let entry = entry?;
         let file_path = entry.path();
-        if file_path.extension().map_or(false, |ext| ext == "mca") {
+        if file_path.extension().is_some_and(|ext| ext == "mca") {
             let filename = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
             let (rx, rz) = parse_region_filename(filename).unwrap_or((0, 0));
 
@@ -488,7 +488,7 @@ fn from_world_directory_impl(
         for entry in std::fs::read_dir(&entities_dir)? {
             let entry = entry?;
             let file_path = entry.path();
-            if file_path.extension().map_or(false, |ext| ext == "mca") {
+            if file_path.extension().is_some_and(|ext| ext == "mca") {
                 let filename = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
                 let (rx, rz) = parse_region_filename(filename).unwrap_or((0, 0));
 
@@ -685,7 +685,7 @@ pub fn to_world(
     let mut chunk_columns: HashMap<(i32, i32), HashMap<i8, SectionBuilder>> = HashMap::new();
     let mut chunk_block_entities: HashMap<(i32, i32), Vec<BlockEntity>> = HashMap::new();
 
-    for (_name, region) in &all_regions {
+    for region in all_regions.values() {
         let bb = region.get_bounding_box();
         let (min_x, min_y, min_z) = bb.min;
         let (max_x, max_y, max_z) = bb.max;
@@ -745,7 +745,7 @@ pub fn to_world(
     // Collect entities and group by chunk
     let mut chunk_entities: HashMap<(i32, i32), Vec<crate::entity::Entity>> = HashMap::new();
 
-    for (_name, region) in &all_regions {
+    for region in all_regions.values() {
         for entity in &region.entities {
             let world_x = entity.position.0 + opts.offset.0 as f64;
             let world_y = entity.position.1 + opts.offset.1 as f64;
@@ -768,9 +768,7 @@ pub fn to_world(
     let mut region_chunks: HashMap<(i32, i32), Vec<ChunkData>> = HashMap::new();
 
     for ((chunk_x, chunk_z), sections_map) in &chunk_columns {
-        let mut sections: Vec<ChunkSection> = sections_map
-            .iter()
-            .map(|(_, builder)| builder.build())
+        let mut sections: Vec<ChunkSection> = sections_map.values().map(|builder| builder.build())
             .collect();
         sections.sort_by_key(|s| s.y);
 

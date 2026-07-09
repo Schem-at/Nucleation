@@ -7,7 +7,7 @@ fn main() {
     println!("=== Connect 4 AI Battle Arena Setup ===\n");
 
     // Step 1: Create example builds (in practice, you'd load these from files)
-    let mut build_a = create_example_build("Build A");
+    let build_a = create_example_build("Build A");
     let mut build_b = create_example_build("Build B");
     let central_server = create_central_server();
 
@@ -109,7 +109,7 @@ fn load_and_transform_builds(
 {
     // Load build A
     let data_a = std::fs::read(build_a_path)?;
-    let mut build_a = litematic::from_litematic(&data_a)?;
+    let build_a = litematic::from_litematic(&data_a)?;
 
     // Load build B
     let data_b = std::fs::read(build_b_path)?;

@@ -240,7 +240,7 @@ impl IoType {
                 Ok(Value::F32(f32::from_bits(bits_u32)))
             }
 
-            IoType::Boolean => Ok(Value::Bool(bits.get(0).copied().unwrap_or(false))),
+            IoType::Boolean => Ok(Value::Bool(bits.first().copied().unwrap_or(false))),
 
             IoType::Ascii { chars } => {
                 let mut text = String::with_capacity(*chars);
@@ -395,6 +395,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::approx_constant)]
     fn test_float32_conversion() {
         let io_type = IoType::Float32;
 

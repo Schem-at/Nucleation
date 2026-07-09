@@ -89,9 +89,9 @@ fn test_chunk_blocks_indices_includes_max_boundary() {
 
     // Test retrieving chunks that include the maximum boundaries
     // Use chunk size that covers the entire region
-    let chunk_width = (tight_bounds.max.0 - tight_bounds.min.0 + 1) as i32;
-    let chunk_height = (tight_bounds.max.1 - tight_bounds.min.1 + 1) as i32;
-    let chunk_length = (tight_bounds.max.2 - tight_bounds.min.2 + 1) as i32;
+    let chunk_width = tight_bounds.max.0 - tight_bounds.min.0 + 1 ;
+    let chunk_height = tight_bounds.max.1 - tight_bounds.min.1 + 1 ;
+    let chunk_length = tight_bounds.max.2 - tight_bounds.min.2 + 1 ;
 
     println!(
         "Chunk dimensions: {}x{}x{}",

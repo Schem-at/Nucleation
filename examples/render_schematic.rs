@@ -342,6 +342,7 @@ fn main() {
         pitch_deg: cfg.pitch_deg,
         zoom: cfg.zoom,
         fov_deg: cfg.fov_deg,
+        ..Default::default()
     };
 
     if cfg.interactive {
@@ -508,6 +509,7 @@ fn render_orbit_video(
             pitch_deg: base_camera.pitch_deg,
             zoom: base_camera.zoom,
             fov_deg: base_camera.fov_deg,
+            ..*base_camera
         };
 
         let pixels = renderer.render_frame(&cam).expect("Failed to render frame");

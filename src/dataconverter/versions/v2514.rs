@@ -521,14 +521,14 @@ pub fn register(reg: &mut RegistryBuilder) {
 
     for id in ABSTRACT_HORSES.iter().chain(TAMEABLE_ANIMALS.iter()) {
         reg.entity.add_converter_for_id(
-            *id,
+            id,
             VERSION,
             0,
             Box::new(|data: &mut NbtMap, _from, _to| update_animal_owner(data)),
         );
         // Reverse: int-array UUIDs -> least/most (LoveCause, Leash, Attributes) and Owner -> OwnerUUID string (lossless).
         reg.entity.add_reverse_converter_for_id(
-            *id,
+            id,
             VERSION,
             0,
             Box::new(|data: &mut NbtMap, _from, _to| restore_animal_owner(data)),
@@ -536,13 +536,13 @@ pub fn register(reg: &mut RegistryBuilder) {
     }
     for id in ANIMALS {
         reg.entity.add_converter_for_id(
-            *id,
+            id,
             VERSION,
             0,
             Box::new(|data: &mut NbtMap, _from, _to| update_animal(data)),
         );
         reg.entity.add_reverse_converter_for_id(
-            *id,
+            id,
             VERSION,
             0,
             Box::new(|data: &mut NbtMap, _from, _to| restore_animal(data)),
@@ -550,13 +550,13 @@ pub fn register(reg: &mut RegistryBuilder) {
     }
     for id in MOBS {
         reg.entity.add_converter_for_id(
-            *id,
+            id,
             VERSION,
             0,
             Box::new(|data: &mut NbtMap, _from, _to| update_mob(data)),
         );
         reg.entity.add_reverse_converter_for_id(
-            *id,
+            id,
             VERSION,
             0,
             Box::new(|data: &mut NbtMap, _from, _to| restore_mob(data)),
@@ -564,13 +564,13 @@ pub fn register(reg: &mut RegistryBuilder) {
     }
     for id in LIVING_ENTITIES {
         reg.entity.add_converter_for_id(
-            *id,
+            id,
             VERSION,
             0,
             Box::new(|data: &mut NbtMap, _from, _to| update_living_entity(data)),
         );
         reg.entity.add_reverse_converter_for_id(
-            *id,
+            id,
             VERSION,
             0,
             Box::new(|data: &mut NbtMap, _from, _to| restore_living_entity(data)),
@@ -578,14 +578,14 @@ pub fn register(reg: &mut RegistryBuilder) {
     }
     for id in PROJECTILES {
         reg.entity.add_converter_for_id(
-            *id,
+            id,
             VERSION,
             0,
             Box::new(|data: &mut NbtMap, _from, _to| update_projectile(data)),
         );
         // Reverse: rename generic Owner -> OwnerUUID (no format change; lossless).
         reg.entity.add_reverse_converter_for_id(
-            *id,
+            id,
             VERSION,
             0,
             Box::new(|data: &mut NbtMap, _from, _to| restore_projectile(data)),

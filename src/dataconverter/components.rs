@@ -483,7 +483,7 @@ fn convert_enchantments(
     hide_tooltip: bool,
 ) {
     let enchantments = item.tag_remove_list_maps(tag_key);
-    let empty_or_none = enchantments.as_ref().map_or(true, |l| l.is_empty());
+    let empty_or_none = enchantments.as_ref().is_none_or(|l| l.is_empty());
 
     if empty_or_none {
         if hide_tooltip {
@@ -518,7 +518,7 @@ fn convert_enchantments(
         }
     }
 
-    if enchantments.as_ref().map_or(false, |l| l.is_empty()) {
+    if enchantments.as_ref().is_some_and(|l| l.is_empty()) {
         item.components
             .set_bool("minecraft:enchantment_glint_override", true);
     }
@@ -2032,10 +2032,7 @@ pub fn unconvert_item(input: &NbtMap) -> NbtMap {
     item.comp_migrate_to_tag("minecraft:entity_data", "EntityTag");
 
     // --- block entity data + its sub-components -> BlockEntityTag ---
-    let mut tile = match item.comp_take_map("minecraft:block_entity_data") {
-        Some(m) => m,
-        None => NbtMap::new(),
-    };
+    let mut tile = item.comp_take_map("minecraft:block_entity_data").unwrap_or_default();
     let tile_found = unconvert_tile_entity(&mut item, &mut tile);
     if !tile.is_empty() && (tile.len() > 1 || tile_found || !tile.has_key("id")) {
         item.tag.set_map("BlockEntityTag", tile);

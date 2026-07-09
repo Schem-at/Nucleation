@@ -48,7 +48,7 @@ pub fn format_region(name: &str, region: &Region) -> String {
     for i in 0..region.blocks.len() {
         let block_palette_index = region.blocks[i];
         let block_position = region.index_to_coords(i);
-        let block_state = region.palette.get(block_palette_index as usize).unwrap();
+        let block_state = region.palette.get(block_palette_index).unwrap();
         output.push_str(&format!(
             "      {} @ {:?}: {:?}\n",
             block_palette_index, block_position, block_state

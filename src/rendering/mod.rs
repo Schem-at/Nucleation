@@ -182,7 +182,7 @@ impl crate::UniversalSchematic {
     ) -> Result<Vec<u8>, RenderError> {
         let mesh_config = crate::meshing::MeshConfig::default();
         let meshes = self
-            .mesh_chunks_parallel(&pack, &mesh_config, 64, num_cpus())
+            .mesh_chunks_parallel(pack, &mesh_config, 64, num_cpus())
             .map_err(|e| RenderError::RenderFailed(e.to_string()))?;
         render_meshes(&meshes, config, None)
     }

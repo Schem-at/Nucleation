@@ -43,7 +43,7 @@ pub struct ValueHook {
 }
 
 #[inline]
-fn floor<'a, V>(map: &'a BTreeMap<EncodedVersion, V>, version: EncodedVersion) -> Option<&'a V> {
+fn floor<V>(map: &BTreeMap<EncodedVersion, V>, version: EncodedVersion) -> Option<&V> {
     map.range(..=version).next_back().map(|(_, v)| v)
 }
 

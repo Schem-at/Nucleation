@@ -2,7 +2,7 @@
 //!
 //! Run with: cargo run --example build_test_adder
 
-use nucleation::{litematic, SchematicBuilder, UniversalSchematic};
+use nucleation::{litematic, SchematicBuilder};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🔧 Building adder from integration tests...\n");

@@ -32,9 +32,7 @@ fn main() {
 
     let reloaded = schematic::from_schematic(&bytes).expect("reload");
     let count: usize = reloaded
-        .get_all_regions()
-        .iter()
-        .map(|(_, r)| r.entities.len())
+        .get_all_regions().values().map(|r| r.entities.len())
         .sum();
     println!("reloaded entity count: {}", count);
 

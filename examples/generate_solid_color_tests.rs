@@ -3,7 +3,7 @@ use nucleation::building::{
     MultiPointGradientBrush, PointGradientBrush, Sphere,
 };
 use nucleation::formats::manager::get_manager;
-use nucleation::{BlockState, UniversalSchematic};
+use nucleation::UniversalSchematic;
 use rand::Rng;
 use std::fs::File;
 use std::io::Write;

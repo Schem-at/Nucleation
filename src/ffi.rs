@@ -24,7 +24,7 @@ use std::ptr;
 // --- Last Error ---
 
 thread_local! {
-    static LAST_ERROR: RefCell<Option<String>> = RefCell::new(None);
+    static LAST_ERROR: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 
 fn set_last_error(msg: String) {
@@ -1647,7 +1647,7 @@ pub extern "C" fn schematic_set_blocks(
     if schematic.is_null() || positions.is_null() || block_name.is_null() {
         return -1;
     }
-    if positions_len % 3 != 0 {
+    if !positions_len.is_multiple_of(3) {
         return -2;
     }
     let count = positions_len / 3;
@@ -1774,7 +1774,7 @@ pub extern "C" fn schematic_get_blocks(
     positions: *const c_int,
     positions_len: usize,
 ) -> StringArray {
-    if schematic.is_null() || positions.is_null() || positions_len % 3 != 0 {
+    if schematic.is_null() || positions.is_null() || !positions_len.is_multiple_of(3) {
         return StringArray {
             data: ptr::null_mut(),
             len: 0,
@@ -4475,7 +4475,7 @@ pub extern "C" fn definitionregion_from_positions(
     positions: *const c_int,
     positions_len: usize,
 ) -> *mut DefinitionRegionWrapper {
-    if positions.is_null() || positions_len % 3 != 0 {
+    if positions.is_null() || !positions_len.is_multiple_of(3) {
         return ptr::null_mut();
     }
     let slice = unsafe { std::slice::from_raw_parts(positions, positions_len) };
@@ -4490,7 +4490,7 @@ pub extern "C" fn definitionregion_from_bounding_boxes(
     boxes: *const c_int,
     boxes_len: usize,
 ) -> *mut DefinitionRegionWrapper {
-    if boxes.is_null() || boxes_len % 6 != 0 {
+    if boxes.is_null() || !boxes_len.is_multiple_of(6) {
         return ptr::null_mut();
     }
     let slice = unsafe { std::slice::from_raw_parts(boxes, boxes_len) };
@@ -5511,7 +5511,7 @@ pub extern "C" fn schematicbuilder_name(
     let builder = unsafe { &mut (*ptr).0 };
     let n = unsafe { CStr::from_ptr(name).to_string_lossy().into_owned() };
     // SchematicBuilder::name consumes self, so we need to swap
-    let old = std::mem::replace(builder, SchematicBuilder::new());
+    let old = std::mem::take(builder);
     *builder = old.name(n);
     0
 }
@@ -5527,7 +5527,7 @@ pub extern "C" fn schematicbuilder_map(
     }
     let builder = unsafe { &mut (*ptr).0 };
     let b = unsafe { CStr::from_ptr(block).to_string_lossy().into_owned() };
-    let old = std::mem::replace(builder, SchematicBuilder::new());
+    let old = std::mem::take(builder);
     *builder = old.map(ch as u8 as char, &b);
     0
 }
@@ -5551,7 +5551,7 @@ pub extern "C" fn schematicbuilder_layers(
         .map(|l| l.iter().map(|s| s.as_str()).collect())
         .collect();
     let layer_slice_refs: Vec<&[&str]> = layer_refs.iter().map(|v| v.as_slice()).collect();
-    let old = std::mem::replace(builder, SchematicBuilder::new());
+    let old = std::mem::take(builder);
     *builder = old.layers(&layer_slice_refs);
     0
 }
@@ -5630,7 +5630,7 @@ pub extern "C" fn schematicbuilder_layer(
         Err(_) => return -2,
     };
     let row_refs: Vec<&str> = rows.iter().map(|s| s.as_str()).collect();
-    let old = std::mem::replace(builder, SchematicBuilder::new());
+    let old = std::mem::take(builder);
     *builder = old.layer(&row_refs);
     0
 }
@@ -5657,7 +5657,7 @@ pub extern "C" fn schematicbuilder_palette(
         .iter()
         .filter_map(|(k, v)| k.chars().next().map(|c| (c, v.as_str())))
         .collect();
-    let old = std::mem::replace(builder, SchematicBuilder::new());
+    let old = std::mem::take(builder);
     *builder = old.palette(&pairs);
     0
 }
@@ -5673,7 +5673,7 @@ pub extern "C" fn schematicbuilder_offset(
         return -1;
     }
     let builder = unsafe { &mut (*ptr).0 };
-    let old = std::mem::replace(builder, SchematicBuilder::new());
+    let old = std::mem::take(builder);
     *builder = old.offset(x, y, z);
     0
 }
@@ -5686,7 +5686,7 @@ pub extern "C" fn schematicbuilder_use_standard_palette(
         return -1;
     }
     let builder = unsafe { &mut (*ptr).0 };
-    let old = std::mem::replace(builder, SchematicBuilder::new());
+    let old = std::mem::take(builder);
     *builder = old.use_standard_palette();
     0
 }
@@ -5697,7 +5697,7 @@ pub extern "C" fn schematicbuilder_use_minimal_palette(ptr: *mut SchematicBuilde
         return -1;
     }
     let builder = unsafe { &mut (*ptr).0 };
-    let old = std::mem::replace(builder, SchematicBuilder::new());
+    let old = std::mem::take(builder);
     *builder = old.use_minimal_palette();
     0
 }
@@ -5708,7 +5708,7 @@ pub extern "C" fn schematicbuilder_use_compact_palette(ptr: *mut SchematicBuilde
         return -1;
     }
     let builder = unsafe { &mut (*ptr).0 };
-    let old = std::mem::replace(builder, SchematicBuilder::new());
+    let old = std::mem::take(builder);
     *builder = old.use_compact_palette();
     0
 }
@@ -9446,7 +9446,7 @@ pub extern "C" fn run_script(path: *const c_char) -> *mut SchematicWrapper {
 #[cfg(feature = "meshing")]
 pub mod item_model_ffi {
     use super::*;
-    use crate::meshing::{ItemModelConfig, ItemModelResult, ResourcePackSource};
+    use crate::meshing::{ItemModelConfig, ItemModelResult};
     use std::ffi::CStr;
 
     pub struct FFIItemModelConfig(ItemModelConfig);
@@ -9684,7 +9684,7 @@ pub mod item_model_ffi {
     pub extern "C" fn itemmodel_zip_data_free(data: *mut u8, len: usize) {
         if !data.is_null() && len > 0 {
             unsafe {
-                drop(Box::from_raw(std::slice::from_raw_parts_mut(data, len)));
+                drop(Box::from_raw(std::ptr::slice_from_raw_parts_mut(data, len)));
             }
         }
     }
@@ -10390,82 +10390,9 @@ pub mod rendering_ffi {
     pub extern "C" fn render_pixels_free(data: *mut u8, len: usize) {
         if !data.is_null() && len > 0 {
             unsafe {
-                drop(Box::from_raw(std::slice::from_raw_parts_mut(data, len)));
+                drop(Box::from_raw(std::ptr::slice_from_raw_parts_mut(data, len)));
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod store_io_tests {
-    use super::*;
-
-    fn cs(s: &str) -> CString {
-        CString::new(s).unwrap()
-    }
-
-    /// Round-trip a schematic through `schematic_save` / `schematic_open` over a
-    /// local temp `.schem` file (no external services).
-    #[test]
-    fn schematic_open_save_roundtrip_local_file() {
-        let dir = std::env::temp_dir();
-        let path = dir.join(format!("nuc_ffi_roundtrip_{}.schem", std::process::id()));
-        let path_c = cs(path.to_str().unwrap());
-
-        // Build a non-empty schematic.
-        let handle = schematic_new();
-        assert!(!handle.is_null());
-        let block = cs("minecraft:stone");
-        assert_eq!(
-            schematic_set_block(handle, 0, 0, 0, block.as_ptr()),
-            0,
-            "set_block failed"
-        );
-
-        // Save to a local file URI.
-        assert_eq!(
-            schematic_save(handle, path_c.as_ptr(), ptr::null()),
-            0,
-            "schematic_save failed: {:?}",
-            unsafe { CStr::from_ptr(schematic_last_error()) }
-        );
-        assert!(path.exists(), "save did not produce a file");
-
-        // Re-open from the same path.
-        let reopened = schematic_open(path_c.as_ptr());
-        assert!(
-            !reopened.is_null(),
-            "schematic_open returned null: {:?}",
-            unsafe { CStr::from_ptr(schematic_last_error()) }
-        );
-
-        // The re-opened schematic must still contain the block we placed.
-        let name = schematic_get_block(reopened, 0, 0, 0);
-        assert!(!name.is_null(), "block missing after round-trip");
-        let name_str = unsafe { CStr::from_ptr(name).to_string_lossy().into_owned() };
-        free_string(name);
-        assert!(
-            name_str.contains("stone"),
-            "unexpected block after round-trip: {}",
-            name_str
-        );
-
-        schematic_free(handle);
-        schematic_free(reopened);
-        let _ = std::fs::remove_file(&path);
-    }
-
-    /// A single-string `mem://` URI must be rejected by the core resolver.
-    #[test]
-    fn schematic_open_rejects_mem_uri() {
-        let uri = cs("mem://some/key.schem");
-        let result = schematic_open(uri.as_ptr());
-        assert!(
-            result.is_null(),
-            "mem:// single-string URI should be rejected"
-        );
-        let err = schematic_last_error();
-        assert!(!err.is_null(), "expected an error message");
     }
 }
 
@@ -10816,5 +10743,78 @@ pub extern "C" fn sdf_eval(
             0
         }
         Err(_) => -1,
+    }
+}
+
+#[cfg(test)]
+mod store_io_tests {
+    use super::*;
+
+    fn cs(s: &str) -> CString {
+        CString::new(s).unwrap()
+    }
+
+    /// Round-trip a schematic through `schematic_save` / `schematic_open` over a
+    /// local temp `.schem` file (no external services).
+    #[test]
+    fn schematic_open_save_roundtrip_local_file() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("nuc_ffi_roundtrip_{}.schem", std::process::id()));
+        let path_c = cs(path.to_str().unwrap());
+
+        // Build a non-empty schematic.
+        let handle = schematic_new();
+        assert!(!handle.is_null());
+        let block = cs("minecraft:stone");
+        assert_eq!(
+            schematic_set_block(handle, 0, 0, 0, block.as_ptr()),
+            0,
+            "set_block failed"
+        );
+
+        // Save to a local file URI.
+        assert_eq!(
+            schematic_save(handle, path_c.as_ptr(), ptr::null()),
+            0,
+            "schematic_save failed: {:?}",
+            unsafe { CStr::from_ptr(schematic_last_error()) }
+        );
+        assert!(path.exists(), "save did not produce a file");
+
+        // Re-open from the same path.
+        let reopened = schematic_open(path_c.as_ptr());
+        assert!(
+            !reopened.is_null(),
+            "schematic_open returned null: {:?}",
+            unsafe { CStr::from_ptr(schematic_last_error()) }
+        );
+
+        // The re-opened schematic must still contain the block we placed.
+        let name = schematic_get_block(reopened, 0, 0, 0);
+        assert!(!name.is_null(), "block missing after round-trip");
+        let name_str = unsafe { CStr::from_ptr(name).to_string_lossy().into_owned() };
+        free_string(name);
+        assert!(
+            name_str.contains("stone"),
+            "unexpected block after round-trip: {}",
+            name_str
+        );
+
+        schematic_free(handle);
+        schematic_free(reopened);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    /// A single-string `mem://` URI must be rejected by the core resolver.
+    #[test]
+    fn schematic_open_rejects_mem_uri() {
+        let uri = cs("mem://some/key.schem");
+        let result = schematic_open(uri.as_ptr());
+        assert!(
+            result.is_null(),
+            "mem:// single-string URI should be rejected"
+        );
+        let err = schematic_last_error();
+        assert!(!err.is_null(), "expected an error message");
     }
 }

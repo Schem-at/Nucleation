@@ -630,7 +630,7 @@ fn entity_to_input_block(entity: &Entity) -> InputBlock {
         id => id,
     };
 
-    let mut input = InputBlock::new(&format!("entity:{}", mesher_id));
+    let mut input = InputBlock::new(format!("entity:{}", mesher_id));
 
     // Extract facing from Rotation NBT (Rotation is a list of 2 floats: [yaw, pitch])
     if let Some(NbtValue::List(rotation)) = entity.nbt.get("Rotation") {
@@ -698,11 +698,11 @@ fn entity_to_input_block(entity: &Entity) -> InputBlock {
 fn yaw_to_facing(yaw: f32) -> &'static str {
     // Normalize yaw to 0..360
     let normalized = ((yaw % 360.0) + 360.0) % 360.0;
-    if normalized >= 315.0 || normalized < 45.0 {
+    if !(45.0..315.0).contains(&normalized) {
         "south"
-    } else if normalized >= 45.0 && normalized < 135.0 {
+    } else if (45.0..135.0).contains(&normalized) {
         "west"
-    } else if normalized >= 135.0 && normalized < 225.0 {
+    } else if (135.0..225.0).contains(&normalized) {
         "north"
     } else {
         "east"
@@ -1541,9 +1541,7 @@ fn collect_region_blocks_by_chunk(
         let chunk_z = z.div_euclid(chunk_size);
 
         let chunk_blocks = chunks.entry((chunk_x, chunk_y, chunk_z)).or_default();
-        if !chunk_blocks.contains_key(&pos) {
-            chunk_blocks.insert(pos, input_block);
-        }
+        chunk_blocks.entry(pos).or_insert(input_block);
     }
 }
 

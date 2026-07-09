@@ -7,6 +7,12 @@ pub struct PaletteBuilder {
     filter: BlockFilter,
 }
 
+impl Default for PaletteBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PaletteBuilder {
     pub fn new() -> Self {
         Self {
@@ -218,7 +224,7 @@ impl Brush for ColorBrush {
     fn get_block(&self, _x: i32, _y: i32, _z: i32, _normal: (f64, f64, f64)) -> Option<BlockState> {
         self.palette
             .find_closest(&self.target_color)
-            .map(|id| BlockState::new(id))
+            .map(BlockState::new)
     }
 }
 
@@ -322,7 +328,7 @@ impl Brush for LinearGradientBrush {
 
         self.palette
             .find_closest(&color)
-            .map(|id| BlockState::new(id))
+            .map(BlockState::new)
     }
 }
 
@@ -412,14 +418,14 @@ impl Brush for MultiPointGradientBrush {
             return self
                 .palette
                 .find_closest(&start_stop.color)
-                .map(|id| BlockState::new(id));
+                .map(BlockState::new);
         }
         // If t is after last stop
         if t >= end_stop.position {
             return self
                 .palette
                 .find_closest(&end_stop.color)
-                .map(|id| BlockState::new(id));
+                .map(BlockState::new);
         }
 
         // Find the two stops surrounding t
@@ -460,7 +466,7 @@ impl Brush for MultiPointGradientBrush {
 
         self.palette
             .find_closest(&color)
-            .map(|id| BlockState::new(id))
+            .map(BlockState::new)
     }
 }
 
@@ -628,7 +634,7 @@ impl Brush for PointGradientBrush {
                 return self
                     .palette
                     .find_closest(&point.color)
-                    .map(|id| BlockState::new(id));
+                    .map(BlockState::new);
             }
 
             let weight = 1.0 / dist.powf(self.falloff);
@@ -673,7 +679,7 @@ impl Brush for PointGradientBrush {
 
         self.palette
             .find_closest(&color)
-            .map(|id| BlockState::new(id))
+            .map(BlockState::new)
     }
 }
 
@@ -744,7 +750,7 @@ impl Brush for BilinearGradientBrush {
 
         self.palette
             .find_closest(&color)
-            .map(|id| BlockState::new(id))
+            .map(BlockState::new)
     }
 }
 
@@ -799,7 +805,7 @@ impl Brush for ShadedBrush {
 
         self.palette
             .find_closest(&color)
-            .map(|id| BlockState::new(id))
+            .map(BlockState::new)
     }
 }
 
@@ -936,7 +942,7 @@ impl CurveGradientBrush {
         let param = t.unwrap_or_else(|| self.spatial_t(x, y, z));
         self.interpolate_color(param)
             .and_then(|color| self.palette.find_closest(&color))
-            .map(|id| BlockState::new(id))
+            .map(BlockState::new)
     }
 }
 

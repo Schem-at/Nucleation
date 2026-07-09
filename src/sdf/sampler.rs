@@ -21,7 +21,7 @@ pub struct Range {
 
 impl Range {
     fn contains(&self, v: i32) -> bool {
-        self.min.map_or(true, |m| v >= m) && self.max.map_or(true, |m| v <= m)
+        self.min.is_none_or(|m| v >= m) && self.max.is_none_or(|m| v <= m)
     }
 }
 
@@ -204,22 +204,22 @@ pub fn sample_to_schematic(
     Ok(schematic)
 }
 
-fn pick_fill<'r>(
-    rules: &'r MaterialRules,
+fn pick_fill(
+    rules: &MaterialRules,
     x: i32,
     y: i32,
     z: i32,
     depth: i32,
-) -> Option<&'r str> {
+) -> Option<&str> {
     for rule in &rules.fill {
         let matches = match &rule.when {
             None => true,
             Some(w) => {
                 w.depth_below_surface
                     .as_ref()
-                    .map_or(true, |r| r.contains(depth))
-                    && w.y_range.as_ref().map_or(true, |r| r.contains(y))
-                    && w.noise.as_ref().map_or(true, |n| {
+                    .is_none_or(|r| r.contains(depth))
+                    && w.y_range.as_ref().is_none_or(|r| r.contains(y))
+                    && w.noise.as_ref().is_none_or(|n| {
                         fbm2(x as f32, z as f32, n.seed, n.frequency, n.octaves) > n.threshold
                     })
             }

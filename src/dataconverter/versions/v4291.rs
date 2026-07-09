@@ -64,9 +64,9 @@ pub fn register(reg: &mut RegistryBuilder) {
         0,
         Box::new(|data: &mut NbtMap, _from, _to| {
             for path in BOOLEAN_PATHS_TO_CONVERT {
-                if let Some(NbtValue::Byte(v)) = data.get(*path) {
+                if let Some(NbtValue::Byte(v)) = data.get(path) {
                     let s = if *v != 0 { "true" } else { "false" };
-                    data.set_string(*path, s);
+                    data.set_string(path, s);
                 }
             }
         }),

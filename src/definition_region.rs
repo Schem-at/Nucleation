@@ -460,7 +460,7 @@ impl DefinitionRegion {
                 if let Some(block) = schematic.get_block(x, y, z) {
                     properties
                         .iter()
-                        .all(|(key, value)| block.get_property(key).map_or(false, |v| v == value))
+                        .all(|(key, value)| block.get_property(key).is_some_and(|v| v == value))
                 } else {
                     false
                 }
@@ -480,7 +480,7 @@ impl DefinitionRegion {
             .filter(|&(x, y, z)| {
                 schematic
                     .get_block(x, y, z)
-                    .map_or(false, |block| predicate(block))
+                    .is_some_and(&predicate)
             })
             .collect();
 

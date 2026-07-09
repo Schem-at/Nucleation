@@ -83,7 +83,7 @@ mod long_wire_test {
         let schematic = world.get_schematic();
 
         let lever = schematic.get_block(0, 0, 0).unwrap();
-        println!("  [0,0,0] {}", format_block_with_props(&lever));
+        println!("  [0,0,0] {}", format_block_with_props(lever));
 
         for x in 1..=15 {
             let wire = schematic.get_block(x, 0, 0).unwrap();
@@ -95,7 +95,7 @@ mod long_wire_test {
         }
 
         let lamp = schematic.get_block(16, 0, 0).unwrap();
-        println!("  [16,0,0] {}", format_block_with_props(&lamp));
+        println!("  [16,0,0] {}", format_block_with_props(lamp));
 
         // Verify results
         println!("\n--- VERIFICATION ---");
