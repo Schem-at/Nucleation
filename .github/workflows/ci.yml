@@ -40,6 +40,28 @@ jobs:
           echo "version=$CARGO_VERSION" >> $GITHUB_OUTPUT
           echo "Version: $CARGO_VERSION (release: $([[ "${{ github.ref }}" == refs/tags/v* ]] && echo yes || echo no))"
 
+      - name: Check version is in sync across bindings
+        run: |
+          CARGO_VERSION=$(grep -m1 'version = ' Cargo.toml | cut -d '"' -f2)
+          JVM_CARGO_VERSION=$(grep -m1 'version = ' nucleation-jvm/Cargo.toml | cut -d '"' -f2)
+          PYTHON_VERSION=$(grep -m1 'version = ' pyproject.toml | cut -d '"' -f2)
+          GRADLE_VERSION=$(grep -m1 'nucleationVersion=' nucleation-jvm/jvm/gradle.properties | cut -d '=' -f2)
+
+          fail=0
+          for pair in "nucleation-jvm/Cargo.toml:$JVM_CARGO_VERSION" "pyproject.toml:$PYTHON_VERSION" "nucleation-jvm/jvm/gradle.properties:$GRADLE_VERSION"; do
+            file="${pair%%:*}"
+            version="${pair##*:}"
+            if [[ "$version" != "$CARGO_VERSION" ]]; then
+              echo "::error file=$file::version $version does not match Cargo.toml version $CARGO_VERSION"
+              fail=1
+            fi
+          done
+          if [[ "$fail" != "0" ]]; then
+            echo "Run ./pre-push.sh locally, or bump the mismatched file(s) above, and push again." >&2
+            exit 1
+          fi
+          echo "All versions match: $CARGO_VERSION"
+
   test:
     runs-on: ubuntu-latest
     steps:
