@@ -82,16 +82,21 @@ jobs:
         run: |
           cargo test  # Test default (no features)
           cargo test --features simulation  # Test simulation feature
-      
+          cargo test --features meshing
+          cargo test --features scripting-lua --test scripting_lua_tests --test scripting_shared_tests
+          cargo test --features scripting-js --test scripting_js_tests --test scripting_shared_tests
+          cargo test --features ffi,meshing,simulation --test ffi_helpers_test --test ffi_simulate_test
+
       - name: Setup Python for build test
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      
-      - name: Test Python build
+
+      - name: Build and test Python bindings
         run: |
-          pip install maturin
-          maturin build --features python,simulation,rendering
+          pip install maturin pytest
+          maturin develop --features python,simulation,rendering
+          pytest tests/python_new_api_test.py tests/python_test.py tests/python_simple_circuit_test.py tests/python_store_test.py -v
 
   # Exercise the networked Store backends (S3/Redis/Postgres) against real
   # services. testcontainers spins throwaway containers via the runner's docker,
@@ -137,6 +142,8 @@ jobs:
           key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Run WASM tests
+        run: wasm-pack test --node --features wasm,simulation,meshing
       - name: Build Rust
         run: cargo build --release  # Build default (what crates.io will build)
       - name: Build WASM
