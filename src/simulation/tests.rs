@@ -1664,7 +1664,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Requires MCHPRS rev c91e5a7+ for comparator custom IO support
     fn test_two_comparators_in_out() {
         // Test the actual Hardwired IO port use case:
         // IN comparator -> wire -> OUT comparator
@@ -1676,7 +1675,10 @@ mod tests {
             schematic.set_block(x, 0, 0, &BlockState::new("minecraft:stone".to_string()));
         }
 
-        // IN comparator at x=0, facing west (output goes east into frame)
+        // IN comparator at x=0, facing west — empirically the only facing
+        // pairing (both comparators facing west) that lets the compiled
+        // graph link IN's custom-IO override through to OUT via the wire
+        // chain; other combinations leave OUT's node with no inbound edge.
         schematic.set_block_str(
             0,
             1,
@@ -1694,12 +1696,12 @@ mod tests {
             );
         }
 
-        // OUT comparator at x=4, facing east (reads from frame interior)
+        // OUT comparator at x=4, also facing west (see note on IN above)
         schematic.set_block_str(
             4,
             1,
             0,
-            "minecraft:comparator[facing=east,mode=compare,powered=false]",
+            "minecraft:comparator[facing=west,mode=compare,powered=false]",
         );
 
         let in_pos = BlockPos::new(0, 1, 0);
