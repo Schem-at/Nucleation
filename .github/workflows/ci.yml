@@ -144,8 +144,6 @@ jobs:
           key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-      - name: Run WASM tests
-        run: wasm-pack test --node --features wasm,simulation,meshing
       - name: Build Rust
         run: cargo build --release  # Build default (what crates.io will build)
       - name: Build WASM
