@@ -1,3 +1,20 @@
+# Nucleation v0.2.18
+
+Maintenance release, no user-facing API changes. The FFI layer
+(`src/ffi.rs`, 10k+ lines) is now split into per-domain modules under
+`src/ffi/`, matching the existing WASM/Python binding structure —
+verified byte-identical exported C symbols across every feature
+combination before and after. Format parsing (`src/formats/`,
+`src/dataconverter/`) converged onto a proper `thiserror`-based error
+type instead of ad-hoc `Box<dyn Error>`/`String` errors; the public
+`UniversalSchematic::to_schematic`/`from_schematic` signatures are
+unchanged. Also merged in a diff palette-swap-dominance feature that
+had been sitting on an unmerged branch, cleared out several stale
+branches, ran a full `clippy --fix` pass, and fixed a comparator
+custom-IO test that had the wrong block orientation baked in (it now
+actually exercises redpiler's IN→wire→OUT signal path instead of
+silently testing nothing while ignored).
+
 # Nucleation v0.2.17
 
 JVM: packed bulk block export. Adds a palette + stride-4 int array
