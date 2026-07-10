@@ -53,8 +53,7 @@ impl Entity {
             NbtTag::LongArray(arr) => NbtValue::LongArray(arr.clone()),
             NbtTag::ByteArray(arr) => NbtValue::ByteArray(arr.clone()),
             NbtTag::List(list) => {
-                let values: Vec<NbtValue> =
-                    list.iter().map(Self::nbt_tag_to_value).collect();
+                let values: Vec<NbtValue> = list.iter().map(Self::nbt_tag_to_value).collect();
                 NbtValue::List(values)
             }
             NbtTag::Compound(compound) => {
@@ -81,10 +80,7 @@ impl Entity {
             NbtValue::LongArray(arr) => NbtTag::LongArray(arr.clone()),
             NbtValue::ByteArray(arr) => NbtTag::ByteArray(arr.clone()),
             NbtValue::List(list) => {
-                let tags: Vec<NbtTag> = list
-                    .iter()
-                    .map(Self::value_to_nbt_tag)
-                    .collect();
+                let tags: Vec<NbtTag> = list.iter().map(Self::value_to_nbt_tag).collect();
                 NbtTag::List(NbtList::from(tags))
             }
             NbtValue::Compound(map) => {

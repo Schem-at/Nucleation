@@ -27,7 +27,11 @@ fn main() {
         ("tests/output/4x4x4+1.schem", "four_cubed_plus", "9"),
         ("tests/output/wool_palette.schem", "wool_palette", "10"),
         ("tests/output/door_plot.schem", "door_plot", "11"),
-        ("examples/schematic_builder_assets/generated/xor.schem", "xor_gate", "12"),
+        (
+            "examples/schematic_builder_assets/generated/xor.schem",
+            "xor_gate",
+            "12",
+        ),
     ];
 
     // Load resource pack

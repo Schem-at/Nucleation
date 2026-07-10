@@ -169,7 +169,9 @@ fn test_float32_binary_conversion() {
     }
 
     // Test pi
-    let bits = io_type.to_binary(&Value::F32(std::f32::consts::PI)).unwrap();
+    let bits = io_type
+        .to_binary(&Value::F32(std::f32::consts::PI))
+        .unwrap();
     if let Value::F32(f) = io_type.from_binary(&bits).unwrap() {
         assert!((f - std::f32::consts::PI).abs() < 0.00001);
     } else {

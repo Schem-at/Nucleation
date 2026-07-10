@@ -226,11 +226,7 @@ impl SchematicExporter for WorldFormat {
         "default".to_string()
     }
 
-    fn write(
-        &self,
-        schematic: &UniversalSchematic,
-        _version: Option<&str>,
-    ) -> Result<Vec<u8>> {
+    fn write(&self, schematic: &UniversalSchematic, _version: Option<&str>) -> Result<Vec<u8>> {
         let opts = WorldExportOptions::default();
         let files = to_world(schematic, None)?;
         let prefixed = prefix_world_files(&files, &opts.world_name);
@@ -243,8 +239,7 @@ impl SchematicExporter for WorldFormat {
         _version: Option<&str>,
         settings: Option<&str>,
     ) -> Result<Vec<u8>> {
-        let options: Option<WorldExportOptions> =
-            settings.map(serde_json::from_str).transpose()?;
+        let options: Option<WorldExportOptions> = settings.map(serde_json::from_str).transpose()?;
         let world_name = options
             .as_ref()
             .map(|o| o.world_name.clone())
@@ -768,7 +763,9 @@ pub fn to_world(
     let mut region_chunks: HashMap<(i32, i32), Vec<ChunkData>> = HashMap::new();
 
     for ((chunk_x, chunk_z), sections_map) in &chunk_columns {
-        let mut sections: Vec<ChunkSection> = sections_map.values().map(|builder| builder.build())
+        let mut sections: Vec<ChunkSection> = sections_map
+            .values()
+            .map(|builder| builder.build())
             .collect();
         sections.sort_by_key(|s| s.y);
 

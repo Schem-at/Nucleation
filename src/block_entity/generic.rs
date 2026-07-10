@@ -212,7 +212,6 @@ impl BlockEntity {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     #[test]
     fn test_block_entity_creation() {
@@ -241,7 +240,10 @@ mod tests {
     #[test]
     fn from_nbt_reads_litematica_lowercase_id_and_xyz() {
         let mut compound = NbtCompound::new();
-        compound.insert("id", quartz_nbt::NbtTag::String("minecraft:dispenser".to_string()));
+        compound.insert(
+            "id",
+            quartz_nbt::NbtTag::String("minecraft:dispenser".to_string()),
+        );
         compound.insert("x", quartz_nbt::NbtTag::Int(3));
         compound.insert("y", quartz_nbt::NbtTag::Int(4));
         compound.insert("z", quartz_nbt::NbtTag::Int(5));
@@ -254,7 +256,10 @@ mod tests {
     #[test]
     fn from_nbt_still_reads_capitalized_id_and_pos() {
         let mut compound = NbtCompound::new();
-        compound.insert("Id", quartz_nbt::NbtTag::String("minecraft:chest".to_string()));
+        compound.insert(
+            "Id",
+            quartz_nbt::NbtTag::String("minecraft:chest".to_string()),
+        );
         compound.insert("Pos", quartz_nbt::NbtTag::IntArray(vec![7, 8, 9]));
         let be = BlockEntity::from_nbt(&compound);
         assert_eq!(be.id, "minecraft:chest");

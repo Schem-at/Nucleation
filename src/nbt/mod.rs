@@ -582,17 +582,26 @@ mod snbt_roundtrip_tests {
         inner.insert("name".to_string(), NbtValue::String("Bob".to_string()));
 
         let mut map = NbtMap::new();
-        map.insert("LastChanged".to_string(), NbtValue::Long(9_007_199_254_740_993)); // 2^53 + 1
+        map.insert(
+            "LastChanged".to_string(),
+            NbtValue::Long(9_007_199_254_740_993),
+        ); // 2^53 + 1
         map.insert("Count".to_string(), NbtValue::Byte(64));
         map.insert("Fuel".to_string(), NbtValue::Short(200));
         map.insert("display".to_string(), NbtValue::Compound(inner));
-        map.insert("ids".to_string(), NbtValue::LongArray(vec![1, i64::MAX, -5]));
+        map.insert(
+            "ids".to_string(),
+            NbtValue::LongArray(vec![1, i64::MAX, -5]),
+        );
 
         let snbt = quartz_nbt::NbtTag::Compound(map.to_quartz_nbt()).to_snbt();
         let parsed = quartz_nbt::snbt::parse(&snbt).expect("SNBT re-parses");
         let back = NbtMap::from_quartz_nbt(&parsed);
 
         assert_eq!(back, map, "SNBT round-trip is lossless (incl. Long > 2^53)");
-        assert_eq!(back.get("LastChanged"), Some(&NbtValue::Long(9_007_199_254_740_993)));
+        assert_eq!(
+            back.get("LastChanged"),
+            Some(&NbtValue::Long(9_007_199_254_740_993))
+        );
     }
 }

@@ -380,10 +380,7 @@ mod tests {
         world.flush();
 
         // Lamp should be on from lever
-        assert!(
-            world.is_lit(lamp_pos),
-            "Lamp should light up from lever"
-        );
+        assert!(world.is_lit(lamp_pos), "Lamp should light up from lever");
 
         // Custom IO signal should still be gettable
         let custom_signal = world.get_signal_strength(wire_pos);

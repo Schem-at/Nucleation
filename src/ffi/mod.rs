@@ -21,7 +21,6 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_float, c_int, c_uchar};
 use std::ptr;
 
-
 // --- Last Error ---
 
 thread_local! {
@@ -545,7 +544,7 @@ pub use autostack::*;
 // The nested `simulation_ffi` / `rendering_ffi` namespaces are re-exported
 // as-is (not flattened) because external code already refers to them as
 // `nucleation::ffi::simulation_ffi::...` / `nucleation::ffi::rendering_ffi::...`.
-#[cfg(feature = "simulation")]
-pub use simulation::simulation_ffi;
 #[cfg(feature = "rendering")]
 pub use rendering::rendering_ffi;
+#[cfg(feature = "simulation")]
+pub use simulation::simulation_ffi;

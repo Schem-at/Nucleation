@@ -185,12 +185,12 @@ impl MchprsWorld {
                     .unwrap_or(&block_state.name)
                     .to_string();
                 let properties = block_state.properties.clone();
-                let block_entity =
-                    if Block::from_name(&name).is_some_and(|b| b.has_block_entity()) {
-                        self.schematic.get_block_entity(pos).cloned()
-                    } else {
-                        None
-                    };
+                let block_entity = if Block::from_name(&name).is_some_and(|b| b.has_block_entity())
+                {
+                    self.schematic.get_block_entity(pos).cloned()
+                } else {
+                    None
+                };
                 (
                     // Normalize coordinates relative to schematic minimum
                     BlockPos::new(

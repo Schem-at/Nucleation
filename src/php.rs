@@ -218,7 +218,10 @@ impl NucleationSchematic {
                 |e| PhpException::default(format!("Failed to export to litematic: {}", e)),
             )?;
         let mut map = HashMap::new();
-        map.insert("bytes".to_string(), String::from_utf8_lossy(&bytes).to_string());
+        map.insert(
+            "bytes".to_string(),
+            String::from_utf8_lossy(&bytes).to_string(),
+        );
         map.insert("loss".to_string(), report.to_json());
         Ok(map)
     }

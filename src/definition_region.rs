@@ -477,11 +477,7 @@ impl DefinitionRegion {
     {
         let positions: Vec<_> = self
             .iter_positions()
-            .filter(|&(x, y, z)| {
-                schematic
-                    .get_block(x, y, z)
-                    .is_some_and(&predicate)
-            })
+            .filter(|&(x, y, z)| schematic.get_block(x, y, z).is_some_and(&predicate))
             .collect();
 
         Self::from_positions(&positions)

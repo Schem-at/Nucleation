@@ -118,7 +118,7 @@ pub fn compile_schematic_insign(schematic: &UniversalSchematic) -> Result<JsonVa
 mod tests {
     use super::*;
     use crate::block_entity::BlockEntity;
-    
+
     use crate::utils::NbtValue;
 
     // ====================================================================================

@@ -217,11 +217,7 @@ impl WorldSource {
         self.chunks_impl(None)
     }
 
-    pub fn chunks_bounded(
-        &self,
-        min: (i32, i32, i32),
-        max: (i32, i32, i32),
-    ) -> Result<ChunkIter> {
+    pub fn chunks_bounded(&self, min: (i32, i32, i32), max: (i32, i32, i32)) -> Result<ChunkIter> {
         self.chunks_impl(Some((min.0, min.1, min.2, max.0, max.1, max.2)))
     }
 

@@ -1,12 +1,10 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct BoundingBox {
     pub min: (i32, i32, i32),
     pub max: (i32, i32, i32),
 }
-
 
 impl BoundingBox {
     pub fn new(min: (i32, i32, i32), max: (i32, i32, i32)) -> Self {

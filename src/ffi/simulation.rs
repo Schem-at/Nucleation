@@ -6,8 +6,8 @@ use super::*;
 
 #[cfg(feature = "simulation")]
 pub mod simulation_ffi {
-    use super::*;
     use super::super::definition_region::DefinitionRegionWrapper;
+    use super::*;
     use crate::simulation::circuit_builder::CircuitBuilder;
     use crate::simulation::typed_executor::{
         ExecutionMode, ExecutionResult, IoLayout, IoLayoutBuilder, IoType, LayoutFunction,

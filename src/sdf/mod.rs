@@ -32,14 +32,14 @@
 //! assert!(schematic.total_blocks() > 0);
 //! ```
 
-pub mod noise;
 mod node;
+pub mod noise;
 mod sampler;
 
 pub use node::{Aabb, Axis, SdfNode};
 pub use sampler::{
-    auto_bounds, sample_to_schematic, FillRule, MaterialRules, NoiseCondition, Range,
-    SampleBounds, SurfaceRule, When,
+    auto_bounds, sample_to_schematic, FillRule, MaterialRules, NoiseCondition, Range, SampleBounds,
+    SurfaceRule, When,
 };
 
 #[cfg(test)]

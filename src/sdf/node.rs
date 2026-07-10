@@ -28,8 +28,16 @@ pub struct Aabb {
 impl Aabb {
     fn grow(self, amount: f32) -> Aabb {
         Aabb {
-            min: [self.min[0] - amount, self.min[1] - amount, self.min[2] - amount],
-            max: [self.max[0] + amount, self.max[1] + amount, self.max[2] + amount],
+            min: [
+                self.min[0] - amount,
+                self.min[1] - amount,
+                self.min[2] - amount,
+            ],
+            max: [
+                self.max[0] + amount,
+                self.max[1] + amount,
+                self.max[2] + amount,
+            ],
         }
     }
 
@@ -69,11 +77,17 @@ impl Aabb {
 /// Primitives are centered at the origin; use [`SdfNode::Translate`] /
 /// [`SdfNode::Rotate`] / [`SdfNode::Scale`] to position them.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum SdfNode {
     // ── Primitives ─────────────────────────────────────────────────────────
     /// Exact.
-    Sphere { radius: f32 },
+    Sphere {
+        radius: f32,
+    },
     /// Exact. `halfExtents` are the FULL half-extents including `rounding`.
     Box {
         half_extents: [f32; 3],
@@ -81,13 +95,27 @@ pub enum SdfNode {
         rounding: f32,
     },
     /// Exact. Ring in the XZ plane.
-    Torus { major_radius: f32, minor_radius: f32 },
+    Torus {
+        major_radius: f32,
+        minor_radius: f32,
+    },
     /// Exact. Line segment `a`→`b` with radius.
-    Capsule { a: [f32; 3], b: [f32; 3], radius: f32 },
+    Capsule {
+        a: [f32; 3],
+        b: [f32; 3],
+        radius: f32,
+    },
     /// Exact. Y-axis aligned.
-    CappedCylinder { radius: f32, half_height: f32 },
+    CappedCylinder {
+        radius: f32,
+        half_height: f32,
+    },
     /// Exact (iq's sdCappedCone). Y-axis aligned; `r1` bottom, `r2` top.
-    CappedCone { half_height: f32, r1: f32, r2: f32 },
+    CappedCone {
+        half_height: f32,
+        r1: f32,
+        r2: f32,
+    },
     /// Exact but unbounded — sampling requires explicit bounds.
     Plane {
         normal: [f32; 3],
@@ -95,11 +123,18 @@ pub enum SdfNode {
         offset: f32,
     },
     /// *Approximate* (iq's bound formulation; underestimates near the poles).
-    Ellipsoid { radii: [f32; 3] },
+    Ellipsoid {
+        radii: [f32; 3],
+    },
     /// Exact.
-    Octahedron { size: f32 },
+    Octahedron {
+        size: f32,
+    },
     /// Exact. Hexagonal cross-section in XZ, extruded along Y.
-    HexPrism { radius: f32, half_height: f32 },
+    HexPrism {
+        radius: f32,
+        half_height: f32,
+    },
     /// *Approximate*: superellipse cross-section in XZ (`(|x|/hx)^p + (|z|/hz)^p ≤ 1`)
     /// extruded along Y with flat top/bottom. The flat-plateau primitive.
     SuperPrism {
@@ -108,26 +143,63 @@ pub enum SdfNode {
     },
 
     // ── Operators ──────────────────────────────────────────────────────────
-    Union { children: Vec<SdfNode> },
-    Intersect { children: Vec<SdfNode> },
+    Union {
+        children: Vec<SdfNode>,
+    },
+    Intersect {
+        children: Vec<SdfNode>,
+    },
     /// `a` minus `b`.
-    Subtract { a: Box<SdfNode>, b: Box<SdfNode> },
-    SmoothUnion { a: Box<SdfNode>, b: Box<SdfNode>, k: f32 },
-    SmoothSubtract { a: Box<SdfNode>, b: Box<SdfNode>, k: f32 },
-    SmoothIntersect { a: Box<SdfNode>, b: Box<SdfNode>, k: f32 },
+    Subtract {
+        a: Box<SdfNode>,
+        b: Box<SdfNode>,
+    },
+    SmoothUnion {
+        a: Box<SdfNode>,
+        b: Box<SdfNode>,
+        k: f32,
+    },
+    SmoothSubtract {
+        a: Box<SdfNode>,
+        b: Box<SdfNode>,
+        k: f32,
+    },
+    SmoothIntersect {
+        a: Box<SdfNode>,
+        b: Box<SdfNode>,
+        k: f32,
+    },
     /// Rounds (inflates) the child surface outward by `radius`.
-    Round { child: Box<SdfNode>, radius: f32 },
+    Round {
+        child: Box<SdfNode>,
+        radius: f32,
+    },
     /// Hollow shell (onion) of the child surface with given thickness.
-    Shell { child: Box<SdfNode>, thickness: f32 },
+    Shell {
+        child: Box<SdfNode>,
+        thickness: f32,
+    },
 
     // ── Transforms ─────────────────────────────────────────────────────────
-    Translate { child: Box<SdfNode>, offset: [f32; 3] },
+    Translate {
+        child: Box<SdfNode>,
+        offset: [f32; 3],
+    },
     /// Euler angles in degrees, applied to the object in X, then Y, then Z order.
-    Rotate { child: Box<SdfNode>, angles: [f32; 3] },
+    Rotate {
+        child: Box<SdfNode>,
+        angles: [f32; 3],
+    },
     /// Uniform scale.
-    Scale { child: Box<SdfNode>, factor: f32 },
+    Scale {
+        child: Box<SdfNode>,
+        factor: f32,
+    },
     /// Mirrors across the plane orthogonal to `axis` (evaluates `abs(coord)`).
-    Mirror { child: Box<SdfNode>, axis: Axis },
+    Mirror {
+        child: Box<SdfNode>,
+        axis: Axis,
+    },
     /// Infinite (or counted) repetition. `spacing` 0 on an axis disables
     /// repetition on that axis. With `count = [nx, ny, nz]` the pattern is
     /// clamped to that many instances per side of the origin (bounded).
@@ -246,7 +318,10 @@ impl SdfNode {
         match self {
             SdfNode::Sphere { radius } => len3(x, y, z) - radius,
 
-            SdfNode::Box { half_extents: b, rounding } => {
+            SdfNode::Box {
+                half_extents: b,
+                rounding,
+            } => {
                 let r = rounding.max(0.0).min(b[0].min(b[1]).min(b[2]));
                 let qx = x.abs() - (b[0] - r);
                 let qy = y.abs() - (b[1] - r);
@@ -256,7 +331,10 @@ impl SdfNode {
                 outside + inside - r
             }
 
-            SdfNode::Torus { major_radius, minor_radius } => {
+            SdfNode::Torus {
+                major_radius,
+                minor_radius,
+            } => {
                 let qx = len2(x, z) - major_radius;
                 len2(qx, y) - minor_radius
             }
@@ -273,13 +351,20 @@ impl SdfNode {
                 len3(pa[0] - ba[0] * h, pa[1] - ba[1] * h, pa[2] - ba[2] * h) - radius
             }
 
-            SdfNode::CappedCylinder { radius, half_height } => {
+            SdfNode::CappedCylinder {
+                radius,
+                half_height,
+            } => {
                 let dx = len2(x, z) - radius;
                 let dy = y.abs() - half_height;
                 dx.max(dy).min(0.0) + len2(dx.max(0.0), dy.max(0.0))
             }
 
-            SdfNode::CappedCone { half_height, r1, r2 } => {
+            SdfNode::CappedCone {
+                half_height,
+                r1,
+                r2,
+            } => {
                 // iq sdCappedCone
                 let h = *half_height;
                 let q = [len2(x, z), y];
@@ -296,7 +381,11 @@ impl SdfNode {
                     0.0
                 };
                 let cb = [q[0] - k1[0] + k2[0] * t, q[1] - k1[1] + k2[1] * t];
-                let s = if cb[0] < 0.0 && ca[1] < 0.0 { -1.0 } else { 1.0 };
+                let s = if cb[0] < 0.0 && ca[1] < 0.0 {
+                    -1.0
+                } else {
+                    1.0
+                };
                 s * (ca[0] * ca[0] + ca[1] * ca[1])
                     .min(cb[0] * cb[0] + cb[1] * cb[1])
                     .sqrt()
@@ -335,7 +424,10 @@ impl SdfNode {
                 len3(qx, qy - size + k, qz - k)
             }
 
-            SdfNode::HexPrism { radius, half_height } => {
+            SdfNode::HexPrism {
+                radius,
+                half_height,
+            } => {
                 // Hex cross-section in XZ, height along Y (iq sdHexPrism reoriented)
                 const KX: f32 = -0.866_025_4;
                 const KY: f32 = 0.5;
@@ -351,7 +443,10 @@ impl SdfNode {
                 d1.max(d2).min(0.0) + len2(d1.max(0.0), d2.max(0.0))
             }
 
-            SdfNode::SuperPrism { half_extents: b, exponent } => {
+            SdfNode::SuperPrism {
+                half_extents: b,
+                exponent,
+            } => {
                 let p = exponent.max(1.0);
                 let s = (x.abs() / b[0]).powf(p) + (z.abs() / b[2]).powf(p);
                 // Scaled implicit → approximate radial distance in the XZ plane
@@ -400,7 +495,11 @@ impl SdfNode {
                 Axis::Z => child.eval(x, y, z.abs()),
             },
 
-            SdfNode::Repeat { child, spacing, count } => {
+            SdfNode::Repeat {
+                child,
+                spacing,
+                count,
+            } => {
                 let map = |v: f32, s: f32, n: Option<u32>| -> f32 {
                     if s <= 0.0 {
                         return v;
@@ -420,14 +519,39 @@ impl SdfNode {
                 )
             }
 
-            SdfNode::Displace { child, amplitude, frequency, seed, octaves } => {
-                child.eval(x, y, z) + fbm3(x, y, z, *seed, *frequency, *octaves) * amplitude
-            }
+            SdfNode::Displace {
+                child,
+                amplitude,
+                frequency,
+                seed,
+                octaves,
+            } => child.eval(x, y, z) + fbm3(x, y, z, *seed, *frequency, *octaves) * amplitude,
 
-            SdfNode::Warp { child, amplitude, frequency, seed } => {
-                let wx = (value_noise3(x * frequency, y * frequency, z * frequency, *seed) * 2.0 - 1.0) * amplitude;
-                let wy = (value_noise3(x * frequency, y * frequency, z * frequency, seed.wrapping_add(7919)) * 2.0 - 1.0) * amplitude;
-                let wz = (value_noise3(x * frequency, y * frequency, z * frequency, seed.wrapping_add(104_729)) * 2.0 - 1.0) * amplitude;
+            SdfNode::Warp {
+                child,
+                amplitude,
+                frequency,
+                seed,
+            } => {
+                let wx = (value_noise3(x * frequency, y * frequency, z * frequency, *seed) * 2.0
+                    - 1.0)
+                    * amplitude;
+                let wy = (value_noise3(
+                    x * frequency,
+                    y * frequency,
+                    z * frequency,
+                    seed.wrapping_add(7919),
+                ) * 2.0
+                    - 1.0)
+                    * amplitude;
+                let wz = (value_noise3(
+                    x * frequency,
+                    y * frequency,
+                    z * frequency,
+                    seed.wrapping_add(104_729),
+                ) * 2.0
+                    - 1.0)
+                    * amplitude;
                 child.eval(x + wx, y + wy, z + wz)
             }
         }
@@ -437,12 +561,20 @@ impl SdfNode {
     /// uncounted repeats). Displace/warp/smooth bounds are grown estimates.
     pub fn bounds(&self) -> Option<Aabb> {
         fn sym(hx: f32, hy: f32, hz: f32) -> Option<Aabb> {
-            Some(Aabb { min: [-hx, -hy, -hz], max: [hx, hy, hz] })
+            Some(Aabb {
+                min: [-hx, -hy, -hz],
+                max: [hx, hy, hz],
+            })
         }
         match self {
             SdfNode::Sphere { radius } => sym(*radius, *radius, *radius),
-            SdfNode::Box { half_extents: b, .. } => sym(b[0], b[1], b[2]),
-            SdfNode::Torus { major_radius, minor_radius } => sym(
+            SdfNode::Box {
+                half_extents: b, ..
+            } => sym(b[0], b[1], b[2]),
+            SdfNode::Torus {
+                major_radius,
+                minor_radius,
+            } => sym(
                 major_radius + minor_radius,
                 *minor_radius,
                 major_radius + minor_radius,
@@ -459,16 +591,28 @@ impl SdfNode {
                     a[2].max(b[2]) + radius,
                 ],
             }),
-            SdfNode::CappedCylinder { radius, half_height } => sym(*radius, *half_height, *radius),
-            SdfNode::CappedCone { half_height, r1, r2 } => {
+            SdfNode::CappedCylinder {
+                radius,
+                half_height,
+            } => sym(*radius, *half_height, *radius),
+            SdfNode::CappedCone {
+                half_height,
+                r1,
+                r2,
+            } => {
                 let r = r1.max(*r2);
                 sym(r, *half_height, r)
             }
             SdfNode::Plane { .. } => None,
             SdfNode::Ellipsoid { radii } => sym(radii[0], radii[1], radii[2]),
             SdfNode::Octahedron { size } => sym(*size, *size, *size),
-            SdfNode::HexPrism { radius, half_height } => sym(*radius, *half_height, *radius),
-            SdfNode::SuperPrism { half_extents: b, .. } => sym(b[0], b[1], b[2]),
+            SdfNode::HexPrism {
+                radius,
+                half_height,
+            } => sym(*radius, *half_height, *radius),
+            SdfNode::SuperPrism {
+                half_extents: b, ..
+            } => sym(b[0], b[1], b[2]),
 
             SdfNode::Union { children } => {
                 let mut acc: Option<Aabb> = None;
@@ -496,20 +640,26 @@ impl SdfNode {
             SdfNode::Subtract { a, .. } => a.bounds(),
             SdfNode::SmoothUnion { a, b, k } => Some(a.bounds()?.union(b.bounds()?).grow(*k)),
             SdfNode::SmoothSubtract { a, b: _, k } => a.bounds().map(|bb| bb.grow(*k)),
-            SdfNode::SmoothIntersect { a, b, k } => {
-                match (a.bounds(), b.bounds()) {
-                    (Some(ab), Some(bb)) => Some(ab.intersection(bb).grow(*k)),
-                    (Some(ab), None) => Some(ab.grow(*k)),
-                    (None, Some(bb)) => Some(bb.grow(*k)),
-                    (None, None) => None,
-                }
-            }
+            SdfNode::SmoothIntersect { a, b, k } => match (a.bounds(), b.bounds()) {
+                (Some(ab), Some(bb)) => Some(ab.intersection(bb).grow(*k)),
+                (Some(ab), None) => Some(ab.grow(*k)),
+                (None, Some(bb)) => Some(bb.grow(*k)),
+                (None, None) => None,
+            },
             SdfNode::Round { child, radius } => child.bounds().map(|b| b.grow(*radius)),
             SdfNode::Shell { child, thickness } => child.bounds().map(|b| b.grow(*thickness)),
 
             SdfNode::Translate { child, offset } => child.bounds().map(|b| Aabb {
-                min: [b.min[0] + offset[0], b.min[1] + offset[1], b.min[2] + offset[2]],
-                max: [b.max[0] + offset[0], b.max[1] + offset[1], b.max[2] + offset[2]],
+                min: [
+                    b.min[0] + offset[0],
+                    b.min[1] + offset[1],
+                    b.min[2] + offset[2],
+                ],
+                max: [
+                    b.max[0] + offset[0],
+                    b.max[1] + offset[1],
+                    b.max[2] + offset[2],
+                ],
             }),
             SdfNode::Rotate { child, angles } => {
                 let b = child.bounds()?;
@@ -551,7 +701,11 @@ impl SdfNode {
                 max[i] = hi;
                 Some(Aabb { min, max })
             }
-            SdfNode::Repeat { child, spacing, count } => {
+            SdfNode::Repeat {
+                child,
+                spacing,
+                count,
+            } => {
                 let b = child.bounds()?;
                 match count {
                     Some(n) => Some(Aabb {
@@ -576,12 +730,12 @@ impl SdfNode {
                     }
                 }
             }
-            SdfNode::Displace { child, amplitude, .. } => {
-                child.bounds().map(|b| b.grow(amplitude.abs()))
-            }
-            SdfNode::Warp { child, amplitude, .. } => {
-                child.bounds().map(|b| b.grow(amplitude.abs()))
-            }
+            SdfNode::Displace {
+                child, amplitude, ..
+            } => child.bounds().map(|b| b.grow(amplitude.abs())),
+            SdfNode::Warp {
+                child, amplitude, ..
+            } => child.bounds().map(|b| b.grow(amplitude.abs())),
         }
     }
 }

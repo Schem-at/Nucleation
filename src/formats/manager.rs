@@ -24,11 +24,7 @@ pub trait SchematicExporter: Send + Sync {
     fn extensions(&self) -> Vec<String>;
     fn available_versions(&self) -> Vec<String>;
     fn default_version(&self) -> String;
-    fn write(
-        &self,
-        schematic: &UniversalSchematic,
-        version: Option<&str>,
-    ) -> Result<Vec<u8>>;
+    fn write(&self, schematic: &UniversalSchematic, version: Option<&str>) -> Result<Vec<u8>>;
     fn write_with_settings(
         &self,
         schematic: &UniversalSchematic,

@@ -172,24 +172,12 @@ fn revert(data: &mut NbtMap, _from: EncodedVersion, _to: EncodedVersion) {
 }
 
 pub fn register(reg: &mut RegistryBuilder) {
-    reg.entity.add_converter_for_id(
-        "minecraft:villager",
-        VERSION,
-        0,
-        Box::new(convert),
-    );
-    reg.entity.add_reverse_converter_for_id(
-        "minecraft:villager",
-        VERSION,
-        0,
-        Box::new(revert),
-    );
-    reg.entity.add_converter_for_id(
-        "minecraft:zombie_villager",
-        VERSION,
-        0,
-        Box::new(convert),
-    );
+    reg.entity
+        .add_converter_for_id("minecraft:villager", VERSION, 0, Box::new(convert));
+    reg.entity
+        .add_reverse_converter_for_id("minecraft:villager", VERSION, 0, Box::new(revert));
+    reg.entity
+        .add_converter_for_id("minecraft:zombie_villager", VERSION, 0, Box::new(convert));
     reg.entity.add_reverse_converter_for_id(
         "minecraft:zombie_villager",
         VERSION,

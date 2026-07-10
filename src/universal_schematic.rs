@@ -450,14 +450,14 @@ impl UniversalSchematic {
         // Add blocks from default region
         let default_palette = self.default_region.get_palette();
         for block_index in &self.default_region.blocks {
-            blocks.push(default_palette[*block_index ].clone());
+            blocks.push(default_palette[*block_index].clone());
         }
 
         // Add blocks from other regions
         for region in self.other_regions.values() {
             let region_palette = region.get_palette();
             for block_index in &region.blocks {
-                blocks.push(region_palette[*block_index ].clone());
+                blocks.push(region_palette[*block_index].clone());
             }
         }
         blocks
@@ -1396,7 +1396,7 @@ impl UniversalSchematic {
                 let (x, y, z) = self.default_region.index_to_coords(index);
                 Some((
                     BlockPosition { x, y, z },
-                    &self.default_region.palette[*block_index ],
+                    &self.default_region.palette[*block_index],
                 ))
             },
         );
@@ -1408,10 +1408,7 @@ impl UniversalSchematic {
                 .enumerate()
                 .filter_map(move |(index, block_index)| {
                     let (x, y, z) = region.index_to_coords(index);
-                    Some((
-                        BlockPosition { x, y, z },
-                        &region.palette[*block_index ],
-                    ))
+                    Some((BlockPosition { x, y, z }, &region.palette[*block_index]))
                 })
         });
 
@@ -2203,7 +2200,7 @@ pub fn is_opaque(block: &BlockState) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     use crate::item::ItemStack;
     use quartz_nbt::io::{read_nbt, write_nbt};
     use std::io::Cursor;
@@ -2226,16 +2223,27 @@ mod tests {
         // melon_block -> melon at V1490; forward to canonical-ish, then back.
         let mut schematic = UniversalSchematic::new("ConvTest".to_string());
         schematic.metadata.source_data_version = Some(1489);
-        schematic.set_block(0, 0, 0, &BlockState::new("minecraft:melon_block".to_string()));
+        schematic.set_block(
+            0,
+            0,
+            0,
+            &BlockState::new("minecraft:melon_block".to_string()),
+        );
 
         let report = schematic.convert_to_data_version(1490);
         assert!(report.is_empty(), "forward rename is lossless");
-        assert_eq!(schematic.get_block(0, 0, 0).unwrap().get_name(), "minecraft:melon");
+        assert_eq!(
+            schematic.get_block(0, 0, 0).unwrap().get_name(),
+            "minecraft:melon"
+        );
         assert_eq!(schematic.metadata.source_data_version, Some(1490));
 
         let report = schematic.convert_to_data_version(1489);
         assert!(report.is_empty(), "reverse rename is lossless");
-        assert_eq!(schematic.get_block(0, 0, 0).unwrap().get_name(), "minecraft:melon_block");
+        assert_eq!(
+            schematic.get_block(0, 0, 0).unwrap().get_name(),
+            "minecraft:melon_block"
+        );
     }
 
     #[test]
@@ -2582,7 +2590,11 @@ mod tests {
 
         assert_eq!(schematic.default_region.entities.len(), 0);
         let all = schematic.get_entities_as_list();
-        assert_eq!(all.len(), 1, "entity in a non-default region must be listed");
+        assert_eq!(
+            all.len(),
+            1,
+            "entity in a non-default region must be listed"
+        );
         assert_eq!(all[0].id, "minecraft:boat");
     }
 

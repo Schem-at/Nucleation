@@ -2032,7 +2032,9 @@ pub fn unconvert_item(input: &NbtMap) -> NbtMap {
     item.comp_migrate_to_tag("minecraft:entity_data", "EntityTag");
 
     // --- block entity data + its sub-components -> BlockEntityTag ---
-    let mut tile = item.comp_take_map("minecraft:block_entity_data").unwrap_or_default();
+    let mut tile = item
+        .comp_take_map("minecraft:block_entity_data")
+        .unwrap_or_default();
     let tile_found = unconvert_tile_entity(&mut item, &mut tile);
     if !tile.is_empty() && (tile.len() > 1 || tile_found || !tile.has_key("id")) {
         item.tag.set_map("BlockEntityTag", tile);

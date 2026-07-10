@@ -77,9 +77,7 @@ fn decompress_and_parse(data: &[u8]) -> Result<NbtCompound> {
 }
 
 /// Read a legacy MCEdit `.schematic` into a `UniversalSchematic`.
-pub fn from_classic_schematic(
-    data: &[u8],
-) -> Result<UniversalSchematic> {
+pub fn from_classic_schematic(data: &[u8]) -> Result<UniversalSchematic> {
     let root = decompress_and_parse(data)?;
 
     let width = root.get::<_, i16>("Width")? as i32;

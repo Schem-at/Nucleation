@@ -1,12 +1,12 @@
 use crate::block_entity::BlockEntity;
 use crate::entity::Entity;
+use crate::formats::error::Result;
 use crate::BlockState;
 use flate2::read::{GzDecoder, ZlibDecoder};
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use quartz_nbt::io::Flavor;
 use quartz_nbt::{NbtCompound, NbtList, NbtTag};
-use crate::formats::error::Result;
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 
 // ─── Data Structures ────────────────────────────────────────────────────────
@@ -273,11 +273,7 @@ fn decompress_chunk(data: &[u8], compression: CompressionType) -> Result<Vec<u8>
     Ok(decompressed)
 }
 
-fn parse_chunk_nbt(
-    nbt: &NbtCompound,
-    chunk_x: i32,
-    chunk_z: i32,
-) -> Result<ChunkData> {
+fn parse_chunk_nbt(nbt: &NbtCompound, chunk_x: i32, chunk_z: i32) -> Result<ChunkData> {
     let data_version = nbt.get::<_, i32>("DataVersion").unwrap_or(3700);
 
     // Status can be at root level or under "Status"
@@ -495,11 +491,7 @@ pub struct EntityChunkData {
 /// Parse entity chunks from an MCA file (entities/r.x.z.mca format).
 /// Uses the same binary MCA format but chunk NBT structure is:
 /// { DataVersion: int, Position: int[2], Entities: list<compound> }
-pub fn parse_entity_mca(
-    data: &[u8],
-    region_x: i32,
-    region_z: i32,
-) -> Result<Vec<EntityChunkData>> {
+pub fn parse_entity_mca(data: &[u8], region_x: i32, region_z: i32) -> Result<Vec<EntityChunkData>> {
     if data.len() < 8192 {
         return Err("Entity MCA file too small (< 8192 bytes)".into());
     }
@@ -975,10 +967,7 @@ impl<R: Read + Seek> RegionReader<R> {
     }
 
     /// Seek to a chunk payload, decompress, and parse the raw NBT.
-    fn read_chunk_nbt_at(
-        &mut self,
-        index: u32,
-    ) -> Result<Option<quartz_nbt::NbtCompound>> {
+    fn read_chunk_nbt_at(&mut self, index: u32) -> Result<Option<quartz_nbt::NbtCompound>> {
         let offset = match self.locations.iter().find(|(i, _)| *i == index) {
             Some((_, off)) => *off,
             None => return Ok(None),

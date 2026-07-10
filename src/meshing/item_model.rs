@@ -31,8 +31,7 @@ const ATLAS_PAGE_SIZE: u32 = 4096;
 /// The scale factor represents **blocks per model unit**:
 /// - `1.0` = 1 block = 1 model unit (max 48 blocks per axis)
 /// - `2.0` = 2 blocks per model unit (max 96 blocks, everything half-size)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum ItemModelScale {
     /// Automatically compute uniform scale to fit within 48 model units.
     #[default]
@@ -42,7 +41,6 @@ pub enum ItemModelScale {
     /// Per-axis scale factors (x, y, z) (each clamped to >= 1.0).
     NonUniform(f32, f32, f32),
 }
-
 
 /// Resolve scale enum to concrete (sx, sy, sz) tuple.
 fn resolve_scale(scale: &ItemModelScale, w: i32, h: i32, d: i32) -> (f32, f32, f32) {

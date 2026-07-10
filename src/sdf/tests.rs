@@ -52,7 +52,12 @@ fn json_round_trip_preserves_tree() {
     let n = SdfNode::from_json(json).unwrap();
     let re = SdfNode::from_json(&n.to_json().unwrap()).unwrap();
     // Same evaluation everywhere we probe
-    for &(x, y, z) in &[(0.0, 0.0, 0.0), (10.0, -5.0, 3.0), (-31.0, 1.9, 12.0), (40.0, -20.0, -40.0)] {
+    for &(x, y, z) in &[
+        (0.0, 0.0, 0.0),
+        (10.0, -5.0, 3.0),
+        (-31.0, 1.9, 12.0),
+        (40.0, -20.0, -40.0),
+    ] {
         assert_eq!(n.eval(x, y, z).to_bits(), re.eval(x, y, z).to_bits());
     }
 }
@@ -66,10 +71,9 @@ fn transforms_behave() {
     assert!(t.eval(10.0, 0.0, 0.0) < 0.0);
     assert!(t.eval(0.0, 0.0, 0.0) > 0.0);
 
-    let s = SdfNode::from_json(
-        r#"{"type":"scale","factor":2.0,"child":{"type":"sphere","radius":2}}"#,
-    )
-    .unwrap();
+    let s =
+        SdfNode::from_json(r#"{"type":"scale","factor":2.0,"child":{"type":"sphere","radius":2}}"#)
+            .unwrap();
     assert!((s.eval(4.0, 0.0, 0.0) - 0.0).abs() < 1e-5);
 
     let r = SdfNode::from_json(
@@ -123,14 +127,20 @@ fn island_rules() -> MaterialRules {
 #[test]
 fn floating_island_samples_correctly() {
     let schematic = sample_to_schematic(&island_tree(), &island_rules(), None, "island").unwrap();
-    assert!(schematic.total_blocks() > 1000, "island should have real volume");
+    assert!(
+        schematic.total_blocks() > 1000,
+        "island should have real volume"
+    );
 
     // Plateau top is flat: superPrism top face at y = 61 + 2.5 → topmost solid
     // block is y=63 across the plateau interior.
     for &(x, z) in &[(0, 0), (10, -10), (-15, 15), (20, 20)] {
         let mut top = None;
         for y in (0..90).rev() {
-            if schematic.get_block(x, y, z).is_some_and(|b| b.name != "minecraft:air") {
+            if schematic
+                .get_block(x, y, z)
+                .is_some_and(|b| b.name != "minecraft:air")
+            {
                 top = Some(y);
                 break;
             }
@@ -145,7 +155,10 @@ fn floating_island_samples_correctly() {
     // Belly: center column should reach well below the plateau underside
     let mut bottom = None;
     for y in 0..90 {
-        if schematic.get_block(0, y, 0).is_some_and(|b| b.name != "minecraft:air") {
+        if schematic
+            .get_block(0, y, 0)
+            .is_some_and(|b| b.name != "minecraft:air")
+        {
             bottom = Some(y);
             break;
         }
@@ -154,7 +167,10 @@ fn floating_island_samples_correctly() {
     assert!(bottom < 45, "belly should taper deep, bottom was {bottom}");
     // Core is stone/deepslate
     let mid = schematic.get_block(0, bottom + 5, 0).unwrap().name.clone();
-    assert!(mid == "minecraft:stone" || mid == "minecraft:deepslate", "core was {mid}");
+    assert!(
+        mid == "minecraft:stone" || mid == "minecraft:deepslate",
+        "core was {mid}"
+    );
 }
 
 #[test]
@@ -177,9 +193,23 @@ fn sampling_is_deterministic() {
 #[test]
 fn noise_is_deterministic_and_bounded() {
     for i in 0..500 {
-        let v = noise::fbm3(i as f32 * 0.37, i as f32 * 0.11, -i as f32 * 0.23, 1234, 0.1, 4);
+        let v = noise::fbm3(
+            i as f32 * 0.37,
+            i as f32 * 0.11,
+            -i as f32 * 0.23,
+            1234,
+            0.1,
+            4,
+        );
         assert!((-1.0..=1.0).contains(&v));
-        let v2 = noise::fbm3(i as f32 * 0.37, i as f32 * 0.11, -i as f32 * 0.23, 1234, 0.1, 4);
+        let v2 = noise::fbm3(
+            i as f32 * 0.37,
+            i as f32 * 0.11,
+            -i as f32 * 0.23,
+            1234,
+            0.1,
+            4,
+        );
         assert_eq!(v.to_bits(), v2.to_bits());
     }
 }

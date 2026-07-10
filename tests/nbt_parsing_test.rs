@@ -88,7 +88,10 @@ fn test_signal_dispenser() {
     let be = get_first_block_entity("minecraft:dispenser[facing=north]{signal=5}");
     let items = get_items_from_data(&be);
 
-    assert!(!items.is_empty(), "Dispenser should support signal shorthand");
+    assert!(
+        !items.is_empty(),
+        "Dispenser should support signal shorthand"
+    );
     assert!(items.len() <= 9, "Dispenser should not exceed 9 slots");
 }
 

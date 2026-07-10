@@ -125,10 +125,7 @@ pub fn to_schematic_with_options(
 }
 
 // Version 3 format (recommended)
-fn to_schematic_v3(
-    schematic: &UniversalSchematic,
-    compression: Compression,
-) -> Result<Vec<u8>> {
+fn to_schematic_v3(schematic: &UniversalSchematic, compression: Compression) -> Result<Vec<u8>> {
     let mut schematic_data = NbtCompound::new();
 
     // Version 3 format
@@ -238,10 +235,7 @@ fn to_schematic_v3(
 }
 
 // Version 2 format (legacy compatibility)
-fn to_schematic_v2(
-    schematic: &UniversalSchematic,
-    compression: Compression,
-) -> Result<Vec<u8>> {
+fn to_schematic_v2(schematic: &UniversalSchematic, compression: Compression) -> Result<Vec<u8>> {
     let mut schematic_data = NbtCompound::new();
 
     schematic_data.insert("Version", NbtTag::Int(2)); // Schematic format version 2
@@ -261,10 +255,7 @@ fn to_schematic_v2(
     schematic_data.insert("Height", NbtTag::Short((height as i16).abs()));
     schematic_data.insert("Length", NbtTag::Short((length as i16).abs()));
 
-    schematic_data.insert(
-        "Size",
-        NbtTag::IntArray(vec![width, height, length]),
-    );
+    schematic_data.insert("Size", NbtTag::IntArray(vec![width, height, length]));
 
     // Set offset to the minimum position of the compact region
     let offset = vec![offset_pos.0, offset_pos.1, offset_pos.2];
@@ -621,9 +612,7 @@ fn convert_entities_v3(region: &Region) -> NbtList {
     entities
 }
 
-fn parse_block_palette(
-    region_tag: &NbtCompound,
-) -> Result<Vec<BlockState>> {
+fn parse_block_palette(region_tag: &NbtCompound) -> Result<Vec<BlockState>> {
     let palette_compound = region_tag.get::<_, &NbtCompound>("Palette")?;
     let palette_max = region_tag
         .get::<_, i32>("PaletteMax") // V2
@@ -750,9 +739,7 @@ fn parse_block_data(
     Ok(block_data)
 }
 
-fn parse_block_entities(
-    region_tag: &NbtCompound,
-) -> Result<Vec<BlockEntity>> {
+fn parse_block_entities(region_tag: &NbtCompound) -> Result<Vec<BlockEntity>> {
     let block_entities_list = region_tag.get::<_, &NbtList>("BlockEntities")?;
     let mut block_entities = Vec::new();
 
@@ -862,11 +849,7 @@ impl SchematicExporter for SchematicFormat {
         SchematicVersion::get_default().as_str().to_string()
     }
 
-    fn write(
-        &self,
-        schematic: &UniversalSchematic,
-        version: Option<&str>,
-    ) -> Result<Vec<u8>> {
+    fn write(&self, schematic: &UniversalSchematic, version: Option<&str>) -> Result<Vec<u8>> {
         if let Some(v) = version {
             match SchematicVersion::from_str(v) {
                 Some(ver) => to_schematic_version(schematic, ver),

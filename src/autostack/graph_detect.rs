@@ -137,7 +137,11 @@ fn dominant_dir(graph: &RedstoneGraph, lab: &HashMap<usize, u64>) -> Option<Vec3
     for ps in by_lab.values() {
         for i in 0..ps.len() {
             for j in (i + 1)..ps.len() {
-                let d = [ps[j][0] - ps[i][0], ps[j][1] - ps[i][1], ps[j][2] - ps[i][2]];
+                let d = [
+                    ps[j][0] - ps[i][0],
+                    ps[j][1] - ps[i][1],
+                    ps[j][2] - ps[i][2],
+                ];
                 if d != [0, 0, 0] {
                     *disp.entry(canon(d)).or_default() += 1;
                 }
@@ -199,8 +203,7 @@ fn true_period(
         let cells = phase_buckets(nodes, period, origin);
         let mut ks: Vec<i64> = cells.keys().copied().collect();
         ks.sort_unstable();
-        let hists: Vec<Vec<(u64, usize)>> =
-            ks.iter().map(|k| label_hist(&cells[k], lab)).collect();
+        let hists: Vec<Vec<(u64, usize)>> = ks.iter().map(|k| label_hist(&cells[k], lab)).collect();
         let mut run = 1usize;
         let mut best = 1usize;
         for i in 1..hists.len() {
@@ -343,7 +346,12 @@ mod tests {
     fn redstone_line(len: i32) -> UniversalSchematic {
         let mut s = UniversalSchematic::new("line".to_string());
         for x in 0..len {
-            s.set_block(x, 0, 0, &BlockState::new("minecraft:gray_concrete".to_string()));
+            s.set_block(
+                x,
+                0,
+                0,
+                &BlockState::new("minecraft:gray_concrete".to_string()),
+            );
         }
         let mut lever = BlockState::new("minecraft:lever".to_string());
         lever.set_property("facing", "east");

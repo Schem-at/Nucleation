@@ -326,9 +326,7 @@ impl Brush for LinearGradientBrush {
             }
         };
 
-        self.palette
-            .find_closest(&color)
-            .map(BlockState::new)
+        self.palette.find_closest(&color).map(BlockState::new)
     }
 }
 
@@ -464,9 +462,7 @@ impl Brush for MultiPointGradientBrush {
             }
         };
 
-        self.palette
-            .find_closest(&color)
-            .map(BlockState::new)
+        self.palette.find_closest(&color).map(BlockState::new)
     }
 }
 
@@ -631,10 +627,7 @@ impl Brush for PointGradientBrush {
             let dist = dist_sq.sqrt();
 
             if dist < 1e-6 {
-                return self
-                    .palette
-                    .find_closest(&point.color)
-                    .map(BlockState::new);
+                return self.palette.find_closest(&point.color).map(BlockState::new);
             }
 
             let weight = 1.0 / dist.powf(self.falloff);
@@ -677,9 +670,7 @@ impl Brush for PointGradientBrush {
             self.points[0].color
         };
 
-        self.palette
-            .find_closest(&color)
-            .map(BlockState::new)
+        self.palette.find_closest(&color).map(BlockState::new)
     }
 }
 
@@ -748,9 +739,7 @@ impl Brush for BilinearGradientBrush {
             }
         };
 
-        self.palette
-            .find_closest(&color)
-            .map(BlockState::new)
+        self.palette.find_closest(&color).map(BlockState::new)
     }
 }
 
@@ -803,9 +792,7 @@ impl Brush for ShadedBrush {
 
         let color = ExtendedColorData::from_rgb(r, g, b);
 
-        self.palette
-            .find_closest(&color)
-            .map(BlockState::new)
+        self.palette.find_closest(&color).map(BlockState::new)
     }
 }
 

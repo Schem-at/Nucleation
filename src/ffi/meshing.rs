@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 
-use super::*;
 use super::definition_region::CFloatArray;
+use super::*;
 
 // =============================================================================
 // Meshing FFI Bindings (feature-gated)
@@ -620,9 +620,7 @@ pub extern "C" fn multimeshresult_total_vertex_count(ptr: *const FFIMultiMeshRes
 }
 
 #[no_mangle]
-pub extern "C" fn multimeshresult_total_triangle_count(
-    ptr: *const FFIMultiMeshResult,
-) -> usize {
+pub extern "C" fn multimeshresult_total_triangle_count(ptr: *const FFIMultiMeshResult) -> usize {
     if ptr.is_null() {
         return 0;
     }
@@ -651,9 +649,7 @@ pub extern "C" fn chunkmeshresult_free(ptr: *mut FFIChunkMeshResult) {
 }
 
 #[no_mangle]
-pub extern "C" fn chunkmeshresult_chunk_coordinates(
-    ptr: *const FFIChunkMeshResult,
-) -> IntArray {
+pub extern "C" fn chunkmeshresult_chunk_coordinates(ptr: *const FFIChunkMeshResult) -> IntArray {
     if ptr.is_null() {
         return IntArray {
             data: ptr::null_mut(),
@@ -701,9 +697,7 @@ pub extern "C" fn chunkmeshresult_total_vertex_count(ptr: *const FFIChunkMeshRes
 }
 
 #[no_mangle]
-pub extern "C" fn chunkmeshresult_total_triangle_count(
-    ptr: *const FFIChunkMeshResult,
-) -> usize {
+pub extern "C" fn chunkmeshresult_total_triangle_count(ptr: *const FFIChunkMeshResult) -> usize {
     if ptr.is_null() {
         return 0;
     }
@@ -999,9 +993,8 @@ pub extern "C" fn schematic_register_mesh_exporter(pack: *const FFIResourcePack)
         return -1;
     }
     let p = unsafe { &(*pack).0 };
-    let mesh_exporter = crate::meshing::MeshExporter::new(
-        ResourcePackSource::from_resource_pack(p.pack().clone()),
-    );
+    let mesh_exporter =
+        crate::meshing::MeshExporter::new(ResourcePackSource::from_resource_pack(p.pack().clone()));
 
     let manager = get_manager();
     let mut manager = match manager.lock() {
@@ -1273,10 +1266,7 @@ pub extern "C" fn itemmodel_config_set_texture_resolution(
 }
 
 #[no_mangle]
-pub extern "C" fn itemmodel_config_set_item(
-    config: *mut FFIItemModelConfig,
-    item: *const c_char,
-) {
+pub extern "C" fn itemmodel_config_set_item(config: *mut FFIItemModelConfig, item: *const c_char) {
     if config.is_null() || item.is_null() {
         return;
     }

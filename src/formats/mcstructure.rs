@@ -54,11 +54,7 @@ impl SchematicExporter for McStructureFormat {
         "default".to_string()
     }
 
-    fn write(
-        &self,
-        schematic: &UniversalSchematic,
-        _version: Option<&str>,
-    ) -> Result<Vec<u8>> {
+    fn write(&self, schematic: &UniversalSchematic, _version: Option<&str>) -> Result<Vec<u8>> {
         to_mcstructure(schematic)
     }
 }
@@ -322,9 +318,7 @@ pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic> {
     Ok(schematic)
 }
 
-pub fn to_mcstructure(
-    schematic: &UniversalSchematic,
-) -> Result<Vec<u8>> {
+pub fn to_mcstructure(schematic: &UniversalSchematic) -> Result<Vec<u8>> {
     let merged_region = schematic.get_merged_region();
     let compact_region = merged_region.to_compact();
     let (width, height, length) = compact_region.get_dimensions();

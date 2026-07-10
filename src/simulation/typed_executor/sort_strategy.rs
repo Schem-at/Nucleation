@@ -8,8 +8,7 @@
 ///
 /// The sort strategy controls how positions are ordered when assigned to bits.
 /// Position 0 corresponds to bit 0 (LSB), position 1 to bit 1, etc.
-#[derive(Debug, Clone, PartialEq)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum SortStrategy {
     // ========================================================================
     // Axis-first sorting (ascending)
@@ -88,7 +87,6 @@ pub enum Direction {
     Ascending,
     Descending,
 }
-
 
 impl SortStrategy {
     /// Sort positions according to this strategy

@@ -239,7 +239,9 @@ impl SchematicWrapper {
     /// exporting for an older version.
     #[wasm_bindgen(js_name = convertToVersion)]
     pub fn convert_to_version(&mut self, target_data_version: i32) -> String {
-        self.0.convert_to_data_version(target_data_version).to_json()
+        self.0
+            .convert_to_data_version(target_data_version)
+            .to_json()
     }
 
     /// The Minecraft data version of the file this schematic was loaded from
@@ -356,10 +358,16 @@ impl SchematicWrapper {
     /// so the UI can warn the user. The schematic itself is left unchanged.
     #[wasm_bindgen(js_name = toLitematicForVersion)]
     pub fn to_litematic_for_version(&self, target_data_version: i32) -> Result<JsValue, JsValue> {
-        let (bytes, report) = litematic::to_litematic_for_data_version(&self.0, target_data_version)
-            .map_err(|e| JsValue::from_str(&format!("Litematic conversion error: {}", e)))?;
+        let (bytes, report) =
+            litematic::to_litematic_for_data_version(&self.0, target_data_version)
+                .map_err(|e| JsValue::from_str(&format!("Litematic conversion error: {}", e)))?;
         let obj = Object::new();
-        Reflect::set(&obj, &"bytes".into(), &js_sys::Uint8Array::from(&bytes[..]).into()).unwrap();
+        Reflect::set(
+            &obj,
+            &"bytes".into(),
+            &js_sys::Uint8Array::from(&bytes[..]).into(),
+        )
+        .unwrap();
         Reflect::set(&obj, &"loss".into(), &JsValue::from_str(&report.to_json())).unwrap();
         Ok(obj.into())
     }
@@ -1014,7 +1022,14 @@ impl SchematicWrapper {
     /// container contents, sign text, banner patterns, item components, etc.
     /// SNBT preserves every NBT tag type with no precision loss.
     #[wasm_bindgen(js_name = setBlockEntity)]
-    pub fn set_block_entity(&mut self, x: i32, y: i32, z: i32, id: &str, snbt: &str) -> Result<(), JsValue> {
+    pub fn set_block_entity(
+        &mut self,
+        x: i32,
+        y: i32,
+        z: i32,
+        id: &str,
+        snbt: &str,
+    ) -> Result<(), JsValue> {
         let compound = quartz_nbt::snbt::parse(snbt)
             .map_err(|e| JsValue::from_str(&format!("Invalid SNBT: {}", e)))?;
         let nbt = crate::nbt::NbtMap::from_quartz_nbt(&compound);

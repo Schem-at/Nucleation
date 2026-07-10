@@ -1,5 +1,5 @@
-use super::*;
 use super::schematic::CBoundingBox;
+use super::*;
 
 // --- Schematic Definition Region Methods ---
 

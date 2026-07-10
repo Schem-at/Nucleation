@@ -1,8 +1,7 @@
 use quartz_nbt::{NbtCompound, NbtTag};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub struct Metadata {
     pub name: Option<String>,
     pub author: Option<String>,

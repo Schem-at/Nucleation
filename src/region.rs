@@ -1717,13 +1717,28 @@ mod tests {
 
     #[test]
     fn unpack_matches_litematica_continuous_stream_all_bit_widths() {
-        for (bits, palette_len) in [(2usize, 4usize), (3, 8), (4, 16), (5, 32), (6, 64), (7, 128), (8, 256)] {
+        for (bits, palette_len) in [
+            (2usize, 4usize),
+            (3, 8),
+            (4, 16),
+            (5, 32),
+            (6, 64),
+            (7, 128),
+            (8, 256),
+        ] {
             let volume = 200usize; // spans many longs
             let values: Vec<usize> = (0..volume).map(|i| (i * 7 + 1) % palette_len).collect();
             let packed = litematica_pack(&values, bits);
             let mut region = Region::new("t".to_string(), (0, 0, 0), (volume as i32, 1, 1));
-            region.palette = (0..palette_len).map(|i| BlockState::new(format!("minecraft:b{}", i))).collect();
-            assert_eq!(region.calculate_bits_per_block(), bits, "bits setup for palette_len={}", palette_len);
+            region.palette = (0..palette_len)
+                .map(|i| BlockState::new(format!("minecraft:b{}", i)))
+                .collect();
+            assert_eq!(
+                region.calculate_bits_per_block(),
+                bits,
+                "bits setup for palette_len={}",
+                palette_len
+            );
             // Litematica long-count is ceil(volume*bits/64); confirm nucleation reads exactly that.
             assert_eq!(packed.len(), (volume * bits).div_ceil(64));
             let unpacked = region.unpack_block_states(&packed);

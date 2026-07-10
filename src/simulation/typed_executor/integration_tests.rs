@@ -792,7 +792,6 @@ fn create_adder_schematic() -> UniversalSchematic {
     // Stack 4 full-adders side by side
     // Note: Don't mix single-block characters with schematics - all palette entries
     // in a layer should have matching dimensions for proper tiling
-    
 
     SchematicBuilder::new()
         .name("four_bit_adder")

@@ -49,7 +49,14 @@ pub fn schematic_version_for_data_version(data_version: i32) -> (i32, Option<i32
     } else if data_version < DATA_VERSION_1_18 {
         (5, None)
     } else if data_version < DATA_VERSION_1_20_5 {
-        (6, if data_version >= DATA_VERSION_1_19_2 { Some(1) } else { None })
+        (
+            6,
+            if data_version >= DATA_VERSION_1_19_2 {
+                Some(1)
+            } else {
+                None
+            },
+        )
     } else {
         (7, Some(1))
     }
@@ -80,7 +87,10 @@ pub fn to_litematic_with_compression(
     // Derive the schematic Version from the target Minecraft data version so the
     // header matches the block/item content (pair with convert_to_data_version to
     // also downgrade the content). Falls back to the latest canonical version.
-    let data_version = schematic.metadata.mc_version.unwrap_or(DEFAULT_TARGET_DATA_VERSION);
+    let data_version = schematic
+        .metadata
+        .mc_version
+        .unwrap_or(DEFAULT_TARGET_DATA_VERSION);
     let (version, sub_version) = schematic_version_for_data_version(data_version);
 
     root.insert("Version", NbtTag::Int(version));
@@ -386,10 +396,7 @@ fn create_regions(schematic: &UniversalSchematic, version: i32) -> NbtCompound {
     regions
 }
 
-fn parse_metadata(
-    root: &NbtCompound,
-    schematic: &mut UniversalSchematic,
-) -> Result<()> {
+fn parse_metadata(root: &NbtCompound, schematic: &mut UniversalSchematic) -> Result<()> {
     // Capture the file's Minecraft data version (root-level, written by Litematica
     // as `MinecraftDataVersion`) so importers know what to forward-convert from.
     if let Ok(dv) = root.get::<_, i32>("MinecraftDataVersion") {
@@ -423,10 +430,7 @@ fn parse_metadata(
     Ok(())
 }
 
-fn parse_regions(
-    root: &NbtCompound,
-    schematic: &mut UniversalSchematic,
-) -> Result<()> {
+fn parse_regions(root: &NbtCompound, schematic: &mut UniversalSchematic) -> Result<()> {
     let regions = root.get::<_, &NbtCompound>("Regions")?;
     let mut loop_count = 0;
     for (name, region_tag) in regions.inner() {
@@ -567,11 +571,7 @@ impl SchematicExporter for LitematicFormat {
         "default".to_string()
     }
 
-    fn write(
-        &self,
-        schematic: &UniversalSchematic,
-        _version: Option<&str>,
-    ) -> Result<Vec<u8>> {
+    fn write(&self, schematic: &UniversalSchematic, _version: Option<&str>) -> Result<Vec<u8>> {
         to_litematic(schematic)
     }
 }
@@ -580,7 +580,7 @@ impl SchematicExporter for LitematicFormat {
 mod tests {
     use super::*;
     use crate::{BlockState, UniversalSchematic};
-    
+
     use std::fs::File;
     use std::io::Write;
 
@@ -629,9 +629,19 @@ mod tests {
             schem.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
             let bytes = to_litematic(&schem).unwrap();
             let root = read_root(&bytes);
-            assert_eq!(root.get::<_, i32>("Version").unwrap(), want_ver, "Version for dv={}", dv);
+            assert_eq!(
+                root.get::<_, i32>("Version").unwrap(),
+                want_ver,
+                "Version for dv={}",
+                dv
+            );
             assert_eq!(root.get::<_, i32>("MinecraftDataVersion").unwrap(), dv);
-            assert_eq!(root.get::<_, i32>("SubVersion").is_ok(), want_sub, "SubVersion presence for dv={}", dv);
+            assert_eq!(
+                root.get::<_, i32>("SubVersion").is_ok(),
+                want_sub,
+                "SubVersion presence for dv={}",
+                dv
+            );
             // PendingFluidTicks presence is gated on Version>=5.
             let regions = root.get::<_, &NbtCompound>("Regions").unwrap();
             let (_, rtag) = regions.inner().iter().next().unwrap();
@@ -646,7 +656,10 @@ mod tests {
             }
             // The bytes re-parse and keep the block + source data version.
             let reparsed = from_litematic(&bytes).unwrap();
-            assert_eq!(reparsed.get_block(0, 0, 0).map(|b| b.name.as_str()), Some("minecraft:stone"));
+            assert_eq!(
+                reparsed.get_block(0, 0, 0).map(|b| b.name.as_str()),
+                Some("minecraft:stone")
+            );
             assert_eq!(reparsed.metadata.source_data_version, Some(dv));
         }
     }
@@ -663,10 +676,17 @@ mod tests {
         let root = read_root(&bytes);
         assert_eq!(root.get::<_, i32>("Version").unwrap(), 4);
         assert_eq!(root.get::<_, i32>("MinecraftDataVersion").unwrap(), 1343);
-        assert_eq!(schem.metadata.mc_version, Some(4189), "input schematic must be unchanged");
+        assert_eq!(
+            schem.metadata.mc_version,
+            Some(4189),
+            "input schematic must be unchanged"
+        );
         // It re-reads and stone (unchanged by flattening) survives.
         let reparsed = from_litematic(&bytes).unwrap();
-        assert_eq!(reparsed.get_block(0, 0, 0).map(|b| b.name.as_str()), Some("minecraft:stone"));
+        assert_eq!(
+            reparsed.get_block(0, 0, 0).map(|b| b.name.as_str()),
+            Some("minecraft:stone")
+        );
     }
 
     #[test]
@@ -676,14 +696,20 @@ mod tests {
         schem.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
         let meta = read_root(&to_litematic(&schem).unwrap());
         let m = meta.get::<_, &NbtCompound>("Metadata").unwrap();
-        assert!(matches!(m.get::<_, &NbtTag>("TotalVolume").unwrap(), NbtTag::Long(_)));
+        assert!(matches!(
+            m.get::<_, &NbtTag>("TotalVolume").unwrap(),
+            NbtTag::Long(_)
+        ));
         // v7 uses Int.
         let mut schem7 = UniversalSchematic::new("v7".to_string());
         schem7.metadata.mc_version = Some(4189);
         schem7.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
         let m7root = read_root(&to_litematic(&schem7).unwrap());
         let m7 = m7root.get::<_, &NbtCompound>("Metadata").unwrap();
-        assert!(matches!(m7.get::<_, &NbtTag>("TotalVolume").unwrap(), NbtTag::Int(_)));
+        assert!(matches!(
+            m7.get::<_, &NbtTag>("TotalVolume").unwrap(),
+            NbtTag::Int(_)
+        ));
     }
 
     // A region with a NEGATIVE Size: Position is the origin corner, Size the signed
@@ -749,18 +775,34 @@ mod tests {
         let schem = from_litematic(&gzip_litematic(&root)).expect("parse");
 
         // The chest block sits at world (0,4,0)...
-        assert_eq!(schem.get_block(0, 4, 0).map(|b| b.name.as_str()), Some("minecraft:chest"));
-        assert_eq!(schem.get_block(0, 5, 0).map(|b| b.name.as_str()), Some("minecraft:air"));
+        assert_eq!(
+            schem.get_block(0, 4, 0).map(|b| b.name.as_str()),
+            Some("minecraft:chest")
+        );
+        assert_eq!(
+            schem.get_block(0, 5, 0).map(|b| b.name.as_str()),
+            Some("minecraft:air")
+        );
         // ...and its block entity must land on it (NOT at Position-offset (0,5,0)).
         let bes = schem.get_block_entities_as_list();
         assert_eq!(bes.len(), 1);
         assert_eq!(bes[0].id, "minecraft:chest");
-        assert_eq!(bes[0].position, (0, 4, 0), "block entity must sit on the min-corner-relative cell");
+        assert_eq!(
+            bes[0].position,
+            (0, 4, 0),
+            "block entity must sit on the min-corner-relative cell"
+        );
         // And its item survived.
         let items_len = bes[0]
             .nbt
             .get("Items")
-            .and_then(|v| if let crate::nbt::NbtValue::List(l) = v { Some(l.len()) } else { None })
+            .and_then(|v| {
+                if let crate::nbt::NbtValue::List(l) = v {
+                    Some(l.len())
+                } else {
+                    None
+                }
+            })
             .unwrap_or(0);
         assert_eq!(items_len, 1);
     }
@@ -823,9 +865,21 @@ mod tests {
 
         let schem = from_litematic(&gzip_litematic(&root)).expect("parse");
         let entity = &schem.default_region.entities[0];
-        assert!((entity.position.0 - 1.5).abs() < 0.001, "x={}", entity.position.0);
-        assert!((entity.position.1 - 1.0).abs() < 0.001, "y={}", entity.position.1);
-        assert!((entity.position.2 - 1.6875).abs() < 0.001, "z={}", entity.position.2);
+        assert!(
+            (entity.position.0 - 1.5).abs() < 0.001,
+            "x={}",
+            entity.position.0
+        );
+        assert!(
+            (entity.position.1 - 1.0).abs() < 0.001,
+            "y={}",
+            entity.position.1
+        );
+        assert!(
+            (entity.position.2 - 1.6875).abs() < 0.001,
+            "z={}",
+            entity.position.2
+        );
     }
 
     #[test]

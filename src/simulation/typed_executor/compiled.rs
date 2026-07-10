@@ -227,12 +227,7 @@ cc··cccccc
         schematic
     }
 
-    fn run_adder(
-        ex: &mut TypedCircuitExecutor,
-        a: bool,
-        b: bool,
-        cin: bool,
-    ) -> (Value, Value) {
+    fn run_adder(ex: &mut TypedCircuitExecutor, a: bool, b: bool, cin: bool) -> (Value, Value) {
         let mut inputs = std::collections::HashMap::new();
         inputs.insert("a".to_string(), Value::Bool(a));
         inputs.insert("b".to_string(), Value::Bool(b));
@@ -305,16 +300,14 @@ cc··cccccc
         const N: u32 = 50;
         let t0 = Instant::now();
         for _ in 0..N {
-            let parsed =
-                crate::formats::schematic::from_schematic(&schem_bytes).unwrap();
+            let parsed = crate::formats::schematic::from_schematic(&schem_bytes).unwrap();
             let _ex = create_executor_from_insign(&parsed).unwrap();
         }
         let full_us = t0.elapsed().as_micros() / N as u128;
 
         let t1 = Instant::now();
         for _ in 0..N {
-            let _parsed =
-                crate::formats::schematic::from_schematic(&schem_bytes).unwrap();
+            let _parsed = crate::formats::schematic::from_schematic(&schem_bytes).unwrap();
         }
         let parse_us = t1.elapsed().as_micros() / N as u128;
 

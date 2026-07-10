@@ -38,11 +38,7 @@ impl SchematicExporter for SnapshotFormat {
         "1".to_string()
     }
 
-    fn write(
-        &self,
-        schematic: &UniversalSchematic,
-        _version: Option<&str>,
-    ) -> Result<Vec<u8>> {
+    fn write(&self, schematic: &UniversalSchematic, _version: Option<&str>) -> Result<Vec<u8>> {
         to_snapshot(schematic)
     }
 }

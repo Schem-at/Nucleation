@@ -5,8 +5,8 @@
 //! their embedded seeds — identical inputs produce identical schematics on
 //! every platform and binding.
 
-use super::noise::{fbm2, hash01_2, hash01_3};
 use super::node::SdfNode;
+use super::noise::{fbm2, hash01_2, hash01_3};
 use crate::UniversalSchematic;
 use serde::{Deserialize, Serialize};
 
@@ -204,13 +204,7 @@ pub fn sample_to_schematic(
     Ok(schematic)
 }
 
-fn pick_fill(
-    rules: &MaterialRules,
-    x: i32,
-    y: i32,
-    z: i32,
-    depth: i32,
-) -> Option<&str> {
+fn pick_fill(rules: &MaterialRules, x: i32, y: i32, z: i32, depth: i32) -> Option<&str> {
     for rule in &rules.fill {
         let matches = match &rule.when {
             None => true,

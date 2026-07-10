@@ -180,10 +180,9 @@ fn sign_tile_reverter(data: &mut NbtMap, version: i32) {
                 }
             }
         }
-        if !data.has_key("GlowingText")
-            && front.get_bool("has_glowing_text").unwrap_or(false) {
-                data.set_bool("GlowingText", true);
-            }
+        if !data.has_key("GlowingText") && front.get_bool("has_glowing_text").unwrap_or(false) {
+            data.set_bool("GlowingText", true);
+        }
     }
 
     // back_text has no legacy representation: a 1.19.4 sign is single-sided.
