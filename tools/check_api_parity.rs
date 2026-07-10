@@ -847,17 +847,34 @@ fn parse_python_impl_block(
 // ============================================================================
 
 fn parse_ffi_surface(base_dir: &str) -> ApiSurface {
-    let ffi_path = format!("{}/src/ffi.rs", base_dir);
-    let mut content = match fs::read_to_string(&ffi_path) {
-        Ok(c) => c,
-        Err(_) => {
-            return ApiSurface {
-                target: Target::Ffi,
-                classes: Vec::new(),
-                free_functions: Vec::new(),
+    // The FFI surface is split across per-domain files under src/ffi/
+    // (mirroring src/wasm/ and src/python/); fall back to a single
+    // src/ffi.rs for compatibility with the pre-split layout.
+    let ffi_dir = format!("{}/src/ffi", base_dir);
+    let mut content = String::new();
+    if let Ok(entries) = fs::read_dir(&ffi_dir) {
+        let mut paths: Vec<_> = entries
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("rs"))
+            .collect();
+        paths.sort();
+        for path in paths {
+            if let Ok(file_content) = fs::read_to_string(&path) {
+                content.push('\n');
+                content.push_str(&file_content);
             }
         }
-    };
+    } else if let Ok(single_file) = fs::read_to_string(format!("{}/src/ffi.rs", base_dir)) {
+        content.push_str(&single_file);
+    }
+    if content.is_empty() {
+        return ApiSurface {
+            target: Target::Ffi,
+            classes: Vec::new(),
+            free_functions: Vec::new(),
+        };
+    }
     // The Store FFI surface lives in its own module file; scan it too.
     if let Ok(store_ffi) = fs::read_to_string(format!("{}/src/store/ffi.rs", base_dir)) {
         content.push('\n');
