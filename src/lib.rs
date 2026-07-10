@@ -32,6 +32,8 @@ pub mod utils;
 // Feature-specific modules
 #[cfg(feature = "autostack")]
 pub mod autostack;
+#[cfg(feature = "bridge")]
+pub mod bridge;
 #[cfg(feature = "ffi")]
 pub mod ffi;
 #[cfg(feature = "meshing")]
