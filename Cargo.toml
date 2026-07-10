@@ -19,7 +19,17 @@ default = ["store-fs", "autostack"]
 ffi = ["autostack"]
 # Diplomat-generated bindings pilot (see /Users/harrison/code/stencil). Additive and
 # default-off: does not touch ffi/wasm/python/php or their generated surfaces.
-bridge = ["dep:diplomat", "dep:diplomat-runtime", "autostack"]
+bridge = ["dep:diplomat", "dep:diplomat-runtime", "dep:base64", "autostack"]
+# Everything the full generated surface needs at runtime; used for codegen builds,
+# smoke tests, and release artifacts of the generated bindings.
+bridge-full = [
+    "bridge",
+    "meshing",
+    "simulation",
+    "rendering",
+    "scripting-lua",
+    "scripting-js",
+]
 
 # Storage backends (the `store` module). `mem` is always available; the rest
 # are feature-gated so you only pull the deps you enable. Networked backends
@@ -97,9 +107,11 @@ pyo3 = { version = "0.25.0", optional = true, features = ["extension-module"] }
 # PHP dependencies
 ext-php-rs = { version = "0.15.12", optional = true }
 
-# Diplomat bridge pilot dependencies
+# Diplomat bridge dependencies (base64: binary payloads cross DiplomatWrite as base64,
+# since the JS/Kotlin backends decode the write buffer as UTF-8 text)
 diplomat = { version = "0.15.0", optional = true }
 diplomat-runtime = { version = "0.15.1", optional = true }
+base64 = { version = "0.22", optional = true }
 
 # Scripting engine dependencies
 mlua = { version = "0.10", features = ["luajit", "vendored"], optional = true }
