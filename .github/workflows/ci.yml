@@ -94,6 +94,8 @@ jobs:
 
       - name: Build and test Python bindings
         run: |
+          python -m venv .venv
+          source .venv/bin/activate
           pip install maturin pytest
           maturin develop --features python,simulation,rendering
           pytest tests/python_new_api_test.py tests/python_test.py tests/python_simple_circuit_test.py tests/python_store_test.py -v
