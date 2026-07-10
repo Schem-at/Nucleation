@@ -95,7 +95,7 @@ Download prebuilt `.so` / `.dylib` / `.dll` from [Releases](https://github.com/S
 or build locally using:
 
 ```bash
-./build-ffi.sh
+cargo build --release --features bridge  # C ABI in bindings/c
 ```
 
 ---
@@ -658,7 +658,7 @@ std::fs::write("diff_overlay.glb", &glb)?;
 The same API is available from every binding — see
 [Python](README-python.md#diff--fingerprint),
 [JavaScript/WASM](README-npm.md#diff--fingerprint),
-[JVM](nucleation-jvm/README.md#diff--fingerprint), and
+[JVM](bindings/kotlin), and
 [C/FFI](examples/ffi.md).
 
 ---
@@ -676,13 +676,13 @@ cargo build --release --features simulation
 cargo build --release --features meshing
 
 # Build WASM module (includes simulation)
-./build-wasm.sh
+./tools/package-npm.sh  # JS/WASM package in dist/npm
 
 # Build Python bindings locally
-maturin develop --features python
+pip install bindings/python  # nanobind extension, builds the Rust core
 
 # Build FFI libs
-./build-ffi.sh
+cargo build --release --features bridge  # C ABI in bindings/c
 
 # Run tests
 cargo test

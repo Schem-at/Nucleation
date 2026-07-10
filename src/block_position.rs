@@ -1,8 +1,4 @@
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "wasm")]
-use wasm_bindgen::prelude::*;
-
-#[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct BlockPosition {
     pub x: i32,
@@ -10,19 +6,8 @@ pub struct BlockPosition {
     pub z: i32,
 }
 
-// WASM-specific implementation
-#[cfg(feature = "wasm")]
-#[wasm_bindgen]
-impl BlockPosition {
-    #[wasm_bindgen(constructor)]
-    pub fn new(x: i32, y: i32, z: i32) -> Self {
-        BlockPosition { x, y, z }
-    }
-}
-
 // Core implementation available to all users of the library
 impl BlockPosition {
-    #[cfg(not(feature = "wasm"))]
     pub fn new(x: i32, y: i32, z: i32) -> Self {
         BlockPosition { x, y, z }
     }

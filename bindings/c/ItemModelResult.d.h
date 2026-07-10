@@ -1,0 +1,19 @@
+#ifndef ItemModelResult_D_H
+#define ItemModelResult_D_H
+
+#include <stdio.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+#include "diplomat_runtime.h"
+
+
+
+
+
+typedef struct ItemModelResult ItemModelResult;
+
+
+
+
+#endif // ItemModelResult_D_H

@@ -11,4 +11,20 @@
 pub mod shared;
 
 pub mod autostack;
+pub mod building;
+pub mod definition_region;
+pub mod diff;
+#[cfg(feature = "meshing")]
+pub mod meshing;
+pub mod nbt;
+#[cfg(feature = "rendering")]
+pub mod rendering;
 pub mod schematic;
+pub mod schematic_builder;
+#[cfg(any(feature = "scripting-lua", feature = "scripting-js"))]
+pub mod scripting;
+pub mod sdf;
+#[cfg(feature = "simulation")]
+pub mod simulation;
+pub mod store_io;
+pub mod world_stream;

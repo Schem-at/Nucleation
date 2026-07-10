@@ -1,0 +1,3 @@
+[nanobind]
+lib_name = "nucleation"
+module_name = "nucleation"

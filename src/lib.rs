@@ -34,22 +34,38 @@ pub mod utils;
 pub mod autostack;
 #[cfg(feature = "bridge")]
 pub mod bridge;
-#[cfg(feature = "ffi")]
-pub mod ffi;
 #[cfg(feature = "meshing")]
 pub mod meshing;
-#[cfg(feature = "php")]
-mod php;
-#[cfg(feature = "python")]
-mod python;
 #[cfg(feature = "rendering")]
 pub mod rendering;
 #[cfg(any(feature = "scripting-lua", feature = "scripting-js"))]
 pub mod scripting;
 #[cfg(feature = "simulation")]
 pub mod simulation;
-#[cfg(feature = "wasm")]
-pub mod wasm;
+
+// The Diplomat wasm module carries no wasm-bindgen glue, so getrandom's "js" source is
+// unavailable; register a deterministic splitmix64 stream instead. Non-crypto by design:
+// rand only feeds seeded shuffles and cosmetic jitter here (see Cargo.toml note).
+#[cfg(target_arch = "wasm32")]
+mod wasm_entropy {
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static STATE: AtomicU64 = AtomicU64::new(0x9E3779B97F4A7C15);
+
+    pub fn getrandom_fallback(buf: &mut [u8]) -> Result<(), getrandom::Error> {
+        for chunk in buf.chunks_mut(8) {
+            let mut z = STATE.fetch_add(0x9E3779B97F4A7C15, Ordering::Relaxed);
+            z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+            z = (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB);
+            z ^= z >> 31;
+            let bytes = z.to_le_bytes();
+            chunk.copy_from_slice(&bytes[..chunk.len()]);
+        }
+        Ok(())
+    }
+}
+#[cfg(target_arch = "wasm32")]
+getrandom::register_custom_getrandom!(wasm_entropy::getrandom_fallback);
 
 // Public re-exports
 pub use block_state::BlockState;
@@ -67,11 +83,3 @@ pub use selection::{
 };
 pub use store::{MemStore, Store, StoreError};
 pub use universal_schematic::UniversalSchematic;
-
-// Re-export WASM types when building with WASM feature
-#[cfg(feature = "wasm")]
-pub use wasm::*;
-
-// Re-export PHP types when building with PHP feature
-#[cfg(feature = "php")]
-pub use php::*;

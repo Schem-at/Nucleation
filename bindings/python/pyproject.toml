@@ -1,0 +1,20 @@
+[build-system]
+requires = ["scikit-build-core >=0.10", "nanobind ==2.12.0"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "nucleation"
+version = "0.3.0"
+description = "A high-performance Minecraft schematic parser and utility library (generated bindings)"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Nano", email = "nano@schem.at" }]
+
+[project.urls]
+Homepage = "https://github.com/Schem-at/Nucleation"
+
+[tool.scikit-build]
+minimum-version = "0.10"
+build-dir = "build/{wheel_tag}"
+# Stable ABI wheels for CPython 3.12+
+wheel.py-api = "cp312"

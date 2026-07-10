@@ -1,3 +1,36 @@
+# Nucleation v0.3.0
+
+**Breaking: every language binding is now generated from a single source of truth.**
+
+The four hand-written binding layers (C FFI via `#[no_mangle]` externs, WASM via
+wasm-bindgen, Python via pyo3, JVM via hand-written JNI) and the experimental
+ext-php-rs extension are gone, replaced by Diplomat-generated bindings for
+C, C++, JS/WASM, Kotlin (JNA), Python (nanobind), and PHP (ext-ffi) — all generated
+from `src/bridge/` by `tools/gen-bindings.sh` into `bindings/`, and regenerated +
+diffed in CI so they can never go stale. The regex parity linters are deleted;
+coverage vs the old 544-function C surface is enforced by
+`tools/check_bridge_coverage.py` against a frozen baseline.
+
+API changes to be aware of:
+- One unified error model: every fallible call returns/raises `NucleationError`
+  (12 variants). The thread-local `schematic_last_error`, per-function int/null
+  sentinels, and error-string returns are gone.
+- Constructors are `create`/`from_*`; accessors drop `get_`/`set_` prefixes
+  (per-language casing applies, e.g. `getBlockName` in JS/PHP).
+- Domain methods moved off the `Schematic` god-object onto their own types
+  (`Diff`, `Fingerprint`, `Autostack`, `StoreIo`, `Renderer`, meshing types,
+  `SchematicRegions`).
+- Binary payloads (litematic/schem/GLB/PNG/…) cross the boundary base64-encoded
+  (`*_b64` methods); arrays/lists cross as JSON strings.
+- The mesh progress callback is replaced by a polling `MeshJob`
+  (start → `poll_progress` → `take_result`).
+- Memory management is generated: no more `free_*` functions anywhere.
+
+See `src/bridge/PORTING.md` for the binding rules and
+`tools/bridge_coverage/exclusions.txt` for the audited old→new name map.
+
+---
+
 # Nucleation v0.2.18
 
 Maintenance release, no user-facing API changes. The FFI layer

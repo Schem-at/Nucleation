@@ -60,3 +60,8 @@ benches/meshing-bench/
 CLAUDE.md
 /docs/superpowers
 /node-compile-cache/
+dist/
+examples/bridge_smoke/python/.venv/
+bindings/kotlin/build/
+bindings/kotlin/.gradle/
+bindings/python/build/

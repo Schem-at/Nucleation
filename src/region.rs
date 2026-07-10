@@ -337,7 +337,9 @@ impl Region {
         let tb_min_x = tight_bounds.min.0;
         let tb_min_y = tight_bounds.min.1;
         let tb_min_z = tight_bounds.min.2;
-        let _tb_max_y = tight_bounds.max.1;
+        // Only read on the wasm32 path below; keep the name so that path compiles.
+        #[allow(unused_variables)]
+        let tb_max_y = tight_bounds.max.1;
         let tb_max_z = tight_bounds.max.2;
 
         let x_off_src = (tb_min_x - self.bbox.min.0) as usize;

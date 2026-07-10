@@ -11,9 +11,9 @@ Nucleation is a high-performance Minecraft schematic engine written in Rust with
 ### Build
 - **Rust (Core):** `cargo build --release`
 - **Rust (with Simulation):** `cargo build --release --features simulation`
-- **WASM:** `./build-wasm.sh` (Builds `pkg/` directory)
-- **Python:** `maturin develop --features python,simulation` (Installs into current venv)
-- **FFI (Shared Libraries):** `./build-ffi.sh`
+- **WASM/JS:** `./tools/package-npm.sh` (assembles `dist/npm`)
+- **Python:** `pip install bindings/python` (nanobind extension; set NUCLEATION_FEATURES to widen features)
+- **C/FFI:** `cargo build --release --features bridge` + headers in `bindings/c`
 
 ### Test
 - **Core Tests:** `cargo test`
@@ -35,9 +35,8 @@ Nucleation is a high-performance Minecraft schematic engine written in Rust with
 ### Modules & Structure
 - **`src/formats/`:** Contains parsers and serializers for specific file formats (`litematic`, `schematic`, `nbt`).
 - **`src/simulation/`:** wrappers around the `mchprs` crates to provide redstone simulation capabilities. Enabled via the `simulation` feature.
-- **`src/wasm/`:** Rust-to-WASM bindings using `wasm-bindgen`.
-- **`src/python/`:** Python bindings using `pyo3`.
-- **`src/ffi/` & `src/php.rs`:** C-compatible FFI and PHP-specific bindings.
+- **`src/bridge/`:** the single annotated-Rust template every language binding is generated from (see `src/bridge/PORTING.md`).
+- **`bindings/`:** generated bindings for C/C++/JS/Kotlin/Python/PHP — never hand-edit; run `./tools/gen-bindings.sh`.
 
 ### Simulation (MCHPRS)
 The simulation feature relies on a forked version of MCHPRS (Minecraft High Performance Redstone Server) crates (`mchprs_world`, `mchprs_redstone`, etc.), specified as git dependencies in `Cargo.toml`. This engine allows for accurate redstone circuit simulation within schematics.

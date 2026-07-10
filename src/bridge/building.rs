@@ -1,0 +1,490 @@
+//! Shapes, brushes and the building tool. Port of `ffi/building.rs`.
+//!
+//! One `Shape` opaque wraps [`crate::building::ShapeEnum`]; one `Brush` opaque wraps
+//! [`crate::building::BrushEnum`]. Combinators (`union_with`, `intersection_with`,
+//! `difference_with`, `hollow`) clone their inputs, exactly like the old
+//! `shape_union`/`shape_hollow` did.
+
+#[diplomat::bridge]
+pub mod ffi {
+    use super::super::schematic::ffi::Schematic;
+    use super::super::shared::ffi::NucleationError;
+
+    /// Color interpolation space for gradient brushes. The old ABI passed this as
+    /// `space: c_int` (`1` = Oklab, anything else = RGB).
+    pub enum InterpolationSpace {
+        Rgb,
+        Oklab,
+    }
+
+    impl InterpolationSpace {
+        fn to_core(self) -> crate::building::InterpolationSpace {
+            match self {
+                InterpolationSpace::Rgb => crate::building::InterpolationSpace::Rgb,
+                InterpolationSpace::Oklab => crate::building::InterpolationSpace::Oklab,
+            }
+        }
+    }
+
+    /// A solid region of blocks: primitives (sphere, cuboid, …) and boolean
+    /// combinations thereof. Wraps `ShapeEnum`.
+    #[diplomat::opaque]
+    pub struct Shape(pub(crate) crate::building::ShapeEnum);
+
+    impl Shape {
+        /// Sphere centered at (`cx`, `cy`, `cz`) (truncated to block coordinates,
+        /// matching the old `shape_sphere`).
+        pub fn sphere(cx: f32, cy: f32, cz: f32, radius: f32) -> Box<Shape> {
+            Box::new(Shape(crate::building::ShapeEnum::Sphere(
+                crate::building::Sphere::new((cx as i32, cy as i32, cz as i32), radius as f64),
+            )))
+        }
+
+        /// Axis-aligned box spanning the two corners (inclusive).
+        pub fn cuboid(
+            min_x: i32,
+            min_y: i32,
+            min_z: i32,
+            max_x: i32,
+            max_y: i32,
+            max_z: i32,
+        ) -> Box<Shape> {
+            Box::new(Shape(crate::building::ShapeEnum::Cuboid(
+                crate::building::Cuboid::new((min_x, min_y, min_z), (max_x, max_y, max_z)),
+            )))
+        }
+
+        /// Ellipsoid centered at (`cx`, `cy`, `cz`) with per-axis radii.
+        pub fn ellipsoid(cx: i32, cy: i32, cz: i32, rx: f32, ry: f32, rz: f32) -> Box<Shape> {
+            Box::new(Shape(crate::building::ShapeEnum::Ellipsoid(
+                crate::building::Ellipsoid::new((cx, cy, cz), (rx as f64, ry as f64, rz as f64)),
+            )))
+        }
+
+        /// Cylinder from base point along an axis vector.
+        #[allow(clippy::too_many_arguments)]
+        pub fn cylinder(
+            bx: f32,
+            by: f32,
+            bz: f32,
+            ax: f32,
+            ay: f32,
+            az: f32,
+            radius: f32,
+            height: f32,
+        ) -> Box<Shape> {
+            Box::new(Shape(crate::building::ShapeEnum::Cylinder(
+                crate::building::Cylinder::new(
+                    (bx as f64, by as f64, bz as f64),
+                    (ax as f64, ay as f64, az as f64),
+                    radius as f64,
+                    height as f64,
+                ),
+            )))
+        }
+
+        /// Cylinder spanning the segment between two points.
+        pub fn cylinder_between(
+            x1: f32,
+            y1: f32,
+            z1: f32,
+            x2: f32,
+            y2: f32,
+            z2: f32,
+            radius: f32,
+        ) -> Box<Shape> {
+            Box::new(Shape(crate::building::ShapeEnum::Cylinder(
+                crate::building::Cylinder::between(
+                    (x1 as f64, y1 as f64, z1 as f64),
+                    (x2 as f64, y2 as f64, z2 as f64),
+                    radius as f64,
+                ),
+            )))
+        }
+
+        /// Cone with apex at (`ax`, `ay`, `az`) opening along direction (`dx`, `dy`, `dz`).
+        #[allow(clippy::too_many_arguments)]
+        pub fn cone(
+            ax: f32,
+            ay: f32,
+            az: f32,
+            dx: f32,
+            dy: f32,
+            dz: f32,
+            radius: f32,
+            height: f32,
+        ) -> Box<Shape> {
+            Box::new(Shape(crate::building::ShapeEnum::Cone(
+                crate::building::Cone::new(
+                    (ax as f64, ay as f64, az as f64),
+                    (dx as f64, dy as f64, dz as f64),
+                    radius as f64,
+                    height as f64,
+                ),
+            )))
+        }
+
+        /// Torus centered at (`cx`, `cy`, `cz`) with the given major/minor radii and
+        /// axis (`ax`, `ay`, `az`).
+        #[allow(clippy::too_many_arguments)]
+        pub fn torus(
+            cx: f32,
+            cy: f32,
+            cz: f32,
+            major_r: f32,
+            minor_r: f32,
+            ax: f32,
+            ay: f32,
+            az: f32,
+        ) -> Box<Shape> {
+            Box::new(Shape(crate::building::ShapeEnum::Torus(
+                crate::building::Torus::new(
+                    (cx as f64, cy as f64, cz as f64),
+                    major_r as f64,
+                    minor_r as f64,
+                    (ax as f64, ay as f64, az as f64),
+                ),
+            )))
+        }
+
+        /// Rectangular pyramid: base center, half-extents, height, up-axis.
+        #[allow(clippy::too_many_arguments)]
+        pub fn pyramid(
+            bx: f32,
+            by: f32,
+            bz: f32,
+            half_w: f32,
+            half_d: f32,
+            height: f32,
+            ax: f32,
+            ay: f32,
+            az: f32,
+        ) -> Box<Shape> {
+            Box::new(Shape(crate::building::ShapeEnum::Pyramid(
+                crate::building::Pyramid::new(
+                    (bx as f64, by as f64, bz as f64),
+                    (half_w as f64, half_d as f64),
+                    height as f64,
+                    (ax as f64, ay as f64, az as f64),
+                ),
+            )))
+        }
+
+        /// Flat disk: center, radius, plane normal, thickness.
+        #[allow(clippy::too_many_arguments)]
+        pub fn disk(
+            cx: f32,
+            cy: f32,
+            cz: f32,
+            radius: f32,
+            nx: f32,
+            ny: f32,
+            nz: f32,
+            thickness: f32,
+        ) -> Box<Shape> {
+            Box::new(Shape(crate::building::ShapeEnum::Disk(
+                crate::building::Disk::new(
+                    (cx as f64, cy as f64, cz as f64),
+                    radius as f64,
+                    (nx as f64, ny as f64, nz as f64),
+                    thickness as f64,
+                ),
+            )))
+        }
+
+        /// Finite plane patch: origin, two spanning vectors `u`/`v`, extents along
+        /// each, thickness.
+        #[allow(clippy::too_many_arguments)]
+        pub fn plane(
+            ox: f32,
+            oy: f32,
+            oz: f32,
+            ux: f32,
+            uy: f32,
+            uz: f32,
+            vx: f32,
+            vy: f32,
+            vz: f32,
+            u_ext: f32,
+            v_ext: f32,
+            thickness: f32,
+        ) -> Box<Shape> {
+            Box::new(Shape(crate::building::ShapeEnum::Plane(
+                crate::building::Plane::new(
+                    (ox as f64, oy as f64, oz as f64),
+                    (ux as f64, uy as f64, uz as f64),
+                    (vx as f64, vy as f64, vz as f64),
+                    u_ext as f64,
+                    v_ext as f64,
+                    thickness as f64,
+                ),
+            )))
+        }
+
+        /// Filled triangle between three vertices, thickened by `thickness`.
+        #[allow(clippy::too_many_arguments)]
+        pub fn triangle(
+            ax: f32,
+            ay: f32,
+            az: f32,
+            bx: f32,
+            by: f32,
+            bz: f32,
+            cx: f32,
+            cy: f32,
+            cz: f32,
+            thickness: f32,
+        ) -> Box<Shape> {
+            Box::new(Shape(crate::building::ShapeEnum::Triangle(
+                crate::building::Triangle::new(
+                    (ax as f64, ay as f64, az as f64),
+                    (bx as f64, by as f64, bz as f64),
+                    (cx as f64, cy as f64, cz as f64),
+                    thickness as f64,
+                ),
+            )))
+        }
+
+        /// Line segment between two points, thickened by `thickness`.
+        pub fn line(
+            x1: f32,
+            y1: f32,
+            z1: f32,
+            x2: f32,
+            y2: f32,
+            z2: f32,
+            thickness: f32,
+        ) -> Box<Shape> {
+            Box::new(Shape(crate::building::ShapeEnum::Line(
+                crate::building::Line::new(
+                    (x1 as f64, y1 as f64, z1 as f64),
+                    (x2 as f64, y2 as f64, z2 as f64),
+                    thickness as f64,
+                ),
+            )))
+        }
+
+        /// Bézier curve through `control_points` (flat `[x0, y0, z0, x1, y1, z1, …]`,
+        /// so the length must be a non-zero multiple of 3), thickened by `thickness`
+        /// and sampled at `resolution` steps.
+        pub fn bezier(
+            control_points: &[f32],
+            thickness: f32,
+            resolution: u32,
+        ) -> Result<Box<Shape>, NucleationError> {
+            if control_points.is_empty() || !control_points.len().is_multiple_of(3) {
+                return Err(NucleationError::InvalidArgument);
+            }
+            let points: Vec<(f64, f64, f64)> = control_points
+                .chunks_exact(3)
+                .map(|p| (p[0] as f64, p[1] as f64, p[2] as f64))
+                .collect();
+            Ok(Box::new(Shape(crate::building::ShapeEnum::BezierCurve(
+                crate::building::BezierCurve::new(points, thickness as f64, resolution),
+            ))))
+        }
+
+        /// Hollowed-out copy of this shape with the given wall thickness (clones the
+        /// input, like the old `shape_hollow`).
+        pub fn hollow(&self, thickness: u32) -> Box<Shape> {
+            Box::new(Shape(crate::building::ShapeEnum::Hollow(
+                crate::building::Hollow::new(self.0.clone(), thickness),
+            )))
+        }
+
+        /// Boolean union of this shape and `other` (clones both inputs).
+        pub fn union_with(&self, other: &Shape) -> Box<Shape> {
+            Box::new(Shape(crate::building::ShapeEnum::Union(
+                crate::building::Union::new(self.0.clone(), other.0.clone()),
+            )))
+        }
+
+        /// Boolean intersection of this shape and `other` (clones both inputs).
+        pub fn intersection_with(&self, other: &Shape) -> Box<Shape> {
+            Box::new(Shape(crate::building::ShapeEnum::Intersection(
+                crate::building::Intersection::new(self.0.clone(), other.0.clone()),
+            )))
+        }
+
+        /// Boolean difference: this shape minus `other` (clones both inputs).
+        pub fn difference_with(&self, other: &Shape) -> Box<Shape> {
+            Box::new(Shape(crate::building::ShapeEnum::Difference(
+                crate::building::Difference::new(self.0.clone(), other.0.clone()),
+            )))
+        }
+    }
+
+    /// Decides which block goes at each point of a filled shape. Wraps `BrushEnum`.
+    #[diplomat::opaque]
+    pub struct Brush(pub(crate) crate::building::BrushEnum);
+
+    impl Brush {
+        /// Every point becomes `block_name` (a block-state string).
+        pub fn solid(block_name: &DiplomatStr) -> Result<Box<Brush>, NucleationError> {
+            let name =
+                std::str::from_utf8(block_name).map_err(|_| NucleationError::InvalidArgument)?;
+            Ok(Box::new(Brush(crate::building::BrushEnum::Solid(
+                crate::building::SolidBrush::new(crate::BlockState::new(name.to_owned())),
+            ))))
+        }
+
+        /// Nearest-block-to-RGB-color brush.
+        pub fn color(r: u8, g: u8, b: u8) -> Box<Brush> {
+            Box::new(Brush(crate::building::BrushEnum::Color(
+                crate::building::ColorBrush::new(r, g, b),
+            )))
+        }
+
+        /// Linear color gradient between two anchored points.
+        #[allow(clippy::too_many_arguments)]
+        pub fn linear_gradient(
+            x1: i32,
+            y1: i32,
+            z1: i32,
+            r1: u8,
+            g1: u8,
+            b1: u8,
+            x2: i32,
+            y2: i32,
+            z2: i32,
+            r2: u8,
+            g2: u8,
+            b2: u8,
+            space: InterpolationSpace,
+        ) -> Box<Brush> {
+            let brush = crate::building::LinearGradientBrush::new(
+                (x1, y1, z1),
+                (r1, g1, b1),
+                (x2, y2, z2),
+                (r2, g2, b2),
+            )
+            .with_space(space.to_core());
+            Box::new(Brush(crate::building::BrushEnum::Linear(brush)))
+        }
+
+        /// Base color shaded by surface normal against light direction
+        /// (`lx`, `ly`, `lz`).
+        pub fn shaded(r: u8, g: u8, b: u8, lx: f32, ly: f32, lz: f32) -> Box<Brush> {
+            Box::new(Brush(crate::building::BrushEnum::Shaded(
+                crate::building::ShadedBrush::new((r, g, b), (lx as f64, ly as f64, lz as f64)),
+            )))
+        }
+
+        /// Bilinear gradient over the patch `origin + s*u + t*v` with corner colors
+        /// c00/c10/c01/c11.
+        #[allow(clippy::too_many_arguments)]
+        pub fn bilinear_gradient(
+            ox: i32,
+            oy: i32,
+            oz: i32,
+            ux: i32,
+            uy: i32,
+            uz: i32,
+            vx: i32,
+            vy: i32,
+            vz: i32,
+            r00: u8,
+            g00: u8,
+            b00: u8,
+            r10: u8,
+            g10: u8,
+            b10: u8,
+            r01: u8,
+            g01: u8,
+            b01: u8,
+            r11: u8,
+            g11: u8,
+            b11: u8,
+            space: InterpolationSpace,
+        ) -> Box<Brush> {
+            let brush = crate::building::BilinearGradientBrush::new(
+                (ox, oy, oz),
+                (ux, uy, uz),
+                (vx, vy, vz),
+                (r00, g00, b00),
+                (r10, g10, b10),
+                (r01, g01, b01),
+                (r11, g11, b11),
+            )
+            .with_space(space.to_core());
+            Box::new(Brush(crate::building::BrushEnum::Bilinear(brush)))
+        }
+
+        /// Inverse-distance-weighted gradient between colored anchor points.
+        /// `positions` is flat `[x0, y0, z0, x1, …]` and `colors` is flat
+        /// `[r0, g0, b0, r1, …]`; both must describe the same non-zero number of
+        /// points (`positions.len() == colors.len()`, a multiple of 3).
+        pub fn point_gradient(
+            positions: &[i32],
+            colors: &[u8],
+            falloff: f32,
+            space: InterpolationSpace,
+        ) -> Result<Box<Brush>, NucleationError> {
+            if positions.is_empty()
+                || !positions.len().is_multiple_of(3)
+                || colors.len() != positions.len()
+            {
+                return Err(NucleationError::InvalidArgument);
+            }
+            #[allow(clippy::type_complexity)]
+            let points: Vec<((i32, i32, i32), (u8, u8, u8))> = positions
+                .chunks_exact(3)
+                .zip(colors.chunks_exact(3))
+                .map(|(p, c)| ((p[0], p[1], p[2]), (c[0], c[1], c[2])))
+                .collect();
+            let brush = crate::building::PointGradientBrush::new(points)
+                .with_space(space.to_core())
+                .with_falloff(falloff as f64);
+            Ok(Box::new(Brush(crate::building::BrushEnum::Point(brush))))
+        }
+
+        /// Gradient along a parametric curve: `stops` holds the curve parameters in
+        /// `[0, 1]` and `colors` the matching flat RGB triples
+        /// (`colors.len() == stops.len() * 3`, `stops` non-empty).
+        pub fn curve_gradient(
+            stops: &[f32],
+            colors: &[u8],
+            space: InterpolationSpace,
+        ) -> Result<Box<Brush>, NucleationError> {
+            if stops.is_empty() || colors.len() != stops.len() * 3 {
+                return Err(NucleationError::InvalidArgument);
+            }
+            let stops: Vec<(f64, (u8, u8, u8))> = stops
+                .iter()
+                .zip(colors.chunks_exact(3))
+                .map(|(t, c)| (*t as f64, (c[0], c[1], c[2])))
+                .collect();
+            let brush = crate::building::CurveGradientBrush::new(stops).with_space(space.to_core());
+            Ok(Box::new(Brush(crate::building::BrushEnum::CurveGradient(
+                brush,
+            ))))
+        }
+    }
+
+    /// Namespace for the fill operations that combine a schematic, a shape and a
+    /// brush (the old `buildingtool_*` free functions).
+    #[diplomat::opaque]
+    pub struct BuildingTool;
+
+    impl BuildingTool {
+        /// Fill `shape` into `schematic` using `brush`.
+        pub fn fill(schematic: &mut Schematic, shape: &Shape, brush: &Brush) {
+            let mut tool = crate::building::BuildingTool::new(&mut schematic.0);
+            tool.fill_enum(&shape.0, &brush.0);
+        }
+
+        /// Fill `count` copies of `shape`, each offset by `offset * i`.
+        pub fn rstack(
+            schematic: &mut Schematic,
+            shape: &Shape,
+            brush: &Brush,
+            count: usize,
+            offset_x: i32,
+            offset_y: i32,
+            offset_z: i32,
+        ) {
+            let mut tool = crate::building::BuildingTool::new(&mut schematic.0);
+            tool.rstack(&shape.0, &brush.0, count, (offset_x, offset_y, offset_z));
+        }
+    }
+}

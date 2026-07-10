@@ -1,6 +1,6 @@
 [package]
 name = "nucleation"
-version = "0.2.18"
+version = "0.3.0"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -12,13 +12,15 @@ categories = ["game-development", "parser-implementations", "wasm"]
 exclude = ["web/", "examples/", "test-schematics/"]
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+# staticlib: linked into the Python (nanobind) extension so the wheel is self-contained.
+crate-type = ["cdylib", "staticlib", "rlib"]
 
 [features]
 default = ["store-fs", "autostack"]
-ffi = ["autostack"]
-# Diplomat-generated bindings pilot (see /Users/harrison/code/stencil). Additive and
-# default-off: does not touch ffi/wasm/python/php or their generated surfaces.
+# The generated-bindings surface (Diplomat): the single source of truth for every
+# language binding (C/C++/JS/Kotlin/Python/PHP) under bindings/, generated from
+# src/bridge/ by tools/gen-bindings.sh. Replaces the old hand-written ffi/wasm/
+# python/php layers and their parity linters.
 bridge = ["dep:diplomat", "dep:diplomat-runtime", "dep:base64", "autostack"]
 # Everything the full generated surface needs at runtime; used for codegen builds,
 # smoke tests, and release artifacts of the generated bindings.
@@ -42,18 +44,6 @@ store-callback = []
 # Exposes the backend-agnostic contract suite + testcontainers for integration tests.
 store-testkit = ["dep:testcontainers-modules"]
 serde = []
-wasm = [
-    "wasm-bindgen",
-    "js-sys",
-    "web-sys",
-    "serde-wasm-bindgen",
-    "console_error_panic_hook",
-    "wasm-bindgen-futures",
-    "autostack",
-]
-python = ["pyo3/extension-module", "pyo3/abi3-py38", "autostack"]
-# New PHP feature
-php = ["ext-php-rs", "autostack"]
 # Redstone simulation support
 simulation = [
     "mchprs_redpiler",
@@ -81,7 +71,9 @@ flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
 log = "0.4.22"
 console = "0.15.8"
 insign = "0.1.1"
-blockpedia = { version = "0.1.9", default-features = false, features = ["wasm"] }
+# blockpedia: no "wasm" feature — that pulls wasm-bindgen, which conflicts with the
+# Diplomat wasm build (raw wasm module, no wasm-bindgen glue to satisfy its imports).
+blockpedia = { version = "0.1.9", default-features = false }
 
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 hematite-nbt = "*"
@@ -91,21 +83,11 @@ rayon = "1.10"
 smol_str = { version = "0.2", features = ["serde"] }
 rustc-hash = "2.0"
 
-# WASM-specific dependencies
-wasm-bindgen = { version = "0.2", features = ["serde-serialize"], optional = true }
-js-sys = { version = "0.3.70", optional = true }
-serde-wasm-bindgen = { version = "0.4", optional = true }
-web-sys = { version = "0.3", optional = true, features = ["console"] }
-console_error_panic_hook = { version = "0.1", optional = true }
 rand = "0.8.5"
-getrandom = { version = "0.2", features = ["js"] }
-
-# Python dependencies
-maturin = { version = "1", optional = true, default-features = false }
-pyo3 = { version = "0.25.0", optional = true, features = ["extension-module"] }
-
-# PHP dependencies
-ext-php-rs = { version = "0.15.12", optional = true }
+# getrandom "custom": the Diplomat wasm module has no wasm-bindgen glue, so the "js"
+# entropy source can't be used; lib.rs registers a non-crypto fallback on wasm32
+# (rand here only feeds seeded shuffles and cosmetic jitter, never key material).
+getrandom = { version = "0.2", features = ["custom"] }
 
 # Diplomat bridge dependencies (base64: binary payloads cross DiplomatWrite as base64,
 # since the JS/Kotlin backends decode the write buffer as UTF-8 text)
@@ -146,7 +128,6 @@ schematic-mesher = { git = "https://github.com/Schem-at/Schematic-Mesher.git", r
 wgpu = { version = "24", optional = true }
 image = { version = "0.24", optional = true }
 pollster = { version = "0.4", optional = true }
-wasm-bindgen-futures = { version = "0.4", optional = true }
 
 # Simulation (MCHPRS) dependencies - optional
 # Note: These are git dependencies and will be excluded from crates.io publish
@@ -161,7 +142,6 @@ mchprs_world = { git = "https://github.com/Nano112/MCHPRS.git", rev = "2e62496",
 mchprs_blocks = { git = "https://github.com/Nano112/MCHPRS.git", rev = "2e62496", optional = true }
 
 [dev-dependencies]
-wasm-bindgen-test = "0.3"
 num-complex = "0.4"
 base64 = "0.22"
 ffmpeg-sidecar = "2.4"

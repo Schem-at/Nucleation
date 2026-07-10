@@ -156,11 +156,14 @@ fn create_metadata(schematic: &UniversalSchematic, version: i32) -> NbtCompound 
         // Use existing timestamp if available
         time as i64
     } else {
-        // Generate current timestamp based on platform
-        #[cfg(all(feature = "wasm", target_arch = "wasm32"))]
-        let current_time = js_sys::Date::now() as i64;
+        // Generate current timestamp based on platform. On wasm32 there is no
+        // system clock (SystemTime::now panics on wasm32-unknown-unknown) and the
+        // Diplomat wasm module carries no JS glue to ask the host — write epoch 0
+        // and let callers set metadata.created explicitly when they care.
+        #[cfg(target_arch = "wasm32")]
+        let current_time = 0i64;
 
-        #[cfg(not(all(feature = "wasm", target_arch = "wasm32")))]
+        #[cfg(not(target_arch = "wasm32"))]
         let current_time = {
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)

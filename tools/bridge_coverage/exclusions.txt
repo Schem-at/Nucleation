@@ -1,0 +1,69 @@
+# Old extern fn -> why it has no same-named bridge method. Every entry was manually
+# verified to be covered (or obsolete by construction). Format: <old_fn> - <reason>.
+#
+# --- Obsolete by construction (error/memory transport is generated) ---
+nuc_store_last_error - Result-based errors; no thread-local error slot
+diff_free_glb - GLB now crosses as base64 string; nothing to free
+schematicbuilder_build_with_error - build() returns Result; error-string variant redundant
+#
+# --- Methods moved to a domain type (same behavior, new home) ---
+schematic_diff - Diff::compute(a, b) in diff.rs
+schematic_diff_opts - Diff::compute_with_opts in diff.rs
+schematic_fingerprint - Fingerprint::compute in diff.rs
+schematic_footprint - Fingerprint::footprint_json in diff.rs
+schematic_footprint_distance - Fingerprint::footprint_distance in diff.rs
+schematic_signature - Fingerprint::signature_json in diff.rs
+schematic_is_duplicate_of - Diff::is_duplicate in diff.rs
+schematic_detect_structures - Autostack::detect_structures in autostack.rs
+schematic_detect_structures_graph - Autostack::detect_structures_graph in autostack.rs
+schematic_open - StoreIo::open in store_io.rs
+schematic_save - StoreIo::save in store_io.rs
+schematic_open_from_store - Store::open_schematic in store_io.rs
+schematic_save_to_store - Store::save_schematic in store_io.rs
+schematic_get_supported_import_formats - StoreIo::supported_import_formats
+schematic_get_supported_export_formats - StoreIo::supported_export_formats
+schematic_get_import_settings_schema - StoreIo::import_settings_schema
+schematic_get_export_settings_schema - StoreIo::export_settings_schema
+schematic_get_format_versions - StoreIo::format_versions
+schematic_get_default_format_version - StoreIo::default_format_version
+schematic_render - Renderer::render_b64 in rendering.rs
+schematic_render_png - Renderer::render_png_b64 in rendering.rs
+schematic_render_to_file - Renderer::render_to_file in rendering.rs
+schematic_mesh_by_chunk - Mesher::mesh_by_chunk in meshing.rs
+schematic_mesh_by_chunk_size - Mesher::mesh_by_chunk_size in meshing.rs
+schematic_mesh_by_region - Mesher::mesh_by_region in meshing.rs
+schematic_mesh_chunks_with_atlas - Mesher::mesh_chunks_with_atlas in meshing.rs
+schematic_mesh_chunks_with_atlas_progress - MeshJob polling API (start/poll_progress/take_result) in meshing.rs, per stencil/docs/mesh-progress-api.md
+schematic_to_mesh - Mesher::to_mesh in meshing.rs
+schematic_to_raw_mesh - Mesher::to_raw_mesh in meshing.rs
+schematic_to_usdz - create_usdz (base64) in meshing.rs
+schematic_to_item_model - ItemModelPackBuilder in meshing.rs
+schematic_register_mesh_exporter - Mesher::register_exporter in meshing.rs
+schematic_build_global_atlas - TextureAtlas::build_global in meshing.rs
+schematic_simulate_use_block - MchprsWorld::simulate_use_block in simulation.rs
+schematic_add_definition_region - SchematicRegions::add in definition_region.rs
+schematic_create_definition_region - SchematicRegions::create in definition_region.rs
+schematic_create_definition_region_from_point - SchematicRegions::create_from_point in definition_region.rs
+schematic_get_definition_region - SchematicRegions::get in definition_region.rs
+schematic_get_definition_region_names - SchematicRegions::names_json in definition_region.rs
+schematic_remove_definition_region - SchematicRegions::remove in definition_region.rs
+schematic_create_region - SchematicRegions::create in definition_region.rs
+schematic_update_region - SchematicRegions::update in definition_region.rs
+schematic_get_palette_from_region - Schematic::region_palette_json in schematic.rs
+debug_schematic - Schematic::print_schematic_string in schematic.rs
+debug_json_schematic - Schematic::debug_json_string in schematic.rs
+schematic_print - Schematic::print_schematic_string in schematic.rs
+schematic_print_schematic - Schematic::print_schematic_string in schematic.rs
+#
+# --- Renames the matcher's rules don't encode ---
+schematic_get_block - covered by get_block_with_properties + get_block_string (old fn returned a BlockState pointer)
+chunkmeshresult_chunk_coordinates - ChunkMeshResult::chunk_coordinate_at(index) + chunk_count
+itemmodel_build_resource_pack - ItemModelPackBuilder::build in meshing.rs
+resourcepack_from_bytes_list - ResourcePack::from_bytes + pack-list opaque in meshing.rs
+mchprs_world_new_with_options - MchprsWorld::create_with_options
+mchprs_world_new_with_custom_io - MchprsWorld::create_with_custom_io
+definitionregion_clone_region - DefinitionRegion::copy (documented alias collapse)
+definitionregion_intersect - DefinitionRegion::intersected (alias collapse: in-place + copy variants merged)
+definitionregion_subtract - DefinitionRegion::subtracted (alias collapse)
+definitionregion_with_metadata - DefinitionRegion::set_metadata (alias collapse)
+definitionregion_set_metadata_mut - DefinitionRegion::set_metadata (alias collapse)

@@ -14,12 +14,6 @@ use flate2::Compression;
 use quartz_nbt::io::{read_nbt, Flavor};
 use quartz_nbt::{NbtCompound, NbtList, NbtTag};
 
-#[cfg(feature = "wasm")]
-use wasm_bindgen::JsValue;
-
-#[cfg(feature = "wasm")]
-use web_sys::console;
-
 // enum for versions of schematics
 #[derive(Debug, Clone, Copy)]
 pub enum SchematicVersion {
@@ -64,9 +58,6 @@ pub fn is_schematic(data: &[u8]) -> bool {
     let (root, _) = match read_nbt(&mut gz, Flavor::Uncompressed) {
         Ok(result) => result,
         Err(_) => {
-            #[cfg(feature = "wasm")]
-            let _: std::result::Result<(), JsValue> =
-                Err(JsValue::from_str("Failed to read NBT data"));
             return false;
         }
     };
@@ -76,16 +67,12 @@ pub fn is_schematic(data: &[u8]) -> bool {
 
     // get tge version of the schematic
     let version = root.get::<_, i32>("Version");
-    #[cfg(feature = "wasm")]
-    console::log_1(&format!("Schematic Version: {:?}", version).into());
     if version.is_err() {
         return root.get::<_, &NbtCompound>("Blocks").is_ok();
     }
 
     // Check if it's a v3 schematic (which has a Blocks compound)
     if version.unwrap() == 3 {
-        #[cfg(feature = "wasm")]
-        console::log_1(&format!("Detected v3 schematic").into());
         return root.get::<_, &NbtCompound>("Blocks").is_ok();
     }
 
@@ -168,17 +155,8 @@ fn to_schematic_v3(schematic: &UniversalSchematic, compression: Compression) -> 
             if original_id < palette_mapping.len() {
                 palette_mapping[original_id] as u32
             } else {
-                // Out of bounds - map to air and log warning if debugging
-                #[cfg(feature = "wasm")]
-                console::log_1(
-                    &format!(
-                        "Warning: Block index {} out of bounds (palette size: {}), mapping to air",
-                        original_id,
-                        palette_mapping.len()
-                    )
-                    .into(),
-                );
-                0 // Default to air for out-of-bounds indices
+                // Out of bounds — map to air
+                0
             }
         })
         .collect();

@@ -1,0 +1,57 @@
+<?php
+namespace Stencil;
+
+final class RenderConfig {
+    /** @internal */
+    public \FFI\CData $ptr;
+    private bool $owned;
+
+    /** @internal */
+    public function __construct(\FFI\CData $ptr, bool $owned) {
+        $this->ptr = $ptr;
+        $this->owned = $owned;
+    }
+
+    public static function create( $width,  $height) {
+        $ret = Lib::ffi()->RenderConfig_create($width, $height);
+        return new RenderConfig($ret, true);
+    }
+
+    public function setYaw( $yaw) {
+        Lib::ffi()->RenderConfig_set_yaw($this->ptr, $yaw);
+    }
+
+    public function setPitch( $pitch) {
+        Lib::ffi()->RenderConfig_set_pitch($this->ptr, $pitch);
+    }
+
+    public function setZoom( $zoom) {
+        Lib::ffi()->RenderConfig_set_zoom($this->ptr, $zoom);
+    }
+
+    public function setFov( $fov) {
+        Lib::ffi()->RenderConfig_set_fov($this->ptr, $fov);
+    }
+
+    public function setBackground( $r,  $g,  $b,  $a) {
+        Lib::ffi()->RenderConfig_set_background($this->ptr, $r, $g, $b, $a);
+    }
+
+    public function clearBackground() {
+        Lib::ffi()->RenderConfig_clear_background($this->ptr);
+    }
+
+    public function setOrthographic( $orthographic) {
+        Lib::ffi()->RenderConfig_set_orthographic($this->ptr, $orthographic);
+    }
+
+    public function setIsometric() {
+        Lib::ffi()->RenderConfig_set_isometric($this->ptr);
+    }
+
+    public function __destruct() {
+        if ($this->owned) {
+            Lib::ffi()->RenderConfig_destroy($this->ptr);
+        }
+    }
+}
