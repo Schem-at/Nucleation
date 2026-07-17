@@ -188,6 +188,11 @@ name = "download-textures"
 path = "tools/mc-data/download-textures.rs"
 required-features = ["mc-data-refresh"]
 
+[[bin]]
+name = "refresh-bedrock-mappings"
+path = "tools/mc-data/refresh-bedrock-mappings.rs"
+required-features = ["mc-data-refresh"]
+
 [dev-dependencies]
 num-complex = "0.4"
 base64 = "0.22"

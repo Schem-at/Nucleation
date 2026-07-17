@@ -255,11 +255,32 @@ manifest's latest release, so a routine bump needs no code edits. A normal `carg
 afterwards bakes the new tables in.
 
 The PrismarineJS `blocks.json` schema is kept as the on-disk format (PrismarineJS itself has
-no 26.x data). The Bedrock snapshots are upstream files gzipped verbatim (PrismarineJS
-`data/bedrock/<version>/blockStates.json` and GeyserMC's generated blockstate mappings);
-they are still at their 1.21.x pins because GeyserMC's mappings-generator has not reached
-Java 26.2 yet — 26.2-only blocks (cinnabar/sulfur/golden_dandelion) have no bedrock mapping
-until upstream catches up. `tests/blockpedia_data_refresh.rs` guards data currency.
+no 26.x data). `tests/blockpedia_data_refresh.rs` guards data currency.
+
+#### Java ↔ Bedrock mappings
+
+- `geyser_mappings.json.gz` — regenerated from **GeyserMC/mappings** (`blocks.nbt` @
+  [`efe0f2c`](https://github.com/GeyserMC/mappings/commit/efe0f2cabeaf4c8147c45e63f2d744e90d3b4156),
+  "Mappings for Minecraft Java **26.2**"). GeyserMC retired the old `mappings-generator`
+  JSON dumps; the canonical data is now gzipped NBT: a `bedrock_mappings` list with one
+  compound per Java blockstate **in runtime state-id order** (java side implicit by index;
+  `bedrock_identifier` absent ⇒ same name as Java, `state` absent ⇒ bedrock default state).
+  `refresh-bedrock-mappings` converts that back into the JSON schema `build.rs` consumes,
+  reconstructing the java side from `prismarinejs_blocks.json.gz` (state-id enumeration
+  validated 32,366/32,366 against the vanilla 26.2 report). All 32,366 Java 26.2 states are
+  mapped (was 29,671 at the 1.21.x pin; all carried-over entries identical, +2,695 gained,
+  none lost), so the identity fallback for unmapped blocks is currently unused:
+
+  ```bash
+  cargo run --release --bin refresh-bedrock-mappings --features mc-data-refresh -- \
+      --data-version 4903   # java world data version, for provenance only
+  ```
+
+- `bedrock_block_states.json.gz` — PrismarineJS `data/bedrock/1.26.30/blockStates.json`
+  gzipped verbatim (content-identical to the previous snapshot; the per-state `version`
+  field `1.21.60.33` is Bedrock's *state-format* version, which hasn't bumped since —
+  the palette content is current and includes the 26.x cinnabar/sulfur blocks). Every
+  `bedrock_identifier` emitted by the mappings exists in this palette.
 
 ## License
 
