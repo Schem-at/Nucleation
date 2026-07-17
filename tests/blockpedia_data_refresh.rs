@@ -1,4 +1,5 @@
-//! Tests covering the 1.21.11 data refresh and the texture color pipeline.
+//! Tests covering the Minecraft 26.2 data refresh and the texture color
+//! pipeline (vanilla report converter + client-jar color extraction).
 
 use nucleation::blockpedia::color::block_palettes::{BlockFilter, BlockPaletteGenerator};
 use nucleation::blockpedia::{all_blocks, get_block};
@@ -32,6 +33,43 @@ fn new_1_21_blocks_are_resolvable() {
 }
 
 #[test]
+fn new_26_x_blocks_are_resolvable() {
+    // 26.2 (cinnabar/sulfur update)
+    for id in [
+        "minecraft:cinnabar",
+        "minecraft:cinnabar_bricks",
+        "minecraft:polished_cinnabar_stairs",
+        "minecraft:sulfur",
+        "minecraft:potent_sulfur",
+        "minecraft:sulfur_spike",
+        "minecraft:golden_dandelion",
+    ] {
+        let block = get_block(id);
+        assert!(block.is_some(), "expected {id} to exist in block data");
+        assert_eq!(block.unwrap().id(), id);
+    }
+
+    // Enrichment carried over / derived: full cubes are opaque, plants are
+    // transparent (prismarine `transparent` semantics).
+    assert!(!get_block("minecraft:cinnabar").unwrap().transparent);
+    assert!(!get_block("minecraft:sulfur_bricks").unwrap().transparent);
+    assert!(get_block("minecraft:golden_dandelion").unwrap().transparent);
+    assert!(get_block("minecraft:sulfur_spike").unwrap().transparent);
+
+    // 26.2 property schema is live: note_block gained the trumpet family.
+    let note_block = get_block("minecraft:note_block").unwrap();
+    let (_, instruments) = note_block
+        .properties
+        .iter()
+        .find(|(name, _)| *name == "instrument")
+        .expect("note_block has an instrument property");
+    assert!(
+        instruments.contains(&"trumpet"),
+        "note_block should have the 26.2 trumpet instrument"
+    );
+}
+
+#[test]
 fn new_blocks_have_texture_derived_colors() {
     for id in [
         "minecraft:crafter",
@@ -44,6 +82,10 @@ fn new_blocks_have_texture_derived_colors() {
         "minecraft:copper_bulb",
         "minecraft:polished_tuff",
         "minecraft:chiseled_copper",
+        // 26.2
+        "minecraft:cinnabar",
+        "minecraft:sulfur_bricks",
+        "minecraft:golden_dandelion",
     ] {
         let block = get_block(id).unwrap_or_else(|| panic!("{id} missing"));
         assert!(
@@ -63,11 +105,13 @@ fn color_coverage_is_nearly_complete() {
     let total = all_blocks().count();
     let with_color = all_blocks().filter(|b| b.extras.color.is_some()).count();
 
-    assert!(total >= 1166, "expected 1.21.11 block count, got {total}");
+    assert!(total >= 1196, "expected 26.2 block count, got {total}");
     // Every block with a block texture has a color; only air variants,
     // barrier, structure_void and mob heads/skulls are excluded.
+    // 26.2 pipeline: 1177/1196 (98.4%) — only air variants, barrier,
+    // structure_void and mob heads/skulls have no texture-derived color.
     assert!(
-        with_color * 100 >= total * 95,
+        with_color * 100 >= total * 97,
         "color coverage regressed: {with_color}/{total}"
     );
 
