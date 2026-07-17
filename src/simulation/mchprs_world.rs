@@ -222,10 +222,7 @@ impl MchprsWorld {
                     }
                 }
             } else {
-                #[cfg(target_arch = "wasm32")]
-                web_sys::console::warn_1(&format!("Unknown block '{}' at {:?}", name, pos).into());
-                #[cfg(not(target_arch = "wasm32"))]
-                eprintln!("Warning: Unknown block '{}' at position {:?}", name, pos);
+                log::warn!("Unknown block '{}' at position {:?}", name, pos);
             }
         }
     }
@@ -518,13 +515,8 @@ impl MchprsWorld {
             return;
         }
 
-        #[cfg(target_arch = "wasm32")]
-        web_sys::console::error_1(
-            &format!("Tried to use non-interactable block at {:?}", pos).into(),
-        );
-        #[cfg(not(target_arch = "wasm32"))]
-        eprintln!(
-            "Error: Tried to use block at {:?} ({}); only levers and buttons are supported",
+        log::error!(
+            "Tried to use block at {:?} ({}); only levers and buttons are supported",
             pos, name
         );
     }

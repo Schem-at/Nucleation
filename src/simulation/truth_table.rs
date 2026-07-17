@@ -26,10 +26,7 @@ pub fn generate_truth_table(schematic: &UniversalSchematic) -> Vec<HashMap<Strin
     let mut world = match MchprsWorld::new(schematic.clone()) {
         Ok(w) => w,
         Err(e) => {
-            #[cfg(target_arch = "wasm32")]
-            web_sys::console::error_1(&format!("Failed to create world: {}", e).into());
-            #[cfg(not(target_arch = "wasm32"))]
-            eprintln!("Failed to create world: {}", e);
+            log::error!("Failed to create world: {}", e);
             return Vec::new();
         }
     };
@@ -37,16 +34,8 @@ pub fn generate_truth_table(schematic: &UniversalSchematic) -> Vec<HashMap<Strin
     // Find all levers and lamps
     let (inputs, outputs) = find_inputs_and_outputs(&world);
 
-    #[cfg(target_arch = "wasm32")]
-    {
-        web_sys::console::log_1(&format!("Inputs: {:?}", inputs).into());
-        web_sys::console::log_1(&format!("Outputs: {:?}", outputs).into());
-    }
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        println!("Inputs: {:?}", inputs);
-        println!("Outputs: {:?}", outputs);
-    }
+    log::debug!("Inputs: {:?}", inputs);
+    log::debug!("Outputs: {:?}", outputs);
 
     let mut truth_table = Vec::new();
     let input_combinations = generate_input_combinations(inputs.len());
