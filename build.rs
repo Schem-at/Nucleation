@@ -1,9 +1,9 @@
 //! Generates the vendored blockpedia block tables (see `src/blockpedia/`).
 //!
-//! Reads the gzipped data snapshots in `data/blockpedia/` (Java 1.21.11
-//! block states from PrismarineJS, Bedrock block states, Geyser blockstate
-//! mappings, and the texture-derived color cache) and writes two files into
-//! `OUT_DIR`:
+//! Reads the gzipped data snapshots in `data/blockpedia/` (Java 26.2 block
+//! states in the PrismarineJS schema, generated from Mojang's data-generator
+//! reports; Bedrock block states; Geyser blockstate mappings; and the
+//! texture-derived color cache) and writes two files into `OUT_DIR`:
 //!
 //!   - `block_table.rs`     — `BLOCKS` PHF map of `BlockFacts` + color query helpers
 //!   - `bedrock_mappings.rs` — Java<->Bedrock blockstate string PHF maps

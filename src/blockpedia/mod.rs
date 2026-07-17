@@ -1,6 +1,6 @@
 //! Vendored blockpedia (formerly the standalone `blockpedia` crate, v0.2.0).
 //!
-//! Minecraft block data (Java 1.21.11 + Bedrock via Geyser mappings) with
+//! Minecraft block data (Java 26.2 + Bedrock via Geyser mappings) with
 //! texture-derived colors, palette/gradient generation, and block-state
 //! transforms. The block tables are generated at build time by `build.rs`
 //! from the gzipped JSON snapshots in `data/blockpedia/`; refresh them with
