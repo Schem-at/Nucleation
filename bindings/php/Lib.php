@@ -115,6 +115,9 @@ Brush_curve_gradient_result Brush_curve_gradient(DiplomatF32View stops, Diplomat
 void Brush_destroy(Brush* self);
 void BuildingTool_fill(Schematic* schematic, Shape* shape, Brush* brush);
 void BuildingTool_rstack(Schematic* schematic, Shape* shape, Brush* brush, size_t count, int32_t offset_x, int32_t offset_y, int32_t offset_z);
+void BuildingTool_fill_only_air(Schematic* schematic, Shape* shape, Brush* brush);
+typedef struct BuildingTool_fill_replacing_result { union { NucleationError err; }; bool is_ok; } BuildingTool_fill_replacing_result;
+BuildingTool_fill_replacing_result BuildingTool_fill_replacing(Schematic* schematic, Shape* shape, Brush* brush, DiplomatStringView targets_json);
 void BuildingTool_destroy(BuildingTool* self);
 Palette* Palette_all();
 Palette* Palette_solid();

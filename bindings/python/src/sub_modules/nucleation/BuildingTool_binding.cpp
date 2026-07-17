@@ -16,6 +16,8 @@ void add_BuildingTool_binding(nb::module_ mod) {
     nb::class_<nucleation::BuildingTool> opaque(mod, "BuildingTool", nb::type_slots(nucleation_BuildingTool_slots));
     opaque
         .def_static("fill", &nucleation::BuildingTool::fill, "schematic"_a, "shape"_a, "brush"_a)
+        .def_static("fill_only_air", &nucleation::BuildingTool::fill_only_air, "schematic"_a, "shape"_a, "brush"_a)
+        .def_static("fill_replacing", &nucleation::BuildingTool::fill_replacing, "schematic"_a, "shape"_a, "brush"_a, "targets_json"_a)
         .def_static("rstack", &nucleation::BuildingTool::rstack, "schematic"_a, "shape"_a, "brush"_a, "count"_a, "offset_x"_a, "offset_y"_a, "offset_z"_a);
 }
 
