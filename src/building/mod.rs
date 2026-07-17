@@ -1,9 +1,11 @@
 pub mod brushes;
 pub mod enums;
+pub mod masks;
 pub mod shapes;
 
 pub use brushes::*;
 pub use enums::*;
+pub use masks::*;
 pub use shapes::*;
 
 use crate::universal_schematic::UniversalSchematic;
@@ -33,11 +35,22 @@ impl<'a> BuildingTool<'a> {
 
     /// Fill a ShapeEnum with a BrushEnum, passing parametric `t` to brushes that support it.
     pub fn fill_enum(&mut self, shape: &ShapeEnum, brush: &BrushEnum) {
+        self.fill_enum_masked(shape, brush, &FillMode::Replace);
+    }
+
+    /// Like [`fill_enum`](Self::fill_enum), but only writes cells `mode`
+    /// allows: [`FillMode::Replace`] overwrites everything,
+    /// [`FillMode::KeepExisting`] only fills air/unset cells, and
+    /// [`FillMode::ReplaceOnly`] only overwrites the listed block ids.
+    pub fn fill_enum_masked(&mut self, shape: &ShapeEnum, brush: &BrushEnum, mode: &FillMode) {
         let (min_x, min_y, min_z, max_x, max_y, max_z) = shape.bounds();
         self.schematic
             .ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
 
         shape.for_each_point(|x, y, z| {
+            if !mode.allows(self.schematic.get_block(x, y, z)) {
+                return;
+            }
             let normal = shape.normal_at(x, y, z);
             let t = shape.parameter_at(x, y, z);
             if let Some(block) = brush.get_block_with_parameter(x, y, z, normal, t) {

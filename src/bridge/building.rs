@@ -728,5 +728,37 @@ pub mod ffi {
             let mut tool = crate::building::BuildingTool::new(&mut schematic.0);
             tool.rstack(&shape.0, &brush.0, count, (offset_x, offset_y, offset_z));
         }
+
+        /// Masked fill that preserves everything already placed: `brush` is
+        /// only written where `schematic` currently has air (or nothing at
+        /// all), so existing structures inside `shape` survive untouched.
+        pub fn fill_only_air(schematic: &mut Schematic, shape: &Shape, brush: &Brush) {
+            let mut tool = crate::building::BuildingTool::new(&mut schematic.0);
+            tool.fill_enum_masked(&shape.0, &brush.0, &crate::building::FillMode::KeepExisting);
+        }
+
+        /// Masked fill that only overwrites the listed blocks: `targets_json`
+        /// is a JSON array of block ids (e.g. `["minecraft:stone"]`, state
+        /// properties ignored) and every cell of `shape` whose current block
+        /// id is in the list is replaced by `brush` — everything else,
+        /// including air, is left alone.
+        pub fn fill_replacing(
+            schematic: &mut Schematic,
+            shape: &Shape,
+            brush: &Brush,
+            targets_json: &DiplomatStr,
+        ) -> Result<(), NucleationError> {
+            let json =
+                std::str::from_utf8(targets_json).map_err(|_| NucleationError::InvalidArgument)?;
+            let targets: Vec<String> =
+                serde_json::from_str(json).map_err(|_| NucleationError::Parse)?;
+            let mut tool = crate::building::BuildingTool::new(&mut schematic.0);
+            tool.fill_enum_masked(
+                &shape.0,
+                &brush.0,
+                &crate::building::FillMode::ReplaceOnly(targets),
+            );
+            Ok(())
+        }
     }
 }

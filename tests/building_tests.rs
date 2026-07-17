@@ -681,3 +681,116 @@ fn palette_ramps_and_gradient_ids() {
         .gradient_ids((0, 0, 0), (255, 255, 255), 8)
         .is_empty());
 }
+
+// ============================================================================
+// Masked fills
+// ============================================================================
+
+#[test]
+fn test_fill_only_air_preserves_existing() {
+    use nucleation::building::FillMode;
+    use nucleation::BlockState;
+
+    let mut schematic = UniversalSchematic::new("mask_air".to_string());
+    let mut tool = BuildingTool::new(&mut schematic);
+
+    // Stone core...
+    let stone_box = ShapeEnum::Cuboid(Cuboid::new((0, 0, 0), (2, 2, 2)));
+    let stone = BrushEnum::Solid(SolidBrush::new(BlockState::new(
+        "minecraft:stone".to_string(),
+    )));
+    tool.fill_enum(&stone_box, &stone);
+
+    // ...then a larger overlapping glass fill that must not touch it.
+    let glass_box = ShapeEnum::Cuboid(Cuboid::new((0, 0, 0), (4, 4, 4)));
+    let glass = BrushEnum::Solid(SolidBrush::new(BlockState::new(
+        "minecraft:glass".to_string(),
+    )));
+    tool.fill_enum_masked(&glass_box, &glass, &FillMode::KeepExisting);
+
+    // Stone untouched everywhere it was placed.
+    for &(x, y, z) in &[(0, 0, 0), (1, 1, 1), (2, 2, 2), (0, 2, 1)] {
+        assert_eq!(
+            schematic.get_block(x, y, z).unwrap().name,
+            "minecraft:stone",
+            "stone overwritten at ({x},{y},{z})"
+        );
+    }
+    // New cells got glass.
+    for &(x, y, z) in &[(3, 0, 0), (4, 4, 4), (0, 0, 3), (3, 3, 3)] {
+        assert_eq!(
+            schematic.get_block(x, y, z).unwrap().name,
+            "minecraft:glass",
+            "expected glass at ({x},{y},{z})"
+        );
+    }
+}
+
+#[test]
+fn test_fill_replacing_swaps_only_targets() {
+    use nucleation::building::FillMode;
+    use nucleation::BlockState;
+
+    let mut schematic = UniversalSchematic::new("mask_replace".to_string());
+    let mut tool = BuildingTool::new(&mut schematic);
+
+    // Half stone, half dirt.
+    let stone_box = ShapeEnum::Cuboid(Cuboid::new((0, 0, 0), (2, 0, 0)));
+    let dirt_box = ShapeEnum::Cuboid(Cuboid::new((3, 0, 0), (5, 0, 0)));
+    let stone = BrushEnum::Solid(SolidBrush::new(BlockState::new(
+        "minecraft:stone".to_string(),
+    )));
+    let dirt = BrushEnum::Solid(SolidBrush::new(BlockState::new(
+        "minecraft:dirt".to_string(),
+    )));
+    tool.fill_enum(&stone_box, &stone);
+    tool.fill_enum(&dirt_box, &dirt);
+
+    // Replace only stone with bricks across the whole strip (plus one air cell).
+    let strip = ShapeEnum::Cuboid(Cuboid::new((0, 0, 0), (6, 0, 0)));
+    let bricks = BrushEnum::Solid(SolidBrush::new(BlockState::new(
+        "minecraft:bricks".to_string(),
+    )));
+    tool.fill_enum_masked(
+        &strip,
+        &bricks,
+        &FillMode::ReplaceOnly(vec!["minecraft:stone".to_string()]),
+    );
+
+    for x in 0..=2 {
+        assert_eq!(
+            schematic.get_block(x, 0, 0).unwrap().name,
+            "minecraft:bricks",
+            "stone at x={x} should be bricks"
+        );
+    }
+    for x in 3..=5 {
+        assert_eq!(
+            schematic.get_block(x, 0, 0).unwrap().name,
+            "minecraft:dirt",
+            "dirt at x={x} must be untouched"
+        );
+    }
+    // Air cell stays air (never written).
+    assert!(schematic
+        .get_block(6, 0, 0)
+        .is_none_or(|b| b.name.contains("air")));
+}
+
+#[test]
+fn test_fill_mode_replace_matches_fill_enum() {
+    use nucleation::building::FillMode;
+    use nucleation::BlockState;
+
+    let mut a = UniversalSchematic::new("a".to_string());
+    let mut b = UniversalSchematic::new("b".to_string());
+    let shape = ShapeEnum::Sphere(Sphere::new((0, 0, 0), 4.0));
+    let brush = BrushEnum::Solid(SolidBrush::new(BlockState::new(
+        "minecraft:stone".to_string(),
+    )));
+
+    BuildingTool::new(&mut a).fill_enum(&shape, &brush);
+    BuildingTool::new(&mut b).fill_enum_masked(&shape, &brush, &FillMode::Replace);
+
+    assert_eq!(a.total_blocks(), b.total_blocks());
+}
