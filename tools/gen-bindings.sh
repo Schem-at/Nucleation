@@ -18,6 +18,14 @@ command -v "$DT" >/dev/null || {
     exit 1
 }
 
+# Probe for the PHP backend BEFORE wiping anything: upstream diplomat-tool
+# lacks it and would otherwise die mid-run with bindings/php already deleted.
+"$DT" php --help >/dev/null 2>&1 || {
+    echo "installed diplomat-tool has no 'php' target (upstream build?); reinstall the fork:" >&2
+    echo "  cargo install --git https://github.com/Nano112/diplomat --branch php-backend diplomat-tool --force" >&2
+    exit 1
+}
+
 # python/ and kotlin/ keep hand-maintained packaging at their roots (pyproject/CMake,
 # gradle); only their generated subtrees are wiped.
 rm -rf bindings/c bindings/cpp bindings/js bindings/kotlin/src bindings/python/src bindings/php
