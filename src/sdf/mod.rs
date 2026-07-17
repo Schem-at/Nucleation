@@ -3,8 +3,8 @@
 //! A JSON AST of distance-field primitives, boolean/smooth operators,
 //! transforms, and seeded noise modifiers ([`SdfNode`]), plus a sampler that
 //! rasterizes a tree into a [`crate::UniversalSchematic`] with declarative
-//! [`MaterialRules`] (depth-based shells, absolute Y bands, noise gates, and
-//! surface scatter).
+//! [`MaterialRules`] (depth-based shells, absolute Y bands, noise gates,
+//! palette-driven gradient fills, and surface scatter).
 //!
 //! Every binding (FFI, Python, WASM, JVM) exposes the same two entry points:
 //! `from_sdf(sdf_json, rules_json[, bounds])` and `sdf_eval(sdf_json, x, y, z)`,
@@ -25,7 +25,8 @@
 //!   "fill": [
 //!     {"when": {"depthBelowSurface": {"min": 0, "max": 0}}, "block": "minecraft:grass_block"},
 //!     {"when": {"depthBelowSurface": {"min": 1, "max": 3}}, "block": "minecraft:dirt"},
-//!     {"block": "minecraft:stone"}
+//!     {"gradient": {"palette": "grayscale", "from": [60, 60, 65], "to": [140, 140, 140],
+//!                   "axis": "y", "range": [34, 64]}}
 //!   ]
 //! }"#).unwrap();
 //! let schematic = sample_to_schematic(&island, &rules, None, "island").unwrap();
@@ -38,8 +39,8 @@ mod sampler;
 
 pub use node::{Aabb, Axis, SdfNode};
 pub use sampler::{
-    auto_bounds, sample_to_schematic, FillRule, MaterialRules, NoiseCondition, Range, SampleBounds,
-    SurfaceRule, When,
+    auto_bounds, sample_to_schematic, FillRule, GradientAxis, GradientFill, MaterialRules,
+    NoiseCondition, PaletteSpec, RampMode, Range, SampleBounds, SurfaceRule, When,
 };
 
 #[cfg(test)]

@@ -190,6 +190,159 @@ fn sampling_is_deterministic() {
     }
 }
 
+fn column_extremes(
+    s: &crate::UniversalSchematic,
+    x: i32,
+    z: i32,
+) -> (Option<(i32, String)>, Option<(i32, String)>) {
+    let mut bottom = None;
+    let mut top = None;
+    for y in -64..64 {
+        if let Some(b) = s.get_block(x, y, z) {
+            if b.name != "minecraft:air" {
+                if bottom.is_none() {
+                    bottom = Some((y, b.name.to_string()));
+                }
+                top = Some((y, b.name.to_string()));
+            }
+        }
+    }
+    (bottom, top)
+}
+
+#[test]
+fn y_gradient_fill_varies_over_height() {
+    let rules = MaterialRules::from_json(
+        r#"{
+        "fill": [
+            {"gradient": {"palette": "wool", "from": [0, 0, 0], "to": [255, 255, 255],
+                          "axis": "y", "range": [-10, 10]}}
+        ]
+    }"#,
+    )
+    .unwrap();
+    let schematic = sample_to_schematic(&sphere(10.0), &rules, None, "grad").unwrap();
+
+    let (bottom, top) = column_extremes(&schematic, 0, 0);
+    let (by, bottom) = bottom.expect("column has blocks");
+    let (ty, top) = top.expect("column has blocks");
+    assert!(ty > by, "column should span height");
+    assert!(bottom.contains("wool"), "bottom was {bottom}");
+    assert!(top.contains("wool"), "top was {top}");
+    assert_ne!(bottom, top, "gradient should differ bottom vs top");
+    // t = 0 at the bottom of the range → exactly the `from` color.
+    assert_eq!(bottom, "minecraft:black_wool");
+}
+
+#[test]
+fn lightness_ramp_indexes_sorted_palette() {
+    let node = SdfNode::from_json(r#"{"type":"box","halfExtents":[1,10,1]}"#).unwrap();
+    let rules = MaterialRules::from_json(
+        r#"{
+        "fill": [
+            {"gradient": {"palette": "wool", "ramp": "lightness",
+                          "axis": "y", "range": [-10, 9]}}
+        ]
+    }"#,
+    )
+    .unwrap();
+    let schematic = sample_to_schematic(&node, &rules, None, "ramp").unwrap();
+    let (bottom, top) = column_extremes(&schematic, 0, 0);
+    let (_, bottom) = bottom.unwrap();
+    let (_, top) = top.unwrap();
+    // Dark → light across the full range: endpoints hit the ramp extremes.
+    assert_eq!(bottom, "minecraft:black_wool");
+    assert_eq!(top, "minecraft:white_wool");
+}
+
+#[test]
+fn depth_gradient_and_explicit_ids_palette() {
+    let rules = MaterialRules::from_json(
+        r#"{
+        "fill": [
+            {"gradient": {"palette": {"ids": ["minecraft:white_concrete", "minecraft:black_concrete"]},
+                          "from": [255, 255, 255], "to": [0, 0, 0],
+                          "axis": "depth", "range": [0, 6]}}
+        ]
+    }"#,
+    )
+    .unwrap();
+    let schematic = sample_to_schematic(&sphere(8.0), &rules, None, "depth").unwrap();
+    // Center column: surface block (depth 0) is white, deep interior black.
+    let (_, top) = column_extremes(&schematic, 0, 0);
+    let (ty, top) = top.unwrap();
+    assert_eq!(top, "minecraft:white_concrete");
+    let deep = schematic.get_block(0, ty - 7, 0).unwrap();
+    assert_eq!(deep.name, "minecraft:black_concrete");
+}
+
+#[test]
+fn gradient_sampling_is_deterministic() {
+    let rules = MaterialRules::from_json(
+        r#"{
+        "fill": [
+            {"gradient": {"palette": "concrete", "from": [200, 40, 40], "to": [40, 40, 200],
+                          "axis": "y", "range": [-10, 10]}}
+        ]
+    }"#,
+    )
+    .unwrap();
+    let a = sample_to_schematic(&sphere(9.0), &rules, None, "a").unwrap();
+    let b = sample_to_schematic(&sphere(9.0), &rules, None, "b").unwrap();
+    let bb = a.get_bounding_box();
+    for x in bb.min.0..=bb.max.0 {
+        for y in bb.min.1..=bb.max.1 {
+            for z in bb.min.2..=bb.max.2 {
+                let na = a.get_block(x, y, z).map(|s| s.name.clone());
+                let nb = b.get_block(x, y, z).map(|s| s.name.clone());
+                assert_eq!(na, nb, "mismatch at ({x},{y},{z})");
+            }
+        }
+    }
+}
+
+#[test]
+fn invalid_gradient_rules_error() {
+    // Unknown palette name
+    let rules = MaterialRules::from_json(
+        r#"{"fill": [{"gradient": {"palette": "chrome", "from": [0,0,0], "to": [1,1,1],
+                                   "axis": "y", "range": [0, 4]}}]}"#,
+    )
+    .unwrap();
+    assert!(sample_to_schematic(&sphere(3.0), &rules, None, "t").is_err());
+
+    // Neither block nor gradient
+    let rules = MaterialRules::from_json(r#"{"fill": [{"when": {"yRange": {"max": 4}}}]}"#).unwrap();
+    assert!(sample_to_schematic(&sphere(3.0), &rules, None, "t").is_err());
+
+    // Both block and gradient
+    let rules = MaterialRules::from_json(
+        r#"{"fill": [{"block": "minecraft:stone",
+                      "gradient": {"palette": "wool", "ramp": "lightness", "range": [0, 4]}}]}"#,
+    )
+    .unwrap();
+    assert!(sample_to_schematic(&sphere(3.0), &rules, None, "t").is_err());
+
+    // Missing from/to without ramp
+    let rules = MaterialRules::from_json(
+        r#"{"fill": [{"gradient": {"palette": "wool", "range": [0, 4]}}]}"#,
+    )
+    .unwrap();
+    assert!(sample_to_schematic(&sphere(3.0), &rules, None, "t").is_err());
+}
+
+#[test]
+fn old_style_rules_still_parse_and_sample() {
+    // The pre-gradient JSON shape (fixed `block` strings) is untouched.
+    let schematic = sample_to_schematic(&island_tree(), &island_rules(), None, "compat").unwrap();
+    assert!(schematic.total_blocks() > 1000);
+    // Round-trip through serialization keeps the same shape.
+    let json = serde_json::to_string(&island_rules()).unwrap();
+    assert!(!json.contains("gradient"));
+    let reparsed = MaterialRules::from_json(&json).unwrap();
+    assert_eq!(reparsed.fill.len(), island_rules().fill.len());
+}
+
 #[test]
 fn noise_is_deterministic_and_bounded() {
     for i in 0..500 {

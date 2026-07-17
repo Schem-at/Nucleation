@@ -1,10 +1,38 @@
 use crate::building::{
-    BezierCurve, BilinearGradientBrush, Brush, ColorBrush, Cone, Cuboid, CurveGradientBrush,
-    Cylinder, Difference, Disk, Ellipsoid, Hollow, Intersection, Line, LinearGradientBrush,
-    MultiPointGradientBrush, ParametricShape, Plane, PointGradientBrush, Pyramid, ShadedBrush,
-    Shape, SolidBrush, Sphere, Torus, Triangle, Union,
+    BezierCurve, BilinearGradientBrush, BlockPalette, Brush, ColorBrush, Cone, Cuboid,
+    CurveGradientBrush, Cylinder, Difference, Disk, Ellipsoid, Hollow, Intersection, Line,
+    LinearGradientBrush, MultiPointGradientBrush, ParametricShape, Plane, PointGradientBrush,
+    Pyramid, ShadedBrush, Shape, SolidBrush, Sphere, Torus, Triangle, Union,
 };
 use crate::BlockState;
+
+// ============================================================================
+// Preset palette lookup
+// ============================================================================
+
+/// Construct one of the preset [`BlockPalette`]s by name — the same set every
+/// consumer (bridge, scripting, SDF material rules) exposes: `all`, `solid`,
+/// `structural`, `decorative`, `concrete`, `wool`, `terracotta`, `grayscale`,
+/// `wood`. Errors on any other name.
+pub fn palette_by_name(name: &str) -> Result<BlockPalette, String> {
+    Ok(match name {
+        "all" => BlockPalette::new_all(),
+        "solid" => BlockPalette::new_solid(),
+        "structural" => BlockPalette::new_structural(),
+        "decorative" => BlockPalette::new_decorative(),
+        "concrete" => BlockPalette::new_concrete(),
+        "wool" => BlockPalette::new_wool(),
+        "terracotta" => BlockPalette::new_terracotta(),
+        "grayscale" => BlockPalette::new_grayscale(),
+        "wood" => BlockPalette::new_wood(),
+        _ => {
+            return Err(format!(
+                "Unknown palette '{name}' (expected all, solid, structural, decorative, \
+                 concrete, wool, terracotta, grayscale or wood)"
+            ))
+        }
+    })
+}
 
 // ============================================================================
 // Delegate macro for ShapeEnum

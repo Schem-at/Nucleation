@@ -7,6 +7,7 @@
 
 use super::node::SdfNode;
 use super::noise::{fbm2, hash01_2, hash01_3};
+use crate::building::{palette_by_name, BlockPalette};
 use crate::UniversalSchematic;
 use serde::{Deserialize, Serialize};
 
@@ -59,12 +60,81 @@ pub struct When {
 
 /// One material rule: the first rule whose `when` matches wins.
 /// A rule without `when` always matches (use it last as the default).
+///
+/// Exactly one of `block` (fixed block string) or `gradient` (palette-driven,
+/// position-dependent block choice) must be present; rules with both or
+/// neither are rejected when sampling.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FillRule {
     #[serde(default)]
     pub when: Option<When>,
     /// Block string, `set_block_str` syntax (properties allowed).
-    pub block: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub block: Option<String>,
+    /// Palette/gradient-driven fill: the block is chosen per position from a
+    /// palette instead of being fixed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gradient: Option<GradientFill>,
+}
+
+/// Palette selector for a [`GradientFill`]: either one of the preset names
+/// (`"all"`, `"solid"`, `"structural"`, `"decorative"`, `"concrete"`,
+/// `"wool"`, `"terracotta"`, `"grayscale"`, `"wood"`) or an explicit block
+/// list `{"ids": ["minecraft:stone", ...]}`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum PaletteSpec {
+    Named(String),
+    Ids { ids: Vec<String> },
+}
+
+/// Axis a [`GradientFill`] measures position along.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum GradientAxis {
+    /// Absolute world Y.
+    Y,
+    /// Depth below the local surface (same measure as `depthBelowSurface`).
+    Depth,
+}
+
+/// Ramp mode for a [`GradientFill`] that indexes the palette directly
+/// instead of interpolating between two colors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RampMode {
+    /// Position indexes the palette sorted by perceptual lightness
+    /// (dark at `range[0]` → light at `range[1]`).
+    Lightness,
+}
+
+/// Palette-driven fill: the block at each position is chosen by mapping the
+/// position along `axis` over `range` (clamped) to either an interpolated
+/// `from`→`to` color snapped to the palette (default), or directly into the
+/// lightness-sorted palette (`"ramp": "lightness"`). Fully deterministic —
+/// the block depends only on the position and the rule.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GradientFill {
+    pub palette: PaletteSpec,
+    /// RGB at `range[0]` (required unless `ramp` is set).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<[u8; 3]>,
+    /// RGB at `range[1]` (required unless `ramp` is set).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<[u8; 3]>,
+    /// Axis the gradient runs along; defaults to `"y"`.
+    #[serde(default = "default_axis")]
+    pub axis: GradientAxis,
+    /// `[min, max]` position span the gradient is stretched over; positions
+    /// outside are clamped.
+    pub range: [i32; 2],
+    /// When set, index the sorted palette directly instead of color-lerping.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ramp: Option<RampMode>,
+}
+
+fn default_axis() -> GradientAxis {
+    GradientAxis::Y
 }
 
 /// Scatter decoration placed on air directly above a surface block.
@@ -94,6 +164,79 @@ pub struct MaterialRules {
 impl MaterialRules {
     pub fn from_json(json: &str) -> Result<MaterialRules, String> {
         serde_json::from_str(json).map_err(|e| format!("Invalid material rules JSON: {e}"))
+    }
+}
+
+/// Cap on precomputed gradient steps: indexing stays deterministic and the
+/// visual resolution of a color ramp saturates long before this.
+const MAX_GRADIENT_STEPS: i64 = 256;
+
+/// A [`GradientFill`] resolved to a ready-to-index block ramp.
+struct ResolvedGradient {
+    ids: Vec<String>,
+    axis: GradientAxis,
+    min: i32,
+    max: i32,
+}
+
+impl ResolvedGradient {
+    fn pick(&self, y: i32, depth: i32) -> &str {
+        let v = match self.axis {
+            GradientAxis::Y => y,
+            GradientAxis::Depth => depth,
+        };
+        let idx = if self.max == self.min || self.ids.len() == 1 {
+            0
+        } else {
+            let t = ((v - self.min) as f32 / (self.max - self.min) as f32).clamp(0.0, 1.0);
+            (t * (self.ids.len() - 1) as f32).round() as usize
+        };
+        &self.ids[idx]
+    }
+}
+
+fn resolve_gradient(g: &GradientFill) -> Result<ResolvedGradient, String> {
+    let palette = match &g.palette {
+        PaletteSpec::Named(name) => palette_by_name(name)?,
+        PaletteSpec::Ids { ids } => BlockPalette::from_block_ids(ids.iter().map(|s| s.as_str())),
+    };
+    if palette.is_empty() {
+        return Err("Gradient palette is empty (unknown ids or no color data)".to_string());
+    }
+    let [min, max] = g.range;
+    if max < min {
+        return Err(format!("Gradient range [{min}, {max}] has max < min"));
+    }
+    let ids = match g.ramp {
+        Some(RampMode::Lightness) => palette
+            .sorted_by_lightness()
+            .block_ids()
+            .map(str::to_string)
+            .collect(),
+        None => {
+            let from = g
+                .from
+                .ok_or("Gradient without `ramp` requires `from` color")?;
+            let to = g.to.ok_or("Gradient without `ramp` requires `to` color")?;
+            let steps = ((max as i64 - min as i64 + 1).min(MAX_GRADIENT_STEPS)) as usize;
+            palette.gradient_ids((from[0], from[1], from[2]), (to[0], to[1], to[2]), steps)
+        }
+    };
+    Ok(ResolvedGradient {
+        ids,
+        axis: g.axis,
+        min,
+        max,
+    })
+}
+
+/// Validate one fill rule and resolve its gradient (if any).
+fn resolve_fill(rule: &FillRule) -> Result<Option<ResolvedGradient>, String> {
+    match (&rule.block, &rule.gradient) {
+        (Some(_), Some(_)) => Err("Fill rule cannot have both `block` and `gradient`".to_string()),
+        (None, None) => Err("Fill rule needs either `block` or `gradient`".to_string()),
+        (Some(_), None) => Ok(None),
+        (None, Some(g)) => resolve_gradient(g).map(Some),
     }
 }
 
@@ -153,6 +296,15 @@ pub fn sample_to_schematic(
         ));
     }
 
+    // Validate every fill rule up front and pre-resolve gradients into
+    // ready-to-index block ramps (one find_closest per ramp step, not per
+    // sampled position).
+    let resolved: Vec<Option<ResolvedGradient>> = rules
+        .fill
+        .iter()
+        .map(resolve_fill)
+        .collect::<Result<_, String>>()?;
+
     let mut schematic = UniversalSchematic::new(name.to_string());
     let default_fill = "minecraft:stone";
     let height = (bounds.max[1] - bounds.min[1] + 1) as usize;
@@ -186,7 +338,8 @@ pub fn sample_to_schematic(
                 for yi in (run_bottom..=run_top).rev() {
                     let y = bounds.min[1] + yi;
                     let depth = surface_y - y;
-                    let block = pick_fill(rules, x, y, z, depth).unwrap_or(default_fill);
+                    let block =
+                        pick_fill(rules, &resolved, x, y, z, depth).unwrap_or(default_fill);
                     if yi == run_top {
                         surface_block = Some(block);
                     }
@@ -204,8 +357,15 @@ pub fn sample_to_schematic(
     Ok(schematic)
 }
 
-fn pick_fill(rules: &MaterialRules, x: i32, y: i32, z: i32, depth: i32) -> Option<&str> {
-    for rule in &rules.fill {
+fn pick_fill<'a>(
+    rules: &'a MaterialRules,
+    resolved: &'a [Option<ResolvedGradient>],
+    x: i32,
+    y: i32,
+    z: i32,
+    depth: i32,
+) -> Option<&'a str> {
+    for (rule, gradient) in rules.fill.iter().zip(resolved) {
         let matches = match &rule.when {
             None => true,
             Some(w) => {
@@ -219,7 +379,11 @@ fn pick_fill(rules: &MaterialRules, x: i32, y: i32, z: i32, depth: i32) -> Optio
             }
         };
         if matches {
-            return Some(&rule.block);
+            return Some(match gradient {
+                Some(g) => g.pick(y, depth),
+                // resolve_fill guarantees a rule without gradient has a block.
+                None => rule.block.as_deref().unwrap_or(""),
+            });
         }
     }
     None
