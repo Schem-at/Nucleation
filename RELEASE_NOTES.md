@@ -29,6 +29,24 @@ API changes to be aware of:
 See `src/bridge/PORTING.md` for the binding rules and
 `tools/bridge_coverage/exclusions.txt` for the audited old→new name map.
 
+**Complete API documentation across all bindings.** Every public function on
+the bridge surface (509 total) now carries a doc comment, propagated by the
+generator into all seven languages; the 140 previously undocumented functions
+(meshing config, simulation value/layout/ordering types, transforms,
+definition regions, …) were documented from their implementations, including
+defaults, units, and coordinate/rotation conventions.
+
+**Editing-operation performance.**
+- `set_block_from_string` now caches parsed block strings (properties + NBT)
+  per schematic, and placed block entities Arc-share the cached NBT
+  (copy-on-write). Repeatedly placing the same NBT-bearing block (e.g. filled
+  chests) is ~41× faster (0.30 → 12.4 M blocks/s); property-bearing blocks
+  (e.g. repeaters) are ~3.6× faster (5.7 → 20.6 M blocks/s).
+- `copy_region` from a single-region source (the common case) now translates
+  palette indices through a precomputed source→target map instead of hashing
+  a `BlockState` per block: ~3.8× faster (64 → 242 M blocks/s), same
+  resulting content (covered by a fast-vs-slow-path equivalence test).
+
 ---
 
 # Nucleation v0.2.18

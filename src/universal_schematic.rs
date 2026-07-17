@@ -32,6 +32,13 @@ pub struct UniversalSchematic {
     /// on every set_block call.
     #[serde(skip, default = "FxHashMap::default")]
     block_state_cache: FxHashMap<String, BlockState>,
+    /// Full-block-string cache used by `set_block_from_string` to skip
+    /// property and NBT parsing on repeated placements of the same string
+    /// (e.g. filling 100k identical chests). The NbtMap is Arc-shared with
+    /// every BlockEntity placed from it; `BlockEntity::nbt_mut` copies on
+    /// write, so sharing is invisible to callers.
+    #[serde(skip, default = "FxHashMap::default")]
+    block_string_cache: FxHashMap<String, (BlockState, Option<std::sync::Arc<NbtMap>>)>,
 }
 
 #[derive(Debug, Clone)]
@@ -71,6 +78,7 @@ impl UniversalSchematic {
             default_region_name,
             definition_regions: HashMap::new(),
             block_state_cache: FxHashMap::default(),
+            block_string_cache: FxHashMap::default(),
         }
     }
 
@@ -949,6 +957,7 @@ impl UniversalSchematic {
             default_region_name,
             definition_regions,
             block_state_cache: FxHashMap::default(),
+            block_string_cache: FxHashMap::default(),
         })
     }
 
@@ -1228,20 +1237,73 @@ impl UniversalSchematic {
 
         let air_block = BlockState::new("minecraft:air".to_string());
 
-        // Copy blocks
-        for x in bounds.min.0..=bounds.max.0 {
-            for y in bounds.min.1..=bounds.max.1 {
-                for z in bounds.min.2..=bounds.max.2 {
-                    if let Some(block) = from_schematic.get_block(x, y, z) {
-                        let new_x = x + offset.0;
-                        let new_y = y + offset.1;
-                        let new_z = z + offset.2;
-
+        // Copy blocks.
+        //
+        // Fast path (single-region source, the common case): translate source
+        // palette indices to target palette indices once, then copy raw
+        // indices. This replaces a per-block BlockState hash + clone with a
+        // per-block Vec lookup. Cells outside the source region are left
+        // untouched, matching the get_block() -> None behavior below.
+        if from_schematic.other_regions.is_empty() {
+            let src = &from_schematic.default_region;
+            let src_bbox = src.get_bounding_box();
+            let min = (
+                bounds.min.0.max(src_bbox.min.0),
+                bounds.min.1.max(src_bbox.min.1),
+                bounds.min.2.max(src_bbox.min.2),
+            );
+            let max = (
+                bounds.max.0.min(src_bbox.max.0),
+                bounds.max.1.min(src_bbox.max.1),
+                bounds.max.2.min(src_bbox.max.2),
+            );
+            if min.0 <= max.0 && min.1 <= max.1 && min.2 <= max.2 {
+                self.ensure_bounds(
+                    (min.0 + offset.0, min.1 + offset.1, min.2 + offset.2),
+                    (max.0 + offset.0, max.1 + offset.1, max.2 + offset.2),
+                );
+                let target = &mut self.default_region;
+                let palette_map: Vec<usize> = src
+                    .palette
+                    .iter()
+                    .map(|block| {
                         if excluded_blocks.contains(block) {
-                            // Set air block instead of skipping
-                            self.set_block(new_x, new_y, new_z, &air_block);
+                            target.get_or_insert_in_palette(&air_block)
                         } else {
-                            self.set_block(new_x, new_y, new_z, block);
+                            target.get_or_insert_in_palette(block)
+                        }
+                    })
+                    .collect();
+                for y in min.1..=max.1 {
+                    for z in min.2..=max.2 {
+                        for x in min.0..=max.0 {
+                            let src_index = src.coords_to_index(x, y, z);
+                            let mapped = palette_map[src.blocks[src_index]];
+                            target.set_block_at_index_unchecked(
+                                mapped,
+                                x + offset.0,
+                                y + offset.1,
+                                z + offset.2,
+                            );
+                        }
+                    }
+                }
+            }
+        } else {
+            for x in bounds.min.0..=bounds.max.0 {
+                for y in bounds.min.1..=bounds.max.1 {
+                    for z in bounds.min.2..=bounds.max.2 {
+                        if let Some(block) = from_schematic.get_block(x, y, z) {
+                            let new_x = x + offset.0;
+                            let new_y = y + offset.1;
+                            let new_z = z + offset.2;
+
+                            if excluded_blocks.contains(block) {
+                                // Set air block instead of skipping
+                                self.set_block(new_x, new_y, new_z, &air_block);
+                            } else {
+                                self.set_block(new_x, new_y, new_z, block);
+                            }
                         }
                     }
                 }
@@ -1802,30 +1864,51 @@ impl UniversalSchematic {
         z: i32,
         block_string: &str,
     ) -> Result<bool, String> {
-        let (mut block_state, nbt_data) = Self::parse_block_string(block_string)?;
+        // Parse once per distinct string: repeated placements of the same
+        // block string (the common case when filling) hit the cache and skip
+        // property/NBT parsing entirely.
+        let (block_state, nbt) = match self.block_string_cache.get(block_string) {
+            Some((state, nbt)) => (state.clone(), nbt.clone()),
+            None => {
+                let (mut block_state, nbt_data) = Self::parse_block_string(block_string)?;
 
-        // Special handling for jukebox: set has_record blockstate if RecordItem exists
-        if block_state.name.contains("jukebox") {
-            if let Some(ref nbt) = nbt_data {
-                let has_record = nbt.contains_key("RecordItem");
-                block_state.set_property("has_record", has_record.to_string());
+                // Special handling for jukebox: set has_record blockstate if RecordItem exists
+                if block_state.name.contains("jukebox") {
+                    if let Some(ref nbt) = nbt_data {
+                        let has_record = nbt.contains_key("RecordItem");
+                        block_state.set_property("has_record", has_record.to_string());
+                    }
+                }
+
+                let nbt = nbt_data.map(|data| {
+                    let mut map = NbtMap::new();
+                    for (key, value) in data {
+                        map.insert(key, value);
+                    }
+                    std::sync::Arc::new(map)
+                });
+
+                self.block_string_cache.insert(
+                    block_string.to_string(),
+                    (block_state.clone(), nbt.clone()),
+                );
+                (block_state, nbt)
             }
-        }
+        };
 
         // Set the basic block first
         if !self.set_block(x, y, z, &block_state) {
             return Ok(false);
         }
 
-        // If we have NBT data, create and set the block entity
-        if let Some(nbt_data) = nbt_data {
-            let mut block_entity = BlockEntity::new(block_state.name.to_string(), (x, y, z));
-
-            // Add NBT data
-            for (key, value) in nbt_data {
-                block_entity = block_entity.with_nbt_data(key, value);
-            }
-
+        // If we have NBT data, create and set the block entity. The NbtMap
+        // stays Arc-shared with the cache (copy-on-write via nbt_mut).
+        if let Some(nbt) = nbt {
+            let block_entity = BlockEntity {
+                id: block_state.name.to_string(),
+                position: (x, y, z),
+                nbt,
+            };
             self.set_block_entity(BlockPosition { x, y, z }, block_entity);
         }
 
@@ -2024,6 +2107,7 @@ impl UniversalSchematic {
 
     pub fn clear_block_state_cache(&mut self) {
         self.block_state_cache.clear();
+        self.block_string_cache.clear();
     }
 
     /// Get cache statistics for debugging
@@ -2204,6 +2288,83 @@ mod tests {
     use crate::item::ItemStack;
     use quartz_nbt::io::{read_nbt, write_nbt};
     use std::io::Cursor;
+
+    #[test]
+    fn copy_region_fast_path_matches_slow_path() {
+        // The single-region source takes the palette-mapped fast path; adding
+        // a dummy other-region forces the per-block slow path. Both must
+        // produce identical targets, including exclusions, air overwrites,
+        // and cells outside the source region staying untouched.
+        let build_source = |extra_region: bool| {
+            let mut src = UniversalSchematic::new("src".to_string());
+            src.set_block_str(0, 0, 0, "minecraft:stone");
+            src.set_block_str(1, 0, 0, "minecraft:dirt");
+            src.set_block_str(2, 1, 1, "minecraft:stone");
+            let _ = src.set_block_from_string(1, 1, 0, "minecraft:repeater[delay=2,facing=east]");
+            if extra_region {
+                src.set_block_in_region_str("Extra", 50, 50, 50, "minecraft:gold_block");
+            }
+            src
+        };
+
+        let build_target = || {
+            let mut t = UniversalSchematic::new("target".to_string());
+            // Pre-existing block that the copy must overwrite with air:
+            // (12,2,7) maps back to source cell (2,0,0), which is air inside
+            // the source region (offset = target_position - bounds.min).
+            t.set_block_str(12, 2, 7, "minecraft:diamond_block");
+            // Pre-existing block outside the copied box: must survive.
+            t.set_block_str(-5, -5, -5, "minecraft:emerald_block");
+            t
+        };
+
+        // Bounds deliberately larger than the source region on every side.
+        let bounds = BoundingBox::new((-2, -2, -2), (6, 6, 6));
+        let excluded = vec![BlockState::new("minecraft:dirt".to_string())];
+
+        let mut fast = build_target();
+        fast.copy_region(&build_source(false), &bounds, (8, 0, 5), &excluded)
+            .unwrap();
+
+        let mut slow = build_target();
+        slow.copy_region(&build_source(true), &bounds, (8, 0, 5), &excluded)
+            .unwrap();
+
+        // Normalize unallocated (None) and allocated-air to the same value:
+        // the two paths allocate different padding around the copy, which is
+        // an implementation detail, not content.
+        let norm = |b: Option<&BlockState>| match b {
+            Some(b) if b.name != "minecraft:air" => Some(b.to_string()),
+            _ => None,
+        };
+        for x in -8..20 {
+            for y in -8..10 {
+                for z in -8..10 {
+                    let f = norm(fast.get_block(x, y, z));
+                    let s = norm(slow.get_block(x, y, z));
+                    assert_eq!(f, s, "mismatch at ({}, {}, {})", x, y, z);
+                }
+            }
+        }
+        // Sanity: the copy actually landed and exclusion produced air.
+        // Source (0,0,0) + offset (10,2,7) = target (10,2,7).
+        assert_eq!(
+            fast.get_block(10, 2, 7).map(|b| b.name.as_str()),
+            Some("minecraft:stone")
+        );
+        assert_ne!(
+            fast.get_block(11, 2, 7).map(|b| b.name.as_str()),
+            Some("minecraft:dirt")
+        );
+        assert_ne!(
+            fast.get_block(12, 2, 7).map(|b| b.name.as_str()),
+            Some("minecraft:diamond_block")
+        );
+        assert_eq!(
+            fast.get_block(-5, -5, -5).map(|b| b.name.as_str()),
+            Some("minecraft:emerald_block")
+        );
+    }
 
     #[test]
     fn litematic_load_captures_source_data_version() {

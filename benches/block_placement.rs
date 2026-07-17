@@ -228,6 +228,66 @@ fn bench_chest_batch_components(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_copy_region(c: &mut Criterion) {
+    // Palette-mapped fast path (single-region source) vs the per-block
+    // set_block slow path (forced by adding a second source region).
+    use nucleation::BoundingBox;
+
+    const SIZE: i32 = 64;
+    let n = (SIZE * SIZE * SIZE) as u64;
+
+    let build_source = |extra_region: bool| {
+        let mut src = UniversalSchematic::new("src".into());
+        for y in 0..SIZE {
+            for z in 0..SIZE {
+                for x in 0..SIZE {
+                    let block = if (x + y + z) % 7 == 0 {
+                        "minecraft:stone"
+                    } else if (x + y + z) % 3 == 0 {
+                        "minecraft:dirt"
+                    } else {
+                        "minecraft:oak_planks"
+                    };
+                    src.set_block_str(x, y, z, block);
+                }
+            }
+        }
+        if extra_region {
+            src.set_block_in_region_str("Extra", 1000, 1000, 1000, "minecraft:gold_block");
+        }
+        src
+    };
+
+    let bounds = BoundingBox::new((0, 0, 0), (SIZE - 1, SIZE - 1, SIZE - 1));
+
+    let mut group = c.benchmark_group("copy_region_64cubed");
+    group.throughput(Throughput::Elements(n));
+    group.sample_size(10);
+
+    let single = build_source(false);
+    group.bench_function("fast_path_palette_mapped", |b| {
+        b.iter(|| {
+            let mut target = UniversalSchematic::new("target".into());
+            target
+                .copy_region(black_box(&single), &bounds, (0, 0, 0), &[])
+                .unwrap();
+            black_box(target);
+        })
+    });
+
+    let multi = build_source(true);
+    group.bench_function("slow_path_per_block", |b| {
+        b.iter(|| {
+            let mut target = UniversalSchematic::new("target".into());
+            target
+                .copy_region(black_box(&multi), &bounds, (0, 0, 0), &[])
+                .unwrap();
+            black_box(target);
+        })
+    });
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_set_block_plain,
@@ -238,5 +298,6 @@ criterion_group!(
     bench_transform_with_block_entities,
     bench_clone_schematic_with_chests,
     bench_chest_batch_components,
+    bench_copy_region,
 );
 criterion_main!(benches);
