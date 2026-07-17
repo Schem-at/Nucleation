@@ -13,6 +13,7 @@ mkdir -p "$OUT"
 cp bindings/js/*.mjs bindings/js/*.d.ts "$OUT/"
 cp target/wasm32-unknown-unknown/release/nucleation.wasm "$OUT/"
 cp bindings/npm/package.json "$OUT/"
+cp bindings/npm/README.md "$OUT/"
 
 # Package-local wasm path (the committed bindings/diplomat.config.mjs points at
 # target/ for the in-repo smoke tests instead).

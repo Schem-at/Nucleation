@@ -21,7 +21,3 @@ dependencies {
 kotlin {
     jvmToolchain(21)
 }
-
-tasks.jar {
-    from("src/main/resources")
-}
