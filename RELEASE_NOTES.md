@@ -1,3 +1,29 @@
+# Nucleation v0.3.2
+
+**The block database now lives inside nucleation, current to Minecraft 26.2.**
+blockpedia is no longer an external dependency: block facts, Java↔Bedrock
+mappings, and texture-derived colors ship in-tree (gzipped, ~330 KB) and are
+generated at build time. Data targets **Java 26.2** (Mojang's new versioning),
+extracted with Mojang's own data generator — 1,196 blocks including the new
+cinnabar/sulfur families — with colors computed from the 26.2 client jar's
+default textures (98.4% coverage, plains-biome tints applied). Refreshing for
+a future release is two commands with no code changes
+(`refresh-block-data` + `fetch-texture-colors`, both `--features mc-data-refresh`).
+
+Palette upgrades for value→block workflows (heatmaps, fractals, pixel art):
+
+- `Palette.sortedByLightness()` — any palette as a dark→light ramp
+- `Palette.gradientIdsJson(r1,g1,b1, r2,g2,b2, steps)` — exactly N block ids
+  sampling an Oklab gradient snapped to the palette; index by intensity
+- `Palette.wood()` — the planks family, a natural wood ramp
+- Default palettes exclude technical blocks (portals, fluids, fire, ...)
+
+Also: the npm wasm now includes **simulation and meshing** (in-browser
+redstone simulation works again); local Python wheel builds no longer trust a
+stale rust lib.
+
+---
+
 # Nucleation v0.3.1
 
 **Fixes broken v0.3.0 native release artifacts.** The v0.3.0 per-platform
