@@ -15,11 +15,28 @@ export class ExecutionMode {
     constructor();
 
 
+    /**
+     * Run for exactly `ticks` ticks.
+     */
     static fixedTicks(ticks: number): ExecutionMode;
 
+    /**
+     * Run until the output named `output_name` meets `condition`,
+     * checking every `check_interval` ticks, giving up after `max_ticks`
+     * ticks (the result's `condition_met` reports which happened).
+     */
     static untilCondition(outputName: string, condition: OutputCondition, maxTicks: number, checkInterval: number): ExecutionMode;
 
+    /**
+     * Run until any output changes from its initial reading, checking
+     * every `check_interval` ticks, giving up after `max_ticks` ticks.
+     */
     static untilChange(maxTicks: number, checkInterval: number): ExecutionMode;
 
+    /**
+     * Run (one tick at a time) until all outputs have been unchanged for
+     * `stable_ticks` consecutive ticks, giving up after `max_ticks`
+     * ticks (the result's `condition_met` reports stability).
+     */
     static untilStable(stableTicks: number, maxTicks: number): ExecutionMode;
 }

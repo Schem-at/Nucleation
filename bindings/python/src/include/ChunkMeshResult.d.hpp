@@ -59,6 +59,9 @@ public:
    */
   inline static nucleation::diplomat::result<std::unique_ptr<nucleation::ChunkMeshResult>, nucleation::NucleationError> create_with_atlas(const nucleation::Schematic& schematic, const nucleation::ResourcePack& pack, const nucleation::MeshConfig& config, int32_t chunk_size, const nucleation::TextureAtlas& atlas);
 
+  /**
+   * Number of chunk meshes.
+   */
   inline uint32_t chunk_count() const;
 
   /**
@@ -72,8 +75,14 @@ public:
    */
   inline nucleation::diplomat::result<std::unique_ptr<nucleation::MeshResult>, nucleation::NucleationError> get_mesh(int32_t cx, int32_t cy, int32_t cz) const;
 
+  /**
+   * Total vertex count across all chunk meshes.
+   */
   inline uint32_t total_vertex_count() const;
 
+  /**
+   * Total triangle count across all chunk meshes.
+   */
   inline uint32_t total_triangle_count() const;
 
   /**

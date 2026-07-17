@@ -46,6 +46,9 @@ export class CircuitBuilder {
     }
 
 
+    /**
+     * Create a builder for a schematic (cloned; no IO defined yet).
+     */
     static create(schematic) {
 
         const result = wasm.CircuitBuilder_create(schematic.ffiValue);
@@ -423,6 +426,9 @@ export class CircuitBuilder {
         }
     }
 
+    /**
+     * Number of inputs defined so far (0 if the builder was consumed).
+     */
     inputCount() {
 
         const result = wasm.CircuitBuilder_input_count(this.ffiValue);
@@ -436,6 +442,9 @@ export class CircuitBuilder {
         }
     }
 
+    /**
+     * Number of outputs defined so far (0 if the builder was consumed).
+     */
     outputCount() {
 
         const result = wasm.CircuitBuilder_output_count(this.ffiValue);

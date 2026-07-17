@@ -42,6 +42,9 @@ export class IoLayoutBuilder {
     }
 
 
+    /**
+     * Create an empty layout builder.
+     */
     static create() {
 
         const result = wasm.IoLayoutBuilder_create();

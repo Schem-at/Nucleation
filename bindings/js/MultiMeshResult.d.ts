@@ -33,9 +33,18 @@ export class MultiMeshResult {
      */
     getMesh(regionName: string): MeshResult;
 
+    /**
+     * Total vertex count across all region meshes.
+     */
     totalVertexCount(): number;
 
+    /**
+     * Total triangle count across all region meshes.
+     */
     totalTriangleCount(): number;
 
+    /**
+     * Number of region meshes.
+     */
     meshCount(): number;
 }

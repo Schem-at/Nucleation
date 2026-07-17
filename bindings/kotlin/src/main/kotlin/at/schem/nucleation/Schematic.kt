@@ -148,6 +148,8 @@ class Schematic internal constructor (
         internal val lib: SchematicLib = Native.load("nucleation", libClass)
         @JvmStatic
         
+        /** Create a new, empty schematic with the given name.
+        */
         fun create(name: String): Schematic {
             val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
             
@@ -163,6 +165,9 @@ class Schematic internal constructor (
         }
         @JvmStatic
         
+        /** Load a schematic from a Litematic file (this path is
+        *Litematic-only; use `from_data` for format auto-detection).
+        */
         fun loadFromFile(path: String): Result<Schematic> {
             val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
             
@@ -454,6 +459,9 @@ class Schematic internal constructor (
         }
     }
     
+    /** The allocated dimensions (width, height, length) of the schematic's
+    *bounding box.
+    */
     fun dimensions(): Dimensions {
         
         val returnVal = lib.Schematic_dimensions(handle);
@@ -480,6 +488,9 @@ class Schematic internal constructor (
         }
     }
     
+    /** The name of the block at a position. `NotFound` if the position is
+    *outside every region.
+    */
     fun getBlockName(x: Int, y: Int, z: Int): Result<String> {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.Schematic_get_block_name(handle, x, y, z, write);
@@ -493,6 +504,10 @@ class Schematic internal constructor (
         }
     }
     
+    /** Save the schematic to a file, always in Litematic format (the
+    *extension is not consulted; use `save_to_file_with_format` for
+    *other formats).
+    */
     fun saveToFile(path: String): Result<Unit> {
         val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
         
@@ -1174,6 +1189,8 @@ class Schematic internal constructor (
         }
     }
     
+    /** Set the schematic name.
+    */
     fun setName(name: String): Result<Unit> {
         val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
         
@@ -1205,6 +1222,8 @@ class Schematic internal constructor (
         }
     }
     
+    /** Set the schematic author.
+    */
     fun setAuthor(author: String): Result<Unit> {
         val authorSliceMemory = PrimitiveArrayTools.borrowUtf8(author)
         
@@ -1236,6 +1255,8 @@ class Schematic internal constructor (
         }
     }
     
+    /** Set the schematic description.
+    */
     fun setDescription(description: String): Result<Unit> {
         val descriptionSliceMemory = PrimitiveArrayTools.borrowUtf8(description)
         
@@ -1292,6 +1313,8 @@ class Schematic internal constructor (
         return (returnVal)
     }
     
+    /** Set the Litematic format version.
+    */
     fun setLmVersion(version: Int): Unit {
         
         val returnVal = lib.Schematic_set_lm_version(handle, version);
@@ -1306,6 +1329,8 @@ class Schematic internal constructor (
         return (returnVal)
     }
     
+    /** Set the Minecraft data version.
+    */
     fun setMcVersion(version: Int): Unit {
         
         val returnVal = lib.Schematic_set_mc_version(handle, version);
@@ -1320,48 +1345,79 @@ class Schematic internal constructor (
         return (returnVal)
     }
     
+    /** Set the WorldEdit version.
+    */
     fun setWeVersion(version: Int): Unit {
         
         val returnVal = lib.Schematic_set_we_version(handle, version);
         
     }
     
+    /** Mirror the default region along the X axis (in place). Block
+    *orientations (e.g. `facing` properties), block entities, and
+    *entities are mirrored too.
+    */
     fun flipX(): Unit {
         
         val returnVal = lib.Schematic_flip_x(handle);
         
     }
     
+    /** Mirror the default region along the Y axis (in place). Block
+    *orientations, block entities, and entities are mirrored too.
+    */
     fun flipY(): Unit {
         
         val returnVal = lib.Schematic_flip_y(handle);
         
     }
     
+    /** Mirror the default region along the Z axis (in place). Block
+    *orientations, block entities, and entities are mirrored too.
+    */
     fun flipZ(): Unit {
         
         val returnVal = lib.Schematic_flip_z(handle);
         
     }
     
+    /** Rotate the default region about the X axis. `degrees` must be a
+    *multiple of 90 (anything else is a no-op; negative values wrap).
+    *+90° maps +Z onto +Y (south face rotates up). The region keeps its
+    *minimum corner; block orientations and entities are updated.
+    */
     fun rotateX(degrees: Int): Unit {
         
         val returnVal = lib.Schematic_rotate_x(handle, degrees);
         
     }
     
+    /** Rotate the default region about the Y axis (horizontal plane).
+    *`degrees` must be a multiple of 90 (anything else is a no-op;
+    *negative values wrap). +90° maps +X onto -Z (east to north, i.e.
+    *counterclockwise seen from above). The region keeps its minimum
+    *corner; block orientations and entities are updated.
+    */
     fun rotateY(degrees: Int): Unit {
         
         val returnVal = lib.Schematic_rotate_y(handle, degrees);
         
     }
     
+    /** Rotate the default region about the Z axis. `degrees` must be a
+    *multiple of 90 (anything else is a no-op; negative values wrap).
+    *+90° maps +Y onto +X (up rotates east). The region keeps its
+    *minimum corner; block orientations and entities are updated.
+    */
     fun rotateZ(degrees: Int): Unit {
         
         val returnVal = lib.Schematic_rotate_z(handle, degrees);
         
     }
     
+    /** Mirror a named region along the X axis (like `flip_x`). `NotFound`
+    *if no region has that name.
+    */
     fun flipRegionX(regionName: String): Result<Unit> {
         val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
         
@@ -1378,6 +1434,9 @@ class Schematic internal constructor (
         }
     }
     
+    /** Mirror a named region along the Y axis (like `flip_y`). `NotFound`
+    *if no region has that name.
+    */
     fun flipRegionY(regionName: String): Result<Unit> {
         val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
         
@@ -1394,6 +1453,9 @@ class Schematic internal constructor (
         }
     }
     
+    /** Mirror a named region along the Z axis (like `flip_z`). `NotFound`
+    *if no region has that name.
+    */
     fun flipRegionZ(regionName: String): Result<Unit> {
         val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
         
@@ -1410,6 +1472,10 @@ class Schematic internal constructor (
         }
     }
     
+    /** Rotate a named region about the X axis by a multiple of 90 degrees
+    *(same semantics as `rotate_x`). `NotFound` if no region has that
+    *name.
+    */
     fun rotateRegionX(regionName: String, degrees: Int): Result<Unit> {
         val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
         
@@ -1426,6 +1492,10 @@ class Schematic internal constructor (
         }
     }
     
+    /** Rotate a named region about the Y axis by a multiple of 90 degrees
+    *(same semantics as `rotate_y`). `NotFound` if no region has that
+    *name.
+    */
     fun rotateRegionY(regionName: String, degrees: Int): Result<Unit> {
         val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
         
@@ -1442,6 +1512,10 @@ class Schematic internal constructor (
         }
     }
     
+    /** Rotate a named region about the Z axis by a multiple of 90 degrees
+    *(same semantics as `rotate_z`). `NotFound` if no region has that
+    *name.
+    */
     fun rotateRegionZ(regionName: String, degrees: Int): Result<Unit> {
         val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
         

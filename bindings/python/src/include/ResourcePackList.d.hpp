@@ -31,6 +31,9 @@ namespace nucleation {
 class ResourcePackList {
 public:
 
+  /**
+   * Create an empty resource-pack list.
+   */
   inline static std::unique_ptr<nucleation::ResourcePackList> create();
 
   /**
@@ -39,6 +42,9 @@ public:
    */
   inline void add(nucleation::diplomat::span<const uint8_t> data);
 
+  /**
+   * Number of pack buffers added so far.
+   */
   inline uint32_t len() const;
 
     inline const nucleation::capi::ResourcePackList* AsFFI() const;

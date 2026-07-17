@@ -47,6 +47,11 @@ class ItemModelConfig internal constructor (
         internal val lib: ItemModelConfigLib = Native.load("nucleation", libClass)
         @JvmStatic
         
+        /** Create a config for a model named `model_name` (used in resource-pack
+        *file paths). Other options start at their defaults: namespace
+        *"nucleation", centered, 16px texture resolution, item "paper",
+        *custom model data "1", auto scale.
+        */
         fun create(modelName: String): Result<ItemModelConfig> {
             val modelNameSliceMemory = PrimitiveArrayTools.borrowUtf8(modelName)
             
@@ -67,6 +72,8 @@ class ItemModelConfig internal constructor (
         }
     }
     
+    /** Set the resource-pack namespace (default: "nucleation").
+    */
     fun setNamespace(namespace: String): Result<Unit> {
         val namespaceSliceMemory = PrimitiveArrayTools.borrowUtf8(namespace)
         
@@ -83,18 +90,24 @@ class ItemModelConfig internal constructor (
         }
     }
     
+    /** Center the schematic within the model bounds (default: true).
+    */
     fun setCenter(center: Boolean): Unit {
         
         val returnVal = lib.ItemModelConfig_set_center(handle, center);
         
     }
     
+    /** Set the texture resolution in pixels per block face (default: 16).
+    */
     fun setTextureResolution(resolution: UInt): Unit {
         
         val returnVal = lib.ItemModelConfig_set_texture_resolution(handle, FFIUint32(resolution));
         
     }
     
+    /** Set the Minecraft item the model binds to (default: "paper").
+    */
     fun setItem(item: String): Result<Unit> {
         val itemSliceMemory = PrimitiveArrayTools.borrowUtf8(item)
         
@@ -111,6 +124,9 @@ class ItemModelConfig internal constructor (
         }
     }
     
+    /** Set the custom-model-data string used to select this model in game
+    *(default: "1").
+    */
     fun setCustomModelData(cmd: String): Result<Unit> {
         val cmdSliceMemory = PrimitiveArrayTools.borrowUtf8(cmd)
         

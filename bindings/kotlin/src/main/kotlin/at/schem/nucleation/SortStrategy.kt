@@ -52,6 +52,9 @@ class SortStrategy internal constructor (
         internal val lib: SortStrategyLib = Native.load("nucleation", libClass)
         @JvmStatic
         
+        /** Sort by Y ascending, then X, then Z (default Minecraft layer
+        *order). The first position after sorting is bit 0 (LSB).
+        */
         fun yxz(): SortStrategy {
             
             val returnVal = lib.SortStrategy_yxz();
@@ -62,6 +65,8 @@ class SortStrategy internal constructor (
         }
         @JvmStatic
         
+        /** Sort by X ascending, then Y, then Z.
+        */
         fun xyz(): SortStrategy {
             
             val returnVal = lib.SortStrategy_xyz();
@@ -72,6 +77,8 @@ class SortStrategy internal constructor (
         }
         @JvmStatic
         
+        /** Sort by Z ascending, then Y, then X.
+        */
         fun zyx(): SortStrategy {
             
             val returnVal = lib.SortStrategy_zyx();
@@ -82,6 +89,8 @@ class SortStrategy internal constructor (
         }
         @JvmStatic
         
+        /** Sort by Y descending, then X ascending, then Z ascending.
+        */
         fun yDescXz(): SortStrategy {
             
             val returnVal = lib.SortStrategy_y_desc_xz();
@@ -92,6 +101,8 @@ class SortStrategy internal constructor (
         }
         @JvmStatic
         
+        /** Sort by X descending, then Y ascending, then Z ascending.
+        */
         fun xDescYz(): SortStrategy {
             
             val returnVal = lib.SortStrategy_x_desc_yz();
@@ -102,6 +113,8 @@ class SortStrategy internal constructor (
         }
         @JvmStatic
         
+        /** Sort by Z descending, then Y ascending, then X ascending.
+        */
         fun zDescYx(): SortStrategy {
             
             val returnVal = lib.SortStrategy_z_desc_yx();
@@ -124,6 +137,9 @@ class SortStrategy internal constructor (
         }
         @JvmStatic
         
+        /** Sort by Euclidean distance from the reference point, closest
+        *first (ties broken by Y, X, Z ascending).
+        */
         fun distanceFrom(x: Int, y: Int, z: Int): SortStrategy {
             
             val returnVal = lib.SortStrategy_distance_from(x, y, z);
@@ -134,6 +150,9 @@ class SortStrategy internal constructor (
         }
         @JvmStatic
         
+        /** Sort by Euclidean distance from the reference point, farthest
+        *first (ties broken by Y, X, Z descending).
+        */
         fun distanceFromDesc(x: Int, y: Int, z: Int): SortStrategy {
             
             val returnVal = lib.SortStrategy_distance_from_desc(x, y, z);
@@ -144,6 +163,9 @@ class SortStrategy internal constructor (
         }
         @JvmStatic
         
+        /** Keep positions in the order they were added (no sorting). Useful
+        *when positions were ordered manually or box order matters.
+        */
         fun preserve(): SortStrategy {
             
             val returnVal = lib.SortStrategy_preserve();
@@ -154,6 +176,8 @@ class SortStrategy internal constructor (
         }
         @JvmStatic
         
+        /** Reverse of the order positions were added.
+        */
         fun reverse(): SortStrategy {
             
             val returnVal = lib.SortStrategy_reverse();

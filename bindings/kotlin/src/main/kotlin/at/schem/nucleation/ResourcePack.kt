@@ -95,18 +95,24 @@ class ResourcePack internal constructor (
         }
     }
     
+    /** Number of blockstate definitions in the pack.
+    */
     fun blockstateCount(): UInt {
         
         val returnVal = lib.ResourcePack_blockstate_count(handle);
         return (returnVal.toUInt())
     }
     
+    /** Number of model definitions in the pack.
+    */
     fun modelCount(): UInt {
         
         val returnVal = lib.ResourcePack_model_count(handle);
         return (returnVal.toUInt())
     }
     
+    /** Number of textures in the pack.
+    */
     fun textureCount(): UInt {
         
         val returnVal = lib.ResourcePack_texture_count(handle);
@@ -153,6 +159,8 @@ class ResourcePack internal constructor (
         return returnString
     }
     
+    /** The blockstate definition JSON for `name`; `NotFound` if absent.
+    */
     fun getBlockstateJson(name: String): Result<String> {
         val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
         val write = DW.lib.diplomat_buffer_write_create(0)
@@ -171,6 +179,8 @@ class ResourcePack internal constructor (
         }
     }
     
+    /** The model definition JSON for `name`; `NotFound` if absent.
+    */
     fun getModelJson(name: String): Result<String> {
         val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
         val write = DW.lib.diplomat_buffer_write_create(0)
@@ -228,6 +238,8 @@ class ResourcePack internal constructor (
         }
     }
     
+    /** Add (or override) a blockstate definition from a JSON string.
+    */
     fun addBlockstateJson(name: String, json: String): Result<Unit> {
         val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
         val jsonSliceMemory = PrimitiveArrayTools.borrowUtf8(json)
@@ -246,6 +258,8 @@ class ResourcePack internal constructor (
         }
     }
     
+    /** Add (or override) a model definition from a JSON string.
+    */
     fun addModelJson(name: String, json: String): Result<Unit> {
         val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
         val jsonSliceMemory = PrimitiveArrayTools.borrowUtf8(json)

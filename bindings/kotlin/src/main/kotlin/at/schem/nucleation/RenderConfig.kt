@@ -47,6 +47,10 @@ class RenderConfig internal constructor (
         internal val lib: RenderConfigLib = Native.load("nucleation", libClass)
         @JvmStatic
         
+        /** Create a config with the given output size in pixels. Camera starts
+        *at the defaults: yaw 45°, pitch 30°, zoom 1.0, fov 45°, perspective
+        *projection, default sky background.
+        */
         fun create(width: UInt, height: UInt): RenderConfig {
             
             val returnVal = lib.RenderConfig_create(FFIUint32(width), FFIUint32(height));
@@ -57,24 +61,34 @@ class RenderConfig internal constructor (
         }
     }
     
+    /** Set the camera yaw (horizontal orbit angle) in degrees. Default: 45.
+    */
     fun setYaw(yaw: Float): Unit {
         
         val returnVal = lib.RenderConfig_set_yaw(handle, yaw);
         
     }
     
+    /** Set the camera pitch (downward tilt) in degrees. Default: 30.
+    */
     fun setPitch(pitch: Float): Unit {
         
         val returnVal = lib.RenderConfig_set_pitch(handle, pitch);
         
     }
     
+    /** Set the zoom factor scaling the auto-fitted camera distance
+    *(1.0 = frame the whole model; larger = further away). Default: 1.0.
+    */
     fun setZoom(zoom: Float): Unit {
         
         val returnVal = lib.RenderConfig_set_zoom(handle, zoom);
         
     }
     
+    /** Set the vertical field of view in degrees (perspective projection
+    *only). Default: 45.
+    */
     fun setFov(fov: Float): Unit {
         
         val returnVal = lib.RenderConfig_set_fov(handle, fov);

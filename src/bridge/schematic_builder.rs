@@ -21,6 +21,8 @@ pub mod ffi {
     pub struct SchematicBuilder(Option<crate::SchematicBuilder>);
 
     impl SchematicBuilder {
+        /// Create a new builder, pre-loaded with the standard Unicode palette
+        /// (override any character via `map` or `palette`).
         pub fn create() -> Box<SchematicBuilder> {
             Box::new(SchematicBuilder(Some(crate::SchematicBuilder::new())))
         }
@@ -100,14 +102,21 @@ pub mod ffi {
             self.apply(|b| b.offset(x, y, z))
         }
 
+        /// Register the standard Unicode palette (redstone wires, repeaters,
+        /// comparators, torches, blocks, air...; the same set `create`
+        /// pre-loads), overwriting any clashing character mappings.
         pub fn use_standard_palette(&mut self) -> Result<(), NucleationError> {
             self.apply(|b| b.use_standard_palette())
         }
 
+        /// Register the minimal palette (an essentials-only subset of the
+        /// standard one), overwriting any clashing character mappings.
         pub fn use_minimal_palette(&mut self) -> Result<(), NucleationError> {
             self.apply(|b| b.use_minimal_palette())
         }
 
+        /// Register the compact ASCII-only palette, overwriting any clashing
+        /// character mappings.
         pub fn use_compact_palette(&mut self) -> Result<(), NucleationError> {
             self.apply(|b| b.use_compact_palette())
         }

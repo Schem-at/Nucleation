@@ -92,18 +92,24 @@ class MultiMeshResult internal constructor (
         }
     }
     
+    /** Total vertex count across all region meshes.
+    */
     fun totalVertexCount(): UInt {
         
         val returnVal = lib.MultiMeshResult_total_vertex_count(handle);
         return (returnVal.toUInt())
     }
     
+    /** Total triangle count across all region meshes.
+    */
     fun totalTriangleCount(): UInt {
         
         val returnVal = lib.MultiMeshResult_total_triangle_count(handle);
         return (returnVal.toUInt())
     }
     
+    /** Number of region meshes.
+    */
     fun meshCount(): UInt {
         
         val returnVal = lib.MultiMeshResult_mesh_count(handle);

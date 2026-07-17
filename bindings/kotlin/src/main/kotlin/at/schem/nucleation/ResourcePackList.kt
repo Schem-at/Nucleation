@@ -42,6 +42,8 @@ class ResourcePackList internal constructor (
         internal val lib: ResourcePackListLib = Native.load("nucleation", libClass)
         @JvmStatic
         
+        /** Create an empty resource-pack list.
+        */
         fun create(): ResourcePackList {
             
             val returnVal = lib.ResourcePackList_create();
@@ -66,6 +68,8 @@ class ResourcePackList internal constructor (
         }
     }
     
+    /** Number of pack buffers added so far.
+    */
     fun len(): UInt {
         
         val returnVal = lib.ResourcePackList_len(handle);

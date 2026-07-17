@@ -43,6 +43,8 @@ class IoType internal constructor (
         internal val lib: IoTypeLib = Native.load("nucleation", libClass)
         @JvmStatic
         
+        /** Unsigned integer of `bits` bits (LSB-first bit order).
+        */
         fun unsignedInt(bits: UInt): IoType {
             
             val returnVal = lib.IoType_unsigned_int(FFIUint32(bits));
@@ -53,6 +55,8 @@ class IoType internal constructor (
         }
         @JvmStatic
         
+        /** Signed integer of `bits` bits (two's complement, LSB-first).
+        */
         fun signedInt(bits: UInt): IoType {
             
             val returnVal = lib.IoType_signed_int(FFIUint32(bits));
@@ -63,6 +67,8 @@ class IoType internal constructor (
         }
         @JvmStatic
         
+        /** 32-bit IEEE 754 float (crosses the wire as its 32 raw bits).
+        */
         fun float32(): IoType {
             
             val returnVal = lib.IoType_float32();
@@ -73,6 +79,8 @@ class IoType internal constructor (
         }
         @JvmStatic
         
+        /** Single boolean (1 bit).
+        */
         fun boolean(): IoType {
             
             val returnVal = lib.IoType_boolean();
@@ -83,6 +91,9 @@ class IoType internal constructor (
         }
         @JvmStatic
         
+        /** Fixed-length ASCII string of `chars` characters (8 bits per char;
+        *shorter strings are zero-padded, longer ones truncated).
+        */
         fun ascii(chars: UInt): IoType {
             
             val returnVal = lib.IoType_ascii(FFIUint32(chars));

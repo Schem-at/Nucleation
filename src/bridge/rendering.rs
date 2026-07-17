@@ -25,6 +25,9 @@ pub mod ffi {
     pub struct RenderConfig(pub(crate) crate::rendering::RenderConfig);
 
     impl RenderConfig {
+        /// Create a config with the given output size in pixels. Camera starts
+        /// at the defaults: yaw 45°, pitch 30°, zoom 1.0, fov 45°, perspective
+        /// projection, default sky background.
         pub fn create(width: u32, height: u32) -> Box<RenderConfig> {
             Box::new(RenderConfig(crate::rendering::RenderConfig {
                 width,
@@ -33,18 +36,24 @@ pub mod ffi {
             }))
         }
 
+        /// Set the camera yaw (horizontal orbit angle) in degrees. Default: 45.
         pub fn set_yaw(&mut self, yaw: f32) {
             self.0.yaw = yaw;
         }
 
+        /// Set the camera pitch (downward tilt) in degrees. Default: 30.
         pub fn set_pitch(&mut self, pitch: f32) {
             self.0.pitch = pitch;
         }
 
+        /// Set the zoom factor scaling the auto-fitted camera distance
+        /// (1.0 = frame the whole model; larger = further away). Default: 1.0.
         pub fn set_zoom(&mut self, zoom: f32) {
             self.0.zoom = zoom;
         }
 
+        /// Set the vertical field of view in degrees (perspective projection
+        /// only). Default: 45.
         pub fn set_fov(&mut self, fov: f32) {
             self.0.fov = fov;
         }

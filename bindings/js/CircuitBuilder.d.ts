@@ -21,6 +21,9 @@ export class CircuitBuilder {
     constructor();
 
 
+    /**
+     * Create a builder for a schematic (cloned; no IO defined yet).
+     */
     static create(schematic: Schematic): CircuitBuilder;
 
     /**
@@ -93,8 +96,14 @@ export class CircuitBuilder {
      */
     buildValidated(): TypedCircuitExecutor;
 
+    /**
+     * Number of inputs defined so far (0 if the builder was consumed).
+     */
     inputCount(): number;
 
+    /**
+     * Number of outputs defined so far (0 if the builder was consumed).
+     */
     outputCount(): number;
 
     /**

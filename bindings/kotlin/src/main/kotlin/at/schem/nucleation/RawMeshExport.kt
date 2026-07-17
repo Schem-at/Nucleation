@@ -66,12 +66,16 @@ class RawMeshExport internal constructor (
         }
     }
     
+    /** Number of vertices in the exported mesh.
+    */
     fun vertexCount(): UInt {
         
         val returnVal = lib.RawMeshExport_vertex_count(handle);
         return (returnVal.toUInt())
     }
     
+    /** Number of triangles in the exported mesh.
+    */
     fun triangleCount(): UInt {
         
         val returnVal = lib.RawMeshExport_triangle_count(handle);
@@ -138,12 +142,16 @@ class RawMeshExport internal constructor (
         return returnString
     }
     
+    /** Width of the baked texture in pixels.
+    */
     fun textureWidth(): UInt {
         
         val returnVal = lib.RawMeshExport_texture_width(handle);
         return (returnVal.toUInt())
     }
     
+    /** Height of the baked texture in pixels.
+    */
     fun textureHeight(): UInt {
         
         val returnVal = lib.RawMeshExport_texture_height(handle);

@@ -34,6 +34,10 @@ namespace capi {
 class SchematicBuilder {
 public:
 
+  /**
+   * Create a new builder, pre-loaded with the standard Unicode palette
+   * (override any character via `map` or `palette`).
+   */
   inline static std::unique_ptr<SchematicBuilder> create();
 
   /**
@@ -76,10 +80,23 @@ public:
    */
   inline diplomat::result<std::monostate, NucleationError> offset(int32_t x, int32_t y, int32_t z);
 
+  /**
+   * Register the standard Unicode palette (redstone wires, repeaters,
+   * comparators, torches, blocks, air...; the same set `create`
+   * pre-loads), overwriting any clashing character mappings.
+   */
   inline diplomat::result<std::monostate, NucleationError> use_standard_palette();
 
+  /**
+   * Register the minimal palette (an essentials-only subset of the
+   * standard one), overwriting any clashing character mappings.
+   */
   inline diplomat::result<std::monostate, NucleationError> use_minimal_palette();
 
+  /**
+   * Register the compact ASCII-only palette, overwriting any clashing
+   * character mappings.
+   */
   inline diplomat::result<std::monostate, NucleationError> use_compact_palette();
 
   /**

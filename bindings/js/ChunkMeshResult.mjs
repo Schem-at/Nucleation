@@ -116,6 +116,9 @@ export class ChunkMeshResult {
         }
     }
 
+    /**
+     * Number of chunk meshes.
+     */
     chunkCount() {
 
         const result = wasm.ChunkMeshResult_chunk_count(this.ffiValue);
@@ -176,6 +179,9 @@ export class ChunkMeshResult {
         }
     }
 
+    /**
+     * Total vertex count across all chunk meshes.
+     */
     totalVertexCount() {
 
         const result = wasm.ChunkMeshResult_total_vertex_count(this.ffiValue);
@@ -189,6 +195,9 @@ export class ChunkMeshResult {
         }
     }
 
+    /**
+     * Total triangle count across all chunk meshes.
+     */
     totalTriangleCount() {
 
         const result = wasm.ChunkMeshResult_total_triangle_count(this.ffiValue);

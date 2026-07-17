@@ -29,16 +29,35 @@ namespace capi {
 class SortStrategy {
 public:
 
+  /**
+   * Sort by Y ascending, then X, then Z (default Minecraft layer
+   * order). The first position after sorting is bit 0 (LSB).
+   */
   inline static std::unique_ptr<SortStrategy> yxz();
 
+  /**
+   * Sort by X ascending, then Y, then Z.
+   */
   inline static std::unique_ptr<SortStrategy> xyz();
 
+  /**
+   * Sort by Z ascending, then Y, then X.
+   */
   inline static std::unique_ptr<SortStrategy> zyx();
 
+  /**
+   * Sort by Y descending, then X ascending, then Z ascending.
+   */
   inline static std::unique_ptr<SortStrategy> y_desc_xz();
 
+  /**
+   * Sort by X descending, then Y ascending, then Z ascending.
+   */
   inline static std::unique_ptr<SortStrategy> x_desc_yz();
 
+  /**
+   * Sort by Z descending, then Y ascending, then X ascending.
+   */
   inline static std::unique_ptr<SortStrategy> z_desc_yx();
 
   /**
@@ -46,12 +65,27 @@ public:
    */
   inline static std::unique_ptr<SortStrategy> descending();
 
+  /**
+   * Sort by Euclidean distance from the reference point, closest
+   * first (ties broken by Y, X, Z ascending).
+   */
   inline static std::unique_ptr<SortStrategy> distance_from(int32_t x, int32_t y, int32_t z);
 
+  /**
+   * Sort by Euclidean distance from the reference point, farthest
+   * first (ties broken by Y, X, Z descending).
+   */
   inline static std::unique_ptr<SortStrategy> distance_from_desc(int32_t x, int32_t y, int32_t z);
 
+  /**
+   * Keep positions in the order they were added (no sorting). Useful
+   * when positions were ordered manually or box order matters.
+   */
   inline static std::unique_ptr<SortStrategy> preserve();
 
+  /**
+   * Reverse of the order positions were added.
+   */
   inline static std::unique_ptr<SortStrategy> reverse();
 
   /**

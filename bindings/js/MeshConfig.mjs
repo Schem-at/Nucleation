@@ -39,6 +39,11 @@ export class MeshConfig {
     }
 
 
+    /**
+     * Create a config with default settings: hidden-face culling on,
+     * ambient occlusion on (intensity 0.4), no biome, atlas max size 4096,
+     * occluded-block culling on, greedy meshing off.
+     */
     static create() {
 
         const result = wasm.MeshConfig_create();
@@ -52,6 +57,9 @@ export class MeshConfig {
         }
     }
 
+    /**
+     * Enable face culling between adjacent solid blocks (default: true).
+     */
     setCullHiddenFaces(val) {
     wasm.MeshConfig_set_cull_hidden_faces(this.ffiValue, val);
 
@@ -62,6 +70,9 @@ export class MeshConfig {
         }
     }
 
+    /**
+     * Whether hidden-face culling is enabled.
+     */
     cullHiddenFaces() {
 
         const result = wasm.MeshConfig_cull_hidden_faces(this.ffiValue);
@@ -75,6 +86,9 @@ export class MeshConfig {
         }
     }
 
+    /**
+     * Enable ambient occlusion (default: true).
+     */
     setAmbientOcclusion(val) {
     wasm.MeshConfig_set_ambient_occlusion(this.ffiValue, val);
 
@@ -85,6 +99,9 @@ export class MeshConfig {
         }
     }
 
+    /**
+     * Whether ambient occlusion is enabled.
+     */
     ambientOcclusion() {
 
         const result = wasm.MeshConfig_ambient_occlusion(this.ffiValue);
@@ -98,6 +115,10 @@ export class MeshConfig {
         }
     }
 
+    /**
+     * Set ambient-occlusion intensity, 0.0 (no darkening) to 1.0 (full
+     * darkening). Default: 0.4.
+     */
     setAoIntensity(val) {
     wasm.MeshConfig_set_ao_intensity(this.ffiValue, val);
 
@@ -108,6 +129,9 @@ export class MeshConfig {
         }
     }
 
+    /**
+     * The ambient-occlusion intensity (0.0–1.0).
+     */
     aoIntensity() {
 
         const result = wasm.MeshConfig_ao_intensity(this.ffiValue);
@@ -187,6 +211,9 @@ export class MeshConfig {
         }
     }
 
+    /**
+     * Set the maximum texture-atlas dimension in pixels (default: 4096).
+     */
     setAtlasMaxSize(size) {
     wasm.MeshConfig_set_atlas_max_size(this.ffiValue, size);
 
@@ -197,6 +224,9 @@ export class MeshConfig {
         }
     }
 
+    /**
+     * The maximum texture-atlas dimension in pixels.
+     */
     atlasMaxSize() {
 
         const result = wasm.MeshConfig_atlas_max_size(this.ffiValue);
@@ -210,6 +240,10 @@ export class MeshConfig {
         }
     }
 
+    /**
+     * Skip blocks fully hidden by opaque neighbors on all 6 sides
+     * (default: true).
+     */
     setCullOccludedBlocks(val) {
     wasm.MeshConfig_set_cull_occluded_blocks(this.ffiValue, val);
 
@@ -220,6 +254,9 @@ export class MeshConfig {
         }
     }
 
+    /**
+     * Whether occluded-block culling is enabled.
+     */
     cullOccludedBlocks() {
 
         const result = wasm.MeshConfig_cull_occluded_blocks(this.ffiValue);
@@ -233,6 +270,10 @@ export class MeshConfig {
         }
     }
 
+    /**
+     * Merge adjacent coplanar faces into larger quads to reduce triangle
+     * count (default: false).
+     */
     setGreedyMeshing(val) {
     wasm.MeshConfig_set_greedy_meshing(this.ffiValue, val);
 
@@ -243,6 +284,9 @@ export class MeshConfig {
         }
     }
 
+    /**
+     * Whether greedy meshing is enabled.
+     */
     greedyMeshing() {
 
         const result = wasm.MeshConfig_greedy_meshing(this.ffiValue);

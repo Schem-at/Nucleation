@@ -25,6 +25,9 @@ namespace capi {
 class ResourcePackList {
 public:
 
+  /**
+   * Create an empty resource-pack list.
+   */
   inline static std::unique_ptr<ResourcePackList> create();
 
   /**
@@ -33,6 +36,9 @@ public:
    */
   inline void add(diplomat::span<const uint8_t> data);
 
+  /**
+   * Number of pack buffers added so far.
+   */
   inline uint32_t len() const;
 
     inline const diplomat::capi::ResourcePackList* AsFFI() const;

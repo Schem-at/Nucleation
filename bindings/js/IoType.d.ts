@@ -13,13 +13,29 @@ export class IoType {
     constructor();
 
 
+    /**
+     * Unsigned integer of `bits` bits (LSB-first bit order).
+     */
     static unsignedInt(bits: number): IoType;
 
+    /**
+     * Signed integer of `bits` bits (two's complement, LSB-first).
+     */
     static signedInt(bits: number): IoType;
 
+    /**
+     * 32-bit IEEE 754 float (crosses the wire as its 32 raw bits).
+     */
     static float32(): IoType;
 
+    /**
+     * Single boolean (1 bit).
+     */
     static boolean(): IoType;
 
+    /**
+     * Fixed-length ASCII string of `chars` characters (8 bits per char;
+     * shorter strings are zero-padded, longer ones truncated).
+     */
     static ascii(chars: number): IoType;
 }

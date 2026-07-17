@@ -48,6 +48,8 @@ class IoLayoutBuilder internal constructor (
         internal val lib: IoLayoutBuilderLib = Native.load("nucleation", libClass)
         @JvmStatic
         
+        /** Create an empty layout builder.
+        */
         fun create(): IoLayoutBuilder {
             
             val returnVal = lib.IoLayoutBuilder_create();

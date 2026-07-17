@@ -17,6 +17,9 @@ export class IoLayoutBuilder {
     constructor();
 
 
+    /**
+     * Create an empty layout builder.
+     */
     static create(): IoLayoutBuilder;
 
     /**

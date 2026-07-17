@@ -23,8 +23,14 @@ export class TextureAtlas {
      */
     static buildGlobal(schematic: Schematic, pack: ResourcePack, config: MeshConfig): TextureAtlas;
 
+    /**
+     * Atlas width in pixels.
+     */
     width(): number;
 
+    /**
+     * Atlas height in pixels.
+     */
     height(): number;
 
     /**

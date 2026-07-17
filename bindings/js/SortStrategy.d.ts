@@ -15,16 +15,35 @@ export class SortStrategy {
     constructor();
 
 
+    /**
+     * Sort by Y ascending, then X, then Z (default Minecraft layer
+     * order). The first position after sorting is bit 0 (LSB).
+     */
     static yxz(): SortStrategy;
 
+    /**
+     * Sort by X ascending, then Y, then Z.
+     */
     static xyz(): SortStrategy;
 
+    /**
+     * Sort by Z ascending, then Y, then X.
+     */
     static zyx(): SortStrategy;
 
+    /**
+     * Sort by Y descending, then X ascending, then Z ascending.
+     */
     static yDescXz(): SortStrategy;
 
+    /**
+     * Sort by X descending, then Y ascending, then Z ascending.
+     */
     static xDescYz(): SortStrategy;
 
+    /**
+     * Sort by Z descending, then Y ascending, then X ascending.
+     */
     static zDescYx(): SortStrategy;
 
     /**
@@ -32,12 +51,27 @@ export class SortStrategy {
      */
     static descending(): SortStrategy;
 
+    /**
+     * Sort by Euclidean distance from the reference point, closest
+     * first (ties broken by Y, X, Z ascending).
+     */
     static distanceFrom(x: number, y: number, z: number): SortStrategy;
 
+    /**
+     * Sort by Euclidean distance from the reference point, farthest
+     * first (ties broken by Y, X, Z descending).
+     */
     static distanceFromDesc(x: number, y: number, z: number): SortStrategy;
 
+    /**
+     * Keep positions in the order they were added (no sorting). Useful
+     * when positions were ordered manually or box order matters.
+     */
     static preserve(): SortStrategy;
 
+    /**
+     * Reverse of the order positions were added.
+     */
     static reverse(): SortStrategy;
 
     /**

@@ -40,6 +40,9 @@ namespace capi {
 class CircuitBuilder {
 public:
 
+  /**
+   * Create a builder for a schematic (cloned; no IO defined yet).
+   */
   inline static std::unique_ptr<CircuitBuilder> create(const Schematic& schematic);
 
   /**
@@ -112,8 +115,14 @@ public:
    */
   inline diplomat::result<std::unique_ptr<TypedCircuitExecutor>, NucleationError> build_validated();
 
+  /**
+   * Number of inputs defined so far (0 if the builder was consumed).
+   */
   inline uint32_t input_count() const;
 
+  /**
+   * Number of outputs defined so far (0 if the builder was consumed).
+   */
   inline uint32_t output_count() const;
 
   /**

@@ -81,6 +81,7 @@ pub mod ffi {
     pub struct ResourcePackList(pub(crate) Vec<Vec<u8>>);
 
     impl ResourcePackList {
+        /// Create an empty resource-pack list.
         pub fn create() -> Box<ResourcePackList> {
             Box::new(ResourcePackList(Vec::new()))
         }
@@ -91,6 +92,7 @@ pub mod ffi {
             self.0.push(data.to_vec());
         }
 
+        /// Number of pack buffers added so far.
         pub fn len(&self) -> u32 {
             self.0.len() as u32
         }
@@ -111,14 +113,17 @@ pub mod ffi {
                 .map_err(|_| NucleationError::Parse)
         }
 
+        /// Number of blockstate definitions in the pack.
         pub fn blockstate_count(&self) -> u32 {
             self.0.stats().blockstate_count as u32
         }
 
+        /// Number of model definitions in the pack.
         pub fn model_count(&self) -> u32 {
             self.0.stats().model_count as u32
         }
 
+        /// Number of textures in the pack.
         pub fn texture_count(&self) -> u32 {
             self.0.stats().texture_count as u32
         }
@@ -143,6 +148,7 @@ pub mod ffi {
             super::write_string_list_json(&self.0.list_textures(), out);
         }
 
+        /// The blockstate definition JSON for `name`; `NotFound` if absent.
         pub fn get_blockstate_json(
             &self,
             name: &DiplomatStr,
@@ -158,6 +164,7 @@ pub mod ffi {
             }
         }
 
+        /// The model definition JSON for `name`; `NotFound` if absent.
         pub fn get_model_json(
             &self,
             name: &DiplomatStr,
@@ -203,6 +210,7 @@ pub mod ffi {
             }
         }
 
+        /// Add (or override) a blockstate definition from a JSON string.
         pub fn add_blockstate_json(
             &mut self,
             name: &DiplomatStr,
@@ -215,6 +223,7 @@ pub mod ffi {
                 .map_err(|_| NucleationError::Parse)
         }
 
+        /// Add (or override) a model definition from a JSON string.
         pub fn add_model_json(
             &mut self,
             name: &DiplomatStr,
@@ -269,30 +278,40 @@ pub mod ffi {
     pub struct MeshConfig(pub(crate) crate::meshing::MeshConfig);
 
     impl MeshConfig {
+        /// Create a config with default settings: hidden-face culling on,
+        /// ambient occlusion on (intensity 0.4), no biome, atlas max size 4096,
+        /// occluded-block culling on, greedy meshing off.
         pub fn create() -> Box<MeshConfig> {
             Box::new(MeshConfig(crate::meshing::MeshConfig::default()))
         }
 
+        /// Enable face culling between adjacent solid blocks (default: true).
         pub fn set_cull_hidden_faces(&mut self, val: bool) {
             self.0.cull_hidden_faces = val;
         }
 
+        /// Whether hidden-face culling is enabled.
         pub fn cull_hidden_faces(&self) -> bool {
             self.0.cull_hidden_faces
         }
 
+        /// Enable ambient occlusion (default: true).
         pub fn set_ambient_occlusion(&mut self, val: bool) {
             self.0.ambient_occlusion = val;
         }
 
+        /// Whether ambient occlusion is enabled.
         pub fn ambient_occlusion(&self) -> bool {
             self.0.ambient_occlusion
         }
 
+        /// Set ambient-occlusion intensity, 0.0 (no darkening) to 1.0 (full
+        /// darkening). Default: 0.4.
         pub fn set_ao_intensity(&mut self, val: f32) {
             self.0.ao_intensity = val;
         }
 
+        /// The ambient-occlusion intensity (0.0–1.0).
         pub fn ao_intensity(&self) -> f32 {
             self.0.ao_intensity
         }
@@ -320,26 +339,34 @@ pub mod ffi {
             }
         }
 
+        /// Set the maximum texture-atlas dimension in pixels (default: 4096).
         pub fn set_atlas_max_size(&mut self, size: u32) {
             self.0.atlas_max_size = size;
         }
 
+        /// The maximum texture-atlas dimension in pixels.
         pub fn atlas_max_size(&self) -> u32 {
             self.0.atlas_max_size
         }
 
+        /// Skip blocks fully hidden by opaque neighbors on all 6 sides
+        /// (default: true).
         pub fn set_cull_occluded_blocks(&mut self, val: bool) {
             self.0.cull_occluded_blocks = val;
         }
 
+        /// Whether occluded-block culling is enabled.
         pub fn cull_occluded_blocks(&self) -> bool {
             self.0.cull_occluded_blocks
         }
 
+        /// Merge adjacent coplanar faces into larger quads to reduce triangle
+        /// count (default: false).
         pub fn set_greedy_meshing(&mut self, val: bool) {
             self.0.greedy_meshing = val;
         }
 
+        /// Whether greedy meshing is enabled.
         pub fn greedy_meshing(&self) -> bool {
             self.0.greedy_meshing
         }
@@ -401,18 +428,22 @@ pub mod ffi {
             super::write_b64(&data, out);
         }
 
+        /// Total number of vertices in the mesh.
         pub fn vertex_count(&self) -> u32 {
             self.0.total_vertices() as u32
         }
 
+        /// Total number of triangles in the mesh.
         pub fn triangle_count(&self) -> u32 {
             self.0.total_triangles() as u32
         }
 
+        /// Whether the mesh contains any transparent or translucent geometry.
         pub fn has_transparency(&self) -> bool {
             self.0.has_transparency()
         }
 
+        /// Axis-aligned bounding box of the mesh, in world units.
         pub fn bounds(&self) -> MeshBounds {
             MeshBounds {
                 min_x: self.0.bounds.min[0],
@@ -464,14 +495,17 @@ pub mod ffi {
             }
         }
 
+        /// Total vertex count across all region meshes.
         pub fn total_vertex_count(&self) -> u32 {
             self.0.values().map(|m| m.total_vertices()).sum::<usize>() as u32
         }
 
+        /// Total triangle count across all region meshes.
         pub fn total_triangle_count(&self) -> u32 {
             self.0.values().map(|m| m.total_triangles()).sum::<usize>() as u32
         }
 
+        /// Number of region meshes.
         pub fn mesh_count(&self) -> u32 {
             self.0.len() as u32
         }
@@ -544,6 +578,7 @@ pub mod ffi {
             )))
         }
 
+        /// Number of chunk meshes.
         pub fn chunk_count(&self) -> u32 {
             self.0.meshes.len() as u32
         }
@@ -570,10 +605,12 @@ pub mod ffi {
             }
         }
 
+        /// Total vertex count across all chunk meshes.
         pub fn total_vertex_count(&self) -> u32 {
             self.0.total_vertex_count as u32
         }
 
+        /// Total triangle count across all chunk meshes.
         pub fn total_triangle_count(&self) -> u32 {
             self.0.total_triangle_count as u32
         }
@@ -613,10 +650,12 @@ pub mod ffi {
                 .map_err(|_| NucleationError::Mesh)
         }
 
+        /// Number of vertices in the exported mesh.
         pub fn vertex_count(&self) -> u32 {
             self.0.vertex_count() as u32
         }
 
+        /// Number of triangles in the exported mesh.
         pub fn triangle_count(&self) -> u32 {
             self.0.triangle_count() as u32
         }
@@ -655,10 +694,12 @@ pub mod ffi {
             super::write_b64(self.0.texture_rgba(), out);
         }
 
+        /// Width of the baked texture in pixels.
         pub fn texture_width(&self) -> u32 {
             self.0.texture_width()
         }
 
+        /// Height of the baked texture in pixels.
         pub fn texture_height(&self) -> u32 {
             self.0.texture_height()
         }
@@ -683,10 +724,12 @@ pub mod ffi {
                 .map_err(|_| NucleationError::Mesh)
         }
 
+        /// Atlas width in pixels.
         pub fn width(&self) -> u32 {
             self.0.width
         }
 
+        /// Atlas height in pixels.
         pub fn height(&self) -> u32 {
             self.0.height
         }
@@ -862,6 +905,10 @@ pub mod ffi {
     pub struct ItemModelConfig(pub(crate) crate::meshing::ItemModelConfig);
 
     impl ItemModelConfig {
+        /// Create a config for a model named `model_name` (used in resource-pack
+        /// file paths). Other options start at their defaults: namespace
+        /// "nucleation", centered, 16px texture resolution, item "paper",
+        /// custom model data "1", auto scale.
         pub fn create(model_name: &DiplomatStr) -> Result<Box<ItemModelConfig>, NucleationError> {
             let name =
                 std::str::from_utf8(model_name).map_err(|_| NucleationError::InvalidArgument)?;
@@ -870,6 +917,7 @@ pub mod ffi {
             )))
         }
 
+        /// Set the resource-pack namespace (default: "nucleation").
         pub fn set_namespace(&mut self, namespace: &DiplomatStr) -> Result<(), NucleationError> {
             let ns =
                 std::str::from_utf8(namespace).map_err(|_| NucleationError::InvalidArgument)?;
@@ -877,20 +925,25 @@ pub mod ffi {
             Ok(())
         }
 
+        /// Center the schematic within the model bounds (default: true).
         pub fn set_center(&mut self, center: bool) {
             self.0.center = center;
         }
 
+        /// Set the texture resolution in pixels per block face (default: 16).
         pub fn set_texture_resolution(&mut self, resolution: u32) {
             self.0.texture_resolution = resolution;
         }
 
+        /// Set the Minecraft item the model binds to (default: "paper").
         pub fn set_item(&mut self, item: &DiplomatStr) -> Result<(), NucleationError> {
             let item = std::str::from_utf8(item).map_err(|_| NucleationError::InvalidArgument)?;
             self.0.item = item.to_string();
             Ok(())
         }
 
+        /// Set the custom-model-data string used to select this model in game
+        /// (default: "1").
         pub fn set_custom_model_data(&mut self, cmd: &DiplomatStr) -> Result<(), NucleationError> {
             let cmd = std::str::from_utf8(cmd).map_err(|_| NucleationError::InvalidArgument)?;
             self.0.custom_model_data = cmd.to_string();
@@ -942,21 +995,25 @@ pub mod ffi {
             Ok(())
         }
 
+        /// Number of elements (cuboids) in the generated model.
         pub fn element_count(&self) -> Result<u32, NucleationError> {
             let inner = self.0.as_ref().ok_or(NucleationError::AlreadyConsumed)?;
             Ok(inner.stats.element_count as u32)
         }
 
+        /// Number of textures the generated model uses.
         pub fn texture_count(&self) -> Result<u32, NucleationError> {
             let inner = self.0.as_ref().ok_or(NucleationError::AlreadyConsumed)?;
             Ok(inner.stats.texture_count as u32)
         }
 
+        /// Number of textured planes in the generated model.
         pub fn plane_count(&self) -> Result<u32, NucleationError> {
             let inner = self.0.as_ref().ok_or(NucleationError::AlreadyConsumed)?;
             Ok(inner.stats.plane_count as u32)
         }
 
+        /// Source schematic dimensions in blocks.
         pub fn dimensions(&self) -> Result<Dimensions, NucleationError> {
             let inner = self.0.as_ref().ok_or(NucleationError::AlreadyConsumed)?;
             let (x, y, z) = inner.stats.dimensions;
@@ -1007,6 +1064,7 @@ pub mod ffi {
     );
 
     impl ItemModelPackBuilder {
+        /// Create an empty pack builder.
         pub fn create() -> Box<ItemModelPackBuilder> {
             Box::new(ItemModelPackBuilder(std::cell::RefCell::new(Vec::new())))
         }

@@ -56,6 +56,9 @@ class SchematicBuilder internal constructor (
         internal val lib: SchematicBuilderLib = Native.load("nucleation", libClass)
         @JvmStatic
         
+        /** Create a new builder, pre-loaded with the standard Unicode palette
+        *(override any character via `map` or `palette`).
+        */
         fun create(): SchematicBuilder {
             
             val returnVal = lib.SchematicBuilder_create();
@@ -198,6 +201,10 @@ class SchematicBuilder internal constructor (
         }
     }
     
+    /** Register the standard Unicode palette (redstone wires, repeaters,
+    *comparators, torches, blocks, air...; the same set `create`
+    *pre-loads), overwriting any clashing character mappings.
+    */
     fun useStandardPalette(): Result<Unit> {
         
         val returnVal = lib.SchematicBuilder_use_standard_palette(handle);
@@ -209,6 +216,9 @@ class SchematicBuilder internal constructor (
         }
     }
     
+    /** Register the minimal palette (an essentials-only subset of the
+    *standard one), overwriting any clashing character mappings.
+    */
     fun useMinimalPalette(): Result<Unit> {
         
         val returnVal = lib.SchematicBuilder_use_minimal_palette(handle);
@@ -220,6 +230,9 @@ class SchematicBuilder internal constructor (
         }
     }
     
+    /** Register the compact ASCII-only palette, overwriting any clashing
+    *character mappings.
+    */
     fun useCompactPalette(): Result<Unit> {
         
         val returnVal = lib.SchematicBuilder_use_compact_palette(handle);

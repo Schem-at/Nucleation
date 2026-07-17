@@ -59,6 +59,8 @@ class CircuitBuilder internal constructor (
         internal val lib: CircuitBuilderLib = Native.load("nucleation", libClass)
         @JvmStatic
         
+        /** Create a builder for a schematic (cloned; no IO defined yet).
+        */
         fun create(schematic: Schematic): CircuitBuilder {
             
             val returnVal = lib.CircuitBuilder_create(schematic.handle);
@@ -322,12 +324,16 @@ class CircuitBuilder internal constructor (
         }
     }
     
+    /** Number of inputs defined so far (0 if the builder was consumed).
+    */
     fun inputCount(): UInt {
         
         val returnVal = lib.CircuitBuilder_input_count(handle);
         return (returnVal.toUInt())
     }
     
+    /** Number of outputs defined so far (0 if the builder was consumed).
+    */
     fun outputCount(): UInt {
         
         val returnVal = lib.CircuitBuilder_output_count(handle);

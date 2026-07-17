@@ -105,24 +105,32 @@ class MeshResult internal constructor (
         return returnString
     }
     
+    /** Total number of vertices in the mesh.
+    */
     fun vertexCount(): UInt {
         
         val returnVal = lib.MeshResult_vertex_count(handle);
         return (returnVal.toUInt())
     }
     
+    /** Total number of triangles in the mesh.
+    */
     fun triangleCount(): UInt {
         
         val returnVal = lib.MeshResult_triangle_count(handle);
         return (returnVal.toUInt())
     }
     
+    /** Whether the mesh contains any transparent or translucent geometry.
+    */
     fun hasTransparency(): Boolean {
         
         val returnVal = lib.MeshResult_has_transparency(handle);
         return (returnVal > 0)
     }
     
+    /** Axis-aligned bounding box of the mesh, in world units.
+    */
     fun bounds(): MeshBounds {
         
         val returnVal = lib.MeshResult_bounds(handle);

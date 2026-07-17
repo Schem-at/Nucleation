@@ -19,6 +19,10 @@ export class SchematicBuilder {
     constructor();
 
 
+    /**
+     * Create a new builder, pre-loaded with the standard Unicode palette
+     * (override any character via `map` or `palette`).
+     */
     static create(): SchematicBuilder;
 
     /**
@@ -61,10 +65,23 @@ export class SchematicBuilder {
      */
     offset(x: number, y: number, z: number): void;
 
+    /**
+     * Register the standard Unicode palette (redstone wires, repeaters,
+     * comparators, torches, blocks, air...; the same set `create`
+     * pre-loads), overwriting any clashing character mappings.
+     */
     useStandardPalette(): void;
 
+    /**
+     * Register the minimal palette (an essentials-only subset of the
+     * standard one), overwriting any clashing character mappings.
+     */
     useMinimalPalette(): void;
 
+    /**
+     * Register the compact ASCII-only palette, overwriting any clashing
+     * character mappings.
+     */
     useCompactPalette(): void;
 
     /**

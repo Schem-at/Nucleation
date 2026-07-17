@@ -40,6 +40,9 @@ export class ItemModelPackBuilder {
     }
 
 
+    /**
+     * Create an empty pack builder.
+     */
     static create() {
 
         const result = wasm.ItemModelPackBuilder_create();

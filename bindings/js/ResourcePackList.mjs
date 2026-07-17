@@ -39,6 +39,9 @@ export class ResourcePackList {
     }
 
 
+    /**
+     * Create an empty resource-pack list.
+     */
     static create() {
 
         const result = wasm.ResourcePackList_create();
@@ -71,6 +74,9 @@ export class ResourcePackList {
         }
     }
 
+    /**
+     * Number of pack buffers added so far.
+     */
     len() {
 
         const result = wasm.ResourcePackList_len(this.ffiValue);

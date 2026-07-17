@@ -14,22 +14,51 @@ export class Value {
     constructor();
 
 
+    /**
+     * Create an unsigned 32-bit integer value.
+     */
     static fromU32(v: number): Value;
 
+    /**
+     * Create a signed 32-bit integer value.
+     */
     static fromI32(v: number): Value;
 
+    /**
+     * Create a 32-bit IEEE 754 float value.
+     */
     static fromF32(v: number): Value;
 
+    /**
+     * Create a boolean value.
+     */
     static fromBool(v: boolean): Value;
 
+    /**
+     * Create a string value. Fails if the bytes are not valid UTF-8.
+     */
     static fromString(s: string): Value;
 
+    /**
+     * The value as u32. Also accepts u64/non-negative signed ints that
+     * fit, and bool (false → 0, true → 1); fails otherwise.
+     */
     asU32(): number;
 
+    /**
+     * The value as i32. Also accepts i64 values in i32 range; fails for
+     * other types.
+     */
     asI32(): number;
 
+    /**
+     * The value as f32; fails if this is not an f32 value.
+     */
     asF32(): number;
 
+    /**
+     * The value as bool; fails if this is not a bool value.
+     */
     asBool(): boolean;
 
     /**

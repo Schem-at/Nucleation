@@ -31,22 +31,51 @@ namespace nucleation {
 class Value {
 public:
 
+  /**
+   * Create an unsigned 32-bit integer value.
+   */
   inline static std::unique_ptr<nucleation::Value> from_u32(uint32_t v);
 
+  /**
+   * Create a signed 32-bit integer value.
+   */
   inline static std::unique_ptr<nucleation::Value> from_i32(int32_t v);
 
+  /**
+   * Create a 32-bit IEEE 754 float value.
+   */
   inline static std::unique_ptr<nucleation::Value> from_f32(float v);
 
+  /**
+   * Create a boolean value.
+   */
   inline static std::unique_ptr<nucleation::Value> from_bool(bool v);
 
+  /**
+   * Create a string value. Fails if the bytes are not valid UTF-8.
+   */
   inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Value>, nucleation::NucleationError> from_string(std::string_view s);
 
+  /**
+   * The value as u32. Also accepts u64/non-negative signed ints that
+   * fit, and bool (false → 0, true → 1); fails otherwise.
+   */
   inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> as_u32() const;
 
+  /**
+   * The value as i32. Also accepts i64 values in i32 range; fails for
+   * other types.
+   */
   inline nucleation::diplomat::result<int32_t, nucleation::NucleationError> as_i32() const;
 
+  /**
+   * The value as f32; fails if this is not an f32 value.
+   */
   inline nucleation::diplomat::result<float, nucleation::NucleationError> as_f32() const;
 
+  /**
+   * The value as bool; fails if this is not a bool value.
+   */
   inline nucleation::diplomat::result<bool, nucleation::NucleationError> as_bool() const;
 
   /**

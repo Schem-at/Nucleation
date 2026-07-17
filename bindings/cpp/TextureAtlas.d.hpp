@@ -40,8 +40,14 @@ public:
    */
   inline static diplomat::result<std::unique_ptr<TextureAtlas>, NucleationError> build_global(const Schematic& schematic, const ResourcePack& pack, const MeshConfig& config);
 
+  /**
+   * Atlas width in pixels.
+   */
   inline uint32_t width() const;
 
+  /**
+   * Atlas height in pixels.
+   */
   inline uint32_t height() const;
 
   /**

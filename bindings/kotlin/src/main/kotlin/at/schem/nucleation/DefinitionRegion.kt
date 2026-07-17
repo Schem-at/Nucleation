@@ -83,6 +83,8 @@ class DefinitionRegion internal constructor (
         internal val lib: DefinitionRegionLib = Native.load("nucleation", libClass)
         @JvmStatic
         
+        /** Create a new empty region (no boxes, no metadata).
+        */
         fun create(): DefinitionRegion {
             
             val returnVal = lib.DefinitionRegion_create();
@@ -93,6 +95,9 @@ class DefinitionRegion internal constructor (
         }
         @JvmStatic
         
+        /** A region consisting of a single inclusive box. Min/max are swapped
+        *per axis if given out of order.
+        */
         fun fromBounds(minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int): DefinitionRegion {
             
             val returnVal = lib.DefinitionRegion_from_bounds(minX, minY, minZ, maxX, maxY, maxZ);
@@ -151,18 +156,25 @@ class DefinitionRegion internal constructor (
         }
     }
     
+    /** Add an inclusive box to the region. Min/max are swapped per axis if
+    *given out of order.
+    */
     fun addBounds(minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int): Unit {
         
         val returnVal = lib.DefinitionRegion_add_bounds(handle, minX, minY, minZ, maxX, maxY, maxZ);
         
     }
     
+    /** Add a single block position (a 1x1x1 box) to the region.
+    */
     fun addPoint(x: Int, y: Int, z: Int): Unit {
         
         val returnVal = lib.DefinitionRegion_add_point(handle, x, y, z);
         
     }
     
+    /** Set a metadata entry (insert or overwrite the key).
+    */
     fun setMetadata(key: String, value: String): Result<Unit> {
         val keySliceMemory = PrimitiveArrayTools.borrowUtf8(key)
         val valueSliceMemory = PrimitiveArrayTools.borrowUtf8(value)
@@ -251,36 +263,52 @@ class DefinitionRegion internal constructor (
         }
     }
     
+    /** `true` if the region contains no boxes.
+    */
     fun isEmpty(): Boolean {
         
         val returnVal = lib.DefinitionRegion_is_empty(handle);
         return (returnVal > 0)
     }
     
+    /** The total volume in blocks, summed box by box: positions covered by
+    *several overlapping boxes are counted once per box.
+    */
     fun volume(): ULong {
         
         val returnVal = lib.DefinitionRegion_volume(handle);
         return (returnVal.toULong())
     }
     
+    /** Whether the position lies inside any of the region's boxes.
+    */
     fun contains(x: Int, y: Int, z: Int): Boolean {
         
         val returnVal = lib.DefinitionRegion_contains(handle, x, y, z);
         return (returnVal > 0)
     }
     
+    /** Translate every box by (`dx`, `dy`, `dz`) in place.
+    */
     fun shift(dx: Int, dy: Int, dz: Int): Unit {
         
         val returnVal = lib.DefinitionRegion_shift(handle, dx, dy, dz);
         
     }
     
+    /** Grow every box in place by (`x`, `y`, `z`) outward on both sides of
+    *each axis. Negative values contract; boxes that shrink away are
+    *removed.
+    */
     fun expand(x: Int, y: Int, z: Int): Unit {
         
         val returnVal = lib.DefinitionRegion_expand(handle, x, y, z);
         
     }
     
+    /** Shrink every box in place by `amount` on all sides (the inverse of
+    *a uniform `expand`); boxes that shrink away are removed.
+    */
     fun contract(amount: Int): Unit {
         
         val returnVal = lib.DefinitionRegion_contract(handle, amount);
@@ -351,6 +379,9 @@ class DefinitionRegion internal constructor (
         }
     }
     
+    /** The (width, height, length) of the overall bounding box; all zeros
+    *when the region is empty.
+    */
     fun dimensions(): Dimensions {
         
         val returnVal = lib.DefinitionRegion_dimensions(handle);
@@ -459,12 +490,18 @@ class DefinitionRegion internal constructor (
         }
     }
     
+    /** Whether all positions form a single face-connected (6-connectivity)
+    *component. `true` for empty and single-block regions.
+    */
     fun isContiguous(): Boolean {
         
         val returnVal = lib.DefinitionRegion_is_contiguous(handle);
         return (returnVal > 0)
     }
     
+    /** The number of face-connected (6-connectivity) components; 0 when
+    *the region is empty.
+    */
     fun connectedComponents(): UInt {
         
         val returnVal = lib.DefinitionRegion_connected_components(handle);
@@ -543,6 +580,9 @@ class DefinitionRegion internal constructor (
         }
     }
     
+    /** Whether any of the region's boxes intersects the given inclusive
+    *box (useful for frustum culling).
+    */
     fun intersectsBounds(minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int): Boolean {
         
         val returnVal = lib.DefinitionRegion_intersects_bounds(handle, minX, minY, minZ, maxX, maxY, maxZ);

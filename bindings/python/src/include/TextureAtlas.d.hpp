@@ -43,8 +43,14 @@ public:
    */
   inline static nucleation::diplomat::result<std::unique_ptr<nucleation::TextureAtlas>, nucleation::NucleationError> build_global(const nucleation::Schematic& schematic, const nucleation::ResourcePack& pack, const nucleation::MeshConfig& config);
 
+  /**
+   * Atlas width in pixels.
+   */
   inline uint32_t width() const;
 
+  /**
+   * Atlas height in pixels.
+   */
   inline uint32_t height() const;
 
   /**

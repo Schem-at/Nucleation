@@ -15,6 +15,9 @@ export class BlockState {
     constructor();
 
 
+    /**
+     * Create a block state with the given name and no properties.
+     */
     static create(name: string): BlockState;
 
     /**
@@ -23,6 +26,9 @@ export class BlockState {
      */
     withProperty(key: string, value: string): BlockState;
 
+    /**
+     * The block name (e.g. `minecraft:stone`).
+     */
     name(): string;
 
     /**

@@ -36,8 +36,15 @@ namespace nucleation {
 class DefinitionRegion {
 public:
 
+  /**
+   * Create a new empty region (no boxes, no metadata).
+   */
   inline static std::unique_ptr<nucleation::DefinitionRegion> create();
 
+  /**
+   * A region consisting of a single inclusive box. Min/max are swapped
+   * per axis if given out of order.
+   */
   inline static std::unique_ptr<nucleation::DefinitionRegion> from_bounds(int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z);
 
   /**
@@ -54,10 +61,20 @@ public:
    */
   inline static nucleation::diplomat::result<std::unique_ptr<nucleation::DefinitionRegion>, nucleation::NucleationError> from_bounding_boxes(nucleation::diplomat::span<const int32_t> boxes);
 
+  /**
+   * Add an inclusive box to the region. Min/max are swapped per axis if
+   * given out of order.
+   */
   inline void add_bounds(int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z);
 
+  /**
+   * Add a single block position (a 1x1x1 box) to the region.
+   */
   inline void add_point(int32_t x, int32_t y, int32_t z);
 
+  /**
+   * Set a metadata entry (insert or overwrite the key).
+   */
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> set_metadata(std::string_view key, std::string_view value);
 
   /**
@@ -88,16 +105,38 @@ public:
    */
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> add_filter(std::string_view filter);
 
+  /**
+   * `true` if the region contains no boxes.
+   */
   inline bool is_empty() const;
 
+  /**
+   * The total volume in blocks, summed box by box: positions covered by
+   * several overlapping boxes are counted once per box.
+   */
   inline uint64_t volume() const;
 
+  /**
+   * Whether the position lies inside any of the region's boxes.
+   */
   inline bool contains(int32_t x, int32_t y, int32_t z) const;
 
+  /**
+   * Translate every box by (`dx`, `dy`, `dz`) in place.
+   */
   inline void shift(int32_t dx, int32_t dy, int32_t dz);
 
+  /**
+   * Grow every box in place by (`x`, `y`, `z`) outward on both sides of
+   * each axis. Negative values contract; boxes that shrink away are
+   * removed.
+   */
   inline void expand(int32_t x, int32_t y, int32_t z);
 
+  /**
+   * Shrink every box in place by `amount` on all sides (the inverse of
+   * a uniform `expand`); boxes that shrink away are removed.
+   */
   inline void contract(int32_t amount);
 
   /**
@@ -131,6 +170,10 @@ public:
    */
   inline nucleation::diplomat::result<nucleation::RegionBounds, nucleation::NucleationError> bounds() const;
 
+  /**
+   * The (width, height, length) of the overall bounding box; all zeros
+   * when the region is empty.
+   */
   inline nucleation::Dimensions dimensions() const;
 
   /**
@@ -181,8 +224,16 @@ public:
   template<typename W>
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> boxes_json_write(W& writeable_output) const;
 
+  /**
+   * Whether all positions form a single face-connected (6-connectivity)
+   * component. `true` for empty and single-block regions.
+   */
   inline bool is_contiguous() const;
 
+  /**
+   * The number of face-connected (6-connectivity) components; 0 when
+   * the region is empty.
+   */
   inline uint32_t connected_components() const;
 
   /**
@@ -209,6 +260,10 @@ public:
    */
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> exclude_block(const nucleation::Schematic& schematic, std::string_view block_name);
 
+  /**
+   * Whether any of the region's boxes intersects the given inclusive
+   * box (useful for frustum culling).
+   */
   inline bool intersects_bounds(int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z) const;
 
   /**

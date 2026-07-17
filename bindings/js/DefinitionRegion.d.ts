@@ -18,8 +18,15 @@ export class DefinitionRegion {
     constructor();
 
 
+    /**
+     * Create a new empty region (no boxes, no metadata).
+     */
     static create(): DefinitionRegion;
 
+    /**
+     * A region consisting of a single inclusive box. Min/max are swapped
+     * per axis if given out of order.
+     */
     static fromBounds(minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number): DefinitionRegion;
 
     /**
@@ -36,10 +43,20 @@ export class DefinitionRegion {
      */
     static fromBoundingBoxes(boxes: Array<number>): DefinitionRegion;
 
+    /**
+     * Add an inclusive box to the region. Min/max are swapped per axis if
+     * given out of order.
+     */
     addBounds(minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number): void;
 
+    /**
+     * Add a single block position (a 1x1x1 box) to the region.
+     */
     addPoint(x: number, y: number, z: number): void;
 
+    /**
+     * Set a metadata entry (insert or overwrite the key).
+     */
     setMetadata(key: string, value: string): void;
 
     /**
@@ -64,16 +81,38 @@ export class DefinitionRegion {
      */
     addFilter(filter: string): void;
 
+    /**
+     * `true` if the region contains no boxes.
+     */
     isEmpty(): boolean;
 
+    /**
+     * The total volume in blocks, summed box by box: positions covered by
+     * several overlapping boxes are counted once per box.
+     */
     volume(): bigint;
 
+    /**
+     * Whether the position lies inside any of the region's boxes.
+     */
     contains(x: number, y: number, z: number): boolean;
 
+    /**
+     * Translate every box by (`dx`, `dy`, `dz`) in place.
+     */
     shift(dx: number, dy: number, dz: number): void;
 
+    /**
+     * Grow every box in place by (`x`, `y`, `z`) outward on both sides of
+     * each axis. Negative values contract; boxes that shrink away are
+     * removed.
+     */
     expand(x: number, y: number, z: number): void;
 
+    /**
+     * Shrink every box in place by `amount` on all sides (the inverse of
+     * a uniform `expand`); boxes that shrink away are removed.
+     */
     contract(amount: number): void;
 
     /**
@@ -107,6 +146,10 @@ export class DefinitionRegion {
      */
     bounds(): RegionBounds;
 
+    /**
+     * The (width, height, length) of the overall bounding box; all zeros
+     * when the region is empty.
+     */
     dimensions(): Dimensions;
 
     /**
@@ -149,8 +192,16 @@ export class DefinitionRegion {
      */
     boxesJson(): string;
 
+    /**
+     * Whether all positions form a single face-connected (6-connectivity)
+     * component. `true` for empty and single-block regions.
+     */
     isContiguous(): boolean;
 
+    /**
+     * The number of face-connected (6-connectivity) components; 0 when
+     * the region is empty.
+     */
     connectedComponents(): number;
 
     /**
@@ -177,6 +228,10 @@ export class DefinitionRegion {
      */
     excludeBlock(schematic: Schematic, blockName: string): void;
 
+    /**
+     * Whether any of the region's boxes intersects the given inclusive
+     * box (useful for frustum culling).
+     */
     intersectsBounds(minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number): boolean;
 
     /**

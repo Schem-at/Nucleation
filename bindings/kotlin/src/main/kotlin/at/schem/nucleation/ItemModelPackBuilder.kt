@@ -42,6 +42,8 @@ class ItemModelPackBuilder internal constructor (
         internal val lib: ItemModelPackBuilderLib = Native.load("nucleation", libClass)
         @JvmStatic
         
+        /** Create an empty pack builder.
+        */
         fun create(): ItemModelPackBuilder {
             
             val returnVal = lib.ItemModelPackBuilder_create();

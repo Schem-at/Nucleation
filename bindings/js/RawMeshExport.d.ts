@@ -22,8 +22,14 @@ export class RawMeshExport {
      */
     static create(schematic: Schematic, pack: ResourcePack, config: MeshConfig): RawMeshExport;
 
+    /**
+     * Number of vertices in the exported mesh.
+     */
     vertexCount(): number;
 
+    /**
+     * Number of triangles in the exported mesh.
+     */
     triangleCount(): number;
 
     /**
@@ -56,7 +62,13 @@ export class RawMeshExport {
      */
     textureRgbaB64(): string;
 
+    /**
+     * Width of the baked texture in pixels.
+     */
     textureWidth(): number;
 
+    /**
+     * Height of the baked texture in pixels.
+     */
     textureHeight(): number;
 }

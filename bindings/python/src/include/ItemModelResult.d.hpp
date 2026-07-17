@@ -57,12 +57,24 @@ public:
   template<typename W>
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> model_json_write(W& writeable_output) const;
 
+  /**
+   * Number of elements (cuboids) in the generated model.
+   */
   inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> element_count() const;
 
+  /**
+   * Number of textures the generated model uses.
+   */
   inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> texture_count() const;
 
+  /**
+   * Number of textured planes in the generated model.
+   */
   inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> plane_count() const;
 
+  /**
+   * Source schematic dimensions in blocks.
+   */
   inline nucleation::diplomat::result<nucleation::Dimensions, nucleation::NucleationError> dimensions() const;
 
   /**

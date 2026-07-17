@@ -39,6 +39,9 @@ export class Schematic {
     }
 
 
+    /**
+     * Create a new, empty schematic with the given name.
+     */
     static create(name) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -57,6 +60,10 @@ export class Schematic {
         }
     }
 
+    /**
+     * The allocated dimensions (width, height, length) of the schematic's
+     * bounding box.
+     */
     dimensions() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 12, 4, false);
 
@@ -102,6 +109,10 @@ export class Schematic {
         }
     }
 
+    /**
+     * The name of the block at a position. `NotFound` if the position is
+     * outside every region.
+     */
     getBlockName(x, y, z) {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
@@ -125,6 +136,11 @@ export class Schematic {
         }
     }
 
+    /**
+     * Save the schematic to a file, always in Litematic format (the
+     * extension is not consulted; use `save_to_file_with_format` for
+     * other formats).
+     */
     saveToFile(path) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -149,6 +165,10 @@ export class Schematic {
         }
     }
 
+    /**
+     * Load a schematic from a Litematic file (this path is
+     * Litematic-only; use `from_data` for format auto-detection).
+     */
     static loadFromFile(path) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -1575,6 +1595,9 @@ export class Schematic {
         }
     }
 
+    /**
+     * Set the schematic name.
+     */
     setName(name) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -1625,6 +1648,9 @@ export class Schematic {
         }
     }
 
+    /**
+     * Set the schematic author.
+     */
     setAuthor(author) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -1675,6 +1701,9 @@ export class Schematic {
         }
     }
 
+    /**
+     * Set the schematic description.
+     */
     setDescription(description) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -1773,6 +1802,9 @@ export class Schematic {
         }
     }
 
+    /**
+     * Set the Litematic format version.
+     */
     setLmVersion(version) {
     wasm.Schematic_set_lm_version(this.ffiValue, version);
 
@@ -1799,6 +1831,9 @@ export class Schematic {
         }
     }
 
+    /**
+     * Set the Minecraft data version.
+     */
     setMcVersion(version) {
     wasm.Schematic_set_mc_version(this.ffiValue, version);
 
@@ -1825,6 +1860,9 @@ export class Schematic {
         }
     }
 
+    /**
+     * Set the WorldEdit version.
+     */
     setWeVersion(version) {
     wasm.Schematic_set_we_version(this.ffiValue, version);
 
@@ -1835,6 +1873,11 @@ export class Schematic {
         }
     }
 
+    /**
+     * Mirror the default region along the X axis (in place). Block
+     * orientations (e.g. `facing` properties), block entities, and
+     * entities are mirrored too.
+     */
     flipX() {
     wasm.Schematic_flip_x(this.ffiValue);
 
@@ -1845,6 +1888,10 @@ export class Schematic {
         }
     }
 
+    /**
+     * Mirror the default region along the Y axis (in place). Block
+     * orientations, block entities, and entities are mirrored too.
+     */
     flipY() {
     wasm.Schematic_flip_y(this.ffiValue);
 
@@ -1855,6 +1902,10 @@ export class Schematic {
         }
     }
 
+    /**
+     * Mirror the default region along the Z axis (in place). Block
+     * orientations, block entities, and entities are mirrored too.
+     */
     flipZ() {
     wasm.Schematic_flip_z(this.ffiValue);
 
@@ -1865,6 +1916,12 @@ export class Schematic {
         }
     }
 
+    /**
+     * Rotate the default region about the X axis. `degrees` must be a
+     * multiple of 90 (anything else is a no-op; negative values wrap).
+     * +90° maps +Z onto +Y (south face rotates up). The region keeps its
+     * minimum corner; block orientations and entities are updated.
+     */
     rotateX(degrees) {
     wasm.Schematic_rotate_x(this.ffiValue, degrees);
 
@@ -1875,6 +1932,13 @@ export class Schematic {
         }
     }
 
+    /**
+     * Rotate the default region about the Y axis (horizontal plane).
+     * `degrees` must be a multiple of 90 (anything else is a no-op;
+     * negative values wrap). +90° maps +X onto -Z (east to north, i.e.
+     * counterclockwise seen from above). The region keeps its minimum
+     * corner; block orientations and entities are updated.
+     */
     rotateY(degrees) {
     wasm.Schematic_rotate_y(this.ffiValue, degrees);
 
@@ -1885,6 +1949,12 @@ export class Schematic {
         }
     }
 
+    /**
+     * Rotate the default region about the Z axis. `degrees` must be a
+     * multiple of 90 (anything else is a no-op; negative values wrap).
+     * +90° maps +Y onto +X (up rotates east). The region keeps its
+     * minimum corner; block orientations and entities are updated.
+     */
     rotateZ(degrees) {
     wasm.Schematic_rotate_z(this.ffiValue, degrees);
 
@@ -1895,6 +1965,10 @@ export class Schematic {
         }
     }
 
+    /**
+     * Mirror a named region along the X axis (like `flip_x`). `NotFound`
+     * if no region has that name.
+     */
     flipRegionX(regionName) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -1919,6 +1993,10 @@ export class Schematic {
         }
     }
 
+    /**
+     * Mirror a named region along the Y axis (like `flip_y`). `NotFound`
+     * if no region has that name.
+     */
     flipRegionY(regionName) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -1943,6 +2021,10 @@ export class Schematic {
         }
     }
 
+    /**
+     * Mirror a named region along the Z axis (like `flip_z`). `NotFound`
+     * if no region has that name.
+     */
     flipRegionZ(regionName) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -1967,6 +2049,11 @@ export class Schematic {
         }
     }
 
+    /**
+     * Rotate a named region about the X axis by a multiple of 90 degrees
+     * (same semantics as `rotate_x`). `NotFound` if no region has that
+     * name.
+     */
     rotateRegionX(regionName, degrees) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -1991,6 +2078,11 @@ export class Schematic {
         }
     }
 
+    /**
+     * Rotate a named region about the Y axis by a multiple of 90 degrees
+     * (same semantics as `rotate_y`). `NotFound` if no region has that
+     * name.
+     */
     rotateRegionY(regionName, degrees) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -2015,6 +2107,11 @@ export class Schematic {
         }
     }
 
+    /**
+     * Rotate a named region about the Z axis by a multiple of 90 degrees
+     * (same semantics as `rotate_z`). `NotFound` if no region has that
+     * name.
+     */
     rotateRegionZ(regionName, degrees) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 

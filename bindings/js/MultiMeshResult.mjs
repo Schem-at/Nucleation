@@ -112,6 +112,9 @@ export class MultiMeshResult {
         }
     }
 
+    /**
+     * Total vertex count across all region meshes.
+     */
     totalVertexCount() {
 
         const result = wasm.MultiMeshResult_total_vertex_count(this.ffiValue);
@@ -125,6 +128,9 @@ export class MultiMeshResult {
         }
     }
 
+    /**
+     * Total triangle count across all region meshes.
+     */
     totalTriangleCount() {
 
         const result = wasm.MultiMeshResult_total_triangle_count(this.ffiValue);
@@ -138,6 +144,9 @@ export class MultiMeshResult {
         }
     }
 
+    /**
+     * Number of region meshes.
+     */
     meshCount() {
 
         const result = wasm.MultiMeshResult_mesh_count(this.ffiValue);

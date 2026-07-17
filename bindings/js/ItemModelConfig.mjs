@@ -39,6 +39,12 @@ export class ItemModelConfig {
     }
 
 
+    /**
+     * Create a config for a model named `model_name` (used in resource-pack
+     * file paths). Other options start at their defaults: namespace
+     * "nucleation", centered, 16px texture resolution, item "paper",
+     * custom model data "1", auto scale.
+     */
     static create(modelName) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -64,6 +70,9 @@ export class ItemModelConfig {
         }
     }
 
+    /**
+     * Set the resource-pack namespace (default: "nucleation").
+     */
     setNamespace(namespace) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -88,6 +97,9 @@ export class ItemModelConfig {
         }
     }
 
+    /**
+     * Center the schematic within the model bounds (default: true).
+     */
     setCenter(center) {
     wasm.ItemModelConfig_set_center(this.ffiValue, center);
 
@@ -98,6 +110,9 @@ export class ItemModelConfig {
         }
     }
 
+    /**
+     * Set the texture resolution in pixels per block face (default: 16).
+     */
     setTextureResolution(resolution) {
     wasm.ItemModelConfig_set_texture_resolution(this.ffiValue, resolution);
 
@@ -108,6 +123,9 @@ export class ItemModelConfig {
         }
     }
 
+    /**
+     * Set the Minecraft item the model binds to (default: "paper").
+     */
     setItem(item) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -132,6 +150,10 @@ export class ItemModelConfig {
         }
     }
 
+    /**
+     * Set the custom-model-data string used to select this model in game
+     * (default: "1").
+     */
     setCustomModelData(cmd) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 

@@ -14,8 +14,17 @@ export class LayoutFunction {
     constructor();
 
 
+    /**
+     * One bit per position: signal strength 0 = false, 15 = true.
+     * The most common layout for traditional redstone circuits.
+     */
     static oneToOne(): LayoutFunction;
 
+    /**
+     * Four bits per position, packed as a hex nibble (0-15) with the
+     * lowest bit first; uses `ceil(bits / 4)` positions (4x denser than
+     * one-to-one).
+     */
     static packed4(): LayoutFunction;
 
     /**
@@ -23,9 +32,21 @@ export class LayoutFunction {
      */
     static custom(mapping: Array<number>): LayoutFunction;
 
+    /**
+     * 2D matrix layout, elements laid out row by row; element bits are
+     * packed 4 per position (nibbles).
+     */
     static rowMajor(rows: number, cols: number, bitsPerElement: number): LayoutFunction;
 
+    /**
+     * 2D matrix layout, elements laid out column by column; element bits
+     * are packed 4 per position (nibbles).
+     */
     static columnMajor(rows: number, cols: number, bitsPerElement: number): LayoutFunction;
 
+    /**
+     * Screen layout: pixels laid out row by row, left to right; pixel
+     * bits are packed 4 per position (nibbles).
+     */
     static scanline(width: number, height: number, bitsPerPixel: number): LayoutFunction;
 }

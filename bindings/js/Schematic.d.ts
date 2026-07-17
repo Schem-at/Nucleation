@@ -14,8 +14,15 @@ export class Schematic {
     constructor();
 
 
+    /**
+     * Create a new, empty schematic with the given name.
+     */
     static create(name: string): Schematic;
 
+    /**
+     * The allocated dimensions (width, height, length) of the schematic's
+     * bounding box.
+     */
     dimensions(): Dimensions;
 
     /**
@@ -24,10 +31,23 @@ export class Schematic {
      */
     setBlock(x: number, y: number, z: number, blockName: string): boolean;
 
+    /**
+     * The name of the block at a position. `NotFound` if the position is
+     * outside every region.
+     */
     getBlockName(x: number, y: number, z: number): string;
 
+    /**
+     * Save the schematic to a file, always in Litematic format (the
+     * extension is not consulted; use `save_to_file_with_format` for
+     * other formats).
+     */
     saveToFile(path: string): void;
 
+    /**
+     * Load a schematic from a Litematic file (this path is
+     * Litematic-only; use `from_data` for format auto-detection).
+     */
     static loadFromFile(path: string): Schematic;
 
     /**
@@ -361,6 +381,9 @@ export class Schematic {
      */
     name(): string;
 
+    /**
+     * Set the schematic name.
+     */
     setName(name: string): void;
 
     /**
@@ -368,6 +391,9 @@ export class Schematic {
      */
     author(): string;
 
+    /**
+     * Set the schematic author.
+     */
     setAuthor(author: string): void;
 
     /**
@@ -375,6 +401,9 @@ export class Schematic {
      */
     description(): string;
 
+    /**
+     * Set the schematic description.
+     */
     setDescription(description: string): void;
 
     /**
@@ -402,6 +431,9 @@ export class Schematic {
      */
     lmVersion(): number;
 
+    /**
+     * Set the Litematic format version.
+     */
     setLmVersion(version: number): void;
 
     /**
@@ -409,6 +441,9 @@ export class Schematic {
      */
     mcVersion(): number;
 
+    /**
+     * Set the Minecraft data version.
+     */
     setMcVersion(version: number): void;
 
     /**
@@ -416,30 +451,92 @@ export class Schematic {
      */
     weVersion(): number;
 
+    /**
+     * Set the WorldEdit version.
+     */
     setWeVersion(version: number): void;
 
+    /**
+     * Mirror the default region along the X axis (in place). Block
+     * orientations (e.g. `facing` properties), block entities, and
+     * entities are mirrored too.
+     */
     flipX(): void;
 
+    /**
+     * Mirror the default region along the Y axis (in place). Block
+     * orientations, block entities, and entities are mirrored too.
+     */
     flipY(): void;
 
+    /**
+     * Mirror the default region along the Z axis (in place). Block
+     * orientations, block entities, and entities are mirrored too.
+     */
     flipZ(): void;
 
+    /**
+     * Rotate the default region about the X axis. `degrees` must be a
+     * multiple of 90 (anything else is a no-op; negative values wrap).
+     * +90° maps +Z onto +Y (south face rotates up). The region keeps its
+     * minimum corner; block orientations and entities are updated.
+     */
     rotateX(degrees: number): void;
 
+    /**
+     * Rotate the default region about the Y axis (horizontal plane).
+     * `degrees` must be a multiple of 90 (anything else is a no-op;
+     * negative values wrap). +90° maps +X onto -Z (east to north, i.e.
+     * counterclockwise seen from above). The region keeps its minimum
+     * corner; block orientations and entities are updated.
+     */
     rotateY(degrees: number): void;
 
+    /**
+     * Rotate the default region about the Z axis. `degrees` must be a
+     * multiple of 90 (anything else is a no-op; negative values wrap).
+     * +90° maps +Y onto +X (up rotates east). The region keeps its
+     * minimum corner; block orientations and entities are updated.
+     */
     rotateZ(degrees: number): void;
 
+    /**
+     * Mirror a named region along the X axis (like `flip_x`). `NotFound`
+     * if no region has that name.
+     */
     flipRegionX(regionName: string): void;
 
+    /**
+     * Mirror a named region along the Y axis (like `flip_y`). `NotFound`
+     * if no region has that name.
+     */
     flipRegionY(regionName: string): void;
 
+    /**
+     * Mirror a named region along the Z axis (like `flip_z`). `NotFound`
+     * if no region has that name.
+     */
     flipRegionZ(regionName: string): void;
 
+    /**
+     * Rotate a named region about the X axis by a multiple of 90 degrees
+     * (same semantics as `rotate_x`). `NotFound` if no region has that
+     * name.
+     */
     rotateRegionX(regionName: string, degrees: number): void;
 
+    /**
+     * Rotate a named region about the Y axis by a multiple of 90 degrees
+     * (same semantics as `rotate_y`). `NotFound` if no region has that
+     * name.
+     */
     rotateRegionY(regionName: string, degrees: number): void;
 
+    /**
+     * Rotate a named region about the Z axis by a multiple of 90 degrees
+     * (same semantics as `rotate_z`). `NotFound` if no region has that
+     * name.
+     */
     rotateRegionZ(regionName: string, degrees: number): void;
 
     /**

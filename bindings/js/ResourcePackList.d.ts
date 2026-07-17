@@ -14,6 +14,9 @@ export class ResourcePackList {
     constructor();
 
 
+    /**
+     * Create an empty resource-pack list.
+     */
     static create(): ResourcePackList;
 
     /**
@@ -22,5 +25,8 @@ export class ResourcePackList {
      */
     add(data: Array<number>): void;
 
+    /**
+     * Number of pack buffers added so far.
+     */
     len(): number;
 }

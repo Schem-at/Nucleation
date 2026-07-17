@@ -400,39 +400,50 @@ pub mod ffi {
     pub struct Value(pub(crate) InnerValue);
 
     impl Value {
+        /// Create an unsigned 32-bit integer value.
         pub fn from_u32(v: u32) -> Box<Value> {
             Box::new(Value(InnerValue::U32(v)))
         }
 
+        /// Create a signed 32-bit integer value.
         pub fn from_i32(v: i32) -> Box<Value> {
             Box::new(Value(InnerValue::I32(v)))
         }
 
+        /// Create a 32-bit IEEE 754 float value.
         pub fn from_f32(v: f32) -> Box<Value> {
             Box::new(Value(InnerValue::F32(v)))
         }
 
+        /// Create a boolean value.
         pub fn from_bool(v: bool) -> Box<Value> {
             Box::new(Value(InnerValue::Bool(v)))
         }
 
+        /// Create a string value. Fails if the bytes are not valid UTF-8.
         pub fn from_string(s: &DiplomatStr) -> Result<Box<Value>, NucleationError> {
             let s = std::str::from_utf8(s).map_err(|_| NucleationError::InvalidArgument)?;
             Ok(Box::new(Value(InnerValue::String(s.to_string()))))
         }
 
+        /// The value as u32. Also accepts u64/non-negative signed ints that
+        /// fit, and bool (false → 0, true → 1); fails otherwise.
         pub fn as_u32(&self) -> Result<u32, NucleationError> {
             self.0.as_u32().map_err(|_| NucleationError::InvalidArgument)
         }
 
+        /// The value as i32. Also accepts i64 values in i32 range; fails for
+        /// other types.
         pub fn as_i32(&self) -> Result<i32, NucleationError> {
             self.0.as_i32().map_err(|_| NucleationError::InvalidArgument)
         }
 
+        /// The value as f32; fails if this is not an f32 value.
         pub fn as_f32(&self) -> Result<f32, NucleationError> {
             self.0.as_f32().map_err(|_| NucleationError::InvalidArgument)
         }
 
+        /// The value as bool; fails if this is not a bool value.
         pub fn as_bool(&self) -> Result<bool, NucleationError> {
             self.0
                 .as_bool()
@@ -475,24 +486,30 @@ pub mod ffi {
     pub struct IoType(pub(crate) InnerIoType);
 
     impl IoType {
+        /// Unsigned integer of `bits` bits (LSB-first bit order).
         pub fn unsigned_int(bits: u32) -> Box<IoType> {
             Box::new(IoType(InnerIoType::UnsignedInt {
                 bits: bits as usize,
             }))
         }
 
+        /// Signed integer of `bits` bits (two's complement, LSB-first).
         pub fn signed_int(bits: u32) -> Box<IoType> {
             Box::new(IoType(InnerIoType::SignedInt { bits: bits as usize }))
         }
 
+        /// 32-bit IEEE 754 float (crosses the wire as its 32 raw bits).
         pub fn float32() -> Box<IoType> {
             Box::new(IoType(InnerIoType::Float32))
         }
 
+        /// Single boolean (1 bit).
         pub fn boolean() -> Box<IoType> {
             Box::new(IoType(InnerIoType::Boolean))
         }
 
+        /// Fixed-length ASCII string of `chars` characters (8 bits per char;
+        /// shorter strings are zero-padded, longer ones truncated).
         pub fn ascii(chars: u32) -> Box<IoType> {
             Box::new(IoType(InnerIoType::Ascii {
                 chars: chars as usize,
@@ -507,10 +524,15 @@ pub mod ffi {
     pub struct LayoutFunction(pub(crate) InnerLayoutFunction);
 
     impl LayoutFunction {
+        /// One bit per position: signal strength 0 = false, 15 = true.
+        /// The most common layout for traditional redstone circuits.
         pub fn one_to_one() -> Box<LayoutFunction> {
             Box::new(LayoutFunction(InnerLayoutFunction::OneToOne))
         }
 
+        /// Four bits per position, packed as a hex nibble (0-15) with the
+        /// lowest bit first; uses `ceil(bits / 4)` positions (4x denser than
+        /// one-to-one).
         pub fn packed4() -> Box<LayoutFunction> {
             Box::new(LayoutFunction(InnerLayoutFunction::Packed4))
         }
@@ -525,6 +547,8 @@ pub mod ffi {
             ))))
         }
 
+        /// 2D matrix layout, elements laid out row by row; element bits are
+        /// packed 4 per position (nibbles).
         pub fn row_major(rows: u32, cols: u32, bits_per_element: u32) -> Box<LayoutFunction> {
             Box::new(LayoutFunction(InnerLayoutFunction::RowMajor {
                 rows: rows as usize,
@@ -533,6 +557,8 @@ pub mod ffi {
             }))
         }
 
+        /// 2D matrix layout, elements laid out column by column; element bits
+        /// are packed 4 per position (nibbles).
         pub fn column_major(rows: u32, cols: u32, bits_per_element: u32) -> Box<LayoutFunction> {
             Box::new(LayoutFunction(InnerLayoutFunction::ColumnMajor {
                 rows: rows as usize,
@@ -541,6 +567,8 @@ pub mod ffi {
             }))
         }
 
+        /// Screen layout: pixels laid out row by row, left to right; pixel
+        /// bits are packed 4 per position (nibbles).
         pub fn scanline(width: u32, height: u32, bits_per_pixel: u32) -> Box<LayoutFunction> {
             Box::new(LayoutFunction(InnerLayoutFunction::Scanline {
                 width: width as usize,
@@ -558,30 +586,38 @@ pub mod ffi {
     pub struct OutputCondition(pub(crate) InnerOutputCondition);
 
     impl OutputCondition {
+        /// Met when the output equals `value`.
         pub fn equals(value: &Value) -> Box<OutputCondition> {
             Box::new(OutputCondition(InnerOutputCondition::Equals(
                 value.0.clone(),
             )))
         }
 
+        /// Met when the output does not equal `value`.
         pub fn not_equals(value: &Value) -> Box<OutputCondition> {
             Box::new(OutputCondition(InnerOutputCondition::NotEquals(
                 value.0.clone(),
             )))
         }
 
+        /// Met when the output is greater than `value`. Numeric only: both
+        /// sides must be the same numeric type (u32/i32/f32), else never met.
         pub fn greater_than(value: &Value) -> Box<OutputCondition> {
             Box::new(OutputCondition(InnerOutputCondition::GreaterThan(
                 value.0.clone(),
             )))
         }
 
+        /// Met when the output is less than `value`. Numeric only: both sides
+        /// must be the same numeric type (u32/i32/f32), else never met.
         pub fn less_than(value: &Value) -> Box<OutputCondition> {
             Box::new(OutputCondition(InnerOutputCondition::LessThan(
                 value.0.clone(),
             )))
         }
 
+        /// Met when `output & mask` is non-zero (flag checking). Integer
+        /// outputs (u32/i32) only; never met for other types.
         pub fn bitwise_and(mask: u32) -> Box<OutputCondition> {
             Box::new(OutputCondition(InnerOutputCondition::BitwiseAnd(
                 mask as u64,
@@ -596,10 +632,14 @@ pub mod ffi {
     pub struct ExecutionMode(pub(crate) InnerExecutionMode);
 
     impl ExecutionMode {
+        /// Run for exactly `ticks` ticks.
         pub fn fixed_ticks(ticks: u32) -> Box<ExecutionMode> {
             Box::new(ExecutionMode(InnerExecutionMode::FixedTicks { ticks }))
         }
 
+        /// Run until the output named `output_name` meets `condition`,
+        /// checking every `check_interval` ticks, giving up after `max_ticks`
+        /// ticks (the result's `condition_met` reports which happened).
         pub fn until_condition(
             output_name: &DiplomatStr,
             condition: &OutputCondition,
@@ -616,6 +656,8 @@ pub mod ffi {
             })))
         }
 
+        /// Run until any output changes from its initial reading, checking
+        /// every `check_interval` ticks, giving up after `max_ticks` ticks.
         pub fn until_change(max_ticks: u32, check_interval: u32) -> Box<ExecutionMode> {
             Box::new(ExecutionMode(InnerExecutionMode::UntilChange {
                 max_ticks,
@@ -623,6 +665,9 @@ pub mod ffi {
             }))
         }
 
+        /// Run (one tick at a time) until all outputs have been unchanged for
+        /// `stable_ticks` consecutive ticks, giving up after `max_ticks`
+        /// ticks (the result's `condition_met` reports stability).
         pub fn until_stable(stable_ticks: u32, max_ticks: u32) -> Box<ExecutionMode> {
             Box::new(ExecutionMode(InnerExecutionMode::UntilStable {
                 stable_ticks,
@@ -639,26 +684,33 @@ pub mod ffi {
     pub struct SortStrategy(pub(crate) InnerSortStrategy);
 
     impl SortStrategy {
+        /// Sort by Y ascending, then X, then Z (default Minecraft layer
+        /// order). The first position after sorting is bit 0 (LSB).
         pub fn yxz() -> Box<SortStrategy> {
             Box::new(SortStrategy(InnerSortStrategy::YXZ))
         }
 
+        /// Sort by X ascending, then Y, then Z.
         pub fn xyz() -> Box<SortStrategy> {
             Box::new(SortStrategy(InnerSortStrategy::XYZ))
         }
 
+        /// Sort by Z ascending, then Y, then X.
         pub fn zyx() -> Box<SortStrategy> {
             Box::new(SortStrategy(InnerSortStrategy::ZYX))
         }
 
+        /// Sort by Y descending, then X ascending, then Z ascending.
         pub fn y_desc_xz() -> Box<SortStrategy> {
             Box::new(SortStrategy(InnerSortStrategy::YDescXZ))
         }
 
+        /// Sort by X descending, then Y ascending, then Z ascending.
         pub fn x_desc_yz() -> Box<SortStrategy> {
             Box::new(SortStrategy(InnerSortStrategy::XDescYZ))
         }
 
+        /// Sort by Z descending, then Y ascending, then X ascending.
         pub fn z_desc_yx() -> Box<SortStrategy> {
             Box::new(SortStrategy(InnerSortStrategy::ZDescYX))
         }
@@ -668,22 +720,29 @@ pub mod ffi {
             Box::new(SortStrategy(InnerSortStrategy::YXZDesc))
         }
 
+        /// Sort by Euclidean distance from the reference point, closest
+        /// first (ties broken by Y, X, Z ascending).
         pub fn distance_from(x: i32, y: i32, z: i32) -> Box<SortStrategy> {
             Box::new(SortStrategy(InnerSortStrategy::DistanceFrom {
                 reference: (x, y, z),
             }))
         }
 
+        /// Sort by Euclidean distance from the reference point, farthest
+        /// first (ties broken by Y, X, Z descending).
         pub fn distance_from_desc(x: i32, y: i32, z: i32) -> Box<SortStrategy> {
             Box::new(SortStrategy(InnerSortStrategy::DistanceFromDesc {
                 reference: (x, y, z),
             }))
         }
 
+        /// Keep positions in the order they were added (no sorting). Useful
+        /// when positions were ordered manually or box order matters.
         pub fn preserve() -> Box<SortStrategy> {
             Box::new(SortStrategy(InnerSortStrategy::Preserve))
         }
 
+        /// Reverse of the order positions were added.
         pub fn reverse() -> Box<SortStrategy> {
             Box::new(SortStrategy(InnerSortStrategy::Reverse))
         }
@@ -709,6 +768,7 @@ pub mod ffi {
     pub struct IoLayoutBuilder(pub(crate) Option<InnerIoLayoutBuilder>);
 
     impl IoLayoutBuilder {
+        /// Create an empty layout builder.
         pub fn create() -> Box<IoLayoutBuilder> {
             Box::new(IoLayoutBuilder(Some(InnerIoLayoutBuilder::new())))
         }
@@ -928,6 +988,7 @@ pub mod ffi {
     pub struct CircuitBuilder(pub(crate) Option<InnerCircuitBuilder>);
 
     impl CircuitBuilder {
+        /// Create a builder for a schematic (cloned; no IO defined yet).
         pub fn create(schematic: &Schematic) -> Box<CircuitBuilder> {
             Box::new(CircuitBuilder(Some(InnerCircuitBuilder::new(
                 schematic.0.clone(),
@@ -1172,6 +1233,7 @@ pub mod ffi {
                 .map_err(|_| NucleationError::Simulation)
         }
 
+        /// Number of inputs defined so far (0 if the builder was consumed).
         pub fn input_count(&self) -> u32 {
             match &self.0 {
                 Some(inner) => inner.input_count() as u32,
@@ -1179,6 +1241,7 @@ pub mod ffi {
             }
         }
 
+        /// Number of outputs defined so far (0 if the builder was consumed).
         pub fn output_count(&self) -> u32 {
             match &self.0 {
                 Some(inner) => inner.output_count() as u32,

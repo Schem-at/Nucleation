@@ -59,12 +59,24 @@ public:
   template<typename W>
   inline void nucm_data_b64_write(W& writeable_output) const;
 
+  /**
+   * Total number of vertices in the mesh.
+   */
   inline uint32_t vertex_count() const;
 
+  /**
+   * Total number of triangles in the mesh.
+   */
   inline uint32_t triangle_count() const;
 
+  /**
+   * Whether the mesh contains any transparent or translucent geometry.
+   */
   inline bool has_transparency() const;
 
+  /**
+   * Axis-aligned bounding box of the mesh, in world units.
+   */
   inline MeshBounds bounds() const;
 
     inline const diplomat::capi::MeshResult* AsFFI() const;

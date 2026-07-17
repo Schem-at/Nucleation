@@ -133,6 +133,9 @@ export class MeshResult {
         }
     }
 
+    /**
+     * Total number of vertices in the mesh.
+     */
     vertexCount() {
 
         const result = wasm.MeshResult_vertex_count(this.ffiValue);
@@ -146,6 +149,9 @@ export class MeshResult {
         }
     }
 
+    /**
+     * Total number of triangles in the mesh.
+     */
     triangleCount() {
 
         const result = wasm.MeshResult_triangle_count(this.ffiValue);
@@ -159,6 +165,9 @@ export class MeshResult {
         }
     }
 
+    /**
+     * Whether the mesh contains any transparent or translucent geometry.
+     */
     hasTransparency() {
 
         const result = wasm.MeshResult_has_transparency(this.ffiValue);
@@ -172,6 +181,9 @@ export class MeshResult {
         }
     }
 
+    /**
+     * Axis-aligned bounding box of the mesh, in world units.
+     */
     bounds() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 24, 4, false);
 

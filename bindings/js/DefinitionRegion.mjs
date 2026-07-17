@@ -43,6 +43,9 @@ export class DefinitionRegion {
     }
 
 
+    /**
+     * Create a new empty region (no boxes, no metadata).
+     */
     static create() {
 
         const result = wasm.DefinitionRegion_create();
@@ -56,6 +59,10 @@ export class DefinitionRegion {
         }
     }
 
+    /**
+     * A region consisting of a single inclusive box. Min/max are swapped
+     * per axis if given out of order.
+     */
     static fromBounds(minX, minY, minZ, maxX, maxY, maxZ) {
 
         const result = wasm.DefinitionRegion_from_bounds(minX, minY, minZ, maxX, maxY, maxZ);
@@ -129,6 +136,10 @@ export class DefinitionRegion {
         }
     }
 
+    /**
+     * Add an inclusive box to the region. Min/max are swapped per axis if
+     * given out of order.
+     */
     addBounds(minX, minY, minZ, maxX, maxY, maxZ) {
     wasm.DefinitionRegion_add_bounds(this.ffiValue, minX, minY, minZ, maxX, maxY, maxZ);
 
@@ -139,6 +150,9 @@ export class DefinitionRegion {
         }
     }
 
+    /**
+     * Add a single block position (a 1x1x1 box) to the region.
+     */
     addPoint(x, y, z) {
     wasm.DefinitionRegion_add_point(this.ffiValue, x, y, z);
 
@@ -149,6 +163,9 @@ export class DefinitionRegion {
         }
     }
 
+    /**
+     * Set a metadata entry (insert or overwrite the key).
+     */
     setMetadata(key, value) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -286,6 +303,9 @@ export class DefinitionRegion {
         }
     }
 
+    /**
+     * `true` if the region contains no boxes.
+     */
     isEmpty() {
 
         const result = wasm.DefinitionRegion_is_empty(this.ffiValue);
@@ -299,6 +319,10 @@ export class DefinitionRegion {
         }
     }
 
+    /**
+     * The total volume in blocks, summed box by box: positions covered by
+     * several overlapping boxes are counted once per box.
+     */
     volume() {
 
         const result = wasm.DefinitionRegion_volume(this.ffiValue);
@@ -312,6 +336,9 @@ export class DefinitionRegion {
         }
     }
 
+    /**
+     * Whether the position lies inside any of the region's boxes.
+     */
     contains(x, y, z) {
 
         const result = wasm.DefinitionRegion_contains(this.ffiValue, x, y, z);
@@ -325,6 +352,9 @@ export class DefinitionRegion {
         }
     }
 
+    /**
+     * Translate every box by (`dx`, `dy`, `dz`) in place.
+     */
     shift(dx, dy, dz) {
     wasm.DefinitionRegion_shift(this.ffiValue, dx, dy, dz);
 
@@ -335,6 +365,11 @@ export class DefinitionRegion {
         }
     }
 
+    /**
+     * Grow every box in place by (`x`, `y`, `z`) outward on both sides of
+     * each axis. Negative values contract; boxes that shrink away are
+     * removed.
+     */
     expand(x, y, z) {
     wasm.DefinitionRegion_expand(this.ffiValue, x, y, z);
 
@@ -345,6 +380,10 @@ export class DefinitionRegion {
         }
     }
 
+    /**
+     * Shrink every box in place by `amount` on all sides (the inverse of
+     * a uniform `expand`); boxes that shrink away are removed.
+     */
     contract(amount) {
     wasm.DefinitionRegion_contract(this.ffiValue, amount);
 
@@ -453,6 +492,10 @@ export class DefinitionRegion {
         }
     }
 
+    /**
+     * The (width, height, length) of the overall bounding box; all zeros
+     * when the region is empty.
+     */
     dimensions() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 12, 4, false);
 
@@ -640,6 +683,10 @@ export class DefinitionRegion {
         }
     }
 
+    /**
+     * Whether all positions form a single face-connected (6-connectivity)
+     * component. `true` for empty and single-block regions.
+     */
     isContiguous() {
 
         const result = wasm.DefinitionRegion_is_contiguous(this.ffiValue);
@@ -653,6 +700,10 @@ export class DefinitionRegion {
         }
     }
 
+    /**
+     * The number of face-connected (6-connectivity) components; 0 when
+     * the region is empty.
+     */
     connectedComponents() {
 
         const result = wasm.DefinitionRegion_connected_components(this.ffiValue);
@@ -766,6 +817,10 @@ export class DefinitionRegion {
         }
     }
 
+    /**
+     * Whether any of the region's boxes intersects the given inclusive
+     * box (useful for frustum culling).
+     */
     intersectsBounds(minX, minY, minZ, maxX, maxY, maxZ) {
 
         const result = wasm.DefinitionRegion_intersects_bounds(this.ffiValue, minX, minY, minZ, maxX, maxY, maxZ);

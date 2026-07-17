@@ -33,14 +33,32 @@ namespace nucleation {
 class OutputCondition {
 public:
 
+  /**
+   * Met when the output equals `value`.
+   */
   inline static std::unique_ptr<nucleation::OutputCondition> equals(const nucleation::Value& value);
 
+  /**
+   * Met when the output does not equal `value`.
+   */
   inline static std::unique_ptr<nucleation::OutputCondition> not_equals(const nucleation::Value& value);
 
+  /**
+   * Met when the output is greater than `value`. Numeric only: both
+   * sides must be the same numeric type (u32/i32/f32), else never met.
+   */
   inline static std::unique_ptr<nucleation::OutputCondition> greater_than(const nucleation::Value& value);
 
+  /**
+   * Met when the output is less than `value`. Numeric only: both sides
+   * must be the same numeric type (u32/i32/f32), else never met.
+   */
   inline static std::unique_ptr<nucleation::OutputCondition> less_than(const nucleation::Value& value);
 
+  /**
+   * Met when `output & mask` is non-zero (flag checking). Integer
+   * outputs (u32/i32) only; never met for other types.
+   */
   inline static std::unique_ptr<nucleation::OutputCondition> bitwise_and(uint32_t mask);
 
     inline const nucleation::capi::OutputCondition* AsFFI() const;

@@ -43,12 +43,15 @@ pub mod ffi {
             std::str::from_utf8(s).map_err(|_| NucleationError::InvalidArgument)
         }
 
+        /// Create a new empty region (no boxes, no metadata).
         pub fn create() -> Box<DefinitionRegion> {
             Box::new(DefinitionRegion(
                 crate::definition_region::DefinitionRegion::new(),
             ))
         }
 
+        /// A region consisting of a single inclusive box. Min/max are swapped
+        /// per axis if given out of order.
         pub fn from_bounds(
             min_x: i32,
             min_y: i32,
@@ -95,6 +98,8 @@ pub mod ffi {
             )))
         }
 
+        /// Add an inclusive box to the region. Min/max are swapped per axis if
+        /// given out of order.
         pub fn add_bounds(
             &mut self,
             min_x: i32,
@@ -108,10 +113,12 @@ pub mod ffi {
                 .add_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
         }
 
+        /// Add a single block position (a 1x1x1 box) to the region.
         pub fn add_point(&mut self, x: i32, y: i32, z: i32) {
             self.0.add_point(x, y, z);
         }
 
+        /// Set a metadata entry (insert or overwrite the key).
         pub fn set_metadata(
             &mut self,
             key: &DiplomatStr,
@@ -160,26 +167,36 @@ pub mod ffi {
             Ok(())
         }
 
+        /// `true` if the region contains no boxes.
         pub fn is_empty(&self) -> bool {
             self.0.is_empty()
         }
 
+        /// The total volume in blocks, summed box by box: positions covered by
+        /// several overlapping boxes are counted once per box.
         pub fn volume(&self) -> u64 {
             self.0.volume()
         }
 
+        /// Whether the position lies inside any of the region's boxes.
         pub fn contains(&self, x: i32, y: i32, z: i32) -> bool {
             self.0.contains(x, y, z)
         }
 
+        /// Translate every box by (`dx`, `dy`, `dz`) in place.
         pub fn shift(&mut self, dx: i32, dy: i32, dz: i32) {
             self.0.shift(dx, dy, dz);
         }
 
+        /// Grow every box in place by (`x`, `y`, `z`) outward on both sides of
+        /// each axis. Negative values contract; boxes that shrink away are
+        /// removed.
         pub fn expand(&mut self, x: i32, y: i32, z: i32) {
             self.0.expand(x, y, z);
         }
 
+        /// Shrink every box in place by `amount` on all sides (the inverse of
+        /// a uniform `expand`); boxes that shrink away are removed.
         pub fn contract(&mut self, amount: i32) {
             self.0.contract(amount);
         }
@@ -223,6 +240,8 @@ pub mod ffi {
             })
         }
 
+        /// The (width, height, length) of the overall bounding box; all zeros
+        /// when the region is empty.
         pub fn dimensions(&self) -> Dimensions {
             let (x, y, z) = self.0.dimensions();
             Dimensions { x, y, z }
@@ -304,10 +323,14 @@ pub mod ffi {
             Ok(())
         }
 
+        /// Whether all positions form a single face-connected (6-connectivity)
+        /// component. `true` for empty and single-block regions.
         pub fn is_contiguous(&self) -> bool {
             self.0.is_contiguous()
         }
 
+        /// The number of face-connected (6-connectivity) components; 0 when
+        /// the region is empty.
         pub fn connected_components(&self) -> u32 {
             self.0.connected_components() as u32
         }
@@ -358,6 +381,8 @@ pub mod ffi {
             Ok(())
         }
 
+        /// Whether any of the region's boxes intersects the given inclusive
+        /// box (useful for frustum culling).
         pub fn intersects_bounds(
             &self,
             min_x: i32,

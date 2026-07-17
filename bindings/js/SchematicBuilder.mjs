@@ -44,6 +44,10 @@ export class SchematicBuilder {
     }
 
 
+    /**
+     * Create a new builder, pre-loaded with the standard Unicode palette
+     * (override any character via `map` or `palette`).
+     */
     static create() {
 
         const result = wasm.SchematicBuilder_create();
@@ -248,6 +252,11 @@ export class SchematicBuilder {
         }
     }
 
+    /**
+     * Register the standard Unicode palette (redstone wires, repeaters,
+     * comparators, torches, blocks, air...; the same set `create`
+     * pre-loads), overwriting any clashing character mappings.
+     */
     useStandardPalette() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
@@ -267,6 +276,10 @@ export class SchematicBuilder {
         }
     }
 
+    /**
+     * Register the minimal palette (an essentials-only subset of the
+     * standard one), overwriting any clashing character mappings.
+     */
     useMinimalPalette() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
@@ -286,6 +299,10 @@ export class SchematicBuilder {
         }
     }
 
+    /**
+     * Register the compact ASCII-only palette, overwriting any clashing
+     * character mappings.
+     */
     useCompactPalette() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 

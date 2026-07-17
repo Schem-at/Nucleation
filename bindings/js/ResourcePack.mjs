@@ -93,6 +93,9 @@ export class ResourcePack {
         }
     }
 
+    /**
+     * Number of blockstate definitions in the pack.
+     */
     blockstateCount() {
 
         const result = wasm.ResourcePack_blockstate_count(this.ffiValue);
@@ -106,6 +109,9 @@ export class ResourcePack {
         }
     }
 
+    /**
+     * Number of model definitions in the pack.
+     */
     modelCount() {
 
         const result = wasm.ResourcePack_model_count(this.ffiValue);
@@ -119,6 +125,9 @@ export class ResourcePack {
         }
     }
 
+    /**
+     * Number of textures in the pack.
+     */
     textureCount() {
 
         const result = wasm.ResourcePack_texture_count(this.ffiValue);
@@ -204,6 +213,9 @@ export class ResourcePack {
         }
     }
 
+    /**
+     * The blockstate definition JSON for `name`; `NotFound` if absent.
+     */
     getBlockstateJson(name) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -232,6 +244,9 @@ export class ResourcePack {
         }
     }
 
+    /**
+     * The model definition JSON for `name`; `NotFound` if absent.
+     */
     getModelJson(name) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -319,6 +334,9 @@ export class ResourcePack {
         }
     }
 
+    /**
+     * Add (or override) a blockstate definition from a JSON string.
+     */
     addBlockstateJson(name, json) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -344,6 +362,9 @@ export class ResourcePack {
         }
     }
 
+    /**
+     * Add (or override) a model definition from a JSON string.
+     */
     addModelJson(name, json) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 

@@ -40,6 +40,9 @@ export class BlockState {
     }
 
 
+    /**
+     * Create a block state with the given name and no properties.
+     */
     static create(name) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -88,6 +91,9 @@ export class BlockState {
         }
     }
 
+    /**
+     * The block name (e.g. `minecraft:stone`).
+     */
     name() {
         const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
 

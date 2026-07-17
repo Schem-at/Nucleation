@@ -14,16 +14,38 @@ export class ItemModelConfig {
     constructor();
 
 
+    /**
+     * Create a config for a model named `model_name` (used in resource-pack
+     * file paths). Other options start at their defaults: namespace
+     * "nucleation", centered, 16px texture resolution, item "paper",
+     * custom model data "1", auto scale.
+     */
     static create(modelName: string): ItemModelConfig;
 
+    /**
+     * Set the resource-pack namespace (default: "nucleation").
+     */
     setNamespace(namespace: string): void;
 
+    /**
+     * Center the schematic within the model bounds (default: true).
+     */
     setCenter(center: boolean): void;
 
+    /**
+     * Set the texture resolution in pixels per block face (default: 16).
+     */
     setTextureResolution(resolution: number): void;
 
+    /**
+     * Set the Minecraft item the model binds to (default: "paper").
+     */
     setItem(item: string): void;
 
+    /**
+     * Set the custom-model-data string used to select this model in game
+     * (default: "1").
+     */
     setCustomModelData(cmd: string): void;
 
     /**

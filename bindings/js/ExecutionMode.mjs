@@ -40,6 +40,9 @@ export class ExecutionMode {
     }
 
 
+    /**
+     * Run for exactly `ticks` ticks.
+     */
     static fixedTicks(ticks) {
 
         const result = wasm.ExecutionMode_fixed_ticks(ticks);
@@ -53,6 +56,11 @@ export class ExecutionMode {
         }
     }
 
+    /**
+     * Run until the output named `output_name` meets `condition`,
+     * checking every `check_interval` ticks, giving up after `max_ticks`
+     * ticks (the result's `condition_met` reports which happened).
+     */
     static untilCondition(outputName, condition, maxTicks, checkInterval) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -78,6 +86,10 @@ export class ExecutionMode {
         }
     }
 
+    /**
+     * Run until any output changes from its initial reading, checking
+     * every `check_interval` ticks, giving up after `max_ticks` ticks.
+     */
     static untilChange(maxTicks, checkInterval) {
 
         const result = wasm.ExecutionMode_until_change(maxTicks, checkInterval);
@@ -91,6 +103,11 @@ export class ExecutionMode {
         }
     }
 
+    /**
+     * Run (one tick at a time) until all outputs have been unchanged for
+     * `stable_ticks` consecutive ticks, giving up after `max_ticks`
+     * ticks (the result's `condition_met` reports stability).
+     */
     static untilStable(stableTicks, maxTicks) {
 
         const result = wasm.ExecutionMode_until_stable(stableTicks, maxTicks);

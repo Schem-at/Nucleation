@@ -56,6 +56,9 @@ public:
    */
   inline static diplomat::result<std::unique_ptr<ChunkMeshResult>, NucleationError> create_with_atlas(const Schematic& schematic, const ResourcePack& pack, const MeshConfig& config, int32_t chunk_size, const TextureAtlas& atlas);
 
+  /**
+   * Number of chunk meshes.
+   */
   inline uint32_t chunk_count() const;
 
   /**
@@ -69,8 +72,14 @@ public:
    */
   inline diplomat::result<std::unique_ptr<MeshResult>, NucleationError> get_mesh(int32_t cx, int32_t cy, int32_t cz) const;
 
+  /**
+   * Total vertex count across all chunk meshes.
+   */
   inline uint32_t total_vertex_count() const;
 
+  /**
+   * Total triangle count across all chunk meshes.
+   */
   inline uint32_t total_triangle_count() const;
 
   /**

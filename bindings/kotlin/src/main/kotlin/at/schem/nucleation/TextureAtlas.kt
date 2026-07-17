@@ -60,12 +60,16 @@ class TextureAtlas internal constructor (
         }
     }
     
+    /** Atlas width in pixels.
+    */
     fun width(): UInt {
         
         val returnVal = lib.TextureAtlas_width(handle);
         return (returnVal.toUInt())
     }
     
+    /** Atlas height in pixels.
+    */
     fun height(): UInt {
         
         val returnVal = lib.TextureAtlas_height(handle);

@@ -29,6 +29,9 @@ namespace capi {
 class BlockState {
 public:
 
+  /**
+   * Create a block state with the given name and no properties.
+   */
   inline static std::unique_ptr<BlockState> create(std::string_view name);
 
   /**
@@ -37,6 +40,9 @@ public:
    */
   inline diplomat::result<std::unique_ptr<BlockState>, NucleationError> with_property(std::string_view key, std::string_view value) const;
 
+  /**
+   * The block name (e.g. `minecraft:stone`).
+   */
   inline std::string name() const;
   template<typename W>
   inline void name_write(W& writeable_output) const;

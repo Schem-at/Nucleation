@@ -56,10 +56,19 @@ public:
    */
   inline nucleation::diplomat::result<std::unique_ptr<nucleation::MeshResult>, nucleation::NucleationError> get_mesh(std::string_view region_name) const;
 
+  /**
+   * Total vertex count across all region meshes.
+   */
   inline uint32_t total_vertex_count() const;
 
+  /**
+   * Total triangle count across all region meshes.
+   */
   inline uint32_t total_triangle_count() const;
 
+  /**
+   * Number of region meshes.
+   */
   inline uint32_t mesh_count() const;
 
     inline const nucleation::capi::MultiMeshResult* AsFFI() const;

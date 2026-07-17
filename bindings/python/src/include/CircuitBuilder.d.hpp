@@ -43,6 +43,9 @@ namespace nucleation {
 class CircuitBuilder {
 public:
 
+  /**
+   * Create a builder for a schematic (cloned; no IO defined yet).
+   */
   inline static std::unique_ptr<nucleation::CircuitBuilder> create(const nucleation::Schematic& schematic);
 
   /**
@@ -115,8 +118,14 @@ public:
    */
   inline nucleation::diplomat::result<std::unique_ptr<nucleation::TypedCircuitExecutor>, nucleation::NucleationError> build_validated();
 
+  /**
+   * Number of inputs defined so far (0 if the builder was consumed).
+   */
   inline uint32_t input_count() const;
 
+  /**
+   * Number of outputs defined so far (0 if the builder was consumed).
+   */
   inline uint32_t output_count() const;
 
   /**

@@ -27,10 +27,19 @@ export class ResourcePack {
      */
     static fromList(list: ResourcePackList): ResourcePack;
 
+    /**
+     * Number of blockstate definitions in the pack.
+     */
     blockstateCount(): number;
 
+    /**
+     * Number of model definitions in the pack.
+     */
     modelCount(): number;
 
+    /**
+     * Number of textures in the pack.
+     */
     textureCount(): number;
 
     /**
@@ -53,8 +62,14 @@ export class ResourcePack {
      */
     listTexturesJson(): string;
 
+    /**
+     * The blockstate definition JSON for `name`; `NotFound` if absent.
+     */
     getBlockstateJson(name: string): string;
 
+    /**
+     * The model definition JSON for `name`; `NotFound` if absent.
+     */
     getModelJson(name: string): string;
 
     /**
@@ -67,8 +82,14 @@ export class ResourcePack {
      */
     getTexturePixelsB64(name: string): string;
 
+    /**
+     * Add (or override) a blockstate definition from a JSON string.
+     */
     addBlockstateJson(name: string, json: string): void;
 
+    /**
+     * Add (or override) a model definition from a JSON string.
+     */
     addModelJson(name: string, json: string): void;
 
     /**

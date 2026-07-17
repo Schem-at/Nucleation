@@ -66,6 +66,9 @@ export class TextureAtlas {
         }
     }
 
+    /**
+     * Atlas width in pixels.
+     */
     width() {
 
         const result = wasm.TextureAtlas_width(this.ffiValue);
@@ -79,6 +82,9 @@ export class TextureAtlas {
         }
     }
 
+    /**
+     * Atlas height in pixels.
+     */
     height() {
 
         const result = wasm.TextureAtlas_height(this.ffiValue);

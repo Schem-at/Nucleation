@@ -38,6 +38,11 @@ export class RenderConfig {
     }
 
 
+    /**
+     * Create a config with the given output size in pixels. Camera starts
+     * at the defaults: yaw 45°, pitch 30°, zoom 1.0, fov 45°, perspective
+     * projection, default sky background.
+     */
     static create(width, height) {
 
         const result = wasm.RenderConfig_create(width, height);
@@ -51,6 +56,9 @@ export class RenderConfig {
         }
     }
 
+    /**
+     * Set the camera yaw (horizontal orbit angle) in degrees. Default: 45.
+     */
     setYaw(yaw) {
     wasm.RenderConfig_set_yaw(this.ffiValue, yaw);
 
@@ -61,6 +69,9 @@ export class RenderConfig {
         }
     }
 
+    /**
+     * Set the camera pitch (downward tilt) in degrees. Default: 30.
+     */
     setPitch(pitch) {
     wasm.RenderConfig_set_pitch(this.ffiValue, pitch);
 
@@ -71,6 +82,10 @@ export class RenderConfig {
         }
     }
 
+    /**
+     * Set the zoom factor scaling the auto-fitted camera distance
+     * (1.0 = frame the whole model; larger = further away). Default: 1.0.
+     */
     setZoom(zoom) {
     wasm.RenderConfig_set_zoom(this.ffiValue, zoom);
 
@@ -81,6 +96,10 @@ export class RenderConfig {
         }
     }
 
+    /**
+     * Set the vertical field of view in degrees (perspective projection
+     * only). Default: 45.
+     */
     setFov(fov) {
     wasm.RenderConfig_set_fov(this.ffiValue, fov);
 

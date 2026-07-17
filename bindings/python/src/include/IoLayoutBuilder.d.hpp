@@ -37,6 +37,9 @@ namespace nucleation {
 class IoLayoutBuilder {
 public:
 
+  /**
+   * Create an empty layout builder.
+   */
   inline static std::unique_ptr<nucleation::IoLayoutBuilder> create();
 
   /**

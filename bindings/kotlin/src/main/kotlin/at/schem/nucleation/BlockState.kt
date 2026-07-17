@@ -43,6 +43,8 @@ class BlockState internal constructor (
         internal val lib: BlockStateLib = Native.load("nucleation", libClass)
         @JvmStatic
         
+        /** Create a block state with the given name and no properties.
+        */
         fun create(name: String): BlockState {
             val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
             
@@ -82,6 +84,8 @@ class BlockState internal constructor (
         }
     }
     
+    /** The block name (e.g. `minecraft:stone`).
+    */
     fun name(): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.BlockState_name(handle, write);

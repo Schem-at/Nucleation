@@ -34,12 +34,24 @@ export class ItemModelResult {
      */
     modelJson(): string;
 
+    /**
+     * Number of elements (cuboids) in the generated model.
+     */
     elementCount(): number;
 
+    /**
+     * Number of textures the generated model uses.
+     */
     textureCount(): number;
 
+    /**
+     * Number of textured planes in the generated model.
+     */
     planeCount(): number;
 
+    /**
+     * Source schematic dimensions in blocks.
+     */
     dimensions(): Dimensions;
 
     /**

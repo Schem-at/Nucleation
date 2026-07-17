@@ -38,11 +38,23 @@ export class MeshResult {
      */
     nucmDataB64(): string;
 
+    /**
+     * Total number of vertices in the mesh.
+     */
     vertexCount(): number;
 
+    /**
+     * Total number of triangles in the mesh.
+     */
     triangleCount(): number;
 
+    /**
+     * Whether the mesh contains any transparent or translucent geometry.
+     */
     hasTransparency(): boolean;
 
+    /**
+     * Axis-aligned bounding box of the mesh, in world units.
+     */
     bounds(): MeshBounds;
 }

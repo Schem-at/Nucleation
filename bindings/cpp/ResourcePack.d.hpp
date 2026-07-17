@@ -42,10 +42,19 @@ public:
    */
   inline static diplomat::result<std::unique_ptr<ResourcePack>, NucleationError> from_list(const ResourcePackList& list);
 
+  /**
+   * Number of blockstate definitions in the pack.
+   */
   inline uint32_t blockstate_count() const;
 
+  /**
+   * Number of model definitions in the pack.
+   */
   inline uint32_t model_count() const;
 
+  /**
+   * Number of textures in the pack.
+   */
   inline uint32_t texture_count() const;
 
   /**
@@ -76,10 +85,16 @@ public:
   template<typename W>
   inline void list_textures_json_write(W& writeable_output) const;
 
+  /**
+   * The blockstate definition JSON for `name`; `NotFound` if absent.
+   */
   inline diplomat::result<std::string, NucleationError> get_blockstate_json(std::string_view name) const;
   template<typename W>
   inline diplomat::result<std::monostate, NucleationError> get_blockstate_json_write(std::string_view name, W& writeable_output) const;
 
+  /**
+   * The model definition JSON for `name`; `NotFound` if absent.
+   */
   inline diplomat::result<std::string, NucleationError> get_model_json(std::string_view name) const;
   template<typename W>
   inline diplomat::result<std::monostate, NucleationError> get_model_json_write(std::string_view name, W& writeable_output) const;
@@ -96,8 +111,14 @@ public:
   template<typename W>
   inline diplomat::result<std::monostate, NucleationError> get_texture_pixels_b64_write(std::string_view name, W& writeable_output) const;
 
+  /**
+   * Add (or override) a blockstate definition from a JSON string.
+   */
   inline diplomat::result<std::monostate, NucleationError> add_blockstate_json(std::string_view name, std::string_view json);
 
+  /**
+   * Add (or override) a model definition from a JSON string.
+   */
   inline diplomat::result<std::monostate, NucleationError> add_model_json(std::string_view name, std::string_view json);
 
   /**

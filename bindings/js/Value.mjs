@@ -39,6 +39,9 @@ export class Value {
     }
 
 
+    /**
+     * Create an unsigned 32-bit integer value.
+     */
     static fromU32(v) {
 
         const result = wasm.Value_from_u32(v);
@@ -52,6 +55,9 @@ export class Value {
         }
     }
 
+    /**
+     * Create a signed 32-bit integer value.
+     */
     static fromI32(v) {
 
         const result = wasm.Value_from_i32(v);
@@ -65,6 +71,9 @@ export class Value {
         }
     }
 
+    /**
+     * Create a 32-bit IEEE 754 float value.
+     */
     static fromF32(v) {
 
         const result = wasm.Value_from_f32(v);
@@ -78,6 +87,9 @@ export class Value {
         }
     }
 
+    /**
+     * Create a boolean value.
+     */
     static fromBool(v) {
 
         const result = wasm.Value_from_bool(v);
@@ -91,6 +103,9 @@ export class Value {
         }
     }
 
+    /**
+     * Create a string value. Fails if the bytes are not valid UTF-8.
+     */
     static fromString(s) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -116,6 +131,10 @@ export class Value {
         }
     }
 
+    /**
+     * The value as u32. Also accepts u64/non-negative signed ints that
+     * fit, and bool (false → 0, true → 1); fails otherwise.
+     */
     asU32() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
@@ -136,6 +155,10 @@ export class Value {
         }
     }
 
+    /**
+     * The value as i32. Also accepts i64 values in i32 range; fails for
+     * other types.
+     */
     asI32() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
@@ -156,6 +179,9 @@ export class Value {
         }
     }
 
+    /**
+     * The value as f32; fails if this is not an f32 value.
+     */
     asF32() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
@@ -176,6 +202,9 @@ export class Value {
         }
     }
 
+    /**
+     * The value as bool; fails if this is not a bool value.
+     */
     asBool() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 1, true);
 

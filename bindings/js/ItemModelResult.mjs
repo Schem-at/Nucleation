@@ -98,6 +98,9 @@ export class ItemModelResult {
         }
     }
 
+    /**
+     * Number of elements (cuboids) in the generated model.
+     */
     elementCount() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
@@ -118,6 +121,9 @@ export class ItemModelResult {
         }
     }
 
+    /**
+     * Number of textures the generated model uses.
+     */
     textureCount() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
@@ -138,6 +144,9 @@ export class ItemModelResult {
         }
     }
 
+    /**
+     * Number of textured planes in the generated model.
+     */
     planeCount() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
@@ -158,6 +167,9 @@ export class ItemModelResult {
         }
     }
 
+    /**
+     * Source schematic dimensions in blocks.
+     */
     dimensions() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 13, 4, true);
 

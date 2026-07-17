@@ -55,12 +55,15 @@ pub mod ffi {
     pub struct Schematic(pub(crate) crate::UniversalSchematic);
 
     impl Schematic {
+        /// Create a new, empty schematic with the given name.
         pub fn create(name: &DiplomatStr) -> Box<Schematic> {
             Box::new(Schematic(crate::UniversalSchematic::new(
                 String::from_utf8_lossy(name).into_owned(),
             )))
         }
 
+        /// The allocated dimensions (width, height, length) of the schematic's
+        /// bounding box.
         pub fn dimensions(&self) -> Dimensions {
             let (x, y, z) = self.0.get_dimensions();
             Dimensions { x, y, z }
@@ -80,6 +83,8 @@ pub mod ffi {
             Ok(self.0.set_block_str(x, y, z, name))
         }
 
+        /// The name of the block at a position. `NotFound` if the position is
+        /// outside every region.
         pub fn get_block_name(
             &self,
             x: i32,
@@ -96,6 +101,9 @@ pub mod ffi {
             }
         }
 
+        /// Save the schematic to a file, always in Litematic format (the
+        /// extension is not consulted; use `save_to_file_with_format` for
+        /// other formats).
         pub fn save_to_file(&self, path: &DiplomatStr) -> Result<(), NucleationError> {
             let path = std::str::from_utf8(path).map_err(|_| NucleationError::InvalidArgument)?;
             let bytes =
@@ -104,6 +112,8 @@ pub mod ffi {
             Ok(())
         }
 
+        /// Load a schematic from a Litematic file (this path is
+        /// Litematic-only; use `from_data` for format auto-detection).
         pub fn load_from_file(path: &DiplomatStr) -> Result<Box<Schematic>, NucleationError> {
             let path = std::str::from_utf8(path).map_err(|_| NucleationError::InvalidArgument)?;
             let bytes = std::fs::read(path).map_err(|_| NucleationError::Io)?;
@@ -1053,6 +1063,7 @@ pub mod ffi {
             }
         }
 
+        /// Set the schematic name.
         pub fn set_name(&mut self, name: &DiplomatStr) -> Result<(), NucleationError> {
             self.0.metadata.name = Some(utf8(name)?.to_string());
             Ok(())
@@ -1069,6 +1080,7 @@ pub mod ffi {
             }
         }
 
+        /// Set the schematic author.
         pub fn set_author(&mut self, author: &DiplomatStr) -> Result<(), NucleationError> {
             self.0.metadata.author = Some(utf8(author)?.to_string());
             Ok(())
@@ -1085,6 +1097,7 @@ pub mod ffi {
             }
         }
 
+        /// Set the schematic description.
         pub fn set_description(
             &mut self,
             description: &DiplomatStr,
@@ -1118,6 +1131,7 @@ pub mod ffi {
             self.0.metadata.lm_version.unwrap_or(-1)
         }
 
+        /// Set the Litematic format version.
         pub fn set_lm_version(&mut self, version: i32) {
             self.0.metadata.lm_version = Some(version);
         }
@@ -1127,6 +1141,7 @@ pub mod ffi {
             self.0.metadata.mc_version.unwrap_or(-1)
         }
 
+        /// Set the Minecraft data version.
         pub fn set_mc_version(&mut self, version: i32) {
             self.0.metadata.mc_version = Some(version);
         }
@@ -1136,54 +1151,84 @@ pub mod ffi {
             self.0.metadata.we_version.unwrap_or(-1)
         }
 
+        /// Set the WorldEdit version.
         pub fn set_we_version(&mut self, version: i32) {
             self.0.metadata.we_version = Some(version);
         }
 
         // --- Transformations ---
 
+        /// Mirror the default region along the X axis (in place). Block
+        /// orientations (e.g. `facing` properties), block entities, and
+        /// entities are mirrored too.
         pub fn flip_x(&mut self) {
             self.0.flip_x();
         }
 
+        /// Mirror the default region along the Y axis (in place). Block
+        /// orientations, block entities, and entities are mirrored too.
         pub fn flip_y(&mut self) {
             self.0.flip_y();
         }
 
+        /// Mirror the default region along the Z axis (in place). Block
+        /// orientations, block entities, and entities are mirrored too.
         pub fn flip_z(&mut self) {
             self.0.flip_z();
         }
 
+        /// Rotate the default region about the X axis. `degrees` must be a
+        /// multiple of 90 (anything else is a no-op; negative values wrap).
+        /// +90° maps +Z onto +Y (south face rotates up). The region keeps its
+        /// minimum corner; block orientations and entities are updated.
         pub fn rotate_x(&mut self, degrees: i32) {
             self.0.rotate_x(degrees);
         }
 
+        /// Rotate the default region about the Y axis (horizontal plane).
+        /// `degrees` must be a multiple of 90 (anything else is a no-op;
+        /// negative values wrap). +90° maps +X onto -Z (east to north, i.e.
+        /// counterclockwise seen from above). The region keeps its minimum
+        /// corner; block orientations and entities are updated.
         pub fn rotate_y(&mut self, degrees: i32) {
             self.0.rotate_y(degrees);
         }
 
+        /// Rotate the default region about the Z axis. `degrees` must be a
+        /// multiple of 90 (anything else is a no-op; negative values wrap).
+        /// +90° maps +Y onto +X (up rotates east). The region keeps its
+        /// minimum corner; block orientations and entities are updated.
         pub fn rotate_z(&mut self, degrees: i32) {
             self.0.rotate_z(degrees);
         }
 
+        /// Mirror a named region along the X axis (like `flip_x`). `NotFound`
+        /// if no region has that name.
         pub fn flip_region_x(&mut self, region_name: &DiplomatStr) -> Result<(), NucleationError> {
             self.0
                 .flip_region_x(utf8(region_name)?)
                 .map_err(|_| NucleationError::NotFound)
         }
 
+        /// Mirror a named region along the Y axis (like `flip_y`). `NotFound`
+        /// if no region has that name.
         pub fn flip_region_y(&mut self, region_name: &DiplomatStr) -> Result<(), NucleationError> {
             self.0
                 .flip_region_y(utf8(region_name)?)
                 .map_err(|_| NucleationError::NotFound)
         }
 
+        /// Mirror a named region along the Z axis (like `flip_z`). `NotFound`
+        /// if no region has that name.
         pub fn flip_region_z(&mut self, region_name: &DiplomatStr) -> Result<(), NucleationError> {
             self.0
                 .flip_region_z(utf8(region_name)?)
                 .map_err(|_| NucleationError::NotFound)
         }
 
+        /// Rotate a named region about the X axis by a multiple of 90 degrees
+        /// (same semantics as `rotate_x`). `NotFound` if no region has that
+        /// name.
         pub fn rotate_region_x(
             &mut self,
             region_name: &DiplomatStr,
@@ -1194,6 +1239,9 @@ pub mod ffi {
                 .map_err(|_| NucleationError::NotFound)
         }
 
+        /// Rotate a named region about the Y axis by a multiple of 90 degrees
+        /// (same semantics as `rotate_y`). `NotFound` if no region has that
+        /// name.
         pub fn rotate_region_y(
             &mut self,
             region_name: &DiplomatStr,
@@ -1204,6 +1252,9 @@ pub mod ffi {
                 .map_err(|_| NucleationError::NotFound)
         }
 
+        /// Rotate a named region about the Z axis by a multiple of 90 degrees
+        /// (same semantics as `rotate_z`). `NotFound` if no region has that
+        /// name.
         pub fn rotate_region_z(
             &mut self,
             region_name: &DiplomatStr,
@@ -1567,6 +1618,7 @@ pub mod ffi {
     pub struct BlockState(pub(crate) crate::BlockState);
 
     impl BlockState {
+        /// Create a block state with the given name and no properties.
         pub fn create(name: &DiplomatStr) -> Box<BlockState> {
             Box::new(BlockState(crate::BlockState::new(
                 String::from_utf8_lossy(name).into_owned(),
@@ -1587,6 +1639,7 @@ pub mod ffi {
             )))
         }
 
+        /// The block name (e.g. `minecraft:stone`).
         pub fn name(&self, out: &mut DiplomatWrite) {
             let _ = write!(out, "{}", self.0.name);
         }

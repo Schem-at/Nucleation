@@ -37,6 +37,9 @@ export class ChunkMeshResult {
      */
     static createWithAtlas(schematic: Schematic, pack: ResourcePack, config: MeshConfig, chunkSize: number, atlas: TextureAtlas): ChunkMeshResult;
 
+    /**
+     * Number of chunk meshes.
+     */
     chunkCount(): number;
 
     /**
@@ -50,8 +53,14 @@ export class ChunkMeshResult {
      */
     getMesh(cx: number, cy: number, cz: number): MeshResult;
 
+    /**
+     * Total vertex count across all chunk meshes.
+     */
     totalVertexCount(): number;
 
+    /**
+     * Total triangle count across all chunk meshes.
+     */
     totalTriangleCount(): number;
 
     /**

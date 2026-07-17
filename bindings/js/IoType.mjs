@@ -38,6 +38,9 @@ export class IoType {
     }
 
 
+    /**
+     * Unsigned integer of `bits` bits (LSB-first bit order).
+     */
     static unsignedInt(bits) {
 
         const result = wasm.IoType_unsigned_int(bits);
@@ -51,6 +54,9 @@ export class IoType {
         }
     }
 
+    /**
+     * Signed integer of `bits` bits (two's complement, LSB-first).
+     */
     static signedInt(bits) {
 
         const result = wasm.IoType_signed_int(bits);
@@ -64,6 +70,9 @@ export class IoType {
         }
     }
 
+    /**
+     * 32-bit IEEE 754 float (crosses the wire as its 32 raw bits).
+     */
     static float32() {
 
         const result = wasm.IoType_float32();
@@ -77,6 +86,9 @@ export class IoType {
         }
     }
 
+    /**
+     * Single boolean (1 bit).
+     */
     static boolean() {
 
         const result = wasm.IoType_boolean();
@@ -90,6 +102,10 @@ export class IoType {
         }
     }
 
+    /**
+     * Fixed-length ASCII string of `chars` characters (8 bits per char;
+     * shorter strings are zero-padded, longer ones truncated).
+     */
     static ascii(chars) {
 
         const result = wasm.IoType_ascii(chars);

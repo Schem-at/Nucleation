@@ -34,6 +34,9 @@ namespace capi {
 class IoLayoutBuilder {
 public:
 
+  /**
+   * Create an empty layout builder.
+   */
   inline static std::unique_ptr<IoLayoutBuilder> create();
 
   /**

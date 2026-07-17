@@ -101,6 +101,8 @@ class ChunkMeshResult internal constructor (
         }
     }
     
+    /** Number of chunk meshes.
+    */
     fun chunkCount(): UInt {
         
         val returnVal = lib.ChunkMeshResult_chunk_count(handle);
@@ -138,12 +140,16 @@ class ChunkMeshResult internal constructor (
         }
     }
     
+    /** Total vertex count across all chunk meshes.
+    */
     fun totalVertexCount(): UInt {
         
         val returnVal = lib.ChunkMeshResult_total_vertex_count(handle);
         return (returnVal.toUInt())
     }
     
+    /** Total triangle count across all chunk meshes.
+    */
     fun totalTriangleCount(): UInt {
         
         val returnVal = lib.ChunkMeshResult_total_triangle_count(handle);

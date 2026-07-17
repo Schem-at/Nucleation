@@ -14,18 +14,42 @@ export class MeshConfig {
     constructor();
 
 
+    /**
+     * Create a config with default settings: hidden-face culling on,
+     * ambient occlusion on (intensity 0.4), no biome, atlas max size 4096,
+     * occluded-block culling on, greedy meshing off.
+     */
     static create(): MeshConfig;
 
+    /**
+     * Enable face culling between adjacent solid blocks (default: true).
+     */
     setCullHiddenFaces(val: boolean): void;
 
+    /**
+     * Whether hidden-face culling is enabled.
+     */
     cullHiddenFaces(): boolean;
 
+    /**
+     * Enable ambient occlusion (default: true).
+     */
     setAmbientOcclusion(val: boolean): void;
 
+    /**
+     * Whether ambient occlusion is enabled.
+     */
     ambientOcclusion(): boolean;
 
+    /**
+     * Set ambient-occlusion intensity, 0.0 (no darkening) to 1.0 (full
+     * darkening). Default: 0.4.
+     */
     setAoIntensity(val: number): void;
 
+    /**
+     * The ambient-occlusion intensity (0.0–1.0).
+     */
     aoIntensity(): number;
 
     /**
@@ -43,15 +67,35 @@ export class MeshConfig {
      */
     biome(): string;
 
+    /**
+     * Set the maximum texture-atlas dimension in pixels (default: 4096).
+     */
     setAtlasMaxSize(size: number): void;
 
+    /**
+     * The maximum texture-atlas dimension in pixels.
+     */
     atlasMaxSize(): number;
 
+    /**
+     * Skip blocks fully hidden by opaque neighbors on all 6 sides
+     * (default: true).
+     */
     setCullOccludedBlocks(val: boolean): void;
 
+    /**
+     * Whether occluded-block culling is enabled.
+     */
     cullOccludedBlocks(): boolean;
 
+    /**
+     * Merge adjacent coplanar faces into larger quads to reduce triangle
+     * count (default: false).
+     */
     setGreedyMeshing(val: boolean): void;
 
+    /**
+     * Whether greedy meshing is enabled.
+     */
     greedyMeshing(): boolean;
 }

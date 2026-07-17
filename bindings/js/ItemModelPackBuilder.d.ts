@@ -15,6 +15,9 @@ export class ItemModelPackBuilder {
     constructor();
 
 
+    /**
+     * Create an empty pack builder.
+     */
     static create(): ItemModelPackBuilder;
 
     /**

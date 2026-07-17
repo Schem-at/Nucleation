@@ -15,13 +15,31 @@ export class OutputCondition {
     constructor();
 
 
+    /**
+     * Met when the output equals `value`.
+     */
     static equals(value: Value): OutputCondition;
 
+    /**
+     * Met when the output does not equal `value`.
+     */
     static notEquals(value: Value): OutputCondition;
 
+    /**
+     * Met when the output is greater than `value`. Numeric only: both
+     * sides must be the same numeric type (u32/i32/f32), else never met.
+     */
     static greaterThan(value: Value): OutputCondition;
 
+    /**
+     * Met when the output is less than `value`. Numeric only: both sides
+     * must be the same numeric type (u32/i32/f32), else never met.
+     */
     static lessThan(value: Value): OutputCondition;
 
+    /**
+     * Met when `output & mask` is non-zero (flag checking). Integer
+     * outputs (u32/i32) only; never met for other types.
+     */
     static bitwiseAnd(mask: number): OutputCondition;
 }

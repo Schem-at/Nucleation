@@ -83,6 +83,8 @@ class ItemModelResult internal constructor (
         }
     }
     
+    /** Number of elements (cuboids) in the generated model.
+    */
     fun elementCount(): Result<UInt> {
         
         val returnVal = lib.ItemModelResult_element_count(handle);
@@ -94,6 +96,8 @@ class ItemModelResult internal constructor (
         }
     }
     
+    /** Number of textures the generated model uses.
+    */
     fun textureCount(): Result<UInt> {
         
         val returnVal = lib.ItemModelResult_texture_count(handle);
@@ -105,6 +109,8 @@ class ItemModelResult internal constructor (
         }
     }
     
+    /** Number of textured planes in the generated model.
+    */
     fun planeCount(): Result<UInt> {
         
         val returnVal = lib.ItemModelResult_plane_count(handle);
@@ -116,6 +122,8 @@ class ItemModelResult internal constructor (
         }
     }
     
+    /** Source schematic dimensions in blocks.
+    */
     fun dimensions(): Result<Dimensions> {
         
         val returnVal = lib.ItemModelResult_dimensions(handle);

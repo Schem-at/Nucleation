@@ -65,6 +65,9 @@ export class RawMeshExport {
         }
     }
 
+    /**
+     * Number of vertices in the exported mesh.
+     */
     vertexCount() {
 
         const result = wasm.RawMeshExport_vertex_count(this.ffiValue);
@@ -78,6 +81,9 @@ export class RawMeshExport {
         }
     }
 
+    /**
+     * Number of triangles in the exported mesh.
+     */
     triangleCount() {
 
         const result = wasm.RawMeshExport_triangle_count(this.ffiValue);
@@ -199,6 +205,9 @@ export class RawMeshExport {
         }
     }
 
+    /**
+     * Width of the baked texture in pixels.
+     */
     textureWidth() {
 
         const result = wasm.RawMeshExport_texture_width(this.ffiValue);
@@ -212,6 +221,9 @@ export class RawMeshExport {
         }
     }
 
+    /**
+     * Height of the baked texture in pixels.
+     */
     textureHeight() {
 
         const result = wasm.RawMeshExport_texture_height(this.ffiValue);

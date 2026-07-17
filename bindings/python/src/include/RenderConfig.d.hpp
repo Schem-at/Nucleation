@@ -30,14 +30,33 @@ namespace nucleation {
 class RenderConfig {
 public:
 
+  /**
+   * Create a config with the given output size in pixels. Camera starts
+   * at the defaults: yaw 45°, pitch 30°, zoom 1.0, fov 45°, perspective
+   * projection, default sky background.
+   */
   inline static std::unique_ptr<nucleation::RenderConfig> create(uint32_t width, uint32_t height);
 
+  /**
+   * Set the camera yaw (horizontal orbit angle) in degrees. Default: 45.
+   */
   inline void set_yaw(float yaw);
 
+  /**
+   * Set the camera pitch (downward tilt) in degrees. Default: 30.
+   */
   inline void set_pitch(float pitch);
 
+  /**
+   * Set the zoom factor scaling the auto-fitted camera distance
+   * (1.0 = frame the whole model; larger = further away). Default: 1.0.
+   */
   inline void set_zoom(float zoom);
 
+  /**
+   * Set the vertical field of view in degrees (perspective projection
+   * only). Default: 45.
+   */
   inline void set_fov(float fov);
 
   /**

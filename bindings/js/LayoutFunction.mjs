@@ -39,6 +39,10 @@ export class LayoutFunction {
     }
 
 
+    /**
+     * One bit per position: signal strength 0 = false, 15 = true.
+     * The most common layout for traditional redstone circuits.
+     */
     static oneToOne() {
 
         const result = wasm.LayoutFunction_one_to_one();
@@ -52,6 +56,11 @@ export class LayoutFunction {
         }
     }
 
+    /**
+     * Four bits per position, packed as a hex nibble (0-15) with the
+     * lowest bit first; uses `ceil(bits / 4)` positions (4x denser than
+     * one-to-one).
+     */
     static packed4() {
 
         const result = wasm.LayoutFunction_packed4();
@@ -93,6 +102,10 @@ export class LayoutFunction {
         }
     }
 
+    /**
+     * 2D matrix layout, elements laid out row by row; element bits are
+     * packed 4 per position (nibbles).
+     */
     static rowMajor(rows, cols, bitsPerElement) {
 
         const result = wasm.LayoutFunction_row_major(rows, cols, bitsPerElement);
@@ -106,6 +119,10 @@ export class LayoutFunction {
         }
     }
 
+    /**
+     * 2D matrix layout, elements laid out column by column; element bits
+     * are packed 4 per position (nibbles).
+     */
     static columnMajor(rows, cols, bitsPerElement) {
 
         const result = wasm.LayoutFunction_column_major(rows, cols, bitsPerElement);
@@ -119,6 +136,10 @@ export class LayoutFunction {
         }
     }
 
+    /**
+     * Screen layout: pixels laid out row by row, left to right; pixel
+     * bits are packed 4 per position (nibbles).
+     */
     static scanline(width, height, bitsPerPixel) {
 
         const result = wasm.LayoutFunction_scanline(width, height, bitsPerPixel);

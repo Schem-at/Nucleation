@@ -29,8 +29,15 @@ namespace capi {
 class Schematic {
 public:
 
+  /**
+   * Create a new, empty schematic with the given name.
+   */
   inline static std::unique_ptr<Schematic> create(std::string_view name);
 
+  /**
+   * The allocated dimensions (width, height, length) of the schematic's
+   * bounding box.
+   */
   inline Dimensions dimensions() const;
 
   /**
@@ -39,12 +46,25 @@ public:
    */
   inline diplomat::result<bool, NucleationError> set_block(int32_t x, int32_t y, int32_t z, std::string_view block_name);
 
+  /**
+   * The name of the block at a position. `NotFound` if the position is
+   * outside every region.
+   */
   inline diplomat::result<std::string, NucleationError> get_block_name(int32_t x, int32_t y, int32_t z) const;
   template<typename W>
   inline diplomat::result<std::monostate, NucleationError> get_block_name_write(int32_t x, int32_t y, int32_t z, W& writeable_output) const;
 
+  /**
+   * Save the schematic to a file, always in Litematic format (the
+   * extension is not consulted; use `save_to_file_with_format` for
+   * other formats).
+   */
   inline diplomat::result<std::monostate, NucleationError> save_to_file(std::string_view path) const;
 
+  /**
+   * Load a schematic from a Litematic file (this path is
+   * Litematic-only; use `from_data` for format auto-detection).
+   */
   inline static diplomat::result<std::unique_ptr<Schematic>, NucleationError> load_from_file(std::string_view path);
 
   /**
@@ -434,6 +454,9 @@ public:
   template<typename W>
   inline diplomat::result<std::monostate, NucleationError> name_write(W& writeable_output) const;
 
+  /**
+   * Set the schematic name.
+   */
   inline diplomat::result<std::monostate, NucleationError> set_name(std::string_view name);
 
   /**
@@ -443,6 +466,9 @@ public:
   template<typename W>
   inline diplomat::result<std::monostate, NucleationError> author_write(W& writeable_output) const;
 
+  /**
+   * Set the schematic author.
+   */
   inline diplomat::result<std::monostate, NucleationError> set_author(std::string_view author);
 
   /**
@@ -452,6 +478,9 @@ public:
   template<typename W>
   inline diplomat::result<std::monostate, NucleationError> description_write(W& writeable_output) const;
 
+  /**
+   * Set the schematic description.
+   */
   inline diplomat::result<std::monostate, NucleationError> set_description(std::string_view description);
 
   /**
@@ -479,6 +508,9 @@ public:
    */
   inline int32_t lm_version() const;
 
+  /**
+   * Set the Litematic format version.
+   */
   inline void set_lm_version(int32_t version);
 
   /**
@@ -486,6 +518,9 @@ public:
    */
   inline int32_t mc_version() const;
 
+  /**
+   * Set the Minecraft data version.
+   */
   inline void set_mc_version(int32_t version);
 
   /**
@@ -493,30 +528,92 @@ public:
    */
   inline int32_t we_version() const;
 
+  /**
+   * Set the WorldEdit version.
+   */
   inline void set_we_version(int32_t version);
 
+  /**
+   * Mirror the default region along the X axis (in place). Block
+   * orientations (e.g. `facing` properties), block entities, and
+   * entities are mirrored too.
+   */
   inline void flip_x();
 
+  /**
+   * Mirror the default region along the Y axis (in place). Block
+   * orientations, block entities, and entities are mirrored too.
+   */
   inline void flip_y();
 
+  /**
+   * Mirror the default region along the Z axis (in place). Block
+   * orientations, block entities, and entities are mirrored too.
+   */
   inline void flip_z();
 
+  /**
+   * Rotate the default region about the X axis. `degrees` must be a
+   * multiple of 90 (anything else is a no-op; negative values wrap).
+   * +90° maps +Z onto +Y (south face rotates up). The region keeps its
+   * minimum corner; block orientations and entities are updated.
+   */
   inline void rotate_x(int32_t degrees);
 
+  /**
+   * Rotate the default region about the Y axis (horizontal plane).
+   * `degrees` must be a multiple of 90 (anything else is a no-op;
+   * negative values wrap). +90° maps +X onto -Z (east to north, i.e.
+   * counterclockwise seen from above). The region keeps its minimum
+   * corner; block orientations and entities are updated.
+   */
   inline void rotate_y(int32_t degrees);
 
+  /**
+   * Rotate the default region about the Z axis. `degrees` must be a
+   * multiple of 90 (anything else is a no-op; negative values wrap).
+   * +90° maps +Y onto +X (up rotates east). The region keeps its
+   * minimum corner; block orientations and entities are updated.
+   */
   inline void rotate_z(int32_t degrees);
 
+  /**
+   * Mirror a named region along the X axis (like `flip_x`). `NotFound`
+   * if no region has that name.
+   */
   inline diplomat::result<std::monostate, NucleationError> flip_region_x(std::string_view region_name);
 
+  /**
+   * Mirror a named region along the Y axis (like `flip_y`). `NotFound`
+   * if no region has that name.
+   */
   inline diplomat::result<std::monostate, NucleationError> flip_region_y(std::string_view region_name);
 
+  /**
+   * Mirror a named region along the Z axis (like `flip_z`). `NotFound`
+   * if no region has that name.
+   */
   inline diplomat::result<std::monostate, NucleationError> flip_region_z(std::string_view region_name);
 
+  /**
+   * Rotate a named region about the X axis by a multiple of 90 degrees
+   * (same semantics as `rotate_x`). `NotFound` if no region has that
+   * name.
+   */
   inline diplomat::result<std::monostate, NucleationError> rotate_region_x(std::string_view region_name, int32_t degrees);
 
+  /**
+   * Rotate a named region about the Y axis by a multiple of 90 degrees
+   * (same semantics as `rotate_y`). `NotFound` if no region has that
+   * name.
+   */
   inline diplomat::result<std::monostate, NucleationError> rotate_region_y(std::string_view region_name, int32_t degrees);
 
+  /**
+   * Rotate a named region about the Z axis by a multiple of 90 degrees
+   * (same semantics as `rotate_z`). `NotFound` if no region has that
+   * name.
+   */
   inline diplomat::result<std::monostate, NucleationError> rotate_region_z(std::string_view region_name, int32_t degrees);
 
   /**

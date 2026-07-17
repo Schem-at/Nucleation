@@ -29,6 +29,9 @@ namespace capi {
 class ItemModelPackBuilder {
 public:
 
+  /**
+   * Create an empty pack builder.
+   */
   inline static std::unique_ptr<ItemModelPackBuilder> create();
 
   /**

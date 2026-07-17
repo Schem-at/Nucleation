@@ -39,8 +39,14 @@ public:
    */
   inline static diplomat::result<std::unique_ptr<RawMeshExport>, NucleationError> create(const Schematic& schematic, const ResourcePack& pack, const MeshConfig& config);
 
+  /**
+   * Number of vertices in the exported mesh.
+   */
   inline uint32_t vertex_count() const;
 
+  /**
+   * Number of triangles in the exported mesh.
+   */
   inline uint32_t triangle_count() const;
 
   /**
@@ -85,8 +91,14 @@ public:
   template<typename W>
   inline void texture_rgba_b64_write(W& writeable_output) const;
 
+  /**
+   * Width of the baked texture in pixels.
+   */
   inline uint32_t texture_width() const;
 
+  /**
+   * Height of the baked texture in pixels.
+   */
   inline uint32_t texture_height() const;
 
     inline const diplomat::capi::RawMeshExport* AsFFI() const;

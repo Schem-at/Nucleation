@@ -40,6 +40,9 @@ export class OutputCondition {
     }
 
 
+    /**
+     * Met when the output equals `value`.
+     */
     static equals(value) {
 
         const result = wasm.OutputCondition_equals(value.ffiValue);
@@ -53,6 +56,9 @@ export class OutputCondition {
         }
     }
 
+    /**
+     * Met when the output does not equal `value`.
+     */
     static notEquals(value) {
 
         const result = wasm.OutputCondition_not_equals(value.ffiValue);
@@ -66,6 +72,10 @@ export class OutputCondition {
         }
     }
 
+    /**
+     * Met when the output is greater than `value`. Numeric only: both
+     * sides must be the same numeric type (u32/i32/f32), else never met.
+     */
     static greaterThan(value) {
 
         const result = wasm.OutputCondition_greater_than(value.ffiValue);
@@ -79,6 +89,10 @@ export class OutputCondition {
         }
     }
 
+    /**
+     * Met when the output is less than `value`. Numeric only: both sides
+     * must be the same numeric type (u32/i32/f32), else never met.
+     */
     static lessThan(value) {
 
         const result = wasm.OutputCondition_less_than(value.ffiValue);
@@ -92,6 +106,10 @@ export class OutputCondition {
         }
     }
 
+    /**
+     * Met when `output & mask` is non-zero (flag checking). Integer
+     * outputs (u32/i32) only; never met for other types.
+     */
     static bitwiseAnd(mask) {
 
         const result = wasm.OutputCondition_bitwise_and(mask);

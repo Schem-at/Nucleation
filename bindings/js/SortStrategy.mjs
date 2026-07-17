@@ -40,6 +40,10 @@ export class SortStrategy {
     }
 
 
+    /**
+     * Sort by Y ascending, then X, then Z (default Minecraft layer
+     * order). The first position after sorting is bit 0 (LSB).
+     */
     static yxz() {
 
         const result = wasm.SortStrategy_yxz();
@@ -53,6 +57,9 @@ export class SortStrategy {
         }
     }
 
+    /**
+     * Sort by X ascending, then Y, then Z.
+     */
     static xyz() {
 
         const result = wasm.SortStrategy_xyz();
@@ -66,6 +73,9 @@ export class SortStrategy {
         }
     }
 
+    /**
+     * Sort by Z ascending, then Y, then X.
+     */
     static zyx() {
 
         const result = wasm.SortStrategy_zyx();
@@ -79,6 +89,9 @@ export class SortStrategy {
         }
     }
 
+    /**
+     * Sort by Y descending, then X ascending, then Z ascending.
+     */
     static yDescXz() {
 
         const result = wasm.SortStrategy_y_desc_xz();
@@ -92,6 +105,9 @@ export class SortStrategy {
         }
     }
 
+    /**
+     * Sort by X descending, then Y ascending, then Z ascending.
+     */
     static xDescYz() {
 
         const result = wasm.SortStrategy_x_desc_yz();
@@ -105,6 +121,9 @@ export class SortStrategy {
         }
     }
 
+    /**
+     * Sort by Z descending, then Y ascending, then X ascending.
+     */
     static zDescYx() {
 
         const result = wasm.SortStrategy_z_desc_yx();
@@ -134,6 +153,10 @@ export class SortStrategy {
         }
     }
 
+    /**
+     * Sort by Euclidean distance from the reference point, closest
+     * first (ties broken by Y, X, Z ascending).
+     */
     static distanceFrom(x, y, z) {
 
         const result = wasm.SortStrategy_distance_from(x, y, z);
@@ -147,6 +170,10 @@ export class SortStrategy {
         }
     }
 
+    /**
+     * Sort by Euclidean distance from the reference point, farthest
+     * first (ties broken by Y, X, Z descending).
+     */
     static distanceFromDesc(x, y, z) {
 
         const result = wasm.SortStrategy_distance_from_desc(x, y, z);
@@ -160,6 +187,10 @@ export class SortStrategy {
         }
     }
 
+    /**
+     * Keep positions in the order they were added (no sorting). Useful
+     * when positions were ordered manually or box order matters.
+     */
     static preserve() {
 
         const result = wasm.SortStrategy_preserve();
@@ -173,6 +204,9 @@ export class SortStrategy {
         }
     }
 
+    /**
+     * Reverse of the order positions were added.
+     */
     static reverse() {
 
         const result = wasm.SortStrategy_reverse();
