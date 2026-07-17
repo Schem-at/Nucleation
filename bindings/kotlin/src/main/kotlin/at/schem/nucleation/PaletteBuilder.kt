@@ -17,6 +17,9 @@ internal interface PaletteBuilderLib: Library {
     fun PaletteBuilder_survival_only(handle: Pointer): ResultUnitInt
     fun PaletteBuilder_exclude_keyword(handle: Pointer, keyword: Slice): ResultUnitInt
     fun PaletteBuilder_include_keyword(handle: Pointer, keyword: Slice): ResultUnitInt
+    fun PaletteBuilder_tag(handle: Pointer, t: Slice): ResultUnitInt
+    fun PaletteBuilder_exclude_tag(handle: Pointer, t: Slice): ResultUnitInt
+    fun PaletteBuilder_kind(handle: Pointer, k: Slice): ResultUnitInt
     fun PaletteBuilder_build(handle: Pointer): ResultPointerInt
 }
 /** Filter-driven palette construction (wraps
@@ -91,6 +94,8 @@ class PaletteBuilder internal constructor (
     }
     
     /** Keep only full cube blocks (no stairs, slabs, fences, ...).
+    *Metadata-driven: uses the official model geometry extracted from
+    *the vanilla jars, not block-name guessing.
     */
     fun fullBlocksOnly(): Result<Unit> {
         
@@ -117,6 +122,8 @@ class PaletteBuilder internal constructor (
     }
     
     /** Exclude transparent/translucent blocks (glass, leaves, ...).
+    *Metadata-driven: uses the per-block transparency flag from the
+    *block-data pipeline, not block-name guessing.
     */
     fun excludeTransparent(): Result<Unit> {
         
@@ -189,6 +196,66 @@ class PaletteBuilder internal constructor (
             }
         } finally {
             keywordSliceMemory.close()
+        }
+    }
+    
+    /** Require the vanilla block tag `t` (`minecraft:wool` or short
+    *`wool`, nested paths like `mineable/pickaxe` too). Repeatable —
+    *a block must carry ALL required tags (AND semantics).
+    */
+    fun tag(t: String): Result<Unit> {
+        val tSliceMemory = PrimitiveArrayTools.borrowUtf8(t)
+        
+        val returnVal = lib.PaletteBuilder_tag(handle, tSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            tSliceMemory.close()
+        }
+    }
+    
+    /** Exclude blocks carrying the vanilla block tag `t` (any listed
+    *tag disqualifies). Repeatable.
+    */
+    fun excludeTag(t: String): Result<Unit> {
+        val tSliceMemory = PrimitiveArrayTools.borrowUtf8(t)
+        
+        val returnVal = lib.PaletteBuilder_exclude_tag(handle, tSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            tSliceMemory.close()
+        }
+    }
+    
+    /** Keep only blocks of the official definition kind `k`
+    *(`minecraft:stair` or short `stair`; plain full blocks are
+    *`minecraft:block`). Repeatable — a block matching ANY listed
+    *kind passes (OR semantics).
+    */
+    fun kind(k: String): Result<Unit> {
+        val kSliceMemory = PrimitiveArrayTools.borrowUtf8(k)
+        
+        val returnVal = lib.PaletteBuilder_kind(handle, kSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            kSliceMemory.close()
         }
     }
     

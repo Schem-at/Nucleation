@@ -18,6 +18,8 @@ export { Dimensions, Dimensions_obj } from "./Dimensions"
 
 export { Autostack } from "./Autostack"
 
+export { Blocks } from "./Blocks"
+
 export { Brush } from "./Brush"
 
 export { BuildingTool } from "./BuildingTool"

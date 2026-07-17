@@ -46,6 +46,15 @@ PaletteBuilder_exclude_keyword_result PaletteBuilder_exclude_keyword(PaletteBuil
 typedef struct PaletteBuilder_include_keyword_result {union { NucleationError err;}; bool is_ok;} PaletteBuilder_include_keyword_result;
 PaletteBuilder_include_keyword_result PaletteBuilder_include_keyword(PaletteBuilder* self, DiplomatStringView keyword);
 
+typedef struct PaletteBuilder_tag_result {union { NucleationError err;}; bool is_ok;} PaletteBuilder_tag_result;
+PaletteBuilder_tag_result PaletteBuilder_tag(PaletteBuilder* self, DiplomatStringView t);
+
+typedef struct PaletteBuilder_exclude_tag_result {union { NucleationError err;}; bool is_ok;} PaletteBuilder_exclude_tag_result;
+PaletteBuilder_exclude_tag_result PaletteBuilder_exclude_tag(PaletteBuilder* self, DiplomatStringView t);
+
+typedef struct PaletteBuilder_kind_result {union { NucleationError err;}; bool is_ok;} PaletteBuilder_kind_result;
+PaletteBuilder_kind_result PaletteBuilder_kind(PaletteBuilder* self, DiplomatStringView k);
+
 typedef struct PaletteBuilder_build_result {union {Palette* ok; NucleationError err;}; bool is_ok;} PaletteBuilder_build_result;
 PaletteBuilder_build_result PaletteBuilder_build(PaletteBuilder* self);
 

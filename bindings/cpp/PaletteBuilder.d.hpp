@@ -50,6 +50,8 @@ public:
 
   /**
    * Keep only full cube blocks (no stairs, slabs, fences, ...).
+   * Metadata-driven: uses the official model geometry extracted from
+   * the vanilla jars, not block-name guessing.
    */
   inline diplomat::result<std::monostate, NucleationError> full_blocks_only();
 
@@ -60,6 +62,8 @@ public:
 
   /**
    * Exclude transparent/translucent blocks (glass, leaves, ...).
+   * Metadata-driven: uses the per-block transparency flag from the
+   * block-data pipeline, not block-name guessing.
    */
   inline diplomat::result<std::monostate, NucleationError> exclude_transparent();
 
@@ -83,6 +87,27 @@ public:
    * any of the included keywords).
    */
   inline diplomat::result<std::monostate, NucleationError> include_keyword(std::string_view keyword);
+
+  /**
+   * Require the vanilla block tag `t` (`minecraft:wool` or short
+   * `wool`, nested paths like `mineable/pickaxe` too). Repeatable —
+   * a block must carry ALL required tags (AND semantics).
+   */
+  inline diplomat::result<std::monostate, NucleationError> tag(std::string_view t);
+
+  /**
+   * Exclude blocks carrying the vanilla block tag `t` (any listed
+   * tag disqualifies). Repeatable.
+   */
+  inline diplomat::result<std::monostate, NucleationError> exclude_tag(std::string_view t);
+
+  /**
+   * Keep only blocks of the official definition kind `k`
+   * (`minecraft:stair` or short `stair`; plain full blocks are
+   * `minecraft:block`). Repeatable — a block matching ANY listed
+   * kind passes (OR semantics).
+   */
+  inline diplomat::result<std::monostate, NucleationError> kind(std::string_view k);
 
   /**
    * Build the palette; consumes the builder.

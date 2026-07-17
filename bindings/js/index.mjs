@@ -16,6 +16,8 @@ export { Dimensions } from "./Dimensions.mjs"
 
 export { Autostack } from "./Autostack.mjs"
 
+export { Blocks } from "./Blocks.mjs"
+
 export { Brush } from "./Brush.mjs"
 
 export { BuildingTool } from "./BuildingTool.mjs"

@@ -105,6 +105,8 @@ export class PaletteBuilder {
 
     /**
      * Keep only full cube blocks (no stairs, slabs, fences, ...).
+     * Metadata-driven: uses the official model geometry extracted from
+     * the vanilla jars, not block-name guessing.
      */
     fullBlocksOnly() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
@@ -149,6 +151,8 @@ export class PaletteBuilder {
 
     /**
      * Exclude transparent/translucent blocks (glass, leaves, ...).
+     * Metadata-driven: uses the per-block transparency flag from the
+     * block-data pipeline, not block-name guessing.
      */
     excludeTransparent() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
@@ -252,6 +256,93 @@ export class PaletteBuilder {
 
 
         const result = wasm.PaletteBuilder_include_keyword(diplomatReceive.buffer, this.ffiValue, keywordSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Require the vanilla block tag `t` (`minecraft:wool` or short
+     * `wool`, nested paths like `mineable/pickaxe` too). Repeatable —
+     * a block must carry ALL required tags (AND semantics).
+     */
+    tag(t) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const tSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, t)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.PaletteBuilder_tag(diplomatReceive.buffer, this.ffiValue, tSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Exclude blocks carrying the vanilla block tag `t` (any listed
+     * tag disqualifies). Repeatable.
+     */
+    excludeTag(t) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const tSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, t)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.PaletteBuilder_exclude_tag(diplomatReceive.buffer, this.ffiValue, tSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Keep only blocks of the official definition kind `k`
+     * (`minecraft:stair` or short `stair`; plain full blocks are
+     * `minecraft:block`). Repeatable — a block matching ANY listed
+     * kind passes (OR semantics).
+     */
+    kind(k) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const kSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, k)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.PaletteBuilder_kind(diplomatReceive.buffer, this.ffiValue, kSlice.ptr);
 
         try {
             if (!diplomatReceive.resultFlag) {

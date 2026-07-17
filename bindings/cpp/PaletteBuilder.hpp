@@ -49,6 +49,15 @@ namespace capi {
     typedef struct PaletteBuilder_include_keyword_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} PaletteBuilder_include_keyword_result;
     PaletteBuilder_include_keyword_result PaletteBuilder_include_keyword(diplomat::capi::PaletteBuilder* self, diplomat::capi::DiplomatStringView keyword);
 
+    typedef struct PaletteBuilder_tag_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} PaletteBuilder_tag_result;
+    PaletteBuilder_tag_result PaletteBuilder_tag(diplomat::capi::PaletteBuilder* self, diplomat::capi::DiplomatStringView t);
+
+    typedef struct PaletteBuilder_exclude_tag_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} PaletteBuilder_exclude_tag_result;
+    PaletteBuilder_exclude_tag_result PaletteBuilder_exclude_tag(diplomat::capi::PaletteBuilder* self, diplomat::capi::DiplomatStringView t);
+
+    typedef struct PaletteBuilder_kind_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} PaletteBuilder_kind_result;
+    PaletteBuilder_kind_result PaletteBuilder_kind(diplomat::capi::PaletteBuilder* self, diplomat::capi::DiplomatStringView k);
+
     typedef struct PaletteBuilder_build_result {union {diplomat::capi::Palette* ok; diplomat::capi::NucleationError err;}; bool is_ok;} PaletteBuilder_build_result;
     PaletteBuilder_build_result PaletteBuilder_build(diplomat::capi::PaletteBuilder* self);
 
@@ -107,6 +116,24 @@ inline diplomat::result<std::monostate, NucleationError> PaletteBuilder::exclude
 inline diplomat::result<std::monostate, NucleationError> PaletteBuilder::include_keyword(std::string_view keyword) {
     auto result = diplomat::capi::PaletteBuilder_include_keyword(this->AsFFI(),
         {keyword.data(), keyword.size()});
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> PaletteBuilder::tag(std::string_view t) {
+    auto result = diplomat::capi::PaletteBuilder_tag(this->AsFFI(),
+        {t.data(), t.size()});
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> PaletteBuilder::exclude_tag(std::string_view t) {
+    auto result = diplomat::capi::PaletteBuilder_exclude_tag(this->AsFFI(),
+        {t.data(), t.size()});
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> PaletteBuilder::kind(std::string_view k) {
+    auto result = diplomat::capi::PaletteBuilder_kind(this->AsFFI(),
+        {k.data(), k.size()});
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 

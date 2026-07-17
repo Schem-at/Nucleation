@@ -18,11 +18,14 @@ void add_PaletteBuilder_binding(nb::module_ mod) {
         .def("exclude_keyword", &nucleation::PaletteBuilder::exclude_keyword, "keyword"_a)
         .def("exclude_light_sources", &nucleation::PaletteBuilder::exclude_light_sources)
         .def("exclude_needs_support", &nucleation::PaletteBuilder::exclude_needs_support)
+        .def("exclude_tag", &nucleation::PaletteBuilder::exclude_tag, "t"_a)
         .def("exclude_tile_entities", &nucleation::PaletteBuilder::exclude_tile_entities)
         .def("exclude_transparent", &nucleation::PaletteBuilder::exclude_transparent)
         .def("full_blocks_only", &nucleation::PaletteBuilder::full_blocks_only)
         .def("include_keyword", &nucleation::PaletteBuilder::include_keyword, "keyword"_a)
-        .def("survival_only", &nucleation::PaletteBuilder::survival_only);
+        .def("kind", &nucleation::PaletteBuilder::kind, "k"_a)
+        .def("survival_only", &nucleation::PaletteBuilder::survival_only)
+        .def("tag", &nucleation::PaletteBuilder::tag, "t"_a);
 }
 
 } 

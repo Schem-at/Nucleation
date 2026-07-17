@@ -10,6 +10,7 @@ require_once __DIR__ . '/TextureInfo.php';
 require_once __DIR__ . '/BlockPos.php';
 require_once __DIR__ . '/Dimensions.php';
 require_once __DIR__ . '/Autostack.php';
+require_once __DIR__ . '/Blocks.php';
 require_once __DIR__ . '/Brush.php';
 require_once __DIR__ . '/BuildingTool.php';
 require_once __DIR__ . '/Palette.php';

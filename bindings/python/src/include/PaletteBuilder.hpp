@@ -49,6 +49,15 @@ namespace capi {
     typedef struct PaletteBuilder_include_keyword_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} PaletteBuilder_include_keyword_result;
     PaletteBuilder_include_keyword_result PaletteBuilder_include_keyword(nucleation::capi::PaletteBuilder* self, nucleation::diplomat::capi::DiplomatStringView keyword);
 
+    typedef struct PaletteBuilder_tag_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} PaletteBuilder_tag_result;
+    PaletteBuilder_tag_result PaletteBuilder_tag(nucleation::capi::PaletteBuilder* self, nucleation::diplomat::capi::DiplomatStringView t);
+
+    typedef struct PaletteBuilder_exclude_tag_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} PaletteBuilder_exclude_tag_result;
+    PaletteBuilder_exclude_tag_result PaletteBuilder_exclude_tag(nucleation::capi::PaletteBuilder* self, nucleation::diplomat::capi::DiplomatStringView t);
+
+    typedef struct PaletteBuilder_kind_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} PaletteBuilder_kind_result;
+    PaletteBuilder_kind_result PaletteBuilder_kind(nucleation::capi::PaletteBuilder* self, nucleation::diplomat::capi::DiplomatStringView k);
+
     typedef struct PaletteBuilder_build_result {union {nucleation::capi::Palette* ok; nucleation::capi::NucleationError err;}; bool is_ok;} PaletteBuilder_build_result;
     PaletteBuilder_build_result PaletteBuilder_build(nucleation::capi::PaletteBuilder* self);
 
@@ -107,6 +116,24 @@ inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError>
 inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::PaletteBuilder::include_keyword(std::string_view keyword) {
     auto result = nucleation::capi::PaletteBuilder_include_keyword(this->AsFFI(),
         {keyword.data(), keyword.size()});
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::PaletteBuilder::tag(std::string_view t) {
+    auto result = nucleation::capi::PaletteBuilder_tag(this->AsFFI(),
+        {t.data(), t.size()});
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::PaletteBuilder::exclude_tag(std::string_view t) {
+    auto result = nucleation::capi::PaletteBuilder_exclude_tag(this->AsFFI(),
+        {t.data(), t.size()});
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::PaletteBuilder::kind(std::string_view k) {
+    auto result = nucleation::capi::PaletteBuilder_kind(this->AsFFI(),
+        {k.data(), k.size()});
     return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
