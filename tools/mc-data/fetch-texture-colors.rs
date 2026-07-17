@@ -1,8 +1,10 @@
 //! End-to-end block color pipeline for the vendored blockpedia module
 //! (requires the `mc-data-refresh` feature).
 //!
-//! 1. Fetches Mojang's version manifest and resolves `MC_VERSION` (kept in
-//!    sync with the PrismarineJS Java data pin in `data/blockpedia/`).
+//! 1. Fetches Mojang's version manifest and resolves the target version
+//!    (first CLI arg; defaults to the manifest's latest release — keep it in
+//!    sync with the Java block-data pin in `data/blockpedia/`, i.e. run
+//!    `refresh-block-data` first).
 //! 2. Downloads the client jar and extracts
 //!    `assets/minecraft/textures/block/*.png` into `target/mc-data/textures/`.
 //! 3. Maps every known block (from the crate's own PHF table, i.e. the
@@ -15,7 +17,7 @@
 //!    bakes into the generated block table on the next build.
 //!
 //! Run from the repo root:
-//! `cargo run --release --bin fetch-texture-colors --features mc-data-refresh`
+//! `cargo run --release --bin fetch-texture-colors --features mc-data-refresh [-- <version>]`
 
 use anyhow::{Context, Result};
 use std::collections::{BTreeMap, HashSet};
@@ -26,10 +28,6 @@ use std::path::Path;
 use nucleation::blockpedia::color::extraction::{ColorExtractor, ExtractionMethod};
 use nucleation::blockpedia::color::texture_mapping::{default_biome_tint, resolve_texture};
 
-/// Java version this pipeline targets. Must match the PrismarineJS pc data
-/// pin used for `data/blockpedia/prismarinejs_blocks.json.gz`.
-const MC_VERSION: &str = "1.21.11";
-
 const VERSION_MANIFEST_URL: &str =
     "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json";
 
@@ -39,27 +37,38 @@ fn main() -> Result<()> {
         .timeout(std::time::Duration::from_secs(300))
         .build()?;
 
+    // 1. Resolve the target version (first CLI arg or the manifest's latest
+    // release). Must match the Java block-data pin in data/blockpedia/.
+    println!("Fetching version manifest...");
+    let manifest: serde_json::Value = client
+        .get(VERSION_MANIFEST_URL)
+        .send()?
+        .error_for_status()?
+        .json()
+        .context("Failed to parse version manifest")?;
+
+    let version = match std::env::args().nth(1) {
+        Some(v) => v,
+        None => manifest["latest"]["release"]
+            .as_str()
+            .context("manifest has no latest.release")?
+            .to_string(),
+    };
+    println!("Target Minecraft version: {version}");
+
     let work_dir = Path::new("target/mc-data");
     let textures_dir = work_dir.join("textures");
-    let jar_path = work_dir.join(format!("client-{MC_VERSION}.jar"));
+    let jar_path = work_dir.join(format!("client-{version}.jar"));
 
-    // 1+2. Download the client jar (cached) and extract block textures
+    // 2. Download the client jar (cached) and extract block textures
     if !jar_path.exists() {
-        println!("Resolving Minecraft {MC_VERSION} via version manifest...");
-        let manifest: serde_json::Value = client
-            .get(VERSION_MANIFEST_URL)
-            .send()?
-            .error_for_status()?
-            .json()
-            .context("Failed to parse version manifest")?;
-
         let version_url = manifest["versions"]
             .as_array()
             .context("manifest has no versions array")?
             .iter()
-            .find(|v| v["id"].as_str() == Some(MC_VERSION))
+            .find(|v| v["id"].as_str() == Some(&version))
             .and_then(|v| v["url"].as_str())
-            .with_context(|| format!("Version {MC_VERSION} not found in manifest"))?
+            .with_context(|| format!("Version {version} not found in manifest"))?
             .to_string();
 
         println!("Fetching version metadata...");
