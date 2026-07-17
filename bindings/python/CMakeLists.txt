@@ -28,10 +28,13 @@ else()
   set(NUCLEATION_FEATURES $ENV{NUCLEATION_FEATURES})
 endif()
 
-add_custom_command(OUTPUT ${RUST_LIB}
+# Always invoke cargo (it is incremental and no-ops when fresh): the previous
+# OUTPUT-based rule skipped the build whenever a libnucleation.a already
+# existed, silently linking stale symbols after source changes.
+add_custom_target(nucleation_rust_target
   COMMAND cargo build --release --lib --features ${NUCLEATION_FEATURES}
+  BYPRODUCTS ${RUST_LIB}
   WORKING_DIRECTORY ${REPO_ROOT})
-add_custom_target(nucleation_rust_target DEPENDS ${RUST_LIB})
 add_library(nucleation_rust STATIC IMPORTED GLOBAL)
 add_dependencies(nucleation_rust nucleation_rust_target)
 set_target_properties(nucleation_rust PROPERTIES IMPORTED_LOCATION ${RUST_LIB})
