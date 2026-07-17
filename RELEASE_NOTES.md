@@ -1,3 +1,36 @@
+# Nucleation v0.3.3
+
+**Block semantics from official data, queryable everywhere.** The data
+pipeline now extracts three new facets straight from the Minecraft 26.2 jars:
+definition kinds + base-block links (Mojang's own variant data: oak_stairs
+knows it is a `minecraft:stair` of `oak_planks`), fully-resolved vanilla
+block tags (265 tags — wool, planks, mineable/pickaxe, ...), and
+model-derived full-cube geometry for every block. Substring guessing is
+retired: `full_blocks_only`, `exclude_transparent`, and the technical-block
+exclusion are all metadata-driven now.
+
+New in every language binding:
+
+- **`Blocks` query API**: `get(id)` (kind, base block, tags, geometry,
+  color, properties), `byTag`, `byKind`, `variantsOf(base)` (the whole
+  family: stairs/slab/fence/button/...), `states(id)` (every property
+  combination), `tags()`, `ids()`, `count()`
+- **`PaletteBuilder.tag(...)/.excludeTag(...)/.kind(...)`** — palettes from
+  real tags and kinds instead of keywords
+- **Masked fills**: `BuildingTool.fillOnlyAir(...)` and
+  `fillReplacing(shape, brush, targets)` for non-destructive edits
+- **SDF gradient materials**: fill rules accept `gradient` (palette +
+  from/to color along y or depth, or a lightness ramp) — terrain with block
+  gradients from pure JSON
+- **Scripting**: `palette_gradient_ids`, `palette_block_ids`,
+  `palette_closest_block` in the Lua and JS engines
+
+Java↔Bedrock mappings refreshed from GeyserMC's new NBT format, now at
+**Java 26.2 parity**: 32,366 blockstate mappings, full coverage including
+the 26.2 blocks, zero fallbacks.
+
+---
+
 # Nucleation v0.3.2
 
 **The block database now lives inside nucleation, current to Minecraft 26.2.**
