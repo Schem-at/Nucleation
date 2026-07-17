@@ -1,3 +1,31 @@
+# Nucleation v0.3.1
+
+**Fixes broken v0.3.0 native release artifacts.** The v0.3.0 per-platform
+libraries were built with the core `bridge` feature only, so every
+meshing/simulation/rendering export was missing — PHP's eager `FFI::cdef`
+could not even bind the release zip's own bindings. All native artifacts
+(platform zips, JVM jar natives) now ship the full `bridge-full` surface,
+matching the wheels, and CI now installs and exercises every wheel and the
+assembled jar (including a simulation-symbol check) before anything ships.
+
+Also in this release:
+
+- **First-class palettes** in every language: `Palette` (solid / structural /
+  decorative / concrete / wool / terracotta / grayscale presets, custom
+  palettes from a JSON block-id list, closest-block lookup),
+  `PaletteBuilder` (blockpedia filter flags + keyword include/exclude), and
+  `Brush.setPalette(...)` on all color/gradient brushes — bindings are no
+  longer locked to the built-in all-blocks palette. Default palettes now
+  exclude technical blocks (portals, fluids, fire, piston internals).
+- **JVM jar is multi-platform**: natives for linux x64/arm64, macOS
+  x64/arm64, and Windows x64 are bundled in JNA layout (previously linux
+  x64 only).
+- **crates.io publishing works again**: the published crate ships without
+  the git-only features (`simulation` — MCHPRS; `meshing`/`rendering` —
+  schematic-mesher); use the git dependency for those.
+
+---
+
 # Nucleation v0.3.0
 
 **Breaking: every language binding is now generated from a single source of truth.**
