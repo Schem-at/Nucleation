@@ -19,6 +19,20 @@ pub struct BlockFacts {
     pub properties: &'static [(&'static str, &'static [&'static str])],
     pub default_state: &'static [(&'static str, &'static str)],
     pub transparent: bool,
+    /// Official block kind from the vanilla report's `definition.type`
+    /// (e.g. `minecraft:stair`, `minecraft:slab`, `minecraft:door`;
+    /// plain full blocks are `minecraft:block`).
+    pub kind: &'static str,
+    /// The block this one is a shape variant of, from the vanilla report's
+    /// `definition.base_state` (stairs) or model-texture linkage
+    /// (e.g. `minecraft:oak_slab` -> `minecraft:oak_planks`).
+    pub base_block: Option<&'static str>,
+    /// Official block tags from the vanilla datapack (`minecraft:wool`,
+    /// `minecraft:mineable/pickaxe`, ...), nested tag refs resolved.
+    pub tags: &'static [&'static str],
+    /// Whether the default-state model resolves to a full opaque-geometry
+    /// cube (cube-family template or full 16x16x16 element).
+    pub full_cube: bool,
     pub extras: Extras,
 }
 
@@ -78,6 +92,37 @@ pub struct BlockState {
 impl BlockFacts {
     pub fn id(&self) -> &str {
         self.id
+    }
+
+    /// Official block kind (`minecraft:stair`, `minecraft:slab`,
+    /// `minecraft:block`, ...) from the vanilla report.
+    pub fn kind(&self) -> &'static str {
+        self.kind
+    }
+
+    /// The block this one is a shape variant of, if any
+    /// (`minecraft:oak_stairs` -> `minecraft:oak_planks`).
+    pub fn base_block(&self) -> Option<&'static str> {
+        self.base_block
+    }
+
+    /// True if the block carries the given vanilla block tag. Accepts both
+    /// `minecraft:wool` and the short `wool` form (also for nested paths
+    /// like `mineable/pickaxe`).
+    pub fn has_tag(&self, tag: &str) -> bool {
+        if tag.contains(':') {
+            self.tags.iter().any(|t| *t == tag)
+        } else {
+            self.tags
+                .iter()
+                .any(|t| t.strip_prefix("minecraft:") == Some(tag))
+        }
+    }
+
+    /// True if the default-state model is a full cube (official geometry;
+    /// replaces the old name-substring "full block" guess).
+    pub fn is_full_cube(&self) -> bool {
+        self.full_cube
     }
 
     pub fn properties(&self) -> HashMap<String, Vec<String>> {
@@ -512,6 +557,39 @@ pub fn get_block(id: &str) -> Option<&'static BlockFacts> {
 /// Get all blocks as an iterator
 pub fn all_blocks() -> impl Iterator<Item = &'static BlockFacts> {
     BLOCKS.values().copied()
+}
+
+/// All blocks carrying a vanilla block tag. Accepts `minecraft:wool` or the
+/// short `wool` form (also nested paths like `mineable/pickaxe`).
+pub fn blocks_by_tag(tag: &str) -> impl Iterator<Item = &'static BlockFacts> {
+    const EMPTY: &[&str] = &[];
+    let key = if tag.contains(':') {
+        tag.to_string()
+    } else {
+        format!("minecraft:{tag}")
+    };
+    BLOCK_TAGS
+        .get(key.as_str())
+        .copied()
+        .unwrap_or(EMPTY)
+        .iter()
+        .filter_map(|id| get_block(id))
+}
+
+/// All shape variants of a base block: every block whose `base_block` is
+/// `base_id` (`minecraft:oak_planks` -> stairs, slab, fence, button, ...).
+/// Accepts the short `oak_planks` form too. Sorted by block id.
+pub fn variants_of(base_id: &str) -> Vec<&'static BlockFacts> {
+    let key = if base_id.contains(':') {
+        base_id.to_string()
+    } else {
+        format!("minecraft:{base_id}")
+    };
+    let mut variants: Vec<&'static BlockFacts> = all_blocks()
+        .filter(|b| b.base_block == Some(key.as_str()))
+        .collect();
+    variants.sort_by_key(|b| b.id);
+    variants
 }
 
 // Block Entity translation

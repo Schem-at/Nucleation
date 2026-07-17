@@ -447,24 +447,9 @@ impl BlockQuery {
     // === HELPER METHODS ===
 
     fn is_solid_block(block: &BlockFacts) -> bool {
-        let id = block.id().to_lowercase();
-        !matches!(id.as_str(),
-            id if id.contains("slab") ||
-                  id.contains("stairs") ||
-                  id.contains("fence") ||
-                  id.contains("gate") ||
-                  id.contains("wall") ||
-                  id.contains("door") ||
-                  id.contains("trapdoor") ||
-                  id.contains("button") ||
-                  id.contains("pressure_plate") ||
-                  id.contains("carpet") ||
-                  id.contains("torch") ||
-                  id.contains("lantern") ||
-                  id.contains("chain") ||
-                  id.contains("rod") ||
-                  id.contains("bars")
-        )
+        // Official model geometry (cube-family template / full 16^3 element)
+        // instead of the old name-substring guess.
+        block.is_full_cube()
     }
 
     fn is_tile_entity(block: &BlockFacts) -> bool {
@@ -500,18 +485,9 @@ impl BlockQuery {
     }
 
     fn is_transparent(block: &BlockFacts) -> bool {
-        let id = block.id().to_lowercase();
-        matches!(id.as_str(),
-            id if id.contains("glass") ||
-                  id.contains("water") ||
-                  id.contains("lava") ||
-                  id.contains("air") ||
-                  id.contains("ice") ||
-                  id.contains("slime_block") ||
-                  id.contains("honey_block") ||
-                  id.contains("barrier") ||
-                  id.contains("structure_void")
-        )
+        // Data field from the block report pipeline instead of the old
+        // name-substring guess.
+        block.transparent
     }
 
     fn is_light_source(block: &BlockFacts) -> bool {

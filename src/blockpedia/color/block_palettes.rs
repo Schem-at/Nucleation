@@ -66,6 +66,24 @@ pub struct BlockFilter {
     pub exclude_patterns: Vec<String>,
     /// Custom block ID patterns to include (overrides excludes)
     pub include_patterns: Vec<String>,
+    /// Vanilla block tags a block must ALL carry (`minecraft:wool` or the
+    /// short `wool` form; empty = no requirement)
+    pub required_tags: Vec<String>,
+    /// Vanilla block tags that disqualify a block (any match excludes)
+    pub excluded_tags: Vec<String>,
+    /// Official block kinds to allow (`minecraft:stair`, short `stair`, ...;
+    /// empty = all kinds allowed)
+    pub kinds: Vec<String>,
+}
+
+/// Normalize a user-supplied tag/kind name to the stored
+/// `minecraft:`-prefixed form.
+fn normalize_mc_name(name: &str) -> String {
+    if name.contains(':') {
+        name.to_string()
+    } else {
+        format!("minecraft:{name}")
+    }
 }
 
 impl BlockFilter {
@@ -90,7 +108,7 @@ impl BlockFilter {
                 "_door".to_string(),
                 "_trapdoor".to_string(),
             ],
-            include_patterns: vec![],
+            ..Default::default()
         }
     }
 
@@ -104,8 +122,7 @@ impl BlockFilter {
             exclude_transparent: false,
             exclude_light_sources: false,
             survival_obtainable_only: true,
-            exclude_patterns: vec![],
-            include_patterns: vec![],
+            ..Default::default()
         }
     }
 
@@ -134,7 +151,7 @@ impl BlockFilter {
                 "lava".to_string(),
                 "air".to_string(),
             ],
-            include_patterns: vec![],
+            ..Default::default()
         }
     }
 
@@ -172,8 +189,8 @@ impl BlockFilter {
             return false;
         }
 
-        // Check full blocks only
-        if self.full_blocks_only && !Self::is_full_block(&id) {
+        // Check full blocks only (official model geometry, not name guessing)
+        if self.full_blocks_only && !block.is_full_cube() {
             return false;
         }
 
@@ -182,8 +199,8 @@ impl BlockFilter {
             return false;
         }
 
-        // Check transparency
-        if self.exclude_transparent && Self::is_transparent(&id) {
+        // Check transparency (data field from the block report pipeline)
+        if self.exclude_transparent && block.transparent {
             return false;
         }
 
@@ -194,6 +211,24 @@ impl BlockFilter {
 
         // Check survival obtainable
         if self.survival_obtainable_only && !Self::is_survival_obtainable(&id) {
+            return false;
+        }
+
+        // Check required/excluded vanilla tags
+        if !self.required_tags.is_empty() && !self.required_tags.iter().all(|t| block.has_tag(t)) {
+            return false;
+        }
+        if self.excluded_tags.iter().any(|t| block.has_tag(t)) {
+            return false;
+        }
+
+        // Check official block kinds (empty = all allowed)
+        if !self.kinds.is_empty()
+            && !self
+                .kinds
+                .iter()
+                .any(|k| block.kind() == normalize_mc_name(k))
+        {
             return false;
         }
 
@@ -230,27 +265,6 @@ impl BlockFilter {
         )
     }
 
-    fn is_full_block(id: &str) -> bool {
-        // Return false if it's a partial block
-        !matches!(id,
-            id if id.contains("slab") ||
-                  id.contains("stairs") ||
-                  id.contains("fence") ||
-                  id.contains("gate") ||
-                  id.contains("wall") ||
-                  id.contains("door") ||
-                  id.contains("trapdoor") ||
-                  id.contains("button") ||
-                  id.contains("pressure_plate") ||
-                  id.contains("carpet") ||
-                  id.contains("torch") ||
-                  id.contains("lantern") ||
-                  id.contains("chain") ||
-                  id.contains("rod") ||
-                  id.contains("bars")
-        )
-    }
-
     fn needs_support(id: &str) -> bool {
         matches!(id,
             id if id.contains("torch") ||
@@ -276,20 +290,6 @@ impl BlockFilter {
                   id.contains("sign") ||
                   id.contains("banner") ||
                   id.contains("painting")
-        )
-    }
-
-    fn is_transparent(id: &str) -> bool {
-        matches!(id,
-            id if id.contains("glass") ||
-                  id.contains("water") ||
-                  id.contains("lava") ||
-                  id.contains("air") ||
-                  id.contains("ice") ||
-                  id.contains("slime_block") ||
-                  id.contains("honey_block") ||
-                  id.contains("barrier") ||
-                  id.contains("structure_void")
         )
     }
 

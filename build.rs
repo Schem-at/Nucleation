@@ -2,8 +2,9 @@
 //!
 //! Reads the gzipped data snapshots in `data/blockpedia/` (Java 26.2 block
 //! states in the PrismarineJS schema, generated from Mojang's data-generator
-//! reports; Bedrock block states; Geyser blockstate mappings; and the
-//! texture-derived color cache) and writes two files into `OUT_DIR`:
+//! reports; official block semantics — kind/base/tags/full-cube; Bedrock
+//! block states; Geyser blockstate mappings; and the texture-derived color
+//! cache) and writes two files into `OUT_DIR`:
 //!
 //!   - `block_table.rs`     — `BLOCKS` PHF map of `BlockFacts` + color query helpers
 //!   - `bedrock_mappings.rs` — Java<->Bedrock blockstate string PHF maps
@@ -30,9 +31,73 @@ struct UnifiedBlockData {
     properties: HashMap<String, Vec<String>>,
     default_state: HashMap<String, String>,
     transparent: bool,
+    kind: String,
+    base_block: Option<String>,
+    tags: Vec<String>,
+    full_cube: bool,
     bedrock_id: Option<String>,
     bedrock_properties: Option<HashMap<String, Vec<String>>>,
     bedrock_default_state: Option<HashMap<String, String>>,
+}
+
+/// Official block semantics parsed from `block_semantics.json.gz`
+/// (kind / base block / tags / full-cube geometry; see tools/mc-data/).
+struct BlockSemantics {
+    kind: String,
+    base_block: Option<String>,
+    tags: Vec<String>,
+    full_cube: bool,
+}
+
+/// Parse `block_semantics.json.gz`: `id -> {kind, base?, tags[], full_cube}`.
+fn parse_semantics(json_data: &str) -> Result<HashMap<String, BlockSemantics>> {
+    let parsed: Value =
+        serde_json::from_str(json_data).context("Failed to parse block semantics JSON")?;
+    let map = parsed
+        .as_object()
+        .context("Block semantics JSON is not an object")?;
+    let mut out = HashMap::new();
+    for (id, entry) in map {
+        out.insert(
+            id.clone(),
+            BlockSemantics {
+                kind: entry["kind"]
+                    .as_str()
+                    .unwrap_or("minecraft:block")
+                    .to_string(),
+                base_block: entry["base"].as_str().map(String::from),
+                tags: entry["tags"]
+                    .as_array()
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(|t| t.as_str().map(String::from))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+                full_cube: entry["full_cube"].as_bool().unwrap_or(false),
+            },
+        );
+    }
+    Ok(out)
+}
+
+/// Attach the official semantics to the Java block list.
+fn merge_semantics(java_blocks: &mut [UnifiedBlockData], semantics: &HashMap<String, BlockSemantics>) {
+    let mut missing = 0usize;
+    for block in java_blocks {
+        match semantics.get(&block.id) {
+            Some(s) => {
+                block.kind = s.kind.clone();
+                block.base_block = s.base_block.clone();
+                block.tags = s.tags.clone();
+                block.full_cube = s.full_cube;
+            }
+            None => missing += 1,
+        }
+    }
+    if missing > 0 {
+        println!("cargo:warning=blockpedia data: {missing} blocks missing from block_semantics.json.gz");
+    }
 }
 
 fn read_gz(path: &Path) -> Result<String> {
@@ -103,6 +168,10 @@ fn parse_prismarine(json_data: &str) -> Result<Vec<UnifiedBlockData>> {
             properties,
             default_state: HashMap::new(), // PrismarineJS doesn't provide default states
             transparent,
+            kind: "minecraft:block".to_string(),
+            base_block: None,
+            tags: Vec::new(),
+            full_cube: false,
             bedrock_id: None,
             bedrock_properties: None,
             bedrock_default_state: None,
@@ -160,6 +229,10 @@ fn parse_bedrock_states(json_data: &str) -> Result<Vec<UnifiedBlockData>> {
                 properties: properties.clone(),
                 default_state: default_state.clone(),
                 transparent: false,
+                kind: "minecraft:block".to_string(),
+                base_block: None,
+                tags: Vec::new(),
+                full_cube: false,
                 bedrock_id: Some(id),
                 bedrock_properties: Some(properties),
                 bedrock_default_state: Some(default_state),
@@ -342,6 +415,22 @@ fn generate_block_table(
         )?;
         writeln!(file, "    id: \"{}\",", block_id)?;
         writeln!(file, "    transparent: {},", block_data.transparent)?;
+        writeln!(file, "    kind: \"{}\",", block_data.kind)?;
+        match &block_data.base_block {
+            Some(base) => writeln!(file, "    base_block: Some(\"{}\"),", base)?,
+            None => writeln!(file, "    base_block: None,")?,
+        }
+        // Identical string literals are pooled by rustc, so repeating tag
+        // names across blocks costs one copy each in rodata.
+        write!(file, "    tags: &[")?;
+        for (i, tag) in block_data.tags.iter().enumerate() {
+            if i > 0 {
+                write!(file, ", ")?;
+            }
+            write!(file, "\"{}\"", tag)?;
+        }
+        writeln!(file, "],")?;
+        writeln!(file, "    full_cube: {},", block_data.full_cube)?;
 
         writeln!(file, "    properties: &[")?;
         for (prop_name, prop_values) in &block_data.properties {
@@ -423,6 +512,30 @@ fn generate_block_table(
     for block_data in unified_blocks {
         let safe_name = rust_ident_for(&block_data.id);
         writeln!(file, "    \"{}\" => &{},", block_data.id, safe_name)?;
+    }
+    writeln!(file, "}};")?;
+    writeln!(file)?;
+
+    // Tag index: tag name -> block ids carrying it (drives `blocks_by_tag`).
+    let mut tag_index: std::collections::BTreeMap<&str, Vec<&str>> = std::collections::BTreeMap::new();
+    for block_data in unified_blocks {
+        for tag in &block_data.tags {
+            tag_index.entry(tag).or_default().push(&block_data.id);
+        }
+    }
+    writeln!(
+        file,
+        "pub static BLOCK_TAGS: Map<&'static str, &'static [&'static str]> = phf_map! {{"
+    )?;
+    for (tag, ids) in &tag_index {
+        write!(file, "    \"{}\" => &[", tag)?;
+        for (i, id) in ids.iter().enumerate() {
+            if i > 0 {
+                write!(file, ", ")?;
+            }
+            write!(file, "\"{}\"", id)?;
+        }
+        writeln!(file, "],")?;
     }
     writeln!(file, "}};")?;
     writeln!(file)?;
@@ -594,9 +707,14 @@ fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=data/blockpedia/bedrock_block_states.json.gz");
     println!("cargo:rerun-if-changed=data/blockpedia/geyser_mappings.json.gz");
     println!("cargo:rerun-if-changed=data/blockpedia/color_cache.json.gz");
+    println!("cargo:rerun-if-changed=data/blockpedia/block_semantics.json.gz");
 
     let prismarine_json = read_gz(&data_dir.join("prismarinejs_blocks.json.gz"))?;
     let mut java_blocks = parse_prismarine(&prismarine_json)?;
+
+    let semantics_json = read_gz(&data_dir.join("block_semantics.json.gz"))?;
+    let semantics = parse_semantics(&semantics_json)?;
+    merge_semantics(&mut java_blocks, &semantics);
 
     let bedrock_json = read_gz(&data_dir.join("bedrock_block_states.json.gz"))?;
     let bedrock_blocks = parse_bedrock_states(&bedrock_json)?;

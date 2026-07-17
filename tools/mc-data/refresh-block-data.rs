@@ -291,7 +291,9 @@ fn main() -> Result<()> {
 ///   nested `#tag` references resolved recursively.
 /// - `full_cube`: every model of the blockstate roots in a cube-family
 ///   template or carries a full 16x16x16 element (catches `grass_block`,
-///   mushroom blocks and other non-template cubes).
+///   `command_block` and other non-template cubes; mushroom blocks render
+///   as a multipart shell of face planes and conservatively classify as
+///   non-full, since that geometry is indistinguishable from vines).
 fn generate_semantics(
     report: &Map<String, Value>,
     server_jar: &Path,
@@ -889,7 +891,7 @@ impl ModelClassifier {
 
     /// True when every model referenced by the block's blockstate is a full
     /// cube: rooted in a cube-family template, or (for non-template models
-    /// like `grass_block` and the mushroom blocks) carrying a full
+    /// like `grass_block` and `command_block`) carrying a full
     /// 16x16x16 element.
     fn is_full_cube(&mut self, name: &str) -> bool {
         let models = self.blockstate_models(name);
