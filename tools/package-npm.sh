@@ -6,7 +6,10 @@ cd "$(dirname "$0")/.."
 
 OUT="${1:-dist/npm}"
 
-cargo build --release --target wasm32-unknown-unknown --lib --features bridge
+# simulation+meshing ride along (schemati's flow runs redstone sim in the
+# browser); rendering (wgpu needs wasm-bindgen glue) and scripting (luajit
+# can't target wasm) stay out of the wasm build.
+cargo build --release --target wasm32-unknown-unknown --lib --features bridge,simulation,meshing
 
 rm -rf "$OUT"
 mkdir -p "$OUT"
