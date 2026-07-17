@@ -183,11 +183,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu
           echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-      - name: Build nucleation native library (bridge surface)
-        # Core bridge only: heavier feature sets (meshing/simulation/rendering) are
-        # opt-in builds consumers can do themselves; keeping the shipped artifact at
-        # the core surface matches what the old `ffi`-feature artifact contained.
-        run: cargo build --release --lib --features bridge --target ${{ matrix.target }}
+      - name: Build nucleation native library (full bridge surface)
+        # bridge-full, matching the wheels: the generated bindings reference the
+        # entire surface, and downstream consumers (schemati's PHP layer) call
+        # meshing through these exact release libs — a core-only artifact turns
+        # those calls into missing-symbol errors at runtime.
+        run: cargo build --release --lib --features bridge-full --target ${{ matrix.target }}
       - name: Stage artifact
         shell: bash
         run: |
