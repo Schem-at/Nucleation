@@ -33,6 +33,9 @@ bindings for C, C++, JavaScript/TypeScript (WASM), Kotlin/JVM, Python, and PHP.
 - **Storage**: a pluggable byte store (in-memory, filesystem, and S3, Redis, or Postgres behind
   feature flags) for moving schematics and renders around with a single URI.
 - **Embedded scripting**: generate schematics from Lua or JavaScript scripts.
+- **Block database**: a vendored copy of blockpedia (`nucleation::blockpedia`) — Minecraft block
+  facts with texture-derived colors, palette and gradient generation, block-state queries and
+  transforms, and Java-Bedrock blockstate and block-entity translation via Geyser mappings.
 
 ## One API, seven languages
 
@@ -208,6 +211,27 @@ php -d ffi.enable=1 -r 'require "examples/bridge_smoke/php/main.php";'
 
 CI regenerates the bindings and fails on any diff, checks coverage of the full pre-0.3.0 FFI
 surface, and runs the smoke tests on every push.
+
+### Minecraft block data
+
+The block database (formerly the standalone `blockpedia` crate) lives in-tree at
+`src/blockpedia/`. Its data ships as gzipped snapshots in `data/blockpedia/` — currently pinned
+to Minecraft **1.21.11** (PrismarineJS Java block states, Bedrock block states, Geyser
+blockstate mappings, and a color cache derived from the vanilla texture pack) — and `build.rs`
+bakes them into static PHF tables at compile time. Normal builds never touch the network.
+
+To refresh the colors for a new Minecraft version, bump `MC_VERSION` in
+`tools/mc-data/fetch-texture-colors.rs` (keep it in sync with the PrismarineJS data pin) and run:
+
+```bash
+# Downloads the client jar, extracts block textures, regenerates
+# data/blockpedia/color_cache.json.gz (alpha-weighted averages + biome tints)
+cargo run --release --bin fetch-texture-colors --features mc-data-refresh
+```
+
+The other snapshots are upstream JSON files, gzipped verbatim (PrismarineJS
+`data/pc/<version>/blocks.json` and `data/bedrock/<version>/blockStates.json`, and GeyserMC's
+`mappings/blocks.json`). `tests/blockpedia_data_refresh.rs` guards data currency.
 
 ## License
 
