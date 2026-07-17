@@ -36,7 +36,10 @@ add_library(nucleation_rust STATIC IMPORTED GLOBAL)
 add_dependencies(nucleation_rust nucleation_rust_target)
 set_target_properties(nucleation_rust PROPERTIES IMPORTED_LOCATION ${RUST_LIB})
 if(WIN32)
-  target_link_libraries(nucleation_rust INTERFACE kernel32.lib advapi32.lib ntdll.lib userenv.lib ws2_32.lib dbghelp.lib)
+  # propsys/runtimeobject/bcrypt/d3dcompiler/opengl32: wgpu's DX12/GL
+  # backends (rendering feature, via windows_core) need them at link time.
+  target_link_libraries(nucleation_rust INTERFACE kernel32.lib advapi32.lib ntdll.lib userenv.lib ws2_32.lib dbghelp.lib
+    propsys.lib runtimeobject.lib bcrypt.lib d3dcompiler.lib opengl32.lib)
 endif()
 if(APPLE)
   # wgpu (rendering feature) needs the system frameworks
