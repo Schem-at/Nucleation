@@ -216,10 +216,10 @@ surface, and runs the smoke tests on every push.
 
 The block database (formerly the standalone `blockpedia` crate) lives in-tree at
 `src/blockpedia/`. Its data ships as gzipped snapshots in `data/blockpedia/` — currently pinned
-to Minecraft **26.2** (Java block states from Mojang's own data generator, Bedrock block
-states, Geyser blockstate mappings, and a color cache derived from the vanilla texture pack) —
-and `build.rs` bakes them into static PHF tables at compile time. Normal builds never touch
-the network.
+to Minecraft **26.2** (Java block states from Mojang's own data generator, official block
+semantics — kind/base-block/tags/full-cube geometry, Bedrock block states, Geyser blockstate
+mappings, and a color cache derived from the vanilla texture pack) — and `build.rs` bakes them
+into static PHF tables at compile time. Normal builds never touch the network.
 
 To refresh the Java data for a new Minecraft version (needs a JRE new enough for the server
 jar on `PATH`; MC 26.x wants Java 25+):
@@ -232,6 +232,17 @@ jar on `PATH`; MC 26.x wants Java 25+):
 #    from the previous snapshot, and blocks new in the version are enriched
 #    from an analogue block or a model-shape heuristic over the client jar
 #    (the run prints the added/removed diff and every derived fact).
+#    Also rebuilds block_semantics.json.gz from official data only:
+#    - kind + base block: the report's definition.type / definition.base_state
+#      (stairs), plus a model-texture linkage for the other shape variants
+#      (oak_slab renders with block/oak_planks, owned by oak_planks)
+#    - tags: every data/minecraft/tags/block/** tag from the server jar's
+#      inner (bundler) jar, nested #tag refs resolved
+#    - full_cube: blockstate models root in a cube-family template or carry
+#      a full 16x16x16 element
+#    These drive BlockFacts::{kind, base_block, has_tag, is_full_cube},
+#    blocks_by_tag/variants_of, and the BlockFilter/only_solid classifiers
+#    (which no longer guess from name substrings).
 cargo run --release --bin refresh-block-data --features mc-data-refresh
 
 # 2. Texture colors: downloads the client jar, extracts block textures,
