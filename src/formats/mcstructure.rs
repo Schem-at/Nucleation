@@ -7,8 +7,7 @@ use crate::nbt::{Endian, NbtMap, NbtValue};
 use crate::region::Region;
 use crate::universal_schematic::UniversalSchematic;
 use crate::BlockState;
-use blockpedia;
-use blockpedia::block_entity::{BlockEntityTranslator, NbtValue as BpNbtValue};
+use crate::blockpedia::block_entity::{BlockEntityTranslator, NbtValue as BpNbtValue};
 use smol_str::SmolStr;
 use std::collections::HashMap;
 use std::io::Cursor;
@@ -143,7 +142,7 @@ pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic> {
                 .collect();
 
             let translated_state =
-                if let Ok(bp_state) = blockpedia::BlockState::from_bedrock(&name, bp_props) {
+                if let Ok(bp_state) = crate::blockpedia::BlockState::from_bedrock(&name, bp_props) {
                     let translated_props: Vec<(smol_str::SmolStr, smol_str::SmolStr)> = bp_state
                         .properties()
                         .iter()
@@ -354,7 +353,7 @@ pub fn to_mcstructure(schematic: &UniversalSchematic) -> Result<Vec<u8>> {
 
         // Translate Java -> Bedrock using blockpedia.
         //
-        // IMPORTANT: blockpedia::BlockState::parse expects the full
+        // IMPORTANT: crate::blockpedia::BlockState::parse expects the full
         // "name[k=v,k2=v2]" form. Passing only `block.name` strips every
         // property before translation, so the Bedrock side ends up with
         // defaults (hopper→facing_direction=0, repeater→delay=1, etc.).
@@ -371,7 +370,7 @@ pub fn to_mcstructure(schematic: &UniversalSchematic) -> Result<Vec<u8>> {
             format!("{}[{}]", block.name, parts.join(","))
         };
 
-        let (name, properties) = if let Ok(java_bp_state) = blockpedia::BlockState::parse(&full_id)
+        let (name, properties) = if let Ok(java_bp_state) = crate::blockpedia::BlockState::parse(&full_id)
         {
             if let Ok(bedrock_bp_state) = java_bp_state.to_bedrock() {
                 let bed_props: Vec<(smol_str::SmolStr, smol_str::SmolStr)> = bedrock_bp_state

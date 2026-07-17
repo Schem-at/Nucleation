@@ -1,4 +1,4 @@
-use blockpedia::all_blocks;
+use nucleation::blockpedia::all_blocks;
 
 fn main() {
     let mut blocks = all_blocks();

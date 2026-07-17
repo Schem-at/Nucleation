@@ -1,6 +1,6 @@
 use crate::BlockState;
-use blockpedia::color::block_palettes::BlockFilter;
-use blockpedia::{all_blocks, BlockFacts, ExtendedColorData};
+use crate::blockpedia::color::block_palettes::BlockFilter;
+use crate::blockpedia::{all_blocks, BlockFacts, ExtendedColorData};
 use std::sync::{Arc, OnceLock};
 
 pub struct PaletteBuilder {
@@ -160,7 +160,7 @@ impl BlockPalette {
     {
         let mut blocks = Vec::new();
         for id in ids {
-            if let Some(facts) = blockpedia::get_block(id) {
+            if let Some(facts) = crate::blockpedia::get_block(id) {
                 if let Some(c) = &facts.extras.color {
                     blocks.push((c.to_extended(), facts.id.to_string()));
                 }

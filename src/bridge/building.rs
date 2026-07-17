@@ -415,7 +415,7 @@ pub mod ffi {
             b: u8,
             out: &mut DiplomatWrite,
         ) -> Result<(), NucleationError> {
-            let target = blockpedia::ExtendedColorData::from_rgb(r, g, b);
+            let target = crate::blockpedia::ExtendedColorData::from_rgb(r, g, b);
             let id = self.0.find_closest(&target).ok_or(NucleationError::NotFound)?;
             let _ = write!(out, "{}", id);
             Ok(())

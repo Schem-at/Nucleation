@@ -55,7 +55,7 @@ fn glob_match(pattern: &str, name: &str) -> bool {
 }
 
 fn match_category(cat: BpCategory, name: &str) -> bool {
-    match blockpedia::get_block(name) {
+    match crate::blockpedia::get_block(name) {
         Some(facts) => match cat {
             BpCategory::Transparent => facts.transparent,
             BpCategory::Solid => !facts.transparent,
