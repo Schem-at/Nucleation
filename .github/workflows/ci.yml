@@ -336,10 +336,23 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
 
+      - name: Archive release artifacts
+        # One zip per platform tree instead of hundreds of loose header/php
+        # files — the flat upload is unusable as a release and its burst of
+        # per-asset API calls trips GitHub's secondary rate limit.
+        run: |
+          mkdir release-assets
+          for d in release-artifacts/*/ ; do
+            base=$(basename "$d")
+            (cd "$d" && zip -qr "$GITHUB_WORKSPACE/release-assets/${base}.zip" .)
+          done
+          find release-artifacts -maxdepth 1 -type f -exec cp {} release-assets/ \;
+          ls -l release-assets
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.check-version.outputs.version }}
           name: Release v${{ needs.check-version.outputs.version }}
           generate_release_notes: true
-          files: release-artifacts/**
+          files: release-assets/*
