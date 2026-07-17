@@ -28,6 +28,19 @@
 //! 4. Prints the added/removed/changed diff and the derived facts for every
 //!    new block, then rewrites the gzipped snapshot.
 //!
+//! 5. Extracts official block *semantics* into
+//!    `data/blockpedia/block_semantics.json.gz` (id -> kind/base/tags/
+//!    full_cube):
+//!    - `kind`/`base`: the report's `definition.type` and
+//!      `definition.base_state.Name` (official variant linkage),
+//!    - `tags`: every `data/minecraft/tags/block/**.json` from the server
+//!      jar (the bundler's inner jar), `#tag` references resolved,
+//!    - `full_cube`: the client jar's blockstate models resolve to a
+//!      cube-family template or a full 16x16x16 element,
+//!    - blocks without `base_state` are linked to a base by their resolved
+//!      model texture set (e.g. `oak_slab` uses exactly `block/oak_planks`,
+//!      which `oak_planks` owns).
+//!
 //! Run from the repo root:
 //! `cargo run --release --bin refresh-block-data --features mc-data-refresh [-- <version>]`
 //!
@@ -46,6 +59,7 @@ const VERSION_MANIFEST_URL: &str =
     "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json";
 
 const SNAPSHOT_PATH: &str = "data/blockpedia/prismarinejs_blocks.json.gz";
+const SEMANTICS_PATH: &str = "data/blockpedia/block_semantics.json.gz";
 
 fn main() -> Result<()> {
     let client = reqwest::blocking::Client::builder()
@@ -248,10 +262,282 @@ fn main() -> Result<()> {
     write_gz(Path::new(SNAPSHOT_PATH), &pretty)?;
     println!();
     println!("Wrote {SNAPSHOT_PATH} ({} blocks).", out.len());
+
+    // --- block semantics (kind / base / tags / full_cube) ---
+    generate_semantics(&report, &server_jar, &mut classifier)?;
+
+    println!();
     println!("Next: `cargo run --release --bin fetch-texture-colors --features mc-data-refresh -- {version}`");
     println!("then `cargo build` to bake the new tables in.");
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Block semantics (kind / base / tags / full_cube)
+// ---------------------------------------------------------------------------
+
+/// Builds `block_semantics.json.gz` from official data only:
+///
+/// - `kind`: the vanilla report's `definition.type`
+/// - `base`: `definition.base_state.Name` when present (stairs); otherwise a
+///   model-texture linkage — a block whose blockstate models resolve to
+///   exactly the texture set owned by a single full-cube block gets that
+///   block as its base (`oak_slab` -> `oak_planks`, `stone_brick_wall` ->
+///   `stone_bricks`). Ambiguous texture ownership is broken by a texture
+///   whose file stem names the owner (`block/stone` -> `minecraft:stone`,
+///   not `infested_stone`); still-ambiguous links are dropped.
+/// - `tags`: `data/minecraft/tags/block/**.json` from the server jar,
+///   nested `#tag` references resolved recursively.
+/// - `full_cube`: every model of the blockstate roots in a cube-family
+///   template or carries a full 16x16x16 element (catches `grass_block`,
+///   mushroom blocks and other non-template cubes).
+fn generate_semantics(
+    report: &Map<String, Value>,
+    server_jar: &Path,
+    classifier: &mut ModelClassifier,
+) -> Result<()> {
+    println!();
+    println!("Extracting block semantics (kind / base / tags / full_cube)...");
+
+    let tags_by_block = extract_block_tags(server_jar)?;
+
+    // Pass 1: kind + full_cube for every block; collect texture ownership of
+    // full cubes for the base linkage below.
+    let mut kinds: HashMap<&str, &str> = HashMap::new();
+    let mut full_cubes: BTreeSet<&str> = BTreeSet::new();
+    let mut cube_textures: HashMap<&str, BTreeSet<String>> = HashMap::new();
+    for (id, entry) in report {
+        let name = id.strip_prefix("minecraft:").unwrap_or(id);
+        let kind = entry["definition"]["type"].as_str().unwrap_or("minecraft:block");
+        kinds.insert(id.as_str(), kind);
+        if classifier.is_full_cube(name) {
+            full_cubes.insert(id.as_str());
+            let textures = classifier.texture_set(name);
+            if !textures.is_empty() {
+                cube_textures.insert(id.as_str(), textures);
+            }
+        }
+    }
+
+    // Texture set -> owning full-cube blocks (for exact-set matches).
+    let mut owners_by_set: HashMap<&BTreeSet<String>, Vec<&str>> = HashMap::new();
+    for (id, set) in &cube_textures {
+        owners_by_set.entry(set).or_default().push(id);
+    }
+
+    // Pass 2: emit each block's record.
+    let mut semantics = Map::new();
+    let mut base_from_report = 0usize;
+    let mut base_from_textures = 0usize;
+    for (id, entry) in report {
+        let name = id.strip_prefix("minecraft:").unwrap_or(id);
+        let kind = kinds[id.as_str()];
+        let full_cube = full_cubes.contains(id.as_str());
+
+        let mut base: Option<String> = entry["definition"]["base_state"]["Name"]
+            .as_str()
+            .map(String::from);
+        if base.is_some() {
+            base_from_report += 1;
+        } else if !full_cube {
+            let textures = classifier.texture_set(name);
+            if let Some(owner) = base_by_textures(&textures, &owners_by_set, &cube_textures) {
+                base = Some(owner.to_string());
+                base_from_textures += 1;
+            }
+        }
+
+        let tags: Vec<&String> = tags_by_block.get(id.as_str()).map(|t| t.iter().collect()).unwrap_or_default();
+
+        let mut record = Map::new();
+        record.insert("kind".into(), json!(kind));
+        if let Some(base) = base {
+            record.insert("base".into(), json!(base));
+        }
+        record.insert("tags".into(), json!(tags));
+        record.insert("full_cube".into(), json!(full_cube));
+        semantics.insert(id.clone(), Value::Object(record));
+    }
+
+    let tagged = semantics
+        .values()
+        .filter(|v| !v["tags"].as_array().map(|a| a.is_empty()).unwrap_or(true))
+        .count();
+    println!(
+        "Semantics: {} blocks, {} full cubes, {} tagged, base links: {} from report + {} from model textures",
+        semantics.len(),
+        full_cubes.len(),
+        tagged,
+        base_from_report,
+        base_from_textures,
+    );
+
+    let pretty = serde_json::to_string_pretty(&Value::Object(semantics))?;
+    write_gz(Path::new(SEMANTICS_PATH), &pretty)?;
+    println!("Wrote {SEMANTICS_PATH}.");
+    Ok(())
+}
+
+/// Resolves a variant block's base by its model texture set: the unique
+/// full-cube block owning exactly (or, failing that, a superset of) the
+/// variant's textures. Ambiguities are broken by a texture file stem naming
+/// the owner; otherwise no base is emitted.
+fn base_by_textures<'a>(
+    textures: &BTreeSet<String>,
+    owners_by_set: &HashMap<&BTreeSet<String>, Vec<&'a str>>,
+    cube_textures: &HashMap<&'a str, BTreeSet<String>>,
+) -> Option<&'a str> {
+    if textures.is_empty() {
+        return None;
+    }
+    let exact: Vec<&str> = owners_by_set.get(textures).map(|v| v.to_vec()).unwrap_or_default();
+    let candidates: Vec<&str> = if !exact.is_empty() {
+        exact
+    } else {
+        cube_textures
+            .iter()
+            .filter(|(_, set)| textures.is_subset(set))
+            .map(|(id, _)| *id)
+            .collect()
+    };
+    match candidates.len() {
+        0 => None,
+        1 => Some(candidates[0]),
+        _ => {
+            // Tie-break: a texture like `block/stone` names its owner.
+            let stems: BTreeSet<&str> = textures
+                .iter()
+                .filter_map(|t| t.rsplit('/').next())
+                .collect();
+            let mut named: Vec<&str> = candidates
+                .iter()
+                .filter(|id| {
+                    let name = id.strip_prefix("minecraft:").unwrap_or(id);
+                    stems.contains(name)
+                })
+                .copied()
+                .collect();
+            named.sort();
+            match named.len() {
+                1 => Some(named[0]),
+                _ => None,
+            }
+        }
+    }
+}
+
+/// Reads every block tag from the server jar and resolves nested `#tag`
+/// references, producing `block id -> sorted tag names`.
+///
+/// The distributed server jar is a *bundler*: `META-INF/versions.list` points
+/// at the real server jar inside `META-INF/versions/`, which carries the
+/// vanilla datapack (`data/minecraft/tags/block/**.json`, including
+/// subdirectories like `mineable/`).
+fn extract_block_tags(server_jar: &Path) -> Result<HashMap<String, BTreeSet<String>>> {
+    let file = fs::File::open(server_jar)
+        .with_context(|| format!("Failed to open {}", server_jar.display()))?;
+    let mut outer = zip::ZipArchive::new(file).context("Server jar is not a valid zip")?;
+
+    // Locate + extract the inner jar (bundler format).
+    let mut versions_list = String::new();
+    outer
+        .by_name("META-INF/versions.list")
+        .context("Server jar has no META-INF/versions.list (not a bundler?)")?
+        .read_to_string(&mut versions_list)?;
+    let inner_rel = versions_list
+        .lines()
+        .next()
+        .and_then(|l| l.split_whitespace().last())
+        .context("META-INF/versions.list is empty")?;
+    let mut inner_bytes = Vec::new();
+    outer
+        .by_name(&format!("META-INF/versions/{inner_rel}"))
+        .with_context(|| format!("Inner jar META-INF/versions/{inner_rel} missing"))?
+        .read_to_end(&mut inner_bytes)?;
+    let mut jar = zip::ZipArchive::new(std::io::Cursor::new(inner_bytes))
+        .context("Inner server jar is not a valid zip")?;
+
+    // Raw tag files: tag name (e.g. `wool`, `mineable/pickaxe`) -> entries.
+    const PREFIX: &str = "data/minecraft/tags/block/";
+    let mut raw: HashMap<String, Vec<String>> = HashMap::new();
+    for i in 0..jar.len() {
+        let mut entry = jar.by_index(i)?;
+        let path = entry.name().to_string();
+        let Some(tag_name) = path
+            .strip_prefix(PREFIX)
+            .and_then(|p| p.strip_suffix(".json"))
+            .map(String::from)
+        else {
+            continue;
+        };
+        let mut buf = String::new();
+        entry.read_to_string(&mut buf)?;
+        let parsed: Value =
+            serde_json::from_str(&buf).with_context(|| format!("Bad tag json: {path}"))?;
+        let values = parsed["values"]
+            .as_array()
+            .with_context(|| format!("Tag {tag_name} has no values array"))?
+            .iter()
+            .filter_map(|v| match v {
+                // Entries are either plain ids/`#tag` refs or
+                // `{"id": ..., "required": bool}` objects.
+                Value::String(s) => Some(s.clone()),
+                Value::Object(o) => o.get("id").and_then(|s| s.as_str()).map(String::from),
+                _ => None,
+            })
+            .collect();
+        raw.insert(tag_name, values);
+    }
+    if raw.is_empty() {
+        bail!("No block tags found in the server jar");
+    }
+
+    // Resolve nested `#minecraft:tag` references to block-id sets.
+    fn resolve(
+        tag: &str,
+        raw: &HashMap<String, Vec<String>>,
+        memo: &mut HashMap<String, BTreeSet<String>>,
+        visiting: &mut Vec<String>,
+    ) -> BTreeSet<String> {
+        if let Some(done) = memo.get(tag) {
+            return done.clone();
+        }
+        if visiting.iter().any(|t| t == tag) {
+            return BTreeSet::new(); // cycle guard
+        }
+        visiting.push(tag.to_string());
+        let mut blocks = BTreeSet::new();
+        for value in raw.get(tag).map(|v| v.as_slice()).unwrap_or(&[]) {
+            if let Some(nested) = value.strip_prefix('#') {
+                let nested = nested.strip_prefix("minecraft:").unwrap_or(nested);
+                blocks.extend(resolve(nested, raw, memo, visiting));
+            } else {
+                blocks.insert(value.clone());
+            }
+        }
+        visiting.pop();
+        memo.insert(tag.to_string(), blocks.clone());
+        blocks
+    }
+
+    let mut memo = HashMap::new();
+    let mut by_block: HashMap<String, BTreeSet<String>> = HashMap::new();
+    let tag_names: Vec<String> = raw.keys().cloned().collect();
+    for tag in &tag_names {
+        for block in resolve(tag, &raw, &mut memo, &mut Vec::new()) {
+            by_block
+                .entry(block)
+                .or_default()
+                .insert(format!("minecraft:{tag}"));
+        }
+    }
+    println!(
+        "Block tags: {} tags covering {} blocks",
+        tag_names.len(),
+        by_block.len()
+    );
+    Ok(by_block)
 }
 
 // ---------------------------------------------------------------------------
@@ -599,6 +885,66 @@ impl ModelClassifier {
             }
         }
         false
+    }
+
+    /// True when every model referenced by the block's blockstate is a full
+    /// cube: rooted in a cube-family template, or (for non-template models
+    /// like `grass_block` and the mushroom blocks) carrying a full
+    /// 16x16x16 element.
+    fn is_full_cube(&mut self, name: &str) -> bool {
+        let models = self.blockstate_models(name);
+        if models.is_empty() {
+            return false;
+        }
+        models.iter().all(|m| self.model_is_full_cube(m))
+    }
+
+    fn model_is_full_cube(&mut self, model_ref: &str) -> bool {
+        let chain = self.parent_chain(model_ref);
+        if chain.iter().any(|c| CUBE_TEMPLATES.contains(&c.as_str())) {
+            return true;
+        }
+        // Nearest model in the chain that defines elements wins (child
+        // elements override the parent's entirely).
+        for m in &chain {
+            let Some(model) = self.model(m) else { continue };
+            let Some(elements) = model["elements"].as_array() else { continue };
+            let full = |v: &Value, expected: f64| {
+                v.as_array()
+                    .map(|a| a.iter().all(|c| c.as_f64() == Some(expected)))
+                    .unwrap_or(false)
+            };
+            return elements
+                .iter()
+                .any(|e| full(&e["from"], 0.0) && full(&e["to"], 16.0));
+        }
+        false
+    }
+
+    /// The resolved (non-reference, non-particle) texture set used across
+    /// all models of a block's blockstate, normalized without `minecraft:`.
+    fn texture_set(&mut self, name: &str) -> BTreeSet<String> {
+        let mut out = BTreeSet::new();
+        for model_ref in self.blockstate_models(name) {
+            // Merge texture maps along the parent chain (child wins).
+            let mut merged: HashMap<String, String> = HashMap::new();
+            for m in self.parent_chain(&model_ref) {
+                let Some(model) = self.model(&m) else { continue };
+                let Some(textures) = model["textures"].as_object() else { continue };
+                for (k, v) in textures {
+                    if let Some(v) = v.as_str() {
+                        merged.entry(k.clone()).or_insert_with(|| v.to_string());
+                    }
+                }
+            }
+            for (k, v) in &merged {
+                if k == "particle" || v.starts_with('#') {
+                    continue;
+                }
+                out.insert(v.strip_prefix("minecraft:").unwrap_or(v).to_string());
+            }
+        }
+        out
     }
 
     fn classify(&mut self, name: &str) -> ModelDerived {
