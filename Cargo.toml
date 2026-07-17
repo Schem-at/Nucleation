@@ -9,7 +9,10 @@ repository = "https://github.com/Schem-at/Nucleation"
 readme = "README.md"
 keywords = ["minecraft", "schematic", "parser", "voxel"]
 categories = ["game-development", "parser-implementations", "wasm"]
-exclude = ["web/", "examples/", "test-schematics/"]
+# Explicit allowlist: the repo carries generated bindings, test samples, and
+# packaging trees that ballooned `cargo package` to 448 MB compressed —
+# crates.io rejects anything over 10 MB. Only the library sources ship.
+include = ["src/**", "Cargo.toml", "README.md", "LICENSE", "RELEASE_NOTES.md"]
 
 [lib]
 # staticlib: linked into the Python (nanobind) extension so the wheel is self-contained.
