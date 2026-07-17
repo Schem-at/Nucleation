@@ -573,3 +573,67 @@ fn test_fill_enum_with_parametric() {
     println!("Parametric Start: {}", start.unwrap().name);
     println!("Parametric End: {}", end.unwrap().name);
 }
+
+#[test]
+fn palette_from_block_ids_and_introspection() {
+    use nucleation::building::BlockPalette;
+
+    let palette = BlockPalette::from_block_ids(
+        ["minecraft:stone", "minecraft:oak_planks", "minecraft:definitely_not_a_block"]
+            .into_iter(),
+    );
+    // Unknown ids are skipped; both real blocks have colors in blockpedia.
+    assert_eq!(palette.len(), 2);
+    let ids: Vec<&str> = palette.block_ids().collect();
+    assert!(ids.contains(&"minecraft:stone"));
+    assert!(ids.contains(&"minecraft:oak_planks"));
+}
+
+#[test]
+fn set_palette_constrains_fill_to_palette_blocks() {
+    use nucleation::building::{BlockPalette, ColorBrush, Cuboid};
+
+    let wool = Arc::new(BlockPalette::new_wool());
+    assert!(!wool.is_empty(), "wool palette must not be empty");
+
+    let mut schematic = UniversalSchematic::new("palette_fill".to_string());
+    let shape = ShapeEnum::Cuboid(Cuboid::new((0, 0, 0), (3, 3, 3)));
+    let mut brush = BrushEnum::Color(ColorBrush::new(200, 30, 30));
+    brush.set_palette(wool.clone());
+
+    let mut tool = BuildingTool::new(&mut schematic);
+    tool.fill_enum(&shape, &brush);
+
+    for x in 0..=3 {
+        for y in 0..=3 {
+            for z in 0..=3 {
+                let block = schematic.get_block(x, y, z).expect("block placed");
+                assert!(
+                    block.name.contains("wool"),
+                    "expected wool at ({x},{y},{z}), got {}",
+                    block.name
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn set_palette_is_noop_for_solid_brush() {
+    use nucleation::building::{BlockPalette, Cuboid, SolidBrush};
+    use nucleation::BlockState;
+
+    let mut schematic = UniversalSchematic::new("solid_palette".to_string());
+    let shape = ShapeEnum::Cuboid(Cuboid::new((0, 0, 0), (1, 1, 1)));
+    let mut brush = BrushEnum::Solid(SolidBrush::new(BlockState::new(
+        "minecraft:glass".to_string(),
+    )));
+    brush.set_palette(Arc::new(BlockPalette::new_wool()));
+
+    let mut tool = BuildingTool::new(&mut schematic);
+    tool.fill_enum(&shape, &brush);
+    assert_eq!(
+        schematic.get_block(0, 0, 0).unwrap().name.as_str(),
+        "minecraft:glass"
+    );
+}

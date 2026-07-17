@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include "InterpolationSpace.hpp"
 #include "NucleationError.hpp"
+#include "Palette.hpp"
 #include "diplomat_runtime.hpp"
 
 
@@ -33,6 +34,8 @@ namespace capi {
 
     typedef struct Brush_point_gradient_result {union {diplomat::capi::Brush* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Brush_point_gradient_result;
     Brush_point_gradient_result Brush_point_gradient(diplomat::capi::DiplomatI32View positions, diplomat::capi::DiplomatU8View colors, float falloff, diplomat::capi::InterpolationSpace space);
+
+    void Brush_set_palette(diplomat::capi::Brush* self, const diplomat::capi::Palette* palette);
 
     typedef struct Brush_curve_gradient_result {union {diplomat::capi::Brush* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Brush_curve_gradient_result;
     Brush_curve_gradient_result Brush_curve_gradient(diplomat::capi::DiplomatF32View stops, diplomat::capi::DiplomatU8View colors, diplomat::capi::InterpolationSpace space);
@@ -114,6 +117,11 @@ inline diplomat::result<std::unique_ptr<Brush>, NucleationError> Brush::point_gr
         falloff,
         space.AsFFI());
     return result.is_ok ? diplomat::result<std::unique_ptr<Brush>, NucleationError>(diplomat::Ok<std::unique_ptr<Brush>>(std::unique_ptr<Brush>(Brush::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Brush>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline void Brush::set_palette(const Palette& palette) {
+    diplomat::capi::Brush_set_palette(this->AsFFI(),
+        palette.AsFFI());
 }
 
 inline diplomat::result<std::unique_ptr<Brush>, NucleationError> Brush::curve_gradient(diplomat::span<const float> stops, diplomat::span<const uint8_t> colors, InterpolationSpace space) {

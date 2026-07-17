@@ -151,6 +151,36 @@ impl BlockPalette {
         })
     }
 
+    /// Build a palette from explicit block ids (e.g. `minecraft:stone`),
+    /// keeping only ids blockpedia knows a color for — unknown or colorless
+    /// ids are silently skipped, so check `len()` afterwards.
+    pub fn from_block_ids<'a, I>(ids: I) -> Self
+    where
+        I: IntoIterator<Item = &'a str>,
+    {
+        let mut blocks = Vec::new();
+        for id in ids {
+            if let Some(facts) = blockpedia::get_block(id) {
+                if let Some(c) = &facts.extras.color {
+                    blocks.push((c.to_extended(), facts.id.to_string()));
+                }
+            }
+        }
+        Self { blocks }
+    }
+
+    pub fn len(&self) -> usize {
+        self.blocks.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.blocks.is_empty()
+    }
+
+    pub fn block_ids(&self) -> impl Iterator<Item = &str> {
+        self.blocks.iter().map(|(_, id)| id.as_str())
+    }
+
     pub fn find_closest(&self, target: &ExtendedColorData) -> Option<String> {
         let mut best_dist = f32::MAX;
         let mut best_id = None;
@@ -218,6 +248,10 @@ impl ColorBrush {
             palette,
         }
     }
+
+    pub fn set_palette(&mut self, palette: Arc<BlockPalette>) {
+        self.palette = palette;
+    }
 }
 
 impl Brush for ColorBrush {
@@ -278,6 +312,10 @@ impl LinearGradientBrush {
     pub fn with_palette(mut self, palette: Arc<BlockPalette>) -> Self {
         self.palette = palette;
         self
+    }
+
+    pub fn set_palette(&mut self, palette: Arc<BlockPalette>) {
+        self.palette = palette;
     }
 }
 
@@ -383,6 +421,10 @@ impl MultiPointGradientBrush {
     pub fn with_palette(mut self, palette: Arc<BlockPalette>) -> Self {
         self.palette = palette;
         self
+    }
+
+    pub fn set_palette(&mut self, palette: Arc<BlockPalette>) {
+        self.palette = palette;
     }
 }
 
@@ -543,6 +585,10 @@ impl BilinearGradientBrush {
         self.palette = palette;
         self
     }
+
+    pub fn set_palette(&mut self, palette: Arc<BlockPalette>) {
+        self.palette = palette;
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -586,6 +632,10 @@ impl PointGradientBrush {
     pub fn with_palette(mut self, palette: Arc<BlockPalette>) -> Self {
         self.palette = palette;
         self
+    }
+
+    pub fn set_palette(&mut self, palette: Arc<BlockPalette>) {
+        self.palette = palette;
     }
 
     pub fn with_decay(mut self, decay: f64) -> Self {
@@ -774,6 +824,10 @@ impl ShadedBrush {
         self.palette = palette;
         self
     }
+
+    pub fn set_palette(&mut self, palette: Arc<BlockPalette>) {
+        self.palette = palette;
+    }
 }
 
 impl Brush for ShadedBrush {
@@ -839,6 +893,10 @@ impl CurveGradientBrush {
     pub fn with_palette(mut self, palette: Arc<BlockPalette>) -> Self {
         self.palette = palette;
         self
+    }
+
+    pub fn set_palette(&mut self, palette: Arc<BlockPalette>) {
+        self.palette = palette;
     }
 
     pub fn with_fallback_axis(mut self, start: (f64, f64, f64), end: (f64, f64, f64)) -> Self {

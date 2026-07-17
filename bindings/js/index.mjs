@@ -20,6 +20,10 @@ export { Brush } from "./Brush.mjs"
 
 export { BuildingTool } from "./BuildingTool.mjs"
 
+export { Palette } from "./Palette.mjs"
+
+export { PaletteBuilder } from "./PaletteBuilder.mjs"
+
 export { Shape } from "./Shape.mjs"
 
 export { DefinitionRegion } from "./DefinitionRegion.mjs"

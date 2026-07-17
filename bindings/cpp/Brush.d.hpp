@@ -11,6 +11,8 @@
 #include <cstdlib>
 #include "diplomat_runtime.hpp"
 
+namespace diplomat::capi { struct Palette; }
+class Palette;
 class InterpolationSpace;
 class NucleationError;
 
@@ -63,6 +65,14 @@ public:
    * points (`positions.len() == colors.len()`, a multiple of 3).
    */
   inline static diplomat::result<std::unique_ptr<Brush>, NucleationError> point_gradient(diplomat::span<const int32_t> positions, diplomat::span<const uint8_t> colors, float falloff, InterpolationSpace space);
+
+  /**
+   * Use `palette` for this brush's color→block snapping instead of the
+   * default all-blocks palette. No-op for `solid` brushes, which place
+   * a fixed block state. Set it before filling; the palette is shared,
+   * not copied.
+   */
+  inline void set_palette(const Palette& palette);
 
   /**
    * Gradient along a parametric curve: `stops` holds the curve parameters in

@@ -22,6 +22,10 @@ export { Brush } from "./Brush"
 
 export { BuildingTool } from "./BuildingTool"
 
+export { Palette } from "./Palette"
+
+export { PaletteBuilder } from "./PaletteBuilder"
+
 export { Shape } from "./Shape"
 
 export { DefinitionRegion } from "./DefinitionRegion"

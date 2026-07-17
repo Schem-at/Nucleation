@@ -9,6 +9,8 @@
 pub mod ffi {
     use super::super::schematic::ffi::Schematic;
     use super::super::shared::ffi::NucleationError;
+    use diplomat_runtime::DiplomatWrite;
+    use std::fmt::Write;
 
     /// Color interpolation space for gradient brushes. The old ABI passed this as
     /// `space: c_int` (`1` = Oklab, anything else = RGB).
@@ -314,8 +316,200 @@ pub mod ffi {
         }
     }
 
-    /// Decides which block goes at each point of a filled shape. Wraps `BrushEnum`.
+    /// A set of colored blocks that color/gradient brushes snap their computed
+    /// colors to (nearest neighbor in Oklab space). Wraps an Arc'd
+    /// [`crate::building::BlockPalette`]; sharing one palette across many
+    /// brushes is cheap.
     #[diplomat::opaque]
+    pub struct Palette(pub(crate) std::sync::Arc<crate::building::BlockPalette>);
+
+    impl Palette {
+        /// Every block blockpedia knows a color for (the default palette
+        /// brushes use when none is set).
+        pub fn all() -> Box<Palette> {
+            Box::new(Palette(std::sync::Arc::new(
+                crate::building::BlockPalette::new_all(),
+            )))
+        }
+
+        /// Only solid blocks: no transparency, gravity, tile entities, or
+        /// support requirements.
+        pub fn solid() -> Box<Palette> {
+            Box::new(Palette(std::sync::Arc::new(
+                crate::building::BlockPalette::new_solid(),
+            )))
+        }
+
+        /// Conservative structural set (full building blocks).
+        pub fn structural() -> Box<Palette> {
+            Box::new(Palette(std::sync::Arc::new(
+                crate::building::BlockPalette::new_structural(),
+            )))
+        }
+
+        /// Decorative set: allows stairs/slabs but no tile entities.
+        pub fn decorative() -> Box<Palette> {
+            Box::new(Palette(std::sync::Arc::new(
+                crate::building::BlockPalette::new_decorative(),
+            )))
+        }
+
+        /// The 16 concrete colors (excludes concrete powder).
+        pub fn concrete() -> Box<Palette> {
+            Box::new(Palette(std::sync::Arc::new(
+                crate::building::BlockPalette::new_concrete(),
+            )))
+        }
+
+        /// The 16 wool colors.
+        pub fn wool() -> Box<Palette> {
+            Box::new(Palette(std::sync::Arc::new(
+                crate::building::BlockPalette::new_wool(),
+            )))
+        }
+
+        /// Terracotta colors (excludes glazed variants).
+        pub fn terracotta() -> Box<Palette> {
+            Box::new(Palette(std::sync::Arc::new(
+                crate::building::BlockPalette::new_terracotta(),
+            )))
+        }
+
+        /// Grayscale-leaning blocks (stones, basalt, deepslate, ...).
+        pub fn grayscale() -> Box<Palette> {
+            Box::new(Palette(std::sync::Arc::new(
+                crate::building::BlockPalette::new_grayscale(),
+            )))
+        }
+
+        /// Custom palette from a JSON array of block ids, e.g.
+        /// `["minecraft:stone", "minecraft:oak_planks"]`. Ids blockpedia has
+        /// no color for are silently skipped — check `len` afterwards.
+        pub fn from_block_ids(ids_json: &DiplomatStr) -> Result<Box<Palette>, NucleationError> {
+            let json =
+                std::str::from_utf8(ids_json).map_err(|_| NucleationError::InvalidArgument)?;
+            let ids: Vec<String> =
+                serde_json::from_str(json).map_err(|_| NucleationError::Parse)?;
+            let palette =
+                crate::building::BlockPalette::from_block_ids(ids.iter().map(|s| s.as_str()));
+            Ok(Box::new(Palette(std::sync::Arc::new(palette))))
+        }
+
+        /// Number of blocks in the palette.
+        pub fn len(&self) -> usize {
+            self.0.len()
+        }
+
+        /// The palette's block ids as a JSON array string.
+        pub fn block_ids_json(&self, out: &mut DiplomatWrite) {
+            let ids: Vec<&str> = self.0.block_ids().collect();
+            let _ = write!(out, "{}", serde_json::to_string(&ids).unwrap_or_default());
+        }
+
+        /// The palette block whose color is closest (Oklab distance) to the
+        /// given RGB. Errors with `NotFound` on an empty palette.
+        pub fn closest_block(
+            &self,
+            r: u8,
+            g: u8,
+            b: u8,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let target = blockpedia::ExtendedColorData::from_rgb(r, g, b);
+            let id = self.0.find_closest(&target).ok_or(NucleationError::NotFound)?;
+            let _ = write!(out, "{}", id);
+            Ok(())
+        }
+    }
+
+    /// Filter-driven palette construction (wraps
+    /// [`crate::building::PaletteBuilder`], which fronts blockpedia's
+    /// `BlockFilter`). Call flag methods, then `build` — the builder is
+    /// consumed; further calls error with `AlreadyConsumed`.
+    #[diplomat::opaque_mut]
+    pub struct PaletteBuilder(pub(crate) Option<crate::building::PaletteBuilder>);
+
+    impl PaletteBuilder {
+        /// A builder matching every colored block (no filters yet).
+        pub fn create() -> Box<PaletteBuilder> {
+            Box::new(PaletteBuilder(Some(crate::building::PaletteBuilder::new())))
+        }
+
+        /// Exclude gravity-affected blocks (sand, gravel, ...).
+        pub fn exclude_falling(&mut self) -> Result<(), NucleationError> {
+            let b = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
+            self.0 = Some(b.exclude_falling());
+            Ok(())
+        }
+
+        /// Exclude blocks with block entities (chests, furnaces, ...).
+        pub fn exclude_tile_entities(&mut self) -> Result<(), NucleationError> {
+            let b = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
+            self.0 = Some(b.exclude_tile_entities());
+            Ok(())
+        }
+
+        /// Keep only full cube blocks (no stairs, slabs, fences, ...).
+        pub fn full_blocks_only(&mut self) -> Result<(), NucleationError> {
+            let b = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
+            self.0 = Some(b.full_blocks_only());
+            Ok(())
+        }
+
+        /// Exclude blocks that need supporting blocks (torches, rails, ...).
+        pub fn exclude_needs_support(&mut self) -> Result<(), NucleationError> {
+            let b = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
+            self.0 = Some(b.exclude_needs_support());
+            Ok(())
+        }
+
+        /// Exclude transparent/translucent blocks (glass, leaves, ...).
+        pub fn exclude_transparent(&mut self) -> Result<(), NucleationError> {
+            let b = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
+            self.0 = Some(b.exclude_transparent());
+            Ok(())
+        }
+
+        /// Exclude light-emitting blocks (glowstone, lanterns, ...).
+        pub fn exclude_light_sources(&mut self) -> Result<(), NucleationError> {
+            let b = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
+            self.0 = Some(b.exclude_light_sources());
+            Ok(())
+        }
+
+        /// Keep only blocks obtainable in survival.
+        pub fn survival_only(&mut self) -> Result<(), NucleationError> {
+            let b = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
+            self.0 = Some(b.survival_obtainable_only());
+            Ok(())
+        }
+
+        /// Exclude blocks whose id contains `keyword`.
+        pub fn exclude_keyword(&mut self, keyword: &DiplomatStr) -> Result<(), NucleationError> {
+            let kw = std::str::from_utf8(keyword).map_err(|_| NucleationError::InvalidArgument)?;
+            let b = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
+            self.0 = Some(b.exclude_keyword(kw));
+            Ok(())
+        }
+
+        /// Keep only blocks whose id contains `keyword` (repeatable; matches
+        /// any of the included keywords).
+        pub fn include_keyword(&mut self, keyword: &DiplomatStr) -> Result<(), NucleationError> {
+            let kw = std::str::from_utf8(keyword).map_err(|_| NucleationError::InvalidArgument)?;
+            let b = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
+            self.0 = Some(b.include_keyword(kw));
+            Ok(())
+        }
+
+        /// Build the palette; consumes the builder.
+        pub fn build(&mut self) -> Result<Box<Palette>, NucleationError> {
+            let b = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
+            Ok(Box::new(Palette(std::sync::Arc::new(b.build()))))
+        }
+    }
+
+    /// Decides which block goes at each point of a filled shape. Wraps `BrushEnum`.
+    #[diplomat::opaque_mut]
     pub struct Brush(pub(crate) crate::building::BrushEnum);
 
     impl Brush {
@@ -436,6 +630,14 @@ pub mod ffi {
                 .with_space(space.to_core())
                 .with_falloff(falloff as f64);
             Ok(Box::new(Brush(crate::building::BrushEnum::Point(brush))))
+        }
+
+        /// Use `palette` for this brush's color→block snapping instead of the
+        /// default all-blocks palette. No-op for `solid` brushes, which place
+        /// a fixed block state. Set it before filling; the palette is shared,
+        /// not copied.
+        pub fn set_palette(&mut self, palette: &Palette) {
+            self.0.set_palette(palette.0.clone());
         }
 
         /// Gradient along a parametric curve: `stops` holds the curve parameters in

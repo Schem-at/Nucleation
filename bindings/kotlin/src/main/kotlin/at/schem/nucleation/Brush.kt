@@ -13,6 +13,7 @@ internal interface BrushLib: Library {
     fun Brush_shaded(r: FFIUint8, g: FFIUint8, b: FFIUint8, lx: Float, ly: Float, lz: Float): Pointer
     fun Brush_bilinear_gradient(ox: Int, oy: Int, oz: Int, ux: Int, uy: Int, uz: Int, vx: Int, vy: Int, vz: Int, r00: FFIUint8, g00: FFIUint8, b00: FFIUint8, r10: FFIUint8, g10: FFIUint8, b10: FFIUint8, r01: FFIUint8, g01: FFIUint8, b01: FFIUint8, r11: FFIUint8, g11: FFIUint8, b11: FFIUint8, space: Int): Pointer
     fun Brush_point_gradient(positions: Slice, colors: Slice, falloff: Float, space: Int): ResultPointerInt
+    fun Brush_set_palette(handle: Pointer, palette: Pointer): Unit
     fun Brush_curve_gradient(stops: Slice, colors: Slice, space: Int): ResultPointerInt
 }
 /** Decides which block goes at each point of a filled shape. Wraps `BrushEnum`.
@@ -168,6 +169,17 @@ class Brush internal constructor (
                 colorsSliceMemory.close()
             }
         }
+    }
+    
+    /** Use `palette` for this brush's color→block snapping instead of the
+    *default all-blocks palette. No-op for `solid` brushes, which place
+    *a fixed block state. Set it before filling; the palette is shared,
+    *not copied.
+    */
+    fun setPalette(palette: Palette): Unit {
+        
+        val returnVal = lib.Brush_set_palette(handle, palette.handle);
+        
     }
 
 }

@@ -12,6 +12,8 @@ require_once __DIR__ . '/Dimensions.php';
 require_once __DIR__ . '/Autostack.php';
 require_once __DIR__ . '/Brush.php';
 require_once __DIR__ . '/BuildingTool.php';
+require_once __DIR__ . '/Palette.php';
+require_once __DIR__ . '/PaletteBuilder.php';
 require_once __DIR__ . '/Shape.php';
 require_once __DIR__ . '/DefinitionRegion.php';
 require_once __DIR__ . '/SchematicRegions.php';

@@ -9,6 +9,7 @@
 
 #include "InterpolationSpace.d.h"
 #include "NucleationError.d.h"
+#include "Palette.d.h"
 
 #include "Brush.d.h"
 
@@ -30,6 +31,8 @@ Brush* Brush_bilinear_gradient(int32_t ox, int32_t oy, int32_t oz, int32_t ux, i
 
 typedef struct Brush_point_gradient_result {union {Brush* ok; NucleationError err;}; bool is_ok;} Brush_point_gradient_result;
 Brush_point_gradient_result Brush_point_gradient(DiplomatI32View positions, DiplomatU8View colors, float falloff, InterpolationSpace space);
+
+void Brush_set_palette(Brush* self, const Palette* palette);
 
 typedef struct Brush_curve_gradient_result {union {Brush* ok; NucleationError err;}; bool is_ok;} Brush_curve_gradient_result;
 Brush_curve_gradient_result Brush_curve_gradient(DiplomatF32View stops, DiplomatU8View colors, InterpolationSpace space);

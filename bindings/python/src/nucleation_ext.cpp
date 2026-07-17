@@ -14,6 +14,8 @@ void add_Dimensions_binding(nb::module_);
 void add_Autostack_binding(nb::module_);
 void add_Brush_binding(nb::module_);
 void add_BuildingTool_binding(nb::module_);
+void add_Palette_binding(nb::module_);
+void add_PaletteBuilder_binding(nb::module_);
 void add_Shape_binding(nb::module_);
 void add_DefinitionRegion_binding(nb::module_);
 void add_SchematicRegions_binding(nb::module_);
@@ -124,6 +126,8 @@ NB_MODULE(nucleation, mod)
     add_Autostack_binding(mod);
     add_Brush_binding(mod);
     add_BuildingTool_binding(mod);
+    add_Palette_binding(mod);
+    add_PaletteBuilder_binding(mod);
     add_Shape_binding(mod);
     add_DefinitionRegion_binding(mod);
     add_SchematicRegions_binding(mod);

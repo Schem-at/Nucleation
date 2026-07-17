@@ -3,6 +3,7 @@
 
 #include "Brush.hpp"
 #include "InterpolationSpace.hpp"
+#include "Palette.hpp"
 
 namespace nucleation {
 void add_Brush_binding(nb::module_ mod) {
@@ -18,6 +19,7 @@ void add_Brush_binding(nb::module_ mod) {
         .def_static("curve_gradient", std::move(maybe_op_unwrap(&nucleation::Brush::curve_gradient)), "stops"_a, "colors"_a, "space"_a)
         .def_static("linear_gradient", std::move(maybe_op_unwrap(&nucleation::Brush::linear_gradient)), "x1"_a, "y1"_a, "z1"_a, "r1"_a, "g1"_a, "b1"_a, "x2"_a, "y2"_a, "z2"_a, "r2"_a, "g2"_a, "b2"_a, "space"_a)
         .def_static("point_gradient", std::move(maybe_op_unwrap(&nucleation::Brush::point_gradient)), "positions"_a, "colors"_a, "falloff"_a, "space"_a)
+        .def("set_palette", &nucleation::Brush::set_palette, "palette"_a)
         .def_static("shaded", std::move(maybe_op_unwrap(&nucleation::Brush::shaded)), "r"_a, "g"_a, "b"_a, "lx"_a, "ly"_a, "lz"_a)
         .def_static("solid", std::move(maybe_op_unwrap(&nucleation::Brush::solid)), "block_name"_a);
 }

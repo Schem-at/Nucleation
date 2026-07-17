@@ -13,6 +13,8 @@
 namespace nucleation {
 namespace capi { struct Brush; }
 class Brush;
+namespace capi { struct Palette; }
+class Palette;
 class InterpolationSpace;
 class NucleationError;
 } // namespace nucleation
@@ -66,6 +68,14 @@ public:
    * points (`positions.len() == colors.len()`, a multiple of 3).
    */
   inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Brush>, nucleation::NucleationError> point_gradient(nucleation::diplomat::span<const int32_t> positions, nucleation::diplomat::span<const uint8_t> colors, float falloff, nucleation::InterpolationSpace space);
+
+  /**
+   * Use `palette` for this brush's color→block snapping instead of the
+   * default all-blocks palette. No-op for `solid` brushes, which place
+   * a fixed block state. Set it before filling; the palette is shared,
+   * not copied.
+   */
+  inline void set_palette(const nucleation::Palette& palette);
 
   /**
    * Gradient along a parametric curve: `stops` holds the curve parameters in

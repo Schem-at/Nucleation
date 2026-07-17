@@ -123,6 +123,23 @@ pub enum BrushEnum {
     CurveGradient(CurveGradientBrush),
 }
 
+impl BrushEnum {
+    /// Point every palette-driven variant at `palette`. No-op for `Solid`,
+    /// which places a fixed block state and never consults a palette.
+    pub fn set_palette(&mut self, palette: std::sync::Arc<crate::building::BlockPalette>) {
+        match self {
+            BrushEnum::Solid(_) => {}
+            BrushEnum::Color(b) => b.set_palette(palette),
+            BrushEnum::Linear(b) => b.set_palette(palette),
+            BrushEnum::Bilinear(b) => b.set_palette(palette),
+            BrushEnum::Point(b) => b.set_palette(palette),
+            BrushEnum::MultiPoint(b) => b.set_palette(palette),
+            BrushEnum::Shaded(b) => b.set_palette(palette),
+            BrushEnum::CurveGradient(b) => b.set_palette(palette),
+        }
+    }
+}
+
 impl Brush for BrushEnum {
     fn get_block(&self, x: i32, y: i32, z: i32, normal: (f64, f64, f64)) -> Option<BlockState> {
         match self {

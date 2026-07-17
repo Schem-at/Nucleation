@@ -78,6 +78,10 @@ final class Brush {
         return new Brush($result->ok, true);
     }
 
+    public function setPalette( $palette) {
+        Lib::ffi()->Brush_set_palette($this->ptr, $palette->ptr);
+    }
+
     public static function curveGradient(array $stops, array $colors, int $space) {
         $__n0 = count($stops);
         $__view0 = Lib::ffi()->new('DiplomatF32View');
