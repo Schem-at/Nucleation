@@ -40,7 +40,8 @@ if(WIN32)
 endif()
 if(APPLE)
   # wgpu (rendering feature) needs the system frameworks
-  target_link_libraries(nucleation_rust INTERFACE "-framework Metal" "-framework QuartzCore" "-framework CoreFoundation")
+  # Foundation: wgpu_hal's Metal layer observer uses NSKeyValueChange* symbols
+  target_link_libraries(nucleation_rust INTERFACE "-framework Metal" "-framework QuartzCore" "-framework CoreFoundation" "-framework Foundation")
 endif()
 
 file(GLOB_RECURSE SUBMODULE_FILES src/sub_modules/*.cpp)
@@ -52,6 +53,14 @@ nanobind_add_module(
   ${SUBMODULE_FILES}
 )
 target_include_directories(nucleation PUBLIC "src/include")
+# The Diplomat-generated dealloc shim reaches into nanobind's internal
+# nb_inst struct (the reason for the ==2.12.0 pin), so the generated
+# sources compile against nb_internals.h, which needs nanobind's bundled
+# robin_map headers — private to the nanobind target, so add them here.
+execute_process(
+  COMMAND "${Python_EXECUTABLE}" -c "import nanobind, os; print(os.path.dirname(nanobind.__file__))"
+  OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE NB_PKG_DIR)
+target_include_directories(nucleation PRIVATE "${NB_PKG_DIR}/ext/robin_map/include")
 target_compile_features(nucleation PUBLIC cxx_std_20)
 target_link_libraries(nucleation PUBLIC nucleation_rust ${Python3_SABI_LIBRARY})
 

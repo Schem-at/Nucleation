@@ -23,7 +23,15 @@ EXT_SUFFIX=$("$PY" -c "import sysconfig; print(sysconfig.get_config_var('EXT_SUF
 BINDINGS="$ROOT/bindings/python/src"
 OUT="nucleation${EXT_SUFFIX}"
 
+# bridge-full's static lib is big enough that GNU ld chokes on it
+# ("failed to set dynamic section sizes: bad value"); use lld on Linux.
+EXTRA_LDFLAGS=""
+if [[ "$(uname)" == "Linux" ]]; then
+    EXTRA_LDFLAGS="-fuse-ld=lld"
+fi
+
 clang++ -std=c++20 -shared -undefined dynamic_lookup -fvisibility=hidden \
+    $EXTRA_LDFLAGS \
     -I "$PY_INCLUDE" \
     -I "$NB_DIR/include" \
     -I "$NB_DIR/ext/robin_map/include" \
