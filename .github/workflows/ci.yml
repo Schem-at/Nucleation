@@ -235,6 +235,33 @@ jobs:
           python -m auditwheel repair wheels/*.whl -w wheels-repaired
           rm wheels/*.whl
           mv wheels-repaired/*.whl wheels/
+      - name: Install and exercise wheel (${{ matrix.label }})
+        # Building green is not enough: a wheel can be missing native symbols
+        # and still build fine (ELF defers unresolved symbols to call time —
+        # exactly how a half-linked wheel once shipped green). Install into a
+        # fresh venv and drive real calls, including the simulation surface
+        # (Value), the symbols that went missing. Runs after the manylinux
+        # repair so linux exercises the wheel that actually ships.
+        shell: bash
+        run: |
+          python -m venv wheel-test-venv
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            VENV_PY=wheel-test-venv/Scripts/python.exe
+          else
+            VENV_PY=wheel-test-venv/bin/python
+          fi
+          "$VENV_PY" -m pip install --upgrade pip
+          "$VENV_PY" -m pip install wheels/*.whl
+          "$VENV_PY" - <<'EOF'
+          import nucleation
+          s = nucleation.Schematic.create("t")
+          s.set_block_from_string(0, 0, 0, 'minecraft:chest[facing=west]{Items:[{Slot:0b,id:"minecraft:diamond",Count:64b}]}')
+          name = s.get_block_name(0, 0, 0)
+          assert name == "minecraft:chest", name
+          m = nucleation.Value.from_u32(7)
+          assert m.as_u32() == 7
+          print("wheel functional check OK:", name)
+          EOF
       - uses: actions/upload-artifact@v4
         with:
           name: python-wheels-${{ matrix.label }}
