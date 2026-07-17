@@ -65,3 +65,4 @@ examples/bridge_smoke/python/.venv/
 bindings/kotlin/build/
 bindings/kotlin/.gradle/
 bindings/python/build/
+bindings/kotlin/.kotlin/
