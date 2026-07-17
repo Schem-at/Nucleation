@@ -74,6 +74,30 @@ public:
   inline static std::unique_ptr<Palette> grayscale();
 
   /**
+   * The planks family — a natural light→dark wood ramp.
+   */
+  inline static std::unique_ptr<Palette> wood();
+
+  /**
+   * A copy of this palette ordered by perceptual lightness (Oklab L,
+   * dark → light). Combined with `block_ids_json`, gives a
+   * ready-to-index ramp: `ids[i]` for intensity `i / (len - 1)`.
+   */
+  inline std::unique_ptr<Palette> sorted_by_lightness() const;
+
+  /**
+   * JSON array of exactly `steps` block ids sampling the color
+   * gradient from (`r1`,`g1`,`b1`) to (`r2`,`g2`,`b2`) in Oklab
+   * space, each step snapped to this palette's closest block. Built
+   * for value→block lookups (heatmaps, fractals): index the returned
+   * list by `intensity * (steps - 1)`. Entries may repeat on coarse
+   * palettes; errors with `NotFound` on an empty palette.
+   */
+  inline diplomat::result<std::string, NucleationError> gradient_ids_json(uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2, uint32_t steps) const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> gradient_ids_json_write(uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2, uint32_t steps, W& writeable_output) const;
+
+  /**
    * Custom palette from a JSON array of block ids, e.g.
    * `["minecraft:stone", "minecraft:oak_planks"]`. Ids blockpedia has
    * no color for are silently skipped — check `len` afterwards.

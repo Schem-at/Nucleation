@@ -32,6 +32,13 @@ Palette* Palette_terracotta(void);
 
 Palette* Palette_grayscale(void);
 
+Palette* Palette_wood(void);
+
+Palette* Palette_sorted_by_lightness(const Palette* self);
+
+typedef struct Palette_gradient_ids_json_result {union { NucleationError err;}; bool is_ok;} Palette_gradient_ids_json_result;
+Palette_gradient_ids_json_result Palette_gradient_ids_json(const Palette* self, uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2, uint32_t steps, DiplomatWrite* write);
+
 typedef struct Palette_from_block_ids_result {union {Palette* ok; NucleationError err;}; bool is_ok;} Palette_from_block_ids_result;
 Palette_from_block_ids_result Palette_from_block_ids(DiplomatStringView ids_json);
 

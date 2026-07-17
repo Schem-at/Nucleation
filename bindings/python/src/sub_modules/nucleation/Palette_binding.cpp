@@ -18,11 +18,14 @@ void add_Palette_binding(nb::module_ mod) {
         .def_static("concrete", std::move(maybe_op_unwrap(&nucleation::Palette::concrete)))
         .def_static("decorative", std::move(maybe_op_unwrap(&nucleation::Palette::decorative)))
         .def_static("from_block_ids", std::move(maybe_op_unwrap(&nucleation::Palette::from_block_ids)), "ids_json"_a)
+        .def("gradient_ids_json", &nucleation::Palette::gradient_ids_json, "r1"_a, "g1"_a, "b1"_a, "r2"_a, "g2"_a, "b2"_a, "steps"_a)
         .def_static("grayscale", std::move(maybe_op_unwrap(&nucleation::Palette::grayscale)))
         .def("len", &nucleation::Palette::len)
         .def_static("solid", std::move(maybe_op_unwrap(&nucleation::Palette::solid)))
+        .def("sorted_by_lightness", std::move(maybe_op_unwrap(&nucleation::Palette::sorted_by_lightness)))
         .def_static("structural", std::move(maybe_op_unwrap(&nucleation::Palette::structural)))
         .def_static("terracotta", std::move(maybe_op_unwrap(&nucleation::Palette::terracotta)))
+        .def_static("wood", std::move(maybe_op_unwrap(&nucleation::Palette::wood)))
         .def_static("wool", std::move(maybe_op_unwrap(&nucleation::Palette::wool)));
 }
 

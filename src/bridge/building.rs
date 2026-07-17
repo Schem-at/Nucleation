@@ -382,6 +382,46 @@ pub mod ffi {
             )))
         }
 
+        /// The planks family — a natural light→dark wood ramp.
+        pub fn wood() -> Box<Palette> {
+            Box::new(Palette(std::sync::Arc::new(
+                crate::building::BlockPalette::new_wood(),
+            )))
+        }
+
+        /// A copy of this palette ordered by perceptual lightness (Oklab L,
+        /// dark → light). Combined with `block_ids_json`, gives a
+        /// ready-to-index ramp: `ids[i]` for intensity `i / (len - 1)`.
+        pub fn sorted_by_lightness(&self) -> Box<Palette> {
+            Box::new(Palette(std::sync::Arc::new(self.0.sorted_by_lightness())))
+        }
+
+        /// JSON array of exactly `steps` block ids sampling the color
+        /// gradient from (`r1`,`g1`,`b1`) to (`r2`,`g2`,`b2`) in Oklab
+        /// space, each step snapped to this palette's closest block. Built
+        /// for value→block lookups (heatmaps, fractals): index the returned
+        /// list by `intensity * (steps - 1)`. Entries may repeat on coarse
+        /// palettes; errors with `NotFound` on an empty palette.
+        #[allow(clippy::too_many_arguments)]
+        pub fn gradient_ids_json(
+            &self,
+            r1: u8,
+            g1: u8,
+            b1: u8,
+            r2: u8,
+            g2: u8,
+            b2: u8,
+            steps: u32,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            if self.0.is_empty() {
+                return Err(NucleationError::NotFound);
+            }
+            let ids = self.0.gradient_ids((r1, g1, b1), (r2, g2, b2), steps as usize);
+            let _ = write!(out, "{}", serde_json::to_string(&ids).unwrap_or_default());
+            Ok(())
+        }
+
         /// Custom palette from a JSON array of block ids, e.g.
         /// `["minecraft:stone", "minecraft:oak_planks"]`. Ids blockpedia has
         /// no color for are silently skipped — check `len` afterwards.

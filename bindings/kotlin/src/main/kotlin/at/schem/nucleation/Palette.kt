@@ -15,6 +15,9 @@ internal interface PaletteLib: Library {
     fun Palette_wool(): Pointer
     fun Palette_terracotta(): Pointer
     fun Palette_grayscale(): Pointer
+    fun Palette_wood(): Pointer
+    fun Palette_sorted_by_lightness(handle: Pointer): Pointer
+    fun Palette_gradient_ids_json(handle: Pointer, r1: FFIUint8, g1: FFIUint8, b1: FFIUint8, r2: FFIUint8, g2: FFIUint8, b2: FFIUint8, steps: FFIUint32, write: Pointer): ResultUnitInt
     fun Palette_from_block_ids(idsJson: Slice): ResultPointerInt
     fun Palette_len(handle: Pointer): FFISizet
     fun Palette_block_ids_json(handle: Pointer, write: Pointer): Unit
@@ -151,6 +154,18 @@ class Palette internal constructor (
         }
         @JvmStatic
         
+        /** The planks family — a natural light→dark wood ramp.
+        */
+        fun wood(): Palette {
+            
+            val returnVal = lib.Palette_wood();
+            val selfEdges: List<Any> = listOf()
+            val handle = returnVal 
+            val returnOpaque = Palette(handle, selfEdges, true)
+            return returnOpaque
+        }
+        @JvmStatic
+        
         /** Custom palette from a JSON array of block ids, e.g.
         *`["minecraft:stone", "minecraft:oak_planks"]`. Ids blockpedia has
         *no color for are silently skipped — check `len` afterwards.
@@ -172,6 +187,39 @@ class Palette internal constructor (
             } finally {
                 idsJsonSliceMemory.close()
             }
+        }
+    }
+    
+    /** A copy of this palette ordered by perceptual lightness (Oklab L,
+    *dark → light). Combined with `block_ids_json`, gives a
+    *ready-to-index ramp: `ids[i]` for intensity `i / (len - 1)`.
+    */
+    fun sortedByLightness(): Palette {
+        
+        val returnVal = lib.Palette_sorted_by_lightness(handle);
+        val selfEdges: List<Any> = listOf()
+        val handle = returnVal 
+        val returnOpaque = Palette(handle, selfEdges, true)
+        return returnOpaque
+    }
+    
+    /** JSON array of exactly `steps` block ids sampling the color
+    *gradient from (`r1`,`g1`,`b1`) to (`r2`,`g2`,`b2`) in Oklab
+    *space, each step snapped to this palette's closest block. Built
+    *for value→block lookups (heatmaps, fractals): index the returned
+    *list by `intensity * (steps - 1)`. Entries may repeat on coarse
+    *palettes; errors with `NotFound` on an empty palette.
+    */
+    fun gradientIdsJson(r1: UByte, g1: UByte, b1: UByte, r2: UByte, g2: UByte, b2: UByte, steps: UInt): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Palette_gradient_ids_json(handle, FFIUint8(r1), FFIUint8(g1), FFIUint8(b1), FFIUint8(r2), FFIUint8(g2), FFIUint8(b2), FFIUint32(steps), write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
     

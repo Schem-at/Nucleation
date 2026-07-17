@@ -174,6 +174,50 @@ impl BlockPalette {
         })
     }
 
+    /// Create a palette of the planks family — a natural light→dark wood
+    /// ramp for gradients.
+    pub fn new_wood() -> Self {
+        Self::new_filtered(|f| f.id.ends_with("_planks") || f.id == "minecraft:bamboo_mosaic")
+    }
+
+    /// A copy of this palette with the blocks reordered by perceptual
+    /// lightness (Oklab L, dark → light) — turns unordered sets like wool
+    /// or concrete into ready-to-index ramps.
+    pub fn sorted_by_lightness(&self) -> Self {
+        let mut blocks = self.blocks.clone();
+        blocks.sort_by(|a, b| {
+            a.0.oklab[0]
+                .partial_cmp(&b.0.oklab[0])
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        Self { blocks }
+    }
+
+    /// Sample an N-step color gradient from `start` to `end` (Oklab
+    /// interpolation), snapping every step to this palette's closest block.
+    /// Returns exactly `steps` ids (consecutive entries may repeat when the
+    /// palette is coarse); empty when the palette is empty.
+    pub fn gradient_ids(&self, start: (u8, u8, u8), end: (u8, u8, u8), steps: usize) -> Vec<String> {
+        let a = ExtendedColorData::from_rgb(start.0, start.1, start.2);
+        let b = ExtendedColorData::from_rgb(end.0, end.1, end.2);
+        (0..steps)
+            .filter_map(|i| {
+                let t = if steps <= 1 {
+                    0.0
+                } else {
+                    i as f32 / (steps as f32 - 1.0)
+                };
+                let mut c = a;
+                c.oklab = [
+                    a.oklab[0] + (b.oklab[0] - a.oklab[0]) * t,
+                    a.oklab[1] + (b.oklab[1] - a.oklab[1]) * t,
+                    a.oklab[2] + (b.oklab[2] - a.oklab[2]) * t,
+                ];
+                self.find_closest(&c)
+            })
+            .collect()
+    }
+
     /// Build a palette from explicit block ids (e.g. `minecraft:stone`),
     /// keeping only ids blockpedia knows a color for — unknown or colorless
     /// ids are silently skipped, so check `len()` afterwards.

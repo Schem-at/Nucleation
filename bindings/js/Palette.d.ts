@@ -60,6 +60,28 @@ export class Palette {
     static grayscale(): Palette;
 
     /**
+     * The planks family — a natural light→dark wood ramp.
+     */
+    static wood(): Palette;
+
+    /**
+     * A copy of this palette ordered by perceptual lightness (Oklab L,
+     * dark → light). Combined with `block_ids_json`, gives a
+     * ready-to-index ramp: `ids[i]` for intensity `i / (len - 1)`.
+     */
+    sortedByLightness(): Palette;
+
+    /**
+     * JSON array of exactly `steps` block ids sampling the color
+     * gradient from (`r1`,`g1`,`b1`) to (`r2`,`g2`,`b2`) in Oklab
+     * space, each step snapped to this palette's closest block. Built
+     * for value→block lookups (heatmaps, fractals): index the returned
+     * list by `intensity * (steps - 1)`. Entries may repeat on coarse
+     * palettes; errors with `NotFound` on an empty palette.
+     */
+    gradientIdsJson(r1: number, g1: number, b1: number, r2: number, g2: number, b2: number, steps: number): string;
+
+    /**
      * Custom palette from a JSON array of block ids, e.g.
      * `["minecraft:stone", "minecraft:oak_planks"]`. Ids blockpedia has
      * no color for are silently skipped — check `len` afterwards.

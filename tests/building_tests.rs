@@ -653,3 +653,31 @@ fn default_palette_is_broad_and_current() {
     assert!(!ids.contains(&"minecraft:nether_portal"));
     assert!(!ids.contains(&"minecraft:water"));
 }
+
+#[test]
+fn palette_ramps_and_gradient_ids() {
+    use nucleation::building::BlockPalette;
+
+    // Lightness ordering turns wool into a ramp: darkest first, lightest last.
+    let wool = BlockPalette::new_wool().sorted_by_lightness();
+    let ids: Vec<&str> = wool.block_ids().collect();
+    assert!(ids.len() >= 16, "wool palette too small: {}", ids.len());
+    assert_eq!(ids.first().copied(), Some("minecraft:black_wool"));
+    assert_eq!(ids.last().copied(), Some("minecraft:white_wool"));
+
+    // Gradient sampling: exactly N entries, endpoints snap to the extremes.
+    let ramp = BlockPalette::new_wool().gradient_ids((0, 0, 0), (255, 255, 255), 16);
+    assert_eq!(ramp.len(), 16);
+    assert_eq!(ramp.first().map(String::as_str), Some("minecraft:black_wool"));
+    assert_eq!(ramp.last().map(String::as_str), Some("minecraft:white_wool"));
+
+    // Wood preset is the planks family.
+    let wood = BlockPalette::new_wood();
+    assert!(wood.len() >= 8, "wood palette too small: {}", wood.len());
+    assert!(wood.block_ids().all(|id| id.ends_with("_planks") || id == "minecraft:bamboo_mosaic"));
+
+    // Empty palette yields an empty gradient, not a panic.
+    assert!(BlockPalette::from_block_ids(std::iter::empty())
+        .gradient_ids((0, 0, 0), (255, 255, 255), 8)
+        .is_empty());
+}

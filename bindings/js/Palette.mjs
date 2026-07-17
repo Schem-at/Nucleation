@@ -173,6 +173,71 @@ export class Palette {
     }
 
     /**
+     * The planks family — a natural light→dark wood ramp.
+     */
+    static wood() {
+
+        const result = wasm.Palette_wood();
+
+        try {
+            return new Palette(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
+     * A copy of this palette ordered by perceptual lightness (Oklab L,
+     * dark → light). Combined with `block_ids_json`, gives a
+     * ready-to-index ramp: `ids[i]` for intensity `i / (len - 1)`.
+     */
+    sortedByLightness() {
+
+        const result = wasm.Palette_sorted_by_lightness(this.ffiValue);
+
+        try {
+            return new Palette(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
+     * JSON array of exactly `steps` block ids sampling the color
+     * gradient from (`r1`,`g1`,`b1`) to (`r2`,`g2`,`b2`) in Oklab
+     * space, each step snapped to this palette's closest block. Built
+     * for value→block lookups (heatmaps, fractals): index the returned
+     * list by `intensity * (steps - 1)`. Entries may repeat on coarse
+     * palettes; errors with `NotFound` on an empty palette.
+     */
+    gradientIdsJson(r1, g1, b1, r2, g2, b2, steps) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Palette_gradient_ids_json(diplomatReceive.buffer, this.ffiValue, r1, g1, b1, r2, g2, b2, steps, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
      * Custom palette from a JSON array of block ids, e.g.
      * `["minecraft:stone", "minecraft:oak_planks"]`. Ids blockpedia has
      * no color for are silently skipped — check `len` afterwards.

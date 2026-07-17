@@ -52,6 +52,25 @@ final class Palette {
         return new Palette($ret, true);
     }
 
+    public static function wood() {
+        $ret = Lib::ffi()->Palette_wood();
+        return new Palette($ret, true);
+    }
+
+    public function sortedByLightness() {
+        $ret = Lib::ffi()->Palette_sorted_by_lightness($this->ptr);
+        return new Palette($ret, true);
+    }
+
+    public function gradientIdsJson( $r1,  $g1,  $b1,  $r2,  $g2,  $b2,  $steps) {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Palette_gradient_ids_json($this->ptr, $r1, $g1, $b1, $r2, $g2, $b2, $steps, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public static function fromBlockIds(string $ids_json) {
         $__n0 = strlen($ids_json);
         $__view0 = Lib::ffi()->new('DiplomatStringView');
