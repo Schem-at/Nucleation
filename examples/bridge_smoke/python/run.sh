@@ -30,7 +30,7 @@ if [[ "$(uname)" == "Linux" ]]; then
     EXTRA_LDFLAGS="-fuse-ld=lld"
 fi
 
-clang++ -std=c++20 -shared -undefined dynamic_lookup -fvisibility=hidden \
+clang++ -std=c++20 -shared -fPIC -undefined dynamic_lookup -fvisibility=hidden \
     $EXTRA_LDFLAGS \
     -I "$PY_INCLUDE" \
     -I "$NB_DIR/include" \
