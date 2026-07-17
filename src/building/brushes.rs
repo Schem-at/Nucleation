@@ -65,6 +65,29 @@ impl PaletteBuilder {
         self
     }
 
+    /// Require a vanilla block tag (`minecraft:wool` or short `wool`,
+    /// nested paths like `mineable/pickaxe` too). Repeatable — a block
+    /// must carry ALL required tags (AND semantics).
+    pub fn tag(mut self, tag: &str) -> Self {
+        self.filter.required_tags.push(tag.to_string());
+        self
+    }
+
+    /// Exclude blocks carrying a vanilla block tag (any listed tag
+    /// disqualifies). Repeatable.
+    pub fn exclude_tag(mut self, tag: &str) -> Self {
+        self.filter.excluded_tags.push(tag.to_string());
+        self
+    }
+
+    /// Keep only blocks of an official definition kind (`minecraft:stair`
+    /// or short `stair`; plain full blocks are `minecraft:block`).
+    /// Repeatable — a block matching ANY listed kind passes (OR semantics).
+    pub fn kind(mut self, kind: &str) -> Self {
+        self.filter.kinds.push(kind.to_string());
+        self
+    }
+
     pub fn build(self) -> BlockPalette {
         BlockPalette::new_from_filter(self.filter)
     }
@@ -75,12 +98,18 @@ pub struct BlockPalette {
     blocks: Vec<(ExtendedColorData, String)>,
 }
 
-/// Technical blocks that carry a color in blockpedia's texture-derived data
-/// but are not placeable building blocks — they must never win a
-/// nearest-color match (a blue gradient snapping to nether_portal is wrong).
-const NON_BUILDABLE: &[&str] = &[
-    "minecraft:water",
-    "minecraft:lava",
+/// Definition kinds of technical blocks that carry a color in blockpedia's
+/// texture-derived data but are not placeable building blocks — they must
+/// never win a nearest-color match (a blue gradient snapping to
+/// nether_portal is wrong).
+///
+/// Derived from the official `definition.type` kinds instead of the old
+/// hardcoded 14-id list: those ids map 1:1 onto these 13 kinds (water and
+/// lava share `minecraft:liquid`) and no other block carries any of them,
+/// so the kind check is exactly equivalent today while staying correct
+/// when a data refresh adds new blocks of these technical kinds.
+const NON_BUILDABLE_KINDS: &[&str] = &[
+    "minecraft:liquid",
     "minecraft:fire",
     "minecraft:soul_fire",
     "minecraft:nether_portal",
@@ -95,11 +124,16 @@ const NON_BUILDABLE: &[&str] = &[
     "minecraft:tripwire",
 ];
 
+/// True for blocks that may appear in palettes (see [`NON_BUILDABLE_KINDS`]).
+fn is_buildable(facts: &BlockFacts) -> bool {
+    !NON_BUILDABLE_KINDS.contains(&facts.kind())
+}
+
 impl BlockPalette {
     /// Every colored block except the technical non-buildables
     /// (portals, fluids, fire, piston internals, ...).
     pub fn new_all() -> Self {
-        Self::new_filtered(|f| !NON_BUILDABLE.contains(&f.id))
+        Self::new_filtered(is_buildable)
     }
 
     pub fn builder() -> PaletteBuilder {
@@ -109,7 +143,7 @@ impl BlockPalette {
     /// Create a palette using a blockpedia BlockFilter (technical
     /// non-buildables are always excluded, whatever the filter says).
     pub fn new_from_filter(filter: BlockFilter) -> Self {
-        Self::new_filtered(|f| !NON_BUILDABLE.contains(&f.id) && filter.allows_block(f))
+        Self::new_filtered(|f| is_buildable(f) && filter.allows_block(f))
     }
 
     /// Create a palette containing only solid blocks (no transparent, gravity, etc.)

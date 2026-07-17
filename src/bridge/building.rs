@@ -490,6 +490,8 @@ pub mod ffi {
         }
 
         /// Keep only full cube blocks (no stairs, slabs, fences, ...).
+        /// Metadata-driven: uses the official model geometry extracted from
+        /// the vanilla jars, not block-name guessing.
         pub fn full_blocks_only(&mut self) -> Result<(), NucleationError> {
             let b = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
             self.0 = Some(b.full_blocks_only());
@@ -504,6 +506,8 @@ pub mod ffi {
         }
 
         /// Exclude transparent/translucent blocks (glass, leaves, ...).
+        /// Metadata-driven: uses the per-block transparency flag from the
+        /// block-data pipeline, not block-name guessing.
         pub fn exclude_transparent(&mut self) -> Result<(), NucleationError> {
             let b = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
             self.0 = Some(b.exclude_transparent());
@@ -538,6 +542,36 @@ pub mod ffi {
             let kw = std::str::from_utf8(keyword).map_err(|_| NucleationError::InvalidArgument)?;
             let b = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
             self.0 = Some(b.include_keyword(kw));
+            Ok(())
+        }
+
+        /// Require the vanilla block tag `t` (`minecraft:wool` or short
+        /// `wool`, nested paths like `mineable/pickaxe` too). Repeatable —
+        /// a block must carry ALL required tags (AND semantics).
+        pub fn tag(&mut self, t: &DiplomatStr) -> Result<(), NucleationError> {
+            let tag = std::str::from_utf8(t).map_err(|_| NucleationError::InvalidArgument)?;
+            let b = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
+            self.0 = Some(b.tag(tag));
+            Ok(())
+        }
+
+        /// Exclude blocks carrying the vanilla block tag `t` (any listed
+        /// tag disqualifies). Repeatable.
+        pub fn exclude_tag(&mut self, t: &DiplomatStr) -> Result<(), NucleationError> {
+            let tag = std::str::from_utf8(t).map_err(|_| NucleationError::InvalidArgument)?;
+            let b = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
+            self.0 = Some(b.exclude_tag(tag));
+            Ok(())
+        }
+
+        /// Keep only blocks of the official definition kind `k`
+        /// (`minecraft:stair` or short `stair`; plain full blocks are
+        /// `minecraft:block`). Repeatable — a block matching ANY listed
+        /// kind passes (OR semantics).
+        pub fn kind(&mut self, k: &DiplomatStr) -> Result<(), NucleationError> {
+            let kind = std::str::from_utf8(k).map_err(|_| NucleationError::InvalidArgument)?;
+            let b = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
+            self.0 = Some(b.kind(kind));
             Ok(())
         }
 

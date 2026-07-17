@@ -11,6 +11,7 @@
 pub mod shared;
 
 pub mod autostack;
+pub mod blocks;
 pub mod building;
 pub mod definition_region;
 pub mod diff;

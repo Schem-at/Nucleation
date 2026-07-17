@@ -545,6 +545,9 @@ pub use query_builder::{
     AllBlocks, BlockQuery, ColorSamplingMethod, ColorSpace, EasingFunction, GradientConfig,
 };
 
+// JSON views over the block table (backs the bridge `Blocks` query API)
+pub mod facts_json;
+
 // Block transformation module for rotation and variants
 pub mod transforms;
 pub use transforms::{BlockShape, BlockTransforms, Direction, Rotation};
