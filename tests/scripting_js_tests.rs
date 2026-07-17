@@ -164,3 +164,55 @@ fn test_js_no_result_returns_none() {
     .expect("js should not error");
     assert!(result.is_none());
 }
+
+#[test]
+fn test_js_palette_gradient_strip() {
+    let result = run_js_code(
+        r#"
+        let ids = palette_gradient_ids("wool", 0, 0, 0, 255, 255, 255, 8);
+        if (ids.length !== 8) throw new Error("expected 8 ids, got " + ids.length);
+        let s = new Schematic("GradientStrip");
+        for (let i = 0; i < ids.length; i++) {
+            s.set_block(i, 0, 0, ids[i]);
+        }
+        result = s;
+    "#,
+    )
+    .expect("js should not error");
+    let s = result.expect("should return a schematic");
+    // Endpoints snap to the palette extremes.
+    assert_eq!(s.get_block(0, 0, 0).unwrap(), "minecraft:black_wool");
+    assert_eq!(s.get_block(7, 0, 0).unwrap(), "minecraft:white_wool");
+}
+
+#[test]
+fn test_js_palette_block_ids_sorted() {
+    run_js_code(
+        r#"
+        let ids = palette_block_ids("wool");
+        if (ids.length < 16) throw new Error("wool palette too small: " + ids.length);
+        // lightness-sorted: darkest first, lightest last
+        if (ids[0] !== "minecraft:black_wool") throw new Error("first was " + ids[0]);
+        if (ids[ids.length - 1] !== "minecraft:white_wool") throw new Error("last was " + ids[ids.length - 1]);
+    "#,
+    )
+    .expect("js should not error");
+}
+
+#[test]
+fn test_js_palette_closest_block() {
+    run_js_code(
+        r#"
+        let id = palette_closest_block("wool", 255, 0, 0);
+        if (id !== "minecraft:red_wool") throw new Error("closest to red was " + id);
+    "#,
+    )
+    .expect("js should not error");
+}
+
+#[test]
+fn test_js_palette_unknown_name_errors() {
+    let result = run_js_code(r#"palette_block_ids("chrome")"#);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("Unknown palette"));
+}

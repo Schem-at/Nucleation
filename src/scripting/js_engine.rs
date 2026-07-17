@@ -202,6 +202,59 @@ fn setup_js(ctx: &Ctx<'_>) -> JsResult<()> {
     let ctor: rquickjs::Value = ctx.globals().get("JsSchematic")?;
     ctx.globals().set("Schematic", ctor)?;
 
+    // -- Palette helpers (globals, mirroring the bridge's Palette surface) --
+    // rquickjs closures top out at 7 typed params, so the 7 numeric arguments
+    // after `name` arrive as a Rest and are validated by hand.
+    ctx.globals().set(
+        "palette_gradient_ids",
+        Function::new(
+            ctx.clone(),
+            |name: String,
+             args: rquickjs::function::Rest<i32>|
+             -> rquickjs::Result<Vec<String>> {
+                let a = &args.0;
+                if a.len() != 7 {
+                    return Err(make_js_err(
+                        "palette_gradient_ids expects (name, r1, g1, b1, r2, g2, b2, steps)",
+                    ));
+                }
+                let channel = |v: i32| -> rquickjs::Result<u8> {
+                    u8::try_from(v).map_err(|_| make_js_err("color channels must be 0-255"))
+                };
+                let steps = usize::try_from(a[6])
+                    .map_err(|_| make_js_err("steps must be non-negative"))?;
+                crate::scripting::shared::palette_gradient_ids(
+                    &name,
+                    (channel(a[0])?, channel(a[1])?, channel(a[2])?),
+                    (channel(a[3])?, channel(a[4])?, channel(a[5])?),
+                    steps,
+                )
+                .map_err(|e| make_js_err(&e))
+            },
+        )?,
+    )?;
+
+    ctx.globals().set(
+        "palette_block_ids",
+        Function::new(
+            ctx.clone(),
+            |name: String| -> rquickjs::Result<Vec<String>> {
+                crate::scripting::shared::palette_block_ids(&name).map_err(|e| make_js_err(&e))
+            },
+        )?,
+    )?;
+
+    ctx.globals().set(
+        "palette_closest_block",
+        Function::new(
+            ctx.clone(),
+            |name: String, r: u8, g: u8, b: u8| -> rquickjs::Result<String> {
+                crate::scripting::shared::palette_closest_block(&name, r, g, b)
+                    .map_err(|e| make_js_err(&e))
+            },
+        )?,
+    )?;
+
     Ok(())
 }
 

@@ -185,3 +185,55 @@ fn test_lua_no_result_returns_none() {
     .expect("lua should not error");
     assert!(result.is_none());
 }
+
+#[test]
+fn test_lua_palette_gradient_strip() {
+    let result = run_lua_code(
+        r#"
+        local ids = palette_gradient_ids("wool", 0, 0, 0, 255, 255, 255, 8)
+        assert(#ids == 8, "expected 8 ids, got " .. #ids)
+        local s = Schematic.new("GradientStrip")
+        for i, id in ipairs(ids) do
+            s:set_block(i - 1, 0, 0, id)
+        end
+        result = s
+    "#,
+    )
+    .expect("lua should not error");
+    let s = result.expect("should return a schematic");
+    // Endpoints snap to the palette extremes.
+    assert_eq!(s.get_block(0, 0, 0).unwrap(), "minecraft:black_wool");
+    assert_eq!(s.get_block(7, 0, 0).unwrap(), "minecraft:white_wool");
+}
+
+#[test]
+fn test_lua_palette_block_ids_sorted() {
+    run_lua_code(
+        r#"
+        local ids = palette_block_ids("wool")
+        assert(#ids >= 16, "wool palette too small: " .. #ids)
+        -- lightness-sorted: darkest first, lightest last
+        assert(ids[1] == "minecraft:black_wool", "first was " .. ids[1])
+        assert(ids[#ids] == "minecraft:white_wool", "last was " .. ids[#ids])
+    "#,
+    )
+    .expect("lua should not error");
+}
+
+#[test]
+fn test_lua_palette_closest_block() {
+    run_lua_code(
+        r#"
+        local id = palette_closest_block("wool", 255, 0, 0)
+        assert(id == "minecraft:red_wool", "closest to red was " .. id)
+    "#,
+    )
+    .expect("lua should not error");
+}
+
+#[test]
+fn test_lua_palette_unknown_name_errors() {
+    let result = run_lua_code(r#"palette_block_ids("chrome")"#);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("Unknown palette"));
+}

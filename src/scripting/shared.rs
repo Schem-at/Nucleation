@@ -1,7 +1,43 @@
-use crate::building::{BuildingTool, Cuboid, SolidBrush, Sphere};
+use crate::building::{palette_by_name, BuildingTool, Cuboid, SolidBrush, Sphere};
 use crate::formats::manager::get_manager;
 use crate::BlockState;
 use crate::UniversalSchematic;
+
+// -- Palettes (engine-agnostic; both Lua and JS register thin wrappers) --
+
+/// Block ids sampling the `start`→`end` color gradient in `steps` steps,
+/// each snapped to the named preset palette's closest block (mirrors the
+/// bridge's `Palette::gradient_ids_json`).
+pub fn palette_gradient_ids(
+    name: &str,
+    start: (u8, u8, u8),
+    end: (u8, u8, u8),
+    steps: usize,
+) -> Result<Vec<String>, String> {
+    let palette = palette_by_name(name)?;
+    if palette.is_empty() {
+        return Err(format!("Palette '{name}' is empty"));
+    }
+    Ok(palette.gradient_ids(start, end, steps))
+}
+
+/// The named preset palette's block ids, sorted by perceptual lightness
+/// (dark → light) — a ready-to-index ramp.
+pub fn palette_block_ids(name: &str) -> Result<Vec<String>, String> {
+    Ok(palette_by_name(name)?
+        .sorted_by_lightness()
+        .block_ids()
+        .map(str::to_string)
+        .collect())
+}
+
+/// The named preset palette's block whose color is closest (Oklab) to the
+/// given RGB.
+pub fn palette_closest_block(name: &str, r: u8, g: u8, b: u8) -> Result<String, String> {
+    palette_by_name(name)?
+        .find_closest(&crate::blockpedia::ExtendedColorData::from_rgb(r, g, b))
+        .ok_or_else(|| format!("Palette '{name}' is empty"))
+}
 
 /// Shared scripting schematic wrapper. All schematic logic lives here —
 /// both Lua and JS engines are thin adapters that delegate to these methods.

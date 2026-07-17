@@ -182,6 +182,55 @@ fn setup_lua(lua: &Lua) -> LuaResult<()> {
     )?;
 
     lua.globals().set("Schematic", schematic_table)?;
+
+    // -- Palette helpers (globals, mirroring the bridge's Palette surface) --
+    lua.globals().set(
+        "palette_gradient_ids",
+        lua.create_function(
+            |lua,
+             (name, r1, g1, b1, r2, g2, b2, steps): (
+                String,
+                u8,
+                u8,
+                u8,
+                u8,
+                u8,
+                u8,
+                usize,
+            )| {
+                let ids =
+                    crate::scripting::shared::palette_gradient_ids(&name, (r1, g1, b1), (r2, g2, b2), steps)
+                        .map_err(LuaError::external)?;
+                let table = lua.create_table()?;
+                for (i, id) in ids.iter().enumerate() {
+                    table.set(i + 1, id.as_str())?;
+                }
+                Ok(table)
+            },
+        )?,
+    )?;
+
+    lua.globals().set(
+        "palette_block_ids",
+        lua.create_function(|lua, name: String| {
+            let ids = crate::scripting::shared::palette_block_ids(&name)
+                .map_err(LuaError::external)?;
+            let table = lua.create_table()?;
+            for (i, id) in ids.iter().enumerate() {
+                table.set(i + 1, id.as_str())?;
+            }
+            Ok(table)
+        })?,
+    )?;
+
+    lua.globals().set(
+        "palette_closest_block",
+        lua.create_function(|_, (name, r, g, b): (String, u8, u8, u8)| {
+            crate::scripting::shared::palette_closest_block(&name, r, g, b)
+                .map_err(LuaError::external)
+        })?,
+    )?;
+
     Ok(())
 }
 
