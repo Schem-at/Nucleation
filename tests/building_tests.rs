@@ -637,3 +637,19 @@ fn set_palette_is_noop_for_solid_brush() {
         "minecraft:glass"
     );
 }
+
+#[test]
+fn default_palette_is_broad_and_current() {
+    use nucleation::building::BlockPalette;
+
+    let all = BlockPalette::new_all();
+    // blockpedia 0.2's texture-derived colors cover ~1100 blocks; anything
+    // below this means the color data regressed to the old sparse cache.
+    assert!(all.len() > 800, "default palette too small: {}", all.len());
+    // 1.21.x content must be present and colored.
+    let ids: Vec<&str> = all.block_ids().collect();
+    assert!(ids.contains(&"minecraft:crafter"), "1.21 blocks missing");
+    // Technical blocks must never be palette candidates.
+    assert!(!ids.contains(&"minecraft:nether_portal"));
+    assert!(!ids.contains(&"minecraft:water"));
+}

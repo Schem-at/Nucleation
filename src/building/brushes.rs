@@ -75,18 +75,41 @@ pub struct BlockPalette {
     blocks: Vec<(ExtendedColorData, String)>,
 }
 
+/// Technical blocks that carry a color in blockpedia's texture-derived data
+/// but are not placeable building blocks — they must never win a
+/// nearest-color match (a blue gradient snapping to nether_portal is wrong).
+const NON_BUILDABLE: &[&str] = &[
+    "minecraft:water",
+    "minecraft:lava",
+    "minecraft:fire",
+    "minecraft:soul_fire",
+    "minecraft:nether_portal",
+    "minecraft:end_portal",
+    "minecraft:end_gateway",
+    "minecraft:bubble_column",
+    "minecraft:moving_piston",
+    "minecraft:piston_head",
+    "minecraft:frosted_ice",
+    "minecraft:light",
+    "minecraft:redstone_wire",
+    "minecraft:tripwire",
+];
+
 impl BlockPalette {
+    /// Every colored block except the technical non-buildables
+    /// (portals, fluids, fire, piston internals, ...).
     pub fn new_all() -> Self {
-        Self::new_filtered(|_| true)
+        Self::new_filtered(|f| !NON_BUILDABLE.contains(&f.id))
     }
 
     pub fn builder() -> PaletteBuilder {
         PaletteBuilder::new()
     }
 
-    /// Create a palette using a blockpedia BlockFilter
+    /// Create a palette using a blockpedia BlockFilter (technical
+    /// non-buildables are always excluded, whatever the filter says).
     pub fn new_from_filter(filter: BlockFilter) -> Self {
-        Self::new_filtered(|f| filter.allows_block(f))
+        Self::new_filtered(|f| !NON_BUILDABLE.contains(&f.id) && filter.allows_block(f))
     }
 
     /// Create a palette containing only solid blocks (no transparent, gravity, etc.)
