@@ -192,9 +192,20 @@ longer = Autostack.resize_1d(wall, 4, 0, 0, 8)   # 3 units → 8: (12,4,1) → (
 
 ## Value → block: palettes
 
-Palettes turn colors into blocks: presets (wool, concrete, terracotta, wood…),
-tag/kind-filtered custom sets, lightness ramps, gradient sampling. Index a ramp
-by any value — escape time, height, temperature:
+Palettes turn colors into blocks. Ask for pure white → pure black in 24 steps
+and the engine picks the blocks itself — evenly spaced along the Oklab line,
+no block repeated, off-hue candidates penalized (bottom row; the other rows
+are the lightness-sorted presets):
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/palette-ramps.png" width="740" alt="Preset palette ramps plus the engine-generated 24-step white-to-black ladder">
+
+```python
+Palette.grayscale().ramp_ids_json(255, 255, 255,  0, 0, 0,  24)
+# 24 DISTINCT blocks: white_wool ... iron_block ... deepslate_tiles ... black_concrete
+```
+
+For value→block *lookups* (heatmaps, fractals — where repeats are fine), sample
+a gradient instead and index it:
 
 <div align="center">
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mandelbrot.png" width="380" alt="128x128 block mandelbrot">
@@ -205,8 +216,6 @@ by any value — escape time, height, temperature:
 ramp = json.loads(Palette.wool().gradient_ids_json(255, 80, 40, 60, 40, 180, 8))
 s.set_block(px, 0, pz, ramp[escape_iterations(px, pz)])
 ```
-
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/palette-ramps.png" width="700" alt="Lightness-sorted ramps: wool, concrete, terracotta, wood">
 
 ## Edit without collateral damage
 
