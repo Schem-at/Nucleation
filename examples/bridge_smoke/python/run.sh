@@ -3,15 +3,16 @@ set -euo pipefail
 cd "$(dirname "$0")"
 ROOT="../../.."
 
-# Pinned to 2.12.0: diplomat-tool 0.15's generated dealloc shim reaches into
-# nanobind's internal nb_inst struct, whose layout changed in nanobind 2.13.
-NANOBIND_VERSION="2.12.0"
+# The generated dealloc shim uses nanobind's public low-level instance API
+# (diplomat fork branch nanobind-public-api), so any nanobind >= 2.12 works,
+# including 2.13+ where the private nb_inst layout changed.
+NANOBIND_SPEC="nanobind>=2.12,<3"
 
 VENV=".venv"
 if [ ! -d "$VENV" ]; then
     python3 -m venv "$VENV"
 fi
-"$VENV/bin/pip" install -q --upgrade pip "nanobind==$NANOBIND_VERSION"
+"$VENV/bin/pip" install -q --upgrade pip "$NANOBIND_SPEC"
 PY="$VENV/bin/python3"
 
 cargo build --release --lib --features bridge-full --manifest-path "$ROOT/Cargo.toml"

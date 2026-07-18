@@ -4,7 +4,7 @@
 # any diff, so the committed bindings can never go stale.
 #
 # diplomat-tool comes from our fork (adds the PHP backend):
-#   cargo install --git https://github.com/Nano112/diplomat --branch php-backend diplomat-tool
+#   cargo install --git https://github.com/Nano112/diplomat --branch nanobind-public-api diplomat-tool
 # or a local checkout's binary via DIPLOMAT_TOOL=/path/to/diplomat-tool.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -14,7 +14,7 @@ ENTRY="src/bridge/mod.rs"
 
 command -v "$DT" >/dev/null || {
     echo "diplomat-tool not found; install with:" >&2
-    echo "  cargo install --git https://github.com/Nano112/diplomat --branch php-backend diplomat-tool" >&2
+    echo "  cargo install --git https://github.com/Nano112/diplomat --branch nanobind-public-api diplomat-tool" >&2
     exit 1
 }
 
@@ -22,7 +22,7 @@ command -v "$DT" >/dev/null || {
 # lacks it and would otherwise die mid-run with bindings/php already deleted.
 "$DT" php --help >/dev/null 2>&1 || {
     echo "installed diplomat-tool has no 'php' target (upstream build?); reinstall the fork:" >&2
-    echo "  cargo install --git https://github.com/Nano112/diplomat --branch php-backend diplomat-tool --force" >&2
+    echo "  cargo install --git https://github.com/Nano112/diplomat --branch nanobind-public-api diplomat-tool --force" >&2
     exit 1
 }
 

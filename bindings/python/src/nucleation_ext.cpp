@@ -1,5 +1,4 @@
 #include "diplomat_nanobind_common.hpp"
-#include <../src/nb_internals.h>  // Required for shimming
 
 // Forward declarations for binding add functions
 namespace nucleation{
@@ -68,33 +67,41 @@ void add_NucleationError_binding(nb::module_);
 // On module init, the dummy type will have the normal nanobind inst_dealloc function in the tp_dealloc slot, so we
 // pull it out, store it here, and then call it in the tp_dealloc function we are shimming in to all our types.
 // Our custom tp_dealloc function will call the tp_free function instead of `delete`, allowing us effectively to override
-// the delete operator.
+// the delete operator. Everything below goes through nanobind's public low-level instance API
+// (inst_state/inst_destruct/inst_set_state/inst_ptr), so it does not depend on the private nb_inst layout
+// (which changed in nanobind 2.13) and works on nanobind >= 2.12.
 // See https://nanobind.readthedocs.io/en/latest/lowlevel.html#customizing-type-creation and
 // https://github.com/wjakob/nanobind/discussions/932
 void (*nb_tp_dealloc)(void *) = nullptr;
 
 void diplomat_tp_dealloc(PyObject *self)
 {
-    using namespace nb::detail;
-    PyTypeObject *tp = Py_TYPE(self);
-    const type_data *t = nb_type_data(tp);
+    nb::handle h(self);
 
-    nb_inst *inst = (nb_inst *)self;
-    void *p = inst_ptr(inst);
-    if (inst->destruct)
+    // inst_state() returns {ready, destruct}. Diplomat opaques always live in
+    // Rust-allocated memory (the payload is never co-located with the Python
+    // object), so `destruct` is set exactly when nanobind owns the instance
+    // and would call `operator delete` on the payload during its dealloc.
+    const bool owned = nb::inst_state(h).second;
+    if (owned)
     {
-        inst->destruct = false;
-        check(t->flags & (uint32_t)type_flags::is_destructible,
-              "nanobind::detail::inst_dealloc(\"%s\"): attempted to call "
-              "the destructor of a non-destructible type!",
-              t->name);
-        if (t->flags & (uint32_t)type_flags::has_destruct)
-            t->destruct(p);
-    }
-    if (inst->cpp_delete)
-    {
-        inst->cpp_delete = false;
-        auto tp_free = (freefunc)(PyType_GetSlot(tp, Py_tp_free));
+        void *p = nb::inst_ptr<void>(h);
+
+        // Run the C++ destructor (if the type has a non-trivial one) and
+        // clear the `destruct` flag through the supported API.
+        nb::inst_destruct(h);
+
+        // Clear the remaining ownership state. For instances whose payload is
+        // not co-located with the Python object, inst_set_state() derives
+        // nanobind's internal "free the payload" flag from `destruct`, so
+        // passing destruct=false guarantees the chained nanobind dealloc
+        // below neither destroys nor frees the payload again.
+        nb::inst_set_state(h, /* ready */ false, /* destruct */ false);
+
+        // Free through the type's Py_tp_free slot, which every diplomat
+        // opaque binding points at `Type::operator delete` - i.e. the FFI
+        // destroy function that releases the Rust allocation.
+        auto tp_free = (freefunc)(PyType_GetSlot(Py_TYPE(self), Py_tp_free));
         (*tp_free)(p);
     }
     (*nb_tp_dealloc)(self);

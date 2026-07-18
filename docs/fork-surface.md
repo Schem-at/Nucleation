@@ -27,35 +27,35 @@ dies *after* wiping `bindings/php` (it did exactly this on 2026-07-17).
   verify `diplomat-tool` supports the `php` target *before* the `rm -rf`,
   e.g. `diplomat-tool php --help` probe, and fail with the install hint.
 
-## 2. The nanobind ==2.12.0 pin
+## 2. The nanobind ==2.12.0 pin — RESOLVED (2026-07-18)
 
-**Dependency:** the Python wheel pins `nanobind ==2.12.0`
+**Was:** the Python wheel pinned `nanobind ==2.12.0`
 (bindings/python/pyproject.toml and examples/bridge_smoke/python/run.sh)
-because diplomat's generated dealloc shim reaches into nanobind's private
-`nb_inst` struct, whose layout changed in nanobind 2.13.
+because diplomat's generated dealloc shim reached into nanobind's private
+`nb_inst` struct, whose layout changed in nanobind 2.13 (the
+destruct/cpp_delete bools were repacked into a `nb_inst_state` bitfield).
 
-**Why it's a time bomb:** every new CPython release eventually needs a
-newer nanobind (3.14 support arrived in 2.9.x; a hypothetical 3.15 may
-land only in >=2.13). When that day comes the pin becomes unsatisfiable.
+**Fix (landed):** the fork's nanobind backend now emits the dealloc shim
+in terms of nanobind's public low-level instance API only —
+`nb::inst_state`, `nb::inst_destruct`, `nb::inst_set_state`,
+`nb::inst_ptr<T>` — and no longer includes `<../src/nb_internals.h>`.
+`inst_set_state(h, false, false)` derives the internal "free the payload"
+flag from `destruct` in both 2.12 and 2.13+, so the chained original
+`inst_dealloc` can be prevented from double-freeing without touching the
+private struct. Lives on fork branch `nanobind-public-api` (based on
+`php-backend`); CI installs diplomat-tool from that branch.
 
-**Exit path — get the shim onto public API:**
-- The clean fix lives in the diplomat fork's nanobind backend codegen, not
-  in nucleation: emit a deleter that goes through supported nanobind
-  machinery (`nb::inst_mark_ready`/`nb::inst_state` are public;
-  tp_dealloc + `nb::detail::nb_inst` layout is not).
-- Concretely: audit what the generated shim reads from `nb_inst` (offset
-  bookkeeping to find the C++ payload) and replace with
-  `nb::inst_ptr<T>(self)` — public, stable, exactly for this. Then bump the
-  pin to `>=2.12,<3` and add a CI leg that builds the wheel against latest
-  nanobind to catch drift early.
-- Estimate: 1–2 days in the fork's nanobind backend + regenerate + the
-  existing wheel smoke tests validate it. This is the higher-value, lower-
-  effort item of the two — do it first, and it also shrinks what needs
-  upstreaming in (1).
+The pin is now `nanobind >=2.12,<3`. Verified by building the wheel and
+running a 10k create/drop destruction stress against both nanobind 2.12.0
+and 2.13.0 (the old shim did not even compile on 2.13).
+
+Still open (nice-to-have): a CI leg that builds the wheel against latest
+nanobind on every run, to catch future drift early.
 
 ## Order of attack
 
-1. Harden gen-bindings.sh (probe before wipe) — minutes, do immediately.
-2. Fix the dealloc shim in the fork's nanobind backend, relax the pin.
-3. Rebase + upstream the PHP backend; switch gen-bindings.sh to upstream
-   once merged and delete the fork.
+1. ~~Harden gen-bindings.sh (probe before wipe)~~ — done.
+2. ~~Fix the dealloc shim in the fork's nanobind backend, relax the pin~~ —
+   done (branch `nanobind-public-api`, see section 2).
+3. Rebase + upstream the PHP backend (including the nanobind shim fix);
+   switch gen-bindings.sh to upstream once merged and delete the fork.

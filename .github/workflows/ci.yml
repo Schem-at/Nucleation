@@ -15,7 +15,7 @@ env:
   CARGO_TERM_COLOR: always
   # diplomat-tool from our fork (adds the PHP backend); pinned by branch.
   DIPLOMAT_TOOL_GIT: https://github.com/Nano112/diplomat
-  DIPLOMAT_TOOL_BRANCH: php-backend
+  DIPLOMAT_TOOL_BRANCH: nanobind-public-api
 
 jobs:
   check-version:
