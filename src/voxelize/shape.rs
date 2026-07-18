@@ -81,6 +81,12 @@ impl TriGrid {
 /// three parities take a majority vote. Robust on closed meshes; open or
 /// self-intersecting meshes get a best-effort answer.
 ///
+/// Note that parity honors real wall thickness: a hollow, double-walled
+/// model (e.g. an actual vessel with inner and outer surfaces) voxelizes as
+/// its thin solid walls, not as a filled volume — sub-voxel walls can then
+/// capture few voxel centers. That is the geometrically correct answer, not
+/// a bug; scale the model up or use a single-surface mesh for a filled solid.
+///
 /// Cloning is cheap (the triangle data and grid are shared via `Arc`).
 #[derive(Clone)]
 pub struct MeshShape {
