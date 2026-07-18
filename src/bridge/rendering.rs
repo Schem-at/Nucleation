@@ -53,6 +53,15 @@ pub mod ffi {
             self.0.zoom = zoom;
         }
 
+        /// Fit the camera to the model's bounding sphere instead of its
+        /// yaw-dependent silhouette. The sphere is rotation invariant, so
+        /// orbiting cameras (turntables) keep a constant distance instead
+        /// of pulsing as the silhouette changes. Frames slightly looser
+        /// than the default fit. Default: false.
+        pub fn set_sphere_fit(&mut self, sphere_fit: bool) {
+            self.0.sphere_fit = sphere_fit;
+        }
+
         /// Set the vertical field of view in degrees (perspective projection
         /// only). Default: 45.
         pub fn set_fov(&mut self, fov: f32) {

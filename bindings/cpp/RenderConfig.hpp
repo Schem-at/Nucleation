@@ -26,6 +26,8 @@ namespace capi {
 
     void RenderConfig_set_zoom(diplomat::capi::RenderConfig* self, float zoom);
 
+    void RenderConfig_set_sphere_fit(diplomat::capi::RenderConfig* self, bool sphere_fit);
+
     void RenderConfig_set_fov(diplomat::capi::RenderConfig* self, float fov);
 
     void RenderConfig_set_background(diplomat::capi::RenderConfig* self, float r, float g, float b, float a);
@@ -61,6 +63,11 @@ inline void RenderConfig::set_pitch(float pitch) {
 inline void RenderConfig::set_zoom(float zoom) {
     diplomat::capi::RenderConfig_set_zoom(this->AsFFI(),
         zoom);
+}
+
+inline void RenderConfig::set_sphere_fit(bool sphere_fit) {
+    diplomat::capi::RenderConfig_set_sphere_fit(this->AsFFI(),
+        sphere_fit);
 }
 
 inline void RenderConfig::set_fov(float fov) {

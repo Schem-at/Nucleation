@@ -19,6 +19,7 @@ void add_RenderConfig_binding(nb::module_ mod) {
         .def("set_isometric", &nucleation::RenderConfig::set_isometric)
         .def("set_orthographic", &nucleation::RenderConfig::set_orthographic, "orthographic"_a)
         .def("set_pitch", &nucleation::RenderConfig::set_pitch, "pitch"_a)
+        .def("set_sphere_fit", &nucleation::RenderConfig::set_sphere_fit, "sphere_fit"_a)
         .def("set_yaw", &nucleation::RenderConfig::set_yaw, "yaw"_a)
         .def("set_zoom", &nucleation::RenderConfig::set_zoom, "zoom"_a);
 }

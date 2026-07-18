@@ -39,6 +39,10 @@ pub struct RenderConfig {
     pub background: Option<[f32; 4]>,
     /// Camera projection mode (default `Perspective`).
     pub projection: Projection,
+    /// Rotation-invariant framing: fit the bounding sphere instead of the
+    /// yaw-dependent silhouette, so orbiting cameras (turntables) keep a
+    /// constant distance. Default `false`.
+    pub sphere_fit: bool,
 }
 
 impl Default for RenderConfig {
@@ -53,6 +57,7 @@ impl Default for RenderConfig {
             target: None,
             background: None,
             projection: Projection::Perspective,
+            sphere_fit: false,
         }
     }
 }
@@ -67,6 +72,7 @@ impl RenderConfig {
             target: self.target,
             projection: self.projection,
             background: self.background,
+            sphere_fit: self.sphere_fit,
         }
     }
 

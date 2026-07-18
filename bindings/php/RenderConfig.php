@@ -29,6 +29,10 @@ final class RenderConfig {
         Lib::ffi()->RenderConfig_set_zoom($this->ptr, $zoom);
     }
 
+    public function setSphereFit( $sphere_fit) {
+        Lib::ffi()->RenderConfig_set_sphere_fit($this->ptr, $sphere_fit);
+    }
+
     public function setFov( $fov) {
         Lib::ffi()->RenderConfig_set_fov($this->ptr, $fov);
     }

@@ -23,6 +23,8 @@ void RenderConfig_set_pitch(RenderConfig* self, float pitch);
 
 void RenderConfig_set_zoom(RenderConfig* self, float zoom);
 
+void RenderConfig_set_sphere_fit(RenderConfig* self, bool sphere_fit);
+
 void RenderConfig_set_fov(RenderConfig* self, float fov);
 
 void RenderConfig_set_background(RenderConfig* self, float r, float g, float b, float a);

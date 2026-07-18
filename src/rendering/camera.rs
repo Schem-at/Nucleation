@@ -26,6 +26,11 @@ pub struct CameraConfig {
     /// Optional solid RGBA clear color (linear 0.0–1.0). `None` uses the
     /// default sky / HDRI behavior.
     pub background: Option<[f32; 4]>,
+    /// Fit the camera to the model's bounding *sphere* instead of the
+    /// yaw-dependent projected box corners. The sphere is rotation
+    /// invariant, so orbiting the camera (turntables) keeps a constant
+    /// distance instead of pulsing with the silhouette.
+    pub sphere_fit: bool,
 }
 
 impl Default for CameraConfig {
@@ -38,6 +43,7 @@ impl Default for CameraConfig {
             target: None,
             projection: Projection::Perspective,
             background: None,
+            sphere_fit: false,
         }
     }
 }
@@ -99,14 +105,25 @@ pub fn compute_view_proj(
             let half_fov_x = (half_fov_y.tan() * aspect).atan();
 
             let mut max_dist = 1.0f32;
-            for c in &corners {
-                let rel = sub3(*c, center);
-                let proj_right = dot3(rel, right).abs();
-                let proj_up = dot3(rel, up).abs();
-                let proj_depth = -dot3(rel, forward);
-                let dist_h = proj_right / half_fov_x.tan() + proj_depth;
-                let dist_v = proj_up / half_fov_y.tan() + proj_depth;
-                max_dist = max_dist.max(dist_h).max(dist_v);
+            if camera.sphere_fit {
+                // Rotation-invariant: fit the bounding sphere around `center`.
+                let mut radius = 0.0f32;
+                for c in &corners {
+                    let rel = sub3(*c, center);
+                    radius = radius.max(dot3(rel, rel).sqrt());
+                }
+                let half_min = half_fov_x.min(half_fov_y);
+                max_dist = (radius / half_min.sin().max(1e-4)).max(1.0);
+            } else {
+                for c in &corners {
+                    let rel = sub3(*c, center);
+                    let proj_right = dot3(rel, right).abs();
+                    let proj_up = dot3(rel, up).abs();
+                    let proj_depth = -dot3(rel, forward);
+                    let dist_h = proj_right / half_fov_x.tan() + proj_depth;
+                    let dist_v = proj_up / half_fov_y.tan() + proj_depth;
+                    max_dist = max_dist.max(dist_h).max(dist_v);
+                }
             }
 
             // zoom is a true zoom factor: >1 moves closer, <1 further out.
@@ -136,8 +153,20 @@ pub fn compute_view_proj(
             }
 
             // Half-extents of the ortho window, fitting both axes, scaled by
-            // zoom (a true zoom factor: >1 magnifies, <1 shrinks).
-            let half_h = (ext_v.max(ext_h / aspect)).max(0.5) * 1.1 / camera.zoom.max(1e-3);
+            // zoom (a true zoom factor: >1 magnifies, <1 shrinks). Sphere
+            // fit swaps the yaw-dependent extents for the rotation-invariant
+            // bounding-sphere radius so turntables hold a constant framing.
+            let fitted = if camera.sphere_fit {
+                let mut radius = 0.0f32;
+                for c in &corners {
+                    let rel = sub3(*c, center);
+                    radius = radius.max(dot3(rel, rel).sqrt());
+                }
+                (radius / aspect.min(1.0)).max(0.5)
+            } else {
+                (ext_v.max(ext_h / aspect)).max(0.5)
+            };
+            let half_h = fitted * 1.1 / camera.zoom.max(1e-3);
             let half_w = half_h * aspect;
 
             // Stand far enough back that all geometry sits between near and far.

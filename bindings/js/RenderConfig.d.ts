@@ -38,6 +38,15 @@ export class RenderConfig {
     setZoom(zoom: number): void;
 
     /**
+     * Fit the camera to the model's bounding sphere instead of its
+     * yaw-dependent silhouette. The sphere is rotation invariant, so
+     * orbiting cameras (turntables) keep a constant distance instead
+     * of pulsing as the silhouette changes. Frames slightly looser
+     * than the default fit. Default: false.
+     */
+    setSphereFit(sphereFit: boolean): void;
+
+    /**
      * Set the vertical field of view in degrees (perspective projection
      * only). Default: 45.
      */

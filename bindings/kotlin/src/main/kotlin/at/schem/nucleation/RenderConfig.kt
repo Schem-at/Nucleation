@@ -11,6 +11,7 @@ internal interface RenderConfigLib: Library {
     fun RenderConfig_set_yaw(handle: Pointer, yaw: Float): Unit
     fun RenderConfig_set_pitch(handle: Pointer, pitch: Float): Unit
     fun RenderConfig_set_zoom(handle: Pointer, zoom: Float): Unit
+    fun RenderConfig_set_sphere_fit(handle: Pointer, sphereFit: Boolean): Unit
     fun RenderConfig_set_fov(handle: Pointer, fov: Float): Unit
     fun RenderConfig_set_background(handle: Pointer, r: Float, g: Float, b: Float, a: Float): Unit
     fun RenderConfig_clear_background(handle: Pointer): Unit
@@ -84,6 +85,18 @@ class RenderConfig internal constructor (
     fun setZoom(zoom: Float): Unit {
         
         val returnVal = lib.RenderConfig_set_zoom(handle, zoom);
+        
+    }
+    
+    /** Fit the camera to the model's bounding sphere instead of its
+    *yaw-dependent silhouette. The sphere is rotation invariant, so
+    *orbiting cameras (turntables) keep a constant distance instead
+    *of pulsing as the silhouette changes. Frames slightly looser
+    *than the default fit. Default: false.
+    */
+    fun setSphereFit(sphereFit: Boolean): Unit {
+        
+        val returnVal = lib.RenderConfig_set_sphere_fit(handle, sphereFit);
         
     }
     
