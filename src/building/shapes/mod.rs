@@ -30,6 +30,11 @@ pub use sphere::Sphere;
 pub use torus::Torus;
 pub use triangle::Triangle;
 
+// The mesh shape lives in the voxelize module (building must not hard-depend
+// on the gltf/image stack); re-exported here so it sits beside its peers.
+#[cfg(feature = "voxelize")]
+pub use crate::voxelize::MeshShape;
+
 pub trait Shape {
     fn contains(&self, x: i32, y: i32, z: i32) -> bool;
     fn points(&self) -> Vec<(i32, i32, i32)>;

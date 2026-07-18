@@ -1954,6 +1954,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "gltf"
+version = "1.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3ce1918195723ce6ac74e80542c5a96a40c2b26162c1957a5cd70799b8cacf7"
+dependencies = [
+ "byteorder",
+ "gltf-json",
+ "lazy_static",
+ "serde_json",
+]
+
+[[package]]
 name = "gltf-derive"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3176,6 +3188,7 @@ dependencies = [
  "flate2",
  "futures-util",
  "getrandom 0.2.16",
+ "gltf",
  "hematite-nbt",
  "image 0.24.9",
  "insign",

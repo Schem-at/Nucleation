@@ -43,6 +43,7 @@ bridge-full = [
     "rendering",
     "scripting-lua",
     "scripting-js",
+    "voxelize",
 ]
 
 # Storage backends (the `store` module). `mem` is always available; the rest
@@ -65,6 +66,8 @@ simulation = [
 ]
 # Auto-stack: detect repeating structures + resize them (pure-voxel core)
 autostack = []
+# Mesh voxelization: GLB/OBJ models -> building Shapes + textured schematics
+voxelize = ["dep:gltf", "dep:image"]
 # Meshing support - generate 3D meshes from schematics
 meshing = ["schematic-mesher"]
 # GPU rendering support - render schematics to images
@@ -151,6 +154,13 @@ schematic-mesher = { version = "0.2.0", git = "https://github.com/Schem-at/Schem
 wgpu = { version = "24", optional = true }
 image = { version = "0.24", optional = true }
 pollster = { version = "0.4", optional = true }
+
+# Mesh voxelization (voxelize feature). gltf with default features off: we parse
+# GLB containers ourselves (`Gltf::from_slice` + the `utils` accessor readers)
+# and decode embedded png/jpeg textures with the `image` dep above, so gltf's
+# own `import`/`image` machinery (and its separate image-crate version) stays out
+# of the tree.
+gltf = { version = "1.4", default-features = false, features = ["utils", "names"], optional = true }
 
 # Simulation (MCHPRS) dependencies - optional
 # Note: These are git dependencies and will be excluded from crates.io publish

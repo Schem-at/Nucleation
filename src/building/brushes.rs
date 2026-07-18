@@ -1098,6 +1098,97 @@ impl Brush for ShadedBrush {
     }
 }
 
+/// A brush that lights surfaces from a cone spotlight: Lambert shading toward
+/// the light position, attenuated by a smoothstep cone falloff around the
+/// spotlight direction, with a small ambient floor so back faces stay visible.
+#[derive(Clone)]
+pub struct SpotlightBrush {
+    light_pos: (f64, f64, f64),
+    /// Normalized aim direction of the cone.
+    direction: (f64, f64, f64),
+    cone_angle_rad: f64,
+    base_color: ExtendedColorData,
+    palette: Arc<BlockPalette>,
+}
+
+impl SpotlightBrush {
+    pub fn new(
+        light_pos: (f64, f64, f64),
+        direction: (f64, f64, f64),
+        cone_angle_deg: f64,
+        color: (u8, u8, u8),
+    ) -> Self {
+        let len = (direction.0 * direction.0
+            + direction.1 * direction.1
+            + direction.2 * direction.2)
+            .sqrt();
+        let direction = if len < 1e-12 {
+            (0.0, -1.0, 0.0)
+        } else {
+            (direction.0 / len, direction.1 / len, direction.2 / len)
+        };
+        Self {
+            light_pos,
+            direction,
+            cone_angle_rad: cone_angle_deg.max(1e-6).to_radians(),
+            base_color: ExtendedColorData::from_rgb(color.0, color.1, color.2),
+            palette: get_default_palette(),
+        }
+    }
+
+    pub fn with_palette(mut self, palette: Arc<BlockPalette>) -> Self {
+        self.palette = palette;
+        self
+    }
+
+    pub fn set_palette(&mut self, palette: Arc<BlockPalette>) {
+        self.palette = palette;
+    }
+}
+
+impl Brush for SpotlightBrush {
+    fn get_block(&self, x: i32, y: i32, z: i32, normal: (f64, f64, f64)) -> Option<BlockState> {
+        // L: unit vector from the voxel toward the light.
+        let lx = self.light_pos.0 - x as f64;
+        let ly = self.light_pos.1 - y as f64;
+        let lz = self.light_pos.2 - z as f64;
+        let len = (lx * lx + ly * ly + lz * lz).sqrt();
+        let (lx, ly, lz) = if len < 1e-12 {
+            (0.0, 1.0, 0.0)
+        } else {
+            (lx / len, ly / len, lz / len)
+        };
+
+        let lambert = (normal.0 * lx + normal.1 * ly + normal.2 * lz).max(0.0);
+
+        // Cone falloff: angle between (-L) (light -> voxel) and the aim
+        // direction; full intensity inside 0.7 * cone_angle, smoothstep to 0
+        // at the cone edge.
+        let cos_angle =
+            (-lx) * self.direction.0 + (-ly) * self.direction.1 + (-lz) * self.direction.2;
+        let angle = cos_angle.clamp(-1.0, 1.0).acos();
+        let inner = 0.7 * self.cone_angle_rad;
+        let outer = self.cone_angle_rad;
+        let cone = if angle <= inner {
+            1.0
+        } else if angle >= outer {
+            0.0
+        } else {
+            let t = ((outer - angle) / (outer - inner)).clamp(0.0, 1.0);
+            t * t * (3.0 - 2.0 * t)
+        };
+
+        // 0.04 ambient floor keeps unlit faces from going pure black.
+        let intensity = (lambert * cone).max(0.04);
+
+        let r = (self.base_color.rgb[0] as f64 * intensity) as u8;
+        let g = (self.base_color.rgb[1] as f64 * intensity) as u8;
+        let b = (self.base_color.rgb[2] as f64 * intensity) as u8;
+        let color = ExtendedColorData::from_rgb(r, g, b);
+        self.palette.find_closest(&color).map(BlockState::new)
+    }
+}
+
 /// A brush that interpolates a multi-stop color gradient along a parametric curve.
 /// Uses the `t` parameter from ParametricShape when available, falls back to
 /// spatial projection along a direction vector.

@@ -28,4 +28,6 @@ pub mod sdf;
 #[cfg(feature = "simulation")]
 pub mod simulation;
 pub mod store_io;
+#[cfg(feature = "voxelize")]
+pub mod voxelize;
 pub mod world_stream;

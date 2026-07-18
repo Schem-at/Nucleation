@@ -2,7 +2,8 @@ use crate::building::{
     BezierCurve, BilinearGradientBrush, BlockPalette, Brush, ColorBrush, Cone, Cuboid,
     CurveGradientBrush, Cylinder, Difference, Disk, Ellipsoid, Hollow, Intersection, Line,
     LinearGradientBrush, MultiPointGradientBrush, ParametricShape, Plane, PointGradientBrush,
-    Pyramid, SdfShape, ShadedBrush, Shape, SolidBrush, Sphere, Torus, Triangle, Union,
+    Pyramid, SdfShape, ShadedBrush, Shape, SolidBrush, Sphere, SpotlightBrush, Torus, Triangle,
+    Union,
 };
 use crate::BlockState;
 
@@ -41,6 +42,8 @@ pub fn palette_by_name(name: &str) -> Result<BlockPalette, String> {
 macro_rules! delegate_shape {
     ($self:expr, $method:ident $(, $arg:expr)*) => {
         match $self {
+            #[cfg(feature = "voxelize")]
+            ShapeEnum::Mesh(s) => s.$method($($arg),*),
             ShapeEnum::Sphere(s) => s.$method($($arg),*),
             ShapeEnum::Cuboid(s) => s.$method($($arg),*),
             ShapeEnum::Ellipsoid(s) => s.$method($($arg),*),
@@ -81,6 +84,9 @@ pub enum ShapeEnum {
     Line(Line),
     BezierCurve(BezierCurve),
     Sdf(SdfShape),
+    /// A voxelized triangle mesh (GLB/OBJ). Only with the `voxelize` feature.
+    #[cfg(feature = "voxelize")]
+    Mesh(crate::voxelize::MeshShape),
     Hollow(Hollow),
     Union(Union),
     Intersection(Intersection),
@@ -151,6 +157,7 @@ pub enum BrushEnum {
     MultiPoint(MultiPointGradientBrush),
     Shaded(ShadedBrush),
     CurveGradient(CurveGradientBrush),
+    Spotlight(SpotlightBrush),
 }
 
 impl BrushEnum {
@@ -166,6 +173,7 @@ impl BrushEnum {
             BrushEnum::MultiPoint(b) => b.set_palette(palette),
             BrushEnum::Shaded(b) => b.set_palette(palette),
             BrushEnum::CurveGradient(b) => b.set_palette(palette),
+            BrushEnum::Spotlight(b) => b.set_palette(palette),
         }
     }
 }
@@ -181,6 +189,7 @@ impl Brush for BrushEnum {
             BrushEnum::MultiPoint(b) => b.get_block(x, y, z, normal),
             BrushEnum::Shaded(b) => b.get_block(x, y, z, normal),
             BrushEnum::CurveGradient(b) => b.get_block(x, y, z, normal),
+            BrushEnum::Spotlight(b) => b.get_block(x, y, z, normal),
         }
     }
 }

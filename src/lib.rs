@@ -46,6 +46,8 @@ pub mod rendering;
 pub mod scripting;
 #[cfg(feature = "simulation")]
 pub mod simulation;
+#[cfg(feature = "voxelize")]
+pub mod voxelize;
 
 // The Diplomat wasm module carries no wasm-bindgen glue, so getrandom's "js" source is
 // unavailable; register a deterministic splitmix64 stream instead. Non-crypto by design:

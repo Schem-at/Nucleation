@@ -806,6 +806,34 @@ pub mod ffi {
             Ok(Box::new(Brush(crate::building::BrushEnum::Point(brush))))
         }
 
+        /// Spotlight-lit base color (`r`, `g`, `b`): Lambert shading toward a
+        /// cone light at (`px`, `py`, `pz`) aimed along (`dx`, `dy`, `dz`).
+        /// Full intensity inside 0.7 × `cone_angle_deg`, smoothstep falloff
+        /// to zero at the cone edge; surfaces facing away or outside the cone
+        /// drop to a 4% ambient floor.
+        #[allow(clippy::too_many_arguments)]
+        pub fn spotlight(
+            px: f32,
+            py: f32,
+            pz: f32,
+            dx: f32,
+            dy: f32,
+            dz: f32,
+            cone_angle_deg: f32,
+            r: u8,
+            g: u8,
+            b: u8,
+        ) -> Box<Brush> {
+            Box::new(Brush(crate::building::BrushEnum::Spotlight(
+                crate::building::SpotlightBrush::new(
+                    (px as f64, py as f64, pz as f64),
+                    (dx as f64, dy as f64, dz as f64),
+                    cone_angle_deg as f64,
+                    (r, g, b),
+                ),
+            )))
+        }
+
         /// Use `palette` for this brush's color→block snapping instead of the
         /// default all-blocks palette. No-op for `solid` brushes, which place
         /// a fixed block state. Set it before filling; the palette is shared,
