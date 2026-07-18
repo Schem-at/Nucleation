@@ -21,7 +21,8 @@ void add_Brush_binding(nb::module_ mod) {
         .def_static("point_gradient", std::move(maybe_op_unwrap(&nucleation::Brush::point_gradient)), "positions"_a, "colors"_a, "falloff"_a, "space"_a)
         .def("set_palette", &nucleation::Brush::set_palette, "palette"_a)
         .def_static("shaded", std::move(maybe_op_unwrap(&nucleation::Brush::shaded)), "r"_a, "g"_a, "b"_a, "lx"_a, "ly"_a, "lz"_a)
-        .def_static("solid", std::move(maybe_op_unwrap(&nucleation::Brush::solid)), "block_name"_a);
+        .def_static("solid", std::move(maybe_op_unwrap(&nucleation::Brush::solid)), "block_name"_a)
+        .def_static("spotlight", std::move(maybe_op_unwrap(&nucleation::Brush::spotlight)), "px"_a, "py"_a, "pz"_a, "dx"_a, "dy"_a, "dz"_a, "cone_angle_deg"_a, "r"_a, "g"_a, "b"_a);
 }
 
 } 

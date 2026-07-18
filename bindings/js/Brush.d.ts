@@ -52,6 +52,15 @@ export class Brush {
     static pointGradient(positions: Array<number>, colors: Array<number>, falloff: number, space: InterpolationSpace): Brush;
 
     /**
+     * Spotlight-lit base color (`r`, `g`, `b`): Lambert shading toward a
+     * cone light at (`px`, `py`, `pz`) aimed along (`dx`, `dy`, `dz`).
+     * Full intensity inside 0.7 × `cone_angle_deg`, smoothstep falloff
+     * to zero at the cone edge; surfaces facing away or outside the cone
+     * drop to a 4% ambient floor.
+     */
+    static spotlight(px: number, py: number, pz: number, dx: number, dy: number, dz: number, coneAngleDeg: number, r: number, g: number, b: number): Brush;
+
+    /**
      * Use `palette` for this brush's color→block snapping instead of the
      * default all-blocks palette. No-op for `solid` brushes, which place
      * a fixed block state. Set it before filling; the palette is shared,

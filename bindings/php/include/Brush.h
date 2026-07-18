@@ -32,6 +32,8 @@ Brush* Brush_bilinear_gradient(int32_t ox, int32_t oy, int32_t oz, int32_t ux, i
 typedef struct Brush_point_gradient_result {union {Brush* ok; NucleationError err;}; bool is_ok;} Brush_point_gradient_result;
 Brush_point_gradient_result Brush_point_gradient(DiplomatI32View positions, DiplomatU8View colors, float falloff, InterpolationSpace space);
 
+Brush* Brush_spotlight(float px, float py, float pz, float dx, float dy, float dz, float cone_angle_deg, uint8_t r, uint8_t g, uint8_t b);
+
 void Brush_set_palette(Brush* self, const Palette* palette);
 
 typedef struct Brush_curve_gradient_result {union {Brush* ok; NucleationError err;}; bool is_ok;} Brush_curve_gradient_result;

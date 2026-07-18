@@ -104,6 +104,8 @@ export { Store } from "./Store.mjs"
 
 export { StoreIo } from "./StoreIo.mjs"
 
+export { Voxelizer } from "./Voxelizer.mjs"
+
 export { WorldChunkView } from "./WorldChunkView.mjs"
 
 export { WorldSink } from "./WorldSink.mjs"

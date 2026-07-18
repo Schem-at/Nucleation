@@ -106,6 +106,8 @@ export { Store } from "./Store"
 
 export { StoreIo } from "./StoreIo"
 
+export { Voxelizer } from "./Voxelizer"
+
 export { WorldChunkView } from "./WorldChunkView"
 
 export { WorldSink } from "./WorldSink"

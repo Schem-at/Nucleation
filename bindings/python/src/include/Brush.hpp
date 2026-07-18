@@ -35,6 +35,8 @@ namespace capi {
     typedef struct Brush_point_gradient_result {union {nucleation::capi::Brush* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Brush_point_gradient_result;
     Brush_point_gradient_result Brush_point_gradient(nucleation::diplomat::capi::DiplomatI32View positions, nucleation::diplomat::capi::DiplomatU8View colors, float falloff, nucleation::capi::InterpolationSpace space);
 
+    nucleation::capi::Brush* Brush_spotlight(float px, float py, float pz, float dx, float dy, float dz, float cone_angle_deg, uint8_t r, uint8_t g, uint8_t b);
+
     void Brush_set_palette(nucleation::capi::Brush* self, const nucleation::capi::Palette* palette);
 
     typedef struct Brush_curve_gradient_result {union {nucleation::capi::Brush* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Brush_curve_gradient_result;
@@ -117,6 +119,20 @@ inline nucleation::diplomat::result<std::unique_ptr<nucleation::Brush>, nucleati
         falloff,
         space.AsFFI());
     return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Brush>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Brush>>(std::unique_ptr<nucleation::Brush>(nucleation::Brush::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Brush>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline std::unique_ptr<nucleation::Brush> nucleation::Brush::spotlight(float px, float py, float pz, float dx, float dy, float dz, float cone_angle_deg, uint8_t r, uint8_t g, uint8_t b) {
+    auto result = nucleation::capi::Brush_spotlight(px,
+        py,
+        pz,
+        dx,
+        dy,
+        dz,
+        cone_angle_deg,
+        r,
+        g,
+        b);
+    return std::unique_ptr<nucleation::Brush>(nucleation::Brush::FromFFI(result));
 }
 
 inline void nucleation::Brush::set_palette(const nucleation::Palette& palette) {

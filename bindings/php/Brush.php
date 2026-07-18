@@ -78,6 +78,11 @@ final class Brush {
         return new Brush($result->ok, true);
     }
 
+    public static function spotlight( $px,  $py,  $pz,  $dx,  $dy,  $dz,  $cone_angle_deg,  $r,  $g,  $b) {
+        $ret = Lib::ffi()->Brush_spotlight($px, $py, $pz, $dx, $dy, $dz, $cone_angle_deg, $r, $g, $b);
+        return new Brush($ret, true);
+    }
+
     public function setPalette( $palette) {
         Lib::ffi()->Brush_set_palette($this->ptr, $palette->ptr);
     }

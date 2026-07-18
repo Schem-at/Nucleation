@@ -55,6 +55,7 @@ void add_TypedCircuitExecutor_binding(nb::module_);
 void add_Value_binding(nb::module_);
 void add_Store_binding(nb::module_);
 void add_StoreIo_binding(nb::module_);
+void add_Voxelizer_binding(nb::module_);
 void add_WorldChunkView_binding(nb::module_);
 void add_WorldSink_binding(nb::module_);
 void add_WorldStream_binding(nb::module_);
@@ -176,6 +177,7 @@ NB_MODULE(nucleation, mod)
     add_Value_binding(mod);
     add_Store_binding(mod);
     add_StoreIo_binding(mod);
+    add_Voxelizer_binding(mod);
     add_WorldChunkView_binding(mod);
     add_WorldSink_binding(mod);
     add_WorldStream_binding(mod);

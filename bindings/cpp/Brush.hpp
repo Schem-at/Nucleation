@@ -35,6 +35,8 @@ namespace capi {
     typedef struct Brush_point_gradient_result {union {diplomat::capi::Brush* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Brush_point_gradient_result;
     Brush_point_gradient_result Brush_point_gradient(diplomat::capi::DiplomatI32View positions, diplomat::capi::DiplomatU8View colors, float falloff, diplomat::capi::InterpolationSpace space);
 
+    diplomat::capi::Brush* Brush_spotlight(float px, float py, float pz, float dx, float dy, float dz, float cone_angle_deg, uint8_t r, uint8_t g, uint8_t b);
+
     void Brush_set_palette(diplomat::capi::Brush* self, const diplomat::capi::Palette* palette);
 
     typedef struct Brush_curve_gradient_result {union {diplomat::capi::Brush* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Brush_curve_gradient_result;
@@ -117,6 +119,20 @@ inline diplomat::result<std::unique_ptr<Brush>, NucleationError> Brush::point_gr
         falloff,
         space.AsFFI());
     return result.is_ok ? diplomat::result<std::unique_ptr<Brush>, NucleationError>(diplomat::Ok<std::unique_ptr<Brush>>(std::unique_ptr<Brush>(Brush::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Brush>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline std::unique_ptr<Brush> Brush::spotlight(float px, float py, float pz, float dx, float dy, float dz, float cone_angle_deg, uint8_t r, uint8_t g, uint8_t b) {
+    auto result = diplomat::capi::Brush_spotlight(px,
+        py,
+        pz,
+        dx,
+        dy,
+        dz,
+        cone_angle_deg,
+        r,
+        g,
+        b);
+    return std::unique_ptr<Brush>(Brush::FromFFI(result));
 }
 
 inline void Brush::set_palette(const Palette& palette) {

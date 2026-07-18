@@ -54,6 +54,7 @@ require_once __DIR__ . '/TypedCircuitExecutor.php';
 require_once __DIR__ . '/Value.php';
 require_once __DIR__ . '/Store.php';
 require_once __DIR__ . '/StoreIo.php';
+require_once __DIR__ . '/Voxelizer.php';
 require_once __DIR__ . '/WorldChunkView.php';
 require_once __DIR__ . '/WorldSink.php';
 require_once __DIR__ . '/WorldStream.php';

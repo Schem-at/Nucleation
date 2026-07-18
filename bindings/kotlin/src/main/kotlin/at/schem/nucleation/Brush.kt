@@ -13,6 +13,7 @@ internal interface BrushLib: Library {
     fun Brush_shaded(r: FFIUint8, g: FFIUint8, b: FFIUint8, lx: Float, ly: Float, lz: Float): Pointer
     fun Brush_bilinear_gradient(ox: Int, oy: Int, oz: Int, ux: Int, uy: Int, uz: Int, vx: Int, vy: Int, vz: Int, r00: FFIUint8, g00: FFIUint8, b00: FFIUint8, r10: FFIUint8, g10: FFIUint8, b10: FFIUint8, r01: FFIUint8, g01: FFIUint8, b01: FFIUint8, r11: FFIUint8, g11: FFIUint8, b11: FFIUint8, space: Int): Pointer
     fun Brush_point_gradient(positions: Slice, colors: Slice, falloff: Float, space: Int): ResultPointerInt
+    fun Brush_spotlight(px: Float, py: Float, pz: Float, dx: Float, dy: Float, dz: Float, coneAngleDeg: Float, r: FFIUint8, g: FFIUint8, b: FFIUint8): Pointer
     fun Brush_set_palette(handle: Pointer, palette: Pointer): Unit
     fun Brush_curve_gradient(stops: Slice, colors: Slice, space: Int): ResultPointerInt
 }
@@ -142,6 +143,22 @@ class Brush internal constructor (
                 positionsSliceMemory.close()
                 colorsSliceMemory.close()
             }
+        }
+        @JvmStatic
+        
+        /** Spotlight-lit base color (`r`, `g`, `b`): Lambert shading toward a
+        *cone light at (`px`, `py`, `pz`) aimed along (`dx`, `dy`, `dz`).
+        *Full intensity inside 0.7 × `cone_angle_deg`, smoothstep falloff
+        *to zero at the cone edge; surfaces facing away or outside the cone
+        *drop to a 4% ambient floor.
+        */
+        fun spotlight(px: Float, py: Float, pz: Float, dx: Float, dy: Float, dz: Float, coneAngleDeg: Float, r: UByte, g: UByte, b: UByte): Brush {
+            
+            val returnVal = lib.Brush_spotlight(px, py, pz, dx, dy, dz, coneAngleDeg, FFIUint8(r), FFIUint8(g), FFIUint8(b));
+            val selfEdges: List<Any> = listOf()
+            val handle = returnVal 
+            val returnOpaque = Brush(handle, selfEdges, true)
+            return returnOpaque
         }
         @JvmStatic
         

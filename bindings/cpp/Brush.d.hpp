@@ -67,6 +67,15 @@ public:
   inline static diplomat::result<std::unique_ptr<Brush>, NucleationError> point_gradient(diplomat::span<const int32_t> positions, diplomat::span<const uint8_t> colors, float falloff, InterpolationSpace space);
 
   /**
+   * Spotlight-lit base color (`r`, `g`, `b`): Lambert shading toward a
+   * cone light at (`px`, `py`, `pz`) aimed along (`dx`, `dy`, `dz`).
+   * Full intensity inside 0.7 × `cone_angle_deg`, smoothstep falloff
+   * to zero at the cone edge; surfaces facing away or outside the cone
+   * drop to a 4% ambient floor.
+   */
+  inline static std::unique_ptr<Brush> spotlight(float px, float py, float pz, float dx, float dy, float dz, float cone_angle_deg, uint8_t r, uint8_t g, uint8_t b);
+
+  /**
    * Use `palette` for this brush's color→block snapping instead of the
    * default all-blocks palette. No-op for `solid` brushes, which place
    * a fixed block state. Set it before filling; the palette is shared,
