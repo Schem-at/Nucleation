@@ -9,7 +9,7 @@ on:
       ref:
         description: "Schematic-Mesher ref (branch/tag/sha) to publish"
         required: true
-        default: "570070ef6dc1c6bc754c304548a4b57238cb68f3" # publish-prep: 253d2b6 + packaging/manifest fixes
+        default: "d22d39ca6b0664f97b14e059d411240932cd9d22" # publish-prep: 253d2b6 + packaging/manifest fixes
 
 jobs:
   publish:
