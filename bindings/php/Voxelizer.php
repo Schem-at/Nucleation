@@ -12,7 +12,7 @@ final class Voxelizer {
         $this->owned = $owned;
     }
 
-    public static function shapeFromGlb(array $data,  $target_size) {
+    public static function shapeFromGlb(array $data,  $target_size,  $shell) {
         $__n0 = count($data);
         $__view0 = Lib::ffi()->new('DiplomatU8View');
         if ($__n0 > 0) {
@@ -23,14 +23,14 @@ final class Voxelizer {
             $__view0->data = null;
         }
         $__view0->len = $__n0;
-        $result = Lib::ffi()->Voxelizer_shape_from_glb($__view0, $target_size);
+        $result = Lib::ffi()->Voxelizer_shape_from_glb($__view0, $target_size, $shell);
         if (!$result->is_ok) {
             throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
         }
         return new Shape($result->ok, true);
     }
 
-    public static function shapeFromObj(string $text,  $target_size) {
+    public static function shapeFromObj(string $text,  $target_size,  $shell) {
         $__n0 = strlen($text);
         $__view0 = Lib::ffi()->new('DiplomatStringView');
         if ($__n0 > 0) {
@@ -41,14 +41,14 @@ final class Voxelizer {
             $__view0->data = null;
         }
         $__view0->len = $__n0;
-        $result = Lib::ffi()->Voxelizer_shape_from_obj($__view0, $target_size);
+        $result = Lib::ffi()->Voxelizer_shape_from_obj($__view0, $target_size, $shell);
         if (!$result->is_ok) {
             throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
         }
         return new Shape($result->ok, true);
     }
 
-    public static function schematicFromGlbTextured(array $data,  $target_size,  $palette, string $name) {
+    public static function schematicFromGlbTextured(array $data,  $target_size,  $shell,  $palette, string $name) {
         $__n0 = count($data);
         $__view0 = Lib::ffi()->new('DiplomatU8View');
         if ($__n0 > 0) {
@@ -59,17 +59,17 @@ final class Voxelizer {
             $__view0->data = null;
         }
         $__view0->len = $__n0;
-        $__n3 = strlen($name);
-        $__view3 = Lib::ffi()->new('DiplomatStringView');
-        if ($__n3 > 0) {
-            $__buf3 = Lib::ffi()->new("uint8_t[" . $__n3 . "]", false);
-            \FFI::memcpy($__buf3, $name, $__n3);
-            $__view3->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf3[0]));
+        $__n4 = strlen($name);
+        $__view4 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n4 > 0) {
+            $__buf4 = Lib::ffi()->new("uint8_t[" . $__n4 . "]", false);
+            \FFI::memcpy($__buf4, $name, $__n4);
+            $__view4->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf4[0]));
         } else {
-            $__view3->data = null;
+            $__view4->data = null;
         }
-        $__view3->len = $__n3;
-        $result = Lib::ffi()->Voxelizer_schematic_from_glb_textured($__view0, $target_size, $palette->ptr, $__view3);
+        $__view4->len = $__n4;
+        $result = Lib::ffi()->Voxelizer_schematic_from_glb_textured($__view0, $target_size, $shell, $palette->ptr, $__view4);
         if (!$result->is_ok) {
             throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
         }

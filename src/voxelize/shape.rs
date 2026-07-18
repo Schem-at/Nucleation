@@ -91,6 +91,11 @@ impl TriGrid {
 #[derive(Clone)]
 pub struct MeshShape {
     data: Arc<MeshData>,
+    /// Also claim voxels whose center is within this distance of the
+    /// surface (in blocks). 0.0 = pure parity solid. Rescues thin/hollow
+    /// geometry (double-walled vessels, open shells) whose walls slip
+    /// between voxel centers.
+    shell: f32,
 }
 
 struct MeshData {
@@ -121,6 +126,7 @@ impl MeshShape {
             (max[2].ceil() as i32 - 1).max(min[2].floor() as i32),
         );
         Self {
+            shell: 0.0,
             data: Arc::new(MeshData {
                 triangles: model.triangles,
                 materials: model.materials,
@@ -175,6 +181,17 @@ impl MeshShape {
 
     /// Nearest triangle to `p`: `(triangle index, closest point, distance)`.
     /// Grid-accelerated expanding-ring search. `None` for an empty mesh.
+    /// `nearest_triangle`, but allowed to give up early once no triangle
+    /// can be within `limit` — the cheap query the shell test needs.
+    fn nearest_triangle_within(
+        &self,
+        p: [f32; 3],
+        limit: f32,
+    ) -> Option<(usize, [f32; 3], f32)> {
+        let hit = self.nearest_triangle(p)?;
+        (hit.2 <= limit).then_some(hit)
+    }
+
     fn nearest_triangle(&self, p: [f32; 3]) -> Option<(usize, [f32; 3], f32)> {
         let d = &self.data;
         if d.triangles.is_empty() {
@@ -226,6 +243,16 @@ impl MeshShape {
         best
     }
 
+    /// A copy of this shape that also claims voxels whose center lies
+    /// within `thickness` blocks of the mesh surface, in addition to the
+    /// parity-solid interior. `0.7`–`1.0` closes single-voxel walls.
+    pub fn with_shell(&self, thickness: f32) -> Self {
+        Self {
+            data: self.data.clone(),
+            shell: thickness.max(0.0),
+        }
+    }
+
     /// Interpolated surface color at the voxel's nearest surface point:
     /// nearest triangle → barycentric UVs → bilinear texture sample of that
     /// triangle's material. `None` when the triangle has no usable UVs or
@@ -264,7 +291,15 @@ impl Shape for MeshShape {
         let votes = (0..3)
             .filter(|&axis| self.axis_ray_parity(c, axis))
             .count();
-        votes >= 2
+        if votes >= 2 {
+            return true;
+        }
+        if self.shell > 0.0 {
+            if let Some((_, _, dist)) = self.nearest_triangle_within(c, self.shell) {
+                return dist <= self.shell;
+            }
+        }
+        false
     }
 
     fn points(&self) -> Vec<(i32, i32, i32)> {

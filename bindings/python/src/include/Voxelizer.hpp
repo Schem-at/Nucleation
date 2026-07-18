@@ -23,13 +23,13 @@ namespace capi {
     extern "C" {
 
     typedef struct Voxelizer_shape_from_glb_result {union {nucleation::capi::Shape* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Voxelizer_shape_from_glb_result;
-    Voxelizer_shape_from_glb_result Voxelizer_shape_from_glb(nucleation::diplomat::capi::DiplomatU8View data, float target_size);
+    Voxelizer_shape_from_glb_result Voxelizer_shape_from_glb(nucleation::diplomat::capi::DiplomatU8View data, float target_size, float shell);
 
     typedef struct Voxelizer_shape_from_obj_result {union {nucleation::capi::Shape* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Voxelizer_shape_from_obj_result;
-    Voxelizer_shape_from_obj_result Voxelizer_shape_from_obj(nucleation::diplomat::capi::DiplomatStringView text, float target_size);
+    Voxelizer_shape_from_obj_result Voxelizer_shape_from_obj(nucleation::diplomat::capi::DiplomatStringView text, float target_size, float shell);
 
     typedef struct Voxelizer_schematic_from_glb_textured_result {union {nucleation::capi::Schematic* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Voxelizer_schematic_from_glb_textured_result;
-    Voxelizer_schematic_from_glb_textured_result Voxelizer_schematic_from_glb_textured(nucleation::diplomat::capi::DiplomatU8View data, float target_size, const nucleation::capi::Palette* palette, nucleation::diplomat::capi::DiplomatStringView name);
+    Voxelizer_schematic_from_glb_textured_result Voxelizer_schematic_from_glb_textured(nucleation::diplomat::capi::DiplomatU8View data, float target_size, float shell, const nucleation::capi::Palette* palette, nucleation::diplomat::capi::DiplomatStringView name);
 
     void Voxelizer_destroy(Voxelizer* self);
 
@@ -37,21 +37,24 @@ namespace capi {
 } // namespace capi
 } // namespace
 
-inline nucleation::diplomat::result<std::unique_ptr<nucleation::Shape>, nucleation::NucleationError> nucleation::Voxelizer::shape_from_glb(nucleation::diplomat::span<const uint8_t> data, float target_size) {
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Shape>, nucleation::NucleationError> nucleation::Voxelizer::shape_from_glb(nucleation::diplomat::span<const uint8_t> data, float target_size, float shell) {
     auto result = nucleation::capi::Voxelizer_shape_from_glb({data.data(), data.size()},
-        target_size);
+        target_size,
+        shell);
     return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Shape>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Shape>>(std::unique_ptr<nucleation::Shape>(nucleation::Shape::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Shape>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
-inline nucleation::diplomat::result<std::unique_ptr<nucleation::Shape>, nucleation::NucleationError> nucleation::Voxelizer::shape_from_obj(std::string_view text, float target_size) {
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Shape>, nucleation::NucleationError> nucleation::Voxelizer::shape_from_obj(std::string_view text, float target_size, float shell) {
     auto result = nucleation::capi::Voxelizer_shape_from_obj({text.data(), text.size()},
-        target_size);
+        target_size,
+        shell);
     return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Shape>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Shape>>(std::unique_ptr<nucleation::Shape>(nucleation::Shape::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Shape>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
-inline nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError> nucleation::Voxelizer::schematic_from_glb_textured(nucleation::diplomat::span<const uint8_t> data, float target_size, const nucleation::Palette& palette, std::string_view name) {
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError> nucleation::Voxelizer::schematic_from_glb_textured(nucleation::diplomat::span<const uint8_t> data, float target_size, float shell, const nucleation::Palette& palette, std::string_view name) {
     auto result = nucleation::capi::Voxelizer_schematic_from_glb_textured({data.data(), data.size()},
         target_size,
+        shell,
         palette.AsFFI(),
         {name.data(), name.size()});
     return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Schematic>>(std::unique_ptr<nucleation::Schematic>(nucleation::Schematic::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));

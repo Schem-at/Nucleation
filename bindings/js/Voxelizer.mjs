@@ -48,18 +48,21 @@ export class Voxelizer {
      * it into a fillable Shape: the model is uniformly scaled so its
      * largest dimension equals `target_size` voxels, centered on x/z
      * with its base resting at y = 0. Solidity is a parity test at each
-     * voxel center (robust on closed meshes; open meshes are
-     * best-effort). Errors with `Parse` on malformed/triangle-less GLB
-     * and `InvalidArgument` on a non-positive `target_size`.
+     * voxel center (robust on closed meshes), plus — when `shell` > 0 —
+     * every voxel whose center is within `shell` blocks of the surface,
+     * which rescues thin walls and hollow vessels (0.7–1.0 closes
+     * single-voxel shells; 0 = pure parity). Errors with `Parse` on
+     * malformed/triangle-less GLB and `InvalidArgument` on a
+     * non-positive `target_size`.
      */
-    static shapeFromGlb(data, targetSize) {
+    static shapeFromGlb(data, targetSize, shell) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
         const dataSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.slice(wasm, data, "u8")));
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
 
-        const result = wasm.Voxelizer_shape_from_glb(diplomatReceive.buffer, dataSlice.ptr, targetSize);
+        const result = wasm.Voxelizer_shape_from_glb(diplomatReceive.buffer, dataSlice.ptr, targetSize, shell);
 
         try {
             if (!diplomatReceive.resultFlag) {
@@ -80,19 +83,19 @@ export class Voxelizer {
     /**
      * Load a Wavefront OBJ (`v`/`vt`/`f` lines; polygon faces are
      * fan-triangulated, negative indices supported, materials ignored)
-     * and voxelize it into a fillable Shape, fitted exactly like
-     * `shape_from_glb`. Errors with `Parse` on malformed/triangle-less
+     * and voxelize it into a fillable Shape, fitted and shelled exactly
+     * like `shape_from_glb`. Errors with `Parse` on malformed/triangle-less
      * OBJ and `InvalidArgument` on invalid UTF-8 or a non-positive
      * `target_size`.
      */
-    static shapeFromObj(text, targetSize) {
+    static shapeFromObj(text, targetSize, shell) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
         const textSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, text)));
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
 
-        const result = wasm.Voxelizer_shape_from_obj(diplomatReceive.buffer, textSlice.ptr, targetSize);
+        const result = wasm.Voxelizer_shape_from_obj(diplomatReceive.buffer, textSlice.ptr, targetSize, shell);
 
         try {
             if (!diplomatReceive.resultFlag) {
@@ -115,11 +118,12 @@ export class Voxelizer {
      * schematic named `name`: every solid voxel becomes the `palette`
      * block closest to its nearest-surface texture color (interior
      * voxels inherit the nearest surface color; voxels without texture
-     * info snap to mid-gray). Errors with `Parse` on malformed GLB and
+     * info snap to mid-gray). `shell` behaves as in `shape_from_glb` —
+     * use ~0.7 for thin-walled models. Errors with `Parse` on malformed GLB and
      * `InvalidArgument` on invalid UTF-8 or a non-positive
      * `target_size`.
      */
-    static schematicFromGlbTextured(data, targetSize, palette, name) {
+    static schematicFromGlbTextured(data, targetSize, shell, palette, name) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
         const dataSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.slice(wasm, data, "u8")));
@@ -127,7 +131,7 @@ export class Voxelizer {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
 
-        const result = wasm.Voxelizer_schematic_from_glb_textured(diplomatReceive.buffer, dataSlice.ptr, targetSize, palette.ffiValue, nameSlice.ptr);
+        const result = wasm.Voxelizer_schematic_from_glb_textured(diplomatReceive.buffer, dataSlice.ptr, targetSize, shell, palette.ffiValue, nameSlice.ptr);
 
         try {
             if (!diplomatReceive.resultFlag) {

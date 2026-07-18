@@ -963,11 +963,11 @@ typedef struct StoreIo_default_format_version_result { union { NucleationError e
 StoreIo_default_format_version_result StoreIo_default_format_version(DiplomatStringView format, DiplomatWrite* write);
 void StoreIo_destroy(StoreIo* self);
 typedef struct Voxelizer_shape_from_glb_result { union { Shape* ok; NucleationError err; }; bool is_ok; } Voxelizer_shape_from_glb_result;
-Voxelizer_shape_from_glb_result Voxelizer_shape_from_glb(DiplomatU8View data, float target_size);
+Voxelizer_shape_from_glb_result Voxelizer_shape_from_glb(DiplomatU8View data, float target_size, float shell);
 typedef struct Voxelizer_shape_from_obj_result { union { Shape* ok; NucleationError err; }; bool is_ok; } Voxelizer_shape_from_obj_result;
-Voxelizer_shape_from_obj_result Voxelizer_shape_from_obj(DiplomatStringView text, float target_size);
+Voxelizer_shape_from_obj_result Voxelizer_shape_from_obj(DiplomatStringView text, float target_size, float shell);
 typedef struct Voxelizer_schematic_from_glb_textured_result { union { Schematic* ok; NucleationError err; }; bool is_ok; } Voxelizer_schematic_from_glb_textured_result;
-Voxelizer_schematic_from_glb_textured_result Voxelizer_schematic_from_glb_textured(DiplomatU8View data, float target_size, Palette* palette, DiplomatStringView name);
+Voxelizer_schematic_from_glb_textured_result Voxelizer_schematic_from_glb_textured(DiplomatU8View data, float target_size, float shell, Palette* palette, DiplomatStringView name);
 void Voxelizer_destroy(Voxelizer* self);
 WorldChunkView* WorldChunkView_create(int32_t cx, int32_t cz);
 int32_t WorldChunkView_cx(WorldChunkView* self);

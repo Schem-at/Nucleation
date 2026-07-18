@@ -629,7 +629,59 @@ def scene_metaballs(pack):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+
+
+MODELS_DIR = os.path.join(ROOT, "target", "readme-models")
+TEAPOT_URL = "https://casual-effects.com/g3d/data10/common/model/teapot/teapot.obj"
+DUCK_URL = ("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/"
+            "main/Models/Duck/glTF-Binary/Duck.glb")
+
+
+def _fetch_model(name, url):
+    os.makedirs(MODELS_DIR, exist_ok=True)
+    path = os.path.join(MODELS_DIR, name)
+    if not os.path.exists(path):
+        subprocess.run(["curl", "-sL", "-o", path, url], check=True)
+    return path
+
+
+def scene_teapot(pack):
+    """Utah teapot under a single spotlight through the grayscale ladder —
+    voxelized from the classic OBJ, lit by the spotlight brush."""
+    obj = open(_fetch_model("teapot.obj", TEAPOT_URL)).read()
+    # shell=0.75: the canonical teapot is a genuinely hollow, double-walled
+    # vessel; the shell closes its quarter-voxel ceramic walls.
+    teapot = None
+    s = nu.Schematic.create("teapot")
+    shape = nu.Voxelizer.shape_from_obj(obj, 56.0, 0.75)
+    light_pos = (-38.0, 55.0, -52.0)          # beside the camera, high left
+    center = (0.0, 12.0, 0.0)
+    d = [c - p for p, c in zip(light_pos, center)]
+    n = math.sqrt(sum(v * v for v in d))
+    brush = nu.Brush.spotlight(*light_pos, *(v / n for v in d), 46.0, 245, 242, 235)
+    brush.set_palette(nu.Palette.from_block_ids(json.dumps(GRAY_RAMP)))
+    nu.BuildingTool.fill(s, shape, brush)
+    cfg = nu.RenderConfig.create(880, 620)
+    cfg.set_isometric(); cfg.set_yaw(205.0); cfg.set_pitch(14.0); cfg.set_zoom(1.2)
+    cfg.set_background(0.086, 0.098, 0.149, 1.0)
+    nu.Renderer.render_to_file(s, pack, cfg, os.path.join(OUT, "teapot-spotlight.png"))
+    print("  wrote docs/media/teapot-spotlight.png")
+    return s
+
+
+def scene_duck(pack):
+    """The classic COLLADA duck, texture-projected onto blocks."""
+    glb = open(_fetch_model("Duck.glb", DUCK_URL), "rb").read()
+    duck = nu.Voxelizer.schematic_from_glb_textured(glb, 44.0, 0.7,
+                                                    nu.Palette.solid(), "duck")
+    render(duck, pack, os.path.join(OUT, "textured-duck.png"), w=720, h=600,
+           yaw=130, pitch=18, zoom=1.15)
+    return duck
+
+
 SCENES = {
+    "teapot": scene_teapot,
+    "duck": scene_duck,
     "metaballs": scene_metaballs,
     "basics": scene_basics,
     "hero": scene_hero,

@@ -21,7 +21,7 @@ nucleation itself, and every snippet ran for real
 
 **Contents** · [Install](#install) · [The basics](#the-basics) ·
 [Build](#build-shapes-brushes-palettes) · [Terrain](#terrain-from-a-json-description) ·
-[Redstone](#simulate-redstone) · [Mesh & render](#mesh-and-render) ·
+[Voxelize](#voxelize-3d-models) · [Redstone](#simulate-redstone) · [Mesh & render](#mesh-and-render) ·
 [Analyze](#analyze-diff-fingerprint-auto-stack) · [Masked edits](#edit-without-collateral-damage) ·
 [Worlds & block data](#worlds-versions-and-the-block-database) ·
 [Languages](#one-api-seven-languages) · [Docs](#documentation--development)
@@ -184,6 +184,39 @@ That's the minimal version; the volcano up top adds smooth-blended cones, a
 cylinder-cored lava crater, and noise-gated snow. Smooth booleans even
 animate into metaballs — recipes, node/rule schemas, and the gradient fill
 rules live in the [SDF terrain guide](docs/guides/sdf-terrain.md).
+
+## Voxelize 3D models
+
+Real 3D models become schematics: GLB (with node transforms and embedded
+textures) and OBJ load into a `MeshModel`, and a voxelized mesh is — like
+everything else here — just a `Shape`. Inside/outside comes from
+triangle-parity ray casting; normals come from the nearest triangle, so
+lighting brushes simply work. The Utah teapot under one spotlight, through
+the grayscale ladder:
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/teapot-spotlight.png" width="640" alt="Voxelized Utah teapot lit by a single spotlight through a grayscale block palette">
+</div>
+
+```python
+teapot = Voxelizer.shape_from_obj(teapot_obj, 56.0, 0.75)   # shell closes its thin ceramic walls
+spot = Brush.spotlight(-38, 55, -52,  0.48, -0.54, 0.66,  46.0,  245, 242, 235)
+spot.set_palette(gray_ramp)
+BuildingTool.fill(s, teapot, spot)
+```
+
+And textures project onto the voxels: each block takes the palette-closest
+color of its nearest surface point (barycentric UVs, bilinear sampling) —
+the classic COLLADA duck, beak and eye catchlights intact:
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/textured-duck.png" width="460" alt="The Khronos duck voxelized with its texture projected onto blocks">
+</div>
+
+```python
+duck = Voxelizer.schematic_from_glb_textured(duck_glb, 44.0, 0.7, Palette.solid(), "duck")
+# 25,641 blocks: yellow_wool body, orange beak, black eyes with snow-block catchlights
+```
 
 ## Simulate redstone
 
