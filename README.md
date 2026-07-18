@@ -124,6 +124,12 @@ Palette.grayscale().ramp_ids_json(255, 255, 255,  0, 0, 0,  24)
 # 24 distinct blocks: white_wool ... iron_block ... deepslate_tiles ... black_concrete
 ```
 
+And when a ramp still bands, dither it: `Palette.…().dithered()` makes
+every brush alternate between the two nearest blocks per voxel (ordered
+Bayer, deterministic) — hard bands on the left, dissolved on the right:
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/dither-compare.png" width="740" alt="The same shaded sphere with hard palette snapping (banded) and dithered snapping (smooth)">
+
 Or build palettes from pure color logic over the block database — no names,
 just measured color values and block facts:
 
@@ -235,6 +241,11 @@ world.tick(2);
 world.flush();
 world.isLit(2, 1, 0);                        // → true
 ```
+
+Eight of those lines make a display — levers flipped through the
+simulator, lamps showing the byte:
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/simulation-byte.png" width="700" alt="Eight lever-wire-lamp lines displaying the binary pattern 10110010">
 
 Beyond poking blocks: a typed executor drives circuits through named, typed
 inputs and outputs (booleans, integers, floats, ASCII) with layout builders
@@ -404,7 +415,13 @@ int main(void) {
   its verified output
 - [Release notes](RELEASE_NOTES.md)
 
-Also in the box: embedded Lua/JS scripting engines, pluggable storage
+Also in the box: embedded Lua/JS scripting engines — this sine wall is a
+12-line Lua script run through `Scripting.run_lua_script`
+([scripting guide](docs/guides/scripting.md)):
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/scripting-wall.png" width="700" alt="A sine-wave wall built by an embedded Lua script with a concrete gradient">
+
+Plus pluggable storage
 (memory / filesystem / S3 / Redis / Postgres behind one URI), and layer-art
 templates (schematics from ASCII art).
 
