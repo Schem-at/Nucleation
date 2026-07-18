@@ -21,6 +21,9 @@ Blocks_get_json_result Blocks_get_json(DiplomatStringView id, DiplomatWrite* wri
 
 void Blocks_ids_json(DiplomatWrite* write);
 
+typedef struct Blocks_by_color_json_result {union { NucleationError err;}; bool is_ok;} Blocks_by_color_json_result;
+Blocks_by_color_json_result Blocks_by_color_json(uint8_t r, uint8_t g, uint8_t b, float max_distance, DiplomatWrite* write);
+
 typedef struct Blocks_by_tag_json_result {union { NucleationError err;}; bool is_ok;} Blocks_by_tag_json_result;
 Blocks_by_tag_json_result Blocks_by_tag_json(DiplomatStringView tag, DiplomatWrite* write);
 

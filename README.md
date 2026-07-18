@@ -19,6 +19,13 @@ nucleation itself, and every snippet ran for real
 
 </div>
 
+**Contents** · [Install](#install) · [The basics](#the-basics) ·
+[Build](#build-shapes-brushes-palettes) · [Terrain](#terrain-from-a-json-description) ·
+[Redstone](#simulate-redstone) · [Mesh & render](#mesh-and-render) ·
+[Analyze](#analyze-diff-fingerprint-auto-stack) · [Masked edits](#edit-without-collateral-damage) ·
+[Worlds & block data](#worlds-versions-and-the-block-database) ·
+[Languages](#one-api-seven-languages) · [Docs](#documentation--development)
+
 ## Install
 
 ```bash
@@ -40,19 +47,17 @@ and block strings, save it in any other:
 ```python
 from nucleation import Schematic
 
-cube = Schematic.load_from_file("simple_cube.litematic")
-d = cube.dimensions()                  # (3, 3, 3)
-cube.palette_json()                    # ["minecraft:air","minecraft:stone",...]
+cube = Schematic.load_from_file("simple_cube.litematic")   # any format, auto-detected
+cube.dimensions()                                          # (3, 3, 3)
 
-cube.set_block(1, 3, 1, "minecraft:glowstone")        # y=3: the region grows to fit
-cube.set_block_from_string(0, 3, 1, "minecraft:lever[face=floor,facing=east]")
+cube.set_block(1, 3, 1, "minecraft:glowstone")             # y=3: the region grows to fit
+cube.get_block_name(1, 3, 1)                               # "minecraft:glowstone"
 
-cube.save_to_file_with_format("simple_cube.schem", "", "")
-# empty format/version = infer from the extension, latest version
+cube.save_to_file("cube.schem")                            # format from the extension
 ```
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/basics.png" width="380" alt="The cube from the snippet: glowstone crown and a lever, rendered">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/basics.png" width="380" alt="The cube from the snippet with its glowstone crown, rendered">
 </div>
 
 The same loop in JavaScript — the WASM build has no filesystem, so it's bytes
@@ -67,8 +72,11 @@ cube.setBlock(1, 3, 1, "minecraft:glowstone");
 writeFileSync("simple_cube.schem", Buffer.from(cube.toSchematicB64(), "base64"));
 ```
 
-Later Python snippets assume `from nucleation import *` and an existing
-schematic `s` — each has a fully runnable version with captured output in
+Block-state strings with properties work anywhere a block is named —
+`"minecraft:lever[face=floor,facing=east]"` — and every block string a
+schematic can contain round-trips. Later Python snippets assume
+`from nucleation import *` and an existing schematic `s`; each has a fully
+runnable version with captured output in
 [`docs/readme-snippets/`](docs/readme-snippets/).
 
 ## Build: shapes, brushes, palettes
@@ -116,14 +124,43 @@ Palette.grayscale().ramp_ids_json(255, 255, 255,  0, 0, 0,  24)
 # 24 distinct blocks: white_wool ... iron_block ... deepslate_tiles ... black_concrete
 ```
 
+Or build palettes from pure color logic over the block database — no names,
+just measured color values and block facts:
+
+```python
+b = PaletteBuilder.create()
+b.chroma_below(0.022)               # near-neutral only
+b.lightness_between(0.35, 0.75)     # mid-grays
+b.full_blocks_only()
+mid_grays = b.build()               # 40+ blocks, picked by math
+
+Blocks.by_color_json(120, 200, 60, 0.10)
+# everything lime-ish, nearest first: lime_concrete_powder (0.053), ...
+```
+
+And shapes aren't limited to the primitives — **any SDF tree is a `Shape`**,
+so smooth-blended distance fields fill with every brush. Field-gradient
+normals mean the shaded brush shades a blend continuously across the seam:
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/sdf-shape-shaded.png" width="400" alt="A smooth-union SDF blob filled with the shaded brush">
+</div>
+
+```python
+blob = Shape.sdf('{"type": "smoothUnion", "k": 6.0, "a": {"type": "sphere", "radius": 10}, '
+                 '"b": {"type": "translate", "offset": [11, 3, 0], "child": {"type": "sphere", "radius": 7}}}')
+BuildingTool.fill(s, blob, shaded_brush)      # masked fills work too
+```
+
 More in the guides: [shapes & brushes](docs/guides/shapes-and-brushes.md) ·
 [palettes, ramps, and pixel art](docs/guides/palettes.md).
 
 ## Terrain from a JSON description
 
-Signed distance fields — primitives, smooth booleans, seeded noise — sampled
-into blocks through declarative material rules. Deterministic: same JSON,
-same terrain, every language.
+The same SDF trees that work as shapes scale up to whole terrains: sampled
+through declarative material rules (surface shells, depth bands, gradients,
+scatter) instead of a single brush. Deterministic: same JSON, same terrain,
+every language.
 
 ```python
 from nucleation import Sdf

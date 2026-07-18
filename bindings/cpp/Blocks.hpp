@@ -24,6 +24,9 @@ namespace capi {
 
     void Blocks_ids_json(diplomat::capi::DiplomatWrite* write);
 
+    typedef struct Blocks_by_color_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Blocks_by_color_json_result;
+    Blocks_by_color_json_result Blocks_by_color_json(uint8_t r, uint8_t g, uint8_t b, float max_distance, diplomat::capi::DiplomatWrite* write);
+
     typedef struct Blocks_by_tag_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Blocks_by_tag_json_result;
     Blocks_by_tag_json_result Blocks_by_tag_json(diplomat::capi::DiplomatStringView tag, diplomat::capi::DiplomatWrite* write);
 
@@ -71,6 +74,27 @@ template<typename W>
 inline void Blocks::ids_json_write(W& writeable) {
     diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
     diplomat::capi::Blocks_ids_json(&write);
+}
+
+inline diplomat::result<std::string, NucleationError> Blocks::by_color_json(uint8_t r, uint8_t g, uint8_t b, float max_distance) {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Blocks_by_color_json(r,
+        g,
+        b,
+        max_distance,
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Blocks::by_color_json_write(uint8_t r, uint8_t g, uint8_t b, float max_distance, W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Blocks_by_color_json(r,
+        g,
+        b,
+        max_distance,
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
 inline diplomat::result<std::string, NucleationError> Blocks::by_tag_json(std::string_view tag) {

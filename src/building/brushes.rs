@@ -5,6 +5,12 @@ use std::sync::{Arc, OnceLock};
 
 pub struct PaletteBuilder {
     filter: BlockFilter,
+    // Color-logic constraints, judged from each block's measured texture
+    // color (Oklab). None = unconstrained.
+    min_lightness: Option<f32>,
+    max_lightness: Option<f32>,
+    max_chroma: Option<f32>,
+    near_color: Option<(ExtendedColorData, f32)>,
 }
 
 impl Default for PaletteBuilder {
@@ -17,7 +23,35 @@ impl PaletteBuilder {
     pub fn new() -> Self {
         Self {
             filter: BlockFilter::default(),
+            min_lightness: None,
+            max_lightness: None,
+            max_chroma: None,
+            near_color: None,
         }
+    }
+
+    /// Keep only blocks whose measured Oklab lightness L is in
+    /// `[min, max]` (0.0 = black, 1.0 = white).
+    pub fn lightness_between(mut self, min: f32, max: f32) -> Self {
+        self.min_lightness = Some(min);
+        self.max_lightness = Some(max);
+        self
+    }
+
+    /// Keep only blocks whose measured Oklab chroma (distance from the
+    /// neutral axis) is at most `max` — small values mean gray/neutral.
+    /// The grayscale preset uses 0.022.
+    pub fn chroma_below(mut self, max: f32) -> Self {
+        self.max_chroma = Some(max);
+        self
+    }
+
+    /// Keep only blocks whose measured color is within `max_distance`
+    /// (Oklab) of the given RGB. ~0.05 is "same color family",
+    /// ~0.15 is generous.
+    pub fn color_near(mut self, r: u8, g: u8, b: u8, max_distance: f32) -> Self {
+        self.near_color = Some((ExtendedColorData::from_rgb(r, g, b), max_distance));
+        self
     }
 
     pub fn exclude_falling(mut self) -> Self {
@@ -89,7 +123,30 @@ impl PaletteBuilder {
     }
 
     pub fn build(self) -> BlockPalette {
-        BlockPalette::new_from_filter(self.filter)
+        let (min_l, max_l) = (self.min_lightness, self.max_lightness);
+        let max_c = self.max_chroma;
+        let near = self.near_color;
+        let filter = self.filter;
+        BlockPalette::new_filtered(|f| {
+            if !is_buildable(f) || !filter.allows_block(f) {
+                return false;
+            }
+            let Some(c) = &f.extras.color else { return false };
+            let ok = c.to_extended();
+            let l = ok.oklab[0];
+            if min_l.is_some_and(|m| l < m) || max_l.is_some_and(|m| l > m) {
+                return false;
+            }
+            if max_c.is_some_and(|m| (ok.oklab[1].powi(2) + ok.oklab[2].powi(2)).sqrt() > m) {
+                return false;
+            }
+            if let Some((target, dist)) = &near {
+                if ok.distance_oklab(target) > *dist {
+                    return false;
+                }
+            }
+            true
+        })
     }
 }
 

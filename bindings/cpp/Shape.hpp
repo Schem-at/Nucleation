@@ -46,6 +46,12 @@ namespace capi {
     typedef struct Shape_bezier_result {union {diplomat::capi::Shape* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Shape_bezier_result;
     Shape_bezier_result Shape_bezier(diplomat::capi::DiplomatF32View control_points, float thickness, uint32_t resolution);
 
+    typedef struct Shape_sdf_result {union {diplomat::capi::Shape* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Shape_sdf_result;
+    Shape_sdf_result Shape_sdf(diplomat::capi::DiplomatStringView sdf_json);
+
+    typedef struct Shape_sdf_bounded_result {union {diplomat::capi::Shape* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Shape_sdf_bounded_result;
+    Shape_sdf_bounded_result Shape_sdf_bounded(diplomat::capi::DiplomatStringView sdf_json, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z);
+
     diplomat::capi::Shape* Shape_hollow(const diplomat::capi::Shape* self, uint32_t thickness);
 
     diplomat::capi::Shape* Shape_union_with(const diplomat::capi::Shape* self, const diplomat::capi::Shape* other);
@@ -205,6 +211,22 @@ inline diplomat::result<std::unique_ptr<Shape>, NucleationError> Shape::bezier(d
     auto result = diplomat::capi::Shape_bezier({control_points.data(), control_points.size()},
         thickness,
         resolution);
+    return result.is_ok ? diplomat::result<std::unique_ptr<Shape>, NucleationError>(diplomat::Ok<std::unique_ptr<Shape>>(std::unique_ptr<Shape>(Shape::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Shape>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<Shape>, NucleationError> Shape::sdf(std::string_view sdf_json) {
+    auto result = diplomat::capi::Shape_sdf({sdf_json.data(), sdf_json.size()});
+    return result.is_ok ? diplomat::result<std::unique_ptr<Shape>, NucleationError>(diplomat::Ok<std::unique_ptr<Shape>>(std::unique_ptr<Shape>(Shape::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Shape>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<Shape>, NucleationError> Shape::sdf_bounded(std::string_view sdf_json, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z) {
+    auto result = diplomat::capi::Shape_sdf_bounded({sdf_json.data(), sdf_json.size()},
+        min_x,
+        min_y,
+        min_z,
+        max_x,
+        max_y,
+        max_z);
     return result.is_ok ? diplomat::result<std::unique_ptr<Shape>, NucleationError>(diplomat::Ok<std::unique_ptr<Shape>>(std::unique_ptr<Shape>(Shape::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Shape>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 

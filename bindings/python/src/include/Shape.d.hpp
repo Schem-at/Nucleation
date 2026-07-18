@@ -103,6 +103,23 @@ public:
   inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Shape>, nucleation::NucleationError> bezier(nucleation::diplomat::span<const float> control_points, float thickness, uint32_t resolution);
 
   /**
+   * Any SDF tree as a Shape: the same JSON the terrain sampler takes
+   * (primitives, smooth booleans, noise — see the SDF guide) becomes
+   * fillable with every brush, combinable with other shapes, and
+   * usable in masked fills. Normals come from the field gradient, so
+   * the shaded brush shades smooth blends smoothly. Errors with
+   * `Parse` on invalid JSON and `InvalidArgument` for unbounded trees
+   * (use `sdf_bounded`).
+   */
+  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Shape>, nucleation::NucleationError> sdf(std::string_view sdf_json);
+
+  /**
+   * Like `sdf`, with explicit sampling bounds (inclusive block
+   * coordinates) for unbounded trees such as planes.
+   */
+  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Shape>, nucleation::NucleationError> sdf_bounded(std::string_view sdf_json, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z);
+
+  /**
    * Hollowed-out copy of this shape with the given wall thickness (clones the
    * input, like the old `shape_hollow`).
    */

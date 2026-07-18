@@ -286,6 +286,47 @@ pub mod ffi {
             ))))
         }
 
+        /// Any SDF tree as a Shape: the same JSON the terrain sampler takes
+        /// (primitives, smooth booleans, noise — see the SDF guide) becomes
+        /// fillable with every brush, combinable with other shapes, and
+        /// usable in masked fills. Normals come from the field gradient, so
+        /// the shaded brush shades smooth blends smoothly. Errors with
+        /// `Parse` on invalid JSON and `InvalidArgument` for unbounded trees
+        /// (use `sdf_bounded`).
+        pub fn sdf(sdf_json: &DiplomatStr) -> Result<Box<Shape>, NucleationError> {
+            let json =
+                std::str::from_utf8(sdf_json).map_err(|_| NucleationError::InvalidArgument)?;
+            let node =
+                crate::sdf::SdfNode::from_json(json).map_err(|_| NucleationError::Parse)?;
+            let shape =
+                crate::building::SdfShape::new(node).ok_or(NucleationError::InvalidArgument)?;
+            Ok(Box::new(Shape(crate::building::ShapeEnum::Sdf(shape))))
+        }
+
+        /// Like `sdf`, with explicit sampling bounds (inclusive block
+        /// coordinates) for unbounded trees such as planes.
+        #[allow(clippy::too_many_arguments)]
+        pub fn sdf_bounded(
+            sdf_json: &DiplomatStr,
+            min_x: i32,
+            min_y: i32,
+            min_z: i32,
+            max_x: i32,
+            max_y: i32,
+            max_z: i32,
+        ) -> Result<Box<Shape>, NucleationError> {
+            let json =
+                std::str::from_utf8(sdf_json).map_err(|_| NucleationError::InvalidArgument)?;
+            let node =
+                crate::sdf::SdfNode::from_json(json).map_err(|_| NucleationError::Parse)?;
+            let shape = crate::building::SdfShape::with_bounds(
+                node,
+                (min_x, min_y, min_z),
+                (max_x, max_y, max_z),
+            );
+            Ok(Box::new(Shape(crate::building::ShapeEnum::Sdf(shape))))
+        }
+
         /// Hollowed-out copy of this shape with the given wall thickness (clones the
         /// input, like the old `shape_hollow`).
         pub fn hollow(&self, thickness: u32) -> Box<Shape> {
@@ -601,6 +642,36 @@ pub mod ffi {
             let kind = std::str::from_utf8(k).map_err(|_| NucleationError::InvalidArgument)?;
             let b = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
             self.0 = Some(b.kind(kind));
+            Ok(())
+        }
+
+        /// Keep only blocks whose measured Oklab lightness L is within
+        /// `[min, max]` (0.0 = black, 1.0 = white).
+        pub fn lightness_between(&mut self, min: f32, max: f32) -> Result<(), NucleationError> {
+            let b = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
+            self.0 = Some(b.lightness_between(min, max));
+            Ok(())
+        }
+
+        /// Keep only near-neutral blocks: measured Oklab chroma at most
+        /// `max` (the grayscale preset uses 0.022).
+        pub fn chroma_below(&mut self, max: f32) -> Result<(), NucleationError> {
+            let b = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
+            self.0 = Some(b.chroma_below(max));
+            Ok(())
+        }
+
+        /// Keep only blocks whose measured color is within `max_distance`
+        /// (Oklab; ~0.05 = same family, ~0.15 = generous) of the RGB color.
+        pub fn color_near(
+            &mut self,
+            r: u8,
+            g: u8,
+            b: u8,
+            max_distance: f32,
+        ) -> Result<(), NucleationError> {
+            let builder = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
+            self.0 = Some(builder.color_near(r, g, b, max_distance));
             Ok(())
         }
 

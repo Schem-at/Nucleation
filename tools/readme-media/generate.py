@@ -535,15 +535,11 @@ def scene_texture_atlas(pack):
 
 
 def scene_basics(pack):
-    """Load a schematic, edit it with set_block, render it — the first taste."""
-    data = open(os.path.join(ROOT, "test_schematic.schem"), "rb").read()
-    s = nu.Schematic.from_data(data)   # 5x5x5 stone/dirt checkerboard
-    for i, block in enumerate(["minecraft:gold_block", "minecraft:emerald_block",
-                               "minecraft:redstone_block"]):
-        s.set_block(5 + i, 0, 0, block)
-    s.set_block(2, 5, 2, "minecraft:glowstone")
-    render(s, pack, os.path.join(OUT, "basics.png"), w=560, h=460,
-           yaw=225, pitch=28, zoom=1.1)
+    """EXACTLY the README basics snippet: load, one set_block, render."""
+    s = nu.Schematic.load_from_file(os.path.join(ROOT, "simple_cube.litematic"))
+    s.set_block(1, 3, 1, "minecraft:glowstone")
+    render(s, pack, os.path.join(OUT, "basics.png"), w=560, h=480,
+           pitch=28, zoom=1.15)
     return s
 
 

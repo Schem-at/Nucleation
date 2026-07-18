@@ -101,30 +101,33 @@ pub mod ffi {
             }
         }
 
-        /// Save the schematic to a file, always in Litematic format (the
-        /// extension is not consulted; use `save_to_file_with_format` for
-        /// other formats). Not available in JS: the WASM build has no
-        /// filesystem — use `to_litematic_b64` / `save_as_b64` there.
+        /// Save the schematic to a file, picking the format from the file
+        /// extension (`.litematic`, `.schem`, `.schematic`, `.mcstructure`,
+        /// `.nbt`, `.nusn`; unknown extensions write Litematic). For an
+        /// explicit format or version, use `save_to_file_with_format`.
+        /// Not available in JS: the WASM build has no filesystem — use
+        /// `save_as_b64` there.
         #[diplomat::attr(js, disable)]
         pub fn save_to_file(&self, path: &DiplomatStr) -> Result<(), NucleationError> {
             let path = std::str::from_utf8(path).map_err(|_| NucleationError::InvalidArgument)?;
-            let bytes =
-                crate::litematic::to_litematic(&self.0).map_err(|_| NucleationError::Serialize)?;
+            let manager = get_manager();
+            let manager = manager.lock().map_err(|_| NucleationError::Lock)?;
+            let bytes = manager
+                .write_auto_with_settings(path, &self.0, None, None)
+                .map_err(|_| NucleationError::Serialize)?;
             std::fs::write(path, bytes).map_err(|_| NucleationError::Io)?;
             Ok(())
         }
 
-        /// Load a schematic from a Litematic file (this path is
-        /// Litematic-only; use `from_data` for format auto-detection).
+        /// Load a schematic from a file, auto-detecting the format from the
+        /// contents (any supported format, whatever the extension says).
         /// Not available in JS: the WASM build has no filesystem — read the
         /// bytes yourself and use `from_data`.
         #[diplomat::attr(js, disable)]
         pub fn load_from_file(path: &DiplomatStr) -> Result<Box<Schematic>, NucleationError> {
             let path = std::str::from_utf8(path).map_err(|_| NucleationError::InvalidArgument)?;
             let bytes = std::fs::read(path).map_err(|_| NucleationError::Io)?;
-            let inner =
-                crate::litematic::from_litematic(&bytes).map_err(|_| NucleationError::Parse)?;
-            Ok(Box::new(Schematic(inner)))
+            Self::from_data(&bytes)
         }
 
         // --- Data I/O (old fns populated an existing schematic; these construct) ---

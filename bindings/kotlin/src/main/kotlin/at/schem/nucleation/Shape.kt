@@ -20,6 +20,8 @@ internal interface ShapeLib: Library {
     fun Shape_triangle(ax: Float, ay: Float, az: Float, bx: Float, by: Float, bz: Float, cx: Float, cy: Float, cz: Float, thickness: Float): Pointer
     fun Shape_line(x1: Float, y1: Float, z1: Float, x2: Float, y2: Float, z2: Float, thickness: Float): Pointer
     fun Shape_bezier(controlPoints: Slice, thickness: Float, resolution: FFIUint32): ResultPointerInt
+    fun Shape_sdf(sdfJson: Slice): ResultPointerInt
+    fun Shape_sdf_bounded(sdfJson: Slice, minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int): ResultPointerInt
     fun Shape_hollow(handle: Pointer, thickness: FFIUint32): Pointer
     fun Shape_union_with(handle: Pointer, other: Pointer): Pointer
     fun Shape_intersection_with(handle: Pointer, other: Pointer): Pointer
@@ -223,6 +225,57 @@ class Shape internal constructor (
                 }
             } finally {
                 controlPointsSliceMemory.close()
+            }
+        }
+        @JvmStatic
+        
+        /** Any SDF tree as a Shape: the same JSON the terrain sampler takes
+        *(primitives, smooth booleans, noise — see the SDF guide) becomes
+        *fillable with every brush, combinable with other shapes, and
+        *usable in masked fills. Normals come from the field gradient, so
+        *the shaded brush shades smooth blends smoothly. Errors with
+        *`Parse` on invalid JSON and `InvalidArgument` for unbounded trees
+        *(use `sdf_bounded`).
+        */
+        fun sdf(sdfJson: String): Result<Shape> {
+            val sdfJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(sdfJson)
+            
+            val returnVal = lib.Shape_sdf(sdfJsonSliceMemory.slice);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal 
+                    val returnOpaque = Shape(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                sdfJsonSliceMemory.close()
+            }
+        }
+        @JvmStatic
+        
+        /** Like `sdf`, with explicit sampling bounds (inclusive block
+        *coordinates) for unbounded trees such as planes.
+        */
+        fun sdfBounded(sdfJson: String, minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int): Result<Shape> {
+            val sdfJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(sdfJson)
+            
+            val returnVal = lib.Shape_sdf_bounded(sdfJsonSliceMemory.slice, minX, minY, minZ, maxX, maxY, maxZ);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal 
+                    val returnOpaque = Shape(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                sdfJsonSliceMemory.close()
             }
         }
     }

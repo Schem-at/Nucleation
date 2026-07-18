@@ -360,6 +360,75 @@ export class PaletteBuilder {
     }
 
     /**
+     * Keep only blocks whose measured Oklab lightness L is within
+     * `[min, max]` (0.0 = black, 1.0 = white).
+     */
+    lightnessBetween(min, max) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.PaletteBuilder_lightness_between(diplomatReceive.buffer, this.ffiValue, min, max);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Keep only near-neutral blocks: measured Oklab chroma at most
+     * `max` (the grayscale preset uses 0.022).
+     */
+    chromaBelow(max) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.PaletteBuilder_chroma_below(diplomatReceive.buffer, this.ffiValue, max);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Keep only blocks whose measured color is within `max_distance`
+     * (Oklab; ~0.05 = same family, ~0.15 = generous) of the RGB color.
+     */
+    colorNear(r, g, b, maxDistance) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.PaletteBuilder_color_near(diplomatReceive.buffer, this.ffiValue, r, g, b, maxDistance);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
      * Build the palette; consumes the builder.
      */
     build() {

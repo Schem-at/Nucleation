@@ -55,16 +55,18 @@ public:
   inline diplomat::result<std::monostate, NucleationError> get_block_name_write(int32_t x, int32_t y, int32_t z, W& writeable_output) const;
 
   /**
-   * Save the schematic to a file, always in Litematic format (the
-   * extension is not consulted; use `save_to_file_with_format` for
-   * other formats). Not available in JS: the WASM build has no
-   * filesystem — use `to_litematic_b64` / `save_as_b64` there.
+   * Save the schematic to a file, picking the format from the file
+   * extension (`.litematic`, `.schem`, `.schematic`, `.mcstructure`,
+   * `.nbt`, `.nusn`; unknown extensions write Litematic). For an
+   * explicit format or version, use `save_to_file_with_format`.
+   * Not available in JS: the WASM build has no filesystem — use
+   * `save_as_b64` there.
    */
   inline diplomat::result<std::monostate, NucleationError> save_to_file(std::string_view path) const;
 
   /**
-   * Load a schematic from a Litematic file (this path is
-   * Litematic-only; use `from_data` for format auto-detection).
+   * Load a schematic from a file, auto-detecting the format from the
+   * contents (any supported format, whatever the extension says).
    * Not available in JS: the WASM build has no filesystem — read the
    * bytes yourself and use `from_data`.
    */

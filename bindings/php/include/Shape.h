@@ -43,6 +43,12 @@ Shape* Shape_line(float x1, float y1, float z1, float x2, float y2, float z2, fl
 typedef struct Shape_bezier_result {union {Shape* ok; NucleationError err;}; bool is_ok;} Shape_bezier_result;
 Shape_bezier_result Shape_bezier(DiplomatF32View control_points, float thickness, uint32_t resolution);
 
+typedef struct Shape_sdf_result {union {Shape* ok; NucleationError err;}; bool is_ok;} Shape_sdf_result;
+Shape_sdf_result Shape_sdf(DiplomatStringView sdf_json);
+
+typedef struct Shape_sdf_bounded_result {union {Shape* ok; NucleationError err;}; bool is_ok;} Shape_sdf_bounded_result;
+Shape_sdf_bounded_result Shape_sdf_bounded(DiplomatStringView sdf_json, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z);
+
 Shape* Shape_hollow(const Shape* self, uint32_t thickness);
 
 Shape* Shape_union_with(const Shape* self, const Shape* other);

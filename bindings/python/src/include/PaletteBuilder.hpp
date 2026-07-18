@@ -58,6 +58,15 @@ namespace capi {
     typedef struct PaletteBuilder_kind_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} PaletteBuilder_kind_result;
     PaletteBuilder_kind_result PaletteBuilder_kind(nucleation::capi::PaletteBuilder* self, nucleation::diplomat::capi::DiplomatStringView k);
 
+    typedef struct PaletteBuilder_lightness_between_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} PaletteBuilder_lightness_between_result;
+    PaletteBuilder_lightness_between_result PaletteBuilder_lightness_between(nucleation::capi::PaletteBuilder* self, float min, float max);
+
+    typedef struct PaletteBuilder_chroma_below_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} PaletteBuilder_chroma_below_result;
+    PaletteBuilder_chroma_below_result PaletteBuilder_chroma_below(nucleation::capi::PaletteBuilder* self, float max);
+
+    typedef struct PaletteBuilder_color_near_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} PaletteBuilder_color_near_result;
+    PaletteBuilder_color_near_result PaletteBuilder_color_near(nucleation::capi::PaletteBuilder* self, uint8_t r, uint8_t g, uint8_t b, float max_distance);
+
     typedef struct PaletteBuilder_build_result {union {nucleation::capi::Palette* ok; nucleation::capi::NucleationError err;}; bool is_ok;} PaletteBuilder_build_result;
     PaletteBuilder_build_result PaletteBuilder_build(nucleation::capi::PaletteBuilder* self);
 
@@ -134,6 +143,28 @@ inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError>
 inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::PaletteBuilder::kind(std::string_view k) {
     auto result = nucleation::capi::PaletteBuilder_kind(this->AsFFI(),
         {k.data(), k.size()});
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::PaletteBuilder::lightness_between(float min, float max) {
+    auto result = nucleation::capi::PaletteBuilder_lightness_between(this->AsFFI(),
+        min,
+        max);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::PaletteBuilder::chroma_below(float max) {
+    auto result = nucleation::capi::PaletteBuilder_chroma_below(this->AsFFI(),
+        max);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::PaletteBuilder::color_near(uint8_t r, uint8_t g, uint8_t b, float max_distance) {
+    auto result = nucleation::capi::PaletteBuilder_color_near(this->AsFFI(),
+        r,
+        g,
+        b,
+        max_distance);
     return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 

@@ -57,6 +57,16 @@ public:
 
   /**
    * Ids of every block carrying the vanilla block tag, as a sorted
+   * Blocks whose measured texture color is within `max_distance`
+   * (Oklab; ~0.05 = same color family, ~0.15 = generous) of the given
+   * RGB, as a JSON array of `{"id", "color": [r,g,b], "distance"}`
+   * sorted nearest-first. Blocks without color data never match.
+   */
+  inline static nucleation::diplomat::result<std::string, nucleation::NucleationError> by_color_json(uint8_t r, uint8_t g, uint8_t b, float max_distance);
+  template<typename W>
+  inline static nucleation::diplomat::result<std::monostate, nucleation::NucleationError> by_color_json_write(uint8_t r, uint8_t g, uint8_t b, float max_distance, W& writeable_output);
+
+  /**
    * JSON array string (`[]` for unknown tags). Accepts
    * `minecraft:wool` and short `wool` forms, including nested paths
    * like `mineable/pickaxe`.

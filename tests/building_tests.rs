@@ -857,3 +857,62 @@ fn ramp_ids_picks_distinct_monotonic_blocks() {
     // Degenerate line -> None.
     assert!(all.ramp_ids((10, 10, 10), (10, 10, 10), 5).is_none());
 }
+
+#[test]
+fn sdf_shapes_plug_into_the_building_system() {
+    use nucleation::building::{BlockPalette, ColorBrush, SdfShape};
+    use nucleation::sdf::SdfNode;
+
+    // A smooth-union blob as a fillable Shape.
+    let node = SdfNode::from_json(
+        r#"{"type": "smoothUnion", "k": 4.0,
+            "a": {"type": "sphere", "radius": 6},
+            "b": {"type": "translate", "offset": [7, 0, 0],
+                   "child": {"type": "sphere", "radius": 5}}}"#,
+    )
+    .unwrap();
+    let shape = SdfShape::new(node).expect("bounded tree");
+
+    let mut s = UniversalSchematic::new("blob".to_string());
+    let mut brush = BrushEnum::Color(ColorBrush::new(200, 60, 60));
+    brush.set_palette(Arc::new(BlockPalette::new_wool()));
+    let mut tool = BuildingTool::new(&mut s);
+    tool.fill_enum(&ShapeEnum::Sdf(shape.clone()), &brush);
+
+    // The blend region between the spheres must be solid (smooth union).
+    assert!(s.get_block(3, 0, 0).is_some_and(|b| b.name.contains("wool")));
+    // Membership matches the sampler convention (center eval <= 0).
+    assert!(shape.contains(0, 0, 0));
+    assert!(!shape.contains(0, 7, 0));
+
+    // Gradient normals are sane: on top of the first sphere, mostly +y.
+    let (nx, ny, nz) = shape.normal_at(0, 5, 0);
+    assert!(ny > 0.8, "top normal should point up, got ({nx},{ny},{nz})");
+
+    // Unbounded trees refuse auto-bounds.
+    let plane = SdfNode::from_json(r#"{"type": "plane", "normal": [0, 1, 0]}"#).unwrap();
+    assert!(SdfShape::new(plane).is_none());
+}
+
+#[test]
+fn palette_builder_color_logic() {
+    use nucleation::building::BlockPalette;
+
+    // Pure color-value logic: near-neutral, mid-lightness only.
+    let grays = BlockPalette::builder()
+        .chroma_below(0.022)
+        .lightness_between(0.35, 0.75)
+        .build();
+    assert!(grays.len() > 5, "too few mid-grays: {}", grays.len());
+    for id in grays.block_ids() {
+        let f = nucleation::blockpedia::get_block(id).unwrap();
+        let ok = f.extras.color.as_ref().unwrap().to_extended().oklab;
+        assert!((ok[1] * ok[1] + ok[2] * ok[2]).sqrt() <= 0.022, "{id} too chromatic");
+        assert!((0.35..=0.75).contains(&ok[0]), "{id} lightness {} out of band", ok[0]);
+    }
+
+    // color_near: everything close to lime.
+    let limes = BlockPalette::builder().color_near(120, 200, 60, 0.12).build();
+    assert!(limes.len() >= 2);
+    assert!(limes.block_ids().any(|i| i.contains("lime")), "lime family expected");
+}

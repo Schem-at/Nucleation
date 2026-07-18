@@ -113,6 +113,24 @@ public:
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> kind(std::string_view k);
 
   /**
+   * Keep only blocks whose measured Oklab lightness L is within
+   * `[min, max]` (0.0 = black, 1.0 = white).
+   */
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> lightness_between(float min, float max);
+
+  /**
+   * Keep only near-neutral blocks: measured Oklab chroma at most
+   * `max` (the grayscale preset uses 0.022).
+   */
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> chroma_below(float max);
+
+  /**
+   * Keep only blocks whose measured color is within `max_distance`
+   * (Oklab; ~0.05 = same family, ~0.15 = generous) of the RGB color.
+   */
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> color_near(uint8_t r, uint8_t g, uint8_t b, float max_distance);
+
+  /**
    * Build the palette; consumes the builder.
    */
   inline nucleation::diplomat::result<std::unique_ptr<nucleation::Palette>, nucleation::NucleationError> build();

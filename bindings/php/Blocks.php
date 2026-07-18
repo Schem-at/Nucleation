@@ -37,6 +37,15 @@ final class Blocks {
         return Lib::readAndFreeWrite($write);
     }
 
+    public static function byColorJson( $r,  $g,  $b,  $max_distance) {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Blocks_by_color_json($r, $g, $b, $max_distance, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public static function byTagJson(string $tag) {
         $__n0 = strlen($tag);
         $__view0 = Lib::ffi()->new('DiplomatStringView');

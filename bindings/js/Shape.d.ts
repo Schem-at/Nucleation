@@ -86,6 +86,23 @@ export class Shape {
     static bezier(controlPoints: Array<number>, thickness: number, resolution: number): Shape;
 
     /**
+     * Any SDF tree as a Shape: the same JSON the terrain sampler takes
+     * (primitives, smooth booleans, noise — see the SDF guide) becomes
+     * fillable with every brush, combinable with other shapes, and
+     * usable in masked fills. Normals come from the field gradient, so
+     * the shaded brush shades smooth blends smoothly. Errors with
+     * `Parse` on invalid JSON and `InvalidArgument` for unbounded trees
+     * (use `sdf_bounded`).
+     */
+    static sdf(sdfJson: string): Shape;
+
+    /**
+     * Like `sdf`, with explicit sampling bounds (inclusive block
+     * coordinates) for unbounded trees such as planes.
+     */
+    static sdfBounded(sdfJson: string, minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number): Shape;
+
+    /**
      * Hollowed-out copy of this shape with the given wall thickness (clones the
      * input, like the old `shape_hollow`).
      */

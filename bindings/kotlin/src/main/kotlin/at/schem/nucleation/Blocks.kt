@@ -9,6 +9,7 @@ internal interface BlocksLib: Library {
     fun Blocks_destroy(handle: Pointer)
     fun Blocks_get_json(id: Slice, write: Pointer): ResultUnitInt
     fun Blocks_ids_json(write: Pointer): Unit
+    fun Blocks_by_color_json(r: FFIUint8, g: FFIUint8, b: FFIUint8, maxDistance: Float, write: Pointer): ResultUnitInt
     fun Blocks_by_tag_json(tag: Slice, write: Pointer): ResultUnitInt
     fun Blocks_by_kind_json(kind: Slice, write: Pointer): ResultUnitInt
     fun Blocks_variants_of_json(baseId: Slice, write: Pointer): ResultUnitInt
@@ -91,7 +92,26 @@ class Blocks internal constructor (
         @JvmStatic
         
         /** Ids of every block carrying the vanilla block tag, as a sorted
-        *JSON array string (`[]` for unknown tags). Accepts
+        *Blocks whose measured texture color is within `max_distance`
+        *(Oklab; ~0.05 = same color family, ~0.15 = generous) of the given
+        *RGB, as a JSON array of `{"id", "color": [r,g,b], "distance"}`
+        *sorted nearest-first. Blocks without color data never match.
+        */
+        fun byColorJson(r: UByte, g: UByte, b: UByte, maxDistance: Float): Result<String> {
+            val write = DW.lib.diplomat_buffer_write_create(0)
+            val returnVal = lib.Blocks_by_color_json(FFIUint8(r), FFIUint8(g), FFIUint8(b), maxDistance, write);
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        }
+        @JvmStatic
+        
+        /** JSON array string (`[]` for unknown tags). Accepts
         *`minecraft:wool` and short `wool` forms, including nested paths
         *like `mineable/pickaxe`.
         */

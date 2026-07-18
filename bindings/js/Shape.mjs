@@ -266,6 +266,69 @@ export class Shape {
     }
 
     /**
+     * Any SDF tree as a Shape: the same JSON the terrain sampler takes
+     * (primitives, smooth booleans, noise — see the SDF guide) becomes
+     * fillable with every brush, combinable with other shapes, and
+     * usable in masked fills. Normals come from the field gradient, so
+     * the shaded brush shades smooth blends smoothly. Errors with
+     * `Parse` on invalid JSON and `InvalidArgument` for unbounded trees
+     * (use `sdf_bounded`).
+     */
+    static sdf(sdfJson) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const sdfJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, sdfJson)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Shape_sdf(diplomatReceive.buffer, sdfJsonSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new Shape(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Like `sdf`, with explicit sampling bounds (inclusive block
+     * coordinates) for unbounded trees such as planes.
+     */
+    static sdfBounded(sdfJson, minX, minY, minZ, maxX, maxY, maxZ) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const sdfJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, sdfJson)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Shape_sdf_bounded(diplomatReceive.buffer, sdfJsonSlice.ptr, minX, minY, minZ, maxX, maxY, maxZ);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new Shape(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
      * Hollowed-out copy of this shape with the given wall thickness (clones the
      * input, like the old `shape_hollow`).
      */

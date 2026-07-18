@@ -12,6 +12,7 @@ void add_Blocks_binding(nb::module_ mod) {
     
     nb::class_<nucleation::Blocks> opaque(mod, "Blocks", nb::type_slots(nucleation_Blocks_slots));
     opaque
+        .def_static("by_color_json", &nucleation::Blocks::by_color_json, "r"_a, "g"_a, "b"_a, "max_distance"_a)
         .def_static("by_kind_json", &nucleation::Blocks::by_kind_json, "kind"_a)
         .def_static("by_tag_json", &nucleation::Blocks::by_tag_json, "tag"_a)
         .def_static("count", &nucleation::Blocks::count)

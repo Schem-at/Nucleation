@@ -55,6 +55,15 @@ PaletteBuilder_exclude_tag_result PaletteBuilder_exclude_tag(PaletteBuilder* sel
 typedef struct PaletteBuilder_kind_result {union { NucleationError err;}; bool is_ok;} PaletteBuilder_kind_result;
 PaletteBuilder_kind_result PaletteBuilder_kind(PaletteBuilder* self, DiplomatStringView k);
 
+typedef struct PaletteBuilder_lightness_between_result {union { NucleationError err;}; bool is_ok;} PaletteBuilder_lightness_between_result;
+PaletteBuilder_lightness_between_result PaletteBuilder_lightness_between(PaletteBuilder* self, float min, float max);
+
+typedef struct PaletteBuilder_chroma_below_result {union { NucleationError err;}; bool is_ok;} PaletteBuilder_chroma_below_result;
+PaletteBuilder_chroma_below_result PaletteBuilder_chroma_below(PaletteBuilder* self, float max);
+
+typedef struct PaletteBuilder_color_near_result {union { NucleationError err;}; bool is_ok;} PaletteBuilder_color_near_result;
+PaletteBuilder_color_near_result PaletteBuilder_color_near(PaletteBuilder* self, uint8_t r, uint8_t g, uint8_t b, float max_distance);
+
 typedef struct PaletteBuilder_build_result {union {Palette* ok; NucleationError err;}; bool is_ok;} PaletteBuilder_build_result;
 PaletteBuilder_build_result PaletteBuilder_build(PaletteBuilder* self);
 

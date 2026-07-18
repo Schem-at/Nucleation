@@ -151,6 +151,27 @@ final class PaletteBuilder {
         }
     }
 
+    public function lightnessBetween( $min,  $max) {
+        $result = Lib::ffi()->PaletteBuilder_lightness_between($this->ptr, $min, $max);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function chromaBelow( $max) {
+        $result = Lib::ffi()->PaletteBuilder_chroma_below($this->ptr, $max);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function colorNear( $r,  $g,  $b,  $max_distance) {
+        $result = Lib::ffi()->PaletteBuilder_color_near($this->ptr, $r, $g, $b, $max_distance);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
     public function build() {
         $result = Lib::ffi()->PaletteBuilder_build($this->ptr);
         if (!$result->is_ok) {

@@ -20,6 +20,9 @@ internal interface PaletteBuilderLib: Library {
     fun PaletteBuilder_tag(handle: Pointer, t: Slice): ResultUnitInt
     fun PaletteBuilder_exclude_tag(handle: Pointer, t: Slice): ResultUnitInt
     fun PaletteBuilder_kind(handle: Pointer, k: Slice): ResultUnitInt
+    fun PaletteBuilder_lightness_between(handle: Pointer, min: Float, max: Float): ResultUnitInt
+    fun PaletteBuilder_chroma_below(handle: Pointer, max: Float): ResultUnitInt
+    fun PaletteBuilder_color_near(handle: Pointer, r: FFIUint8, g: FFIUint8, b: FFIUint8, maxDistance: Float): ResultUnitInt
     fun PaletteBuilder_build(handle: Pointer): ResultPointerInt
 }
 /** Filter-driven palette construction (wraps
@@ -256,6 +259,48 @@ class PaletteBuilder internal constructor (
             }
         } finally {
             kSliceMemory.close()
+        }
+    }
+    
+    /** Keep only blocks whose measured Oklab lightness L is within
+    *`[min, max]` (0.0 = black, 1.0 = white).
+    */
+    fun lightnessBetween(min: Float, max: Float): Result<Unit> {
+        
+        val returnVal = lib.PaletteBuilder_lightness_between(handle, min, max);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    /** Keep only near-neutral blocks: measured Oklab chroma at most
+    *`max` (the grayscale preset uses 0.022).
+    */
+    fun chromaBelow(max: Float): Result<Unit> {
+        
+        val returnVal = lib.PaletteBuilder_chroma_below(handle, max);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    /** Keep only blocks whose measured color is within `max_distance`
+    *(Oklab; ~0.05 = same family, ~0.15 = generous) of the RGB color.
+    */
+    fun colorNear(r: UByte, g: UByte, b: UByte, maxDistance: Float): Result<Unit> {
+        
+        val returnVal = lib.PaletteBuilder_color_near(handle, FFIUint8(r), FFIUint8(g), FFIUint8(b), maxDistance);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
     

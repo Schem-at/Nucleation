@@ -102,6 +102,35 @@ export class Blocks {
 
     /**
      * Ids of every block carrying the vanilla block tag, as a sorted
+     * Blocks whose measured texture color is within `max_distance`
+     * (Oklab; ~0.05 = same color family, ~0.15 = generous) of the given
+     * RGB, as a JSON array of `{"id", "color": [r,g,b], "distance"}`
+     * sorted nearest-first. Blocks without color data never match.
+     */
+    static byColorJson(r, g, b, maxDistance) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Blocks_by_color_json(diplomatReceive.buffer, r, g, b, maxDistance, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
      * JSON array string (`[]` for unknown tags). Accepts
      * `minecraft:wool` and short `wool` forms, including nested paths
      * like `mineable/pickaxe`.

@@ -44,6 +44,40 @@ pub mod ffi {
         }
 
         /// Ids of every block carrying the vanilla block tag, as a sorted
+        /// Blocks whose measured texture color is within `max_distance`
+        /// (Oklab; ~0.05 = same color family, ~0.15 = generous) of the given
+        /// RGB, as a JSON array of `{"id", "color": [r,g,b], "distance"}`
+        /// sorted nearest-first. Blocks without color data never match.
+        pub fn by_color_json(
+            r: u8,
+            g: u8,
+            b: u8,
+            max_distance: f32,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let target = crate::blockpedia::ExtendedColorData::from_rgb(r, g, b);
+            let mut hits: Vec<(f32, &str, [u8; 3])> = crate::blockpedia::all_blocks()
+                .filter_map(|f| {
+                    let c = f.extras.color.as_ref()?.to_extended();
+                    let d = c.distance_oklab(&target);
+                    (d <= max_distance).then_some((d, f.id, c.rgb))
+                })
+                .collect();
+            hits.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+            let rows: Vec<serde_json::Value> = hits
+                .into_iter()
+                .map(|(d, id, rgb)| {
+                    serde_json::json!({"id": id, "color": rgb, "distance": (d * 1000.0).round() / 1000.0})
+                })
+                .collect();
+            let _ = write!(
+                out,
+                "{}",
+                serde_json::to_string(&rows).unwrap_or_default()
+            );
+            Ok(())
+        }
+
         /// JSON array string (`[]` for unknown tags). Accepts
         /// `minecraft:wool` and short `wool` forms, including nested paths
         /// like `mineable/pickaxe`.

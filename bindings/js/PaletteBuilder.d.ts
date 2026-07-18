@@ -95,6 +95,24 @@ export class PaletteBuilder {
     kind(k: string): void;
 
     /**
+     * Keep only blocks whose measured Oklab lightness L is within
+     * `[min, max]` (0.0 = black, 1.0 = white).
+     */
+    lightnessBetween(min: number, max: number): void;
+
+    /**
+     * Keep only near-neutral blocks: measured Oklab chroma at most
+     * `max` (the grayscale preset uses 0.022).
+     */
+    chromaBelow(max: number): void;
+
+    /**
+     * Keep only blocks whose measured color is within `max_distance`
+     * (Oklab; ~0.05 = same family, ~0.15 = generous) of the RGB color.
+     */
+    colorNear(r: number, g: number, b: number, maxDistance: number): void;
+
+    /**
      * Build the palette; consumes the builder.
      */
     build(): Palette;
