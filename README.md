@@ -126,6 +126,22 @@ terrain = Sdf.schematic_from_sdf_auto(island, rules)
 # → 29×18×29, 6,927 blocks — deterministic in every language
 ```
 
+Those smooth booleans are metaballs when you animate them — here wearing the
+smoothest white→black gradient survival blocks allow (19 blocks, snow to black
+concrete, ordered by measured lightness), painted by one gradient fill rule:
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/metaballs.gif" width="520" alt="Orbiting metaballs wearing a survival-block white-to-black gradient">
+</div>
+
+```python
+rules = {"fill": [{"gradient": {
+    "palette": {"ids": GRAY_RAMP},        # snow_block ... black_concrete, 19 steps
+    "from": [8, 10, 14], "to": [250, 252, 252],
+    "axis": "y", "range": [4, 17]}}]}
+# one schematic_from_sdf call per frame, spheres orbiting under a smoothUnion
+```
+
 ## Simulate redstone
 
 Headless circuit simulation via [MCHPRS](https://github.com/MCHPR/MCHPRS)'s

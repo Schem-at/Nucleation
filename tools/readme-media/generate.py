@@ -565,7 +565,72 @@ def scene_palette_ramps(pack):
     return s
 
 
+
+
+# The smoothest survival-obtainable white->black ladder, ordered by measured
+# Oklab lightness (see Blocks.get_json colors); tinted/noisy outliers
+# (obsidian, sculk, gravel, quartz warmth) deliberately excluded.
+GRAY_RAMP = [
+    "minecraft:snow_block", "minecraft:white_wool", "minecraft:calcite",
+    "minecraft:white_concrete", "minecraft:polished_diorite", "minecraft:smooth_stone",
+    "minecraft:light_gray_wool", "minecraft:stone", "minecraft:tuff",
+    "minecraft:cyan_terracotta", "minecraft:deepslate", "minecraft:polished_deepslate",
+    "minecraft:gray_wool", "minecraft:gray_concrete", "minecraft:polished_blackstone",
+    "minecraft:blackstone", "minecraft:black_wool", "minecraft:coal_block",
+    "minecraft:black_concrete",
+]
+
+
+def _metaballs_sdf(t):
+    """Three spheres orbiting a common center, smooth-unioned into one mass."""
+    balls = []
+    for i in range(3):
+        ph = t * 2 * math.pi + i * 2 * math.pi / 3
+        x = 12 * math.cos(ph) * (0.75 + 0.25 * math.cos(2 * ph))
+        z = 12 * math.sin(ph) * (0.75 + 0.25 * math.cos(2 * ph))
+        y = 7 + 3 * math.sin(2 * ph + i)
+        balls.append({"type": "translate", "offset": [round(x, 2), round(y, 2), round(z, 2)],
+                      "child": {"type": "sphere", "radius": 9 - i}})
+    a, b, c = balls
+    return {"type": "smoothUnion", "k": 10.0,
+            "a": {"type": "smoothUnion", "k": 10.0, "a": a, "b": b}, "b": c}
+
+
+_METABALL_RULES = {"fill": [{"gradient": {
+    "palette": {"ids": GRAY_RAMP},
+    "from": [8, 10, 14], "to": [250, 252, 252],   # black floor of the mass -> white crowns
+    "axis": "y", "range": [4, 17]}}]}
+
+
+def scene_metaballs(pack):
+    """Looping metaball animation: smooth-union spheres wearing the smoothest
+    survival-block white->black gradient, floating over a dark plate."""
+    tmp = tempfile.mkdtemp(prefix="nuc-metaballs-")
+    frames = 48
+    try:
+        for i in range(frames):
+            s = nu.Sdf.schematic_from_sdf(
+                json.dumps(_metaballs_sdf(i / frames)), json.dumps(_METABALL_RULES),
+                True, -25, -6, -25, 25, 21, 25)
+            # Static plate: grounds the composition and pins the sphere-fit
+            # framing so the orbit cannot pulse.
+            s.fill_cuboid(-25, -9, -25, 25, -9, 25, "minecraft:black_concrete")
+            cfg = nu.RenderConfig.create(620, 500)
+            cfg.set_isometric()
+            cfg.set_pitch(14.0)   # near eye-level: the full gradient band stays visible
+            cfg.set_sphere_fit(True)
+            cfg.set_zoom(1.35)
+            cfg.set_background(*NAVY)
+            nu.Renderer.render_to_file(s, pack, cfg, os.path.join(tmp, f"f{i:03}.png"))
+        assemble_gif(tmp, os.path.join(OUT, "metaballs.gif"), fps=frames / 4.8,
+                     max_colors=128)
+        print(f"  wrote docs/media/metaballs.gif ({frames} frames)")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 SCENES = {
+    "metaballs": scene_metaballs,
     "basics": scene_basics,
     "hero": scene_hero,
     "torus": scene_gradient_torus,
