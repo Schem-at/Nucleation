@@ -16,7 +16,7 @@ dependencies (no Pillow/numpy).
 """
 
 import argparse
-import colorsys
+import base64
 import json
 import math
 import os
@@ -51,6 +51,16 @@ def render(schematic, pack, path, w=880, h=620, yaw=None, pitch=None, zoom=None,
     print(f"  wrote {os.path.relpath(path, ROOT)}")
 
 
+def hstack(paths, out):
+    """Composite same-height panels side by side."""
+    inputs = [a for p in paths for a in ("-i", p)]
+    refs = "".join(f"[{i}]" for i in range(len(paths)))
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", *inputs,
+                    "-filter_complex", f"{refs}hstack=inputs={len(paths)}", out],
+                   check=True)
+    print(f"  wrote {os.path.relpath(out, ROOT)}")
+
+
 def assemble_gif(frame_dir, path, fps, max_colors=192, stats_mode="diff",
                  dither="bayer:bayer_scale=4"):
     """Palette-optimised GIF from f%03d.png frames in frame_dir.
@@ -72,7 +82,11 @@ def assemble_gif(frame_dir, path, fps, max_colors=192, stats_mode="diff",
 
 def turntable_gif(schematic, pack, path, frames=40, w=560, h=400, pitch=None,
                   zoom=None, seconds=4.0):
-    """Render a full-rotation turntable and assemble a looping GIF."""
+    """Render a full-rotation turntable and assemble a looping GIF.
+
+    sphere_fit keeps the orbit distance constant across yaws so the subject
+    doesn't "breathe" as its screen-space bounding box changes.
+    """
     tmp = tempfile.mkdtemp(prefix="nuc-turntable-")
     try:
         for i in range(frames):
@@ -83,6 +97,7 @@ def turntable_gif(schematic, pack, path, frames=40, w=560, h=400, pitch=None,
                 cfg.set_pitch(pitch)
             if zoom is not None:
                 cfg.set_zoom(zoom)
+            cfg.set_sphere_fit(True)
             cfg.set_background(*NAVY)
             nu.Renderer.render_to_file(schematic, pack, cfg,
                                        os.path.join(tmp, f"f{i:03}.png"))
@@ -95,33 +110,65 @@ def turntable_gif(schematic, pack, path, frames=40, w=560, h=400, pitch=None,
 # ── Scenes ───────────────────────────────────────────────────────────────────
 
 def scene_hero(pack):
-    """SDF floating island with material rules — the front-door image."""
-    sdf = {
-        "type": "smoothUnion", "k": 2.5,
-        "a": {"type": "displace", "amplitude": 7.0, "frequency": 0.06, "seed": 7,
-              "child": {"type": "ellipsoid", "radii": [30, 12, 30]}},
-        "b": {"type": "translate", "offset": [26, 29, -14],
-              "child": {"type": "sphere", "radius": 7.5}},
-    }
+    """SDF volcano island with material rules — the front-door image."""
+    base = {"type": "smoothUnion", "k": 8.0,
+            "a": {"type": "ellipsoid", "radii": [28, 11, 24]},
+            "b": {"type": "translate", "offset": [12, 2, 12],
+                  "child": {"type": "ellipsoid", "radii": [18, 9, 16]}}}
+    peak = {"type": "translate", "offset": [-10, 10, -6],
+            "child": {"type": "cappedCone", "halfHeight": 20, "r1": 18, "r2": 8}}
+    mass = {"type": "displace", "amplitude": 9.0, "frequency": 0.055, "seed": 7,
+            "octaves": 4,
+            "child": {"type": "smoothUnion", "k": 5.0, "a": base, "b": peak}}
+    root = {"type": "displace", "amplitude": 5.0, "frequency": 0.10, "seed": 12,
+            "child": {"type": "translate", "offset": [2, -16, 2],
+                      "child": {"type": "cappedCone", "halfHeight": 15,
+                                "r1": 1.5, "r2": 20}}}
+    arch = {"type": "translate", "offset": [26, 1, 12],
+            "child": {"type": "rotate", "angles": [90, 0, 25],
+                      "child": {"type": "torus", "majorRadius": 12,
+                                "minorRadius": 3.0}}}
+    shards = {"type": "union", "children": [
+        {"type": "translate", "offset": [36, -4, -18],
+         "child": {"type": "displace", "amplitude": 2.0, "frequency": 0.25,
+                   "seed": 21, "child": {"type": "sphere", "radius": 4.5}}},
+        {"type": "translate", "offset": [-38, -4, 24],
+         "child": {"type": "displace", "amplitude": 2.5, "frequency": 0.22,
+                   "seed": 22, "child": {"type": "sphere", "radius": 5.5}}},
+        {"type": "translate", "offset": [18, -14, 34],
+         "child": {"type": "displace", "amplitude": 1.5, "frequency": 0.3,
+                   "seed": 23, "child": {"type": "sphere", "radius": 3.5}}},
+    ]}
+    island = {"type": "union", "children": [
+        {"type": "smoothUnion", "k": 3.0,
+         "a": {"type": "smoothUnion", "k": 5.0, "a": mass, "b": root},
+         "b": arch},
+        shards]}
+    crater = {"type": "translate", "offset": [-10, 32, -6],
+              "child": {"type": "cappedCylinder", "radius": 5.5, "halfHeight": 8}}
+    sdf = {"type": "smoothSubtract", "k": 1.0, "a": island, "b": crater}
+
     rules = {
         "fill": [
             {"when": {"depthBelowSurface": {"min": 0, "max": 0},
-                      "yRange": {"min": 11, "max": 64}},
+                      "yRange": {"min": 20, "max": 64},
+                      "noise": {"threshold": -0.25, "frequency": 0.15, "seed": 3}},
              "block": "minecraft:snow_block"},
             {"when": {"depthBelowSurface": {"min": 0, "max": 0},
-                      "yRange": {"min": -4, "max": 10}},
+                      "yRange": {"min": -3, "max": 16}},
              "block": "minecraft:grass_block"},
             {"when": {"depthBelowSurface": {"min": 0, "max": 0}},
              "block": "minecraft:stone"},
-            {"when": {"depthBelowSurface": {"min": 1, "max": 3}},
+            {"when": {"depthBelowSurface": {"min": 1, "max": 2},
+                      "yRange": {"min": -3, "max": 16}},
              "block": "minecraft:dirt"},
-            {"when": {"yRange": {"min": -64, "max": 12}},
+            {"when": {"yRange": {"min": -64, "max": 15}},
              "gradient": {"palette": {"ids": [
                  "minecraft:deepslate", "minecraft:cobbled_deepslate",
                  "minecraft:tuff", "minecraft:stone", "minecraft:andesite"]},
                  "from": [70, 68, 72], "to": [150, 148, 152],
-                 "axis": "y", "range": [-19, 10]}},
-            {"block": "minecraft:stone"},  # catch-all (companion sphere core)
+                 "axis": "y", "range": [-28, 14]}},
+            {"block": "minecraft:stone"},
         ],
         "surface": [
             {"density": 0.10, "on": "minecraft:grass_block",
@@ -130,29 +177,45 @@ def scene_hero(pack):
         ],
     }
     s = nu.Sdf.schematic_from_sdf(json.dumps(sdf), json.dumps(rules), True,
-                                  -38, -21, -38, 38, 40, 38)
-    render(s, pack, os.path.join(OUT, "hero.png"), w=1200, h=760, pitch=30, zoom=1.33)
+                                  -44, -34, -40, 48, 42, 44)
+    # lava pool in the crater (fills only air, so the rim stays intact)
+    nu.BuildingTool.fill_replacing(s, nu.Shape.cylinder(-10, 24, -6, 0, 1, 0, 6, 3),
+                                   nu.Brush.solid("minecraft:lava"),
+                                   json.dumps(["minecraft:air"]))
+    cfg = nu.RenderConfig.create(1200, 760)
+    cfg.set_isometric(); cfg.set_yaw(135.0); cfg.set_pitch(26.0)
+    cfg.set_zoom(1.45); cfg.set_sphere_fit(True)
+    cfg.set_background(0, 0, 0, 0)
+    nu.Renderer.render_to_file(s, pack, cfg, os.path.join(OUT, "hero.png"))
+    print("  wrote docs/media/hero.png")
     turntable_gif(s, pack, os.path.join(OUT, "hero-turntable.gif"),
-                  pitch=28, zoom=1.18)
+                  pitch=28, zoom=1.4)
     return s
 
 
 def scene_gradient_torus(pack):
-    """Rainbow torus: Shape.torus + an IDW point-gradient brush over wool."""
-    positions, colors = [], []
-    n = 12
-    for i in range(n):  # 12 rainbow-colored gradient points around the ring
-        a = 2 * math.pi * i / n
-        r, g, b = colorsys.hsv_to_rgb(i / n, 0.95, 0.95)
-        positions += [round(16 * math.cos(a)), 0, round(16 * math.sin(a))]
-        colors += [int(r * 255), int(g * 255), int(b * 255)]
+    """Rainbow torus: a curve gradient runs along the ring's parameter."""
+    stops = [i / 6 for i in range(7)]
+    colors = [255, 40, 40,   255, 180, 0,   60, 200, 60,
+              40, 180, 220,  60, 70, 230,   200, 60, 220,
+              255, 40, 40]  # first == last -> seamless wrap
     s = nu.Schematic.create("torus")
-    shape = nu.Shape.torus(0, 0, 0, 16, 6, 0, 1, 0)
-    brush = nu.Brush.point_gradient(positions, bytes(colors), 4.0,
-                                    nu.InterpolationSpace.Oklab)
+    brush = nu.Brush.curve_gradient(stops, bytes(colors), nu.InterpolationSpace.Oklab)
     brush.set_palette(nu.Palette.wool())
-    nu.BuildingTool.fill(s, shape, brush)
+    nu.BuildingTool.fill(s, nu.Shape.torus(0, 0, 0, 16, 6, 0, 1, 0), brush)
     render(s, pack, os.path.join(OUT, "gradient-torus.png"), pitch=32, zoom=1.25)
+    return s
+
+
+def scene_shaded_sphere(pack):
+    """Lambertian-shaded brush: base color lit from the upper left, snapped
+    to the terracotta palette."""
+    s = nu.Schematic.create("shaded")
+    brush = nu.Brush.shaded(224, 130, 84, -1.0, 0.7, -0.3)
+    brush.set_palette(nu.Palette.terracotta())
+    nu.BuildingTool.fill(s, nu.Shape.sphere(0, 0, 0, 16), brush)
+    render(s, pack, os.path.join(OUT, "shaded-sphere.png"), w=620, h=540,
+           yaw=45, pitch=25, zoom=1.2)
     return s
 
 
@@ -250,50 +313,238 @@ def scene_shapes(pack):
 
 
 def scene_masked_fill(pack):
-    """Before/after: fill_replacing weathers stone_bricks inside a sphere."""
-    def castle():
-        s = nu.Schematic.create("castle")
-        stone = nu.Brush.solid("minecraft:stone_bricks")
+    """Before/after: fill_replacing ages a Greek temple inside a sphere."""
+    def temple():
+        s = nu.Schematic.create("temple")
         fill = nu.BuildingTool.fill
-        fill(s, nu.Shape.cuboid(-13, 0, -13, 13, 0, 13), stone)  # courtyard
-        walls = nu.Shape.cuboid(-14, 0, -14, 14, 8, 14).difference_with(
-            nu.Shape.cuboid(-13, 0, -13, 13, 9, 13))
-        fill(s, walls, stone)
-        for tx, tz in [(-14, -14), (-14, 14), (14, -14), (14, 14)]:
-            fill(s, nu.Shape.cylinder(tx, 0, tz, 0, 1, 0, 4, 13), stone)
-            fill(s, nu.Shape.cone(tx, 13, tz, 0, 1, 0, 5, 6),
-                 nu.Brush.solid("minecraft:dark_oak_planks"))
-        fill(s, nu.Shape.cuboid(-5, 1, -5, 5, 14, 5).hollow(1), stone)
-        fill(s, nu.Shape.pyramid(0, 15, 0, 7, 7, 6, 0, 1, 0),
-             nu.Brush.solid("minecraft:dark_oak_planks"))
+        bricks = nu.Brush.solid("minecraft:stone_bricks")
+        # three-stepped platform (stylobate)
+        for i in range(3):
+            fill(s, nu.Shape.cuboid(-13 + i, i, -9 + i, 13 - i, i, 9 - i), bricks)
+        # peripteral colonnade
+        cols = [(x, z) for x in (-10, -5, 0, 5, 10) for z in (-6, 6)]
+        cols += [(x, z) for x in (-10, 10) for z in (-2, 2)]
+        for x, z in cols:
+            fill(s, nu.Shape.cylinder(x, 3, z, 0, 1, 0, 0.8, 7), bricks)
+        # altar in the cella
+        fill(s, nu.Shape.cuboid(-1, 3, -1, 1, 4, 1), bricks)
+        # architrave + frieze
+        fill(s, nu.Shape.cuboid(-11, 10, -7, 11, 10, 7), bricks)
+        fill(s, nu.Shape.cuboid(-11, 11, -7, 11, 11, 7),
+             nu.Brush.solid("minecraft:chiseled_stone_bricks"))
+        # stepped gable roof along the long axis
+        for i, z in enumerate((6, 4, 2, 0)):
+            fill(s, nu.Shape.cuboid(-12 + i, 12 + i, -z, 12 - i, 12 + i, z), bricks)
         return s
 
-    before = castle()
-    after = castle()
-    # weather one corner: swap stone_bricks -> mossy/cracked inside a sphere
-    decay = nu.Shape.sphere(-14, 2, -14, 16)
-    weathered = nu.Brush.linear_gradient(-14, 0, -14, 90, 130, 70,
-                                         2, 10, 2, 115, 118, 108,
-                                         nu.InterpolationSpace.Oklab)
-    weathered.set_palette(nu.Palette.from_block_ids(json.dumps(
-        ["minecraft:mossy_cobblestone", "minecraft:mossy_stone_bricks",
-         "minecraft:cracked_stone_bricks"])))
-    nu.BuildingTool.fill_replacing(after, decay, weathered,
+    before = temple()
+    after = temple()
+    # age one corner: swap stone_bricks -> mossy/cracked inside a sphere
+    decay = nu.Shape.sphere(-13, 1, -9, 17)
+    aged = nu.Brush.linear_gradient(-13, 0, -9, 80, 110, 60,
+                                    1, 12, 1, 125, 122, 116,
+                                    nu.InterpolationSpace.Oklab)
+    aged.set_palette(nu.Palette.from_block_ids(json.dumps(
+        ["minecraft:mossy_stone_bricks", "minecraft:mossy_cobblestone",
+         "minecraft:cracked_stone_bricks", "minecraft:cobblestone"])))
+    nu.BuildingTool.fill_replacing(after, decay, aged,
                                    json.dumps(["minecraft:stone_bricks"]))
 
     tmp = tempfile.mkdtemp(prefix="nuc-masked-")
     try:
-        a = os.path.join(tmp, "before.png")
-        b = os.path.join(tmp, "after.png")
-        for s, path in [(before, a), (after, b)]:
-            render(s, pack, path, w=660, h=560, yaw=225, pitch=24, zoom=1.18)
-        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", a, "-i", b,
-                        "-filter_complex", "[0][1]hstack", os.path.join(OUT, "masked-fill.png")],
-                       check=True)
-        print("  wrote docs/media/masked-fill.png")
+        panels = []
+        for s, name in [(before, "before"), (after, "after")]:
+            p = os.path.join(tmp, f"{name}.png")
+            cfg = nu.RenderConfig.create(700, 560)
+            cfg.set_isometric(); cfg.set_yaw(215.0); cfg.set_pitch(24.0)
+            cfg.set_zoom(1.12)
+            cfg.set_background(0, 0, 0, 0)
+            nu.Renderer.render_to_file(s, pack, cfg, p)
+            panels.append(p)
+        hstack(panels, os.path.join(OUT, "masked-fill.png"))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     return after
+
+
+def scene_redstone(pack):
+    """Before/after: the README's lever->wire->lamp circuit, simulated."""
+    def circuit():
+        s = nu.Schematic.create("lamp_circuit")
+        for x in range(3):
+            s.set_block(x, 0, 0, "minecraft:gray_concrete")
+        s.set_block_from_string(0, 1, 0, "minecraft:lever[facing=east,face=floor,powered=false]")
+        s.set_block_from_string(1, 1, 0, "minecraft:redstone_wire[power=0,east=side,west=side]")
+        s.set_block_from_string(2, 1, 0, "minecraft:redstone_lamp[lit=false]")
+        return s
+
+    before = circuit()
+    world = nu.MchprsWorld.create(circuit())
+    world.on_use_block(0, 1, 0)   # flip the lever
+    world.tick(2)
+    world.flush()
+    world.sync_to_schematic()
+    after = world.get_schematic()
+
+    tmp = tempfile.mkdtemp(prefix="nuc-redstone-")
+    try:
+        panels = []
+        for s, name in [(before, "before"), (after, "after")]:
+            p = os.path.join(tmp, f"{name}.png")
+            cfg = nu.RenderConfig.create(560, 420)
+            cfg.set_isometric(); cfg.set_yaw(210.0); cfg.set_pitch(28.0)
+            cfg.set_zoom(1.1)
+            cfg.set_background(0, 0, 0, 0)
+            nu.Renderer.render_to_file(s, pack, cfg, p)
+            panels.append(p)
+        hstack(panels, os.path.join(OUT, "redstone.png"))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return after
+
+
+def scene_diff(pack):
+    """Triptych: before | after | Diff.compute changes over a glass ghost."""
+    def cottage():
+        s = nu.Schematic.create("cottage")
+        fill = nu.BuildingTool.fill
+        planks = nu.Brush.solid("minecraft:oak_planks")
+        bricks = nu.Brush.solid("minecraft:stone_bricks")
+        fill(s, nu.Shape.cuboid(0, 0, 0, 8, 0, 6), bricks)            # floor
+        fill(s, nu.Shape.cuboid(0, 1, 0, 8, 3, 6).hollow(1), planks)  # walls
+        fill(s, nu.Shape.cuboid(0, 4, 0, 8, 4, 6), bricks)            # roof
+        for y in (1, 2):                                              # doorway
+            s.set_block(4, y, 0, "minecraft:air")
+        # garden lantern post
+        fill(s, nu.Shape.cuboid(11, 0, 1, 11, 5, 1), nu.Brush.solid("minecraft:oak_log"))
+        s.set_block(11, 6, 1, "minecraft:glowstone")
+        return s
+
+    def renovate(s):
+        nu.BuildingTool.fill(s, nu.Shape.cuboid(7, 5, 5, 7, 6, 5),
+                             nu.Brush.solid("minecraft:bricks"))       # chimney
+        for x in (2, 6):
+            s.set_block(x, 2, 0, "minecraft:air")                      # cut windows
+
+    before = cottage()
+    after = cottage()
+    renovate(after)
+    diff = json.loads(nu.Diff.compute(before, after, "exact").to_json())
+
+    # changes view: glass ghost of the union, lime = added, red = removed
+    changes = cottage()
+    renovate(changes)
+    for b in json.loads(changes.get_all_blocks_json()):
+        if b["name"] != "minecraft:air":
+            changes.set_block(b["x"], b["y"], b["z"],
+                              "minecraft:light_gray_stained_glass")
+    for e in diff["added"]:
+        changes.set_block(*e["pos"], "minecraft:lime_concrete")
+    for e in diff["removed"]:
+        changes.set_block(*e["pos"], "minecraft:red_concrete")
+
+    tmp = tempfile.mkdtemp(prefix="nuc-diff-")
+    try:
+        panels = []
+        for s, name in [(before, "a"), (after, "b"), (changes, "c")]:
+            p = os.path.join(tmp, f"{name}.png")
+            cfg = nu.RenderConfig.create(460, 400)
+            cfg.set_isometric(); cfg.set_yaw(215.0); cfg.set_pitch(26.0)
+            cfg.set_zoom(1.1)
+            cfg.set_background(0, 0, 0, 0)
+            nu.Renderer.render_to_file(s, pack, cfg, p)
+            panels.append(p)
+        hstack(panels, os.path.join(OUT, "diff-engine.png"))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return changes
+
+
+def scene_autostack(pack):
+    """Before/after: detect the repeating wall module, restamp it 6 wide."""
+    def wall(units):
+        s = nu.Schematic.create("wall")
+        fill = nu.BuildingTool.fill
+        bricks = nu.Brush.solid("minecraft:stone_bricks")
+        logs = nu.Brush.solid("minecraft:dark_oak_log")
+        for u in range(units):
+            x = u * 6
+            fill(s, nu.Shape.cuboid(x, 1, 0, x + 5, 5, 0), bricks)   # panel
+            fill(s, nu.Shape.cuboid(x, 0, 0, x + 5, 0, 0),
+                 nu.Brush.solid("minecraft:polished_andesite"))       # plinth
+            fill(s, nu.Shape.cuboid(x, 1, 0, x, 6, 0), logs)          # beam
+            fill(s, nu.Shape.cuboid(x + 2, 2, 0, x + 3, 3, 0),
+                 nu.Brush.solid("minecraft:air"))                     # window
+            fill(s, nu.Shape.cuboid(x + 1, 6, 0, x + 5, 6, 0), logs)  # cap
+        return s
+
+    two = wall(2)
+    det = json.loads(nu.Autostack.detect_structures(two))
+    vx, vy, vz = det[0]["vectors"][0]   # period vector, here [6, 0, 0]
+    print(f"  detected: {det[0]['label']} vectors={det[0]['vectors']}")
+    six = nu.Autostack.resize_1d(two, vx, vy, vz, 6)
+
+    tmp = tempfile.mkdtemp(prefix="nuc-autostack-")
+    try:
+        panels = []
+        for s, name, w in [(two, "a", 400), (six, "b", 1000)]:
+            p = os.path.join(tmp, f"{name}.png")
+            cfg = nu.RenderConfig.create(w, 340)
+            cfg.set_isometric(); cfg.set_yaw(200.0); cfg.set_pitch(20.0)
+            cfg.set_zoom(1.0)
+            cfg.set_background(0, 0, 0, 0)
+            nu.Renderer.render_to_file(s, pack, cfg, p)
+            panels.append(p)
+        hstack(panels, os.path.join(OUT, "autostack.png"))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return six
+
+
+ATLAS_BLOCKS = [
+    "minecraft:grass_block", "minecraft:oak_planks", "minecraft:stone_bricks",
+    "minecraft:bricks", "minecraft:bookshelf", "minecraft:gold_block",
+    "minecraft:diamond_ore", "minecraft:glowstone", "minecraft:pumpkin",
+    "minecraft:mossy_cobblestone", "minecraft:red_wool", "minecraft:sandstone",
+    "minecraft:copper_block", "minecraft:amethyst_block", "minecraft:cherry_planks",
+    "minecraft:prismarine", "minecraft:crying_obsidian", "minecraft:melon",
+    "minecraft:tnt", "minecraft:crafting_table", "minecraft:note_block",
+    "minecraft:target", "minecraft:sea_lantern", "minecraft:redstone_lamp",
+    "minecraft:blue_ice", "minecraft:purpur_pillar", "minecraft:quartz_bricks",
+    "minecraft:dark_prismarine", "minecraft:warped_planks", "minecraft:end_stone",
+    "minecraft:lapis_block", "minecraft:chiseled_sandstone", "minecraft:magma_block",
+]
+
+
+def scene_texture_atlas(pack):
+    """The packed RGBA atlas TextureAtlas.build_global returns for a build."""
+    s = nu.Schematic.create("atlas-demo")
+    for i, block in enumerate(ATLAS_BLOCKS):
+        s.set_block(i % 6, 0, i // 6, block)
+    rp = nu.ResourcePack.from_bytes(pack)
+    atlas = nu.TextureAtlas.build_global(s, rp, nu.MeshConfig.create())
+    w, h = atlas.width(), atlas.height()
+    rgba = base64.b64decode(atlas.rgba_data_b64())
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo",
+                    "-pixel_format", "rgba", "-video_size", f"{w}x{h}", "-i", "-",
+                    "-vf", "scale=iw*4:ih*4:flags=neighbor",
+                    os.path.join(OUT, "texture-atlas.png")],
+                   input=rgba, check=True)
+    print(f"  wrote docs/media/texture-atlas.png ({w}x{h} atlas)")
+    return s
+
+
+def scene_basics(pack):
+    """Load a schematic, edit it with set_block, render it — the first taste."""
+    data = open(os.path.join(ROOT, "test_schematic.schem"), "rb").read()
+    s = nu.Schematic.from_data(data)   # 5x5x5 stone/dirt checkerboard
+    for i, block in enumerate(["minecraft:gold_block", "minecraft:emerald_block",
+                               "minecraft:redstone_block"]):
+        s.set_block(5 + i, 0, 0, block)
+    s.set_block(2, 5, 2, "minecraft:glowstone")
+    render(s, pack, os.path.join(OUT, "basics.png"), w=560, h=460,
+           yaw=225, pitch=28, zoom=1.1)
+    return s
 
 
 def scene_palette_ramps(pack):
@@ -315,11 +566,17 @@ def scene_palette_ramps(pack):
 
 
 SCENES = {
+    "basics": scene_basics,
     "hero": scene_hero,
     "torus": scene_gradient_torus,
+    "shaded": scene_shaded_sphere,
     "mandelbrot": scene_mandelbrot,
     "shapes": scene_shapes,
     "masked-fill": scene_masked_fill,
+    "redstone": scene_redstone,
+    "diff": scene_diff,
+    "autostack": scene_autostack,
+    "atlas": scene_texture_atlas,
     "palette-ramps": scene_palette_ramps,
     "timelapse": scene_timelapse,
 }
