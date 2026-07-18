@@ -159,8 +159,10 @@ pollster = { version = "0.4", optional = true }
 # GLB containers ourselves (`Gltf::from_slice` + the `utils` accessor readers)
 # and decode embedded png/jpeg textures with the `image` dep above, so gltf's
 # own `import`/`image` machinery (and its separate image-crate version) stays out
-# of the tree.
-gltf = { version = "1.4", default-features = false, features = ["utils", "names"], optional = true }
+# of the tree. NOTE: do not enable gltf's "names" feature — it toggles a `name`
+# field onto every gltf-json struct crate-tree-wide and breaks schematic-mesher's
+# struct literals (feature unification).
+gltf = { version = "1.4", default-features = false, features = ["utils"], optional = true }
 
 # Simulation (MCHPRS) dependencies - optional
 # Note: These are git dependencies and will be excluded from crates.io publish
