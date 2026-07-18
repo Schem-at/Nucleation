@@ -257,6 +257,17 @@ afterwards bakes the new tables in.
 The PrismarineJS `blocks.json` schema is kept as the on-disk format (PrismarineJS itself has
 no 26.x data). `tests/blockpedia_data_refresh.rs` guards data currency.
 
+The refresh is also automated: `.github/workflows/data-refresh.yml` runs weekly (and on
+manual dispatch, optionally with an explicit version), compares the version manifest's
+`latest.release` against `data/blockpedia/DATA_VERSION` (a plain-text marker
+`refresh-block-data` rewrites on every run), and — when Mojang has shipped a new release —
+regenerates the snapshots and opens/updates a PR on `data-refresh/<version>`. The PR body
+carries the added/removed-block diff, file size deltas, and color coverage. Two failure
+modes are tolerated by design: `refresh-bedrock-mappings` may fail while GeyserMC's
+mappings lag the Java release (noted in the PR, previous mappings kept), and `cargo test`
+may fail because new blocks need human test updates (the PR is still opened, marked
+failing, with the failure tail).
+
 #### Java ↔ Bedrock mappings
 
 - `geyser_mappings.json.gz` — regenerated from **GeyserMC/mappings** (`blocks.nbt` @

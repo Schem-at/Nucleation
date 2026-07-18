@@ -60,6 +60,10 @@ const VERSION_MANIFEST_URL: &str =
 
 const SNAPSHOT_PATH: &str = "data/blockpedia/prismarinejs_blocks.json.gz";
 const SEMANTICS_PATH: &str = "data/blockpedia/block_semantics.json.gz";
+/// Plain-text marker of the Minecraft version the snapshots were generated
+/// from; the weekly `data-refresh` workflow compares it against the version
+/// manifest's `latest.release` to decide whether a refresh is needed.
+const DATA_VERSION_PATH: &str = "data/blockpedia/DATA_VERSION";
 
 fn main() -> Result<()> {
     let client = reqwest::blocking::Client::builder()
@@ -265,6 +269,11 @@ fn main() -> Result<()> {
 
     // --- block semantics (kind / base / tags / full_cube) ---
     generate_semantics(&report, &server_jar, &mut classifier)?;
+
+    // --- version marker (drives the automated data-refresh workflow) ---
+    fs::write(DATA_VERSION_PATH, format!("{version}\n"))
+        .with_context(|| format!("Failed to write {DATA_VERSION_PATH}"))?;
+    println!("Wrote {DATA_VERSION_PATH} ({version}).");
 
     println!();
     println!("Next: `cargo run --release --bin fetch-texture-colors --features mc-data-refresh -- {version}`");

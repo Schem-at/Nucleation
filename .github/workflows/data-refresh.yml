@@ -1,0 +1,276 @@
+name: Minecraft data refresh
+
+# Weekly check of Mojang's version manifest against data/blockpedia/DATA_VERSION.
+# When a new release ships, regenerates the blockpedia snapshots and opens (or
+# updates) a PR on branch data-refresh/<version>. See the "Minecraft block data"
+# section of the README.
+
+on:
+  schedule:
+    # Mondays 06:17 UTC (off the top of the hour to dodge cron load spikes).
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: >-
+          Minecraft version to refresh to (must exist in the version manifest).
+          Defaults to the manifest's latest release.
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: data-refresh
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect target version
+        id: detect
+        shell: bash
+        env:
+          REQUESTED_VERSION: ${{ inputs.version || '' }}
+        run: |
+          set -euo pipefail
+          current="$(tr -d '[:space:]' < data/blockpedia/DATA_VERSION)"
+          manifest="$(curl -fsSL --retry 3 https://launchermeta.mojang.com/mc/game/version_manifest_v2.json)"
+          latest="$(jq -r '.latest.release // empty' <<<"$manifest")"
+          if [[ -z "$latest" ]]; then
+            echo "::error::version manifest has no latest.release"
+            exit 1
+          fi
+          target="${REQUESTED_VERSION:-$latest}"
+          if ! jq -e --arg v "$target" '.versions[] | select(.id == $v)' <<<"$manifest" >/dev/null; then
+            echo "::error::version ${target} not found in the version manifest"
+            exit 1
+          fi
+          echo "Current data version: ${current}"
+          echo "Target version:       ${target}"
+          {
+            echo "current=${current}"
+            echo "version=${target}"
+          } >> "$GITHUB_OUTPUT"
+          if [[ "$target" == "$current" ]]; then
+            echo "Data already at ${target}; nothing to do."
+            echo "refresh=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "refresh=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # MC 26.x's server-jar data generator needs Java 25+. Temurin 25 is the
+      # newest available LTS (Adoptium available_releases, checked 2026-07);
+      # bump this pin when the next LTS (29, due 2027) ships.
+      - name: Set up Java
+        if: steps.detect.outputs.refresh == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Rust
+        if: steps.detect.outputs.refresh == 'true'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        if: steps.detect.outputs.refresh == 'true'
+        uses: Swatinem/rust-cache@v2
+
+      - name: Record snapshot sizes (before)
+        if: steps.detect.outputs.refresh == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/data-refresh"
+          for f in data/blockpedia/*.gz; do
+            printf '%s %s\n' "$(basename "$f")" "$(stat -c%s "$f")"
+          done > "$RUNNER_TEMP/data-refresh/sizes-before.txt"
+
+      - name: Refresh block data (vanilla report converter)
+        if: steps.detect.outputs.refresh == 'true'
+        shell: bash
+        env:
+          VERSION: ${{ steps.detect.outputs.version }}
+        run: |
+          set -euo pipefail
+          cargo run --release --bin refresh-block-data --features mc-data-refresh -- "$VERSION" \
+            | tee "$RUNNER_TEMP/data-refresh/refresh-block-data.log"
+
+      - name: Refresh texture colors
+        if: steps.detect.outputs.refresh == 'true'
+        shell: bash
+        env:
+          VERSION: ${{ steps.detect.outputs.version }}
+        run: |
+          set -euo pipefail
+          cargo run --release --bin fetch-texture-colors --features mc-data-refresh -- "$VERSION" \
+            | tee "$RUNNER_TEMP/data-refresh/fetch-texture-colors.log"
+
+      # Geyser's mappings routinely lag a new Java release, so a failure here
+      # is reported in the PR body instead of failing the run; the previous
+      # geyser_mappings.json.gz is kept.
+      - name: Refresh Bedrock mappings (tolerates failure)
+        if: steps.detect.outputs.refresh == 'true'
+        id: geyser
+        shell: bash
+        env:
+          VERSION: ${{ steps.detect.outputs.version }}
+        run: |
+          set -uo pipefail
+          args=()
+          # World data version from the (cached) server jar, for provenance.
+          server_jar="target/mc-data/server-${VERSION}.jar"
+          if [[ -f "$server_jar" ]]; then
+            world_version="$(unzip -p "$server_jar" version.json 2>/dev/null | jq -r '.world_version // empty' || true)"
+            [[ -n "${world_version}" ]] && args+=(--data-version "$world_version")
+          fi
+          if cargo run --release --bin refresh-bedrock-mappings --features mc-data-refresh -- "${args[@]}" \
+              2>&1 | tee "$RUNNER_TEMP/data-refresh/refresh-bedrock-mappings.log"; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::refresh-bedrock-mappings failed (Geyser mappings often lag new Java releases); keeping the previous geyser_mappings.json.gz"
+            git checkout -- data/blockpedia/geyser_mappings.json.gz
+          fi
+
+      # A new MC version legitimately breaks tests (new-block asserts in
+      # tests/blockpedia_data_refresh.rs need human updates), so the PR is
+      # still opened, clearly marked failing, with the failure tail.
+      - name: Run tests (tolerates failure)
+        if: steps.detect.outputs.refresh == 'true'
+        id: tests
+        shell: bash
+        run: |
+          set -uo pipefail
+          if cargo test 2>&1 | tee "$RUNNER_TEMP/data-refresh/cargo-test.log"; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::cargo test failed; the PR will be marked failing"
+          fi
+
+      - name: Build PR body
+        if: steps.detect.outputs.refresh == 'true'
+        shell: bash
+        env:
+          CURRENT: ${{ steps.detect.outputs.current }}
+          VERSION: ${{ steps.detect.outputs.version }}
+          GEYSER_OK: ${{ steps.geyser.outputs.ok }}
+          TESTS_OK: ${{ steps.tests.outputs.ok }}
+          SERVER_URL: ${{ github.server_url }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/data-refresh"
+          body="$dir/pr-body.md"
+
+          for f in data/blockpedia/*.gz; do
+            printf '%s %s\n' "$(basename "$f")" "$(stat -c%s "$f")"
+          done > "$dir/sizes-after.txt"
+
+          {
+            echo "## Minecraft data refresh: ${CURRENT} -> ${VERSION}"
+            echo
+            echo "Automated weekly refresh ([run](${SERVER_URL}/${REPOSITORY}/actions/runs/${RUN_ID}))."
+            echo
+            echo "### Status"
+            echo "- refresh-block-data: OK"
+            echo "- fetch-texture-colors: OK — $(grep -m1 '^Coverage:' "$dir/fetch-texture-colors.log" || echo 'coverage line not found')"
+            if [[ "$GEYSER_OK" == "true" ]]; then
+              echo "- refresh-bedrock-mappings: OK"
+            else
+              echo "- refresh-bedrock-mappings: **FAILED** — Geyser mappings often lag new Java releases; the previous geyser_mappings.json.gz was kept. Re-run once GeyserMC/mappings ships ${VERSION} support (tail below)."
+            fi
+            if [[ "$TESTS_OK" == "true" ]]; then
+              echo "- cargo test: passed"
+            else
+              echo "- cargo test: **FAILING** — new MC versions legitimately need human test updates (e.g. new-block asserts in tests/blockpedia_data_refresh.rs). Do not merge until fixed (tail below)."
+            fi
+            echo
+            echo "### File size deltas"
+            echo
+            echo "| file | before | after | delta |"
+            echo "| --- | ---: | ---: | ---: |"
+            join "$dir/sizes-before.txt" "$dir/sizes-after.txt" \
+              | awk '{ printf "| %s | %s | %s | %+d |\n", $1, $2, $3, $3 - $2 }'
+            echo
+            echo "### Block diff (refresh-block-data)"
+            echo
+            echo "<details><summary>added/removed blocks, property changes, derived facts</summary>"
+            echo
+            echo '```'
+            sed -n '/^Vanilla .* report:/,/^Wrote data\/blockpedia\/prismarinejs/p' "$dir/refresh-block-data.log" | sed '$d'
+            echo '```'
+            echo
+            echo "</details>"
+            if [[ "$GEYSER_OK" != "true" ]]; then
+              echo
+              echo "### refresh-bedrock-mappings failure tail"
+              echo
+              echo '```'
+              tail -n 30 "$dir/refresh-bedrock-mappings.log"
+              echo '```'
+            fi
+            if [[ "$TESTS_OK" != "true" ]]; then
+              echo
+              echo "### Test failure tail"
+              echo
+              echo '```'
+              tail -n 60 "$dir/cargo-test.log"
+              echo '```'
+            fi
+          } > "$body"
+
+      - name: Commit, push branch, open or update PR
+        if: steps.detect.outputs.refresh == 'true'
+        shell: bash
+        env:
+          VERSION: ${{ steps.detect.outputs.version }}
+          CURRENT: ${{ steps.detect.outputs.current }}
+          TESTS_OK: ${{ steps.tests.outputs.ok }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          branch="data-refresh/${VERSION}"
+          title="data: refresh Minecraft data ${CURRENT} -> ${VERSION}"
+          if [[ "$TESTS_OK" != "true" ]]; then
+            title="${title} [tests failing]"
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$branch"
+          git add data/blockpedia/DATA_VERSION data/blockpedia/*.gz
+          if git diff --cached --quiet; then
+            echo "::error::refresh reported a new version but produced no data changes"
+            exit 1
+          fi
+          git commit -m "data: refresh Minecraft data to ${VERSION}"
+          git push --force origin "$branch"
+
+          if [[ "$(gh pr list --head "$branch" --state open --json number --jq length)" == "0" ]]; then
+            gh pr create --base master --head "$branch" \
+              --title "$title" --body-file "$RUNNER_TEMP/data-refresh/pr-body.md"
+          else
+            gh pr edit "$branch" \
+              --title "$title" --body-file "$RUNNER_TEMP/data-refresh/pr-body.md"
+          fi
+
+      # Surface the test failure as a red run so a green scheduled run always
+      # means "PR is mergeable as-is". The PR has been opened either way.
+      - name: Fail the run if tests failed
+        if: steps.detect.outputs.refresh == 'true' && steps.tests.outputs.ok != 'true'
+        shell: bash
+        run: |
+          echo "::error::Data refresh PR opened, but cargo test is failing — human test updates needed."
+          exit 1
