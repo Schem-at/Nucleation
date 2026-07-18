@@ -1,3 +1,33 @@
+# Nucleation v0.3.4
+
+**meshing and rendering are on the crates.io crate again.** schematic-mesher
+is published to crates.io (0.2.0), so the dependency is now dual
+version+git: local/git builds use the pinned rev, `cargo publish` keeps the
+versioned crate. The published crate no longer strips meshing/rendering —
+only `simulation` (MCHPRS) stays git-only.
+
+**The nanobind pin is gone.** The Python wheel accepted only
+`nanobind ==2.12.0` because the generated dealloc shim reached into
+nanobind's private struct layout (broken in 2.13). The diplomat fork's
+nanobind backend now uses nanobind's public low-level instance API, so the
+pin is `>=2.12,<3` — verified building and running a create/drop
+destruction stress against both 2.12 and 2.13.
+
+**Block data polish** (all from official 26.2 sources):
+
+- `default_state` is now populated for all 1,196 blocks (was empty) — the
+  Blocks query API returns real default property maps
+- Tile-entity classification comes from the `block_entity_type` registry
+  (186 blocks, was 42 by substring) — signs, banners, skulls, shelves, ...
+- Light emission uses per-block emit-light data, not name guessing
+- Mushroom blocks classify as full cubes
+
+**Automated data refresh**: a weekly workflow checks Mojang's manifest and
+opens a PR (regenerated data + new-blocks diff) when a new Minecraft release
+ships.
+
+---
+
 # Nucleation v0.3.3
 
 **Block semantics from official data, queryable everywhere.** The data
