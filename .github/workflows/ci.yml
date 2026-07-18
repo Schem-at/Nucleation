@@ -355,11 +355,12 @@ jobs:
           path: release-artifacts
 
       - name: Publish to crates.io (git-only features stripped)
-        # crates.io can't take the MCHPRS/schematic-mesher git deps, so the
-        # published crate ships without simulation/meshing/rendering; use
-        # the git dependency to get those. strip-git-deps.py rewrites
-        # Cargo.toml accordingly (publish schematic-mesher to crates.io to
-        # win meshing/rendering back).
+        # crates.io can't take the MCHPRS git deps, so the published crate
+        # ships without simulation; use the git dependency to get it.
+        # strip-git-deps.py rewrites Cargo.toml accordingly. meshing and
+        # rendering survive: schematic-mesher is published to crates.io
+        # (via publish-mesher.yml) and its dep is dual version+git, which
+        # cargo publish resolves to the version side on its own.
         run: |
           python3 tools/strip-git-deps.py
           cargo publish --allow-dirty --token ${{ secrets.CRATES_IO_TOKEN }}

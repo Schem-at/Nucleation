@@ -141,7 +141,11 @@ testcontainers-modules = { version = "0.11", features = [
 ], optional = true }
 
 # Meshing dependencies - optional
-schematic-mesher = { git = "https://github.com/Schem-at/Schematic-Mesher.git", rev = "253d2b6", optional = true }
+# Dual version+git dep: the git side pins the exact rev the crates.io 0.1.0
+# release was published from (253d2b6 + manifest-only packaging fixes; same
+# source). cargo publish keeps the version and drops the git side, so the
+# published nucleation crate keeps meshing/rendering.
+schematic-mesher = { version = "0.1.0", git = "https://github.com/Schem-at/Schematic-Mesher.git", rev = "570070ef6dc1c6bc754c304548a4b57238cb68f3", optional = true }
 
 # Rendering dependencies - optional
 wgpu = { version = "24", optional = true }

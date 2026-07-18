@@ -1,0 +1,24 @@
+name: Publish schematic-mesher
+
+# Publishes the Schem-at/Schematic-Mesher crate to crates.io so nucleation's
+# crates.io crate can keep its meshing/rendering features (the dep is dual
+# version+git; cargo keeps the version side on publish). Trigger manually.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Schematic-Mesher ref (branch/tag/sha) to publish"
+        required: true
+        default: "570070ef6dc1c6bc754c304548a4b57238cb68f3" # publish-prep: 253d2b6 + packaging/manifest fixes
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: Schem-at/Schematic-Mesher
+          ref: ${{ inputs.ref }}
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Publish to crates.io
+        run: cargo publish --allow-dirty --token ${{ secrets.CRATES_IO_TOKEN }}
