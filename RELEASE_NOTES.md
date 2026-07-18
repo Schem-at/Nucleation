@@ -1,3 +1,23 @@
+# Nucleation v0.3.9
+
+**Voxelize 3D models.** New `voxelize` feature (in `bridge-full` and the
+WASM build): load GLB (node transforms, embedded textures) or OBJ into a
+`MeshModel`, and use it as a first-class building `Shape` —
+inside/outside via triangle-parity ray casting (three-axis majority vote,
+grid-accelerated), normals from the nearest triangle so lighting brushes
+just work, and an optional `shell` distance that closes thin-walled and
+hollow geometry (the canonical Utah teapot is a double-walled vessel —
+parity alone is faithful to that). Texture projection maps each voxel to
+the palette-closest color of its nearest surface point (barycentric UVs,
+bilinear sampling): `Voxelizer.schematic_from_glb_textured`.
+
+**Spotlight brush.** `Brush.spotlight(pos, direction, cone_angle, color)`
+— Lambert term from the surface normal times a smooth cone falloff,
+snapped to any palette. Point it at a voxelized teapot through the
+grayscale ladder and you get film-noir ceramics.
+
+---
+
 # Nucleation v0.3.8
 
 **The basics got simple.** `load_from_file` auto-detects the format from
