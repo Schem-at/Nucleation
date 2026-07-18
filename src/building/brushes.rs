@@ -191,11 +191,15 @@ impl BlockPalette {
         Self::new_filtered(|f| f.id.contains("terracotta") && !f.id.contains("glazed"))
     }
 
-    /// Create a palette containing only grayscale blocks
+    /// Create a palette containing only grayscale blocks. Restricted to
+    /// full cubes: the name match alone also caught panes, stairs, and
+    /// walls (e.g. light_gray_stained_glass_pane), which render as holes
+    /// when a gradient snaps to them.
     pub fn new_grayscale() -> Self {
         Self::new_filtered(|f| {
             let id = &f.id;
-            id.contains("white")
+            f.is_full_cube()
+                && (id.contains("white")
                 || id.contains("gray")
                 || id.contains("black")
                 || id.contains("stone")
@@ -204,7 +208,7 @@ impl BlockPalette {
                 || id.contains("diorite")
                 || id.contains("tuff")
                 || id.contains("deepslate")
-                || id.contains("bedrock")
+                || id.contains("bedrock"))
         })
     }
 

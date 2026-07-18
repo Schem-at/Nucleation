@@ -7,6 +7,7 @@ import com.sun.jna.Structure
 
 internal interface SdfLib: Library {
     fun Sdf_destroy(handle: Pointer)
+    fun Sdf_schematic_from_sdf_auto(sdfJson: Slice, rulesJson: Slice): ResultPointerInt
     fun Sdf_schematic_from_sdf(sdfJson: Slice, rulesJson: Slice, hasBounds: Boolean, minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int): ResultPointerInt
     fun Sdf_eval(sdfJson: Slice, x: Float, y: Float, z: Float): ResultFloatInt
 }
@@ -42,7 +43,34 @@ class Sdf internal constructor (
         @JvmStatic
         
         /** Builds a schematic by sampling an SDF JSON tree with material rules JSON.
-        *When `has_bounds` is false the tree's own AABB is used (fails with
+        *Sample an SDF tree into a schematic using the tree's own AABB —
+        *the ergonomic path for bounded trees (all primitives except
+        *`plane`). Fails with `InvalidArgument` for unbounded trees; use
+        *`schematic_from_sdf` with explicit bounds for those.
+        */
+        fun schematicFromSdfAuto(sdfJson: String, rulesJson: String): Result<Schematic> {
+            val sdfJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(sdfJson)
+            val rulesJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(rulesJson)
+            
+            val returnVal = lib.Sdf_schematic_from_sdf_auto(sdfJsonSliceMemory.slice, rulesJsonSliceMemory.slice);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal 
+                    val returnOpaque = Schematic(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                sdfJsonSliceMemory.close()
+                rulesJsonSliceMemory.close()
+            }
+        }
+        @JvmStatic
+        
+        /** When `has_bounds` is false the tree's own AABB is used (fails with
         *`InvalidArgument` for unbounded trees) and the `min_*`/`max_*` arguments
         *are ignored.
         */

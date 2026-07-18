@@ -131,9 +131,9 @@ def scene_hero(pack):
     }
     s = nu.Sdf.schematic_from_sdf(json.dumps(sdf), json.dumps(rules), True,
                                   -38, -21, -38, 38, 40, 38)
-    render(s, pack, os.path.join(OUT, "hero.png"), w=1200, h=760, pitch=30, zoom=0.75)
+    render(s, pack, os.path.join(OUT, "hero.png"), w=1200, h=760, pitch=30, zoom=1.33)
     turntable_gif(s, pack, os.path.join(OUT, "hero-turntable.gif"),
-                  pitch=28, zoom=0.85)
+                  pitch=28, zoom=1.18)
     return s
 
 
@@ -152,7 +152,7 @@ def scene_gradient_torus(pack):
                                     nu.InterpolationSpace.Oklab)
     brush.set_palette(nu.Palette.wool())
     nu.BuildingTool.fill(s, shape, brush)
-    render(s, pack, os.path.join(OUT, "gradient-torus.png"), pitch=32, zoom=0.8)
+    render(s, pack, os.path.join(OUT, "gradient-torus.png"), pitch=32, zoom=1.25)
     return s
 
 
@@ -245,7 +245,7 @@ def scene_shapes(pack):
     ribbon = nu.Shape.bezier([84, 3, 0, 94, 20, -8, 110, 0, 6, 120, 16, -2], 3.0, 64)
     fill(s, ribbon, nu.Brush.solid("minecraft:lapis_block"))
     render(s, pack, os.path.join(OUT, "shapes-gallery.png"), w=1400, h=480,
-           yaw=12, pitch=16, zoom=0.92)
+           yaw=12, pitch=16, zoom=1.09)
     return s
 
 
@@ -286,7 +286,7 @@ def scene_masked_fill(pack):
         a = os.path.join(tmp, "before.png")
         b = os.path.join(tmp, "after.png")
         for s, path in [(before, a), (after, b)]:
-            render(s, pack, path, w=660, h=560, yaw=225, pitch=24, zoom=0.85)
+            render(s, pack, path, w=660, h=560, yaw=225, pitch=24, zoom=1.18)
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", a, "-i", b,
                         "-filter_complex", "[0][1]hstack", os.path.join(OUT, "masked-fill.png")],
                        check=True)

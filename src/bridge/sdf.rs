@@ -12,6 +12,17 @@ pub mod ffi {
 
     impl Sdf {
         /// Builds a schematic by sampling an SDF JSON tree with material rules JSON.
+        /// Sample an SDF tree into a schematic using the tree's own AABB —
+        /// the ergonomic path for bounded trees (all primitives except
+        /// `plane`). Fails with `InvalidArgument` for unbounded trees; use
+        /// `schematic_from_sdf` with explicit bounds for those.
+        pub fn schematic_from_sdf_auto(
+            sdf_json: &DiplomatStr,
+            rules_json: &DiplomatStr,
+        ) -> Result<Box<Schematic>, NucleationError> {
+            Self::schematic_from_sdf(sdf_json, rules_json, false, 0, 0, 0, 0, 0, 0)
+        }
+
         /// When `has_bounds` is false the tree's own AABB is used (fails with
         /// `InvalidArgument` for unbounded trees) and the `min_*`/`max_*` arguments
         /// are ignored.

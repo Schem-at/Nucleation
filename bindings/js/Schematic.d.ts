@@ -38,19 +38,6 @@ export class Schematic {
     getBlockName(x: number, y: number, z: number): string;
 
     /**
-     * Save the schematic to a file, always in Litematic format (the
-     * extension is not consulted; use `save_to_file_with_format` for
-     * other formats).
-     */
-    saveToFile(path: string): void;
-
-    /**
-     * Load a schematic from a Litematic file (this path is
-     * Litematic-only; use `from_data` for format auto-detection).
-     */
-    static loadFromFile(path: string): Schematic;
-
-    /**
      * Build a schematic from raw byte data, auto-detecting the format.
      * Supports Litematic, Sponge Schematic, and McStructure (Bedrock) formats.
      * `Parse` if a format was detected but failed to parse, `InvalidArgument` if
@@ -554,12 +541,6 @@ export class Schematic {
      * may be empty strings for defaults.
      */
     saveAsB64(format: string, version: string, settings: string): string;
-
-    /**
-     * Save to a file. If `format` is empty, the format is auto-detected from
-     * the file extension; `version` may be empty for the default.
-     */
-    saveToFileWithFormat(path: string, format: string, version: string): void;
 
     /**
      * Serialize as a Sponge schematic targeting a specific format version,

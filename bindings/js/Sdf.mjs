@@ -43,6 +43,38 @@ export class Sdf {
 
     /**
      * Builds a schematic by sampling an SDF JSON tree with material rules JSON.
+     * Sample an SDF tree into a schematic using the tree's own AABB —
+     * the ergonomic path for bounded trees (all primitives except
+     * `plane`). Fails with `InvalidArgument` for unbounded trees; use
+     * `schematic_from_sdf` with explicit bounds for those.
+     */
+    static schematicFromSdfAuto(sdfJson, rulesJson) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const sdfJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, sdfJson)));
+        const rulesJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, rulesJson)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Sdf_schematic_from_sdf_auto(diplomatReceive.buffer, sdfJsonSlice.ptr, rulesJsonSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new Schematic(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
      * When `has_bounds` is false the tree's own AABB is used (fails with
      * `InvalidArgument` for unbounded trees) and the `min_*`/`max_*` arguments
      * are ignored.

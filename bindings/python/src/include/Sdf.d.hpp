@@ -34,6 +34,14 @@ public:
 
   /**
    * Builds a schematic by sampling an SDF JSON tree with material rules JSON.
+   * Sample an SDF tree into a schematic using the tree's own AABB —
+   * the ergonomic path for bounded trees (all primitives except
+   * `plane`). Fails with `InvalidArgument` for unbounded trees; use
+   * `schematic_from_sdf` with explicit bounds for those.
+   */
+  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError> schematic_from_sdf_auto(std::string_view sdf_json, std::string_view rules_json);
+
+  /**
    * When `has_bounds` is false the tree's own AABB is used (fails with
    * `InvalidArgument` for unbounded trees) and the `min_*`/`max_*` arguments
    * are ignored.

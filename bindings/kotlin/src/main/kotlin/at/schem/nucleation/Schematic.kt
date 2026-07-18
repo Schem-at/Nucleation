@@ -167,6 +167,8 @@ class Schematic internal constructor (
         
         /** Load a schematic from a Litematic file (this path is
         *Litematic-only; use `from_data` for format auto-detection).
+        *Not available in JS: the WASM build has no filesystem — read the
+        *bytes yourself and use `from_data`.
         */
         fun loadFromFile(path: String): Result<Schematic> {
             val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
@@ -506,7 +508,8 @@ class Schematic internal constructor (
     
     /** Save the schematic to a file, always in Litematic format (the
     *extension is not consulted; use `save_to_file_with_format` for
-    *other formats).
+    *other formats). Not available in JS: the WASM build has no
+    *filesystem — use `to_litematic_b64` / `save_as_b64` there.
     */
     fun saveToFile(path: String): Result<Unit> {
         val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
@@ -1595,6 +1598,7 @@ class Schematic internal constructor (
     
     /** Save to a file. If `format` is empty, the format is auto-detected from
     *the file extension; `version` may be empty for the default.
+    *Not available in JS (no filesystem in WASM) — use `save_as_b64`.
     */
     fun saveToFileWithFormat(path: String, format: String, version: String): Result<Unit> {
         val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)

@@ -57,13 +57,16 @@ public:
   /**
    * Save the schematic to a file, always in Litematic format (the
    * extension is not consulted; use `save_to_file_with_format` for
-   * other formats).
+   * other formats). Not available in JS: the WASM build has no
+   * filesystem — use `to_litematic_b64` / `save_as_b64` there.
    */
   inline diplomat::result<std::monostate, NucleationError> save_to_file(std::string_view path) const;
 
   /**
    * Load a schematic from a Litematic file (this path is
    * Litematic-only; use `from_data` for format auto-detection).
+   * Not available in JS: the WASM build has no filesystem — read the
+   * bytes yourself and use `from_data`.
    */
   inline static diplomat::result<std::unique_ptr<Schematic>, NucleationError> load_from_file(std::string_view path);
 
@@ -637,6 +640,7 @@ public:
   /**
    * Save to a file. If `format` is empty, the format is auto-detected from
    * the file extension; `version` may be empty for the default.
+   * Not available in JS (no filesystem in WASM) — use `save_as_b64`.
    */
   inline diplomat::result<std::monostate, NucleationError> save_to_file_with_format(std::string_view path, std::string_view format, std::string_view version) const;
 

@@ -20,6 +20,9 @@ namespace diplomat {
 namespace capi {
     extern "C" {
 
+    typedef struct Sdf_schematic_from_sdf_auto_result {union {diplomat::capi::Schematic* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Sdf_schematic_from_sdf_auto_result;
+    Sdf_schematic_from_sdf_auto_result Sdf_schematic_from_sdf_auto(diplomat::capi::DiplomatStringView sdf_json, diplomat::capi::DiplomatStringView rules_json);
+
     typedef struct Sdf_schematic_from_sdf_result {union {diplomat::capi::Schematic* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Sdf_schematic_from_sdf_result;
     Sdf_schematic_from_sdf_result Sdf_schematic_from_sdf(diplomat::capi::DiplomatStringView sdf_json, diplomat::capi::DiplomatStringView rules_json, bool has_bounds, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z);
 
@@ -31,6 +34,12 @@ namespace capi {
     } // extern "C"
 } // namespace capi
 } // namespace
+
+inline diplomat::result<std::unique_ptr<Schematic>, NucleationError> Sdf::schematic_from_sdf_auto(std::string_view sdf_json, std::string_view rules_json) {
+    auto result = diplomat::capi::Sdf_schematic_from_sdf_auto({sdf_json.data(), sdf_json.size()},
+        {rules_json.data(), rules_json.size()});
+    return result.is_ok ? diplomat::result<std::unique_ptr<Schematic>, NucleationError>(diplomat::Ok<std::unique_ptr<Schematic>>(std::unique_ptr<Schematic>(Schematic::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Schematic>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
 
 inline diplomat::result<std::unique_ptr<Schematic>, NucleationError> Sdf::schematic_from_sdf(std::string_view sdf_json, std::string_view rules_json, bool has_bounds, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z) {
     auto result = diplomat::capi::Sdf_schematic_from_sdf({sdf_json.data(), sdf_json.size()},

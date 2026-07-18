@@ -103,7 +103,9 @@ pub mod ffi {
 
         /// Save the schematic to a file, always in Litematic format (the
         /// extension is not consulted; use `save_to_file_with_format` for
-        /// other formats).
+        /// other formats). Not available in JS: the WASM build has no
+        /// filesystem — use `to_litematic_b64` / `save_as_b64` there.
+        #[diplomat::attr(js, disable)]
         pub fn save_to_file(&self, path: &DiplomatStr) -> Result<(), NucleationError> {
             let path = std::str::from_utf8(path).map_err(|_| NucleationError::InvalidArgument)?;
             let bytes =
@@ -114,6 +116,9 @@ pub mod ffi {
 
         /// Load a schematic from a Litematic file (this path is
         /// Litematic-only; use `from_data` for format auto-detection).
+        /// Not available in JS: the WASM build has no filesystem — read the
+        /// bytes yourself and use `from_data`.
+        #[diplomat::attr(js, disable)]
         pub fn load_from_file(path: &DiplomatStr) -> Result<Box<Schematic>, NucleationError> {
             let path = std::str::from_utf8(path).map_err(|_| NucleationError::InvalidArgument)?;
             let bytes = std::fs::read(path).map_err(|_| NucleationError::Io)?;
@@ -1343,6 +1348,8 @@ pub mod ffi {
 
         /// Save to a file. If `format` is empty, the format is auto-detected from
         /// the file extension; `version` may be empty for the default.
+        /// Not available in JS (no filesystem in WASM) — use `save_as_b64`.
+        #[diplomat::attr(js, disable)]
         pub fn save_to_file_with_format(
             &self,
             path: &DiplomatStr,

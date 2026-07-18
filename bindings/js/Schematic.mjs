@@ -137,64 +137,6 @@ export class Schematic {
     }
 
     /**
-     * Save the schematic to a file, always in Litematic format (the
-     * extension is not consulted; use `save_to_file_with_format` for
-     * other formats).
-     */
-    saveToFile(path) {
-        let functionCleanupArena = new diplomatRuntime.CleanupArena();
-
-        const pathSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, path)));
-        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
-
-
-        const result = wasm.Schematic_save_to_file(diplomatReceive.buffer, this.ffiValue, pathSlice.ptr);
-
-        try {
-            if (!diplomatReceive.resultFlag) {
-                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
-                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
-            }
-        }
-
-        finally {
-            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
-            functionCleanupArena.free();
-
-            diplomatReceive.free();
-        }
-    }
-
-    /**
-     * Load a schematic from a Litematic file (this path is
-     * Litematic-only; use `from_data` for format auto-detection).
-     */
-    static loadFromFile(path) {
-        let functionCleanupArena = new diplomatRuntime.CleanupArena();
-
-        const pathSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, path)));
-        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
-
-
-        const result = wasm.Schematic_load_from_file(diplomatReceive.buffer, pathSlice.ptr);
-
-        try {
-            if (!diplomatReceive.resultFlag) {
-                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
-                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
-            }
-            return new Schematic(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
-        }
-
-        finally {
-            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
-            functionCleanupArena.free();
-
-            diplomatReceive.free();
-        }
-    }
-
-    /**
      * Build a schematic from raw byte data, auto-detecting the format.
      * Supports Litematic, Sponge Schematic, and McStructure (Bedrock) formats.
      * `Parse` if a format was detected but failed to parse, `InvalidArgument` if
@@ -2221,36 +2163,6 @@ export class Schematic {
 
             diplomatReceive.free();
             write.free();
-        }
-    }
-
-    /**
-     * Save to a file. If `format` is empty, the format is auto-detected from
-     * the file extension; `version` may be empty for the default.
-     */
-    saveToFileWithFormat(path, format, version) {
-        let functionCleanupArena = new diplomatRuntime.CleanupArena();
-
-        const pathSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, path)));
-        const formatSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, format)));
-        const versionSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, version)));
-        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
-
-
-        const result = wasm.Schematic_save_to_file_with_format(diplomatReceive.buffer, this.ffiValue, pathSlice.ptr, formatSlice.ptr, versionSlice.ptr);
-
-        try {
-            if (!diplomatReceive.resultFlag) {
-                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
-                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
-            }
-        }
-
-        finally {
-            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
-            functionCleanupArena.free();
-
-            diplomatReceive.free();
         }
     }
 

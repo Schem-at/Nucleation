@@ -13,7 +13,8 @@ void add_Sdf_binding(nb::module_ mod) {
     nb::class_<nucleation::Sdf> opaque(mod, "Sdf", nb::type_slots(nucleation_Sdf_slots));
     opaque
         .def_static("eval", &nucleation::Sdf::eval, "sdf_json"_a, "x"_a, "y"_a, "z"_a)
-        .def_static("schematic_from_sdf", std::move(maybe_op_unwrap(&nucleation::Sdf::schematic_from_sdf)), "sdf_json"_a, "rules_json"_a, "has_bounds"_a, "min_x"_a, "min_y"_a, "min_z"_a, "max_x"_a, "max_y"_a, "max_z"_a);
+        .def_static("schematic_from_sdf", std::move(maybe_op_unwrap(&nucleation::Sdf::schematic_from_sdf)), "sdf_json"_a, "rules_json"_a, "has_bounds"_a, "min_x"_a, "min_y"_a, "min_z"_a, "max_x"_a, "max_y"_a, "max_z"_a)
+        .def_static("schematic_from_sdf_auto", std::move(maybe_op_unwrap(&nucleation::Sdf::schematic_from_sdf_auto)), "sdf_json"_a, "rules_json"_a);
 }
 
 } 

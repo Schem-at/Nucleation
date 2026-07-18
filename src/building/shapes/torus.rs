@@ -134,12 +134,36 @@ impl ParametricShape for Torus {
         let dx = x as f64 - self.center.0;
         let dy = y as f64 - self.center.1;
         let dz = z as f64 - self.center.2;
-        let h = dx * ax.0 + dy * ax.1 + dz * ax.2;
-        let px = dx - h * ax.0;
-        let py = dy - h * ax.1;
+
+        // The angle must be measured inside the plane perpendicular to the
+        // axis, so build an orthonormal basis (u, v) for that plane. Taking
+        // raw world components of the projected vector is wrong: for the
+        // default y-up torus the y component of the projection is
+        // identically 0 and atan2 collapses to {0, PI}.
+        let helper = if ax.1.abs() < 0.9 {
+            (0.0, 1.0, 0.0)
+        } else {
+            (1.0, 0.0, 0.0)
+        };
+        // u = normalize(helper x axis), v = axis x u
+        let (ux, uy, uz) = (
+            helper.1 * ax.2 - helper.2 * ax.1,
+            helper.2 * ax.0 - helper.0 * ax.2,
+            helper.0 * ax.1 - helper.1 * ax.0,
+        );
+        let ulen = (ux * ux + uy * uy + uz * uz).sqrt();
+        let (ux, uy, uz) = (ux / ulen, uy / ulen, uz / ulen);
+        let (vx, vy, vz) = (
+            ax.1 * uz - ax.2 * uy,
+            ax.2 * ux - ax.0 * uz,
+            ax.0 * uy - ax.1 * ux,
+        );
+
+        let cu = dx * ux + dy * uy + dz * uz;
+        let cv = dx * vx + dy * vy + dz * vz;
 
         // Angle around the major circle, mapped to [0, 1]
-        let angle = py.atan2(px); // -PI to PI
+        let angle = cv.atan2(cu); // -PI to PI
         ((angle + std::f64::consts::PI) / (2.0 * std::f64::consts::PI)).clamp(0.0, 1.0)
     }
 }

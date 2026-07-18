@@ -109,7 +109,8 @@ pub fn compute_view_proj(
                 max_dist = max_dist.max(dist_h).max(dist_v);
             }
 
-            let distance = max_dist * 1.1 * camera.zoom;
+            // zoom is a true zoom factor: >1 moves closer, <1 further out.
+            let distance = max_dist * 1.1 / camera.zoom.max(1e-3);
             let eye = [
                 center[0] - dir[0] * distance,
                 center[1] - dir[1] * distance,
@@ -134,8 +135,9 @@ pub fn compute_view_proj(
                 ext_depth = ext_depth.max(dot3(rel, forward).abs());
             }
 
-            // Half-extents of the ortho window, fitting both axes, scaled by zoom.
-            let half_h = (ext_v.max(ext_h / aspect)).max(0.5) * 1.1 * camera.zoom;
+            // Half-extents of the ortho window, fitting both axes, scaled by
+            // zoom (a true zoom factor: >1 magnifies, <1 shrinks).
+            let half_h = (ext_v.max(ext_h / aspect)).max(0.5) * 1.1 / camera.zoom.max(1e-3);
             let half_w = half_h * aspect;
 
             // Stand far enough back that all geometry sits between near and far.

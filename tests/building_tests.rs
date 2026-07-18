@@ -794,3 +794,32 @@ fn test_fill_mode_replace_matches_fill_enum() {
 
     assert_eq!(a.total_blocks(), b.total_blocks());
 }
+
+#[test]
+fn torus_parameter_covers_the_full_ring() {
+    use nucleation::building::ParametricShape;
+
+    // Regression: parameter_at used raw world components of the radial
+    // projection, so a y-up torus collapsed t to {0.5, 1.0} (two-color
+    // gradient halves). The angle must be measured in an in-plane basis.
+    let torus = Torus::new((0.0, 0.0, 0.0), 16.0, 6.0, (0.0, 1.0, 0.0));
+    let mut deciles = std::collections::HashSet::new();
+    for i in 0..64 {
+        let a = 2.0 * std::f64::consts::PI * (i as f64) / 64.0;
+        let (x, z) = ((16.0 * a.cos()).round() as i32, (16.0 * a.sin()).round() as i32);
+        let t = torus.parameter_at(x, 0, z);
+        assert!((0.0..=1.0).contains(&t));
+        deciles.insert((t * 10.0).floor() as i32);
+    }
+    assert!(deciles.len() >= 9, "t only hit deciles {:?}", deciles);
+
+    // A tilted-axis torus must cover the ring too.
+    let tilted = Torus::new((0.0, 0.0, 0.0), 16.0, 6.0, (1.0, 0.0, 0.0));
+    let mut deciles = std::collections::HashSet::new();
+    for i in 0..64 {
+        let a = 2.0 * std::f64::consts::PI * (i as f64) / 64.0;
+        let (y, z) = ((16.0 * a.cos()).round() as i32, (16.0 * a.sin()).round() as i32);
+        deciles.insert((tilted.parameter_at(0, y, z) * 10.0).floor() as i32);
+    }
+    assert!(deciles.len() >= 9, "tilted t only hit deciles {:?}", deciles);
+}

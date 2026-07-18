@@ -31,8 +31,9 @@ export class RenderConfig {
     setPitch(pitch: number): void;
 
     /**
-     * Set the zoom factor scaling the auto-fitted camera distance
-     * (1.0 = frame the whole model; larger = further away). Default: 1.0.
+     * Set the zoom factor applied to the auto-fitted framing
+     * (1.0 = frame the whole model; 2.0 = twice as close; 0.5 = twice
+     * as far). Default: 1.0.
      */
     setZoom(zoom: number): void;
 

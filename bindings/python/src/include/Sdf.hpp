@@ -20,6 +20,9 @@ namespace nucleation {
 namespace capi {
     extern "C" {
 
+    typedef struct Sdf_schematic_from_sdf_auto_result {union {nucleation::capi::Schematic* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_schematic_from_sdf_auto_result;
+    Sdf_schematic_from_sdf_auto_result Sdf_schematic_from_sdf_auto(nucleation::diplomat::capi::DiplomatStringView sdf_json, nucleation::diplomat::capi::DiplomatStringView rules_json);
+
     typedef struct Sdf_schematic_from_sdf_result {union {nucleation::capi::Schematic* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_schematic_from_sdf_result;
     Sdf_schematic_from_sdf_result Sdf_schematic_from_sdf(nucleation::diplomat::capi::DiplomatStringView sdf_json, nucleation::diplomat::capi::DiplomatStringView rules_json, bool has_bounds, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z);
 
@@ -31,6 +34,12 @@ namespace capi {
     } // extern "C"
 } // namespace capi
 } // namespace
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError> nucleation::Sdf::schematic_from_sdf_auto(std::string_view sdf_json, std::string_view rules_json) {
+    auto result = nucleation::capi::Sdf_schematic_from_sdf_auto({sdf_json.data(), sdf_json.size()},
+        {rules_json.data(), rules_json.size()});
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Schematic>>(std::unique_ptr<nucleation::Schematic>(nucleation::Schematic::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
 
 inline nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError> nucleation::Sdf::schematic_from_sdf(std::string_view sdf_json, std::string_view rules_json, bool has_bounds, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z) {
     auto result = nucleation::capi::Sdf_schematic_from_sdf({sdf_json.data(), sdf_json.size()},
