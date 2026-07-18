@@ -144,6 +144,8 @@ Palette* Palette_terracotta();
 Palette* Palette_grayscale();
 Palette* Palette_wood();
 Palette* Palette_sorted_by_lightness(Palette* self);
+typedef struct Palette_ramp_ids_json_result { union { NucleationError err; }; bool is_ok; } Palette_ramp_ids_json_result;
+Palette_ramp_ids_json_result Palette_ramp_ids_json(Palette* self, uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2, uint32_t steps, DiplomatWrite* write);
 typedef struct Palette_gradient_ids_json_result { union { NucleationError err; }; bool is_ok; } Palette_gradient_ids_json_result;
 Palette_gradient_ids_json_result Palette_gradient_ids_json(Palette* self, uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2, uint32_t steps, DiplomatWrite* write);
 typedef struct Palette_from_block_ids_result { union { Palette* ok; NucleationError err; }; bool is_ok; } Palette_from_block_ids_result;

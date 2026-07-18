@@ -62,6 +62,15 @@ final class Palette {
         return new Palette($ret, true);
     }
 
+    public function rampIdsJson( $r1,  $g1,  $b1,  $r2,  $g2,  $b2,  $steps) {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Palette_ramp_ids_json($this->ptr, $r1, $g1, $b1, $r2, $g2, $b2, $steps, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function gradientIdsJson( $r1,  $g1,  $b1,  $r2,  $g2,  $b2,  $steps) {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         $result = Lib::ffi()->Palette_gradient_ids_json($this->ptr, $r1, $g1, $b1, $r2, $g2, $b2, $steps, $write);

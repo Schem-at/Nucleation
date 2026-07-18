@@ -21,6 +21,7 @@ void add_Palette_binding(nb::module_ mod) {
         .def("gradient_ids_json", &nucleation::Palette::gradient_ids_json, "r1"_a, "g1"_a, "b1"_a, "r2"_a, "g2"_a, "b2"_a, "steps"_a)
         .def_static("grayscale", std::move(maybe_op_unwrap(&nucleation::Palette::grayscale)))
         .def("len", &nucleation::Palette::len)
+        .def("ramp_ids_json", &nucleation::Palette::ramp_ids_json, "r1"_a, "g1"_a, "b1"_a, "r2"_a, "g2"_a, "b2"_a, "steps"_a)
         .def_static("solid", std::move(maybe_op_unwrap(&nucleation::Palette::solid)))
         .def("sorted_by_lightness", std::move(maybe_op_unwrap(&nucleation::Palette::sorted_by_lightness)))
         .def_static("structural", std::move(maybe_op_unwrap(&nucleation::Palette::structural)))

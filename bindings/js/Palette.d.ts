@@ -55,7 +55,9 @@ export class Palette {
     static terracotta(): Palette;
 
     /**
-     * Grayscale-leaning blocks (stones, basalt, deepslate, ...).
+     * Genuinely gray blocks: opaque full cubes whose measured color
+     * is near-neutral (low Oklab chroma) — judged from color data,
+     * not names.
      */
     static grayscale(): Palette;
 
@@ -70,6 +72,17 @@ export class Palette {
      * ready-to-index ramp: `ids[i]` for intensity `i / (len - 1)`.
      */
     sortedByLightness(): Palette;
+
+    /**
+     * JSON array of exactly `steps` DISTINCT block ids forming the
+     * smoothest ramp this palette can make from (`r1`,`g1`,`b1`) to
+     * (`r2`,`g2`,`b2`): targets are evenly spaced along the Oklab line
+     * and blocks are chosen by a minimum-cost monotonic matching, so
+     * off-hue blocks are penalized and no block repeats. Errors with
+     * `InvalidArgument` when the palette has fewer than `steps` blocks,
+     * `steps` is 0, or start equals end.
+     */
+    rampIdsJson(r1: number, g1: number, b1: number, r2: number, g2: number, b2: number, steps: number): string;
 
     /**
      * JSON array of exactly `steps` block ids sampling the color

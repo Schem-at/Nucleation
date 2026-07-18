@@ -69,7 +69,9 @@ public:
   inline static std::unique_ptr<Palette> terracotta();
 
   /**
-   * Grayscale-leaning blocks (stones, basalt, deepslate, ...).
+   * Genuinely gray blocks: opaque full cubes whose measured color
+   * is near-neutral (low Oklab chroma) — judged from color data,
+   * not names.
    */
   inline static std::unique_ptr<Palette> grayscale();
 
@@ -84,6 +86,19 @@ public:
    * ready-to-index ramp: `ids[i]` for intensity `i / (len - 1)`.
    */
   inline std::unique_ptr<Palette> sorted_by_lightness() const;
+
+  /**
+   * JSON array of exactly `steps` DISTINCT block ids forming the
+   * smoothest ramp this palette can make from (`r1`,`g1`,`b1`) to
+   * (`r2`,`g2`,`b2`): targets are evenly spaced along the Oklab line
+   * and blocks are chosen by a minimum-cost monotonic matching, so
+   * off-hue blocks are penalized and no block repeats. Errors with
+   * `InvalidArgument` when the palette has fewer than `steps` blocks,
+   * `steps` is 0, or start equals end.
+   */
+  inline diplomat::result<std::string, NucleationError> ramp_ids_json(uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2, uint32_t steps) const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> ramp_ids_json_write(uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2, uint32_t steps, W& writeable_output) const;
 
   /**
    * JSON array of exactly `steps` block ids sampling the color

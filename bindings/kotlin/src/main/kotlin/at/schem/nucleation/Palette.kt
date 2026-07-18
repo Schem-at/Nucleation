@@ -17,6 +17,7 @@ internal interface PaletteLib: Library {
     fun Palette_grayscale(): Pointer
     fun Palette_wood(): Pointer
     fun Palette_sorted_by_lightness(handle: Pointer): Pointer
+    fun Palette_ramp_ids_json(handle: Pointer, r1: FFIUint8, g1: FFIUint8, b1: FFIUint8, r2: FFIUint8, g2: FFIUint8, b2: FFIUint8, steps: FFIUint32, write: Pointer): ResultUnitInt
     fun Palette_gradient_ids_json(handle: Pointer, r1: FFIUint8, g1: FFIUint8, b1: FFIUint8, r2: FFIUint8, g2: FFIUint8, b2: FFIUint8, steps: FFIUint32, write: Pointer): ResultUnitInt
     fun Palette_from_block_ids(idsJson: Slice): ResultPointerInt
     fun Palette_len(handle: Pointer): FFISizet
@@ -142,7 +143,9 @@ class Palette internal constructor (
         }
         @JvmStatic
         
-        /** Grayscale-leaning blocks (stones, basalt, deepslate, ...).
+        /** Genuinely gray blocks: opaque full cubes whose measured color
+        *is near-neutral (low Oklab chroma) — judged from color data,
+        *not names.
         */
         fun grayscale(): Palette {
             
@@ -201,6 +204,27 @@ class Palette internal constructor (
         val handle = returnVal 
         val returnOpaque = Palette(handle, selfEdges, true)
         return returnOpaque
+    }
+    
+    /** JSON array of exactly `steps` DISTINCT block ids forming the
+    *smoothest ramp this palette can make from (`r1`,`g1`,`b1`) to
+    *(`r2`,`g2`,`b2`): targets are evenly spaced along the Oklab line
+    *and blocks are chosen by a minimum-cost monotonic matching, so
+    *off-hue blocks are penalized and no block repeats. Errors with
+    *`InvalidArgument` when the palette has fewer than `steps` blocks,
+    *`steps` is 0, or start equals end.
+    */
+    fun rampIdsJson(r1: UByte, g1: UByte, b1: UByte, r2: UByte, g2: UByte, b2: UByte, steps: UInt): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Palette_ramp_ids_json(handle, FFIUint8(r1), FFIUint8(g1), FFIUint8(b1), FFIUint8(r2), FFIUint8(g2), FFIUint8(b2), FFIUint32(steps), write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
     }
     
     /** JSON array of exactly `steps` block ids sampling the color

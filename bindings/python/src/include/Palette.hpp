@@ -39,6 +39,9 @@ namespace capi {
 
     nucleation::capi::Palette* Palette_sorted_by_lightness(const nucleation::capi::Palette* self);
 
+    typedef struct Palette_ramp_ids_json_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Palette_ramp_ids_json_result;
+    Palette_ramp_ids_json_result Palette_ramp_ids_json(const nucleation::capi::Palette* self, uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2, uint32_t steps, nucleation::diplomat::capi::DiplomatWrite* write);
+
     typedef struct Palette_gradient_ids_json_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Palette_gradient_ids_json_result;
     Palette_gradient_ids_json_result Palette_gradient_ids_json(const nucleation::capi::Palette* self, uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2, uint32_t steps, nucleation::diplomat::capi::DiplomatWrite* write);
 
@@ -106,6 +109,35 @@ inline std::unique_ptr<nucleation::Palette> nucleation::Palette::wood() {
 inline std::unique_ptr<nucleation::Palette> nucleation::Palette::sorted_by_lightness() const {
     auto result = nucleation::capi::Palette_sorted_by_lightness(this->AsFFI());
     return std::unique_ptr<nucleation::Palette>(nucleation::Palette::FromFFI(result));
+}
+
+inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::Palette::ramp_ids_json(uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2, uint32_t steps) const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    auto result = nucleation::capi::Palette_ramp_ids_json(this->AsFFI(),
+        r1,
+        g1,
+        b1,
+        r2,
+        g2,
+        b2,
+        steps,
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Ok<std::string>(std::move(output))) : nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::Palette::ramp_ids_json_write(uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2, uint32_t steps, W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = nucleation::capi::Palette_ramp_ids_json(this->AsFFI(),
+        r1,
+        g1,
+        b1,
+        r2,
+        g2,
+        b2,
+        steps,
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
 inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::Palette::gradient_ids_json(uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2, uint32_t steps) const {

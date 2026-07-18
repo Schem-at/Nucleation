@@ -157,7 +157,9 @@ export class Palette {
     }
 
     /**
-     * Grayscale-leaning blocks (stones, basalt, deepslate, ...).
+     * Genuinely gray blocks: opaque full cubes whose measured color
+     * is near-neutral (low Oklab chroma) — judged from color data,
+     * not names.
      */
     static grayscale() {
 
@@ -203,6 +205,38 @@ export class Palette {
 
         finally {
             diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
+     * JSON array of exactly `steps` DISTINCT block ids forming the
+     * smoothest ramp this palette can make from (`r1`,`g1`,`b1`) to
+     * (`r2`,`g2`,`b2`): targets are evenly spaced along the Oklab line
+     * and blocks are chosen by a minimum-cost monotonic matching, so
+     * off-hue blocks are penalized and no block repeats. Errors with
+     * `InvalidArgument` when the palette has fewer than `steps` blocks,
+     * `steps` is 0, or start equals end.
+     */
+    rampIdsJson(r1, g1, b1, r2, g2, b2, steps) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Palette_ramp_ids_json(diplomatReceive.buffer, this.ffiValue, r1, g1, b1, r2, g2, b2, steps, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+            write.free();
         }
     }
 

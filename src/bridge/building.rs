@@ -375,7 +375,9 @@ pub mod ffi {
             )))
         }
 
-        /// Grayscale-leaning blocks (stones, basalt, deepslate, ...).
+        /// Genuinely gray blocks: opaque full cubes whose measured color
+        /// is near-neutral (low Oklab chroma) — judged from color data,
+        /// not names.
         pub fn grayscale() -> Box<Palette> {
             Box::new(Palette(std::sync::Arc::new(
                 crate::building::BlockPalette::new_grayscale(),
@@ -394,6 +396,33 @@ pub mod ffi {
         /// ready-to-index ramp: `ids[i]` for intensity `i / (len - 1)`.
         pub fn sorted_by_lightness(&self) -> Box<Palette> {
             Box::new(Palette(std::sync::Arc::new(self.0.sorted_by_lightness())))
+        }
+
+        /// JSON array of exactly `steps` DISTINCT block ids forming the
+        /// smoothest ramp this palette can make from (`r1`,`g1`,`b1`) to
+        /// (`r2`,`g2`,`b2`): targets are evenly spaced along the Oklab line
+        /// and blocks are chosen by a minimum-cost monotonic matching, so
+        /// off-hue blocks are penalized and no block repeats. Errors with
+        /// `InvalidArgument` when the palette has fewer than `steps` blocks,
+        /// `steps` is 0, or start equals end.
+        #[allow(clippy::too_many_arguments)]
+        pub fn ramp_ids_json(
+            &self,
+            r1: u8,
+            g1: u8,
+            b1: u8,
+            r2: u8,
+            g2: u8,
+            b2: u8,
+            steps: u32,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let ids = self
+                .0
+                .ramp_ids((r1, g1, b1), (r2, g2, b2), steps as usize)
+                .ok_or(NucleationError::InvalidArgument)?;
+            let _ = write!(out, "{}", serde_json::to_string(&ids).unwrap_or_default());
+            Ok(())
         }
 
         /// JSON array of exactly `steps` block ids sampling the color

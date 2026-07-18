@@ -823,3 +823,37 @@ fn torus_parameter_covers_the_full_ring() {
     }
     assert!(deciles.len() >= 9, "tilted t only hit deciles {:?}", deciles);
 }
+
+#[test]
+fn ramp_ids_picks_distinct_monotonic_blocks() {
+    use nucleation::building::BlockPalette;
+
+    // 28 distinct blocks, pure white -> pure black, from the full palette.
+    let all = BlockPalette::new_all();
+    let ramp = all.ramp_ids((255, 255, 255), (0, 0, 0), 28).expect("ramp");
+    assert_eq!(ramp.len(), 28);
+    let distinct: std::collections::HashSet<_> = ramp.iter().collect();
+    assert_eq!(distinct.len(), 28, "blocks must not repeat");
+
+    // Endpoints anchor near the extremes and lightness decreases monotonically
+    // (the matching is monotonic along the white->black line = pure -L axis).
+    let l = |id: &str| {
+        let f = nucleation::blockpedia::get_block(id).unwrap();
+        f.extras.color.as_ref().unwrap().to_extended().oklab[0]
+    };
+    assert!(l(&ramp[0]) > 0.9, "start too dark: {} ({})", ramp[0], l(&ramp[0]));
+    assert!(l(&ramp[27]) < 0.25, "end too light: {} ({})", ramp[27], l(&ramp[27]));
+    for w in ramp.windows(2) {
+        assert!(
+            l(&w[0]) >= l(&w[1]) - 1e-4,
+            "lightness not monotonic: {} -> {}",
+            w[0],
+            w[1]
+        );
+    }
+
+    // Too many steps for a small palette -> None, not a panic.
+    assert!(BlockPalette::new_wool().ramp_ids((255, 255, 255), (0, 0, 0), 17).is_none());
+    // Degenerate line -> None.
+    assert!(all.ramp_ids((10, 10, 10), (10, 10, 10), 5).is_none());
+}

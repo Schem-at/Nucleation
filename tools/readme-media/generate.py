@@ -550,17 +550,21 @@ def scene_basics(pack):
 def scene_palette_ramps(pack):
     """A literal picture of Palette ramps: one row per palette, light-sorted."""
     s = nu.Schematic.create("ramps")
-    palettes = [nu.Palette.wool(), nu.Palette.concrete(),
-                nu.Palette.terracotta(), nu.Palette.wood()]
-    widest = 17  # terracotta
-    for row, palette in enumerate(palettes):
-        ids = json.loads(palette.sorted_by_lightness().block_ids_json())
+    rows = [json.loads(p.sorted_by_lightness().block_ids_json())
+            for p in (nu.Palette.wool(), nu.Palette.concrete(),
+                      nu.Palette.terracotta(), nu.Palette.wood())]
+    # Bottom row: ramp_ids picks the 24 best DISTINCT blocks for a pure
+    # white -> pure black ramp out of the grayscale palette.
+    rows.append(json.loads(
+        nu.Palette.grayscale().ramp_ids_json(255, 255, 255, 0, 0, 0, 24)))
+    widest = max(len(r) for r in rows)
+    for row, ids in enumerate(rows):
         x0 = (widest - len(ids)) // 2
-        y0 = 3 * (len(palettes) - 1 - row)
+        y0 = 3 * (len(rows) - 1 - row)
         for col, block_id in enumerate(ids):
             s.set_block(x0 + col, y0, 0, block_id)
             s.set_block(x0 + col, y0 + 1, 0, block_id)
-    render(s, pack, os.path.join(OUT, "palette-ramps.png"), w=1360, h=870,
+    render(s, pack, os.path.join(OUT, "palette-ramps.png"), w=1500, h=1000,
            yaw=0.0, pitch=0.0, ortho=True)
     return s
 

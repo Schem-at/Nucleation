@@ -191,24 +191,24 @@ impl BlockPalette {
         Self::new_filtered(|f| f.id.contains("terracotta") && !f.id.contains("glazed"))
     }
 
-    /// Create a palette containing only grayscale blocks. Restricted to
-    /// full cubes: the name match alone also caught panes, stairs, and
-    /// walls (e.g. light_gray_stained_glass_pane), which render as holes
-    /// when a gradient snaps to them.
+    /// Create a palette of genuinely gray blocks: opaque full cubes whose
+    /// texture-averaged color is near-neutral (low Oklab chroma). Judged
+    /// from the measured color data rather than block names — the old
+    /// substring match ("stone", "white", ...) caught cream sandstones,
+    /// patterned glazed terracottas, and stained glass while missing
+    /// neutral blocks with other names.
     pub fn new_grayscale() -> Self {
         Self::new_filtered(|f| {
-            let id = &f.id;
-            f.is_full_cube()
-                && (id.contains("white")
-                || id.contains("gray")
-                || id.contains("black")
-                || id.contains("stone")
-                || id.contains("basalt")
-                || id.contains("andesite")
-                || id.contains("diorite")
-                || id.contains("tuff")
-                || id.contains("deepslate")
-                || id.contains("bedrock"))
+            if !f.is_full_cube() || f.transparent || f.id.contains("glazed") {
+                return false;
+            }
+            match &f.extras.color {
+                Some(c) => {
+                    let ok = c.to_extended().oklab;
+                    (ok[1] * ok[1] + ok[2] * ok[2]).sqrt() < 0.022
+                }
+                None => false,
+            }
         })
     }
 
@@ -254,6 +254,92 @@ impl BlockPalette {
                 self.find_closest(&c)
             })
             .collect()
+    }
+
+    /// Choose exactly `steps` DISTINCT blocks from this palette forming the
+    /// smoothest ramp from `start` to `end` (unlike [`Self::gradient_ids`],
+    /// which snaps per-step and may repeat blocks). The line is interpolated
+    /// in Oklab; blocks are assigned to the evenly spaced targets by a
+    /// monotonic minimum-cost matching over their projections onto the
+    /// line, so off-hue blocks are naturally penalized and the result
+    /// stays ordered. Returns `None` when the palette has fewer than
+    /// `steps` distinct blocks (or `steps` is 0).
+    pub fn ramp_ids(&self, start: (u8, u8, u8), end: (u8, u8, u8), steps: usize) -> Option<Vec<String>> {
+        if steps == 0 || self.blocks.len() < steps {
+            return None;
+        }
+        let a = ExtendedColorData::from_rgb(start.0, start.1, start.2).oklab;
+        let b = ExtendedColorData::from_rgb(end.0, end.1, end.2).oklab;
+
+        // Candidates sorted by projection along the a->b line.
+        let axis = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+        let axis_len_sq = axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2];
+        if axis_len_sq < 1e-9 {
+            return None; // degenerate: start == end
+        }
+        let mut cands: Vec<(f32, usize)> = self
+            .blocks
+            .iter()
+            .enumerate()
+            .map(|(idx, (c, _))| {
+                let d = [c.oklab[0] - a[0], c.oklab[1] - a[1], c.oklab[2] - a[2]];
+                let t = (d[0] * axis[0] + d[1] * axis[1] + d[2] * axis[2]) / axis_len_sq;
+                (t, idx)
+            })
+            .collect();
+        cands.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap_or(std::cmp::Ordering::Equal));
+
+        // dp[i][j]: min cost assigning targets 0..i using sorted candidates 0..j,
+        // with target i-1 -> candidate j-1 monotonically.
+        let n = cands.len();
+        let cost = |target: usize, cand: usize| -> f32 {
+            let t = target as f32 / (steps as f32 - 1.0).max(1.0);
+            let goal = [
+                a[0] + axis[0] * t,
+                a[1] + axis[1] * t,
+                a[2] + axis[2] * t,
+            ];
+            let c = &self.blocks[cands[cand].1].0.oklab;
+            let d = [c[0] - goal[0], c[1] - goal[1], c[2] - goal[2]];
+            d[0] * d[0] + d[1] * d[1] + d[2] * d[2]
+        };
+        const INF: f32 = f32::MAX / 4.0;
+        let mut dp = vec![vec![INF; n + 1]; steps + 1];
+        let mut take = vec![vec![false; n + 1]; steps + 1];
+        for j in 0..=n {
+            dp[0][j] = 0.0;
+        }
+        for i in 1..=steps {
+            for j in 1..=n {
+                let skip = dp[i][j - 1];
+                let assigned = if dp[i - 1][j - 1] < INF {
+                    dp[i - 1][j - 1] + cost(i - 1, j - 1)
+                } else {
+                    INF
+                };
+                if assigned < skip {
+                    dp[i][j] = assigned;
+                    take[i][j] = true;
+                } else {
+                    dp[i][j] = skip;
+                }
+            }
+        }
+        if dp[steps][n] >= INF {
+            return None;
+        }
+        // Backtrack.
+        let mut picks = Vec::with_capacity(steps);
+        let (mut i, mut j) = (steps, n);
+        while i > 0 {
+            if take[i][j] {
+                picks.push(self.blocks[cands[j - 1].1].1.clone());
+                i -= 1;
+            }
+            j -= 1;
+        }
+        picks.reverse();
+        Some(picks)
     }
 
     /// Build a palette from explicit block ids (e.g. `minecraft:stone`),
