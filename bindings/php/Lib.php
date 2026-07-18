@@ -147,6 +147,7 @@ Palette* Palette_wool();
 Palette* Palette_terracotta();
 Palette* Palette_grayscale();
 Palette* Palette_wood();
+Palette* Palette_dithered(Palette* self);
 Palette* Palette_sorted_by_lightness(Palette* self);
 typedef struct Palette_ramp_ids_json_result { union { NucleationError err; }; bool is_ok; } Palette_ramp_ids_json_result;
 Palette_ramp_ids_json_result Palette_ramp_ids_json(Palette* self, uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2, uint32_t steps, DiplomatWrite* write);

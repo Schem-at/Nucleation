@@ -191,6 +191,26 @@ export class Palette {
     }
 
     /**
+     * A copy of this palette with ordered dithering enabled: brushes
+     * snapping through it alternate between the two nearest blocks per
+     * voxel (4x4 Bayer threshold, deterministic in position), which
+     * reads as intermediate shades at a distance — the classic map-art
+     * trick. Ramp and list queries are unaffected.
+     */
+    dithered() {
+
+        const result = wasm.Palette_dithered(this.ffiValue);
+
+        try {
+            return new Palette(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
      * A copy of this palette ordered by perceptual lightness (Oklab L,
      * dark → light). Combined with `block_ids_json`, gives a
      * ready-to-index ramp: `ids[i]` for intensity `i / (len - 1)`.

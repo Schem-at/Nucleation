@@ -153,6 +153,9 @@ impl PaletteBuilder {
 /// A palette of blocks used for color matching
 pub struct BlockPalette {
     blocks: Vec<(ExtendedColorData, String)>,
+    /// When set, brush snapping uses ordered (Bayer 4x4) dithering between
+    /// the two nearest blocks instead of a hard nearest pick.
+    dither: bool,
 }
 
 /// Definition kinds of technical blocks that carry a color in blockpedia's
@@ -230,7 +233,7 @@ impl BlockPalette {
                 }
             }
         }
-        Self { blocks }
+        Self { blocks, dither: false }
     }
 
     /// Create a palette containing only concrete blocks
@@ -285,7 +288,7 @@ impl BlockPalette {
                 .partial_cmp(&b.0.oklab[0])
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
-        Self { blocks }
+        Self { blocks, dither: false }
     }
 
     /// Sample an N-step color gradient from `start` to `end` (Oklab
@@ -414,7 +417,7 @@ impl BlockPalette {
                 }
             }
         }
-        Self { blocks }
+        Self { blocks, dither: false }
     }
 
     pub fn len(&self) -> usize {
@@ -427,6 +430,88 @@ impl BlockPalette {
 
     pub fn block_ids(&self) -> impl Iterator<Item = &str> {
         self.blocks.iter().map(|(_, id)| id.as_str())
+    }
+
+    /// A copy of this palette with ordered dithering enabled: brushes
+    /// snapping through it alternate between the two nearest blocks per
+    /// voxel (4x4 Bayer), which reads as intermediate shades at a distance
+    /// — the classic map-art trick. Ramp/list queries are unaffected.
+    pub fn dithered(&self) -> Self {
+        Self {
+            blocks: self.blocks.clone(),
+            dither: true,
+        }
+    }
+
+    /// Whether brush snapping dithers.
+    pub fn is_dithered(&self) -> bool {
+        self.dither
+    }
+
+    /// Position-aware snap used by brushes: dithered when the palette has
+    /// dithering enabled, plain nearest otherwise.
+    pub fn snap(&self, target: &ExtendedColorData, x: i32, y: i32, z: i32) -> Option<String> {
+        if self.dither {
+            self.find_closest_dithered(target, x, y, z)
+        } else {
+            self.find_closest(target)
+        }
+    }
+
+    /// Ordered-dither variant of [`Self::find_closest`]: finds the two
+    /// nearest palette blocks, projects the target onto the Oklab segment
+    /// between them, and picks per position via a 4x4 Bayer threshold —
+    /// adjacent voxels alternate between the neighboring ramp blocks in
+    /// proportion to where the target falls, which reads as extra
+    /// intermediate shades at a distance (the classic map-art trick).
+    /// Deterministic in (x, y, z).
+    pub fn find_closest_dithered(
+        &self,
+        target: &ExtendedColorData,
+        x: i32,
+        y: i32,
+        z: i32,
+    ) -> Option<String> {
+        if self.blocks.len() < 2 {
+            return self.find_closest(target);
+        }
+        let (mut ai, mut ad) = (0usize, f32::MAX);
+        let (mut bi, mut bd) = (0usize, f32::MAX);
+        for (i, (color, _)) in self.blocks.iter().enumerate() {
+            let d = target.distance_oklab(color);
+            if d < ad {
+                bi = ai;
+                bd = ad;
+                ai = i;
+                ad = d;
+            } else if d < bd {
+                bi = i;
+                bd = d;
+            }
+        }
+        let a = &self.blocks[ai].0.oklab;
+        let b = &self.blocks[bi].0.oklab;
+        let t = &target.oklab;
+        let ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+        let len_sq = ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2];
+        if len_sq < 1e-9 {
+            return Some(self.blocks[ai].1.clone());
+        }
+        let at = [t[0] - a[0], t[1] - a[1], t[2] - a[2]];
+        let f = ((at[0] * ab[0] + at[1] * ab[1] + at[2] * ab[2]) / len_sq).clamp(0.0, 1.0);
+
+        // 4x4 Bayer matrix, y folded in so vertical runs dither too.
+        const BAYER: [[f32; 4]; 4] = [
+            [0.0, 8.0, 2.0, 10.0],
+            [12.0, 4.0, 14.0, 6.0],
+            [3.0, 11.0, 1.0, 9.0],
+            [15.0, 7.0, 13.0, 5.0],
+        ];
+        let bx = ((x + y) & 3) as usize;
+        let bz = ((z + (y >> 2)) & 3) as usize;
+        let threshold = (BAYER[bx][bz] + 0.5) / 16.0;
+        let pick = if f > threshold { bi } else { ai };
+        Some(self.blocks[pick].1.clone())
     }
 
     pub fn find_closest(&self, target: &ExtendedColorData) -> Option<String> {
@@ -503,9 +588,9 @@ impl ColorBrush {
 }
 
 impl Brush for ColorBrush {
-    fn get_block(&self, _x: i32, _y: i32, _z: i32, _normal: (f64, f64, f64)) -> Option<BlockState> {
+    fn get_block(&self, x: i32, y: i32, z: i32, _normal: (f64, f64, f64)) -> Option<BlockState> {
         self.palette
-            .find_closest(&self.target_color)
+            .snap(&self.target_color, x, y, z)
             .map(BlockState::new)
     }
 }
@@ -612,7 +697,7 @@ impl Brush for LinearGradientBrush {
             }
         };
 
-        self.palette.find_closest(&color).map(BlockState::new)
+        self.palette.snap(&color, x, y, z).map(BlockState::new)
     }
 }
 
@@ -705,14 +790,14 @@ impl Brush for MultiPointGradientBrush {
         if t <= start_stop.position {
             return self
                 .palette
-                .find_closest(&start_stop.color)
+                .snap(&start_stop.color, x, y, z)
                 .map(BlockState::new);
         }
         // If t is after last stop
         if t >= end_stop.position {
             return self
                 .palette
-                .find_closest(&end_stop.color)
+                .snap(&end_stop.color, x, y, z)
                 .map(BlockState::new);
         }
 
@@ -752,7 +837,7 @@ impl Brush for MultiPointGradientBrush {
             }
         };
 
-        self.palette.find_closest(&color).map(BlockState::new)
+        self.palette.snap(&color, x, y, z).map(BlockState::new)
     }
 }
 
@@ -925,7 +1010,7 @@ impl Brush for PointGradientBrush {
             let dist = dist_sq.sqrt();
 
             if dist < 1e-6 {
-                return self.palette.find_closest(&point.color).map(BlockState::new);
+                return self.palette.snap(&point.color, x, y, z).map(BlockState::new);
             }
 
             let weight = 1.0 / dist.powf(self.falloff);
@@ -968,7 +1053,7 @@ impl Brush for PointGradientBrush {
             self.points[0].color
         };
 
-        self.palette.find_closest(&color).map(BlockState::new)
+        self.palette.snap(&color, x, y, z).map(BlockState::new)
     }
 }
 
@@ -1037,7 +1122,7 @@ impl Brush for BilinearGradientBrush {
             }
         };
 
-        self.palette.find_closest(&color).map(BlockState::new)
+        self.palette.snap(&color, x, y, z).map(BlockState::new)
     }
 }
 
@@ -1079,7 +1164,7 @@ impl ShadedBrush {
 }
 
 impl Brush for ShadedBrush {
-    fn get_block(&self, _x: i32, _y: i32, _z: i32, normal: (f64, f64, f64)) -> Option<BlockState> {
+    fn get_block(&self, x: i32, y: i32, z: i32, normal: (f64, f64, f64)) -> Option<BlockState> {
         // Simple Lambertian shading: dot(N, L)
         // Range [-1, 1], map to brightness [0.2, 1.0] for example
         let dot =
@@ -1094,7 +1179,7 @@ impl Brush for ShadedBrush {
 
         let color = ExtendedColorData::from_rgb(r, g, b);
 
-        self.palette.find_closest(&color).map(BlockState::new)
+        self.palette.snap(&color, x, y, z).map(BlockState::new)
     }
 }
 
@@ -1185,7 +1270,7 @@ impl Brush for SpotlightBrush {
         let g = (self.base_color.rgb[1] as f64 * intensity) as u8;
         let b = (self.base_color.rgb[2] as f64 * intensity) as u8;
         let color = ExtendedColorData::from_rgb(r, g, b);
-        self.palette.find_closest(&color).map(BlockState::new)
+        self.palette.snap(&color, x, y, z).map(BlockState::new)
     }
 }
 
@@ -1325,7 +1410,7 @@ impl CurveGradientBrush {
     ) -> Option<BlockState> {
         let param = t.unwrap_or_else(|| self.spatial_t(x, y, z));
         self.interpolate_color(param)
-            .and_then(|color| self.palette.find_closest(&color))
+            .and_then(|color| self.palette.snap(&color, x, y, z))
             .map(BlockState::new)
     }
 }

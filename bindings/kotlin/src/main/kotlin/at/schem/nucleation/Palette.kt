@@ -16,6 +16,7 @@ internal interface PaletteLib: Library {
     fun Palette_terracotta(): Pointer
     fun Palette_grayscale(): Pointer
     fun Palette_wood(): Pointer
+    fun Palette_dithered(handle: Pointer): Pointer
     fun Palette_sorted_by_lightness(handle: Pointer): Pointer
     fun Palette_ramp_ids_json(handle: Pointer, r1: FFIUint8, g1: FFIUint8, b1: FFIUint8, r2: FFIUint8, g2: FFIUint8, b2: FFIUint8, steps: FFIUint32, write: Pointer): ResultUnitInt
     fun Palette_gradient_ids_json(handle: Pointer, r1: FFIUint8, g1: FFIUint8, b1: FFIUint8, r2: FFIUint8, g2: FFIUint8, b2: FFIUint8, steps: FFIUint32, write: Pointer): ResultUnitInt
@@ -191,6 +192,21 @@ class Palette internal constructor (
                 idsJsonSliceMemory.close()
             }
         }
+    }
+    
+    /** A copy of this palette with ordered dithering enabled: brushes
+    *snapping through it alternate between the two nearest blocks per
+    *voxel (4x4 Bayer threshold, deterministic in position), which
+    *reads as intermediate shades at a distance — the classic map-art
+    *trick. Ramp and list queries are unaffected.
+    */
+    fun dithered(): Palette {
+        
+        val returnVal = lib.Palette_dithered(handle);
+        val selfEdges: List<Any> = listOf()
+        val handle = returnVal 
+        val returnOpaque = Palette(handle, selfEdges, true)
+        return returnOpaque
     }
     
     /** A copy of this palette ordered by perceptual lightness (Oklab L,

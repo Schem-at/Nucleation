@@ -654,15 +654,16 @@ def scene_teapot(pack):
     teapot = None
     s = nu.Schematic.create("teapot")
     shape = nu.Voxelizer.shape_from_obj(obj, 56.0, 0.75)
-    light_pos = (-38.0, 55.0, -52.0)          # beside the camera, high left
+    light_pos = (25.0, 58.0, -55.0)           # high right of the camera
     center = (0.0, 12.0, 0.0)
     d = [c - p for p, c in zip(light_pos, center)]
     n = math.sqrt(sum(v * v for v in d))
-    brush = nu.Brush.spotlight(*light_pos, *(v / n for v in d), 46.0, 245, 242, 235)
-    brush.set_palette(nu.Palette.from_block_ids(json.dumps(GRAY_RAMP)))
+    brush = nu.Brush.spotlight(*light_pos, *(v / n for v in d), 50.0, 245, 242, 235)
+    # dithered ramp: the falloff blends between neighboring grays per voxel
+    brush.set_palette(nu.Palette.from_block_ids(json.dumps(GRAY_RAMP)).dithered())
     nu.BuildingTool.fill(s, shape, brush)
     cfg = nu.RenderConfig.create(880, 620)
-    cfg.set_isometric(); cfg.set_yaw(205.0); cfg.set_pitch(14.0); cfg.set_zoom(1.2)
+    cfg.set_isometric(); cfg.set_yaw(185.0); cfg.set_pitch(10.0); cfg.set_zoom(1.1)
     cfg.set_background(0.086, 0.098, 0.149, 1.0)
     nu.Renderer.render_to_file(s, pack, cfg, os.path.join(OUT, "teapot-spotlight.png"))
     print("  wrote docs/media/teapot-spotlight.png")
@@ -679,7 +680,89 @@ def scene_duck(pack):
     return duck
 
 
+
+
+def scene_dither(pack):
+    """Hard-snap vs dithered palette on the same shaded sphere, hstacked."""
+    def sphere(dither):
+        s = nu.Schematic.create("d")
+        # sparse 6-step ramp: hard snapping bands hard, dithering dissolves it
+        pal = nu.Palette.from_block_ids(json.dumps(GRAY_RAMP[::3]))
+        brush = nu.Brush.shaded(235, 232, 228, -1.0, 0.7, -0.3)
+        brush.set_palette(pal.dithered() if dither else pal)
+        nu.BuildingTool.fill(s, nu.Shape.sphere(0, 0, 0, 15), brush)
+        return s
+    tmp = tempfile.mkdtemp(prefix="nuc-dither-")
+    try:
+        for tag, d in (("a", False), ("b", True)):
+            cfg = nu.RenderConfig.create(560, 520)
+            cfg.set_isometric(); cfg.set_yaw(45.0); cfg.set_pitch(22.0); cfg.set_zoom(1.15)
+            cfg.set_background(0, 0, 0, 0)
+            nu.Renderer.render_to_file(sphere(d == True), pack, cfg,
+                                       os.path.join(tmp, f"{tag}.png"))
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error",
+                        "-i", os.path.join(tmp, "a.png"), "-i", os.path.join(tmp, "b.png"),
+                        "-filter_complex", "hstack", os.path.join(OUT, "dither-compare.png")],
+                       check=True)
+        print("  wrote docs/media/dither-compare.png")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def scene_scripting(pack):
+    """The Lua sine-wave wall from the scripting guide, rendered."""
+    lua = """
+local wall = Schematic.new("sine_wall")
+local ramp = palette_gradient_ids("concrete", 200, 60, 40, 255, 220, 80, 8)
+local width, base, amp = 48, 6, 5
+for x = 0, width - 1 do
+  local h = base + math.floor(amp * math.sin(x * 2 * math.pi / 24) + 0.5)
+  for y = 0, h - 1 do
+    wall:set_block(x, y, 0, ramp[math.floor(y * (#ramp - 1) / (base + amp - 1)) + 1])
+  end
+end
+result = wall
+"""
+    tmp = tempfile.mkdtemp(prefix="nuc-lua-")
+    try:
+        path = os.path.join(tmp, "wall.lua")
+        open(path, "w").write(lua)
+        wall = nu.Scripting.run_lua_script(path)
+        render(wall, pack, os.path.join(OUT, "scripting-wall.png"), w=1100, h=320,
+               yaw=0.0, pitch=0.0, ortho=True)
+        return wall
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def scene_simulation(pack):
+    """A byte on a lamp bus: eight lever->wire->lamp lines, some levers
+    flipped through the simulator — the lamps display the binary pattern."""
+    s = nu.Schematic.create("byte")
+    for i in range(8):
+        z = i * 2
+        for x in range(3):
+            s.set_block(x, 0, z, "minecraft:gray_concrete")
+        s.set_block_from_string(0, 1, z, "minecraft:lever[facing=east,face=floor,powered=false]")
+        s.set_block_from_string(1, 1, z, "minecraft:redstone_wire[power=0,east=side,west=side]")
+        s.set_block_from_string(2, 1, z, "minecraft:redstone_lamp[lit=false]")
+    world = nu.MchprsWorld.create(s)
+    for i, bit in enumerate("10110010"):
+        if bit == "1":
+            world.on_use_block(0, 1, i * 2)
+    world.tick(2)
+    world.flush()
+    world.sync_to_schematic()
+    lit = world.get_schematic()
+    render(lit, pack, os.path.join(OUT, "simulation-byte.png"), w=900, h=460,
+           yaw=150, pitch=35, zoom=1.1)
+    return lit
+
+
 SCENES = {
+    "dither": scene_dither,
+    "scripting": scene_scripting,
+    "simulation": scene_simulation,
     "teapot": scene_teapot,
     "duck": scene_duck,
     "metaballs": scene_metaballs,

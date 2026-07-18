@@ -34,6 +34,8 @@ Palette* Palette_grayscale(void);
 
 Palette* Palette_wood(void);
 
+Palette* Palette_dithered(const Palette* self);
+
 Palette* Palette_sorted_by_lightness(const Palette* self);
 
 typedef struct Palette_ramp_ids_json_result {union { NucleationError err;}; bool is_ok;} Palette_ramp_ids_json_result;

@@ -916,3 +916,45 @@ fn palette_builder_color_logic() {
     assert!(limes.len() >= 2);
     assert!(limes.block_ids().any(|i| i.contains("lime")), "lime family expected");
 }
+
+#[test]
+fn dithered_palette_blends_between_ramp_steps() {
+    use nucleation::building::{BlockPalette, ColorBrush, Cuboid};
+
+    // A two-block palette and a color exactly between them: hard snap picks
+    // one block everywhere; the dithered palette must mix both.
+    let two = BlockPalette::from_block_ids(
+        ["minecraft:white_wool", "minecraft:black_wool"].into_iter(),
+    );
+
+    let fill_with = |palette: BlockPalette| {
+        let mut s = UniversalSchematic::new("dither".to_string());
+        let mut brush = BrushEnum::Color(ColorBrush::new(128, 128, 132));
+        brush.set_palette(Arc::new(palette));
+        let mut tool = BuildingTool::new(&mut s);
+        tool.fill_enum(&ShapeEnum::Cuboid(Cuboid::new((0, 0, 0), (15, 0, 15))), &brush);
+        let mut counts = std::collections::HashMap::new();
+        for x in 0..16 {
+            for z in 0..16 {
+                *counts
+                    .entry(s.get_block(x, 0, z).unwrap().name.to_string())
+                    .or_insert(0usize) += 1;
+            }
+        }
+        counts
+    };
+
+    let hard = fill_with(BlockPalette::from_block_ids(
+        ["minecraft:white_wool", "minecraft:black_wool"].into_iter(),
+    ));
+    assert_eq!(hard.len(), 1, "hard snap should pick one block: {hard:?}");
+
+    let dithered = fill_with(two.dithered());
+    assert_eq!(dithered.len(), 2, "dither should mix both: {dithered:?}");
+    // A mid color should land in a roughly balanced mix, not a 95/5 split.
+    let min = dithered.values().min().unwrap();
+    assert!(*min > 32, "unbalanced dither: {dithered:?}");
+
+    // Determinism: same input, same result.
+    assert_eq!(fill_with(two.dithered()), fill_with(two.dithered()));
+}

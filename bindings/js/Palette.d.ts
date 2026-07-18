@@ -67,6 +67,15 @@ export class Palette {
     static wood(): Palette;
 
     /**
+     * A copy of this palette with ordered dithering enabled: brushes
+     * snapping through it alternate between the two nearest blocks per
+     * voxel (4x4 Bayer threshold, deterministic in position), which
+     * reads as intermediate shades at a distance — the classic map-art
+     * trick. Ramp and list queries are unaffected.
+     */
+    dithered(): Palette;
+
+    /**
      * A copy of this palette ordered by perceptual lightness (Oklab L,
      * dark → light). Combined with `block_ids_json`, gives a
      * ready-to-index ramp: `ids[i]` for intensity `i / (len - 1)`.

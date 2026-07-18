@@ -57,6 +57,11 @@ final class Palette {
         return new Palette($ret, true);
     }
 
+    public function dithered() {
+        $ret = Lib::ffi()->Palette_dithered($this->ptr);
+        return new Palette($ret, true);
+    }
+
     public function sortedByLightness() {
         $ret = Lib::ffi()->Palette_sorted_by_lightness($this->ptr);
         return new Palette($ret, true);

@@ -131,6 +131,10 @@ pub struct GradientFill {
     /// When set, index the sorted palette directly instead of color-lerping.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ramp: Option<RampMode>,
+    /// Ordered (Bayer 4x4) dithering between adjacent gradient steps —
+    /// reads as extra intermediate shades. Default false.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub dither: bool,
 }
 
 fn default_axis() -> GradientAxis {
@@ -177,21 +181,42 @@ struct ResolvedGradient {
     axis: GradientAxis,
     min: i32,
     max: i32,
+    dither: bool,
 }
 
 impl ResolvedGradient {
-    fn pick(&self, y: i32, depth: i32) -> &str {
+    fn pick(&self, x: i32, y: i32, z: i32, depth: i32) -> &str {
         let v = match self.axis {
             GradientAxis::Y => y,
             GradientAxis::Depth => depth,
         };
-        let idx = if self.max == self.min || self.ids.len() == 1 {
-            0
+        if self.max == self.min || self.ids.len() == 1 {
+            return &self.ids[0];
+        }
+        let t = ((v - self.min) as f32 / (self.max - self.min) as f32).clamp(0.0, 1.0);
+        let pos = t * (self.ids.len() - 1) as f32;
+        if !self.dither {
+            return &self.ids[pos.round() as usize];
+        }
+        // Ordered dithering between the two neighboring steps: the
+        // fractional position becomes a per-voxel Bayer-thresholded choice.
+        const BAYER: [[f32; 4]; 4] = [
+            [0.0, 8.0, 2.0, 10.0],
+            [12.0, 4.0, 14.0, 6.0],
+            [3.0, 11.0, 1.0, 9.0],
+            [15.0, 7.0, 13.0, 5.0],
+        ];
+        let lo = pos.floor() as usize;
+        let hi = (lo + 1).min(self.ids.len() - 1);
+        let frac = pos - pos.floor();
+        let bx = ((x + y) & 3) as usize;
+        let bz = ((z + (y >> 2)) & 3) as usize;
+        let threshold = (BAYER[bx][bz] + 0.5) / 16.0;
+        if frac > threshold {
+            &self.ids[hi]
         } else {
-            let t = ((v - self.min) as f32 / (self.max - self.min) as f32).clamp(0.0, 1.0);
-            (t * (self.ids.len() - 1) as f32).round() as usize
-        };
-        &self.ids[idx]
+            &self.ids[lo]
+        }
     }
 }
 
@@ -227,6 +252,7 @@ fn resolve_gradient(g: &GradientFill) -> Result<ResolvedGradient, String> {
         axis: g.axis,
         min,
         max,
+        dither: g.dither,
     })
 }
 
@@ -380,7 +406,7 @@ fn pick_fill<'a>(
         };
         if matches {
             return Some(match gradient {
-                Some(g) => g.pick(y, depth),
+                Some(g) => g.pick(x, y, z, depth),
                 // resolve_fill guarantees a rule without gradient has a block.
                 None => rule.block.as_deref().unwrap_or(""),
             });

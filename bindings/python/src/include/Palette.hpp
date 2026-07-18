@@ -37,6 +37,8 @@ namespace capi {
 
     nucleation::capi::Palette* Palette_wood(void);
 
+    nucleation::capi::Palette* Palette_dithered(const nucleation::capi::Palette* self);
+
     nucleation::capi::Palette* Palette_sorted_by_lightness(const nucleation::capi::Palette* self);
 
     typedef struct Palette_ramp_ids_json_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Palette_ramp_ids_json_result;
@@ -103,6 +105,11 @@ inline std::unique_ptr<nucleation::Palette> nucleation::Palette::grayscale() {
 
 inline std::unique_ptr<nucleation::Palette> nucleation::Palette::wood() {
     auto result = nucleation::capi::Palette_wood();
+    return std::unique_ptr<nucleation::Palette>(nucleation::Palette::FromFFI(result));
+}
+
+inline std::unique_ptr<nucleation::Palette> nucleation::Palette::dithered() const {
+    auto result = nucleation::capi::Palette_dithered(this->AsFFI());
     return std::unique_ptr<nucleation::Palette>(nucleation::Palette::FromFFI(result));
 }
 
