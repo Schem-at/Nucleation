@@ -30,13 +30,18 @@
 //!
 //! 5. Extracts official block *semantics* into
 //!    `data/blockpedia/block_semantics.json.gz` (id -> kind/base/tags/
-//!    full_cube):
+//!    full_cube/block_entity):
 //!    - `kind`/`base`: the report's `definition.type` and
 //!      `definition.base_state.Name` (official variant linkage),
 //!    - `tags`: every `data/minecraft/tags/block/**.json` from the server
 //!      jar (the bundler's inner jar), `#tag` references resolved,
 //!    - `full_cube`: the client jar's blockstate models resolve to a
-//!      cube-family template or a full 16x16x16 element,
+//!      cube-family template or a full 16x16x16 element (plus
+//!      `full_cube_override` for model-ambiguous blocks like the huge
+//!      mushrooms),
+//!    - `block_entity`: the `block_entity_type` registry
+//!      (`generated/reports/registries.json`) joined to the report's
+//!      `definition.type` kinds,
 //!    - blocks without `base_state` are linked to a base by their resolved
 //!      model texture set (e.g. `oak_slab` uses exactly `block/oak_planks`,
 //!      which `oak_planks` owns).
@@ -250,6 +255,13 @@ fn main() -> Result<()> {
         obj.insert("minStateId".into(), json!(min_id));
         obj.insert("maxStateId".into(), json!(max_id));
         obj.insert("defaultState".into(), json!(default_id));
+        // The default state's property map, straight from the report state
+        // flagged `"default": true` (the numeric `defaultState` id above is
+        // useless to consumers that key states by property values).
+        obj.insert(
+            "defaultProperties".into(),
+            Value::Object(default_state_properties(entry)),
+        );
         out.push(block);
     }
 
@@ -267,8 +279,9 @@ fn main() -> Result<()> {
     println!();
     println!("Wrote {SNAPSHOT_PATH} ({} blocks).", out.len());
 
-    // --- block semantics (kind / base / tags / full_cube) ---
-    generate_semantics(&report, &server_jar, &mut classifier)?;
+    // --- block semantics (kind / base / tags / full_cube / block_entity) ---
+    let gen_dir = work_dir.join(format!("gen-{version}"));
+    generate_semantics(&report, &server_jar, &mut classifier, &gen_dir)?;
 
     // --- version marker (drives the automated data-refresh workflow) ---
     fs::write(DATA_VERSION_PATH, format!("{version}\n"))
@@ -300,18 +313,25 @@ fn main() -> Result<()> {
 ///   nested `#tag` references resolved recursively.
 /// - `full_cube`: every model of the blockstate roots in a cube-family
 ///   template or carries a full 16x16x16 element (catches `grass_block`,
-///   `command_block` and other non-template cubes; mushroom blocks render
-///   as a multipart shell of face planes and conservatively classify as
-///   non-full, since that geometry is indistinguishable from vines).
+///   `command_block` and other non-template cubes). Blocks whose render
+///   geometry is not classifiable from models alone are settled by
+///   `full_cube_override` (mushroom blocks render as a multipart shell of
+///   face planes — indistinguishable from vines — but are full cubes).
+/// - `block_entity`: the block carries a block entity ("tile entity") —
+///   derived by joining the `minecraft:block_entity_type` registry
+///   (`generated/reports/registries.json`) to the blocks report's
+///   `definition.type` kinds (see `block_entity_kinds`).
 fn generate_semantics(
     report: &Map<String, Value>,
     server_jar: &Path,
     classifier: &mut ModelClassifier,
+    gen_dir: &Path,
 ) -> Result<()> {
     println!();
-    println!("Extracting block semantics (kind / base / tags / full_cube)...");
+    println!("Extracting block semantics (kind / base / tags / full_cube / block_entity)...");
 
     let tags_by_block = extract_block_tags(server_jar)?;
+    let entity_kinds = block_entity_kinds(gen_dir)?;
 
     // Pass 1: kind + full_cube for every block; collect texture ownership of
     // full cubes for the base linkage below.
@@ -322,7 +342,8 @@ fn generate_semantics(
         let name = id.strip_prefix("minecraft:").unwrap_or(id);
         let kind = entry["definition"]["type"].as_str().unwrap_or("minecraft:block");
         kinds.insert(id.as_str(), kind);
-        if classifier.is_full_cube(name) {
+        let full_cube = full_cube_override(name).unwrap_or_else(|| classifier.is_full_cube(name));
+        if full_cube {
             full_cubes.insert(id.as_str());
             let textures = classifier.texture_set(name);
             if !textures.is_empty() {
@@ -341,10 +362,17 @@ fn generate_semantics(
     let mut semantics = Map::new();
     let mut base_from_report = 0usize;
     let mut base_from_textures = 0usize;
+    let mut block_entities = 0usize;
+    let mut matched_entity_kinds: BTreeSet<&str> = BTreeSet::new();
     for (id, entry) in report {
         let name = id.strip_prefix("minecraft:").unwrap_or(id);
         let kind = kinds[id.as_str()];
         let full_cube = full_cubes.contains(id.as_str());
+        let block_entity = entity_kinds.contains(kind);
+        if block_entity {
+            block_entities += 1;
+            matched_entity_kinds.insert(kind);
+        }
 
         let mut base: Option<String> = entry["definition"]["base_state"]["Name"]
             .as_str()
@@ -368,7 +396,23 @@ fn generate_semantics(
         }
         record.insert("tags".into(), json!(tags));
         record.insert("full_cube".into(), json!(full_cube));
+        record.insert("block_entity".into(), json!(block_entity));
         semantics.insert(id.clone(), Value::Object(record));
+    }
+
+    // Every kind derived from the block_entity_type registry must have
+    // matched at least one block — a miss means a rename in the report or a
+    // stale `BLOCK_ENTITY_KIND_OVERRIDES` table.
+    let unmatched: Vec<&str> = entity_kinds
+        .iter()
+        .map(String::as_str)
+        .filter(|k| !matched_entity_kinds.contains(k))
+        .collect();
+    if !unmatched.is_empty() {
+        bail!(
+            "block_entity_type kinds matched no block (update BLOCK_ENTITY_KIND_OVERRIDES): {}",
+            unmatched.join(", ")
+        );
     }
 
     let tagged = semantics
@@ -376,10 +420,11 @@ fn generate_semantics(
         .filter(|v| !v["tags"].as_array().map(|a| a.is_empty()).unwrap_or(true))
         .count();
     println!(
-        "Semantics: {} blocks, {} full cubes, {} tagged, base links: {} from report + {} from model textures",
+        "Semantics: {} blocks, {} full cubes, {} tagged, {} block entities, base links: {} from report + {} from model textures",
         semantics.len(),
         full_cubes.len(),
         tagged,
+        block_entities,
         base_from_report,
         base_from_textures,
     );
@@ -388,6 +433,100 @@ fn generate_semantics(
     write_gz(Path::new(SEMANTICS_PATH), &pretty)?;
     println!("Wrote {SEMANTICS_PATH}.");
     Ok(())
+}
+
+/// Explicit full-cube overrides for blocks whose render geometry cannot be
+/// classified from the client-jar models (same pattern as
+/// `texture_mapping::texture_override` and `analogue_override`).
+///
+/// The huge-mushroom blocks render as a six-face multipart shell of
+/// individual face planes — model geometry identical to vines, which are
+/// genuinely non-full — but they collide, occlude and light as full opaque
+/// cubes in game.
+fn full_cube_override(name: &str) -> Option<bool> {
+    Some(match name {
+        "brown_mushroom_block" | "red_mushroom_block" | "mushroom_stem" => true,
+        _ => return None,
+    })
+}
+
+/// `block_entity_type` registry entries whose blocks are NOT simply "every
+/// block whose report `definition.type` kind carries the same name". Maps a
+/// registry entry to the report kinds it owns; entries absent here map to
+/// the kind with the identical name (`minecraft:barrel` -> kind
+/// `minecraft:barrel`).
+const BLOCK_ENTITY_KIND_OVERRIDES: &[(&str, &[&str])] = &[
+    ("minecraft:banner", &["minecraft:banner", "minecraft:wall_banner"]),
+    ("minecraft:brushable_block", &["minecraft:brushable"]),
+    (
+        "minecraft:chest",
+        &["minecraft:chest", "minecraft:copper_chest", "minecraft:weathering_copper_chest"],
+    ),
+    ("minecraft:chiseled_bookshelf", &["minecraft:chiseled_book_shelf"]),
+    ("minecraft:command_block", &["minecraft:command"]),
+    (
+        "minecraft:copper_golem_statue",
+        &["minecraft:copper_golem_statue", "minecraft:weathering_copper_golem_statue"],
+    ),
+    ("minecraft:enchanting_table", &["minecraft:enchantment_table"]),
+    (
+        "minecraft:hanging_sign",
+        &["minecraft:ceiling_hanging_sign", "minecraft:wall_hanging_sign"],
+    ),
+    ("minecraft:mob_spawner", &["minecraft:spawner"]),
+    // The `piston` block entity belongs to the in-motion technical block,
+    // not the piston bases (which carry no block entity).
+    ("minecraft:piston", &["minecraft:moving_piston"]),
+    ("minecraft:sign", &["minecraft:standing_sign", "minecraft:wall_sign"]),
+    (
+        "minecraft:skull",
+        &[
+            "minecraft:skull",
+            "minecraft:wall_skull",
+            "minecraft:wither_skull",
+            "minecraft:wither_wall_skull",
+            "minecraft:player_head",
+            "minecraft:player_wall_head",
+            "minecraft:piglinwallskull",
+        ],
+    ),
+    ("minecraft:structure_block", &["minecraft:structure"]),
+    ("minecraft:test_block", &["minecraft:test"]),
+    ("minecraft:test_instance_block", &["minecraft:test_instance"]),
+];
+
+/// The set of report `definition.type` kinds whose blocks carry a block
+/// entity, derived from the authoritative `minecraft:block_entity_type`
+/// registry in `generated/reports/registries.json`: each registry entry
+/// maps to the kind of the same name unless `BLOCK_ENTITY_KIND_OVERRIDES`
+/// says otherwise.
+fn block_entity_kinds(gen_dir: &Path) -> Result<BTreeSet<String>> {
+    let registries_path = gen_dir.join("generated/reports/registries.json");
+    let registries: Value = serde_json::from_str(
+        &fs::read_to_string(&registries_path)
+            .with_context(|| format!("Failed to read {}", registries_path.display()))?,
+    )
+    .context("Failed to parse registries.json report")?;
+    let entries = registries["minecraft:block_entity_type"]["entries"]
+        .as_object()
+        .context("registries.json has no minecraft:block_entity_type registry")?;
+
+    let overrides: HashMap<&str, &[&str]> = BLOCK_ENTITY_KIND_OVERRIDES.iter().copied().collect();
+    let mut kinds = BTreeSet::new();
+    for entry in entries.keys() {
+        match overrides.get(entry.as_str()) {
+            Some(mapped) => kinds.extend(mapped.iter().map(|k| k.to_string())),
+            None => {
+                kinds.insert(entry.clone());
+            }
+        }
+    }
+    println!(
+        "Block entities: {} registry entries -> {} block kinds",
+        entries.len(),
+        kinds.len()
+    );
+    Ok(kinds)
 }
 
 /// Resolves a variant block's base by its model texture set: the unique
@@ -652,6 +791,22 @@ fn state_ids(entry: &Value) -> Option<(u64, u64, u64)> {
         .and_then(|s| s["id"].as_u64())
         .or_else(|| ids.first().copied())?;
     Some((*ids.iter().min()?, *ids.iter().max()?, default))
+}
+
+/// The property map of the report state flagged `"default": true` (falls
+/// back to the first state, mirroring `state_ids`). Empty for
+/// property-less blocks.
+fn default_state_properties(entry: &Value) -> Map<String, Value> {
+    entry["states"]
+        .as_array()
+        .and_then(|states| {
+            states
+                .iter()
+                .find(|s| s["default"].as_bool() == Some(true))
+                .or_else(|| states.first())
+        })
+        .and_then(|s| s["properties"].as_object().cloned())
+        .unwrap_or_default()
 }
 
 /// Property name -> sorted value set, from a report entry.

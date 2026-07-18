@@ -48,6 +48,8 @@ fn facts_value(f: &BlockFacts) -> Value {
         "tags": f.tags,
         "full_cube": f.full_cube,
         "transparent": f.transparent,
+        "has_block_entity": f.has_block_entity,
+        "emit_light": f.emit_light,
         "color": f.extras.color.as_ref().map(|c| c.rgb),
         "properties": properties,
         "default_state": default_state,
@@ -55,8 +57,9 @@ fn facts_value(f: &BlockFacts) -> Value {
 }
 
 /// Full facts for one block as a JSON object (`None` for unknown ids):
-/// `{id, kind, base_block, tags, full_cube, transparent, color,
-/// properties, default_state}`. Accepts short and `minecraft:`-prefixed ids.
+/// `{id, kind, base_block, tags, full_cube, transparent, has_block_entity,
+/// emit_light, color, properties, default_state}`. Accepts short and
+/// `minecraft:`-prefixed ids.
 pub fn block_facts_json(id: &str) -> Option<String> {
     get_block_normalized(id).map(|f| facts_value(f).to_string())
 }

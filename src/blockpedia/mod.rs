@@ -19,6 +19,11 @@ pub struct BlockFacts {
     pub properties: &'static [(&'static str, &'static [&'static str])],
     pub default_state: &'static [(&'static str, &'static str)],
     pub transparent: bool,
+    /// Light level (0-15) emitted by the block's default state, from the
+    /// PrismarineJS-schema enrichment data (`emitLight`). State-dependent
+    /// emitters count their default state: a lit campfire is 15, an unlit
+    /// candle or redstone lamp is 0.
+    pub emit_light: u8,
     /// Official block kind from the vanilla report's `definition.type`
     /// (e.g. `minecraft:stair`, `minecraft:slab`, `minecraft:door`;
     /// plain full blocks are `minecraft:block`).
@@ -33,6 +38,10 @@ pub struct BlockFacts {
     /// Whether the default-state model resolves to a full opaque-geometry
     /// cube (cube-family template or full 16x16x16 element).
     pub full_cube: bool,
+    /// Whether the block carries a block entity ("tile entity"), from the
+    /// vanilla `block_entity_type` registry joined to the report's
+    /// definition kinds (replaces the old name-substring guess).
+    pub has_block_entity: bool,
     pub extras: Extras,
 }
 
@@ -123,6 +132,17 @@ impl BlockFacts {
     /// replaces the old name-substring "full block" guess).
     pub fn is_full_cube(&self) -> bool {
         self.full_cube
+    }
+
+    /// True if the block carries a block entity ("tile entity") — official
+    /// `block_entity_type` registry data, not a name-substring guess.
+    pub fn has_block_entity(&self) -> bool {
+        self.has_block_entity
+    }
+
+    /// True if the block's default state emits light (`emit_light > 0`).
+    pub fn is_light_source(&self) -> bool {
+        self.emit_light > 0
     }
 
     pub fn properties(&self) -> HashMap<String, Vec<String>> {

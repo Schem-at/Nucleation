@@ -184,8 +184,8 @@ impl BlockFilter {
             return false;
         }
 
-        // Check tile entities
-        if self.exclude_tile_entities && Self::is_tile_entity(&id) {
+        // Check tile entities (official block_entity_type registry data)
+        if self.exclude_tile_entities && block.has_block_entity {
             return false;
         }
 
@@ -204,8 +204,8 @@ impl BlockFilter {
             return false;
         }
 
-        // Check light sources
-        if self.exclude_light_sources && Self::is_light_source(&id) {
+        // Check light sources (default-state `emit_light` data field)
+        if self.exclude_light_sources && block.is_light_source() {
             return false;
         }
 
@@ -244,27 +244,6 @@ impl BlockFilter {
         )
     }
 
-    fn is_tile_entity(id: &str) -> bool {
-        matches!(id,
-            id if id.contains("chest") ||
-                  id.contains("furnace") ||
-                  id.contains("dispenser") ||
-                  id.contains("dropper") ||
-                  id.contains("hopper") ||
-                  id.contains("beacon") ||
-                  id.contains("brewing_stand") ||
-                  id.contains("enchanting_table") ||
-                  id.contains("ender_chest") ||
-                  id.contains("shulker_box") ||
-                  id.contains("barrel") ||
-                  id.contains("smoker") ||
-                  id.contains("blast_furnace") ||
-                  id.contains("campfire") ||
-                  id.contains("lectern") ||
-                  id.contains("jukebox")
-        )
-    }
-
     fn needs_support(id: &str) -> bool {
         matches!(id,
             id if id.contains("torch") ||
@@ -290,28 +269,6 @@ impl BlockFilter {
                   id.contains("sign") ||
                   id.contains("banner") ||
                   id.contains("painting")
-        )
-    }
-
-    fn is_light_source(id: &str) -> bool {
-        matches!(id,
-            id if id.contains("torch") ||
-                  id.contains("lantern") ||
-                  id.contains("glowstone") ||
-                  id.contains("sea_lantern") ||
-                  id.contains("beacon") ||
-                  id.contains("campfire") ||
-                  id.contains("fire") ||
-                  id.contains("lava") ||
-                  id.contains("magma_block") ||
-                  id.contains("jack_o_lantern") ||
-                  id.contains("redstone_lamp") ||
-                  id.contains("shroomlight") ||
-                  id.contains("crying_obsidian") ||
-                  id.contains("respawn_anchor") ||
-                  id.contains("candle") ||
-                  id.contains("glow_lichen") ||
-                  id.contains("amethyst_cluster")
         )
     }
 

@@ -90,10 +90,12 @@ fn full_cube_is_model_geometry_not_name_guessing() {
     assert!(get_block("minecraft:grass_block").unwrap().is_full_cube());
     assert!(get_block("minecraft:command_block").unwrap().is_full_cube());
 
-    // Known conservative miss: mushroom blocks render as a multipart shell
-    // of six face planes — model geometry indistinguishable from vines
-    // (which are genuinely non-full), so they classify as non-full.
-    assert!(!get_block("minecraft:brown_mushroom_block").unwrap().is_full_cube());
+    // Mushroom blocks render as a multipart shell of six face planes —
+    // model geometry indistinguishable from vines — but are full opaque
+    // cubes in game; the extractor's `full_cube_override` settles them.
+    assert!(get_block("minecraft:brown_mushroom_block").unwrap().is_full_cube());
+    assert!(get_block("minecraft:red_mushroom_block").unwrap().is_full_cube());
+    assert!(get_block("minecraft:mushroom_stem").unwrap().is_full_cube());
 
     // Shapes without telltale name substrings are now correctly non-full
     assert!(!get_block("minecraft:rose_bush").unwrap().is_full_cube());
@@ -110,8 +112,9 @@ fn semantics_coverage_is_sane() {
     let with_base = all_blocks().filter(|b| b.base_block().is_some()).count();
 
     assert!(total >= 1196, "expected 26.2 block count, got {total}");
-    // 26.2 extraction: 424 full cubes, 1132 tagged, 1015 non-generic kinds,
-    // 234 base links (64 report base_state + 170 model-texture).
+    // 26.2 extraction: 427 full cubes (424 from models + 3 mushroom
+    // overrides), 1132 tagged, 1015 non-generic kinds, 234 base links
+    // (64 report base_state + 170 model-texture).
     assert!(full_cubes >= 400, "full cube count regressed: {full_cubes}");
     assert!(tagged * 100 >= total * 90, "tag coverage regressed: {tagged}/{total}");
     assert!(non_generic_kind >= 1000, "kind coverage regressed: {non_generic_kind}");

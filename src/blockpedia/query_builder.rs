@@ -453,25 +453,9 @@ impl BlockQuery {
     }
 
     fn is_tile_entity(block: &BlockFacts) -> bool {
-        let id = block.id().to_lowercase();
-        matches!(id.as_str(),
-            id if id.contains("chest") ||
-                  id.contains("furnace") ||
-                  id.contains("dispenser") ||
-                  id.contains("dropper") ||
-                  id.contains("hopper") ||
-                  id.contains("beacon") ||
-                  id.contains("brewing_stand") ||
-                  id.contains("enchanting_table") ||
-                  id.contains("ender_chest") ||
-                  id.contains("shulker_box") ||
-                  id.contains("barrel") ||
-                  id.contains("smoker") ||
-                  id.contains("blast_furnace") ||
-                  id.contains("campfire") ||
-                  id.contains("lectern") ||
-                  id.contains("jukebox")
-        )
+        // Official `block_entity_type` registry data baked into the table
+        // instead of the old name-substring guess.
+        block.has_block_entity
     }
 
     fn is_falling_block(block: &BlockFacts) -> bool {
@@ -491,26 +475,10 @@ impl BlockQuery {
     }
 
     fn is_light_source(block: &BlockFacts) -> bool {
-        let id = block.id().to_lowercase();
-        matches!(id.as_str(),
-            id if id.contains("torch") ||
-                  id.contains("lantern") ||
-                  id.contains("glowstone") ||
-                  id.contains("sea_lantern") ||
-                  id.contains("beacon") ||
-                  id.contains("campfire") ||
-                  id.contains("fire") ||
-                  id.contains("lava") ||
-                  id.contains("magma_block") ||
-                  id.contains("jack_o_lantern") ||
-                  id.contains("redstone_lamp") ||
-                  id.contains("shroomlight") ||
-                  id.contains("crying_obsidian") ||
-                  id.contains("respawn_anchor") ||
-                  id.contains("candle") ||
-                  id.contains("glow_lichen") ||
-                  id.contains("amethyst_cluster")
-        )
+        // Data field (prismarine `emitLight` for the default state) instead
+        // of the old name-substring guess: an unlit-by-default emitter
+        // (candle, redstone lamp) no longer counts as a light source.
+        block.is_light_source()
     }
 
     fn needs_support(block: &BlockFacts) -> bool {

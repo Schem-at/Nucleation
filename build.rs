@@ -31,22 +31,26 @@ struct UnifiedBlockData {
     properties: HashMap<String, Vec<String>>,
     default_state: HashMap<String, String>,
     transparent: bool,
+    emit_light: u8,
     kind: String,
     base_block: Option<String>,
     tags: Vec<String>,
     full_cube: bool,
+    has_block_entity: bool,
     bedrock_id: Option<String>,
     bedrock_properties: Option<HashMap<String, Vec<String>>>,
     bedrock_default_state: Option<HashMap<String, String>>,
 }
 
 /// Official block semantics parsed from `block_semantics.json.gz`
-/// (kind / base block / tags / full-cube geometry; see tools/mc-data/).
+/// (kind / base block / tags / full-cube geometry / block entity;
+/// see tools/mc-data/).
 struct BlockSemantics {
     kind: String,
     base_block: Option<String>,
     tags: Vec<String>,
     full_cube: bool,
+    block_entity: bool,
 }
 
 /// Parse `block_semantics.json.gz`: `id -> {kind, base?, tags[], full_cube}`.
@@ -75,6 +79,7 @@ fn parse_semantics(json_data: &str) -> Result<HashMap<String, BlockSemantics>> {
                     })
                     .unwrap_or_default(),
                 full_cube: entry["full_cube"].as_bool().unwrap_or(false),
+                block_entity: entry["block_entity"].as_bool().unwrap_or(false),
             },
         );
     }
@@ -91,6 +96,7 @@ fn merge_semantics(java_blocks: &mut [UnifiedBlockData], semantics: &HashMap<Str
                 block.base_block = s.base_block.clone();
                 block.tags = s.tags.clone();
                 block.full_cube = s.full_cube;
+                block.has_block_entity = s.block_entity;
             }
             None => missing += 1,
         }
@@ -163,15 +169,35 @@ fn parse_prismarine(json_data: &str) -> Result<Vec<UnifiedBlockData>> {
             .and_then(|t| t.as_bool())
             .unwrap_or(false);
 
+        let emit_light = block_obj
+            .get("emitLight")
+            .and_then(|l| l.as_u64())
+            .unwrap_or(0)
+            .min(15) as u8;
+
+        // Default state property values, from the vanilla report's state
+        // flagged `"default": true` (converted to `defaultProperties` by
+        // tools/mc-data/refresh-block-data.rs).
+        let mut default_state = HashMap::new();
+        if let Some(defaults) = block_obj.get("defaultProperties").and_then(|d| d.as_object()) {
+            for (name, value) in defaults {
+                if let Some(value) = value.as_str() {
+                    default_state.insert(name.clone(), value.to_string());
+                }
+            }
+        }
+
         unified_blocks.push(UnifiedBlockData {
             id,
             properties,
-            default_state: HashMap::new(), // PrismarineJS doesn't provide default states
+            default_state,
             transparent,
+            emit_light,
             kind: "minecraft:block".to_string(),
             base_block: None,
             tags: Vec::new(),
             full_cube: false,
+            has_block_entity: false,
             bedrock_id: None,
             bedrock_properties: None,
             bedrock_default_state: None,
@@ -229,10 +255,12 @@ fn parse_bedrock_states(json_data: &str) -> Result<Vec<UnifiedBlockData>> {
                 properties: properties.clone(),
                 default_state: default_state.clone(),
                 transparent: false,
+                emit_light: 0,
                 kind: "minecraft:block".to_string(),
                 base_block: None,
                 tags: Vec::new(),
                 full_cube: false,
+                has_block_entity: false,
                 bedrock_id: Some(id),
                 bedrock_properties: Some(properties),
                 bedrock_default_state: Some(default_state),
@@ -415,6 +443,7 @@ fn generate_block_table(
         )?;
         writeln!(file, "    id: \"{}\",", block_id)?;
         writeln!(file, "    transparent: {},", block_data.transparent)?;
+        writeln!(file, "    emit_light: {},", block_data.emit_light)?;
         writeln!(file, "    kind: \"{}\",", block_data.kind)?;
         match &block_data.base_block {
             Some(base) => writeln!(file, "    base_block: Some(\"{}\"),", base)?,
@@ -431,6 +460,7 @@ fn generate_block_table(
         }
         writeln!(file, "],")?;
         writeln!(file, "    full_cube: {},", block_data.full_cube)?;
+        writeln!(file, "    has_block_entity: {},", block_data.has_block_entity)?;
 
         writeln!(file, "    properties: &[")?;
         for (prop_name, prop_values) in &block_data.properties {
