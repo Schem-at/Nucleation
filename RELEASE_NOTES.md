@@ -1,3 +1,13 @@
+# Nucleation v0.3.5
+
+**Linux release libraries now target glibc 2.35 (was 2.39).** The native
+`.so`s (PHP FFI) and the JVM jar's bundled linux natives (JNA) are built on
+ubuntu-22.04 instead of ubuntu-latest, so they load on older-glibc deploy
+targets — e.g. Debian bookworm (glibc 2.36), where the v0.3.x libs failed
+`FFI::cdef` with "GLIBC_2.38 not found". No API changes.
+
+---
+
 # Nucleation v0.3.4
 
 **meshing and rendering are on the crates.io crate again.** schematic-mesher
