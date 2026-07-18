@@ -1,3 +1,21 @@
+# Nucleation v0.3.7
+
+- **`Palette.ramp_ids(start, end, steps)`** — ask for pure white → pure
+  black in N steps and the engine picks N *distinct* blocks forming the
+  smoothest ramp the palette allows: targets evenly spaced along the Oklab
+  line, blocks assigned by a minimum-cost monotonic matching (unlike
+  `gradient_ids`, which snaps per step and repeats). In every binding as
+  `ramp_ids_json`.
+- **`RenderConfig.set_sphere_fit(true)`** — rotation-invariant camera
+  framing: turntables hold a constant distance instead of pulsing with the
+  model's silhouette.
+- **`Palette.grayscale()` is now data-driven** — opaque full cubes with
+  near-neutral *measured* color (low Oklab chroma) instead of name
+  substrings, which caught cream sandstones and patterned glazed
+  terracottas while missing neutral blocks named otherwise.
+
+---
+
 # Nucleation v0.3.6
 
 Fixes surfaced by making the library render its own README
