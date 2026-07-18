@@ -1,3 +1,26 @@
+# Nucleation v0.3.8
+
+**The basics got simple.** `load_from_file` auto-detects the format from
+file contents (previously Litematic-only — it couldn't open a `.schem`);
+`save_to_file` picks the format from the extension. The explicit
+`save_to_file_with_format` remains.
+
+**Palettes from pure color logic.** `PaletteBuilder` gains
+`lightness_between(min, max)`, `chroma_below(max)`, and
+`color_near(r, g, b, distance)` — filters over each block's *measured*
+Oklab color, composable with the tag/kind/flag filters. And
+`Blocks.by_color(r, g, b, max_distance)` queries the whole block database
+by color, nearest first.
+
+**SDF trees are Shapes.** `Shape.sdf(json)` (and `sdf_bounded`) turns any
+distance-field tree — smooth unions, noise, all of it — into a first-class
+building shape: fillable with every brush, combinable with other shapes,
+usable in masked fills. Normals come from the field gradient, so the
+shaded brush shades smooth blends continuously. The terrain sampler and
+the building system now share one geometry language.
+
+---
+
 # Nucleation v0.3.7
 
 - **`Palette.ramp_ids(start, end, steps)`** — ask for pure white → pure
