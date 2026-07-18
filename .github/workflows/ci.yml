@@ -182,6 +182,12 @@ jobs:
         with:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
+        with:
+          # Segregate by runner OS: rust-cache keys on the target triple, which
+          # is identical across ubuntu-22.04 and -24.04, so a target/ cache from
+          # a 24.04 run (glibc 2.39) would be restored here and its cached
+          # build-script binaries fail to exec on 22.04's older glibc.
+          key: ${{ matrix.os }}
       - name: Install cross-compilation tools (ARM64 Linux)
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
