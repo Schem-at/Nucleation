@@ -97,3 +97,51 @@ def grow(p, d, length, radius, depth, twist):
 
 grow(origin, up, length=15, radius=3, depth=7, twist=0.4)
 ```
+
+## Gyroid
+
+The gyroid is a triply-periodic minimal surface: the set where
+`sin·cos + sin·cos + sin·cos` crosses zero. Keep the voxels near that zero and
+you get its endless interlocking labyrinth, here tinted iridescent along the
+cube's diagonal.
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/gallery-gyroid.png" width="520" alt="A gyroid minimal surface in blocks, an interlocking labyrinth tinted rainbow along its diagonal">
+</div>
+
+```python
+n, k = 64, 2 * math.pi / 16                 # a 16-block period
+for x in range(n):
+    for y in range(n):
+        for z in range(n):
+            f = (math.sin(x*k) * math.cos(y*k) + math.sin(y*k) * math.cos(z*k)
+                 + math.sin(z*k) * math.cos(x*k))
+            if abs(f) < 0.55:               # thicken the zero-surface into a shell
+                s.set_block(x, y, z, pal.closest_block(*hsv((x + y + z) / (2 * n))))
+```
+
+## Mandelbulb
+
+The power-8 Mandelbulb, escape-tested per voxel: raise each point to the eighth
+power in spherical coordinates, add its own position, and keep the ones that
+never fly off to infinity. Tinted like an ember.
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/gallery-mandelbulb.png" width="520" alt="A Mandelbulb 3D fractal in blocks with an ember-red to gold gradient">
+</div>
+
+```python
+for cx, cy, cz in grid(n=132, span=2.5):        # c = each voxel's position
+    x = y = z = 0.0
+    for _ in range(7):
+        r = math.sqrt(x*x + y*y + z*z)
+        if r > 2.0:
+            break                                # escaped, so outside
+        t, p = 8 * math.acos(z / r), 8 * math.atan2(y, x)     # z -> z^8 ...
+        rp = r ** 8
+        x, y, z = (rp*math.sin(t)*math.cos(p) + cx,
+                   rp*math.sin(t)*math.sin(p) + cy,
+                   rp*math.cos(t) + cz)          # ... + c
+    else:
+        s.set_block(gx, gy, gz, pal.closest_block(*ember(gy)))
+```

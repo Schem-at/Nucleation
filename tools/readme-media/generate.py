@@ -2044,11 +2044,67 @@ def scene_g_tree(pack):
     return s
 
 
+def scene_g_gyroid(pack):
+    """A gyroid: the triply-periodic minimal surface where
+    sin·cos + sin·cos + sin·cos crosses zero, thickened into a shell and tinted
+    iridescent along its diagonal."""
+    s = nu.Schematic.create("gyroid")
+    pal = nu.Palette.concrete()
+    n, k = 64, 2 * math.pi / 16.0
+    for x in range(n):
+        for y in range(n):
+            for z in range(n):
+                sx, sy, sz = x * k, y * k, z * k
+                f = (math.sin(sx) * math.cos(sy) + math.sin(sy) * math.cos(sz)
+                     + math.sin(sz) * math.cos(sx))
+                if abs(f) < 0.55:
+                    s.set_block(x, y, z, _hue_block(pal, (x + y + z) / (2.0 * n), 0.85, 1.0))
+    render(s, pack, os.path.join(OUT, "gallery-gyroid.png"), w=720, h=680,
+           yaw=30, pitch=30, zoom=1.2, background=NAVY, sphere_fit=True)
+    return s
+
+
+def scene_g_mandelbulb(pack):
+    """The power-8 Mandelbulb: a spherical z → z^8 + c escape test per voxel,
+    the surface tinted by a fiery vertical gradient."""
+    s = nu.Schematic.create("bulb")
+    pal = nu.Palette.concrete()
+    n, power, span = 132, 8, 2.5
+    for ix in range(n):
+        for iy in range(n):
+            for iz in range(n):
+                cx, cy, cz = ((ix / n - 0.5) * span, (iy / n - 0.5) * span,
+                              (iz / n - 0.5) * span)
+                x = y = z = 0.0
+                inside = True
+                for _ in range(7):
+                    r = math.sqrt(x * x + y * y + z * z)
+                    if r > 2.0:
+                        inside = False
+                        break
+                    r = r or 1e-9
+                    theta = power * math.acos(max(-1.0, min(1.0, z / r)))
+                    phi = power * math.atan2(y, x)
+                    rp = r ** power
+                    x = rp * math.sin(theta) * math.cos(phi) + cx
+                    y = rp * math.sin(theta) * math.sin(phi) + cy
+                    z = rp * math.cos(theta) + cz
+                if inside:
+                    f = iy / n                                   # ember red up to gold
+                    s.set_block(ix, iy, iz, pal.closest_block(
+                        int(150 + f * 105), int(20 + f * 200), int(10 + f * 40)))
+    render(s, pack, os.path.join(OUT, "gallery-mandelbulb.png"), w=720, h=700,
+           yaw=25, pitch=26, zoom=1.3, background=NAVY, sphere_fit=True)
+    return s
+
+
 SCENES = {
     "g-dna": scene_g_dna,
     "g-knot": scene_g_knot,
     "g-menger": scene_g_menger,
     "g-tree": scene_g_tree,
+    "g-gyroid": scene_g_gyroid,
+    "g-mandelbulb": scene_g_mandelbulb,
     "streaming": scene_streaming,
     "worldgen": scene_worldgen,
     "worldgen-sdf": scene_worldgen_sdf,
