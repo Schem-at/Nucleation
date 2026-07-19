@@ -1,3 +1,17 @@
+# Nucleation v0.3.16
+
+**Nucleation as a custom world generator / processor.**
+`WorldChunkView.from_schematic(schematic, cx, cz)` is the write-side twin of
+`to_schematic`: fill a schematic with *any* tool — shapes, SDF, brushes, OSM
+footprints, a heightmap, noise — clip it to a chunk, and stream it straight to
+a playable world with `WorldSink`. Run the bridge the other way (`WorldStream`
+→ `to_schematic` → transform → `from_schematic` → `WorldSink`) and it is a
+constant-memory world filter. Intersecting the fill with each chunk means the
+source is only evaluated inside the chunk being written, so worlds of any size
+generate in flat memory. All seven bindings.
+
+---
+
 # Nucleation v0.3.15
 
 **Storage: sensible default format.** `StoreIo.save` / `Store.save_schematic`
