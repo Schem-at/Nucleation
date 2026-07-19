@@ -234,6 +234,13 @@ scanline voxelizer:
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mariokart-closeup.png" width="620" alt="Closeup of the voxelized road: eight blocks wide, rainbow rails, gold star specks">
 </div>
 
+A ribbon in the void is the easy case. Koopa Troopa Beach is the hard one — an
+open island of sand, dirt track, cliffs, palms and a central lagoon, with the
+sea faked in as a floor plane so the parity solver has a closed volume to fill.
+Same call, a color-matched beach palette, and the shore reads at a glance:
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mk64-koopa-beach.png" width="760" alt="Mario Kart 64 Koopa Troopa Beach voxelized: sand island, cyan shallows and central lagoon in an endless sea">
+
 ## The real world, in blocks
 
 Texture mapping and the color math, animated: a voxel Earth spinning under

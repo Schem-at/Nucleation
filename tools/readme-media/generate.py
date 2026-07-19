@@ -652,22 +652,22 @@ def scene_teapot(pack):
     """Utah teapot under a single spotlight through the grayscale ladder —
     voxelized from the classic OBJ, lit by the spotlight brush."""
     obj = open(_fetch_model("teapot.obj", TEAPOT_URL)).read()
-    # shell=0.75: the canonical teapot is a genuinely hollow, double-walled
-    # vessel; the shell closes its quarter-voxel ceramic walls.
+    # shell=1.0: the canonical teapot is a genuinely hollow, double-walled
+    # vessel; a full-voxel shell closes its ceramic walls without pinholes.
     teapot = None
     s = nu.Schematic.create("teapot")
-    shape = nu.Voxelizer.shape_from_obj(obj, 56.0, 0.75)
-    light_pos = (25.0, 58.0, -55.0)           # high right of the camera
-    center = (0.0, 12.0, 0.0)
+    shape = nu.Voxelizer.shape_from_obj(obj, 56.0, 1.0)
+    light_pos = (-40.0, 88.0, -46.0)          # high three-quarter key, camera right
+    center = (5.0, 10.0, 0.0)                 # aimed just spout-of-center
     d = [c - p for p, c in zip(light_pos, center)]
     n = math.sqrt(sum(v * v for v in d))
-    brush = nu.Brush.spotlight(*light_pos, *(v / n for v in d), 50.0, 245, 242, 235)
+    brush = nu.Brush.spotlight(*light_pos, *(v / n for v in d), 58.0, 248, 242, 232)
     # dithered ramp: the falloff blends between neighboring grays per voxel
     brush.set_palette(nu.Palette.from_block_ids(json.dumps(GRAY_RAMP)).dithered())
     nu.BuildingTool.fill(s, shape, brush)
     cfg = nu.RenderConfig.create(880, 620)
-    cfg.set_isometric(); cfg.set_yaw(185.0); cfg.set_pitch(10.0); cfg.set_zoom(1.1)
-    cfg.set_background(0.086, 0.098, 0.149, 1.0)
+    cfg.set_isometric(); cfg.set_yaw(185.0); cfg.set_pitch(14.0); cfg.set_zoom(1.1)
+    cfg.set_background(0.105, 0.115, 0.168, 1.0)
     nu.Renderer.render_to_file(s, pack, cfg, os.path.join(OUT, "teapot-spotlight.png"))
     print("  wrote docs/media/teapot-spotlight.png")
     return s
@@ -797,6 +797,207 @@ def scene_mariokart(pack):
     print("  wrote docs/media/mariokart-closeup.png")
     turntable_gif(s, pack, os.path.join(OUT, "mariokart-turntable.gif"),
                   frames=36, pitch=35, zoom=1.75)
+    return s
+
+
+KTB_ZIP_URL = ("https://models.spriters-resource.com/media/assets/297/"
+               "300000.zip")                       # Koopa Troopa Beach (MK64)
+
+# Daytime beach palette: sands/sandstones for the shore, browns for the dirt
+# road and cliffs, planks for the bridges, greens for grass and palm fronds,
+# blues for the sea. MK64_PALETTE's neon wools are wrong for this course.
+KTB_PALETTE = [
+    "minecraft:sand", "minecraft:sandstone", "minecraft:smooth_sandstone",
+    "minecraft:cut_sandstone", "minecraft:end_stone",
+    "minecraft:white_terracotta", "minecraft:yellow_terracotta",
+    "minecraft:terracotta", "minecraft:brown_terracotta",
+    "minecraft:packed_mud", "minecraft:brown_concrete", "minecraft:brown_wool",
+    "minecraft:oak_planks", "minecraft:spruce_planks",
+    "minecraft:dark_oak_planks",
+    "minecraft:green_concrete", "minecraft:green_wool", "minecraft:moss_block",
+    "minecraft:blue_concrete", "minecraft:blue_wool",
+    "minecraft:light_blue_concrete", "minecraft:light_blue_wool",
+    "minecraft:cyan_concrete",
+    "minecraft:white_concrete", "minecraft:black_concrete",
+]
+
+
+def _koopa_glb():
+    """Download + prepare the MK64 Koopa Troopa Beach course as an opaque GLB.
+
+    Same recipe as _mariokart_glb: keep only course geometry (terrain, dirt
+    road, cliffs/arches, wooden bridges, water, finish line, palm trunks and
+    fronds), dropping the 2-face trackside banners, arrow signs and flag
+    billboards; flatten the two RGBA textures — the palm frond over its
+    in-game leaf green, the second water sheet is already fully opaque —
+    and strip the MTL transparency so the palette snap stays out of glass.
+    """
+    glb = os.path.join(MODELS_DIR, "mk64-koopa-beach.glb")
+    if os.path.exists(glb):
+        return glb
+    zip_path = os.path.join(MODELS_DIR, "mk64-koopa-beach.zip")
+    if not os.path.exists(zip_path):
+        os.makedirs(MODELS_DIR, exist_ok=True)
+        subprocess.run(["curl", "-sL", "-A", MK64_UA, "-o", zip_path,
+                        KTB_ZIP_URL], check=True)
+    src = os.path.join(MODELS_DIR, "mk64-koopa-beach")
+    subprocess.run(["unzip", "-oq", zip_path, "-d", src], check=True)
+
+    keep = {"_Rip1VMtl019",   # beach sand
+            "_Rip1VMtl033",   # dirt road
+            "_Rip1VMtl027",   # deep ocean floor (retextured as deep water)
+            "_Rip1VMtl025",   # tide flats (retextured as shallow water)
+            "_Rip1VMtl040",   # gravel cliff walls / rock arch
+            "_Rip1VMtl041",   # grass clifftops
+            "_Rip1VMtl020",   # start/finish line
+            "_Rip1VMtl003",   # palm trunks
+            "_Rip3VMtl058",   # wooden bridge planks
+            "_Rip3VMtl059",   # palm fronds
+            "water1", "water2"}
+    cur, verts, lines = None, [], []
+    for line in open(os.path.join(src, "KoopaTroopaBeach.obj")):
+        if line.startswith("v "):
+            verts.append(tuple(float(v) for v in line.split()[1:4]))
+        if line.startswith("usemtl"):
+            cur = line.split()[1]
+        if line.startswith(("f ", "g ", "usemtl", "s ")) and cur is not None \
+                and cur not in keep:
+            continue
+        # The frame-ripped road carries ~115 near-vertical "curtain" faces
+        # (capture-frustum skirts radiating across the map). A real road
+        # face always points up, so drop road faces with |normal.y| < 0.35.
+        if line.startswith("f ") and cur == "_Rip1VMtl033":
+            p = [verts[int(t.split("/")[0]) - 1] for t in line.split()[1:4]]
+            u = [p[1][i] - p[0][i] for i in range(3)]
+            v = [p[2][i] - p[0][i] for i in range(3)]
+            n = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2],
+                 u[0] * v[1] - u[1] * v[0])
+            length = math.sqrt(sum(c * c for c in n)) or 1.0
+            if abs(n[1]) / length < 0.35:
+                continue
+        lines.append(line.replace("KoopaTroopaBeach.mtl", "track.mtl"))
+    # Close the model from below: every rip surface is single-sided, so the
+    # voxelizer's parity sweeps see one crossing along +y and vote "inside"
+    # for the whole sky, teaming up with stray horizontal-parity wedges into
+    # radiating phantom walls above the sea. A floor quad one unit under the
+    # deep-ocean sheet makes the y-parity even everywhere above the map (and
+    # harmlessly fills the hidden interior below the surfaces).
+    nv = len(verts)
+    lines.append("usemtl _Rip1VMtl027\n")
+    for fx, fz in ((-278.0, -241.0), (157.0, -241.0),
+                   (157.0, 418.0), (-278.0, 418.0)):
+        lines.append(f"v {fx} -7.0 {fz}\n")
+    lines.append(f"f {nv+1}/1/1 {nv+2}/1/1 {nv+3}/1/1\n")
+    lines.append(f"f {nv+1}/1/1 {nv+3}/1/1 {nv+4}/1/1\n")
+    open(os.path.join(src, "track.obj"), "w").writelines(lines)
+    mtl = [line for line in open(os.path.join(src, "KoopaTroopaBeach.mtl"))
+           if not line.split() or line.split()[0] not in ("d", "Tr", "Tf")]
+    open(os.path.join(src, "track.mtl"), "w").writelines(
+        line.replace("E27C62B_c.png", "frond_flat.png")
+            .replace("46E1B53_c.png", "water_flat.png")
+            .replace("236F857A_c.png", "ocean_deep.png")
+            .replace("43EFF121_c.png", "ocean_shallow.png")
+            .replace("20F371EB_c.png", "road_warm.png")
+            .replace("7CF42C55_c.png", "cliff_warm.png") for line in mtl)
+    # Palm fronds: composite the alpha leaf over its in-game green.
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error",
+                    "-f", "lavfi", "-i", "color=0x2e8b3a:s=64x32,format=rgba",
+                    "-i", os.path.join(src, "E27C62B_c.png"),
+                    "-filter_complex", "[0][1]overlay=format=auto:shortest=1,format=rgb24",
+                    os.path.join(src, "frond_flat.png")], check=True)
+    # Shallow-crossing water sheet: fully opaque already, just drop the
+    # alpha channel so obj2gltf can't mark it blended.
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error",
+                    "-i", os.path.join(src, "46E1B53_c.png"),
+                    "-vf", "format=rgb24",
+                    os.path.join(src, "water_flat.png")], check=True)
+    # The rip exports the sea as bare seabed (the N64 water plane is an
+    # animated transparent layer the ripper never captured): 236F857A is the
+    # deep floor, 43EFF121 the tide flats — both entirely below sea level.
+    # Retexture them as flat lagoon blues (any real water texture tiles into
+    # sparkle noise at these UV scales) so the sea voxelizes as clean water.
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error",
+                    "-f", "lavfi", "-i", "color=0x2d2f8f:s=32x32", "-frames:v", "1",
+                    "-vf", "format=rgb24",
+                    os.path.join(src, "ocean_deep.png")], check=True)
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error",
+                    "-f", "lavfi", "-i", "color=0x2489c7:s=32x32", "-frames:v", "1",
+                    "-vf", "format=rgb24",
+                    os.path.join(src, "ocean_shallow.png")], check=True)
+    # The dirt-road gravel rips very dark and slightly blue; sepia-tone it
+    # (plus a small lift) so the palette snap lands in browns, never in
+    # gray or blue concrete mush.
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error",
+                    "-i", os.path.join(src, "20F371EB_c.png"),
+                    "-vf", "colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0"
+                           ":.272:.534:.131:0,eq=brightness=0.08,format=rgb24",
+                    os.path.join(src, "road_warm.png")], check=True)
+    # Same treatment for the blue-gray gravel cliff walls (they snap to
+    # blue concrete otherwise, with no grays in the beach palette).
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error",
+                    "-i", os.path.join(src, "7CF42C55_c.png"),
+                    "-vf", "colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0"
+                           ":.272:.534:.131:0,eq=brightness=0.05,format=rgb24",
+                    os.path.join(src, "cliff_warm.png")], check=True)
+    subprocess.run(["npx", "-y", "obj2gltf", "-i", os.path.join(src, "track.obj"),
+                    "-o", glb, "--binary"], check=True)
+    return glb
+
+
+def _largest_component(s):
+    """Keep only the largest 26-connected component of a voxelized schematic
+    (same cleanup as scene_mariokart: drops floating trackside scraps).
+    Blocks are streamed in z-slabs to avoid enumerating the air voxels."""
+    mn, mx = s.tight_bounds_min(), s.tight_bounds_max()
+    occ = set()
+    for zs in range(mn.z, mx.z + 1, 16):
+        chunk = json.loads(s.get_chunk_blocks_json(
+            mn.x, mn.y, zs, mx.x - mn.x + 1, mx.y - mn.y + 1,
+            min(16, mx.z + 1 - zs)))
+        occ.update((b["x"], b["y"], b["z"]) for b in chunk
+                   if b["name"] != "minecraft:air")
+    seen, comps = set(), []
+    for p in occ:
+        if p in seen:
+            continue
+        stack, comp = [p], [p]
+        seen.add(p)
+        while stack:
+            x, y, z = stack.pop()
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    for dz in (-1, 0, 1):
+                        q = (x + dx, y + dy, z + dz)
+                        if q in occ and q not in seen:
+                            seen.add(q)
+                            stack.append(q)
+                            comp.append(q)
+        comps.append(comp)
+    comps.sort(key=len, reverse=True)
+    for comp in comps[1:]:
+        for (x, y, z) in comp:
+            s.set_block(x, y, z, "minecraft:air")
+
+
+def scene_mk64_track2(pack):
+    """MK64 Koopa Troopa Beach, voxelized from the ripped course model.
+
+    target_size=500 calibrates the dirt road to ~8-10 blocks wide (measured
+    as x-runs of road blocks on straight segments; the course map is mostly
+    sea, so the island itself stays compact). shell=1.0 for the same reason
+    as scene_mariokart: open surfaces defeat parity interior tests.
+    """
+    glb = open(_koopa_glb(), "rb").read()
+    pal = nu.Palette.from_block_ids(json.dumps(KTB_PALETTE))
+    s = nu.Voxelizer.schematic_from_glb_textured(glb, 500.0, 1.0, pal,
+                                                 "koopa_troopa_beach")
+    _largest_component(s)
+    # Hero: three-quarter aerial over the island. Background is the deep-water
+    # block's *rendered* navy pushed back through sRGB into linear light, so it
+    # matches the synthesized ocean floor exactly and the floor's rectangular
+    # edge dissolves into an endless sea.
+    render(s, pack, os.path.join(OUT, "mk64-koopa-beach.png"), w=1200, h=800,
+           yaw=250, pitch=45, zoom=1.7, background=(0.024, 0.026, 0.255, 1.0))
     return s
 
 
@@ -1272,7 +1473,7 @@ def scene_paintings(pack):
 # NASA Blue Marble (land/ocean/ice composite), public domain — the globe's
 # equirectangular texture, mirrored on Wikimedia Commons.
 GLOBE_TEXTURE = "Land ocean ice 2048.jpg"
-GLOBE_RADIUS = 38.0
+GLOBE_RADIUS = 60.0
 GLOBE_FRAMES = 48
 # Fixed sun, world space (camera at yaw 0 looks along -z, so +z faces the
 # viewer): from the camera's upper right, pulled far enough sideways that the
@@ -1350,14 +1551,14 @@ def scene_globe(pack):
     try:
         for i in range(GLOBE_FRAMES):
             s = _globe_frame(i / GLOBE_FRAMES, surf, tex, pal)
-            cfg = nu.RenderConfig.create(720, 720)
+            cfg = nu.RenderConfig.create(840, 840)
             cfg.set_isometric(); cfg.set_yaw(0.0); cfg.set_pitch(15.0)
             cfg.set_zoom(1.6); cfg.set_sphere_fit(True)
             cfg.set_background(*NAVY)
             nu.Renderer.render_to_file(s, pack, cfg,
                                        os.path.join(tmp, f"f{i:03}.png"))
         assemble_gif(tmp, os.path.join(OUT, "globe-day-night.gif"),
-                     fps=GLOBE_FRAMES / 4.8, max_colors=112)
+                     fps=GLOBE_FRAMES / 4.8, max_colors=80)
         print(f"  wrote docs/media/globe-day-night.gif ({GLOBE_FRAMES} frames)")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -1372,6 +1573,7 @@ SCENES = {
     "teapot": scene_teapot,
     "duck": scene_duck,
     "mariokart": scene_mariokart,
+    "mariokart2": scene_mk64_track2,
     "mountains": scene_mountains,
     "city": scene_city,
     "metaballs": scene_metaballs,
