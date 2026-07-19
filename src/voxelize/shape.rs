@@ -4,7 +4,8 @@
 
 use super::model::{MeshModel, MeshTriangle, TextureImage};
 use crate::building::Shape;
-use std::sync::Arc;
+use rayon::prelude::*;
+use std::sync::{Arc, OnceLock};
 
 /// Uniform spatial grid over the triangles (cell size = 1 voxel).
 struct TriGrid {
@@ -91,6 +92,10 @@ impl TriGrid {
 #[derive(Clone)]
 pub struct MeshShape {
     data: Arc<MeshData>,
+    /// Lazily computed solid-voxel bitset for bulk fills (scanline parity
+    /// sweeps + shell rasterization). Reset by `with_shell`, shared by
+    /// plain clones.
+    mask: Arc<OnceLock<SolidMask>>,
     /// Also claim voxels whose center is within this distance of the
     /// surface (in blocks). 0.0 = pure parity solid. Rescues thin/hollow
     /// geometry (double-walled vessels, open shells) whose walls slip
@@ -127,6 +132,7 @@ impl MeshShape {
         );
         Self {
             shell: 0.0,
+            mask: Arc::new(OnceLock::new()),
             data: Arc::new(MeshData {
                 triangles: model.triangles,
                 materials: model.materials,
@@ -250,6 +256,7 @@ impl MeshShape {
         Self {
             data: self.data.clone(),
             shell: thickness.max(0.0),
+            mask: Arc::new(OnceLock::new()),
         }
     }
 
@@ -279,8 +286,196 @@ impl MeshShape {
     }
 }
 
+
+/// Precomputed solid-voxel bitset over the shape's bounds.
+struct SolidMask {
+    origin: (i32, i32, i32),
+    dims: (usize, usize, usize),
+    bits: Vec<u64>,
+}
+
+impl SolidMask {
+    fn index(&self, x: i32, y: i32, z: i32) -> Option<usize> {
+        let (ox, oy, oz) = self.origin;
+        let (dx, dy, dz) = self.dims;
+        let (ix, iy, iz) = ((x - ox) as isize, (y - oy) as isize, (z - oz) as isize);
+        if ix < 0 || iy < 0 || iz < 0 {
+            return None;
+        }
+        let (ix, iy, iz) = (ix as usize, iy as usize, iz as usize);
+        if ix >= dx || iy >= dy || iz >= dz {
+            return None;
+        }
+        Some((ix * dy + iy) * dz + iz)
+    }
+
+    fn get(&self, x: i32, y: i32, z: i32) -> bool {
+        self.index(x, y, z)
+            .is_some_and(|i| self.bits[i >> 6] >> (i & 63) & 1 == 1)
+    }
+
+    fn set_linear(bits: &mut [u64], i: usize) {
+        bits[i >> 6] |= 1 << (i & 63);
+    }
+}
+
+impl MeshShape {
+    fn solid_mask(&self) -> &SolidMask {
+        self.mask.get_or_init(|| self.compute_mask())
+    }
+
+    /// Bulk solve: three scanline parity sweeps (one ray per column per
+    /// axis, majority vote — same robustness as the per-voxel test at a
+    /// fraction of the cost) plus per-triangle shell rasterization.
+    fn compute_mask(&self) -> SolidMask {
+        let d = &self.data;
+        let (x0, y0, z0, x1, y1, z1) = d.bounds;
+        let dims = (
+            (x1 - x0 + 1) as usize,
+            (y1 - y0 + 1) as usize,
+            (z1 - z0 + 1) as usize,
+        );
+        let total = dims.0 * dims.1 * dims.2;
+        let words = total.div_ceil(64);
+        let mut votes: Vec<u8> = vec![0; total];
+
+        // One parity sweep per axis. A column fixes the two perpendicular
+        // coordinates; all crossings along the column are collected once
+        // and walked in order.
+        for axis in 0..3 {
+            let (p1, p2) = ((axis + 1) % 3, (axis + 2) % 3);
+            let axis_lo = [x0, y0, z0][axis];
+            let axis_len = [dims.0, dims.1, dims.2][axis];
+            let lo1 = [x0, y0, z0][p1];
+            let lo2 = [x0, y0, z0][p2];
+            let len1 = [dims.0, dims.1, dims.2][p1];
+            let len2 = [dims.0, dims.1, dims.2][p2];
+
+            let columns: Vec<(usize, usize, Vec<f32>)> = (0..len1 * len2)
+                .into_par_iter()
+                .map(|ci| {
+                    let (i1, i2) = (ci / len2, ci % len2);
+                    let mut o = [0f32; 3];
+                    o[axis] = d.aabb_min[axis] - 1.0;
+                    o[p1] = (lo1 + i1 as i32) as f32 + 0.5 + JITTER;
+                    o[p2] = (lo2 + i2 as i32) as f32 + 0.5 - 1.31 * JITTER;
+
+                    let start = d.grid.cell_of(o);
+                    let mut candidates: Vec<u32> = Vec::new();
+                    let mut c = start;
+                    for a in 0..d.grid.dims[axis] {
+                        c[axis] = a;
+                        candidates.extend_from_slice(d.grid.bucket(c));
+                    }
+                    candidates.sort_unstable();
+                    candidates.dedup();
+
+                    let mut dir = [0f32; 3];
+                    dir[axis] = 1.0;
+                    let mut ts: Vec<f32> = candidates
+                        .iter()
+                        .filter_map(|&t| {
+                            ray_triangle_t(o, dir, &d.triangles[t as usize].positions)
+                                .filter(|&t| t > 1e-6)
+                        })
+                        .collect();
+                    ts.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+                    (i1, i2, ts)
+                })
+                .collect();
+
+            for (i1, i2, ts) in columns {
+                let origin_axis = d.aabb_min[axis] - 1.0;
+                let mut k = 0usize; // crossings passed
+                for ia in 0..axis_len {
+                    let center = (axis_lo + ia as i32) as f32 + 0.5 - origin_axis;
+                    while k < ts.len() && ts[k] < center {
+                        k += 1;
+                    }
+                    if k % 2 == 1 {
+                        let mut idx3 = [0usize; 3];
+                        idx3[axis] = ia;
+                        idx3[p1] = i1;
+                        idx3[p2] = i2;
+                        votes[(idx3[0] * dims.1 + idx3[1]) * dims.2 + idx3[2]] += 1;
+                    }
+                }
+            }
+        }
+
+        let mut bits = vec![0u64; words];
+        for (i, &v) in votes.iter().enumerate() {
+            if v >= 2 {
+                SolidMask::set_linear(&mut bits, i);
+            }
+        }
+        drop(votes);
+
+        // Shell: rasterize each triangle's neighborhood.
+        if self.shell > 0.0 {
+            let shell = self.shell;
+            let extra: Vec<Vec<usize>> = d
+                .triangles
+                .par_iter()
+                .map(|tri| {
+                    let mut out = Vec::new();
+                    let mut tmin = [f32::INFINITY; 3];
+                    let mut tmax = [f32::NEG_INFINITY; 3];
+                    for pt in &tri.positions {
+                        for a in 0..3 {
+                            tmin[a] = tmin[a].min(pt[a]);
+                            tmax[a] = tmax[a].max(pt[a]);
+                        }
+                    }
+                    let lo = [
+                        ((tmin[0] - shell).floor() as i32).max(x0),
+                        ((tmin[1] - shell).floor() as i32).max(y0),
+                        ((tmin[2] - shell).floor() as i32).max(z0),
+                    ];
+                    let hi = [
+                        ((tmax[0] + shell).ceil() as i32).min(x1),
+                        ((tmax[1] + shell).ceil() as i32).min(y1),
+                        ((tmax[2] + shell).ceil() as i32).min(z1),
+                    ];
+                    for x in lo[0]..=hi[0] {
+                        for y in lo[1]..=hi[1] {
+                            for z in lo[2]..=hi[2] {
+                                let c = [x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5];
+                                let q = closest_point_on_triangle(c, &tri.positions);
+                                if distance(c, q) <= shell {
+                                    let idx = (((x - x0) as usize) * dims.1
+                                        + (y - y0) as usize)
+                                        * dims.2
+                                        + (z - z0) as usize;
+                                    out.push(idx);
+                                }
+                            }
+                        }
+                    }
+                    out
+                })
+                .collect();
+            for list in extra {
+                for i in list {
+                    SolidMask::set_linear(&mut bits, i);
+                }
+            }
+        }
+
+        SolidMask {
+            origin: (x0, y0, z0),
+            dims,
+            bits,
+        }
+    }
+}
+
 impl Shape for MeshShape {
     fn contains(&self, x: i32, y: i32, z: i32) -> bool {
+        // Random access reuses the bulk mask when a fill already solved it.
+        if let Some(mask) = self.mask.get() {
+            return mask.get(x, y, z);
+        }
         let d = &self.data;
         let c = [x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5];
         for a in 0..3 {
@@ -335,12 +530,17 @@ impl Shape for MeshShape {
     where
         F: FnMut(i32, i32, i32),
     {
-        let (x0, y0, z0, x1, y1, z1) = self.data.bounds;
-        for x in x0..=x1 {
-            for y in y0..=y1 {
-                for z in z0..=z1 {
-                    if self.contains(x, y, z) {
-                        f(x, y, z);
+        // Bulk path: scanline-solved bitset (see compute_mask) instead of
+        // three rays per voxel.
+        let mask = self.solid_mask();
+        let (ox, oy, oz) = mask.origin;
+        let (dx, dy, dz) = mask.dims;
+        for ix in 0..dx {
+            for iy in 0..dy {
+                for iz in 0..dz {
+                    let i = (ix * dy + iy) * dz + iz;
+                    if mask.bits[i >> 6] >> (i & 63) & 1 == 1 {
+                        f(ox + ix as i32, oy + iy as i32, oz + iz as i32);
                     }
                 }
             }
