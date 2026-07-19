@@ -345,7 +345,11 @@ sink.finish()
 
 A schematic is multi-region in the Litematica sense — many named sub-volumes,
 each with its own palette and bounds — and both whole builds and single
-regions transform in place.
+regions transform in place. Here a keep and two wings are three separate
+named regions; `rotate_region_y` turns the copper wing 90° and leaves the
+keep and the prismarine wing exactly where they were:
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/regions.png" width="760" alt="Before and after: a quartz keep with copper and prismarine wings as three named regions, with the copper wing rotated 90 degrees in place">
 
 ```python
 # Address independent named regions in one schematic:
@@ -362,12 +366,17 @@ dst.copy_region(src, 0, 0, 0,  9, 0, 0,   100, 0, 0,  "[]")
 #               source  ── from box ──   ── to ──   exclude
 ```
 
-<!-- TODO(readme-media): illustrate — before/after of one region rotated in place while its neighbours stay put, or a copy_region stamp tiled. Scene not yet written. -->
 
 ## Block entities, entities, and NBT
 
 Blocks carry NBT, and the schematic holds full block entities and entities,
 round-tripped as SNBT — so a chest keeps its loot table and a spawner its mob.
+A vault of them — chests, barrels, dyed shulker boxes, a caged spawner, and
+brewing/enchanting furniture, every one an NBT carrier:
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/block-entities.png" width="620" alt="An aerial view of a stone-brick vault lined with chests, barrels, dyed shulker boxes, furnaces, a caged spawner, and an enchanting table">
+</div>
 
 ```python
 # A chest with contents, set straight from SNBT:
@@ -381,8 +390,6 @@ s.get_block_entity_snbt(0, 0, 0)
 s.add_entity_from_snbt('{id:"minecraft:armor_stand",Pos:[0.5d,1.0d,0.5d],Rotation:[0f,0f]}')
 s.entity_count()                      # 1
 ```
-
-<!-- TODO(readme-media): illustrate — a rendered chest/furnace/spawner with visible contents, or a placed armor stand. Scene not yet written. -->
 
 ## Simulate redstone
 
@@ -514,8 +521,6 @@ store.put("meta/version", b"3")
 store.get_b64("meta/version")          # "Mw=="
 store.list("meta/")                    # ["meta/version"]
 ```
-
-<!-- TODO(readme-media): illustrate — a small diagram of the five backends behind one URI, or a byte-identical round-trip through mem/fs/s3. Scene not yet written. -->
 
 ## One API, seven languages
 

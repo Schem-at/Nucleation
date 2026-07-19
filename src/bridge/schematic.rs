@@ -1469,15 +1469,22 @@ pub mod ffi {
             out: &mut DiplomatWrite,
         ) -> Result<(), NucleationError> {
             let name = utf8(region_name)?;
-            let bbox = if name == "default" || name == "Default" {
-                self.0.default_region.get_bounding_box()
+            let region = if name == "default" || name == "Default" {
+                &self.0.default_region
             } else {
                 self.0
                     .other_regions
                     .get(name)
                     .ok_or(NucleationError::NotFound)?
-                    .get_bounding_box()
             };
+            // The tight content bounds (min/max of placed non-air blocks), not
+            // the internal storage box — which over-allocates by up to 64 blocks
+            // per axis and would otherwise leak allocation padding into the
+            // reported bounds. Empty regions fall back to their (degenerate)
+            // origin box.
+            let bbox = region
+                .get_tight_bounds()
+                .unwrap_or_else(|| region.get_bounding_box());
             let _ = write!(
                 out,
                 "[{},{},{},{},{},{}]",

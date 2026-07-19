@@ -1617,8 +1617,109 @@ def scene_streaming(pack):
     return s
 
 
+# ── Regions, transforms & stamping ───────────────────────────────────────────
+
+def _fort_regions():
+    """A keep with two wings, each a *separate named region* in one schematic —
+    distinct blocks so the regions read apart in the render."""
+    s = nu.Schematic.create("fort")
+
+    def box(region, x0, y0, z0, x1, y1, z1, block, hollow=False):
+        for x in range(x0, x1 + 1):
+            for y in range(y0, y1 + 1):
+                for z in range(z0, z1 + 1):
+                    if hollow and x0 < x < x1 and z0 < z < z1 and y < y1:
+                        continue
+                    s.set_block_in_region(region, x, y, z, block)
+
+    # keep: central quartz tower with a crenellated crown
+    box("keep", -3, 0, -3, 3, 11, 3, "minecraft:quartz_block", hollow=True)
+    for x in range(-3, 4, 2):
+        for z in (-3, 3):
+            s.set_block_in_region("keep", x, 12, z, "minecraft:quartz_block")
+    for z in range(-3, 4, 2):
+        for x in (-3, 3):
+            s.set_block_in_region("keep", x, 12, z, "minecraft:quartz_block")
+    # east_wing: a copper hall reaching out along +x
+    box("east_wing", 4, 0, -2, 13, 4, 2, "minecraft:cut_copper", hollow=True)
+    box("east_wing", 4, 5, -2, 13, 5, 2, "minecraft:copper_block")
+    # west_wing: a prismarine hall reaching out along -x
+    box("west_wing", -13, 0, -2, -4, 4, 2, "minecraft:prismarine_bricks", hollow=True)
+    box("west_wing", -13, 5, -2, -4, 5, 2, "minecraft:dark_prismarine")
+    return s
+
+
+def scene_regions(pack):
+    """Before/after: three named regions, then one wing rotated in place."""
+    tmp = tempfile.mkdtemp(prefix="nuc-regions-")
+    try:
+        before = os.path.join(tmp, "a.png")
+        after = os.path.join(tmp, "b.png")
+        s = _fort_regions()
+        render(s, pack, before, w=760, h=620, yaw=210, pitch=32, zoom=1.05,
+               background=NAVY, sphere_fit=True)
+        s.rotate_region_y("east_wing", 90)      # turn just the copper wing
+        render(s, pack, after, w=760, h=620, yaw=210, pitch=32, zoom=1.05,
+               background=NAVY, sphere_fit=True)
+        hstack([before, after], os.path.join(OUT, "regions.png"))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return s
+
+
+# ── Block entities, entities & NBT ───────────────────────────────────────────
+
+def scene_blockentities(pack):
+    """A loot vault: a room of block-entity blocks, each a carrier of NBT —
+    chests set with real Item SNBT, a caged spawner, furnaces, brewing, and
+    stacked dyed shulker boxes."""
+    s = nu.Schematic.create("vault")
+    fill = nu.BuildingTool.fill
+    # stone-brick floor + low kerb walls, NO ceiling (open for the aerial look)
+    fill(s, nu.Shape.cuboid(-7, 0, -7, 7, 0, 7), nu.Brush.solid("minecraft:stone_bricks"))
+    for (a, b, c, d) in ((-7, -7, 7, -7), (-7, 7, 7, 7), (-7, -7, -7, 7), (7, -7, 7, 7)):
+        fill(s, nu.Shape.cuboid(a, 1, b, c, 2, d),
+             nu.Brush.solid("minecraft:chiseled_stone_bricks"))
+
+    # chests along the back wall, each carrying real loot NBT (place the block,
+    # then attach the block entity — set_block_entity only writes the NBT)
+    for i, x in enumerate(range(-6, 7, 2)):
+        s.set_block(x, 1, -6, "minecraft:chest[facing=south]")
+        s.set_block_entity(x, 1, -6, "minecraft:chest",
+            '{Items:[{Slot:0b,id:"minecraft:diamond",Count:%db}]}' % (i + 1))
+    # barrels along the front, a second data-bearing container
+    for x in range(-6, 7, 2):
+        s.set_block(x, 1, 6, "minecraft:barrel[facing=up]")
+    # furnaces / blast furnace / smoker down the left wall
+    for i, z in enumerate(range(-5, 6, 2)):
+        blk = ("minecraft:furnace", "minecraft:blast_furnace", "minecraft:smoker",
+               "minecraft:furnace", "minecraft:blast_furnace", "minecraft:smoker")[i]
+        s.set_block(-6, 1, z, blk + "[facing=east]")
+    # dyed shulker boxes stacked in the right corner — the color accent
+    for i, c in enumerate(("red", "orange", "yellow", "lime", "cyan", "purple",
+                           "magenta", "light_blue", "green")):
+        s.set_block(6, 1 + i % 3, 5 - (i // 3) * 2, f"minecraft:{c}_shulker_box")
+    # a mob spawner in an iron cage, dead center
+    s.set_block(0, 1, 0, "minecraft:spawner")
+    for dx in (-1, 1):
+        s.set_block(dx, 1, 0, "minecraft:iron_bars")
+        s.set_block(0, 1, dx, "minecraft:iron_bars")
+    # brewing + enchanting corners
+    s.set_block(-5, 1, 5, "minecraft:brewing_stand")
+    s.set_block(-6, 1, 5, "minecraft:cauldron")
+    s.set_block(4, 1, -5, "minecraft:enchanting_table")
+    s.set_block(5, 1, -5, "minecraft:lectern[facing=west]")
+    s.set_block(3, 1, -5, "minecraft:bell[attachment=floor]")
+
+    render(s, pack, os.path.join(OUT, "block-entities.png"), w=900, h=720,
+           yaw=225, pitch=58, zoom=1.2, background=NAVY, sphere_fit=True)
+    return s
+
+
 SCENES = {
     "streaming": scene_streaming,
+    "regions": scene_regions,
+    "blockentities": scene_blockentities,
     "globe": scene_globe,
     "paintings": scene_paintings,
     "dither": scene_dither,
