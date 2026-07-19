@@ -35,7 +35,7 @@ NAVY = (0.086, 0.098, 0.149, 1.0)
 
 
 def render(schematic, pack, path, w=880, h=620, yaw=None, pitch=None, zoom=None,
-           ortho=False, background=(0, 0, 0, 0)):
+           ortho=False, background=(0, 0, 0, 0), sphere_fit=False):
     cfg = nu.RenderConfig.create(w, h)
     cfg.set_isometric()
     if yaw is not None:
@@ -46,6 +46,8 @@ def render(schematic, pack, path, w=880, h=620, yaw=None, pitch=None, zoom=None,
         cfg.set_zoom(zoom)
     if ortho:
         cfg.set_orthographic(True)
+    if sphere_fit:
+        cfg.set_sphere_fit(True)
     r, g, b, a = background
     cfg.set_background(r, g, b, a)
     nu.Renderer.render_to_file(schematic, pack, cfg, path)
@@ -810,6 +812,271 @@ def scene_duck(pack):
 
 
 
+# ── Real-world geodata ───────────────────────────────────────────────────────
+
+TERRARIUM_URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
+MATTERHORN_LATLON = (45.976, 7.658)
+TERRAIN_ZOOM = 12        # 26.5 m/px at this latitude
+TERRAIN_WINDOW = 600     # px cropped around the peak from the 3x3 tile block
+TERRAIN_GRID = 300       # columns after 2x2 box-averaging -> 53 m per block
+TERRAIN_PEAK_Y = 108     # blocks from the lowest valley floor to the summit
+
+
+def _terrarium_heightfield():
+    """TERRAIN_GRID^2 elevations (meters ASL) around the Matterhorn.
+
+    Fetches the 3x3 block of AWS terrarium tiles whose center tile contains
+    the peak, decodes each PNG to raw rgb24 via ffmpeg (the PNG-input twin of
+    _image_pixels), merges, crops a TERRAIN_WINDOW px window centered on the
+    peak and 2x2 box-averages it down. Terrarium encoding:
+    elevation_m = R*256 + G + B/256 - 32768.
+    """
+    lat, lon = MATTERHORN_LATLON
+    n = 2 ** TERRAIN_ZOOM
+    fx = (lon + 180.0) / 360.0 * n
+    fy = (1.0 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2.0 * n
+    tx, ty = int(fx), int(fy)
+    merged = [[0.0] * 768 for _ in range(768)]
+    for j, yt in enumerate((ty - 1, ty, ty + 1)):
+        for i, xt in enumerate((tx - 1, tx, tx + 1)):
+            path = _fetch_model(f"terrarium-{TERRAIN_ZOOM}-{xt}-{yt}.png",
+                                TERRARIUM_URL.format(z=TERRAIN_ZOOM, x=xt, y=yt))
+            raw = subprocess.run(["ffmpeg", "-v", "error", "-i", path,
+                                  "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                                 capture_output=True).stdout
+            for py in range(256):
+                row = merged[j * 256 + py]
+                base = py * 256 * 3
+                for px in range(256):
+                    k = base + px * 3
+                    row[i * 256 + px] = (raw[k] * 256 + raw[k + 1]
+                                         + raw[k + 2] / 256 - 32768)
+    cx = int((fx - tx + 1) * 256)
+    cy = int((fy - ty + 1) * 256)
+    x0 = min(max(cx - TERRAIN_WINDOW // 2, 0), 768 - TERRAIN_WINDOW)
+    y0 = min(max(cy - TERRAIN_WINDOW // 2, 0), 768 - TERRAIN_WINDOW)
+    step = TERRAIN_WINDOW // TERRAIN_GRID
+    field = []
+    for gz in range(TERRAIN_GRID):
+        row = []
+        for gx in range(TERRAIN_GRID):
+            acc = 0.0
+            for dy in range(step):
+                for dx in range(step):
+                    acc += merged[y0 + gz * step + dy][x0 + gx * step + dx]
+            row.append(acc / (step * step))
+        field.append(row)
+    return field
+
+
+def _band_jitter(x, z):
+    """Deterministic +-80 m elevation jitter so palette bands dissolve into
+    each other instead of drawing contour lines."""
+    h = ((x * 73856093) ^ (z * 19349663)) & 0xFFFF
+    return (h / 65535.0 - 0.5) * 160.0
+
+
+def _alp_surface(elev, slope):
+    """Surface block from elevation (meters ASL) + slope (blocks per column
+    step): rock wherever it is too steep for snow, then altitude bands."""
+    if slope > 2.4:                                    # cliff faces: bare rock
+        return "minecraft:deepslate" if elev > 3800 else "minecraft:stone"
+    if elev > 3000:
+        return "minecraft:snow_block"                  # glaciers + summit snow
+    if elev > 2650:
+        return "minecraft:gravel"                      # scree fields
+    if elev > 2100:
+        return "minecraft:moss_block"                  # alpine meadows
+    return "minecraft:grass_block"                     # valley floor
+
+
+def _mountains_schematic():
+    field = _terrarium_heightfield()
+    lo = min(min(r) for r in field)
+    hi = max(max(r) for r in field)
+    scale = (hi - lo) / float(TERRAIN_PEAK_Y)          # meters per block of y
+    g = TERRAIN_GRID
+    hgrid = [[max(1, round((field[z][x] - lo) / scale)) for x in range(g)]
+             for z in range(g)]
+    s = nu.Schematic.create("matterhorn")
+    for z in range(g):
+        for x in range(g):
+            h = hgrid[z][x]
+            slope = max(abs(h - hgrid[z2][x2])
+                        for x2, z2 in ((x - 1, z), (x + 1, z), (x, z - 1), (x, z + 1))
+                        if 0 <= x2 < g and 0 <= z2 < g)
+            surf = _alp_surface(field[z][x] + _band_jitter(x, z), slope)
+            if h > 3:
+                s.fill_cuboid(x, 0, z, x, h - 3, z, "minecraft:stone")
+                s.fill_cuboid(x, h - 2, z, x, h, z, surf)
+            else:
+                s.fill_cuboid(x, 0, z, x, h, z, surf)
+    return s
+
+
+def scene_mountains(pack):
+    """The Matterhorn from real elevation data: AWS terrarium tiles ->
+    300x300 columns, palette banded by altitude + slope."""
+    s = _mountains_schematic()
+    # Hero: straight up the axis at the pyramid, Zermatt's valley to the right.
+    render(s, pack, os.path.join(OUT, "geo-mountains.png"), w=1100, h=660,
+           yaw=180, pitch=32, zoom=2.15, background=NAVY, sphere_fit=True)
+    # Aerial: the whole 16 km window from the southwest corner.
+    render(s, pack, os.path.join(OUT, "geo-mountains-aerial.png"), w=1100,
+           h=700, yaw=225, pitch=30, zoom=1.5, background=NAVY, sphere_fit=True)
+    return s
+
+
+OVERPASS_URLS = [   # public instances 504 under load; try in order
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+]
+FIDI_BBOX = (40.7035, -74.0130, 40.7090, -74.0060)   # S, W, N, E: Wall St core
+CITY_BLOCK_M = 2.0       # 1 block = 2 m -> a ~296x304 column grid
+CITY_MAX_H = 320.0       # sanity cap, meters (28 Liberty tops out at 248 m)
+
+# Height-banded massing palette: warm brick low-rise -> pale stone mid-rise ->
+# white/quartz towers. Two choices per band, picked by OSM id hash, so
+# adjacent same-band buildings do not fuse into one slab.
+CITY_BANDS = [           # (min height in meters, block choices)
+    (150.0, ["minecraft:quartz_block", "minecraft:quartz_block"]),
+    (80.0, ["minecraft:white_concrete", "minecraft:smooth_stone"]),
+    (40.0, ["minecraft:sandstone", "minecraft:smooth_stone"]),
+    (15.0, ["minecraft:terracotta", "minecraft:bricks"]),
+    (0.0, ["minecraft:red_terracotta", "minecraft:bricks"]),
+]
+
+
+def _fetch_fidi():
+    path = os.path.join(MODELS_DIR, "fidi-buildings.json")
+    if not os.path.exists(path):
+        os.makedirs(MODELS_DIR, exist_ok=True)
+        b = "(%s,%s,%s,%s)" % FIDI_BBOX
+        q = ("[out:json][timeout:60]; ("
+             f'way["building"]{b}; relation["building"]{b}; '
+             f'way["building:part"]{b}; relation["building:part"]{b};'
+             "); out geom;")
+        for url in OVERPASS_URLS:
+            r = subprocess.run(["curl", "-sf", "-m", "90",
+                                "-A", "nucleation-readme-media/1.0",
+                                "-o", path, "--data-urlencode", "data=" + q,
+                                url])
+            if r.returncode == 0:
+                break
+        else:
+            raise RuntimeError("all Overpass instances failed")
+    return json.load(open(path))
+
+
+def _osm_height_m(tags, default):
+    try:
+        return min(float(str(tags["height"]).replace("m", "").strip()),
+                   CITY_MAX_H)
+    except (KeyError, ValueError):
+        pass
+    try:
+        return min(float(tags["building:levels"]) * 3.2, CITY_MAX_H)
+    except (KeyError, ValueError):
+        return default
+
+
+def _rings(el):
+    if el["type"] == "way":
+        return [el["geometry"]] if el.get("geometry") else []
+    return [m["geometry"] for m in el.get("members", [])
+            if m.get("geometry") and m.get("role") in ("outer", "inner")]
+
+
+def _rasterize_polygon(rings, hb, block, hgrid, bgrid, mx, mz):
+    """Even-odd scanline fill of projected rings onto the column grids; each
+    cell keeps its tallest occupant (so building:part stacks refine bases)."""
+    pts = [[(mx(p["lon"]), mz(p["lat"])) for p in ring] for ring in rings]
+    zs = [z for ring in pts for _, z in ring]
+    if not zs:
+        return
+    depth, width = len(hgrid), len(hgrid[0])
+    z0, z1 = max(0, int(min(zs))), min(depth - 1, int(max(zs)) + 1)
+    for gz in range(z0, z1 + 1):
+        zc = gz + 0.5
+        xs = []
+        for ring in pts:
+            for (xa, za), (xb, zb) in zip(ring, ring[1:]):
+                if (za <= zc) != (zb <= zc):
+                    xs.append(xa + (zc - za) / (zb - za) * (xb - xa))
+        xs.sort()
+        for xa, xb in zip(xs[::2], xs[1::2]):
+            for gx in range(max(0, int(xa + 0.5)),
+                            min(width - 1, int(xb - 0.5)) + 1):
+                if hb > hgrid[gz][gx]:
+                    hgrid[gz][gx] = hb
+                    bgrid[gz][gx] = block
+
+
+def _city_block(h_m, osm_id):
+    for floor, choices in CITY_BANDS:
+        if h_m >= floor:
+            return choices[osm_id % len(choices)]
+    return CITY_BANDS[-1][1][0]
+
+
+def _city_schematic():
+    data = _fetch_fidi()
+    s_, w_, n_, e_ = FIDI_BBOX
+    latc = math.radians((s_ + n_) / 2)
+
+    def mx(lon):
+        return (lon - w_) * 111320.0 * math.cos(latc) / CITY_BLOCK_M
+
+    def mz(lat):
+        return (n_ - lat) * 110574.0 / CITY_BLOCK_M
+
+    width, depth = int(mx(e_)), int(mz(s_))
+    hgrid = [[0] * width for _ in range(depth)]
+    bgrid = [[None] * width for _ in range(depth)]
+    n_buildings, tallest = 0, 0.0
+    for el in data["elements"]:
+        tags = el.get("tags", {})
+        is_part = tags.get("building:part") not in (None, "no")
+        # Outlines with no data get a 10 m default; untagged parts defer to
+        # the base outline that is already stamped underneath them.
+        h_m = _osm_height_m(tags, None if is_part else 10.0)
+        if h_m is None:
+            continue
+        rings = _rings(el)
+        if not rings:
+            continue
+        # Towers straddling the bbox edge leave floating spire slivers behind;
+        # keep an element only if its centroid is inside the district.
+        pts = [p for ring in rings for p in ring]
+        clat = sum(p["lat"] for p in pts) / len(pts)
+        clon = sum(p["lon"] for p in pts) / len(pts)
+        if not (s_ <= clat <= n_ and w_ <= clon <= e_):
+            continue
+        if not is_part:
+            n_buildings += 1
+            tallest = max(tallest, h_m)
+        _rasterize_polygon(rings, max(1, round(h_m / CITY_BLOCK_M)),
+                           _city_block(h_m, el["id"]), hgrid, bgrid, mx, mz)
+    print(f"  {n_buildings} buildings, tallest {tallest:.0f} m")
+    s = nu.Schematic.create("fidi")
+    s.fill_cuboid(0, 0, 0, width - 1, 0, depth - 1, "minecraft:gray_concrete")
+    for gz in range(depth):
+        for gx in range(width):
+            if bgrid[gz][gx]:
+                s.fill_cuboid(gx, 1, gz, gx, hgrid[gz][gx], gz, bgrid[gz][gx])
+    return s
+
+
+def scene_city(pack):
+    """Lower Manhattan's Financial District from OSM building footprints:
+    even-odd rasterized, extruded to tagged heights, banded by height."""
+    s = _city_schematic()
+    render(s, pack, os.path.join(OUT, "geo-city.png"), w=1100, h=740,
+           yaw=315, pitch=30, zoom=1.5, background=NAVY, sphere_fit=True)
+    return s
+
+
 def scene_dither(pack):
     """Hard-snap vs dithered palette on the same shaded sphere, hstacked."""
     def sphere(dither):
@@ -1105,6 +1372,8 @@ SCENES = {
     "teapot": scene_teapot,
     "duck": scene_duck,
     "mariokart": scene_mariokart,
+    "mountains": scene_mountains,
+    "city": scene_city,
     "metaballs": scene_metaballs,
     "basics": scene_basics,
     "hero": scene_hero,
