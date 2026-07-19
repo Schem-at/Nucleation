@@ -1107,20 +1107,20 @@ def _mountains_schematic():
     g = TERRAIN_GRID
     hgrid = [[max(1, round((field[z][x] - lo) / scale)) for x in range(g)]
              for z in range(g)]
-    s = nu.Schematic.create("matterhorn")
+    # Flat row-major heights + a per-column surface band (elevation + slope),
+    # extruded by the library. surface_depth=3 caps the top three blocks of
+    # each column with its band block over a stone core.
+    heights, surfaces = [], []
     for z in range(g):
         for x in range(g):
             h = hgrid[z][x]
             slope = max(abs(h - hgrid[z2][x2])
                         for x2, z2 in ((x - 1, z), (x + 1, z), (x, z - 1), (x, z + 1))
                         if 0 <= x2 < g and 0 <= z2 < g)
-            surf = _alp_surface(field[z][x] + _band_jitter(x, z), slope)
-            if h > 3:
-                s.fill_cuboid(x, 0, z, x, h - 3, z, "minecraft:stone")
-                s.fill_cuboid(x, h - 2, z, x, h, z, surf)
-            else:
-                s.fill_cuboid(x, 0, z, x, h, z, surf)
-    return s
+            heights.append(h)
+            surfaces.append(_alp_surface(field[z][x] + _band_jitter(x, z), slope))
+    return nu.Geo.heightmap_terrain(json.dumps(heights), g, json.dumps(surfaces),
+                                    "minecraft:stone", 3, "matterhorn")
 
 
 def scene_mountains(pack):
@@ -1253,11 +1253,16 @@ def _city_schematic():
 
 
 def scene_city(pack):
-    """Lower Manhattan's Financial District from OSM building footprints:
-    even-odd rasterized, extruded to tagged heights, banded by height."""
+    """Lower Manhattan's Financial District from OSM building footprints,
+    extruded by Geo.extrude_footprints and banded by height."""
     s = _city_schematic()
+    # Aerial massing.
     render(s, pack, os.path.join(OUT, "geo-city.png"), w=1100, h=740,
            yaw=315, pitch=30, zoom=1.5, background=NAVY, sphere_fit=True)
+    # Low-angle skyline: the 2.4M-block district as a silhouette, the same
+    # schematic that streams straight out to a playable world.
+    render(s, pack, os.path.join(OUT, "geo-city-skyline.png"), w=1200, h=620,
+           yaw=300, pitch=10, zoom=1.9, background=NAVY, sphere_fit=True)
     return s
 
 

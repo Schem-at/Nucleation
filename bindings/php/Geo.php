@@ -50,7 +50,7 @@ final class Geo {
         return new Schematic($result->ok, true);
     }
 
-    public static function heightmapTerrain(string $heights_json,  $width, string $surface_block, string $subsurface_block,  $surface_depth, string $name) {
+    public static function heightmapTerrain(string $heights_json,  $width, string $surface_blocks_json, string $subsurface_block,  $surface_depth, string $name) {
         $__n0 = strlen($heights_json);
         $__view0 = Lib::ffi()->new('DiplomatStringView');
         if ($__n0 > 0) {
@@ -61,11 +61,11 @@ final class Geo {
             $__view0->data = null;
         }
         $__view0->len = $__n0;
-        $__n2 = strlen($surface_block);
+        $__n2 = strlen($surface_blocks_json);
         $__view2 = Lib::ffi()->new('DiplomatStringView');
         if ($__n2 > 0) {
             $__buf2 = Lib::ffi()->new("uint8_t[" . $__n2 . "]", false);
-            \FFI::memcpy($__buf2, $surface_block, $__n2);
+            \FFI::memcpy($__buf2, $surface_blocks_json, $__n2);
             $__view2->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf2[0]));
         } else {
             $__view2->data = null;

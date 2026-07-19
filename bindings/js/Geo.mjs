@@ -80,21 +80,24 @@ export class Geo {
     /**
      * Raise terrain from a heightmap. `heights_json` is a flat row-major
      * JSON array of per-column heights (blocks); `width` is columns per row.
-     * Each column's top `surface_depth` blocks are `surface_block`, the rest
+     * `surface_blocks_json` is a JSON array of block names — one entry (the
+     * same surface everywhere) or one per column, row-major and the same
+     * length as `heights`, for elevation/slope banding. Each column's top
+     * `surface_depth` blocks are its surface block, the rest are
      * `subsurface_block`. Errors `Parse` on bad JSON, `InvalidArgument` on a
-     * non-positive width or non-UTF-8.
+     * non-positive width, empty surface list, or non-UTF-8.
      */
-    static heightmapTerrain(heightsJson, width, surfaceBlock, subsurfaceBlock, surfaceDepth, name) {
+    static heightmapTerrain(heightsJson, width, surfaceBlocksJson, subsurfaceBlock, surfaceDepth, name) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
         const heightsJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, heightsJson)));
-        const surfaceBlockSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, surfaceBlock)));
+        const surfaceBlocksJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, surfaceBlocksJson)));
         const subsurfaceBlockSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, subsurfaceBlock)));
         const nameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, name)));
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
 
-        const result = wasm.Geo_heightmap_terrain(diplomatReceive.buffer, heightsJsonSlice.ptr, width, surfaceBlockSlice.ptr, subsurfaceBlockSlice.ptr, surfaceDepth, nameSlice.ptr);
+        const result = wasm.Geo_heightmap_terrain(diplomatReceive.buffer, heightsJsonSlice.ptr, width, surfaceBlocksJsonSlice.ptr, subsurfaceBlockSlice.ptr, surfaceDepth, nameSlice.ptr);
 
         try {
             if (!diplomatReceive.resultFlag) {

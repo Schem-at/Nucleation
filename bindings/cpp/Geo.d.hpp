@@ -45,11 +45,14 @@ public:
   /**
    * Raise terrain from a heightmap. `heights_json` is a flat row-major
    * JSON array of per-column heights (blocks); `width` is columns per row.
-   * Each column's top `surface_depth` blocks are `surface_block`, the rest
+   * `surface_blocks_json` is a JSON array of block names — one entry (the
+   * same surface everywhere) or one per column, row-major and the same
+   * length as `heights`, for elevation/slope banding. Each column's top
+   * `surface_depth` blocks are its surface block, the rest are
    * `subsurface_block`. Errors `Parse` on bad JSON, `InvalidArgument` on a
-   * non-positive width or non-UTF-8.
+   * non-positive width, empty surface list, or non-UTF-8.
    */
-  inline static diplomat::result<std::unique_ptr<Schematic>, NucleationError> heightmap_terrain(std::string_view heights_json, int32_t width, std::string_view surface_block, std::string_view subsurface_block, int32_t surface_depth, std::string_view name);
+  inline static diplomat::result<std::unique_ptr<Schematic>, NucleationError> heightmap_terrain(std::string_view heights_json, int32_t width, std::string_view surface_blocks_json, std::string_view subsurface_block, int32_t surface_depth, std::string_view name);
 
     inline const diplomat::capi::Geo* AsFFI() const;
     inline diplomat::capi::Geo* AsFFI();

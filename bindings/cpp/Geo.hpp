@@ -24,7 +24,7 @@ namespace capi {
     Geo_extrude_footprints_result Geo_extrude_footprints(diplomat::capi::DiplomatStringView buildings_json, diplomat::capi::DiplomatStringView base_block, diplomat::capi::DiplomatStringView name);
 
     typedef struct Geo_heightmap_terrain_result {union {diplomat::capi::Schematic* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Geo_heightmap_terrain_result;
-    Geo_heightmap_terrain_result Geo_heightmap_terrain(diplomat::capi::DiplomatStringView heights_json, int32_t width, diplomat::capi::DiplomatStringView surface_block, diplomat::capi::DiplomatStringView subsurface_block, int32_t surface_depth, diplomat::capi::DiplomatStringView name);
+    Geo_heightmap_terrain_result Geo_heightmap_terrain(diplomat::capi::DiplomatStringView heights_json, int32_t width, diplomat::capi::DiplomatStringView surface_blocks_json, diplomat::capi::DiplomatStringView subsurface_block, int32_t surface_depth, diplomat::capi::DiplomatStringView name);
 
     void Geo_destroy(Geo* self);
 
@@ -39,10 +39,10 @@ inline diplomat::result<std::unique_ptr<Schematic>, NucleationError> Geo::extrud
     return result.is_ok ? diplomat::result<std::unique_ptr<Schematic>, NucleationError>(diplomat::Ok<std::unique_ptr<Schematic>>(std::unique_ptr<Schematic>(Schematic::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Schematic>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
-inline diplomat::result<std::unique_ptr<Schematic>, NucleationError> Geo::heightmap_terrain(std::string_view heights_json, int32_t width, std::string_view surface_block, std::string_view subsurface_block, int32_t surface_depth, std::string_view name) {
+inline diplomat::result<std::unique_ptr<Schematic>, NucleationError> Geo::heightmap_terrain(std::string_view heights_json, int32_t width, std::string_view surface_blocks_json, std::string_view subsurface_block, int32_t surface_depth, std::string_view name) {
     auto result = diplomat::capi::Geo_heightmap_terrain({heights_json.data(), heights_json.size()},
         width,
-        {surface_block.data(), surface_block.size()},
+        {surface_blocks_json.data(), surface_blocks_json.size()},
         {subsurface_block.data(), subsurface_block.size()},
         surface_depth,
         {name.data(), name.size()});

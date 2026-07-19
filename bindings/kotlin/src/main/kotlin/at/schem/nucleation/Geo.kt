@@ -8,7 +8,7 @@ import com.sun.jna.Structure
 internal interface GeoLib: Library {
     fun Geo_destroy(handle: Pointer)
     fun Geo_extrude_footprints(buildingsJson: Slice, baseBlock: Slice, name: Slice): ResultPointerInt
-    fun Geo_heightmap_terrain(heightsJson: Slice, width: Int, surfaceBlock: Slice, subsurfaceBlock: Slice, surfaceDepth: Int, name: Slice): ResultPointerInt
+    fun Geo_heightmap_terrain(heightsJson: Slice, width: Int, surfaceBlocksJson: Slice, subsurfaceBlock: Slice, surfaceDepth: Int, name: Slice): ResultPointerInt
 }
 /** Namespace for the geodata entry points (no network — data goes in,
 *blocks come out).
@@ -75,17 +75,20 @@ class Geo internal constructor (
         
         /** Raise terrain from a heightmap. `heights_json` is a flat row-major
         *JSON array of per-column heights (blocks); `width` is columns per row.
-        *Each column's top `surface_depth` blocks are `surface_block`, the rest
+        *`surface_blocks_json` is a JSON array of block names — one entry (the
+        *same surface everywhere) or one per column, row-major and the same
+        *length as `heights`, for elevation/slope banding. Each column's top
+        *`surface_depth` blocks are its surface block, the rest are
         *`subsurface_block`. Errors `Parse` on bad JSON, `InvalidArgument` on a
-        *non-positive width or non-UTF-8.
+        *non-positive width, empty surface list, or non-UTF-8.
         */
-        fun heightmapTerrain(heightsJson: String, width: Int, surfaceBlock: String, subsurfaceBlock: String, surfaceDepth: Int, name: String): Result<Schematic> {
+        fun heightmapTerrain(heightsJson: String, width: Int, surfaceBlocksJson: String, subsurfaceBlock: String, surfaceDepth: Int, name: String): Result<Schematic> {
             val heightsJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(heightsJson)
-            val surfaceBlockSliceMemory = PrimitiveArrayTools.borrowUtf8(surfaceBlock)
+            val surfaceBlocksJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(surfaceBlocksJson)
             val subsurfaceBlockSliceMemory = PrimitiveArrayTools.borrowUtf8(subsurfaceBlock)
             val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
             
-            val returnVal = lib.Geo_heightmap_terrain(heightsJsonSliceMemory.slice, width, surfaceBlockSliceMemory.slice, subsurfaceBlockSliceMemory.slice, surfaceDepth, nameSliceMemory.slice);
+            val returnVal = lib.Geo_heightmap_terrain(heightsJsonSliceMemory.slice, width, surfaceBlocksJsonSliceMemory.slice, subsurfaceBlockSliceMemory.slice, surfaceDepth, nameSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
@@ -98,7 +101,7 @@ class Geo internal constructor (
                 }
             } finally {
                 heightsJsonSliceMemory.close()
-                surfaceBlockSliceMemory.close()
+                surfaceBlocksJsonSliceMemory.close()
                 subsurfaceBlockSliceMemory.close()
                 nameSliceMemory.close()
             }

@@ -57,20 +57,23 @@ pub mod ffi {
 
         /// Raise terrain from a heightmap. `heights_json` is a flat row-major
         /// JSON array of per-column heights (blocks); `width` is columns per row.
-        /// Each column's top `surface_depth` blocks are `surface_block`, the rest
+        /// `surface_blocks_json` is a JSON array of block names — one entry (the
+        /// same surface everywhere) or one per column, row-major and the same
+        /// length as `heights`, for elevation/slope banding. Each column's top
+        /// `surface_depth` blocks are its surface block, the rest are
         /// `subsurface_block`. Errors `Parse` on bad JSON, `InvalidArgument` on a
-        /// non-positive width or non-UTF-8.
+        /// non-positive width, empty surface list, or non-UTF-8.
         pub fn heightmap_terrain(
             heights_json: &DiplomatStr,
             width: i32,
-            surface_block: &DiplomatStr,
+            surface_blocks_json: &DiplomatStr,
             subsurface_block: &DiplomatStr,
             surface_depth: i32,
             name: &DiplomatStr,
         ) -> Result<Box<Schematic>, NucleationError> {
             let hj = std::str::from_utf8(heights_json)
                 .map_err(|_| NucleationError::InvalidArgument)?;
-            let surf = std::str::from_utf8(surface_block)
+            let sj = std::str::from_utf8(surface_blocks_json)
                 .map_err(|_| NucleationError::InvalidArgument)?;
             let sub = std::str::from_utf8(subsurface_block)
                 .map_err(|_| NucleationError::InvalidArgument)?;
@@ -80,11 +83,16 @@ pub mod ffi {
             }
             let heights: Vec<i32> =
                 serde_json::from_str(hj).map_err(|_| NucleationError::Parse)?;
+            let surface_blocks: Vec<String> =
+                serde_json::from_str(sj).map_err(|_| NucleationError::Parse)?;
+            if surface_blocks.is_empty() {
+                return Err(NucleationError::InvalidArgument);
+            }
             let s = crate::geo::heightmap_terrain(
                 name,
                 &heights,
                 width as usize,
-                surf,
+                &surface_blocks,
                 sub,
                 surface_depth,
             );

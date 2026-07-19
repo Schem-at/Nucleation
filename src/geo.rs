@@ -70,27 +70,38 @@ pub fn extrude_footprints(
 
 /// Raise terrain columns from a row-major heightmap of per-column heights
 /// (in blocks), `width` columns per row. Each column rises to its height; the
-/// top `surface_depth` blocks are `surface_block`, everything below is
-/// `subsurface_block`.
+/// top `surface_depth` blocks are the column's surface block, everything below
+/// is `subsurface_block`.
+///
+/// `surface_blocks` is either a single entry (the same surface everywhere) or
+/// one entry per column, row-major and the same length as `heights` — that's
+/// how a heightmap gets painted with elevation/slope bands (snow, scree,
+/// meadow) without any per-voxel callback.
 pub fn heightmap_terrain(
     name: &str,
     heights: &[i32],
     width: usize,
-    surface_block: &str,
+    surface_blocks: &[String],
     subsurface_block: &str,
     surface_depth: i32,
 ) -> UniversalSchematic {
     let mut s = UniversalSchematic::new(name.to_string());
-    if width == 0 {
+    if width == 0 || surface_blocks.is_empty() {
         return s;
     }
-    let surf = BlockState::new(surface_block);
     let sub = BlockState::new(subsurface_block);
     let surface_depth = surface_depth.max(1);
+    let uniform = surface_blocks.len() == 1;
     let depth = heights.len() / width;
     for gz in 0..depth {
         for gx in 0..width {
-            let h = heights[gz * width + gx].max(0);
+            let idx = gz * width + gx;
+            let h = heights[idx].max(0);
+            let surf = if uniform {
+                BlockState::new(surface_blocks[0].as_str())
+            } else {
+                BlockState::new(surface_blocks[idx.min(surface_blocks.len() - 1)].as_str())
+            };
             for y in 0..=h {
                 let bs = if y > h - surface_depth { &surf } else { &sub };
                 s.set_block(gx as i32, y, gz as i32, bs);
@@ -133,7 +144,14 @@ mod tests {
     #[test]
     fn heightmap_caps_with_surface() {
         // 2x2 grid, heights [2,2,5,5].
-        let s = heightmap_terrain("t", &[2, 2, 5, 5], 2, "minecraft:grass_block", "minecraft:stone", 1);
+        let s = heightmap_terrain(
+            "t",
+            &[2, 2, 5, 5],
+            2,
+            &["minecraft:grass_block".to_string()],
+            "minecraft:stone",
+            1,
+        );
         assert_eq!(s.get_block(0, 2, 0).unwrap().name, "minecraft:grass_block");
         assert_eq!(s.get_block(0, 1, 0).unwrap().name, "minecraft:stone");
         assert_eq!(s.get_block(0, 5, 1).unwrap().name, "minecraft:grass_block");
@@ -141,5 +159,21 @@ mod tests {
             s.get_block(0, 3, 0).map_or(true, |b| b.name == "minecraft:air"),
             "nothing solid above the column top"
         );
+    }
+
+    #[test]
+    fn heightmap_per_column_surface_bands() {
+        // 2x1: each column gets its own surface block (elevation banding).
+        let s = heightmap_terrain(
+            "t",
+            &[3, 3],
+            2,
+            &["minecraft:snow_block".to_string(), "minecraft:gravel".to_string()],
+            "minecraft:stone",
+            1,
+        );
+        assert_eq!(s.get_block(0, 3, 0).unwrap().name, "minecraft:snow_block");
+        assert_eq!(s.get_block(1, 3, 0).unwrap().name, "minecraft:gravel");
+        assert_eq!(s.get_block(0, 0, 0).unwrap().name, "minecraft:stone");
     }
 }
