@@ -242,13 +242,13 @@ duck = Voxelizer.schematic_from_glb_textured(duck_glb, 44.0, 0.7, Palette.solid(
 ```
 
 And it scales: a full Mario Kart 64 Rainbow Road, voxelized to a road eight
-blocks wide — 515 blocks long, 53,000 blocks, solved in 1.5 seconds by the
+blocks wide — 515 blocks long, 51,000 blocks, solved in 1.5 seconds by the
 scanline voxelizer:
 
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mariokart-track.png?v=2" width="760" alt="Rainbow Road N64 voxelized: the whole course as a glowing rainbow ribbon">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mariokart-track.png?v=3" width="760" alt="Rainbow Road N64 voxelized: the whole course as a glowing rainbow ribbon">
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mariokart-closeup.png?v=2" width="620" alt="Closeup of the voxelized road: eight blocks wide, rainbow rails, gold star specks">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mariokart-closeup.png?v=3" width="620" alt="Closeup of the voxelized road: eight blocks wide, rainbow-striped surface curving into a banked loop">
 </div>
 
 A ribbon in the void is the easy case. Koopa Troopa Beach is the hard one — an

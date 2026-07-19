@@ -710,7 +710,14 @@ def _mariokart_glb():
     src = os.path.join(MODELS_DIR, "mk64-rainbow-road")
     subprocess.run(["unzip", "-oq", zip_path, "-d", src], check=True)
 
-    keep = {"Material__992", "Material__975"}    # road surface, rainbow rails
+    # Keep ONLY the rainbow ribbon (__975). Material __992 is the track's
+    # near-vertical side-skirt geometry (100% of its faces point sideways):
+    # each material voxelizes cleanly on its own, but together the skirt walls
+    # give the scanline parity solver extra ray crossings, so it marks the
+    # gaps between the skirt and the ribbon as "interior" and fills them into
+    # blue "sails". Dropping the skirt leaves a clean open rainbow ribbon that
+    # the shell handles perfectly — which is what Rainbow Road actually is.
+    keep = {"Material__975"}
     cur, lines = None, []
     for line in open(os.path.join(src, "rainbow.obj")):
         if line.startswith("usemtl"):
@@ -720,18 +727,10 @@ def _mariokart_glb():
             continue
         lines.append(line.replace("rainbow.mtl", "track.mtl"))
     open(os.path.join(src, "track.obj"), "w").writelines(lines)
+    # Strip MTL transparency so the palette snap can't land in stained glass.
     mtl = [line for line in open(os.path.join(src, "rainbow.mtl"))
            if not line.split() or line.split()[0] not in ("d", "Tr", "Tf")]
-    open(os.path.join(src, "track.mtl"), "w").writelines(
-        line.replace("31A2D889_c.png", "road_dark.png") for line in mtl)
-    # A deep starfield blue (not near-black): the road banks hard into the
-    # loops, and a near-black backing made those banked faces read as black
-    # voids at a low camera. Deep blue reads as intentional track surface.
-    subprocess.run(["ffmpeg", "-y", "-loglevel", "error",
-                    "-f", "lavfi", "-i", "color=0x3a2d80:s=32x32,format=rgba",
-                    "-i", os.path.join(src, "31A2D889_c.png"),
-                    "-filter_complex", "[0][1]overlay=format=auto:shortest=1,format=rgb24",
-                    os.path.join(src, "road_dark.png")], check=True)
+    open(os.path.join(src, "track.mtl"), "w").writelines(mtl)
     subprocess.run(["npx", "-y", "obj2gltf", "-i", os.path.join(src, "track.obj"),
                     "-o", glb, "--binary"], check=True)
     return glb
