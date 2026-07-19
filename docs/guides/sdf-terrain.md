@@ -20,8 +20,11 @@ Primitives: `sphere`, `box`, `torus`, `capsule`, `cappedCylinder`,
 `superPrism`. Operators: `union` (n-ary), `intersection`, `difference`,
 `smoothUnion` / `smoothIntersection` / `smoothDifference` (with blend
 radius `k`). Transforms: `translate`, `rotate`, `scale`. Noise:
-`displace` (`amplitude`, `frequency`, `seed`, optional `octaves`).
-Field names are camelCase; see `src/sdf/node.rs` for the full schema.
+`displace` (`amplitude`, `frequency`, `seed`, optional `octaves`) and `warp`;
+`cells` for Worley / Voronoi (`frequency`, `seed`, `jitter`, `mode` one of
+`f1` / `f2` / `f2MinusF1` / `value`, optional `threshold`). Any node also drives
+color through `Brush.field`, and any point through `Sdf.eval`. Field names are
+camelCase; see `src/sdf/node.rs` for the full schema.
 
 ## Material rules
 
