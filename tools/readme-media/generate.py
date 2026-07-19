@@ -1266,6 +1266,48 @@ def scene_city(pack):
     return s
 
 
+def scene_worldgen(pack):
+    """The OSM city generated chunk by chunk — the streaming world generator,
+    animated. The full city is built once (the one-shot path), then its 16×16
+    chunk columns are revealed in a diagonal wavefront into a fixed frame, the
+    way `from_schematic` streams them out one chunk at a time."""
+    full = _city_schematic()
+    mn, mx = full.tight_bounds_min(), full.tight_bounds_max()
+    chunks = [(cx, cz)
+              for cx in range(mn.x // 16, mx.x // 16 + 1)
+              for cz in range(mn.z // 16, mx.z // 16 + 1)]
+    chunks.sort(key=lambda c: (c[0] + c[1], c[0]))     # diagonal wavefront
+    frames = 30
+    per = max(1, math.ceil(len(chunks) / frames))
+    accum = nu.Schematic.create("worldgen")
+    tmp = tempfile.mkdtemp(prefix="nuc-wg-")
+    try:
+        fi = 0
+        for start in range(0, len(chunks), per):
+            for cx, cz in chunks[start:start + per]:
+                x0, z0 = cx * 16, cz * 16
+                accum.copy_region(full, x0, mn.y, z0, x0 + 15, mx.y, z0 + 15,
+                                  x0, mn.y, z0, "[]")
+            cfg = nu.RenderConfig.create(900, 520)
+            cfg.set_isometric(); cfg.set_yaw(300.0); cfg.set_pitch(12.0)
+            cfg.set_zoom(0.8); cfg.set_sphere_fit(False)
+            cfg.set_background(*NAVY)
+            nu.Renderer.render_to_file(accum, pack, cfg,
+                                       os.path.join(tmp, f"f{fi:03}.png"))
+            fi += 1
+        # hold the finished skyline for a beat before the loop restarts
+        last = os.path.join(tmp, f"f{fi - 1:03}.png")
+        for _ in range(8):
+            shutil.copy(last, os.path.join(tmp, f"f{fi:03}.png"))
+            fi += 1
+        assemble_gif(tmp, os.path.join(OUT, "worldgen-osm.gif"),
+                     fps=10, max_colors=96)
+        print(f"  wrote docs/media/worldgen-osm.gif ({fi} frames)")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return None
+
+
 def scene_dither(pack):
     """Hard-snap vs dithered palette on the same shaded sphere, hstacked."""
     def sphere(dither):
@@ -1764,6 +1806,7 @@ def scene_storage(pack):
 
 SCENES = {
     "streaming": scene_streaming,
+    "worldgen": scene_worldgen,
     "storage": scene_storage,
     "regions": scene_regions,
     "blockentities": scene_blockentities,

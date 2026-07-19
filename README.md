@@ -382,6 +382,12 @@ for cx in range(-8, 8):
 sink.finish()
 ```
 
+Here's the OSM Financial District doing exactly that — 179 buildings streamed
+out one 16×16 chunk column at a time, a diagonal wavefront assembling the whole
+2.4M-block skyline:
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/worldgen-osm.gif" width="760" alt="The voxel Financial District generating chunk column by chunk column in a diagonal sweep until the full skyline stands">
+
 Run the same bridge the other way and it's a *processing pipeline*: `WorldStream`
 in → `to_schematic` → transform with any tool → `from_schematic` → `WorldSink`
 out. The OSM city, an SDF, a heightmap, a filter — all the same three moves
