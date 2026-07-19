@@ -1541,6 +1541,66 @@ def scene_paintings(pack):
     print("  wrote docs/media/painting-starry-night.png + painting-gallery.png")
 
 
+def _starry_night_path():
+    import urllib.request
+    path = os.path.join(MODELS_DIR, "starry-night.jpg")
+    if not os.path.exists(path):
+        os.makedirs(MODELS_DIR, exist_ok=True)
+        req = urllib.request.Request(_commons_url(PAINTINGS["starry-night"][0]),
+                                     headers={"User-Agent": "nucleation-readme-media/1.0"})
+        open(path, "wb").write(urllib.request.urlopen(req).read())
+    return path
+
+
+# The composition: a torus SDF, a lattice of spheres subtracted for holes, a
+# noise warp to deform it, then Starry Night texture-projected around the ring
+# and tube through the flat-art palette. Five features stacking in one build.
+COMPOSE_SDF = json.dumps({
+    "type": "warp", "amplitude": 3.0, "frequency": 0.045, "seed": 11,
+    "child": {
+        "type": "smoothSubtract", "k": 1.5,
+        "a": {"type": "torus", "majorRadius": 26, "minorRadius": 9},
+        "b": {"type": "repeat", "spacing": [11, 11, 11],
+              "child": {"type": "sphere", "radius": 3.5}},
+    },
+})
+COMPOSE_MAJOR = 26.0
+
+
+def scene_compose(pack):
+    """Everything at once: an SDF torus with lattice holes, warp-deformed, wearing
+    Van Gogh's Starry Night wrapped around it (UVs from the torus geometry, colors
+    through the dithered flat-art palette). Rendered as a turntable."""
+    w, h, raw = _image_pixels(_starry_night_path(), 200)
+
+    def sample(u, v):
+        px = min(w - 1, max(0, int(u * w)))
+        py = min(h - 1, max(0, int((1.0 - v) * h)))
+        i = (py * w + px) * 3
+        return raw[i], raw[i + 1], raw[i + 2]
+
+    s = nu.Schematic.create("compose")
+    nu.BuildingTool.fill(s, nu.Shape.sdf(COMPOSE_SDF), nu.Brush.solid("minecraft:stone"))
+    pal = flat_art_palette().dithered()
+    two_pi = 2.0 * math.pi
+    r = COMPOSE_MAJOR
+    for b in json.loads(s.get_all_blocks_json()):
+        if b["name"] != "minecraft:stone":
+            continue
+        x, y, z = b["x"], b["y"], b["z"]
+        phi = math.atan2(z, x)
+        u = (phi / two_pi + 0.5) % 1.0                 # around the ring
+        cphi, sphi = math.cos(phi), math.sin(phi)
+        radial = (x - r * cphi) * cphi + (z - r * sphi) * sphi
+        v = (math.atan2(y, radial) / two_pi + 0.5) % 1.0   # around the tube
+        cr, cg, cb = _boost(*sample(u, v))
+        s.set_block(x, y, z, pal.closest_block_dithered(cr, cg, cb, x, y, z))
+
+    turntable_gif(s, pack, os.path.join(OUT, "compose-torus.gif"),
+                  frames=36, w=680, h=560, pitch=36, zoom=1.2)
+    return s
+
+
 # NASA Blue Marble (land/ocean/ice composite), public domain — the globe's
 # equirectangular texture, mirrored on Wikimedia Commons.
 GLOBE_TEXTURE = "Land ocean ice 2048.jpg"
@@ -1854,6 +1914,7 @@ SCENES = {
     "blockentities": scene_blockentities,
     "globe": scene_globe,
     "paintings": scene_paintings,
+    "compose": scene_compose,
     "dither": scene_dither,
     "scripting": scene_scripting,
     "simulation": scene_simulation,
