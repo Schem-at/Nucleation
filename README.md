@@ -266,7 +266,7 @@ luminosity through the dithered palette, so continents sweep through a
 true day/night terminator:
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/globe-day-night.gif" width="440" alt="A voxel Earth rotating through a day/night cycle, every block re-picked by luminosity">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/globe-day-night.gif?v=2" width="440" alt="A voxel Earth rotating through a day/night cycle, every block re-picked by luminosity">
 </div>
 
 And real geodata voxelizes straight from public sources — the Matterhorn

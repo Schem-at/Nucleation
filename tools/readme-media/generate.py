@@ -1481,7 +1481,7 @@ def scene_paintings(pack):
 # NASA Blue Marble (land/ocean/ice composite), public domain — the globe's
 # equirectangular texture, mirrored on Wikimedia Commons.
 GLOBE_TEXTURE = "Land ocean ice 2048.jpg"
-GLOBE_RADIUS = 60.0
+GLOBE_RADIUS = 120.0
 GLOBE_FRAMES = 48
 # Fixed sun, world space (camera at yaw 0 looks along -z, so +z faces the
 # viewer): from the camera's upper right, pulled far enough sideways that the
@@ -1535,7 +1535,10 @@ def _globe_frame(phase, surf, tex, pal):
                          nu.Brush.solid("minecraft:black_concrete"))
     two_pi = 2.0 * math.pi
     for x, y, z, nx, ny, nz in surf:
-        u = (math.atan2(nz, nx) / two_pi + phase) % 1.0
+        # -atan2 so longitude runs west→east left→right across the visible
+        # face (the camera looks down -Z, +X on the right); -phase spins the
+        # globe eastward (prograde), features drifting to the right.
+        u = (-math.atan2(nz, nx) / two_pi - phase) % 1.0
         v = 0.5 - math.asin(max(-1.0, min(1.0, ny))) / math.pi
         i = (min(th - 1, max(0, int(v * th))) * tw + min(tw - 1, int(u * tw))) * 3
         light = max(0.0, nx * sx + ny * sy + nz * sz)
