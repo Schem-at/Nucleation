@@ -10,7 +10,8 @@ binding — the same API the README documents. Regenerate after visual changes:
 The resource pack is any vanilla-format pack zip (assets/minecraft/...);
 it is NOT committed to the repo. Output lands in docs/media/.
 GIF assembly and image compositing need ffmpeg on PATH; there are no other
-dependencies (no Pillow/numpy).
+Python dependencies (no Pillow/numpy). The mariokart scene additionally needs
+Node on PATH (npx obj2gltf converts the ripped OBJ course to GLB).
 
     --only hero,torus     regenerate a subset (see SCENES for names)
 """
@@ -670,6 +671,133 @@ def scene_teapot(pack):
     return s
 
 
+MK64_ZIP_URL = ("https://models.spriters-resource.com/media/assets/309/"
+                "311926.zip?updated=1755503213")   # Rainbow Road (Mario Kart 64)
+MK64_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+           "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+
+# 32 saturated wools/concretes + two "glow" golds: matches the track's neon
+# rainbow far better than Palette.all(), which wanders into glass and ores.
+MK64_PALETTE = [f"minecraft:{c}_{kind}" for kind in ("concrete", "wool")
+                for c in ("white", "orange", "magenta", "light_blue", "yellow",
+                          "lime", "pink", "gray", "light_gray", "cyan", "purple",
+                          "blue", "brown", "green", "red", "black")]
+MK64_PALETTE += ["minecraft:gold_block", "minecraft:glowstone"]
+
+
+def _mariokart_glb():
+    """Download + prepare the MK64 Rainbow Road track as an opaque GLB.
+
+    Needs Node on PATH: the OBJ+MTL+PNG rip is converted with `npx obj2gltf`.
+    Preparation is deterministic:
+      * keep only the two materials that span the whole course (road ribbon +
+        rainbow rails); everything else is trackside billboards/banner,
+      * composite the road's star texture (pure yellow + alpha) over the dark
+        indigo it blends against in-game, and strip the MTL transparency —
+        otherwise the voxelizer's palette snap lands in stained glass,
+      * rebuild as a self-contained binary GLB.
+    """
+    glb = os.path.join(MODELS_DIR, "mk64-rainbow-road.glb")
+    if os.path.exists(glb):
+        return glb
+    zip_path = os.path.join(MODELS_DIR, "mk64-rainbow-road.zip")
+    if not os.path.exists(zip_path):
+        os.makedirs(MODELS_DIR, exist_ok=True)
+        subprocess.run(["curl", "-sL", "-A", MK64_UA, "-o", zip_path,
+                        MK64_ZIP_URL], check=True)
+    src = os.path.join(MODELS_DIR, "mk64-rainbow-road")
+    subprocess.run(["unzip", "-oq", zip_path, "-d", src], check=True)
+
+    keep = {"Material__992", "Material__975"}    # road surface, rainbow rails
+    cur, lines = None, []
+    for line in open(os.path.join(src, "rainbow.obj")):
+        if line.startswith("usemtl"):
+            cur = line.split()[1]
+        if line.startswith(("f ", "g ", "usemtl", "s ")) and cur is not None \
+                and cur not in keep:
+            continue
+        lines.append(line.replace("rainbow.mtl", "track.mtl"))
+    open(os.path.join(src, "track.obj"), "w").writelines(lines)
+    mtl = [line for line in open(os.path.join(src, "rainbow.mtl"))
+           if not line.split() or line.split()[0] not in ("d", "Tr", "Tf")]
+    open(os.path.join(src, "track.mtl"), "w").writelines(
+        line.replace("31A2D889_c.png", "road_dark.png") for line in mtl)
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error",
+                    "-f", "lavfi", "-i", "color=0x1e1a46:s=32x32,format=rgba",
+                    "-i", os.path.join(src, "31A2D889_c.png"),
+                    "-filter_complex", "[0][1]overlay=format=auto:shortest=1,format=rgb24",
+                    os.path.join(src, "road_dark.png")], check=True)
+    subprocess.run(["npx", "-y", "obj2gltf", "-i", os.path.join(src, "track.obj"),
+                    "-o", glb, "--binary"], check=True)
+    return glb
+
+
+def scene_mariokart(pack):
+    """MK64 Rainbow Road, voxelized from the ripped course model.
+
+    target_size=515 calibrates the road ribbon to 8-9 blocks wide (measured
+    as the mode of cross-road block runs on straight segments). shell=1.0 is
+    essential: the track is an open ribbon surface, so parity-based interior
+    tests fail — the shell claims every voxel within one voxel of the
+    surface instead.
+    """
+    glb = open(_mariokart_glb(), "rb").read()
+    pal = nu.Palette.from_block_ids(json.dumps(MK64_PALETTE))
+    s = nu.Voxelizer.schematic_from_glb_textured(glb, 515.0, 1.0, pal,
+                                                 "rainbow_road")
+
+    # The two kept materials still carry a few floating trackside scraps;
+    # drop every connected component except the course itself. Blocks are
+    # streamed in z-slabs: one get_all_blocks_json on the full ~500^3-bounded
+    # volume enumerates every air voxel too and swallows gigabytes.
+    mn, mx = s.tight_bounds_min(), s.tight_bounds_max()
+    occ = set()
+    for zs in range(mn.z, mx.z + 1, 16):
+        chunk = json.loads(s.get_chunk_blocks_json(
+            mn.x, mn.y, zs, mx.x - mn.x + 1, mx.y - mn.y + 1,
+            min(16, mx.z + 1 - zs)))
+        occ.update((b["x"], b["y"], b["z"]) for b in chunk
+                   if b["name"] != "minecraft:air")
+    seen, comps = set(), []
+    for p in occ:
+        if p in seen:
+            continue
+        stack, comp = [p], [p]
+        seen.add(p)
+        while stack:
+            x, y, z = stack.pop()
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    for dz in (-1, 0, 1):
+                        q = (x + dx, y + dy, z + dz)
+                        if q in occ and q not in seen:
+                            seen.add(q)
+                            stack.append(q)
+                            comp.append(q)
+        comps.append(comp)
+    comps.sort(key=len, reverse=True)
+    for comp in comps[1:]:
+        for (x, y, z) in comp:
+            s.set_block(x, y, z, "minecraft:air")
+
+    # Hero: three-quarter aerial framing the whole course.
+    render(s, pack, os.path.join(OUT, "mariokart-track.png"), w=1200, h=800,
+           yaw=250, pitch=45, zoom=1.05, background=NAVY)
+    # Closeup: low-angle over the crossing straights; the ~9-block road and
+    # its projected star/rail textures fill the frame (sphere_fit off, so
+    # zoom>1 dives into the scene instead of re-fitting it).
+    cfg = nu.RenderConfig.create(1100, 700)
+    cfg.set_isometric(); cfg.set_yaw(205.0); cfg.set_pitch(12.0)
+    cfg.set_zoom(4.0); cfg.set_sphere_fit(False)
+    cfg.set_background(*NAVY)
+    nu.Renderer.render_to_file(s, pack, cfg,
+                               os.path.join(OUT, "mariokart-closeup.png"))
+    print("  wrote docs/media/mariokart-closeup.png")
+    turntable_gif(s, pack, os.path.join(OUT, "mariokart-turntable.gif"),
+                  frames=36, pitch=35, zoom=1.75)
+    return s
+
+
 def scene_duck(pack):
     """The classic COLLADA duck, texture-projected onto blocks."""
     glb = open(_fetch_model("Duck.glb", DUCK_URL), "rb").read()
@@ -765,6 +893,7 @@ SCENES = {
     "simulation": scene_simulation,
     "teapot": scene_teapot,
     "duck": scene_duck,
+    "mariokart": scene_mariokart,
     "metaballs": scene_metaballs,
     "basics": scene_basics,
     "hero": scene_hero,
