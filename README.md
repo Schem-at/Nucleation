@@ -245,10 +245,10 @@ And it scales: a full Mario Kart 64 Rainbow Road, voxelized to a road eight
 blocks wide — 515 blocks long, 53,000 blocks, solved in 1.5 seconds by the
 scanline voxelizer:
 
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mariokart-track.png" width="760" alt="Rainbow Road N64 voxelized: the whole course as a glowing rainbow ribbon">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mariokart-track.png?v=2" width="760" alt="Rainbow Road N64 voxelized: the whole course as a glowing rainbow ribbon">
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mariokart-closeup.png" width="620" alt="Closeup of the voxelized road: eight blocks wide, rainbow rails, gold star specks">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mariokart-closeup.png?v=2" width="620" alt="Closeup of the voxelized road: eight blocks wide, rainbow rails, gold star specks">
 </div>
 
 A ribbon in the void is the easy case. Koopa Troopa Beach is the hard one — an
@@ -256,7 +256,7 @@ open island of sand, dirt track, cliffs, palms and a central lagoon, with the
 sea faked in as a floor plane so the parity solver has a closed volume to fill.
 Same call, a color-matched beach palette, and the shore reads at a glance:
 
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mk64-koopa-beach.png" width="760" alt="Mario Kart 64 Koopa Troopa Beach voxelized: sand island, cyan shallows and central lagoon in an endless sea">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mk64-koopa-beach.png?v=2" width="760" alt="Mario Kart 64 Koopa Troopa Beach voxelized: sand island, cyan shallows and central lagoon in an endless sea">
 
 ## The real world, in blocks
 
