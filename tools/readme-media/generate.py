@@ -724,8 +724,11 @@ def _mariokart_glb():
            if not line.split() or line.split()[0] not in ("d", "Tr", "Tf")]
     open(os.path.join(src, "track.mtl"), "w").writelines(
         line.replace("31A2D889_c.png", "road_dark.png") for line in mtl)
+    # A deep starfield blue (not near-black): the road banks hard into the
+    # loops, and a near-black backing made those banked faces read as black
+    # voids at a low camera. Deep blue reads as intentional track surface.
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error",
-                    "-f", "lavfi", "-i", "color=0x1e1a46:s=32x32,format=rgba",
+                    "-f", "lavfi", "-i", "color=0x3a2d80:s=32x32,format=rgba",
                     "-i", os.path.join(src, "31A2D889_c.png"),
                     "-filter_complex", "[0][1]overlay=format=auto:shortest=1,format=rgb24",
                     os.path.join(src, "road_dark.png")], check=True)
@@ -784,7 +787,7 @@ def scene_mariokart(pack):
 
     # Hero: three-quarter aerial framing the whole course.
     render(s, pack, os.path.join(OUT, "mariokart-track.png"), w=1200, h=800,
-           yaw=250, pitch=45, zoom=1.05, background=NAVY)
+           yaw=250, pitch=52, zoom=1.05, background=NAVY)
     # Closeup: low-angle over the crossing straights; the ~9-block road and
     # its projected star/rail textures fill the frame (sphere_fit off, so
     # zoom>1 dives into the scene instead of re-fitting it).
@@ -863,17 +866,22 @@ def _koopa_glb():
         if line.startswith(("f ", "g ", "usemtl", "s ")) and cur is not None \
                 and cur not in keep:
             continue
-        # The frame-ripped road carries ~115 near-vertical "curtain" faces
-        # (capture-frustum skirts radiating across the map). A real road
-        # face always points up, so drop road faces with |normal.y| < 0.35.
-        if line.startswith("f ") and cur == "_Rip1VMtl033":
+        # Frame-ripped courses carry big near-vertical "curtain" faces
+        # (capture-frustum skirts radiating across the map). On the road they
+        # streak the track; across the sea they voxelize into thin lines. Drop
+        # any *large* near-vertical face (|normal.y| small AND a long edge);
+        # genuine vertical detail — cliff walls, palm trunks — is finely
+        # tessellated with short edges and survives. Applied to every material,
+        # not just the road, which is what clears the lines over the water.
+        if line.startswith("f "):
             p = [verts[int(t.split("/")[0]) - 1] for t in line.split()[1:4]]
             u = [p[1][i] - p[0][i] for i in range(3)]
             v = [p[2][i] - p[0][i] for i in range(3)]
             n = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2],
                  u[0] * v[1] - u[1] * v[0])
             length = math.sqrt(sum(c * c for c in n)) or 1.0
-            if abs(n[1]) / length < 0.35:
+            edge = max(math.dist(p[a], p[b]) for a, b in ((0, 1), (1, 2), (2, 0)))
+            if abs(n[1]) / length < 0.35 and edge > 16.0:
                 continue
         lines.append(line.replace("KoopaTroopaBeach.mtl", "track.mtl"))
     # Close the model from below: every rip surface is single-sided, so the
