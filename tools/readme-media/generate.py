@@ -1965,9 +1965,90 @@ def scene_g_knot(pack):
     return s
 
 
+def _in_menger(x, y, z, level):
+    for _ in range(level):
+        if [x % 3, y % 3, z % 3].count(1) >= 2:
+            return False
+        x //= 3; y //= 3; z //= 3
+    return True
+
+
+def scene_g_menger(pack):
+    """A level-4 Menger sponge: the classic recursive fractal, every cell kept
+    or carved by the same mod-3 test, tinted by height."""
+    s = nu.Schematic.create("menger")
+    pal = nu.Palette.concrete()
+    n = 81
+    for x in range(n):
+        for y in range(n):
+            for z in range(n):
+                if _in_menger(x, y, z, 4):
+                    f = y / n                                  # icy blue up to white
+                    block = pal.closest_block(int(60 + f * 195),
+                                              int(110 + f * 145), int(225 + f * 30))
+                    s.set_block(x, y, z, block)
+    render(s, pack, os.path.join(OUT, "gallery-menger.png"), w=720, h=680,
+           yaw=35, pitch=28, zoom=1.15, background=NAVY, sphere_fit=True)
+    return s
+
+
+def _rodrigues(v, axis, ang):
+    # Rodrigues rotation of vector v about `axis` by angle `ang`.
+    import math as _m
+    ux, uy, uz = axis
+    n = _m.sqrt(ux * ux + uy * uy + uz * uz) or 1.0
+    ux, uy, uz = ux / n, uy / n, uz / n
+    c, sn = _m.cos(ang), _m.sin(ang)
+    vx, vy, vz = v
+    dot = ux * vx + uy * vy + uz * vz
+    return (
+        vx * c + (uy * vz - uz * vy) * sn + ux * dot * (1 - c),
+        vy * c + (uz * vx - ux * vz) * sn + uy * dot * (1 - c),
+        vz * c + (ux * vy - uy * vx) * sn + uz * dot * (1 - c),
+    )
+
+
+def scene_g_tree(pack):
+    """A recursive fractal tree: each branch splits into three tilted children,
+    autumn foliage at the tips."""
+    s = nu.Schematic.create("tree")
+    fill = nu.BuildingTool.fill
+    autumn = ["minecraft:green_concrete", "minecraft:lime_concrete", "minecraft:yellow_concrete",
+              "minecraft:orange_concrete", "minecraft:red_concrete"]
+
+    def perp(d):
+        a = (1.0, 0.0, 0.0) if abs(d[0]) < 0.9 else (0.0, 1.0, 0.0)
+        cx = d[1] * a[2] - d[2] * a[1]
+        cy = d[2] * a[0] - d[0] * a[2]
+        cz = d[0] * a[1] - d[1] * a[0]
+        return (cx, cy, cz)
+
+    def grow(x, y, z, d, length, radius, depth, twist):
+        x2, y2, z2 = x + d[0] * length, y + d[1] * length, z + d[2] * length
+        fill(s, nu.Shape.cylinder_between(round(x), round(y), round(z),
+                                          round(x2), round(y2), round(z2), max(1.0, radius)),
+             nu.Brush.solid("minecraft:spruce_log"))
+        if depth == 0:
+            leaf = autumn[min(len(autumn) - 1, int((y2 / 55.0) * len(autumn)))]
+            fill(s, nu.Shape.sphere(round(x2), round(y2), round(z2), 4), nu.Brush.solid(leaf))
+            return
+        p = perp(d)
+        for k in range(3):
+            tilted = _rodrigues(d, p, math.radians(34))
+            child = _rodrigues(tilted, d, twist + k * 2 * math.pi / 3)
+            grow(x2, y2, z2, child, length * 0.74, radius * 0.68, depth - 1, twist + 0.7)
+
+    grow(0, 0, 0, (0.0, 1.0, 0.0), 15.0, 3.0, 7, 0.4)
+    render(s, pack, os.path.join(OUT, "gallery-tree.png"), w=640, h=760,
+           yaw=40, pitch=18, zoom=1.2, background=NAVY, sphere_fit=True)
+    return s
+
+
 SCENES = {
     "g-dna": scene_g_dna,
     "g-knot": scene_g_knot,
+    "g-menger": scene_g_menger,
+    "g-tree": scene_g_tree,
     "streaming": scene_streaming,
     "worldgen": scene_worldgen,
     "worldgen-sdf": scene_worldgen_sdf,
