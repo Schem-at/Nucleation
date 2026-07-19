@@ -1977,15 +1977,15 @@ def scene_g_menger(pack):
     """A level-4 Menger sponge: the classic recursive fractal, every cell kept
     or carved by the same mod-3 test, tinted by height."""
     s = nu.Schematic.create("menger")
-    pal = nu.Palette.concrete()
+    pal = flat_art_palette().dithered()                        # rich + dithered = smooth
     n = 81
     for x in range(n):
         for y in range(n):
             for z in range(n):
                 if _in_menger(x, y, z, 4):
-                    f = y / n                                  # icy blue up to white
-                    block = pal.closest_block(int(60 + f * 195),
-                                              int(110 + f * 145), int(225 + f * 30))
+                    f = y / n                                  # deep teal up to pale ice
+                    block = pal.closest_block_dithered(
+                        int(30 + f * 185), int(120 + f * 125), int(150 + f * 105), x, y, z)
                     s.set_block(x, y, z, block)
     render(s, pack, os.path.join(OUT, "gallery-menger.png"), w=720, h=680,
            yaw=35, pitch=28, zoom=1.15, background=NAVY, sphere_fit=True)
@@ -2068,7 +2068,7 @@ def scene_g_mandelbulb(pack):
     """The power-8 Mandelbulb: a spherical z → z^8 + c escape test per voxel,
     the surface tinted by a fiery vertical gradient."""
     s = nu.Schematic.create("bulb")
-    pal = nu.Palette.concrete()
+    pal = flat_art_palette().dithered()                        # dithered ember gradient
     n, power, span = 132, 8, 2.5
     for ix in range(n):
         for iy in range(n):
@@ -2091,8 +2091,8 @@ def scene_g_mandelbulb(pack):
                     z = rp * math.cos(theta) + cz
                 if inside:
                     f = iy / n                                   # ember red up to gold
-                    s.set_block(ix, iy, iz, pal.closest_block(
-                        int(150 + f * 105), int(20 + f * 200), int(10 + f * 40)))
+                    s.set_block(ix, iy, iz, pal.closest_block_dithered(
+                        int(90 + f * 165), int(15 + f * 210), int(8 + f * 70), ix, iy, iz))
     render(s, pack, os.path.join(OUT, "gallery-mandelbulb.png"), w=720, h=700,
            yaw=25, pitch=26, zoom=1.3, background=NAVY, sphere_fit=True)
     return s
@@ -2109,7 +2109,7 @@ def scene_g_fox(pack):
     fox = nu.Voxelizer.schematic_from_glb_textured(glb, 84.0, 0.7,
                                                    nu.Palette.solid(), "fox")
     render(fox, pack, os.path.join(OUT, "gallery-fox.png"), w=760, h=620,
-           yaw=210, pitch=14, zoom=1.15, background=NAVY, sphere_fit=True)
+           yaw=30, pitch=14, zoom=1.15, background=NAVY, sphere_fit=True)
     return fox
 
 

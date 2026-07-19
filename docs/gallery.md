@@ -68,11 +68,12 @@ def in_menger(x, y, z, level):
         x, y, z = x // 3, y // 3, z // 3
     return True
 
+pal = flat_art_palette().dithered()              # a rich palette, dithered for smooth ramps
 for x in range(81):
     for y in range(81):
         for z in range(81):
             if in_menger(x, y, z, 4):
-                s.set_block(x, y, z, pal.closest_block(*blue_to_white(y / 81)))
+                s.set_block(x, y, z, pal.closest_block_dithered(*teal_to_ice(y / 81), x, y, z))
 ```
 
 ## Fractal tree
@@ -143,7 +144,7 @@ for cx, cy, cz in grid(n=132, span=2.5):        # c = each voxel's position
                    rp*math.sin(t)*math.sin(p) + cy,
                    rp*math.cos(t) + cz)          # ... + c
     else:
-        s.set_block(gx, gy, gz, pal.closest_block(*ember(gy)))
+        s.set_block(gx, gy, gz, pal.closest_block_dithered(*ember(gy), gx, gy, gz))
 ```
 
 ## Voxelized fox
