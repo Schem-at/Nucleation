@@ -29,7 +29,8 @@ nucleation itself, and every snippet ran for real
 [Mesh & render](#mesh-and-render) · [Analyze](#analyze-diff-fingerprint-auto-stack) ·
 [Worlds](#worlds-and-versions) · [Block database](#the-block-database) ·
 [Scripting](#scripting) · [Storage](#pluggable-storage) ·
-[Languages](#one-api-seven-languages) · [Docs](#documentation--development)
+[Gallery](#the-gallery) · [Languages](#one-api-seven-languages) ·
+[Docs](#documentation--development)
 
 ## Install
 
@@ -613,6 +614,20 @@ store.put("meta/version", b"3")
 store.get_b64("meta/version")          # "Mw=="
 store.list("meta/")                    # ["meta/version"]
 ```
+
+## The gallery
+
+Ten more builds, each a short recipe that leans on the same handful of
+primitives: a rainbow DNA helix and a trefoil knot, a Menger sponge, a fractal
+tree, a gyroid, a Mandelbulb, a voxelized fox, a supershape, animated wave
+interference, and type set in blocks.
+
+<div align="center">
+<a href="docs/gallery.md"><img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/gallery-montage.png" width="900" alt="A gyroid, a trefoil knot, a voxelized fox, and a fractal tree, four of the gallery builds"></a>
+</div>
+
+Every one is a few dozen lines. Open the [gallery](docs/gallery.md) for all ten
+with their code.
 
 ## One API, seven languages
 
