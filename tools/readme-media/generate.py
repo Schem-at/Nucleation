@@ -2098,6 +2098,49 @@ def scene_g_mandelbulb(pack):
     return s
 
 
+FOX_URL = ("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/"
+           "main/Models/Fox/glTF-Binary/Fox.glb")
+
+
+def scene_g_fox(pack):
+    """The Khronos low-poly Fox, voxelized with its texture projected onto the
+    blocks — a real 3D model becomes a chunky character."""
+    glb = open(_fetch_model("Fox.glb", FOX_URL), "rb").read()
+    fox = nu.Voxelizer.schematic_from_glb_textured(glb, 84.0, 0.7,
+                                                   nu.Palette.solid(), "fox")
+    render(fox, pack, os.path.join(OUT, "gallery-fox.png"), w=760, h=620,
+           yaw=210, pitch=14, zoom=1.15, background=NAVY, sphere_fit=True)
+    return fox
+
+
+def _superformula(a, m, n1, n2, n3):
+    t1 = abs(math.cos(m * a / 4.0)) ** n2
+    t2 = abs(math.sin(m * a / 4.0)) ** n3
+    return (t1 + t2) ** (-1.0 / n1)
+
+
+def scene_g_supershape(pack):
+    """A 3D supershape from the superformula: a spherical product of two profiles,
+    sampled onto a surface of blocks and colored by longitude."""
+    s = nu.Schematic.create("supershape")
+    pal = nu.Palette.concrete()
+    fill, sphere = nu.BuildingTool.fill, nu.Shape.sphere
+    scale, steps = 26.0, 200
+    for i in range(steps):
+        theta = -math.pi + i / steps * 2 * math.pi
+        r1 = _superformula(theta, 7, 0.2, 1.7, 1.7)
+        for j in range(steps // 2):
+            phi = -math.pi / 2 + j / (steps // 2) * math.pi
+            r2 = _superformula(phi, 7, 0.2, 1.7, 1.7)
+            x = round(scale * r1 * math.cos(theta) * r2 * math.cos(phi))
+            y = round(scale * r2 * math.sin(phi))
+            z = round(scale * r1 * math.sin(theta) * r2 * math.cos(phi))
+            fill(s, sphere(x, y, z, 1), nu.Brush.solid(_hue_block(pal, i / steps)))
+    render(s, pack, os.path.join(OUT, "gallery-supershape.png"), w=720, h=680,
+           yaw=30, pitch=26, zoom=1.2, background=NAVY, sphere_fit=True)
+    return s
+
+
 SCENES = {
     "g-dna": scene_g_dna,
     "g-knot": scene_g_knot,
@@ -2105,6 +2148,8 @@ SCENES = {
     "g-tree": scene_g_tree,
     "g-gyroid": scene_g_gyroid,
     "g-mandelbulb": scene_g_mandelbulb,
+    "g-fox": scene_g_fox,
+    "g-supershape": scene_g_supershape,
     "streaming": scene_streaming,
     "worldgen": scene_worldgen,
     "worldgen-sdf": scene_worldgen_sdf,

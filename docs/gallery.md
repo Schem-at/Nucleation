@@ -145,3 +145,43 @@ for cx, cy, cz in grid(n=132, span=2.5):        # c = each voxel's position
     else:
         s.set_block(gx, gy, gz, pal.closest_block(*ember(gy)))
 ```
+
+## Voxelized fox
+
+Any GLB or OBJ becomes a `Shape`, and `schematic_from_glb_textured` projects its
+texture onto the blocks. Here the Khronos low-poly Fox turns into a chunky
+character, orange fur, white tail-tip, and dark legs all carried by the texture.
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/gallery-fox.png" width="520" alt="The Khronos low-poly Fox model voxelized, its texture giving it orange fur, a white-tipped tail, and dark legs">
+</div>
+
+```python
+glb = open("Fox.glb", "rb").read()
+fox = Voxelizer.schematic_from_glb_textured(glb, 84.0, 0.7, Palette.solid(), "fox")
+```
+
+## Supershape
+
+The superformula draws a closed profile with any number of lobes; a spherical
+product of two profiles sweeps it into a 3D solid. This one is seven-lobed and
+colored by longitude.
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/gallery-supershape.png" width="520" alt="A seven-lobed 3D supershape in rainbow blocks, like a mathematical starburst">
+</div>
+
+```python
+def superformula(a, m, n1, n2, n3):
+    return (abs(math.cos(m*a/4))**n2 + abs(math.sin(m*a/4))**n3) ** (-1/n1)
+
+for theta in linspace(-pi, pi, 200):
+    r1 = superformula(theta, 7, 0.2, 1.7, 1.7)
+    for phi in linspace(-pi/2, pi/2, 100):
+        r2 = superformula(phi, 7, 0.2, 1.7, 1.7)          # spherical product
+        x = 26 * r1 * math.cos(theta) * r2 * math.cos(phi)
+        y = 26 * r2 * math.sin(phi)
+        z = 26 * r1 * math.sin(theta) * r2 * math.cos(phi)
+        fill(s, Shape.sphere(round(x), round(y), round(z), 1),
+             Brush.solid(pal.closest_block(*hsv((theta + pi) / (2 * pi)))))
+```
