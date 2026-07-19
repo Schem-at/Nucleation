@@ -1,3 +1,21 @@
+# Nucleation v0.3.12
+
+**Fix: `region_bounding_box_json` now reports tight content bounds.** It was
+returning the region's internal storage box, which `expand_to_fit`
+over-allocates by up to 64 blocks per axis — so a region holding blocks at
+(0,0,0)..(3,2,3) reported `[0,0,0,67,66,67]` instead of `[0,0,0,3,2,3]`. It
+now uses the tight min/max of placed non-air blocks (empty regions fall back
+to the allocated box).
+
+Docs: the README was restructured around author → read/process → analyze →
+data → integrate, and the read/stream/regions/NBT/scripting/storage surface
+that was previously one buried section is now first-class — including a new
+chunk-streaming visualization, a multi-region before/after, and a
+block-entity vault. Snippets for chunk iteration, regions/transforms,
+NBT, and storage are verified in `docs/readme-snippets/`.
+
+---
+
 # Nucleation v0.3.11
 
 **`Palette.closest_block_dithered(r, g, b, x, y, z)`** — the per-pixel
