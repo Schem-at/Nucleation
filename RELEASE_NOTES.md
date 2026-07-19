@@ -1,3 +1,26 @@
+# Nucleation v0.3.14
+
+**Geodata is first-class.** The moves behind the README's mountain and city
+showcases are now real, network-free API — you fetch and project, they build
+the blocks:
+
+- `Shape.polygon_prism(polygon_json, y_min, y_max)` — extrude a closed 2D
+  footprint (even-odd fill, concave-safe) between two Y levels. The primitive
+  for building footprints, lake outlines, plot fills.
+- `Geo.extrude_footprints(buildings_json, base_block, name)` — OSM-style
+  footprints → a massed city, stamped tallest-wins per column on a ground slab.
+- `Geo.heightmap_terrain(heights_json, width, surface_blocks_json,
+  subsurface_block, surface_depth, name)` — an elevation grid → terrain
+  columns, with a single surface block or one per column for elevation/slope
+  bands (snow/scree/meadow).
+
+Both README recipes now run through these (the Matterhorn render is
+byte-identical to the hand-rolled version), and a new showcase streams the
+2.4M-block Financial District straight out to a playable Minecraft world.
+Available in all seven language bindings.
+
+---
+
 # Nucleation v0.3.13
 
 **Surface-only mesh voxelization.** `Voxelizer.shape_from_glb` /
