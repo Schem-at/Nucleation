@@ -1,3 +1,20 @@
+# Nucleation v0.3.10
+
+**Ordered dithering.** `Palette.dithered()` makes every brush alternate
+between the two nearest blocks per voxel (4x4 Bayer threshold on the
+target's position along the Oklab segment between them) — deterministic,
+and gradients stop banding. SDF gradient fills take `"dither": true` for
+the same effect between ramp steps.
+
+**The voxelizer got ~1000x faster at fills.** Bulk solves now run three
+scanline parity sweeps (one ray per column per axis, rayon-parallel,
+majority vote — same robustness as the per-voxel test) plus per-triangle
+shell rasterization, cached as a bitset on the shape. A 6k-triangle
+Mario Kart course: 107s → 0.1s at size 200; a 515-block-long
+voxelization solves in 1.5s.
+
+---
+
 # Nucleation v0.3.9
 
 **Voxelize 3D models.** New `voxelize` feature (in `bridge-full` and the
