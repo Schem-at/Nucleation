@@ -22,7 +22,7 @@ nucleation itself, and every snippet ran for real
 **Contents** · [Install](#install) · [The basics](#the-basics) ·
 [Build](#build-shapes-brushes-palettes) · [Terrain](#terrain-from-a-json-description) ·
 [Voxelize](#voxelize-3d-models) · [Redstone](#simulate-redstone) · [Mesh & render](#mesh-and-render) ·
-[Analyze](#analyze-diff-fingerprint-auto-stack) · [Masked edits](#edit-without-collateral-damage) ·
+[Analyze](#analyze-diff-fingerprint-auto-stack) · [Paintings](#paintings-in-blocks) · [Masked edits](#edit-without-collateral-damage) ·
 [Worlds & block data](#worlds-versions-and-the-block-database) ·
 [Languages](#one-api-seven-languages) · [Docs](#documentation--development)
 
@@ -303,6 +303,26 @@ tiling wall, a repeater bus, a pixel grid — and restamp it to a new size:
 Autostack.detect_structures(wall)        # {"mode": "1d", "vectors": [[4,0,0]], "coverage": 1.0}
 longer = Autostack.resize_1d(wall, 4, 0, 0, 6)   # 2 units → 6: (8,4,1) → (24,4,1)
 ```
+
+## Paintings, in blocks
+
+Everything above composes: flat-texture palettes built by color-logic
+filters, chroma-boosted matching (so muted pigments land on saturated
+blocks, not gray clays), and per-voxel ordered dithering — pointed at art.
+Van Gogh's Starry Night, 128 blocks wide:
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/painting-starry-night.png" width="760" alt="Van Gogh's Starry Night as block pixel art, 128 blocks wide">
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/painting-gallery.png" width="760" alt="Sunflowers, The Great Wave off Kanagawa, and Girl with a Pearl Earring as block pixel art">
+
+```python
+palette = flat_art_palette().dithered()          # PaletteBuilder + map-art excludes
+r, g, b = boost(*pixel, sat=1.35)                # chroma exaggeration pre-match
+s.set_block(x, 0, y, palette.closest_block_dithered(r, g, b, x, 0, y))
+```
+
+The full recipe — including the flat-palette filter chain — is
+`scene_paintings` in [`tools/readme-media/generate.py`](tools/readme-media/generate.py).
 
 ## Edit without collateral damage
 

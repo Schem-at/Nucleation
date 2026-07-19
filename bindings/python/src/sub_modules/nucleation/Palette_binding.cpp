@@ -15,6 +15,7 @@ void add_Palette_binding(nb::module_ mod) {
         .def_static("all", std::move(maybe_op_unwrap(&nucleation::Palette::all)))
         .def("block_ids_json", &nucleation::Palette::block_ids_json)
         .def("closest_block", &nucleation::Palette::closest_block, "r"_a, "g"_a, "b"_a)
+        .def("closest_block_dithered", &nucleation::Palette::closest_block_dithered, "r"_a, "g"_a, "b"_a, "x"_a, "y"_a, "z"_a)
         .def_static("concrete", std::move(maybe_op_unwrap(&nucleation::Palette::concrete)))
         .def_static("decorative", std::move(maybe_op_unwrap(&nucleation::Palette::decorative)))
         .def("dithered", std::move(maybe_op_unwrap(&nucleation::Palette::dithered)))

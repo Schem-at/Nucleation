@@ -887,7 +887,123 @@ def scene_simulation(pack):
     return lit
 
 
+
+
+# Public-domain paintings for the pixel-art gallery (Wikimedia Commons).
+PAINTINGS = {
+    "starry-night": ("Van Gogh - Starry Night - Google Art Project.jpg", 128),
+    "sunflowers": ("Vincent Willem van Gogh 127.jpg", 96),
+    "great-wave": ("Great Wave off Kanagawa2.jpg", 128),
+    "pearl-earring": ("1665 Girl with a Pearl Earring.jpg", 96),
+}
+
+# Blocks whose textures are too patterned for pixel art (faces, dots,
+# machinery) — the map-art exclusion list, applied on top of the
+# full-cube/opaque/no-tile-entity builder filters.
+NOISY_BLOCKS = [
+    "prismarine", "carved", "jack_o", "command", "structure", "loom",
+    "cartography", "crafting", "smithing", "fletching", "barrel", "jukebox",
+    "note_block", "tnt", "target", "piston", "observer", "dispenser", "dropper",
+    "furnace", "smoker", "sculk", "chiseled", "pumpkin", "melon", "mycelium",
+    "podzol", "glazed", "shroomlight", "froglight", "_ore", "raw_", "bookshelf",
+    "hay_block", "dried", "magma", "sponge", "cake", "spawner", "respawn",
+    "ancient", "reinforced", "suspicious", "infested", "mushroom", "coral",
+    "sulfur", "cinnabar", "copper_grate", "bulb", "daylight", "composter",
+    "beehive", "bee_nest", "lodestone", "bedrock", "grass_block", "creaking",
+    "pale_moss", "resin_clump", "amethyst", "budding", "wart", "nylium",
+    "oxidized", "weathered", "exposed", "pillar", "lantern", "blue_ice",
+    "packed_ice", "frosted", "crying", "gilded", "redstone_block", "slime",
+    "honey", "scaffolding", "kelp", "bamboo_block", "muddy", "root",
+]
+
+
+def flat_art_palette():
+    """A flat-texture palette for pixel art, built from filters + excludes."""
+    b = nu.PaletteBuilder.create()
+    b.full_blocks_only()
+    b.exclude_tile_entities()
+    b.exclude_transparent()
+    for kw in NOISY_BLOCKS:
+        b.exclude_keyword(kw)
+    return b.build()
+
+
+def _boost(r, g, b, sat=1.35, contrast=1.06):
+    """Chroma + contrast exaggeration before palette matching, so muted
+    paint pigments land on saturated blocks instead of gray clays."""
+    lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    out = []
+    for c in (r, g, b):
+        v = lum + (c - lum) * sat
+        v = 128.0 + (v - 128.0) * contrast
+        out.append(max(0, min(255, round(v))))
+    return out
+
+
+def _image_pixels(path, width):
+    probe = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+                            "-show_entries", "stream=width,height", "-of", "csv=p=0", path],
+                           capture_output=True, text=True).stdout.strip().split(",")
+    height = round(width * int(probe[1]) / int(probe[0]))
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", path,
+                          "-vf", f"scale={width}:{height}", "-f", "rawvideo",
+                          "-pix_fmt", "rgb24", "-"], capture_output=True).stdout
+    return width, height, raw
+
+
+def _commons_url(title):
+    import urllib.parse, urllib.request
+    q = urllib.parse.urlencode({
+        "action": "query", "titles": f"File:{title}", "prop": "imageinfo",
+        "iiprop": "url", "iiurlwidth": 1280, "format": "json"})
+    req = urllib.request.Request(
+        f"https://commons.wikimedia.org/w/api.php?{q}",
+        headers={"User-Agent": "nucleation-readme-media/1.0"})
+    d = json.load(urllib.request.urlopen(req))
+    return list(d["query"]["pages"].values())[0]["imageinfo"][0]["thumburl"]
+
+
+def scene_paintings(pack):
+    """Public-domain paintings as block pixel art: flat-texture palette from
+    color-logic filters, chroma-boosted matching, ordered dithering."""
+    import urllib.request
+    pal = flat_art_palette().dithered()
+    tiles = {}
+    for name, (title, width) in PAINTINGS.items():
+        path = os.path.join(MODELS_DIR, f"{name}.jpg")
+        if not os.path.exists(path):
+            os.makedirs(MODELS_DIR, exist_ok=True)
+            req = urllib.request.Request(
+                _commons_url(title), headers={"User-Agent": "nucleation-readme-media/1.0"})
+            open(path, "wb").write(urllib.request.urlopen(req).read())
+        w, h, raw = _image_pixels(path, width)
+        s = nu.Schematic.create(name)
+        for py in range(h):
+            for px in range(w):
+                i = (py * w + px) * 3
+                r, g, b = _boost(raw[i], raw[i + 1], raw[i + 2])
+                s.set_block(px, 0, py, pal.closest_block_dithered(r, g, b, px, 0, py))
+        out_w = 1100 if width == 128 else 760
+        cfg = nu.RenderConfig.create(out_w, round(out_w * h / w))
+        cfg.set_isometric(); cfg.set_yaw(0.0); cfg.set_pitch(89.9)
+        cfg.set_orthographic(True); cfg.set_background(0, 0, 0, 0)
+        tile = os.path.join(MODELS_DIR, f"px-{name}.png")
+        nu.Renderer.render_to_file(s, pack, cfg, tile)
+        tiles[name] = tile
+
+    shutil.copy(tiles["starry-night"], os.path.join(OUT, "painting-starry-night.png"))
+    # gallery strip: sunflowers | great wave | pearl earring at equal height
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error",
+                    "-i", tiles["sunflowers"], "-i", tiles["great-wave"],
+                    "-i", tiles["pearl-earring"],
+                    "-filter_complex",
+                    "[0]scale=-2:760[a];[1]scale=-2:760[b];[2]scale=-2:760[c];[a][b][c]hstack=3",
+                    os.path.join(OUT, "painting-gallery.png")], check=True)
+    print("  wrote docs/media/painting-starry-night.png + painting-gallery.png")
+
+
 SCENES = {
+    "paintings": scene_paintings,
     "dither": scene_dither,
     "scripting": scene_scripting,
     "simulation": scene_simulation,

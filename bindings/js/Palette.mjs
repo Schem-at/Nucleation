@@ -356,6 +356,36 @@ export class Palette {
     }
 
     /**
+     * Position-aware dithered snap: the block for the given RGB at
+     * voxel (x, y, z), alternating between the two nearest palette
+     * blocks per position (4x4 Bayer) — the per-pixel entry point for
+     * pixel art and image mapping. Deterministic. Errors with
+     * `NotFound` on an empty palette.
+     */
+    closestBlockDithered(r, g, b, x, y, z) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Palette_closest_block_dithered(diplomatReceive.buffer, this.ffiValue, r, g, b, x, y, z, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
      * The palette block whose color is closest (Oklab distance) to the
      * given RGB. Errors with `NotFound` on an empty palette.
      */

@@ -525,6 +525,31 @@ pub mod ffi {
             let _ = write!(out, "{}", serde_json::to_string(&ids).unwrap_or_default());
         }
 
+        /// Position-aware dithered snap: the block for the given RGB at
+        /// voxel (x, y, z), alternating between the two nearest palette
+        /// blocks per position (4x4 Bayer) — the per-pixel entry point for
+        /// pixel art and image mapping. Deterministic. Errors with
+        /// `NotFound` on an empty palette.
+        #[allow(clippy::too_many_arguments)]
+        pub fn closest_block_dithered(
+            &self,
+            r: u8,
+            g: u8,
+            b: u8,
+            x: i32,
+            y: i32,
+            z: i32,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let target = crate::blockpedia::ExtendedColorData::from_rgb(r, g, b);
+            let id = self
+                .0
+                .find_closest_dithered(&target, x, y, z)
+                .ok_or(NucleationError::NotFound)?;
+            let _ = write!(out, "{}", id);
+            Ok(())
+        }
+
         /// The palette block whose color is closest (Oklab distance) to the
         /// given RGB. Errors with `NotFound` on an empty palette.
         pub fn closest_block(

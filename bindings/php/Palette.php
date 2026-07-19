@@ -114,6 +114,15 @@ final class Palette {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function closestBlockDithered( $r,  $g,  $b,  $x,  $y,  $z) {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Palette_closest_block_dithered($this->ptr, $r, $g, $b, $x, $y, $z, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function closestBlock( $r,  $g,  $b) {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         $result = Lib::ffi()->Palette_closest_block($this->ptr, $r, $g, $b, $write);

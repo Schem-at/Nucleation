@@ -157,6 +157,8 @@ typedef struct Palette_from_block_ids_result { union { Palette* ok; NucleationEr
 Palette_from_block_ids_result Palette_from_block_ids(DiplomatStringView ids_json);
 size_t Palette_len(Palette* self);
 void Palette_block_ids_json(Palette* self, DiplomatWrite* write);
+typedef struct Palette_closest_block_dithered_result { union { NucleationError err; }; bool is_ok; } Palette_closest_block_dithered_result;
+Palette_closest_block_dithered_result Palette_closest_block_dithered(Palette* self, uint8_t r, uint8_t g, uint8_t b, int32_t x, int32_t y, int32_t z, DiplomatWrite* write);
 typedef struct Palette_closest_block_result { union { NucleationError err; }; bool is_ok; } Palette_closest_block_result;
 Palette_closest_block_result Palette_closest_block(Palette* self, uint8_t r, uint8_t g, uint8_t b, DiplomatWrite* write);
 void Palette_destroy(Palette* self);

@@ -121,6 +121,15 @@ export class Palette {
     blockIdsJson(): string;
 
     /**
+     * Position-aware dithered snap: the block for the given RGB at
+     * voxel (x, y, z), alternating between the two nearest palette
+     * blocks per position (4x4 Bayer) — the per-pixel entry point for
+     * pixel art and image mapping. Deterministic. Errors with
+     * `NotFound` on an empty palette.
+     */
+    closestBlockDithered(r: number, g: number, b: number, x: number, y: number, z: number): string;
+
+    /**
      * The palette block whose color is closest (Oklab distance) to the
      * given RGB. Errors with `NotFound` on an empty palette.
      */

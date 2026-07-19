@@ -54,6 +54,9 @@ namespace capi {
 
     void Palette_block_ids_json(const nucleation::capi::Palette* self, nucleation::diplomat::capi::DiplomatWrite* write);
 
+    typedef struct Palette_closest_block_dithered_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Palette_closest_block_dithered_result;
+    Palette_closest_block_dithered_result Palette_closest_block_dithered(const nucleation::capi::Palette* self, uint8_t r, uint8_t g, uint8_t b, int32_t x, int32_t y, int32_t z, nucleation::diplomat::capi::DiplomatWrite* write);
+
     typedef struct Palette_closest_block_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Palette_closest_block_result;
     Palette_closest_block_result Palette_closest_block(const nucleation::capi::Palette* self, uint8_t r, uint8_t g, uint8_t b, nucleation::diplomat::capi::DiplomatWrite* write);
 
@@ -198,6 +201,33 @@ inline void nucleation::Palette::block_ids_json_write(W& writeable) const {
     nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
     nucleation::capi::Palette_block_ids_json(this->AsFFI(),
         &write);
+}
+
+inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::Palette::closest_block_dithered(uint8_t r, uint8_t g, uint8_t b, int32_t x, int32_t y, int32_t z) const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    auto result = nucleation::capi::Palette_closest_block_dithered(this->AsFFI(),
+        r,
+        g,
+        b,
+        x,
+        y,
+        z,
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Ok<std::string>(std::move(output))) : nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::Palette::closest_block_dithered_write(uint8_t r, uint8_t g, uint8_t b, int32_t x, int32_t y, int32_t z, W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = nucleation::capi::Palette_closest_block_dithered(this->AsFFI(),
+        r,
+        g,
+        b,
+        x,
+        y,
+        z,
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
 inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::Palette::closest_block(uint8_t r, uint8_t g, uint8_t b) const {

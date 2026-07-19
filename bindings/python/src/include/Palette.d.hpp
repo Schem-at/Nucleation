@@ -144,6 +144,17 @@ public:
   inline void block_ids_json_write(W& writeable_output) const;
 
   /**
+   * Position-aware dithered snap: the block for the given RGB at
+   * voxel (x, y, z), alternating between the two nearest palette
+   * blocks per position (4x4 Bayer) — the per-pixel entry point for
+   * pixel art and image mapping. Deterministic. Errors with
+   * `NotFound` on an empty palette.
+   */
+  inline nucleation::diplomat::result<std::string, nucleation::NucleationError> closest_block_dithered(uint8_t r, uint8_t g, uint8_t b, int32_t x, int32_t y, int32_t z) const;
+  template<typename W>
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> closest_block_dithered_write(uint8_t r, uint8_t g, uint8_t b, int32_t x, int32_t y, int32_t z, W& writeable_output) const;
+
+  /**
    * The palette block whose color is closest (Oklab distance) to the
    * given RGB. Errors with `NotFound` on an empty palette.
    */

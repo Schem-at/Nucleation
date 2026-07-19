@@ -51,6 +51,9 @@ size_t Palette_len(const Palette* self);
 
 void Palette_block_ids_json(const Palette* self, DiplomatWrite* write);
 
+typedef struct Palette_closest_block_dithered_result {union { NucleationError err;}; bool is_ok;} Palette_closest_block_dithered_result;
+Palette_closest_block_dithered_result Palette_closest_block_dithered(const Palette* self, uint8_t r, uint8_t g, uint8_t b, int32_t x, int32_t y, int32_t z, DiplomatWrite* write);
+
 typedef struct Palette_closest_block_result {union { NucleationError err;}; bool is_ok;} Palette_closest_block_result;
 Palette_closest_block_result Palette_closest_block(const Palette* self, uint8_t r, uint8_t g, uint8_t b, DiplomatWrite* write);
 

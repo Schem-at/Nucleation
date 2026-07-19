@@ -23,6 +23,7 @@ internal interface PaletteLib: Library {
     fun Palette_from_block_ids(idsJson: Slice): ResultPointerInt
     fun Palette_len(handle: Pointer): FFISizet
     fun Palette_block_ids_json(handle: Pointer, write: Pointer): Unit
+    fun Palette_closest_block_dithered(handle: Pointer, r: FFIUint8, g: FFIUint8, b: FFIUint8, x: Int, y: Int, z: Int, write: Pointer): ResultUnitInt
     fun Palette_closest_block(handle: Pointer, r: FFIUint8, g: FFIUint8, b: FFIUint8, write: Pointer): ResultUnitInt
 }
 /** A set of colored blocks that color/gradient brushes snap their computed
@@ -279,6 +280,25 @@ class Palette internal constructor (
         
         val returnString = DW.writeToString(write)
         return returnString
+    }
+    
+    /** Position-aware dithered snap: the block for the given RGB at
+    *voxel (x, y, z), alternating between the two nearest palette
+    *blocks per position (4x4 Bayer) — the per-pixel entry point for
+    *pixel art and image mapping. Deterministic. Errors with
+    *`NotFound` on an empty palette.
+    */
+    fun closestBlockDithered(r: UByte, g: UByte, b: UByte, x: Int, y: Int, z: Int): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Palette_closest_block_dithered(handle, FFIUint8(r), FFIUint8(g), FFIUint8(b), x, y, z, write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
     }
     
     /** The palette block whose color is closest (Oklab distance) to the
