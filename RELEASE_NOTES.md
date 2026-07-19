@@ -1,3 +1,17 @@
+# Nucleation v0.3.17
+
+**Patterns as fields.** A `cells` SDF node adds Worley / Voronoi noise to the
+field language, so cellular patterns compose into the SDF like any node and
+drive geometry (`f1` / `f2` / `f2MinusF1` distance fields, or a per-cell
+`value`; thresholded, `f2MinusF1` carves a foam). And `Brush.field(field_json,
+stops, colors, lo, hi, space)` colors each voxel by evaluating any field through
+a gradient, so the same language drives color: a `cells value` field paints a
+Voronoi mosaic, an fbm field a marble, a coordinate expression a stripe. Voronoi
+is one field; the same brush and node take any of the others. All seven
+bindings.
+
+---
+
 # Nucleation v0.3.16
 
 **Nucleation as a custom world generator / processor.**
