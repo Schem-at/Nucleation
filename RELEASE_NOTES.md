@@ -1,3 +1,13 @@
+# Nucleation v0.3.15
+
+**Storage: sensible default format.** `StoreIo.save` / `Store.save_schematic`
+no longer error when the key or path has no recognizable format extension —
+they default to litematic. The written bytes are self-describing, so `open`
+reads them back by content regardless of the key, and a bare store key like
+`builds/castle` now round-trips instead of surfacing an opaque error.
+
+---
+
 # Nucleation v0.3.14
 
 **Geodata is first-class.** The moves behind the README's mountain and city
