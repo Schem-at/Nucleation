@@ -20,7 +20,9 @@ pub mod ffi {
         /// voxel center (robust on closed meshes), plus — when `shell` > 0 —
         /// every voxel whose center is within `shell` blocks of the surface,
         /// which rescues thin walls and hollow vessels (0.7–1.0 closes
-        /// single-voxel shells; 0 = pure parity). Errors with `Parse` on
+        /// single-voxel shells; 0 = pure parity; a *negative* `shell` is
+        /// surface-only — a skin |shell| blocks thick with no interior fill,
+        /// for open sheets/ribbons that dip or self-overlap). Errors with `Parse` on
         /// malformed/triangle-less GLB and `InvalidArgument` on a
         /// non-positive `target_size`.
         pub fn shape_from_glb(
@@ -34,7 +36,15 @@ pub mod ffi {
             let mut model = crate::voxelize::MeshModel::from_glb_bytes(data)
                 .map_err(|_| NucleationError::Parse)?;
             model.fit(target_size);
-            let shape = crate::voxelize::MeshShape::new(model).with_shell(shell);
+            // Negative `shell` selects surface-only voxelization (a skin
+            // |shell| blocks thick, no parity interior fill) — the right mode
+            // for open sheets/ribbons that dip or cross over themselves.
+            let mesh = crate::voxelize::MeshShape::new(model);
+            let shape = if shell < 0.0 {
+                mesh.with_surface_shell(-shell)
+            } else {
+                mesh.with_shell(shell)
+            };
             Ok(Box::new(Shape(crate::building::ShapeEnum::Mesh(shape))))
         }
 
@@ -57,7 +67,15 @@ pub mod ffi {
             let mut model = crate::voxelize::MeshModel::from_obj_str(text)
                 .map_err(|_| NucleationError::Parse)?;
             model.fit(target_size);
-            let shape = crate::voxelize::MeshShape::new(model).with_shell(shell);
+            // Negative `shell` selects surface-only voxelization (a skin
+            // |shell| blocks thick, no parity interior fill) — the right mode
+            // for open sheets/ribbons that dip or cross over themselves.
+            let mesh = crate::voxelize::MeshShape::new(model);
+            let shape = if shell < 0.0 {
+                mesh.with_surface_shell(-shell)
+            } else {
+                mesh.with_shell(shell)
+            };
             Ok(Box::new(Shape(crate::building::ShapeEnum::Mesh(shape))))
         }
 
@@ -85,7 +103,15 @@ pub mod ffi {
             let mut model = crate::voxelize::MeshModel::from_glb_bytes(data)
                 .map_err(|_| NucleationError::Parse)?;
             model.fit(target_size);
-            let shape = crate::voxelize::MeshShape::new(model).with_shell(shell);
+            // Negative `shell` selects surface-only voxelization (a skin
+            // |shell| blocks thick, no parity interior fill) — the right mode
+            // for open sheets/ribbons that dip or cross over themselves.
+            let mesh = crate::voxelize::MeshShape::new(model);
+            let shape = if shell < 0.0 {
+                mesh.with_surface_shell(-shell)
+            } else {
+                mesh.with_shell(shell)
+            };
             let schematic = crate::voxelize::voxelize_textured(&shape, &palette.0, name);
             Ok(Box::new(Schematic(schematic)))
         }

@@ -101,6 +101,12 @@ pub struct MeshShape {
     /// geometry (double-walled vessels, open shells) whose walls slip
     /// between voxel centers.
     shell: f32,
+    /// When set, skip the parity interior test entirely and keep *only* the
+    /// shell — a pure surface skin `shell` blocks thick. This is the right
+    /// mode for open sheets that fold back on themselves (a road ribbon with
+    /// dips and self-overlaps): parity would read the concavities and
+    /// crossings as enclosed interior and fill them.
+    shell_only: bool,
 }
 
 struct MeshData {
@@ -132,6 +138,7 @@ impl MeshShape {
         );
         Self {
             shell: 0.0,
+            shell_only: false,
             mask: Arc::new(OnceLock::new()),
             data: Arc::new(MeshData {
                 triangles: model.triangles,
@@ -256,6 +263,19 @@ impl MeshShape {
         Self {
             data: self.data.clone(),
             shell: thickness.max(0.0),
+            shell_only: false,
+            mask: Arc::new(OnceLock::new()),
+        }
+    }
+
+    /// A copy that keeps *only* a surface skin `thickness` blocks thick, with
+    /// no parity interior fill. Use for open sheets/ribbons that dip or cross
+    /// over themselves, where the parity test would fill the enclosed volume.
+    pub fn with_surface_shell(&self, thickness: f32) -> Self {
+        Self {
+            data: self.data.clone(),
+            shell: thickness.max(1e-3),
+            shell_only: true,
             mask: Arc::new(OnceLock::new()),
         }
     }
@@ -337,6 +357,12 @@ impl MeshShape {
         );
         let total = dims.0 * dims.1 * dims.2;
         let words = total.div_ceil(64);
+        let mut bits = vec![0u64; words];
+
+        // Surface-only mode skips the parity interior test entirely: the shell
+        // rasterization below is the whole answer. Everything in this block is
+        // the parity solve, run only when an interior fill is wanted.
+        if !self.shell_only {
         let mut votes: Vec<u8> = vec![0; total];
 
         // One parity sweep per axis. A column fixes the two perpendicular
@@ -403,13 +429,13 @@ impl MeshShape {
             }
         }
 
-        let mut bits = vec![0u64; words];
         for (i, &v) in votes.iter().enumerate() {
             if v >= 2 {
                 SolidMask::set_linear(&mut bits, i);
             }
         }
         drop(votes);
+        }
 
         // Shell: rasterize each triangle's neighborhood.
         if self.shell > 0.0 {
@@ -483,11 +509,15 @@ impl Shape for MeshShape {
                 return false;
             }
         }
-        let votes = (0..3)
-            .filter(|&axis| self.axis_ray_parity(c, axis))
-            .count();
-        if votes >= 2 {
-            return true;
+        // Surface-only mode skips the parity interior test — the shell is the
+        // whole answer (matches the bulk mask path).
+        if !self.shell_only {
+            let votes = (0..3)
+                .filter(|&axis| self.axis_ray_parity(c, axis))
+                .count();
+            if votes >= 2 {
+                return true;
+            }
         }
         if self.shell > 0.0 {
             if let Some((_, _, dist)) = self.nearest_triangle_within(c, self.shell) {

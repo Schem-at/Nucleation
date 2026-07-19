@@ -740,14 +740,15 @@ def scene_mariokart(pack):
     """MK64 Rainbow Road, voxelized from the ripped course model.
 
     target_size=515 calibrates the road ribbon to 8-9 blocks wide (measured
-    as the mode of cross-road block runs on straight segments). shell=1.0 is
-    essential: the track is an open ribbon surface, so parity-based interior
-    tests fail — the shell claims every voxel within one voxel of the
-    surface instead.
+    as the mode of cross-road block runs on straight segments). shell=-1.0
+    asks for surface-only voxelization: the track is an open ribbon that dips
+    and crosses over itself, so a parity interior test fills those arcs and
+    overlaps as enclosed volume. A negative shell skips parity and keeps just
+    a one-block skin of the ribbon.
     """
     glb = open(_mariokart_glb(), "rb").read()
     pal = nu.Palette.from_block_ids(json.dumps(MK64_PALETTE))
-    s = nu.Voxelizer.schematic_from_glb_textured(glb, 515.0, 1.0, pal,
+    s = nu.Voxelizer.schematic_from_glb_textured(glb, 515.0, -1.0, pal,
                                                  "rainbow_road")
 
     # The two kept materials still carry a few floating trackside scraps;

@@ -76,6 +76,31 @@ fn obj_cube_voxelizes_solid() {
     assert!(ny_bottom < -0.9, "-y face normal should point down, got {ny_bottom}");
 }
 
+/// Surface-only voxelization keeps a skin and skips the parity interior fill:
+/// a closed cube comes out hollow. This is the mode open ribbons that fold
+/// back on themselves (a road with dips and self-overlaps) need, so parity
+/// does not fill the enclosed volume.
+#[test]
+fn surface_shell_skips_the_interior_fill() {
+    let mut model = MeshModel::from_obj_str(CUBE_OBJ).expect("cube OBJ parses");
+    model.fit(16.0);
+    let skin = MeshShape::new(model).with_surface_shell(1.0);
+
+    // Deep interior is empty — a solid/parity cube would fill it.
+    assert!(!skin.contains(0, 8, 0), "surface-only cube must be hollow at the center");
+    // The faces themselves are present.
+    assert!(skin.contains(0, 0, 0), "bottom face voxel present");
+    assert!(skin.contains(0, 15, 0), "top face voxel present");
+
+    // Far fewer voxels than the solid parity fill.
+    let solid = fitted_cube(16.0).points().len();
+    let shell = skin.points().len();
+    assert!(
+        shell < solid / 2,
+        "surface skin {shell} should be well under solid fill {solid}"
+    );
+}
+
 /// Octahedron: |x| + |y| + |z| <= r, closed and convex — parity must agree
 /// with the analytic solid almost everywhere, with no stray voxels.
 #[test]
