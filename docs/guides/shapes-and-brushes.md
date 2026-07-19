@@ -7,8 +7,12 @@ block goes at each position). All of it is available in every binding.
 
 `sphere`, `cuboid`, `ellipsoid`, `cylinder` / `cylinder_between`, `cone`,
 `torus`, `pyramid`, `disk`, `plane`, `triangle`, `line`, `bezier`
-(control points + thickness + resolution) — plus combinators
-`union_with`, `intersection_with`, `difference_with`, and `hollow(thickness)`.
+(control points + thickness + resolution), and `polygon_prism` (a closed 2D
+footprint extruded between two Y levels — building footprints, lake outlines)
+— plus combinators `union_with`, `intersection_with`, `difference_with`, and
+`hollow(thickness)`. An [SDF tree](sdf-terrain.md) is a `Shape` too
+(`Shape.sdf`), and so is a voxelized [mesh](../meshing-nucm-rendering.md)
+(`Voxelizer.shape_from_glb` / `shape_from_obj`).
 
 Several shapes are **parametric**: a position inside them maps to a
 parameter `t ∈ [0, 1]` (angle around a torus, distance along a line or

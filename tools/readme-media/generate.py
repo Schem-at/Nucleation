@@ -1707,8 +1707,64 @@ def scene_blockentities(pack):
     return s
 
 
+def scene_storage(pack):
+    """A little library of saved builds — storage's illustration: four distinct
+    schematics, each the kind of thing you persist and reload through one URI."""
+    def sphere():
+        s = nu.Schematic.create("sphere")
+        b = nu.Brush.shaded(206, 120, 78, -1.0, 0.7, -0.3)
+        b.set_palette(nu.Palette.terracotta())
+        nu.BuildingTool.fill(s, nu.Shape.sphere(0, 0, 0, 11), b)
+        return s
+
+    def torus():
+        s = nu.Schematic.create("torus")
+        stops = [i / 6 for i in range(7)]
+        colors = [255, 40, 40, 255, 180, 0, 60, 200, 60, 40, 180, 220,
+                  60, 70, 230, 200, 60, 220, 255, 40, 40]
+        b = nu.Brush.curve_gradient(stops, bytes(colors), nu.InterpolationSpace.Oklab)
+        b.set_palette(nu.Palette.wool())
+        nu.BuildingTool.fill(s, nu.Shape.torus(0, 0, 0, 13, 5, 0, 1, 0), b)
+        return s
+
+    def tree():
+        s = nu.Schematic.create("tree")
+        nu.BuildingTool.fill(s, nu.Shape.cylinder(0, 0, 0, 0, 1, 0, 1.4, 11),
+                             nu.Brush.solid("minecraft:oak_log"))
+        nu.BuildingTool.fill(s, nu.Shape.sphere(0, 13, 0, 7),
+                             nu.Brush.solid("minecraft:oak_leaves"))
+        return s
+
+    def pyramid():
+        s = nu.Schematic.create("pyramid")
+        nu.BuildingTool.fill(s, nu.Shape.pyramid(0, 0, 0, 11, 11, 15, 0, 1, 0),
+                             nu.Brush.solid("minecraft:sandstone"))
+        return s
+
+    tmp = tempfile.mkdtemp(prefix="nuc-store-")
+    try:
+        parts = []
+        for name, mk, yaw, pitch, zoom in (
+                ("sphere", sphere, 45, 22, 1.2),
+                ("torus", torus, 0, 34, 1.25),
+                ("tree", tree, 30, 18, 1.05),
+                ("pyramid", pyramid, 35, 22, 1.1)):
+            p = os.path.join(tmp, name + ".png")
+            cfg = nu.RenderConfig.create(380, 380)
+            cfg.set_isometric(); cfg.set_yaw(yaw); cfg.set_pitch(pitch)
+            cfg.set_zoom(zoom); cfg.set_sphere_fit(True)
+            cfg.set_background(*NAVY)
+            nu.Renderer.render_to_file(mk(), pack, cfg, p)
+            parts.append(p)
+        hstack(parts, os.path.join(OUT, "storage-gallery.png"))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return None
+
+
 SCENES = {
     "streaming": scene_streaming,
+    "storage": scene_storage,
     "regions": scene_regions,
     "blockentities": scene_blockentities,
     "globe": scene_globe,

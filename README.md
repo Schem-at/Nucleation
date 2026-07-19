@@ -525,12 +525,16 @@ sine wall is a 12-line Lua script run through `Scripting.run_lua_script`
 
 ## Pluggable storage
 
-Persist and load through one URI, across backends — memory, filesystem, S3,
-Redis, Postgres. Two layers: `StoreIo` moves whole schematics, `Store` is a
-raw key-value store over the same backends.
+A library of builds — any schematic saves and loads through one URI, across
+backends — memory, filesystem, S3, Redis, Postgres:
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/storage-gallery.png" width="820" alt="A shaded sphere, a rainbow torus, an oak tree, and a sandstone pyramid — four saved schematics">
+
+Two layers: `StoreIo` moves whole schematics, `Store` is a raw key-value store
+over the same backends.
 
 ```python
-# Whole schematics, by URI (format inferred from the path):
+# Whole schematics, by URI (format inferred from the path — or defaulted):
 StoreIo.save(castle, "file:///data/castle.schem", "")
 castle = StoreIo.open("file:///data/castle.schem")
 

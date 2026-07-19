@@ -72,7 +72,18 @@ fn write_manager(
     let manager = arc
         .lock()
         .map_err(|_| "format manager lock poisoned".to_string())?;
-    Ok(manager.write_auto(key_or_path, schematic, version)?)
+    match manager.write_auto(key_or_path, schematic, version) {
+        Ok(bytes) => Ok(bytes),
+        // No usable format extension (a bare store key like "builds/castle",
+        // or an unrecognized suffix) previously surfaced as an opaque error.
+        // Default to litematic instead — the written bytes are self-describing,
+        // so `open`/`read_manager` reads them back by content regardless of key.
+        Err(_) => Ok(manager.write_auto(
+            &format!("{key_or_path}.litematic"),
+            schematic,
+            version,
+        )?),
+    }
 }
 
 impl UniversalSchematic {

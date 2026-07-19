@@ -22,6 +22,28 @@ JS/Kotlin/PHP), unified `NucleationError` errors.
   annotations
 - [Meshing, .nucm, and rendering](meshing-nucm-rendering.md)
 
+## More capabilities
+
+Covered in the README's illustrated tour, each with a verified Python snippet:
+
+- [Voxelize 3D models](../README.md#voxelize-3d-models) — GLB/OBJ → building
+  `Shape`s, texture projection, and surface-only voxelization (negative
+  `shell`) for open ribbons that dip or self-overlap
+- [Read, iterate, and stream](../README.md#read-iterate-and-stream) — chunk
+  iteration strategies + the `WorldStream`/`WorldSink` constant-memory world
+  pipeline ([snippet](readme-snippets/12-chunk-iteration-python.md))
+- [Regions, transforms & stamping](../README.md#regions-transforms-and-stamping)
+  — multi-region schematics, rotate/flip, `copy_region`
+  ([snippet](readme-snippets/13-regions-transforms-python.md))
+- [Block entities, entities & NBT](../README.md#block-entities-entities-and-nbt)
+  ([snippet](readme-snippets/14-block-entities-nbt-python.md))
+- [Geodata](../README.md#the-real-world-in-blocks) — `Shape.polygon_prism`,
+  `Geo.extrude_footprints`, `Geo.heightmap_terrain`, then out to a playable
+  world ([snippet](readme-snippets/16-geo-osm-python.md))
+- [Pluggable storage](../README.md#pluggable-storage) — `StoreIo` / `Store`
+  over one URI (memory / filesystem / S3 / Redis / Postgres)
+  ([snippet](readme-snippets/15-storage-python.md))
+
 ## Per-language references
 
 - [Rust](rust/) · [JavaScript](javascript/) · [Python](python/) ·
