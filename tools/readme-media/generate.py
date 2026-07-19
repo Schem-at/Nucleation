@@ -1197,31 +1197,6 @@ def _rings(el):
             if m.get("geometry") and m.get("role") in ("outer", "inner")]
 
 
-def _rasterize_polygon(rings, hb, block, hgrid, bgrid, mx, mz):
-    """Even-odd scanline fill of projected rings onto the column grids; each
-    cell keeps its tallest occupant (so building:part stacks refine bases)."""
-    pts = [[(mx(p["lon"]), mz(p["lat"])) for p in ring] for ring in rings]
-    zs = [z for ring in pts for _, z in ring]
-    if not zs:
-        return
-    depth, width = len(hgrid), len(hgrid[0])
-    z0, z1 = max(0, int(min(zs))), min(depth - 1, int(max(zs)) + 1)
-    for gz in range(z0, z1 + 1):
-        zc = gz + 0.5
-        xs = []
-        for ring in pts:
-            for (xa, za), (xb, zb) in zip(ring, ring[1:]):
-                if (za <= zc) != (zb <= zc):
-                    xs.append(xa + (zc - za) / (zb - za) * (xb - xa))
-        xs.sort()
-        for xa, xb in zip(xs[::2], xs[1::2]):
-            for gx in range(max(0, int(xa + 0.5)),
-                            min(width - 1, int(xb - 0.5)) + 1):
-                if hb > hgrid[gz][gx]:
-                    hgrid[gz][gx] = hb
-                    bgrid[gz][gx] = block
-
-
 def _city_block(h_m, osm_id):
     for floor, choices in CITY_BANDS:
         if h_m >= floor:
@@ -1240,9 +1215,9 @@ def _city_schematic():
     def mz(lat):
         return (n_ - lat) * 110574.0 / CITY_BLOCK_M
 
-    width, depth = int(mx(e_)), int(mz(s_))
-    hgrid = [[0] * width for _ in range(depth)]
-    bgrid = [[None] * width for _ in range(depth)]
+    # Build the footprint list and hand it to Geo.extrude_footprints — the
+    # library rasterizes, extrudes, and does the tallest-wins stacking.
+    buildings = []
     n_buildings, tallest = 0, 0.0
     for el in data["elements"]:
         tags = el.get("tags", {})
@@ -1265,16 +1240,16 @@ def _city_schematic():
         if not is_part:
             n_buildings += 1
             tallest = max(tallest, h_m)
-        _rasterize_polygon(rings, max(1, round(h_m / CITY_BLOCK_M)),
-                           _city_block(h_m, el["id"]), hgrid, bgrid, mx, mz)
+        block = _city_block(h_m, el["id"])
+        top = 1 + max(1, round(h_m / CITY_BLOCK_M))
+        for ring in rings:
+            buildings.append({
+                "polygon": [[mx(p["lon"]), mz(p["lat"])] for p in ring],
+                "min_y": 1, "height": top, "block": block,
+            })
     print(f"  {n_buildings} buildings, tallest {tallest:.0f} m")
-    s = nu.Schematic.create("fidi")
-    s.fill_cuboid(0, 0, 0, width - 1, 0, depth - 1, "minecraft:gray_concrete")
-    for gz in range(depth):
-        for gx in range(width):
-            if bgrid[gz][gx]:
-                s.fill_cuboid(gx, 1, gz, gx, hgrid[gz][gx], gz, bgrid[gz][gx])
-    return s
+    return nu.Geo.extrude_footprints(json.dumps(buildings),
+                                     "minecraft:gray_concrete", "fidi")
 
 
 def scene_city(pack):
