@@ -348,8 +348,10 @@ for x, y, z in solid_voxels(s):
 ```
 
 Swap the torus for a mesh, the painting for a heightmap, the palette for
-grayscale, and it is a different build with the same five moves. The full recipe
-is `scene_compose` in [`tools/readme-media/generate.py`](tools/readme-media/generate.py).
+grayscale, and it is a different build with the same five moves. There's a
+[runnable version](docs/readme-snippets/18-compose-torus-python.md) you can paste
+and adapt; the full recipe is `scene_compose` in
+[`tools/readme-media/generate.py`](tools/readme-media/generate.py).
 
 ## Read, iterate, and stream
 
