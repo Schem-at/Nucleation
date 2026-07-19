@@ -224,6 +224,16 @@ duck = Voxelizer.schematic_from_glb_textured(duck_glb, 44.0, 0.7, Palette.solid(
 # 25,641 blocks: yellow_wool body, orange beak, black eyes with snow-block catchlights
 ```
 
+And it scales: a full Mario Kart 64 Rainbow Road, voxelized to a road eight
+blocks wide — 515 blocks long, 53,000 blocks, solved in 1.5 seconds by the
+scanline voxelizer:
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mariokart-track.png" width="760" alt="Rainbow Road N64 voxelized: the whole course as a glowing rainbow ribbon">
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mariokart-closeup.png" width="620" alt="Closeup of the voxelized road: eight blocks wide, rainbow rails, gold star specks">
+</div>
+
 ## Simulate redstone
 
 Headless circuit simulation via [MCHPRS](https://github.com/MCHPR/MCHPRS)'s
