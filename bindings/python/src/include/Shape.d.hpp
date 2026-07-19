@@ -44,6 +44,17 @@ public:
   inline static std::unique_ptr<nucleation::Shape> cuboid(int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z);
 
   /**
+   * A closed 2D polygon extruded between two Y levels (inclusive). The
+   * footprint is `polygon_json`, a JSON array of `[x, z]` world-coordinate
+   * pairs in order (winding does not matter; the ring closes implicitly);
+   * any simple polygon works, concave ones included. This is the shape
+   * behind extruded building footprints, lake outlines, and plot fills.
+   * Errors with `Parse` on invalid JSON and `InvalidArgument` on non-UTF-8
+   * or fewer than three vertices.
+   */
+  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Shape>, nucleation::NucleationError> polygon_prism(std::string_view polygon_json, int32_t y_min, int32_t y_max);
+
+  /**
    * Ellipsoid centered at (`cx`, `cy`, `cz`) with per-axis radii.
    */
   inline static std::unique_ptr<nucleation::Shape> ellipsoid(int32_t cx, int32_t cy, int32_t cz, float rx, float ry, float rz);

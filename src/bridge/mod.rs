@@ -15,6 +15,7 @@ pub mod blocks;
 pub mod building;
 pub mod definition_region;
 pub mod diff;
+pub mod geo;
 #[cfg(feature = "meshing")]
 pub mod meshing;
 pub mod nbt;

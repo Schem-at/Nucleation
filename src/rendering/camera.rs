@@ -392,6 +392,7 @@ mod view_proj_tests {
             target: None,
             projection: Projection::Orthographic,
             background: None,
+            sphere_fit: false,
         };
         let (vp, _) = compute_view_proj([0.0, 0.0, 0.0], [4.0, 2.0, 6.0], 16.0 / 9.0, &cam);
 

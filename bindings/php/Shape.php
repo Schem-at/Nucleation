@@ -22,6 +22,24 @@ final class Shape {
         return new Shape($ret, true);
     }
 
+    public static function polygonPrism(string $polygon_json,  $y_min,  $y_max) {
+        $__n0 = strlen($polygon_json);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $polygon_json, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->Shape_polygon_prism($__view0, $y_min, $y_max);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Shape($result->ok, true);
+    }
+
     public static function ellipsoid( $cx,  $cy,  $cz,  $rx,  $ry,  $rz) {
         $ret = Lib::ffi()->Shape_ellipsoid($cx, $cy, $cz, $rx, $ry, $rz);
         return new Shape($ret, true);

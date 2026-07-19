@@ -20,6 +20,9 @@ Shape* Shape_sphere(float cx, float cy, float cz, float radius);
 
 Shape* Shape_cuboid(int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z);
 
+typedef struct Shape_polygon_prism_result {union {Shape* ok; NucleationError err;}; bool is_ok;} Shape_polygon_prism_result;
+Shape_polygon_prism_result Shape_polygon_prism(DiplomatStringView polygon_json, int32_t y_min, int32_t y_max);
+
 Shape* Shape_ellipsoid(int32_t cx, int32_t cy, int32_t cz, float rx, float ry, float rz);
 
 Shape* Shape_cylinder(float bx, float by, float bz, float ax, float ay, float az, float radius, float height);

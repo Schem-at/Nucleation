@@ -2,8 +2,8 @@ use crate::building::{
     BezierCurve, BilinearGradientBrush, BlockPalette, Brush, ColorBrush, Cone, Cuboid,
     CurveGradientBrush, Cylinder, Difference, Disk, Ellipsoid, Hollow, Intersection, Line,
     LinearGradientBrush, MultiPointGradientBrush, ParametricShape, Plane, PointGradientBrush,
-    Pyramid, SdfShape, ShadedBrush, Shape, SolidBrush, Sphere, SpotlightBrush, Torus, Triangle,
-    Union,
+    PolygonPrism, Pyramid, SdfShape, ShadedBrush, Shape, SolidBrush, Sphere, SpotlightBrush, Torus,
+    Triangle, Union,
 };
 use crate::BlockState;
 
@@ -53,6 +53,7 @@ macro_rules! delegate_shape {
             ShapeEnum::Pyramid(s) => s.$method($($arg),*),
             ShapeEnum::Disk(s) => s.$method($($arg),*),
             ShapeEnum::Plane(s) => s.$method($($arg),*),
+            ShapeEnum::PolygonPrism(s) => s.$method($($arg),*),
             ShapeEnum::Triangle(s) => s.$method($($arg),*),
             ShapeEnum::Line(s) => s.$method($($arg),*),
             ShapeEnum::BezierCurve(s) => s.$method($($arg),*),
@@ -80,6 +81,7 @@ pub enum ShapeEnum {
     Pyramid(Pyramid),
     Disk(Disk),
     Plane(Plane),
+    PolygonPrism(PolygonPrism),
     Triangle(Triangle),
     Line(Line),
     BezierCurve(BezierCurve),

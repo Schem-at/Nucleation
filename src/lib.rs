@@ -18,6 +18,7 @@ pub mod diff;
 mod entity;
 pub mod fingerprint;
 pub mod formats;
+pub mod geo;
 pub mod insign;
 mod item;
 mod metadata;

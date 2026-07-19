@@ -27,6 +27,17 @@ export class Shape {
     static cuboid(minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number): Shape;
 
     /**
+     * A closed 2D polygon extruded between two Y levels (inclusive). The
+     * footprint is `polygon_json`, a JSON array of `[x, z]` world-coordinate
+     * pairs in order (winding does not matter; the ring closes implicitly);
+     * any simple polygon works, concave ones included. This is the shape
+     * behind extruded building footprints, lake outlines, and plot fills.
+     * Errors with `Parse` on invalid JSON and `InvalidArgument` on non-UTF-8
+     * or fewer than three vertices.
+     */
+    static polygonPrism(polygonJson: string, yMin: number, yMax: number): Shape;
+
+    /**
      * Ellipsoid centered at (`cx`, `cy`, `cz`) with per-axis radii.
      */
     static ellipsoid(cx: number, cy: number, cz: number, rx: number, ry: number, rz: number): Shape;

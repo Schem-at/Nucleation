@@ -56,6 +56,30 @@ pub mod ffi {
             )))
         }
 
+        /// A closed 2D polygon extruded between two Y levels (inclusive). The
+        /// footprint is `polygon_json`, a JSON array of `[x, z]` world-coordinate
+        /// pairs in order (winding does not matter; the ring closes implicitly);
+        /// any simple polygon works, concave ones included. This is the shape
+        /// behind extruded building footprints, lake outlines, and plot fills.
+        /// Errors with `Parse` on invalid JSON and `InvalidArgument` on non-UTF-8
+        /// or fewer than three vertices.
+        pub fn polygon_prism(
+            polygon_json: &DiplomatStr,
+            y_min: i32,
+            y_max: i32,
+        ) -> Result<Box<Shape>, NucleationError> {
+            let json = std::str::from_utf8(polygon_json)
+                .map_err(|_| NucleationError::InvalidArgument)?;
+            let verts: Vec<(f64, f64)> =
+                serde_json::from_str(json).map_err(|_| NucleationError::Parse)?;
+            if verts.len() < 3 {
+                return Err(NucleationError::InvalidArgument);
+            }
+            Ok(Box::new(Shape(crate::building::ShapeEnum::PolygonPrism(
+                crate::building::PolygonPrism::new(verts, y_min, y_max),
+            ))))
+        }
+
         /// Ellipsoid centered at (`cx`, `cy`, `cz`) with per-axis radii.
         pub fn ellipsoid(cx: i32, cy: i32, cz: i32, rx: f32, ry: f32, rz: f32) -> Box<Shape> {
             Box::new(Shape(crate::building::ShapeEnum::Ellipsoid(

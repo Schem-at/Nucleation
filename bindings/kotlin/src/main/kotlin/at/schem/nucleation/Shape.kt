@@ -9,6 +9,7 @@ internal interface ShapeLib: Library {
     fun Shape_destroy(handle: Pointer)
     fun Shape_sphere(cx: Float, cy: Float, cz: Float, radius: Float): Pointer
     fun Shape_cuboid(minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int): Pointer
+    fun Shape_polygon_prism(polygonJson: Slice, yMin: Int, yMax: Int): ResultPointerInt
     fun Shape_ellipsoid(cx: Int, cy: Int, cz: Int, rx: Float, ry: Float, rz: Float): Pointer
     fun Shape_cylinder(bx: Float, by: Float, bz: Float, ax: Float, ay: Float, az: Float, radius: Float, height: Float): Pointer
     fun Shape_cylinder_between(x1: Float, y1: Float, z1: Float, x2: Float, y2: Float, z2: Float, radius: Float): Pointer
@@ -80,6 +81,34 @@ class Shape internal constructor (
             val handle = returnVal 
             val returnOpaque = Shape(handle, selfEdges, true)
             return returnOpaque
+        }
+        @JvmStatic
+        
+        /** A closed 2D polygon extruded between two Y levels (inclusive). The
+        *footprint is `polygon_json`, a JSON array of `[x, z]` world-coordinate
+        *pairs in order (winding does not matter; the ring closes implicitly);
+        *any simple polygon works, concave ones included. This is the shape
+        *behind extruded building footprints, lake outlines, and plot fills.
+        *Errors with `Parse` on invalid JSON and `InvalidArgument` on non-UTF-8
+        *or fewer than three vertices.
+        */
+        fun polygonPrism(polygonJson: String, yMin: Int, yMax: Int): Result<Shape> {
+            val polygonJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(polygonJson)
+            
+            val returnVal = lib.Shape_polygon_prism(polygonJsonSliceMemory.slice, yMin, yMax);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal 
+                    val returnOpaque = Shape(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                polygonJsonSliceMemory.close()
+            }
         }
         @JvmStatic
         

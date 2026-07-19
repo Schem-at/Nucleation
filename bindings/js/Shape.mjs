@@ -74,6 +74,40 @@ export class Shape {
     }
 
     /**
+     * A closed 2D polygon extruded between two Y levels (inclusive). The
+     * footprint is `polygon_json`, a JSON array of `[x, z]` world-coordinate
+     * pairs in order (winding does not matter; the ring closes implicitly);
+     * any simple polygon works, concave ones included. This is the shape
+     * behind extruded building footprints, lake outlines, and plot fills.
+     * Errors with `Parse` on invalid JSON and `InvalidArgument` on non-UTF-8
+     * or fewer than three vertices.
+     */
+    static polygonPrism(polygonJson, yMin, yMax) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const polygonJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, polygonJson)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Shape_polygon_prism(diplomatReceive.buffer, polygonJsonSlice.ptr, yMin, yMax);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new Shape(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
      * Ellipsoid centered at (`cx`, `cy`, `cz`) with per-axis radii.
      */
     static ellipsoid(cx, cy, cz, rx, ry, rz) {

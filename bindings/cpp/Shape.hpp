@@ -23,6 +23,9 @@ namespace capi {
 
     diplomat::capi::Shape* Shape_cuboid(int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z);
 
+    typedef struct Shape_polygon_prism_result {union {diplomat::capi::Shape* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Shape_polygon_prism_result;
+    Shape_polygon_prism_result Shape_polygon_prism(diplomat::capi::DiplomatStringView polygon_json, int32_t y_min, int32_t y_max);
+
     diplomat::capi::Shape* Shape_ellipsoid(int32_t cx, int32_t cy, int32_t cz, float rx, float ry, float rz);
 
     diplomat::capi::Shape* Shape_cylinder(float bx, float by, float bz, float ax, float ay, float az, float radius, float height);
@@ -82,6 +85,13 @@ inline std::unique_ptr<Shape> Shape::cuboid(int32_t min_x, int32_t min_y, int32_
         max_y,
         max_z);
     return std::unique_ptr<Shape>(Shape::FromFFI(result));
+}
+
+inline diplomat::result<std::unique_ptr<Shape>, NucleationError> Shape::polygon_prism(std::string_view polygon_json, int32_t y_min, int32_t y_max) {
+    auto result = diplomat::capi::Shape_polygon_prism({polygon_json.data(), polygon_json.size()},
+        y_min,
+        y_max);
+    return result.is_ok ? diplomat::result<std::unique_ptr<Shape>, NucleationError>(diplomat::Ok<std::unique_ptr<Shape>>(std::unique_ptr<Shape>(Shape::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Shape>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
 inline std::unique_ptr<Shape> Shape::ellipsoid(int32_t cx, int32_t cy, int32_t cz, float rx, float ry, float rz) {

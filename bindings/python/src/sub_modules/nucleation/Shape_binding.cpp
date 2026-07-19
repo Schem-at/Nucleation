@@ -24,6 +24,7 @@ void add_Shape_binding(nb::module_ mod) {
         .def("intersection_with", std::move(maybe_op_unwrap(&nucleation::Shape::intersection_with)), "other"_a)
         .def_static("line", std::move(maybe_op_unwrap(&nucleation::Shape::line)), "x1"_a, "y1"_a, "z1"_a, "x2"_a, "y2"_a, "z2"_a, "thickness"_a)
         .def_static("plane", std::move(maybe_op_unwrap(&nucleation::Shape::plane)), "ox"_a, "oy"_a, "oz"_a, "ux"_a, "uy"_a, "uz"_a, "vx"_a, "vy"_a, "vz"_a, "u_ext"_a, "v_ext"_a, "thickness"_a)
+        .def_static("polygon_prism", std::move(maybe_op_unwrap(&nucleation::Shape::polygon_prism)), "polygon_json"_a, "y_min"_a, "y_max"_a)
         .def_static("pyramid", std::move(maybe_op_unwrap(&nucleation::Shape::pyramid)), "bx"_a, "by"_a, "bz"_a, "half_w"_a, "half_d"_a, "height"_a, "ax"_a, "ay"_a, "az"_a)
         .def_static("sdf", std::move(maybe_op_unwrap(&nucleation::Shape::sdf)), "sdf_json"_a)
         .def_static("sdf_bounded", std::move(maybe_op_unwrap(&nucleation::Shape::sdf_bounded)), "sdf_json"_a, "min_x"_a, "min_y"_a, "min_z"_a, "max_x"_a, "max_y"_a, "max_z"_a)

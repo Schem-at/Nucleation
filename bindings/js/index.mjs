@@ -36,6 +36,8 @@ export { Diff } from "./Diff.mjs"
 
 export { Fingerprint } from "./Fingerprint.mjs"
 
+export { Geo } from "./Geo.mjs"
+
 export { ChunkMeshResult } from "./ChunkMeshResult.mjs"
 
 export { ItemModelConfig } from "./ItemModelConfig.mjs"

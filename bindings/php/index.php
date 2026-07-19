@@ -20,6 +20,7 @@ require_once __DIR__ . '/DefinitionRegion.php';
 require_once __DIR__ . '/SchematicRegions.php';
 require_once __DIR__ . '/Diff.php';
 require_once __DIR__ . '/Fingerprint.php';
+require_once __DIR__ . '/Geo.php';
 require_once __DIR__ . '/ChunkMeshResult.php';
 require_once __DIR__ . '/ItemModelConfig.php';
 require_once __DIR__ . '/ItemModelPackBuilder.php';
