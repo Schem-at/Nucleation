@@ -917,13 +917,13 @@ NOISY_BLOCKS = [
 ]
 
 
-def flat_art_palette():
+def flat_art_palette(extra_exclude=()):
     """A flat-texture palette for pixel art, built from filters + excludes."""
     b = nu.PaletteBuilder.create()
     b.full_blocks_only()
     b.exclude_tile_entities()
     b.exclude_transparent()
-    for kw in NOISY_BLOCKS:
+    for kw in (*NOISY_BLOCKS, *extra_exclude):
         b.exclude_keyword(kw)
     return b.build()
 
@@ -1002,7 +1002,102 @@ def scene_paintings(pack):
     print("  wrote docs/media/painting-starry-night.png + painting-gallery.png")
 
 
+# NASA Blue Marble (land/ocean/ice composite), public domain — the globe's
+# equirectangular texture, mirrored on Wikimedia Commons.
+GLOBE_TEXTURE = "Land ocean ice 2048.jpg"
+GLOBE_RADIUS = 19.0
+GLOBE_FRAMES = 48
+# Fixed sun, world space (camera at yaw 0 looks along -z, so +z faces the
+# viewer): from the camera's upper right, pulled far enough sideways that the
+# terminator crosses the visible disc as the texture spins underneath it.
+GLOBE_SUN = (0.75, 0.40, 0.55)
+GLOBE_AMBIENT = 0.12
+GLOBE_GAMMA = 0.62   # lifts Blue Marble's near-black oceans into deep blues
+
+# Speckle that reads as noise at one-block-per-"pixel" globe scale, on top of
+# the map-art exclusions: mono-color concretes/wools should carry the scene.
+GLOBE_EXTRA_NOISE = ["granite", "diorite", "andesite", "netherrack", "basalt",
+                     "bone_block", "purpur", "quartz", "snow"]
+
+
+def _globe_texture():
+    import urllib.request
+    path = os.path.join(MODELS_DIR, "blue-marble.jpg")
+    if not os.path.exists(path):
+        os.makedirs(MODELS_DIR, exist_ok=True)
+        req = urllib.request.Request(
+            _commons_url(GLOBE_TEXTURE),
+            headers={"User-Agent": "nucleation-readme-media/1.0"})
+        open(path, "wb").write(urllib.request.urlopen(req).read())
+    return _image_pixels(path, 1024)
+
+
+def _globe_surface(r=GLOBE_RADIUS):
+    """The sphere's one-voxel surface shell with unit normals, computed once —
+    the frame loop only re-shades it."""
+    surf = []
+    n = int(r) + 1
+    for x in range(-n, n + 1):
+        for y in range(-n, n + 1):
+            for z in range(-n, n + 1):
+                d = math.sqrt(x * x + y * y + z * z)
+                if r - 0.6 <= d <= r + 0.4:
+                    surf.append((x, y, z, x / d, y / d, z / d))
+    return surf
+
+
+def _globe_frame(phase, surf, tex, pal):
+    """One globe schematic: texture spun by `phase` turns, sun fixed, so the
+    day/night cycle emerges as continents cross the terminator."""
+    tw, th, raw = tex
+    m = math.sqrt(sum(c * c for c in GLOBE_SUN))
+    sx, sy, sz = (c / m for c in GLOBE_SUN)
+    amb = GLOBE_AMBIENT
+    s = nu.Schematic.create("globe")
+    # solid interior so no surface gap ever sees through to the far side
+    nu.BuildingTool.fill(s, nu.Shape.sphere(0, 0, 0, GLOBE_RADIUS),
+                         nu.Brush.solid("minecraft:black_concrete"))
+    two_pi = 2.0 * math.pi
+    for x, y, z, nx, ny, nz in surf:
+        u = (math.atan2(nz, nx) / two_pi + phase) % 1.0
+        v = 0.5 - math.asin(max(-1.0, min(1.0, ny))) / math.pi
+        i = (min(th - 1, max(0, int(v * th))) * tw + min(tw - 1, int(u * tw))) * 3
+        light = max(0.0, nx * sx + ny * sy + nz * sz)
+        light = light * light * (3.0 - 2.0 * light)     # soft terminator
+        lum = amb + (1.0 - amb) * light
+        r_, g_, b_ = _boost(
+            *(255.0 * (c / 255.0) ** GLOBE_GAMMA * lum
+              for c in (raw[i], raw[i + 1], raw[i + 2])),
+            sat=1.3, contrast=1.0)
+        s.set_block(x, y, z, pal.closest_block_dithered(r_, g_, b_, x, y, z))
+    return s
+
+
+def scene_globe(pack):
+    """Day/night Earth: Blue Marble sampled per surface voxel, spun under a
+    fixed sun, per-voxel Lambert + ambient, dithered flat-block palette."""
+    tex = _globe_texture()
+    surf = _globe_surface()
+    pal = flat_art_palette(GLOBE_EXTRA_NOISE).dithered()
+    tmp = tempfile.mkdtemp(prefix="nuc-globe-")
+    try:
+        for i in range(GLOBE_FRAMES):
+            s = _globe_frame(i / GLOBE_FRAMES, surf, tex, pal)
+            cfg = nu.RenderConfig.create(520, 520)
+            cfg.set_isometric(); cfg.set_yaw(0.0); cfg.set_pitch(15.0)
+            cfg.set_zoom(1.6); cfg.set_sphere_fit(True)
+            cfg.set_background(*NAVY)
+            nu.Renderer.render_to_file(s, pack, cfg,
+                                       os.path.join(tmp, f"f{i:03}.png"))
+        assemble_gif(tmp, os.path.join(OUT, "globe-day-night.gif"),
+                     fps=GLOBE_FRAMES / 4.8, max_colors=128)
+        print(f"  wrote docs/media/globe-day-night.gif ({GLOBE_FRAMES} frames)")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 SCENES = {
+    "globe": scene_globe,
     "paintings": scene_paintings,
     "dither": scene_dither,
     "scripting": scene_scripting,
