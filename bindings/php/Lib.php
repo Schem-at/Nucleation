@@ -984,6 +984,7 @@ WorldChunkView* WorldChunkView_create(int32_t cx, int32_t cz);
 int32_t WorldChunkView_cx(WorldChunkView* self);
 int32_t WorldChunkView_cz(WorldChunkView* self);
 Schematic* WorldChunkView_to_schematic(WorldChunkView* self);
+WorldChunkView* WorldChunkView_from_schematic(Schematic* schematic, int32_t cx, int32_t cz);
 typedef struct WorldChunkView_set_block_result { union { NucleationError err; }; bool is_ok; } WorldChunkView_set_block_result;
 WorldChunkView_set_block_result WorldChunkView_set_block(WorldChunkView* self, int32_t x, int32_t y, int32_t z, DiplomatStringView block_name);
 typedef struct WorldChunkView_set_biome_result { union { NucleationError err; }; bool is_ok; } WorldChunkView_set_biome_result;

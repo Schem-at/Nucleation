@@ -11,6 +11,7 @@ internal interface WorldChunkViewLib: Library {
     fun WorldChunkView_cx(handle: Pointer): Int
     fun WorldChunkView_cz(handle: Pointer): Int
     fun WorldChunkView_to_schematic(handle: Pointer): Pointer
+    fun WorldChunkView_from_schematic(schematic: Pointer, cx: Int, cz: Int): Pointer
     fun WorldChunkView_set_block(handle: Pointer, x: Int, y: Int, z: Int, blockName: Slice): ResultUnitInt
     fun WorldChunkView_set_biome(handle: Pointer, biomeName: Slice): ResultUnitInt
     fun WorldChunkView_biome_palette_json(handle: Pointer, write: Pointer): ResultUnitInt
@@ -54,6 +55,25 @@ class WorldChunkView internal constructor (
         fun create(cx: Int, cz: Int): WorldChunkView {
             
             val returnVal = lib.WorldChunkView_create(cx, cz);
+            val selfEdges: List<Any> = listOf()
+            val handle = returnVal 
+            val returnOpaque = WorldChunkView(handle, selfEdges, true)
+            return returnOpaque
+        }
+        @JvmStatic
+        
+        /** Build a chunk view at (`cx`, `cz`) from a schematic — every non-air
+        *block whose world (x, z) falls in this chunk is copied in, the rest
+        *ignored. The write-side twin of `to_schematic`: this is how the
+        *schematic building tools become a *world generator*. Fill a schematic
+        *with any shape, SDF, brush, or footprint (intersect it with the
+        *chunk's cuboid to keep memory flat), then hand it here per chunk and
+        *`WorldSink.write_chunk` it. Also the transform step of a world filter:
+        *`to_schematic` a streamed chunk, edit it, rebuild with this.
+        */
+        fun fromSchematic(schematic: Schematic, cx: Int, cz: Int): WorldChunkView {
+            
+            val returnVal = lib.WorldChunkView_from_schematic(schematic.handle, cx, cz);
             val selfEdges: List<Any> = listOf()
             val handle = returnVal 
             val returnOpaque = WorldChunkView(handle, selfEdges, true)

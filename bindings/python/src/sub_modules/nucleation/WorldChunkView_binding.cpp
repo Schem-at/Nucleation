@@ -1,6 +1,7 @@
 #include "diplomat_nanobind_common.hpp"
 
 
+#include "Schematic.hpp"
 #include "WorldChunkView.hpp"
 
 namespace nucleation {
@@ -16,6 +17,7 @@ void add_WorldChunkView_binding(nb::module_ mod) {
         .def_static("create", std::move(maybe_op_unwrap(&nucleation::WorldChunkView::create)), "cx"_a, "cz"_a)
         .def("cx", &nucleation::WorldChunkView::cx)
         .def("cz", &nucleation::WorldChunkView::cz)
+        .def_static("from_schematic", std::move(maybe_op_unwrap(&nucleation::WorldChunkView::from_schematic)), "schematic"_a, "cx"_a, "cz"_a)
         .def("set_biome", &nucleation::WorldChunkView::set_biome, "biome_name"_a)
         .def("set_block", &nucleation::WorldChunkView::set_block, "x"_a, "y"_a, "z"_a, "block_name"_a)
         .def("to_schematic", std::move(maybe_op_unwrap(&nucleation::WorldChunkView::to_schematic)));

@@ -28,6 +28,8 @@ namespace capi {
 
     diplomat::capi::Schematic* WorldChunkView_to_schematic(const diplomat::capi::WorldChunkView* self);
 
+    diplomat::capi::WorldChunkView* WorldChunkView_from_schematic(const diplomat::capi::Schematic* schematic, int32_t cx, int32_t cz);
+
     typedef struct WorldChunkView_set_block_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} WorldChunkView_set_block_result;
     WorldChunkView_set_block_result WorldChunkView_set_block(diplomat::capi::WorldChunkView* self, int32_t x, int32_t y, int32_t z, diplomat::capi::DiplomatStringView block_name);
 
@@ -62,6 +64,13 @@ inline int32_t WorldChunkView::cz() const {
 inline std::unique_ptr<Schematic> WorldChunkView::to_schematic() const {
     auto result = diplomat::capi::WorldChunkView_to_schematic(this->AsFFI());
     return std::unique_ptr<Schematic>(Schematic::FromFFI(result));
+}
+
+inline std::unique_ptr<WorldChunkView> WorldChunkView::from_schematic(const Schematic& schematic, int32_t cx, int32_t cz) {
+    auto result = diplomat::capi::WorldChunkView_from_schematic(schematic.AsFFI(),
+        cx,
+        cz);
+    return std::unique_ptr<WorldChunkView>(WorldChunkView::FromFFI(result));
 }
 
 inline diplomat::result<std::monostate, NucleationError> WorldChunkView::set_block(int32_t x, int32_t y, int32_t z, std::string_view block_name) {

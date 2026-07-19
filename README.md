@@ -360,6 +360,33 @@ while True:
 sink.finish()
 ```
 
+And the chunk is a **two-way bridge to the building tools**. `to_schematic()`
+reads a chunk out; `WorldChunkView.from_schematic(schematic, cx, cz)` writes one
+back — so *anything that fills a schematic becomes a custom world generator*, one
+chunk at a time. Fill an SDF (or OSM footprints, a heightmap, noise) clipped to
+each chunk and stream it straight to a playable world; intersecting with the
+chunk means the field is only evaluated inside the chunk being written, so it
+never materializes:
+
+```python
+from nucleation import Schematic, Shape, Brush, BuildingTool, WorldChunkView, WorldSink
+
+sdf  = Shape.sdf(island_json)
+sink = WorldSink.create("world/", "")
+for cx in range(-8, 8):
+    for cz in range(-8, 8):
+        chunk = Schematic.create("c")
+        box = Shape.cuboid(cx*16, -16, cz*16, cx*16 + 15, 48, cz*16 + 15)
+        BuildingTool.fill(chunk, sdf.intersection_with(box), Brush.solid("minecraft:stone"))
+        sink.write_chunk(WorldChunkView.from_schematic(chunk, cx, cz))
+sink.finish()
+```
+
+Run the same bridge the other way and it's a *processing pipeline*: `WorldStream`
+in → `to_schematic` → transform with any tool → `from_schematic` → `WorldSink`
+out. The OSM city, an SDF, a heightmap, a filter — all the same three moves
+([generator + filter snippet](docs/readme-snippets/17-world-generator-python.md)).
+
 ## Regions, transforms, and stamping
 
 A schematic is multi-region in the Litematica sense — many named sub-volumes,

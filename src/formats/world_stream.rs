@@ -530,6 +530,26 @@ impl WorldChunkView {
         true
     }
 
+    /// Build a chunk view at (`cx`, `cz`) from a schematic's blocks: every
+    /// non-air block whose world (x, z) falls in this chunk is copied in, the
+    /// rest ignored. This is the bridge from the schematic building tools to a
+    /// streamed world — fill a schematic with any shape, SDF, brush, or
+    /// footprint (clip it to the chunk to keep memory flat) and hand it here
+    /// per chunk, or read a chunk with `to_schematic`, transform it, and rebuild.
+    pub fn from_schematic(schematic: &UniversalSchematic, cx: i32, cz: i32) -> Self {
+        let mut view = Self::new(cx, cz);
+        let (x0, z0) = (cx * 16, cz * 16);
+        for (pos, block) in schematic.iter_blocks() {
+            if block.name == "minecraft:air" {
+                continue;
+            }
+            if (x0..x0 + 16).contains(&pos.x) && (z0..z0 + 16).contains(&pos.z) {
+                view.set_block(pos.x, pos.y, pos.z, block);
+            }
+        }
+        view
+    }
+
     /// Overwrite the biome of every currently-present section with a
     /// single-entry palette of `biome_name` (e.g. `"minecraft:desert"`).
     ///
@@ -851,4 +871,26 @@ pub fn diff_worlds(
             return Some(Ok(ChunkDiff { cx, cz, diff: d }));
         }
     }))
+}
+
+#[cfg(test)]
+mod from_schematic_tests {
+    use super::*;
+
+    #[test]
+    fn from_schematic_copies_only_in_chunk_blocks() {
+        // A bar spanning two chunks; the chunk view at (0,0) keeps only the
+        // x in [0,16) part.
+        let mut s = UniversalSchematic::new("bar".to_string());
+        let stone = BlockState::new("minecraft:stone".to_string());
+        for x in 0..32 {
+            s.set_block(x, 4, 0, &stone);
+        }
+        let view = WorldChunkView::from_schematic(&s, 0, 0);
+        assert_eq!(view.cx(), 0);
+        assert!(view.get_block(0, 4, 0).is_some(), "in-chunk block copied");
+        assert!(view.get_block(15, 4, 0).is_some(), "chunk edge copied");
+        assert!(view.get_block(16, 4, 0).is_none(), "next chunk's block not copied");
+        assert!(view.get_block(31, 4, 0).is_none(), "far block not copied");
+    }
 }

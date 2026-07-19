@@ -148,6 +148,24 @@ pub mod ffi {
             Box::new(Schematic(self.0.to_schematic()))
         }
 
+        /// Build a chunk view at (`cx`, `cz`) from a schematic — every non-air
+        /// block whose world (x, z) falls in this chunk is copied in, the rest
+        /// ignored. The write-side twin of `to_schematic`: this is how the
+        /// schematic building tools become a *world generator*. Fill a schematic
+        /// with any shape, SDF, brush, or footprint (intersect it with the
+        /// chunk's cuboid to keep memory flat), then hand it here per chunk and
+        /// `WorldSink.write_chunk` it. Also the transform step of a world filter:
+        /// `to_schematic` a streamed chunk, edit it, rebuild with this.
+        pub fn from_schematic(schematic: &Schematic, cx: i32, cz: i32) -> Box<WorldChunkView> {
+            Box::new(WorldChunkView(
+                crate::formats::world_stream::WorldChunkView::from_schematic(
+                    &schematic.0,
+                    cx,
+                    cz,
+                ),
+            ))
+        }
+
         /// Set a block at absolute world coordinates inside this chunk view.
         /// `block_name` must be a valid Minecraft block identifier (e.g.
         /// `minecraft:stone`). Errors with `InvalidArgument` if (x, z) is outside

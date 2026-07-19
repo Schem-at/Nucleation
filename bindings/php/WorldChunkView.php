@@ -32,6 +32,11 @@ final class WorldChunkView {
         return new Schematic($ret, true);
     }
 
+    public static function fromSchematic( $schematic,  $cx,  $cz) {
+        $ret = Lib::ffi()->WorldChunkView_from_schematic($schematic->ptr, $cx, $cz);
+        return new WorldChunkView($ret, true);
+    }
+
     public function setBlock( $x,  $y,  $z, string $block_name) {
         $__n3 = strlen($block_name);
         $__view3 = Lib::ffi()->new('DiplomatStringView');

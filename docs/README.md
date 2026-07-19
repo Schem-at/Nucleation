@@ -31,7 +31,10 @@ Covered in the README's illustrated tour, each with a verified Python snippet:
   `shell`) for open ribbons that dip or self-overlap
 - [Read, iterate, and stream](../README.md#read-iterate-and-stream) — chunk
   iteration strategies + the `WorldStream`/`WorldSink` constant-memory world
-  pipeline ([snippet](readme-snippets/12-chunk-iteration-python.md))
+  pipeline ([snippet](readme-snippets/12-chunk-iteration-python.md)), and the
+  `to_schematic` ↔ `from_schematic` bridge that makes any fill (SDF, OSM,
+  heightmap, noise) a custom world **generator** or **filter**
+  ([snippet](readme-snippets/17-world-generator-python.md))
 - [Regions, transforms & stamping](../README.md#regions-transforms-and-stamping)
   — multi-region schematics, rotate/flip, `copy_region`
   ([snippet](readme-snippets/13-regions-transforms-python.md))

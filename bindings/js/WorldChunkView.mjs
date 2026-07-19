@@ -109,6 +109,29 @@ export class WorldChunkView {
     }
 
     /**
+     * Build a chunk view at (`cx`, `cz`) from a schematic — every non-air
+     * block whose world (x, z) falls in this chunk is copied in, the rest
+     * ignored. The write-side twin of `to_schematic`: this is how the
+     * schematic building tools become a *world generator*. Fill a schematic
+     * with any shape, SDF, brush, or footprint (intersect it with the
+     * chunk's cuboid to keep memory flat), then hand it here per chunk and
+     * `WorldSink.write_chunk` it. Also the transform step of a world filter:
+     * `to_schematic` a streamed chunk, edit it, rebuild with this.
+     */
+    static fromSchematic(schematic, cx, cz) {
+
+        const result = wasm.WorldChunkView_from_schematic(schematic.ffiValue, cx, cz);
+
+        try {
+            return new WorldChunkView(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
      * Set a block at absolute world coordinates inside this chunk view.
      * `block_name` must be a valid Minecraft block identifier (e.g.
      * `minecraft:stone`). Errors with `InvalidArgument` if (x, z) is outside
