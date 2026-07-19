@@ -1272,14 +1272,14 @@ def scene_paintings(pack):
 # NASA Blue Marble (land/ocean/ice composite), public domain — the globe's
 # equirectangular texture, mirrored on Wikimedia Commons.
 GLOBE_TEXTURE = "Land ocean ice 2048.jpg"
-GLOBE_RADIUS = 19.0
+GLOBE_RADIUS = 38.0
 GLOBE_FRAMES = 48
 # Fixed sun, world space (camera at yaw 0 looks along -z, so +z faces the
 # viewer): from the camera's upper right, pulled far enough sideways that the
 # terminator crosses the visible disc as the texture spins underneath it.
 GLOBE_SUN = (0.75, 0.40, 0.55)
-GLOBE_AMBIENT = 0.12
-GLOBE_GAMMA = 0.62   # lifts Blue Marble's near-black oceans into deep blues
+GLOBE_AMBIENT = 0.26
+GLOBE_GAMMA = 0.55   # lifts Blue Marble's near-black oceans into deep blues
 
 # Speckle that reads as noise at one-block-per-"pixel" globe scale, on top of
 # the map-art exclusions: mono-color concretes/wools should carry the scene.
@@ -1350,14 +1350,14 @@ def scene_globe(pack):
     try:
         for i in range(GLOBE_FRAMES):
             s = _globe_frame(i / GLOBE_FRAMES, surf, tex, pal)
-            cfg = nu.RenderConfig.create(520, 520)
+            cfg = nu.RenderConfig.create(720, 720)
             cfg.set_isometric(); cfg.set_yaw(0.0); cfg.set_pitch(15.0)
             cfg.set_zoom(1.6); cfg.set_sphere_fit(True)
             cfg.set_background(*NAVY)
             nu.Renderer.render_to_file(s, pack, cfg,
                                        os.path.join(tmp, f"f{i:03}.png"))
         assemble_gif(tmp, os.path.join(OUT, "globe-day-night.gif"),
-                     fps=GLOBE_FRAMES / 4.8, max_colors=128)
+                     fps=GLOBE_FRAMES / 4.8, max_colors=112)
         print(f"  wrote docs/media/globe-day-night.gif ({GLOBE_FRAMES} frames)")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
