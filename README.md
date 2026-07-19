@@ -2,7 +2,7 @@
 
 # Nucleation
 
-**A Minecraft schematic engine in Rust — load, build, simulate, mesh, and render
+**A Minecraft schematic engine in Rust: load, build, simulate, mesh, and render
 schematics from seven languages.**
 
 [![Crates.io](https://img.shields.io/crates/v/nucleation.svg)](https://crates.io/crates/nucleation)
@@ -12,7 +12,7 @@ schematics from seven languages.**
 
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/hero.png" width="760" alt="A volcanic floating island generated from a JSON SDF description and rendered by nucleation">
 
-*This volcano island is a JSON description — [signed distance fields](docs/guides/sdf-terrain.md)
+*This volcano island is a JSON description: [signed distance fields](docs/guides/sdf-terrain.md)
 plus material rules. Every image on this page was built **and rendered** by
 nucleation itself, and every snippet ran for real
 ([images](tools/readme-media/generate.py) · [snippets + outputs](docs/readme-snippets/)).*
@@ -39,14 +39,14 @@ pip  install nucleation     # Python (CPython 3.12+)
 ```
 
 Kotlin/JVM, PHP, C, and C++ ship as archives on
-[Releases](https://github.com/Schem-at/Nucleation/releases) —
+[Releases](https://github.com/Schem-at/Nucleation/releases); see the
 [quickstarts below](#one-api-seven-languages).
 
 ## The basics
 
-A `Schematic` is a named collection of blocks (plus block entities, entities,
-and metadata) — one or many named regions. Load one from any supported format,
-edit it with plain coordinates and block strings, save it in any other:
+A `Schematic` is a named collection of blocks, plus block entities, entities,
+and metadata, held in one or many named regions. Load one from any supported
+format, edit it with plain coordinates and block strings, save it in any other:
 
 ```python
 from nucleation import Schematic
@@ -64,7 +64,7 @@ cube.save_to_file("cube.schem")                            # format from the ext
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/basics.png" width="380" alt="The cube from the snippet with its glowstone crown, rendered">
 </div>
 
-The same loop in JavaScript — the WASM build has no filesystem, so it's bytes
+The same loop in JavaScript. The WASM build has no filesystem, so it is bytes
 in, bytes out:
 
 ```js
@@ -76,22 +76,21 @@ cube.setBlock(1, 3, 1, "minecraft:glowstone");
 writeFileSync("simple_cube.schem", Buffer.from(cube.toSchematicB64(), "base64"));
 ```
 
-Block-state strings with properties work anywhere a block is named —
-`"minecraft:lever[face=floor,facing=east]"` — and every block string a
-schematic can contain round-trips. Later Python snippets assume
-`from nucleation import *` and an existing schematic `s`; each has a fully
-runnable version with captured output in
-[`docs/readme-snippets/`](docs/readme-snippets/).
+Block-state strings with properties work anywhere a block is named, like
+`"minecraft:lever[face=floor,facing=east]"`, and every block string a schematic
+can contain round-trips. Later Python snippets assume `from nucleation import *`
+and an existing schematic `s`; each has a fully runnable version with captured
+output in [`docs/readme-snippets/`](docs/readme-snippets/).
 
 ## Build: shapes, brushes, palettes
 
-Spheres, tori, cones, pyramids, bezier ribbons — plus boolean combinators —
+Spheres, tori, cones, pyramids, and bezier ribbons, plus boolean combinators,
 filled by brushes that pick each block:
 
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/shapes-gallery.png" width="700" alt="Shape gallery: sphere, torus, cone, pyramid, bezier ribbon">
 
-A gradient brush follows a shape's own parameter — around the ring of a
-torus, along a bezier — and snaps every color to a palette:
+A gradient brush follows a shape's own parameter, around the ring of a torus or
+along a bezier, and snaps every color to a palette:
 
 <div align="center">
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/gradient-torus.png" width="480" alt="Rainbow torus: a seamless curve gradient snapped to the wool palette">
@@ -103,8 +102,8 @@ brush.set_palette(Palette.wool())
 BuildingTool.fill(s, Shape.torus(0, 0, 0, 16, 6, 0, 1, 0), brush)
 ```
 
-The shaded brush lights a base color by surface normal — 3D-lit forms out of
-flat blocks:
+The shaded brush lights a base color by surface normal, giving 3D-lit forms out
+of flat blocks:
 
 <div align="center">
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/shaded-sphere.png" width="300" alt="Lambertian-shaded terracotta sphere">
@@ -116,8 +115,8 @@ brush.set_palette(Palette.terracotta())
 BuildingTool.fill(s, Shape.sphere(0, 0, 0, 16), brush)
 ```
 
-And palettes turn colors into blocks. Ask for pure white → pure black in 24
-steps and the engine picks the blocks itself — distinct, ordered, off-hue
+And palettes turn colors into blocks. Ask for pure white to pure black in 24
+steps and the engine picks the blocks itself: distinct, ordered, with off-hue
 candidates penalized (bottom row; above it, the lightness-sorted wool,
 concrete, terracotta, and planks presets):
 
@@ -128,14 +127,14 @@ Palette.grayscale().ramp_ids_json(255, 255, 255,  0, 0, 0,  24)
 # 24 distinct blocks: white_wool ... iron_block ... deepslate_tiles ... black_concrete
 ```
 
-And when a ramp still bands, dither it: `Palette.…().dithered()` makes
-every brush alternate between the two nearest blocks per voxel (ordered
-Bayer, deterministic) — hard bands on the left, dissolved on the right:
+And when a ramp still bands, dither it: `Palette.…().dithered()` makes every
+brush alternate between the two nearest blocks per voxel (ordered Bayer,
+deterministic). Hard bands on the left, dissolved on the right:
 
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/dither-compare.png" width="740" alt="The same shaded sphere with hard palette snapping (banded) and dithered snapping (smooth)">
 
-Or build palettes from pure color logic over the block database — no names,
-just measured color values and block facts:
+Or build palettes from pure color logic over the block database, no names, just
+measured color values and block facts:
 
 ```python
 b = PaletteBuilder.create()
@@ -148,9 +147,9 @@ Blocks.by_color_json(120, 200, 60, 0.10)
 # everything lime-ish, nearest first: lime_concrete_powder (0.053), ...
 ```
 
-And shapes aren't limited to the primitives — **any SDF tree is a `Shape`**,
-so smooth-blended distance fields fill with every brush. Field-gradient
-normals mean the shaded brush shades a blend continuously across the seam:
+And shapes aren't limited to the primitives: **any SDF tree is a `Shape`**, so
+smooth-blended distance fields fill with every brush. Field-gradient normals
+mean the shaded brush shades a blend continuously across the seam:
 
 <div align="center">
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/sdf-shape-shaded.png" width="400" alt="A smooth-union SDF blob filled with the shaded brush">
@@ -167,9 +166,9 @@ More in the guides: [shapes & brushes](docs/guides/shapes-and-brushes.md) ·
 
 ## Edit without collateral damage
 
-Masked fills touch only what you allow: `fill_only_air` builds around
-existing work; `fill_replacing` swaps listed blocks inside a shape — a
-temple weathering into moss and cracks within a sphere of decay:
+Masked fills touch only what you allow: `fill_only_air` builds around existing
+work; `fill_replacing` swaps listed blocks inside a shape. Here a temple weathers
+into moss and cracks within a sphere of decay:
 
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/masked-fill.png" width="760" alt="Greek temple before/after weathering via fill_replacing">
 
@@ -204,18 +203,17 @@ terrain = Sdf.schematic_from_sdf_auto(island, rules)
 </div>
 
 That's the minimal version; the volcano up top adds smooth-blended cones, a
-cylinder-cored lava crater, and noise-gated snow. Smooth booleans even
-animate into metaballs — recipes, node/rule schemas, and the gradient fill
-rules live in the [SDF terrain guide](docs/guides/sdf-terrain.md).
+cylinder-cored lava crater, and noise-gated snow. Smooth booleans even animate
+into metaballs. Recipes, node and rule schemas, and the gradient fill rules live
+in the [SDF terrain guide](docs/guides/sdf-terrain.md).
 
 ## Voxelize 3D models
 
-Real 3D models become schematics: GLB (with node transforms and embedded
-textures) and OBJ load into a `MeshModel`, and a voxelized mesh is — like
-everything else here — just a `Shape`. Inside/outside comes from
-triangle-parity ray casting; normals come from the nearest triangle, so
-lighting brushes simply work. The Utah teapot under one spotlight, through
-the grayscale ladder:
+Real 3D models become schematics: GLB (node transforms, embedded textures) and
+OBJ load into a `MeshModel`, and a voxelized mesh is, like everything else here,
+just a `Shape`. Inside/outside comes from triangle-parity ray casting, and
+normals from the nearest triangle, so lighting brushes work on it directly. The
+Utah teapot under one spotlight, through the grayscale ladder:
 
 <div align="center">
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/teapot-spotlight.png" width="640" alt="Voxelized Utah teapot lit by a single spotlight through a grayscale block palette">
@@ -228,9 +226,9 @@ spot.set_palette(gray_ramp)
 BuildingTool.fill(s, teapot, spot)
 ```
 
-And textures project onto the voxels: each block takes the palette-closest
-color of its nearest surface point (barycentric UVs, bilinear sampling) —
-the classic COLLADA duck, beak and eye catchlights intact:
+And textures project onto the voxels: each block takes the palette-closest color
+of its nearest surface point (barycentric UVs, bilinear sampling). The classic
+COLLADA duck, beak and eye catchlights intact:
 
 <div align="center">
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/textured-duck.png" width="460" alt="The Khronos duck voxelized with its texture projected onto blocks">
@@ -242,8 +240,7 @@ duck = Voxelizer.schematic_from_glb_textured(duck_glb, 44.0, 0.7, Palette.solid(
 ```
 
 And it scales: a full Mario Kart 64 Rainbow Road, voxelized to a road eight
-blocks wide — 515 blocks long, 51,000 blocks, solved in 1.5 seconds by the
-scanline voxelizer:
+blocks wide, 51,000 blocks solved in 1.5 seconds by the scanline voxelizer:
 
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mariokart-track.png?v=4" width="760" alt="Rainbow Road N64 voxelized: the whole course as a glowing rainbow ribbon">
 
@@ -251,32 +248,31 @@ scanline voxelizer:
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mariokart-closeup.png?v=4" width="620" alt="Closeup of the voxelized road: eight blocks wide, rainbow-striped surface curving into a banked loop">
 </div>
 
-A ribbon in the void is the easy case. Koopa Troopa Beach is the hard one — an
-open island of sand, dirt track, cliffs, palms and a central lagoon, with the
-sea faked in as a floor plane so the parity solver has a closed volume to fill.
-Same call, a color-matched beach palette, and the shore reads at a glance:
+A ribbon in the void is the easy case; Koopa Troopa Beach is the hard one: an
+open island of sand, dirt track, cliffs, palms, and a central lagoon. The same
+voxelizer call handles it, with a color-matched beach palette:
 
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mk64-koopa-beach.png?v=2" width="760" alt="Mario Kart 64 Koopa Troopa Beach voxelized: sand island, cyan shallows and central lagoon in an endless sea">
 
 ## The real world, in blocks
 
-Texture mapping and the color math, animated: a voxel Earth spinning under
-a fixed sun — every frame, every surface block is re-picked by its
-luminosity through the dithered palette, so continents sweep through a
-true day/night terminator:
+Texture mapping and the color math, animated: a voxel Earth spinning under a
+fixed sun. Every frame, every surface block is re-picked by its luminosity
+through the dithered palette, so continents sweep through a true day/night
+terminator:
 
 <div align="center">
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/globe-day-night.gif?v=2" width="440" alt="A voxel Earth rotating through a day/night cycle, every block re-picked by luminosity">
 </div>
 
 And real geodata voxelizes straight from public sources. The geo entry points
-take data, not URLs — you fetch and project, they build the blocks. The
+take data, not URLs: you fetch and project, they build the blocks. The
 Matterhorn is an AWS elevation grid through `Geo.heightmap_terrain` (300×300
 columns, ~53 m/block, then snow/scree/meadow bands by elevation and slope):
 
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/geo-mountains.png" width="760" alt="The Matterhorn and surrounding range voxelized from elevation tiles">
 
-…and Wall Street is OpenStreetMap footprints through `Geo.extrude_footprints` —
+…and Wall Street is OpenStreetMap footprints through `Geo.extrude_footprints`:
 179 buildings, each a `Shape.polygon_prism` extruded to its tagged height at
 1 block = 2 m, stacked tallest-wins and banded by height:
 
@@ -288,9 +284,9 @@ buildings = [{"polygon": [[0,0],[12,0],[12,8],[0,8]], "height": 40, "block": "mi
 city = Geo.extrude_footprints(json.dumps(buildings), "minecraft:gray_concrete", "fidi")
 ```
 
-That whole 2.4-million-block district is one schematic — and it streams
-straight out to a *playable Minecraft world*, region files and all, chunk by
-chunk in constant memory (see [Read, iterate, and stream](#read-iterate-and-stream)):
+That whole 2.4-million-block district is one schematic, and it streams straight
+out to a *playable Minecraft world*, region files and all, chunk by chunk in
+constant memory (see [Read, iterate, and stream](#read-iterate-and-stream)):
 
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/geo-city-skyline.png" width="820" alt="A low-angle skyline of the voxelized Financial District, ready to load as a Minecraft world">
 
@@ -305,10 +301,10 @@ All four are reproducible recipes in
 
 ## Paintings, in blocks
 
-Everything above composes: flat-texture palettes built by color-logic
-filters, chroma-boosted matching (so muted pigments land on saturated
-blocks, not gray clays), and per-voxel ordered dithering — pointed at art.
-Van Gogh's Starry Night, 128 blocks wide:
+Everything above composes, pointed at art: flat-texture palettes built by
+color-logic filters, chroma-boosted matching (so muted pigments land on
+saturated blocks, not gray clays), and per-voxel ordered dithering. Van Gogh's
+Starry Night, 128 blocks wide:
 
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/painting-starry-night.png" width="760" alt="Van Gogh's Starry Night as block pixel art, 128 blocks wide">
 
@@ -320,16 +316,16 @@ r, g, b = boost(*pixel, sat=1.35)                # chroma exaggeration pre-match
 s.set_block(x, 0, y, palette.closest_block_dithered(r, g, b, x, 0, y))
 ```
 
-The full recipe — including the flat-palette filter chain — is
-`scene_paintings` in [`tools/readme-media/generate.py`](tools/readme-media/generate.py).
+The full recipe, including the flat-palette filter chain, is `scene_paintings`
+in [`tools/readme-media/generate.py`](tools/readme-media/generate.py).
 
 ## Read, iterate, and stream
 
 Everything above *writes* blocks. This is how you read them back and process
 builds too big to hold in memory. Any schematic splits into fixed chunks in a
-traversal order you choose — `bottom_up`, `top_down`, `center_outward`,
-`distance_to_camera`, or `random`. Freeze a center-outward walk 60% of the
-way through and the iterator's wavefront reads straight off the terrain:
+traversal order you choose: `bottom_up`, `top_down`, `center_outward`,
+`distance_to_camera`, or `random`. Freeze a center-outward walk 60% of the way
+through and the iterator's wavefront reads straight off the terrain:
 plasma-tinted columns have been visited, green ones haven't yet.
 
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/streaming-chunks.png" width="760" alt="A rolling terrain iterated 16x16 column by column, tinted by center-outward chunk order with the unvisited rim still natural green">
@@ -341,9 +337,9 @@ for chunk in json.loads(s.get_chunks_with_strategy_json(16, 16, 16, "center_outw
     handle(chunk["chunk_x"], chunk["chunk_z"], chunk["blocks"])
 ```
 
-The same idea scales past memory: stream a real world folder chunk-by-chunk
-and write a transformed copy, with only one chunk resident at a time — RAM
-stays flat whether the world is 10 MB or 10 GB.
+The same idea scales past memory: stream a real world folder chunk-by-chunk and
+write a transformed copy, with only one chunk resident at a time. RAM stays flat
+whether the world is 10 MB or 10 GB.
 
 ```python
 from nucleation import WorldStream, WorldSink
@@ -362,9 +358,9 @@ sink.finish()
 
 And the chunk is a **two-way bridge to the building tools**. `to_schematic()`
 reads a chunk out; `WorldChunkView.from_schematic(schematic, cx, cz)` writes one
-back — so *anything that fills a schematic becomes a custom world generator*, one
+back. So *anything that fills a schematic becomes a custom world generator*, one
 chunk at a time. Fill an SDF (or OSM footprints, a heightmap, noise) clipped to
-each chunk and stream it straight to a playable world; intersecting with the
+each chunk and stream it straight to a playable world. Intersecting with the
 chunk means the field is only evaluated inside the chunk being written, so it
 never materializes:
 
@@ -382,32 +378,32 @@ for cx in range(-8, 8):
 sink.finish()
 ```
 
-Here's the OSM Financial District doing exactly that — 179 buildings streamed
-out one 16×16 chunk column at a time, a diagonal wavefront assembling the whole
+Here's the OSM Financial District doing exactly that: 179 buildings streamed out
+one 16×16 chunk column at a time, a diagonal wavefront assembling the whole
 2.4M-block skyline:
 
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/worldgen-osm.gif" width="760" alt="The voxel Financial District generating chunk column by chunk column in a diagonal sweep until the full skyline stands">
 
-The source is whatever you fill with. Swap the OSM footprints for an SDF and
-the *same* generator streams a terrain instead — here each chunk is the SDF
-evaluated only inside that chunk, materializing center-outward:
+The source is whatever you fill with. Swap the OSM footprints for an SDF and the
+*same* generator streams a terrain instead, each chunk the SDF evaluated only
+inside that chunk, materializing center-outward:
 
 <div align="center">
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/worldgen-sdf.gif" width="560" alt="An SDF island terrain generating chunk by chunk, growing outward from its center until the whole island stands">
 </div>
 
 Run the same bridge the other way and it's a *processing pipeline*: `WorldStream`
-in → `to_schematic` → transform with any tool → `from_schematic` → `WorldSink`
-out. The OSM city, an SDF, a heightmap, a filter — all the same three moves
+→ `to_schematic` → transform with any tool → `from_schematic` → `WorldSink`. The
+OSM city, an SDF, a heightmap, a filter: the same three moves
 ([generator + filter snippet](docs/readme-snippets/17-world-generator-python.md)).
 
 ## Regions, transforms, and stamping
 
-A schematic is multi-region in the Litematica sense — many named sub-volumes,
-each with its own palette and bounds — and both whole builds and single
-regions transform in place. Here a keep and two wings are three separate
-named regions; `rotate_region_y` turns the copper wing 90° and leaves the
-keep and the prismarine wing exactly where they were:
+A schematic is multi-region in the Litematica sense: many named sub-volumes,
+each with its own palette and bounds, and both whole builds and single regions
+transform in place. Here a keep and two wings are three separate named regions;
+`rotate_region_y` turns the copper wing 90° and leaves the keep and the
+prismarine wing exactly where they were:
 
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/regions.png" width="760" alt="Before and after: a quartz keep with copper and prismarine wings as three named regions, with the copper wing rotated 90 degrees in place">
 
@@ -418,21 +414,20 @@ s.set_block_in_region("gate", 10, 0, 0, "minecraft:blackstone")
 s.region_names_json()                 # ["Main", "keep", "gate"]
 s.rotate_region_y("gate", 90)         # turn one region, leave the rest
 
-# Transform the whole build — rotate_x/y/z (degrees), flip_x/y/z:
+# Transform the whole build with rotate_x/y/z (degrees) and flip_x/y/z:
 s.rotate_y(90)                        # a bar's +x tip at (9,0,0) lands at (0,0,0)
 
 # Stamp a sub-volume of one schematic into another:
 dst.copy_region(src, 0, 0, 0,  9, 0, 0,   100, 0, 0,  "[]")
-#               source  ── from box ──   ── to ──   exclude
+#               source   min-corner    max-corner    target    exclude
 ```
-
 
 ## Block entities, entities, and NBT
 
 Blocks carry NBT, and the schematic holds full block entities and entities,
-round-tripped as SNBT — so a chest keeps its loot table and a spawner its mob.
-A vault of them — chests, barrels, dyed shulker boxes, a caged spawner, and
-brewing/enchanting furniture, every one an NBT carrier:
+round-tripped as SNBT, so a chest keeps its loot table and a spawner its mob. A
+vault of them: chests, barrels, dyed shulker boxes, a caged spawner, and brewing
+and enchanting furniture, every one an NBT carrier:
 
 <div align="center">
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/block-entities.png" width="620" alt="An aerial view of a stone-brick vault lined with chests, barrels, dyed shulker boxes, furnaces, a caged spawner, and an enchanting table">
@@ -454,7 +449,7 @@ s.entity_count()                      # 1
 ## Simulate redstone
 
 Headless circuit simulation via [MCHPRS](https://github.com/MCHPR/MCHPRS)'s
-redpiler — and it runs in the browser, since simulation ships in the WASM
+redpiler, and it runs in the browser too, since simulation ships in the WASM
 build. Flip the lever, tick the world, and the lamp (and wire) light up:
 
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/redstone.png" width="700" alt="Lever, wire and lamp before and after simulation">
@@ -469,23 +464,22 @@ world.flush();
 world.isLit(2, 1, 0);                        // → true
 ```
 
-Eight of those lines make a display — levers flipped through the
-simulator, lamps showing the byte:
+Eight of those lines make a display: levers flipped through the simulator, lamps
+showing the byte:
 
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/simulation-byte.png" width="700" alt="Eight lever-wire-lamp lines displaying the binary pattern 10110010">
 
-Beyond poking blocks: a typed executor drives circuits through named, typed
-inputs and outputs (booleans, integers, floats, ASCII) with layout builders
-for buses. Build an `IoLayout`, wrap the world in a `TypedCircuitExecutor`,
-and set an 8-bit input by value instead of toggling wires by hand — see the
-[docs](docs/README.md).
+Beyond poking blocks, a typed executor drives circuits through named, typed
+inputs and outputs (booleans, integers, floats, ASCII) with layout builders for
+buses. Build an `IoLayout`, wrap the world in a `TypedCircuitExecutor`, and set
+an 8-bit input by value instead of toggling wires by hand (see the
+[docs](docs/README.md)).
 
 ## Mesh and render
 
-Any schematic → GLB/glTF or USDZ using any vanilla-format resource pack,
-plus the headless GPU renderer that drew this page. The sphere-fit camera
-holds a rotation-stable frame — this turntable is 40 renders of the hero
-island:
+Any schematic exports to GLB/glTF or USDZ using any vanilla-format resource
+pack, plus the headless GPU renderer that drew this page. The sphere-fit camera
+holds a rotation-stable frame; this turntable is 40 renders of the hero island:
 
 <div align="center">
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/hero-turntable.gif" width="440" alt="Rotation-stable turntable of the volcano island">
@@ -503,7 +497,7 @@ Renderer.render_to_file(schem, pack_zip, cfg, "island.png")
 
 ## Analyze: diff, fingerprint, auto-stack
 
-Structural diffs know what was added, removed, changed, and swapped — here
+Structural diffs know what was added, removed, changed, and swapped, shown here
 as a ghost view, additions in green, removals in red:
 
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/diff-engine.png" width="760" alt="Cottage before, after, and diff ghost view">
@@ -513,8 +507,8 @@ diff = Diff.compute(before, after, "exact")     # distance 3; summary JSON with 
 Fingerprint.is_duplicate(before, after, "exact")   # False (fingerprints are translation-invariant)
 ```
 
-And nucleation can *find the repetition in a build* — the lattice of a
-tiling wall, a repeater bus, a pixel grid — and restamp it to a new size:
+And nucleation can *find the repetition in a build*, the lattice of a tiling
+wall, a repeater bus, or a pixel grid, and restamp it to a new size:
 
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/autostack.png" width="760" alt="A 2-unit wall module restamped to 6 units">
 
@@ -525,7 +519,7 @@ longer = Autostack.resize_1d(wall, 4, 0, 0, 6)   # 2 units → 6: (8,4,1) → (2
 
 ## Worlds and versions
 
-Schematics round-trip through *playable worlds* — export a real world folder
+Schematics round-trip through *playable worlds*: export a real world folder
 (`level.dat` + region files), import any world back, bounded to a box or
 [streamed chunk-by-chunk](#read-iterate-and-stream) in constant memory:
 
@@ -540,12 +534,12 @@ translation runs on GeyserMC's mappings at full **26.2** parity.
 
 ## The block database
 
-Under it all sits a block database extracted from Mojang's own data
-generator and the vanilla jars — kinds, variant families, resolved tags,
-geometry, measured colors for all 1,196 Minecraft 26.2 blocks — which
-[updates itself](docs/guides/minecraft-block-data.md) when Mojang ships a
-new version. It's what lets palettes reason about color and brushes about
-block facts:
+Under it all sits a block database extracted from Mojang's own data generator
+and the vanilla jars: kinds, variant families, resolved tags, geometry, and
+measured colors for all 1,196 Minecraft 26.2 blocks. It
+[updates itself](docs/guides/minecraft-block-data.md) when Mojang ships a new
+version, and it's what lets palettes reason about color and brushes about block
+facts:
 
 ```python
 json.loads(Blocks.get_json("minecraft:oak_stairs"))
@@ -558,24 +552,24 @@ json.loads(Blocks.variants_of_json("minecraft:oak_planks"))
 
 ## Scripting
 
-Embedded Lua and JS engines run build scripts against the full API — this
-sine wall is a 12-line Lua script run through `Scripting.run_lua_script`
+Embedded Lua and JS engines run build scripts against the full API. This sine
+wall is a 12-line Lua script run through `Scripting.run_lua_script`
 ([scripting guide](docs/guides/scripting.md)):
 
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/scripting-wall.png" width="700" alt="A sine-wave wall built by an embedded Lua script with a concrete gradient">
 
 ## Pluggable storage
 
-A library of builds — any schematic saves and loads through one URI, across
-backends — memory, filesystem, S3, Redis, Postgres:
+A library of builds: any schematic saves and loads through one URI, across
+memory, filesystem, S3, Redis, and Postgres backends:
 
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/storage-gallery.png" width="820" alt="A shaded sphere, a rainbow torus, an oak tree, and a sandstone pyramid — four saved schematics">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/storage-gallery.png" width="820" alt="A shaded sphere, a rainbow torus, an oak tree, and a sandstone pyramid: four saved schematics">
 
 Two layers: `StoreIo` moves whole schematics, `Store` is a raw key-value store
 over the same backends.
 
 ```python
-# Whole schematics, by URI (format inferred from the path — or defaulted):
+# Whole schematics, by URI (format inferred from the path, or defaulted):
 StoreIo.save(castle, "file:///data/castle.schem", "")
 castle = StoreIo.open("file:///data/castle.schem")
 
@@ -590,7 +584,7 @@ store.list("meta/")                    # ["meta/version"]
 
 Every binding is generated from one annotated-Rust source of truth
 ([`src/bridge/`](src/bridge/)) via
-[Diplomat](https://github.com/rust-diplomat/diplomat) — committed,
+[Diplomat](https://github.com/rust-diplomat/diplomat), then committed,
 regenerated, and diffed in CI so they can never drift:
 
 | Language | Package | Errors | Naming |
@@ -612,7 +606,7 @@ What ships where:
 | Release archives + JAR | full surface, native, 5 platforms |
 | crates.io | full surface except `simulation`* |
 
-\* MCHPRS isn't on crates.io — for simulation in Rust, use
+\* MCHPRS isn't on crates.io; for simulation in Rust, use
 `nucleation = { git = "https://github.com/Schem-at/Nucleation", features = ["simulation"] }`.
 
 <details>
@@ -655,13 +649,13 @@ int main(void) {
 
 ## Documentation & development
 
-- [Documentation index](docs/README.md) — per-language references and all
+- [Documentation index](docs/README.md): per-language references and all
   feature guides ([shapes & brushes](docs/guides/shapes-and-brushes.md),
   [palettes](docs/guides/palettes.md), [SDF terrain](docs/guides/sdf-terrain.md),
   [scripting](docs/guides/scripting.md),
   [block database](docs/guides/minecraft-block-data.md))
-- [`docs/readme-snippets/`](docs/readme-snippets/) — every snippet above with
-  its verified output
+- [`docs/readme-snippets/`](docs/readme-snippets/): every snippet above with its
+  verified output
 - [Release notes](RELEASE_NOTES.md)
 
 Also in the box: layer-art templates (schematics from ASCII art).
@@ -672,9 +666,9 @@ cargo test                          # core suite (784 tests)
 ./examples/bridge_smoke/js/run.sh   # end-to-end smoke per language
 ```
 
-CI regenerates bindings and fails on drift, exercises every built wheel and
-the assembled JAR before release, and smoke-tests all seven language
-bindings on every push.
+CI regenerates bindings and fails on drift, exercises every built wheel and the
+assembled JAR before release, and smoke-tests all seven language bindings on
+every push.
 
 ## License
 
