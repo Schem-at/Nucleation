@@ -1,3 +1,16 @@
+# Nucleation v0.3.11
+
+**`Palette.closest_block_dithered(r, g, b, x, y, z)`** — the per-pixel
+entry point for image mapping and pixel art: position-aware ordered
+dithering between the two nearest palette blocks, deterministic. It powers
+the README's new showcases: four public-domain paintings as block art
+(Starry Night, Sunflowers, The Great Wave, Girl with a Pearl Earring), a
+rotating voxel Earth whose blocks are re-picked per frame by luminosity
+through a day/night terminator, the Matterhorn from elevation tiles, and
+Wall Street from OpenStreetMap.
+
+---
+
 # Nucleation v0.3.10
 
 **Ordered dithering.** `Palette.dithered()` makes every brush alternate
