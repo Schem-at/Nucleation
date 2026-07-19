@@ -44,7 +44,9 @@ public:
    * voxel center (robust on closed meshes), plus — when `shell` > 0 —
    * every voxel whose center is within `shell` blocks of the surface,
    * which rescues thin walls and hollow vessels (0.7–1.0 closes
-   * single-voxel shells; 0 = pure parity). Errors with `Parse` on
+   * single-voxel shells; 0 = pure parity; a *negative* `shell` is
+   * surface-only — a skin |shell| blocks thick with no interior fill,
+   * for open sheets/ribbons that dip or self-overlap). Errors with `Parse` on
    * malformed/triangle-less GLB and `InvalidArgument` on a
    * non-positive `target_size`.
    */
