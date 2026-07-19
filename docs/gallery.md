@@ -185,3 +185,49 @@ for theta in linspace(-pi, pi, 200):
         fill(s, Shape.sphere(round(x), round(y), round(z), 1),
              Brush.solid(pal.closest_block(*hsv((theta + pi) / (2 * pi)))))
 ```
+
+## Wave interference
+
+Two circular sources rippling across a heightfield, animated. Each column rises
+to the summed wave and takes the color of its crest, so the interference pattern
+reads straight off the surface.
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/gallery-wave.gif" width="560" alt="Two interfering circular wave sources rippling across a blocky heightfield, animated">
+</div>
+
+```python
+for frame in range(40):
+    ph = frame / 40 * tau
+    for gx in range(88):
+        for gz in range(88):
+            h = (math.sin(dist(gx, gz, src_a) * 0.5 - 2 * ph)
+                 + math.sin(dist(gx, gz, src_b) * 0.5 - 2 * ph))
+            s.fill_cuboid(gx, 0, gz, gx, round(10 + h * 4), gz, blue_to_white(h))
+    frames.append(render(s))       # fixed camera
+```
+
+## Type in blocks
+
+Draw a word to an image, then extrude every letter pixel into a short prism and
+sweep a rainbow across it. Any font, any word.
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/gallery-logo.png" width="760" alt="The word NUCLEATION set in 3D extruded blocks with a rainbow gradient across the letters">
+</div>
+
+```python
+img = drawtext("NUCLEATION", font="Impact")     # ffmpeg draws the text
+w, h, px = image_pixels(img, 230)
+for y in range(h):
+    for x in range(w):
+        if px[y][x] > 128:                       # a letter pixel
+            for d in range(7):                   # extrude toward the camera
+                s.set_block(x, h - 1 - y, d, pal.closest_block(*hsv(x / w)))
+```
+
+---
+
+That's ten. Every one is a few dozen lines that lean on the same handful of
+primitives: shapes, an SDF string, a brush, a palette, a voxelizer. Pick one,
+change a number, and it's yours. Back to the [README](../README.md).

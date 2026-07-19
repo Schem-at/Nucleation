@@ -2141,6 +2141,69 @@ def scene_g_supershape(pack):
     return s
 
 
+def scene_g_wave(pack):
+    """Two circular wave sources interfering on a heightfield, animated: each
+    column rises to the summed wave and is colored by its crest, deep blue in
+    the troughs to white on the peaks."""
+    frames, n = 40, 88
+    pal = nu.Palette.concrete()
+    s1, s2 = (n * 0.32, n * 0.34), (n * 0.70, n * 0.62)
+    tmp = tempfile.mkdtemp(prefix="nuc-wave-")
+    try:
+        for f in range(frames):
+            s = nu.Schematic.create("wave")
+            ph = f / frames * 2 * math.pi
+            for gx in range(n):
+                for gz in range(n):
+                    d1 = math.hypot(gx - s1[0], gz - s1[1])
+                    d2 = math.hypot(gx - s2[0], gz - s2[1])
+                    hv = math.sin(d1 * 0.5 - 2 * ph) + math.sin(d2 * 0.5 - 2 * ph)
+                    y = round(10 + hv * 4)
+                    t = (hv + 2) / 4.0
+                    block = pal.closest_block(int(30 + t * 190),
+                                              int(90 + t * 150), int(205 + t * 50))
+                    s.fill_cuboid(gx, 0, gz, gx, y, gz, block)
+            cfg = nu.RenderConfig.create(720, 470)
+            cfg.set_isometric(); cfg.set_yaw(35.0); cfg.set_pitch(34.0)
+            cfg.set_zoom(1.06); cfg.set_sphere_fit(True); cfg.set_background(*NAVY)
+            nu.Renderer.render_to_file(s, pack, cfg, os.path.join(tmp, f"f{f:03}.png"))
+        assemble_gif(tmp, os.path.join(OUT, "gallery-wave.gif"), fps=14, max_colors=64)
+        print(f"  wrote docs/media/gallery-wave.gif ({frames} frames)")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return None
+
+
+LOGO_FONT = "/System/Library/Fonts/Supplemental/Impact.ttf"
+
+
+def scene_g_logo(pack):
+    """Type set in blocks: draw a word to an image, then extrude every letter
+    pixel into a short prism, colored by a rainbow sweep across the word."""
+    tmp = tempfile.mkdtemp(prefix="nuc-logo-")
+    try:
+        txt = os.path.join(tmp, "txt.png")
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error",
+                        "-f", "lavfi", "-i", "color=c=black:s=1000x170",
+                        "-vf", (f"drawtext=fontfile={LOGO_FONT}:text='NUCLEATION':"
+                                "fontsize=130:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2"),
+                        "-frames:v", "1", txt], check=True)
+        w, h, raw = _image_pixels(txt, 230)
+        pal = nu.Palette.concrete()
+        s = nu.Schematic.create("logo")
+        for py in range(h):
+            for px in range(w):
+                if raw[(py * w + px) * 3] > 128:           # a letter pixel
+                    block = _hue_block(pal, px / w)         # rainbow across the word
+                    for d in range(7):                     # extrude toward the camera
+                        s.set_block(px, h - 1 - py, d, block)
+        render(s, pack, os.path.join(OUT, "gallery-logo.png"), w=1000, h=300,
+               yaw=24, pitch=20, zoom=1.85, background=NAVY, sphere_fit=True)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return None
+
+
 SCENES = {
     "g-dna": scene_g_dna,
     "g-knot": scene_g_knot,
@@ -2150,6 +2213,8 @@ SCENES = {
     "g-mandelbulb": scene_g_mandelbulb,
     "g-fox": scene_g_fox,
     "g-supershape": scene_g_supershape,
+    "g-wave": scene_g_wave,
+    "g-logo": scene_g_logo,
     "streaming": scene_streaming,
     "worldgen": scene_worldgen,
     "worldgen-sdf": scene_worldgen_sdf,
