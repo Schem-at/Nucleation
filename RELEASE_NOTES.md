@@ -1,3 +1,19 @@
+# Nucleation v0.3.13
+
+**Surface-only mesh voxelization.** `Voxelizer.shape_from_glb` /
+`shape_from_obj` / `schematic_from_glb_textured` now accept a **negative**
+`shell` value, which voxelizes an open sheet as a skin |shell| blocks thick
+with **no parity interior fill**. Open surfaces that fold back on themselves —
+a road ribbon that dips into a valley or crosses over itself — no longer trap
+the inside/outside test into filling the enclosed pockets. (Rust:
+`MeshShape::with_surface_shell`.) Positive `shell` is unchanged (parity solid
++ shell); `0` is still pure parity.
+
+This is the last piece of the README Rainbow Road: the course now voxelizes as
+a clean rainbow ribbon, dips and overlaps and all.
+
+---
+
 # Nucleation v0.3.12
 
 **Fix: `region_bounding_box_json` now reports tight content bounds.** It was
