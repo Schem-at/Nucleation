@@ -388,6 +388,14 @@ out one 16×16 chunk column at a time, a diagonal wavefront assembling the whole
 
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/worldgen-osm.gif" width="760" alt="The voxel Financial District generating chunk column by chunk column in a diagonal sweep until the full skyline stands">
 
+The source is whatever you fill with. Swap the OSM footprints for an SDF and
+the *same* generator streams a terrain instead — here each chunk is the SDF
+evaluated only inside that chunk, materializing center-outward:
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/worldgen-sdf.gif" width="560" alt="An SDF island terrain generating chunk by chunk, growing outward from its center until the whole island stands">
+</div>
+
 Run the same bridge the other way and it's a *processing pipeline*: `WorldStream`
 in → `to_schematic` → transform with any tool → `from_schematic` → `WorldSink`
 out. The OSM city, an SDF, a heightmap, a filter — all the same three moves

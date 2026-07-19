@@ -1308,6 +1308,47 @@ def scene_worldgen(pack):
     return None
 
 
+def scene_worldgen_sdf(pack):
+    """A different source through the same generator: an SDF island filled one
+    chunk at a time (the field only ever evaluated inside the chunk being
+    written — the true streaming generator, not a reveal), accumulated
+    center-outward into a fixed frame."""
+    island = ('{"type": "displace", "amplitude": 7, "frequency": 0.06, "seed": 9,'
+              ' "child": {"type": "ellipsoid", "radii": [64, 13, 64]}}')
+    sdf = nu.Shape.sdf(island)
+    brush = nu.Brush.solid("minecraft:moss_block")
+    y0, y1 = -20, 20
+    chunks = [(cx, cz) for cx in range(-5, 5) for cz in range(-5, 5)]
+    chunks.sort(key=lambda c: c[0] * c[0] + c[1] * c[1] + c[0] * 0.01)   # center-outward
+    accum = nu.Schematic.create("wg-sdf")
+    tmp = tempfile.mkdtemp(prefix="nuc-wgs-")
+    try:
+        fi, since = 0, 0
+        for cx, cz in chunks:
+            box = nu.Shape.cuboid(cx * 16, y0, cz * 16, cx * 16 + 15, y1, cz * 16 + 15)
+            nu.BuildingTool.fill(accum, sdf.intersection_with(box), brush)
+            since += 1
+            if since >= 2 and accum.block_count() > 0:      # a frame every 2 chunks
+                since = 0
+                cfg = nu.RenderConfig.create(760, 620)
+                cfg.set_isometric(); cfg.set_yaw(225.0); cfg.set_pitch(26.0)
+                cfg.set_zoom(1.15); cfg.set_sphere_fit(False)
+                cfg.set_background(*NAVY)
+                nu.Renderer.render_to_file(accum, pack, cfg,
+                                           os.path.join(tmp, f"f{fi:03}.png"))
+                fi += 1
+        last = os.path.join(tmp, f"f{fi - 1:03}.png")
+        for _ in range(8):
+            shutil.copy(last, os.path.join(tmp, f"f{fi:03}.png"))
+            fi += 1
+        assemble_gif(tmp, os.path.join(OUT, "worldgen-sdf.gif"),
+                     fps=10, max_colors=80)
+        print(f"  wrote docs/media/worldgen-sdf.gif ({fi} frames)")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return None
+
+
 def scene_dither(pack):
     """Hard-snap vs dithered palette on the same shaded sphere, hstacked."""
     def sphere(dither):
@@ -1807,6 +1848,7 @@ def scene_storage(pack):
 SCENES = {
     "streaming": scene_streaming,
     "worldgen": scene_worldgen,
+    "worldgen-sdf": scene_worldgen_sdf,
     "storage": scene_storage,
     "regions": scene_regions,
     "blockentities": scene_blockentities,
