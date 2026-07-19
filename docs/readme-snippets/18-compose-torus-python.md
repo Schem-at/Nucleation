@@ -47,4 +47,4 @@ painted voxels: 38161 | distinct wool colors used: 11
 
 _Environment: CPython 3.14.6 + nucleation 0.3.16 wheel (bridge-full, cp312-abi3), macOS arm64._
 
-<!-- The SDF vocabulary (torus, box, capsule, cappedCone, ...; union/intersect/subtract, smooth variants; round/shell; translate/rotate/scale/mirror/repeat; displace/warp) is documented in docs/guides/sdf-terrain.md. To wrap a real image instead of a hue, compute (u, v) from the torus geometry (angle around the ring, angle around the tube) and sample the image there — that's scene_compose in tools/readme-media/generate.py. -->
+<!-- The SDF vocabulary (torus, box, capsule, cappedCone, ...; union/intersect/subtract, smooth variants; round/shell; translate/rotate/scale/mirror/repeat; displace/warp) is documented in docs/guides/sdf-terrain.md. To wrap a real image instead of a hue, compute (u, v) from the torus geometry (angle around the ring, angle around the tube) and sample the image there (that's scene_compose in tools/readme-media/generate.py). -->
