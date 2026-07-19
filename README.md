@@ -21,7 +21,7 @@ nucleation itself, and every snippet ran for real
 
 **Contents** · [Install](#install) · [The basics](#the-basics) ·
 [Build](#build-shapes-brushes-palettes) · [Terrain](#terrain-from-a-json-description) ·
-[Voxelize](#voxelize-3d-models) · [Redstone](#simulate-redstone) · [Mesh & render](#mesh-and-render) ·
+[Voxelize](#voxelize-3d-models) · [Real world](#the-real-world-in-blocks) · [Redstone](#simulate-redstone) · [Mesh & render](#mesh-and-render) ·
 [Analyze](#analyze-diff-fingerprint-auto-stack) · [Paintings](#paintings-in-blocks) · [Masked edits](#edit-without-collateral-damage) ·
 [Worlds & block data](#worlds-versions-and-the-block-database) ·
 [Languages](#one-api-seven-languages) · [Docs](#documentation--development)
@@ -233,6 +233,32 @@ scanline voxelizer:
 <div align="center">
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/mariokart-closeup.png" width="620" alt="Closeup of the voxelized road: eight blocks wide, rainbow rails, gold star specks">
 </div>
+
+## The real world, in blocks
+
+Texture mapping and the color math, animated: a voxel Earth spinning under
+a fixed sun — every frame, every surface block is re-picked by its
+luminosity through the dithered palette, so continents sweep through a
+true day/night terminator:
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/globe-day-night.gif" width="440" alt="A voxel Earth rotating through a day/night cycle, every block re-picked by luminosity">
+</div>
+
+And real geodata voxelizes straight from public sources — the Matterhorn
+from AWS elevation tiles (300×300 columns, ~53 m/block, snow/scree/meadow
+bands by elevation and slope):
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/geo-mountains.png" width="760" alt="The Matterhorn and surrounding range voxelized from elevation tiles">
+
+…and Wall Street from OpenStreetMap — 179 buildings, footprints extruded
+to their tagged heights at 1 block = 2 m, palette banded by height:
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/geo-city.png" width="760" alt="Manhattan's Financial District voxelized from OSM building data">
+
+All three are reproducible recipes in
+[`tools/readme-media/generate.py`](tools/readme-media/generate.py)
+(`globe`, `mountains`, `city`).
 
 ## Simulate redstone
 
