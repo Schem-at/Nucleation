@@ -1905,7 +1905,69 @@ def scene_storage(pack):
     return None
 
 
+# ── Gallery: ten cool builds ─────────────────────────────────────────────────
+
+import colorsys as _colorsys
+
+
+def _spectrum(n):
+    """n concrete blocks evenly around the hue wheel, for closest_block lookups."""
+    pal = nu.Palette.concrete()
+    return pal
+
+
+def _hue_block(pal, hue, sat=0.85, val=1.0):
+    r, g, b = (round(c * 255) for c in _colorsys.hsv_to_rgb(hue % 1.0, sat, val))
+    return pal.closest_block(r, g, b)
+
+
+def scene_g_dna(pack):
+    """A rainbow DNA double helix: two phase-shifted strands with base-pair rungs,
+    each strand bead colored by its turn around the axis."""
+    s = nu.Schematic.create("dna")
+    pal = nu.Palette.concrete()
+    fill, sphere = nu.BuildingTool.fill, nu.Shape.sphere
+    radius, steps, rise = 11.0, 260, 0.42
+    for i in range(steps):
+        t = i / 24.0
+        y = round(i * rise)
+        block = _hue_block(pal, i / steps)
+        for offset in (0.0, math.pi):
+            x = round(radius * math.cos(t + offset))
+            z = round(radius * math.sin(t + offset))
+            fill(s, sphere(x, y, z, 2), nu.Brush.solid(block))
+        if i % 11 == 0:                       # a base-pair rung
+            ax, az = round(radius * math.cos(t)), round(radius * math.sin(t))
+            bx, bz = round(radius * math.cos(t + math.pi)), round(radius * math.sin(t + math.pi))
+            rung = ("minecraft:white_concrete" if (i // 11) % 2 == 0
+                    else "minecraft:light_gray_concrete")
+            fill(s, nu.Shape.cylinder_between(ax, y, az, bx, y, bz, 1.0), nu.Brush.solid(rung))
+    render(s, pack, os.path.join(OUT, "gallery-dna.png"), w=520, h=820,
+           yaw=35, pitch=8, zoom=1.25, background=NAVY, sphere_fit=True)
+    return s
+
+
+def scene_g_knot(pack):
+    """A trefoil knot drawn as a fat rainbow tube: a parametric curve stamped as
+    overlapping spheres, hue running along its length."""
+    s = nu.Schematic.create("knot")
+    pal = nu.Palette.concrete()
+    fill, sphere = nu.BuildingTool.fill, nu.Shape.sphere
+    steps, scale = 480, 11.0
+    for i in range(steps):
+        t = i / steps * 2 * math.pi
+        x = round(scale * (math.sin(t) + 2 * math.sin(2 * t)))
+        y = round(scale * (math.cos(t) - 2 * math.cos(2 * t)))
+        z = round(scale * (-math.sin(3 * t)))
+        fill(s, sphere(x, y, z, 3), nu.Brush.solid(_hue_block(pal, i / steps)))
+    render(s, pack, os.path.join(OUT, "gallery-knot.png"), w=720, h=680,
+           yaw=30, pitch=30, zoom=1.2, background=NAVY, sphere_fit=True)
+    return s
+
+
 SCENES = {
+    "g-dna": scene_g_dna,
+    "g-knot": scene_g_knot,
     "streaming": scene_streaming,
     "worldgen": scene_worldgen,
     "worldgen-sdf": scene_worldgen_sdf,
