@@ -1426,6 +1426,116 @@ def scene_simulation(pack):
     return lit
 
 
+def scene_sim_anim(pack):
+    """The byte bus, live: the simulator flips one lever per frame and the
+    lamps light in sequence, the redstone wavefront assembling 10110010 tick
+    by tick."""
+    byte = "10110010"
+    s = nu.Schematic.create("byte")
+    for i in range(8):
+        z = i * 2
+        for x in range(3):
+            s.set_block(x, 0, z, "minecraft:gray_concrete")
+        s.set_block_from_string(0, 1, z, "minecraft:lever[facing=east,face=floor,powered=false]")
+        s.set_block_from_string(1, 1, z, "minecraft:redstone_wire[power=0,east=side,west=side]")
+        s.set_block_from_string(2, 1, z, "minecraft:redstone_lamp[lit=false]")
+    world = nu.MchprsWorld.create(s)
+
+    tmp = tempfile.mkdtemp(prefix="nuc-sim-anim-")
+    try:
+        f = 0
+        def frame(holds=1):
+            nonlocal f
+            world.flush(); world.sync_to_schematic()
+            lit = world.get_schematic()
+            cfg = nu.RenderConfig.create(900, 460)
+            cfg.set_isometric(); cfg.set_yaw(150.0); cfg.set_pitch(35.0)
+            cfg.set_zoom(1.1); cfg.set_sphere_fit(True); cfg.set_background(*NAVY)
+            path = os.path.join(tmp, f"f{f:03}.png")
+            nu.Renderer.render_to_file(lit, pack, cfg, path)
+            for _ in range(holds - 1):        # duplicate to hold on the timeline
+                f += 1
+                shutil.copy(path, os.path.join(tmp, f"f{f:03}.png"))
+            f += 1
+
+        frame(holds=3)                        # all dark, a beat before it fills
+        for i, bit in enumerate(byte):
+            if bit == "1":
+                world.on_use_block(0, 1, i * 2)
+                world.tick(2)
+            frame()
+        frame(holds=8)                        # hold on the finished byte
+        assemble_gif(tmp, os.path.join(OUT, "simulation-byte.gif"), fps=5,
+                     stats_mode="full", dither="none")
+        print(f"  wrote {os.path.relpath(os.path.join(OUT, 'simulation-byte.gif'), ROOT)} ({f} frames)")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return None
+
+
+CAPTION_FONT = "/System/Library/Fonts/SFNSMono.ttf"
+
+
+def _caption(src, text, out, bar=64):
+    """Pad a transparent strip below the panel and center a monospace caption
+    in it, so text never overlaps the render."""
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", src, "-vf",
+                    (f"pad=iw:ih+{bar}:0:0:color=0x00000000,"
+                     f"drawtext=fontfile={CAPTION_FONT}:text='{text}':"
+                     f"fontcolor=white:fontsize=27:x=(w-text_w)/2:"
+                     f"y=h-{bar}+({bar}-text_h)/2:"
+                     "box=1:boxcolor=0x141428@0.85:boxborderw=12"),
+                    out], check=True)
+
+
+def _register_bus():
+    """Eight lever->wire->lamp lines: an 8-bit bus. Returns (schematic,
+    lever_positions, lamp_positions) as flat [x,y,z,...] coordinate lists."""
+    s = nu.Schematic.create("register")
+    levers, lamps = [], []
+    for i in range(8):
+        z = i * 2
+        for x in range(3):
+            s.set_block(x, 0, z, "minecraft:gray_concrete")
+        s.set_block_from_string(0, 1, z, "minecraft:lever[facing=east,face=floor,powered=false]")
+        s.set_block_from_string(1, 1, z, "minecraft:redstone_wire[power=0,east=side,west=side]")
+        s.set_block_from_string(2, 1, z, "minecraft:redstone_lamp[lit=false]")
+        levers += [0, 1, z]
+        lamps += [2, 1, z]
+    return s, levers, lamps
+
+
+def scene_executor(pack):
+    """A typed executor drives the 8-bit bus by value: hand `execute` an
+    integer for the `a` input, the redpiler sets the levers and lights the
+    lamps, and the typed `y` output reads the byte straight back. Two panels,
+    two values, no wires toggled by hand."""
+    tmp = tempfile.mkdtemp(prefix="nuc-executor-")
+    try:
+        panels = []
+        for val in (0x2A, 0xB2):            # 42, 178: two distinct lamp patterns
+            s, levers, lamps = _register_bus()
+            cb = nu.CircuitBuilder.create(s)
+            cb.with_input_auto("a", nu.IoType.unsigned_int(8), levers)
+            cb.with_output_auto("y", nu.IoType.unsigned_int(8), lamps)
+            ex = cb.build()
+            res = json.loads(ex.execute(json.dumps({"a": val}),
+                                        nu.ExecutionMode.until_stable(2, 100)))
+            y = res["outputs"]["y"]["value"]
+            assert y == val, (val, y)       # typed round-trip through real redstone
+            lit = ex.sync_to_schematic()
+            raw = os.path.join(tmp, f"raw{val}.png")
+            render(lit, pack, raw, w=640, h=460, yaw=150, pitch=35,
+                   zoom=1.05, sphere_fit=True)
+            cap = os.path.join(tmp, f"cap{val}.png")
+            _caption(raw, f"execute a={val}   ->   y={y}", cap)
+            panels.append(cap)
+        hstack(panels, os.path.join(OUT, "typed-executor.png"))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return None
+
+
 
 
 # Public-domain paintings for the pixel-art gallery (Wikimedia Commons).
@@ -2278,6 +2388,8 @@ SCENES = {
     "dither": scene_dither,
     "scripting": scene_scripting,
     "simulation": scene_simulation,
+    "sim-anim": scene_sim_anim,
+    "executor": scene_executor,
     "teapot": scene_teapot,
     "duck": scene_duck,
     "mariokart": scene_mariokart,

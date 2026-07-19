@@ -529,16 +529,30 @@ world.flush();
 world.isLit(2, 1, 0);                        // → true
 ```
 
-Eight of those lines make a display: levers flipped through the simulator, lamps
-showing the byte:
+Eight of those lines make a display: the simulator flips one lever per tick and
+the lamps light in sequence, the wavefront assembling the byte:
 
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/simulation-byte.png" width="700" alt="Eight lever-wire-lamp lines displaying the binary pattern 10110010">
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/simulation-byte.gif" width="700" alt="Eight lever-wire-lamp lines lighting up in sequence to display the binary pattern 10110010">
+</div>
 
 Beyond poking blocks, a typed executor drives circuits through named, typed
 inputs and outputs (booleans, integers, floats, ASCII) with layout builders for
-buses. Build an `IoLayout`, wrap the world in a `TypedCircuitExecutor`, and set
-an 8-bit input by value instead of toggling wires by hand (see the
-[docs](docs/README.md)).
+buses. Bind an 8-bit `a` input to the levers and a `y` output to the lamps, then
+hand `execute` a number: the redpiler sets the bus and the typed output reads
+straight back, no wires toggled by hand.
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/typed-executor.png" width="820" alt="The 8-bit lamp bus driven to 42 and to 178 by a typed circuit executor">
+
+```python
+cb = CircuitBuilder.create(bus)                       # bus = the 8 lever->wire->lamp lines
+cb.with_input_auto("a", IoType.unsigned_int(8), levers)   # flat [x,y,z,...] positions
+cb.with_output_auto("y", IoType.unsigned_int(8), lamps)
+ex = cb.build()
+
+res = json.loads(ex.execute('{"a": 178}', ExecutionMode.until_stable(2, 100)))
+res["outputs"]["y"]["value"]                           # -> 178, straight back through the lamps
+```
 
 ## Mesh and render
 
