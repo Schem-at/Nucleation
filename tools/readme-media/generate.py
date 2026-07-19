@@ -1564,7 +1564,61 @@ def scene_globe(pack):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+# ── Chunked iteration / streaming ────────────────────────────────────────────
+
+# Plasma control points (perceptually smooth, warm) — sampled per chunk so the
+# tint contrasts hard against the green/stone terrain still waiting to stream.
+_PLASMA = [(13, 8, 135), (126, 3, 168), (204, 71, 120),
+           (248, 149, 64), (240, 249, 33)]
+
+
+def _plasma(t):
+    t = max(0.0, min(1.0, t)) * (len(_PLASMA) - 1)
+    i = min(len(_PLASMA) - 2, int(t))
+    f = t - i
+    a, b = _PLASMA[i], _PLASMA[i + 1]
+    return tuple(a[k] + (b[k] - a[k]) * f for k in range(3))
+
+
+def scene_streaming(pack):
+    """Chunked streaming caught mid-sweep: a rolling terrain walked 16×16
+    column by column with the same chunk iterator the world streamer uses.
+    The chunks already visited are tinted by *when* they came out of a
+    center-outward traversal; the rest are still natural terrain — so the
+    strategy's wavefront reads straight off the map as the frontier between
+    processed and pending."""
+    island = ('{"type": "displace", "amplitude": 6, "frequency": 0.085, "seed": 5,'
+              ' "child": {"type": "ellipsoid", "radii": [66, 8, 66]}}')
+    rules = ('{"fill": ['
+             '{"when": {"depthBelowSurface": {"min": 0, "max": 0}}, "block": "minecraft:grass_block"},'
+             '{"when": {"depthBelowSurface": {"min": 1, "max": 3}}, "block": "minecraft:dirt"},'
+             '{"block": "minecraft:stone"}]}')
+    s = nu.Sdf.schematic_from_sdf_auto(island, rules)
+
+    mn, mx = s.tight_bounds_min(), s.tight_bounds_max()
+    cx, cz = (mn.x + mx.x) / 2.0, (mn.z + mx.z) / 2.0
+    # One chunk per 16×16 column (chunk height spans the whole build), walked
+    # center-outward: chunks[0] is the middle column, the four corners last.
+    chunks = json.loads(s.get_chunks_with_strategy_json(
+        16, 512, 16, "center_outward", cx, 0.0, cz))
+    pal = nu.Palette.concrete()
+    natural = '["minecraft:grass_block", "minecraft:dirt", "minecraft:stone"]'
+    processed = int(round(len(chunks) * 0.6))     # freeze the sweep 60% in
+    for i, ch in enumerate(chunks[:processed]):
+        block = pal.closest_block(
+            *(int(round(v)) for v in _plasma(i / (processed - 1))))
+        x0, z0 = ch["chunk_x"] * 16, ch["chunk_z"] * 16
+        nu.BuildingTool.fill_replacing(
+            s, nu.Shape.cuboid(x0, mn.y, z0, x0 + 15, mx.y, z0 + 15),
+            nu.Brush.solid(block), natural)
+
+    render(s, pack, os.path.join(OUT, "streaming-chunks.png"), w=1100, h=720,
+           yaw=235, pitch=44, zoom=1.12, background=NAVY, sphere_fit=True)
+    return s
+
+
 SCENES = {
+    "streaming": scene_streaming,
     "globe": scene_globe,
     "paintings": scene_paintings,
     "dither": scene_dither,

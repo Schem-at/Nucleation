@@ -20,10 +20,14 @@ nucleation itself, and every snippet ran for real
 </div>
 
 **Contents** · [Install](#install) · [The basics](#the-basics) ·
-[Build](#build-shapes-brushes-palettes) · [Terrain](#terrain-from-a-json-description) ·
-[Voxelize](#voxelize-3d-models) · [Real world](#the-real-world-in-blocks) · [Redstone](#simulate-redstone) · [Mesh & render](#mesh-and-render) ·
-[Analyze](#analyze-diff-fingerprint-auto-stack) · [Paintings](#paintings-in-blocks) · [Masked edits](#edit-without-collateral-damage) ·
-[Worlds & block data](#worlds-versions-and-the-block-database) ·
+[Build](#build-shapes-brushes-palettes) · [Masked edits](#edit-without-collateral-damage) ·
+[Terrain](#terrain-from-a-json-description) · [Voxelize](#voxelize-3d-models) ·
+[Real world](#the-real-world-in-blocks) · [Paintings](#paintings-in-blocks) ·
+[Read & stream](#read-iterate-and-stream) · [Regions & transforms](#regions-transforms-and-stamping) ·
+[Block entities & NBT](#block-entities-entities-and-nbt) · [Redstone](#simulate-redstone) ·
+[Mesh & render](#mesh-and-render) · [Analyze](#analyze-diff-fingerprint-auto-stack) ·
+[Worlds](#worlds-and-versions) · [Block database](#the-block-database) ·
+[Scripting](#scripting) · [Storage](#pluggable-storage) ·
 [Languages](#one-api-seven-languages) · [Docs](#documentation--development)
 
 ## Install
@@ -40,9 +44,9 @@ Kotlin/JVM, PHP, C, and C++ ship as archives on
 
 ## The basics
 
-A `Schematic` is a named region of blocks (plus block entities, entities, and
-metadata). Load one from any supported format, edit it with plain coordinates
-and block strings, save it in any other:
+A `Schematic` is a named collection of blocks (plus block entities, entities,
+and metadata) — one or many named regions. Load one from any supported format,
+edit it with plain coordinates and block strings, save it in any other:
 
 ```python
 from nucleation import Schematic
@@ -161,6 +165,19 @@ BuildingTool.fill(s, blob, shaded_brush)      # masked fills work too
 More in the guides: [shapes & brushes](docs/guides/shapes-and-brushes.md) ·
 [palettes, ramps, and pixel art](docs/guides/palettes.md).
 
+## Edit without collateral damage
+
+Masked fills touch only what you allow: `fill_only_air` builds around
+existing work; `fill_replacing` swaps listed blocks inside a shape — a
+temple weathering into moss and cracks within a sphere of decay:
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/masked-fill.png" width="760" alt="Greek temple before/after weathering via fill_replacing">
+
+```python
+BuildingTool.fill_replacing(temple, decay_sphere, weathered_brush,
+                            '["minecraft:stone_bricks"]')
+```
+
 ## Terrain from a JSON description
 
 The same SDF trees that work as shapes scale up to whole terrains: sampled
@@ -267,6 +284,106 @@ All three are reproducible recipes in
 [`tools/readme-media/generate.py`](tools/readme-media/generate.py)
 (`globe`, `mountains`, `city`).
 
+## Paintings, in blocks
+
+Everything above composes: flat-texture palettes built by color-logic
+filters, chroma-boosted matching (so muted pigments land on saturated
+blocks, not gray clays), and per-voxel ordered dithering — pointed at art.
+Van Gogh's Starry Night, 128 blocks wide:
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/painting-starry-night.png" width="760" alt="Van Gogh's Starry Night as block pixel art, 128 blocks wide">
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/painting-gallery.png" width="760" alt="Sunflowers, The Great Wave off Kanagawa, and Girl with a Pearl Earring as block pixel art">
+
+```python
+palette = flat_art_palette().dithered()          # PaletteBuilder + map-art excludes
+r, g, b = boost(*pixel, sat=1.35)                # chroma exaggeration pre-match
+s.set_block(x, 0, y, palette.closest_block_dithered(r, g, b, x, 0, y))
+```
+
+The full recipe — including the flat-palette filter chain — is
+`scene_paintings` in [`tools/readme-media/generate.py`](tools/readme-media/generate.py).
+
+## Read, iterate, and stream
+
+Everything above *writes* blocks. This is how you read them back and process
+builds too big to hold in memory. Any schematic splits into fixed chunks in a
+traversal order you choose — `bottom_up`, `top_down`, `center_outward`,
+`distance_to_camera`, or `random`. Freeze a center-outward walk 60% of the
+way through and the iterator's wavefront reads straight off the terrain:
+plasma-tinted columns have been visited, green ones haven't yet.
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/streaming-chunks.png" width="760" alt="A rolling terrain iterated 16x16 column by column, tinted by center-outward chunk order with the unvisited rim still natural green">
+
+```python
+import json
+# Walk a build in 16×16×16 chunks, center-outward from a point:
+for chunk in json.loads(s.get_chunks_with_strategy_json(16, 16, 16, "center_outward", 0, 0, 0)):
+    handle(chunk["chunk_x"], chunk["chunk_z"], chunk["blocks"])
+```
+
+The same idea scales past memory: stream a real world folder chunk-by-chunk
+and write a transformed copy, with only one chunk resident at a time — RAM
+stays flat whether the world is 10 MB or 10 GB.
+
+```python
+from nucleation import WorldStream, WorldSink
+
+stream = WorldStream.open_dir("world/")     # or .from_zip(bytes), or *_bounded(...)
+sink   = WorldSink.create("world-out/", "")
+while True:
+    try:
+        chunk = stream.next()               # a WorldChunkView
+    except Exception:
+        break                               # end of stream is signalled by raising
+    # inspect or edit here: chunk.set_block(...), chunk.to_schematic(), ...
+    sink.write_chunk(chunk)
+sink.finish()
+```
+
+## Regions, transforms, and stamping
+
+A schematic is multi-region in the Litematica sense — many named sub-volumes,
+each with its own palette and bounds — and both whole builds and single
+regions transform in place.
+
+```python
+# Address independent named regions in one schematic:
+s.set_block_in_region("keep",  0, 0, 0, "minecraft:quartz_block")
+s.set_block_in_region("gate", 10, 0, 0, "minecraft:blackstone")
+s.region_names_json()                 # ["Main", "keep", "gate"]
+s.rotate_region_y("gate", 90)         # turn one region, leave the rest
+
+# Transform the whole build — rotate_x/y/z (degrees), flip_x/y/z:
+s.rotate_y(90)                        # a bar's +x tip at (9,0,0) lands at (0,0,0)
+
+# Stamp a sub-volume of one schematic into another:
+dst.copy_region(src, 0, 0, 0,  9, 0, 0,   100, 0, 0,  "[]")
+#               source  ── from box ──   ── to ──   exclude
+```
+
+<!-- TODO(readme-media): illustrate — before/after of one region rotated in place while its neighbours stay put, or a copy_region stamp tiled. Scene not yet written. -->
+
+## Block entities, entities, and NBT
+
+Blocks carry NBT, and the schematic holds full block entities and entities,
+round-tripped as SNBT — so a chest keeps its loot table and a spawner its mob.
+
+```python
+# A chest with contents, set straight from SNBT:
+s.set_block_entity(0, 0, 0, "minecraft:chest",
+    '{Items:[{Slot:0b,id:"minecraft:diamond",Count:3b},'
+            '{Slot:1b,id:"minecraft:emerald",Count:5b}]}')
+s.get_block_entity_snbt(0, 0, 0)
+# → {Items:[{...diamond, Slot:0B, Count:3B}, {...emerald, Slot:1B, Count:5B}]}  (SNBT)
+
+# Entities parse from SNBT too:
+s.add_entity_from_snbt('{id:"minecraft:armor_stand",Pos:[0.5d,1.0d,0.5d],Rotation:[0f,0f]}')
+s.entity_count()                      # 1
+```
+
+<!-- TODO(readme-media): illustrate — a rendered chest/furnace/spawner with visible contents, or a placed armor stand. Scene not yet written. -->
+
 ## Simulate redstone
 
 Headless circuit simulation via [MCHPRS](https://github.com/MCHPR/MCHPRS)'s
@@ -292,7 +409,9 @@ simulator, lamps showing the byte:
 
 Beyond poking blocks: a typed executor drives circuits through named, typed
 inputs and outputs (booleans, integers, floats, ASCII) with layout builders
-for buses — see the [docs](docs/README.md).
+for buses. Build an `IoLayout`, wrap the world in a `TypedCircuitExecutor`,
+and set an 8-bit input by value instead of toggling wires by hand — see the
+[docs](docs/README.md).
 
 ## Mesh and render
 
@@ -337,44 +456,11 @@ Autostack.detect_structures(wall)        # {"mode": "1d", "vectors": [[4,0,0]], 
 longer = Autostack.resize_1d(wall, 4, 0, 0, 6)   # 2 units → 6: (8,4,1) → (24,4,1)
 ```
 
-## Paintings, in blocks
-
-Everything above composes: flat-texture palettes built by color-logic
-filters, chroma-boosted matching (so muted pigments land on saturated
-blocks, not gray clays), and per-voxel ordered dithering — pointed at art.
-Van Gogh's Starry Night, 128 blocks wide:
-
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/painting-starry-night.png" width="760" alt="Van Gogh's Starry Night as block pixel art, 128 blocks wide">
-
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/painting-gallery.png" width="760" alt="Sunflowers, The Great Wave off Kanagawa, and Girl with a Pearl Earring as block pixel art">
-
-```python
-palette = flat_art_palette().dithered()          # PaletteBuilder + map-art excludes
-r, g, b = boost(*pixel, sat=1.35)                # chroma exaggeration pre-match
-s.set_block(x, 0, y, palette.closest_block_dithered(r, g, b, x, 0, y))
-```
-
-The full recipe — including the flat-palette filter chain — is
-`scene_paintings` in [`tools/readme-media/generate.py`](tools/readme-media/generate.py).
-
-## Edit without collateral damage
-
-Masked fills touch only what you allow: `fill_only_air` builds around
-existing work; `fill_replacing` swaps listed blocks inside a shape — a
-temple weathering into moss and cracks within a sphere of decay:
-
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/masked-fill.png" width="760" alt="Greek temple before/after weathering via fill_replacing">
-
-```python
-BuildingTool.fill_replacing(temple, decay_sphere, weathered_brush,
-                            '["minecraft:stone_bricks"]')
-```
-
-## Worlds, versions, and the block database
+## Worlds and versions
 
 Schematics round-trip through *playable worlds* — export a real world folder
-(`level.dat` + region files), import any world back, bounded or streamed
-chunk-by-chunk in constant memory:
+(`level.dat` + region files), import any world back, bounded to a box or
+[streamed chunk-by-chunk](#read-iterate-and-stream) in constant memory:
 
 ```python
 plaza.save_world(world_dir, "")
@@ -385,11 +471,14 @@ The built-in DataConverter port migrates blocks, items, and entities across
 Minecraft data versions (loss reports on downgrades), and Java ↔ Bedrock
 translation runs on GeyserMC's mappings at full **26.2** parity.
 
+## The block database
+
 Under it all sits a block database extracted from Mojang's own data
 generator and the vanilla jars — kinds, variant families, resolved tags,
 geometry, measured colors for all 1,196 Minecraft 26.2 blocks — which
 [updates itself](docs/guides/minecraft-block-data.md) when Mojang ships a
-new version:
+new version. It's what lets palettes reason about color and brushes about
+block facts:
 
 ```python
 json.loads(Blocks.get_json("minecraft:oak_stairs"))
@@ -399,6 +488,34 @@ json.loads(Blocks.get_json("minecraft:oak_stairs"))
 json.loads(Blocks.variants_of_json("minecraft:oak_planks"))
 # [oak_planks, oak_button, oak_fence, oak_fence_gate, oak_pressure_plate, oak_slab, ...]
 ```
+
+## Scripting
+
+Embedded Lua and JS engines run build scripts against the full API — this
+sine wall is a 12-line Lua script run through `Scripting.run_lua_script`
+([scripting guide](docs/guides/scripting.md)):
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/scripting-wall.png" width="700" alt="A sine-wave wall built by an embedded Lua script with a concrete gradient">
+
+## Pluggable storage
+
+Persist and load through one URI, across backends — memory, filesystem, S3,
+Redis, Postgres. Two layers: `StoreIo` moves whole schematics, `Store` is a
+raw key-value store over the same backends.
+
+```python
+# Whole schematics, by URI (format inferred from the path):
+StoreIo.save(castle, "file:///data/castle.schem", "")
+castle = StoreIo.open("file:///data/castle.schem")
+
+# Or raw key-value over any backend:
+store = Store.open("mem://")           # also file:// · s3:// · redis:// · postgres://
+store.put("meta/version", b"3")
+store.get_b64("meta/version")          # "Mw=="
+store.list("meta/")                    # ["meta/version"]
+```
+
+<!-- TODO(readme-media): illustrate — a small diagram of the five backends behind one URI, or a byte-identical round-trip through mem/fs/s3. Scene not yet written. -->
 
 ## One API, seven languages
 
@@ -478,15 +595,7 @@ int main(void) {
   its verified output
 - [Release notes](RELEASE_NOTES.md)
 
-Also in the box: embedded Lua/JS scripting engines — this sine wall is a
-12-line Lua script run through `Scripting.run_lua_script`
-([scripting guide](docs/guides/scripting.md)):
-
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/scripting-wall.png" width="700" alt="A sine-wave wall built by an embedded Lua script with a concrete gradient">
-
-Plus pluggable storage
-(memory / filesystem / S3 / Redis / Postgres behind one URI), and layer-art
-templates (schematics from ASCII art).
+Also in the box: layer-art templates (schematics from ASCII art).
 
 ```bash
 cargo test                          # core suite (784 tests)
