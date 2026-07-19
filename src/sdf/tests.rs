@@ -366,3 +366,25 @@ fn noise_is_deterministic_and_bounded() {
         assert_eq!(v.to_bits(), v2.to_bits());
     }
 }
+
+#[test]
+fn cells_value_is_unit_range_and_unbounded() {
+    let v = SdfNode::from_json(r#"{"type":"cells","frequency":0.1,"seed":3,"mode":"value"}"#).unwrap();
+    for i in 0..60 {
+        let f = i as f32;
+        let s = v.eval(f * 1.7, f * 0.3, f * 2.1 - 5.0);
+        assert!((0.0..1.0).contains(&s), "cell value in [0,1): {s}");
+    }
+    assert!(v.bounds().is_none(), "cells is unbounded on its own");
+}
+
+#[test]
+fn cells_distance_modes_are_nonnegative() {
+    for mode in ["f1", "f2", "f2MinusF1"] {
+        let json = format!(r#"{{"type":"cells","frequency":0.12,"seed":9,"mode":"{mode}"}}"#);
+        let n = SdfNode::from_json(&json).unwrap();
+        for i in 0..40 {
+            assert!(n.eval(i as f32 * 0.9, 2.0, i as f32 * -1.3) >= -1e-4, "{mode} nonneg");
+        }
+    }
+}

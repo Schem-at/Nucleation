@@ -1,6 +1,6 @@
 use crate::building::{
     BezierCurve, BilinearGradientBrush, BlockPalette, Brush, ColorBrush, Cone, Cuboid,
-    CurveGradientBrush, Cylinder, Difference, Disk, Ellipsoid, Hollow, Intersection, Line,
+    CurveGradientBrush, Cylinder, Difference, Disk, Ellipsoid, FieldBrush, Hollow, Intersection, Line,
     LinearGradientBrush, MultiPointGradientBrush, ParametricShape, Plane, PointGradientBrush,
     PolygonPrism, Pyramid, SdfShape, ShadedBrush, Shape, SolidBrush, Sphere, SpotlightBrush, Torus,
     Triangle, Union,
@@ -160,6 +160,7 @@ pub enum BrushEnum {
     Shaded(ShadedBrush),
     CurveGradient(CurveGradientBrush),
     Spotlight(SpotlightBrush),
+    Field(FieldBrush),
 }
 
 impl BrushEnum {
@@ -176,6 +177,7 @@ impl BrushEnum {
             BrushEnum::Shaded(b) => b.set_palette(palette),
             BrushEnum::CurveGradient(b) => b.set_palette(palette),
             BrushEnum::Spotlight(b) => b.set_palette(palette),
+            BrushEnum::Field(b) => b.set_palette(palette),
         }
     }
 }
@@ -192,6 +194,7 @@ impl Brush for BrushEnum {
             BrushEnum::Shaded(b) => b.get_block(x, y, z, normal),
             BrushEnum::CurveGradient(b) => b.get_block(x, y, z, normal),
             BrushEnum::Spotlight(b) => b.get_block(x, y, z, normal),
+            BrushEnum::Field(b) => b.get_block(x, y, z, normal),
         }
     }
 }

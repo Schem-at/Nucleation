@@ -1420,3 +1420,107 @@ impl Brush for CurveGradientBrush {
         self.get_block_parametric(x, y, z, normal, None)
     }
 }
+
+/// Sample a multi-stop color gradient at `t` in [0, 1], interpolating in `space`.
+fn sample_stops(stops: &[GradientStop], t: f64, space: InterpolationSpace) -> ExtendedColorData {
+    if stops.is_empty() {
+        return ExtendedColorData::from_rgb(0, 0, 0);
+    }
+    let t = t.clamp(0.0, 1.0);
+    if t <= stops[0].position {
+        return stops[0].color;
+    }
+    let last = &stops[stops.len() - 1];
+    if t >= last.position {
+        return last.color;
+    }
+    let (mut a, mut b) = (&stops[0], last);
+    for i in 0..stops.len() - 1 {
+        if t >= stops[i].position && t <= stops[i + 1].position {
+            a = &stops[i];
+            b = &stops[i + 1];
+            break;
+        }
+    }
+    let lt = if b.position > a.position {
+        ((t - a.position) / (b.position - a.position)) as f32
+    } else {
+        0.0
+    };
+    match space {
+        InterpolationSpace::Rgb => {
+            let mix = |i: usize| {
+                (a.color.rgb[i] as f32 * (1.0 - lt) + b.color.rgb[i] as f32 * lt) as u8
+            };
+            ExtendedColorData::from_rgb(mix(0), mix(1), mix(2))
+        }
+        InterpolationSpace::Oklab => {
+            let mut c = a.color;
+            for i in 0..3 {
+                c.oklab[i] = a.color.oklab[i] * (1.0 - lt) + b.color.oklab[i] * lt;
+            }
+            c
+        }
+    }
+}
+
+/// A brush that colors each voxel by a scalar field (any [`crate::sdf::SdfNode`]):
+/// evaluate the field at the voxel center, remap `[lo, hi]` to `[0, 1]`, and read
+/// a multi-stop gradient. A cellular/Voronoi field paints a mosaic, an FBM field
+/// a marble, a coordinate expression a stripe — the same field language that
+/// drives geometry, pointed at color.
+#[derive(Clone)]
+pub struct FieldBrush {
+    field: crate::sdf::SdfNode,
+    stops: Vec<GradientStop>,
+    lo: f64,
+    hi: f64,
+    palette: Arc<BlockPalette>,
+    space: InterpolationSpace,
+}
+
+impl FieldBrush {
+    pub fn new(field: crate::sdf::SdfNode, stops: Vec<GradientStop>, lo: f64, hi: f64) -> Self {
+        Self {
+            field,
+            stops,
+            lo,
+            hi,
+            palette: get_default_palette(),
+            space: InterpolationSpace::Oklab,
+        }
+    }
+
+    pub fn with_space(mut self, space: InterpolationSpace) -> Self {
+        self.space = space;
+        self
+    }
+
+    pub fn with_palette(mut self, palette: Arc<BlockPalette>) -> Self {
+        self.palette = palette;
+        self
+    }
+
+    pub fn set_palette(&mut self, palette: Arc<BlockPalette>) {
+        self.palette = palette;
+    }
+}
+
+impl Brush for FieldBrush {
+    fn get_block(&self, x: i32, y: i32, z: i32, _normal: (f64, f64, f64)) -> Option<BlockState> {
+        if self.stops.is_empty() {
+            return None;
+        }
+        let v = self
+            .field
+            .eval(x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5) as f64;
+        let t = if self.hi > self.lo {
+            (v - self.lo) / (self.hi - self.lo)
+        } else {
+            0.0
+        };
+        self.palette
+            .snap(&sample_stops(&self.stops, t, self.space), x, y, z)
+            .map(BlockState::new)
+    }
+}

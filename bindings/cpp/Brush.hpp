@@ -42,6 +42,9 @@ namespace capi {
     typedef struct Brush_curve_gradient_result {union {diplomat::capi::Brush* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Brush_curve_gradient_result;
     Brush_curve_gradient_result Brush_curve_gradient(diplomat::capi::DiplomatF32View stops, diplomat::capi::DiplomatU8View colors, diplomat::capi::InterpolationSpace space);
 
+    typedef struct Brush_field_result {union {diplomat::capi::Brush* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Brush_field_result;
+    Brush_field_result Brush_field(diplomat::capi::DiplomatStringView field_json, diplomat::capi::DiplomatF32View stops, diplomat::capi::DiplomatU8View colors, float lo, float hi, diplomat::capi::InterpolationSpace space);
+
     void Brush_destroy(Brush* self);
 
     } // extern "C"
@@ -143,6 +146,16 @@ inline void Brush::set_palette(const Palette& palette) {
 inline diplomat::result<std::unique_ptr<Brush>, NucleationError> Brush::curve_gradient(diplomat::span<const float> stops, diplomat::span<const uint8_t> colors, InterpolationSpace space) {
     auto result = diplomat::capi::Brush_curve_gradient({stops.data(), stops.size()},
         {colors.data(), colors.size()},
+        space.AsFFI());
+    return result.is_ok ? diplomat::result<std::unique_ptr<Brush>, NucleationError>(diplomat::Ok<std::unique_ptr<Brush>>(std::unique_ptr<Brush>(Brush::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Brush>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<Brush>, NucleationError> Brush::field(std::string_view field_json, diplomat::span<const float> stops, diplomat::span<const uint8_t> colors, float lo, float hi, InterpolationSpace space) {
+    auto result = diplomat::capi::Brush_field({field_json.data(), field_json.size()},
+        {stops.data(), stops.size()},
+        {colors.data(), colors.size()},
+        lo,
+        hi,
         space.AsFFI());
     return result.is_ok ? diplomat::result<std::unique_ptr<Brush>, NucleationError>(diplomat::Ok<std::unique_ptr<Brush>>(std::unique_ptr<Brush>(Brush::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Brush>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }

@@ -16,6 +16,7 @@ internal interface BrushLib: Library {
     fun Brush_spotlight(px: Float, py: Float, pz: Float, dx: Float, dy: Float, dz: Float, coneAngleDeg: Float, r: FFIUint8, g: FFIUint8, b: FFIUint8): Pointer
     fun Brush_set_palette(handle: Pointer, palette: Pointer): Unit
     fun Brush_curve_gradient(stops: Slice, colors: Slice, space: Int): ResultPointerInt
+    fun Brush_field(fieldJson: Slice, stops: Slice, colors: Slice, lo: Float, hi: Float, space: Int): ResultPointerInt
 }
 /** Decides which block goes at each point of a filled shape. Wraps `BrushEnum`.
 */
@@ -182,6 +183,40 @@ class Brush internal constructor (
                     return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
                 }
             } finally {
+                stopsSliceMemory.close()
+                colorsSliceMemory.close()
+            }
+        }
+        @JvmStatic
+        
+        /** A field brush: color every voxel by evaluating a scalar field at its
+        *center, remapping `[lo, hi]` to `[0, 1]`, and reading a multi-stop
+        *gradient (`stops` in `[0, 1]`, `colors` as flat RGB triples). The
+        *field is any SDF JSON — the same language that builds geometry — so a
+        *`cells` node paints a Voronoi mosaic (`mode: value`) or cracks
+        *(`mode: f2MinusF1`), an fbm field a marble, a coordinate expression a
+        *stripe. Call `set_palette` to choose the block set. Errors with
+        *`Parse` on bad field JSON and `InvalidArgument` on a stops/colors
+        *length mismatch.
+        */
+        fun field(fieldJson: String, stops: FloatArray, colors: UByteArray, lo: Float, hi: Float, space: InterpolationSpace): Result<Brush> {
+            val fieldJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(fieldJson)
+            val stopsSliceMemory = PrimitiveArrayTools.borrow(stops)
+            val colorsSliceMemory = PrimitiveArrayTools.borrow(colors)
+            
+            val returnVal = lib.Brush_field(fieldJsonSliceMemory.slice, stopsSliceMemory.slice, colorsSliceMemory.slice, lo, hi, space.toNative());
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal 
+                    val returnOpaque = Brush(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                fieldJsonSliceMemory.close()
                 stopsSliceMemory.close()
                 colorsSliceMemory.close()
             }

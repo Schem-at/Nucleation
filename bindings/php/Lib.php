@@ -132,6 +132,8 @@ Brush* Brush_spotlight(float px, float py, float pz, float dx, float dy, float d
 void Brush_set_palette(Brush* self, Palette* palette);
 typedef struct Brush_curve_gradient_result { union { Brush* ok; NucleationError err; }; bool is_ok; } Brush_curve_gradient_result;
 Brush_curve_gradient_result Brush_curve_gradient(DiplomatF32View stops, DiplomatU8View colors, InterpolationSpace space);
+typedef struct Brush_field_result { union { Brush* ok; NucleationError err; }; bool is_ok; } Brush_field_result;
+Brush_field_result Brush_field(DiplomatStringView field_json, DiplomatF32View stops, DiplomatU8View colors, float lo, float hi, InterpolationSpace space);
 void Brush_destroy(Brush* self);
 void BuildingTool_fill(Schematic* schematic, Shape* shape, Brush* brush);
 void BuildingTool_rstack(Schematic* schematic, Shape* shape, Brush* brush, size_t count, int32_t offset_x, int32_t offset_y, int32_t offset_z);

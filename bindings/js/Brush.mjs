@@ -234,6 +234,44 @@ export class Brush {
         }
     }
 
+    /**
+     * A field brush: color every voxel by evaluating a scalar field at its
+     * center, remapping `[lo, hi]` to `[0, 1]`, and reading a multi-stop
+     * gradient (`stops` in `[0, 1]`, `colors` as flat RGB triples). The
+     * field is any SDF JSON — the same language that builds geometry — so a
+     * `cells` node paints a Voronoi mosaic (`mode: value`) or cracks
+     * (`mode: f2MinusF1`), an fbm field a marble, a coordinate expression a
+     * stripe. Call `set_palette` to choose the block set. Errors with
+     * `Parse` on bad field JSON and `InvalidArgument` on a stops/colors
+     * length mismatch.
+     */
+    static field(fieldJson, stops, colors, lo, hi, space) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const fieldJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, fieldJson)));
+        const stopsSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.slice(wasm, stops, "f32")));
+        const colorsSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.slice(wasm, colors, "u8")));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Brush_field(diplomatReceive.buffer, fieldJsonSlice.ptr, stopsSlice.ptr, colorsSlice.ptr, lo, hi, space.ffiValue);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new Brush(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
     constructor(symbol, ptr, selfEdge) {
         return this.#internalConstructor(...arguments)
     }

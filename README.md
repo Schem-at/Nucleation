@@ -23,7 +23,7 @@ nucleation itself, and every snippet ran for real
 [Build](#build-shapes-brushes-palettes) · [Masked edits](#edit-without-collateral-damage) ·
 [Terrain](#terrain-from-a-json-description) · [Voxelize](#voxelize-3d-models) ·
 [Real world](#the-real-world-in-blocks) · [Paintings](#paintings-in-blocks) ·
-[Compose](#everything-composes) ·
+[Compose](#everything-composes) · [Patterns](#fields-and-patterns) ·
 [Read & stream](#read-iterate-and-stream) · [Regions & transforms](#regions-transforms-and-stamping) ·
 [Block entities & NBT](#block-entities-entities-and-nbt) · [Redstone](#simulate-redstone) ·
 [Mesh & render](#mesh-and-render) · [Analyze](#analyze-diff-fingerprint-auto-stack) ·
@@ -353,6 +353,36 @@ grayscale, and it is a different build with the same five moves. There's a
 [runnable version](docs/readme-snippets/18-compose-torus-python.md) you can paste
 and adapt; the full recipe is `scene_compose` in
 [`tools/readme-media/generate.py`](tools/readme-media/generate.py).
+
+## Fields and patterns
+
+A pattern is a scalar field, and nucleation already speaks fields: the SDF JSON
+that builds terrain. The `cells` node adds Worley / Voronoi noise to that
+language, so one field stamps a pattern two ways. Point a **field brush** at it
+to color by the field (each cell a flat color), or feed its value into
+**geometry** (each cell's value drives a column's height):
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/voronoi-mosaic.png" width="330" alt="A sphere skinned with a Voronoi mosaic, each cell a flat color, from a field brush"> <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/voronoi-columns.png" width="380" alt="A terrain of Voronoi cells raised to different heights, like basalt columns, from the same cells field">
+</div>
+
+```python
+field = '{"type": "cells", "frequency": 0.11, "seed": 7, "mode": "value"}'
+
+# Texture: color every voxel by which Voronoi cell it falls in.
+brush = Brush.field(field, stops, colors, 0.0, 1.0, InterpolationSpace.Oklab)
+BuildingTool.fill(s, Shape.sphere(0, 0, 0, 28), brush)
+
+# Geometry: raise each column to its cell's value.
+for x, z in grid:
+    h = Sdf.eval(field, x, 0, z)                    # 0..1 per cell
+    s.fill_cuboid(x, 0, z, x, round(1 + h * 20), z, block_for(h))
+```
+
+`cells` has `f1`, `f2`, and `f2MinusF1` (the classic crack field) modes too, and
+it composes with every other SDF node: subtract it for a foam, intersect it,
+warp it. Voronoi is one field; the same brush and the same node take any of the
+others.
 
 ## Read, iterate, and stream
 

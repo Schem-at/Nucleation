@@ -1905,6 +1905,56 @@ def scene_storage(pack):
     return None
 
 
+VORONOI_STOPS = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+VORONOI_COLORS = bytes([235, 70, 70, 240, 175, 45, 80, 200, 95,
+                        60, 160, 235, 150, 80, 220, 235, 70, 140])
+
+
+def _voronoi_brush(freq, seed):
+    field = json.dumps({"type": "cells", "frequency": freq, "seed": seed, "mode": "value"})
+    b = nu.Brush.field(field, VORONOI_STOPS, VORONOI_COLORS, 0.0, 1.0,
+                       nu.InterpolationSpace.Oklab)
+    b.set_palette(nu.Palette.concrete())
+    return b
+
+
+def scene_voronoi(pack):
+    """One cellular field, two ways from the same JSON. A field brush colors a
+    sphere by cell (texture); the same cells node, thresholded, carves the sphere
+    into separated cells (geometry)."""
+    freq, seed = 0.11, 7
+    tmp = tempfile.mkdtemp(prefix="nuc-voronoi-")
+    try:
+        mosaic = nu.Schematic.create("mosaic")
+        nu.BuildingTool.fill(mosaic, nu.Shape.sphere(0, 0, 0, 28), _voronoi_brush(freq, seed))
+        a = os.path.join(tmp, "a.png")
+        cfg = nu.RenderConfig.create(560, 560)
+        cfg.set_isometric(); cfg.set_yaw(30.0); cfg.set_pitch(24.0)
+        cfg.set_zoom(1.2); cfg.set_sphere_fit(True); cfg.set_background(*NAVY)
+        nu.Renderer.render_to_file(mosaic, pack, cfg, a)
+
+        # geometry: the same cells value drives column height, a basalt terrain
+        cfield = json.dumps({"type": "cells", "frequency": 0.08, "seed": 5, "mode": "value"})
+        pal = nu.Palette.concrete()
+        cols = nu.Schematic.create("columns")
+        grid = 60
+        for x in range(grid):
+            for z in range(grid):
+                v = nu.Sdf.eval(cfield, float(x), 0.0, float(z))
+                cols.fill_cuboid(x, 0, z, x, 1 + round(v * 20), z, _hue_block(pal, v))
+        b = os.path.join(tmp, "b.png")
+        cfg2 = nu.RenderConfig.create(600, 520)
+        cfg2.set_isometric(); cfg2.set_yaw(35.0); cfg2.set_pitch(34.0)
+        cfg2.set_zoom(1.12); cfg2.set_sphere_fit(True); cfg2.set_background(*NAVY)
+        nu.Renderer.render_to_file(cols, pack, cfg2, b)
+
+        shutil.copy(a, os.path.join(OUT, "voronoi-mosaic.png"))
+        shutil.copy(b, os.path.join(OUT, "voronoi-columns.png"))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return None
+
+
 # ── Gallery: ten cool builds ─────────────────────────────────────────────────
 
 import colorsys as _colorsys
@@ -2224,6 +2274,7 @@ SCENES = {
     "globe": scene_globe,
     "paintings": scene_paintings,
     "compose": scene_compose,
+    "voronoi": scene_voronoi,
     "dither": scene_dither,
     "scripting": scene_scripting,
     "simulation": scene_simulation,

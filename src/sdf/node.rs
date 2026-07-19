@@ -6,8 +6,23 @@
 //! *approximate* return a lower bound rather than an exact Euclidean
 //! distance — safe for inside/outside sampling, imprecise for sphere tracing.
 
-use super::noise::{fbm3, value_noise3};
+use super::noise::{fbm3, hash01_3, value_noise3};
 use serde::{Deserialize, Serialize};
+
+/// What a `Cells` (Worley / cellular) node returns per point.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum CellMode {
+    /// Distance to the nearest seed (rounded blobs around each cell center).
+    F1,
+    /// Distance to the second-nearest seed.
+    F2,
+    /// `F2 - F1`: small on cell boundaries, the classic Voronoi crack field.
+    #[default]
+    F2MinusF1,
+    /// A per-cell pseudo-random constant in `[0, 1)`: the Voronoi mosaic.
+    Value,
+}
 
 /// Axis selector for mirror operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -229,6 +244,33 @@ pub enum SdfNode {
         frequency: f32,
         seed: i32,
     },
+    /// Cellular / Worley noise: a jittered seed point per grid cell, returning a
+    /// scalar per sample chosen by `mode` (F1, F2, F2-F1, or a per-cell value),
+    /// minus `threshold`. Unbounded on its own (wrap it in `sdfBounded` or
+    /// intersect it with a bounded shape); as an SDF it is solid where the
+    /// returned value is negative, so `mode: f2MinusF1` with a small `threshold`
+    /// makes a Voronoi foam of cell walls, and as a field brush its raw value
+    /// (`threshold: 0`) paints Voronoi patterns.
+    Cells {
+        #[serde(default = "default_cell_frequency")]
+        frequency: f32,
+        #[serde(default)]
+        seed: i32,
+        #[serde(default = "default_jitter")]
+        jitter: f32,
+        #[serde(default)]
+        mode: CellMode,
+        #[serde(default)]
+        threshold: f32,
+    },
+}
+
+fn default_cell_frequency() -> f32 {
+    0.1
+}
+
+fn default_jitter() -> f32 {
+    1.0
 }
 
 fn default_octaves() -> u32 {
@@ -554,6 +596,47 @@ impl SdfNode {
                     * amplitude;
                 child.eval(x + wx, y + wy, z + wz)
             }
+            SdfNode::Cells {
+                frequency,
+                seed,
+                jitter,
+                mode,
+                threshold,
+            } => {
+                let (px, py, pz) = (x * frequency, y * frequency, z * frequency);
+                let (bx, by, bz) = (px.floor() as i32, py.floor() as i32, pz.floor() as i32);
+                let (mut f1, mut f2) = (f32::INFINITY, f32::INFINITY);
+                let mut best = (bx, by, bz);
+                for dx in -1..=1 {
+                    for dy in -1..=1 {
+                        for dz in -1..=1 {
+                            let (gx, gy, gz) = (bx + dx, by + dy, bz + dz);
+                            let sx = gx as f32 + jitter * hash01_3(gx, gy, gz, *seed);
+                            let sy =
+                                gy as f32 + jitter * hash01_3(gx, gy, gz, seed.wrapping_add(1));
+                            let sz =
+                                gz as f32 + jitter * hash01_3(gx, gy, gz, seed.wrapping_add(2));
+                            let d = ((px - sx).powi(2) + (py - sy).powi(2) + (pz - sz).powi(2))
+                                .sqrt();
+                            if d < f1 {
+                                f2 = f1;
+                                f1 = d;
+                                best = (gx, gy, gz);
+                            } else if d < f2 {
+                                f2 = d;
+                            }
+                        }
+                    }
+                }
+                let inv_f = 1.0 / frequency.max(1e-6);
+                let raw = match mode {
+                    CellMode::F1 => f1 * inv_f,
+                    CellMode::F2 => f2 * inv_f,
+                    CellMode::F2MinusF1 => (f2 - f1) * inv_f,
+                    CellMode::Value => hash01_3(best.0, best.1, best.2, seed.wrapping_add(7)),
+                };
+                raw - threshold
+            }
         }
     }
 
@@ -736,6 +819,7 @@ impl SdfNode {
             SdfNode::Warp {
                 child, amplitude, ..
             } => child.bounds().map(|b| b.grow(amplitude.abs())),
+            SdfNode::Cells { .. } => None,
         }
     }
 }

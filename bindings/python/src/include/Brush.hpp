@@ -42,6 +42,9 @@ namespace capi {
     typedef struct Brush_curve_gradient_result {union {nucleation::capi::Brush* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Brush_curve_gradient_result;
     Brush_curve_gradient_result Brush_curve_gradient(nucleation::diplomat::capi::DiplomatF32View stops, nucleation::diplomat::capi::DiplomatU8View colors, nucleation::capi::InterpolationSpace space);
 
+    typedef struct Brush_field_result {union {nucleation::capi::Brush* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Brush_field_result;
+    Brush_field_result Brush_field(nucleation::diplomat::capi::DiplomatStringView field_json, nucleation::diplomat::capi::DiplomatF32View stops, nucleation::diplomat::capi::DiplomatU8View colors, float lo, float hi, nucleation::capi::InterpolationSpace space);
+
     void Brush_destroy(Brush* self);
 
     } // extern "C"
@@ -143,6 +146,16 @@ inline void nucleation::Brush::set_palette(const nucleation::Palette& palette) {
 inline nucleation::diplomat::result<std::unique_ptr<nucleation::Brush>, nucleation::NucleationError> nucleation::Brush::curve_gradient(nucleation::diplomat::span<const float> stops, nucleation::diplomat::span<const uint8_t> colors, nucleation::InterpolationSpace space) {
     auto result = nucleation::capi::Brush_curve_gradient({stops.data(), stops.size()},
         {colors.data(), colors.size()},
+        space.AsFFI());
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Brush>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Brush>>(std::unique_ptr<nucleation::Brush>(nucleation::Brush::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Brush>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Brush>, nucleation::NucleationError> nucleation::Brush::field(std::string_view field_json, nucleation::diplomat::span<const float> stops, nucleation::diplomat::span<const uint8_t> colors, float lo, float hi, nucleation::InterpolationSpace space) {
+    auto result = nucleation::capi::Brush_field({field_json.data(), field_json.size()},
+        {stops.data(), stops.size()},
+        {colors.data(), colors.size()},
+        lo,
+        hi,
         space.AsFFI());
     return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Brush>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Brush>>(std::unique_ptr<nucleation::Brush>(nucleation::Brush::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Brush>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }

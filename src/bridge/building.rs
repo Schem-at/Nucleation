@@ -921,6 +921,42 @@ pub mod ffi {
                 brush,
             ))))
         }
+
+        /// A field brush: color every voxel by evaluating a scalar field at its
+        /// center, remapping `[lo, hi]` to `[0, 1]`, and reading a multi-stop
+        /// gradient (`stops` in `[0, 1]`, `colors` as flat RGB triples). The
+        /// field is any SDF JSON — the same language that builds geometry — so a
+        /// `cells` node paints a Voronoi mosaic (`mode: value`) or cracks
+        /// (`mode: f2MinusF1`), an fbm field a marble, a coordinate expression a
+        /// stripe. Call `set_palette` to choose the block set. Errors with
+        /// `Parse` on bad field JSON and `InvalidArgument` on a stops/colors
+        /// length mismatch.
+        pub fn field(
+            field_json: &DiplomatStr,
+            stops: &[f32],
+            colors: &[u8],
+            lo: f32,
+            hi: f32,
+            space: InterpolationSpace,
+        ) -> Result<Box<Brush>, NucleationError> {
+            let json =
+                std::str::from_utf8(field_json).map_err(|_| NucleationError::InvalidArgument)?;
+            if stops.is_empty() || colors.len() != stops.len() * 3 {
+                return Err(NucleationError::InvalidArgument);
+            }
+            let node = crate::sdf::SdfNode::from_json(json).map_err(|_| NucleationError::Parse)?;
+            let gstops: Vec<crate::building::GradientStop> = stops
+                .iter()
+                .zip(colors.chunks_exact(3))
+                .map(|(t, c)| crate::building::GradientStop {
+                    position: *t as f64,
+                    color: crate::blockpedia::ExtendedColorData::from_rgb(c[0], c[1], c[2]),
+                })
+                .collect();
+            let brush = crate::building::FieldBrush::new(node, gstops, lo as f64, hi as f64)
+                .with_space(space.to_core());
+            Ok(Box::new(Brush(crate::building::BrushEnum::Field(brush))))
+        }
     }
 
     /// Namespace for the fill operations that combine a schematic, a shape and a
