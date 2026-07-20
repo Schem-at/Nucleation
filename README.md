@@ -246,6 +246,15 @@ through tuff to andesite, with the lava pool sitting in the crater.
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/cross-section.png" width="720" alt="The volcano island sliced through the crater, exposing the lava pool and the stone strata inside">
 </div>
 
+Materials can also key on the **surface normal**, not just height and depth. The
+normal is the gradient of the surface, which an SDF gives you directly, so a
+landscaping rule paints by slope: flat ground takes grass, steepening slopes take
+coarse dirt then bare stone, and the flat peaks catch snow.
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/slope-paint.png" width="760" alt="A rolling landscape painted by slope: grass on the flats, coarse dirt on the inclines, bare stone on the steepest faces, snow on the high flats">
+</div>
+
 ## Voxelize 3D models
 
 Real 3D models become schematics: GLB (node transforms, embedded textures) and

@@ -2372,7 +2372,9 @@ def scene_voronoi_planet(pack):
       at the core, showing through the cracks."""
     R = 60
     freq, seed = 0.06, 4
-    crust, inset, glass, crack_w, f1_rim = 14.0, 1.0, 2.0, 1.5, 8.0
+    # inset carves the crack down: the lava rivers sit this many blocks below the
+    # raised cell plates before the glass shell and emitters begin.
+    crust, inset, glass, crack_w, f1_rim = 14.0, 3.0, 2.0, 2.0, 8.0
     cells = {"frequency": freq, "seed": seed, "jitter": 1.0}
     f1_field = json.dumps({"type": "cells", "mode": "f1", **cells})
     crack_field = json.dumps({"type": "cells", "mode": "f2MinusF1", **cells})
@@ -2423,6 +2425,46 @@ def scene_voronoi_planet(pack):
                 s.set_block(x, y, z, block)
     render(s, pack, os.path.join(OUT, "voronoi-planet.png"), w=820, h=780,
            yaw=32, pitch=26, zoom=1.16, sphere_fit=True, background=NAVY)
+    return s
+
+
+def scene_slope(pack):
+    """Painting by the surface normal. On a landscape, flat ground (normal facing
+    up) takes grass, steepening slopes take coarse dirt then bare stone, and the
+    flat high ground catches snow. The normal here is the gradient of the height
+    field, which is exactly the quantity an SDF exposes at any surface, so the
+    same slope-aware rule generalizes past a heightmap to any shape."""
+    import math
+    W = 112
+
+    def height(x, z):
+        h = 17.0 * math.sin(x * 0.042) * math.cos(z * 0.038)      # broad gentle rolls
+        h += 5.0 * math.sin(x * 0.10 + 1.7) * math.sin(z * 0.085)  # medium
+        h += 1.5 * math.cos(x * 0.23) * math.cos(z * 0.26 + 0.5)   # fine
+        return h
+
+    hmap = [[height(x, z) for z in range(W)] for x in range(W)]
+    s = nu.Schematic.create("terrain")
+    for x in range(1, W - 1):
+        for z in range(1, W - 1):
+            h = hmap[x][z]
+            top = round(h)
+            dx = hmap[x + 1][z] - hmap[x - 1][z]
+            dz = hmap[x][z + 1] - hmap[x][z - 1]
+            ny = 2.0 / math.sqrt(dx * dx + dz * dz + 4.0)     # normal.y: 1 flat, ->0 vertical
+            if ny > 0.86:                                     # flat: soil (snow when high)
+                surf = "minecraft:snow_block" if h > 16 else "minecraft:grass_block"
+                sub = "minecraft:dirt"
+            elif ny > 0.72:                                   # gentle: patchy dirt
+                surf = "minecraft:coarse_dirt"
+                sub = "minecraft:dirt"
+            else:                                             # steep: bare rock
+                surf = "minecraft:stone"
+                sub = "minecraft:stone"
+            s.fill_cuboid(x, top - 5, z, x, top - 1, z, sub)
+            s.set_block(x, top, z, surf)
+    render(s, pack, os.path.join(OUT, "slope-paint.png"), w=1100, h=680,
+           yaw=210, pitch=38, zoom=1.3, sphere_fit=True, background=NAVY)
     return s
 
 
@@ -2904,6 +2946,7 @@ SCENES = {
     "voronoi": scene_voronoi,
     "planet": scene_voronoi_planet,
     "fracture-paint": scene_fracture_paint,
+    "slope": scene_slope,
     "dither": scene_dither,
     "scripting": scene_scripting,
     "simulation": scene_simulation,

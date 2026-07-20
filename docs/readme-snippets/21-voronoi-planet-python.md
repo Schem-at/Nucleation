@@ -12,7 +12,7 @@ import json, math
 from nucleation import Schematic, Palette, Sdf
 
 R, freq, seed = 60, 0.06, 4
-crust, inset, glass, crack_w, f1_rim = 14.0, 1.0, 2.0, 1.5, 8.0
+crust, inset, glass, crack_w, f1_rim = 14.0, 3.0, 2.0, 2.0, 8.0  # inset = river depth
 cells = {"frequency": freq, "seed": seed, "jitter": 1.0}
 f1_field    = json.dumps({"type": "cells", "mode": "f1",        **cells})
 crack_field = json.dumps({"type": "cells", "mode": "f2MinusF1", **cells})
@@ -72,7 +72,7 @@ print("planet:", (dim.x, dim.y, dim.z), "blocks:", s.block_count())
 Output:
 
 ```text
-planet: (119, 120, 121) blocks: 891063
+planet: (119, 120, 121) blocks: 855272
 ```
 
 The pieces are independent knobs: swap `f1` for `f2` to shade toward the
