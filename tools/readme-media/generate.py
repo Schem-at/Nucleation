@@ -2468,6 +2468,72 @@ def scene_slope(pack):
     return s
 
 
+def _stepped_temple():
+    """A clean stone-brick stepped temple: broad tiers with a little shrine on
+    top. The 'before' any naturalisation acts on."""
+    s = nu.Schematic.create("temple")
+    fill = nu.BuildingTool.fill
+    brick = nu.Brush.solid("minecraft:stone_bricks")
+    tiers, base, th = 5, 22, 3
+    for i in range(tiers):
+        r = base - i * 4
+        y0 = i * th
+        fill(s, nu.Shape.cuboid(-r, y0, -r, r, y0 + th - 1, r), brick)
+    y = tiers * th
+    fill(s, nu.Shape.cuboid(-4, y, -4, 4, y + 5, 4).hollow(1), brick)   # shrine walls
+    fill(s, nu.Shape.cuboid(-5, y + 5, -5, 5, y + 5, 5), brick)          # roof slab
+    for cx, cz in ((-3, -3), (3, -3), (-3, 3), (3, 3)):                  # corner posts
+        fill(s, nu.Shape.cuboid(cx, y, cz, cx, y + 4, cz), brick)
+    return s
+
+
+def scene_naturalise(pack):
+    """Naturalisation is not a built-in, it is a rule written over the primitives.
+    Take a clean stone-brick temple, read its `DistanceField`, and let slope plus
+    a patch-noise field decide the weathering: moss and grass settle on the flat
+    up-facing tiers, mossy brick creeps down the gentler steps, and the steep
+    walls stay mostly bare with cracks. Same primitives, a completely different
+    look from the fractured planet."""
+    clean = _stepped_temple()
+    field = nu.DistanceField.from_schematic(clean)
+    patch = json.dumps({"type": "cells", "frequency": 0.16, "seed": 9, "mode": "value"})
+    solid = [(b["x"], b["y"], b["z"]) for b in json.loads(clean.get_all_blocks_json())
+             if b["name"] != "minecraft:air"]
+
+    def weather(ny, m):
+        if ny > 0.75:                                  # flat, up-facing: things grow
+            return ("minecraft:grass_block" if m > 0.60 else
+                    "minecraft:moss_block" if m > 0.34 else "minecraft:mossy_stone_bricks")
+        if ny > 0.35:                                  # gentle: moss creeps in
+            return "minecraft:mossy_stone_bricks" if m > 0.4 else "minecraft:mossy_cobblestone"
+        return ("minecraft:mossy_stone_bricks" if m > 0.78 else   # steep: mostly bare, cracked
+                "minecraft:cracked_stone_bricks" if m > 0.45 else "minecraft:stone_bricks")
+
+    out = nu.Schematic.create("weathered")
+    for (x, y, z) in solid:
+        if field.depth(x, y, z) == 1:                  # surface only
+            m = nu.Sdf.eval(patch, x + 0.5, y + 0.5, z + 0.5)
+            block = weather(field.slope(x, y, z), m)
+        else:
+            block = "minecraft:stone_bricks"
+        out.set_block(x, y, z, block)
+
+    tmp = tempfile.mkdtemp(prefix="nuc-nat-")
+    try:
+        panels = []
+        for name, s in [("clean", clean), ("naturalised", out)]:
+            raw = os.path.join(tmp, f"{name}.png")
+            render(s, pack, raw, w=560, h=520, yaw=32, pitch=30, zoom=1.15,
+                   sphere_fit=True, background=NAVY)
+            cap = os.path.join(tmp, f"{name}_c.png")
+            _caption(raw, name, cap)
+            panels.append(cap)
+        hstack(panels, os.path.join(OUT, "naturalise.png"))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return out
+
+
 def scene_fracture_paint(pack):
     """The fractured-planet look is not sphere-specific: it is three fields over
     (x, y, z) plus a depth. `DistanceField.from_schematic` runs the distance
@@ -2924,6 +2990,7 @@ SCENES = {
     "voronoi": scene_voronoi,
     "planet": scene_voronoi_planet,
     "fracture-paint": scene_fracture_paint,
+    "naturalise": scene_naturalise,
     "slope": scene_slope,
     "dither": scene_dither,
     "scripting": scene_scripting,

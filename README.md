@@ -488,6 +488,16 @@ block, its glowing seams following the Voronoi field across the terrain:
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/fracture-paint.png" width="620" alt="The hero volcano island repainted as a black fractured planet, glowing Voronoi crack seams running over its arch, peak, and floating shards">
 </div>
 
+The fractured look is not a built-in, just one rule written over those
+primitives. Swap the rule and the same `DistanceField` naturalises instead: on a
+clean stone-brick temple, slope and a patch-noise field settle moss and grass on
+the flat tiers, creep mossy brick down the steps, and leave the steep walls bare
+and cracked. Same primitives, ancient ruin:
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/naturalise.png" width="760" alt="A clean stone-brick stepped temple beside the same temple naturalised: moss and grass on the flat tiers, mossy and cracked brick down the walls">
+</div>
+
 ## Read, iterate, and stream
 
 Everything above *writes* blocks. This is how you read them back and process
