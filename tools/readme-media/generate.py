@@ -2347,6 +2347,80 @@ def scene_voronoi(pack):
     return None
 
 
+def _stops_rgb(t, stops):
+    """Color at t in [0,1] along a list of (position, (r,g,b)) stops."""
+    t = max(0.0, min(1.0, t))
+    for (t0, c0), (t1, c1) in zip(stops, stops[1:]):
+        if t <= t1:
+            f = (t - t0) / (t1 - t0) if t1 > t0 else 0.0
+            return tuple(round(c0[i] + (c1[i] - c0[i]) * f) for i in range(3))
+    return stops[-1][1]
+
+
+def scene_voronoi_planet(pack):
+    """A fractured planet from three fields, each evaluated per voxel and snapped
+    through the dithered palette, so the whole thing reuses the same toolbox:
+
+    * the Voronoi **F1** field (distance to the nearest cell seed) shades every
+      cell light at its center and dark toward its rim;
+    * the **F2 - F1** crack field cuts recessed buffer grooves between cells;
+    * the **depth into the sphere** drives a glow ramp normal to the surface.
+      Depth is just `R - |p|`, which is exactly what an SDF returns: the signed
+      distance to the surface, measured along its normal. So the same idea
+      gradient-into-a-shape works for any SDF, not only a sphere. Orange-yellow
+      glass sits at the crust and dithers down through shroomlight into glowstone
+      at the core, showing through the cracks."""
+    R = 30
+    freq, seed = 0.09, 4
+    crust, inset, crack_w, f1_rim = 7.0, 1.0, 1.2, 4.0
+    cells = {"frequency": freq, "seed": seed, "jitter": 1.0}
+    f1_field = json.dumps({"type": "cells", "mode": "f1", **cells})
+    crack_field = json.dumps({"type": "cells", "mode": "f2MinusF1", **cells})
+
+    cell_pal = nu.Palette.from_block_ids(json.dumps([
+        "minecraft:black_concrete", "minecraft:coal_block", "minecraft:blackstone",
+        "minecraft:polished_blackstone", "minecraft:deepslate",
+        "minecraft:polished_deepslate", "minecraft:gray_concrete"])).dithered()
+    glow_pal = nu.Palette.from_block_ids(json.dumps([
+        "minecraft:yellow_stained_glass", "minecraft:orange_stained_glass",
+        "minecraft:shroomlight", "minecraft:glowstone"])).dithered()
+
+    cell_stops = [(0.0, (118, 120, 128)), (1.0, (10, 11, 16))]    # bright center -> black rim
+    glow_stops = [(0.0, (233, 233, 70)), (0.20, (220, 130, 52)),  # glass ...
+                  (0.45, (241, 147, 71)), (1.0, (172, 131, 84))]  # shroomlight -> glowstone
+
+    def glow(depth, x, y, z):
+        # normalize over the visible crack depth (~2x the crust) so a groove
+        # shows the full glass -> shroomlight -> glowstone transition, not just
+        # the shallow glass; the deep core clamps to glowstone.
+        t = min(depth / (crust * 2.0), 1.0)
+        return glow_pal.closest_block_dithered(*_stops_rgb(t, glow_stops), x, y, z)
+
+    s = nu.Schematic.create("planet")
+    for x in range(-R, R + 1):
+        for y in range(-R, R + 1):
+            for z in range(-R, R + 1):
+                d = math.sqrt(x * x + y * y + z * z)
+                if d > R:
+                    continue
+                depth = R - d
+                fx, fy, fz = x + 0.5, y + 0.5, z + 0.5
+                if depth > crust:                                 # glowing core
+                    block = glow(depth, x, y, z)
+                elif nu.Sdf.eval(crack_field, fx, fy, fz) < crack_w:   # buffer groove
+                    if depth < inset:
+                        continue                                  # recessed air gap
+                    block = glow(depth, x, y, z)
+                else:                                             # cell crust
+                    f1 = nu.Sdf.eval(f1_field, fx, fy, fz)
+                    block = cell_pal.closest_block_dithered(
+                        *_stops_rgb(min(f1 / f1_rim, 1.0), cell_stops), x, y, z)
+                s.set_block(x, y, z, block)
+    render(s, pack, os.path.join(OUT, "voronoi-planet.png"), w=820, h=780,
+           yaw=32, pitch=26, zoom=1.16, sphere_fit=True, background=NAVY)
+    return s
+
+
 # ── Gallery: ten cool builds ─────────────────────────────────────────────────
 
 import colorsys as _colorsys
@@ -2747,6 +2821,7 @@ SCENES = {
     "paintings": scene_paintings,
     "compose": scene_compose,
     "voronoi": scene_voronoi,
+    "planet": scene_voronoi_planet,
     "dither": scene_dither,
     "scripting": scene_scripting,
     "simulation": scene_simulation,

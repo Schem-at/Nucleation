@@ -436,6 +436,32 @@ it composes with every other SDF node: subtract it for a foam, intersect it,
 warp it. Voronoi is one field; the same brush and the same node take any of the
 others.
 
+Put all three modes to work at once and you get a build, not a demo. This
+fractured planet reads `f1` to shade each cell light at its center and dark at
+its rim, cuts recessed buffer grooves along the `f2MinusF1` cracks, and pours a
+glow down the surface normal. That last field needs no new tool: the depth into
+the sphere is `R - length(p)`, exactly the signed distance an SDF returns, so the
+same idea gives a gradient normal to *any* shape. Orange-yellow glass at the
+crust dithers through shroomlight into glowstone at the core, showing through the
+cracks:
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/voronoi-planet.png" width="460" alt="A black planet fractured into Voronoi cells, each lit brighter at its center, with glowing orange buffer cracks running between them">
+</div>
+
+```python
+f1    = '{"type": "cells", "frequency": 0.09, "seed": 4, "mode": "f1"}'
+crack = '{"type": "cells", "frequency": 0.09, "seed": 4, "mode": "f2MinusF1"}'
+for x, y, z in inside_sphere(R):
+    depth = R - length(x, y, z)                     # distance along the surface normal
+    if depth > crust:                               # glowing core
+        block = glow.snap(depth)                    # glass -> shroomlight -> glowstone
+    elif Sdf.eval(crack, x, y, z) < crack_w:        # recessed buffer groove
+        block = None if depth < inset else glow.snap(depth)
+    else:                                            # cell crust
+        block = cells.snap(shade(Sdf.eval(f1, x, y, z)))   # light center, dark rim
+```
+
 ## Read, iterate, and stream
 
 Everything above *writes* blocks. This is how you read them back and process
