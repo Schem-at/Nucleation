@@ -2370,9 +2370,9 @@ def scene_voronoi_planet(pack):
       gradient-into-a-shape works for any SDF, not only a sphere. Orange-yellow
       glass sits at the crust and dithers down through shroomlight into glowstone
       at the core, showing through the cracks."""
-    R = 30
-    freq, seed = 0.09, 4
-    crust, inset, crack_w, f1_rim = 7.0, 1.0, 1.2, 4.0
+    R = 60
+    freq, seed = 0.06, 4
+    crust, inset, glass, crack_w, f1_rim = 14.0, 1.0, 2.0, 1.5, 8.0
     cells = {"frequency": freq, "seed": seed, "jitter": 1.0}
     f1_field = json.dumps({"type": "cells", "mode": "f1", **cells})
     crack_field = json.dumps({"type": "cells", "mode": "f2MinusF1", **cells})
@@ -2381,20 +2381,25 @@ def scene_voronoi_planet(pack):
         "minecraft:black_concrete", "minecraft:coal_block", "minecraft:blackstone",
         "minecraft:polished_blackstone", "minecraft:deepslate",
         "minecraft:polished_deepslate", "minecraft:gray_concrete"])).dithered()
-    glow_pal = nu.Palette.from_block_ids(json.dumps([
-        "minecraft:yellow_stained_glass", "minecraft:orange_stained_glass",
+    # Two materials in depth order: a transparent glass shell at the crack mouth,
+    # then the light-emitting interior beneath it. Splitting the palettes keeps
+    # the glass a clean shell instead of dithering emitters up to the surface.
+    glass_pal = nu.Palette.from_block_ids(json.dumps([
+        "minecraft:yellow_stained_glass", "minecraft:orange_stained_glass"])).dithered()
+    emit_pal = nu.Palette.from_block_ids(json.dumps([
         "minecraft:shroomlight", "minecraft:glowstone"])).dithered()
 
     cell_stops = [(0.0, (118, 120, 128)), (1.0, (10, 11, 16))]    # bright center -> black rim
-    glow_stops = [(0.0, (233, 233, 70)), (0.20, (220, 130, 52)),  # glass ...
-                  (0.45, (241, 147, 71)), (1.0, (172, 131, 84))]  # shroomlight -> glowstone
+    glass_stops = [(0.0, (242, 172, 55)), (1.0, (224, 118, 46))]  # amber -> orange glass
+    emit_stops = [(0.0, (246, 150, 72)), (1.0, (180, 133, 82))]   # shroomlight -> glowstone
 
     def glow(depth, x, y, z):
-        # normalize over the visible crack depth (~2x the crust) so a groove
-        # shows the full glass -> shroomlight -> glowstone transition, not just
-        # the shallow glass; the deep core clamps to glowstone.
-        t = min(depth / (crust * 2.0), 1.0)
-        return glow_pal.closest_block_dithered(*_stops_rgb(t, glow_stops), x, y, z)
+        below = depth - inset                                     # depth beneath the crack mouth
+        if below < glass:                                         # the glass shell (a couple layers)
+            col = _stops_rgb(below / glass, glass_stops)
+            return glass_pal.closest_block_dithered(*col, x, y, z)
+        t = min((below - glass) / crust, 1.0)                     # emitters, brighter -> deeper
+        return emit_pal.closest_block_dithered(*_stops_rgb(t, emit_stops), x, y, z)
 
     s = nu.Schematic.create("planet")
     for x in range(-R, R + 1):

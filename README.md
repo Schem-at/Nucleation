@@ -441,9 +441,9 @@ fractured planet reads `f1` to shade each cell light at its center and dark at
 its rim, cuts recessed buffer grooves along the `f2MinusF1` cracks, and pours a
 glow down the surface normal. That last field needs no new tool: the depth into
 the sphere is `R - length(p)`, exactly the signed distance an SDF returns, so the
-same idea gives a gradient normal to *any* shape. Orange-yellow glass at the
-crust dithers through shroomlight into glowstone at the core, showing through the
-cracks:
+same idea gives a gradient normal to *any* shape. Each groove wears a couple
+layers of orange glass over light-emitting blocks that brighten with depth,
+shroomlight fading into glowstone toward the core:
 
 <div align="center">
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/voronoi-planet.png" width="460" alt="A black planet fractured into Voronoi cells, each lit brighter at its center, with glowing orange buffer cracks running between them">
@@ -455,7 +455,7 @@ crack = '{"type": "cells", "frequency": 0.09, "seed": 4, "mode": "f2MinusF1"}'
 for x, y, z in inside_sphere(R):
     depth = R - length(x, y, z)                     # distance along the surface normal
     if depth > crust:                               # glowing core
-        block = glow.snap(depth)                    # glass -> shroomlight -> glowstone
+        block = glow.snap(depth)                    # glass shell, then emitters deeper
     elif Sdf.eval(crack, x, y, z) < crack_w:        # recessed buffer groove
         block = None if depth < inset else glow.snap(depth)
     else:                                            # cell crust
