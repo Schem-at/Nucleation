@@ -44,10 +44,9 @@ pub mod ffi {
         #[cfg(not(target_arch = "wasm32"))]
         pub fn open_dir(path: &DiplomatStr) -> Result<Box<WorldStream>, NucleationError> {
             let path = Self::utf8(path)?;
-            let source = crate::formats::world_stream::WorldSource::open_dir(std::path::Path::new(
-                path,
-            ))
-            .map_err(|_| NucleationError::Io)?;
+            let source =
+                crate::formats::world_stream::WorldSource::open_dir(std::path::Path::new(path))
+                    .map_err(|_| NucleationError::Io)?;
             source
                 .chunks()
                 .map(|it| Box::new(WorldStream(it)))
@@ -68,10 +67,9 @@ pub mod ffi {
             max_z: i32,
         ) -> Result<Box<WorldStream>, NucleationError> {
             let path = Self::utf8(path)?;
-            let source = crate::formats::world_stream::WorldSource::open_dir(std::path::Path::new(
-                path,
-            ))
-            .map_err(|_| NucleationError::Io)?;
+            let source =
+                crate::formats::world_stream::WorldSource::open_dir(std::path::Path::new(path))
+                    .map_err(|_| NucleationError::Io)?;
             source
                 .chunks_bounded((min_x, min_y, min_z), (max_x, max_y, max_z))
                 .map(|it| Box::new(WorldStream(it)))
@@ -158,11 +156,7 @@ pub mod ffi {
         /// `to_schematic` a streamed chunk, edit it, rebuild with this.
         pub fn from_schematic(schematic: &Schematic, cx: i32, cz: i32) -> Box<WorldChunkView> {
             Box::new(WorldChunkView(
-                crate::formats::world_stream::WorldChunkView::from_schematic(
-                    &schematic.0,
-                    cx,
-                    cz,
-                ),
+                crate::formats::world_stream::WorldChunkView::from_schematic(&schematic.0, cx, cz),
             ))
         }
 
@@ -177,8 +171,8 @@ pub mod ffi {
             z: i32,
             block_name: &DiplomatStr,
         ) -> Result<(), NucleationError> {
-            let name = std::str::from_utf8(block_name)
-                .map_err(|_| NucleationError::InvalidArgument)?;
+            let name =
+                std::str::from_utf8(block_name).map_err(|_| NucleationError::InvalidArgument)?;
             let state = crate::BlockState::new(name.to_owned());
             if self.0.set_block(x, y, z, &state) {
                 Ok(())
@@ -191,8 +185,8 @@ pub mod ffi {
         /// view with `biome_name` (e.g. `minecraft:desert`). Sections are created
         /// lazily by `set_block`, so call this AFTER placing blocks.
         pub fn set_biome(&mut self, biome_name: &DiplomatStr) -> Result<(), NucleationError> {
-            let biome = std::str::from_utf8(biome_name)
-                .map_err(|_| NucleationError::InvalidArgument)?;
+            let biome =
+                std::str::from_utf8(biome_name).map_err(|_| NucleationError::InvalidArgument)?;
             self.0.set_biome(biome);
             Ok(())
         }

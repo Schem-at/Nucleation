@@ -1121,6 +1121,82 @@ impl UniversalSchematic {
         })
     }
 
+    /// Mesh one [`MeshOutput`] per animation group, in group order.
+    ///
+    /// This is the bridge between [`crate::animation`] and the renderer:
+    /// `render_animation` poses mesh *i* with group *i*, so the two must be
+    /// index-aligned. Groups producing no geometry (all air) still yield an
+    /// entry, keeping that alignment exact.
+    ///
+    /// Each group is meshed independently, so faces between groups are **not**
+    /// culled against each other — which is what you want when the groups move
+    /// apart, and wasteful when they never do. Prefer coarse groupings
+    /// (`Layer`, `Chunk`) for large builds: per-block meshing means one draw
+    /// call per block.
+    ///
+    /// ```ignore
+    /// let anim = BuildAnimator::from_schematic(&schem, Grouping::PerBlock);
+    /// let meshes = schem.mesh_groups(&pack, &config, anim.groups())?;
+    /// render_animation(&meshes, &anim.frames(24.0), &render_config, None)?;
+    /// ```
+    pub fn mesh_groups(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+        groups: &[crate::animation::Group],
+    ) -> Result<Vec<MeshOutput>> {
+        let mesher_config = config.to_mesher_config();
+        let mut out = Vec::with_capacity(groups.len());
+
+        for group in groups {
+            let mut blocks: HashMap<MesherBlockPosition, InputBlock> = HashMap::new();
+            let mut min = [f32::MAX; 3];
+            let mut max = [f32::MIN; 3];
+
+            for &(x, y, z) in &group.blocks {
+                let Some(block) = self.get_block(x, y, z) else {
+                    continue;
+                };
+                if crate::fingerprint::is_air(block.get_name()) {
+                    continue;
+                }
+                let pos = MesherBlockPosition { x, y, z };
+                blocks.insert(pos, block_state_to_input_block(block));
+                min[0] = min[0].min(x as f32);
+                min[1] = min[1].min(y as f32);
+                min[2] = min[2].min(z as f32);
+                max[0] = max[0].max(x as f32 + 1.0);
+                max[1] = max[1].max(y as f32 + 1.0);
+                max[2] = max[2].max(z as f32 + 1.0);
+            }
+
+            if blocks.is_empty() {
+                // Keep index alignment with `groups` even when empty.
+                out.push(MeshOutput {
+                    opaque: MeshLayer::default(),
+                    cutout: MeshLayer::default(),
+                    transparent: MeshLayer::default(),
+                    atlas: schematic_mesher::TextureAtlas::empty(),
+                    greedy_materials: Vec::new(),
+                    animated_textures: Vec::new(),
+                    bounds: MesherBoundingBox::new([0.0; 3], [0.0; 3]),
+                    chunk_coord: None,
+                    lod_level: 0,
+                });
+                continue;
+            }
+
+            let bounds = MesherBoundingBox::new(min, max);
+            let source = ChunkBlockSource::new(blocks, bounds);
+            let mesher = Mesher::with_config(pack.pack.clone(), mesher_config.clone());
+            let output = mesher
+                .mesh(&source)
+                .map_err(|e| MeshError::Meshing(e.to_string()))?;
+            out.push(mesh_output_from_mesher(output, None));
+        }
+        Ok(out)
+    }
+
     /// Create a lazy chunk mesh iterator.
     ///
     /// Yields one [`MeshOutput`] per chunk of `chunk_size` blocks on each axis.

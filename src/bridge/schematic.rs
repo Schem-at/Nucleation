@@ -31,7 +31,10 @@ fn parse_world_options(
 }
 
 /// One block as JSON, shaped like the old `CBlock` (properties as serialized pairs).
-fn block_json(pos: &crate::block_position::BlockPosition, block: &crate::BlockState) -> serde_json::Value {
+fn block_json(
+    pos: &crate::block_position::BlockPosition,
+    block: &crate::BlockState,
+) -> serde_json::Value {
     serde_json::json!({
         "x": pos.x,
         "y": pos.y,
@@ -204,8 +207,8 @@ pub mod ffi {
 
         /// The schematic as McStructure (Bedrock) bytes, base64-encoded.
         pub fn to_mcstructure_b64(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
-            let data = mcstructure::to_mcstructure(&self.0)
-                .map_err(|_| NucleationError::Serialize)?;
+            let data =
+                mcstructure::to_mcstructure(&self.0).map_err(|_| NucleationError::Serialize)?;
             let _ = write!(out, "{}", b64(&data));
             Ok(())
         }
@@ -463,21 +466,23 @@ pub mod ffi {
                 }
 
                 let block_name_owned = block_state.name.to_string();
-                let proto: Option<crate::block_entity::BlockEntity> = nbt_data.as_ref().map(|nbt| {
-                    let mut be =
-                        crate::block_entity::BlockEntity::new(block_name_owned.clone(), (0, 0, 0));
-                    for (k, v) in nbt {
-                        be = be.with_nbt_data(k.clone(), v.clone());
-                    }
-                    be
-                });
+                let proto: Option<crate::block_entity::BlockEntity> =
+                    nbt_data.as_ref().map(|nbt| {
+                        let mut be = crate::block_entity::BlockEntity::new(
+                            block_name_owned.clone(),
+                            (0, 0, 0),
+                        );
+                        for (k, v) in nbt {
+                            be = be.with_nbt_data(k.clone(), v.clone());
+                        }
+                        be
+                    });
 
                 let region = &mut s.default_region;
                 region.ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
                 let palette_index = region.get_or_insert_palette_by_state(&block_state);
                 for i in 0..count {
-                    let (x, y, z) =
-                        (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+                    let (x, y, z) = (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
                     region.set_block_at_index_unchecked(palette_index, x, y, z);
                 }
 
@@ -560,10 +565,14 @@ pub mod ffi {
                     excluded.push(bs);
                 }
             }
-            let bounds =
-                crate::BoundingBox::new((min_x, min_y, min_z), (max_x, max_y, max_z));
+            let bounds = crate::BoundingBox::new((min_x, min_y, min_z), (max_x, max_y, max_z));
             self.0
-                .copy_region(&source.0, &bounds, (target_x, target_y, target_z), &excluded)
+                .copy_region(
+                    &source.0,
+                    &bounds,
+                    (target_x, target_y, target_z),
+                    &excluded,
+                )
                 .map_err(|_| NucleationError::InvalidArgument)
         }
 
@@ -737,7 +746,10 @@ pub mod ffi {
         /// version (else `mc_version`, else canonical) as origin, updating metadata
         /// to the target. Writes a JSON loss report (`[]` when lossless).
         pub fn convert_to_version(&mut self, target_data_version: i32, out: &mut DiplomatWrite) {
-            let json = self.0.convert_to_data_version(target_data_version).to_json();
+            let json = self
+                .0
+                .convert_to_data_version(target_data_version)
+                .to_json();
             let _ = write!(out, "{}", json);
         }
 
@@ -804,8 +816,7 @@ pub mod ffi {
         ) -> Result<(), NucleationError> {
             let id_str = utf8(id)?.to_string();
             let snbt_str = utf8(snbt)?;
-            let compound =
-                quartz_nbt::snbt::parse(snbt_str).map_err(|_| NucleationError::Parse)?;
+            let compound = quartz_nbt::snbt::parse(snbt_str).map_err(|_| NucleationError::Parse)?;
             let nbt = crate::nbt::NbtMap::from_quartz_nbt(&compound);
             let mut be = crate::block_entity::BlockEntity::new(id_str, (x, y, z));
             be.set_nbt(nbt);
@@ -864,10 +875,9 @@ pub mod ffi {
         /// and `Pos`).
         pub fn add_entity_from_snbt(&mut self, snbt: &DiplomatStr) -> Result<(), NucleationError> {
             let snbt_str = utf8(snbt)?;
-            let compound =
-                quartz_nbt::snbt::parse(snbt_str).map_err(|_| NucleationError::Parse)?;
-            let entity = crate::entity::Entity::from_nbt(&compound)
-                .map_err(|_| NucleationError::Parse)?;
+            let compound = quartz_nbt::snbt::parse(snbt_str).map_err(|_| NucleationError::Parse)?;
+            let entity =
+                crate::entity::Entity::from_nbt(&compound).map_err(|_| NucleationError::Parse)?;
             self.0.add_entity(entity);
             Ok(())
         }
@@ -973,9 +983,7 @@ pub mod ffi {
                     let blocks: Vec<serde_json::Value> = chunk
                         .positions
                         .into_iter()
-                        .filter_map(|pos| {
-                            self.0.get_block(pos.x, pos.y, pos.z).map(|b| (pos, b))
-                        })
+                        .filter_map(|pos| self.0.get_block(pos.x, pos.y, pos.z).map(|b| (pos, b)))
                         .map(|(pos, block)| block_json(&pos, block))
                         .collect();
                     serde_json::json!({
@@ -1016,11 +1024,7 @@ pub mod ffi {
             let _ = write!(
                 out,
                 "Schematic name: {}, Regions: {}",
-                self.0
-                    .metadata
-                    .name
-                    .as_deref()
-                    .unwrap_or("Unnamed"),
+                self.0.metadata.name.as_deref().unwrap_or("Unnamed"),
                 self.0.other_regions.len() + 1 // +1 for the main region
             );
         }
@@ -1666,10 +1670,7 @@ pub mod ffi {
         pub fn properties_json(&self, out: &mut DiplomatWrite) {
             let mut map = serde_json::Map::new();
             for (k, v) in &self.0.properties {
-                map.insert(
-                    k.to_string(),
-                    serde_json::Value::String(v.to_string()),
-                );
+                map.insert(k.to_string(), serde_json::Value::String(v.to_string()));
             }
             let json = serde_json::to_string(&serde_json::Value::Object(map))
                 .unwrap_or_else(|_| "{}".to_string());

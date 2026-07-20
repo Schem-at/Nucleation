@@ -85,7 +85,9 @@ pub mod ffi {
         /// Build a region from bounding boxes crossing as flat `[i32]` chunked in
         /// sixes (`min_x, min_y, min_z, max_x, max_y, max_z` per box). Errors
         /// with `InvalidArgument` if the length is not a multiple of 6.
-        pub fn from_bounding_boxes(boxes: &[i32]) -> Result<Box<DefinitionRegion>, NucleationError> {
+        pub fn from_bounding_boxes(
+            boxes: &[i32],
+        ) -> Result<Box<DefinitionRegion>, NucleationError> {
             if boxes.len() % 6 != 0 {
                 return Err(NucleationError::InvalidArgument);
             }
@@ -258,8 +260,7 @@ pub mod ffi {
         /// floats. Errors with `NotFound` when the region is empty.
         pub fn center_f32_json(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
             let (x, y, z) = self.0.center_f32().ok_or(NucleationError::NotFound)?;
-            let json =
-                serde_json::to_string(&[x, y, z]).map_err(|_| NucleationError::Serialize)?;
+            let json = serde_json::to_string(&[x, y, z]).map_err(|_| NucleationError::Serialize)?;
             let _ = write!(out, "{}", json);
             Ok(())
         }
@@ -278,7 +279,10 @@ pub mod ffi {
 
         /// Every contained position in sorted (y, z, x) order, written as a flat
         /// JSON array of ints.
-        pub fn positions_sorted_json(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
+        pub fn positions_sorted_json(
+            &self,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
             let sorted = self.0.iter_positions_sorted();
             let mut flat: Vec<i32> = Vec::with_capacity(sorted.len() * 3);
             for (x, y, z) in sorted {
@@ -480,7 +484,10 @@ pub mod ffi {
             region: &DefinitionRegion,
         ) -> Result<(), NucleationError> {
             let name = Self::utf8(name)?.to_owned();
-            schematic.0.definition_regions.insert(name, region.0.clone());
+            schematic
+                .0
+                .definition_regions
+                .insert(name, region.0.clone());
             Ok(())
         }
 
@@ -493,7 +500,10 @@ pub mod ffi {
             region: &DefinitionRegion,
         ) -> Result<(), NucleationError> {
             let name = Self::utf8(name)?.to_owned();
-            schematic.0.definition_regions.insert(name, region.0.clone());
+            schematic
+                .0
+                .definition_regions
+                .insert(name, region.0.clone());
             Ok(())
         }
 
@@ -539,7 +549,10 @@ pub mod ffi {
         }
 
         /// Create an empty region under `name`.
-        pub fn create(schematic: &mut Schematic, name: &DiplomatStr) -> Result<(), NucleationError> {
+        pub fn create(
+            schematic: &mut Schematic,
+            name: &DiplomatStr,
+        ) -> Result<(), NucleationError> {
             let name = Self::utf8(name)?.to_owned();
             schematic
                 .0

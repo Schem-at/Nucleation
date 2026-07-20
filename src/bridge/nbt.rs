@@ -95,10 +95,8 @@ pub mod ffi {
             italic: i32,
             out: &mut DiplomatWrite,
         ) -> Result<(), NucleationError> {
-            let text =
-                std::str::from_utf8(s).map_err(|_| NucleationError::InvalidArgument)?;
-            let color =
-                std::str::from_utf8(color).map_err(|_| NucleationError::InvalidArgument)?;
+            let text = std::str::from_utf8(s).map_err(|_| NucleationError::InvalidArgument)?;
+            let color = std::str::from_utf8(color).map_err(|_| NucleationError::InvalidArgument)?;
             let color = if color.is_empty() { None } else { Some(color) };
             let _ = write!(out, "{}", build_text_json(text, color, bold, italic));
             Ok(())
@@ -120,8 +118,7 @@ pub mod ffi {
         ) -> Result<(), NucleationError> {
             let items_str =
                 std::str::from_utf8(items_json).map_err(|_| NucleationError::InvalidArgument)?;
-            let name =
-                std::str::from_utf8(name).map_err(|_| NucleationError::InvalidArgument)?;
+            let name = std::str::from_utf8(name).map_err(|_| NucleationError::InvalidArgument)?;
             let items: Vec<ChestItem> = if items_str.is_empty() {
                 Vec::new()
             } else {
@@ -176,8 +173,7 @@ pub mod ffi {
             out: &mut DiplomatWrite,
         ) -> Result<(), NucleationError> {
             fn parse_lines(json: &[u8]) -> Result<Vec<String>, NucleationError> {
-                let s =
-                    std::str::from_utf8(json).map_err(|_| NucleationError::InvalidArgument)?;
+                let s = std::str::from_utf8(json).map_err(|_| NucleationError::InvalidArgument)?;
                 if s.is_empty() {
                     return Ok(Vec::new());
                 }
@@ -186,8 +182,7 @@ pub mod ffi {
             let front_msgs = collect_sign_lines(parse_lines(front_json)?)?;
             let back_msgs = collect_sign_lines(parse_lines(back_json)?)?;
 
-            let color =
-                std::str::from_utf8(color).map_err(|_| NucleationError::InvalidArgument)?;
+            let color = std::str::from_utf8(color).map_err(|_| NucleationError::InvalidArgument)?;
             let color = if color.is_empty() { "black" } else { color };
             let g = if glowing { "1b" } else { "0b" };
             let w = if waxed { "1b" } else { "0b" };

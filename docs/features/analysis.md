@@ -1,4 +1,39 @@
-# Auto-stack — periodicity detection & resize
+# Analysis: diff, fingerprint, auto-stack
+
+## Analyze: diff, fingerprint, auto-stack
+
+
+Structural diffs know what was added, removed, changed, and swapped, shown here
+as a ghost view, additions in green, removals in red:
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/diff-engine.png" width="760" alt="Cottage before, after, and diff ghost view">
+
+```python
+diff = Diff.compute(before, after, "exact")     # distance 3; summary JSON with regions
+Fingerprint.is_duplicate(before, after, "exact")   # False (fingerprints are translation-invariant)
+```
+
+Fingerprints are position-blind, and the `shape` preset is orientation-blind
+too: a build moved and turned still reads as a duplicate, while adding one block
+makes it unique. Deduplicate a library no matter how each copy was placed:
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/fingerprint.png" width="820" alt="One build, a moved and turned copy flagged DUPLICATE, and a one-block-different copy flagged UNIQUE">
+</div>
+
+And nucleation can *find the repetition in a build*, the lattice of a tiling
+wall, a repeater bus, or a pixel grid, and restamp it to a new size:
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/autostack.png" width="760" alt="A 2-unit wall module restamped to 6 units">
+
+```python
+Autostack.detect_structures(wall)        # {"mode": "1d", "vectors": [[4,0,0]], "coverage": 1.0}
+longer = Autostack.resize_1d(wall, 4, 0, 0, 6)   # 2 units → 6: (8,4,1) → (24,4,1)
+```
+
+---
+
+## Reference
 
 Detect the repeating structure(s) in a build and resize them by re-stamping the
 fundamental domain a different number of times along its lattice vector. A 4-bit

@@ -364,8 +364,7 @@ pub fn sample_to_schematic(
                 for yi in (run_bottom..=run_top).rev() {
                     let y = bounds.min[1] + yi;
                     let depth = surface_y - y;
-                    let block =
-                        pick_fill(rules, &resolved, x, y, z, depth).unwrap_or(default_fill);
+                    let block = pick_fill(rules, &resolved, x, y, z, depth).unwrap_or(default_fill);
                     if yi == run_top {
                         surface_block = Some(block);
                     }

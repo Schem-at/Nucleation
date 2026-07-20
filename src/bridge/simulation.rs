@@ -429,18 +429,24 @@ pub mod ffi {
         /// The value as u32. Also accepts u64/non-negative signed ints that
         /// fit, and bool (false → 0, true → 1); fails otherwise.
         pub fn as_u32(&self) -> Result<u32, NucleationError> {
-            self.0.as_u32().map_err(|_| NucleationError::InvalidArgument)
+            self.0
+                .as_u32()
+                .map_err(|_| NucleationError::InvalidArgument)
         }
 
         /// The value as i32. Also accepts i64 values in i32 range; fails for
         /// other types.
         pub fn as_i32(&self) -> Result<i32, NucleationError> {
-            self.0.as_i32().map_err(|_| NucleationError::InvalidArgument)
+            self.0
+                .as_i32()
+                .map_err(|_| NucleationError::InvalidArgument)
         }
 
         /// The value as f32; fails if this is not an f32 value.
         pub fn as_f32(&self) -> Result<f32, NucleationError> {
-            self.0.as_f32().map_err(|_| NucleationError::InvalidArgument)
+            self.0
+                .as_f32()
+                .map_err(|_| NucleationError::InvalidArgument)
         }
 
         /// The value as bool; fails if this is not a bool value.
@@ -495,7 +501,9 @@ pub mod ffi {
 
         /// Signed integer of `bits` bits (two's complement, LSB-first).
         pub fn signed_int(bits: u32) -> Box<IoType> {
-            Box::new(IoType(InnerIoType::SignedInt { bits: bits as usize }))
+            Box::new(IoType(InnerIoType::SignedInt {
+                bits: bits as usize,
+            }))
         }
 
         /// 32-bit IEEE 754 float (crosses the wire as its 32 raw bits).
@@ -648,12 +656,14 @@ pub mod ffi {
         ) -> Result<Box<ExecutionMode>, NucleationError> {
             let name =
                 std::str::from_utf8(output_name).map_err(|_| NucleationError::InvalidArgument)?;
-            Ok(Box::new(ExecutionMode(InnerExecutionMode::UntilCondition {
-                output_name: name.to_string(),
-                condition: condition.0.clone(),
-                max_ticks,
-                check_interval,
-            })))
+            Ok(Box::new(ExecutionMode(
+                InnerExecutionMode::UntilCondition {
+                    output_name: name.to_string(),
+                    condition: condition.0.clone(),
+                    max_ticks,
+                    check_interval,
+                },
+            )))
         }
 
         /// Run until any output changes from its initial reading, checking
@@ -1183,7 +1193,11 @@ pub mod ffi {
         }
 
         /// Set simulation options.
-        pub fn with_options(&mut self, optimize: bool, io_only: bool) -> Result<(), NucleationError> {
+        pub fn with_options(
+            &mut self,
+            optimize: bool,
+            io_only: bool,
+        ) -> Result<(), NucleationError> {
             let inner = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
             let options = SimulationOptions {
                 optimize,
@@ -1303,8 +1317,9 @@ pub mod ffi {
                 io_only,
                 custom_io: Vec::new(),
             };
-            let new_world = crate::simulation::MchprsWorld::with_options(schematic, options.clone())
-                .map_err(|_| NucleationError::Simulation)?;
+            let new_world =
+                crate::simulation::MchprsWorld::with_options(schematic, options.clone())
+                    .map_err(|_| NucleationError::Simulation)?;
             Ok(Box::new(TypedCircuitExecutor(
                 InnerTypedCircuitExecutor::from_layout_with_options(
                     new_world,
@@ -1455,14 +1470,20 @@ pub mod ffi {
 
         /// The nodes as a JSON array string.
         pub fn nodes_json(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
-            let json = self.0.nodes_json().map_err(|_| NucleationError::Serialize)?;
+            let json = self
+                .0
+                .nodes_json()
+                .map_err(|_| NucleationError::Serialize)?;
             let _ = write!(out, "{}", json);
             Ok(())
         }
 
         /// The directed edges as a JSON array string.
         pub fn edges_json(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
-            let json = self.0.edges_json().map_err(|_| NucleationError::Serialize)?;
+            let json = self
+                .0
+                .edges_json()
+                .map_err(|_| NucleationError::Serialize)?;
             let _ = write!(out, "{}", json);
             Ok(())
         }
@@ -1485,7 +1506,8 @@ pub mod ffi {
             preset: &DiplomatStr,
             out: &mut DiplomatWrite,
         ) -> Result<(), NucleationError> {
-            let preset = std::str::from_utf8(preset).map_err(|_| NucleationError::InvalidArgument)?;
+            let preset =
+                std::str::from_utf8(preset).map_err(|_| NucleationError::InvalidArgument)?;
             let preset = if preset.is_empty() {
                 "structural"
             } else {

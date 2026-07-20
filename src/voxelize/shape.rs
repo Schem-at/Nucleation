@@ -62,9 +62,21 @@ impl TriGrid {
 
     fn cell_of(&self, p: [f32; 3]) -> [i32; 3] {
         [
-            Self::clamp_axis(self.dims, 0, ((p[0] - self.min[0]) / Self::CELL).floor() as i32),
-            Self::clamp_axis(self.dims, 1, ((p[1] - self.min[1]) / Self::CELL).floor() as i32),
-            Self::clamp_axis(self.dims, 2, ((p[2] - self.min[2]) / Self::CELL).floor() as i32),
+            Self::clamp_axis(
+                self.dims,
+                0,
+                ((p[0] - self.min[0]) / Self::CELL).floor() as i32,
+            ),
+            Self::clamp_axis(
+                self.dims,
+                1,
+                ((p[1] - self.min[1]) / Self::CELL).floor() as i32,
+            ),
+            Self::clamp_axis(
+                self.dims,
+                2,
+                ((p[2] - self.min[2]) / Self::CELL).floor() as i32,
+            ),
         ]
     }
 
@@ -183,8 +195,7 @@ impl MeshShape {
         dir[axis] = 1.0;
         let mut crossings = 0u32;
         for &t in &candidates {
-            if ray_triangle_t(o, dir, &d.triangles[t as usize].positions)
-                .is_some_and(|t| t > 1e-6)
+            if ray_triangle_t(o, dir, &d.triangles[t as usize].positions).is_some_and(|t| t > 1e-6)
             {
                 crossings += 1;
             }
@@ -196,11 +207,7 @@ impl MeshShape {
     /// Grid-accelerated expanding-ring search. `None` for an empty mesh.
     /// `nearest_triangle`, but allowed to give up early once no triangle
     /// can be within `limit` — the cheap query the shell test needs.
-    fn nearest_triangle_within(
-        &self,
-        p: [f32; 3],
-        limit: f32,
-    ) -> Option<(usize, [f32; 3], f32)> {
+    fn nearest_triangle_within(&self, p: [f32; 3], limit: f32) -> Option<(usize, [f32; 3], f32)> {
         let hit = self.nearest_triangle(p)?;
         (hit.2 <= limit).then_some(hit)
     }
@@ -288,11 +295,7 @@ impl MeshShape {
         let p = [x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5];
         let (ti, q, _) = self.nearest_triangle(p)?;
         let tri = &self.data.triangles[ti];
-        let img = self
-            .data
-            .materials
-            .get(tri.material? as usize)?
-            .as_ref()?;
+        let img = self.data.materials.get(tri.material? as usize)?.as_ref()?;
         if img.width == 1 && img.height == 1 {
             return Some([img.pixels[0], img.pixels[1], img.pixels[2]]);
         }
@@ -305,7 +308,6 @@ impl MeshShape {
         Some(img.sample_bilinear(uv[0], uv[1]))
     }
 }
-
 
 /// Precomputed solid-voxel bitset over the shape's bounds.
 struct SolidMask {
@@ -363,78 +365,78 @@ impl MeshShape {
         // rasterization below is the whole answer. Everything in this block is
         // the parity solve, run only when an interior fill is wanted.
         if !self.shell_only {
-        let mut votes: Vec<u8> = vec![0; total];
+            let mut votes: Vec<u8> = vec![0; total];
 
-        // One parity sweep per axis. A column fixes the two perpendicular
-        // coordinates; all crossings along the column are collected once
-        // and walked in order.
-        for axis in 0..3 {
-            let (p1, p2) = ((axis + 1) % 3, (axis + 2) % 3);
-            let axis_lo = [x0, y0, z0][axis];
-            let axis_len = [dims.0, dims.1, dims.2][axis];
-            let lo1 = [x0, y0, z0][p1];
-            let lo2 = [x0, y0, z0][p2];
-            let len1 = [dims.0, dims.1, dims.2][p1];
-            let len2 = [dims.0, dims.1, dims.2][p2];
+            // One parity sweep per axis. A column fixes the two perpendicular
+            // coordinates; all crossings along the column are collected once
+            // and walked in order.
+            for axis in 0..3 {
+                let (p1, p2) = ((axis + 1) % 3, (axis + 2) % 3);
+                let axis_lo = [x0, y0, z0][axis];
+                let axis_len = [dims.0, dims.1, dims.2][axis];
+                let lo1 = [x0, y0, z0][p1];
+                let lo2 = [x0, y0, z0][p2];
+                let len1 = [dims.0, dims.1, dims.2][p1];
+                let len2 = [dims.0, dims.1, dims.2][p2];
 
-            let columns: Vec<(usize, usize, Vec<f32>)> = (0..len1 * len2)
-                .into_par_iter()
-                .map(|ci| {
-                    let (i1, i2) = (ci / len2, ci % len2);
-                    let mut o = [0f32; 3];
-                    o[axis] = d.aabb_min[axis] - 1.0;
-                    o[p1] = (lo1 + i1 as i32) as f32 + 0.5 + JITTER;
-                    o[p2] = (lo2 + i2 as i32) as f32 + 0.5 - 1.31 * JITTER;
+                let columns: Vec<(usize, usize, Vec<f32>)> = (0..len1 * len2)
+                    .into_par_iter()
+                    .map(|ci| {
+                        let (i1, i2) = (ci / len2, ci % len2);
+                        let mut o = [0f32; 3];
+                        o[axis] = d.aabb_min[axis] - 1.0;
+                        o[p1] = (lo1 + i1 as i32) as f32 + 0.5 + JITTER;
+                        o[p2] = (lo2 + i2 as i32) as f32 + 0.5 - 1.31 * JITTER;
 
-                    let start = d.grid.cell_of(o);
-                    let mut candidates: Vec<u32> = Vec::new();
-                    let mut c = start;
-                    for a in 0..d.grid.dims[axis] {
-                        c[axis] = a;
-                        candidates.extend_from_slice(d.grid.bucket(c));
-                    }
-                    candidates.sort_unstable();
-                    candidates.dedup();
+                        let start = d.grid.cell_of(o);
+                        let mut candidates: Vec<u32> = Vec::new();
+                        let mut c = start;
+                        for a in 0..d.grid.dims[axis] {
+                            c[axis] = a;
+                            candidates.extend_from_slice(d.grid.bucket(c));
+                        }
+                        candidates.sort_unstable();
+                        candidates.dedup();
 
-                    let mut dir = [0f32; 3];
-                    dir[axis] = 1.0;
-                    let mut ts: Vec<f32> = candidates
-                        .iter()
-                        .filter_map(|&t| {
-                            ray_triangle_t(o, dir, &d.triangles[t as usize].positions)
-                                .filter(|&t| t > 1e-6)
-                        })
-                        .collect();
-                    ts.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
-                    (i1, i2, ts)
-                })
-                .collect();
+                        let mut dir = [0f32; 3];
+                        dir[axis] = 1.0;
+                        let mut ts: Vec<f32> = candidates
+                            .iter()
+                            .filter_map(|&t| {
+                                ray_triangle_t(o, dir, &d.triangles[t as usize].positions)
+                                    .filter(|&t| t > 1e-6)
+                            })
+                            .collect();
+                        ts.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+                        (i1, i2, ts)
+                    })
+                    .collect();
 
-            for (i1, i2, ts) in columns {
-                let origin_axis = d.aabb_min[axis] - 1.0;
-                let mut k = 0usize; // crossings passed
-                for ia in 0..axis_len {
-                    let center = (axis_lo + ia as i32) as f32 + 0.5 - origin_axis;
-                    while k < ts.len() && ts[k] < center {
-                        k += 1;
-                    }
-                    if k % 2 == 1 {
-                        let mut idx3 = [0usize; 3];
-                        idx3[axis] = ia;
-                        idx3[p1] = i1;
-                        idx3[p2] = i2;
-                        votes[(idx3[0] * dims.1 + idx3[1]) * dims.2 + idx3[2]] += 1;
+                for (i1, i2, ts) in columns {
+                    let origin_axis = d.aabb_min[axis] - 1.0;
+                    let mut k = 0usize; // crossings passed
+                    for ia in 0..axis_len {
+                        let center = (axis_lo + ia as i32) as f32 + 0.5 - origin_axis;
+                        while k < ts.len() && ts[k] < center {
+                            k += 1;
+                        }
+                        if k % 2 == 1 {
+                            let mut idx3 = [0usize; 3];
+                            idx3[axis] = ia;
+                            idx3[p1] = i1;
+                            idx3[p2] = i2;
+                            votes[(idx3[0] * dims.1 + idx3[1]) * dims.2 + idx3[2]] += 1;
+                        }
                     }
                 }
             }
-        }
 
-        for (i, &v) in votes.iter().enumerate() {
-            if v >= 2 {
-                SolidMask::set_linear(&mut bits, i);
+            for (i, &v) in votes.iter().enumerate() {
+                if v >= 2 {
+                    SolidMask::set_linear(&mut bits, i);
+                }
             }
-        }
-        drop(votes);
+            drop(votes);
         }
 
         // Shell: rasterize each triangle's neighborhood.
@@ -469,8 +471,7 @@ impl MeshShape {
                                 let c = [x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5];
                                 let q = closest_point_on_triangle(c, &tri.positions);
                                 if distance(c, q) <= shell {
-                                    let idx = (((x - x0) as usize) * dims.1
-                                        + (y - y0) as usize)
+                                    let idx = (((x - x0) as usize) * dims.1 + (y - y0) as usize)
                                         * dims.2
                                         + (z - z0) as usize;
                                     out.push(idx);
@@ -512,9 +513,7 @@ impl Shape for MeshShape {
         // Surface-only mode skips the parity interior test — the shell is the
         // whole answer (matches the bulk mask path).
         if !self.shell_only {
-            let votes = (0..3)
-                .filter(|&axis| self.axis_ray_parity(c, axis))
-                .count();
+            let votes = (0..3).filter(|&axis| self.axis_ray_parity(c, axis)).count();
             if votes >= 2 {
                 return true;
             }

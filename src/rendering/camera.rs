@@ -13,6 +13,7 @@ pub enum Projection {
 }
 
 /// Camera configuration for rendering.
+#[derive(Clone, Debug)]
 pub struct CameraConfig {
     pub yaw_deg: f32,
     pub pitch_deg: f32,

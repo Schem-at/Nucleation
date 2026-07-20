@@ -143,6 +143,83 @@ pub async fn render_meshes_async(
     }
 }
 
+/// Render an animation to a sequence of RGBA frames.
+///
+/// `meshes[i]` is posed by the animation group with id `i`, so callers building
+/// a per-block animation must mesh per block. Meshes with no matching group
+/// hold the identity pose.
+///
+/// The GPU renderer, atlas and geometry buffers are built **once** and reused
+/// for every frame — only the per-draw uniform buffer is rewritten. That is the
+/// difference between rendering an animation and re-rendering a still N times.
+///
+/// Frame times come from [`crate::animation::Timeline::frame_times`], so the
+/// output is deterministic and regenerating it is byte-identical.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn render_animation(
+    meshes: &[MeshOutput],
+    frames: &[crate::animation::Frame],
+    config: &RenderConfig,
+    hdri: Option<&HdriData>,
+) -> Result<Vec<Vec<u8>>, RenderError> {
+    pollster::block_on(async {
+        let renderer = GpuRenderer::new(meshes, config.width, config.height, hdri).await?;
+        let base = config.to_camera();
+        let mut out = Vec::with_capacity(frames.len());
+        let mut poses = vec![crate::animation::Pose::IDENTITY; meshes.len()];
+
+        for frame in frames {
+            // Frame poses are keyed by GroupId; slot i drives mesh i.
+            poses
+                .iter_mut()
+                .for_each(|p| *p = crate::animation::Pose::IDENTITY);
+            for (id, pose) in &frame.poses {
+                if let Some(slot) = poses.get_mut(*id as usize) {
+                    *slot = *pose;
+                }
+            }
+            renderer.set_poses(&poses);
+
+            // A camera clip on the same timeline moves the view with the build.
+            let camera = match &frame.camera {
+                Some(c) => {
+                    let mut cfg = config.clone();
+                    cfg.yaw += c.yaw;
+                    cfg.pitch += c.pitch;
+                    cfg.zoom *= c.zoom;
+                    cfg.to_camera()
+                }
+                None => base.clone(),
+            };
+            out.push(renderer.render_frame(&camera)?);
+        }
+        Ok(out)
+    })
+}
+
+/// Render an animation straight to numbered PNG files (`{prefix}{i:04}.png`).
+///
+/// The naming matches what `ffmpeg -i 'f%04d.png'` expects, which is how the
+/// README media pipeline assembles GIFs.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn render_animation_to_files(
+    meshes: &[MeshOutput],
+    frames: &[crate::animation::Frame],
+    config: &RenderConfig,
+    hdri: Option<&HdriData>,
+    prefix: &str,
+) -> Result<Vec<String>, RenderError> {
+    let pixels = render_animation(meshes, frames, config, hdri)?;
+    let mut paths = Vec::with_capacity(pixels.len());
+    for (i, px) in pixels.iter().enumerate() {
+        let path = format!("{prefix}{i:04}.png");
+        let png = encode_png(px, config.width, config.height)?;
+        std::fs::write(&path, &png).map_err(RenderError::Io)?;
+        paths.push(path);
+    }
+    Ok(paths)
+}
+
 // ─── Sync wrappers (native only) ────────────────────────────────────────────
 
 /// Render meshes to RGBA pixels (synchronous, native only).

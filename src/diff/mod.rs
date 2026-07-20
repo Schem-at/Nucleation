@@ -361,11 +361,11 @@ fn refine_offset(
     // when the grid was strided — an exhaustive sweep of the gap around the
     // coarse winner, so the true offset can't hide between grid samples.
     let step = refinement_step(window);
-    let mut sweep = |candidates: Vec<IVec3>,
-                     anchor: IVec3,
-                     best: &mut IVec3,
-                     best_raw: &mut RawDiff,
-                     best_r: &mut usize| {
+    let sweep = |candidates: Vec<IVec3>,
+                 anchor: IVec3,
+                 best: &mut IVec3,
+                 best_raw: &mut RawDiff,
+                 best_r: &mut usize| {
         for t in candidates {
             if t == anchor {
                 continue;

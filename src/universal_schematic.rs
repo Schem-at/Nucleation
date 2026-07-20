@@ -1888,10 +1888,8 @@ impl UniversalSchematic {
                     std::sync::Arc::new(map)
                 });
 
-                self.block_string_cache.insert(
-                    block_string.to_string(),
-                    (block_state.clone(), nbt.clone()),
-                );
+                self.block_string_cache
+                    .insert(block_string.to_string(), (block_state.clone(), nbt.clone()));
                 (block_state, nbt)
             }
         };

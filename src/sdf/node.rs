@@ -616,8 +616,8 @@ impl SdfNode {
                                 gy as f32 + jitter * hash01_3(gx, gy, gz, seed.wrapping_add(1));
                             let sz =
                                 gz as f32 + jitter * hash01_3(gx, gy, gz, seed.wrapping_add(2));
-                            let d = ((px - sx).powi(2) + (py - sy).powi(2) + (pz - sz).powi(2))
-                                .sqrt();
+                            let d =
+                                ((px - sx).powi(2) + (py - sy).powi(2) + (pz - sz).powi(2)).sqrt();
                             if d < f1 {
                                 f2 = f1;
                                 f1 = d;

@@ -150,7 +150,11 @@ pub mod ffi {
         ) -> Result<(), NucleationError> {
             let key = Self::utf8(key)?;
             let version = Self::utf8(version)?;
-            let version = if version.is_empty() { None } else { Some(version) };
+            let version = if version.is_empty() {
+                None
+            } else {
+                Some(version)
+            };
             schematic
                 .0
                 .save_to_store(self.0.as_ref(), key, version)
@@ -193,7 +197,11 @@ pub mod ffi {
         ) -> Result<(), NucleationError> {
             let uri = Self::utf8(uri)?;
             let version = Self::utf8(version)?;
-            let version = if version.is_empty() { None } else { Some(version) };
+            let version = if version.is_empty() {
+                None
+            } else {
+                Some(version)
+            };
             schematic
                 .0
                 .save(uri, version)

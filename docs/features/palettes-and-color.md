@@ -1,4 +1,37 @@
-# Palettes: turning colors into blocks
+# Palettes and color
+
+## Paintings, in blocks
+
+
+Everything above composes, pointed at art: flat-texture palettes built by
+color-logic filters, chroma-boosted matching (so muted pigments land on
+saturated blocks, not gray clays), and per-voxel ordered dithering. Van Gogh's
+Starry Night, 128 blocks wide:
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/painting-starry-night.png" width="760" alt="Van Gogh's Starry Night as block pixel art, 128 blocks wide">
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/painting-gallery.png" width="760" alt="Sunflowers, The Great Wave off Kanagawa, and Girl with a Pearl Earring as block pixel art">
+
+```python
+palette = flat_art_palette().dithered()          # PaletteBuilder + map-art excludes
+r, g, b = boost(*pixel, sat=1.35)                # chroma exaggeration pre-match
+s.set_block(x, 0, y, palette.closest_block_dithered(r, g, b, x, 0, y))
+```
+
+The full recipe, including the flat-palette filter chain, is `scene_paintings`
+in [`tools/readme-media/generate.py`](../../tools/readme-media/generate.py).
+
+And a flat image is also a heightmap: read each pixel's brightness as a column
+height and paint it with its own color, and the same Starry Night lifts off the
+canvas into rolling, luminous terrain, the moon and stars its highest peaks.
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/heightmap.png" width="760" alt="Van Gogh's Starry Night as 3D relief terrain, pixel brightness lifted into hills with the moon and stars as peaks">
+</div>
+
+---
+
+## Reference
 
 A `Palette` is a set of colored blocks used to translate colors into block
 choices. Everything here works identically in every binding (snake_case in
@@ -81,7 +114,7 @@ indexing, and `closest_block(r, g, b)` answers single lookups.
 - Every color/gradient **brush** takes `set_palette(palette)` — snapping
   happens per placed block.
 - **SDF material rules** accept palettes in `gradient` fill rules
-  ([SDF guide](sdf-terrain.md)).
+  ([SDF guide](sdf-and-fields.md)).
 - The **scripting engines** expose `palette_gradient_ids`,
   `palette_block_ids`, and `palette_closest_block`
   ([scripting guide](scripting.md)).

@@ -151,7 +151,7 @@ testcontainers-modules = { version = "0.11", features = [
 schematic-mesher = { version = "0.2.0", git = "https://github.com/Schem-at/Schematic-Mesher.git", rev = "d22d39ca6b0664f97b14e059d411240932cd9d22", optional = true }
 
 # Rendering dependencies - optional
-wgpu = { version = "24", optional = true }
+wgpu = { version = "30", optional = true }
 image = { version = "0.24", optional = true }
 pollster = { version = "0.4", optional = true }
 
@@ -243,6 +243,14 @@ harness = false
 name = "fingerprint_bench"
 harness = false
 
+[[example]]
+name = "airship_fortress"
+required-features = ["voxelize"]
+
+[[example]]
+name = "voxelize_course"
+required-features = ["voxelize"]
+
 # Examples requiring the meshing feature
 [[example]]
 name = "render_schematic"
@@ -299,4 +307,5 @@ opt-level = 3
 # Patch for MCHPRS compatibility
 [patch.crates-io]
 hematite-nbt = { git = "https://github.com/StackDoubleFlow/hematite_nbt" }
+
 

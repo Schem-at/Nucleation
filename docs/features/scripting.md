@@ -1,4 +1,17 @@
-# Embedded scripting
+# Embedded scripting (Lua / JS)
+
+## Scripting
+
+
+Embedded Lua and JS engines run build scripts against the full API. This sine
+wall is a 12-line Lua script run through `Scripting.run_lua_script`
+([scripting guide](scripting.md)):
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/scripting-wall.png" width="700" alt="A sine-wave wall built by an embedded Lua script with a concrete gradient">
+
+---
+
+## Reference
 
 Nucleation embeds Lua and JavaScript engines (behind the `scripting-lua` /
 `scripting-js` features, both in `bridge-full`) that generate schematics

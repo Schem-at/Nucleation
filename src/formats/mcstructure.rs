@@ -1,4 +1,5 @@
 use crate::block_entity::BlockEntity;
+use crate::blockpedia::block_entity::{BlockEntityTranslator, NbtValue as BpNbtValue};
 use crate::entity::Entity;
 use crate::formats::error::Result;
 use crate::formats::manager::{SchematicExporter, SchematicImporter};
@@ -7,7 +8,6 @@ use crate::nbt::{Endian, NbtMap, NbtValue};
 use crate::region::Region;
 use crate::universal_schematic::UniversalSchematic;
 use crate::BlockState;
-use crate::blockpedia::block_entity::{BlockEntityTranslator, NbtValue as BpNbtValue};
 use smol_str::SmolStr;
 use std::collections::HashMap;
 use std::io::Cursor;
@@ -141,24 +141,25 @@ pub fn from_mcstructure(data: &[u8]) -> Result<UniversalSchematic> {
                 .map(|(k, v): &(SmolStr, SmolStr)| (k.to_string(), v.to_string()))
                 .collect();
 
-            let translated_state =
-                if let Ok(bp_state) = crate::blockpedia::BlockState::from_bedrock(&name, bp_props) {
-                    let translated_props: Vec<(smol_str::SmolStr, smol_str::SmolStr)> = bp_state
-                        .properties()
-                        .iter()
-                        .map(|(k, v)| (k.into(), v.into()))
-                        .collect();
+            let translated_state = if let Ok(bp_state) =
+                crate::blockpedia::BlockState::from_bedrock(&name, bp_props)
+            {
+                let translated_props: Vec<(smol_str::SmolStr, smol_str::SmolStr)> = bp_state
+                    .properties()
+                    .iter()
+                    .map(|(k, v)| (k.into(), v.into()))
+                    .collect();
 
-                    BlockState {
-                        name: bp_state.id().into(),
-                        properties: translated_props,
-                    }
-                } else {
-                    BlockState {
-                        name: name.into(),
-                        properties,
-                    }
-                };
+                BlockState {
+                    name: bp_state.id().into(),
+                    properties: translated_props,
+                }
+            } else {
+                BlockState {
+                    name: name.into(),
+                    properties,
+                }
+            };
 
             palette.push(translated_state);
         }
@@ -370,22 +371,22 @@ pub fn to_mcstructure(schematic: &UniversalSchematic) -> Result<Vec<u8>> {
             format!("{}[{}]", block.name, parts.join(","))
         };
 
-        let (name, properties) = if let Ok(java_bp_state) = crate::blockpedia::BlockState::parse(&full_id)
-        {
-            if let Ok(bedrock_bp_state) = java_bp_state.to_bedrock() {
-                let bed_props: Vec<(smol_str::SmolStr, smol_str::SmolStr)> = bedrock_bp_state
-                    .properties()
-                    .iter()
-                    .map(|(k, v)| (k.into(), v.into()))
-                    .collect();
+        let (name, properties) =
+            if let Ok(java_bp_state) = crate::blockpedia::BlockState::parse(&full_id) {
+                if let Ok(bedrock_bp_state) = java_bp_state.to_bedrock() {
+                    let bed_props: Vec<(smol_str::SmolStr, smol_str::SmolStr)> = bedrock_bp_state
+                        .properties()
+                        .iter()
+                        .map(|(k, v)| (k.into(), v.into()))
+                        .collect();
 
-                (bedrock_bp_state.id().to_string(), bed_props)
+                    (bedrock_bp_state.id().to_string(), bed_props)
+                } else {
+                    (block.name.to_string(), block.properties.clone())
+                }
             } else {
                 (block.name.to_string(), block.properties.clone())
-            }
-        } else {
-            (block.name.to_string(), block.properties.clone())
-        };
+            };
 
         block_entry.insert("name".to_string(), NbtValue::String(name));
 

@@ -78,11 +78,9 @@ fn write_manager(
         // or an unrecognized suffix) previously surfaced as an opaque error.
         // Default to litematic instead — the written bytes are self-describing,
         // so `open`/`read_manager` reads them back by content regardless of key.
-        Err(_) => Ok(manager.write_auto(
-            &format!("{key_or_path}.litematic"),
-            schematic,
-            version,
-        )?),
+        Err(_) => {
+            Ok(manager.write_auto(&format!("{key_or_path}.litematic"), schematic, version)?)
+        }
     }
 }
 

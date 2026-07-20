@@ -312,7 +312,8 @@ fn invalid_gradient_rules_error() {
     assert!(sample_to_schematic(&sphere(3.0), &rules, None, "t").is_err());
 
     // Neither block nor gradient
-    let rules = MaterialRules::from_json(r#"{"fill": [{"when": {"yRange": {"max": 4}}}]}"#).unwrap();
+    let rules =
+        MaterialRules::from_json(r#"{"fill": [{"when": {"yRange": {"max": 4}}}]}"#).unwrap();
     assert!(sample_to_schematic(&sphere(3.0), &rules, None, "t").is_err());
 
     // Both block and gradient
@@ -369,7 +370,8 @@ fn noise_is_deterministic_and_bounded() {
 
 #[test]
 fn cells_value_is_unit_range_and_unbounded() {
-    let v = SdfNode::from_json(r#"{"type":"cells","frequency":0.1,"seed":3,"mode":"value"}"#).unwrap();
+    let v =
+        SdfNode::from_json(r#"{"type":"cells","frequency":0.1,"seed":3,"mode":"value"}"#).unwrap();
     for i in 0..60 {
         let f = i as f32;
         let s = v.eval(f * 1.7, f * 0.3, f * 2.1 - 5.0);
@@ -384,7 +386,10 @@ fn cells_distance_modes_are_nonnegative() {
         let json = format!(r#"{{"type":"cells","frequency":0.12,"seed":9,"mode":"{mode}"}}"#);
         let n = SdfNode::from_json(&json).unwrap();
         for i in 0..40 {
-            assert!(n.eval(i as f32 * 0.9, 2.0, i as f32 * -1.3) >= -1e-4, "{mode} nonneg");
+            assert!(
+                n.eval(i as f32 * 0.9, 2.0, i as f32 * -1.3) >= -1e-4,
+                "{mode} nonneg"
+            );
         }
     }
 }

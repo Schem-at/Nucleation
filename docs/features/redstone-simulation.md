@@ -1,4 +1,61 @@
-# Insign IO Integration for TypedCircuitExecutor
+# Redstone simulation
+
+## Simulate redstone
+
+
+Headless circuit simulation via [MCHPRS](https://github.com/MCHPR/MCHPRS)'s
+redpiler, and it runs in the browser too, since simulation ships in the WASM
+build. Flip the lever, tick the world, and the lamp (and wire) light up:
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/redstone.png" width="700" alt="Lever, wire and lamp before and after simulation">
+
+```js
+import { Schematic, MchprsWorld } from "nucleation";
+
+const world = MchprsWorld.create(circuit);   // lever → wire → lamp
+world.onUseBlock(0, 1, 0);                   // flip the lever
+world.tick(2);
+world.flush();
+world.isLit(2, 1, 0);                        // → true
+```
+
+Eight of those lines make a display: the simulator flips one lever per tick and
+the lamps light in sequence, the wavefront assembling the byte:
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/simulation-byte.gif" width="700" alt="Eight lever-wire-lamp lines lighting up in sequence to display the binary pattern 10110010">
+</div>
+
+Beyond poking blocks, a typed executor drives circuits through named, typed
+inputs and outputs (booleans, integers, floats, ASCII) with layout builders for
+buses. Bind an 8-bit `a` input to the levers and a `y` output to the lamps, then
+hand `execute` a number: the redpiler sets the bus and the typed output reads
+straight back, no wires toggled by hand.
+
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/typed-executor.png" width="820" alt="The 8-bit lamp bus driven to 42 and to 178 by a typed circuit executor">
+
+```python
+cb = CircuitBuilder.create(bus)                       # bus = the 8 lever->wire->lamp lines
+cb.with_input_auto("a", IoType.unsigned_int(8), levers)   # flat [x,y,z,...] positions
+cb.with_output_auto("y", IoType.unsigned_int(8), lamps)
+ex = cb.build()
+
+res = json.loads(ex.execute('{"a": 178}', ExecutionMode.until_stable(2, 100)))
+res["outputs"]["y"]["value"]                           # -> 178, straight back through the lamps
+```
+
+The simulator is also a probe: read `get_redstone_power` anywhere and the
+circuit becomes data. A signal leaves a redstone block at strength 15 and drops
+one per block down a dust line; plotting the reading as a hot-to-cold staircase
+turns that falloff into a field you can see:
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/signal-heatmap.png" width="720" alt="A redstone signal decaying from strength 15 to 0, drawn as a staircase colored hot to cold">
+</div>
+
+---
+
+## Reference
 
 This document describes how to use Insign DSL annotations to automatically create `TypedCircuitExecutor` instances with properly configured IO layouts.
 
@@ -303,4 +360,3 @@ pub enum InsignIoError {
 - Custom layout function specification
 - Array and struct type definitions
 - Integration with schematic-renderer for visual IO overlay
-

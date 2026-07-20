@@ -1,4 +1,27 @@
-# The Minecraft block database
+# The block database
+
+## The block database
+
+
+Under it all sits a block database extracted from Mojang's own data generator
+and the vanilla jars: kinds, variant families, resolved tags, geometry, and
+measured colors for all 1,196 Minecraft 26.2 blocks. It
+[updates itself](block-database.md) when Mojang ships a new
+version, and it's what lets palettes reason about color and brushes about block
+facts:
+
+```python
+json.loads(Blocks.get_json("minecraft:oak_stairs"))
+# {"kind": "minecraft:stair", "base_block": "minecraft:oak_planks",
+#  "tags": ["minecraft:mineable/axe", ...], "full_cube": false, ...}
+
+json.loads(Blocks.variants_of_json("minecraft:oak_planks"))
+# [oak_planks, oak_button, oak_fence, oak_fence_gate, oak_pressure_plate, oak_slab, ...]
+```
+
+---
+
+## Reference
 
 The block database (formerly the standalone `blockpedia` crate) lives in-tree at
 `src/blockpedia/`. Its data ships as gzipped snapshots in `data/blockpedia/` — currently pinned

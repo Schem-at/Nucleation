@@ -555,9 +555,10 @@ pub mod ffi {
             chunk_size: i32,
             atlas: &TextureAtlas,
         ) -> Result<Box<ChunkMeshResult>, NucleationError> {
-            let iter = schematic
-                .0
-                .mesh_chunks_with_atlas(&pack.0, &config.0, chunk_size, atlas.0.clone());
+            let iter =
+                schematic
+                    .0
+                    .mesh_chunks_with_atlas(&pack.0, &config.0, chunk_size, atlas.0.clone());
             let mut meshes = std::collections::HashMap::new();
             let mut total_vertex_count = 0;
             let mut total_triangle_count = 0;
@@ -569,13 +570,11 @@ pub mod ffi {
                     meshes.insert(coord, mesh);
                 }
             }
-            Ok(Box::new(ChunkMeshResult(
-                crate::meshing::ChunkMeshResult {
-                    meshes,
-                    total_vertex_count,
-                    total_triangle_count,
-                },
-            )))
+            Ok(Box::new(ChunkMeshResult(crate::meshing::ChunkMeshResult {
+                meshes,
+                total_vertex_count,
+                total_triangle_count,
+            })))
         }
 
         /// Number of chunk meshes.
@@ -788,7 +787,8 @@ pub mod ffi {
             atlas: &TextureAtlas,
         ) -> Box<MeshJob> {
             let schematic = schematic.0.clone();
-            let pack = crate::meshing::ResourcePackSource::from_resource_pack(pack.0.pack().clone());
+            let pack =
+                crate::meshing::ResourcePackSource::from_resource_pack(pack.0.pack().clone());
             let config = config.0.clone();
             let atlas = atlas.0.clone();
 
@@ -800,8 +800,7 @@ pub mod ffi {
             let thread_state = state.clone();
 
             let handle = std::thread::spawn(move || {
-                let mut iter =
-                    schematic.mesh_chunks_with_atlas(&pack, &config, chunk_size, atlas);
+                let mut iter = schematic.mesh_chunks_with_atlas(&pack, &config, chunk_size, atlas);
                 if let Ok(mut s) = thread_state.lock() {
                     s.phase = 1;
                     s.total = iter.chunk_count() as u32;
@@ -880,10 +879,7 @@ pub mod ffi {
         /// Block until the job finishes (if it hasn't already) and return the
         /// result. Consumes the job: a second call returns `AlreadyConsumed`.
         pub fn take_result(&mut self) -> Result<Box<ChunkMeshResult>, NucleationError> {
-            let handle = self
-                .handle
-                .take()
-                .ok_or(NucleationError::AlreadyConsumed)?;
+            let handle = self.handle.take().ok_or(NucleationError::AlreadyConsumed)?;
             let result = handle.join().map_err(|_| NucleationError::Mesh)?;
             result
                 .map(|r| Box::new(ChunkMeshResult(r)))
@@ -1081,8 +1077,8 @@ pub mod ffi {
                 return Err(NucleationError::InvalidArgument);
             }
             let refs: Vec<&crate::meshing::ItemModelResult> = items.iter().collect();
-            let data =
-                crate::meshing::build_resource_pack(&refs).map_err(|_| NucleationError::Serialize)?;
+            let data = crate::meshing::build_resource_pack(&refs)
+                .map_err(|_| NucleationError::Serialize)?;
             super::write_b64(&data, out);
             Ok(())
         }
