@@ -2407,32 +2407,18 @@ def scene_g_knot(pack):
     return s
 
 
-DYE_COLORS = ["white", "orange", "magenta", "light_blue", "yellow", "lime",
-              "pink", "gray", "light_gray", "cyan", "purple", "blue", "brown",
-              "green", "red", "black"]
-
-
-def _smooth_color_palette():
-    """A wide, purely-chromatic palette for smooth gradients: the four dyed
-    families (concrete, concrete_powder, wool, terracotta) across all 16 colors,
-    64 blocks that span the hue wheel with several saturation and lightness steps
-    per hue. Unlike the full block set it holds no earth tones, so saturated
-    ramps stay vivid instead of muddying into sandstone and dirt, and the extra
-    in-between shades give ordered dithering finer steps to blend across."""
-    ids = [f"minecraft:{c}_{fam}" for c in DYE_COLORS
-           for fam in ("concrete", "concrete_powder", "wool", "terracotta")]
-    return nu.Palette.from_block_ids(json.dumps(ids))
-
-
 def scene_gradient_knot(pack):
     """The trefoil, recolored as a super-smooth cyclic gradient. A single hue is
     swept red -> blue -> green -> red once around the loop, and a `Brush.color`
-    over a wide dithered palette snaps each voxel with ordered dithering, so the
-    ramp blends between neighbouring blocks instead of banding."""
+    over the full dithered pixel-art palette snaps each voxel by its measured
+    Oklab color, blending between the two nearest blocks per position. The
+    pixel-art palette is the widest *flat-textured* set: it keeps every smooth
+    colored block and drops only patterned ones (mushroom spots, glazed swirls,
+    ores) whose textures would speckle a gradient."""
     import colorsys
     s = nu.Schematic.create("gradient-knot")
     fill, sphere = nu.BuildingTool.fill, nu.Shape.sphere
-    dith = _smooth_color_palette().dithered()
+    dith = flat_art_palette().dithered()
     steps, scale = 640, 12.0
     for i in range(steps):
         t = i / steps
@@ -2460,7 +2446,7 @@ def scene_interp(pack):
         ((225, 40, 150), (40, 200, 215)),     # magenta -> cyan
         ((240, 130, 30), (90, 30, 140)),      # orange -> indigo
     ]
-    dith = _smooth_color_palette().dithered()
+    dith = flat_art_palette().dithered()
     n, height = 96, 6
     tmp = tempfile.mkdtemp(prefix="nuc-interp-")
     try:
