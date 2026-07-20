@@ -462,6 +462,17 @@ for x, y, z in inside_sphere(R):
         block = cells.snap(shade(Sdf.eval(f1, x, y, z)))   # light center, dark rim
 ```
 
+None of that is sphere-specific: it is three fields over `(x, y, z)` plus a
+depth. An SDF shape gets the depth for free (its own value), and *any* build gets
+it from one distance transform of its occupied voxels. So the same material
+paints over arbitrary geometry. Here it repaints the pre-existing hero island
+schematic block for block, its glowing seams following the Voronoi field across
+the terrain:
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/fracture-paint.png" width="620" alt="The hero volcano island repainted as a black fractured planet, glowing Voronoi crack seams running over its arch, peak, and floating shards">
+</div>
+
 ## Read, iterate, and stream
 
 Everything above *writes* blocks. This is how you read them back and process

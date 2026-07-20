@@ -2426,6 +2426,82 @@ def scene_voronoi_planet(pack):
     return s
 
 
+def _surface_depth(solid):
+    """Distance transform of an occupancy set: for every solid voxel, how many
+    blocks it sits beneath the surface. Multi-source BFS from every voxel that
+    touches air. This is the one field arbitrary geometry can't get for free
+    (an SDF shape would just read its own value); computed once, it lets the
+    fractured-planet material paint over any imported build."""
+    from collections import deque
+    nb = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
+    depth = {}
+    dq = deque()
+    for v in solid:
+        if any((v[0] + dx, v[1] + dy, v[2] + dz) not in solid for dx, dy, dz in nb):
+            depth[v] = 0
+            dq.append(v)
+    while dq:
+        v = dq.popleft()
+        for dx, dy, dz in nb:
+            n = (v[0] + dx, v[1] + dy, v[2] + dz)
+            if n in solid and n not in depth:
+                depth[n] = depth[v] + 1
+                dq.append(n)
+    return depth
+
+
+def scene_fracture_paint(pack):
+    """The fractured-planet look is not sphere-specific: it is three fields over
+    (x, y, z) plus a depth. Feed the depth from a distance transform of any
+    occupied volume and the same material paints over arbitrary geometry. Here it
+    repaints the pre-existing hero island schematic, block for block: Voronoi
+    cells shade its crust light-center/dark-rim, the crack field runs glowing
+    glass-over-glowstone seams through it, and the glow deepens toward the core."""
+    src = _hero_schematic()
+    solid = {(b["x"], b["y"], b["z"]) for b in json.loads(src.get_all_blocks_json())
+             if b["name"] != "minecraft:air"}
+    depth = _surface_depth(solid)
+
+    freq, seed = 0.09, 7
+    crust, glass, crack_w, f1_rim = 5.0, 2.0, 1.0, 5.0
+    cells = {"frequency": freq, "seed": seed, "jitter": 1.0}
+    f1_field = json.dumps({"type": "cells", "mode": "f1", **cells})
+    crack_field = json.dumps({"type": "cells", "mode": "f2MinusF1", **cells})
+
+    cell_pal = nu.Palette.from_block_ids(json.dumps([
+        "minecraft:black_concrete", "minecraft:blackstone", "minecraft:deepslate",
+        "minecraft:polished_deepslate", "minecraft:gray_concrete"])).dithered()
+    glass_pal = nu.Palette.from_block_ids(json.dumps([
+        "minecraft:yellow_stained_glass", "minecraft:orange_stained_glass"])).dithered()
+    emit_pal = nu.Palette.from_block_ids(json.dumps([
+        "minecraft:shroomlight", "minecraft:glowstone"])).dithered()
+    cell_stops = [(0.0, (118, 120, 128)), (1.0, (10, 11, 16))]
+    glass_stops = [(0.0, (242, 172, 55)), (1.0, (224, 118, 46))]
+    emit_stops = [(0.0, (246, 150, 72)), (1.0, (180, 133, 82))]
+
+    def glow(d, x, y, z):
+        if d < glass:
+            return glass_pal.closest_block_dithered(*_stops_rgb(d / glass, glass_stops), x, y, z)
+        return emit_pal.closest_block_dithered(
+            *_stops_rgb(min((d - glass) / crust, 1.0), emit_stops), x, y, z)
+
+    out = nu.Schematic.create("fractured-island")
+    for (x, y, z), d in depth.items():
+        fx, fy, fz = x + 0.5, y + 0.5, z + 0.5
+        if d > crust:                                          # glowing core
+            block = glow(d, x, y, z)
+        elif nu.Sdf.eval(crack_field, fx, fy, fz) < crack_w:   # crack seam
+            block = glow(d, x, y, z)
+        else:                                                  # cell crust
+            f1 = nu.Sdf.eval(f1_field, fx, fy, fz)
+            block = cell_pal.closest_block_dithered(
+                *_stops_rgb(min(f1 / f1_rim, 1.0), cell_stops), x, y, z)
+        out.set_block(x, y, z, block)
+    render(out, pack, os.path.join(OUT, "fracture-paint.png"), w=1100, h=720,
+           yaw=135, pitch=26, zoom=1.4, sphere_fit=True, background=NAVY)
+    return out
+
+
 # ── Gallery: ten cool builds ─────────────────────────────────────────────────
 
 import colorsys as _colorsys
@@ -2827,6 +2903,7 @@ SCENES = {
     "compose": scene_compose,
     "voronoi": scene_voronoi,
     "planet": scene_voronoi_planet,
+    "fracture-paint": scene_fracture_paint,
     "dither": scene_dither,
     "scripting": scene_scripting,
     "simulation": scene_simulation,
