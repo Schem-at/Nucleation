@@ -498,6 +498,17 @@ and cracked. Same primitives, ancient ruin:
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/naturalise.png" width="760" alt="A clean stone-brick stepped temple beside the same temple naturalised: moss and grass on the flat tiers, mossy and cracked brick down the walls">
 </div>
 
+And those are two rules of many. The same handful of inputs, a `DistanceField`'s
+depth and normal, block occupancy, and position, plus a field and a palette,
+drive a whole range of treatments. Snow settles on up-facing surfaces; copper
+greens with exposure; height bands a badlands mesa; ambient occlusion darkens the
+recesses of a rock; and corners chip to mossy cobble by how many faces they
+expose. None of it is a built-in, each is a short rule:
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/treatments.png" width="820" alt="Five material treatments from the same primitives: snow accumulation, copper patina, badlands strata, ambient-occlusion cavity shading, and edge wear">
+</div>
+
 ## Read, iterate, and stream
 
 Everything above *writes* blocks. This is how you read them back and process

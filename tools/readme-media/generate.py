@@ -2468,6 +2468,132 @@ def scene_slope(pack):
     return s
 
 
+def _solid_set(schem):
+    return {(b["x"], b["y"], b["z"]) for b in json.loads(schem.get_all_blocks_json())
+            if b["name"] != "minecraft:air"}
+
+
+def scene_treatments(pack):
+    """Five material treatments, one panel each, all written over the same
+    primitives (a DistanceField's depth and normal, block occupancy, position)
+    plus a field and a palette. None is a built-in; each is a short rule. Proof
+    that the fractured planet is one example, not the point."""
+    import math
+    tmp = tempfile.mkdtemp(prefix="nuc-treat-")
+    concrete = nu.Palette.concrete()
+    panels = []
+
+    def panel(schem, label, yaw=32, pitch=30, zoom=1.15):
+        raw = os.path.join(tmp, f"{label}.png")
+        render(schem, pack, raw, w=540, h=500, yaw=yaw, pitch=pitch, zoom=zoom,
+               sphere_fit=True, background=NAVY)
+        cap = os.path.join(tmp, f"{label}_c.png")
+        _caption(raw, label, cap)
+        panels.append(cap)
+
+    fill = nu.BuildingTool.fill
+    noise = json.dumps({"type": "cells", "frequency": 0.14, "seed": 3, "mode": "value"})
+
+    # 1. SNOW: settles on up-facing surfaces, bare stone on the steeps.
+    rock = nu.Schematic.create("rock")
+    fill(rock, nu.Shape.sdf('{"type":"displace","amplitude":4,"frequency":0.11,"seed":5,'
+                            '"child":{"type":"ellipsoid","radii":[22,13,19]}}'),
+         nu.Brush.solid("minecraft:stone"))
+    df = nu.DistanceField.from_schematic(rock)
+    snow = nu.Schematic.create("snow")
+    for (x, y, z) in _solid_set(rock):
+        if df.depth(x, y, z) != 1:
+            snow.set_block(x, y, z, "minecraft:stone"); continue
+        ny = df.slope(x, y, z)
+        thr = 0.5 + 0.18 * (nu.Sdf.eval(noise, x + .5, y + .5, z + .5) - 0.5)
+        snow.set_block(x, y, z, "minecraft:snow_block" if ny > thr else "minecraft:stone")
+    panel(snow, "snow")
+
+    # 2. PATINA: copper greens with exposure, sheltered undersides stay bright.
+    ball = nu.Schematic.create("copper")
+    fill(ball, nu.Shape.sphere(0, 0, 0, 20), nu.Brush.solid("minecraft:copper_block"))
+    df = nu.DistanceField.from_schematic(ball)
+    cop = nu.Schematic.create("patina")
+    stages = ["minecraft:copper_block", "minecraft:exposed_copper",
+              "minecraft:weathered_copper", "minecraft:oxidized_copper"]
+    for (x, y, z) in _solid_set(ball):
+        if df.depth(x, y, z) != 1:
+            cop.set_block(x, y, z, "minecraft:copper_block"); continue
+        ny = df.slope(x, y, z)
+        e = max(0.0, ny) + 0.5 * (nu.Sdf.eval(noise, x + .5, y + .5, z + .5) - 0.5)
+        s = min(len(stages) - 1, max(0, int(e * 4)))
+        cop.set_block(x, y, z, stages[s])
+    panel(cop, "patina")
+
+    # 3. STRATA: banded by absolute height, a badlands mesa.
+    butte = nu.Schematic.create("butte")
+    fill(butte, nu.Shape.sdf('{"type":"displace","amplitude":3,"frequency":0.13,"seed":2,'
+                             '"child":{"type":"cappedCylinder","radius":17,"halfHeight":22}}'),
+         nu.Brush.solid("minecraft:stone"))
+    bands = ["minecraft:red_terracotta", "minecraft:terracotta", "minecraft:orange_terracotta",
+             "minecraft:brown_terracotta", "minecraft:white_terracotta",
+             "minecraft:light_gray_terracotta"]
+    df = nu.DistanceField.from_schematic(butte)
+    mesa = nu.Schematic.create("strata")
+    for (x, y, z) in _solid_set(butte):
+        if df.depth(x, y, z) != 1:
+            mesa.set_block(x, y, z, "minecraft:stone"); continue
+        mesa.set_block(x, y, z, bands[((y + 40) // 3) % len(bands)])
+    panel(mesa, "strata")
+
+    # 4. CAVITY: ambient occlusion, recesses darken by how enclosed they are.
+    lump = nu.Schematic.create("lump")
+    fill(lump, nu.Shape.sdf('{"type":"displace","amplitude":5,"frequency":0.13,"seed":8,'
+                            '"child":{"type":"sphere","radius":18}}'),
+         nu.Brush.solid("minecraft:sandstone"))
+    occ = _solid_set(lump)
+    dfp = nu.Palette.from_block_ids(json.dumps([
+        "minecraft:smooth_sandstone", "minecraft:sandstone", "minecraft:cut_sandstone",
+        "minecraft:brown_terracotta", "minecraft:dirt", "minecraft:coarse_dirt"])).dithered()
+    cav = nu.Schematic.create("cavity")
+    off = [(dx, dy, dz) for dx in (-2, -1, 0, 1, 2) for dy in (-2, -1, 0, 1, 2)
+           for dz in (-2, -1, 0, 1, 2)]
+    for (x, y, z) in occ:
+        n = sum((x + dx, y + dy, z + dz) in occ for dx, dy, dz in off) / len(off)
+        v = int(235 - 150 * n)                                  # enclosed -> dark
+        cav.set_block(x, y, z, dfp.closest_block_dithered(v, int(v * 0.9), int(v * 0.72), x, y, z))
+    panel(cav, "cavity")
+
+    # 5. EDGE WEAR: corners and edges chip by how many faces are exposed.
+    nb = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
+    block_box = nu.Schematic.create("box")
+    fill(block_box, nu.Shape.cuboid(-13, -13, -13, 13, 13, 13),
+         nu.Brush.solid("minecraft:stone_bricks"))
+    occ = _solid_set(block_box)
+    worn = nu.Schematic.create("edgewear")
+    for (x, y, z) in occ:
+        exposed = sum((x + dx, y + dy, z + dz) not in occ for dx, dy, dz in nb)
+        if exposed == 0:
+            continue
+        m = nu.Sdf.eval(noise, x + .5, y + .5, z + .5)
+        if exposed >= 3:
+            b = "minecraft:mossy_cobblestone"                   # corners crumble most
+        elif exposed == 2:
+            b = "minecraft:cobblestone"                         # edges chip to cobble
+        else:
+            b = "minecraft:cracked_stone_bricks" if m > 0.80 else "minecraft:stone_bricks"
+        worn.set_block(x, y, z, b)
+    panel(worn, "edge wear", yaw=28, pitch=26)
+
+    # Montage: a top row of 3, a bottom row of 2 padded to match, stacked.
+    pw = 540
+    top = os.path.join(tmp, "top.png")
+    hstack(panels[0:3], top)
+    bot = os.path.join(tmp, "bot.png")
+    hstack(panels[3:5], bot)
+    botp = os.path.join(tmp, "botp.png")
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", bot, "-vf",
+                    f"pad={pw * 3}:ih:(ow-iw)/2:0:color=0x161926", botp], check=True)
+    vstack([top, botp], os.path.join(OUT, "treatments.png"))
+    shutil.rmtree(tmp, ignore_errors=True)
+    return None
+
+
 def _stepped_temple():
     """A clean stone-brick stepped temple: broad tiers with a little shrine on
     top. The 'before' any naturalisation acts on."""
@@ -2991,6 +3117,7 @@ SCENES = {
     "planet": scene_voronoi_planet,
     "fracture-paint": scene_fracture_paint,
     "naturalise": scene_naturalise,
+    "treatments": scene_treatments,
     "slope": scene_slope,
     "dither": scene_dither,
     "scripting": scene_scripting,
