@@ -209,6 +209,14 @@ cylinder-cored lava crater, and noise-gated snow. Smooth booleans even animate
 into metaballs. Recipes, node and rule schemas, and the gradient fill rules live
 in the [SDF terrain guide](docs/guides/sdf-terrain.md).
 
+Slice the hero island in half and the material rules show their work: a grass
+and dirt skin over a stone core that grades from deepslate at the roots up
+through tuff to andesite, with the lava pool sitting in the crater.
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/cross-section.png" width="720" alt="The volcano island sliced through the crater, exposing the lava pool and the stone strata inside">
+</div>
+
 ## Voxelize 3D models
 
 Real 3D models become schematics: GLB (node transforms, embedded textures) and
@@ -487,6 +495,14 @@ dst.copy_region(src, 0, 0, 0,  9, 0, 0,   100, 0, 0,  "[]")
 #               source   min-corner    max-corner    target    exclude
 ```
 
+Those two operations compose into symmetry. This mandala is one asymmetric
+petal, built once, then `flip_x` and `flip_z` mirror four `copy_region` stamps
+into the quadrants of a canvas so the domes meet at the center:
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/transforms.png" width="520" alt="A four-fold symmetric mandala built by mirroring one petal into each quadrant">
+</div>
+
 ## Block entities, entities, and NBT
 
 Blocks carry NBT, and the schematic holds full block entities and entities,
@@ -553,6 +569,15 @@ ex = cb.build()
 res = json.loads(ex.execute('{"a": 178}', ExecutionMode.until_stable(2, 100)))
 res["outputs"]["y"]["value"]                           # -> 178, straight back through the lamps
 ```
+
+The simulator is also a probe: read `get_redstone_power` anywhere and the
+circuit becomes data. A signal leaves a redstone block at strength 15 and drops
+one per block down a dust line; plotting the reading as a hot-to-cold staircase
+turns that falloff into a field you can see:
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/signal-heatmap.png" width="720" alt="A redstone signal decaying from strength 15 to 0, drawn as a staircase colored hot to cold">
+</div>
 
 ## Mesh and render
 

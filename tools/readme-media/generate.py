@@ -112,8 +112,9 @@ def turntable_gif(schematic, pack, path, frames=40, w=560, h=400, pitch=None,
 
 # ── Scenes ───────────────────────────────────────────────────────────────────
 
-def scene_hero(pack):
-    """SDF volcano island with material rules — the front-door image."""
+def _hero_schematic():
+    """Build (but do not render) the SDF volcano island the README opens with,
+    lava pool included. Shared by the hero shot and the interior cut-away."""
     base = {"type": "smoothUnion", "k": 8.0,
             "a": {"type": "ellipsoid", "radii": [28, 11, 24]},
             "b": {"type": "translate", "offset": [12, 2, 12],
@@ -185,6 +186,12 @@ def scene_hero(pack):
     nu.BuildingTool.fill_replacing(s, nu.Shape.cylinder(-10, 24, -6, 0, 1, 0, 6, 3),
                                    nu.Brush.solid("minecraft:lava"),
                                    json.dumps(["minecraft:air"]))
+    return s
+
+
+def scene_hero(pack):
+    """SDF volcano island with material rules — the front-door image."""
+    s = _hero_schematic()
     cfg = nu.RenderConfig.create(1200, 760)
     cfg.set_isometric(); cfg.set_yaw(135.0); cfg.set_pitch(26.0)
     cfg.set_zoom(1.45); cfg.set_sphere_fit(True)
@@ -1536,6 +1543,94 @@ def scene_executor(pack):
     return None
 
 
+def scene_signal(pack):
+    """Redstone as data: a signal leaves a power source at strength 15 and
+    drops one per block down a dust line. Reading `get_redstone_power` at each
+    step turns the circuit into a field, drawn here as a hot-to-cold staircase
+    whose height and color both track the measured strength."""
+    n = 15
+    line = nu.Schematic.create("rail")
+    for x in range(n + 1):
+        line.set_block(x, 0, 0, "minecraft:gray_concrete")
+    line.set_block(0, 1, 0, "minecraft:redstone_block")           # source, power 15
+    for x in range(1, n + 1):
+        line.set_block_from_string(x, 1, 0, "minecraft:redstone_wire[power=0,east=side,west=side]")
+    world = nu.MchprsWorld.create(line)
+    world.tick(2); world.flush()
+    power = [world.get_redstone_power(x, 1, 0) for x in range(n + 1)]   # 15,14,...,0
+
+    pal = nu.Palette.concrete()
+    bars = nu.Schematic.create("signal")
+    for x, p in enumerate(power):
+        t = p / 15.0                                             # 1 hot .. 0 cold
+        hue = 0.0 + (1.0 - t) * 0.62                             # red -> blue
+        block = _hue_block(pal, hue, sat=0.9, val=1.0)
+        for z in range(3):                                       # a little depth
+            bars.fill_cuboid(x, 0, z, x, max(p, 1), z, block)
+    render(bars, pack, os.path.join(OUT, "signal-heatmap.png"), w=940, h=520,
+           yaw=38, pitch=30, zoom=1.12, sphere_fit=True, background=NAVY)
+    return bars
+
+
+def scene_cross_section(pack):
+    """See inside a build. The hero island, sliced through the crater: the cut
+    face exposes the lava pool and the vertical stone strata the material rules
+    painted (deepslate at the roots grading up through tuff to andesite)."""
+    s = _hero_schematic()
+    z_cut = -6                                          # plane through the crater
+    for b in json.loads(s.get_all_blocks_json()):
+        if b["z"] > z_cut:                              # carve away the near half
+            s.set_block(b["x"], b["y"], b["z"], "minecraft:air")
+    render(s, pack, os.path.join(OUT, "cross-section.png"), w=1100, h=680,
+           yaw=0, pitch=14, zoom=1.45, sphere_fit=True, background=NAVY)
+    return s
+
+
+def _stamp(canvas, piece, tx, tz):
+    """Paste a piece's non-air footprint into canvas with its min corner at
+    (tx, 0, tz). rotate_y / flip_* relocate blocks inside the working region,
+    so we read the real extent back before copying."""
+    bs = [b for b in json.loads(piece.get_all_blocks_json())
+          if b["name"] != "minecraft:air"]
+    xs = [b["x"] for b in bs]; ys = [b["y"] for b in bs]; zs = [b["z"] for b in bs]
+    canvas.copy_region(piece, min(xs), min(ys), min(zs), max(xs), max(ys), max(zs),
+                       tx, 0, tz, json.dumps(["minecraft:air"]))
+
+
+def scene_transforms(pack):
+    """Symmetry for free from the transform ops. One asymmetric petal is built
+    once with its dome at the (0,0) corner, then `flip_x` and `flip_z` mirror
+    four copies into the quadrants of a canvas: a mandala that peaks at the
+    center where the four petals meet."""
+    import math
+    pal = nu.Palette.concrete()
+    r = 26
+
+    def petal():
+        b = nu.Schematic.create("petal")
+        for x in range(r):
+            for z in range(r):
+                d = math.hypot(x + 0.5, z + 0.5)
+                if d > r:
+                    continue
+                ang = math.atan2(z + 0.5, x + 0.5) / (math.pi / 2)   # 0..1 across the quadrant
+                hue = (d / r) * 0.72 + ang * 0.12                    # radial ramp + a twist
+                h = 1 + int((1 - d / r) ** 1.4 * 13)                 # domed toward the corner
+                if abs(ang - 0.5) < 0.06:                            # a bright rib down the middle
+                    hue = 0.11
+                b.fill_cuboid(x, 0, z, x, h, z, _hue_block(pal, hue, sat=0.9))
+        return b
+
+    canvas = nu.Schematic.create("mandala")
+    p = petal();                          _stamp(canvas, p, r, r)   # NE
+    p = petal(); p.flip_x();              _stamp(canvas, p, 0, r)   # NW
+    p = petal(); p.flip_z();              _stamp(canvas, p, r, 0)   # SE
+    p = petal(); p.flip_x(); p.flip_z();  _stamp(canvas, p, 0, 0)   # SW
+    render(canvas, pack, os.path.join(OUT, "transforms.png"), w=820, h=820,
+           yaw=45, pitch=68, zoom=1.22, sphere_fit=True, background=NAVY)
+    return canvas
+
+
 
 
 # Public-domain paintings for the pixel-art gallery (Wikimedia Commons).
@@ -2390,6 +2485,9 @@ SCENES = {
     "simulation": scene_simulation,
     "sim-anim": scene_sim_anim,
     "executor": scene_executor,
+    "signal": scene_signal,
+    "cross-section": scene_cross_section,
+    "transforms": scene_transforms,
     "teapot": scene_teapot,
     "duck": scene_duck,
     "mariokart": scene_mariokart,
