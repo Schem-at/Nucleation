@@ -236,6 +236,13 @@ spot.set_palette(gray_ramp)
 BuildingTool.fill(s, teapot, spot)
 ```
 
+The same teapot, printed layer by layer: the unbuilt volume stays on as a glass
+ghost so the frame holds still while solid, height-colored layers sweep up.
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/printer.gif" width="480" alt="The voxelized teapot materializing one layer at a time, a glass ghost filling in with solid height-colored blocks from the base up">
+</div>
+
 And textures project onto the voxels: each block takes the palette-closest color
 of its nearest surface point (barycentric UVs, bilinear sampling). The classic
 COLLADA duck, beak and eye catchlights intact:
@@ -328,6 +335,14 @@ s.set_block(x, 0, y, palette.closest_block_dithered(r, g, b, x, 0, y))
 
 The full recipe, including the flat-palette filter chain, is `scene_paintings`
 in [`tools/readme-media/generate.py`](tools/readme-media/generate.py).
+
+And a flat image is also a heightmap: read each pixel's brightness as a column
+height and paint it with its own color, and the same Starry Night lifts off the
+canvas into rolling, luminous terrain, the moon and stars its highest peaks.
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/heightmap.png" width="760" alt="Van Gogh's Starry Night as 3D relief terrain, pixel brightness lifted into hills with the moon and stars as peaks">
+</div>
 
 ## Everything composes
 
@@ -611,6 +626,14 @@ diff = Diff.compute(before, after, "exact")     # distance 3; summary JSON with 
 Fingerprint.is_duplicate(before, after, "exact")   # False (fingerprints are translation-invariant)
 ```
 
+Fingerprints are position-blind, and the `shape` preset is orientation-blind
+too: a build moved and turned still reads as a duplicate, while adding one block
+makes it unique. Deduplicate a library no matter how each copy was placed:
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/fingerprint.png" width="820" alt="One build, a moved and turned copy flagged DUPLICATE, and a one-block-different copy flagged UNIQUE">
+</div>
+
 And nucleation can *find the repetition in a build*, the lattice of a tiling
 wall, a repeater bus, or a pixel grid, and restamp it to a new size:
 
@@ -635,6 +658,19 @@ back = Schematic.from_world_directory_bounded(world_dir, 0, 0, 0, 39, 4, 39)
 The built-in DataConverter port migrates blocks, items, and entities across
 Minecraft data versions (loss reports on downgrades), and Java ↔ Bedrock
 translation runs on GeyserMC's mappings at full **26.2** parity.
+
+Those loss reports are per block, so you can see a downgrade before you commit
+it. Here a sampler of blocks from many eras is checked against 1.12.2 (before
+the Flattening) and recolored by the verdict: green survives, red is a loss.
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/migration.png" width="820" alt="A sampler of blocks from many Minecraft versions, and the same layout recolored green for survives and red for lost when downgrading to 1.12.2">
+</div>
+
+```python
+report = json.loads(build.convert_to_data_version(1343, build.canonical_data_version()))
+lost = [e["path"] for e in report if e["severity"] == "loss"]   # what 1.12.2 cannot represent
+```
 
 ## The block database
 

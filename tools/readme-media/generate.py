@@ -1631,6 +1631,100 @@ def scene_transforms(pack):
     return canvas
 
 
+# Blocks spanning Minecraft eras, oldest to newest, for the downgrade demo.
+ERA_BLOCKS = [
+    "minecraft:cobblestone", "minecraft:oak_planks", "minecraft:glass",       # ancient
+    "minecraft:prismarine", "minecraft:sea_lantern",                          # 1.8
+    "minecraft:blue_ice", "minecraft:bone_block",                             # 1.10-1.13
+    "minecraft:deepslate", "minecraft:copper_block",                          # 1.17
+    "minecraft:amethyst_block", "minecraft:tuff",                             # 1.17
+    "minecraft:mangrove_planks", "minecraft:sculk", "minecraft:mud_bricks",   # 1.19
+    "minecraft:cherry_planks",                                                # 1.20
+]
+
+
+def scene_migration(pack):
+    """Downgrade-checked. `convert_to_data_version` reports, per block, what an
+    older data version can represent. A sampler of blocks from many eras is
+    checked against 1.12.2 (pre-Flattening) and each pillar recolored by the
+    verdict: green survives, red is a loss the DataConverter flags."""
+    cols = 5
+    now = nu.Schematic.canonical_data_version()
+    old = 1343                                          # 1.12.2, before the Flattening
+
+    def grid(block_for):
+        s = nu.Schematic.create("sampler")
+        s.fill_cuboid(-1, 0, -1, cols * 2 - 1, 0, ((len(ERA_BLOCKS) + cols - 1) // cols) * 2 - 1,
+                      "minecraft:polished_andesite")     # base plate
+        for i, b in enumerate(ERA_BLOCKS):
+            x, z = (i % cols) * 2, (i // cols) * 2
+            s.fill_cuboid(x, 1, z, x, 4, z, block_for(i, b))
+        return s
+
+    report = json.loads(grid(lambda i, b: b).convert_to_data_version(old, now))
+    lost = {e["path"].split(" ", 1)[-1] for e in report if e.get("severity") == "loss"}
+    print(f"  {len(lost)}/{len(ERA_BLOCKS)} blocks flagged as loss downgrading to 1.12.2")
+
+    tmp = tempfile.mkdtemp(prefix="nuc-migration-")
+    try:
+        panels = []
+        for name, block_for, cap in [
+            ("real", lambda i, b: b, "modern palette"),
+            ("verdict", lambda i, b: "minecraft:red_concrete" if b in lost
+             else "minecraft:lime_concrete", "downgrade to 1.12.2"),
+        ]:
+            raw = os.path.join(tmp, f"{name}.png")
+            render(grid(block_for), pack, raw, w=620, h=560, yaw=210, pitch=40,
+                   zoom=1.12, sphere_fit=True, background=NAVY)
+            cap_p = os.path.join(tmp, f"{name}_c.png")
+            _caption(raw, cap, cap_p)
+            panels.append(cap_p)
+        hstack(panels, os.path.join(OUT, "migration.png"))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return None
+
+
+def scene_fingerprint(pack):
+    """Translation- and rotation-invariant fingerprints. The `shape` preset
+    sees past position and orientation: a moved, turned copy is a duplicate
+    (distance 0), while adding a single block makes the build unique."""
+    def sculpt():
+        s = nu.Schematic.create("sculpt")
+        s.fill_cuboid(0, 0, 0, 5, 0, 4, "minecraft:stone_bricks")       # base
+        s.fill_cuboid(0, 1, 0, 0, 4, 0, "minecraft:crimson_stem")       # corner spire
+        s.fill_cuboid(3, 1, 3, 5, 2, 4, "minecraft:copper_block")       # cluster
+        s.set_block(5, 3, 4, "minecraft:amethyst_block")
+        s.fill_cuboid(1, 1, 3, 2, 1, 4, "minecraft:lime_wool")
+        return s
+
+    a = sculpt()
+    b = sculpt(); b.rotate_y(90)                                        # moved + turned
+    c = sculpt(); c.set_block(2, 3, 2, "minecraft:redstone_block")      # one block added
+
+    preset = "shape"
+    verdicts = [(a, "original"), (b, "moved + turned"), (c, "one block added")]
+    tmp = tempfile.mkdtemp(prefix="nuc-fingerprint-")
+    try:
+        panels = []
+        for i, (s, label) in enumerate(verdicts):
+            raw = os.path.join(tmp, f"{i}.png")
+            render(s, pack, raw, w=560, h=520, yaw=35, pitch=32, zoom=1.15,
+                   sphere_fit=True, background=NAVY)
+            if i == 0:
+                cap = "original"
+            else:
+                dup = nu.Fingerprint.is_duplicate(a, s, preset)
+                cap = f"{label}  ->  {'DUPLICATE' if dup else 'UNIQUE'}"
+            cap_p = os.path.join(tmp, f"{i}_c.png")
+            _caption(raw, cap, cap_p)
+            panels.append(cap_p)
+        hstack(panels, os.path.join(OUT, "fingerprint.png"))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return None
+
+
 
 
 # Public-domain paintings for the pixel-art gallery (Wikimedia Commons).
@@ -1705,6 +1799,89 @@ def _commons_url(title):
         headers={"User-Agent": "nucleation-readme-media/1.0"})
     d = json.load(urllib.request.urlopen(req))
     return list(d["query"]["pages"].values())[0]["imageinfo"][0]["thumburl"]
+
+
+def scene_heightmap(pack):
+    """Any image is a heightmap. Each pixel's brightness sets a column's height
+    and its own color paints it (through the dithered art palette), lifting Van
+    Gogh's Starry Night off the canvas into rolling, luminous terrain."""
+    import urllib.request
+    title = PAINTINGS["starry-night"][0]
+    path = os.path.join(MODELS_DIR, "starry-night.jpg")
+    if not os.path.exists(path):
+        os.makedirs(MODELS_DIR, exist_ok=True)
+        req = urllib.request.Request(_commons_url(title),
+                                     headers={"User-Agent": "nucleation-readme-media/1.0"})
+        open(path, "wb").write(urllib.request.urlopen(req).read())
+
+    width = 128
+    w, h, raw = _image_pixels(path, width)
+    pal = flat_art_palette().dithered()
+    max_h = 20
+    s = nu.Schematic.create("relief")
+    for pz in range(h):
+        for px in range(w):
+            i = (pz * w + px) * 3
+            r, g, b = raw[i], raw[i + 1], raw[i + 2]
+            lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0
+            top = 1 + int(lum ** 1.4 * max_h)                 # bright stars/moon rise highest
+            br, bg, bb = _boost(r, g, b)
+            for y in range(top + 1):
+                s.set_block(px, y, pz, pal.closest_block_dithered(br, bg, bb, px, y, pz))
+    render(s, pack, os.path.join(OUT, "heightmap.png"), w=1080, h=680,
+           yaw=200, pitch=40, zoom=1.34, sphere_fit=True, background=NAVY)
+    return s
+
+
+def scene_printer(pack):
+    """A build materializing layer by layer. The unprinted volume stays on as a
+    glass ghost so the frame never moves, while solid, height-colored layers
+    sweep up the Utah teapot the way a printer lays them down."""
+    obj = open(_fetch_model("teapot.obj", TEAPOT_URL)).read()
+    shape = nu.Voxelizer.shape_from_obj(obj, 46.0, 1.0)
+    full = nu.Schematic.create("teapot")
+    nu.BuildingTool.fill(full, shape, nu.Brush.solid("minecraft:white_concrete"))
+    blocks = [(b["x"], b["y"], b["z"]) for b in json.loads(full.get_all_blocks_json())
+              if b["name"] != "minecraft:air"]
+    ys = [y for _, y, _ in blocks]
+    ymin, ymax = min(ys), max(ys)
+    span = max(1, ymax - ymin)
+    pal = nu.Palette.concrete()
+    solid = {(x, y, z): _hue_block(pal, 0.66 * (1 - (y - ymin) / span), 0.9, 1.0)
+             for (x, y, z) in blocks}
+    ghost = "minecraft:light_blue_stained_glass"
+
+    tmp = tempfile.mkdtemp(prefix="nuc-printer-")
+    try:
+        layers = list(range(ymin, ymax + 1))
+        step = max(1, len(layers) // 30)
+        ks = layers[::step]
+        if ks[-1] != ymax:
+            ks.append(ymax)
+        f = 0
+
+        def frame(k, holds=1):
+            nonlocal f
+            fr = nu.Schematic.create("f")
+            for (x, y, z) in blocks:
+                fr.set_block(x, y, z, solid[(x, y, z)] if y <= k else ghost)
+            cfg = nu.RenderConfig.create(620, 560)
+            cfg.set_isometric(); cfg.set_yaw(200.0); cfg.set_pitch(16.0)
+            cfg.set_zoom(1.12); cfg.set_sphere_fit(True); cfg.set_background(*NAVY)
+            p = os.path.join(tmp, f"f{f:03}.png")
+            nu.Renderer.render_to_file(fr, pack, cfg, p)
+            for _ in range(holds - 1):
+                f += 1; shutil.copy(p, os.path.join(tmp, f"f{f:03}.png"))
+            f += 1
+
+        for k in ks:
+            frame(k)
+        frame(ymax, holds=8)                      # hold on the finished teapot
+        assemble_gif(tmp, os.path.join(OUT, "printer.gif"), fps=8)
+        print(f"  wrote docs/media/printer.gif ({f} frames)")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return None
 
 
 def scene_paintings(pack):
@@ -2488,6 +2665,10 @@ SCENES = {
     "signal": scene_signal,
     "cross-section": scene_cross_section,
     "transforms": scene_transforms,
+    "migration": scene_migration,
+    "fingerprint": scene_fingerprint,
+    "heightmap": scene_heightmap,
+    "printer": scene_printer,
     "teapot": scene_teapot,
     "duck": scene_duck,
     "mariokart": scene_mariokart,
