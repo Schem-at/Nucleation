@@ -246,10 +246,16 @@ through tuff to andesite, with the lava pool sitting in the crater.
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/cross-section.png" width="720" alt="The volcano island sliced through the crater, exposing the lava pool and the stone strata inside">
 </div>
 
-Materials can also key on the **surface normal**, not just height and depth. The
-normal is the gradient of the surface, which an SDF gives you directly, so a
-landscaping rule paints by slope: flat ground takes grass, steepening slopes take
-coarse dirt then bare stone, and the flat peaks catch snow.
+Materials can also key on the **surface normal**, not just height and depth. A
+`DistanceField` reads it off any build (`slope` is its upward component), so a
+landscaping rule paints by steepness: flat ground takes grass, steepening slopes
+take coarse dirt then bare stone, and the flat peaks catch snow.
+
+```python
+field = DistanceField.from_schematic(terrain)     # depth + normal of any build
+ny = field.slope(x, top, z)                        # 1 flat, ->0 vertical
+surf = "grass_block" if ny > 0.86 else "coarse_dirt" if ny > 0.72 else "stone"
+```
 
 <div align="center">
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/slope-paint.png" width="760" alt="A rolling landscape painted by slope: grass on the flats, coarse dirt on the inclines, bare stone on the steepest faces, snow on the high flats">
@@ -472,11 +478,11 @@ for x, y, z in inside_sphere(R):
 ```
 
 None of that is sphere-specific: it is three fields over `(x, y, z)` plus a
-depth. An SDF shape gets the depth for free (its own value), and *any* build gets
-it from one distance transform of its occupied voxels. So the same material
-paints over arbitrary geometry. Here it repaints the pre-existing hero island
-schematic block for block, its glowing seams following the Voronoi field across
-the terrain:
+depth. An SDF shape gets the depth for free (its own value), and for *any* other
+build `DistanceField.from_schematic` runs the distance transform and hands back
+the depth (and a surface normal). So the same material paints over arbitrary
+geometry. Here it repaints the pre-existing hero island schematic block for
+block, its glowing seams following the Voronoi field across the terrain:
 
 <div align="center">
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/fracture-paint.png" width="620" alt="The hero volcano island repainted as a black fractured planet, glowing Voronoi crack seams running over its arch, peak, and floating shards">

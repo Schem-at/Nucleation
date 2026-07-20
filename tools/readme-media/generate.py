@@ -2429,11 +2429,11 @@ def scene_voronoi_planet(pack):
 
 
 def scene_slope(pack):
-    """Painting by the surface normal. On a landscape, flat ground (normal facing
-    up) takes grass, steepening slopes take coarse dirt then bare stone, and the
-    flat high ground catches snow. The normal here is the gradient of the height
-    field, which is exactly the quantity an SDF exposes at any surface, so the
-    same slope-aware rule generalizes past a heightmap to any shape."""
+    """Painting by the surface normal, read straight from the toolbox. Build a
+    stone landscape, take a `DistanceField` of it, and its `slope` (the upward
+    component of the surface normal) picks the material: flat ground takes grass,
+    steepening slopes take coarse dirt then bare stone, snow on the flat peaks.
+    The same field works on any build, not just a heightmap."""
     import math
     W = 112
 
@@ -2443,66 +2443,43 @@ def scene_slope(pack):
         h += 1.5 * math.cos(x * 0.23) * math.cos(z * 0.26 + 0.5)   # fine
         return h
 
-    hmap = [[height(x, z) for z in range(W)] for x in range(W)]
+    tops = {}
     s = nu.Schematic.create("terrain")
-    for x in range(1, W - 1):
-        for z in range(1, W - 1):
-            h = hmap[x][z]
-            top = round(h)
-            dx = hmap[x + 1][z] - hmap[x - 1][z]
-            dz = hmap[x][z + 1] - hmap[x][z - 1]
-            ny = 2.0 / math.sqrt(dx * dx + dz * dz + 4.0)     # normal.y: 1 flat, ->0 vertical
-            if ny > 0.86:                                     # flat: soil (snow when high)
-                surf = "minecraft:snow_block" if h > 16 else "minecraft:grass_block"
-                sub = "minecraft:dirt"
-            elif ny > 0.72:                                   # gentle: patchy dirt
-                surf = "minecraft:coarse_dirt"
-                sub = "minecraft:dirt"
-            else:                                             # steep: bare rock
-                surf = "minecraft:stone"
-                sub = "minecraft:stone"
-            s.fill_cuboid(x, top - 5, z, x, top - 1, z, sub)
-            s.set_block(x, top, z, surf)
+    for x in range(W):
+        for z in range(W):
+            top = round(height(x, z))
+            tops[(x, z)] = top
+            s.fill_cuboid(x, top - 6, z, x, top, z, "minecraft:stone")
+
+    field = nu.DistanceField.from_schematic(s)                 # depth + normal of the terrain
+    for (x, z), top in tops.items():
+        ny = field.slope(x, top, z)                            # 1 flat, ->0 vertical
+        if ny > 0.86:                                          # flat: soil (snow when high)
+            surf = "minecraft:snow_block" if top > 16 else "minecraft:grass_block"
+            s.fill_cuboid(x, top - 2, z, x, top - 1, z, "minecraft:dirt")
+        elif ny > 0.72:                                        # gentle: patchy dirt
+            surf = "minecraft:coarse_dirt"
+            s.fill_cuboid(x, top - 2, z, x, top - 1, z, "minecraft:dirt")
+        else:                                                 # steep: bare rock
+            surf = "minecraft:stone"
+        s.set_block(x, top, z, surf)
     render(s, pack, os.path.join(OUT, "slope-paint.png"), w=1100, h=680,
            yaw=210, pitch=38, zoom=1.3, sphere_fit=True, background=NAVY)
     return s
 
 
-def _surface_depth(solid):
-    """Distance transform of an occupancy set: for every solid voxel, how many
-    blocks it sits beneath the surface. Multi-source BFS from every voxel that
-    touches air. This is the one field arbitrary geometry can't get for free
-    (an SDF shape would just read its own value); computed once, it lets the
-    fractured-planet material paint over any imported build."""
-    from collections import deque
-    nb = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
-    depth = {}
-    dq = deque()
-    for v in solid:
-        if any((v[0] + dx, v[1] + dy, v[2] + dz) not in solid for dx, dy, dz in nb):
-            depth[v] = 0
-            dq.append(v)
-    while dq:
-        v = dq.popleft()
-        for dx, dy, dz in nb:
-            n = (v[0] + dx, v[1] + dy, v[2] + dz)
-            if n in solid and n not in depth:
-                depth[n] = depth[v] + 1
-                dq.append(n)
-    return depth
-
-
 def scene_fracture_paint(pack):
     """The fractured-planet look is not sphere-specific: it is three fields over
-    (x, y, z) plus a depth. Feed the depth from a distance transform of any
-    occupied volume and the same material paints over arbitrary geometry. Here it
-    repaints the pre-existing hero island schematic, block for block: Voronoi
-    cells shade its crust light-center/dark-rim, the crack field runs glowing
-    glass-over-glowstone seams through it, and the glow deepens toward the core."""
+    (x, y, z) plus a depth. `DistanceField.from_schematic` runs the distance
+    transform (depth below the surface) over any pre-existing build, so the same
+    material paints over arbitrary geometry. Here it repaints the hero island
+    block for block: Voronoi cells shade its crust light-center/dark-rim, the
+    crack field runs glowing glass-over-glowstone seams through it, and the glow
+    deepens toward the core."""
     src = _hero_schematic()
-    solid = {(b["x"], b["y"], b["z"]) for b in json.loads(src.get_all_blocks_json())
-             if b["name"] != "minecraft:air"}
-    depth = _surface_depth(solid)
+    field = nu.DistanceField.from_schematic(src)
+    solid = [(b["x"], b["y"], b["z"]) for b in json.loads(src.get_all_blocks_json())
+             if b["name"] != "minecraft:air"]
 
     freq, seed = 0.09, 7
     crust, glass, crack_w, f1_rim = 5.0, 2.0, 1.0, 5.0
@@ -2528,7 +2505,8 @@ def scene_fracture_paint(pack):
             *_stops_rgb(min((d - glass) / crust, 1.0), emit_stops), x, y, z)
 
     out = nu.Schematic.create("fractured-island")
-    for (x, y, z), d in depth.items():
+    for (x, y, z) in solid:
+        d = field.depth(x, y, z)                               # blocks below the surface
         fx, fy, fz = x + 0.5, y + 0.5, z + 0.5
         if d > crust:                                          # glowing core
             block = glow(d, x, y, z)

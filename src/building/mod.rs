@@ -1,9 +1,11 @@
 pub mod brushes;
+pub mod distance_field;
 pub mod enums;
 pub mod masks;
 pub mod shapes;
 
 pub use brushes::*;
+pub use distance_field::*;
 pub use enums::*;
 pub use masks::*;
 pub use shapes::*;

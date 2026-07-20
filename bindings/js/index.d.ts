@@ -38,6 +38,8 @@ export { Diff } from "./Diff"
 
 export { Fingerprint } from "./Fingerprint"
 
+export { DistanceField } from "./DistanceField"
+
 export { Geo } from "./Geo"
 
 export { ChunkMeshResult } from "./ChunkMeshResult"

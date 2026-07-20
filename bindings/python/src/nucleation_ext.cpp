@@ -21,6 +21,7 @@ void add_DefinitionRegion_binding(nb::module_);
 void add_SchematicRegions_binding(nb::module_);
 void add_Diff_binding(nb::module_);
 void add_Fingerprint_binding(nb::module_);
+void add_DistanceField_binding(nb::module_);
 void add_Geo_binding(nb::module_);
 void add_ChunkMeshResult_binding(nb::module_);
 void add_ItemModelConfig_binding(nb::module_);
@@ -144,6 +145,7 @@ NB_MODULE(nucleation, mod)
     add_SchematicRegions_binding(mod);
     add_Diff_binding(mod);
     add_Fingerprint_binding(mod);
+    add_DistanceField_binding(mod);
     add_Geo_binding(mod);
     add_ChunkMeshResult_binding(mod);
     add_ItemModelConfig_binding(mod);
