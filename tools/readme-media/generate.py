@@ -2407,18 +2407,31 @@ def scene_g_knot(pack):
     return s
 
 
+def _gradient_palette():
+    """The widest palette a solid form can use, trusting the color heuristic:
+    every full-cube block, patterned ones included (mushroom, glazed, ores, the
+    copper and sandstone families) for their extra hues. The only thing dropped
+    is what would actually break the fill, transparent blocks that leave
+    see-through holes. The snap matches each block's measured color in Oklab, so
+    if the heuristic calls a block closest, it gets used."""
+    b = nu.PaletteBuilder.create()
+    b.full_blocks_only()       # full-cube geometry only: no slab/stair/pane holes
+    b.exclude_transparent()    # no glass/ice see-through gaps in a solid tube
+    b.exclude_tile_entities()  # drop command/structure/jigsaw (GUI-text faces), as Palette.all() does
+    return b.build()
+
+
 def scene_gradient_knot(pack):
     """The trefoil, recolored as a super-smooth cyclic gradient. A single hue is
     swept red -> blue -> green -> red once around the loop, and a `Brush.color`
-    over the full dithered pixel-art palette snaps each voxel by its measured
-    Oklab color, blending between the two nearest blocks per position. The
-    pixel-art palette is the widest *flat-textured* set: it keeps every smooth
-    colored block and drops only patterned ones (mushroom spots, glazed swirls,
-    ores) whose textures would speckle a gradient."""
+    over the widest dithered palette snaps each voxel to its measured-Oklab
+    nearest block, blending between the two nearest per position. Patterned
+    blocks stay in for their extra colors; only hole-punching transparent blocks
+    are dropped."""
     import colorsys
     s = nu.Schematic.create("gradient-knot")
     fill, sphere = nu.BuildingTool.fill, nu.Shape.sphere
-    dith = flat_art_palette().dithered()
+    dith = _gradient_palette().dithered()
     steps, scale = 640, 12.0
     for i in range(steps):
         t = i / steps
@@ -2446,7 +2459,7 @@ def scene_interp(pack):
         ((225, 40, 150), (40, 200, 215)),     # magenta -> cyan
         ((240, 130, 30), (90, 30, 140)),      # orange -> indigo
     ]
-    dith = flat_art_palette().dithered()
+    dith = _gradient_palette().dithered()
     n, height = 96, 6
     tmp = tempfile.mkdtemp(prefix="nuc-interp-")
     try:
