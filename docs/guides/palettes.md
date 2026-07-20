@@ -9,12 +9,18 @@ Python/Rust, camelCase in JS/Kotlin/PHP).
 ```python
 Palette.wool()          # the 16 wools
 Palette.concrete()      # the 16 concretes
-Palette.terracotta()    # unglazed terracottas
-Palette.wood()          # the planks family
-Palette.grayscale()     # opaque full cubes with near-neutral measured color
+Palette.terracotta()    # unglazed terracottas (17)
+Palette.wood()          # the planks family (13)
+Palette.grayscale()     # opaque full cubes with near-neutral measured color (81)
+Palette.decorative()    # the broad decorative set (~950 blocks)
+Palette.structural()    # bricks, stones, and building blocks (~316)
 Palette.solid()         # solid blocks (no transparency/gravity/tile entities)
 Palette.all()           # every colored block except technical ones
 Palette.from_block_ids('["minecraft:stone", "minecraft:oak_planks"]')
+
+# List what any palette holds, or count it:
+Palette.wood().block_ids_json()   # ["minecraft:birch_planks", "minecraft:spruce_planks", ...]
+Palette.concrete().len()          # 16
 ```
 
 `PaletteBuilder` composes filters over the block database — vanilla tags,

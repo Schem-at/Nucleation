@@ -64,6 +64,16 @@ def hstack(paths, out):
     print(f"  wrote {os.path.relpath(out, ROOT)}")
 
 
+def vstack(paths, out):
+    """Composite same-width panels top to bottom."""
+    inputs = [a for p in paths for a in ("-i", p)]
+    refs = "".join(f"[{i}]" for i in range(len(paths)))
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", *inputs,
+                    "-filter_complex", f"{refs}vstack=inputs={len(paths)}", out],
+                   check=True)
+    print(f"  wrote {os.path.relpath(out, ROOT)}")
+
+
 def assemble_gif(frame_dir, path, fps, max_colors=192, stats_mode="diff",
                  dither="bayer:bayer_scale=4"):
     """Palette-optimised GIF from f%03d.png frames in frame_dir.
@@ -2397,6 +2407,65 @@ def scene_g_knot(pack):
     return s
 
 
+def scene_gradient_knot(pack):
+    """The trefoil, recolored as a super-smooth cyclic gradient. A single hue is
+    swept red -> blue -> green -> red once around the loop, and a `Brush.color`
+    over a dithered palette snaps each voxel with ordered dithering, so the ramp
+    blends between neighbouring blocks instead of banding."""
+    import colorsys
+    s = nu.Schematic.create("gradient-knot")
+    fill, sphere = nu.BuildingTool.fill, nu.Shape.sphere
+    dith = flat_art_palette().dithered()
+    steps, scale = 640, 12.0
+    for i in range(steps):
+        t = i / steps
+        a = t * 2 * math.pi
+        x = round(scale * (math.sin(a) + 2 * math.sin(2 * a)))
+        y = round(scale * (math.cos(a) - 2 * math.cos(2 * a)))
+        z = round(scale * (-math.sin(3 * a)))
+        r, g, b = (round(c * 255) for c in colorsys.hsv_to_rgb((1.0 - t) % 1.0, 0.92, 1.0))
+        brush = nu.Brush.color(r, g, b)
+        brush.set_palette(dith)
+        fill(s, sphere(x, y, z, 3), brush)
+    render(s, pack, os.path.join(OUT, "gradient-knot.png"), w=760, h=720,
+           yaw=30, pitch=30, zoom=1.2, background=NAVY, sphere_fit=True)
+    return s
+
+
+def scene_interp(pack):
+    """Interpolate between any two colors and snap the ramp to blocks. Five
+    pairs, each a `linear_gradient` in Oklab over a dithered rich palette, so
+    every ramp is a smooth continuous blend rather than a few hard steps."""
+    pairs = [
+        ((200, 30, 70), (245, 205, 55)),      # crimson -> gold
+        ((30, 180, 175), (150, 50, 200)),     # teal -> violet
+        ((120, 210, 50), (40, 80, 220)),      # lime -> blue
+        ((225, 40, 150), (40, 200, 215)),     # magenta -> cyan
+        ((240, 130, 30), (90, 30, 140)),      # orange -> indigo
+    ]
+    dith = flat_art_palette().dithered()
+    n, height = 96, 6
+    tmp = tempfile.mkdtemp(prefix="nuc-interp-")
+    try:
+        panels = []
+        for i, (c1, c2) in enumerate(pairs):
+            s = nu.Schematic.create("bar")
+            brush = nu.Brush.linear_gradient(0, 0, 0, *c1, n - 1, 0, 0, *c2,
+                                             nu.InterpolationSpace.Oklab)
+            brush.set_palette(dith)
+            nu.BuildingTool.fill(s, nu.Shape.cuboid(0, 0, 0, n - 1, height, 0), brush)
+            raw = os.path.join(tmp, f"{i}.png")
+            cfg = nu.RenderConfig.create(1200, 96)
+            cfg.set_isometric(); cfg.set_yaw(0.0); cfg.set_pitch(0.0)
+            cfg.set_orthographic(True); cfg.set_background(*NAVY)
+            nu.Renderer.render_to_file(s, pack, cfg, raw)
+            panels.append(raw)
+        vstack(panels, os.path.join(OUT, "gradient-pairs.png"))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return None
+
+
 def _in_menger(x, y, z, level):
     for _ in range(level):
         if [x % 3, y % 3, z % 3].count(1) >= 2:
@@ -2669,6 +2738,8 @@ SCENES = {
     "fingerprint": scene_fingerprint,
     "heightmap": scene_heightmap,
     "printer": scene_printer,
+    "gradient-knot": scene_gradient_knot,
+    "interp": scene_interp,
     "teapot": scene_teapot,
     "duck": scene_duck,
     "mariokart": scene_mariokart,

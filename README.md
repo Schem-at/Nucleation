@@ -129,6 +129,35 @@ Palette.grayscale().ramp_ids_json(255, 255, 255,  0, 0, 0,  24)
 # 24 distinct blocks: white_wool ... iron_block ... deepslate_tiles ... black_concrete
 ```
 
+Seven presets ship, each a curated set you can list with `block_ids_json`:
+`concrete` and `wool` (16 dyed colors each), `terracotta` (17), `wood` (13 plank
+tones), `grayscale` (81 neutrals), and the broad `decorative` (951) and
+`structural` (316) sets. Between any two colors a palette interpolates directly:
+`gradient_ids_json` samples the line evenly, `ramp_ids_json` picks distinct steps.
+
+```python
+Palette.concrete().gradient_ids_json(200, 30, 70,  245, 205, 55,  8)
+# crimson -> gold: red, red, pink, orange, orange, yellow, yellow, yellow
+Palette.terracotta().ramp_ids_json(220, 40, 44,  40, 80, 220,  6)   # distinct steps
+# red, pink, magenta, purple, blue, light_blue terracotta
+```
+
+A gradient brush does the same in 3D and paints as it fills. Five pairs, each a
+`linear_gradient` in Oklab over a dithered palette, so every ramp is a smooth
+blend rather than a few hard steps:
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/gradient-pairs.png" width="720" alt="Five smooth two-color block gradients: crimson to gold, teal to violet, lime to blue, magenta to cyan, orange to indigo">
+</div>
+
+Sweep a single hue around a closed loop instead of between two endpoints and the
+ramp closes on itself with no seam. A trefoil knot, one hue dithered red -> blue
+-> green -> red around its length:
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/gradient-knot.png" width="440" alt="A trefoil knot colored by a seamless cyclic gradient sweeping red to blue to green and back">
+</div>
+
 And when a ramp still bands, dither it: `Palette.…().dithered()` makes every
 brush alternate between the two nearest blocks per voxel (ordered Bayer,
 deterministic). Hard bands on the left, dissolved on the right:
