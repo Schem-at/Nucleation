@@ -603,8 +603,21 @@ impl BlockSource for VecBlockSource {
 }
 
 /// Convert a Nucleation BlockState to a schematic-mesher InputBlock.
+///
+/// A bare block id carries no properties, but "no properties" is not the same
+/// as "all properties false": a block placed by id means its *default* state.
+/// The mesher picks a variant purely from the properties it is handed, so an
+/// empty set makes multi-face blocks fall to their all-false variant, e.g.
+/// `red_mushroom_block` renders the pale porous inside instead of its red cap.
+/// Seed the input with the block's canonical `default_state` first, then let
+/// any explicit properties from the schematic override it.
 fn block_state_to_input_block(block_state: &BlockState) -> InputBlock {
     let mut input = InputBlock::new(block_state.name.to_string());
+    if let Some(facts) = crate::blockpedia::get_block(&block_state.name) {
+        for (key, value) in facts.default_state {
+            input.properties.insert(key.to_string(), value.to_string());
+        }
+    }
     for (key, value) in &block_state.properties {
         input.properties.insert(key.to_string(), value.to_string());
     }
