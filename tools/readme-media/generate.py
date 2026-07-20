@@ -2439,7 +2439,12 @@ def scene_gradient_knot(pack):
         x = round(scale * (math.sin(a) + 2 * math.sin(2 * a)))
         y = round(scale * (math.cos(a) - 2 * math.cos(2 * a)))
         z = round(scale * (-math.sin(3 * a)))
-        r, g, b = (round(c * 255) for c in colorsys.hsv_to_rgb((1.0 - t) % 1.0, 0.92, 1.0))
+        # Saturation eased below full: at max saturation the targets are more
+        # vivid than any block, so whole hue arcs (magenta->violet especially)
+        # collapse onto the single most-saturated block (bubble_coral). Pulling
+        # it back lands targets inside the block gamut, giving the dither real
+        # neighbours to blend and a smoother ramp through the sparse pinks.
+        r, g, b = (round(c * 255) for c in colorsys.hsv_to_rgb((1.0 - t) % 1.0, 0.82, 1.0))
         brush = nu.Brush.color(r, g, b)
         brush.set_palette(dith)
         fill(s, sphere(x, y, z, 3), brush)
