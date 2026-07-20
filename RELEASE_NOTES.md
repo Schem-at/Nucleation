@@ -1,3 +1,22 @@
+# Nucleation v0.3.18
+
+**A material system over any geometry.** New `DistanceField` primitive:
+`DistanceField.from_schematic(build)` runs a distance transform over the
+occupancy and answers `depth(x,y,z)` (blocks below the surface), `slope(x,y,z)`
+(the upward component of the surface normal), and `normal_json(x,y,z)`. An SDF
+shape already exposes depth and normal for free; this recovers both for any
+build, an imported schematic, a voxelized model, or map data, so materials can
+key on depth and slope over arbitrary geometry: paint grass on the flats and
+stone on the steeps, weather a temple with moss, snow, patina, strata, ambient
+occlusion, or edge wear. Available across all seven language bindings.
+
+**Meshing fix.** A bare block id now meshes as its default state instead of the
+all-false variant, so multi-face blocks render correctly (e.g.
+`red_mushroom_block` shows its red cap, not the pale inside faces) everywhere:
+rendering, GLB/USDZ export, and color matching.
+
+---
+
 # Nucleation v0.3.17
 
 **Patterns as fields.** A `cells` SDF node adds Worley / Voronoi noise to the
