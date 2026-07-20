@@ -246,15 +246,14 @@ through tuff to andesite, with the lava pool sitting in the crater.
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/cross-section.png" width="720" alt="The volcano island sliced through the crater, exposing the lava pool and the stone strata inside">
 </div>
 
-Materials can also key on the **surface normal**, not just height and depth. A
-`DistanceField` reads it off any build (`slope` is its upward component), so a
-landscaping rule paints by steepness: flat ground takes grass, steepening slopes
-take coarse dirt then bare stone, and the flat peaks catch snow.
+Materials can also key on the **surface normal**, not just height and depth. On a
+heightmap it is the gradient of the heights; on a solid build `DistanceField`'s
+`slope` gives it directly. Its upward component decides the ground cover: gentle
+ground greens over, steep faces stay rock, snow caps the flat peaks.
 
 ```python
-field = DistanceField.from_schematic(terrain)     # depth + normal of any build
-ny = field.slope(x, top, z)                        # 1 flat, ->0 vertical
-surf = "grass_block" if ny > 0.86 else "coarse_dirt" if ny > 0.72 else "stone"
+ny = 2 / math.hypot(h[x+1] - h[x-1], h[z+1] - h[z-1], 2)   # upward normal: 1 flat, ->0 vertical
+surf = "grass_block" if ny > 0.82 else "stone"             # + snow on high flats, scree on rock
 ```
 
 <div align="center">

@@ -2429,11 +2429,12 @@ def scene_voronoi_planet(pack):
 
 
 def scene_slope(pack):
-    """Painting by the surface normal, read straight from the toolbox. Build a
-    stone landscape, take a `DistanceField` of it, and its `slope` (the upward
-    component of the surface normal) picks the material: flat ground takes grass,
-    steepening slopes take coarse dirt then bare stone, snow on the flat peaks.
-    The same field works on any build, not just a heightmap."""
+    """Painting by the surface normal. On a heightmap the normal is the gradient
+    of the heights (for a solid build, `DistanceField.slope` gives it directly);
+    its upward component decides the ground cover. Gentle ground greens over,
+    steep faces stay rock with a little scree, snow caps the high flats. A patch
+    field jitters the grass line and drops the odd bare spot so it reads natural,
+    not as contour bands."""
     import math
     W = 112
 
@@ -2443,26 +2444,28 @@ def scene_slope(pack):
         h += 1.5 * math.cos(x * 0.23) * math.cos(z * 0.26 + 0.5)   # fine
         return h
 
-    tops = {}
+    hmap = [[height(x, z) for z in range(W)] for x in range(W)]
+    patch = json.dumps({"type": "cells", "frequency": 0.11, "seed": 6, "mode": "value"})
     s = nu.Schematic.create("terrain")
-    for x in range(W):
-        for z in range(W):
-            top = round(height(x, z))
-            tops[(x, z)] = top
-            s.fill_cuboid(x, top - 6, z, x, top, z, "minecraft:stone")
-
-    field = nu.DistanceField.from_schematic(s)                 # depth + normal of the terrain
-    for (x, z), top in tops.items():
-        ny = field.slope(x, top, z)                            # 1 flat, ->0 vertical
-        if ny > 0.86:                                          # flat: soil (snow when high)
-            surf = "minecraft:snow_block" if top > 16 else "minecraft:grass_block"
-            s.fill_cuboid(x, top - 2, z, x, top - 1, z, "minecraft:dirt")
-        elif ny > 0.72:                                        # gentle: patchy dirt
-            surf = "minecraft:coarse_dirt"
-            s.fill_cuboid(x, top - 2, z, x, top - 1, z, "minecraft:dirt")
-        else:                                                 # steep: bare rock
-            surf = "minecraft:stone"
-        s.set_block(x, top, z, surf)
+    for x in range(1, W - 1):
+        for z in range(1, W - 1):
+            top = round(hmap[x][z])
+            dx = hmap[x + 1][z] - hmap[x - 1][z]
+            dz = hmap[x][z + 1] - hmap[x][z - 1]
+            ny = 2.0 / math.sqrt(dx * dx + dz * dz + 4.0)     # smooth surface-normal.y
+            n = nu.Sdf.eval(patch, x + 0.5, 0.0, z + 0.5)     # 0..1 patchiness
+            s.fill_cuboid(x, top - 5, z, x, top - 1, z, "minecraft:stone")
+            if ny > 0.82 - 0.05 * (2 * n - 1):                # green cover (jittered line)
+                s.fill_cuboid(x, top - 3, z, x, top - 1, z, "minecraft:dirt")
+                if top > 17 and ny > 0.93:
+                    surf = "minecraft:snow_block"
+                elif n > 0.88:
+                    surf = "minecraft:coarse_dirt"            # occasional bare patch
+                else:
+                    surf = "minecraft:grass_block"
+            else:                                             # rock face, some scree
+                surf = "minecraft:gravel" if n > 0.85 else "minecraft:stone"
+            s.set_block(x, top, z, surf)
     render(s, pack, os.path.join(OUT, "slope-paint.png"), w=1100, h=680,
            yaw=210, pitch=38, zoom=1.3, sphere_fit=True, background=NAVY)
     return s
@@ -2541,23 +2544,31 @@ def scene_treatments(pack):
         mesa.set_block(x, y, z, bands[((y + 40) // 3) % len(bands)])
     panel(mesa, "strata")
 
-    # 4. CAVITY: ambient occlusion, recesses darken by how enclosed they are.
-    lump = nu.Schematic.create("lump")
-    fill(lump, nu.Shape.sdf('{"type":"displace","amplitude":5,"frequency":0.13,"seed":8,'
-                            '"child":{"type":"sphere","radius":18}}'),
-         nu.Brush.solid("minecraft:sandstone"))
-    occ = _solid_set(lump)
-    dfp = nu.Palette.from_block_ids(json.dumps([
-        "minecraft:smooth_sandstone", "minecraft:sandstone", "minecraft:cut_sandstone",
-        "minecraft:brown_terracotta", "minecraft:dirt", "minecraft:coarse_dirt"])).dithered()
+    # 4. CAVITY: ambient occlusion, the valleys where lobes meet darken by how
+    # enclosed they are, read as neutral shading (not dirt).
+    lobes = [(0, 0, 0, 13), (13, 4, 2, 11), (-9, 6, -7, 10), (4, -8, 10, 10), (-6, -4, 9, 9)]
+    parts = [f'{{"type":"translate","offset":[{a},{b},{c}],"child":{{"type":"sphere","radius":{r}}}}}'
+             for a, b, c, r in lobes]
+    blob_sdf = parts[0]
+    for p in parts[1:]:
+        blob_sdf = f'{{"type":"smoothUnion","k":6.0,"a":{blob_sdf},"b":{p}}}'
+    blob = nu.Schematic.create("blob")
+    fill(blob, nu.Shape.sdf(blob_sdf), nu.Brush.solid("minecraft:smooth_stone"))
+    occ = _solid_set(blob)
+    shade = nu.Palette.from_block_ids(json.dumps([
+        "minecraft:calcite", "minecraft:diorite", "minecraft:smooth_stone",
+        "minecraft:stone", "minecraft:cobbled_deepslate", "minecraft:deepslate",
+        "minecraft:polished_blackstone"])).dithered()
+    off = [(dx, dy, dz, 1.0 / (1 + abs(dx) + abs(dy) + abs(dz)))
+           for dx in range(-3, 4) for dy in range(-3, 4) for dz in range(-3, 4)]
+    wtot = sum(w for *_, w in off)
     cav = nu.Schematic.create("cavity")
-    off = [(dx, dy, dz) for dx in (-2, -1, 0, 1, 2) for dy in (-2, -1, 0, 1, 2)
-           for dz in (-2, -1, 0, 1, 2)]
     for (x, y, z) in occ:
-        n = sum((x + dx, y + dy, z + dz) in occ for dx, dy, dz in off) / len(off)
-        v = int(235 - 150 * n)                                  # enclosed -> dark
-        cav.set_block(x, y, z, dfp.closest_block_dithered(v, int(v * 0.9), int(v * 0.72), x, y, z))
-    panel(cav, "cavity")
+        ao = sum(w for dx, dy, dz, w in off if (x + dx, y + dy, z + dz) in occ) / wtot
+        t = min(1.0, max(0.0, (ao - 0.45) / 0.32))              # exposed -> occluded
+        v = int(232 - 196 * t)
+        cav.set_block(x, y, z, shade.closest_block_dithered(v, v, v, x, y, z))
+    panel(cav, "cavity", zoom=1.05)
 
     # 5. EDGE WEAR: corners and edges chip by how many faces are exposed.
     nb = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
