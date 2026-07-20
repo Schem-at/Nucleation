@@ -144,6 +144,14 @@ use crate::universal_schematic::UniversalSchematic;
 
 /// Tokenize a build under a rotation: B-frame positions + tokens + rotated blocks.
 pub(crate) fn cells(schem: &UniversalSchematic, g: &RigidOp, spec: &FingerprintSpec) -> Vec<Cell> {
+    // Memoize block-entity NBT serializations by NBT identity so
+    // template-shared entities are hashed once, not once per cell.
+    let mut nbt_memo: HashMap<*const crate::utils::NbtMap, Option<Token>> = HashMap::new();
+    // Only content-exact specs fold block-entity NBT into the token; the fuzzy
+    // presets deliberately ignore block identity. Rotation-tolerant specs also
+    // drop facing/rotation NBT keys, which the group element does not rotate.
+    let fold_nbt = spec.block_entities;
+    let ignore_directional = spec.symmetry != crate::fingerprint::symmetry::Symmetry::None;
     schem
         .iter_blocks()
         // Air is absence, not a block: never tokenize it as a present cell in the
@@ -152,9 +160,24 @@ pub(crate) fn cells(schem: &UniversalSchematic, g: &RigidOp, spec: &FingerprintS
         .filter(|(_, b)| !crate::fingerprint::is_air(b.get_name()))
         .filter_map(|(pos, b)| {
             let rb = g.apply_block(b);
-            spec.blocks
-                .tokenize(&rb)
-                .map(|tok| (g.apply_pos((pos.x, pos.y, pos.z)), tok, rb))
+            spec.blocks.tokenize(&rb).map(|tok| {
+                // Cells differing only in tile-entity NBT (sign text, chest
+                // contents) must not compare equal: fold the entity's stable
+                // NBT token into the cell token.
+                let tok = match schem.get_block_entity(pos).filter(|_| fold_nbt) {
+                    Some(be) => {
+                        let key = std::sync::Arc::as_ptr(&be.nbt);
+                        match nbt_memo.entry(key).or_insert_with(|| {
+                            crate::fingerprint::stable_nbt_token(&be.nbt, ignore_directional)
+                        }) {
+                            Some(nbt) => crate::fingerprint::token_with_nbt(&tok, nbt),
+                            None => tok,
+                        }
+                    }
+                    None => tok,
+                };
+                (g.apply_pos((pos.x, pos.y, pos.z)), tok, rb)
+            })
         })
         .collect()
 }
@@ -227,6 +250,12 @@ pub(crate) fn collapse_swaps(
     let mut confusion: HashMap<Token, HashMap<Token, usize>> = HashMap::new();
     for (p, _, _) in &changed {
         if let (Some(at), Some(bt)) = (a_tok.get(p), bmap.get(p)) {
+            // Tokens carrying block-entity NBT are per-cell content edits, not
+            // re-skins: never collapse them into a palette swap (their hashes
+            // would otherwise each form a spurious 100%-dominant "swap").
+            if crate::fingerprint::token_has_nbt(at) || crate::fingerprint::token_has_nbt(bt) {
+                continue;
+            }
             *confusion
                 .entry(at.clone())
                 .or_default()
@@ -269,36 +298,104 @@ fn raw_score(raw: &RawDiff) -> usize {
     raw.added.len() + raw.removed.len() + raw.changed.len()
 }
 
+/// Hard cap on the candidates in a single refinement grid (7³ — the
+/// exhaustive grid for a ±3 window).
+pub(crate) const REFINE_MAX_PASSES: usize = 343;
+
+/// Hard cap on total `compare` passes for a whole `refine_offset` call: the
+/// coarse grid plus, when that grid was strided, one exhaustive sweep of the
+/// gap around its winner.
+pub(crate) const REFINE_MAX_TOTAL_PASSES: usize = 2 * REFINE_MAX_PASSES;
+
+/// Candidate offsets for [`refine_offset`]: `base` plus a symmetric grid of
+/// ±`window` on each axis. Windows up to 3 are exhaustive; beyond that the
+/// per-axis step grows (coarser grid, extremes always sampled) so the total
+/// stays ≤ [`REFINE_MAX_PASSES`] instead of blowing up as `(2·window+1)³`.
+/// Per-axis grid step for a given window: `ceil(window/3)`, so at most 3
+/// interior samples per side plus the extreme → ≤7 values per axis.
+pub(crate) fn refinement_step(window: usize) -> usize {
+    window.div_ceil(3).max(1)
+}
+
+pub(crate) fn refinement_offsets(base: IVec3, window: usize) -> Vec<IVec3> {
+    let w = window as i32;
+    let step = refinement_step(window) as i32;
+    let mut axis = vec![0i32];
+    let mut v = step;
+    while v < w {
+        axis.push(v);
+        axis.push(-v);
+        v += step;
+    }
+    if w > 0 {
+        axis.push(w);
+        axis.push(-w);
+    }
+    let mut out = Vec::with_capacity(axis.len().pow(3));
+    for dz in &axis {
+        for dy in &axis {
+            for dx in &axis {
+                out.push((base.0 + dx, base.1 + dy, base.2 + dz));
+            }
+        }
+    }
+    out
+}
+
 /// Snap a coarse (downsampled-FFT) offset to the exact translation by a small
-/// local search within ±`window` on each axis, minimizing the residual. Returns
-/// the chosen offset together with its `RawDiff`, so the caller reuses that
-/// comparison instead of recomputing it.
+/// local search within ±`window` on each axis, minimizing the residual. The
+/// search is bounded to [`REFINE_MAX_PASSES`] `compare` passes (see
+/// [`refinement_offsets`]). Returns the chosen offset together with its
+/// `RawDiff`, so the caller reuses that comparison instead of recomputing it.
 fn refine_offset(
     a_cells: &[Cell],
     b_cells: &[Cell],
     base: IVec3,
     window: usize,
 ) -> (IVec3, RawDiff) {
-    let w = window as i32;
     let mut best = base;
     let mut best_raw = compare(a_cells, base, b_cells);
     let mut best_r = raw_score(&best_raw);
-    for dz in -w..=w {
-        for dy in -w..=w {
-            for dx in -w..=w {
-                if dx == 0 && dy == 0 && dz == 0 {
-                    continue;
-                }
-                let t = (base.0 + dx, base.1 + dy, base.2 + dz);
-                let raw = compare(a_cells, t, b_cells);
-                let r = raw_score(&raw);
-                if r < best_r {
-                    best_r = r;
-                    best = t;
-                    best_raw = raw;
-                }
+
+    // Coarse pass over the (possibly strided) grid spanning ±window, then —
+    // when the grid was strided — an exhaustive sweep of the gap around the
+    // coarse winner, so the true offset can't hide between grid samples.
+    let step = refinement_step(window);
+    let mut sweep = |candidates: Vec<IVec3>,
+                     anchor: IVec3,
+                     best: &mut IVec3,
+                     best_raw: &mut RawDiff,
+                     best_r: &mut usize| {
+        for t in candidates {
+            if t == anchor {
+                continue;
+            }
+            let raw = compare(a_cells, t, b_cells);
+            let r = raw_score(&raw);
+            if r < *best_r {
+                *best_r = r;
+                *best = t;
+                *best_raw = raw;
             }
         }
+    };
+
+    sweep(
+        refinement_offsets(base, window),
+        base,
+        &mut best,
+        &mut best_raw,
+        &mut best_r,
+    );
+    if step > 1 {
+        let coarse = best;
+        sweep(
+            refinement_offsets(coarse, step - 1),
+            coarse,
+            &mut best,
+            &mut best_raw,
+            &mut best_r,
+        );
     }
     (best, best_raw)
 }
@@ -528,9 +625,21 @@ impl Diff {
         .to_string()
     }
 
+    /// Cap on the `regions` array in [`summary_json`](Self::summary_json):
+    /// keeps the JSON bounded for pathological scattered-change diffs.
+    const SUMMARY_REGION_CAP: usize = 100;
+
     /// Compact human summary (counts + regions + swaps), no per-cell data.
+    /// `regions` is capped at [`SUMMARY_REGION_CAP`](Self::SUMMARY_REGION_CAP)
+    /// entries (the largest by changed-cell count); `region_total` always
+    /// reports the uncapped count and `regions_truncated` flags the cut.
     pub fn summary_json(&self) -> String {
-        let regs = crate::diff::regions::regions(self);
+        let mut regs = crate::diff::regions::regions(self);
+        let region_total = regs.len();
+        // Largest first; deterministic tie-break by bounding box corner.
+        regs.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.min.cmp(&b.min)));
+        let regions_truncated = region_total > Self::SUMMARY_REGION_CAP;
+        regs.truncate(Self::SUMMARY_REGION_CAP);
         let region_json: Vec<serde_json::Value> = regs
             .iter()
             .map(|r| {
@@ -550,6 +659,8 @@ impl Diff {
                         "changed": self.changed.len(), "swapped": self.swapped.len() },
             "swaps": self.palette_swaps.iter().map(|(a, b)| [a.to_string(), b.to_string()]).collect::<Vec<_>>(),
             "regions": region_json,
+            "regions_truncated": regions_truncated,
+            "region_total": region_total,
         })
         .to_string()
     }
@@ -1021,8 +1132,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "block-entity NBT diffing not yet implemented — see the diff spec's \
-                'Appendix: block-entity diffing'"]
     fn block_entity_nbt_change_is_a_nonzero_diff() {
         use crate::block_entity::BlockEntity;
         use crate::block_position::BlockPosition;
@@ -1055,6 +1164,130 @@ mod tests {
             "differing chest NBT should be a non-zero diff"
         );
         assert_eq!(d.changed.len(), 1, "the chest cell is the changed cell");
+    }
+
+    #[test]
+    fn refinement_search_is_bounded_for_large_strides() {
+        // A downsampled alignment of a huge build can hand refine_offset a
+        // stride-12 window; the exhaustive grid would be 25^3 = 15625 compare
+        // passes. The search must stay within REFINE_MAX_PASSES.
+        let offs = refinement_offsets((5, -3, 7), 12);
+        assert!(
+            offs.len() <= REFINE_MAX_PASSES,
+            "at most {} candidate offsets, got {}",
+            REFINE_MAX_PASSES,
+            offs.len()
+        );
+        // The coarser grid still spans the whole ±window cube.
+        assert!(offs.contains(&(5, -3, 7)), "base offset included");
+        assert!(offs.contains(&(5 + 12, -3 + 12, 7 + 12)), "+w corner");
+        assert!(offs.contains(&(5 - 12, -3 - 12, 7 - 12)), "-w corner");
+        // Small windows stay exhaustive (unchanged behavior).
+        assert_eq!(refinement_offsets((0, 0, 0), 1).len(), 27);
+        assert_eq!(refinement_offsets((0, 0, 0), 3).len(), 343);
+        for w in [0usize, 1, 2, 3, 5, 7, 12, 40, 1000] {
+            assert!(
+                refinement_offsets((0, 0, 0), w).len() <= REFINE_MAX_PASSES,
+                "window {w} exceeds the pass cap"
+            );
+        }
+    }
+
+    #[test]
+    fn refinement_finds_an_offset_between_coarse_grid_samples() {
+        // Regression: with a stride-12 window the coarse grid samples only
+        // {0,±4,±8,±12} per axis, so a true offset of +1 sits BETWEEN samples.
+        // The exhaustive second sweep around the coarse winner must still
+        // land on it exactly.
+        let spec = FingerprintSpec::exact();
+        let a = filled_box((0, 0, 0), (6, 4, 5), "minecraft:stone");
+        let b = filled_box((1, 0, 0), (7, 4, 5), "minecraft:stone");
+        let g = RigidOp::identity();
+        let a_cells = cells(&a, &g, &spec);
+        let b_cells = cells(&b, &g, &spec);
+
+        let (off, raw) = refine_offset(&a_cells, &b_cells, (0, 0, 0), 12);
+        assert_eq!(off, (1, 0, 0), "exact offset recovered from a strided grid");
+        assert_eq!(
+            raw_score(&raw),
+            0,
+            "the recovered offset aligns the builds perfectly"
+        );
+    }
+
+    #[test]
+    fn refinement_total_passes_stay_bounded() {
+        // Coarse grid + one exhaustive gap sweep, both capped.
+        for w in [0usize, 1, 2, 3, 5, 7, 12, 40, 1000] {
+            let coarse = refinement_offsets((0, 0, 0), w).len();
+            let step = refinement_step(w);
+            let gap = if step > 1 {
+                refinement_offsets((0, 0, 0), step - 1).len()
+            } else {
+                0
+            };
+            assert!(
+                coarse + gap <= REFINE_MAX_TOTAL_PASSES,
+                "window {w}: {coarse}+{gap} exceeds the total pass cap"
+            );
+        }
+    }
+
+    #[test]
+    fn summary_json_caps_regions_and_reports_totals() {
+        // 200 isolated added cells (spaced out → 200 one-cell regions), with
+        // the first region enlarged so "keep the largest" is observable.
+        let stone = BlockState::new("minecraft:stone");
+        let mut added = Vec::new();
+        for i in 0..200 {
+            added.push(((i * 5, 0, 0), stone.clone()));
+        }
+        // A second row attached to region 0 makes it a 4-cell region.
+        for z in 1..4 {
+            added.push(((0, 0, z), stone.clone()));
+        }
+        let d = Diff {
+            transform: Transform {
+                rotate: RigidOp::identity(),
+                translate: (0, 0, 0),
+            },
+            distance: added.len() as u64,
+            added,
+            removed: Vec::new(),
+            changed: Vec::new(),
+            swapped: Vec::new(),
+            palette_swaps: Vec::new(),
+            support: 0.0,
+        };
+        let s: serde_json::Value = serde_json::from_str(&d.summary_json()).unwrap();
+        let regs = s["regions"].as_array().unwrap();
+        assert_eq!(regs.len(), 100, "regions capped at 100");
+        assert_eq!(s["regions_truncated"], serde_json::json!(true));
+        assert_eq!(s["region_total"], serde_json::json!(200));
+        // Largest regions kept: the 4-cell region must survive the cut.
+        assert!(
+            regs.iter().any(|r| r["count"].as_u64() == Some(4)),
+            "largest region kept"
+        );
+
+        // A small diff is not truncated and reports its true total.
+        let small = Diff {
+            transform: Transform {
+                rotate: RigidOp::identity(),
+                translate: (0, 0, 0),
+            },
+            distance: 1,
+            added: vec![((0, 0, 0), stone.clone())],
+            removed: Vec::new(),
+            changed: Vec::new(),
+            swapped: Vec::new(),
+            palette_swaps: Vec::new(),
+            support: 1.0,
+        };
+        let s: serde_json::Value = serde_json::from_str(&small.summary_json()).unwrap();
+        assert_eq!(s["regions"].as_array().unwrap().len(), 1);
+        assert_eq!(s["regions_truncated"], serde_json::json!(false));
+        assert_eq!(s["region_total"], serde_json::json!(1));
     }
 
     #[test]

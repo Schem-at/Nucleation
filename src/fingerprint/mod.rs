@@ -20,6 +20,162 @@ pub(crate) mod testgen;
 use crate::block_state::BlockState;
 use crate::fingerprint::classifier::{Classifier, Token};
 use crate::fingerprint::symmetry::Symmetry;
+use crate::utils::{NbtMap, NbtValue};
+
+/// Top-level block-entity NBT keys that restate WHERE the entity sits (or its
+/// id, which the block token already carries) rather than what it contains.
+/// Excluded from the stable NBT hash so translated copies stay equal.
+fn is_positional_key(k: &str) -> bool {
+    matches!(k, "x" | "y" | "z" | "id" | "Id" | "Pos")
+}
+
+/// Top-level block-entity NBT keys that encode a facing/rotation. Under a
+/// rotation-tolerant symmetry these must be excluded from the hash: the block
+/// token is rotated by the group element but the NBT is not, so a genuinely
+/// rotated copy would otherwise fail to match itself. Under `Symmetry::None`
+/// they are kept — there is no rotation to be invariant to, and the rotation
+/// is real content.
+fn is_directional_key(k: &str) -> bool {
+    matches!(
+        k,
+        "Rotation" | "rotation" | "Facing" | "facing" | "Rot" | "rot"
+    )
+}
+
+/// Unambiguous, order-independent text serialization of an NBT value:
+/// compound keys sorted recursively, strings length-prefixed, floats by bit
+/// pattern. Used only for hashing (never parsed back).
+fn write_nbt_value(out: &mut String, v: &NbtValue) {
+    use std::fmt::Write;
+    let write_str = |out: &mut String, s: &str| {
+        let _ = write!(out, "{}:", s.len());
+        out.push_str(s);
+    };
+    match v {
+        NbtValue::Byte(x) => {
+            let _ = write!(out, "B{x}");
+        }
+        NbtValue::Short(x) => {
+            let _ = write!(out, "S{x}");
+        }
+        NbtValue::Int(x) => {
+            let _ = write!(out, "I{x}");
+        }
+        NbtValue::Long(x) => {
+            let _ = write!(out, "L{x}");
+        }
+        NbtValue::Float(x) => {
+            let _ = write!(out, "F{}", x.to_bits());
+        }
+        NbtValue::Double(x) => {
+            let _ = write!(out, "D{}", x.to_bits());
+        }
+        NbtValue::String(s) => {
+            out.push('T');
+            write_str(out, s);
+        }
+        NbtValue::ByteArray(a) => {
+            out.push_str("BA[");
+            for x in a {
+                let _ = write!(out, "{x},");
+            }
+            out.push(']');
+        }
+        NbtValue::IntArray(a) => {
+            out.push_str("IA[");
+            for x in a {
+                let _ = write!(out, "{x},");
+            }
+            out.push(']');
+        }
+        NbtValue::LongArray(a) => {
+            out.push_str("LA[");
+            for x in a {
+                let _ = write!(out, "{x},");
+            }
+            out.push(']');
+        }
+        NbtValue::List(l) => {
+            out.push('[');
+            for x in l {
+                write_nbt_value(out, x);
+                out.push(',');
+            }
+            out.push(']');
+        }
+        NbtValue::Compound(m) => {
+            let mut entries: Vec<(&String, &NbtValue)> = m.iter().collect();
+            entries.sort_by(|a, b| a.0.cmp(b.0));
+            out.push('{');
+            for (k, v) in entries {
+                write_str(out, k);
+                out.push('=');
+                write_nbt_value(out, v);
+                out.push(';');
+            }
+            out.push('}');
+        }
+    }
+}
+
+/// Stable hash token for a block entity's NBT payload, or `None` when there
+/// is no payload beyond positional/id keys (an empty tile-entity record must
+/// fingerprint the same as no record at all). Deterministic across HashMap
+/// iteration orders: top-level and nested compound keys are sorted.
+pub(crate) fn stable_nbt_token(nbt: &NbtMap, ignore_directional: bool) -> Option<Token> {
+    let mut entries: Vec<(&String, &NbtValue)> = nbt
+        .iter()
+        .filter(|(k, _)| !is_positional_key(k))
+        .filter(|(k, _)| !(ignore_directional && is_directional_key(k)))
+        .collect();
+    if entries.is_empty() {
+        return None;
+    }
+    entries.sort_by(|a, b| a.0.cmp(b.0));
+    let mut out = String::new();
+    out.push('{');
+    for (k, v) in entries {
+        use std::fmt::Write;
+        let _ = write!(out, "{}:", k.len());
+        out.push_str(k);
+        out.push('=');
+        write_nbt_value(&mut out, v);
+        out.push(';');
+    }
+    out.push('}');
+    let hash = blake3::hash(out.as_bytes());
+    let hex = hash.to_hex();
+    Some(Token::from(&hex.as_str()[..NBT_TOKEN_HEX_LEN]))
+}
+
+/// Separator between a cell's block token and its block-entity NBT hash.
+pub(crate) const NBT_MARKER: &str = "#nbt:";
+/// Hex width of the truncated blake3 NBT hash.
+pub(crate) const NBT_TOKEN_HEX_LEN: usize = 16;
+
+/// A cell token augmented with its block entity's stable NBT token, so cells
+/// differing only in tile-entity data (sign text, chest contents) compare and
+/// hash as different.
+pub(crate) fn token_with_nbt(tok: &Token, nbt_tok: &Token) -> Token {
+    let mut s = String::with_capacity(tok.len() + nbt_tok.len() + NBT_MARKER.len());
+    s.push_str(tok.as_str());
+    s.push_str(NBT_MARKER);
+    s.push_str(nbt_tok.as_str());
+    Token::from(s)
+}
+
+/// True if `tok` was augmented with block-entity NBT by [`token_with_nbt`].
+/// Matches the trailing marker + fixed-width hex hash rather than a bare
+/// substring, so a block token that merely contains `#nbt:` (a modded id, a
+/// property value) is not misread as carrying NBT.
+pub(crate) fn token_has_nbt(tok: &Token) -> bool {
+    match tok.as_str().rsplit_once(NBT_MARKER) {
+        Some((_, hash)) => {
+            hash.len() == NBT_TOKEN_HEX_LEN && hash.bytes().all(|b| b.is_ascii_hexdigit())
+        }
+        None => false,
+    }
+}
 
 pub(crate) fn is_air(name: &str) -> bool {
     matches!(
@@ -78,6 +234,11 @@ impl BlockPolicy {
 pub struct FingerprintSpec {
     pub symmetry: Symmetry,
     pub blocks: BlockPolicy,
+    /// Fold block-entity NBT (sign text, chest contents) into each cell's
+    /// token. Only meaningful for content-exact matching: the fuzzy presets
+    /// deliberately ignore block identity, so making them sensitive to loot
+    /// tables or sign text would defeat their purpose.
+    pub block_entities: bool,
 }
 
 impl FingerprintSpec {
@@ -85,34 +246,49 @@ impl FingerprintSpec {
         Self {
             symmetry: Symmetry::None,
             blocks: BlockPolicy::Exact,
+            block_entities: true,
         }
     }
     pub fn shape() -> Self {
         Self {
             symmetry: Symmetry::Octahedral,
             blocks: BlockPolicy::IdOnly,
+            block_entities: false,
         }
     }
     pub fn structural() -> Self {
         Self {
             symmetry: Symmetry::YawMirror,
             blocks: BlockPolicy::Classify(rulesets::structural()),
+            block_entities: false,
         }
     }
     pub fn redstone_computational() -> Self {
         Self {
             symmetry: Symmetry::YawMirror,
             blocks: BlockPolicy::Classify(rulesets::redstone_computational()),
+            block_entities: false,
         }
     }
     pub fn redstone_survival() -> Self {
         Self {
             symmetry: Symmetry::YawMirror,
             blocks: BlockPolicy::Classify(rulesets::redstone_survival()),
+            block_entities: false,
         }
     }
     pub fn custom(symmetry: Symmetry, blocks: BlockPolicy) -> Self {
-        Self { symmetry, blocks }
+        Self {
+            symmetry,
+            blocks,
+            block_entities: false,
+        }
+    }
+
+    /// Builder: opt this spec in or out of block-entity NBT sensitivity.
+    pub fn with_block_entities(mut self, on: bool) -> Self {
+        self.block_entities = on;
+        self
     }
 
     /// Canonical preset names. `redstone` aliases `redstone_computational`.
@@ -247,6 +423,35 @@ pub fn fingerprint(schem: &UniversalSchematic, spec: &FingerprintSpec) -> Finger
         cell_list.push(((pos.x, pos.y, pos.z), id));
     }
 
+    // Block-entity NBT tokens per occupied cell, computed once (they are
+    // rotation-invariant). Serializations are memoized by NBT identity so
+    // template-shared entities hash once. Positions come from the store keys
+    // (via `get_block_entity`), never from `BlockEntity::position`, which is
+    // stale for template-shared entities.
+    let mut nbt_memo: HashMap<*const NbtMap, Option<Token>> = HashMap::new();
+    let mut nbt_by_pos: HashMap<(i32, i32, i32), Token> = HashMap::new();
+    // Rotation-tolerant specs must not hash facing/rotation fields (see
+    // `is_directional_key`).
+    let ignore_directional = spec.symmetry != Symmetry::None;
+    if spec.block_entities {
+        for (pos, _) in &cell_list {
+            if let Some(be) = schem.get_block_entity(crate::block_position::BlockPosition {
+                x: pos.0,
+                y: pos.1,
+                z: pos.2,
+            }) {
+                let key = std::sync::Arc::as_ptr(&be.nbt);
+                let tok = nbt_memo
+                    .entry(key)
+                    .or_insert_with(|| stable_nbt_token(&be.nbt, ignore_directional))
+                    .clone();
+                if let Some(t) = tok {
+                    nbt_by_pos.insert(*pos, t);
+                }
+            }
+        }
+    }
+
     let mut best: Option<Vec<u8>> = None;
     for g in spec.symmetry.elements() {
         let toks: Vec<Option<Token>> = palette
@@ -256,7 +461,11 @@ pub fn fingerprint(schem: &UniversalSchematic, spec: &FingerprintSpec) -> Finger
         let mut cells: Vec<((i32, i32, i32), Token)> = Vec::with_capacity(cell_list.len());
         for (pos, id) in &cell_list {
             if let Some(tok) = &toks[*id] {
-                cells.push((g.apply_pos(*pos), tok.clone()));
+                let tok = match nbt_by_pos.get(pos) {
+                    Some(nbt) => token_with_nbt(tok, nbt),
+                    None => tok.clone(),
+                };
+                cells.push((g.apply_pos(*pos), tok));
             }
         }
         if cells.is_empty() {
@@ -308,6 +517,149 @@ mod signature_tests {
         let b = translated(&a, (40, -5, 12));
         let spec = FingerprintSpec::structural();
         assert_eq!(signature(&a, &spec), signature(&b, &spec));
+    }
+}
+
+#[cfg(test)]
+mod block_entity_tests {
+    use super::*;
+    use crate::block_entity::BlockEntity;
+    use crate::block_position::BlockPosition;
+    use crate::fingerprint::testgen::filled_box;
+    use crate::utils::NbtValue;
+
+    fn signed_at(text: &str, at: (i32, i32, i32)) -> UniversalSchematic {
+        let mut s = filled_box(at, (at.0 + 1, at.1, at.2), "minecraft:oak_sign");
+        s.set_block_entity(
+            BlockPosition {
+                x: at.0,
+                y: at.1,
+                z: at.2,
+            },
+            BlockEntity::new("minecraft:oak_sign".to_string(), at)
+                .with_nbt_data("Text1".to_string(), NbtValue::String(text.to_string())),
+        );
+        s
+    }
+
+    fn signed(text: &str) -> UniversalSchematic {
+        signed_at(text, (0, 0, 0))
+    }
+
+    #[test]
+    fn differing_block_entity_nbt_changes_the_fingerprint() {
+        let spec = FingerprintSpec::exact();
+        let a = signed("Alpha");
+        let b = signed("Beta");
+        assert_ne!(
+            fingerprint(&a, &spec),
+            fingerprint(&b, &spec),
+            "sign text must be part of the fingerprint"
+        );
+    }
+
+    #[test]
+    fn identical_block_entities_share_a_fingerprint() {
+        let spec = FingerprintSpec::exact();
+        let a = signed("Alpha");
+        let b = signed("Alpha");
+        assert_eq!(fingerprint(&a, &spec), fingerprint(&b, &spec));
+    }
+
+    #[test]
+    fn block_entity_fingerprint_is_translation_invariant() {
+        let spec = FingerprintSpec::exact();
+        let a = signed("Alpha");
+        let b = signed_at("Alpha", (13, 2, -7));
+        assert_eq!(
+            fingerprint(&a, &spec),
+            fingerprint(&b, &spec),
+            "translated copy (block entities included) must fingerprint equal"
+        );
+    }
+
+    /// Build a one-block sign carrying an arbitrary single NBT key.
+    fn sign_with_key(key: &str, value: &str) -> UniversalSchematic {
+        let at = (0, 0, 0);
+        let mut s = filled_box(at, (1, 0, 0), "minecraft:oak_sign");
+        s.set_block_entity(
+            BlockPosition { x: 0, y: 0, z: 0 },
+            BlockEntity::new("minecraft:oak_sign".to_string(), at)
+                .with_nbt_data(key.to_string(), NbtValue::String(value.to_string())),
+        );
+        s
+    }
+
+    #[test]
+    fn fuzzy_presets_ignore_block_entity_nbt() {
+        // The fuzzy presets deliberately ignore block identity; making them
+        // sensitive to sign text or chest loot would defeat their purpose.
+        let a = signed("Alpha");
+        let b = signed("Beta");
+        for (name, spec) in [
+            ("shape", FingerprintSpec::shape()),
+            ("structural", FingerprintSpec::structural()),
+            ("redstone_survival", FingerprintSpec::redstone_survival()),
+        ] {
+            assert!(!spec.block_entities, "{name} must not fold NBT");
+            assert_eq!(
+                fingerprint(&a, &spec),
+                fingerprint(&b, &spec),
+                "{name}: differing sign text must NOT change a fuzzy fingerprint"
+            );
+        }
+        // ...while the exact preset still distinguishes them.
+        let exact = FingerprintSpec::exact();
+        assert!(exact.block_entities);
+        assert_ne!(fingerprint(&a, &exact), fingerprint(&b, &exact));
+    }
+
+    #[test]
+    fn rotation_tolerant_specs_ignore_directional_nbt() {
+        // Under a rotation-tolerant symmetry the block token is rotated by the
+        // group element but the NBT is not, so facing/rotation keys must be
+        // excluded or a genuinely rotated copy fails to match itself.
+        let rot = FingerprintSpec::custom(Symmetry::YawMirror, BlockPolicy::Exact)
+            .with_block_entities(true);
+        let a = sign_with_key("Rotation", "4");
+        let b = sign_with_key("Rotation", "12");
+        assert_eq!(
+            fingerprint(&a, &rot),
+            fingerprint(&b, &rot),
+            "rotation-tolerant spec must ignore directional NBT keys"
+        );
+        // Non-directional content is still distinguished under that spec.
+        let c = sign_with_key("Text1", "Alpha");
+        let d = sign_with_key("Text1", "Beta");
+        assert_ne!(
+            fingerprint(&c, &rot),
+            fingerprint(&d, &rot),
+            "non-directional NBT is still content"
+        );
+        // With no symmetry there is nothing to be invariant to, so the
+        // rotation is real content and must be kept.
+        let none =
+            FingerprintSpec::custom(Symmetry::None, BlockPolicy::Exact).with_block_entities(true);
+        assert_ne!(
+            fingerprint(&a, &none),
+            fingerprint(&b, &none),
+            "Symmetry::None must keep directional NBT"
+        );
+    }
+
+    #[test]
+    fn token_has_nbt_requires_a_well_formed_marker() {
+        let base = Token::from("minecraft:stone");
+        let nbt = Token::from("0123456789abcdef");
+        assert!(token_has_nbt(&token_with_nbt(&base, &nbt)));
+        assert!(!token_has_nbt(&base));
+        // A block token that merely CONTAINS the marker must not be misread:
+        // the suffix has to be exactly the fixed-width hex hash.
+        assert!(!token_has_nbt(&Token::from("modid:weird#nbt:block")));
+        assert!(!token_has_nbt(&Token::from("foo#nbt:")));
+        assert!(!token_has_nbt(&Token::from("foo#nbt:0123456789abcde")));
+        assert!(!token_has_nbt(&Token::from("foo#nbt:0123456789abcdefg")));
+        assert!(!token_has_nbt(&Token::from("foo#nbt:zzzzzzzzzzzzzzzz")));
     }
 }
 
