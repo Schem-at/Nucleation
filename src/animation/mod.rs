@@ -25,6 +25,7 @@
 //! See `docs/features/animation.md` for the guide, and
 //! `docs/plans/2026-07-21-build-animator-design.md` for the design rationale.
 
+pub mod builder;
 pub mod easing;
 pub mod pose;
 pub mod presets;
@@ -32,6 +33,7 @@ pub mod stagger;
 pub mod timeline;
 pub mod track;
 
+pub use builder::{AnimationEffect, BuildAnimation};
 pub use easing::{Easing, Power};
 pub use pose::{Mat4, Pose};
 pub use stagger::{Axis, Group, GroupId, Grouping, Order, Pos, Spread, Stagger, StaggerFrom};

@@ -38,6 +38,7 @@ internal interface SchematicLib: Library {
     fun Schematic_set_blocks(handle: Pointer, positions: Slice, blockName: Slice): ResultIntInt
     fun Schematic_get_blocks_json(handle: Pointer, positions: Slice, write: Pointer): ResultUnitInt
     fun Schematic_copy_region(handle: Pointer, source: Pointer, minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int, targetX: Int, targetY: Int, targetZ: Int, excludedBlocksJson: Slice): ResultUnitInt
+    fun Schematic_get_block(handle: Pointer, x: Int, y: Int, z: Int): ResultPointerInt
     fun Schematic_get_block_with_properties(handle: Pointer, x: Int, y: Int, z: Int): ResultPointerInt
     fun Schematic_get_block_string(handle: Pointer, x: Int, y: Int, z: Int, write: Pointer): ResultUnitInt
     fun Schematic_get_block_entity_json(handle: Pointer, x: Int, y: Int, z: Int, write: Pointer): ResultUnitInt
@@ -45,6 +46,7 @@ internal interface SchematicLib: Library {
     fun Schematic_entity_count(handle: Pointer): FFIUint32
     fun Schematic_get_entities_json(handle: Pointer, write: Pointer): Unit
     fun Schematic_add_entity(handle: Pointer, id: Slice, x: Double, y: Double, z: Double, nbtJson: Slice): ResultUnitInt
+    fun Schematic_add_armor_stand(handle: Pointer, x: Double, y: Double, z: Double, yaw: Float, armorMaterial: Slice): ResultUnitInt
     fun Schematic_remove_entity(handle: Pointer, index: FFIUint32): ResultUnitInt
     fun Schematic_canonical_data_version(): Int
     fun Schematic_convert_to_data_version(handle: Pointer, targetDataVersion: Int, sourceDataVersion: Int, write: Pointer): Unit
@@ -790,7 +792,25 @@ class Schematic internal constructor (
         }
     }
     
+    /** The full block state at a position. `NotFound` if the position is
+    *outside every region.
+    */
+    fun getBlock(x: Int, y: Int, z: Int): Result<BlockState> {
+        
+        val returnVal = lib.Schematic_get_block(handle, x, y, z);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            val selfEdges: List<Any> = listOf()
+            val handle = nativeOkVal 
+            val returnOpaque = BlockState(handle, selfEdges, true)
+            return returnOpaque.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
     /** The block at a position with its properties, as a `BlockState`.
+    *Kept as an explicit alias for callers migrating from the older API.
     */
     fun getBlockWithProperties(x: Int, y: Int, z: Int): Result<BlockState> {
         
@@ -884,6 +904,27 @@ class Schematic internal constructor (
         } finally {
             idSliceMemory.close()
             nbtJsonSliceMemory.close()
+        }
+    }
+    
+    /** Add an armor stand without hand-authoring entity NBT.
+    *
+    *`armor_material` accepts `diamond`, `netherite`, `iron`, etc.; an
+    *empty string creates an unarmored stand. `yaw` uses Minecraft degrees.
+    */
+    fun addArmorStand(x: Double, y: Double, z: Double, yaw: Float, armorMaterial: String): Result<Unit> {
+        val armorMaterialSliceMemory = PrimitiveArrayTools.borrowUtf8(armorMaterial)
+        
+        val returnVal = lib.Schematic_add_armor_stand(handle, x, y, z, yaw, armorMaterialSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            armorMaterialSliceMemory.close()
         }
     }
     

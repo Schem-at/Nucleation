@@ -45,6 +45,18 @@ final class RenderConfig {
         Lib::ffi()->RenderConfig_clear_background($this->ptr);
     }
 
+    public function setGrid( $half_extent,  $spacing,  $plane_y,  $show_axes,  $red,  $green,  $blue,  $alpha) {
+        Lib::ffi()->RenderConfig_set_grid($this->ptr, $half_extent, $spacing, $plane_y, $show_axes, $red, $green, $blue, $alpha);
+    }
+
+    public function setFittedGrid( $margin,  $spacing,  $plane_y,  $show_axes,  $red,  $green,  $blue,  $alpha) {
+        Lib::ffi()->RenderConfig_set_fitted_grid($this->ptr, $margin, $spacing, $plane_y, $show_axes, $red, $green, $blue, $alpha);
+    }
+
+    public function clearGrid() {
+        Lib::ffi()->RenderConfig_clear_grid($this->ptr);
+    }
+
     public function setOrthographic( $orthographic) {
         Lib::ffi()->RenderConfig_set_orthographic($this->ptr, $orthographic);
     }

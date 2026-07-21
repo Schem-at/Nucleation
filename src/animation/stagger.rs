@@ -58,7 +58,8 @@ impl Group {
     }
 }
 
-/// Block centres, so a single block's centroid is its middle rather than its corner.
+/// The mesher centres each block model on its integer schematic coordinate, so
+/// a single block at `(x, y, z)` must rotate around exactly `(x, y, z)`.
 fn centroid_of(blocks: &[Pos]) -> [f32; 3] {
     if blocks.is_empty() {
         return [0.0; 3];
@@ -66,9 +67,9 @@ fn centroid_of(blocks: &[Pos]) -> [f32; 3] {
     let n = blocks.len() as f32;
     let (mut x, mut y, mut z) = (0.0f32, 0.0f32, 0.0f32);
     for b in blocks {
-        x += b.0 as f32 + 0.5;
-        y += b.1 as f32 + 0.5;
-        z += b.2 as f32 + 0.5;
+        x += b.0 as f32;
+        y += b.1 as f32;
+        z += b.2 as f32;
     }
     [x / n, y / n, z / n]
 }
@@ -358,9 +359,9 @@ mod tests {
     }
 
     #[test]
-    fn per_block_centroid_is_the_block_centre() {
+    fn per_block_centroid_matches_the_meshers_integer_block_centre() {
         let g = Grouping::PerBlock.apply(&[(2, 3, 4)]);
-        assert_eq!(g[0].centroid, [2.5, 3.5, 4.5]);
+        assert_eq!(g[0].centroid, [2.0, 3.0, 4.0]);
     }
 
     #[test]

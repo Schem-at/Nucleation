@@ -113,6 +113,9 @@ namespace capi {
     typedef struct Schematic_copy_region_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_copy_region_result;
     Schematic_copy_region_result Schematic_copy_region(nucleation::capi::Schematic* self, const nucleation::capi::Schematic* source, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z, int32_t target_x, int32_t target_y, int32_t target_z, nucleation::diplomat::capi::DiplomatStringView excluded_blocks_json);
 
+    typedef struct Schematic_get_block_result {union {nucleation::capi::BlockState* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_get_block_result;
+    Schematic_get_block_result Schematic_get_block(const nucleation::capi::Schematic* self, int32_t x, int32_t y, int32_t z);
+
     typedef struct Schematic_get_block_with_properties_result {union {nucleation::capi::BlockState* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_get_block_with_properties_result;
     Schematic_get_block_with_properties_result Schematic_get_block_with_properties(const nucleation::capi::Schematic* self, int32_t x, int32_t y, int32_t z);
 
@@ -130,6 +133,9 @@ namespace capi {
 
     typedef struct Schematic_add_entity_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_add_entity_result;
     Schematic_add_entity_result Schematic_add_entity(nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatStringView id, double x, double y, double z, nucleation::diplomat::capi::DiplomatStringView nbt_json);
+
+    typedef struct Schematic_add_armor_stand_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_add_armor_stand_result;
+    Schematic_add_armor_stand_result Schematic_add_armor_stand(nucleation::capi::Schematic* self, double x, double y, double z, float yaw, nucleation::diplomat::capi::DiplomatStringView armor_material);
 
     typedef struct Schematic_remove_entity_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_remove_entity_result;
     Schematic_remove_entity_result Schematic_remove_entity(nucleation::capi::Schematic* self, uint32_t index);
@@ -613,6 +619,14 @@ inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError>
     return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::BlockState>, nucleation::NucleationError> nucleation::Schematic::get_block(int32_t x, int32_t y, int32_t z) const {
+    auto result = nucleation::capi::Schematic_get_block(this->AsFFI(),
+        x,
+        y,
+        z);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::BlockState>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::BlockState>>(std::unique_ptr<nucleation::BlockState>(nucleation::BlockState::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::BlockState>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
 inline nucleation::diplomat::result<std::unique_ptr<nucleation::BlockState>, nucleation::NucleationError> nucleation::Schematic::get_block_with_properties(int32_t x, int32_t y, int32_t z) const {
     auto result = nucleation::capi::Schematic_get_block_with_properties(this->AsFFI(),
         x,
@@ -703,6 +717,16 @@ inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError>
         y,
         z,
         {nbt_json.data(), nbt_json.size()});
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::Schematic::add_armor_stand(double x, double y, double z, float yaw, std::string_view armor_material) {
+    auto result = nucleation::capi::Schematic_add_armor_stand(this->AsFFI(),
+        x,
+        y,
+        z,
+        yaw,
+        {armor_material.data(), armor_material.size()});
     return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 

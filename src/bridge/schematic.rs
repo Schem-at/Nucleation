@@ -578,8 +578,9 @@ pub mod ffi {
 
         // --- Block & Entity Accessors ---
 
-        /// The block at a position with its properties, as a `BlockState`.
-        pub fn get_block_with_properties(
+        /// The full block state at a position. `NotFound` if the position is
+        /// outside every region.
+        pub fn get_block(
             &self,
             x: i32,
             y: i32,
@@ -588,10 +589,21 @@ pub mod ffi {
             self.0
                 .get_block(x, y, z)
                 .cloned()
-                .map(|bs| Box::new(BlockState(bs)))
+                .map(BlockState)
+                .map(Box::new)
                 .ok_or(NucleationError::NotFound)
         }
 
+        /// The block at a position with its properties, as a `BlockState`.
+        /// Kept as an explicit alias for callers migrating from the older API.
+        pub fn get_block_with_properties(
+            &self,
+            x: i32,
+            y: i32,
+            z: i32,
+        ) -> Result<Box<BlockState>, NucleationError> {
+            self.get_block(x, y, z)
+        }
         /// The full block string (name, properties, NBT) at a position.
         pub fn get_block_string(
             &self,
@@ -695,6 +707,29 @@ pub mod ffi {
                 }
             }
             self.0.add_entity(entity);
+            Ok(())
+        }
+
+        /// Add an armor stand without hand-authoring entity NBT.
+        ///
+        /// `armor_material` accepts `diamond`, `netherite`, `iron`, etc.; an
+        /// empty string creates an unarmored stand. `yaw` uses Minecraft degrees.
+        pub fn add_armor_stand(
+            &mut self,
+            x: f64,
+            y: f64,
+            z: f64,
+            yaw: f32,
+            armor_material: &DiplomatStr,
+        ) -> Result<(), NucleationError> {
+            let material = utf8(armor_material)?;
+            let equipment = if material.is_empty() {
+                crate::ArmorStandEquipment::default()
+            } else {
+                crate::ArmorStandEquipment::full_set(material)
+            };
+            self.0
+                .add_entity(crate::Entity::armor_stand((x, y, z), yaw, equipment));
             Ok(())
         }
 

@@ -14,6 +14,10 @@ export { BlockPos } from "./BlockPos.mjs"
 
 export { Dimensions } from "./Dimensions.mjs"
 
+export { AnimationEffect } from "./AnimationEffect.mjs"
+
+export { BuildAnimation } from "./BuildAnimation.mjs"
+
 export { Autostack } from "./Autostack.mjs"
 
 export { Blocks } from "./Blocks.mjs"

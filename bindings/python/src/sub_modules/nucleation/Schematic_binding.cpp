@@ -12,6 +12,7 @@ void add_Schematic_binding(nb::module_ mod) {
     
     nb::class_<nucleation::Schematic> opaque(mod, "Schematic", nb::type_slots(nucleation_Schematic_slots));
     opaque
+        .def("add_armor_stand", &nucleation::Schematic::add_armor_stand, "x"_a, "y"_a, "z"_a, "yaw"_a, "armor_material"_a)
         .def("add_entity", &nucleation::Schematic::add_entity, "id"_a, "x"_a, "y"_a, "z"_a, "nbt_json"_a)
         .def("add_entity_from_snbt", &nucleation::Schematic::add_entity_from_snbt, "snbt"_a)
         .def("all_palettes_json", &nucleation::Schematic::all_palettes_json)
@@ -57,6 +58,7 @@ void add_Schematic_binding(nb::module_ mod) {
         .def("get_all_block_entities_json", &nucleation::Schematic::get_all_block_entities_json)
         .def("get_all_block_entities_snbt_json", &nucleation::Schematic::get_all_block_entities_snbt_json)
         .def("get_all_blocks_json", &nucleation::Schematic::get_all_blocks_json)
+        .def("get_block", std::move(maybe_op_unwrap(&nucleation::Schematic::get_block)), "x"_a, "y"_a, "z"_a)
         .def("get_block_entity_json", &nucleation::Schematic::get_block_entity_json, "x"_a, "y"_a, "z"_a)
         .def("get_block_entity_snbt", &nucleation::Schematic::get_block_entity_snbt, "x"_a, "y"_a, "z"_a)
         .def("get_block_name", &nucleation::Schematic::get_block_name, "x"_a, "y"_a, "z"_a)

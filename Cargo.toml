@@ -292,6 +292,22 @@ required-features = ["meshing"]
 name = "entity_mesh_test"
 required-features = ["meshing"]
 
+# README media generators live under examples/readme/<section>/ so the root
+# examples directory stays navigable as the feature showcase grows.
+[[example]]
+name = "readme_setblock"
+path = "examples/readme/animation/set-block.rs"
+required-features = ["rendering"]
+
+[[example]]
+name = "readme_assemble"
+path = "examples/readme/animation/assemble.rs"
+required-features = ["rendering"]
+
+[[example]]
+name = "readme_formats"
+path = "examples/readme/formats-and-io/round-trip.rs"
+
 # Store backends against real services via testcontainers (docker required).
 [[test]]
 name = "store_testcontainers"

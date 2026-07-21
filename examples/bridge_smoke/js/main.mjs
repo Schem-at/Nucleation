@@ -1,7 +1,9 @@
 // End-to-end smoke test for the generated JS/WASM bindings (same coverage as ../c,
 // minus file/store I/O which need the host filesystem shape).
 import {
+  AnimationEffect,
   Autostack,
+  BuildAnimation,
   DefinitionRegion,
   Diff,
   Schematic,
@@ -57,5 +59,12 @@ const r = DefinitionRegion.create();
 r.addPoint(1, 2, 3);
 SchematicRegions.add(s, "io", r);
 expect(SchematicRegions.namesJson(s) === '["io"]', "region name registered");
+
+// --- construction animation: fluent one-shot effect ---
+const animation = BuildAnimation.create("fluent");
+const effect = AnimationEffect.spinIn(600, 1);
+expect(animation.withEffect(effect).setBlock(0, 0, 0, "minecraft:stone") === 0, "fluent effect placement");
+expect(animation.setBlock(1, 0, 0, "minecraft:dirt") === 1, "next operation uses normal path");
+expect(animation.groupCount() === 2, "both animation targets recorded");
 
 console.log("bridge smoke (JS) OK");

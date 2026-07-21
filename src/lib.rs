@@ -78,7 +78,7 @@ getrandom::register_custom_getrandom!(wasm_entropy::getrandom_fallback);
 // Public re-exports
 pub use block_state::BlockState;
 pub use bounding_box::BoundingBox;
-pub use entity::Entity;
+pub use entity::{ArmorStandEquipment, Entity};
 pub use formats::{litematic, schematic, world_stream};
 pub use print_utils::{format_json_schematic, format_schematic};
 pub use region::Region;

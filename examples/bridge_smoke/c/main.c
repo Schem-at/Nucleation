@@ -5,6 +5,8 @@
 #include <string.h>
 
 #include "Autostack.h"
+#include "AnimationEffect.h"
+#include "BuildAnimation.h"
 #include "DefinitionRegion.h"
 #include "Diff.h"
 #include "Schematic.h"
@@ -82,6 +84,20 @@ int main(void) {
     assert(os.is_ok);
     Schematic_destroy(os.ok);
     Store_destroy(store);
+
+    /* --- construction animation: fluent one-shot effect --- */
+    BuildAnimation *animation = BuildAnimation_create(sv("fluent"));
+    AnimationEffect *effect = AnimationEffect_spin_in(600.0f, 1.0f);
+    BuildAnimation *borrowed = BuildAnimation_with_effect(animation, effect);
+    BuildAnimation_set_block_result animated =
+        BuildAnimation_set_block(borrowed, 0, 0, 0, sv("minecraft:stone"));
+    assert(animated.is_ok && animated.ok == 0);
+    BuildAnimation_set_block_result plain =
+        BuildAnimation_set_block(animation, 1, 0, 0, sv("minecraft:dirt"));
+    assert(plain.is_ok && plain.ok == 1);
+    assert(BuildAnimation_group_count(animation) == 2);
+    AnimationEffect_destroy(effect);
+    BuildAnimation_destroy(animation);
 
     Schematic_destroy(built);
     Schematic_destroy(loaded);

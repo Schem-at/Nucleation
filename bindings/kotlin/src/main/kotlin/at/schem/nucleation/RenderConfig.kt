@@ -15,6 +15,9 @@ internal interface RenderConfigLib: Library {
     fun RenderConfig_set_fov(handle: Pointer, fov: Float): Unit
     fun RenderConfig_set_background(handle: Pointer, r: Float, g: Float, b: Float, a: Float): Unit
     fun RenderConfig_clear_background(handle: Pointer): Unit
+    fun RenderConfig_set_grid(handle: Pointer, halfExtent: Int, spacing: Int, planeY: Float, showAxes: Boolean, red: Float, green: Float, blue: Float, alpha: Float): Unit
+    fun RenderConfig_set_fitted_grid(handle: Pointer, margin: Int, spacing: Int, planeY: Float, showAxes: Boolean, red: Float, green: Float, blue: Float, alpha: Float): Unit
+    fun RenderConfig_clear_grid(handle: Pointer): Unit
     fun RenderConfig_set_orthographic(handle: Pointer, orthographic: Boolean): Unit
     fun RenderConfig_set_isometric(handle: Pointer): Unit
 }
@@ -123,6 +126,30 @@ class RenderConfig internal constructor (
     fun clearBackground(): Unit {
         
         val returnVal = lib.RenderConfig_clear_background(handle);
+        
+    }
+    
+    /** Configure a one-block world grid. Models are centred on integer
+    *schematic coordinates, so grid lines are placed on half-integer
+    *block boundaries automatically.
+    */
+    fun setGrid(halfExtent: Int, spacing: Int, planeY: Float, showAxes: Boolean, red: Float, green: Float, blue: Float, alpha: Float): Unit {
+        
+        val returnVal = lib.RenderConfig_set_grid(handle, halfExtent, spacing, planeY, showAxes, red, green, blue, alpha);
+        
+    }
+    
+    /** Configure a compact grid fitted to half-integer block boundaries.
+    */
+    fun setFittedGrid(margin: Int, spacing: Int, planeY: Float, showAxes: Boolean, red: Float, green: Float, blue: Float, alpha: Float): Unit {
+        
+        val returnVal = lib.RenderConfig_set_fitted_grid(handle, margin, spacing, planeY, showAxes, red, green, blue, alpha);
+        
+    }
+    
+    fun clearGrid(): Unit {
+        
+        val returnVal = lib.RenderConfig_clear_grid(handle);
         
     }
     

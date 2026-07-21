@@ -156,6 +156,44 @@ export class RenderConfig {
     }
 
     /**
+     * Configure a one-block world grid. Models are centred on integer
+     * schematic coordinates, so grid lines are placed on half-integer
+     * block boundaries automatically.
+     */
+    setGrid(halfExtent, spacing, planeY, showAxes, red, green, blue, alpha) {
+    wasm.RenderConfig_set_grid(this.ffiValue, halfExtent, spacing, planeY, showAxes, red, green, blue, alpha);
+
+        try {}
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
+     * Configure a compact grid fitted to half-integer block boundaries.
+     */
+    setFittedGrid(margin, spacing, planeY, showAxes, red, green, blue, alpha) {
+    wasm.RenderConfig_set_fitted_grid(this.ffiValue, margin, spacing, planeY, showAxes, red, green, blue, alpha);
+
+        try {}
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    clearGrid() {
+    wasm.RenderConfig_clear_grid(this.ffiValue);
+
+        try {}
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
      * Enable (`true`) or disable orthographic projection.
      */
     setOrthographic(orthographic) {

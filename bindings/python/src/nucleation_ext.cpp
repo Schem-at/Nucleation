@@ -10,6 +10,8 @@ void add_MeshProgress_binding(nb::module_);
 void add_TextureInfo_binding(nb::module_);
 void add_BlockPos_binding(nb::module_);
 void add_Dimensions_binding(nb::module_);
+void add_AnimationEffect_binding(nb::module_);
+void add_BuildAnimation_binding(nb::module_);
 void add_Autostack_binding(nb::module_);
 void add_Blocks_binding(nb::module_);
 void add_Brush_binding(nb::module_);
@@ -134,6 +136,8 @@ NB_MODULE(nucleation, mod)
     add_TextureInfo_binding(mod);
     add_BlockPos_binding(mod);
     add_Dimensions_binding(mod);
+    add_AnimationEffect_binding(mod);
+    add_BuildAnimation_binding(mod);
     add_Autostack_binding(mod);
     add_Blocks_binding(mod);
     add_Brush_binding(mod);

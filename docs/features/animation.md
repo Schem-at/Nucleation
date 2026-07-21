@@ -9,10 +9,10 @@ It answers the questions a schematic library actually gets asked: *show me this
 build assembling itself*, *print it layer by layer*, *reveal it along the curve
 it was built from*, *replay this diff*.
 
-> **Status:** the data model and rendering both work end to end — see
-> `examples/render_animation.rs`. Language bindings are not wired up yet
-> (Rust only for now); dynamic lights and shadows are deliberately out of scope
-> ([why](../plans/renderer-lighting-deferred.md)).
+> **Status:** the deterministic core, renderer, direct GIF/PNG output, and
+> generated Rust/JavaScript/Python/Kotlin bindings work end to end. The concise
+> construction-shaped API is `BuildAnimation`; `BuildAnimator` remains the
+> lower-level API for existing schematics and custom grouping.
 
 ## The shape of it
 
@@ -30,7 +30,53 @@ positions ──> Grouping ──> [Group]  ──> Timeline ──seek(t)──
 - A **`Timeline`** binds clips to targets; `seek(t)` returns a **`Frame`** of
   poses.
 
-## Quick start
+## Quick start: record normal construction code
+
+`BuildAnimation` owns a schematic and records each mutation as a target. Calls
+outside a group become separate steps; calls between `begin_group()` and
+`end_group()` animate together. The default is drop-and-pop and can be replaced
+for the whole build or one call.
+
+```python
+from pathlib import Path
+from nucleation import AnimationEffect, BuildAnimation, RenderConfig
+
+a = BuildAnimation.create("stairs")
+a.set_default_effect(AnimationEffect.drop_and_pop(480, 4.5))
+
+a.begin_group()
+for x in range(8):
+    a.set_block(x, 0, 0, "minecraft:stone")
+a.end_group()
+
+a.with_effect(AnimationEffect.spin_in(600, 1)).set_block(
+    7, 1, 0, "minecraft:diamond_block"
+)
+
+camera = AnimationEffect.turntable(4_000)
+a.animate_camera(camera, 0)
+
+view = RenderConfig.create(480, 360)
+view.set_isometric()
+view.set_fitted_grid(1, 1, -0.002, False, .42, .52, .60, .26)
+a.render_gif(Path("pack.zip").read_bytes(), view, "stairs.gif", 18, 750)
+```
+
+<div align="center">
+<img src="../media/readme/animation/workshop.gif" width="420" alt="A workshop floor assembling with a furnace, crafting table, chest, and equipped armor stand">
+</div>
+
+For travelling-wave geometry such as the trefoil, use
+`begin_keyed_group(key)` for each segment and `set_stagger_total_ms(...)`.
+Custom effects use `AnimationEffect.create`, `add_tween`, and `add_keyframe`;
+blocks and the camera consume exactly the same effect representation.
+
+The complete README example is
+[`examples/readme/animation/workshop.py`](../../examples/readme/animation/workshop.py),
+and its exact output is available as a
+[`workshop.schem` download](../downloads/readme/animation/workshop.schem).
+
+## Lower-level Rust timeline
 
 ```rust
 use nucleation::animation::*;
@@ -314,16 +360,21 @@ ground plane with optional coloured axes (+X red, +Y green, +Z blue):
 ```rust
 use nucleation::rendering::GridConfig;
 rc.grid = Some(GridConfig {
-    half_extent: 16,          // spans -16..=16 blocks
-    spacing: 1,               // a line every block
-    plane_y: 0.0,
-    show_axes: true,
-    line_rgba: [0.55, 0.57, 0.62, 0.6],
+    fit_to_bounds: true,       // rectangular grid around actual block bounds
+    margin: 1,                 // one complete grid cell around the build
+    spacing: 1,                // one cell per block; lines use n ± 0.5 boundaries
+    plane_y: -0.502,           // below y=0 floor blocks, whose bottom is -0.5
+    show_axes: false,
+    line_rgba: [0.42, 0.52, 0.60, 0.26],
+    ..GridConfig::default()
 });
 ```
 
-Blocks occlude grid lines behind them, and glass blends over the grid. It is
-`None` by default, so a render without a grid is bit-for-bit unchanged.
+The fitted form uses `floor(min)` and `ceil(max)` from the rendered geometry,
+so an asymmetric build does not receive a misleading origin-centred square.
+Every line remains on a half-integer boundary and therefore meets the edges of
+block models centred on integer coordinates. In generated bindings, call
+`RenderConfig.set_fitted_grid(margin, spacing, plane_y, ...)`.
 
 ## Screen-space overlays (labels, leader lines, code)
 
@@ -341,7 +392,7 @@ if let Some((px, py)) = project_point(&view_projs[i], [2.5, 2.5, 2.5], rc.width,
 }
 ```
 
-`examples/readme_assemble.rs` writes these anchors to `anchors.json`; a
+`examples/readme/animation/assemble.rs` writes these anchors to `anchors.json`; a
 compositor then draws a leader line and caption that track the block frame by
 frame. A 2D screen-space grid is the same idea — evenly spaced lines drawn by
 the compositor.

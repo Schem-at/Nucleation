@@ -10,7 +10,7 @@ this doc is the *authoring* side — how to turn the API into a GIF for the READ
 ## The big picture
 
 ```
-Rust example (examples/readme_*.rs)
+README generator (examples/readme/<section>/*.{py,rs})
   build schematic ──► save .schem/.litematic     (the download beside the image)
                  └──► BuildAnimator + Timeline    (the animation, pure data)
                  └──► render transparent frames    (f0000.png … via the renderer)
@@ -100,7 +100,8 @@ ffmpeg -y -framerate 20 -i 'render_work/foo/f%04d.png' \
 `reserve_transparent=1` + `alpha_threshold=128` — omit either and the background
 comes back solid black.
 
-Every `examples/readme_*.rs` follows this shape. Copy the closest one.
+Every generator under `examples/readme/<section>/` follows this shape. Copy the
+closest one.
 
 ---
 
@@ -120,18 +121,26 @@ closed curve) loops if you **sample exactly one period and drop the last frame**
 ## Code-synced illustrations (the flagship)
 
 "Highlight the code as the block it places drops in." Template:
-`examples/readme_setblock.rs` + `tools/readme-media/compose_code.py`.
+`examples/readme/animation/set-block.rs` + `tools/readme-media/compose_code.py`.
 
 The generator emits `timing.json` beside the frames:
 
 ```json
 {
-  "title": "Placing blocks",
-  "code": ["s = Schematic(\"pillar\")", "s.set_block(0,0,0,\"...\")", ...],
-  "anim_w": 360, "anim_h": 420,
-  "active": [0, 0, 1, 1, 2, ...]     // live code-line index, one per frame
+  "title": "Signal gate",
+  "filename": "signal_gate.py",
+  "code": ["from nucleation import Schematic", "s = Schematic(\"signal_gate\")", ...],
+  "anim_w": 420, "anim_h": 420,
+  "active": [1, 1, 2, 2, 3, ...]     // live code-line index, one per frame
 }
 ```
+
+The compositor sizes the editor from the longest line, reserves the full render
+canvas, and adds line numbers, syntax colouring, active-line hierarchy, and a
+separate live-render stage. `filename` is optional and defaults to `example.py`.
+Keep placement-to-line mappings as data in the generator instead of assuming a
+fixed line offset; imports and setup lines can then be added without drifting
+out of sync.
 
 `active[i]` is which line is lit at frame `i`. The generator computes it from the
 stagger timing (block i starts at `intro + i*each_ms`). The compositor does the rest:
@@ -160,7 +169,7 @@ let vps = animation_view_projs(&meshes, &frames, &rc);   // GPU-free, per frame
 let (px, py) = camera::project_point(&vps[i], [2.5,2.5,2.5], rc.width, rc.height).unwrap();
 ```
 
-`examples/readme_assemble.rs` writes these to `anchors.json`; an SVG/ffmpeg
+`examples/readme/animation/assemble.rs` writes these to `anchors.json`; an SVG/ffmpeg
 overlay draws a leader line that tracks the block. Proven: the line lands exactly
 on the block's pixels.
 

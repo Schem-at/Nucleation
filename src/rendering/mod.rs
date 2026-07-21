@@ -26,8 +26,13 @@ use crate::meshing::MeshOutput;
 /// legible — the point of it is documentation, not decoration.
 #[derive(Clone, Copy, Debug)]
 pub struct GridConfig {
-    /// The grid spans `-half_extent..=half_extent` blocks on each axis.
+    /// The grid spans `-half_extent..=half_extent` blocks on each axis unless
+    /// `fit_to_bounds` is enabled.
     pub half_extent: i32,
+    /// Fit the grid to the rendered block bounds instead of an origin-centred square.
+    pub fit_to_bounds: bool,
+    /// Whole-block margin around fitted bounds.
+    pub margin: i32,
     /// A grid line every `spacing` blocks (clamped to at least 1).
     pub spacing: i32,
     /// Height of the grid plane (usually the build's floor, `0`).
@@ -42,6 +47,8 @@ impl Default for GridConfig {
     fn default() -> Self {
         Self {
             half_extent: 16,
+            fit_to_bounds: false,
+            margin: 1,
             spacing: 1,
             plane_y: 0.0,
             show_axes: true,
@@ -316,6 +323,53 @@ pub fn encode_png(pixels: &[u8], width: u32, height: u32) -> Result<Vec<u8>, Ren
     Ok(buf.into_inner())
 }
 
+/// Encode deterministic RGBA animation frames as an infinitely looping GIF.
+pub fn encode_animation_gif(
+    frames: &[Vec<u8>],
+    width: u32,
+    height: u32,
+    fps: f64,
+) -> Result<Vec<u8>, RenderError> {
+    use image::codecs::gif::{GifEncoder, Repeat as GifRepeat};
+    use image::{Delay, Frame};
+
+    let mut bytes = Vec::new();
+    {
+        let mut encoder = GifEncoder::new(&mut bytes);
+        encoder
+            .set_repeat(GifRepeat::Infinite)
+            .map_err(|e| RenderError::PngEncode(e.to_string()))?;
+        let fps = fps.max(1.0).round() as u32;
+        for pixels in frames {
+            let image =
+                image::RgbaImage::from_raw(width, height, pixels.clone()).ok_or_else(|| {
+                    RenderError::PngEncode("Failed to create GIF frame from pixels".into())
+                })?;
+            encoder
+                .encode_frame(Frame::from_parts(
+                    image,
+                    0,
+                    0,
+                    Delay::from_numer_denom_ms(1000, fps),
+                ))
+                .map_err(|e| RenderError::PngEncode(e.to_string()))?;
+        }
+    }
+    Ok(bytes)
+}
+
+/// Write deterministic RGBA animation frames as an infinitely looping GIF.
+pub fn write_animation_gif(
+    frames: &[Vec<u8>],
+    width: u32,
+    height: u32,
+    fps: f64,
+    path: &str,
+) -> Result<(), RenderError> {
+    let gif = encode_animation_gif(frames, width, height, fps)?;
+    std::fs::write(path, gif).map_err(RenderError::Io)
+}
+
 // ─── High-level API on UniversalSchematic ───────────────────────────────────
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -380,6 +434,15 @@ mod config_tests {
         assert_eq!(c.projection, Projection::Orthographic);
         assert!((c.yaw - 45.0).abs() < 1e-4);
         assert!((c.pitch - 35.264).abs() < 1e-3);
+    }
+
+    #[test]
+    fn animation_gif_encoder_produces_a_looping_gif() {
+        let black = vec![0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255];
+        let white = vec![255; 16];
+        let gif = encode_animation_gif(&[black, white], 2, 2, 20.0).unwrap();
+        assert!(gif.starts_with(b"GIF"));
+        assert!(gif.windows(11).any(|w| w == b"NETSCAPE2.0"));
     }
 
     #[test]

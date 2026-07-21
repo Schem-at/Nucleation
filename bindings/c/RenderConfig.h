@@ -31,6 +31,12 @@ void RenderConfig_set_background(RenderConfig* self, float r, float g, float b, 
 
 void RenderConfig_clear_background(RenderConfig* self);
 
+void RenderConfig_set_grid(RenderConfig* self, int32_t half_extent, int32_t spacing, float plane_y, bool show_axes, float red, float green, float blue, float alpha);
+
+void RenderConfig_set_fitted_grid(RenderConfig* self, int32_t margin, int32_t spacing, float plane_y, bool show_axes, float red, float green, float blue, float alpha);
+
+void RenderConfig_clear_grid(RenderConfig* self);
+
 void RenderConfig_set_orthographic(RenderConfig* self, bool orthographic);
 
 void RenderConfig_set_isometric(RenderConfig* self);

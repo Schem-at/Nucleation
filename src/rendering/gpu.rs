@@ -102,36 +102,59 @@ impl DrawUniforms {
 
 /// Interleaved `[x, y, z, r, g, b, a]` line vertices for a reference grid and,
 /// optionally, coloured axes through the origin.
-fn build_grid_vertices(cfg: &super::GridConfig) -> Vec<f32> {
+fn build_grid_vertices(
+    cfg: &super::GridConfig,
+    bounds_min: [f32; 3],
+    bounds_max: [f32; 3],
+) -> Vec<f32> {
     let mut v = Vec::new();
     let mut push = |p: [f32; 3], c: [f32; 4]| {
         v.extend_from_slice(&[p[0], p[1], p[2], c[0], c[1], c[2], c[3]]);
     };
     let ext = cfg.half_extent.max(1);
-    let step = cfg.spacing.max(1);
+    let margin = cfg.margin.max(0) as f32;
+    // Block models are centred on integer schematic coordinates, so their
+    // boundaries — and therefore world-grid lines — live on half-integers.
+    let (min_x, max_x, min_z, max_z) = if cfg.fit_to_bounds {
+        (
+            bounds_min[0].floor() - margin - 0.5,
+            bounds_max[0].ceil() + margin - 0.5,
+            bounds_min[2].floor() - margin - 0.5,
+            bounds_max[2].ceil() + margin - 0.5,
+        )
+    } else {
+        let e = ext as f32;
+        (-e - 0.5, e + 0.5, -e - 0.5, e + 0.5)
+    };
+    let step = cfg.spacing.max(1) as f32;
     let y = cfg.plane_y;
-    let e = ext as f32;
     let col = cfg.line_rgba;
 
-    let mut i = -ext;
-    while i <= ext {
-        let t = i as f32;
-        // Lines parallel to X (varying z) and to Z (varying x).
-        push([-e, y, t], col);
-        push([e, y, t], col);
-        push([t, y, -e], col);
-        push([t, y, e], col);
-        i += step;
+    let mut z = min_z;
+    while z <= max_z + f32::EPSILON {
+        push([min_x, y, z], col);
+        push([max_x, y, z], col);
+        z += step;
+    }
+    let mut x = min_x;
+    while x <= max_x + f32::EPSILON {
+        push([x, y, min_z], col);
+        push([x, y, max_z], col);
+        x += step;
     }
 
     if cfg.show_axes {
-        // Full-strength primary colours: +X red, +Y green, +Z blue.
+        let axis_extent = max_x
+            .abs()
+            .max(min_x.abs())
+            .max(max_z.abs())
+            .max(min_z.abs());
         push([0.0, y, 0.0], [0.9, 0.2, 0.2, 1.0]);
-        push([e, y, 0.0], [0.9, 0.2, 0.2, 1.0]);
+        push([axis_extent, y, 0.0], [0.9, 0.2, 0.2, 1.0]);
         push([0.0, y, 0.0], [0.2, 0.8, 0.3, 1.0]);
-        push([0.0, y + e, 0.0], [0.2, 0.8, 0.3, 1.0]);
+        push([0.0, y + axis_extent, 0.0], [0.2, 0.8, 0.3, 1.0]);
         push([0.0, y, 0.0], [0.3, 0.5, 0.95, 1.0]);
-        push([0.0, y, e], [0.3, 0.5, 0.95, 1.0]);
+        push([0.0, y, axis_extent], [0.3, 0.5, 0.95, 1.0]);
     }
     v
 }
@@ -141,21 +164,62 @@ mod grid_tests {
     use super::*;
 
     #[test]
+    fn fitted_grid_uses_half_integer_block_boundaries_with_a_small_margin() {
+        let cfg = super::super::GridConfig {
+            fit_to_bounds: true,
+            margin: 1,
+            show_axes: false,
+            ..Default::default()
+        };
+        // Mesher metadata uses [min block coordinate, max coordinate + 1], while
+        // the actual models are centred on integer coordinates and therefore
+        // occupy n-0.5..n+0.5.
+        let vertices = build_grid_vertices(&cfg, [-3.0, 0.0, -2.0], [3.0, 2.0, 3.0]);
+        let points: Vec<[f32; 3]> = vertices
+            .chunks_exact(7)
+            .map(|v| [v[0], v[1], v[2]])
+            .collect();
+        assert_eq!(
+            points.iter().map(|p| p[0]).fold(f32::INFINITY, f32::min),
+            -4.5
+        );
+        assert_eq!(
+            points
+                .iter()
+                .map(|p| p[0])
+                .fold(f32::NEG_INFINITY, f32::max),
+            3.5
+        );
+        assert_eq!(
+            points.iter().map(|p| p[2]).fold(f32::INFINITY, f32::min),
+            -3.5
+        );
+        assert_eq!(
+            points
+                .iter()
+                .map(|p| p[2])
+                .fold(f32::NEG_INFINITY, f32::max),
+            3.5
+        );
+    }
+
+    #[test]
     fn grid_vertex_count_matches_the_line_count() {
         let cfg = super::super::GridConfig {
             half_extent: 4,
             spacing: 1,
-            plane_y: 0.0,
+            plane_y: -0.02,
             show_axes: true,
             line_rgba: [1.0; 4],
+            ..Default::default()
         };
-        let v = build_grid_vertices(&cfg);
+        let v = build_grid_vertices(&cfg, [-4.0, 0.0, -4.0], [4.0, 1.0, 4.0]);
         // 7 floats per vertex, 2 vertices per line.
         assert_eq!(v.len() % 7, 0, "each vertex is 7 floats");
         let verts = v.len() / 7;
-        // -4..=4 is 9 positions; one X-line and one Z-line each = 18 lines,
-        // plus 3 axes = 21 lines = 42 vertices.
-        assert_eq!(verts, 42);
+        // Centres -4..=4 occupy cells bounded by -4.5..=4.5: 10 X-lines
+        // and 10 Z-lines, plus 3 axes = 23 lines = 46 vertices.
+        assert_eq!(verts, 46);
     }
 
     #[test]
@@ -166,22 +230,34 @@ mod grid_tests {
             plane_y: 0.0,
             show_axes: false,
             line_rgba: [1.0; 4],
+            ..Default::default()
         };
-        let dense = build_grid_vertices(&base).len();
-        let sparse = build_grid_vertices(&super::super::GridConfig { spacing: 3, ..base }).len();
+        let bounds = ([-6.0, 0.0, -6.0], [6.0, 1.0, 6.0]);
+        let dense = build_grid_vertices(&base, bounds.0, bounds.1).len();
+        let sparse = build_grid_vertices(
+            &super::super::GridConfig { spacing: 3, ..base },
+            bounds.0,
+            bounds.1,
+        )
+        .len();
         assert!(sparse < dense, "larger spacing draws fewer lines");
     }
 
     #[test]
     fn degenerate_spacing_does_not_hang() {
         // spacing 0 is clamped to 1 rather than looping forever.
-        let v = build_grid_vertices(&super::super::GridConfig {
-            half_extent: 2,
-            spacing: 0,
-            plane_y: 0.0,
-            show_axes: false,
-            line_rgba: [1.0; 4],
-        });
+        let v = build_grid_vertices(
+            &super::super::GridConfig {
+                half_extent: 2,
+                spacing: 0,
+                plane_y: 0.0,
+                show_axes: false,
+                line_rgba: [1.0; 4],
+                ..Default::default()
+            },
+            [-2.0, 0.0, -2.0],
+            [2.0, 1.0, 2.0],
+        );
         assert!(!v.is_empty());
     }
 }
@@ -1037,7 +1113,7 @@ impl GpuRenderer {
 
         // Build the grid vertex buffer before the pass so it outlives it.
         let grid_lines = self.grid.get().map(|cfg| {
-            let verts = build_grid_vertices(&cfg);
+            let verts = build_grid_vertices(&cfg, self.bounds_min, self.bounds_max);
             let count = (verts.len() / 7) as u32;
             let buf = self
                 .device

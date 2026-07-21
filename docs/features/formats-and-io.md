@@ -1,29 +1,25 @@
 # Formats and I/O
 
-A `Schematic` is a named collection of blocks — plus block entities, entities,
-and metadata — held in one or many named regions. Load one from any supported
-format, edit it with plain coordinates and block strings, and save it as any
-other.
+Load a schematic from any supported container, edit it through the normal
+[`Schematic` construction API](basics.md), and write it in another format.
+Filesystem helpers detect input by content and select output from the extension:
 
 ```python
 from nucleation import Schematic
 
-cube = Schematic.load_from_file("simple_cube.litematic")   # any format, auto-detected
-cube.dimensions()                                          # (3, 3, 3)
-
-cube.set_block(1, 3, 1, "minecraft:glowstone")             # y=3: the region grows to fit
-cube.get_block_name(1, 3, 1)                               # "minecraft:glowstone"
-
-cube.save_to_file("cube.schem")                            # format from the extension
+build = Schematic.load_from_file("build.litematic")  # input format auto-detected
+build.save_to_file("build.schem")                    # Sponge output
 ```
 
-<div align="center">
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/basics.png" width="380" alt="The cube from the snippet with its glowstone crown, rendered">
-</div>
+For in-memory pipelines, use bytes instead of filesystem paths:
 
-Block-state strings with properties work anywhere a block is named —
-`"minecraft:lever[face=floor,facing=east]"` — and every block string a schematic
-can hold round-trips.
+```python
+build = Schematic.from_data(open("mystery.bin", "rb").read())
+```
+
+The rest of this guide covers supported containers, detection, conversion, and
+measured round-trip fidelity. For coordinates, block placement, automatic
+region growth, and block-state strings, start with [Basics](basics.md).
 
 ## Supported formats
 
@@ -52,7 +48,7 @@ Schematic.from_data(open("mystery.bin", "rb").read())   # format figured out fro
 
 ## Round-trip fidelity — measured, not claimed
 
-`examples/readme_formats.rs` builds one schematic (blocks, block-state
+`examples/readme/formats-and-io/round-trip.rs` builds one schematic (blocks, block-state
 properties, and a chest carrying NBT), writes it to every writable format, reads
 each back, and compares a **content-exact fingerprint** to the original. An
 identical hash is proof the round-trip lost nothing:
@@ -65,7 +61,7 @@ identical hash is proof the round-trip lost nothing:
 | mcstructure | 945 | ✕ translated | Bedrock is a *different game edition* — block ids and states are remapped through GeyserMC mappings, so this is a translation, not a round-trip |
 
 The download beside every illustration comes from this same script:
-[`round-trip.schem`](../../examples/readme_formats.rs) and `.litematic` are
+[`round-trip.schem`](../../examples/readme/formats-and-io/round-trip.rs) and `.litematic` are
 written next to the fingerprint table.
 
 **Where data changes on purpose:** only the two cross-boundary cases.

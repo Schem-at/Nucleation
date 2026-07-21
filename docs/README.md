@@ -10,6 +10,10 @@ JS/Kotlin/PHP), unified `NucleationError` errors.
 
 ## Feature guides
 
+- [Basics](features/basics.md) — create a schematic, place and inspect blocks,
+  coordinates, automatic growth, and block-state strings
+- [Formats and I/O](features/formats-and-io.md) — format detection, conversion,
+  round-trip fidelity, and filesystem/byte APIs
 - [Shapes, brushes, and masked fills](features/shapes-and-brushes.md)
 - [Palettes: turning colors into blocks](features/palettes-and-color.md)
 - [SDF shapes and terrain](features/sdf-and-fields.md)

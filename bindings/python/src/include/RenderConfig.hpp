@@ -34,6 +34,12 @@ namespace capi {
 
     void RenderConfig_clear_background(nucleation::capi::RenderConfig* self);
 
+    void RenderConfig_set_grid(nucleation::capi::RenderConfig* self, int32_t half_extent, int32_t spacing, float plane_y, bool show_axes, float red, float green, float blue, float alpha);
+
+    void RenderConfig_set_fitted_grid(nucleation::capi::RenderConfig* self, int32_t margin, int32_t spacing, float plane_y, bool show_axes, float red, float green, float blue, float alpha);
+
+    void RenderConfig_clear_grid(nucleation::capi::RenderConfig* self);
+
     void RenderConfig_set_orthographic(nucleation::capi::RenderConfig* self, bool orthographic);
 
     void RenderConfig_set_isometric(nucleation::capi::RenderConfig* self);
@@ -85,6 +91,34 @@ inline void nucleation::RenderConfig::set_background(float r, float g, float b, 
 
 inline void nucleation::RenderConfig::clear_background() {
     nucleation::capi::RenderConfig_clear_background(this->AsFFI());
+}
+
+inline void nucleation::RenderConfig::set_grid(int32_t half_extent, int32_t spacing, float plane_y, bool show_axes, float red, float green, float blue, float alpha) {
+    nucleation::capi::RenderConfig_set_grid(this->AsFFI(),
+        half_extent,
+        spacing,
+        plane_y,
+        show_axes,
+        red,
+        green,
+        blue,
+        alpha);
+}
+
+inline void nucleation::RenderConfig::set_fitted_grid(int32_t margin, int32_t spacing, float plane_y, bool show_axes, float red, float green, float blue, float alpha) {
+    nucleation::capi::RenderConfig_set_fitted_grid(this->AsFFI(),
+        margin,
+        spacing,
+        plane_y,
+        show_axes,
+        red,
+        green,
+        blue,
+        alpha);
+}
+
+inline void nucleation::RenderConfig::clear_grid() {
+    nucleation::capi::RenderConfig_clear_grid(this->AsFFI());
 }
 
 inline void nucleation::RenderConfig::set_orthographic(bool orthographic) {

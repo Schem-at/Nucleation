@@ -110,6 +110,9 @@ Schematic_get_blocks_json_result Schematic_get_blocks_json(const Schematic* self
 typedef struct Schematic_copy_region_result {union { NucleationError err;}; bool is_ok;} Schematic_copy_region_result;
 Schematic_copy_region_result Schematic_copy_region(Schematic* self, const Schematic* source, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z, int32_t target_x, int32_t target_y, int32_t target_z, DiplomatStringView excluded_blocks_json);
 
+typedef struct Schematic_get_block_result {union {BlockState* ok; NucleationError err;}; bool is_ok;} Schematic_get_block_result;
+Schematic_get_block_result Schematic_get_block(const Schematic* self, int32_t x, int32_t y, int32_t z);
+
 typedef struct Schematic_get_block_with_properties_result {union {BlockState* ok; NucleationError err;}; bool is_ok;} Schematic_get_block_with_properties_result;
 Schematic_get_block_with_properties_result Schematic_get_block_with_properties(const Schematic* self, int32_t x, int32_t y, int32_t z);
 
@@ -127,6 +130,9 @@ void Schematic_get_entities_json(const Schematic* self, DiplomatWrite* write);
 
 typedef struct Schematic_add_entity_result {union { NucleationError err;}; bool is_ok;} Schematic_add_entity_result;
 Schematic_add_entity_result Schematic_add_entity(Schematic* self, DiplomatStringView id, double x, double y, double z, DiplomatStringView nbt_json);
+
+typedef struct Schematic_add_armor_stand_result {union { NucleationError err;}; bool is_ok;} Schematic_add_armor_stand_result;
+Schematic_add_armor_stand_result Schematic_add_armor_stand(Schematic* self, double x, double y, double z, float yaw, DiplomatStringView armor_material);
 
 typedef struct Schematic_remove_entity_result {union { NucleationError err;}; bool is_ok;} Schematic_remove_entity_result;
 Schematic_remove_entity_result Schematic_remove_entity(Schematic* self, uint32_t index);

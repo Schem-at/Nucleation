@@ -235,8 +235,8 @@ mod tests {
         let tl = Timeline::new(groups(2));
         let f = tl.seek(0.0);
         assert_eq!(f.poses.len(), 2);
-        assert_eq!(f.pose(0).unwrap().pivot, [0.5, 0.5, 0.5]);
-        assert_eq!(f.pose(1).unwrap().pivot, [1.5, 0.5, 0.5]);
+        assert_eq!(f.pose(0).unwrap().pivot, [0.0, 0.0, 0.0]);
+        assert_eq!(f.pose(1).unwrap().pivot, [1.0, 0.0, 0.0]);
         assert_eq!(f.pose(0).unwrap().scale, [1.0; 3]);
     }
 
