@@ -17,9 +17,24 @@ nook = Schematic.create("crafting_nook")
 for x in range(5):
     for z in range(5):
         nook.set_block(x, 0, z, "minecraft:spruce_planks")
+
+def wall_block(i, y, end_posts):
+    if i == 2 and y == 2:
+        return "minecraft:light_blue_stained_glass"
+    if i in end_posts:
+        return "minecraft:stripped_spruce_log[axis=y]"
+    return "minecraft:oak_planks"
+
+for y in (1, 2, 3):
+    for x in range(5):
+        nook.set_block(x, y, 0, wall_block(x, y, (0, 4)))
+    for z in range(1, 5):
+        nook.set_block(0, y, z, wall_block(z, y, (4,)))
+
 nook.set_block(1, 1, 1, "minecraft:crafting_table")
-nook.set_block(3, 1, 1, "minecraft:chest[facing=west]")
-nook.set_block(0, 2, 4, "minecraft:wall_torch[facing=east]")
+nook.set_block(3, 1, 1, "minecraft:chest[facing=south]")
+nook.set_block(4, 2, 1, "minecraft:wall_torch[facing=south]")
+nook.set_block(1, 2, 4, "minecraft:wall_torch[facing=east]")
 nook.save_to_file("crafting-nook.schem")
 copy = Schematic.load_from_file("crafting-nook.schem")
 block = copy.get_block(1, 1, 1)
@@ -86,9 +101,11 @@ properties programmatically.
 `get_block(x, y, z)` returns the complete `BlockState`:
 
 ```python
+build = Schematic.create("inspect")
+build.set_block(1, 1, 1, "minecraft:oak_log[axis=x]")
 state = build.get_block(1, 1, 1)
 print(state.name())
-print(state.to_string())
+print(build.get_block_string(1, 1, 1))
 ```
 
 For lighter-weight queries, use `get_block_name` or `get_block_string`. A lookup
