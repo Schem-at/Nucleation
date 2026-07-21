@@ -1,7 +1,7 @@
 # Nucleation documentation
 
-Start with the [project README](../README.md) — installation, the basics, and
-an illustrated tour. Everything here goes deeper.
+Start with the [project README](../README.md) — installation, the feature index,
+and the gallery. Everything here goes deeper.
 
 Since v0.3.0 every binding is generated from one source of truth
 (`src/bridge/`), so **the API is the same everywhere**: same types, same
@@ -56,7 +56,8 @@ Each with a verified Python snippet:
 ## Per-language references
 
 - [Rust](rust/) · [JavaScript](javascript/) · [Python](python/) ·
-  [Kotlin](kotlin/) · [PHP](php/) · [C](c/) · [C++](cpp/)
+  [Kotlin](../bindings/kotlin/) · [PHP](../bindings/php/) ·
+  [C](../bindings/c/) · [C++](../bindings/cpp/)
 
 ## Verified examples
 

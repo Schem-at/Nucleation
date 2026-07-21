@@ -5,11 +5,13 @@ final class Renderer {
     /** @internal */
     public \FFI\CData $ptr;
     private bool $owned;
+    private ?object $borrowedFrom;
 
     /** @internal */
-    public function __construct(\FFI\CData $ptr, bool $owned) {
+    public function __construct(\FFI\CData $ptr, bool $owned, ?object $borrowedFrom = null) {
         $this->ptr = $ptr;
         $this->owned = $owned;
+        $this->borrowedFrom = $borrowedFrom;
     }
 
     public static function renderPixelsB64( $schematic, array $pack_zip,  $config) {

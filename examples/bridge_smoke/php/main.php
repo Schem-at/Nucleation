@@ -77,8 +77,19 @@ $reopened = $store->openSchematic('k1.litematic');
 expect($reopened->getBlockName(1, 2, 3) === 'minecraft:stone', 'store roundtrip preserves block');
 
 // --- construction animation: fluent borrowed one-shot effect ---
-$animation = BuildAnimation::create('fluent');
+$owner = BuildAnimation::create('borrowed-owner');
 $effect = AnimationEffect::spinIn(600.0, 1.0);
+$borrowed = $owner->withEffect($effect);
+unset($owner);
+gc_collect_cycles();
+expect(
+    $borrowed->setBlock(0, 0, 0, 'minecraft:stone') === 0,
+    'borrowed wrapper retains its owner'
+);
+unset($borrowed);
+gc_collect_cycles();
+
+$animation = BuildAnimation::create('fluent');
 $borrowed = $animation->withEffect($effect);
 expect($borrowed->setBlock(0, 0, 0, 'minecraft:stone') === 0, 'fluent effect placement');
 unset($borrowed);

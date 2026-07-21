@@ -5,11 +5,13 @@ final class BuildAnimation {
     /** @internal */
     public \FFI\CData $ptr;
     private bool $owned;
+    private ?object $borrowedFrom;
 
     /** @internal */
-    public function __construct(\FFI\CData $ptr, bool $owned) {
+    public function __construct(\FFI\CData $ptr, bool $owned, ?object $borrowedFrom = null) {
         $this->ptr = $ptr;
         $this->owned = $owned;
+        $this->borrowedFrom = $borrowedFrom;
     }
 
     public static function create(string $name) {
@@ -33,7 +35,7 @@ final class BuildAnimation {
 
     public function withEffect( $effect) {
         $ret = Lib::ffi()->BuildAnimation_with_effect($this->ptr, $effect->ptr);
-        return new BuildAnimation($ret, false);
+        return new BuildAnimation($ret, false, $this);
     }
 
     public function setStepMs( $step_ms) {
