@@ -32,12 +32,13 @@ const SEGMENTS: usize = 90;
 /// One full loop: build, hold, dissolve, and one 360° camera turn.
 const PERIOD_MS: f32 = 6000.0;
 /// How long the wave takes to travel the knot, as a fraction of the period.
-/// Well under the period so the knot is fully built for a beat before it goes.
-const SPREAD_MS: f32 = PERIOD_MS * 0.34;
+/// The tail remains visible across the period boundary, so the travelling wave
+/// wraps directly into the head without an empty pause at the GIF seam.
+const SPREAD_MS: f32 = PERIOD_MS * 0.40;
 /// Phase boundaries within a segment's own clip, as fractions of the period.
 const APPEAR_END: f32 = 0.10;
-const VANISH_START: f32 = 0.52;
-const VANISH_END: f32 = 0.62;
+const VANISH_START: f32 = 0.58;
+const VANISH_END: f32 = 0.68;
 /// How far above its final position a block starts (and ends).
 const FLY_HEIGHT: f32 = 7.0;
 const FPS: f64 = 20.0;
@@ -131,11 +132,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //    wave travelling around the knot.
     //
     //    One period is: fly in (staggered along the curve) → hold the finished
-    //    knot → fly back out (same direction) → empty. Because it ends empty
-    //    exactly where it began, the loop closes with nothing to hide.
+    //    knot → fly back out in the same direction. The tail crosses the period
+    //    boundary and meets the head on the closed curve, avoiding an empty hold.
     //
-    //    The stagger spread is well under the period, so the last segment lands
-    //    before the first leaves and the knot is genuinely whole for a beat.
+    //    The last segment still lands before the first leaves, so the knot is
+    //    genuinely whole for a beat even though the travelling wave wraps.
     let flash = arrival_flash();
     let flash_refs: Vec<&str> = flash.iter().map(String::as_str).collect();
     let clip = Clip::new(PERIOD_MS)
