@@ -257,6 +257,18 @@ name = "render_schematic"
 required-features = ["rendering"]
 
 [[example]]
+name = "render_smoke"
+required-features = ["rendering"]
+
+[[example]]
+name = "render_animation"
+required-features = ["rendering"]
+
+[[example]]
+name = "render_trefoil"
+required-features = ["rendering"]
+
+[[example]]
 name = "bench_mesh_timing"
 required-features = ["meshing"]
 
