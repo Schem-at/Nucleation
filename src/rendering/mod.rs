@@ -21,6 +21,35 @@ pub use hdri::HdriData;
 
 use crate::meshing::MeshOutput;
 
+/// A world-space reference grid drawn on a horizontal plane, optionally with
+/// coloured X/Y/Z axis lines through the origin. Makes block coordinates
+/// legible — the point of it is documentation, not decoration.
+#[derive(Clone, Copy, Debug)]
+pub struct GridConfig {
+    /// The grid spans `-half_extent..=half_extent` blocks on each axis.
+    pub half_extent: i32,
+    /// A grid line every `spacing` blocks (clamped to at least 1).
+    pub spacing: i32,
+    /// Height of the grid plane (usually the build's floor, `0`).
+    pub plane_y: f32,
+    /// Draw red/green/blue lines along +X/+Y/+Z from the origin.
+    pub show_axes: bool,
+    /// Grid line colour, linear RGBA. Alpha below 1 blends over the scene.
+    pub line_rgba: [f32; 4],
+}
+
+impl Default for GridConfig {
+    fn default() -> Self {
+        Self {
+            half_extent: 16,
+            spacing: 1,
+            plane_y: 0.0,
+            show_axes: true,
+            line_rgba: [0.5, 0.5, 0.55, 0.5],
+        }
+    }
+}
+
 /// Render configuration.
 #[derive(Clone)]
 pub struct RenderConfig {
@@ -43,6 +72,9 @@ pub struct RenderConfig {
     /// yaw-dependent silhouette, so orbiting cameras (turntables) keep a
     /// constant distance. Default `false`.
     pub sphere_fit: bool,
+    /// Optional world-space reference grid. `None` (the default) draws nothing
+    /// and leaves rendering bit-for-bit identical to before this existed.
+    pub grid: Option<GridConfig>,
 }
 
 impl Default for RenderConfig {
@@ -58,6 +90,7 @@ impl Default for RenderConfig {
             background: None,
             projection: Projection::Perspective,
             sphere_fit: false,
+            grid: None,
         }
     }
 }
@@ -129,6 +162,7 @@ pub async fn render_meshes_async(
     hdri: Option<&HdriData>,
 ) -> Result<Vec<u8>, RenderError> {
     let renderer = GpuRenderer::new(meshes, config.width, config.height, hdri).await?;
+    renderer.set_grid(config.grid);
     let camera = config.to_camera();
     // Use render_frame on native, which does sync readback
     #[cfg(not(target_arch = "wasm32"))]
@@ -164,6 +198,7 @@ pub fn render_animation(
 ) -> Result<Vec<Vec<u8>>, RenderError> {
     pollster::block_on(async {
         let renderer = GpuRenderer::new(meshes, config.width, config.height, hdri).await?;
+        renderer.set_grid(config.grid);
         let base = config.to_camera();
         let mut out = Vec::with_capacity(frames.len());
         let mut poses = vec![crate::animation::Pose::IDENTITY; meshes.len()];
@@ -218,6 +253,34 @@ pub fn render_animation_to_files(
         paths.push(path);
     }
     Ok(paths)
+}
+
+/// The exact view-projection matrix used for each frame of an animation.
+///
+/// GPU-free: the matrices are pure maths over the mesh bounds and per-frame
+/// camera. Pair with [`camera::project_point`] to place overlay labels — the
+/// compositor asks "where is block P at frame i" and gets a pixel anchor from
+/// `project_point(&view_projs[i], p, w, h)`. Because it uses the *same* camera
+/// derivation as [`render_animation`], the anchors line up with the pixels.
+pub fn animation_view_projs(
+    meshes: &[MeshOutput],
+    frames: &[crate::animation::Frame],
+    config: &RenderConfig,
+) -> Vec<[[f32; 4]; 4]> {
+    let (bmin, bmax) = camera::merged_bounds(meshes);
+    let aspect = config.width as f32 / config.height.max(1) as f32;
+    frames
+        .iter()
+        .map(|frame| {
+            let mut cam = config.to_camera();
+            if let Some(c) = &frame.camera {
+                cam.yaw_deg += c.yaw;
+                cam.pitch_deg += c.pitch;
+                cam.zoom *= c.zoom;
+            }
+            camera::compute_view_proj(bmin, bmax, aspect, &cam).0
+        })
+        .collect()
 }
 
 // ─── Sync wrappers (native only) ────────────────────────────────────────────

@@ -112,6 +112,34 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 }
 
+// ─── Grid / axis lines ──────────────────────────────────────────────────────
+// A world-space reference grid, drawn with the scene's view-projection so it
+// sits under the build and shares its perspective. No lighting or texturing —
+// each vertex just carries its own colour.
+
+struct LineVertex {
+    @location(0) position: vec3<f32>,
+    @location(1) color: vec4<f32>,
+};
+
+struct LineOutput {
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) color: vec4<f32>,
+};
+
+@vertex
+fn vs_line(in: LineVertex) -> LineOutput {
+    var out: LineOutput;
+    out.clip_position = uniforms.view_proj * vec4<f32>(in.position, 1.0);
+    out.color = in.color;
+    return out;
+}
+
+@fragment
+fn fs_line(in: LineOutput) -> @location(0) vec4<f32> {
+    return in.color;
+}
+
 // ─── Skybox rendering ───────────────────────────────────────────────────────
 
 struct SkyVertexOutput {

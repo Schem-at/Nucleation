@@ -9,10 +9,9 @@ It answers the questions a schematic library actually gets asked: *show me this
 build assembling itself*, *print it layer by layer*, *reveal it along the curve
 it was built from*, *replay this diff*.
 
-> **Status:** the data model (this page) is implemented. Renderer support for
-> per-block poses is in progress — see
-> [the design doc](../plans/2026-07-21-build-animator-design.md). Dynamic lights
-> and shadows are deliberately out of scope
+> **Status:** the data model and rendering both work end to end — see
+> `examples/render_animation.rs`. Language bindings are not wired up yet
+> (Rust only for now); dynamic lights and shadows are deliberately out of scope
 > ([why](../plans/renderer-lighting-deferred.md)).
 
 ## The shape of it
@@ -145,6 +144,24 @@ holds its last. Nothing snaps back.
 `Bounce`; `Steps(n)`; and `CubicBezier(x1, y1, x2, y2)` with the same
 parameterisation as CSS, so any curve you can write there works here.
 
+### Colours in one call
+
+Tint and emissive take colour strings and expand to per-channel tracks, so one
+name writes a compound value instead of three tracks at the call site:
+
+```rust
+Clip::new(600.0)
+    .tint(&["#ff0000", "#00ff00", "#0000ff"], Easing::Linear)
+    .emissive(&["#000000", "#ffcc00"], Easing::Out(Power::Cubic))
+```
+
+`#rgb`, `#rrggbb` and `#rrggbbaa` all parse, with or without the leading `#`.
+An unparseable colour becomes neutral white rather than failing, so a typo dulls
+a colour instead of killing the render.
+
+`Pose::opacity` folds into tint alpha at draw time, so there is a single alpha
+source rather than two that can disagree.
+
 ### Modifiers
 
 A `Modifier` post-processes a track's value — `SinCosBounce` drives the
@@ -210,6 +227,124 @@ A group's pose pivots about its **centroid** by default, which is what makes
 Renderers **must** apply it — skip it and rotated geometry shades wrong in a way
 that reads as a lighting bug. Degenerate poses (a block at scale 0 mid-reveal)
 return identity rather than emitting NaNs.
+
+## Rendering it
+
+Three calls: group, mesh per group, render.
+
+```rust
+use nucleation::animation::{presets, Axis, BuildAnimator, Grouping, Order, Stagger, Target};
+use nucleation::rendering::{render_animation_to_files, RenderConfig};
+
+let mut anim = BuildAnimator::from_schematic(&schem, Grouping::PerBlock);
+anim.timeline_mut().add_staggered(
+    presets::drop_and_pop(420.0, 6.0),
+    &Stagger::each(Order::Axis(Axis::Y, true), 55.0),
+    0.0,
+);
+let spin = presets::turntable(anim.duration_ms());
+anim.timeline_mut().add(spin, Target::Camera, 0.0);
+
+// One MeshOutput per group, index-aligned — this is the contract.
+let meshes = schem.mesh_groups(&pack, &MeshConfig::default(), anim.groups())?;
+
+let mut rc = RenderConfig::isometric();
+rc.sphere_fit = true;          // steady framing while the camera orbits
+render_animation_to_files(&meshes, &anim.frames(24.0), &rc, None, "out/f")?;
+```
+
+Then assemble the frames with ffmpeg (below).
+
+### Transparent GIFs for docs
+
+Set an alpha-0 clear and the frames drop into a README on light *or* dark
+backgrounds:
+
+```rust
+rc.background = Some([0.0, 0.0, 0.0, 0.0]);
+```
+
+GIF only has **1-bit** transparency — a pixel is fully opaque or fully gone. That
+would normally fringe antialiased edges, but the renderer does not multisample
+(`count: 1`), so edges are hard-cut and the cutout is clean. Two ffmpeg flags do
+the work:
+
+```bash
+ffmpeg -y -framerate 24 -i 'out/f%04d.png' \
+  -vf "split[a][b];[a]palettegen=max_colors=200:reserve_transparent=1[p];\
+[b][p]paletteuse=alpha_threshold=128" \
+  -loop 0 out.gif
+```
+
+`reserve_transparent=1` keeps a palette slot for the transparent colour;
+`alpha_threshold=128` picks the opaque/clear cutoff. Omit either and the
+background comes back as solid black.
+
+For full 8-bit alpha, APNG is the alternative and GitHub renders it — but
+expect roughly double the file size:
+
+```bash
+ffmpeg -y -framerate 24 -i 'out/f%04d.png' -plays 0 -f apng out.png
+```
+
+Keep README animations small: drop to 12–15fps, shrink the canvas, and lower
+`max_colors`. A 480×360 55-frame clip lands around 430 KB as a GIF.
+
+`mesh_groups` is what keeps mesh *i* aligned with group *i* — groups that
+contain only air still produce an entry so the indices never slip.
+
+The GPU renderer, atlas and geometry buffers are built **once** and reused for
+every frame; only a small uniform buffer is rewritten per frame. Rendering an
+animation is therefore much cheaper than rendering N stills.
+
+`examples/render_animation.rs` is the runnable version of the above.
+
+### What rendering costs
+
+Each group is meshed independently, so faces between groups are **not** culled
+against each other. That is what you want when groups move apart, and wasteful
+when they never do. Per-block grouping also means one draw call per block.
+Prefer `Layer` or `Chunk` for large builds.
+
+## Reference grid and axes
+
+For coordinate-space clarity, the renderer can draw a world-space grid on the
+ground plane with optional coloured axes (+X red, +Y green, +Z blue):
+
+```rust
+use nucleation::rendering::GridConfig;
+rc.grid = Some(GridConfig {
+    half_extent: 16,          // spans -16..=16 blocks
+    spacing: 1,               // a line every block
+    plane_y: 0.0,
+    show_axes: true,
+    line_rgba: [0.55, 0.57, 0.62, 0.6],
+});
+```
+
+Blocks occlude grid lines behind them, and glass blends over the grid. It is
+`None` by default, so a render without a grid is bit-for-bit unchanged.
+
+## Screen-space overlays (labels, leader lines, code)
+
+Text and 2D chrome live in a **compositor**, not the 3D renderer — that keeps a
+heavy text-rendering dependency out of the library. The renderer's job is to
+say *where on screen* a block is; the compositor draws the callout.
+
+```rust
+use nucleation::rendering::{animation_view_projs, camera::project_point};
+
+let view_projs = animation_view_projs(&meshes, &frames, &rc);   // GPU-free
+// For frame i, the pixel position of the block centre at (2, 2, 2):
+if let Some((px, py)) = project_point(&view_projs[i], [2.5, 2.5, 2.5], rc.width, rc.height) {
+    // hand (px, py) to an SVG/ffmpeg overlay step
+}
+```
+
+`examples/readme_assemble.rs` writes these anchors to `anchors.json`; a
+compositor then draws a leader line and caption that track the block frame by
+frame. A 2D screen-space grid is the same idea — evenly spaced lines drawn by
+the compositor.
 
 ## Presets
 

@@ -20,6 +20,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let out_dir = args
         .next()
         .unwrap_or_else(|| "render_work/anim".to_string());
+    // `--transparent` clears to alpha 0 so the frames drop into a README on
+    // either a light or a dark background.
+    let transparent = std::env::args().any(|a| a == "--transparent");
     std::fs::create_dir_all(&out_dir)?;
 
     let pack = ResourcePackSource::from_file(&pack_path)?;
@@ -58,6 +61,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     rc.width = 480;
     rc.height = 360;
     rc.sphere_fit = true;
+    if transparent {
+        rc.background = Some([0.0, 0.0, 0.0, 0.0]);
+    }
 
     let paths = render_animation_to_files(&meshes, &frames, &rc, None, &format!("{out_dir}/f"))?;
     println!("wrote {} frames to {out_dir}/", paths.len());

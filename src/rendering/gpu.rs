@@ -100,6 +100,92 @@ impl DrawUniforms {
     }
 }
 
+/// Interleaved `[x, y, z, r, g, b, a]` line vertices for a reference grid and,
+/// optionally, coloured axes through the origin.
+fn build_grid_vertices(cfg: &super::GridConfig) -> Vec<f32> {
+    let mut v = Vec::new();
+    let mut push = |p: [f32; 3], c: [f32; 4]| {
+        v.extend_from_slice(&[p[0], p[1], p[2], c[0], c[1], c[2], c[3]]);
+    };
+    let ext = cfg.half_extent.max(1);
+    let step = cfg.spacing.max(1);
+    let y = cfg.plane_y;
+    let e = ext as f32;
+    let col = cfg.line_rgba;
+
+    let mut i = -ext;
+    while i <= ext {
+        let t = i as f32;
+        // Lines parallel to X (varying z) and to Z (varying x).
+        push([-e, y, t], col);
+        push([e, y, t], col);
+        push([t, y, -e], col);
+        push([t, y, e], col);
+        i += step;
+    }
+
+    if cfg.show_axes {
+        // Full-strength primary colours: +X red, +Y green, +Z blue.
+        push([0.0, y, 0.0], [0.9, 0.2, 0.2, 1.0]);
+        push([e, y, 0.0], [0.9, 0.2, 0.2, 1.0]);
+        push([0.0, y, 0.0], [0.2, 0.8, 0.3, 1.0]);
+        push([0.0, y + e, 0.0], [0.2, 0.8, 0.3, 1.0]);
+        push([0.0, y, 0.0], [0.3, 0.5, 0.95, 1.0]);
+        push([0.0, y, e], [0.3, 0.5, 0.95, 1.0]);
+    }
+    v
+}
+
+#[cfg(test)]
+mod grid_tests {
+    use super::*;
+
+    #[test]
+    fn grid_vertex_count_matches_the_line_count() {
+        let cfg = super::super::GridConfig {
+            half_extent: 4,
+            spacing: 1,
+            plane_y: 0.0,
+            show_axes: true,
+            line_rgba: [1.0; 4],
+        };
+        let v = build_grid_vertices(&cfg);
+        // 7 floats per vertex, 2 vertices per line.
+        assert_eq!(v.len() % 7, 0, "each vertex is 7 floats");
+        let verts = v.len() / 7;
+        // -4..=4 is 9 positions; one X-line and one Z-line each = 18 lines,
+        // plus 3 axes = 21 lines = 42 vertices.
+        assert_eq!(verts, 42);
+    }
+
+    #[test]
+    fn axes_can_be_disabled_and_spacing_thins_the_grid() {
+        let base = super::super::GridConfig {
+            half_extent: 6,
+            spacing: 1,
+            plane_y: 0.0,
+            show_axes: false,
+            line_rgba: [1.0; 4],
+        };
+        let dense = build_grid_vertices(&base).len();
+        let sparse = build_grid_vertices(&super::super::GridConfig { spacing: 3, ..base }).len();
+        assert!(sparse < dense, "larger spacing draws fewer lines");
+    }
+
+    #[test]
+    fn degenerate_spacing_does_not_hang() {
+        // spacing 0 is clamped to 1 rather than looping forever.
+        let v = build_grid_vertices(&super::super::GridConfig {
+            half_extent: 2,
+            spacing: 0,
+            plane_y: 0.0,
+            show_axes: false,
+            line_rgba: [1.0; 4],
+        });
+        assert!(!v.is_empty());
+    }
+}
+
 struct LayerBuffers {
     positions: wgpu::Buffer,
     normals: wgpu::Buffer,
@@ -136,6 +222,9 @@ pub struct GpuRenderer {
     draw_buf: wgpu::Buffer,
     draw_bg: wgpu::BindGroup,
     draw_stride: u32,
+    // Optional world-space reference grid.
+    line_pipeline: wgpu::RenderPipeline,
+    grid: std::cell::Cell<Option<super::GridConfig>>,
     chunks_gpu: Vec<ChunkGpuData>,
     // Headless-only (None in windowed mode)
     render_target: Option<wgpu::Texture>,
@@ -615,6 +704,65 @@ impl GpuRenderer {
             None
         };
 
+        // --- Grid/axis line pipeline (group 0 = view-projection only) ---
+        let line_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("line_pipeline_layout"),
+            bind_group_layouts: &[Some(&uniform_bgl)],
+            ..Default::default()
+        });
+        let line_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("grid_lines"),
+            layout: Some(&line_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_line"),
+                // Interleaved position(3) + colour(4) = 28-byte stride.
+                buffers: &[Some(wgpu::VertexBufferLayout {
+                    array_stride: 28,
+                    step_mode: wgpu::VertexStepMode::Vertex,
+                    attributes: &[
+                        wgpu::VertexAttribute {
+                            format: wgpu::VertexFormat::Float32x3,
+                            offset: 0,
+                            shader_location: 0,
+                        },
+                        wgpu::VertexAttribute {
+                            format: wgpu::VertexFormat::Float32x4,
+                            offset: 12,
+                            shader_location: 1,
+                        },
+                    ],
+                })],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_line"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: color_format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::LineList,
+                ..Default::default()
+            },
+            // Depth-tested so blocks occlude grid lines behind them, but no
+            // depth write so the grid does not disturb transparent sorting.
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: depth_format,
+                depth_write_enabled: Some(false),
+                depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
+            multisample: Default::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+
         let atlas_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("atlas_sampler"),
             mag_filter: wgpu::FilterMode::Nearest,
@@ -816,6 +964,8 @@ impl GpuRenderer {
             draw_buf,
             draw_bg,
             draw_stride,
+            line_pipeline,
+            grid: std::cell::Cell::new(None),
             chunks_gpu,
             render_target,
             render_target_view,
@@ -884,6 +1034,20 @@ impl GpuRenderer {
         let (_sb, sky_bg) = make_ub(&sky_u, "sky_ub");
 
         let clear_color = clear_color_for(camera.background, self.hdri_enabled);
+
+        // Build the grid vertex buffer before the pass so it outlives it.
+        let grid_lines = self.grid.get().map(|cfg| {
+            let verts = build_grid_vertices(&cfg);
+            let count = (verts.len() / 7) as u32;
+            let buf = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("grid_lines"),
+                    contents: bytemuck::cast_slice(&verts),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+            (buf, count)
+        });
 
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("render_pass"),
@@ -959,6 +1123,15 @@ impl GpuRenderer {
                 i,
             );
         }
+        // Grid after the opaque/cutout depth is laid down (so blocks occlude it)
+        // but before transparent geometry (so glass blends over it).
+        if let Some((buf, count)) = &grid_lines {
+            pass.set_pipeline(&self.line_pipeline);
+            pass.set_bind_group(0, &opaque_bg, &[]);
+            pass.set_vertex_buffer(0, buf.slice(..));
+            pass.draw(0..*count, 0..1);
+        }
+
         for (i, chunk) in self.chunks_gpu.iter().enumerate() {
             draw_layer(
                 &mut pass,
@@ -1008,6 +1181,12 @@ impl GpuRenderer {
     /// Reset every mesh to the identity pose.
     pub fn clear_poses(&self) {
         self.set_poses(&[]);
+    }
+
+    /// Set (or clear, with `None`) the world-space reference grid drawn under
+    /// the scene. Cheap: the geometry is rebuilt per frame from this config.
+    pub fn set_grid(&self, grid: Option<super::GridConfig>) {
+        self.grid.set(grid);
     }
 
     pub fn render_frame(&self, camera: &CameraConfig) -> Result<Vec<u8>, RenderError> {
