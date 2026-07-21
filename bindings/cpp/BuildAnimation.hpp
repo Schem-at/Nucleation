@@ -12,8 +12,10 @@
 #include <optional>
 #include <cstdlib>
 #include "AnimationEffect.hpp"
+#include "Brush.hpp"
 #include "NucleationError.hpp"
 #include "RenderConfig.hpp"
+#include "Shape.hpp"
 #include "diplomat_runtime.hpp"
 
 
@@ -33,6 +35,13 @@ namespace capi {
 
     void BuildAnimation_clear_stagger(diplomat::capi::BuildAnimation* self);
 
+    void BuildAnimation_set_stagger_offset_ms(diplomat::capi::BuildAnimation* self, float offset_ms);
+
+    typedef struct BuildAnimation_set_loop_period_ms_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_set_loop_period_ms_result;
+    BuildAnimation_set_loop_period_ms_result BuildAnimation_set_loop_period_ms(diplomat::capi::BuildAnimation* self, float period_ms);
+
+    void BuildAnimation_clear_loop_period(diplomat::capi::BuildAnimation* self);
+
     typedef struct BuildAnimation_begin_group_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_begin_group_result;
     BuildAnimation_begin_group_result BuildAnimation_begin_group(diplomat::capi::BuildAnimation* self);
 
@@ -44,6 +53,9 @@ namespace capi {
 
     typedef struct BuildAnimation_set_block_result {union {uint32_t ok; diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_set_block_result;
     BuildAnimation_set_block_result BuildAnimation_set_block(diplomat::capi::BuildAnimation* self, int32_t x, int32_t y, int32_t z, diplomat::capi::DiplomatStringView block);
+
+    typedef struct BuildAnimation_fill_along_parameter_result {union {uint32_t ok; diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_fill_along_parameter_result;
+    BuildAnimation_fill_along_parameter_result BuildAnimation_fill_along_parameter(diplomat::capi::BuildAnimation* self, const diplomat::capi::Shape* shape, const diplomat::capi::Brush* brush, uint32_t group_count);
 
     typedef struct BuildAnimation_add_armor_stand_result {union {uint32_t ok; diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_add_armor_stand_result;
     BuildAnimation_add_armor_stand_result BuildAnimation_add_armor_stand(diplomat::capi::BuildAnimation* self, double x, double y, double z, float yaw, diplomat::capi::DiplomatStringView armor_material);
@@ -101,6 +113,21 @@ inline void BuildAnimation::clear_stagger() {
     diplomat::capi::BuildAnimation_clear_stagger(this->AsFFI());
 }
 
+inline void BuildAnimation::set_stagger_offset_ms(float offset_ms) {
+    diplomat::capi::BuildAnimation_set_stagger_offset_ms(this->AsFFI(),
+        offset_ms);
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::set_loop_period_ms(float period_ms) {
+    auto result = diplomat::capi::BuildAnimation_set_loop_period_ms(this->AsFFI(),
+        period_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline void BuildAnimation::clear_loop_period() {
+    diplomat::capi::BuildAnimation_clear_loop_period(this->AsFFI());
+}
+
 inline diplomat::result<std::monostate, NucleationError> BuildAnimation::begin_group() {
     auto result = diplomat::capi::BuildAnimation_begin_group(this->AsFFI());
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
@@ -123,6 +150,14 @@ inline diplomat::result<uint32_t, NucleationError> BuildAnimation::set_block(int
         y,
         z,
         {block.data(), block.size()});
+    return result.is_ok ? diplomat::result<uint32_t, NucleationError>(diplomat::Ok<uint32_t>(result.ok)) : diplomat::result<uint32_t, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<uint32_t, NucleationError> BuildAnimation::fill_along_parameter(const Shape& shape, const Brush& brush, uint32_t group_count) {
+    auto result = diplomat::capi::BuildAnimation_fill_along_parameter(this->AsFFI(),
+        shape.AsFFI(),
+        brush.AsFFI(),
+        group_count);
     return result.is_ok ? diplomat::result<uint32_t, NucleationError>(diplomat::Ok<uint32_t>(result.ok)) : diplomat::result<uint32_t, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 

@@ -28,6 +28,8 @@ export { Brush } from "./Brush"
 
 export { BuildingTool } from "./BuildingTool"
 
+export { Curve3D } from "./Curve3D"
+
 export { Palette } from "./Palette"
 
 export { PaletteBuilder } from "./PaletteBuilder"

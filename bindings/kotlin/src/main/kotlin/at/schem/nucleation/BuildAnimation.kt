@@ -13,10 +13,14 @@ internal interface BuildAnimationLib: Library {
     fun BuildAnimation_set_step_ms(handle: Pointer, stepMs: Float): Unit
     fun BuildAnimation_set_stagger_total_ms(handle: Pointer, totalMs: Float): Unit
     fun BuildAnimation_clear_stagger(handle: Pointer): Unit
+    fun BuildAnimation_set_stagger_offset_ms(handle: Pointer, offsetMs: Float): Unit
+    fun BuildAnimation_set_loop_period_ms(handle: Pointer, periodMs: Float): ResultUnitInt
+    fun BuildAnimation_clear_loop_period(handle: Pointer): Unit
     fun BuildAnimation_begin_group(handle: Pointer): ResultUnitInt
     fun BuildAnimation_begin_keyed_group(handle: Pointer, key: Float): ResultUnitInt
     fun BuildAnimation_end_group(handle: Pointer): ResultFFIUint32Int
     fun BuildAnimation_set_block(handle: Pointer, x: Int, y: Int, z: Int, block: Slice): ResultFFIUint32Int
+    fun BuildAnimation_fill_along_parameter(handle: Pointer, shape: Pointer, brush: Pointer, groupCount: FFIUint32): ResultFFIUint32Int
     fun BuildAnimation_add_armor_stand(handle: Pointer, x: Double, y: Double, z: Double, yaw: Float, armorMaterial: Slice): ResultFFIUint32Int
     fun BuildAnimation_animate_camera(handle: Pointer, effect: Pointer, offsetMs: Float): Unit
     fun BuildAnimation_frame_count(handle: Pointer, fps: Double, holdMs: Float): FFIUint32
@@ -109,6 +113,34 @@ class BuildAnimation internal constructor (
         
     }
     
+    /** Shift every construction group's start time. Negative offsets let a
+    *repeating staggered effect cross the beginning of a loop capture.
+    */
+    fun setStaggerOffsetMs(offsetMs: Float): Unit {
+        
+        val returnVal = lib.BuildAnimation_set_stagger_offset_ms(handle, offsetMs);
+        
+    }
+    
+    /** Capture exactly one loop period, excluding the duplicate endpoint.
+    */
+    fun setLoopPeriodMs(periodMs: Float): Result<Unit> {
+        
+        val returnVal = lib.BuildAnimation_set_loop_period_ms(handle, periodMs);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    fun clearLoopPeriod(): Unit {
+        
+        val returnVal = lib.BuildAnimation_clear_loop_period(handle);
+        
+    }
+    
     fun beginGroup(): Result<Unit> {
         
         val returnVal = lib.BuildAnimation_begin_group(handle);
@@ -155,6 +187,20 @@ class BuildAnimation internal constructor (
             }
         } finally {
             blockSliceMemory.close()
+        }
+    }
+    
+    /** Fill a parametric shape and record its voxels as ordered groups in
+    *the same transactional construction operation.
+    */
+    fun fillAlongParameter(shape: Shape, brush: Brush, groupCount: UInt): Result<UInt> {
+        
+        val returnVal = lib.BuildAnimation_fill_along_parameter(handle, shape.handle, brush.handle, FFIUint32(groupCount));
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return (nativeOkVal.toUInt()).ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
     

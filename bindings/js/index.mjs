@@ -26,6 +26,8 @@ export { Brush } from "./Brush.mjs"
 
 export { BuildingTool } from "./BuildingTool.mjs"
 
+export { Curve3D } from "./Curve3D.mjs"
+
 export { Palette } from "./Palette.mjs"
 
 export { PaletteBuilder } from "./PaletteBuilder.mjs"

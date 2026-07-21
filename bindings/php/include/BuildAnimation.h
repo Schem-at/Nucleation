@@ -8,8 +8,10 @@
 #include "diplomat_runtime.h"
 
 #include "AnimationEffect.d.h"
+#include "Brush.d.h"
 #include "NucleationError.d.h"
 #include "RenderConfig.d.h"
+#include "Shape.d.h"
 
 #include "BuildAnimation.d.h"
 
@@ -30,6 +32,13 @@ void BuildAnimation_set_stagger_total_ms(BuildAnimation* self, float total_ms);
 
 void BuildAnimation_clear_stagger(BuildAnimation* self);
 
+void BuildAnimation_set_stagger_offset_ms(BuildAnimation* self, float offset_ms);
+
+typedef struct BuildAnimation_set_loop_period_ms_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_set_loop_period_ms_result;
+BuildAnimation_set_loop_period_ms_result BuildAnimation_set_loop_period_ms(BuildAnimation* self, float period_ms);
+
+void BuildAnimation_clear_loop_period(BuildAnimation* self);
+
 typedef struct BuildAnimation_begin_group_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_begin_group_result;
 BuildAnimation_begin_group_result BuildAnimation_begin_group(BuildAnimation* self);
 
@@ -41,6 +50,9 @@ BuildAnimation_end_group_result BuildAnimation_end_group(BuildAnimation* self);
 
 typedef struct BuildAnimation_set_block_result {union {uint32_t ok; NucleationError err;}; bool is_ok;} BuildAnimation_set_block_result;
 BuildAnimation_set_block_result BuildAnimation_set_block(BuildAnimation* self, int32_t x, int32_t y, int32_t z, DiplomatStringView block);
+
+typedef struct BuildAnimation_fill_along_parameter_result {union {uint32_t ok; NucleationError err;}; bool is_ok;} BuildAnimation_fill_along_parameter_result;
+BuildAnimation_fill_along_parameter_result BuildAnimation_fill_along_parameter(BuildAnimation* self, const Shape* shape, const Brush* brush, uint32_t group_count);
 
 typedef struct BuildAnimation_add_armor_stand_result {union {uint32_t ok; NucleationError err;}; bool is_ok;} BuildAnimation_add_armor_stand_result;
 BuildAnimation_add_armor_stand_result BuildAnimation_add_armor_stand(BuildAnimation* self, double x, double y, double z, float yaw, DiplomatStringView armor_material);

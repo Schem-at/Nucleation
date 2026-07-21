@@ -86,6 +86,8 @@ pub struct BuildAnimation {
     pending_effect: Option<Clip>,
     step_ms: f32,
     stagger_total_ms: Option<f32>,
+    stagger_offset_ms: f32,
+    loop_period_ms: Option<f32>,
     camera: Vec<(Clip, f32)>,
 }
 
@@ -99,6 +101,8 @@ impl BuildAnimation {
             pending_effect: None,
             step_ms: 600.0,
             stagger_total_ms: None,
+            stagger_offset_ms: 0.0,
+            loop_period_ms: None,
             camera: Vec::new(),
         }
     }
@@ -131,6 +135,18 @@ impl BuildAnimation {
 
     pub fn set_stagger_total_ms(&mut self, stagger_total_ms: Option<f32>) {
         self.stagger_total_ms = stagger_total_ms.map(|v| v.max(0.0));
+    }
+
+    pub fn set_stagger_offset_ms(&mut self, offset_ms: f32) {
+        self.stagger_offset_ms = if offset_ms.is_finite() {
+            offset_ms
+        } else {
+            0.0
+        };
+    }
+
+    pub fn set_loop_period_ms(&mut self, period_ms: Option<f32>) {
+        self.loop_period_ms = period_ms.filter(|period| period.is_finite() && *period > 0.0);
     }
 
     pub fn begin_group(&mut self, effect: Option<Clip>) -> Result<(), String> {
@@ -174,6 +190,71 @@ impl BuildAnimation {
     pub fn set_block(&mut self, x: i32, y: i32, z: i32, block: &str) -> Result<GroupId, String> {
         let effect = self.pending_effect.take();
         self.set_block_inner(x, y, z, block, effect)
+    }
+
+    /// Fill a parametric shape and partition its voxels into ordered animation
+    /// groups using the shape's normalised `parameter_at` value.
+    pub fn fill_along_parameter(
+        &mut self,
+        shape: &crate::building::ShapeEnum,
+        brush: &crate::building::BrushEnum,
+        group_count: usize,
+    ) -> Result<Vec<GroupId>, String> {
+        use crate::building::Shape;
+        use std::collections::BTreeMap;
+
+        let effect = self.pending_effect.take();
+        if self.open_group.is_some() {
+            return Err("finish the open animation group before filling a shape".into());
+        }
+        if group_count == 0 {
+            return Err("parametric fill requires at least one animation group".into());
+        }
+
+        let mut placements = BTreeMap::new();
+        shape.for_each_point(|x, y, z| {
+            let Some(parameter) = shape.parameter_at(x, y, z) else {
+                return;
+            };
+            let normal = shape.normal_at(x, y, z);
+            if let Some(block) = brush.get_block_with_parameter(x, y, z, normal, Some(parameter)) {
+                let group = ((parameter.clamp(0.0, 1.0) * group_count as f64).floor() as usize)
+                    .min(group_count - 1);
+                placements.insert((x, y, z), (group, block));
+            }
+        });
+        if placements.is_empty() {
+            return Err("parametric shape produced no blocks".into());
+        }
+        let (min_x, min_y, min_z, max_x, max_y, max_z) = shape.bounds();
+        self.schematic
+            .ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
+        let replaced: std::collections::HashSet<_> = placements.keys().copied().collect();
+        for step in &mut self.steps {
+            step.blocks.retain(|position| !replaced.contains(position));
+        }
+
+        let mut buckets = vec![Vec::new(); group_count];
+        for (position, (group, block)) in placements {
+            self.schematic
+                .set_block(position.0, position.1, position.2, &block);
+            buckets[group].push(position);
+        }
+
+        let mut ids = Vec::new();
+        for (index, blocks) in buckets.into_iter().enumerate() {
+            if blocks.is_empty() {
+                continue;
+            }
+            let id = self.steps.len() as GroupId;
+            self.steps.push(RecordedStep {
+                blocks,
+                effect: effect.clone(),
+                key: index as f32,
+            });
+            ids.push(id);
+        }
+        Ok(ids)
     }
 
     fn set_block_inner(
@@ -261,7 +342,10 @@ impl BuildAnimation {
     pub fn frames(&self, fps: f64, hold_ms: f32) -> Vec<super::Frame> {
         let timeline = self.timeline();
         let fps = fps.max(1.0);
-        let duration = timeline.duration_ms() as f64 + hold_ms.max(0.0) as f64;
+        let duration = self
+            .loop_period_ms
+            .map(f64::from)
+            .unwrap_or_else(|| timeline.duration_ms() as f64 + hold_ms.max(0.0) as f64);
         let count = ((duration / 1000.0) * fps).round().max(1.0) as usize;
         (0..count)
             .map(|i| timeline.seek((i as f64 * 1000.0 / fps) as f32))
@@ -271,11 +355,11 @@ impl BuildAnimation {
     fn delays(&self) -> Vec<f32> {
         let Some(total) = self.stagger_total_ms else {
             return (0..self.steps.len())
-                .map(|i| i as f32 * self.step_ms)
+                .map(|i| i as f32 * self.step_ms + self.stagger_offset_ms)
                 .collect();
         };
         if self.steps.len() <= 1 {
-            return vec![0.0; self.steps.len()];
+            return vec![self.stagger_offset_ms; self.steps.len()];
         }
         let min = self
             .steps
@@ -289,11 +373,11 @@ impl BuildAnimation {
             .fold(f32::NEG_INFINITY, f32::max);
         let span = max - min;
         if span.abs() <= f32::EPSILON {
-            return vec![0.0; self.steps.len()];
+            return vec![self.stagger_offset_ms; self.steps.len()];
         }
         self.steps
             .iter()
-            .map(|s| (s.key - min) / span * total)
+            .map(|s| (s.key - min) / span * total + self.stagger_offset_ms)
             .collect()
     }
 }
@@ -302,6 +386,7 @@ impl BuildAnimation {
 mod tests {
     use super::*;
     use crate::animation::{presets, Property};
+    use crate::building::{BrushEnum, Curve3D, ShapeEnum, SolidBrush, TubePath};
 
     #[test]
     fn records_single_mutations_and_explicit_groups_as_animation_targets() {
@@ -478,6 +563,75 @@ mod tests {
         assert_eq!(timeline.seek(0.0).pose(2).unwrap().scale, [0.0; 3]);
         assert!(timeline.seek(600.0).pose(0).unwrap().scale[0] > 0.99);
         assert_eq!(timeline.seek(600.0).pose(2).unwrap().scale, [0.0; 3]);
+    }
+
+    #[test]
+    fn parametric_fill_records_one_ordered_group_per_curve_partition() {
+        let curve = Curve3D::new(vec![(0.0, 0.0, 0.0), (9.0, 0.0, 0.0)], false).unwrap();
+        let shape = ShapeEnum::TubePath(TubePath::new(curve, 0.6).unwrap());
+        let brush = BrushEnum::Solid(SolidBrush::new(crate::BlockState::new("minecraft:stone")));
+        let mut animation = BuildAnimation::new("parametric");
+
+        animation.fill_along_parameter(&shape, &brush, 4).unwrap();
+
+        assert_eq!(animation.groups().len(), 4);
+        assert_eq!(
+            animation
+                .steps
+                .iter()
+                .map(|step| step.blocks.len())
+                .sum::<usize>(),
+            10
+        );
+        assert_eq!(
+            animation
+                .groups()
+                .iter()
+                .flat_map(|group| group.blocks.iter())
+                .collect::<std::collections::HashSet<_>>()
+                .len(),
+            10,
+            "every filled voxel must belong to exactly one animation group"
+        );
+        assert_eq!(
+            animation.schematic().get_block(9, 0, 0).unwrap().get_name(),
+            "minecraft:stone"
+        );
+        assert!(animation
+            .steps
+            .windows(2)
+            .all(|pair| pair[0].key < pair[1].key));
+    }
+
+    #[test]
+    fn loop_period_and_negative_stagger_phase_capture_one_seamless_cycle() {
+        let mut animation = BuildAnimation::new("loop");
+        for i in 0..3 {
+            animation.begin_group_with_key(None, i as f32).unwrap();
+            animation.set_block(i, 0, 0, "minecraft:stone").unwrap();
+            animation.end_group().unwrap();
+        }
+        let effect = AnimationEffect::new(1_000.0)
+            .keyframe(Property::ScaleUniform, 0.0, 0.0, Easing::Linear)
+            .keyframe(Property::ScaleUniform, 0.1, 1.0, Easing::Linear)
+            .keyframe(Property::ScaleUniform, 0.58, 1.0, Easing::Linear)
+            .keyframe(Property::ScaleUniform, 0.68, 0.0, Easing::Linear)
+            .keyframe(Property::ScaleUniform, 1.0, 0.0, Easing::Linear)
+            .repeat_forever();
+        animation.set_default_effect(effect);
+        animation.set_stagger_total_ms(Some(400.0));
+        animation.set_stagger_offset_ms(-1_000.0);
+        animation.set_loop_period_ms(Some(1_000.0));
+
+        let frames = animation.frames(20.0, 5_000.0);
+
+        assert_eq!(
+            frames.len(),
+            20,
+            "loop capture must ignore one-shot hold time"
+        );
+        assert!(frames.first().unwrap().pose(2).unwrap().scale[0] > 0.0);
+        assert!(frames.last().unwrap().pose(2).unwrap().scale[0] > 0.0);
     }
 
     #[test]

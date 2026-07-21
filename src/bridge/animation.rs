@@ -49,6 +49,7 @@ fn easing(name: &str) -> Result<crate::animation::Easing, NucleationError> {
 
 #[diplomat::bridge]
 pub mod ffi {
+    use super::super::building::ffi::{Brush, Shape};
     #[cfg(all(feature = "rendering", not(target_arch = "wasm32")))]
     use super::super::rendering::ffi::RenderConfig;
     use super::super::shared::ffi::NucleationError;
@@ -163,6 +164,25 @@ pub mod ffi {
             self.0.set_stagger_total_ms(None);
         }
 
+        /// Shift every construction group's start time. Negative offsets let a
+        /// repeating staggered effect cross the beginning of a loop capture.
+        pub fn set_stagger_offset_ms(&mut self, offset_ms: f32) {
+            self.0.set_stagger_offset_ms(offset_ms);
+        }
+
+        /// Capture exactly one loop period, excluding the duplicate endpoint.
+        pub fn set_loop_period_ms(&mut self, period_ms: f32) -> Result<(), NucleationError> {
+            if !period_ms.is_finite() || period_ms <= 0.0 {
+                return Err(NucleationError::InvalidArgument);
+            }
+            self.0.set_loop_period_ms(Some(period_ms));
+            Ok(())
+        }
+
+        pub fn clear_loop_period(&mut self) {
+            self.0.set_loop_period_ms(None);
+        }
+
         pub fn begin_group(&mut self) -> Result<(), NucleationError> {
             self.0
                 .begin_group(None)
@@ -190,6 +210,20 @@ pub mod ffi {
         ) -> Result<u32, NucleationError> {
             self.0
                 .set_block(x, y, z, utf8(block)?)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Fill a parametric shape and record its voxels as ordered groups in
+        /// the same transactional construction operation.
+        pub fn fill_along_parameter(
+            &mut self,
+            shape: &Shape,
+            brush: &Brush,
+            group_count: u32,
+        ) -> Result<u32, NucleationError> {
+            self.0
+                .fill_along_parameter(&shape.0, &brush.0, group_count as usize)
+                .map(|groups| groups.len() as u32)
                 .map_err(|_| NucleationError::InvalidArgument)
         }
 
@@ -314,6 +348,23 @@ pub mod ffi {
 #[cfg(test)]
 mod tests {
     use super::ffi::{AnimationEffect, BuildAnimation};
+    use crate::bridge::building::ffi::{Brush, Curve3D, Shape};
+
+    #[test]
+    fn bridge_builds_and_groups_a_sampled_curve_in_one_bulk_operation() {
+        let curve = Curve3D::from_points(&[0.0, 0.0, 0.0, 9.0, 0.0, 0.0], false).unwrap();
+        let shape = Shape::tube_along(&curve, 0.6).unwrap();
+        let brush = Brush::solid(b"minecraft:stone").unwrap();
+        let mut animation = BuildAnimation::create(b"curve");
+
+        assert_eq!(
+            animation.fill_along_parameter(&shape, &brush, 4).unwrap(),
+            4
+        );
+        animation.set_stagger_offset_ms(-1_000.0);
+        animation.set_loop_period_ms(1_000.0).unwrap();
+        assert_eq!(animation.frame_count(20.0, 5_000.0), 20);
+    }
 
     #[test]
     fn bridge_builder_exposes_group_default_override_and_camera_controls() {

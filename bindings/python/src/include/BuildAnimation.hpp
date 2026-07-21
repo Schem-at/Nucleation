@@ -12,8 +12,10 @@
 #include <optional>
 #include <cstdlib>
 #include "AnimationEffect.hpp"
+#include "Brush.hpp"
 #include "NucleationError.hpp"
 #include "RenderConfig.hpp"
+#include "Shape.hpp"
 #include "diplomat_runtime.hpp"
 
 
@@ -33,6 +35,13 @@ namespace capi {
 
     void BuildAnimation_clear_stagger(nucleation::capi::BuildAnimation* self);
 
+    void BuildAnimation_set_stagger_offset_ms(nucleation::capi::BuildAnimation* self, float offset_ms);
+
+    typedef struct BuildAnimation_set_loop_period_ms_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} BuildAnimation_set_loop_period_ms_result;
+    BuildAnimation_set_loop_period_ms_result BuildAnimation_set_loop_period_ms(nucleation::capi::BuildAnimation* self, float period_ms);
+
+    void BuildAnimation_clear_loop_period(nucleation::capi::BuildAnimation* self);
+
     typedef struct BuildAnimation_begin_group_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} BuildAnimation_begin_group_result;
     BuildAnimation_begin_group_result BuildAnimation_begin_group(nucleation::capi::BuildAnimation* self);
 
@@ -44,6 +53,9 @@ namespace capi {
 
     typedef struct BuildAnimation_set_block_result {union {uint32_t ok; nucleation::capi::NucleationError err;}; bool is_ok;} BuildAnimation_set_block_result;
     BuildAnimation_set_block_result BuildAnimation_set_block(nucleation::capi::BuildAnimation* self, int32_t x, int32_t y, int32_t z, nucleation::diplomat::capi::DiplomatStringView block);
+
+    typedef struct BuildAnimation_fill_along_parameter_result {union {uint32_t ok; nucleation::capi::NucleationError err;}; bool is_ok;} BuildAnimation_fill_along_parameter_result;
+    BuildAnimation_fill_along_parameter_result BuildAnimation_fill_along_parameter(nucleation::capi::BuildAnimation* self, const nucleation::capi::Shape* shape, const nucleation::capi::Brush* brush, uint32_t group_count);
 
     typedef struct BuildAnimation_add_armor_stand_result {union {uint32_t ok; nucleation::capi::NucleationError err;}; bool is_ok;} BuildAnimation_add_armor_stand_result;
     BuildAnimation_add_armor_stand_result BuildAnimation_add_armor_stand(nucleation::capi::BuildAnimation* self, double x, double y, double z, float yaw, nucleation::diplomat::capi::DiplomatStringView armor_material);
@@ -101,6 +113,21 @@ inline void nucleation::BuildAnimation::clear_stagger() {
     nucleation::capi::BuildAnimation_clear_stagger(this->AsFFI());
 }
 
+inline void nucleation::BuildAnimation::set_stagger_offset_ms(float offset_ms) {
+    nucleation::capi::BuildAnimation_set_stagger_offset_ms(this->AsFFI(),
+        offset_ms);
+}
+
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::BuildAnimation::set_loop_period_ms(float period_ms) {
+    auto result = nucleation::capi::BuildAnimation_set_loop_period_ms(this->AsFFI(),
+        period_ms);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline void nucleation::BuildAnimation::clear_loop_period() {
+    nucleation::capi::BuildAnimation_clear_loop_period(this->AsFFI());
+}
+
 inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::BuildAnimation::begin_group() {
     auto result = nucleation::capi::BuildAnimation_begin_group(this->AsFFI());
     return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
@@ -123,6 +150,14 @@ inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> nucle
         y,
         z,
         {block.data(), block.size()});
+    return result.is_ok ? nucleation::diplomat::result<uint32_t, nucleation::NucleationError>(nucleation::diplomat::Ok<uint32_t>(result.ok)) : nucleation::diplomat::result<uint32_t, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> nucleation::BuildAnimation::fill_along_parameter(const nucleation::Shape& shape, const nucleation::Brush& brush, uint32_t group_count) {
+    auto result = nucleation::capi::BuildAnimation_fill_along_parameter(this->AsFFI(),
+        shape.AsFFI(),
+        brush.AsFFI(),
+        group_count);
     return result.is_ok ? nucleation::diplomat::result<uint32_t, nucleation::NucleationError>(nucleation::diplomat::Ok<uint32_t>(result.ok)) : nucleation::diplomat::result<uint32_t, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 

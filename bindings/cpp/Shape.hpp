@@ -11,6 +11,7 @@
 #include <functional>
 #include <optional>
 #include <cstdlib>
+#include "Curve3D.hpp"
 #include "NucleationError.hpp"
 #include "diplomat_runtime.hpp"
 
@@ -18,6 +19,9 @@
 namespace diplomat {
 namespace capi {
     extern "C" {
+
+    typedef struct Shape_tube_along_result {union {diplomat::capi::Shape* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Shape_tube_along_result;
+    Shape_tube_along_result Shape_tube_along(const diplomat::capi::Curve3D* curve, double radius);
 
     diplomat::capi::Shape* Shape_sphere(float cx, float cy, float cz, float radius);
 
@@ -68,6 +72,12 @@ namespace capi {
     } // extern "C"
 } // namespace capi
 } // namespace
+
+inline diplomat::result<std::unique_ptr<Shape>, NucleationError> Shape::tube_along(const Curve3D& curve, double radius) {
+    auto result = diplomat::capi::Shape_tube_along(curve.AsFFI(),
+        radius);
+    return result.is_ok ? diplomat::result<std::unique_ptr<Shape>, NucleationError>(diplomat::Ok<std::unique_ptr<Shape>>(std::unique_ptr<Shape>(Shape::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Shape>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
 
 inline std::unique_ptr<Shape> Shape::sphere(float cx, float cy, float cz, float radius) {
     auto result = diplomat::capi::Shape_sphere(cx,

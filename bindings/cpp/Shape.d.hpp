@@ -11,6 +11,8 @@
 #include <cstdlib>
 #include "diplomat_runtime.hpp"
 
+namespace diplomat::capi { struct Curve3D; }
+class Curve3D;
 class NucleationError;
 
 
@@ -28,6 +30,11 @@ namespace capi {
  */
 class Shape {
 public:
+
+  /**
+   * Thicken a sampled 3D curve into a parametric tube with the given radius.
+   */
+  inline static diplomat::result<std::unique_ptr<Shape>, NucleationError> tube_along(const Curve3D& curve, double radius);
 
   /**
    * Sphere centered at (`cx`, `cy`, `cz`) (truncated to block coordinates,

@@ -11,6 +11,7 @@
 #include <functional>
 #include <optional>
 #include <cstdlib>
+#include "Curve3D.hpp"
 #include "NucleationError.hpp"
 #include "diplomat_runtime.hpp"
 
@@ -18,6 +19,9 @@
 namespace nucleation {
 namespace capi {
     extern "C" {
+
+    typedef struct Shape_tube_along_result {union {nucleation::capi::Shape* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Shape_tube_along_result;
+    Shape_tube_along_result Shape_tube_along(const nucleation::capi::Curve3D* curve, double radius);
 
     nucleation::capi::Shape* Shape_sphere(float cx, float cy, float cz, float radius);
 
@@ -68,6 +72,12 @@ namespace capi {
     } // extern "C"
 } // namespace capi
 } // namespace
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Shape>, nucleation::NucleationError> nucleation::Shape::tube_along(const nucleation::Curve3D& curve, double radius) {
+    auto result = nucleation::capi::Shape_tube_along(curve.AsFFI(),
+        radius);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Shape>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Shape>>(std::unique_ptr<nucleation::Shape>(nucleation::Shape::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Shape>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
 
 inline std::unique_ptr<nucleation::Shape> nucleation::Shape::sphere(float cx, float cy, float cz, float radius) {
     auto result = nucleation::capi::Shape_sphere(cx,

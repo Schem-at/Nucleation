@@ -15,6 +15,7 @@ require_once __DIR__ . '/Autostack.php';
 require_once __DIR__ . '/Blocks.php';
 require_once __DIR__ . '/Brush.php';
 require_once __DIR__ . '/BuildingTool.php';
+require_once __DIR__ . '/Curve3D.php';
 require_once __DIR__ . '/Palette.php';
 require_once __DIR__ . '/PaletteBuilder.php';
 require_once __DIR__ . '/Shape.php';

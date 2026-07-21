@@ -14,6 +14,14 @@ final class Shape {
         $this->borrowedFrom = $borrowedFrom;
     }
 
+    public static function tubeAlong( $curve,  $radius) {
+        $result = Lib::ffi()->Shape_tube_along($curve->ptr, $radius);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Shape($result->ok, true);
+    }
+
     public static function sphere( $cx,  $cy,  $cz,  $radius) {
         $ret = Lib::ffi()->Shape_sphere($cx, $cy, $cz, $radius);
         return new Shape($ret, true);

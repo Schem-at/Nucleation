@@ -50,6 +50,21 @@ final class BuildAnimation {
         Lib::ffi()->BuildAnimation_clear_stagger($this->ptr);
     }
 
+    public function setStaggerOffsetMs( $offset_ms) {
+        Lib::ffi()->BuildAnimation_set_stagger_offset_ms($this->ptr, $offset_ms);
+    }
+
+    public function setLoopPeriodMs( $period_ms) {
+        $result = Lib::ffi()->BuildAnimation_set_loop_period_ms($this->ptr, $period_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function clearLoopPeriod() {
+        Lib::ffi()->BuildAnimation_clear_loop_period($this->ptr);
+    }
+
     public function beginGroup() {
         $result = Lib::ffi()->BuildAnimation_begin_group($this->ptr);
         if (!$result->is_ok) {
@@ -84,6 +99,14 @@ final class BuildAnimation {
         }
         $__view3->len = $__n3;
         $result = Lib::ffi()->BuildAnimation_set_block($this->ptr, $x, $y, $z, $__view3);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return $result->ok;
+    }
+
+    public function fillAlongParameter( $shape,  $brush,  $group_count) {
+        $result = Lib::ffi()->BuildAnimation_fill_along_parameter($this->ptr, $shape->ptr, $brush->ptr, $group_count);
         if (!$result->is_ok) {
             throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
         }

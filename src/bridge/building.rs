@@ -28,12 +28,51 @@ pub mod ffi {
         }
     }
 
+    /// A sampled 3D polyline. Closed curves include the final segment back to
+    /// the first point and retain arc-length parameterisation for animation.
+    #[diplomat::opaque]
+    pub struct Curve3D(pub(crate) crate::building::Curve3D);
+
+    impl Curve3D {
+        /// Create a curve from flat `[x0, y0, z0, x1, y1, z1, …]` coordinates.
+        pub fn from_points(
+            coordinates: &[f64],
+            closed: bool,
+        ) -> Result<Box<Curve3D>, NucleationError> {
+            if coordinates.len() % 3 != 0 {
+                return Err(NucleationError::InvalidArgument);
+            }
+            let points = coordinates
+                .chunks_exact(3)
+                .map(|point| (point[0], point[1], point[2]))
+                .collect();
+            crate::building::Curve3D::new(points, closed)
+                .map(|curve| Box::new(Curve3D(curve)))
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        pub fn point_count(&self) -> u32 {
+            self.0.points().len() as u32
+        }
+
+        pub fn is_closed(&self) -> bool {
+            self.0.is_closed()
+        }
+    }
+
     /// A solid region of blocks: primitives (sphere, cuboid, …) and boolean
     /// combinations thereof. Wraps `ShapeEnum`.
     #[diplomat::opaque]
     pub struct Shape(pub(crate) crate::building::ShapeEnum);
 
     impl Shape {
+        /// Thicken a sampled 3D curve into a parametric tube with the given radius.
+        pub fn tube_along(curve: &Curve3D, radius: f64) -> Result<Box<Shape>, NucleationError> {
+            crate::building::TubePath::new(curve.0.clone(), radius)
+                .map(|tube| Box::new(Shape(crate::building::ShapeEnum::TubePath(tube))))
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
         /// Sphere centered at (`cx`, `cy`, `cz`) (truncated to block coordinates,
         /// matching the old `shape_sphere`).
         pub fn sphere(cx: f32, cy: f32, cz: f32, radius: f32) -> Box<Shape> {

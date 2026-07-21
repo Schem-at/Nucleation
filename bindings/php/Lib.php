@@ -52,6 +52,7 @@ typedef struct Autostack Autostack;
 typedef struct Blocks Blocks;
 typedef struct Brush Brush;
 typedef struct BuildingTool BuildingTool;
+typedef struct Curve3D Curve3D;
 typedef struct Palette Palette;
 typedef struct PaletteBuilder PaletteBuilder;
 typedef struct Shape Shape;
@@ -119,6 +120,10 @@ BuildAnimation* BuildAnimation_with_effect(BuildAnimation* self, AnimationEffect
 void BuildAnimation_set_step_ms(BuildAnimation* self, float step_ms);
 void BuildAnimation_set_stagger_total_ms(BuildAnimation* self, float total_ms);
 void BuildAnimation_clear_stagger(BuildAnimation* self);
+void BuildAnimation_set_stagger_offset_ms(BuildAnimation* self, float offset_ms);
+typedef struct BuildAnimation_set_loop_period_ms_result { union { NucleationError err; }; bool is_ok; } BuildAnimation_set_loop_period_ms_result;
+BuildAnimation_set_loop_period_ms_result BuildAnimation_set_loop_period_ms(BuildAnimation* self, float period_ms);
+void BuildAnimation_clear_loop_period(BuildAnimation* self);
 typedef struct BuildAnimation_begin_group_result { union { NucleationError err; }; bool is_ok; } BuildAnimation_begin_group_result;
 BuildAnimation_begin_group_result BuildAnimation_begin_group(BuildAnimation* self);
 typedef struct BuildAnimation_begin_keyed_group_result { union { NucleationError err; }; bool is_ok; } BuildAnimation_begin_keyed_group_result;
@@ -127,6 +132,8 @@ typedef struct BuildAnimation_end_group_result { union { uint32_t ok; Nucleation
 BuildAnimation_end_group_result BuildAnimation_end_group(BuildAnimation* self);
 typedef struct BuildAnimation_set_block_result { union { uint32_t ok; NucleationError err; }; bool is_ok; } BuildAnimation_set_block_result;
 BuildAnimation_set_block_result BuildAnimation_set_block(BuildAnimation* self, int32_t x, int32_t y, int32_t z, DiplomatStringView block);
+typedef struct BuildAnimation_fill_along_parameter_result { union { uint32_t ok; NucleationError err; }; bool is_ok; } BuildAnimation_fill_along_parameter_result;
+BuildAnimation_fill_along_parameter_result BuildAnimation_fill_along_parameter(BuildAnimation* self, Shape* shape, Brush* brush, uint32_t group_count);
 typedef struct BuildAnimation_add_armor_stand_result { union { uint32_t ok; NucleationError err; }; bool is_ok; } BuildAnimation_add_armor_stand_result;
 BuildAnimation_add_armor_stand_result BuildAnimation_add_armor_stand(BuildAnimation* self, double x, double y, double z, float yaw, DiplomatStringView armor_material);
 void BuildAnimation_animate_camera(BuildAnimation* self, AnimationEffect* effect, float offset_ms);
@@ -184,6 +191,11 @@ void BuildingTool_fill_only_air(Schematic* schematic, Shape* shape, Brush* brush
 typedef struct BuildingTool_fill_replacing_result { union { NucleationError err; }; bool is_ok; } BuildingTool_fill_replacing_result;
 BuildingTool_fill_replacing_result BuildingTool_fill_replacing(Schematic* schematic, Shape* shape, Brush* brush, DiplomatStringView targets_json);
 void BuildingTool_destroy(BuildingTool* self);
+typedef struct Curve3D_from_points_result { union { Curve3D* ok; NucleationError err; }; bool is_ok; } Curve3D_from_points_result;
+Curve3D_from_points_result Curve3D_from_points(DiplomatF64View coordinates, bool closed);
+uint32_t Curve3D_point_count(Curve3D* self);
+bool Curve3D_is_closed(Curve3D* self);
+void Curve3D_destroy(Curve3D* self);
 Palette* Palette_all();
 Palette* Palette_solid();
 Palette* Palette_structural();
@@ -242,6 +254,8 @@ PaletteBuilder_color_near_result PaletteBuilder_color_near(PaletteBuilder* self,
 typedef struct PaletteBuilder_build_result { union { Palette* ok; NucleationError err; }; bool is_ok; } PaletteBuilder_build_result;
 PaletteBuilder_build_result PaletteBuilder_build(PaletteBuilder* self);
 void PaletteBuilder_destroy(PaletteBuilder* self);
+typedef struct Shape_tube_along_result { union { Shape* ok; NucleationError err; }; bool is_ok; } Shape_tube_along_result;
+Shape_tube_along_result Shape_tube_along(Curve3D* curve, double radius);
 Shape* Shape_sphere(float cx, float cy, float cz, float radius);
 Shape* Shape_cuboid(int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z);
 typedef struct Shape_polygon_prism_result { union { Shape* ok; NucleationError err; }; bool is_ok; } Shape_polygon_prism_result;

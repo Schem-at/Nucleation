@@ -2,8 +2,10 @@
 
 
 #include "AnimationEffect.hpp"
+#include "Brush.hpp"
 #include "BuildAnimation.hpp"
 #include "RenderConfig.hpp"
+#include "Shape.hpp"
 
 namespace nucleation {
 void add_BuildAnimation_binding(nb::module_ mod) {
@@ -18,10 +20,12 @@ void add_BuildAnimation_binding(nb::module_ mod) {
         .def("animate_camera", &nucleation::BuildAnimation::animate_camera, "effect"_a, "offset_ms"_a)
         .def("begin_group", &nucleation::BuildAnimation::begin_group)
         .def("begin_keyed_group", &nucleation::BuildAnimation::begin_keyed_group, "key"_a)
+        .def("clear_loop_period", &nucleation::BuildAnimation::clear_loop_period)
         .def("clear_stagger", &nucleation::BuildAnimation::clear_stagger)
         .def_static("create", std::move(maybe_op_unwrap(&nucleation::BuildAnimation::create)), "name"_a)
         .def("duration_ms", &nucleation::BuildAnimation::duration_ms)
         .def("end_group", &nucleation::BuildAnimation::end_group)
+        .def("fill_along_parameter", &nucleation::BuildAnimation::fill_along_parameter, "shape"_a, "brush"_a, "group_count"_a)
         .def("frame_count", &nucleation::BuildAnimation::frame_count, "fps"_a, "hold_ms"_a)
         .def("group_count", &nucleation::BuildAnimation::group_count)
         .def("render_frames", &nucleation::BuildAnimation::render_frames, "pack_zip"_a, "config"_a, "prefix"_a, "fps"_a, "hold_ms"_a)
@@ -29,6 +33,8 @@ void add_BuildAnimation_binding(nb::module_ mod) {
         .def("save_to_file", &nucleation::BuildAnimation::save_to_file, "path"_a)
         .def("set_block", &nucleation::BuildAnimation::set_block, "x"_a, "y"_a, "z"_a, "block"_a)
         .def("set_default_effect", &nucleation::BuildAnimation::set_default_effect, "effect"_a)
+        .def("set_loop_period_ms", &nucleation::BuildAnimation::set_loop_period_ms, "period_ms"_a)
+        .def("set_stagger_offset_ms", &nucleation::BuildAnimation::set_stagger_offset_ms, "offset_ms"_a)
         .def("set_stagger_total_ms", &nucleation::BuildAnimation::set_stagger_total_ms, "total_ms"_a)
         .def("set_step_ms", &nucleation::BuildAnimation::set_step_ms, "step_ms"_a)
         .def("with_effect", &nucleation::BuildAnimation::with_effect, "effect"_a, nb::rv_policy::reference_internal);

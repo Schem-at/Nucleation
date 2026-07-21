@@ -13,8 +13,12 @@
 
 namespace diplomat::capi { struct AnimationEffect; }
 class AnimationEffect;
+namespace diplomat::capi { struct Brush; }
+class Brush;
 namespace diplomat::capi { struct RenderConfig; }
 class RenderConfig;
+namespace diplomat::capi { struct Shape; }
+class Shape;
 class NucleationError;
 
 
@@ -48,6 +52,19 @@ public:
 
   inline void clear_stagger();
 
+  /**
+   * Shift every construction group's start time. Negative offsets let a
+   * repeating staggered effect cross the beginning of a loop capture.
+   */
+  inline void set_stagger_offset_ms(float offset_ms);
+
+  /**
+   * Capture exactly one loop period, excluding the duplicate endpoint.
+   */
+  inline diplomat::result<std::monostate, NucleationError> set_loop_period_ms(float period_ms);
+
+  inline void clear_loop_period();
+
   inline diplomat::result<std::monostate, NucleationError> begin_group();
 
   inline diplomat::result<std::monostate, NucleationError> begin_keyed_group(float key);
@@ -55,6 +72,12 @@ public:
   inline diplomat::result<uint32_t, NucleationError> end_group();
 
   inline diplomat::result<uint32_t, NucleationError> set_block(int32_t x, int32_t y, int32_t z, std::string_view block);
+
+  /**
+   * Fill a parametric shape and record its voxels as ordered groups in
+   * the same transactional construction operation.
+   */
+  inline diplomat::result<uint32_t, NucleationError> fill_along_parameter(const Shape& shape, const Brush& brush, uint32_t group_count);
 
   inline diplomat::result<uint32_t, NucleationError> add_armor_stand(double x, double y, double z, float yaw, std::string_view armor_material);
 

@@ -1,6 +1,7 @@
 #include "diplomat_nanobind_common.hpp"
 
 
+#include "Curve3D.hpp"
 #include "Shape.hpp"
 
 namespace nucleation {
@@ -31,6 +32,7 @@ void add_Shape_binding(nb::module_ mod) {
         .def_static("sphere", std::move(maybe_op_unwrap(&nucleation::Shape::sphere)), "cx"_a, "cy"_a, "cz"_a, "radius"_a)
         .def_static("torus", std::move(maybe_op_unwrap(&nucleation::Shape::torus)), "cx"_a, "cy"_a, "cz"_a, "major_r"_a, "minor_r"_a, "ax"_a, "ay"_a, "az"_a)
         .def_static("triangle", std::move(maybe_op_unwrap(&nucleation::Shape::triangle)), "ax"_a, "ay"_a, "az"_a, "bx"_a, "by"_a, "bz"_a, "cx"_a, "cy"_a, "cz"_a, "thickness"_a)
+        .def_static("tube_along", std::move(maybe_op_unwrap(&nucleation::Shape::tube_along)), "curve"_a, "radius"_a)
         .def("union_with", std::move(maybe_op_unwrap(&nucleation::Shape::union_with)), "other"_a);
 }
 

@@ -13,10 +13,14 @@
 namespace nucleation {
 namespace capi { struct AnimationEffect; }
 class AnimationEffect;
+namespace capi { struct Brush; }
+class Brush;
 namespace capi { struct BuildAnimation; }
 class BuildAnimation;
 namespace capi { struct RenderConfig; }
 class RenderConfig;
+namespace capi { struct Shape; }
+class Shape;
 class NucleationError;
 } // namespace nucleation
 
@@ -51,6 +55,19 @@ public:
 
   inline void clear_stagger();
 
+  /**
+   * Shift every construction group's start time. Negative offsets let a
+   * repeating staggered effect cross the beginning of a loop capture.
+   */
+  inline void set_stagger_offset_ms(float offset_ms);
+
+  /**
+   * Capture exactly one loop period, excluding the duplicate endpoint.
+   */
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> set_loop_period_ms(float period_ms);
+
+  inline void clear_loop_period();
+
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> begin_group();
 
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> begin_keyed_group(float key);
@@ -58,6 +75,12 @@ public:
   inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> end_group();
 
   inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> set_block(int32_t x, int32_t y, int32_t z, std::string_view block);
+
+  /**
+   * Fill a parametric shape and record its voxels as ordered groups in
+   * the same transactional construction operation.
+   */
+  inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> fill_along_parameter(const nucleation::Shape& shape, const nucleation::Brush& brush, uint32_t group_count);
 
   inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> add_armor_stand(double x, double y, double z, float yaw, std::string_view armor_material);
 
