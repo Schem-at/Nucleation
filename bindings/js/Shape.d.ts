@@ -18,6 +18,7 @@ export class Shape {
 
     /**
      * Thicken a sampled 3D curve into a parametric tube with the given radius.
+     * Inputs outside voxel-coordinate or bounded-work limits are rejected.
      */
     static tubeAlong(curve: Curve3D, radius: number): Shape;
 

@@ -339,6 +339,10 @@ impl BuildAnimation {
     }
 
     /// Sample deterministic frames and optionally hold the final state.
+    ///
+    /// Loop captures round the requested frame count to the nearest whole
+    /// frame, then partition `[0, period)` evenly so the full cycle is sampled
+    /// without duplicating its endpoint.
     pub fn frames(&self, fps: f64, hold_ms: f32) -> Vec<super::Frame> {
         let timeline = self.timeline();
         let fps = fps.max(1.0);
@@ -347,8 +351,13 @@ impl BuildAnimation {
             .map(f64::from)
             .unwrap_or_else(|| timeline.duration_ms() as f64 + hold_ms.max(0.0) as f64);
         let count = ((duration / 1000.0) * fps).round().max(1.0) as usize;
+        let step_ms = if self.loop_period_ms.is_some() {
+            duration / count as f64
+        } else {
+            1000.0 / fps
+        };
         (0..count)
-            .map(|i| timeline.seek((i as f64 * 1000.0 / fps) as f32))
+            .map(|i| timeline.seek((i as f64 * step_ms) as f32))
             .collect()
     }
 
@@ -632,6 +641,20 @@ mod tests {
         );
         assert!(frames.first().unwrap().pose(2).unwrap().scale[0] > 0.0);
         assert!(frames.last().unwrap().pose(2).unwrap().scale[0] > 0.0);
+    }
+
+    #[test]
+    fn non_integral_loop_frame_counts_still_sample_the_complete_period() {
+        let mut animation = BuildAnimation::new("fractional-loop");
+        animation.set_block(0, 0, 0, "minecraft:stone").unwrap();
+        animation.set_loop_period_ms(Some(1_025.0));
+
+        let frames = animation.frames(20.0, 0.0);
+
+        assert_eq!(frames.len(), 21);
+        let expected_last_time = 1_025.0 * 20.0 / 21.0;
+        assert!((frames.last().unwrap().time_ms - expected_last_time).abs() < 0.001);
+        assert!(frames.last().unwrap().time_ms < 1_025.0);
     }
 
     #[test]

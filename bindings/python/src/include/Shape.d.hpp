@@ -36,6 +36,7 @@ public:
 
   /**
    * Thicken a sampled 3D curve into a parametric tube with the given radius.
+   * Inputs outside voxel-coordinate or bounded-work limits are rejected.
    */
   inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Shape>, nucleation::NucleationError> tube_along(const nucleation::Curve3D& curve, double radius);
 

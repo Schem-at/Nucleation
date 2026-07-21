@@ -63,6 +63,7 @@ public:
 
   /**
    * Capture exactly one loop period, excluding the duplicate endpoint.
+   * The rounded frame count evenly partitions the complete period.
    */
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> set_loop_period_ms(float period_ms);
 

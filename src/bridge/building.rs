@@ -30,6 +30,7 @@ pub mod ffi {
 
     /// A sampled 3D polyline. Closed curves include the final segment back to
     /// the first point and retain arc-length parameterisation for animation.
+    /// Oversized point sets and overflowing segment lengths are rejected.
     #[diplomat::opaque]
     pub struct Curve3D(pub(crate) crate::building::Curve3D);
 
@@ -40,6 +41,9 @@ pub mod ffi {
             closed: bool,
         ) -> Result<Box<Curve3D>, NucleationError> {
             if coordinates.len() % 3 != 0 {
+                return Err(NucleationError::InvalidArgument);
+            }
+            if coordinates.len() / 3 > crate::building::Curve3D::MAX_POINTS {
                 return Err(NucleationError::InvalidArgument);
             }
             let points = coordinates
@@ -67,6 +71,7 @@ pub mod ffi {
 
     impl Shape {
         /// Thicken a sampled 3D curve into a parametric tube with the given radius.
+        /// Inputs outside voxel-coordinate or bounded-work limits are rejected.
         pub fn tube_along(curve: &Curve3D, radius: f64) -> Result<Box<Shape>, NucleationError> {
             crate::building::TubePath::new(curve.0.clone(), radius)
                 .map(|tube| Box::new(Shape(crate::building::ShapeEnum::TubePath(tube))))

@@ -113,4 +113,16 @@ mod sampled_curve_tests {
             }
         }
     }
+
+    #[test]
+    fn sampled_curve_rejects_finite_inputs_that_overflow_or_exceed_voxel_work_budgets() {
+        assert!(Curve3D::new(vec![(f64::MAX, 0.0, 0.0), (-f64::MAX, 0.0, 0.0)], false,).is_err());
+
+        let ordinary = Curve3D::new(vec![(0.0, 0.0, 0.0), (10.0, 0.0, 0.0)], false).unwrap();
+        assert!(TubePath::new(ordinary, f64::MAX).is_err());
+
+        let enormous_span =
+            Curve3D::new(vec![(0.0, 0.0, 0.0), (1_000_000_000.0, 0.0, 0.0)], false).unwrap();
+        assert!(TubePath::new(enormous_span, 1.0).is_err());
+    }
 }

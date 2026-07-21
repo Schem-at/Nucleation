@@ -2,6 +2,10 @@ use std::collections::BTreeSet;
 
 use super::{ParametricShape, Shape};
 
+/// A finite sampled polyline with arc-length parameterisation.
+///
+/// Curves are limited to [`Curve3D::MAX_POINTS`]. Segment and total lengths
+/// that overflow `f64` are rejected before the curve can be voxelised.
 #[derive(Debug, Clone)]
 pub struct Curve3D {
     points: Vec<(f64, f64, f64)>,
@@ -19,12 +23,21 @@ struct CurveSegment {
 }
 
 impl Curve3D {
+    /// Hard cap applied before segment construction and FFI allocation.
+    pub const MAX_POINTS: usize = 100_000;
+
     pub fn new(points: Vec<(f64, f64, f64)>, closed: bool) -> Result<Self, String> {
         let minimum = if closed { 3 } else { 2 };
         if points.len() < minimum {
             return Err(format!(
                 "a {} curve requires at least {minimum} points",
                 if closed { "closed" } else { "open" }
+            ));
+        }
+        if points.len() > Self::MAX_POINTS {
+            return Err(format!(
+                "curve exceeds the maximum of {} points",
+                Self::MAX_POINTS
             ));
         }
         if points
@@ -48,7 +61,13 @@ impl Curve3D {
             let dx = end.0 - start.0;
             let dy = end.1 - start.1;
             let dz = end.2 - start.2;
+            if !dx.is_finite() || !dy.is_finite() || !dz.is_finite() {
+                return Err("curve segment delta overflowed".into());
+            }
             let length = (dx * dx + dy * dy + dz * dz).sqrt();
+            if !length.is_finite() {
+                return Err("curve segment length overflowed".into());
+            }
             if length <= f64::EPSILON {
                 continue;
             }
@@ -59,6 +78,9 @@ impl Curve3D {
                 cumulative_length: total_length,
             });
             total_length += length;
+            if !total_length.is_finite() {
+                return Err("curve total length overflowed".into());
+            }
         }
         if segments.is_empty() {
             return Err("curve must contain at least one non-zero segment".into());
@@ -126,18 +148,87 @@ struct ClosestPoint {
     parameter: f64,
 }
 
+/// A voxel tube around a [`Curve3D`].
+///
+/// Construction validates voxel-coordinate bounds and rejects shapes whose
+/// estimated candidate or closest-segment work exceeds internal safety
+/// budgets. This makes malformed finite inputs fail before enumeration.
 #[derive(Debug, Clone)]
 pub struct TubePath {
     curve: Curve3D,
     radius: f64,
+    reach: i32,
+    sample_counts: Vec<usize>,
 }
 
 impl TubePath {
+    const MAX_CANDIDATE_VISITS: u128 = 10_000_000;
+    const MAX_DISTANCE_CHECKS: u128 = 500_000_000;
+
     pub fn new(curve: Curve3D, radius: f64) -> Result<Self, String> {
         if !radius.is_finite() || radius <= 0.0 {
             return Err("tube radius must be finite and greater than zero".into());
         }
-        Ok(Self { curve, radius })
+
+        let reach_f64 = radius.ceil();
+        if reach_f64 > i32::MAX as f64 {
+            return Err("tube radius exceeds the supported voxel range".into());
+        }
+        let reach = reach_f64 as i32;
+        let coordinate_margin = reach as f64 + 1.0;
+        let minimum_coordinate = i32::MIN as f64 + coordinate_margin;
+        let maximum_coordinate = i32::MAX as f64 - coordinate_margin;
+        if curve
+            .points()
+            .iter()
+            .flat_map(|point| [point.0, point.1, point.2])
+            .any(|value| value < minimum_coordinate || value > maximum_coordinate)
+        {
+            return Err("tube bounds exceed the supported voxel coordinate range".into());
+        }
+
+        let side = (reach as u128)
+            .checked_mul(2)
+            .and_then(|value| value.checked_add(1))
+            .ok_or_else(|| "tube candidate volume overflowed".to_string())?;
+        let candidates_per_sample = side
+            .checked_mul(side)
+            .and_then(|value| value.checked_mul(side))
+            .ok_or_else(|| "tube candidate volume overflowed".to_string())?;
+
+        let mut sample_counts = Vec::with_capacity(curve.segments.len());
+        let mut sample_centers = 0_u128;
+        for segment in &curve.segments {
+            let raw_samples = (segment.length * 2.0).ceil().max(1.0);
+            if !raw_samples.is_finite() || raw_samples > usize::MAX as f64 {
+                return Err("tube segment requires too many samples".into());
+            }
+            let samples = raw_samples as usize;
+            sample_centers = sample_centers
+                .checked_add(samples as u128 + 1)
+                .ok_or_else(|| "tube sample count overflowed".to_string())?;
+            sample_counts.push(samples);
+        }
+
+        let candidate_visits = sample_centers
+            .checked_mul(candidates_per_sample)
+            .ok_or_else(|| "tube voxelization work estimate overflowed".to_string())?;
+        if candidate_visits > Self::MAX_CANDIDATE_VISITS {
+            return Err("tube exceeds the voxel candidate budget".into());
+        }
+        let distance_checks = candidate_visits
+            .checked_mul(curve.segments.len() as u128)
+            .ok_or_else(|| "tube distance-check estimate overflowed".to_string())?;
+        if distance_checks > Self::MAX_DISTANCE_CHECKS {
+            return Err("tube exceeds the distance-check budget".into());
+        }
+
+        Ok(Self {
+            curve,
+            radius,
+            reach,
+            sample_counts,
+        })
     }
 
     pub fn curve(&self) -> &Curve3D {
@@ -146,9 +237,8 @@ impl TubePath {
 
     fn voxel_points(&self) -> Vec<(i32, i32, i32)> {
         let mut points = BTreeSet::new();
-        let reach = self.radius.ceil() as i32;
-        for segment in &self.curve.segments {
-            let samples = (segment.length * 2.0).ceil().max(1.0) as usize;
+        let reach = self.reach;
+        for (segment, &samples) in self.curve.segments.iter().zip(&self.sample_counts) {
             for sample in 0..=samples {
                 let t = sample as f64 / samples as f64;
                 let center = (

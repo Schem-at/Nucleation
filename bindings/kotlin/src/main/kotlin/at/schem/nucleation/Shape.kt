@@ -61,6 +61,7 @@ class Shape internal constructor (
         @JvmStatic
         
         /** Thicken a sampled 3D curve into a parametric tube with the given radius.
+        *Inputs outside voxel-coordinate or bounded-work limits are rejected.
         */
         fun tubeAlong(curve: Curve3D, radius: Double): Result<Shape> {
             

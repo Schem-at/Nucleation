@@ -7,6 +7,7 @@ import type { pointer, codepoint } from "./diplomat-runtime.d.ts";
 /**
  * A sampled 3D polyline. Closed curves include the final segment back to
  * the first point and retain arc-length parameterisation for animation.
+ * Oversized point sets and overflowing segment lengths are rejected.
  */
 export class Curve3D {
     /** @internal */

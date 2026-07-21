@@ -171,6 +171,7 @@ pub mod ffi {
         }
 
         /// Capture exactly one loop period, excluding the duplicate endpoint.
+        /// The rounded frame count evenly partitions the complete period.
         pub fn set_loop_period_ms(&mut self, period_ms: f32) -> Result<(), NucleationError> {
             if !period_ms.is_finite() || period_ms <= 0.0 {
                 return Err(NucleationError::InvalidArgument);

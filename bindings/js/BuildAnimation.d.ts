@@ -41,6 +41,7 @@ export class BuildAnimation {
 
     /**
      * Capture exactly one loop period, excluding the duplicate endpoint.
+     * The rounded frame count evenly partitions the complete period.
      */
     setLoopPeriodMs(periodMs: number): void;
 

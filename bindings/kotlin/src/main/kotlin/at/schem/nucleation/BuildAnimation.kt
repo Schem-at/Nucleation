@@ -123,6 +123,7 @@ class BuildAnimation internal constructor (
     }
     
     /** Capture exactly one loop period, excluding the duplicate endpoint.
+    *The rounded frame count evenly partitions the complete period.
     */
     fun setLoopPeriodMs(periodMs: Float): Result<Unit> {
         
