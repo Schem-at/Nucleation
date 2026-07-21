@@ -264,13 +264,25 @@ pub fn resolve_texture(block_name: &str, available: &HashSet<String>) -> Option<
     let suffix_rules: [(&str, fn(&str) -> Vec<String>); 14] = [
         // Wooden variants must resolve to planks before the generic prefix
         // scan can pick e.g. oak_log_top for oak_stairs.
-        ("_stairs", |b| vec![b.to_string(), format!("{b}s"), format!("{b}_planks")]),
-        ("_slab", |b| vec![b.to_string(), format!("{b}s"), format!("{b}_planks")]),
+        ("_stairs", |b| {
+            vec![b.to_string(), format!("{b}s"), format!("{b}_planks")]
+        }),
+        ("_slab", |b| {
+            vec![b.to_string(), format!("{b}s"), format!("{b}_planks")]
+        }),
         ("_wall", |b| vec![b.to_string(), format!("{b}s")]),
-        ("_button", |b| vec![b.to_string(), format!("{b}s"), format!("{b}_planks")]),
-        ("_pressure_plate", |b| vec![b.to_string(), format!("{b}s"), format!("{b}_planks")]),
-        ("_fence_gate", |b| vec![format!("{b}_planks"), b.to_string(), format!("{b}s")]),
-        ("_fence", |b| vec![format!("{b}_planks"), b.to_string(), format!("{b}s")]),
+        ("_button", |b| {
+            vec![b.to_string(), format!("{b}s"), format!("{b}_planks")]
+        }),
+        ("_pressure_plate", |b| {
+            vec![b.to_string(), format!("{b}s"), format!("{b}_planks")]
+        }),
+        ("_fence_gate", |b| {
+            vec![format!("{b}_planks"), b.to_string(), format!("{b}s")]
+        }),
+        ("_fence", |b| {
+            vec![format!("{b}_planks"), b.to_string(), format!("{b}s")]
+        }),
         ("_wood", |b| vec![format!("{b}_log")]),
         ("_hyphae", |b| vec![format!("{b}_stem")]),
         ("_carpet", |b| vec![b.to_string(), format!("{b}_wool")]),
@@ -315,7 +327,10 @@ pub fn resolve_texture(block_name: &str, available: &HashSet<String>) -> Option<
 
     // 4. Prefix scan over available textures
     let prefix = format!("{name}_");
-    let mut matches: Vec<&String> = available.iter().filter(|t| t.starts_with(&prefix)).collect();
+    let mut matches: Vec<&String> = available
+        .iter()
+        .filter(|t| t.starts_with(&prefix))
+        .collect();
     if !matches.is_empty() {
         matches.sort();
         for face in ["_side", "_top", "_front"] {
@@ -417,10 +432,22 @@ mod tests {
 
         assert_eq!(resolve_texture("stone", &a).as_deref(), Some("stone"));
         // Wooden derivatives resolve to planks
-        assert_eq!(resolve_texture("oak_stairs", &a).as_deref(), Some("oak_planks"));
-        assert_eq!(resolve_texture("oak_fence", &a).as_deref(), Some("oak_planks"));
-        assert_eq!(resolve_texture("oak_sign", &a).as_deref(), Some("oak_planks"));
-        assert_eq!(resolve_texture("oak_wall_sign", &a).as_deref(), Some("oak_planks"));
+        assert_eq!(
+            resolve_texture("oak_stairs", &a).as_deref(),
+            Some("oak_planks")
+        );
+        assert_eq!(
+            resolve_texture("oak_fence", &a).as_deref(),
+            Some("oak_planks")
+        );
+        assert_eq!(
+            resolve_texture("oak_sign", &a).as_deref(),
+            Some("oak_planks")
+        );
+        assert_eq!(
+            resolve_texture("oak_wall_sign", &a).as_deref(),
+            Some("oak_planks")
+        );
         // Wood -> log
         assert_eq!(resolve_texture("oak_wood", &a).as_deref(), Some("oak_log"));
         // waxed_ stripping recurses
@@ -429,12 +456,24 @@ mod tests {
             Some("cut_copper")
         );
         // Wool stand-ins
-        assert_eq!(resolve_texture("purple_bed", &a).as_deref(), Some("purple_wool"));
+        assert_eq!(
+            resolve_texture("purple_bed", &a).as_deref(),
+            Some("purple_wool")
+        );
         // Overrides
-        assert_eq!(resolve_texture("grass_block", &a).as_deref(), Some("grass_block_top"));
-        assert_eq!(resolve_texture("magenta_candle_cake", &a).as_deref(), Some("cake_side"));
+        assert_eq!(
+            resolve_texture("grass_block", &a).as_deref(),
+            Some("grass_block_top")
+        );
+        assert_eq!(
+            resolve_texture("magenta_candle_cake", &a).as_deref(),
+            Some("cake_side")
+        );
         // minecraft: prefix is accepted
-        assert_eq!(resolve_texture("minecraft:stone", &a).as_deref(), Some("stone"));
+        assert_eq!(
+            resolve_texture("minecraft:stone", &a).as_deref(),
+            Some("stone")
+        );
         // Unknown blocks resolve to nothing
         assert_eq!(resolve_texture("air", &a), None);
     }
@@ -442,10 +481,16 @@ mod tests {
     #[test]
     fn prefix_scan_prefers_faces_then_last_stage() {
         let a = avail(&["furnace_front", "furnace_side", "furnace_top"]);
-        assert_eq!(resolve_texture("furnace", &a).as_deref(), Some("furnace_side"));
+        assert_eq!(
+            resolve_texture("furnace", &a).as_deref(),
+            Some("furnace_side")
+        );
 
         let a = avail(&["wheat_stage0", "wheat_stage3", "wheat_stage7"]);
-        assert_eq!(resolve_texture("wheat", &a).as_deref(), Some("wheat_stage7"));
+        assert_eq!(
+            resolve_texture("wheat", &a).as_deref(),
+            Some("wheat_stage7")
+        );
     }
 
     #[test]
@@ -453,12 +498,21 @@ mod tests {
         assert_eq!(default_biome_tint("grass_block"), Some(PLAINS_GRASS_TINT));
         assert_eq!(default_biome_tint("oak_leaves"), Some(PLAINS_FOLIAGE_TINT));
         assert_eq!(default_biome_tint("birch_leaves"), Some(BIRCH_FOLIAGE_TINT));
-        assert_eq!(default_biome_tint("spruce_leaves"), Some(SPRUCE_FOLIAGE_TINT));
-        assert_eq!(default_biome_tint("mangrove_leaves"), Some(MANGROVE_FOLIAGE_TINT));
+        assert_eq!(
+            default_biome_tint("spruce_leaves"),
+            Some(SPRUCE_FOLIAGE_TINT)
+        );
+        assert_eq!(
+            default_biome_tint("mangrove_leaves"),
+            Some(MANGROVE_FOLIAGE_TINT)
+        );
         assert_eq!(default_biome_tint("water"), Some(WATER_TINT));
         assert_eq!(default_biome_tint("lily_pad"), Some(LILY_PAD_TINT));
         assert_eq!(default_biome_tint("melon_stem"), Some(STEM_TINT));
-        assert_eq!(default_biome_tint("redstone_wire"), Some(REDSTONE_WIRE_TINT));
+        assert_eq!(
+            default_biome_tint("redstone_wire"),
+            Some(REDSTONE_WIRE_TINT)
+        );
         // Cherry / pale oak leaves are NOT tinted
         assert_eq!(default_biome_tint("cherry_leaves"), None);
         assert_eq!(default_biome_tint("pale_oak_leaves"), None);

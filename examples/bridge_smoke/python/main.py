@@ -47,4 +47,11 @@ store.save_schematic(s, "k1.litematic", "")
 reopened = store.open_schematic("k1.litematic")
 assert reopened.get_block_name(1, 2, 3) == "minecraft:stone"
 
+# --- construction animation: fluent one-shot effect ---
+animation = m.BuildAnimation.create("fluent")
+effect = m.AnimationEffect.spin_in(600.0, 1.0)
+assert animation.with_effect(effect).set_block(0, 0, 0, "minecraft:stone") == 0
+assert animation.set_block(1, 0, 0, "minecraft:dirt") == 1
+assert animation.group_count() == 2
+
 print("bridge smoke (Python) OK")

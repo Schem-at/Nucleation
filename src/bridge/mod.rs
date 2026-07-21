@@ -10,6 +10,7 @@
 
 pub mod shared;
 
+pub mod animation;
 pub mod autostack;
 pub mod blocks;
 pub mod building;

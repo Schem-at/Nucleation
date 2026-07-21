@@ -49,6 +49,219 @@ struct Uniforms {
     params: [f32; 4], // x = alpha_cutoff, y = hdri_enabled, z = hdri_intensity
 }
 
+/// Per-draw animation state, mirroring `DrawUniforms` in the shader.
+///
+/// WGSL aligns each `mat3x3` column to 16 bytes, so the normal matrix is stored
+/// as three padded `vec4`s rather than three `vec3`s.
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct DrawUniforms {
+    model: [[f32; 4]; 4],
+    normal_mat: [[f32; 4]; 3],
+    tint: [f32; 4],
+    emissive: [f32; 4],
+}
+
+impl DrawUniforms {
+    /// The no-op value: identity transform, neutral tint, no emission.
+    fn identity() -> Self {
+        DrawUniforms {
+            model: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
+            normal_mat: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+            ],
+            tint: [1.0, 1.0, 1.0, 1.0],
+            emissive: [0.0; 4],
+        }
+    }
+
+    fn from_pose(p: &crate::animation::Pose) -> Self {
+        let n = p.normal_matrix();
+        let mut tint = p.tint;
+        // Opacity folds into tint alpha so the shader has one alpha source.
+        tint[3] *= p.opacity;
+        DrawUniforms {
+            model: p.to_matrix(),
+            normal_mat: [
+                [n[0][0], n[0][1], n[0][2], 0.0],
+                [n[1][0], n[1][1], n[1][2], 0.0],
+                [n[2][0], n[2][1], n[2][2], 0.0],
+            ],
+            tint,
+            emissive: p.emissive,
+        }
+    }
+}
+
+/// Interleaved `[x, y, z, r, g, b, a]` line vertices for a reference grid and,
+/// optionally, coloured axes through the origin.
+fn build_grid_vertices(
+    cfg: &super::GridConfig,
+    bounds_min: [f32; 3],
+    bounds_max: [f32; 3],
+) -> Vec<f32> {
+    let mut v = Vec::new();
+    let mut push = |p: [f32; 3], c: [f32; 4]| {
+        v.extend_from_slice(&[p[0], p[1], p[2], c[0], c[1], c[2], c[3]]);
+    };
+    let ext = cfg.half_extent.max(1);
+    let margin = cfg.margin.max(0) as f32;
+    // Block models are centred on integer schematic coordinates, so their
+    // boundaries — and therefore world-grid lines — live on half-integers.
+    let (min_x, max_x, min_z, max_z) = if cfg.fit_to_bounds {
+        (
+            bounds_min[0].floor() - margin - 0.5,
+            bounds_max[0].ceil() + margin - 0.5,
+            bounds_min[2].floor() - margin - 0.5,
+            bounds_max[2].ceil() + margin - 0.5,
+        )
+    } else {
+        let e = ext as f32;
+        (-e - 0.5, e + 0.5, -e - 0.5, e + 0.5)
+    };
+    let step = cfg.spacing.max(1) as f32;
+    let y = cfg.plane_y;
+    let col = cfg.line_rgba;
+
+    let mut z = min_z;
+    while z <= max_z + f32::EPSILON {
+        push([min_x, y, z], col);
+        push([max_x, y, z], col);
+        z += step;
+    }
+    let mut x = min_x;
+    while x <= max_x + f32::EPSILON {
+        push([x, y, min_z], col);
+        push([x, y, max_z], col);
+        x += step;
+    }
+
+    if cfg.show_axes {
+        let axis_extent = max_x
+            .abs()
+            .max(min_x.abs())
+            .max(max_z.abs())
+            .max(min_z.abs());
+        push([0.0, y, 0.0], [0.9, 0.2, 0.2, 1.0]);
+        push([axis_extent, y, 0.0], [0.9, 0.2, 0.2, 1.0]);
+        push([0.0, y, 0.0], [0.2, 0.8, 0.3, 1.0]);
+        push([0.0, y + axis_extent, 0.0], [0.2, 0.8, 0.3, 1.0]);
+        push([0.0, y, 0.0], [0.3, 0.5, 0.95, 1.0]);
+        push([0.0, y, axis_extent], [0.3, 0.5, 0.95, 1.0]);
+    }
+    v
+}
+
+#[cfg(test)]
+mod grid_tests {
+    use super::*;
+
+    #[test]
+    fn fitted_grid_uses_half_integer_block_boundaries_with_a_small_margin() {
+        let cfg = super::super::GridConfig {
+            fit_to_bounds: true,
+            margin: 1,
+            show_axes: false,
+            ..Default::default()
+        };
+        // Mesher metadata uses [min block coordinate, max coordinate + 1], while
+        // the actual models are centred on integer coordinates and therefore
+        // occupy n-0.5..n+0.5.
+        let vertices = build_grid_vertices(&cfg, [-3.0, 0.0, -2.0], [3.0, 2.0, 3.0]);
+        let points: Vec<[f32; 3]> = vertices
+            .chunks_exact(7)
+            .map(|v| [v[0], v[1], v[2]])
+            .collect();
+        assert_eq!(
+            points.iter().map(|p| p[0]).fold(f32::INFINITY, f32::min),
+            -4.5
+        );
+        assert_eq!(
+            points
+                .iter()
+                .map(|p| p[0])
+                .fold(f32::NEG_INFINITY, f32::max),
+            3.5
+        );
+        assert_eq!(
+            points.iter().map(|p| p[2]).fold(f32::INFINITY, f32::min),
+            -3.5
+        );
+        assert_eq!(
+            points
+                .iter()
+                .map(|p| p[2])
+                .fold(f32::NEG_INFINITY, f32::max),
+            3.5
+        );
+    }
+
+    #[test]
+    fn grid_vertex_count_matches_the_line_count() {
+        let cfg = super::super::GridConfig {
+            half_extent: 4,
+            spacing: 1,
+            plane_y: -0.02,
+            show_axes: true,
+            line_rgba: [1.0; 4],
+            ..Default::default()
+        };
+        let v = build_grid_vertices(&cfg, [-4.0, 0.0, -4.0], [4.0, 1.0, 4.0]);
+        // 7 floats per vertex, 2 vertices per line.
+        assert_eq!(v.len() % 7, 0, "each vertex is 7 floats");
+        let verts = v.len() / 7;
+        // Centres -4..=4 occupy cells bounded by -4.5..=4.5: 10 X-lines
+        // and 10 Z-lines, plus 3 axes = 23 lines = 46 vertices.
+        assert_eq!(verts, 46);
+    }
+
+    #[test]
+    fn axes_can_be_disabled_and_spacing_thins_the_grid() {
+        let base = super::super::GridConfig {
+            half_extent: 6,
+            spacing: 1,
+            plane_y: 0.0,
+            show_axes: false,
+            line_rgba: [1.0; 4],
+            ..Default::default()
+        };
+        let bounds = ([-6.0, 0.0, -6.0], [6.0, 1.0, 6.0]);
+        let dense = build_grid_vertices(&base, bounds.0, bounds.1).len();
+        let sparse = build_grid_vertices(
+            &super::super::GridConfig { spacing: 3, ..base },
+            bounds.0,
+            bounds.1,
+        )
+        .len();
+        assert!(sparse < dense, "larger spacing draws fewer lines");
+    }
+
+    #[test]
+    fn degenerate_spacing_does_not_hang() {
+        // spacing 0 is clamped to 1 rather than looping forever.
+        let v = build_grid_vertices(
+            &super::super::GridConfig {
+                half_extent: 2,
+                spacing: 0,
+                plane_y: 0.0,
+                show_axes: false,
+                line_rgba: [1.0; 4],
+                ..Default::default()
+            },
+            [-2.0, 0.0, -2.0],
+            [2.0, 1.0, 2.0],
+        );
+        assert!(!v.is_empty());
+    }
+}
+
 struct LayerBuffers {
     positions: wgpu::Buffer,
     normals: wgpu::Buffer,
@@ -81,6 +294,13 @@ pub struct GpuRenderer {
     hdri_bg: wgpu::BindGroup,
     hdri_enabled: bool,
     dummy_atlas_bg: wgpu::BindGroup,
+    // Per-draw animation state, addressed with a dynamic offset per chunk.
+    draw_buf: wgpu::Buffer,
+    draw_bg: wgpu::BindGroup,
+    draw_stride: u32,
+    // Optional world-space reference grid.
+    line_pipeline: wgpu::RenderPipeline,
+    grid: std::cell::Cell<Option<super::GridConfig>>,
     chunks_gpu: Vec<ChunkGpuData>,
     // Headless-only (None in windowed mode)
     render_target: Option<wgpu::Texture>,
@@ -102,9 +322,14 @@ impl GpuRenderer {
         height: u32,
         hdri: Option<&HdriData>,
     ) -> Result<Self, RenderError> {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+        // wgpu 30: `InstanceDescriptor` is passed by value and has no `Default`
+        // (its `display` field is a boxed trait object), so spell it out.
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
-            ..Default::default()
+            flags: wgpu::InstanceFlags::default(),
+            memory_budget_thresholds: Default::default(),
+            backend_options: Default::default(),
+            display: None,
         });
         Self::create(meshes, width, height, hdri, &instance, None).await
     }
@@ -130,38 +355,42 @@ impl GpuRenderer {
         surface: Option<&wgpu::Surface<'_>>,
     ) -> Result<Self, RenderError> {
         // Graceful GPU fallback: hardware → software → error
+        // wgpu 30: `request_adapter` returns `Result`, not `Option`.
         let adapter = match instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
                 compatible_surface: surface,
                 force_fallback_adapter: false,
+                ..Default::default()
             })
             .await
         {
-            Some(a) => a,
-            None => {
+            Ok(a) => a,
+            Err(_) => {
                 // Try software fallback
                 instance
                     .request_adapter(&wgpu::RequestAdapterOptions {
                         power_preference: wgpu::PowerPreference::LowPower,
                         compatible_surface: surface,
                         force_fallback_adapter: true,
+                        ..Default::default()
                     })
                     .await
-                    .ok_or(RenderError::NoGpuAdapter)?
+                    .map_err(|_| RenderError::NoGpuAdapter)?
             }
         };
 
+        // wgpu 30: single-argument `request_device` (the trace path moved into
+        // the descriptor), and `DeviceDescriptor` has no `Default`.
         let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: Some("render_device"),
-                    required_features: wgpu::Features::FLOAT32_FILTERABLE,
-                    required_limits: wgpu::Limits::default(),
-                    ..Default::default()
-                },
-                None,
-            )
+            .request_device(&wgpu::DeviceDescriptor {
+                label: Some("render_device"),
+                required_features: wgpu::Features::FLOAT32_FILTERABLE,
+                required_limits: wgpu::Limits::default(),
+                experimental_features: wgpu::ExperimentalFeatures::disabled(),
+                memory_hints: wgpu::MemoryHints::default(),
+                trace: wgpu::Trace::Off,
+            })
             .await
             .map_err(|e| RenderError::DeviceCreation(e.to_string()))?;
 
@@ -229,16 +458,43 @@ impl GpuRenderer {
             ],
         });
 
+        // Per-draw uniforms: one aligned slot per mesh, selected with a dynamic
+        // offset so the whole scene needs a single buffer and bind group.
+        let draw_bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("draw_bgl"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: true,
+                    min_binding_size: wgpu::BufferSize::new(
+                        std::mem::size_of::<DrawUniforms>() as u64
+                    ),
+                },
+                count: None,
+            }],
+        });
+
         let mesh_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("mesh_pipeline_layout"),
-            bind_group_layouts: &[&uniform_bgl, &texture_bgl, &hdri_bgl],
-            push_constant_ranges: &[],
+            // wgpu 30: layouts are `Option`-wrapped (gaps allowed) and
+            // `push_constant_ranges` was replaced by immediates.
+            bind_group_layouts: &[
+                Some(&uniform_bgl),
+                Some(&texture_bgl),
+                Some(&hdri_bgl),
+                Some(&draw_bgl),
+            ],
+            ..Default::default()
         });
 
         let sky_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("sky_pipeline_layout"),
-            bind_group_layouts: &[&uniform_bgl, &texture_bgl, &hdri_bgl],
-            push_constant_ranges: &[],
+            // wgpu 30: layouts are `Option`-wrapped (gaps allowed) and
+            // `push_constant_ranges` was replaced by immediates.
+            bind_group_layouts: &[Some(&uniform_bgl), Some(&texture_bgl), Some(&hdri_bgl)],
+            ..Default::default()
         });
 
         // --- HDRI texture (or 1x1 dummy) ---
@@ -338,8 +594,9 @@ impl GpuRenderer {
         });
 
         // --- Vertex buffer layout ---
+        // wgpu 30: vertex buffer slots are optional, so each layout is `Some(..)`.
         let vertex_buffer_layouts = [
-            wgpu::VertexBufferLayout {
+            Some(wgpu::VertexBufferLayout {
                 array_stride: 12,
                 step_mode: wgpu::VertexStepMode::Vertex,
                 attributes: &[wgpu::VertexAttribute {
@@ -347,8 +604,8 @@ impl GpuRenderer {
                     offset: 0,
                     shader_location: 0,
                 }],
-            },
-            wgpu::VertexBufferLayout {
+            }),
+            Some(wgpu::VertexBufferLayout {
                 array_stride: 12,
                 step_mode: wgpu::VertexStepMode::Vertex,
                 attributes: &[wgpu::VertexAttribute {
@@ -356,8 +613,8 @@ impl GpuRenderer {
                     offset: 0,
                     shader_location: 1,
                 }],
-            },
-            wgpu::VertexBufferLayout {
+            }),
+            Some(wgpu::VertexBufferLayout {
                 array_stride: 8,
                 step_mode: wgpu::VertexStepMode::Vertex,
                 attributes: &[wgpu::VertexAttribute {
@@ -365,8 +622,8 @@ impl GpuRenderer {
                     offset: 0,
                     shader_location: 2,
                 }],
-            },
-            wgpu::VertexBufferLayout {
+            }),
+            Some(wgpu::VertexBufferLayout {
                 array_stride: 16,
                 step_mode: wgpu::VertexStepMode::Vertex,
                 attributes: &[wgpu::VertexAttribute {
@@ -374,7 +631,7 @@ impl GpuRenderer {
                     offset: 0,
                     shader_location: 3,
                 }],
-            },
+            }),
         ];
 
         // --- Color format ---
@@ -462,13 +719,13 @@ impl GpuRenderer {
                     },
                     depth_stencil: Some(wgpu::DepthStencilState {
                         format: depth_format,
-                        depth_write_enabled: depth_write,
-                        depth_compare: wgpu::CompareFunction::Less,
+                        depth_write_enabled: Some(depth_write),
+                        depth_compare: Some(wgpu::CompareFunction::Less),
                         stencil: Default::default(),
                         bias: Default::default(),
                     }),
                     multisample: Default::default(),
-                    multiview: None,
+                    multiview_mask: None,
                     cache: None,
                 })
             };
@@ -509,13 +766,13 @@ impl GpuRenderer {
                     },
                     depth_stencil: Some(wgpu::DepthStencilState {
                         format: depth_format,
-                        depth_write_enabled: false,
-                        depth_compare: wgpu::CompareFunction::LessEqual,
+                        depth_write_enabled: Some(false),
+                        depth_compare: Some(wgpu::CompareFunction::LessEqual),
                         stencil: Default::default(),
                         bias: Default::default(),
                     }),
                     multisample: Default::default(),
-                    multiview: None,
+                    multiview_mask: None,
                     cache: None,
                 }),
             )
@@ -523,11 +780,70 @@ impl GpuRenderer {
             None
         };
 
+        // --- Grid/axis line pipeline (group 0 = view-projection only) ---
+        let line_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("line_pipeline_layout"),
+            bind_group_layouts: &[Some(&uniform_bgl)],
+            ..Default::default()
+        });
+        let line_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("grid_lines"),
+            layout: Some(&line_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_line"),
+                // Interleaved position(3) + colour(4) = 28-byte stride.
+                buffers: &[Some(wgpu::VertexBufferLayout {
+                    array_stride: 28,
+                    step_mode: wgpu::VertexStepMode::Vertex,
+                    attributes: &[
+                        wgpu::VertexAttribute {
+                            format: wgpu::VertexFormat::Float32x3,
+                            offset: 0,
+                            shader_location: 0,
+                        },
+                        wgpu::VertexAttribute {
+                            format: wgpu::VertexFormat::Float32x4,
+                            offset: 12,
+                            shader_location: 1,
+                        },
+                    ],
+                })],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_line"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: color_format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::LineList,
+                ..Default::default()
+            },
+            // Depth-tested so blocks occlude grid lines behind them, but no
+            // depth write so the grid does not disturb transparent sorting.
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: depth_format,
+                depth_write_enabled: Some(false),
+                depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
+            multisample: Default::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+
         let atlas_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("atlas_sampler"),
             mag_filter: wgpu::FilterMode::Nearest,
             min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
             ..Default::default()
         });
 
@@ -676,6 +992,39 @@ impl GpuRenderer {
 
         let (bounds_min, bounds_max) = merged_bounds(meshes);
 
+        // One aligned slot per mesh. Alignment comes from the device rather
+        // than a hardcoded 256, so this is correct on every backend.
+        let align = device.limits().min_uniform_buffer_offset_alignment;
+        let draw_stride = {
+            let sz = std::mem::size_of::<DrawUniforms>() as u32;
+            sz.div_ceil(align) * align
+        };
+        let slots = chunks_gpu.len().max(1) as u64;
+        let identity = DrawUniforms::identity();
+        let mut init = vec![0u8; (draw_stride as u64 * slots) as usize];
+        for i in 0..slots as usize {
+            let off = i * draw_stride as usize;
+            init[off..off + std::mem::size_of::<DrawUniforms>()]
+                .copy_from_slice(bytemuck::bytes_of(&identity));
+        }
+        let draw_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("draw_uniforms"),
+            contents: &init,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let draw_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("draw_bg"),
+            layout: &draw_bgl,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &draw_buf,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(std::mem::size_of::<DrawUniforms>() as u64),
+                }),
+            }],
+        });
+
         Ok(Self {
             device,
             queue,
@@ -688,6 +1037,11 @@ impl GpuRenderer {
             hdri_bg,
             hdri_enabled,
             dummy_atlas_bg,
+            draw_buf,
+            draw_bg,
+            draw_stride,
+            line_pipeline,
+            grid: std::cell::Cell::new(None),
             chunks_gpu,
             render_target,
             render_target_view,
@@ -757,9 +1111,24 @@ impl GpuRenderer {
 
         let clear_color = clear_color_for(camera.background, self.hdri_enabled);
 
+        // Build the grid vertex buffer before the pass so it outlives it.
+        let grid_lines = self.grid.get().map(|cfg| {
+            let verts = build_grid_vertices(&cfg, self.bounds_min, self.bounds_max);
+            let count = (verts.len() / 7) as u32;
+            let buf = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("grid_lines"),
+                    contents: bytemuck::cast_slice(&verts),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+            (buf, count)
+        });
+
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("render_pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                depth_slice: None,
                 view: color_view,
                 resolve_target: None,
                 ops: wgpu::Operations {
@@ -792,12 +1161,15 @@ impl GpuRenderer {
                           pipeline: &wgpu::RenderPipeline,
                           uniform_bg: &wgpu::BindGroup,
                           texture_bg: &wgpu::BindGroup,
-                          bufs: &Option<LayerBuffers>| {
+                          bufs: &Option<LayerBuffers>,
+                          chunk_index: usize| {
             if let Some(b) = bufs {
+                let draw_offset = (chunk_index as u32) * self.draw_stride;
                 pass.set_pipeline(pipeline);
                 pass.set_bind_group(0, uniform_bg, &[]);
                 pass.set_bind_group(1, texture_bg, &[]);
                 pass.set_bind_group(2, &self.hdri_bg, &[]);
+                pass.set_bind_group(3, &self.draw_bg, &[draw_offset]);
                 pass.set_vertex_buffer(0, b.positions.slice(..));
                 pass.set_vertex_buffer(1, b.normals.slice(..));
                 pass.set_vertex_buffer(2, b.uvs.slice(..));
@@ -807,37 +1179,92 @@ impl GpuRenderer {
             }
         };
 
-        for chunk in &self.chunks_gpu {
+        for (i, chunk) in self.chunks_gpu.iter().enumerate() {
             draw_layer(
                 &mut pass,
                 &self.opaque_pipeline,
                 &opaque_bg,
                 &chunk.texture_bg,
                 &chunk.opaque,
+                i,
             );
         }
-        for chunk in &self.chunks_gpu {
+        for (i, chunk) in self.chunks_gpu.iter().enumerate() {
             draw_layer(
                 &mut pass,
                 &self.cutout_pipeline,
                 &cutout_bg,
                 &chunk.texture_bg,
                 &chunk.cutout,
+                i,
             );
         }
-        for chunk in &self.chunks_gpu {
+        // Grid after the opaque/cutout depth is laid down (so blocks occlude it)
+        // but before transparent geometry (so glass blends over it).
+        if let Some((buf, count)) = &grid_lines {
+            pass.set_pipeline(&self.line_pipeline);
+            pass.set_bind_group(0, &opaque_bg, &[]);
+            pass.set_vertex_buffer(0, buf.slice(..));
+            pass.draw(0..*count, 0..1);
+        }
+
+        for (i, chunk) in self.chunks_gpu.iter().enumerate() {
             draw_layer(
                 &mut pass,
                 &self.transparent_pipeline,
                 &transparent_bg,
                 &chunk.texture_bg,
                 &chunk.transparent,
+                i,
             );
         }
     }
 
     /// Render a single frame and return RGBA pixels. Headless mode only.
     #[cfg(not(target_arch = "wasm32"))]
+    /// Number of independently posable meshes in this renderer.
+    pub fn mesh_count(&self) -> usize {
+        self.chunks_gpu.len()
+    }
+
+    /// Set the per-draw pose of every mesh.
+    ///
+    /// `poses[i]` applies to the *i*-th [`MeshOutput`] this renderer was built
+    /// from, so a caller animating per block must mesh per block (one
+    /// `MeshOutput` per animation group). Extra poses are ignored; meshes past
+    /// the end of `poses` keep the identity pose.
+    ///
+    /// Cheap enough to call once per frame — it writes one uniform buffer and
+    /// touches no geometry, which is what makes rendering an animation from a
+    /// single [`GpuRenderer`] worthwhile.
+    pub fn set_poses(&self, poses: &[crate::animation::Pose]) {
+        if self.chunks_gpu.is_empty() {
+            return;
+        }
+        let slot = std::mem::size_of::<DrawUniforms>();
+        let mut bytes = vec![0u8; self.draw_stride as usize * self.chunks_gpu.len()];
+        for i in 0..self.chunks_gpu.len() {
+            let u = poses
+                .get(i)
+                .map(DrawUniforms::from_pose)
+                .unwrap_or_else(DrawUniforms::identity);
+            let off = i * self.draw_stride as usize;
+            bytes[off..off + slot].copy_from_slice(bytemuck::bytes_of(&u));
+        }
+        self.queue.write_buffer(&self.draw_buf, 0, &bytes);
+    }
+
+    /// Reset every mesh to the identity pose.
+    pub fn clear_poses(&self) {
+        self.set_poses(&[]);
+    }
+
+    /// Set (or clear, with `None`) the world-space reference grid drawn under
+    /// the scene. Cheap: the geometry is rebuilt per frame from this config.
+    pub fn set_grid(&self, grid: Option<super::GridConfig>) {
+        self.grid.set(grid);
+    }
+
     pub fn render_frame(&self, camera: &CameraConfig) -> Result<Vec<u8>, RenderError> {
         let render_target = self.render_target.as_ref().ok_or_else(|| {
             RenderError::RenderFailed("render_frame requires headless mode".into())
@@ -889,13 +1316,16 @@ impl GpuRenderer {
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
             sender.send(result).unwrap();
         });
-        self.device.poll(wgpu::Maintain::Wait);
+        let _ = self.device.poll(wgpu::PollType::wait_indefinitely());
         receiver
             .recv()
             .unwrap()
             .map_err(|e| RenderError::RenderFailed(format!("Failed to map buffer: {}", e)))?;
 
-        let data = buffer_slice.get_mapped_range();
+        // wgpu 30: `get_mapped_range` is fallible.
+        let data = buffer_slice
+            .get_mapped_range()
+            .map_err(|e| RenderError::RenderFailed(format!("Failed to read mapped buffer: {e}")))?;
         let bytes_per_pixel = 4u32;
         let unpadded_bytes_per_row = bytes_per_pixel * self.width;
         let mut pixels = Vec::with_capacity((self.width * self.height * bytes_per_pixel) as usize);
@@ -1005,12 +1435,15 @@ impl GpuRenderer {
         slice.map_async(wgpu::MapMode::Read, move |r| {
             tx.send(r).unwrap();
         });
-        self.device.poll(wgpu::Maintain::Wait);
+        let _ = self.device.poll(wgpu::PollType::wait_indefinitely());
         rx.recv().unwrap().map_err(|e| {
             RenderError::RenderFailed(format!("Failed to map screenshot buffer: {}", e))
         })?;
 
-        let data = slice.get_mapped_range();
+        // wgpu 30: `get_mapped_range` is fallible.
+        let data = slice.get_mapped_range().map_err(|e| {
+            RenderError::RenderFailed(format!("Failed to read screenshot buffer: {e}"))
+        })?;
         let mut pixels = Vec::with_capacity((self.width * self.height * bpp) as usize);
         for row in 0..self.height {
             let start = (row * padded) as usize;

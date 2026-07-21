@@ -104,11 +104,7 @@ impl MeshModel {
         } else {
             1.0
         };
-        let anchor = [
-            (min[0] + max[0]) * 0.5,
-            min[1],
-            (min[2] + max[2]) * 0.5,
-        ];
+        let anchor = [(min[0] + max[0]) * 0.5, min[1], (min[2] + max[2]) * 0.5];
         for tri in &mut self.triangles {
             for p in &mut tri.positions {
                 for a in 0..3 {
@@ -135,9 +131,8 @@ impl MeshModel {
                 gltf::buffer::Source::Bin => blob
                     .clone()
                     .ok_or_else(|| "GLB references BIN chunk but has none".to_string())?,
-                gltf::buffer::Source::Uri(uri) => decode_data_uri(uri).ok_or_else(|| {
-                    format!("unsupported external buffer URI in GLB: {uri}")
-                })?,
+                gltf::buffer::Source::Uri(uri) => decode_data_uri(uri)
+                    .ok_or_else(|| format!("unsupported external buffer URI in GLB: {uri}"))?,
             };
             if data.len() < buffer.length() {
                 return Err(format!(
@@ -161,14 +156,16 @@ impl MeshModel {
                 }
                 gltf::image::Source::Uri { uri, .. } => decode_data_uri(uri),
             };
-            let decoded = bytes.and_then(|b| image::load_from_memory(&b).ok()).map(|d| {
-                let rgba = d.to_rgba8();
-                TextureImage {
-                    width: rgba.width(),
-                    height: rgba.height(),
-                    pixels: rgba.into_raw(),
-                }
-            });
+            let decoded = bytes
+                .and_then(|b| image::load_from_memory(&b).ok())
+                .map(|d| {
+                    let rgba = d.to_rgba8();
+                    TextureImage {
+                        width: rgba.width(),
+                        height: rgba.height(),
+                        pixels: rgba.into_raw(),
+                    }
+                });
             images.push(decoded);
         }
 
@@ -263,9 +260,7 @@ impl MeshModel {
                             .next()
                             .and_then(|t| resolve_index(t, positions.len()))
                             .ok_or_else(|| err("bad face index"))?;
-                        let ti = parts
-                            .next()
-                            .and_then(|t| resolve_index(t, texcoords.len()));
+                        let ti = parts.next().and_then(|t| resolve_index(t, texcoords.len()));
                         verts.push((vi, ti));
                     }
                     if verts.len() < 3 {
@@ -372,11 +367,9 @@ fn visit_node(
             let Some(positions) = reader.read_positions() else {
                 continue;
             };
-            let positions: Vec<[f32; 3]> =
-                positions.map(|p| transform_point(&world, p)).collect();
-            let uvs: Option<Vec<[f32; 2]>> = reader
-                .read_tex_coords(0)
-                .map(|tc| tc.into_f32().collect());
+            let positions: Vec<[f32; 3]> = positions.map(|p| transform_point(&world, p)).collect();
+            let uvs: Option<Vec<[f32; 2]>> =
+                reader.read_tex_coords(0).map(|tc| tc.into_f32().collect());
             let indices: Vec<u32> = match reader.read_indices() {
                 Some(ix) => ix.into_u32().collect(),
                 None => (0..positions.len() as u32).collect(),
@@ -388,8 +381,7 @@ fn visit_node(
                     continue;
                 }
                 let tri_uvs = uvs.as_ref().and_then(|uv| {
-                    (a < uv.len() && b < uv.len() && c < uv.len())
-                        .then(|| [uv[a], uv[b], uv[c]])
+                    (a < uv.len() && b < uv.len() && c < uv.len()).then(|| [uv[a], uv[b], uv[c]])
                 });
                 triangles.push(MeshTriangle {
                     positions: [positions[a], positions[b], positions[c]],

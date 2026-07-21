@@ -1,7 +1,7 @@
 use crate::building::{
     BezierCurve, BilinearGradientBrush, BlockPalette, Brush, ColorBrush, Cone, Cuboid,
-    CurveGradientBrush, Cylinder, Difference, Disk, Ellipsoid, FieldBrush, Hollow, Intersection, Line,
-    LinearGradientBrush, MultiPointGradientBrush, ParametricShape, Plane, PointGradientBrush,
+    CurveGradientBrush, Cylinder, Difference, Disk, Ellipsoid, FieldBrush, Hollow, Intersection,
+    Line, LinearGradientBrush, MultiPointGradientBrush, ParametricShape, Plane, PointGradientBrush,
     PolygonPrism, Pyramid, SdfShape, ShadedBrush, Shape, SolidBrush, Sphere, SpotlightBrush, Torus,
     Triangle, Union,
 };

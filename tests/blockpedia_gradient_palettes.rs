@@ -292,7 +292,6 @@ mod integration_tests {
         let block2 = BLOCKS.get("minecraft:black_wool");
 
         if let (Some(block1), Some(block2)) = (block1, block2) {
-
             let color1 = block1.extras.color.unwrap().to_extended();
             let color2 = block2.extras.color.unwrap().to_extended();
 

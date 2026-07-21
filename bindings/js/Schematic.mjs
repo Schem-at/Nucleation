@@ -848,7 +848,32 @@ export class Schematic {
     }
 
     /**
+     * The full block state at a position. `NotFound` if the position is
+     * outside every region.
+     */
+    getBlock(x, y, z) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_get_block(diplomatReceive.buffer, this.ffiValue, x, y, z);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new BlockState(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
      * The block at a position with its properties, as a `BlockState`.
+     * Kept as an explicit alias for callers migrating from the older API.
      */
     getBlockWithProperties(x, y, z) {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
@@ -989,6 +1014,36 @@ export class Schematic {
 
 
         const result = wasm.Schematic_add_entity(diplomatReceive.buffer, this.ffiValue, idSlice.ptr, x, y, z, nbtJsonSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Add an armor stand without hand-authoring entity NBT.
+     *
+     * `armor_material` accepts `diamond`, `netherite`, `iron`, etc.; an
+     * empty string creates an unarmored stand. `yaw` uses Minecraft degrees.
+     */
+    addArmorStand(x, y, z, yaw, armorMaterial) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const armorMaterialSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, armorMaterial)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_add_armor_stand(diplomatReceive.buffer, this.ffiValue, x, y, z, yaw, armorMaterialSlice.ptr);
 
         try {
             if (!diplomatReceive.resultFlag) {

@@ -46,43 +46,51 @@ Kotlin/JVM, PHP, C, and C++ ship as archives on
 
 ## The basics
 
-A `Schematic` is a named collection of blocks, plus block entities, entities,
-and metadata, held in one or many named regions. Load one from any supported
-format, edit it with plain coordinates and block strings, save it in any other:
+A `Schematic` is a named collection of blocks at integer coordinates. Create one
+from scratch or load an existing build, inspect and replace blocks with normal
+Minecraft block-state strings, then save it in any supported format.
 
-```python
-from nucleation import Schematic
+<table>
+<tr>
+<td width="53%" valign="top"><pre><code class="language-python">from nucleation import Schematic
+nook = Schematic.create("crafting_nook")
+for x in range(5):
+    for z in range(5):
+        nook.set_block(x, 0, z, "minecraft:spruce_planks")
+for y in range(1, 4):
+    for i in range(5):
+        block = (
+            "minecraft:light_blue_stained_glass"
+            if i == 2 and y == 2
+            else "minecraft:oak_planks"
+        )
+        nook.set_block(i, y, 0, block)
+        nook.set_block(0, y, i, block)
+nook.set_block(1, 1, 1, "minecraft:crafting_table")
+nook.set_block(3, 1, 1, "minecraft:chest[facing=south]")
+nook.save_to_file("crafting-nook.schem")
+copy = Schematic.load_from_file("crafting-nook.schem")
+print(copy.get_block(1, 1, 1).name())  # minecraft:crafting_table</code></pre></td>
+<td width="47%" valign="middle" align="center"><img src="docs/media/readme/basics/animation.gif" width="480" alt="A compact crafting nook assembling with two centered windows, a crafting table, chest, and two wall torches"></td>
+</tr>
+</table>
 
-cube = Schematic.load_from_file("simple_cube.litematic")   # any format, auto-detected
-cube.dimensions()                                          # (3, 3, 3)
+[**Run the complete animation generator**](examples/readme/basics/generate.py)
+· [**Download the resulting `.schem`**](docs/downloads/readme/basics/crafting-nook.schem)
 
-cube.set_block(1, 3, 1, "minecraft:glowstone")             # y=3: the region grows to fit
-cube.get_block_name(1, 3, 1)                               # "minecraft:glowstone"
+Coordinates are integer block positions, including negative values. A new
+schematic grows automatically when a placement falls outside its current bounds,
+so there is no allocation step before construction. Calling `set_block` at an
+occupied coordinate replaces it; setting `minecraft:air` removes it.
 
-cube.save_to_file("cube.schem")                            # format from the extension
-```
+Block-state properties use the same bracket notation as Minecraft tooling:
+`minecraft:chest[facing=south]`. `get_block` returns the complete `BlockState`;
+`get_block_name` and `get_block_string` are convenient shortcuts when only a name
+or serialised form is needed.
 
-<div align="center">
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/basics.png" width="380" alt="The cube from the snippet with its glowstone crown, rendered">
-</div>
-
-The same loop in JavaScript. The WASM build has no filesystem, so it is bytes
-in, bytes out:
-
-```js
-import { Schematic } from "nucleation";
-import { readFileSync, writeFileSync } from "node:fs";
-
-const cube = Schematic.fromData(readFileSync("simple_cube.litematic"));
-cube.setBlock(1, 3, 1, "minecraft:glowstone");
-writeFileSync("simple_cube.schem", Buffer.from(cube.toSchematicB64(), "base64"));
-```
-
-Block-state strings with properties work anywhere a block is named, like
-`"minecraft:lever[face=floor,facing=east]"`, and every block string a schematic
-can contain round-trips. Later Python snippets assume `from nucleation import *`
-and an existing schematic `s`; each has a fully runnable version with captured
-output in [`docs/readme-snippets/`](docs/readme-snippets/).
+`load_from_file` detects the input format from its contents and `save_to_file`
+selects the output format from the extension. See [Formats and I/O](docs/features/formats-and-io.md)
+for byte APIs, explicit format selection, conversion, and round-trip details.
 
 ## Build: shapes, brushes, palettes
 

@@ -134,11 +134,17 @@ mod tests {
             },
         ];
         let s = extrude_footprints("t", &fps, Some("minecraft:gray_concrete"));
-        assert_eq!(s.get_block(0, 0, 0).unwrap().name, "minecraft:gray_concrete");
+        assert_eq!(
+            s.get_block(0, 0, 0).unwrap().name,
+            "minecraft:gray_concrete"
+        );
         assert_eq!(s.get_block(1, 2, 1).unwrap().name, "minecraft:bricks");
         // Overlap column: tower filled last, so it owns the shared levels.
         assert_eq!(s.get_block(5, 2, 5).unwrap().name, "minecraft:quartz_block");
-        assert_eq!(s.get_block(5, 18, 5).unwrap().name, "minecraft:quartz_block");
+        assert_eq!(
+            s.get_block(5, 18, 5).unwrap().name,
+            "minecraft:quartz_block"
+        );
     }
 
     #[test]
@@ -156,7 +162,8 @@ mod tests {
         assert_eq!(s.get_block(0, 1, 0).unwrap().name, "minecraft:stone");
         assert_eq!(s.get_block(0, 5, 1).unwrap().name, "minecraft:grass_block");
         assert!(
-            s.get_block(0, 3, 0).map_or(true, |b| b.name == "minecraft:air"),
+            s.get_block(0, 3, 0)
+                .map_or(true, |b| b.name == "minecraft:air"),
             "nothing solid above the column top"
         );
     }
@@ -168,7 +175,10 @@ mod tests {
             "t",
             &[3, 3],
             2,
-            &["minecraft:snow_block".to_string(), "minecraft:gravel".to_string()],
+            &[
+                "minecraft:snow_block".to_string(),
+                "minecraft:gravel".to_string(),
+            ],
             "minecraft:stone",
             1,
         );

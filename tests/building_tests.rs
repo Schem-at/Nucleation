@@ -579,8 +579,12 @@ fn palette_from_block_ids_and_introspection() {
     use nucleation::building::BlockPalette;
 
     let palette = BlockPalette::from_block_ids(
-        ["minecraft:stone", "minecraft:oak_planks", "minecraft:definitely_not_a_block"]
-            .into_iter(),
+        [
+            "minecraft:stone",
+            "minecraft:oak_planks",
+            "minecraft:definitely_not_a_block",
+        ]
+        .into_iter(),
     );
     // Unknown ids are skipped; both real blocks have colors in blockpedia.
     assert_eq!(palette.len(), 2);
@@ -668,13 +672,21 @@ fn palette_ramps_and_gradient_ids() {
     // Gradient sampling: exactly N entries, endpoints snap to the extremes.
     let ramp = BlockPalette::new_wool().gradient_ids((0, 0, 0), (255, 255, 255), 16);
     assert_eq!(ramp.len(), 16);
-    assert_eq!(ramp.first().map(String::as_str), Some("minecraft:black_wool"));
-    assert_eq!(ramp.last().map(String::as_str), Some("minecraft:white_wool"));
+    assert_eq!(
+        ramp.first().map(String::as_str),
+        Some("minecraft:black_wool")
+    );
+    assert_eq!(
+        ramp.last().map(String::as_str),
+        Some("minecraft:white_wool")
+    );
 
     // Wood preset is the planks family.
     let wood = BlockPalette::new_wood();
     assert!(wood.len() >= 8, "wood palette too small: {}", wood.len());
-    assert!(wood.block_ids().all(|id| id.ends_with("_planks") || id == "minecraft:bamboo_mosaic"));
+    assert!(wood
+        .block_ids()
+        .all(|id| id.ends_with("_planks") || id == "minecraft:bamboo_mosaic"));
 
     // Empty palette yields an empty gradient, not a panic.
     assert!(BlockPalette::from_block_ids(std::iter::empty())
@@ -806,7 +818,10 @@ fn torus_parameter_covers_the_full_ring() {
     let mut deciles = std::collections::HashSet::new();
     for i in 0..64 {
         let a = 2.0 * std::f64::consts::PI * (i as f64) / 64.0;
-        let (x, z) = ((16.0 * a.cos()).round() as i32, (16.0 * a.sin()).round() as i32);
+        let (x, z) = (
+            (16.0 * a.cos()).round() as i32,
+            (16.0 * a.sin()).round() as i32,
+        );
         let t = torus.parameter_at(x, 0, z);
         assert!((0.0..=1.0).contains(&t));
         deciles.insert((t * 10.0).floor() as i32);
@@ -818,10 +833,17 @@ fn torus_parameter_covers_the_full_ring() {
     let mut deciles = std::collections::HashSet::new();
     for i in 0..64 {
         let a = 2.0 * std::f64::consts::PI * (i as f64) / 64.0;
-        let (y, z) = ((16.0 * a.cos()).round() as i32, (16.0 * a.sin()).round() as i32);
+        let (y, z) = (
+            (16.0 * a.cos()).round() as i32,
+            (16.0 * a.sin()).round() as i32,
+        );
         deciles.insert((tilted.parameter_at(0, y, z) * 10.0).floor() as i32);
     }
-    assert!(deciles.len() >= 9, "tilted t only hit deciles {:?}", deciles);
+    assert!(
+        deciles.len() >= 9,
+        "tilted t only hit deciles {:?}",
+        deciles
+    );
 }
 
 #[test]
@@ -841,8 +863,18 @@ fn ramp_ids_picks_distinct_monotonic_blocks() {
         let f = nucleation::blockpedia::get_block(id).unwrap();
         f.extras.color.as_ref().unwrap().to_extended().oklab[0]
     };
-    assert!(l(&ramp[0]) > 0.9, "start too dark: {} ({})", ramp[0], l(&ramp[0]));
-    assert!(l(&ramp[27]) < 0.25, "end too light: {} ({})", ramp[27], l(&ramp[27]));
+    assert!(
+        l(&ramp[0]) > 0.9,
+        "start too dark: {} ({})",
+        ramp[0],
+        l(&ramp[0])
+    );
+    assert!(
+        l(&ramp[27]) < 0.25,
+        "end too light: {} ({})",
+        ramp[27],
+        l(&ramp[27])
+    );
     for w in ramp.windows(2) {
         assert!(
             l(&w[0]) >= l(&w[1]) - 1e-4,
@@ -853,7 +885,9 @@ fn ramp_ids_picks_distinct_monotonic_blocks() {
     }
 
     // Too many steps for a small palette -> None, not a panic.
-    assert!(BlockPalette::new_wool().ramp_ids((255, 255, 255), (0, 0, 0), 17).is_none());
+    assert!(BlockPalette::new_wool()
+        .ramp_ids((255, 255, 255), (0, 0, 0), 17)
+        .is_none());
     // Degenerate line -> None.
     assert!(all.ramp_ids((10, 10, 10), (10, 10, 10), 5).is_none());
 }
@@ -880,7 +914,9 @@ fn sdf_shapes_plug_into_the_building_system() {
     tool.fill_enum(&ShapeEnum::Sdf(shape.clone()), &brush);
 
     // The blend region between the spheres must be solid (smooth union).
-    assert!(s.get_block(3, 0, 0).is_some_and(|b| b.name.contains("wool")));
+    assert!(s
+        .get_block(3, 0, 0)
+        .is_some_and(|b| b.name.contains("wool")));
     // Membership matches the sampler convention (center eval <= 0).
     assert!(shape.contains(0, 0, 0));
     assert!(!shape.contains(0, 7, 0));
@@ -907,14 +943,26 @@ fn palette_builder_color_logic() {
     for id in grays.block_ids() {
         let f = nucleation::blockpedia::get_block(id).unwrap();
         let ok = f.extras.color.as_ref().unwrap().to_extended().oklab;
-        assert!((ok[1] * ok[1] + ok[2] * ok[2]).sqrt() <= 0.022, "{id} too chromatic");
-        assert!((0.35..=0.75).contains(&ok[0]), "{id} lightness {} out of band", ok[0]);
+        assert!(
+            (ok[1] * ok[1] + ok[2] * ok[2]).sqrt() <= 0.022,
+            "{id} too chromatic"
+        );
+        assert!(
+            (0.35..=0.75).contains(&ok[0]),
+            "{id} lightness {} out of band",
+            ok[0]
+        );
     }
 
     // color_near: everything close to lime.
-    let limes = BlockPalette::builder().color_near(120, 200, 60, 0.12).build();
+    let limes = BlockPalette::builder()
+        .color_near(120, 200, 60, 0.12)
+        .build();
     assert!(limes.len() >= 2);
-    assert!(limes.block_ids().any(|i| i.contains("lime")), "lime family expected");
+    assert!(
+        limes.block_ids().any(|i| i.contains("lime")),
+        "lime family expected"
+    );
 }
 
 #[test]
@@ -923,16 +971,18 @@ fn dithered_palette_blends_between_ramp_steps() {
 
     // A two-block palette and a color exactly between them: hard snap picks
     // one block everywhere; the dithered palette must mix both.
-    let two = BlockPalette::from_block_ids(
-        ["minecraft:white_wool", "minecraft:black_wool"].into_iter(),
-    );
+    let two =
+        BlockPalette::from_block_ids(["minecraft:white_wool", "minecraft:black_wool"].into_iter());
 
     let fill_with = |palette: BlockPalette| {
         let mut s = UniversalSchematic::new("dither".to_string());
         let mut brush = BrushEnum::Color(ColorBrush::new(128, 128, 132));
         brush.set_palette(Arc::new(palette));
         let mut tool = BuildingTool::new(&mut s);
-        tool.fill_enum(&ShapeEnum::Cuboid(Cuboid::new((0, 0, 0), (15, 0, 15))), &brush);
+        tool.fill_enum(
+            &ShapeEnum::Cuboid(Cuboid::new((0, 0, 0), (15, 0, 15))),
+            &brush,
+        );
         let mut counts = std::collections::HashMap::new();
         for x in 0..16 {
             for z in 0..16 {

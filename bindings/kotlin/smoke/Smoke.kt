@@ -6,6 +6,8 @@
 // Lives outside src/ because tools/gen-bindings.sh wipes bindings/kotlin/src
 // wholesale; this file is hand-maintained, like the gradle build scripts.
 import at.schem.nucleation.Schematic
+import at.schem.nucleation.AnimationEffect
+import at.schem.nucleation.BuildAnimation
 
 fun main() {
     val s = Schematic.create("smoke")
@@ -15,5 +17,12 @@ fun main() {
     ).getOrThrow()
     val name = s.getBlockName(0, 0, 0).getOrThrow()
     check(name == "minecraft:chest") { "expected minecraft:chest, got '$name'" }
-    println("JVM smoke OK: created schematic, set+read block -> $name")
+
+    val animation = BuildAnimation.create("fluent")
+    val effect = AnimationEffect.spinIn(600.0f, 1.0f)
+    check(animation.withEffect(effect).setBlock(0, 0, 0, "minecraft:stone").getOrThrow() == 0u)
+    check(animation.setBlock(1, 0, 0, "minecraft:dirt").getOrThrow() == 1u)
+    check(animation.groupCount() == 2u)
+
+    println("JVM smoke OK: schematic + fluent animation effect")
 }

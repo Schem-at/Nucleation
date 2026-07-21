@@ -13,6 +13,7 @@ pub enum Projection {
 }
 
 /// Camera configuration for rendering.
+#[derive(Clone, Debug)]
 pub struct CameraConfig {
     pub yaw_deg: f32,
     pub pitch_deg: f32,
@@ -62,6 +63,39 @@ pub fn merged_bounds(meshes: &[MeshOutput]) -> ([f32; 3], [f32; 3]) {
 }
 
 /// Compute view-projection and inverse view-projection matrices.
+/// Project a world-space point to pixel coordinates using a view-projection
+/// matrix, or `None` when the point is behind the camera.
+///
+/// This is the enabler for 2D overlays: labels, leader lines, and code panels
+/// live in a separate compositor, but they need to know *where on screen* a
+/// block sits. The renderer already computes the matrix; this turns it into a
+/// pixel anchor. Origin is top-left, matching image conventions.
+///
+/// The matrix is column-major (`m[col][row]`), the same layout the shader
+/// consumes.
+pub fn project_point(
+    view_proj: &[[f32; 4]; 4],
+    world: [f32; 3],
+    width: u32,
+    height: u32,
+) -> Option<(f32, f32)> {
+    let v = [world[0], world[1], world[2], 1.0];
+    let mut clip = [0.0f32; 4];
+    for (row, out) in clip.iter_mut().enumerate() {
+        *out = (0..4).map(|col| view_proj[col][row] * v[col]).sum();
+    }
+    // Behind the camera (perspective). Orthographic keeps w == 1.
+    if clip[3] <= 1e-6 {
+        return None;
+    }
+    let ndc_x = clip[0] / clip[3];
+    let ndc_y = clip[1] / clip[3];
+    let px = (ndc_x * 0.5 + 0.5) * width as f32;
+    // Flip Y: NDC is y-up, image space is y-down.
+    let py = (1.0 - (ndc_y * 0.5 + 0.5)) * height as f32;
+    Some((px, py))
+}
+
 pub fn compute_view_proj(
     bounds_min: [f32; 3],
     bounds_max: [f32; 3],
@@ -423,5 +457,61 @@ mod view_proj_tests {
         }
         // The framing should roughly fill the viewport (1/1.1 ≈ 0.9).
         assert!(max_xy > 0.8, "geometry too small in frame: {}", max_xy);
+    }
+
+    #[test]
+    fn project_point_places_the_target_at_screen_centre() {
+        let cam = CameraConfig {
+            yaw_deg: 30.0,
+            pitch_deg: 25.0,
+            zoom: 1.0,
+            fov_deg: 45.0,
+            target: Some([5.0, 5.0, 5.0]),
+            projection: Projection::Perspective,
+            background: None,
+            sphere_fit: true,
+        };
+        let (vp, _) = compute_view_proj([0.0; 3], [10.0; 3], 1.0, &cam);
+        let (px, py) = project_point(&vp, [5.0, 5.0, 5.0], 800, 600).unwrap();
+        // The orbit target must land at the middle of the frame.
+        assert!((px - 400.0).abs() < 1.0, "x={px}");
+        assert!((py - 300.0).abs() < 1.0, "y={py}");
+    }
+
+    #[test]
+    fn project_point_is_y_down() {
+        // A point directly above the target projects into the top half.
+        let cam = CameraConfig {
+            yaw_deg: 0.0,
+            pitch_deg: 0.0,
+            zoom: 1.0,
+            fov_deg: 60.0,
+            target: Some([0.0, 0.0, 0.0]),
+            projection: Projection::Perspective,
+            background: None,
+            sphere_fit: true,
+        };
+        let (vp, _) = compute_view_proj([-5.0, -5.0, -5.0], [5.0, 5.0, 5.0], 1.0, &cam);
+        let (_, top) = project_point(&vp, [0.0, 3.0, 0.0], 400, 400).unwrap();
+        let (_, mid) = project_point(&vp, [0.0, 0.0, 0.0], 400, 400).unwrap();
+        assert!(top < mid, "higher world Y should map to smaller screen Y");
+    }
+
+    #[test]
+    fn project_point_rejects_points_behind_the_camera() {
+        let cam = CameraConfig {
+            yaw_deg: 0.0,
+            pitch_deg: 0.0,
+            zoom: 1.0,
+            fov_deg: 60.0,
+            target: Some([0.0, 0.0, 0.0]),
+            projection: Projection::Perspective,
+            background: None,
+            sphere_fit: true,
+        };
+        let (vp, _) = compute_view_proj([-5.0; 3], [5.0; 3], 1.0, &cam);
+        // The camera looks down -Z from +Z, so a point far behind it (large +Z)
+        // is off-screen.
+        assert!(project_point(&vp, [0.0, 0.0, 1000.0], 400, 400).is_none());
     }
 }

@@ -526,6 +526,14 @@ final class Schematic {
         }
     }
 
+    public function getBlock( $x,  $y,  $z) {
+        $result = Lib::ffi()->Schematic_get_block($this->ptr, $x, $y, $z);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new BlockState($result->ok, true);
+    }
+
     public function getBlockWithProperties( $x,  $y,  $z) {
         $result = Lib::ffi()->Schematic_get_block_with_properties($this->ptr, $x, $y, $z);
         if (!$result->is_ok) {
@@ -591,6 +599,23 @@ final class Schematic {
         }
         $__view4->len = $__n4;
         $result = Lib::ffi()->Schematic_add_entity($this->ptr, $__view0, $x, $y, $z, $__view4);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function addArmorStand( $x,  $y,  $z,  $yaw, string $armor_material) {
+        $__n4 = strlen($armor_material);
+        $__view4 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n4 > 0) {
+            $__buf4 = Lib::ffi()->new("uint8_t[" . $__n4 . "]", false);
+            \FFI::memcpy($__buf4, $armor_material, $__n4);
+            $__view4->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf4[0]));
+        } else {
+            $__view4->data = null;
+        }
+        $__view4->len = $__n4;
+        $result = Lib::ffi()->Schematic_add_armor_stand($this->ptr, $x, $y, $z, $yaw, $__view4);
         if (!$result->is_ok) {
             throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
         }

@@ -1,4 +1,6 @@
-use nucleation::blockpedia::color::block_palettes::{BlockFilter, BlockPaletteGenerator, PaletteTheme};
+use nucleation::blockpedia::color::block_palettes::{
+    BlockFilter, BlockPaletteGenerator, PaletteTheme,
+};
 use nucleation::blockpedia::BLOCKS;
 
 #[test]

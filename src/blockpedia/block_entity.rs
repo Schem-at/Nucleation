@@ -32,9 +32,7 @@ impl BlockEntityTranslator {
     // ────────────────────────────────────────────────────────────────────
 
     /// Translate Bedrock block-entity NBT into the Java edition layout.
-    pub fn translate_bedrock_to_java(
-        nbt: &HashMap<String, NbtValue>,
-    ) -> HashMap<String, NbtValue> {
+    pub fn translate_bedrock_to_java(nbt: &HashMap<String, NbtValue>) -> HashMap<String, NbtValue> {
         let mut out = nbt.clone();
 
         if let Some(NbtValue::String(id)) = nbt.get("id") {
@@ -90,9 +88,7 @@ impl BlockEntityTranslator {
     /// like `id: "minecraft:hopper"`, `Items: [...]`, `Text1`..`Text4`).
     /// The output is what `block_position_data[i].block_entity_data`
     /// expects in an `.mcstructure` file.
-    pub fn translate_java_to_bedrock(
-        nbt: &HashMap<String, NbtValue>,
-    ) -> HashMap<String, NbtValue> {
+    pub fn translate_java_to_bedrock(nbt: &HashMap<String, NbtValue>) -> HashMap<String, NbtValue> {
         let mut out = nbt.clone();
 
         let java_id = match nbt.get("id") {
@@ -188,7 +184,10 @@ impl BlockEntityTranslator {
     }
 
     fn sign_bedrock_to_java(nbt: &mut HashMap<String, NbtValue>) {
-        nbt.insert("id".to_string(), NbtValue::String("minecraft:sign".to_string()));
+        nbt.insert(
+            "id".to_string(),
+            NbtValue::String("minecraft:sign".to_string()),
+        );
         if let Some(NbtValue::String(text)) = nbt.remove("Text") {
             let mut lines = text.split('\n');
             for i in 1..=4 {
@@ -216,7 +215,10 @@ impl BlockEntityTranslator {
     }
 
     fn beacon_bedrock_to_java(nbt: &mut HashMap<String, NbtValue>) {
-        nbt.insert("id".to_string(), NbtValue::String("minecraft:beacon".to_string()));
+        nbt.insert(
+            "id".to_string(),
+            NbtValue::String("minecraft:beacon".to_string()),
+        );
     }
 
     fn command_block_bedrock_to_java(nbt: &mut HashMap<String, NbtValue>) {
@@ -347,11 +349,21 @@ fn java_to_bedrock_be_id(java_id: &str) -> String {
         "trapped_chest" => "TrappedChest",
         "barrel" => "Barrel",
         "shulker_box" => "ShulkerBox",
-        "white_shulker_box" | "orange_shulker_box" | "magenta_shulker_box"
-        | "light_blue_shulker_box" | "yellow_shulker_box" | "lime_shulker_box"
-        | "pink_shulker_box" | "gray_shulker_box" | "light_gray_shulker_box"
-        | "cyan_shulker_box" | "purple_shulker_box" | "blue_shulker_box"
-        | "brown_shulker_box" | "green_shulker_box" | "red_shulker_box"
+        "white_shulker_box"
+        | "orange_shulker_box"
+        | "magenta_shulker_box"
+        | "light_blue_shulker_box"
+        | "yellow_shulker_box"
+        | "lime_shulker_box"
+        | "pink_shulker_box"
+        | "gray_shulker_box"
+        | "light_gray_shulker_box"
+        | "cyan_shulker_box"
+        | "purple_shulker_box"
+        | "blue_shulker_box"
+        | "brown_shulker_box"
+        | "green_shulker_box"
+        | "red_shulker_box"
         | "black_shulker_box" => "ShulkerBox",
         "dispenser" => "Dispenser",
         "dropper" => "Dropper",
@@ -360,34 +372,45 @@ fn java_to_bedrock_be_id(java_id: &str) -> String {
         "blast_furnace" => "BlastFurnace",
         "smoker" => "Smoker",
         "brewing_stand" => "BrewingStand",
-        "sign" | "oak_sign" | "spruce_sign" | "birch_sign" | "jungle_sign"
-        | "acacia_sign" | "dark_oak_sign" | "crimson_sign" | "warped_sign"
-        | "mangrove_sign" | "bamboo_sign" | "cherry_sign" => "Sign",
+        "sign" | "oak_sign" | "spruce_sign" | "birch_sign" | "jungle_sign" | "acacia_sign"
+        | "dark_oak_sign" | "crimson_sign" | "warped_sign" | "mangrove_sign" | "bamboo_sign"
+        | "cherry_sign" => "Sign",
         "wall_sign" | "oak_wall_sign" | "spruce_wall_sign" | "birch_wall_sign"
-        | "jungle_wall_sign" | "acacia_wall_sign" | "dark_oak_wall_sign"
-        | "crimson_wall_sign" | "warped_wall_sign" | "mangrove_wall_sign"
-        | "bamboo_wall_sign" | "cherry_wall_sign" => "Sign",
-        "oak_hanging_sign" | "spruce_hanging_sign" | "birch_hanging_sign"
-        | "jungle_hanging_sign" | "acacia_hanging_sign" | "dark_oak_hanging_sign"
-        | "crimson_hanging_sign" | "warped_hanging_sign" | "mangrove_hanging_sign"
-        | "bamboo_hanging_sign" | "cherry_hanging_sign" => "HangingSign",
+        | "jungle_wall_sign" | "acacia_wall_sign" | "dark_oak_wall_sign" | "crimson_wall_sign"
+        | "warped_wall_sign" | "mangrove_wall_sign" | "bamboo_wall_sign" | "cherry_wall_sign" => {
+            "Sign"
+        }
+        "oak_hanging_sign"
+        | "spruce_hanging_sign"
+        | "birch_hanging_sign"
+        | "jungle_hanging_sign"
+        | "acacia_hanging_sign"
+        | "dark_oak_hanging_sign"
+        | "crimson_hanging_sign"
+        | "warped_hanging_sign"
+        | "mangrove_hanging_sign"
+        | "bamboo_hanging_sign"
+        | "cherry_hanging_sign" => "HangingSign",
         "comparator" => "Comparator",
         "piston" | "sticky_piston" => "PistonArm",
         "beacon" => "Beacon",
         "command_block" | "chain_command_block" | "repeating_command_block" => "CommandBlock",
         "jukebox" => "Jukebox",
         "lectern" => "Lectern",
-        "banner" | "white_banner" | "orange_banner" | "magenta_banner"
-        | "light_blue_banner" | "yellow_banner" | "lime_banner" | "pink_banner"
-        | "gray_banner" | "light_gray_banner" | "cyan_banner" | "purple_banner"
-        | "blue_banner" | "brown_banner" | "green_banner" | "red_banner"
-        | "black_banner" => "Banner",
-        "bed" | "white_bed" | "orange_bed" | "magenta_bed" | "light_blue_bed"
-        | "yellow_bed" | "lime_bed" | "pink_bed" | "gray_bed"
-        | "light_gray_bed" | "cyan_bed" | "purple_bed" | "blue_bed"
-        | "brown_bed" | "green_bed" | "red_bed" | "black_bed" => "Bed",
-        "skeleton_skull" | "wither_skeleton_skull" | "zombie_head" | "player_head"
-        | "creeper_head" | "dragon_head" | "piglin_head" => "Skull",
+        "banner" | "white_banner" | "orange_banner" | "magenta_banner" | "light_blue_banner"
+        | "yellow_banner" | "lime_banner" | "pink_banner" | "gray_banner" | "light_gray_banner"
+        | "cyan_banner" | "purple_banner" | "blue_banner" | "brown_banner" | "green_banner"
+        | "red_banner" | "black_banner" => "Banner",
+        "bed" | "white_bed" | "orange_bed" | "magenta_bed" | "light_blue_bed" | "yellow_bed"
+        | "lime_bed" | "pink_bed" | "gray_bed" | "light_gray_bed" | "cyan_bed" | "purple_bed"
+        | "blue_bed" | "brown_bed" | "green_bed" | "red_bed" | "black_bed" => "Bed",
+        "skeleton_skull"
+        | "wither_skeleton_skull"
+        | "zombie_head"
+        | "player_head"
+        | "creeper_head"
+        | "dragon_head"
+        | "piglin_head" => "Skull",
         _ => "",
     }
     .to_string()
@@ -408,7 +431,10 @@ mod tests {
         let mut item = HashMap::new();
         item.insert("id".to_string(), cmp("minecraft:cobblestone"));
         item.insert("Count".to_string(), NbtValue::Byte(64));
-        nbt.insert("Items".to_string(), NbtValue::List(vec![NbtValue::Compound(item)]));
+        nbt.insert(
+            "Items".to_string(),
+            NbtValue::List(vec![NbtValue::Compound(item)]),
+        );
 
         let bed = BlockEntityTranslator::translate_java_to_bedrock(&nbt);
         assert_eq!(bed.get("id"), Some(&cmp("Chest")));
@@ -488,7 +514,10 @@ mod tests {
         let mut item = HashMap::new();
         item.insert("Name".to_string(), cmp("cobblestone"));
         item.insert("Count".to_string(), NbtValue::Byte(32));
-        nbt.insert("Items".to_string(), NbtValue::List(vec![NbtValue::Compound(item)]));
+        nbt.insert(
+            "Items".to_string(),
+            NbtValue::List(vec![NbtValue::Compound(item)]),
+        );
 
         let java = BlockEntityTranslator::translate_bedrock_to_java(&nbt);
         assert_eq!(java.get("id"), Some(&cmp("minecraft:chest")));

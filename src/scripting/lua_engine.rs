@@ -213,8 +213,8 @@ fn setup_lua(lua: &Lua) -> LuaResult<()> {
     lua.globals().set(
         "palette_block_ids",
         lua.create_function(|lua, name: String| {
-            let ids = crate::scripting::shared::palette_block_ids(&name)
-                .map_err(LuaError::external)?;
+            let ids =
+                crate::scripting::shared::palette_block_ids(&name).map_err(LuaError::external)?;
             let table = lua.create_table()?;
             for (i, id) in ids.iter().enumerate() {
                 table.set(i + 1, id.as_str())?;

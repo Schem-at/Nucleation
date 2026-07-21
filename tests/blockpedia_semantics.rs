@@ -93,8 +93,12 @@ fn full_cube_is_model_geometry_not_name_guessing() {
     // Mushroom blocks render as a multipart shell of six face planes —
     // model geometry indistinguishable from vines — but are full opaque
     // cubes in game; the extractor's `full_cube_override` settles them.
-    assert!(get_block("minecraft:brown_mushroom_block").unwrap().is_full_cube());
-    assert!(get_block("minecraft:red_mushroom_block").unwrap().is_full_cube());
+    assert!(get_block("minecraft:brown_mushroom_block")
+        .unwrap()
+        .is_full_cube());
+    assert!(get_block("minecraft:red_mushroom_block")
+        .unwrap()
+        .is_full_cube());
     assert!(get_block("minecraft:mushroom_stem").unwrap().is_full_cube());
 
     // Shapes without telltale name substrings are now correctly non-full
@@ -108,7 +112,9 @@ fn semantics_coverage_is_sane() {
     let total = all_blocks().count();
     let full_cubes = all_blocks().filter(|b| b.is_full_cube()).count();
     let tagged = all_blocks().filter(|b| !b.tags.is_empty()).count();
-    let non_generic_kind = all_blocks().filter(|b| b.kind() != "minecraft:block").count();
+    let non_generic_kind = all_blocks()
+        .filter(|b| b.kind() != "minecraft:block")
+        .count();
     let with_base = all_blocks().filter(|b| b.base_block().is_some()).count();
 
     assert!(total >= 1196, "expected 26.2 block count, got {total}");
@@ -116,9 +122,18 @@ fn semantics_coverage_is_sane() {
     // overrides), 1132 tagged, 1015 non-generic kinds, 234 base links
     // (64 report base_state + 170 model-texture).
     assert!(full_cubes >= 400, "full cube count regressed: {full_cubes}");
-    assert!(tagged * 100 >= total * 90, "tag coverage regressed: {tagged}/{total}");
-    assert!(non_generic_kind >= 1000, "kind coverage regressed: {non_generic_kind}");
-    assert!(with_base >= 220, "base-link coverage regressed: {with_base}");
+    assert!(
+        tagged * 100 >= total * 90,
+        "tag coverage regressed: {tagged}/{total}"
+    );
+    assert!(
+        non_generic_kind >= 1000,
+        "kind coverage regressed: {non_generic_kind}"
+    );
+    assert!(
+        with_base >= 220,
+        "base-link coverage regressed: {with_base}"
+    );
 }
 
 #[test]

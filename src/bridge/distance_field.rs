@@ -26,9 +26,10 @@ pub mod ffi {
                     occ.insert((pos.x, pos.y, pos.z));
                 }
             }
-            let field = crate::building::DistanceField::from_occupancy(bb.min, bb.max, |x, y, z| {
-                occ.contains(&(x, y, z))
-            });
+            let field =
+                crate::building::DistanceField::from_occupancy(bb.min, bb.max, |x, y, z| {
+                    occ.contains(&(x, y, z))
+                });
             Box::new(DistanceField(field))
         }
 

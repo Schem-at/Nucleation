@@ -16,6 +16,10 @@ export { BlockPos, BlockPos_obj } from "./BlockPos"
 
 export { Dimensions, Dimensions_obj } from "./Dimensions"
 
+export { AnimationEffect } from "./AnimationEffect"
+
+export { BuildAnimation } from "./BuildAnimation"
+
 export { Autostack } from "./Autostack"
 
 export { Blocks } from "./Blocks"

@@ -65,6 +65,7 @@ use schematic_mesher::{
 
 pub mod cache;
 pub mod item_model;
+mod resource_pack_compat;
 
 // Re-export the real MeshOutput and MeshLayer types from schematic-mesher.
 pub use item_model::{
@@ -99,18 +100,37 @@ pub struct ResourcePackSource {
 }
 
 impl ResourcePackSource {
+    fn with_mesher_texture_aliases(mut pack: ResourcePack) -> Self {
+        // schematic-mesher 0.2 names this texture `wood`, while vanilla packs
+        // ship it as `armorstand.png`. Preserve an explicitly supplied legacy
+        // override; otherwise alias the canonical texture so the entity enters
+        // the atlas instead of using the missing-texture tile.
+        if pack.get_texture("entity/armorstand/wood").is_none() {
+            if let Some(texture) = pack.get_texture("entity/armorstand/armorstand").cloned() {
+                pack.add_texture("minecraft", "entity/armorstand/wood", texture);
+            }
+        }
+        Self { pack }
+    }
+
     /// Load a resource pack from a file path (ZIP or directory).
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
+        if path.as_ref().is_file() {
+            return Self::from_bytes(&std::fs::read(path)?);
+        }
         let pack = schematic_mesher::load_resource_pack(path)
             .map_err(|e| MeshError::ResourcePack(e.to_string()))?;
-        Ok(Self { pack })
+        Ok(Self::with_mesher_texture_aliases(pack))
     }
 
     /// Load a resource pack from bytes (for WASM compatibility).
     pub fn from_bytes(data: &[u8]) -> Result<Self> {
-        let pack = schematic_mesher::load_resource_pack_from_bytes(data)
+        let normalized =
+            resource_pack_compat::normalize_zip(data).map_err(MeshError::ResourcePack)?;
+        let bytes = normalized.as_deref().unwrap_or(data);
+        let pack = schematic_mesher::load_resource_pack_from_bytes(bytes)
             .map_err(|e| MeshError::ResourcePack(e.to_string()))?;
-        Ok(Self { pack })
+        Ok(Self::with_mesher_texture_aliases(pack))
     }
 
     /// Load multiple resource packs from file paths in priority order.
@@ -123,9 +143,11 @@ impl ResourcePackSource {
         I: IntoIterator<Item = P>,
         P: AsRef<Path>,
     {
-        let pack = schematic_mesher::load_resource_packs(paths)
-            .map_err(|e| MeshError::ResourcePack(e.to_string()))?;
-        Ok(Self { pack })
+        let mut pack = ResourcePack::new();
+        for path in paths {
+            pack.overlay(Self::from_file(path)?.pack);
+        }
+        Ok(Self::with_mesher_texture_aliases(pack))
     }
 
     /// Load multiple resource packs from in-memory byte buffers in priority
@@ -135,14 +157,16 @@ impl ResourcePackSource {
         I: IntoIterator<Item = B>,
         B: AsRef<[u8]>,
     {
-        let pack = schematic_mesher::load_resource_packs_from_bytes(datas)
-            .map_err(|e| MeshError::ResourcePack(e.to_string()))?;
-        Ok(Self { pack })
+        let mut pack = ResourcePack::new();
+        for data in datas {
+            pack.overlay(Self::from_bytes(data.as_ref())?.pack);
+        }
+        Ok(Self::with_mesher_texture_aliases(pack))
     }
 
     /// Create a ResourcePackSource from an already-loaded ResourcePack.
     pub fn from_resource_pack(pack: ResourcePack) -> Self {
-        Self { pack }
+        Self::with_mesher_texture_aliases(pack)
     }
 
     /// Get a reference to the underlying ResourcePack.
@@ -704,7 +728,34 @@ fn entity_to_input_block(entity: &Entity) -> InputBlock {
         }
     }
 
+    // Armor stand equipment uses Minecraft's boots-to-helmet ArmorItems order.
+    if let Some(NbtValue::List(items)) = entity.nbt.get("ArmorItems") {
+        for (index, property) in ["boots", "leggings", "chestplate", "helmet"]
+            .iter()
+            .enumerate()
+        {
+            if let Some(NbtValue::Compound(item)) = items.get(index) {
+                if let Some(NbtValue::String(id)) = item.get("id") {
+                    input.properties.insert((*property).to_string(), id.clone());
+                }
+            }
+        }
+    }
+
     input
+}
+
+fn entity_input_at_position(entities: &[Entity], pos: (i32, i32, i32)) -> Option<InputBlock> {
+    entities
+        .iter()
+        .find(|entity| {
+            (
+                entity.position.0.floor() as i32,
+                entity.position.1.floor() as i32,
+                entity.position.2.floor() as i32,
+            ) == pos
+        })
+        .map(entity_to_input_block)
 }
 
 /// Convert a yaw angle (degrees) to cardinal direction string.
@@ -1119,6 +1170,85 @@ impl UniversalSchematic {
             total_vertex_count,
             total_triangle_count,
         })
+    }
+
+    /// Mesh one [`MeshOutput`] per animation group, in group order.
+    ///
+    /// This is the bridge between [`crate::animation`] and the renderer:
+    /// `render_animation` poses mesh *i* with group *i*, so the two must be
+    /// index-aligned. Groups producing no geometry (all air) still yield an
+    /// entry, keeping that alignment exact.
+    ///
+    /// Each group is meshed independently, so faces between groups are **not**
+    /// culled against each other — which is what you want when the groups move
+    /// apart, and wasteful when they never do. Prefer coarse groupings
+    /// (`Layer`, `Chunk`) for large builds: per-block meshing means one draw
+    /// call per block.
+    ///
+    /// ```ignore
+    /// let anim = BuildAnimator::from_schematic(&schem, Grouping::PerBlock);
+    /// let meshes = schem.mesh_groups(&pack, &config, anim.groups())?;
+    /// render_animation(&meshes, &anim.frames(24.0), &render_config, None)?;
+    /// ```
+    pub fn mesh_groups(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+        groups: &[crate::animation::Group],
+    ) -> Result<Vec<MeshOutput>> {
+        let mesher_config = config.to_mesher_config();
+        let entities = self.get_entities_as_list();
+        let mut out = Vec::with_capacity(groups.len());
+
+        for group in groups {
+            let mut blocks: HashMap<MesherBlockPosition, InputBlock> = HashMap::new();
+            let mut min = [f32::MAX; 3];
+            let mut max = [f32::MIN; 3];
+
+            for &(x, y, z) in &group.blocks {
+                let pos = MesherBlockPosition { x, y, z };
+                let block = self
+                    .get_block(x, y, z)
+                    .filter(|block| !crate::fingerprint::is_air(block.get_name()))
+                    .map(block_state_to_input_block)
+                    .or_else(|| entity_input_at_position(&entities, (x, y, z)));
+                let Some(block) = block else {
+                    continue;
+                };
+                blocks.insert(pos, block);
+                min[0] = min[0].min(x as f32);
+                min[1] = min[1].min(y as f32);
+                min[2] = min[2].min(z as f32);
+                max[0] = max[0].max(x as f32 + 1.0);
+                max[1] = max[1].max(y as f32 + 1.0);
+                max[2] = max[2].max(z as f32 + 1.0);
+            }
+
+            if blocks.is_empty() {
+                // Keep index alignment with `groups` even when empty.
+                out.push(MeshOutput {
+                    opaque: MeshLayer::default(),
+                    cutout: MeshLayer::default(),
+                    transparent: MeshLayer::default(),
+                    atlas: schematic_mesher::TextureAtlas::empty(),
+                    greedy_materials: Vec::new(),
+                    animated_textures: Vec::new(),
+                    bounds: MesherBoundingBox::new([0.0; 3], [0.0; 3]),
+                    chunk_coord: None,
+                    lod_level: 0,
+                });
+                continue;
+            }
+
+            let bounds = MesherBoundingBox::new(min, max);
+            let source = ChunkBlockSource::new(blocks, bounds);
+            let mesher = Mesher::with_config(pack.pack.clone(), mesher_config.clone());
+            let output = mesher
+                .mesh(&source)
+                .map_err(|e| MeshError::Meshing(e.to_string()))?;
+            out.push(mesh_output_from_mesher(output, None));
+        }
+        Ok(out)
     }
 
     /// Create a lazy chunk mesh iterator.
@@ -1712,6 +1842,51 @@ mod tests {
     }
 
     #[test]
+    fn armor_stand_equipment_is_forwarded_to_the_entity_mesher() {
+        let entity = Entity::armor_stand(
+            (0.5, 1.0, 0.5),
+            0.0,
+            crate::ArmorStandEquipment {
+                helmet: Some("minecraft:diamond_helmet".to_string()),
+                chestplate: Some("minecraft:diamond_chestplate".to_string()),
+                leggings: Some("minecraft:diamond_leggings".to_string()),
+                boots: Some("minecraft:diamond_boots".to_string()),
+            },
+        );
+
+        let input = entity_to_input_block(&entity);
+
+        assert_eq!(input.name, "entity:armor_stand");
+        assert_eq!(
+            input.properties.get("helmet").map(String::as_str),
+            Some("minecraft:diamond_helmet")
+        );
+        assert_eq!(
+            input.properties.get("chestplate").map(String::as_str),
+            Some("minecraft:diamond_chestplate")
+        );
+        assert_eq!(
+            input.properties.get("leggings").map(String::as_str),
+            Some("minecraft:diamond_leggings")
+        );
+        assert_eq!(
+            input.properties.get("boots").map(String::as_str),
+            Some("minecraft:diamond_boots")
+        );
+    }
+
+    #[test]
+    fn entity_lookup_matches_floored_block_position_for_group_meshing() {
+        let entity =
+            Entity::armor_stand((0.5, 1.0, 0.5), 0.0, crate::ArmorStandEquipment::default());
+
+        let found = entity_input_at_position(&[entity], (0, 1, 0)).unwrap();
+
+        assert_eq!(found.name, "entity:armor_stand");
+        assert!(entity_input_at_position(&[], (0, 1, 0)).is_none());
+    }
+
+    #[test]
     fn test_mesh_config_defaults() {
         let config = MeshConfig::default();
         assert!(config.cull_hidden_faces);
@@ -1834,6 +2009,28 @@ mod tests {
         let bad_data = vec![vec![0u8, 1, 2, 3]];
         let result = ResourcePackSource::from_bytes_list(bad_data);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn resource_pack_aliases_the_vanilla_armor_stand_texture_for_the_entity_mesher() {
+        use schematic_mesher::resource_pack::TextureData;
+
+        let mut pack = ResourcePack::new();
+        pack.add_texture(
+            "minecraft",
+            "entity/armorstand/armorstand",
+            TextureData::new(1, 1, vec![120, 80, 40, 255]),
+        );
+
+        let source = ResourcePackSource::from_resource_pack(pack);
+
+        assert!(
+            source
+                .pack()
+                .get_texture("entity/armorstand/wood")
+                .is_some(),
+            "schematic-mesher's armor stand model currently requests the legacy wood alias"
+        );
     }
 
     #[test]

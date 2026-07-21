@@ -154,7 +154,9 @@ fn main() -> Result<()> {
     let mut prop_changes = 0usize;
     for (id, entry) in &report {
         let name = id.strip_prefix("minecraft:").unwrap_or(id);
-        let Some(old) = old_by_name.get(name) else { continue };
+        let Some(old) = old_by_name.get(name) else {
+            continue;
+        };
         let new_props = property_sets(entry);
         let old_props = old_property_sets(old);
         if new_props != old_props {
@@ -186,8 +188,8 @@ fn main() -> Result<()> {
     for (index, (id, entry)) in report.iter().enumerate() {
         let name = id.strip_prefix("minecraft:").unwrap_or(id);
         let states = states_from_report(entry);
-        let (min_id, max_id, default_id) = state_ids(entry)
-            .with_context(|| format!("{id}: bad states in report"))?;
+        let (min_id, max_id, default_id) =
+            state_ids(entry).with_context(|| format!("{id}: bad states in report"))?;
 
         let mut block = match old_by_name.get(name) {
             // Existing block: keep all enrichment fields, refresh the schema.
@@ -196,31 +198,40 @@ fn main() -> Result<()> {
             None => {
                 let model = classifier.classify(name);
                 let analogue = find_analogue(name, &old_by_name);
-                let (transparent, bounding_box, filter_light, emit_light, hardness, resistance, material, diggable, stack_size) =
-                    match &analogue {
-                        Some((_, a)) => (
-                            a["transparent"].as_bool().unwrap_or(false),
-                            a["boundingBox"].as_str().unwrap_or("block").to_string(),
-                            a["filterLight"].as_u64().unwrap_or(0),
-                            a["emitLight"].as_u64().unwrap_or(0),
-                            a["hardness"].clone(),
-                            a["resistance"].clone(),
-                            a["material"].as_str().unwrap_or("default").to_string(),
-                            a["diggable"].as_bool().unwrap_or(true),
-                            a["stackSize"].as_u64().unwrap_or(64),
-                        ),
-                        None => (
-                            model.transparent,
-                            model.bounding_box.to_string(),
-                            model.filter_light,
-                            0,
-                            json!(1.5),
-                            json!(6.0),
-                            "mineable/pickaxe".to_string(),
-                            true,
-                            64,
-                        ),
-                    };
+                let (
+                    transparent,
+                    bounding_box,
+                    filter_light,
+                    emit_light,
+                    hardness,
+                    resistance,
+                    material,
+                    diggable,
+                    stack_size,
+                ) = match &analogue {
+                    Some((_, a)) => (
+                        a["transparent"].as_bool().unwrap_or(false),
+                        a["boundingBox"].as_str().unwrap_or("block").to_string(),
+                        a["filterLight"].as_u64().unwrap_or(0),
+                        a["emitLight"].as_u64().unwrap_or(0),
+                        a["hardness"].clone(),
+                        a["resistance"].clone(),
+                        a["material"].as_str().unwrap_or("default").to_string(),
+                        a["diggable"].as_bool().unwrap_or(true),
+                        a["stackSize"].as_u64().unwrap_or(64),
+                    ),
+                    None => (
+                        model.transparent,
+                        model.bounding_box.to_string(),
+                        model.filter_light,
+                        0,
+                        json!(1.5),
+                        json!(6.0),
+                        "mineable/pickaxe".to_string(),
+                        true,
+                        64,
+                    ),
+                };
                 new_block_report.push(format!(
                     "  {id}: transparent={transparent} boundingBox={bounding_box} filterLight={filter_light} \
                      hardness={hardness} material={material} \
@@ -340,7 +351,9 @@ fn generate_semantics(
     let mut cube_textures: HashMap<&str, BTreeSet<String>> = HashMap::new();
     for (id, entry) in report {
         let name = id.strip_prefix("minecraft:").unwrap_or(id);
-        let kind = entry["definition"]["type"].as_str().unwrap_or("minecraft:block");
+        let kind = entry["definition"]["type"]
+            .as_str()
+            .unwrap_or("minecraft:block");
         kinds.insert(id.as_str(), kind);
         let full_cube = full_cube_override(name).unwrap_or_else(|| classifier.is_full_cube(name));
         if full_cube {
@@ -387,7 +400,10 @@ fn generate_semantics(
             }
         }
 
-        let tags: Vec<&String> = tags_by_block.get(id.as_str()).map(|t| t.iter().collect()).unwrap_or_default();
+        let tags: Vec<&String> = tags_by_block
+            .get(id.as_str())
+            .map(|t| t.iter().collect())
+            .unwrap_or_default();
 
         let mut record = Map::new();
         record.insert("kind".into(), json!(kind));
@@ -456,28 +472,50 @@ fn full_cube_override(name: &str) -> Option<bool> {
 /// the kind with the identical name (`minecraft:barrel` -> kind
 /// `minecraft:barrel`).
 const BLOCK_ENTITY_KIND_OVERRIDES: &[(&str, &[&str])] = &[
-    ("minecraft:banner", &["minecraft:banner", "minecraft:wall_banner"]),
+    (
+        "minecraft:banner",
+        &["minecraft:banner", "minecraft:wall_banner"],
+    ),
     ("minecraft:brushable_block", &["minecraft:brushable"]),
     (
         "minecraft:chest",
-        &["minecraft:chest", "minecraft:copper_chest", "minecraft:weathering_copper_chest"],
+        &[
+            "minecraft:chest",
+            "minecraft:copper_chest",
+            "minecraft:weathering_copper_chest",
+        ],
     ),
-    ("minecraft:chiseled_bookshelf", &["minecraft:chiseled_book_shelf"]),
+    (
+        "minecraft:chiseled_bookshelf",
+        &["minecraft:chiseled_book_shelf"],
+    ),
     ("minecraft:command_block", &["minecraft:command"]),
     (
         "minecraft:copper_golem_statue",
-        &["minecraft:copper_golem_statue", "minecraft:weathering_copper_golem_statue"],
+        &[
+            "minecraft:copper_golem_statue",
+            "minecraft:weathering_copper_golem_statue",
+        ],
     ),
-    ("minecraft:enchanting_table", &["minecraft:enchantment_table"]),
+    (
+        "minecraft:enchanting_table",
+        &["minecraft:enchantment_table"],
+    ),
     (
         "minecraft:hanging_sign",
-        &["minecraft:ceiling_hanging_sign", "minecraft:wall_hanging_sign"],
+        &[
+            "minecraft:ceiling_hanging_sign",
+            "minecraft:wall_hanging_sign",
+        ],
     ),
     ("minecraft:mob_spawner", &["minecraft:spawner"]),
     // The `piston` block entity belongs to the in-motion technical block,
     // not the piston bases (which carry no block entity).
     ("minecraft:piston", &["minecraft:moving_piston"]),
-    ("minecraft:sign", &["minecraft:standing_sign", "minecraft:wall_sign"]),
+    (
+        "minecraft:sign",
+        &["minecraft:standing_sign", "minecraft:wall_sign"],
+    ),
     (
         "minecraft:skull",
         &[
@@ -492,7 +530,10 @@ const BLOCK_ENTITY_KIND_OVERRIDES: &[(&str, &[&str])] = &[
     ),
     ("minecraft:structure_block", &["minecraft:structure"]),
     ("minecraft:test_block", &["minecraft:test"]),
-    ("minecraft:test_instance_block", &["minecraft:test_instance"]),
+    (
+        "minecraft:test_instance_block",
+        &["minecraft:test_instance"],
+    ),
 ];
 
 /// The set of report `definition.type` kinds whose blocks carry a block
@@ -541,7 +582,10 @@ fn base_by_textures<'a>(
     if textures.is_empty() {
         return None;
     }
-    let exact: Vec<&str> = owners_by_set.get(textures).map(|v| v.to_vec()).unwrap_or_default();
+    let exact: Vec<&str> = owners_by_set
+        .get(textures)
+        .map(|v| v.to_vec())
+        .unwrap_or_default();
     let candidates: Vec<&str> = if !exact.is_empty() {
         exact
     } else {
@@ -712,7 +756,11 @@ fn download_jar(
     println!("Downloading {which} jar from {url}...");
     let bytes = client.get(url).send()?.error_for_status()?.bytes()?;
     fs::write(&jar_path, &bytes)?;
-    println!("Saved {} ({:.1} MB)", jar_path.display(), bytes.len() as f64 / 1e6);
+    println!(
+        "Saved {} ({:.1} MB)",
+        jar_path.display(),
+        bytes.len() as f64 / 1e6
+    );
     Ok(jar_path)
 }
 
@@ -819,7 +867,11 @@ fn property_sets(entry: &Value) -> HashMap<String, BTreeSet<String>> {
                 .map(|(k, v)| {
                     let vals = v
                         .as_array()
-                        .map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect())
+                        .map(|a| {
+                            a.iter()
+                                .filter_map(|x| x.as_str().map(String::from))
+                                .collect()
+                        })
                         .unwrap_or_default();
                     (k.clone(), vals)
                 })
@@ -833,7 +885,9 @@ fn old_property_sets(block: &Value) -> HashMap<String, BTreeSet<String>> {
     let mut out = HashMap::new();
     if let Some(states) = block["states"].as_array() {
         for s in states {
-            let Some(name) = s["name"].as_str() else { continue };
+            let Some(name) = s["name"].as_str() else {
+                continue;
+            };
             let vals: BTreeSet<String> = if s["type"].as_str() == Some("bool") {
                 ["true".to_string(), "false".to_string()].into()
             } else {
@@ -983,7 +1037,10 @@ impl ModelClassifier {
         let file = fs::File::open(client_jar)
             .with_context(|| format!("Failed to open {}", client_jar.display()))?;
         let archive = zip::ZipArchive::new(file).context("Client jar is not a valid zip")?;
-        Ok(Self { archive, model_cache: HashMap::new() })
+        Ok(Self {
+            archive,
+            model_cache: HashMap::new(),
+        })
     }
 
     fn read_json(&mut self, path: &str) -> Option<Value> {
@@ -994,7 +1051,10 @@ impl ModelClassifier {
     }
 
     fn model(&mut self, model_ref: &str) -> Option<Value> {
-        let key = model_ref.strip_prefix("minecraft:").unwrap_or(model_ref).to_string();
+        let key = model_ref
+            .strip_prefix("minecraft:")
+            .unwrap_or(model_ref)
+            .to_string();
         if let Some(cached) = self.model_cache.get(&key) {
             return cached.clone();
         }
@@ -1015,11 +1075,23 @@ impl ModelClassifier {
 
     /// The parent chain of a model (normalized, without `minecraft:`).
     fn parent_chain(&mut self, model_ref: &str) -> Vec<String> {
-        let mut chain = vec![model_ref.strip_prefix("minecraft:").unwrap_or(model_ref).to_string()];
+        let mut chain = vec![model_ref
+            .strip_prefix("minecraft:")
+            .unwrap_or(model_ref)
+            .to_string()];
         for _ in 0..8 {
-            let Some(m) = self.model(chain.last().unwrap().clone().as_str()) else { break };
-            let Some(parent) = m["parent"].as_str() else { break };
-            chain.push(parent.strip_prefix("minecraft:").unwrap_or(parent).to_string());
+            let Some(m) = self.model(chain.last().unwrap().clone().as_str()) else {
+                break;
+            };
+            let Some(parent) = m["parent"].as_str() else {
+                break;
+            };
+            chain.push(
+                parent
+                    .strip_prefix("minecraft:")
+                    .unwrap_or(parent)
+                    .to_string(),
+            );
         }
         chain
     }
@@ -1027,15 +1099,21 @@ impl ModelClassifier {
     /// True if any texture referenced by the model has meaningfully
     /// translucent pixels (>1% below alpha 250).
     fn has_translucent_texture(&mut self, model_ref: &str) -> bool {
-        let Some(m) = self.model(model_ref) else { return false };
-        let Some(textures) = m["textures"].as_object() else { return false };
+        let Some(m) = self.model(model_ref) else {
+            return false;
+        };
+        let Some(textures) = m["textures"].as_object() else {
+            return false;
+        };
         for tex in textures.values().filter_map(|t| t.as_str()) {
             if tex.starts_with('#') {
                 continue;
             }
             let tex = tex.strip_prefix("minecraft:").unwrap_or(tex);
             let path = format!("assets/minecraft/textures/{tex}.png");
-            let Ok(mut entry) = self.archive.by_name(&path) else { continue };
+            let Ok(mut entry) = self.archive.by_name(&path) else {
+                continue;
+            };
             let mut buf = Vec::new();
             if entry.read_to_end(&mut buf).is_err() {
                 continue;
@@ -1074,7 +1152,9 @@ impl ModelClassifier {
         // elements override the parent's entirely).
         for m in &chain {
             let Some(model) = self.model(m) else { continue };
-            let Some(elements) = model["elements"].as_array() else { continue };
+            let Some(elements) = model["elements"].as_array() else {
+                continue;
+            };
             let full = |v: &Value, expected: f64| {
                 v.as_array()
                     .map(|a| a.iter().all(|c| c.as_f64() == Some(expected)))
@@ -1095,8 +1175,12 @@ impl ModelClassifier {
             // Merge texture maps along the parent chain (child wins).
             let mut merged: HashMap<String, String> = HashMap::new();
             for m in self.parent_chain(&model_ref) {
-                let Some(model) = self.model(&m) else { continue };
-                let Some(textures) = model["textures"].as_object() else { continue };
+                let Some(model) = self.model(&m) else {
+                    continue;
+                };
+                let Some(textures) = model["textures"].as_object() else {
+                    continue;
+                };
                 for (k, v) in textures {
                     if let Some(v) = v.as_str() {
                         merged.entry(k.clone()).or_insert_with(|| v.to_string());
@@ -1125,7 +1209,8 @@ impl ModelClassifier {
         }
 
         let chains: Vec<Vec<String>> = models.iter().map(|m| self.parent_chain(m)).collect();
-        let in_set = |chain: &[String], set: &[&str]| chain.iter().any(|c| set.contains(&c.as_str()));
+        let in_set =
+            |chain: &[String], set: &[&str]| chain.iter().any(|c| set.contains(&c.as_str()));
 
         if chains.iter().all(|c| in_set(c, CUBE_TEMPLATES)) {
             if models.iter().any(|m| self.has_translucent_texture(m)) {
@@ -1203,8 +1288,8 @@ fn collect_model_refs(value: &Value, out: &mut BTreeSet<String>) {
 // ---------------------------------------------------------------------------
 
 fn read_gz(path: &Path) -> Result<String> {
-    let file = fs::File::open(path)
-        .with_context(|| format!("Failed to open {}", path.display()))?;
+    let file =
+        fs::File::open(path).with_context(|| format!("Failed to open {}", path.display()))?;
     let mut decoder = flate2::read::GzDecoder::new(file);
     let mut out = String::new();
     decoder.read_to_string(&mut out)?;
@@ -1213,8 +1298,8 @@ fn read_gz(path: &Path) -> Result<String> {
 
 fn write_gz(path: &Path, contents: &str) -> Result<()> {
     use std::io::Write;
-    let file = fs::File::create(path)
-        .with_context(|| format!("Failed to create {}", path.display()))?;
+    let file =
+        fs::File::create(path).with_context(|| format!("Failed to create {}", path.display()))?;
     let mut encoder = flate2::write::GzEncoder::new(file, flate2::Compression::best());
     encoder.write_all(contents.as_bytes())?;
     encoder.finish()?;

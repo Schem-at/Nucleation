@@ -27,10 +27,7 @@ pub mod ffi {
         /// `minecraft:block`); `base_block` is the block this one is a
         /// shape variant of (or `null`); `color` is the texture-derived
         /// average RGB. Errors with `NotFound` for unknown ids.
-        pub fn get_json(
-            id: &DiplomatStr,
-            out: &mut DiplomatWrite,
-        ) -> Result<(), NucleationError> {
+        pub fn get_json(id: &DiplomatStr, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
             let id = std::str::from_utf8(id).map_err(|_| NucleationError::InvalidArgument)?;
             let json = crate::blockpedia::facts_json::block_facts_json(id)
                 .ok_or(NucleationError::NotFound)?;
@@ -40,7 +37,11 @@ pub mod ffi {
 
         /// All known block ids as a sorted JSON array string.
         pub fn ids_json(out: &mut DiplomatWrite) {
-            let _ = write!(out, "{}", crate::blockpedia::facts_json::all_block_ids_json());
+            let _ = write!(
+                out,
+                "{}",
+                crate::blockpedia::facts_json::all_block_ids_json()
+            );
         }
 
         /// Ids of every block carrying the vanilla block tag, as a sorted
@@ -70,11 +71,7 @@ pub mod ffi {
                     serde_json::json!({"id": id, "color": rgb, "distance": (d * 1000.0).round() / 1000.0})
                 })
                 .collect();
-            let _ = write!(
-                out,
-                "{}",
-                serde_json::to_string(&rows).unwrap_or_default()
-            );
+            let _ = write!(out, "{}", serde_json::to_string(&rows).unwrap_or_default());
             Ok(())
         }
 
@@ -144,14 +141,13 @@ pub mod ffi {
             out: &mut DiplomatWrite,
         ) -> Result<(), NucleationError> {
             let id = std::str::from_utf8(id).map_err(|_| NucleationError::InvalidArgument)?;
-            let json = crate::blockpedia::facts_json::block_states_json(id).map_err(
-                |e| match e {
+            let json =
+                crate::blockpedia::facts_json::block_states_json(id).map_err(|e| match e {
                     crate::blockpedia::BlockpediaError::Block(
                         crate::blockpedia::errors::BlockError::NotFound(_),
                     ) => NucleationError::NotFound,
                     _ => NucleationError::InvalidArgument,
-                },
-            )?;
+                })?;
             let _ = write!(out, "{json}");
             Ok(())
         }

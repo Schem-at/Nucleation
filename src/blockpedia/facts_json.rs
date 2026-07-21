@@ -6,8 +6,8 @@
 use serde_json::{json, Map, Value};
 
 use super::{
-    all_blocks, blocks_by_tag, get_block, variants_of, BlockFacts, BlockpediaError, Result,
-    BLOCKS, BLOCK_TAGS,
+    all_blocks, blocks_by_tag, get_block, variants_of, BlockFacts, BlockpediaError, Result, BLOCKS,
+    BLOCK_TAGS,
 };
 
 /// Cap on the number of property-value combinations [`block_states_json`]

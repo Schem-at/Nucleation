@@ -20,7 +20,12 @@ fn get_json_reports_full_facts_for_oak_stairs() {
     assert_eq!(v["kind"], "minecraft:stair");
     assert_eq!(v["base_block"], "minecraft:oak_planks");
     assert_eq!(v["full_cube"], false);
-    let tags: Vec<&str> = v["tags"].as_array().unwrap().iter().map(|t| t.as_str().unwrap()).collect();
+    let tags: Vec<&str> = v["tags"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t.as_str().unwrap())
+        .collect();
     assert!(tags.contains(&"minecraft:stairs"), "{tags:?}");
     assert!(tags.contains(&"minecraft:wooden_stairs"), "{tags:?}");
     let facing = v["properties"]["facing"].as_array().unwrap();
@@ -39,7 +44,12 @@ fn get_json_reports_full_facts_for_oak_stairs() {
 #[test]
 fn ids_json_lists_every_block_sorted() {
     let ids = parse(&all_block_ids_json());
-    let ids: Vec<&str> = ids.as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
+    let ids: Vec<&str> = ids
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
     assert_eq!(ids.len(), block_count());
     assert!(ids.len() >= 1196);
     assert!(ids.contains(&"minecraft:stone"));
@@ -50,9 +60,16 @@ fn ids_json_lists_every_block_sorted() {
 fn by_tag_json_finds_the_16_wools() {
     let wool = parse(&block_ids_by_tag_json("wool"));
     assert_eq!(wool.as_array().unwrap().len(), 16, "{wool}");
-    assert!(wool.as_array().unwrap().iter().any(|v| v == "minecraft:red_wool"));
+    assert!(wool
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|v| v == "minecraft:red_wool"));
     // Prefixed form matches the short form
-    assert_eq!(block_ids_by_tag_json("minecraft:wool"), block_ids_by_tag_json("wool"));
+    assert_eq!(
+        block_ids_by_tag_json("minecraft:wool"),
+        block_ids_by_tag_json("wool")
+    );
     assert_eq!(block_ids_by_tag_json("no_such_tag"), "[]");
 }
 
@@ -61,7 +78,11 @@ fn by_kind_json_groups_by_definition_kind() {
     let stairs = parse(&block_ids_by_kind_json("stair"));
     let stairs = stairs.as_array().unwrap();
     assert!(stairs.iter().any(|v| v == "minecraft:oak_stairs"));
-    assert!(stairs.len() >= 30, "expected many stair kinds, got {}", stairs.len());
+    assert!(
+        stairs.len() >= 30,
+        "expected many stair kinds, got {}",
+        stairs.len()
+    );
     assert_eq!(
         block_ids_by_kind_json("minecraft:stair"),
         block_ids_by_kind_json("stair")
@@ -72,7 +93,12 @@ fn by_kind_json_groups_by_definition_kind() {
 #[test]
 fn variants_of_json_puts_the_base_first() {
     let v = parse(&variants_of_ids_json("minecraft:oak_planks").unwrap());
-    let ids: Vec<&str> = v.as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
+    let ids: Vec<&str> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
     assert_eq!(ids[0], "minecraft:oak_planks", "base first: {ids:?}");
     assert!(ids.contains(&"minecraft:oak_stairs"), "{ids:?}");
     assert!(ids.contains(&"minecraft:oak_slab"), "{ids:?}");
@@ -82,7 +108,12 @@ fn variants_of_json_puts_the_base_first() {
 #[test]
 fn tags_json_lists_known_tag_names() {
     let tags = parse(&all_tags_json());
-    let tags: Vec<&str> = tags.as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
+    let tags: Vec<&str> = tags
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
     assert!(tags.contains(&"minecraft:wool"));
     assert!(tags.contains(&"minecraft:mineable/pickaxe"));
     assert!(tags.windows(2).all(|w| w[0] < w[1]), "sorted, no dups");
@@ -99,8 +130,7 @@ fn states_json_enumerates_every_combination() {
         o.contains_key("face") && o.contains_key("facing") && o.contains_key("powered")
     }));
     // All combinations are distinct
-    let unique: std::collections::HashSet<String> =
-        states.iter().map(|s| s.to_string()).collect();
+    let unique: std::collections::HashSet<String> = states.iter().map(|s| s.to_string()).collect();
     assert_eq!(unique.len(), 24);
 
     // Property-less blocks have exactly one (empty) state

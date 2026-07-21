@@ -87,7 +87,10 @@ fn parse_semantics(json_data: &str) -> Result<HashMap<String, BlockSemantics>> {
 }
 
 /// Attach the official semantics to the Java block list.
-fn merge_semantics(java_blocks: &mut [UnifiedBlockData], semantics: &HashMap<String, BlockSemantics>) {
+fn merge_semantics(
+    java_blocks: &mut [UnifiedBlockData],
+    semantics: &HashMap<String, BlockSemantics>,
+) {
     let mut missing = 0usize;
     for block in java_blocks {
         match semantics.get(&block.id) {
@@ -102,7 +105,9 @@ fn merge_semantics(java_blocks: &mut [UnifiedBlockData], semantics: &HashMap<Str
         }
     }
     if missing > 0 {
-        println!("cargo:warning=blockpedia data: {missing} blocks missing from block_semantics.json.gz");
+        println!(
+            "cargo:warning=blockpedia data: {missing} blocks missing from block_semantics.json.gz"
+        );
     }
 }
 
@@ -119,8 +124,11 @@ fn read_gz(path: &Path) -> Result<String> {
 
 /// Parse PrismarineJS pc blocks.json (array of block objects).
 fn parse_prismarine(json_data: &str) -> Result<Vec<UnifiedBlockData>> {
-    let parsed: Value = serde_json::from_str(json_data).context("Failed to parse PrismarineJS JSON")?;
-    let blocks_array = parsed.as_array().context("PrismarineJS JSON is not an array")?;
+    let parsed: Value =
+        serde_json::from_str(json_data).context("Failed to parse PrismarineJS JSON")?;
+    let blocks_array = parsed
+        .as_array()
+        .context("PrismarineJS JSON is not an array")?;
 
     let mut unified_blocks = Vec::new();
     for block in blocks_array {
@@ -179,7 +187,10 @@ fn parse_prismarine(json_data: &str) -> Result<Vec<UnifiedBlockData>> {
         // flagged `"default": true` (converted to `defaultProperties` by
         // tools/mc-data/refresh-block-data.rs).
         let mut default_state = HashMap::new();
-        if let Some(defaults) = block_obj.get("defaultProperties").and_then(|d| d.as_object()) {
+        if let Some(defaults) = block_obj
+            .get("defaultProperties")
+            .and_then(|d| d.as_object())
+        {
             for (name, value) in defaults {
                 if let Some(value) = value.as_str() {
                     default_state.insert(name.clone(), value.to_string());
@@ -300,7 +311,10 @@ type CachedColor = (u8, u8, u8, f32, f32, f32);
 
 /// Load the texture-derived color cache and fill remaining holes by
 /// inheriting from base materials (stairs/slabs/walls/fences/doors/...).
-fn load_colors(data_dir: &Path, available_block_ids: &[String]) -> Result<HashMap<String, CachedColor>> {
+fn load_colors(
+    data_dir: &Path,
+    available_block_ids: &[String],
+) -> Result<HashMap<String, CachedColor>> {
     let cache_path = data_dir.join("color_cache.json.gz");
     let cache_data = read_gz(&cache_path)?;
     let mut colors: HashMap<String, CachedColor> =
@@ -321,7 +335,11 @@ fn load_colors(data_dir: &Path, available_block_ids: &[String]) -> Result<HashMa
             }
         }
     }
-    println!("cargo:warning=blockpedia data: {} cached colors, {} inherited", existing.len(), inherited);
+    println!(
+        "cargo:warning=blockpedia data: {} cached colors, {} inherited",
+        existing.len(),
+        inherited
+    );
     Ok(colors)
 }
 
@@ -340,9 +358,15 @@ fn base_material_for_block(block_id: &str) -> Option<String> {
             "petrified_oak" => "minecraft:oak_planks".to_string(),
             "smooth_stone" => "minecraft:stone".to_string(),
             "cut_copper" | "waxed_cut_copper" => "minecraft:copper_block".to_string(),
-            "exposed_cut_copper" | "waxed_exposed_cut_copper" => "minecraft:exposed_copper".to_string(),
-            "weathered_cut_copper" | "waxed_weathered_cut_copper" => "minecraft:weathered_copper".to_string(),
-            "oxidized_cut_copper" | "waxed_oxidized_cut_copper" => "minecraft:oxidized_copper".to_string(),
+            "exposed_cut_copper" | "waxed_exposed_cut_copper" => {
+                "minecraft:exposed_copper".to_string()
+            }
+            "weathered_cut_copper" | "waxed_weathered_cut_copper" => {
+                "minecraft:weathered_copper".to_string()
+            }
+            "oxidized_cut_copper" | "waxed_oxidized_cut_copper" => {
+                "minecraft:oxidized_copper".to_string()
+            }
             "cut_red_sandstone" => "minecraft:red_sandstone".to_string(),
             "cut_sandstone" => "minecraft:sandstone".to_string(),
             "prismarine_brick" => "minecraft:prismarine_bricks".to_string(),
@@ -392,13 +416,19 @@ fn base_material_for_block(block_id: &str) -> Option<String> {
     }
 
     if block_name.ends_with("_door") || block_name.ends_with("_trapdoor") {
-        let suffix = if block_name.ends_with("_trapdoor") { "_trapdoor" } else { "_door" };
+        let suffix = if block_name.ends_with("_trapdoor") {
+            "_trapdoor"
+        } else {
+            "_door"
+        };
         let base = block_name.replace(suffix, "");
         return Some(match base.as_str() {
             "iron" => "minecraft:iron_block".to_string(),
             "copper" | "waxed_copper" => "minecraft:copper_block".to_string(),
             "exposed_copper" | "waxed_exposed_copper" => "minecraft:exposed_copper".to_string(),
-            "weathered_copper" | "waxed_weathered_copper" => "minecraft:weathered_copper".to_string(),
+            "weathered_copper" | "waxed_weathered_copper" => {
+                "minecraft:weathered_copper".to_string()
+            }
             "oxidized_copper" | "waxed_oxidized_copper" => "minecraft:oxidized_copper".to_string(),
             _ => format!("minecraft:{base}_planks"),
         });
@@ -460,7 +490,11 @@ fn generate_block_table(
         }
         writeln!(file, "],")?;
         writeln!(file, "    full_cube: {},", block_data.full_cube)?;
-        writeln!(file, "    has_block_entity: {},", block_data.has_block_entity)?;
+        writeln!(
+            file,
+            "    has_block_entity: {},",
+            block_data.has_block_entity
+        )?;
 
         writeln!(file, "    properties: &[")?;
         for (prop_name, prop_values) in &block_data.properties {
@@ -481,7 +515,10 @@ fn generate_block_table(
         }
         writeln!(file, "    ],")?;
 
-        write!(file, "    extras: crate::blockpedia::Extras {{ mock_data: None,")?;
+        write!(
+            file,
+            "    extras: crate::blockpedia::Extras {{ mock_data: None,"
+        )?;
 
         if let Some((r, g, b, l, a, b_val)) = colors.get(block_id) {
             // Nudge values that would trip clippy::approx_constant
@@ -547,7 +584,8 @@ fn generate_block_table(
     writeln!(file)?;
 
     // Tag index: tag name -> block ids carrying it (drives `blocks_by_tag`).
-    let mut tag_index: std::collections::BTreeMap<&str, Vec<&str>> = std::collections::BTreeMap::new();
+    let mut tag_index: std::collections::BTreeMap<&str, Vec<&str>> =
+        std::collections::BTreeMap::new();
     for block_data in unified_blocks {
         for tag in &block_data.tags {
             tag_index.entry(tag).or_default().push(&block_data.id);
@@ -573,13 +611,25 @@ fn generate_block_table(
     // Color query helpers (same generated API as blockpedia)
     writeln!(file, "// Generated query helper functions")?;
     writeln!(file, "impl crate::blockpedia::BlockFacts {{")?;
-    writeln!(file, "    pub fn closest_to_color(target_rgb: [u8; 3]) -> Option<&'static Self> {{")?;
+    writeln!(
+        file,
+        "    pub fn closest_to_color(target_rgb: [u8; 3]) -> Option<&'static Self> {{"
+    )?;
     writeln!(file, "        let target_oklab = rgb_to_oklab(target_rgb);")?;
     writeln!(file, "        let mut best_block = None;")?;
     writeln!(file, "        let mut best_distance = f32::INFINITY;")?;
-    writeln!(file, "        for block in crate::blockpedia::all_blocks() {{")?;
-    writeln!(file, "            if let Some(ref color) = block.extras.color {{")?;
-    writeln!(file, "                let distance = oklab_distance(target_oklab, color.oklab);")?;
+    writeln!(
+        file,
+        "        for block in crate::blockpedia::all_blocks() {{"
+    )?;
+    writeln!(
+        file,
+        "            if let Some(ref color) = block.extras.color {{"
+    )?;
+    writeln!(
+        file,
+        "                let distance = oklab_distance(target_oklab, color.oklab);"
+    )?;
     writeln!(file, "                if distance < best_distance {{")?;
     writeln!(file, "                    best_distance = distance;")?;
     writeln!(file, "                    best_block = Some(block);")?;
@@ -592,9 +642,18 @@ fn generate_block_table(
     writeln!(file, "    pub fn blocks_in_color_range(center_rgb: [u8; 3], max_distance: f32) -> Vec<&'static Self> {{")?;
     writeln!(file, "        let center_oklab = rgb_to_oklab(center_rgb);")?;
     writeln!(file, "        let mut result = Vec::new();")?;
-    writeln!(file, "        for block in crate::blockpedia::all_blocks() {{")?;
-    writeln!(file, "            if let Some(ref color) = block.extras.color {{")?;
-    writeln!(file, "                let distance = oklab_distance(center_oklab, color.oklab);")?;
+    writeln!(
+        file,
+        "        for block in crate::blockpedia::all_blocks() {{"
+    )?;
+    writeln!(
+        file,
+        "            if let Some(ref color) = block.extras.color {{"
+    )?;
+    writeln!(
+        file,
+        "                let distance = oklab_distance(center_oklab, color.oklab);"
+    )?;
     writeln!(file, "                if distance <= max_distance {{")?;
     writeln!(file, "                    result.push(block);")?;
     writeln!(file, "                }}")?;
@@ -605,7 +664,10 @@ fn generate_block_table(
     writeln!(file, "}}")?;
     writeln!(file)?;
     writeln!(file, "fn rgb_to_oklab(rgb: [u8; 3]) -> [f32; 3] {{")?;
-    writeln!(file, "    // Simplified RGB to Oklab conversion for build-time")?;
+    writeln!(
+        file,
+        "    // Simplified RGB to Oklab conversion for build-time"
+    )?;
     writeln!(file, "    let r = rgb[0] as f32 / 255.0;")?;
     writeln!(file, "    let g = rgb[1] as f32 / 255.0;")?;
     writeln!(file, "    let b = rgb[2] as f32 / 255.0;")?;
@@ -615,7 +677,10 @@ fn generate_block_table(
     writeln!(file, "    [l, a, b_val]")?;
     writeln!(file, "}}")?;
     writeln!(file)?;
-    writeln!(file, "fn oklab_distance(a: [f32; 3], b: [f32; 3]) -> f32 {{")?;
+    writeln!(
+        file,
+        "fn oklab_distance(a: [f32; 3], b: [f32; 3]) -> f32 {{"
+    )?;
     writeln!(file, "    let dl = a[0] - b[0];")?;
     writeln!(file, "    let da = a[1] - b[1];")?;
     writeln!(file, "    let db = a[2] - b[2];")?;
@@ -703,7 +768,11 @@ fn generate_bedrock_mappings(out_dir: &str, data_dir: &Path) -> Result<()> {
                 format!("{}[]", bedrock_id)
             };
 
-            writeln!(file, "    r#\"{}\"# => r#\"{}\"#,", java_state_str, bedrock_state_str)?;
+            writeln!(
+                file,
+                "    r#\"{}\"# => r#\"{}\"#,",
+                java_state_str, bedrock_state_str
+            )?;
             b2j_map.entry(bedrock_state_str).or_insert(java_state_str);
         }
     }
@@ -715,7 +784,11 @@ fn generate_bedrock_mappings(out_dir: &str, data_dir: &Path) -> Result<()> {
         "pub static BEDROCK_B2J_MAP: phf::Map<&'static str, &'static str> = phf_map! {{"
     )?;
     for (bedrock_state, java_state) in &b2j_map {
-        writeln!(file, "    r#\"{}\"# => r#\"{}\"#,", bedrock_state, java_state)?;
+        writeln!(
+            file,
+            "    r#\"{}\"# => r#\"{}\"#,",
+            bedrock_state, java_state
+        )?;
     }
     writeln!(file, "}};")?;
 

@@ -40,7 +40,10 @@ fn default_state_matches_the_vanilla_report() {
     assert_eq!(campfire.get_property("lit"), Some("true"));
 
     // Property-less blocks have an empty default state
-    assert!(get_block("minecraft:stone").unwrap().default_state.is_empty());
+    assert!(get_block("minecraft:stone")
+        .unwrap()
+        .default_state
+        .is_empty());
 }
 
 #[test]
@@ -53,7 +56,8 @@ fn every_block_has_a_complete_default_state() {
         let defaults: std::collections::BTreeSet<&str> =
             block.default_state.iter().map(|(name, _)| *name).collect();
         assert_eq!(
-            props, defaults,
+            props,
+            defaults,
             "{}: default_state keys must match the property set",
             block.id()
         );
@@ -156,7 +160,10 @@ fn tile_entity_filters_use_the_registry_data() {
         .collect();
     assert!(ids.contains(&"minecraft:stone"));
     assert!(!ids.contains(&"minecraft:chest"));
-    assert!(!ids.contains(&"minecraft:oak_sign"), "substring guess missed signs");
+    assert!(
+        !ids.contains(&"minecraft:oak_sign"),
+        "substring guess missed signs"
+    );
 
     // BlockFilter::exclude_tile_entities
     let filter = BlockFilter {
@@ -181,7 +188,9 @@ fn mushroom_blocks_are_full_cubes_via_the_geometry_override() {
         assert!(get_block(id).unwrap().is_full_cube(), "{id}");
     }
     // The small mushroom plants stay non-full
-    assert!(!get_block("minecraft:brown_mushroom").unwrap().is_full_cube());
+    assert!(!get_block("minecraft:brown_mushroom")
+        .unwrap()
+        .is_full_cube());
     // ...and vines, whose geometry the mushroom shell mimics, stay non-full
     assert!(!get_block("minecraft:vine").unwrap().is_full_cube());
 }
@@ -200,7 +209,9 @@ fn light_sources_use_the_emit_light_data_field() {
     // State-dependent emitters count their default state: campfires are lit
     // by default, redstone lamps and candles are not.
     assert!(get_block("minecraft:campfire").unwrap().is_light_source());
-    assert!(!get_block("minecraft:redstone_lamp").unwrap().is_light_source());
+    assert!(!get_block("minecraft:redstone_lamp")
+        .unwrap()
+        .is_light_source());
     assert!(!get_block("minecraft:candle").unwrap().is_light_source());
 
     let ids: Vec<&str> = AllBlocks::new()

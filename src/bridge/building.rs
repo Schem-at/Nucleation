@@ -68,8 +68,8 @@ pub mod ffi {
             y_min: i32,
             y_max: i32,
         ) -> Result<Box<Shape>, NucleationError> {
-            let json = std::str::from_utf8(polygon_json)
-                .map_err(|_| NucleationError::InvalidArgument)?;
+            let json =
+                std::str::from_utf8(polygon_json).map_err(|_| NucleationError::InvalidArgument)?;
             let verts: Vec<(f64, f64)> =
                 serde_json::from_str(json).map_err(|_| NucleationError::Parse)?;
             if verts.len() < 3 {
@@ -320,8 +320,7 @@ pub mod ffi {
         pub fn sdf(sdf_json: &DiplomatStr) -> Result<Box<Shape>, NucleationError> {
             let json =
                 std::str::from_utf8(sdf_json).map_err(|_| NucleationError::InvalidArgument)?;
-            let node =
-                crate::sdf::SdfNode::from_json(json).map_err(|_| NucleationError::Parse)?;
+            let node = crate::sdf::SdfNode::from_json(json).map_err(|_| NucleationError::Parse)?;
             let shape =
                 crate::building::SdfShape::new(node).ok_or(NucleationError::InvalidArgument)?;
             Ok(Box::new(Shape(crate::building::ShapeEnum::Sdf(shape))))
@@ -341,8 +340,7 @@ pub mod ffi {
         ) -> Result<Box<Shape>, NucleationError> {
             let json =
                 std::str::from_utf8(sdf_json).map_err(|_| NucleationError::InvalidArgument)?;
-            let node =
-                crate::sdf::SdfNode::from_json(json).map_err(|_| NucleationError::Parse)?;
+            let node = crate::sdf::SdfNode::from_json(json).map_err(|_| NucleationError::Parse)?;
             let shape = crate::building::SdfShape::with_bounds(
                 node,
                 (min_x, min_y, min_z),
@@ -520,7 +518,9 @@ pub mod ffi {
             if self.0.is_empty() {
                 return Err(NucleationError::NotFound);
             }
-            let ids = self.0.gradient_ids((r1, g1, b1), (r2, g2, b2), steps as usize);
+            let ids = self
+                .0
+                .gradient_ids((r1, g1, b1), (r2, g2, b2), steps as usize);
             let _ = write!(out, "{}", serde_json::to_string(&ids).unwrap_or_default());
             Ok(())
         }
@@ -584,7 +584,10 @@ pub mod ffi {
             out: &mut DiplomatWrite,
         ) -> Result<(), NucleationError> {
             let target = crate::blockpedia::ExtendedColorData::from_rgb(r, g, b);
-            let id = self.0.find_closest(&target).ok_or(NucleationError::NotFound)?;
+            let id = self
+                .0
+                .find_closest(&target)
+                .ok_or(NucleationError::NotFound)?;
             let _ = write!(out, "{}", id);
             Ok(())
         }

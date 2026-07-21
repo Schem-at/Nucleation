@@ -34,6 +34,12 @@ namespace capi {
 
     void RenderConfig_clear_background(diplomat::capi::RenderConfig* self);
 
+    void RenderConfig_set_grid(diplomat::capi::RenderConfig* self, int32_t half_extent, int32_t spacing, float plane_y, bool show_axes, float red, float green, float blue, float alpha);
+
+    void RenderConfig_set_fitted_grid(diplomat::capi::RenderConfig* self, int32_t margin, int32_t spacing, float plane_y, bool show_axes, float red, float green, float blue, float alpha);
+
+    void RenderConfig_clear_grid(diplomat::capi::RenderConfig* self);
+
     void RenderConfig_set_orthographic(diplomat::capi::RenderConfig* self, bool orthographic);
 
     void RenderConfig_set_isometric(diplomat::capi::RenderConfig* self);
@@ -85,6 +91,34 @@ inline void RenderConfig::set_background(float r, float g, float b, float a) {
 
 inline void RenderConfig::clear_background() {
     diplomat::capi::RenderConfig_clear_background(this->AsFFI());
+}
+
+inline void RenderConfig::set_grid(int32_t half_extent, int32_t spacing, float plane_y, bool show_axes, float red, float green, float blue, float alpha) {
+    diplomat::capi::RenderConfig_set_grid(this->AsFFI(),
+        half_extent,
+        spacing,
+        plane_y,
+        show_axes,
+        red,
+        green,
+        blue,
+        alpha);
+}
+
+inline void RenderConfig::set_fitted_grid(int32_t margin, int32_t spacing, float plane_y, bool show_axes, float red, float green, float blue, float alpha) {
+    diplomat::capi::RenderConfig_set_fitted_grid(this->AsFFI(),
+        margin,
+        spacing,
+        plane_y,
+        show_axes,
+        red,
+        green,
+        blue,
+        alpha);
+}
+
+inline void RenderConfig::clear_grid() {
+    diplomat::capi::RenderConfig_clear_grid(this->AsFFI());
 }
 
 inline void RenderConfig::set_orthographic(bool orthographic) {

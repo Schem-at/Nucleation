@@ -517,7 +517,8 @@ impl MchprsWorld {
 
         log::error!(
             "Tried to use block at {:?} ({}); only levers and buttons are supported",
-            pos, name
+            pos,
+            name
         );
     }
 

@@ -1,4 +1,29 @@
-# Nucleation Meshing, NUCM Cache Format, and Rendering Pipeline
+# Meshing and rendering
+
+## Mesh and render
+
+
+Any schematic exports to GLB/glTF or USDZ using any vanilla-format resource
+pack, plus the headless GPU renderer that drew this page. The sphere-fit camera
+holds a rotation-stable frame; this turntable is 40 renders of the hero island:
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/hero-turntable.gif" width="440" alt="Rotation-stable turntable of the volcano island">
+</div>
+
+```python
+mesh = MeshResult.create(schem, ResourcePack.from_bytes(pack_zip), MeshConfig.create())
+glb = base64.b64decode(mesh.glb_data_b64())     # magic b'glTF'
+
+cfg = RenderConfig.create(1200, 760)
+cfg.set_isometric()
+cfg.set_sphere_fit(True)                        # rotation-stable framing
+Renderer.render_to_file(schem, pack_zip, cfg, "island.png")
+```
+
+---
+
+## Reference
 
 This document describes the complete pipeline from Minecraft schematic to rendered 3D output: the meshing API that converts schematics into triangle meshes, the `.nucm` binary cache format for efficient serialization, and the wgpu/Three.js rendering pipeline that displays them.
 

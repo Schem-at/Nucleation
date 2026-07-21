@@ -64,6 +64,20 @@ export class RenderConfig {
     clearBackground(): void;
 
     /**
+     * Configure a one-block world grid. Models are centred on integer
+     * schematic coordinates, so grid lines are placed on half-integer
+     * block boundaries automatically.
+     */
+    setGrid(halfExtent: number, spacing: number, planeY: number, showAxes: boolean, red: number, green: number, blue: number, alpha: number): void;
+
+    /**
+     * Configure a compact grid fitted to half-integer block boundaries.
+     */
+    setFittedGrid(margin: number, spacing: number, planeY: number, showAxes: boolean, red: number, green: number, blue: number, alpha: number): void;
+
+    clearGrid(): void;
+
+    /**
      * Enable (`true`) or disable orthographic projection.
      */
     setOrthographic(orthographic: boolean): void;

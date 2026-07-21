@@ -96,7 +96,10 @@ fn download_texture(
     url: &str,
     local_path: &Path,
 ) -> Result<()> {
-    let response = client.get(url).send().context("Failed to download texture")?;
+    let response = client
+        .get(url)
+        .send()
+        .context("Failed to download texture")?;
     let bytes = response.bytes().context("Failed to read texture bytes")?;
     fs::write(local_path, bytes).context("Failed to write texture file")?;
     Ok(())

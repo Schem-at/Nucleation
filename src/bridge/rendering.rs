@@ -79,6 +79,58 @@ pub mod ffi {
             self.0.background = None;
         }
 
+        /// Configure a one-block world grid. Models are centred on integer
+        /// schematic coordinates, so grid lines are placed on half-integer
+        /// block boundaries automatically.
+        pub fn set_grid(
+            &mut self,
+            half_extent: i32,
+            spacing: i32,
+            plane_y: f32,
+            show_axes: bool,
+            red: f32,
+            green: f32,
+            blue: f32,
+            alpha: f32,
+        ) {
+            self.0.grid = Some(crate::rendering::GridConfig {
+                half_extent,
+                fit_to_bounds: false,
+                margin: 1,
+                spacing,
+                plane_y,
+                show_axes,
+                line_rgba: [red, green, blue, alpha],
+            });
+        }
+
+        /// Configure a compact grid fitted to half-integer block boundaries.
+        pub fn set_fitted_grid(
+            &mut self,
+            margin: i32,
+            spacing: i32,
+            plane_y: f32,
+            show_axes: bool,
+            red: f32,
+            green: f32,
+            blue: f32,
+            alpha: f32,
+        ) {
+            self.0.grid = Some(crate::rendering::GridConfig {
+                half_extent: 1,
+                fit_to_bounds: true,
+                margin,
+                spacing,
+                plane_y,
+                show_axes,
+                line_rgba: [red, green, blue, alpha],
+            });
+        }
+
+        pub fn clear_grid(&mut self) {
+            self.0.grid = None;
+        }
+
         /// Enable (`true`) or disable orthographic projection.
         pub fn set_orthographic(&mut self, orthographic: bool) {
             self.0.projection = if orthographic {
@@ -171,5 +223,20 @@ pub mod ffi {
                 .render_to_file(&pack, path, &config.0)
                 .map_err(|_| NucleationError::Render)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ffi::RenderConfig;
+
+    #[test]
+    fn bridge_render_config_exposes_aligned_world_grid() {
+        let mut config = RenderConfig::create(420, 420);
+        config.set_grid(10, 1, 0.0, false, 0.42, 0.52, 0.60, 0.38);
+        let grid = config.0.grid.unwrap();
+        assert_eq!(grid.spacing, 1);
+        assert_eq!(grid.plane_y, 0.0);
+        assert_eq!(grid.line_rgba[3], 0.38);
     }
 }

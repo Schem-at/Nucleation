@@ -595,9 +595,12 @@ impl ApplicationHandler for InteractiveApp {
             ));
         let window = Arc::new(event_loop.create_window(attrs).unwrap());
 
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
-            ..Default::default()
+            flags: wgpu::InstanceFlags::default(),
+            memory_budget_thresholds: Default::default(),
+            backend_options: Default::default(),
+            display: None,
         });
         let surface = instance.create_surface(window.clone()).unwrap();
 
@@ -614,6 +617,7 @@ impl ApplicationHandler for InteractiveApp {
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: renderer.color_format,
+            color_space: wgpu::SurfaceColorSpace::Auto,
             width: self.init_width,
             height: self.init_height,
             present_mode: wgpu::PresentMode::Fifo,
@@ -645,12 +649,23 @@ impl ApplicationHandler for InteractiveApp {
                 let renderer = self.renderer.as_ref().unwrap();
 
                 let output = match surface.get_current_texture() {
-                    Ok(t) => t,
-                    Err(wgpu::SurfaceError::Outdated | wgpu::SurfaceError::Lost) => {
+                    wgpu::CurrentSurfaceTexture::Success(texture)
+                    | wgpu::CurrentSurfaceTexture::Suboptimal(texture) => texture,
+                    wgpu::CurrentSurfaceTexture::Outdated => {
+                        if let Some(config) = self.surface_config.as_ref() {
+                            surface.configure(&renderer.device, config);
+                        }
                         return;
                     }
-                    Err(e) => {
-                        eprintln!("Surface error: {:?}", e);
+                    wgpu::CurrentSurfaceTexture::Lost => {
+                        eprintln!("Surface lost");
+                        event_loop.exit();
+                        return;
+                    }
+                    wgpu::CurrentSurfaceTexture::Timeout
+                    | wgpu::CurrentSurfaceTexture::Occluded => return,
+                    wgpu::CurrentSurfaceTexture::Validation => {
+                        eprintln!("Surface validation error");
                         return;
                     }
                 };
@@ -676,7 +691,7 @@ impl ApplicationHandler for InteractiveApp {
                 );
 
                 renderer.queue.submit(std::iter::once(encoder.finish()));
-                output.present();
+                renderer.queue.present(output);
             }
 
             WindowEvent::Resized(size) => {

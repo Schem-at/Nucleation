@@ -71,8 +71,8 @@ pub mod ffi {
             surface_depth: i32,
             name: &DiplomatStr,
         ) -> Result<Box<Schematic>, NucleationError> {
-            let hj = std::str::from_utf8(heights_json)
-                .map_err(|_| NucleationError::InvalidArgument)?;
+            let hj =
+                std::str::from_utf8(heights_json).map_err(|_| NucleationError::InvalidArgument)?;
             let sj = std::str::from_utf8(surface_blocks_json)
                 .map_err(|_| NucleationError::InvalidArgument)?;
             let sub = std::str::from_utf8(subsurface_block)
@@ -81,8 +81,7 @@ pub mod ffi {
             if width <= 0 {
                 return Err(NucleationError::InvalidArgument);
             }
-            let heights: Vec<i32> =
-                serde_json::from_str(hj).map_err(|_| NucleationError::Parse)?;
+            let heights: Vec<i32> = serde_json::from_str(hj).map_err(|_| NucleationError::Parse)?;
             let surface_blocks: Vec<String> =
                 serde_json::from_str(sj).map_err(|_| NucleationError::Parse)?;
             if surface_blocks.is_empty() {

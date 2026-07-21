@@ -232,7 +232,14 @@ public:
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> copy_region(const nucleation::Schematic& source, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z, int32_t target_x, int32_t target_y, int32_t target_z, std::string_view excluded_blocks_json);
 
   /**
+   * The full block state at a position. `NotFound` if the position is
+   * outside every region.
+   */
+  inline nucleation::diplomat::result<std::unique_ptr<nucleation::BlockState>, nucleation::NucleationError> get_block(int32_t x, int32_t y, int32_t z) const;
+
+  /**
    * The block at a position with its properties, as a `BlockState`.
+   * Kept as an explicit alias for callers migrating from the older API.
    */
   inline nucleation::diplomat::result<std::unique_ptr<nucleation::BlockState>, nucleation::NucleationError> get_block_with_properties(int32_t x, int32_t y, int32_t z) const;
 
@@ -276,6 +283,14 @@ public:
    * Add a mobile entity. `nbt_json` is a JSON object (may be empty).
    */
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> add_entity(std::string_view id, double x, double y, double z, std::string_view nbt_json);
+
+  /**
+   * Add an armor stand without hand-authoring entity NBT.
+   *
+   * `armor_material` accepts `diamond`, `netherite`, `iron`, etc.; an
+   * empty string creates an unarmored stand. `yaw` uses Minecraft degrees.
+   */
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> add_armor_stand(double x, double y, double z, float yaw, std::string_view armor_material);
 
   /**
    * Remove a mobile entity by index.

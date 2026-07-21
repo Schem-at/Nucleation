@@ -1,0 +1,205 @@
+[
+ {
+  "slug": "bowser-castle",
+  "title": "Bowser Castle",
+  "game": "mkds",
+  "asset": 309908,
+  "bucket": 307
+ },
+ {
+  "slug": "desert-hills",
+  "title": "Desert Hills",
+  "game": "mkds",
+  "asset": 311779,
+  "bucket": 309
+ },
+ {
+  "slug": "dk-pass",
+  "title": "DK Pass",
+  "game": "mkds",
+  "asset": 309910,
+  "bucket": 307
+ },
+ {
+  "slug": "figure-eight-circuit",
+  "title": "Figure Eight Circuit",
+  "game": "mkds",
+  "asset": 299892,
+  "bucket": 297
+ },
+ {
+  "slug": "gba-peach-circuit",
+  "title": "GBA Peach Circuit",
+  "game": "mkds",
+  "asset": 307214,
+  "bucket": 304
+ },
+ {
+  "slug": "gba-sky-garden",
+  "title": "GBA Sky Garden",
+  "game": "mkds",
+  "asset": 308410,
+  "bucket": 305
+ },
+ {
+  "slug": "gcn-baby-park",
+  "title": "GCN Baby Park",
+  "game": "mkds",
+  "asset": 309907,
+  "bucket": 307
+ },
+ {
+  "slug": "gcn-luigi-circuit",
+  "title": "GCN Luigi Circuit",
+  "game": "mkds",
+  "asset": 463395,
+  "bucket": 486
+ },
+ {
+  "slug": "gcn-mushroom-bridge",
+  "title": "GCN Mushroom Bridge",
+  "game": "mkds",
+  "asset": 301963,
+  "bucket": 299
+ },
+ {
+  "slug": "luigis-mansion",
+  "title": "Luigi's Mansion",
+  "game": "mkds",
+  "asset": 309909,
+  "bucket": 307
+ },
+ {
+  "slug": "mario-circuit",
+  "title": "Mario Circuit",
+  "game": "mkds",
+  "asset": 309938,
+  "bucket": 307
+ },
+ {
+  "slug": "n64-frappe-snowland",
+  "title": "N64 Frappe Snowland",
+  "game": "mkds",
+  "asset": 463509,
+  "bucket": 487
+ },
+ {
+  "slug": "peach-gardens",
+  "title": "Peach Gardens",
+  "game": "mkds",
+  "asset": 301957,
+  "bucket": 299
+ },
+ {
+  "slug": "rainbow-road",
+  "title": "Rainbow Road",
+  "game": "mkds",
+  "asset": 289183,
+  "bucket": 286
+ },
+ {
+  "slug": "shroom-ridge",
+  "title": "Shroom Ridge",
+  "game": "mkds",
+  "asset": 330403,
+  "bucket": 327
+ },
+ {
+  "slug": "snes-choco-island-2",
+  "title": "SNES Choco Island 2",
+  "game": "mkds",
+  "asset": 339210,
+  "bucket": 336
+ },
+ {
+  "slug": "snes-donut-plains-1",
+  "title": "SNES Donut Plains 1",
+  "game": "mkds",
+  "asset": 339926,
+  "bucket": 337
+ },
+ {
+  "slug": "snes-koopa-beach-2",
+  "title": "SNES Koopa Beach 2",
+  "game": "mkds",
+  "asset": 339122,
+  "bucket": 336
+ },
+ {
+  "slug": "snes-mario-circuit-1",
+  "title": "SNES Mario Circuit 1",
+  "game": "mkds",
+  "asset": 307701,
+  "bucket": 305
+ },
+ {
+  "slug": "waluigi-pinball",
+  "title": "Waluigi Pinball",
+  "game": "mkds",
+  "asset": 330404,
+  "bucket": 327
+ },
+ {
+  "slug": "wario-stadium",
+  "title": "Wario Stadium",
+  "game": "mkds",
+  "asset": 311941,
+  "bucket": 309
+ },
+ {
+  "slug": "yoshi-falls",
+  "title": "Yoshi Falls",
+  "game": "mkds",
+  "asset": 313833,
+  "bucket": 311
+ },
+ {
+  "slug": "bowsers-castle-mk64",
+  "title": "Bowser's Castle",
+  "game": "mk64",
+  "asset": 326232,
+  "bucket": 323
+ },
+ {
+  "slug": "koopa-troopa-beach-mk64",
+  "title": "Koopa Troopa Beach",
+  "game": "mk64",
+  "asset": 300000,
+  "bucket": 297
+ },
+ {
+  "slug": "luigi-raceway-mk64",
+  "title": "Luigi Raceway",
+  "game": "mk64",
+  "asset": 324807,
+  "bucket": 322
+ },
+ {
+  "slug": "mario-raceway-mk64",
+  "title": "Mario Raceway",
+  "game": "mk64",
+  "asset": 324854,
+  "bucket": 322
+ },
+ {
+  "slug": "royal-raceway-mk64",
+  "title": "Royal Raceway",
+  "game": "mk64",
+  "asset": 332775,
+  "bucket": 330
+ },
+ {
+  "slug": "sherbet-land-mk64",
+  "title": "Sherbet Land",
+  "game": "mk64",
+  "asset": 304606,
+  "bucket": 301
+ },
+ {
+  "slug": "wario-stadium-mk64",
+  "title": "Wario Stadium",
+  "game": "mk64",
+  "asset": 340104,
+  "bucket": 337
+ }
+]

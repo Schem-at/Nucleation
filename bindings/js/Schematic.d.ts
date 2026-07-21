@@ -180,7 +180,14 @@ export class Schematic {
     copyRegion(source: Schematic, minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number, targetX: number, targetY: number, targetZ: number, excludedBlocksJson: string): void;
 
     /**
+     * The full block state at a position. `NotFound` if the position is
+     * outside every region.
+     */
+    getBlock(x: number, y: number, z: number): BlockState;
+
+    /**
      * The block at a position with its properties, as a `BlockState`.
+     * Kept as an explicit alias for callers migrating from the older API.
      */
     getBlockWithProperties(x: number, y: number, z: number): BlockState;
 
@@ -216,6 +223,14 @@ export class Schematic {
      * Add a mobile entity. `nbt_json` is a JSON object (may be empty).
      */
     addEntity(id: string, x: number, y: number, z: number, nbtJson: string): void;
+
+    /**
+     * Add an armor stand without hand-authoring entity NBT.
+     *
+     * `armor_material` accepts `diamond`, `netherite`, `iron`, etc.; an
+     * empty string creates an unarmored stand. `yaw` uses Minecraft degrees.
+     */
+    addArmorStand(x: number, y: number, z: number, yaw: number, armorMaterial: string): void;
 
     /**
      * Remove a mobile entity by index.

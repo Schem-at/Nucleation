@@ -46,8 +46,9 @@ if(WIN32)
 endif()
 if(APPLE)
   # wgpu (rendering feature) needs the system frameworks
+  # CoreGraphics: wgpu_hal color-space symbols used by Metal surfaces
   # Foundation: wgpu_hal's Metal layer observer uses NSKeyValueChange* symbols
-  target_link_libraries(nucleation_rust INTERFACE "-framework Metal" "-framework QuartzCore" "-framework CoreFoundation" "-framework Foundation")
+  target_link_libraries(nucleation_rust INTERFACE "-framework Metal" "-framework QuartzCore" "-framework CoreGraphics" "-framework CoreFoundation" "-framework Foundation")
 endif()
 
 file(GLOB_RECURSE SUBMODULE_FILES src/sub_modules/*.cpp)

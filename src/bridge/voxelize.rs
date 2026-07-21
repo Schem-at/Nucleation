@@ -59,8 +59,7 @@ pub mod ffi {
             target_size: f32,
             shell: f32,
         ) -> Result<Box<Shape>, NucleationError> {
-            let text =
-                std::str::from_utf8(text).map_err(|_| NucleationError::InvalidArgument)?;
+            let text = std::str::from_utf8(text).map_err(|_| NucleationError::InvalidArgument)?;
             if !(target_size > 0.0) {
                 return Err(NucleationError::InvalidArgument);
             }
@@ -95,8 +94,7 @@ pub mod ffi {
             palette: &Palette,
             name: &DiplomatStr,
         ) -> Result<Box<Schematic>, NucleationError> {
-            let name =
-                std::str::from_utf8(name).map_err(|_| NucleationError::InvalidArgument)?;
+            let name = std::str::from_utf8(name).map_err(|_| NucleationError::InvalidArgument)?;
             if !(target_size > 0.0) {
                 return Err(NucleationError::InvalidArgument);
             }

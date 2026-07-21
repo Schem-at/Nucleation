@@ -13,8 +13,8 @@ mod shape;
 pub use model::{MeshModel, MeshTriangle, TextureImage};
 pub use shape::MeshShape;
 
-use crate::building::{BlockPalette, Shape};
 use crate::blockpedia::ExtendedColorData;
+use crate::building::{BlockPalette, Shape};
 use crate::{BlockState, UniversalSchematic};
 
 /// Fallback color for voxels with no texture information (mid-gray).

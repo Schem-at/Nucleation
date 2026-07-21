@@ -21,6 +21,42 @@ pub use hdri::HdriData;
 
 use crate::meshing::MeshOutput;
 
+/// A world-space reference grid drawn on a horizontal plane, optionally with
+/// coloured X/Y/Z axis lines through the origin. Makes block coordinates
+/// legible — the point of it is documentation, not decoration.
+#[derive(Clone, Copy, Debug)]
+pub struct GridConfig {
+    /// The grid spans `-half_extent..=half_extent` blocks on each axis unless
+    /// `fit_to_bounds` is enabled.
+    pub half_extent: i32,
+    /// Fit the grid to the rendered block bounds instead of an origin-centred square.
+    pub fit_to_bounds: bool,
+    /// Whole-block margin around fitted bounds.
+    pub margin: i32,
+    /// A grid line every `spacing` blocks (clamped to at least 1).
+    pub spacing: i32,
+    /// Height of the grid plane (usually the build's floor, `0`).
+    pub plane_y: f32,
+    /// Draw red/green/blue lines along +X/+Y/+Z from the origin.
+    pub show_axes: bool,
+    /// Grid line colour, linear RGBA. Alpha below 1 blends over the scene.
+    pub line_rgba: [f32; 4],
+}
+
+impl Default for GridConfig {
+    fn default() -> Self {
+        Self {
+            half_extent: 16,
+            fit_to_bounds: false,
+            margin: 1,
+            spacing: 1,
+            plane_y: 0.0,
+            show_axes: true,
+            line_rgba: [0.5, 0.5, 0.55, 0.5],
+        }
+    }
+}
+
 /// Render configuration.
 #[derive(Clone)]
 pub struct RenderConfig {
@@ -43,6 +79,9 @@ pub struct RenderConfig {
     /// yaw-dependent silhouette, so orbiting cameras (turntables) keep a
     /// constant distance. Default `false`.
     pub sphere_fit: bool,
+    /// Optional world-space reference grid. `None` (the default) draws nothing
+    /// and leaves rendering bit-for-bit identical to before this existed.
+    pub grid: Option<GridConfig>,
 }
 
 impl Default for RenderConfig {
@@ -58,6 +97,7 @@ impl Default for RenderConfig {
             background: None,
             projection: Projection::Perspective,
             sphere_fit: false,
+            grid: None,
         }
     }
 }
@@ -129,6 +169,7 @@ pub async fn render_meshes_async(
     hdri: Option<&HdriData>,
 ) -> Result<Vec<u8>, RenderError> {
     let renderer = GpuRenderer::new(meshes, config.width, config.height, hdri).await?;
+    renderer.set_grid(config.grid);
     let camera = config.to_camera();
     // Use render_frame on native, which does sync readback
     #[cfg(not(target_arch = "wasm32"))]
@@ -141,6 +182,112 @@ pub async fn render_meshes_async(
             "Use render_meshes_async with wasm_bindgen_futures on WASM".into(),
         ))
     }
+}
+
+/// Render an animation to a sequence of RGBA frames.
+///
+/// `meshes[i]` is posed by the animation group with id `i`, so callers building
+/// a per-block animation must mesh per block. Meshes with no matching group
+/// hold the identity pose.
+///
+/// The GPU renderer, atlas and geometry buffers are built **once** and reused
+/// for every frame — only the per-draw uniform buffer is rewritten. That is the
+/// difference between rendering an animation and re-rendering a still N times.
+///
+/// Frame times come from [`crate::animation::Timeline::frame_times`], so the
+/// output is deterministic and regenerating it is byte-identical.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn render_animation(
+    meshes: &[MeshOutput],
+    frames: &[crate::animation::Frame],
+    config: &RenderConfig,
+    hdri: Option<&HdriData>,
+) -> Result<Vec<Vec<u8>>, RenderError> {
+    pollster::block_on(async {
+        let renderer = GpuRenderer::new(meshes, config.width, config.height, hdri).await?;
+        renderer.set_grid(config.grid);
+        let base = config.to_camera();
+        let mut out = Vec::with_capacity(frames.len());
+        let mut poses = vec![crate::animation::Pose::IDENTITY; meshes.len()];
+
+        for frame in frames {
+            // Frame poses are keyed by GroupId; slot i drives mesh i.
+            poses
+                .iter_mut()
+                .for_each(|p| *p = crate::animation::Pose::IDENTITY);
+            for (id, pose) in &frame.poses {
+                if let Some(slot) = poses.get_mut(*id as usize) {
+                    *slot = *pose;
+                }
+            }
+            renderer.set_poses(&poses);
+
+            // A camera clip on the same timeline moves the view with the build.
+            let camera = match &frame.camera {
+                Some(c) => {
+                    let mut cfg = config.clone();
+                    cfg.yaw += c.yaw;
+                    cfg.pitch += c.pitch;
+                    cfg.zoom *= c.zoom;
+                    cfg.to_camera()
+                }
+                None => base.clone(),
+            };
+            out.push(renderer.render_frame(&camera)?);
+        }
+        Ok(out)
+    })
+}
+
+/// Render an animation straight to numbered PNG files (`{prefix}{i:04}.png`).
+///
+/// The naming matches what `ffmpeg -i 'f%04d.png'` expects, which is how the
+/// README media pipeline assembles GIFs.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn render_animation_to_files(
+    meshes: &[MeshOutput],
+    frames: &[crate::animation::Frame],
+    config: &RenderConfig,
+    hdri: Option<&HdriData>,
+    prefix: &str,
+) -> Result<Vec<String>, RenderError> {
+    let pixels = render_animation(meshes, frames, config, hdri)?;
+    let mut paths = Vec::with_capacity(pixels.len());
+    for (i, px) in pixels.iter().enumerate() {
+        let path = format!("{prefix}{i:04}.png");
+        let png = encode_png(px, config.width, config.height)?;
+        std::fs::write(&path, &png).map_err(RenderError::Io)?;
+        paths.push(path);
+    }
+    Ok(paths)
+}
+
+/// The exact view-projection matrix used for each frame of an animation.
+///
+/// GPU-free: the matrices are pure maths over the mesh bounds and per-frame
+/// camera. Pair with [`camera::project_point`] to place overlay labels — the
+/// compositor asks "where is block P at frame i" and gets a pixel anchor from
+/// `project_point(&view_projs[i], p, w, h)`. Because it uses the *same* camera
+/// derivation as [`render_animation`], the anchors line up with the pixels.
+pub fn animation_view_projs(
+    meshes: &[MeshOutput],
+    frames: &[crate::animation::Frame],
+    config: &RenderConfig,
+) -> Vec<[[f32; 4]; 4]> {
+    let (bmin, bmax) = camera::merged_bounds(meshes);
+    let aspect = config.width as f32 / config.height.max(1) as f32;
+    frames
+        .iter()
+        .map(|frame| {
+            let mut cam = config.to_camera();
+            if let Some(c) = &frame.camera {
+                cam.yaw_deg += c.yaw;
+                cam.pitch_deg += c.pitch;
+                cam.zoom *= c.zoom;
+            }
+            camera::compute_view_proj(bmin, bmax, aspect, &cam).0
+        })
+        .collect()
 }
 
 // ─── Sync wrappers (native only) ────────────────────────────────────────────
@@ -174,6 +321,53 @@ pub fn encode_png(pixels: &[u8], width: u32, height: u32) -> Result<Vec<u8>, Ren
     img.write_to(&mut buf, image::ImageFormat::Png)
         .map_err(|e| RenderError::PngEncode(e.to_string()))?;
     Ok(buf.into_inner())
+}
+
+/// Encode deterministic RGBA animation frames as an infinitely looping GIF.
+pub fn encode_animation_gif(
+    frames: &[Vec<u8>],
+    width: u32,
+    height: u32,
+    fps: f64,
+) -> Result<Vec<u8>, RenderError> {
+    use image::codecs::gif::{GifEncoder, Repeat as GifRepeat};
+    use image::{Delay, Frame};
+
+    let mut bytes = Vec::new();
+    {
+        let mut encoder = GifEncoder::new(&mut bytes);
+        encoder
+            .set_repeat(GifRepeat::Infinite)
+            .map_err(|e| RenderError::PngEncode(e.to_string()))?;
+        let fps = fps.max(1.0).round() as u32;
+        for pixels in frames {
+            let image =
+                image::RgbaImage::from_raw(width, height, pixels.clone()).ok_or_else(|| {
+                    RenderError::PngEncode("Failed to create GIF frame from pixels".into())
+                })?;
+            encoder
+                .encode_frame(Frame::from_parts(
+                    image,
+                    0,
+                    0,
+                    Delay::from_numer_denom_ms(1000, fps),
+                ))
+                .map_err(|e| RenderError::PngEncode(e.to_string()))?;
+        }
+    }
+    Ok(bytes)
+}
+
+/// Write deterministic RGBA animation frames as an infinitely looping GIF.
+pub fn write_animation_gif(
+    frames: &[Vec<u8>],
+    width: u32,
+    height: u32,
+    fps: f64,
+    path: &str,
+) -> Result<(), RenderError> {
+    let gif = encode_animation_gif(frames, width, height, fps)?;
+    std::fs::write(path, gif).map_err(RenderError::Io)
 }
 
 // ─── High-level API on UniversalSchematic ───────────────────────────────────
@@ -240,6 +434,15 @@ mod config_tests {
         assert_eq!(c.projection, Projection::Orthographic);
         assert!((c.yaw - 45.0).abs() < 1e-4);
         assert!((c.pitch - 35.264).abs() < 1e-3);
+    }
+
+    #[test]
+    fn animation_gif_encoder_produces_a_looping_gif() {
+        let black = vec![0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255];
+        let white = vec![255; 16];
+        let gif = encode_animation_gif(&[black, white], 2, 2, 20.0).unwrap();
+        assert!(gif.starts_with(b"GIF"));
+        assert!(gif.windows(11).any(|w| w == b"NETSCAPE2.0"));
     }
 
     #[test]

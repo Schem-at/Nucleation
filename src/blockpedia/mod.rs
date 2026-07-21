@@ -394,37 +394,48 @@ impl BlockState {
         }
         def_props_vec.sort();
         let default_state_str = format!("{}[{}]", self.block_id, def_props_vec.join(","));
-        
-        if let Some(bedrock_default) = 
+
+        if let Some(bedrock_default) =
             bedrock_mapping::BedrockBlockStateMapper::java_to_bedrock(&default_state_str)
         {
-             // We found the default state mapping. Now try to apply the differences.
-             // This is a naive heuristic but better than nothing.
-             // Parse the bedrock default state
-             let mut bedrock_state = Self::parse_unvalidated(bedrock_default)?;
-             
-             // Apply common property remappings
-             for (key, value) in &self.properties {
-                 match key.as_str() {
-                     "facing" => {
-                         // Map facing to minecraft:cardinal_direction or direction
-                         // This requires knowing the specific bedrock property name, which varies.
-                         // But we can guess or use a look-up if we had one.
-                         // For many blocks it is minecraft:cardinal_direction
-                         bedrock_state.properties.insert("minecraft:cardinal_direction".to_string(), value.clone());
-                         // Sometimes it's just "direction"
-                         bedrock_state.properties.insert("direction".to_string(), match value.as_str() {
-                             "down" => "0", "up" => "1", "north" => "2", "south" => "3", "west" => "4", "east" => "5",
-                             _ => "0"
-                         }.to_string());
-                     },
-                     "powered" => {
-                         // Map powered=true/false to some bit property if we knew it.
-                     }
-                     _ => {}
-                 }
-             }
-             return Ok(bedrock_state);
+            // We found the default state mapping. Now try to apply the differences.
+            // This is a naive heuristic but better than nothing.
+            // Parse the bedrock default state
+            let mut bedrock_state = Self::parse_unvalidated(bedrock_default)?;
+
+            // Apply common property remappings
+            for (key, value) in &self.properties {
+                match key.as_str() {
+                    "facing" => {
+                        // Map facing to minecraft:cardinal_direction or direction
+                        // This requires knowing the specific bedrock property name, which varies.
+                        // But we can guess or use a look-up if we had one.
+                        // For many blocks it is minecraft:cardinal_direction
+                        bedrock_state
+                            .properties
+                            .insert("minecraft:cardinal_direction".to_string(), value.clone());
+                        // Sometimes it's just "direction"
+                        bedrock_state.properties.insert(
+                            "direction".to_string(),
+                            match value.as_str() {
+                                "down" => "0",
+                                "up" => "1",
+                                "north" => "2",
+                                "south" => "3",
+                                "west" => "4",
+                                "east" => "5",
+                                _ => "0",
+                            }
+                            .to_string(),
+                        );
+                    }
+                    "powered" => {
+                        // Map powered=true/false to some bit property if we knew it.
+                    }
+                    _ => {}
+                }
+            }
+            return Ok(bedrock_state);
         }
 
         Err(BlockpediaError::custom(format!(
@@ -457,23 +468,23 @@ impl BlockState {
 
         // Fallback: Try to map based on rules if exact match fails
         // Section 1.A: Procedural Property Mapping logic
-        
+
         // 1. Identify the likely Java block ID
         // Bedrock "minecraft:stone" -> Java "minecraft:stone"
         // But Bedrock "minecraft:wool" [color=14] -> Java "minecraft:red_wool"
         // We can try to use a "base" mapping if available, or just guess the ID.
-        
+
         // Try stripping the namespace and seeing if it matches a Java block
         let java_id = if bedrock_id.starts_with("minecraft:") {
             bedrock_id.to_string()
         } else {
             format!("minecraft:{}", bedrock_id)
         };
-        
+
         // Check if this simple ID exists in Java blocks
         if BLOCKS.contains_key(java_id.as_str()) {
             let mut java_state = BlockState::new(&java_id)?;
-            
+
             // Try to map properties
             for (key, value) in properties {
                 match key.as_str() {
@@ -484,26 +495,42 @@ impl BlockState {
                         // Standard 6-way: 0=down, 1=up, 2=north, 3=south, 4=west, 5=east
                         // Standard 4-way (horizontal): 2=north, 3=south, 4=west, 5=east
                         let facing = match value.as_str() {
-                            "0" => "down", "1" => "up", "2" => "north", "3" => "south", "4" => "west", "5" => "east",
-                            _ => "north" // default
+                            "0" => "down",
+                            "1" => "up",
+                            "2" => "north",
+                            "3" => "south",
+                            "4" => "west",
+                            "5" => "east",
+                            _ => "north", // default
                         };
                         // Only set if the Java block has this property
-                        if BLOCKS.get(&java_id).map(|b| b.has_property("facing")).unwrap_or(false) {
-                             // Check valid values
-                             if let Some(valid) = BLOCKS.get(&java_id).and_then(|b| b.get_property_values("facing")) {
-                                 if valid.contains(&facing.to_string()) {
-                                     java_state = java_state.with("facing", facing)?;
-                                 }
-                             }
+                        if BLOCKS
+                            .get(&java_id)
+                            .map(|b| b.has_property("facing"))
+                            .unwrap_or(false)
+                        {
+                            // Check valid values
+                            if let Some(valid) = BLOCKS
+                                .get(&java_id)
+                                .and_then(|b| b.get_property_values("facing"))
+                            {
+                                if valid.contains(&facing.to_string()) {
+                                    java_state = java_state.with("facing", facing)?;
+                                }
+                            }
                         }
-                    },
+                    }
                     "output_lit_bit" => {
                         if value == "1" {
-                            if BLOCKS.get(&java_id).map(|b| b.has_property("powered")).unwrap_or(false) {
+                            if BLOCKS
+                                .get(&java_id)
+                                .map(|b| b.has_property("powered"))
+                                .unwrap_or(false)
+                            {
                                 java_state = java_state.with("powered", "true")?;
                             }
                         }
-                    },
+                    }
                     // Add more procedural rules here
                     _ => {}
                 }
