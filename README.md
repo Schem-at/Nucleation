@@ -10,12 +10,12 @@ schematics from seven languages.**
 [![PyPI](https://img.shields.io/pypi/v/nucleation.svg)](https://pypi.org/project/nucleation)
 [![CI](https://github.com/Schem-at/Nucleation/actions/workflows/ci.yml/badge.svg)](https://github.com/Schem-at/Nucleation/actions/workflows/ci.yml)
 
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/hero.png" width="760" alt="A volcanic floating island generated from a JSON SDF description and rendered by nucleation">
+<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/hero.gif" width="760" alt="A scorched animated 3x7 torus knot whose braided geometry and raised cellular surface flow in a seamless loop">
 
-*This volcano island is a JSON description: [signed distance fields](docs/features/sdf-and-fields.md)
-plus material rules. Every image on this page was built **and rendered** by
-nucleation itself, and every snippet ran for real
-([images](tools/readme-media/generate.py) · [snippets + outputs](docs/readme-snippets/)).*
+*Every frame of this 3x7 knot is a separately generated schematic: its braid
+advances while a periodic cellular field flows along the curve, cutting raised
+scorched plates over a molten core. It was built **and rendered** by nucleation
+([Python source](examples/readme/hero/) · [frame 0 `.schem`](docs/downloads/readme/hero/scorched-3x7-frame-000.schem) · [SDFs and fields](docs/features/sdf-and-fields.md)).*
 
 </div>
 
