@@ -5,6 +5,16 @@ metadata, and one or more regions. Start empty or open an existing build, edit i
 with ordinary Minecraft block-state strings, inspect the result, then save it in
 the format you need.
 
+## Edit a schematic
+
+```python
+from nucleation import Schematic
+build = Schematic.load_from_file("build.schem")
+build.set_block(0, 0, 0, "minecraft:gold_block")
+print(build.get_block_string(0, 0, 0))
+build.save_to_file("build-edited.schem")
+```
+
 ## Build a crafting nook
 
 ```python
