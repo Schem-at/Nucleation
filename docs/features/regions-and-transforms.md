@@ -58,7 +58,7 @@ Use region-specific reads whenever regions overlap:
 - `region_bounding_box_json(name)`
 - `region_palette_json(name)`
 
-Composite methods such as `get_block(x, y, z)` use stable precedence: the default region first, then named regions in lexical order. Region-specific methods avoid that ownership ambiguity.
+Composite reads, `get_merged_region()`, and merged-format exports use stable precedence: the default region first, then named regions in lexical order. Air inside a higher-priority region's visible content bounds masks lower-priority blocks just like any other block. Region-specific methods avoid that ownership ambiguity.
 
 ## Transform scope
 

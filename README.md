@@ -37,13 +37,13 @@ Every capability, with its own deep-dive doc:
 
 - [Basics](docs/features/basics.md) — create, inspect, load, save, and download a complete example
 - [Formats and I/O](docs/features/formats-and-io.md) — load, edit, and save every supported format
+- [Regions, transforms, stamping](docs/features/regions-and-transforms.md) — deterministic multi-region builds, scoped rigid transforms, and reusable stamping
 - [Shapes, brushes, masked fills](docs/features/shapes-and-brushes.md) — the building primitives
 - [SDF shapes, terrain, and fields](docs/features/sdf-and-fields.md) — JSON-described geometry, terrain, Voronoi
 - [Palettes and color](docs/features/palettes-and-color.md) — turning colors into blocks
 - [Voxelizing 3D models](docs/features/voxelize.md) — GLB/OBJ meshes, texture projection
 - [Geodata](docs/features/geo.md) — elevation grids and OSM footprints
 - [Composition](docs/features/composition.md) — stacking the primitives
-- [Regions, transforms, stamping](docs/features/regions-and-transforms.md) — multi-region builds and rigid motions
 - [Chunk iteration, streaming, worlds](docs/features/streaming-and-worlds.md) — constant-memory pipelines and world I/O
 - [Block entities, entities, NBT](docs/features/block-entities-nbt.md) — SNBT round-trips
 - [Redstone simulation](docs/features/redstone-simulation.md) — MCHPRS redpiler, typed circuit executors
