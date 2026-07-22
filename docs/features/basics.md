@@ -9,11 +9,17 @@ the format you need.
 
 ```python
 from nucleation import Schematic
-build = Schematic.load_from_file("build.schem")
-build.set_block(0, 0, 0, "minecraft:gold_block")
-print(build.get_block_string(0, 0, 0))
-build.save_to_file("build-edited.schem")
+build = Schematic.load_from_file("beacon-base.schem")
+build.set_block(4, 3, 4, "minecraft:beacon")
+print(build.get_block_string(4, 3, 4))
+build.save_to_file("beacon-complete.schem")
 ```
+
+<div align="center">
+<img src="../media/readme/basics/beacon.png" width="480" alt="A beacon centered on compact gold and iron tiers above a clipped polished-blackstone pedestal">
+</div>
+
+[Download the beacon base](../downloads/readme/basics/beacon-base.schem)
 
 ## Build a crafting nook
 
