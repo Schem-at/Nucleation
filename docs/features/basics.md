@@ -5,21 +5,24 @@ metadata, and one or more regions. Start empty or open an existing build, edit i
 with ordinary Minecraft block-state strings, inspect the result, then save it in
 the format you need.
 
-## Edit a schematic
+## Build a beacon
 
 ```python
 from nucleation import Schematic
-build = Schematic.load_from_file("beacon-base.schem")
-build.set_block(4, 3, 4, "minecraft:beacon")
-print(build.get_block_string(4, 3, 4))
-build.save_to_file("beacon-complete.schem")
+
+beacon = Schematic.create("beacon")
+for x in range(5):
+    for z in range(5):
+        beacon.set_block(x, 0, z, "minecraft:gold_block")
+beacon.set_block(2, 1, 2, "minecraft:beacon")
+beacon.save_to_file("beacon.schem")
 ```
 
 <div align="center">
-<img src="../media/readme/basics/beacon.png" width="480" alt="A beacon centered on compact gold and iron tiers above a clipped polished-blackstone pedestal">
+<img src="../media/readme/basics/beacon.gif" width="480" alt="A five-by-five gold-block base assembling in nested-loop order before a beacon lands at its center">
 </div>
 
-[Download the beacon base](../downloads/readme/basics/beacon-base.schem)
+[Download the beacon](../downloads/readme/basics/beacon.schem)
 
 ## Build a crafting nook
 

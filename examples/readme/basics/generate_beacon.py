@@ -1,72 +1,56 @@
-"""Generate the five-line beacon example for docs/features/basics.md."""
+"""Generate the animated 5x5 gold beacon for docs/features/basics.md."""
 
 import os
 from pathlib import Path
 
-from nucleation import RenderConfig, Renderer, Schematic
+from nucleation import AnimationEffect, BuildAnimation, RenderConfig
 
+animation = BuildAnimation.create("beacon")
+animation.set_step_ms(85)
 
-def make_base() -> Schematic:
-    scene = Schematic.create("beacon_base")
+# Mirror the Basics snippet exactly: 25 gold blocks, then one beacon.
+for x in range(5):
+    for z in range(5):
+        animation.set_block(x, 0, z, "minecraft:gold_block")
 
-    # A clipped dark pedestal gives the tiny mineral pyramid a clear silhouette.
-    for x in range(9):
-        for z in range(9):
-            dx, dz = x - 4, z - 4
-            if abs(dx) + abs(dz) <= 7:
-                block = (
-                    "minecraft:chiseled_polished_blackstone"
-                    if (abs(dx), abs(dz)) in {(4, 3), (3, 4)}
-                    else "minecraft:polished_blackstone_bricks"
-                )
-                scene.set_block(x, 0, z, block)
+animation.with_effect(AnimationEffect.spin_in(680, 1)).set_block(
+    2, 1, 2, "minecraft:beacon"
+)
 
-    # Two small, valid beacon tiers.
-    for x in range(2, 7):
-        for z in range(2, 7):
-            scene.set_block(x, 1, z, "minecraft:iron_block")
-    for x in range(3, 6):
-        for z in range(3, 6):
-            scene.set_block(x, 2, z, "minecraft:gold_block")
+view = RenderConfig.create(480, 360)
+view.set_isometric()
+view.set_yaw(28)
+view.set_pitch(24)
+view.set_zoom(1.22)
+view.set_sphere_fit(True)
+view.set_background(0, 0, 0, 0)
 
-    # Four low accents frame the empty beacon position without obscuring it.
-    for x, z in ((2, 2), (2, 6), (6, 2), (6, 6)):
-        scene.set_block(x, 2, z, "minecraft:light_blue_stained_glass")
+# A restrained drift keeps the tiny build dimensional without distracting from
+# the nested-loop placement order.
+camera = AnimationEffect.create(3_200)
+camera.add_tween("rotateY", -5, 5, "inOutSine")
+animation.animate_camera(camera, 0)
 
-    return scene
-
-
-def main() -> None:
-    root = Path(__file__).resolve().parents[3]
-    base_out = root / "docs/downloads/readme/basics/beacon-base.schem"
-    image_out = root / "docs/media/readme/basics/beacon.png"
-    pack_path = Path(
-        os.environ.get(
-            "NUCLEATION_PACK",
-            root / "render_work/pack.zip",
-        )
+root = Path(__file__).resolve().parents[3]
+pack = Path(
+    os.environ.get("NUCLEATION_PACK", root / "render_work/pack.zip")
+).read_bytes()
+gif_out = Path(
+    os.environ.get(
+        "NUCLEATION_OUT",
+        root / "docs/media/readme/basics/beacon.gif",
     )
+)
+schem_out = Path(
+    os.environ.get(
+        "NUCLEATION_SCHEM_OUT",
+        root / "docs/downloads/readme/basics/beacon.schem",
+    )
+)
+gif_out.parent.mkdir(parents=True, exist_ok=True)
+schem_out.parent.mkdir(parents=True, exist_ok=True)
 
-    base = make_base()
-    base_out.parent.mkdir(parents=True, exist_ok=True)
-    image_out.parent.mkdir(parents=True, exist_ok=True)
-    base.save_to_file(str(base_out))
-
-    completed = Schematic.load_from_file(str(base_out))
-    completed.set_block(4, 3, 4, "minecraft:beacon")
-
-    view = RenderConfig.create(560, 420)
-    view.set_isometric()
-    view.set_yaw(28.0)
-    view.set_pitch(24.0)
-    view.set_zoom(1.18)
-    view.set_sphere_fit(True)
-    view.set_background(0, 0, 0, 0)
-    Renderer.render_to_file(completed, pack_path.read_bytes(), view, str(image_out))
-
-    print(f"saved {base_out}")
-    print(f"rendered {image_out}")
-
-
-if __name__ == "__main__":
-    main()
+animation.save_to_file(str(schem_out))
+frames = animation.render_gif(pack, view, str(gif_out), 18, 900)
+print(f"saved {schem_out}")
+print(f"rendered {frames} frames to {gif_out}")
