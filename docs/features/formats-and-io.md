@@ -1,108 +1,154 @@
 # Formats and I/O
 
-Load a schematic from any supported container, edit it through the normal
-[`Schematic` construction API](basics.md), and write it in another format.
-Filesystem helpers detect input by content and select output from the extension:
+Nucleation uses one editable [`Schematic`](basics.md) model for every supported
+container. Load by content, edit through the normal construction API, then choose
+the output format explicitly or by file extension.
 
 ```python
 from nucleation import Schematic
 
-build = Schematic.load_from_file("build.litematic")  # input format auto-detected
-build.save_to_file("build.schem")                    # Sponge output
+build = Schematic.load_from_file("build.litematic")
+build.set_block(1, 3, 1, "minecraft:glowstone")
+build.save_to_file("build.schem")
 ```
 
-For in-memory pipelines, use bytes instead of filesystem paths:
+`load_from_file` inspects the bytes rather than trusting the filename. The
+extension matters when writing: `.litematic`, `.schem`, `.mcstructure`, `.nusn`,
+and `.zip` select their corresponding exporters. An unknown output extension is
+an error; Nucleation does not silently choose a fallback format.
+
+For coordinates, block placement, automatic region growth, and block-state
+strings, start with [Basics](basics.md).
+
+## Schematic containers
+
+| Format | Extension | Read | Write | Exporter key | Notes |
+| --- | --- | :---: | :---: | --- | --- |
+| **Litematica** | `.litematic` | yes | yes | `litematic` | Multi-region native; the reference container |
+| **Sponge Schematic** | `.schem` | yes | yes | `schematic` | WorldEdit/community format; exporter versions `v2` and `v3` |
+| **Bedrock structure** | `.mcstructure` | yes | yes | `mcstructure` | Java block IDs and states are translated through GeyserMC mappings |
+| **Nucleation snapshot** | `.nusn` | yes | yes | `snapshot` | Fast, uncompressed internal interchange format |
+| **Legacy MCEdit** | `.schematic` | yes | no | — | Pre-Flattening numeric IDs; import only |
+
+Use `.schem` for Sponge output. The modern Sponge exporter accepts
+`.schematic` as an extension alias, but it does not produce the deprecated
+MCEdit format.
+
+## Worlds are a separate I/O surface
+
+Anvil data can be much larger than a normal schematic container, so world APIs
+support bounded imports and directory-oriented output:
+
+- `.mca` region file: `Schematic.from_mca(...)` or
+  `Schematic.from_mca_bounded(...)`;
+- zipped world: `Schematic.from_world_zip(...)`, bounded variants, or generic
+  content detection through `from_data`;
+- world directory: `Schematic.from_world_directory(...)` or
+  `from_world_directory_bounded(...)` on native targets;
+- export: `save_world(...)`, `to_world_zip_b64(...)`, or `.zip` through the
+  normal extension-based writer.
+
+See [Chunk iteration, streaming, and worlds](streaming-and-worlds.md) for
+constant-memory pipelines and world-generation workflows.
+
+## Input detection is content-based
+
+Both `load_from_file` and `from_data` run the registered format detectors over
+the payload. Renaming a litematic to `mystery.bin` does not change what it is:
 
 ```python
-build = Schematic.from_data(open("mystery.bin", "rb").read())
+from pathlib import Path
+from nucleation import Schematic
+
+payload = Path("mystery.bin").read_bytes()
+build = Schematic.from_data(payload)
 ```
 
-The rest of this guide covers supported containers, detection, conversion, and
-measured round-trip fidelity. For coordinates, block placement, automatic
-region growth, and block-state strings, start with [Basics](basics.md).
+The detector recognizes Litematica, Sponge, Bedrock structures, Nucleation
+snapshots, legacy MCEdit schematics, MCA region files, and zipped worlds. If no
+format matches, loading fails instead of constructing a partial schematic.
 
-## Supported formats
+## Byte pipelines
 
-| Format | Extension | Read | Write | Notes |
-| --- | --- | :---: | :---: | --- |
-| **Litematica** | `.litematic` | ✅ | ✅ | Multi-region native; the reference format |
-| **Sponge Schematic** | `.schem` | ✅ | ✅ | The WorldEdit / community standard (v2–v3) |
-| **Bedrock structure** | `.mcstructure` | ✅ | ✅ | Java ↔ Bedrock translated on the way through |
-| **Snapshot** | `.nusn` | ✅ | ✅ | Nucleation's own uncompressed format |
-| **Anvil world** | dir · `.zip` · `.mca` | ✅ | ✅ | Real world folders and region files |
-| **Legacy MCEdit** | `.schematic` | ✅ | — | The pre-Flattening format; import only |
-
-Worlds are covered in [Chunk iteration, streaming, and worlds](streaming-and-worlds.md);
-the rest are single-schematic containers.
-
-## Detection is by content, not extension
-
-`load_from_file` and the byte-level readers sniff the **magic bytes**, so a
-`.schem` that is really a litematic still loads, and the extension only decides
-the *writer* on save. (The Anvil readers are tried last, since their headers are
-the least distinctive.)
+Generated bindings accept raw bytes on input. Serialized output crosses the
+shared binding boundary as base64, so decode it before writing or sending binary
+data:
 
 ```python
-Schematic.from_data(open("mystery.bin", "rb").read())   # format figured out from the bytes
+from base64 import b64decode
+from pathlib import Path
+from nucleation import Schematic
+
+build = Schematic.from_data(Path("in.litematic").read_bytes())
+build.set_block(1, 3, 1, "minecraft:glowstone")
+
+encoded = build.save_as_b64("schematic", "v3", "")
+Path("out.schem").write_bytes(b64decode(encoded))
 ```
 
-## Round-trip fidelity — measured, not claimed
+The three arguments to `save_as_b64` are the exporter key, optional version,
+and optional JSON settings. Pass an empty string for a format's default version
+or settings. JavaScript/WASM has no filesystem methods, so this byte/base64 path
+is its normal I/O workflow; generated bindings apply their usual language casing.
 
-`examples/readme/formats-and-io/round-trip.rs` builds one schematic (blocks, block-state
-properties, and a chest carrying NBT), writes it to every writable format, reads
-each back, and compares a **content-exact fingerprint** to the original. An
-identical hash is proof the round-trip lost nothing:
+Convenience exporters such as `to_litematic_b64`, `to_schematic_b64`,
+`to_mcstructure_b64`, `to_snapshot_b64`, and `to_world_zip_b64` are also
+available when the target format is fixed.
 
-| Format | Bytes | Fingerprint | Meaning |
+## Explicit output format and version
+
+`save_to_file` selects an exporter from the filename. Use
+`save_to_file_with_format` when the filename is intentionally opaque or when a
+specific Sponge version is required:
+
+```python
+build.save_to_file_with_format(
+    "artifact.bin",
+    "schematic",
+    "v2",
+)
+```
+
+The supported named exporter keys are `litematic`, `schematic`, `mcstructure`,
+`snapshot`, and `world`. An unsupported key, version, or extension returns a
+`NucleationError`; it never writes Litematic as an implicit fallback.
+
+## Round-trip fidelity, measured
+
+[`examples/readme/formats-and-io/round-trip.rs`](../../examples/readme/formats-and-io/round-trip.rs)
+builds one 19-block fixture containing block-state properties and chest NBT. It
+writes every schematic container with an exporter, auto-detects each result,
+loads it, and compares a content-exact fingerprint with the original.
+
+The current checkout produced:
+
+| Format | Bytes | Content fingerprint | Result |
 | --- | ---: | --- | --- |
-| litematic | 485 | ✅ identical | bit-exact, NBT and all |
-| snapshot | 70 202 | ✅ identical | bit-exact (uncompressed, hence large) |
-| sponge `.schem` | 328 | ≈ equal | every block, state, and tile-entity value preserved; the reader adds an empty `components` tag (a 1.20.5+ data-component placeholder), which a content-exact hash notices but which loses nothing |
-| mcstructure | 945 | ✕ translated | Bedrock is a *different game edition* — block ids and states are remapped through GeyserMC mappings, so this is a translation, not a round-trip |
+| Litematica | 483 | `5654c8b94f558113be01dc6a31c0dc8d` | identical |
+| Sponge `.schem` | 328 | `ab2071dca4aa393fe44697bf160ad00b` | equivalent content; reader adds an empty `components` compound |
+| Snapshot `.nusn` | 70,202 | `5654c8b94f558113be01dc6a31c0dc8d` | identical |
+| Bedrock `.mcstructure` | 945 | `b881f6eb62f4bd96b8185bcd7b9fad0f` | translated to Bedrock IDs and states |
 
-The download beside every illustration comes from this same script:
-[`round-trip.schem`](../../examples/readme/formats-and-io/round-trip.rs) and `.litematic` are
-written next to the fingerprint table.
+Download the exact generated outputs:
 
-**Where data changes on purpose:** only the two cross-boundary cases.
-`.mcstructure` translates to Bedrock (see
-[Versions and translation](versions-and-translation.md)); legacy MCEdit
-`.schematic` is import-only because the pre-Flattening numeric-id format cannot
-represent modern block states. Everything else preserves content.
+- [`round-trip.litematic`](../downloads/readme/formats-and-io/round-trip.litematic)
+- [`round-trip.schem`](../downloads/readme/formats-and-io/round-trip.schem)
+- [`round-trip.nusn`](../downloads/readme/formats-and-io/round-trip.nusn)
+- [`round-trip.mcstructure`](../downloads/readme/formats-and-io/round-trip.mcstructure)
 
-## The same loop, three languages
+“Identical” here means the canonical schematic content fingerprint matches, not
+that compressed container bytes are byte-for-byte identical. Sponge preserves
+the fixture's blocks, states, and chest data; its reader adds an empty Minecraft
+1.20.5+ `components` placeholder, which is harmless but visible to an exact NBT
+fingerprint. Bedrock is a translation boundary rather than a same-edition
+round trip. See [Versions and translation](versions-and-translation.md).
 
-Rust — the native API, `Result`-returning:
+Legacy MCEdit is intentionally import-only: its numeric-ID model cannot express
+modern block states without loss.
 
-```rust
-use nucleation::formats::{litematic, schematic as sponge};
+## Next
 
-let mut s = litematic::from_litematic(&std::fs::read("in.litematic")?)?;
-s.set_block_from_string(1, 3, 1, "minecraft:glowstone")?;
-std::fs::write("out.schem", sponge::to_schematic(&s)?)?;
-// Auto-detect by content: nucleation::formats::manager::get_manager()
-//     .lock().unwrap().read(&bytes)?
-```
-
-Python — filesystem helpers, format from the extension:
-
-```python
-s = Schematic.load_from_file("in.litematic")
-s.set_block(1, 3, 1, "minecraft:glowstone")
-s.save_to_file("out.schem")
-```
-
-JavaScript — the WASM build has no filesystem, so it is bytes in, bytes out
-(binary payloads cross as base64):
-
-```js
-import { Schematic } from "nucleation";
-import { readFileSync, writeFileSync } from "node:fs";
-
-const s = Schematic.fromData(readFileSync("in.litematic"));
-s.setBlock(1, 3, 1, "minecraft:glowstone");
-writeFileSync("out.schem", Buffer.from(s.toSchematicB64(), "base64"));
-```
-
-Every Python snippet in these docs has a fully runnable version with captured
-output under [`docs/readme-snippets/`](../readme-snippets/).
+- [Basics](basics.md) for editing the loaded schematic
+- [Versions and translation](versions-and-translation.md) for Java/Bedrock and data-version changes
+- [Chunk iteration, streaming, and worlds](streaming-and-worlds.md) for large-world I/O
+- [Pluggable storage](storage.md) for memory, filesystem, S3, Redis, and Postgres URIs

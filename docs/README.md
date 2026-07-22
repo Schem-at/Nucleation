@@ -67,9 +67,9 @@ from [`tools/readme-media/generate.py`](../tools/readme-media/generate.py).
 
 ## Formats
 
-`.litematic` · Sponge `.schem` · WorldEdit `.schematic` · Bedrock
-`.mcstructure` · structure `.nbt` · `.nusn` (fast binary snapshot) — with
-auto-detection — plus world folders (Anvil region files) in both directions.
+`.litematic` · Sponge `.schem` · legacy MCEdit `.schematic` (import only) ·
+Bedrock `.mcstructure` · `.nusn` (fast binary snapshot) — with content-based
+auto-detection — plus Anvil region files, zipped worlds, and world directories.
 
 ## License
 

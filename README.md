@@ -89,9 +89,9 @@ cargo test                          # core suite
 ./examples/bridge_smoke/js/run.sh   # end-to-end smoke per language
 ```
 
-CI regenerates bindings and fails on drift, exercises every built wheel and the
-assembled JAR before release, and smoke-tests all seven language bindings on
-every push.
+The release/manual CI matrix regenerates bindings and fails on drift, exercises
+every built wheel and the assembled JAR, and smoke-tests all seven language
+bindings.
 
 ## License
 
