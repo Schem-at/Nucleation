@@ -21,6 +21,8 @@
 
 Schematic* Schematic_create(DiplomatStringView name);
 
+Schematic* Schematic_deep_clone(const Schematic* self);
+
 Dimensions Schematic_dimensions(const Schematic* self);
 
 typedef struct Schematic_set_block_result {union {bool ok; NucleationError err;}; bool is_ok;} Schematic_set_block_result;
@@ -107,6 +109,12 @@ Schematic_set_blocks_result Schematic_set_blocks(Schematic* self, DiplomatI32Vie
 typedef struct Schematic_get_blocks_json_result {union { NucleationError err;}; bool is_ok;} Schematic_get_blocks_json_result;
 Schematic_get_blocks_json_result Schematic_get_blocks_json(const Schematic* self, DiplomatI32View positions, DiplomatWrite* write);
 
+typedef struct Schematic_stamp_box_result {union { NucleationError err;}; bool is_ok;} Schematic_stamp_box_result;
+Schematic_stamp_box_result Schematic_stamp_box(Schematic* self, const Schematic* source, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z, int32_t target_x, int32_t target_y, int32_t target_z, DiplomatStringView excluded_blocks_json);
+
+typedef struct Schematic_stamp_region_result {union { NucleationError err;}; bool is_ok;} Schematic_stamp_region_result;
+Schematic_stamp_region_result Schematic_stamp_region(Schematic* self, const Schematic* source, DiplomatStringView source_region_name, int32_t target_x, int32_t target_y, int32_t target_z, DiplomatStringView excluded_blocks_json);
+
 typedef struct Schematic_copy_region_result {union { NucleationError err;}; bool is_ok;} Schematic_copy_region_result;
 Schematic_copy_region_result Schematic_copy_region(Schematic* self, const Schematic* source, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z, int32_t target_x, int32_t target_y, int32_t target_z, DiplomatStringView excluded_blocks_json);
 
@@ -116,11 +124,20 @@ Schematic_get_block_result Schematic_get_block(const Schematic* self, int32_t x,
 typedef struct Schematic_get_block_with_properties_result {union {BlockState* ok; NucleationError err;}; bool is_ok;} Schematic_get_block_with_properties_result;
 Schematic_get_block_with_properties_result Schematic_get_block_with_properties(const Schematic* self, int32_t x, int32_t y, int32_t z);
 
+typedef struct Schematic_get_block_in_region_result {union {BlockState* ok; NucleationError err;}; bool is_ok;} Schematic_get_block_in_region_result;
+Schematic_get_block_in_region_result Schematic_get_block_in_region(const Schematic* self, DiplomatStringView region_name, int32_t x, int32_t y, int32_t z);
+
+typedef struct Schematic_get_block_string_in_region_result {union { NucleationError err;}; bool is_ok;} Schematic_get_block_string_in_region_result;
+Schematic_get_block_string_in_region_result Schematic_get_block_string_in_region(const Schematic* self, DiplomatStringView region_name, int32_t x, int32_t y, int32_t z, DiplomatWrite* write);
+
 typedef struct Schematic_get_block_string_result {union { NucleationError err;}; bool is_ok;} Schematic_get_block_string_result;
 Schematic_get_block_string_result Schematic_get_block_string(const Schematic* self, int32_t x, int32_t y, int32_t z, DiplomatWrite* write);
 
 typedef struct Schematic_get_block_entity_json_result {union { NucleationError err;}; bool is_ok;} Schematic_get_block_entity_json_result;
 Schematic_get_block_entity_json_result Schematic_get_block_entity_json(const Schematic* self, int32_t x, int32_t y, int32_t z, DiplomatWrite* write);
+
+typedef struct Schematic_get_block_entity_json_in_region_result {union { NucleationError err;}; bool is_ok;} Schematic_get_block_entity_json_in_region_result;
+Schematic_get_block_entity_json_in_region_result Schematic_get_block_entity_json_in_region(const Schematic* self, DiplomatStringView region_name, int32_t x, int32_t y, int32_t z, DiplomatWrite* write);
 
 void Schematic_get_all_block_entities_json(const Schematic* self, DiplomatWrite* write);
 
@@ -234,11 +251,17 @@ void Schematic_flip_y(Schematic* self);
 
 void Schematic_flip_z(Schematic* self);
 
-void Schematic_rotate_x(Schematic* self, int32_t degrees);
+typedef struct Schematic_rotate_x_result {union { NucleationError err;}; bool is_ok;} Schematic_rotate_x_result;
+Schematic_rotate_x_result Schematic_rotate_x(Schematic* self, int32_t degrees);
 
-void Schematic_rotate_y(Schematic* self, int32_t degrees);
+typedef struct Schematic_rotate_y_result {union { NucleationError err;}; bool is_ok;} Schematic_rotate_y_result;
+Schematic_rotate_y_result Schematic_rotate_y(Schematic* self, int32_t degrees);
 
-void Schematic_rotate_z(Schematic* self, int32_t degrees);
+typedef struct Schematic_rotate_z_result {union { NucleationError err;}; bool is_ok;} Schematic_rotate_z_result;
+Schematic_rotate_z_result Schematic_rotate_z(Schematic* self, int32_t degrees);
+
+typedef struct Schematic_translate_result {union { NucleationError err;}; bool is_ok;} Schematic_translate_result;
+Schematic_translate_result Schematic_translate(Schematic* self, int32_t dx, int32_t dy, int32_t dz);
 
 typedef struct Schematic_flip_region_x_result {union { NucleationError err;}; bool is_ok;} Schematic_flip_region_x_result;
 Schematic_flip_region_x_result Schematic_flip_region_x(Schematic* self, DiplomatStringView region_name);
@@ -257,6 +280,30 @@ Schematic_rotate_region_y_result Schematic_rotate_region_y(Schematic* self, Dipl
 
 typedef struct Schematic_rotate_region_z_result {union { NucleationError err;}; bool is_ok;} Schematic_rotate_region_z_result;
 Schematic_rotate_region_z_result Schematic_rotate_region_z(Schematic* self, DiplomatStringView region_name, int32_t degrees);
+
+typedef struct Schematic_translate_region_result {union { NucleationError err;}; bool is_ok;} Schematic_translate_region_result;
+Schematic_translate_region_result Schematic_translate_region(Schematic* self, DiplomatStringView region_name, int32_t dx, int32_t dy, int32_t dz);
+
+typedef struct Schematic_rotate_schematic_x_result {union { NucleationError err;}; bool is_ok;} Schematic_rotate_schematic_x_result;
+Schematic_rotate_schematic_x_result Schematic_rotate_schematic_x(Schematic* self, int32_t degrees);
+
+typedef struct Schematic_rotate_schematic_y_result {union { NucleationError err;}; bool is_ok;} Schematic_rotate_schematic_y_result;
+Schematic_rotate_schematic_y_result Schematic_rotate_schematic_y(Schematic* self, int32_t degrees);
+
+typedef struct Schematic_rotate_schematic_z_result {union { NucleationError err;}; bool is_ok;} Schematic_rotate_schematic_z_result;
+Schematic_rotate_schematic_z_result Schematic_rotate_schematic_z(Schematic* self, int32_t degrees);
+
+typedef struct Schematic_flip_schematic_x_result {union { NucleationError err;}; bool is_ok;} Schematic_flip_schematic_x_result;
+Schematic_flip_schematic_x_result Schematic_flip_schematic_x(Schematic* self);
+
+typedef struct Schematic_flip_schematic_y_result {union { NucleationError err;}; bool is_ok;} Schematic_flip_schematic_y_result;
+Schematic_flip_schematic_y_result Schematic_flip_schematic_y(Schematic* self);
+
+typedef struct Schematic_flip_schematic_z_result {union { NucleationError err;}; bool is_ok;} Schematic_flip_schematic_z_result;
+Schematic_flip_schematic_z_result Schematic_flip_schematic_z(Schematic* self);
+
+typedef struct Schematic_translate_schematic_result {union { NucleationError err;}; bool is_ok;} Schematic_translate_schematic_result;
+Schematic_translate_schematic_result Schematic_translate_schematic(Schematic* self, int32_t dx, int32_t dy, int32_t dz);
 
 typedef struct Schematic_fill_cuboid_result {union { NucleationError err;}; bool is_ok;} Schematic_fill_cuboid_result;
 Schematic_fill_cuboid_result Schematic_fill_cuboid(Schematic* self, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z, DiplomatStringView block_name);
@@ -281,6 +328,18 @@ Schematic_set_block_with_nbt_result Schematic_set_block_with_nbt(Schematic* self
 
 typedef struct Schematic_set_block_in_region_result {union { NucleationError err;}; bool is_ok;} Schematic_set_block_in_region_result;
 Schematic_set_block_in_region_result Schematic_set_block_in_region(Schematic* self, DiplomatStringView region_name, int32_t x, int32_t y, int32_t z, DiplomatStringView block_name);
+
+typedef struct Schematic_has_region_result {union {bool ok; NucleationError err;}; bool is_ok;} Schematic_has_region_result;
+Schematic_has_region_result Schematic_has_region(const Schematic* self, DiplomatStringView region_name);
+
+typedef struct Schematic_create_region_result {union { NucleationError err;}; bool is_ok;} Schematic_create_region_result;
+Schematic_create_region_result Schematic_create_region(Schematic* self, DiplomatStringView region_name);
+
+typedef struct Schematic_remove_region_result {union { NucleationError err;}; bool is_ok;} Schematic_remove_region_result;
+Schematic_remove_region_result Schematic_remove_region(Schematic* self, DiplomatStringView region_name);
+
+typedef struct Schematic_rename_region_result {union { NucleationError err;}; bool is_ok;} Schematic_rename_region_result;
+Schematic_rename_region_result Schematic_rename_region(Schematic* self, DiplomatStringView old_name, DiplomatStringView new_name);
 
 void Schematic_bounding_box_json(const Schematic* self, DiplomatWrite* write);
 

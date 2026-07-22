@@ -90,38 +90,49 @@ impl BoundingBox {
     }
 
     pub fn from_position_and_size(position: (i32, i32, i32), size: (i32, i32, i32)) -> Self {
-        let position2 = (
-            position.0 + size.0,
-            position.1 + size.1,
-            position.2 + size.2,
-        );
+        fn endpoint(position: i32, size: i32) -> i32 {
+            let inclusive_delta = size - size.signum();
+            position
+                .checked_add(inclusive_delta)
+                .expect("bounding box position and size exceed i32 coordinates")
+        }
 
-        let offset_min = (
-            -size.0.signum().min(0),
-            -size.1.signum().min(0),
-            -size.2.signum().min(0),
+        let end = (
+            endpoint(position.0, size.0),
+            endpoint(position.1, size.1),
+            endpoint(position.2, size.2),
         );
-        let offset_max = (
-            -size.0.signum().max(0),
-            -size.1.signum().max(0),
-            -size.2.signum().max(0),
-        );
-
         BoundingBox::new(
             (
-                position.0.min(position2.0) + offset_min.0,
-                position.1.min(position2.1) + offset_min.1,
-                position.2.min(position2.2) + offset_min.2,
+                position.0.min(end.0),
+                position.1.min(end.1),
+                position.2.min(end.2),
             ),
             (
-                position.0.max(position2.0) + offset_max.0,
-                position.1.max(position2.1) + offset_max.1,
-                position.2.max(position2.2) + offset_max.2,
+                position.0.max(end.0),
+                position.1.max(end.1),
+                position.2.max(end.2),
             ),
         )
     }
     pub fn volume(&self) -> u64 {
         let (width, height, length) = self.get_dimensions();
         width as u64 * height as u64 * length as u64
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BoundingBox;
+
+    #[test]
+    fn one_cell_boxes_are_valid_at_signed_endpoints() {
+        let min = BoundingBox::from_position_and_size((i32::MIN, 0, 0), (1, 1, 1));
+        assert_eq!(min.min, (i32::MIN, 0, 0));
+        assert_eq!(min.max, (i32::MIN, 0, 0));
+
+        let max = BoundingBox::from_position_and_size((i32::MAX, 0, 0), (1, 1, 1));
+        assert_eq!(max.min, (i32::MAX, 0, 0));
+        assert_eq!(max.max, (i32::MAX, 0, 0));
     }
 }

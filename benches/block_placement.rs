@@ -140,7 +140,7 @@ fn bench_transform_with_block_entities(c: &mut Criterion) {
         b.iter_batched(
             || s.clone(),
             |mut schem| {
-                schem.rotate_y(90);
+                schem.rotate_y(90).expect("90 is a valid quarter-turn");
                 black_box(schem);
             },
             criterion::BatchSize::SmallInput,

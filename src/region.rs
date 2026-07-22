@@ -163,7 +163,14 @@ impl Region {
     }
 
     pub fn get_block_entities_as_list(&self) -> Vec<BlockEntity> {
-        self.block_entities.values().cloned().collect()
+        self.block_entities
+            .iter()
+            .map(|(position, template)| {
+                let mut entity = template.clone();
+                entity.position = position;
+                entity
+            })
+            .collect()
     }
 
     pub fn set_block(&mut self, x: i32, y: i32, z: i32, block: &BlockState) -> bool {
@@ -1282,6 +1289,60 @@ impl Region {
         }
     }
 
+    /// Move this region and all attached content by an integer offset.
+    pub fn translate(&mut self, dx: i32, dy: i32, dz: i32) -> Result<(), String> {
+        let shifted = |value: i32, delta: i32| {
+            value
+                .checked_add(delta)
+                .ok_or_else(|| "Region translation exceeds the i32 coordinate range".to_string())
+        };
+
+        let new_position = (
+            shifted(self.position.0, dx)?,
+            shifted(self.position.1, dy)?,
+            shifted(self.position.2, dz)?,
+        );
+        shifted(self.bbox.max.0, dx)?;
+        shifted(self.bbox.max.1, dy)?;
+        shifted(self.bbox.max.2, dz)?;
+        for &(x, y, z) in self.block_entities.keys() {
+            shifted(x, dx)?;
+            shifted(y, dy)?;
+            shifted(z, dz)?;
+        }
+
+        let new_tight_bounds = self
+            .tight_bounds
+            .as_ref()
+            .map(|bounds| {
+                Ok::<BoundingBox, String>(BoundingBox::new(
+                    (
+                        shifted(bounds.min.0, dx)?,
+                        shifted(bounds.min.1, dy)?,
+                        shifted(bounds.min.2, dz)?,
+                    ),
+                    (
+                        shifted(bounds.max.0, dx)?,
+                        shifted(bounds.max.1, dy)?,
+                        shifted(bounds.max.2, dz)?,
+                    ),
+                ))
+            })
+            .transpose()?;
+
+        self.position = new_position;
+        self.tight_bounds = new_tight_bounds;
+        self.block_entities
+            .remap_positions(|(x, y, z)| (x + dx, y + dy, z + dz));
+        for entity in &mut self.entities {
+            entity.position.0 += dx as f64;
+            entity.position.1 += dy as f64;
+            entity.position.2 += dz as f64;
+        }
+        self.rebuild_bbox();
+        Ok(())
+    }
+
     /// Rotate the region around the Y axis (horizontal plane)
     /// Degrees must be 90, 180, or 270
     pub fn rotate_y(&mut self, degrees: i32) {
@@ -1322,8 +1383,8 @@ impl Region {
             let rel_x = x - old_bbox.min.0;
             let rel_z = z - old_bbox.min.2;
 
-            let new_rel_x = rel_z;
-            let new_rel_z = old_size_x - 1 - rel_x;
+            let new_rel_x = old_size_z - 1 - rel_z;
+            let new_rel_z = rel_x;
 
             let new_x = new_bbox.min.0 + new_rel_x;
             let new_z = new_bbox.min.2 + new_rel_z;
@@ -1353,12 +1414,12 @@ impl Region {
         let old_min_z = old_bbox.min.2;
         let new_min_x = new_bbox_clone.min.0;
         let new_min_z = new_bbox_clone.min.2;
-        let osize_x = old_size_x;
+        let osize_z = old_size_z;
         self.block_entities.remap_positions(move |(x, y, z)| {
             let rel_x = x - old_min_x;
             let rel_z = z - old_min_z;
-            let new_rel_x = rel_z;
-            let new_rel_z = osize_x - 1 - rel_x;
+            let new_rel_x = osize_z - 1 - rel_z;
+            let new_rel_z = rel_x;
             (new_min_x + new_rel_x, y, new_min_z + new_rel_z)
         });
 
@@ -1366,8 +1427,8 @@ impl Region {
         for entity in &mut self.entities {
             let rel_x = entity.position.0 - old_bbox.min.0 as f64;
             let rel_z = entity.position.2 - old_bbox.min.2 as f64;
-            let new_rel_x = rel_z;
-            let new_rel_z = old_size_x as f64 - 1.0 - rel_x;
+            let new_rel_x = old_size_z as f64 - 1.0 - rel_z;
+            let new_rel_z = rel_x;
             entity.position.0 = new_bbox_clone.min.0 as f64 + new_rel_x;
             entity.position.2 = new_bbox_clone.min.2 as f64 + new_rel_z;
         }
@@ -1408,8 +1469,8 @@ impl Region {
             let rel_y = y - old_bbox.min.1;
             let rel_z = z - old_bbox.min.2;
 
-            let new_rel_y = rel_z;
-            let new_rel_z = old_size_y - 1 - rel_y;
+            let new_rel_y = old_size_z - 1 - rel_z;
+            let new_rel_z = rel_y;
 
             let new_y = new_bbox.min.1 + new_rel_y;
             let new_z = new_bbox.min.2 + new_rel_z;
@@ -1438,20 +1499,20 @@ impl Region {
         let old_min_z = old_bbox.min.2;
         let new_min_y = new_bbox_clone.min.1;
         let new_min_z = new_bbox_clone.min.2;
-        let osize_y = old_size_y;
+        let osize_z = old_size_z;
         self.block_entities.remap_positions(move |(x, y, z)| {
             let rel_y = y - old_min_y;
             let rel_z = z - old_min_z;
-            let new_rel_y = rel_z;
-            let new_rel_z = osize_y - 1 - rel_y;
+            let new_rel_y = osize_z - 1 - rel_z;
+            let new_rel_z = rel_y;
             (x, new_min_y + new_rel_y, new_min_z + new_rel_z)
         });
 
         for entity in &mut self.entities {
             let rel_y = entity.position.1 - old_bbox.min.1 as f64;
             let rel_z = entity.position.2 - old_bbox.min.2 as f64;
-            let new_rel_y = rel_z;
-            let new_rel_z = old_size_y as f64 - 1.0 - rel_y;
+            let new_rel_y = old_size_z as f64 - 1.0 - rel_z;
+            let new_rel_z = rel_y;
             entity.position.1 = new_bbox_clone.min.1 as f64 + new_rel_y;
             entity.position.2 = new_bbox_clone.min.2 as f64 + new_rel_z;
         }
@@ -1492,8 +1553,8 @@ impl Region {
             let rel_x = x - old_bbox.min.0;
             let rel_y = y - old_bbox.min.1;
 
-            let new_rel_x = rel_y;
-            let new_rel_y = old_size_x - 1 - rel_x;
+            let new_rel_x = old_size_y - 1 - rel_y;
+            let new_rel_y = rel_x;
 
             let new_x = new_bbox.min.0 + new_rel_x;
             let new_y = new_bbox.min.1 + new_rel_y;
@@ -1522,20 +1583,20 @@ impl Region {
         let old_min_y = old_bbox.min.1;
         let new_min_x = new_bbox_clone.min.0;
         let new_min_y = new_bbox_clone.min.1;
-        let osize_x = old_size_x;
+        let osize_y = old_size_y;
         self.block_entities.remap_positions(move |(x, y, z)| {
             let rel_x = x - old_min_x;
             let rel_y = y - old_min_y;
-            let new_rel_x = rel_y;
-            let new_rel_y = osize_x - 1 - rel_x;
+            let new_rel_x = osize_y - 1 - rel_y;
+            let new_rel_y = rel_x;
             (new_min_x + new_rel_x, new_min_y + new_rel_y, z)
         });
 
         for entity in &mut self.entities {
             let rel_x = entity.position.0 - old_bbox.min.0 as f64;
             let rel_y = entity.position.1 - old_bbox.min.1 as f64;
-            let new_rel_x = rel_y;
-            let new_rel_y = old_size_x as f64 - 1.0 - rel_x;
+            let new_rel_x = old_size_y as f64 - 1.0 - rel_y;
+            let new_rel_y = rel_x;
             entity.position.0 = new_bbox_clone.min.0 as f64 + new_rel_x;
             entity.position.1 = new_bbox_clone.min.1 as f64 + new_rel_y;
         }

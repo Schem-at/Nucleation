@@ -29,6 +29,11 @@ final class Schematic {
         return new Schematic($ret, true);
     }
 
+    public function deepClone() {
+        $ret = Lib::ffi()->Schematic_deep_clone($this->ptr);
+        return new Schematic($ret, true);
+    }
+
     public function dimensions() {
         $ret = Lib::ffi()->Schematic_dimensions($this->ptr);
         return Dimensions::fromFFI($ret);
@@ -511,6 +516,50 @@ final class Schematic {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function stampBox( $source,  $min_x,  $min_y,  $min_z,  $max_x,  $max_y,  $max_z,  $target_x,  $target_y,  $target_z, string $excluded_blocks_json) {
+        $__n10 = strlen($excluded_blocks_json);
+        $__view10 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n10 > 0) {
+            $__buf10 = Lib::ffi()->new("uint8_t[" . $__n10 . "]", false);
+            \FFI::memcpy($__buf10, $excluded_blocks_json, $__n10);
+            $__view10->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf10[0]));
+        } else {
+            $__view10->data = null;
+        }
+        $__view10->len = $__n10;
+        $result = Lib::ffi()->Schematic_stamp_box($this->ptr, $source->ptr, $min_x, $min_y, $min_z, $max_x, $max_y, $max_z, $target_x, $target_y, $target_z, $__view10);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function stampRegion( $source, string $source_region_name,  $target_x,  $target_y,  $target_z, string $excluded_blocks_json) {
+        $__n1 = strlen($source_region_name);
+        $__view1 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n1 > 0) {
+            $__buf1 = Lib::ffi()->new("uint8_t[" . $__n1 . "]", false);
+            \FFI::memcpy($__buf1, $source_region_name, $__n1);
+            $__view1->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf1[0]));
+        } else {
+            $__view1->data = null;
+        }
+        $__view1->len = $__n1;
+        $__n5 = strlen($excluded_blocks_json);
+        $__view5 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n5 > 0) {
+            $__buf5 = Lib::ffi()->new("uint8_t[" . $__n5 . "]", false);
+            \FFI::memcpy($__buf5, $excluded_blocks_json, $__n5);
+            $__view5->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf5[0]));
+        } else {
+            $__view5->data = null;
+        }
+        $__view5->len = $__n5;
+        $result = Lib::ffi()->Schematic_stamp_region($this->ptr, $source->ptr, $__view1, $target_x, $target_y, $target_z, $__view5);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
     public function copyRegion( $source,  $min_x,  $min_y,  $min_z,  $max_x,  $max_y,  $max_z,  $target_x,  $target_y,  $target_z, string $excluded_blocks_json) {
         $__n10 = strlen($excluded_blocks_json);
         $__view10 = Lib::ffi()->new('DiplomatStringView');
@@ -544,6 +593,43 @@ final class Schematic {
         return new BlockState($result->ok, true);
     }
 
+    public function getBlockInRegion(string $region_name,  $x,  $y,  $z) {
+        $__n0 = strlen($region_name);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $region_name, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->Schematic_get_block_in_region($this->ptr, $__view0, $x, $y, $z);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new BlockState($result->ok, true);
+    }
+
+    public function getBlockStringInRegion(string $region_name,  $x,  $y,  $z) {
+        $__n0 = strlen($region_name);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $region_name, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Schematic_get_block_string_in_region($this->ptr, $__view0, $x, $y, $z, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function getBlockString( $x,  $y,  $z) {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         $result = Lib::ffi()->Schematic_get_block_string($this->ptr, $x, $y, $z, $write);
@@ -556,6 +642,25 @@ final class Schematic {
     public function getBlockEntityJson( $x,  $y,  $z) {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         $result = Lib::ffi()->Schematic_get_block_entity_json($this->ptr, $x, $y, $z, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function getBlockEntityJsonInRegion(string $region_name,  $x,  $y,  $z) {
+        $__n0 = strlen($region_name);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $region_name, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Schematic_get_block_entity_json_in_region($this->ptr, $__view0, $x, $y, $z, $write);
         if (!$result->is_ok) {
             throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
         }
@@ -953,15 +1058,31 @@ final class Schematic {
     }
 
     public function rotateX( $degrees) {
-        Lib::ffi()->Schematic_rotate_x($this->ptr, $degrees);
+        $result = Lib::ffi()->Schematic_rotate_x($this->ptr, $degrees);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
     }
 
     public function rotateY( $degrees) {
-        Lib::ffi()->Schematic_rotate_y($this->ptr, $degrees);
+        $result = Lib::ffi()->Schematic_rotate_y($this->ptr, $degrees);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
     }
 
     public function rotateZ( $degrees) {
-        Lib::ffi()->Schematic_rotate_z($this->ptr, $degrees);
+        $result = Lib::ffi()->Schematic_rotate_z($this->ptr, $degrees);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function translate( $dx,  $dy,  $dz) {
+        $result = Lib::ffi()->Schematic_translate($this->ptr, $dx, $dy, $dz);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
     }
 
     public function flipRegionX(string $region_name) {
@@ -1061,6 +1182,72 @@ final class Schematic {
         }
         $__view0->len = $__n0;
         $result = Lib::ffi()->Schematic_rotate_region_z($this->ptr, $__view0, $degrees);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function translateRegion(string $region_name,  $dx,  $dy,  $dz) {
+        $__n0 = strlen($region_name);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $region_name, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->Schematic_translate_region($this->ptr, $__view0, $dx, $dy, $dz);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function rotateSchematicX( $degrees) {
+        $result = Lib::ffi()->Schematic_rotate_schematic_x($this->ptr, $degrees);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function rotateSchematicY( $degrees) {
+        $result = Lib::ffi()->Schematic_rotate_schematic_y($this->ptr, $degrees);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function rotateSchematicZ( $degrees) {
+        $result = Lib::ffi()->Schematic_rotate_schematic_z($this->ptr, $degrees);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function flipSchematicX() {
+        $result = Lib::ffi()->Schematic_flip_schematic_x($this->ptr);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function flipSchematicY() {
+        $result = Lib::ffi()->Schematic_flip_schematic_y($this->ptr);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function flipSchematicZ() {
+        $result = Lib::ffi()->Schematic_flip_schematic_z($this->ptr);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function translateSchematic( $dx,  $dy,  $dz) {
+        $result = Lib::ffi()->Schematic_translate_schematic($this->ptr, $dx, $dy, $dz);
         if (!$result->is_ok) {
             throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
         }
@@ -1253,6 +1440,85 @@ final class Schematic {
         }
         $__view4->len = $__n4;
         $result = Lib::ffi()->Schematic_set_block_in_region($this->ptr, $__view0, $x, $y, $z, $__view4);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function hasRegion(string $region_name) {
+        $__n0 = strlen($region_name);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $region_name, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->Schematic_has_region($this->ptr, $__view0);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return $result->ok;
+    }
+
+    public function createRegion(string $region_name) {
+        $__n0 = strlen($region_name);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $region_name, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->Schematic_create_region($this->ptr, $__view0);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function removeRegion(string $region_name) {
+        $__n0 = strlen($region_name);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $region_name, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->Schematic_remove_region($this->ptr, $__view0);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function renameRegion(string $old_name, string $new_name) {
+        $__n0 = strlen($old_name);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $old_name, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $__n1 = strlen($new_name);
+        $__view1 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n1 > 0) {
+            $__buf1 = Lib::ffi()->new("uint8_t[" . $__n1 . "]", false);
+            \FFI::memcpy($__buf1, $new_name, $__n1);
+            $__view1->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf1[0]));
+        } else {
+            $__view1->data = null;
+        }
+        $__view1->len = $__n1;
+        $result = Lib::ffi()->Schematic_rename_region($this->ptr, $__view0, $__view1);
         if (!$result->is_ok) {
             throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
         }

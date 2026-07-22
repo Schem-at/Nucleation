@@ -18,6 +18,21 @@ fn b64(bytes: &[u8]) -> String {
     base64::engine::general_purpose::STANDARD.encode(bytes)
 }
 
+fn parse_excluded_blocks(json: &str) -> Result<Vec<crate::BlockState>, NucleationError> {
+    if json.is_empty() {
+        return Ok(Vec::new());
+    }
+    let strings: Vec<String> = serde_json::from_str(json).map_err(|_| NucleationError::Parse)?;
+    strings
+        .iter()
+        .map(|block| {
+            crate::UniversalSchematic::parse_block_string(block)
+                .map(|(state, _)| state)
+                .map_err(|_| NucleationError::Parse)
+        })
+        .collect()
+}
+
 /// Parse optional world-export options JSON (empty string ⇒ defaults).
 fn parse_world_options(
     json: &str,
@@ -47,7 +62,7 @@ fn block_json(
 #[diplomat::bridge]
 pub mod ffi {
     use super::super::shared::ffi::{BlockPos, Dimensions, NucleationError};
-    use super::{b64, block_json, parse_world_options, utf8};
+    use super::{b64, block_json, parse_excluded_blocks, parse_world_options, utf8};
     use crate::formats::{litematic, manager::get_manager, mcstructure};
     use crate::universal_schematic::ChunkLoadingStrategy;
     use diplomat_runtime::DiplomatWrite;
@@ -63,6 +78,12 @@ pub mod ffi {
             Box::new(Schematic(crate::UniversalSchematic::new(
                 String::from_utf8_lossy(name).into_owned(),
             )))
+        }
+
+        /// Return an independent deep copy. Subsequent block, region, entity,
+        /// metadata, or transform changes do not affect the original.
+        pub fn deep_clone(&self) -> Box<Schematic> {
+            Box::new(Schematic(self.0.clone()))
         }
 
         /// The allocated dimensions (width, height, length) of the schematic's
@@ -499,8 +520,63 @@ pub mod ffi {
             Ok(())
         }
 
-        /// Copy a region from `source` into this schematic. `excluded_blocks_json`
-        /// is a JSON array of block strings to skip (empty string or `[]` for none).
+        /// Stamp a merged source box into the default region. Excluded blocks
+        /// are skipped, preserving destination content. Empty string or `[]`
+        /// means no exclusions.
+        #[allow(clippy::too_many_arguments)]
+        pub fn stamp_box(
+            &mut self,
+            source: &Schematic,
+            min_x: i32,
+            min_y: i32,
+            min_z: i32,
+            max_x: i32,
+            max_y: i32,
+            max_z: i32,
+            target_x: i32,
+            target_y: i32,
+            target_z: i32,
+            excluded_blocks_json: &DiplomatStr,
+        ) -> Result<(), NucleationError> {
+            let excluded = parse_excluded_blocks(utf8(excluded_blocks_json)?)?;
+            let bounds = crate::BoundingBox::new((min_x, min_y, min_z), (max_x, max_y, max_z));
+            self.0
+                .stamp_box(
+                    &source.0,
+                    &bounds,
+                    (target_x, target_y, target_z),
+                    &excluded,
+                )
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Stamp one explicitly named source region into the default region.
+        /// The region's minimum corner is mapped to the target position.
+        pub fn stamp_region(
+            &mut self,
+            source: &Schematic,
+            source_region_name: &DiplomatStr,
+            target_x: i32,
+            target_y: i32,
+            target_z: i32,
+            excluded_blocks_json: &DiplomatStr,
+        ) -> Result<(), NucleationError> {
+            let region_name = utf8(source_region_name)?;
+            if !source.0.has_region(region_name) {
+                return Err(NucleationError::NotFound);
+            }
+            let excluded = parse_excluded_blocks(utf8(excluded_blocks_json)?)?;
+            self.0
+                .stamp_region(
+                    &source.0,
+                    region_name,
+                    (target_x, target_y, target_z),
+                    &excluded,
+                )
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Compatibility alias for `stamp_box`.
         #[allow(clippy::too_many_arguments)]
         pub fn copy_region(
             &mut self,
@@ -516,26 +592,19 @@ pub mod ffi {
             target_z: i32,
             excluded_blocks_json: &DiplomatStr,
         ) -> Result<(), NucleationError> {
-            let excluded_str = utf8(excluded_blocks_json)?;
-            let mut excluded = Vec::new();
-            if !excluded_str.is_empty() {
-                let strings: Vec<String> =
-                    serde_json::from_str(excluded_str).map_err(|_| NucleationError::Parse)?;
-                for block_str in &strings {
-                    let (bs, _) = crate::UniversalSchematic::parse_block_string(block_str)
-                        .map_err(|_| NucleationError::Parse)?;
-                    excluded.push(bs);
-                }
-            }
-            let bounds = crate::BoundingBox::new((min_x, min_y, min_z), (max_x, max_y, max_z));
-            self.0
-                .copy_region(
-                    &source.0,
-                    &bounds,
-                    (target_x, target_y, target_z),
-                    &excluded,
-                )
-                .map_err(|_| NucleationError::InvalidArgument)
+            self.stamp_box(
+                source,
+                min_x,
+                min_y,
+                min_z,
+                max_x,
+                max_y,
+                max_z,
+                target_x,
+                target_y,
+                target_z,
+                excluded_blocks_json,
+            )
         }
 
         // --- Block & Entity Accessors ---
@@ -566,6 +635,42 @@ pub mod ffi {
         ) -> Result<Box<BlockState>, NucleationError> {
             self.get_block(x, y, z)
         }
+
+        /// The full block state at a position in one specific region. This
+        /// avoids composite lookup ambiguity when regions overlap.
+        pub fn get_block_in_region(
+            &self,
+            region_name: &DiplomatStr,
+            x: i32,
+            y: i32,
+            z: i32,
+        ) -> Result<Box<BlockState>, NucleationError> {
+            let name = utf8(region_name)?;
+            self.0
+                .get_block_from_region(name, x, y, z)
+                .cloned()
+                .map(BlockState)
+                .map(Box::new)
+                .ok_or(NucleationError::NotFound)
+        }
+
+        /// The block string at a position in one specific region.
+        pub fn get_block_string_in_region(
+            &self,
+            region_name: &DiplomatStr,
+            x: i32,
+            y: i32,
+            z: i32,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let block = self
+                .0
+                .get_block_string_in_region(utf8(region_name)?, x, y, z)
+                .ok_or(NucleationError::NotFound)?;
+            let _ = write!(out, "{}", block);
+            Ok(())
+        }
+
         /// The full block string (name, properties, NBT) at a position.
         pub fn get_block_string(
             &self,
@@ -593,11 +698,11 @@ pub mod ffi {
             out: &mut DiplomatWrite,
         ) -> Result<(), NucleationError> {
             let pos = crate::block_position::BlockPosition { x, y, z };
-            match self.0.get_block_entity(pos) {
+            match self.0.get_block_entity_owned(pos) {
                 Some(be) => {
                     let json = serde_json::json!({
                         "id": be.id,
-                        "position": [be.position.0, be.position.1, be.position.2],
+                        "position": [x, y, z],
                         "nbt": serde_json::to_value(&be.nbt).unwrap_or(serde_json::Value::Null),
                     });
                     let _ = write!(out, "{}", json);
@@ -605,6 +710,28 @@ pub mod ffi {
                 }
                 None => Err(NucleationError::NotFound),
             }
+        }
+
+        /// The block entity at a position in one specific region as JSON.
+        pub fn get_block_entity_json_in_region(
+            &self,
+            region_name: &DiplomatStr,
+            x: i32,
+            y: i32,
+            z: i32,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let entity = self
+                .0
+                .get_block_entity_in_region(utf8(region_name)?, x, y, z)
+                .ok_or(NucleationError::NotFound)?;
+            let json = serde_json::json!({
+                "id": entity.id,
+                "position": [x, y, z],
+                "nbt": serde_json::to_value(&entity.nbt).unwrap_or(serde_json::Value::Null),
+            });
+            let _ = write!(out, "{}", json);
+            Ok(())
         }
 
         /// Every block entity as a JSON array of
@@ -1168,110 +1295,202 @@ pub mod ffi {
         // --- Transformations ---
 
         /// Mirror the default region along the X axis (in place). Block
-        /// orientations (e.g. `facing` properties), block entities, and
-        /// entities are mirrored too.
+        /// orientations, block entities, and entities are mirrored too.
         pub fn flip_x(&mut self) {
             self.0.flip_x();
         }
 
-        /// Mirror the default region along the Y axis (in place). Block
-        /// orientations, block entities, and entities are mirrored too.
+        /// Mirror the default region along the Y axis (in place).
         pub fn flip_y(&mut self) {
             self.0.flip_y();
         }
 
-        /// Mirror the default region along the Z axis (in place). Block
-        /// orientations, block entities, and entities are mirrored too.
+        /// Mirror the default region along the Z axis (in place).
         pub fn flip_z(&mut self) {
             self.0.flip_z();
         }
 
-        /// Rotate the default region about the X axis. `degrees` must be a
-        /// multiple of 90 (anything else is a no-op; negative values wrap).
-        /// +90° maps +Z onto +Y (south face rotates up). The region keeps its
-        /// minimum corner; block orientations and entities are updated.
-        pub fn rotate_x(&mut self, degrees: i32) {
-            self.0.rotate_x(degrees);
+        /// Rotate the default region about the X axis. +90° maps south (+Z)
+        /// to down (-Y). Only multiples of 90 are accepted; invalid angles
+        /// return `InvalidArgument` without changing the schematic. Negative
+        /// values wrap.
+        pub fn rotate_x(&mut self, degrees: i32) -> Result<(), NucleationError> {
+            self.0
+                .rotate_x(degrees)
+                .map_err(|_| NucleationError::InvalidArgument)
         }
 
-        /// Rotate the default region about the Y axis (horizontal plane).
-        /// `degrees` must be a multiple of 90 (anything else is a no-op;
-        /// negative values wrap). +90° maps +X onto -Z (east to north, i.e.
-        /// counterclockwise seen from above). The region keeps its minimum
-        /// corner; block orientations and entities are updated.
-        pub fn rotate_y(&mut self, degrees: i32) {
-            self.0.rotate_y(degrees);
+        /// Rotate the default region clockwise about the Y axis when viewed
+        /// from above. +90° maps east (+X) to south (+Z).
+        pub fn rotate_y(&mut self, degrees: i32) -> Result<(), NucleationError> {
+            self.0
+                .rotate_y(degrees)
+                .map_err(|_| NucleationError::InvalidArgument)
         }
 
-        /// Rotate the default region about the Z axis. `degrees` must be a
-        /// multiple of 90 (anything else is a no-op; negative values wrap).
-        /// +90° maps +Y onto +X (up rotates east). The region keeps its
-        /// minimum corner; block orientations and entities are updated.
-        pub fn rotate_z(&mut self, degrees: i32) {
-            self.0.rotate_z(degrees);
+        /// Rotate the default region about the Z axis. +90° maps up (+Y) to
+        /// west (-X).
+        pub fn rotate_z(&mut self, degrees: i32) -> Result<(), NucleationError> {
+            self.0
+                .rotate_z(degrees)
+                .map_err(|_| NucleationError::InvalidArgument)
         }
 
-        /// Mirror a named region along the X axis (like `flip_x`). `NotFound`
-        /// if no region has that name.
+        /// Move the default region and all attached block entities/entities.
+        pub fn translate(&mut self, dx: i32, dy: i32, dz: i32) -> Result<(), NucleationError> {
+            self.0
+                .translate(dx, dy, dz)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Mirror a named region along the X axis.
         pub fn flip_region_x(&mut self, region_name: &DiplomatStr) -> Result<(), NucleationError> {
+            let name = utf8(region_name)?;
+            if !self.0.has_region(name) {
+                return Err(NucleationError::NotFound);
+            }
             self.0
-                .flip_region_x(utf8(region_name)?)
-                .map_err(|_| NucleationError::NotFound)
+                .flip_region_x(name)
+                .map_err(|_| NucleationError::InvalidArgument)
         }
 
-        /// Mirror a named region along the Y axis (like `flip_y`). `NotFound`
-        /// if no region has that name.
+        /// Mirror a named region along the Y axis.
         pub fn flip_region_y(&mut self, region_name: &DiplomatStr) -> Result<(), NucleationError> {
+            let name = utf8(region_name)?;
+            if !self.0.has_region(name) {
+                return Err(NucleationError::NotFound);
+            }
             self.0
-                .flip_region_y(utf8(region_name)?)
-                .map_err(|_| NucleationError::NotFound)
+                .flip_region_y(name)
+                .map_err(|_| NucleationError::InvalidArgument)
         }
 
-        /// Mirror a named region along the Z axis (like `flip_z`). `NotFound`
-        /// if no region has that name.
+        /// Mirror a named region along the Z axis.
         pub fn flip_region_z(&mut self, region_name: &DiplomatStr) -> Result<(), NucleationError> {
+            let name = utf8(region_name)?;
+            if !self.0.has_region(name) {
+                return Err(NucleationError::NotFound);
+            }
             self.0
-                .flip_region_z(utf8(region_name)?)
-                .map_err(|_| NucleationError::NotFound)
+                .flip_region_z(name)
+                .map_err(|_| NucleationError::InvalidArgument)
         }
 
-        /// Rotate a named region about the X axis by a multiple of 90 degrees
-        /// (same semantics as `rotate_x`). `NotFound` if no region has that
-        /// name.
+        /// Rotate a named region about the X axis by a multiple of 90 degrees.
         pub fn rotate_region_x(
             &mut self,
             region_name: &DiplomatStr,
             degrees: i32,
         ) -> Result<(), NucleationError> {
+            let name = utf8(region_name)?;
+            if !self.0.has_region(name) {
+                return Err(NucleationError::NotFound);
+            }
             self.0
-                .rotate_region_x(utf8(region_name)?, degrees)
-                .map_err(|_| NucleationError::NotFound)
+                .rotate_region_x(name, degrees)
+                .map_err(|_| NucleationError::InvalidArgument)
         }
 
-        /// Rotate a named region about the Y axis by a multiple of 90 degrees
-        /// (same semantics as `rotate_y`). `NotFound` if no region has that
-        /// name.
+        /// Rotate a named region clockwise about the Y axis by a multiple of
+        /// 90 degrees.
         pub fn rotate_region_y(
             &mut self,
             region_name: &DiplomatStr,
             degrees: i32,
         ) -> Result<(), NucleationError> {
+            let name = utf8(region_name)?;
+            if !self.0.has_region(name) {
+                return Err(NucleationError::NotFound);
+            }
             self.0
-                .rotate_region_y(utf8(region_name)?, degrees)
-                .map_err(|_| NucleationError::NotFound)
+                .rotate_region_y(name, degrees)
+                .map_err(|_| NucleationError::InvalidArgument)
         }
 
-        /// Rotate a named region about the Z axis by a multiple of 90 degrees
-        /// (same semantics as `rotate_z`). `NotFound` if no region has that
-        /// name.
+        /// Rotate a named region about the Z axis by a multiple of 90 degrees.
         pub fn rotate_region_z(
             &mut self,
             region_name: &DiplomatStr,
             degrees: i32,
         ) -> Result<(), NucleationError> {
+            let name = utf8(region_name)?;
+            if !self.0.has_region(name) {
+                return Err(NucleationError::NotFound);
+            }
             self.0
-                .rotate_region_z(utf8(region_name)?, degrees)
-                .map_err(|_| NucleationError::NotFound)
+                .rotate_region_z(name, degrees)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Move one named region without affecting its siblings.
+        pub fn translate_region(
+            &mut self,
+            region_name: &DiplomatStr,
+            dx: i32,
+            dy: i32,
+            dz: i32,
+        ) -> Result<(), NucleationError> {
+            let name = utf8(region_name)?;
+            if !self.0.has_region(name) {
+                return Err(NucleationError::NotFound);
+            }
+            self.0
+                .translate_region(name, dx, dy, dz)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Rotate every region as one rigid schematic around the shared bounds.
+        pub fn rotate_schematic_x(&mut self, degrees: i32) -> Result<(), NucleationError> {
+            self.0
+                .rotate_schematic_x(degrees)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Rotate every region as one rigid schematic around the shared bounds.
+        pub fn rotate_schematic_y(&mut self, degrees: i32) -> Result<(), NucleationError> {
+            self.0
+                .rotate_schematic_y(degrees)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Rotate every region as one rigid schematic around the shared bounds.
+        pub fn rotate_schematic_z(&mut self, degrees: i32) -> Result<(), NucleationError> {
+            self.0
+                .rotate_schematic_z(degrees)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Mirror every region across the shared schematic X bounds.
+        pub fn flip_schematic_x(&mut self) -> Result<(), NucleationError> {
+            self.0
+                .flip_schematic_x()
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Mirror every region across the shared schematic Y bounds.
+        pub fn flip_schematic_y(&mut self) -> Result<(), NucleationError> {
+            self.0
+                .flip_schematic_y()
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Mirror every region across the shared schematic Z bounds.
+        pub fn flip_schematic_z(&mut self) -> Result<(), NucleationError> {
+            self.0
+                .flip_schematic_z()
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Move every region by the same delta, preserving their relative layout.
+        pub fn translate_schematic(
+            &mut self,
+            dx: i32,
+            dy: i32,
+            dz: i32,
+        ) -> Result<(), NucleationError> {
+            self.0
+                .translate_schematic(dx, dy, dz)
+                .map_err(|_| NucleationError::InvalidArgument)
         }
 
         // --- Building ---
@@ -1441,14 +1660,57 @@ pub mod ffi {
         ) -> Result<(), NucleationError> {
             let region = utf8(region_name)?;
             let block = utf8(block_name)?;
-            if self.0.set_block_in_region_str(region, x, y, z, block) {
-                Ok(())
-            } else {
-                Err(NucleationError::InvalidArgument)
-            }
+            self.0
+                .try_set_block_in_region_str(region, x, y, z, block)
+                .and_then(|placed| {
+                    placed
+                        .then_some(())
+                        .ok_or_else(|| "Block placement failed".to_string())
+                })
+                .map_err(|_| NucleationError::InvalidArgument)
         }
 
         // --- Palette / bounding box / info ---
+
+        /// Whether a default or named schematic region exists.
+        pub fn has_region(&self, region_name: &DiplomatStr) -> Result<bool, NucleationError> {
+            Ok(self.0.has_region(utf8(region_name)?))
+        }
+
+        /// Create an empty named region. Its first block anchors its bounds.
+        pub fn create_region(&mut self, region_name: &DiplomatStr) -> Result<(), NucleationError> {
+            self.0
+                .create_schematic_region(utf8(region_name)?)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Remove a named region. The default region cannot be removed.
+        pub fn remove_region(&mut self, region_name: &DiplomatStr) -> Result<(), NucleationError> {
+            let name = utf8(region_name)?;
+            if !self.0.has_region(name) {
+                return Err(NucleationError::NotFound);
+            }
+            self.0
+                .remove_schematic_region(name)
+                .map(|_| ())
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Rename a named region. The default region cannot be renamed.
+        pub fn rename_region(
+            &mut self,
+            old_name: &DiplomatStr,
+            new_name: &DiplomatStr,
+        ) -> Result<(), NucleationError> {
+            let old = utf8(old_name)?;
+            let new = utf8(new_name)?;
+            if !self.0.has_region(old) {
+                return Err(NucleationError::NotFound);
+            }
+            self.0
+                .rename_schematic_region(old, new)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
 
         /// The schematic bounding box as a JSON array
         /// `[min_x, min_y, min_z, max_x, max_y, max_z]`.
@@ -1470,14 +1732,13 @@ pub mod ffi {
             out: &mut DiplomatWrite,
         ) -> Result<(), NucleationError> {
             let name = utf8(region_name)?;
-            let region = if name == "default" || name == "Default" {
-                &self.0.default_region
-            } else {
-                self.0
-                    .other_regions
-                    .get(name)
-                    .ok_or(NucleationError::NotFound)?
-            };
+            let region = self
+                .0
+                .get_region(name)
+                .or_else(|| {
+                    (name == "default" || name == "Default").then_some(&self.0.default_region)
+                })
+                .ok_or(NucleationError::NotFound)?;
             // The tight content bounds (min/max of placed non-air blocks), not
             // the internal storage box — which over-allocates by up to 64 blocks
             // per axis and would otherwise leak allocation padding into the
@@ -1589,14 +1850,13 @@ pub mod ffi {
             out: &mut DiplomatWrite,
         ) -> Result<(), NucleationError> {
             let name = utf8(region_name)?;
-            let region = if name == "default" || name == "Default" {
-                &self.0.default_region
-            } else {
-                self.0
-                    .other_regions
-                    .get(name)
-                    .ok_or(NucleationError::NotFound)?
-            };
+            let region = self
+                .0
+                .get_region(name)
+                .or_else(|| {
+                    (name == "default" || name == "Default").then_some(&self.0.default_region)
+                })
+                .ok_or(NucleationError::NotFound)?;
             let names: Vec<&str> = region.palette.iter().map(|bs| bs.name.as_str()).collect();
             let json = serde_json::to_string(&names).unwrap_or_else(|_| "[]".to_string());
             let _ = write!(out, "{}", json);

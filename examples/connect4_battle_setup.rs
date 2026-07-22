@@ -145,15 +145,19 @@ fn demonstrate_all_transformations() {
 
     // Rotation operations
     let mut rotated_90 = test_schematic.clone();
-    rotated_90.rotate_y(90);
+    rotated_90.rotate_y(90).expect("90 is a valid quarter-turn");
     println!("After rotate_y(90): repeater now facing east");
 
     let mut rotated_180 = test_schematic.clone();
-    rotated_180.rotate_y(180);
+    rotated_180
+        .rotate_y(180)
+        .expect("180 is a valid quarter-turn");
     println!("After rotate_y(180): repeater now facing south");
 
     let mut rotated_270 = test_schematic.clone();
-    rotated_270.rotate_y(270);
+    rotated_270
+        .rotate_y(270)
+        .expect("270 is a valid quarter-turn");
     println!("After rotate_y(270): repeater now facing west");
 }
 

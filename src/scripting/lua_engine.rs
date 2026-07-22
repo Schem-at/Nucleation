@@ -99,15 +99,24 @@ impl LuaUserData for LuaSchematic {
             Ok(())
         });
         methods.add_method_mut("rotate_x", |_, this, degrees: i32| {
-            this.0.borrow_mut().rotate_x(degrees);
+            this.0
+                .borrow_mut()
+                .rotate_x(degrees)
+                .map_err(LuaError::external)?;
             Ok(())
         });
         methods.add_method_mut("rotate_y", |_, this, degrees: i32| {
-            this.0.borrow_mut().rotate_y(degrees);
+            this.0
+                .borrow_mut()
+                .rotate_y(degrees)
+                .map_err(LuaError::external)?;
             Ok(())
         });
         methods.add_method_mut("rotate_z", |_, this, degrees: i32| {
-            this.0.borrow_mut().rotate_z(degrees);
+            this.0
+                .borrow_mut()
+                .rotate_z(degrees)
+                .map_err(LuaError::external)?;
             Ok(())
         });
 

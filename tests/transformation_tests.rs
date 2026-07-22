@@ -133,14 +133,14 @@ fn test_rotate_y_90_simple() {
     region.rotate_y(90);
 
     // After 90-degree rotation around Y:
-    // (0,0,0) -> (0,0,2)
-    // (2,0,0) -> (0,0,0)
+    // (0,0,0) -> (2,0,0)
+    // (2,0,0) -> (2,0,2)
     assert_eq!(
-        region.get_block(0, 0, 2).map(|b| &b.name),
+        region.get_block(2, 0, 0).map(|b| &b.name),
         Some(&SmolStr::from("minecraft:stone"))
     );
     assert_eq!(
-        region.get_block(0, 0, 0).map(|b| &b.name),
+        region.get_block(2, 0, 2).map(|b| &b.name),
         Some(&SmolStr::from("minecraft:stone"))
     );
 }
@@ -173,7 +173,7 @@ fn test_rotate_y_with_directional_blocks() {
     region.rotate_y(90);
 
     // North should become East after 90-degree rotation
-    let rotated_block = region.get_block(0, 0, 1).unwrap();
+    let rotated_block = region.get_block(1, 0, 0).unwrap();
     assert_eq!(
         rotated_block.get_property("facing"),
         Some(&SmolStr::from("east"))

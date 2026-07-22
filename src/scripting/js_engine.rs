@@ -127,16 +127,16 @@ impl JsSchematic {
         self.inner.flip_z();
     }
 
-    pub fn rotate_x(&mut self, degrees: i32) {
-        self.inner.rotate_x(degrees);
+    pub fn rotate_x(&mut self, degrees: i32) -> rquickjs::Result<()> {
+        self.inner.rotate_x(degrees).map_err(|e| make_js_err(&e))
     }
 
-    pub fn rotate_y(&mut self, degrees: i32) {
-        self.inner.rotate_y(degrees);
+    pub fn rotate_y(&mut self, degrees: i32) -> rquickjs::Result<()> {
+        self.inner.rotate_y(degrees).map_err(|e| make_js_err(&e))
     }
 
-    pub fn rotate_z(&mut self, degrees: i32) {
-        self.inner.rotate_z(degrees);
+    pub fn rotate_z(&mut self, degrees: i32) -> rquickjs::Result<()> {
+        self.inner.rotate_z(degrees).map_err(|e| make_js_err(&e))
     }
 
     // -- Export --

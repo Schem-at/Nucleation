@@ -14,6 +14,9 @@ JS/Kotlin/PHP), unified `NucleationError` errors.
   coordinates, automatic growth, and block-state strings
 - [Formats and I/O](features/formats-and-io.md) — format detection, conversion,
   round-trip fidelity, and filesystem/byte APIs
+- [Regions, transforms & stamping](features/regions-and-transforms.md)
+  — region lifecycle, scoped rigid transforms, `stamp_box` / `stamp_region`
+  ([snippet](readme-snippets/13-regions-transforms-python.md))
 - [Shapes, brushes, and masked fills](features/shapes-and-brushes.md)
 - [Palettes: turning colors into blocks](features/palettes-and-color.md)
 - [SDF shapes and terrain](features/sdf-and-fields.md)
@@ -41,9 +44,6 @@ Each with a verified Python snippet:
   `to_schematic` ↔ `from_schematic` bridge that makes any fill (SDF, OSM,
   heightmap, noise) a custom world **generator** or **filter**
   ([snippet](readme-snippets/17-world-generator-python.md))
-- [Regions, transforms & stamping](features/regions-and-transforms.md)
-  — multi-region schematics, rotate/flip, `copy_region`
-  ([snippet](readme-snippets/13-regions-transforms-python.md))
 - [Block entities, entities & NBT](features/block-entities-nbt.md)
   ([snippet](readme-snippets/14-block-entities-nbt-python.md))
 - [Geodata](features/geo.md) — `Shape.polygon_prism`,

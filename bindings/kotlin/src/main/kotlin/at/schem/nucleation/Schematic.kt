@@ -8,6 +8,7 @@ import com.sun.jna.Structure
 internal interface SchematicLib: Library {
     fun Schematic_destroy(handle: Pointer)
     fun Schematic_create(name: Slice): Pointer
+    fun Schematic_deep_clone(handle: Pointer): Pointer
     fun Schematic_dimensions(handle: Pointer): DimensionsNative
     fun Schematic_set_block(handle: Pointer, x: Int, y: Int, z: Int, blockName: Slice): ResultByteInt
     fun Schematic_get_block_name(handle: Pointer, x: Int, y: Int, z: Int, write: Pointer): ResultUnitInt
@@ -37,11 +38,16 @@ internal interface SchematicLib: Library {
     fun Schematic_place(handle: Pointer, x: Int, y: Int, z: Int, paletteIndex: Int): ResultUnitInt
     fun Schematic_set_blocks(handle: Pointer, positions: Slice, blockName: Slice): ResultIntInt
     fun Schematic_get_blocks_json(handle: Pointer, positions: Slice, write: Pointer): ResultUnitInt
+    fun Schematic_stamp_box(handle: Pointer, source: Pointer, minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int, targetX: Int, targetY: Int, targetZ: Int, excludedBlocksJson: Slice): ResultUnitInt
+    fun Schematic_stamp_region(handle: Pointer, source: Pointer, sourceRegionName: Slice, targetX: Int, targetY: Int, targetZ: Int, excludedBlocksJson: Slice): ResultUnitInt
     fun Schematic_copy_region(handle: Pointer, source: Pointer, minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int, targetX: Int, targetY: Int, targetZ: Int, excludedBlocksJson: Slice): ResultUnitInt
     fun Schematic_get_block(handle: Pointer, x: Int, y: Int, z: Int): ResultPointerInt
     fun Schematic_get_block_with_properties(handle: Pointer, x: Int, y: Int, z: Int): ResultPointerInt
+    fun Schematic_get_block_in_region(handle: Pointer, regionName: Slice, x: Int, y: Int, z: Int): ResultPointerInt
+    fun Schematic_get_block_string_in_region(handle: Pointer, regionName: Slice, x: Int, y: Int, z: Int, write: Pointer): ResultUnitInt
     fun Schematic_get_block_string(handle: Pointer, x: Int, y: Int, z: Int, write: Pointer): ResultUnitInt
     fun Schematic_get_block_entity_json(handle: Pointer, x: Int, y: Int, z: Int, write: Pointer): ResultUnitInt
+    fun Schematic_get_block_entity_json_in_region(handle: Pointer, regionName: Slice, x: Int, y: Int, z: Int, write: Pointer): ResultUnitInt
     fun Schematic_get_all_block_entities_json(handle: Pointer, write: Pointer): Unit
     fun Schematic_entity_count(handle: Pointer): FFIUint32
     fun Schematic_get_entities_json(handle: Pointer, write: Pointer): Unit
@@ -91,15 +97,24 @@ internal interface SchematicLib: Library {
     fun Schematic_flip_x(handle: Pointer): Unit
     fun Schematic_flip_y(handle: Pointer): Unit
     fun Schematic_flip_z(handle: Pointer): Unit
-    fun Schematic_rotate_x(handle: Pointer, degrees: Int): Unit
-    fun Schematic_rotate_y(handle: Pointer, degrees: Int): Unit
-    fun Schematic_rotate_z(handle: Pointer, degrees: Int): Unit
+    fun Schematic_rotate_x(handle: Pointer, degrees: Int): ResultUnitInt
+    fun Schematic_rotate_y(handle: Pointer, degrees: Int): ResultUnitInt
+    fun Schematic_rotate_z(handle: Pointer, degrees: Int): ResultUnitInt
+    fun Schematic_translate(handle: Pointer, dx: Int, dy: Int, dz: Int): ResultUnitInt
     fun Schematic_flip_region_x(handle: Pointer, regionName: Slice): ResultUnitInt
     fun Schematic_flip_region_y(handle: Pointer, regionName: Slice): ResultUnitInt
     fun Schematic_flip_region_z(handle: Pointer, regionName: Slice): ResultUnitInt
     fun Schematic_rotate_region_x(handle: Pointer, regionName: Slice, degrees: Int): ResultUnitInt
     fun Schematic_rotate_region_y(handle: Pointer, regionName: Slice, degrees: Int): ResultUnitInt
     fun Schematic_rotate_region_z(handle: Pointer, regionName: Slice, degrees: Int): ResultUnitInt
+    fun Schematic_translate_region(handle: Pointer, regionName: Slice, dx: Int, dy: Int, dz: Int): ResultUnitInt
+    fun Schematic_rotate_schematic_x(handle: Pointer, degrees: Int): ResultUnitInt
+    fun Schematic_rotate_schematic_y(handle: Pointer, degrees: Int): ResultUnitInt
+    fun Schematic_rotate_schematic_z(handle: Pointer, degrees: Int): ResultUnitInt
+    fun Schematic_flip_schematic_x(handle: Pointer): ResultUnitInt
+    fun Schematic_flip_schematic_y(handle: Pointer): ResultUnitInt
+    fun Schematic_flip_schematic_z(handle: Pointer): ResultUnitInt
+    fun Schematic_translate_schematic(handle: Pointer, dx: Int, dy: Int, dz: Int): ResultUnitInt
     fun Schematic_fill_cuboid(handle: Pointer, minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int, blockName: Slice): ResultUnitInt
     fun Schematic_fill_sphere(handle: Pointer, cx: Float, cy: Float, cz: Float, radius: Float, blockName: Slice): ResultUnitInt
     fun Schematic_save_as_b64(handle: Pointer, format: Slice, version: Slice, settings: Slice, write: Pointer): ResultUnitInt
@@ -108,6 +123,10 @@ internal interface SchematicLib: Library {
     fun Schematic_available_schematic_versions_json(write: Pointer): ResultUnitInt
     fun Schematic_set_block_with_nbt(handle: Pointer, x: Int, y: Int, z: Int, blockName: Slice, nbtJson: Slice): ResultUnitInt
     fun Schematic_set_block_in_region(handle: Pointer, regionName: Slice, x: Int, y: Int, z: Int, blockName: Slice): ResultUnitInt
+    fun Schematic_has_region(handle: Pointer, regionName: Slice): ResultByteInt
+    fun Schematic_create_region(handle: Pointer, regionName: Slice): ResultUnitInt
+    fun Schematic_remove_region(handle: Pointer, regionName: Slice): ResultUnitInt
+    fun Schematic_rename_region(handle: Pointer, oldName: Slice, newName: Slice): ResultUnitInt
     fun Schematic_bounding_box_json(handle: Pointer, write: Pointer): Unit
     fun Schematic_region_bounding_box_json(handle: Pointer, regionName: Slice, write: Pointer): ResultUnitInt
     fun Schematic_palette_json(handle: Pointer, write: Pointer): Unit
@@ -463,6 +482,18 @@ class Schematic internal constructor (
         }
     }
     
+    /** Return an independent deep copy. Subsequent block, region, entity,
+    *metadata, or transform changes do not affect the original.
+    */
+    fun deepClone(): Schematic {
+        
+        val returnVal = lib.Schematic_deep_clone(handle);
+        val selfEdges: List<Any> = listOf()
+        val handle = returnVal 
+        val returnOpaque = Schematic(handle, selfEdges, true)
+        return returnOpaque
+    }
+    
     /** The allocated dimensions (width, height, length) of the schematic's
     *bounding box.
     */
@@ -773,8 +804,48 @@ class Schematic internal constructor (
         }
     }
     
-    /** Copy a region from `source` into this schematic. `excluded_blocks_json`
-    *is a JSON array of block strings to skip (empty string or `[]` for none).
+    /** Stamp a merged source box into the default region. Excluded blocks
+    *are skipped, preserving destination content. Empty string or `[]`
+    *means no exclusions.
+    */
+    fun stampBox(source: Schematic, minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int, targetX: Int, targetY: Int, targetZ: Int, excludedBlocksJson: String): Result<Unit> {
+        val excludedBlocksJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(excludedBlocksJson)
+        
+        val returnVal = lib.Schematic_stamp_box(handle, source.handle, minX, minY, minZ, maxX, maxY, maxZ, targetX, targetY, targetZ, excludedBlocksJsonSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            excludedBlocksJsonSliceMemory.close()
+        }
+    }
+    
+    /** Stamp one explicitly named source region into the default region.
+    *The region's minimum corner is mapped to the target position.
+    */
+    fun stampRegion(source: Schematic, sourceRegionName: String, targetX: Int, targetY: Int, targetZ: Int, excludedBlocksJson: String): Result<Unit> {
+        val sourceRegionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(sourceRegionName)
+        val excludedBlocksJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(excludedBlocksJson)
+        
+        val returnVal = lib.Schematic_stamp_region(handle, source.handle, sourceRegionNameSliceMemory.slice, targetX, targetY, targetZ, excludedBlocksJsonSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            sourceRegionNameSliceMemory.close()
+            excludedBlocksJsonSliceMemory.close()
+        }
+    }
+    
+    /** Compatibility alias for `stamp_box`.
     */
     fun copyRegion(source: Schematic, minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int, targetX: Int, targetY: Int, targetZ: Int, excludedBlocksJson: String): Result<Unit> {
         val excludedBlocksJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(excludedBlocksJson)
@@ -826,6 +897,48 @@ class Schematic internal constructor (
         }
     }
     
+    /** The full block state at a position in one specific region. This
+    *avoids composite lookup ambiguity when regions overlap.
+    */
+    fun getBlockInRegion(regionName: String, x: Int, y: Int, z: Int): Result<BlockState> {
+        val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
+        
+        val returnVal = lib.Schematic_get_block_in_region(handle, regionNameSliceMemory.slice, x, y, z);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                val selfEdges: List<Any> = listOf()
+                val handle = nativeOkVal 
+                val returnOpaque = BlockState(handle, selfEdges, true)
+                return returnOpaque.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            regionNameSliceMemory.close()
+        }
+    }
+    
+    /** The block string at a position in one specific region.
+    */
+    fun getBlockStringInRegion(regionName: String, x: Int, y: Int, z: Int): Result<String> {
+        val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Schematic_get_block_string_in_region(handle, regionNameSliceMemory.slice, x, y, z, write);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            regionNameSliceMemory.close()
+        }
+    }
+    
     /** The full block string (name, properties, NBT) at a position.
     */
     fun getBlockString(x: Int, y: Int, z: Int): Result<String> {
@@ -854,6 +967,26 @@ class Schematic internal constructor (
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    /** The block entity at a position in one specific region as JSON.
+    */
+    fun getBlockEntityJsonInRegion(regionName: String, x: Int, y: Int, z: Int): Result<String> {
+        val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Schematic_get_block_entity_json_in_region(handle, regionNameSliceMemory.slice, x, y, z, write);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            regionNameSliceMemory.close()
         }
     }
     
@@ -1400,8 +1533,7 @@ class Schematic internal constructor (
     }
     
     /** Mirror the default region along the X axis (in place). Block
-    *orientations (e.g. `facing` properties), block entities, and
-    *entities are mirrored too.
+    *orientations, block entities, and entities are mirrored too.
     */
     fun flipX(): Unit {
         
@@ -1409,8 +1541,7 @@ class Schematic internal constructor (
         
     }
     
-    /** Mirror the default region along the Y axis (in place). Block
-    *orientations, block entities, and entities are mirrored too.
+    /** Mirror the default region along the Y axis (in place).
     */
     fun flipY(): Unit {
         
@@ -1418,8 +1549,7 @@ class Schematic internal constructor (
         
     }
     
-    /** Mirror the default region along the Z axis (in place). Block
-    *orientations, block entities, and entities are mirrored too.
+    /** Mirror the default region along the Z axis (in place).
     */
     fun flipZ(): Unit {
         
@@ -1427,42 +1557,64 @@ class Schematic internal constructor (
         
     }
     
-    /** Rotate the default region about the X axis. `degrees` must be a
-    *multiple of 90 (anything else is a no-op; negative values wrap).
-    *+90° maps +Z onto +Y (south face rotates up). The region keeps its
-    *minimum corner; block orientations and entities are updated.
+    /** Rotate the default region about the X axis. +90° maps south (+Z)
+    *to down (-Y). Only multiples of 90 are accepted; invalid angles
+    *return `InvalidArgument` without changing the schematic. Negative
+    *values wrap.
     */
-    fun rotateX(degrees: Int): Unit {
+    fun rotateX(degrees: Int): Result<Unit> {
         
         val returnVal = lib.Schematic_rotate_x(handle, degrees);
-        
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
     }
     
-    /** Rotate the default region about the Y axis (horizontal plane).
-    *`degrees` must be a multiple of 90 (anything else is a no-op;
-    *negative values wrap). +90° maps +X onto -Z (east to north, i.e.
-    *counterclockwise seen from above). The region keeps its minimum
-    *corner; block orientations and entities are updated.
+    /** Rotate the default region clockwise about the Y axis when viewed
+    *from above. +90° maps east (+X) to south (+Z).
     */
-    fun rotateY(degrees: Int): Unit {
+    fun rotateY(degrees: Int): Result<Unit> {
         
         val returnVal = lib.Schematic_rotate_y(handle, degrees);
-        
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
     }
     
-    /** Rotate the default region about the Z axis. `degrees` must be a
-    *multiple of 90 (anything else is a no-op; negative values wrap).
-    *+90° maps +Y onto +X (up rotates east). The region keeps its
-    *minimum corner; block orientations and entities are updated.
+    /** Rotate the default region about the Z axis. +90° maps up (+Y) to
+    *west (-X).
     */
-    fun rotateZ(degrees: Int): Unit {
+    fun rotateZ(degrees: Int): Result<Unit> {
         
         val returnVal = lib.Schematic_rotate_z(handle, degrees);
-        
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
     }
     
-    /** Mirror a named region along the X axis (like `flip_x`). `NotFound`
-    *if no region has that name.
+    /** Move the default region and all attached block entities/entities.
+    */
+    fun translate(dx: Int, dy: Int, dz: Int): Result<Unit> {
+        
+        val returnVal = lib.Schematic_translate(handle, dx, dy, dz);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    /** Mirror a named region along the X axis.
     */
     fun flipRegionX(regionName: String): Result<Unit> {
         val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
@@ -1480,8 +1632,7 @@ class Schematic internal constructor (
         }
     }
     
-    /** Mirror a named region along the Y axis (like `flip_y`). `NotFound`
-    *if no region has that name.
+    /** Mirror a named region along the Y axis.
     */
     fun flipRegionY(regionName: String): Result<Unit> {
         val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
@@ -1499,8 +1650,7 @@ class Schematic internal constructor (
         }
     }
     
-    /** Mirror a named region along the Z axis (like `flip_z`). `NotFound`
-    *if no region has that name.
+    /** Mirror a named region along the Z axis.
     */
     fun flipRegionZ(regionName: String): Result<Unit> {
         val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
@@ -1518,9 +1668,7 @@ class Schematic internal constructor (
         }
     }
     
-    /** Rotate a named region about the X axis by a multiple of 90 degrees
-    *(same semantics as `rotate_x`). `NotFound` if no region has that
-    *name.
+    /** Rotate a named region about the X axis by a multiple of 90 degrees.
     */
     fun rotateRegionX(regionName: String, degrees: Int): Result<Unit> {
         val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
@@ -1538,9 +1686,8 @@ class Schematic internal constructor (
         }
     }
     
-    /** Rotate a named region about the Y axis by a multiple of 90 degrees
-    *(same semantics as `rotate_y`). `NotFound` if no region has that
-    *name.
+    /** Rotate a named region clockwise about the Y axis by a multiple of
+    *90 degrees.
     */
     fun rotateRegionY(regionName: String, degrees: Int): Result<Unit> {
         val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
@@ -1558,9 +1705,7 @@ class Schematic internal constructor (
         }
     }
     
-    /** Rotate a named region about the Z axis by a multiple of 90 degrees
-    *(same semantics as `rotate_z`). `NotFound` if no region has that
-    *name.
+    /** Rotate a named region about the Z axis by a multiple of 90 degrees.
     */
     fun rotateRegionZ(regionName: String, degrees: Int): Result<Unit> {
         val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
@@ -1575,6 +1720,115 @@ class Schematic internal constructor (
             }
         } finally {
             regionNameSliceMemory.close()
+        }
+    }
+    
+    /** Move one named region without affecting its siblings.
+    */
+    fun translateRegion(regionName: String, dx: Int, dy: Int, dz: Int): Result<Unit> {
+        val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
+        
+        val returnVal = lib.Schematic_translate_region(handle, regionNameSliceMemory.slice, dx, dy, dz);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            regionNameSliceMemory.close()
+        }
+    }
+    
+    /** Rotate every region as one rigid schematic around the shared bounds.
+    */
+    fun rotateSchematicX(degrees: Int): Result<Unit> {
+        
+        val returnVal = lib.Schematic_rotate_schematic_x(handle, degrees);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    /** Rotate every region as one rigid schematic around the shared bounds.
+    */
+    fun rotateSchematicY(degrees: Int): Result<Unit> {
+        
+        val returnVal = lib.Schematic_rotate_schematic_y(handle, degrees);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    /** Rotate every region as one rigid schematic around the shared bounds.
+    */
+    fun rotateSchematicZ(degrees: Int): Result<Unit> {
+        
+        val returnVal = lib.Schematic_rotate_schematic_z(handle, degrees);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    /** Mirror every region across the shared schematic X bounds.
+    */
+    fun flipSchematicX(): Result<Unit> {
+        
+        val returnVal = lib.Schematic_flip_schematic_x(handle);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    /** Mirror every region across the shared schematic Y bounds.
+    */
+    fun flipSchematicY(): Result<Unit> {
+        
+        val returnVal = lib.Schematic_flip_schematic_y(handle);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    /** Mirror every region across the shared schematic Z bounds.
+    */
+    fun flipSchematicZ(): Result<Unit> {
+        
+        val returnVal = lib.Schematic_flip_schematic_z(handle);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    /** Move every region by the same delta, preserving their relative layout.
+    */
+    fun translateSchematic(dx: Int, dy: Int, dz: Int): Result<Unit> {
+        
+        val returnVal = lib.Schematic_translate_schematic(handle, dx, dy, dz);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
     
@@ -1722,6 +1976,80 @@ class Schematic internal constructor (
         } finally {
             regionNameSliceMemory.close()
             blockNameSliceMemory.close()
+        }
+    }
+    
+    /** Whether a default or named schematic region exists.
+    */
+    fun hasRegion(regionName: String): Result<Boolean> {
+        val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
+        
+        val returnVal = lib.Schematic_has_region(handle, regionNameSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return (nativeOkVal > 0).ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            regionNameSliceMemory.close()
+        }
+    }
+    
+    /** Create an empty named region. Its first block anchors its bounds.
+    */
+    fun createRegion(regionName: String): Result<Unit> {
+        val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
+        
+        val returnVal = lib.Schematic_create_region(handle, regionNameSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            regionNameSliceMemory.close()
+        }
+    }
+    
+    /** Remove a named region. The default region cannot be removed.
+    */
+    fun removeRegion(regionName: String): Result<Unit> {
+        val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
+        
+        val returnVal = lib.Schematic_remove_region(handle, regionNameSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            regionNameSliceMemory.close()
+        }
+    }
+    
+    /** Rename a named region. The default region cannot be renamed.
+    */
+    fun renameRegion(oldName: String, newName: String): Result<Unit> {
+        val oldNameSliceMemory = PrimitiveArrayTools.borrowUtf8(oldName)
+        val newNameSliceMemory = PrimitiveArrayTools.borrowUtf8(newName)
+        
+        val returnVal = lib.Schematic_rename_region(handle, oldNameSliceMemory.slice, newNameSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            oldNameSliceMemory.close()
+            newNameSliceMemory.close()
         }
     }
     

@@ -20,6 +20,12 @@ export class Schematic {
     static create(name: string): Schematic;
 
     /**
+     * Return an independent deep copy. Subsequent block, region, entity,
+     * metadata, or transform changes do not affect the original.
+     */
+    deepClone(): Schematic;
+
+    /**
      * The allocated dimensions (width, height, length) of the schematic's
      * bounding box.
      */
@@ -174,8 +180,20 @@ export class Schematic {
     getBlocksJson(positions: Array<number>): string;
 
     /**
-     * Copy a region from `source` into this schematic. `excluded_blocks_json`
-     * is a JSON array of block strings to skip (empty string or `[]` for none).
+     * Stamp a merged source box into the default region. Excluded blocks
+     * are skipped, preserving destination content. Empty string or `[]`
+     * means no exclusions.
+     */
+    stampBox(source: Schematic, minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number, targetX: number, targetY: number, targetZ: number, excludedBlocksJson: string): void;
+
+    /**
+     * Stamp one explicitly named source region into the default region.
+     * The region's minimum corner is mapped to the target position.
+     */
+    stampRegion(source: Schematic, sourceRegionName: string, targetX: number, targetY: number, targetZ: number, excludedBlocksJson: string): void;
+
+    /**
+     * Compatibility alias for `stamp_box`.
      */
     copyRegion(source: Schematic, minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number, targetX: number, targetY: number, targetZ: number, excludedBlocksJson: string): void;
 
@@ -192,6 +210,17 @@ export class Schematic {
     getBlockWithProperties(x: number, y: number, z: number): BlockState;
 
     /**
+     * The full block state at a position in one specific region. This
+     * avoids composite lookup ambiguity when regions overlap.
+     */
+    getBlockInRegion(regionName: string, x: number, y: number, z: number): BlockState;
+
+    /**
+     * The block string at a position in one specific region.
+     */
+    getBlockStringInRegion(regionName: string, x: number, y: number, z: number): string;
+
+    /**
      * The full block string (name, properties, NBT) at a position.
      */
     getBlockString(x: number, y: number, z: number): string;
@@ -201,6 +230,11 @@ export class Schematic {
      * `{"id": ..., "position": [x,y,z], "nbt": {...}}` (the old `CBlockEntity`).
      */
     getBlockEntityJson(x: number, y: number, z: number): string;
+
+    /**
+     * The block entity at a position in one specific region as JSON.
+     */
+    getBlockEntityJsonInRegion(regionName: string, x: number, y: number, z: number): string;
 
     /**
      * Every block entity as a JSON array of
@@ -460,86 +494,115 @@ export class Schematic {
 
     /**
      * Mirror the default region along the X axis (in place). Block
-     * orientations (e.g. `facing` properties), block entities, and
-     * entities are mirrored too.
+     * orientations, block entities, and entities are mirrored too.
      */
     flipX(): void;
 
     /**
-     * Mirror the default region along the Y axis (in place). Block
-     * orientations, block entities, and entities are mirrored too.
+     * Mirror the default region along the Y axis (in place).
      */
     flipY(): void;
 
     /**
-     * Mirror the default region along the Z axis (in place). Block
-     * orientations, block entities, and entities are mirrored too.
+     * Mirror the default region along the Z axis (in place).
      */
     flipZ(): void;
 
     /**
-     * Rotate the default region about the X axis. `degrees` must be a
-     * multiple of 90 (anything else is a no-op; negative values wrap).
-     * +90° maps +Z onto +Y (south face rotates up). The region keeps its
-     * minimum corner; block orientations and entities are updated.
+     * Rotate the default region about the X axis. +90° maps south (+Z)
+     * to down (-Y). Only multiples of 90 are accepted; invalid angles
+     * return `InvalidArgument` without changing the schematic. Negative
+     * values wrap.
      */
     rotateX(degrees: number): void;
 
     /**
-     * Rotate the default region about the Y axis (horizontal plane).
-     * `degrees` must be a multiple of 90 (anything else is a no-op;
-     * negative values wrap). +90° maps +X onto -Z (east to north, i.e.
-     * counterclockwise seen from above). The region keeps its minimum
-     * corner; block orientations and entities are updated.
+     * Rotate the default region clockwise about the Y axis when viewed
+     * from above. +90° maps east (+X) to south (+Z).
      */
     rotateY(degrees: number): void;
 
     /**
-     * Rotate the default region about the Z axis. `degrees` must be a
-     * multiple of 90 (anything else is a no-op; negative values wrap).
-     * +90° maps +Y onto +X (up rotates east). The region keeps its
-     * minimum corner; block orientations and entities are updated.
+     * Rotate the default region about the Z axis. +90° maps up (+Y) to
+     * west (-X).
      */
     rotateZ(degrees: number): void;
 
     /**
-     * Mirror a named region along the X axis (like `flip_x`). `NotFound`
-     * if no region has that name.
+     * Move the default region and all attached block entities/entities.
+     */
+    translate(dx: number, dy: number, dz: number): void;
+
+    /**
+     * Mirror a named region along the X axis.
      */
     flipRegionX(regionName: string): void;
 
     /**
-     * Mirror a named region along the Y axis (like `flip_y`). `NotFound`
-     * if no region has that name.
+     * Mirror a named region along the Y axis.
      */
     flipRegionY(regionName: string): void;
 
     /**
-     * Mirror a named region along the Z axis (like `flip_z`). `NotFound`
-     * if no region has that name.
+     * Mirror a named region along the Z axis.
      */
     flipRegionZ(regionName: string): void;
 
     /**
-     * Rotate a named region about the X axis by a multiple of 90 degrees
-     * (same semantics as `rotate_x`). `NotFound` if no region has that
-     * name.
+     * Rotate a named region about the X axis by a multiple of 90 degrees.
      */
     rotateRegionX(regionName: string, degrees: number): void;
 
     /**
-     * Rotate a named region about the Y axis by a multiple of 90 degrees
-     * (same semantics as `rotate_y`). `NotFound` if no region has that
-     * name.
+     * Rotate a named region clockwise about the Y axis by a multiple of
+     * 90 degrees.
      */
     rotateRegionY(regionName: string, degrees: number): void;
 
     /**
-     * Rotate a named region about the Z axis by a multiple of 90 degrees
-     * (same semantics as `rotate_z`). `NotFound` if no region has that
-     * name.
+     * Rotate a named region about the Z axis by a multiple of 90 degrees.
      */
     rotateRegionZ(regionName: string, degrees: number): void;
+
+    /**
+     * Move one named region without affecting its siblings.
+     */
+    translateRegion(regionName: string, dx: number, dy: number, dz: number): void;
+
+    /**
+     * Rotate every region as one rigid schematic around the shared bounds.
+     */
+    rotateSchematicX(degrees: number): void;
+
+    /**
+     * Rotate every region as one rigid schematic around the shared bounds.
+     */
+    rotateSchematicY(degrees: number): void;
+
+    /**
+     * Rotate every region as one rigid schematic around the shared bounds.
+     */
+    rotateSchematicZ(degrees: number): void;
+
+    /**
+     * Mirror every region across the shared schematic X bounds.
+     */
+    flipSchematicX(): void;
+
+    /**
+     * Mirror every region across the shared schematic Y bounds.
+     */
+    flipSchematicY(): void;
+
+    /**
+     * Mirror every region across the shared schematic Z bounds.
+     */
+    flipSchematicZ(): void;
+
+    /**
+     * Move every region by the same delta, preserving their relative layout.
+     */
+    translateSchematic(dx: number, dy: number, dz: number): void;
 
     /**
      * Fill a cuboid with a block.
@@ -579,6 +642,26 @@ export class Schematic {
      * Set a block (by name) in a named region.
      */
     setBlockInRegion(regionName: string, x: number, y: number, z: number, blockName: string): void;
+
+    /**
+     * Whether a default or named schematic region exists.
+     */
+    hasRegion(regionName: string): boolean;
+
+    /**
+     * Create an empty named region. Its first block anchors its bounds.
+     */
+    createRegion(regionName: string): void;
+
+    /**
+     * Remove a named region. The default region cannot be removed.
+     */
+    removeRegion(regionName: string): void;
+
+    /**
+     * Rename a named region. The default region cannot be renamed.
+     */
+    renameRegion(oldName: string, newName: string): void;
 
     /**
      * The schematic bounding box as a JSON array

@@ -35,6 +35,12 @@ public:
   inline static std::unique_ptr<Schematic> create(std::string_view name);
 
   /**
+   * Return an independent deep copy. Subsequent block, region, entity,
+   * metadata, or transform changes do not affect the original.
+   */
+  inline std::unique_ptr<Schematic> deep_clone() const;
+
+  /**
    * The allocated dimensions (width, height, length) of the schematic's
    * bounding box.
    */
@@ -223,8 +229,20 @@ public:
   inline diplomat::result<std::monostate, NucleationError> get_blocks_json_write(diplomat::span<const int32_t> positions, W& writeable_output) const;
 
   /**
-   * Copy a region from `source` into this schematic. `excluded_blocks_json`
-   * is a JSON array of block strings to skip (empty string or `[]` for none).
+   * Stamp a merged source box into the default region. Excluded blocks
+   * are skipped, preserving destination content. Empty string or `[]`
+   * means no exclusions.
+   */
+  inline diplomat::result<std::monostate, NucleationError> stamp_box(const Schematic& source, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z, int32_t target_x, int32_t target_y, int32_t target_z, std::string_view excluded_blocks_json);
+
+  /**
+   * Stamp one explicitly named source region into the default region.
+   * The region's minimum corner is mapped to the target position.
+   */
+  inline diplomat::result<std::monostate, NucleationError> stamp_region(const Schematic& source, std::string_view source_region_name, int32_t target_x, int32_t target_y, int32_t target_z, std::string_view excluded_blocks_json);
+
+  /**
+   * Compatibility alias for `stamp_box`.
    */
   inline diplomat::result<std::monostate, NucleationError> copy_region(const Schematic& source, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z, int32_t target_x, int32_t target_y, int32_t target_z, std::string_view excluded_blocks_json);
 
@@ -241,6 +259,19 @@ public:
   inline diplomat::result<std::unique_ptr<BlockState>, NucleationError> get_block_with_properties(int32_t x, int32_t y, int32_t z) const;
 
   /**
+   * The full block state at a position in one specific region. This
+   * avoids composite lookup ambiguity when regions overlap.
+   */
+  inline diplomat::result<std::unique_ptr<BlockState>, NucleationError> get_block_in_region(std::string_view region_name, int32_t x, int32_t y, int32_t z) const;
+
+  /**
+   * The block string at a position in one specific region.
+   */
+  inline diplomat::result<std::string, NucleationError> get_block_string_in_region(std::string_view region_name, int32_t x, int32_t y, int32_t z) const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> get_block_string_in_region_write(std::string_view region_name, int32_t x, int32_t y, int32_t z, W& writeable_output) const;
+
+  /**
    * The full block string (name, properties, NBT) at a position.
    */
   inline diplomat::result<std::string, NucleationError> get_block_string(int32_t x, int32_t y, int32_t z) const;
@@ -254,6 +285,13 @@ public:
   inline diplomat::result<std::string, NucleationError> get_block_entity_json(int32_t x, int32_t y, int32_t z) const;
   template<typename W>
   inline diplomat::result<std::monostate, NucleationError> get_block_entity_json_write(int32_t x, int32_t y, int32_t z, W& writeable_output) const;
+
+  /**
+   * The block entity at a position in one specific region as JSON.
+   */
+  inline diplomat::result<std::string, NucleationError> get_block_entity_json_in_region(std::string_view region_name, int32_t x, int32_t y, int32_t z) const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> get_block_entity_json_in_region_write(std::string_view region_name, int32_t x, int32_t y, int32_t z, W& writeable_output) const;
 
   /**
    * Every block entity as a JSON array of
@@ -555,86 +593,115 @@ public:
 
   /**
    * Mirror the default region along the X axis (in place). Block
-   * orientations (e.g. `facing` properties), block entities, and
-   * entities are mirrored too.
+   * orientations, block entities, and entities are mirrored too.
    */
   inline void flip_x();
 
   /**
-   * Mirror the default region along the Y axis (in place). Block
-   * orientations, block entities, and entities are mirrored too.
+   * Mirror the default region along the Y axis (in place).
    */
   inline void flip_y();
 
   /**
-   * Mirror the default region along the Z axis (in place). Block
-   * orientations, block entities, and entities are mirrored too.
+   * Mirror the default region along the Z axis (in place).
    */
   inline void flip_z();
 
   /**
-   * Rotate the default region about the X axis. `degrees` must be a
-   * multiple of 90 (anything else is a no-op; negative values wrap).
-   * +90° maps +Z onto +Y (south face rotates up). The region keeps its
-   * minimum corner; block orientations and entities are updated.
+   * Rotate the default region about the X axis. +90° maps south (+Z)
+   * to down (-Y). Only multiples of 90 are accepted; invalid angles
+   * return `InvalidArgument` without changing the schematic. Negative
+   * values wrap.
    */
-  inline void rotate_x(int32_t degrees);
+  inline diplomat::result<std::monostate, NucleationError> rotate_x(int32_t degrees);
 
   /**
-   * Rotate the default region about the Y axis (horizontal plane).
-   * `degrees` must be a multiple of 90 (anything else is a no-op;
-   * negative values wrap). +90° maps +X onto -Z (east to north, i.e.
-   * counterclockwise seen from above). The region keeps its minimum
-   * corner; block orientations and entities are updated.
+   * Rotate the default region clockwise about the Y axis when viewed
+   * from above. +90° maps east (+X) to south (+Z).
    */
-  inline void rotate_y(int32_t degrees);
+  inline diplomat::result<std::monostate, NucleationError> rotate_y(int32_t degrees);
 
   /**
-   * Rotate the default region about the Z axis. `degrees` must be a
-   * multiple of 90 (anything else is a no-op; negative values wrap).
-   * +90° maps +Y onto +X (up rotates east). The region keeps its
-   * minimum corner; block orientations and entities are updated.
+   * Rotate the default region about the Z axis. +90° maps up (+Y) to
+   * west (-X).
    */
-  inline void rotate_z(int32_t degrees);
+  inline diplomat::result<std::monostate, NucleationError> rotate_z(int32_t degrees);
 
   /**
-   * Mirror a named region along the X axis (like `flip_x`). `NotFound`
-   * if no region has that name.
+   * Move the default region and all attached block entities/entities.
+   */
+  inline diplomat::result<std::monostate, NucleationError> translate(int32_t dx, int32_t dy, int32_t dz);
+
+  /**
+   * Mirror a named region along the X axis.
    */
   inline diplomat::result<std::monostate, NucleationError> flip_region_x(std::string_view region_name);
 
   /**
-   * Mirror a named region along the Y axis (like `flip_y`). `NotFound`
-   * if no region has that name.
+   * Mirror a named region along the Y axis.
    */
   inline diplomat::result<std::monostate, NucleationError> flip_region_y(std::string_view region_name);
 
   /**
-   * Mirror a named region along the Z axis (like `flip_z`). `NotFound`
-   * if no region has that name.
+   * Mirror a named region along the Z axis.
    */
   inline diplomat::result<std::monostate, NucleationError> flip_region_z(std::string_view region_name);
 
   /**
-   * Rotate a named region about the X axis by a multiple of 90 degrees
-   * (same semantics as `rotate_x`). `NotFound` if no region has that
-   * name.
+   * Rotate a named region about the X axis by a multiple of 90 degrees.
    */
   inline diplomat::result<std::monostate, NucleationError> rotate_region_x(std::string_view region_name, int32_t degrees);
 
   /**
-   * Rotate a named region about the Y axis by a multiple of 90 degrees
-   * (same semantics as `rotate_y`). `NotFound` if no region has that
-   * name.
+   * Rotate a named region clockwise about the Y axis by a multiple of
+   * 90 degrees.
    */
   inline diplomat::result<std::monostate, NucleationError> rotate_region_y(std::string_view region_name, int32_t degrees);
 
   /**
-   * Rotate a named region about the Z axis by a multiple of 90 degrees
-   * (same semantics as `rotate_z`). `NotFound` if no region has that
-   * name.
+   * Rotate a named region about the Z axis by a multiple of 90 degrees.
    */
   inline diplomat::result<std::monostate, NucleationError> rotate_region_z(std::string_view region_name, int32_t degrees);
+
+  /**
+   * Move one named region without affecting its siblings.
+   */
+  inline diplomat::result<std::monostate, NucleationError> translate_region(std::string_view region_name, int32_t dx, int32_t dy, int32_t dz);
+
+  /**
+   * Rotate every region as one rigid schematic around the shared bounds.
+   */
+  inline diplomat::result<std::monostate, NucleationError> rotate_schematic_x(int32_t degrees);
+
+  /**
+   * Rotate every region as one rigid schematic around the shared bounds.
+   */
+  inline diplomat::result<std::monostate, NucleationError> rotate_schematic_y(int32_t degrees);
+
+  /**
+   * Rotate every region as one rigid schematic around the shared bounds.
+   */
+  inline diplomat::result<std::monostate, NucleationError> rotate_schematic_z(int32_t degrees);
+
+  /**
+   * Mirror every region across the shared schematic X bounds.
+   */
+  inline diplomat::result<std::monostate, NucleationError> flip_schematic_x();
+
+  /**
+   * Mirror every region across the shared schematic Y bounds.
+   */
+  inline diplomat::result<std::monostate, NucleationError> flip_schematic_y();
+
+  /**
+   * Mirror every region across the shared schematic Z bounds.
+   */
+  inline diplomat::result<std::monostate, NucleationError> flip_schematic_z();
+
+  /**
+   * Move every region by the same delta, preserving their relative layout.
+   */
+  inline diplomat::result<std::monostate, NucleationError> translate_schematic(int32_t dx, int32_t dy, int32_t dz);
 
   /**
    * Fill a cuboid with a block.
@@ -687,6 +754,26 @@ public:
    * Set a block (by name) in a named region.
    */
   inline diplomat::result<std::monostate, NucleationError> set_block_in_region(std::string_view region_name, int32_t x, int32_t y, int32_t z, std::string_view block_name);
+
+  /**
+   * Whether a default or named schematic region exists.
+   */
+  inline diplomat::result<bool, NucleationError> has_region(std::string_view region_name) const;
+
+  /**
+   * Create an empty named region. Its first block anchors its bounds.
+   */
+  inline diplomat::result<std::monostate, NucleationError> create_region(std::string_view region_name);
+
+  /**
+   * Remove a named region. The default region cannot be removed.
+   */
+  inline diplomat::result<std::monostate, NucleationError> remove_region(std::string_view region_name);
+
+  /**
+   * Rename a named region. The default region cannot be renamed.
+   */
+  inline diplomat::result<std::monostate, NucleationError> rename_region(std::string_view old_name, std::string_view new_name);
 
   /**
    * The schematic bounding box as a JSON array
