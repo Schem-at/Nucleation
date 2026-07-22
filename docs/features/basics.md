@@ -5,14 +5,11 @@ metadata, and one or more regions. Start empty or open an existing build, edit i
 with ordinary Minecraft block-state strings, inspect the result, then save it in
 the format you need.
 
-This page uses Python for clarity. The generated bindings expose the same model
-and operations in every supported language.
-
 ## Build a crafting nook
 
-<table>
-<tr>
-<td width="53%" valign="top"><pre><code>from nucleation import Schematic
+```python
+from nucleation import Schematic
+
 nook = Schematic.create("crafting_nook")
 for x in range(5):
     for z in range(5):
@@ -36,34 +33,17 @@ nook.set_block(3, 1, 1, "minecraft:chest[facing=south]")
 nook.set_block(4, 2, 1, "minecraft:wall_torch[facing=south]")
 nook.set_block(1, 2, 4, "minecraft:wall_torch[facing=east]")
 nook.save_to_file("crafting-nook.schem")
+
 copy = Schematic.load_from_file("crafting-nook.schem")
 block = copy.get_block(1, 1, 1)
-print(block.name())  # minecraft:crafting_table</code></pre></td>
-<td width="47%" valign="top" align="center"><img src="../media/readme/basics/animation.gif" width="480" alt="A compact crafting nook assembling with two centered windows, a crafting table, chest, and two wall torches"></td>
-</tr>
-</table>
-
-[View the complete working generator](../../examples/readme/basics/generate.py) ·
-[Download the generated crafting nook](../downloads/readme/basics/crafting-nook.schem)
-
-The complete script is the source of truth for both artifacts. It builds the
-schematic, saves the downloadable `.schem`, configures the camera and animation,
-and renders the GIF shown above.
-
-To regenerate the media locally, point it at a Minecraft resource-pack ZIP:
-
-```bash
-NUCLEATION_PACK=/path/to/resource-pack.zip \
-  python examples/readme/basics/generate.py
+print(block.name())  # minecraft:crafting_table
 ```
 
-By default it writes to the section-scoped locations used by this page:
+<div align="center">
+<img src="../media/readme/basics/animation.gif" width="480" alt="A compact crafting nook assembling with two centered windows, a crafting table, chest, and two wall torches">
+</div>
 
-```text
-examples/readme/basics/generate.py
-├── docs/media/readme/basics/animation.gif
-└── docs/downloads/readme/basics/crafting-nook.schem
-```
+[Download the crafting nook](../downloads/readme/basics/crafting-nook.schem)
 
 ## Coordinates and automatic growth
 
