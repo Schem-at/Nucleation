@@ -1,4 +1,4 @@
-"""Generate the animated 5x5 gold beacon for docs/features/basics.md."""
+"""Generate the animated 3x3 gold beacon on a 5x5 Cartesian grid."""
 
 import os
 from pathlib import Path
@@ -6,29 +6,30 @@ from pathlib import Path
 from nucleation import AnimationEffect, BuildAnimation, RenderConfig
 
 animation = BuildAnimation.create("beacon")
-animation.set_step_ms(85)
+animation.set_step_ms(140)
 
-# Mirror the Basics snippet exactly: 25 gold blocks, then one beacon.
-for x in range(5):
-    for z in range(5):
+# Mirror the Basics snippet exactly: nine gold blocks, then one beacon.
+for x in range(-1, 2):
+    for z in range(-1, 2):
         animation.set_block(x, 0, z, "minecraft:gold_block")
 
 animation.with_effect(AnimationEffect.spin_in(680, 1)).set_block(
-    2, 1, 2, "minecraft:beacon"
+    0, 1, 0, "minecraft:beacon"
 )
 
 view = RenderConfig.create(480, 360)
 view.set_isometric()
 view.set_yaw(28)
 view.set_pitch(24)
-view.set_zoom(1.22)
+view.set_zoom(0.80)
 view.set_sphere_fit(True)
 view.set_background(0, 0, 0, 0)
+view.set_grid(2, 1, -0.502, True, 0.44, 0.54, 0.66, 0.32)
 
 # A restrained drift keeps the tiny build dimensional without distracting from
 # the nested-loop placement order.
-camera = AnimationEffect.create(3_200)
-camera.add_tween("rotateY", -5, 5, "inOutSine")
+camera = AnimationEffect.create(2_400)
+camera.add_tween("rotateY", -4, 4, "inOutSine")
 animation.animate_camera(camera, 0)
 
 root = Path(__file__).resolve().parents[3]

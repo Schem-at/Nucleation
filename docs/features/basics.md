@@ -11,15 +11,15 @@ the format you need.
 from nucleation import Schematic
 
 beacon = Schematic.create("beacon")
-for x in range(5):
-    for z in range(5):
+for x in range(-1, 2):
+    for z in range(-1, 2):
         beacon.set_block(x, 0, z, "minecraft:gold_block")
-beacon.set_block(2, 1, 2, "minecraft:beacon")
+beacon.set_block(0, 1, 0, "minecraft:beacon")
 beacon.save_to_file("beacon.schem")
 ```
 
 <div align="center">
-<img src="../media/readme/basics/beacon.gif" width="480" alt="A five-by-five gold-block base assembling in nested-loop order before a beacon lands at its center">
+<img src="../media/readme/basics/beacon.gif" width="480" alt="A three-by-three gold-block beacon assembling at the origin of a five-by-five Cartesian grid">
 </div>
 
 [Download the beacon](../downloads/readme/basics/beacon.schem)
