@@ -83,7 +83,9 @@ pub mod ffi {
         ) -> Result<bool, NucleationError> {
             let name =
                 std::str::from_utf8(block_name).map_err(|_| NucleationError::InvalidArgument)?;
-            Ok(self.0.set_block_str(x, y, z, name))
+            self.0
+                .try_set_block_str(x, y, z, name)
+                .map_err(|_| NucleationError::InvalidArgument)
         }
 
         /// The name of the block at a position. `NotFound` if the position is
@@ -439,6 +441,7 @@ pub mod ffi {
             if count == 0 {
                 return Ok(0);
             }
+            let count_i32 = i32::try_from(count).map_err(|_| NucleationError::InvalidArgument)?;
             let s = &mut self.0;
 
             let (mut min_x, mut min_y, mut min_z) = (positions[0], positions[1], positions[2]);
@@ -453,59 +456,18 @@ pub mod ffi {
                 max_z = max_z.max(z);
             }
 
-            // Complex block strings: parse once, apply many.
-            if block_name_str.contains('[') || block_name_str.ends_with('}') {
-                let (mut block_state, nbt_data) =
-                    crate::UniversalSchematic::parse_block_string(block_name_str)
-                        .map_err(|_| NucleationError::Parse)?;
-                if block_state.name.contains("jukebox") {
-                    if let Some(ref nbt) = nbt_data {
-                        let has_record = nbt.contains_key("RecordItem");
-                        block_state.set_property("has_record", has_record.to_string());
-                    }
-                }
-
-                let block_name_owned = block_state.name.to_string();
-                let proto: Option<crate::block_entity::BlockEntity> =
-                    nbt_data.as_ref().map(|nbt| {
-                        let mut be = crate::block_entity::BlockEntity::new(
-                            block_name_owned.clone(),
-                            (0, 0, 0),
-                        );
-                        for (k, v) in nbt {
-                            be = be.with_nbt_data(k.clone(), v.clone());
-                        }
-                        be
-                    });
-
-                let region = &mut s.default_region;
-                region.ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
-                let palette_index = region.get_or_insert_palette_by_state(&block_state);
-                for i in 0..count {
-                    let (x, y, z) = (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
-                    region.set_block_at_index_unchecked(palette_index, x, y, z);
-                }
-
-                if let Some(ref template) = proto {
-                    for i in 0..count {
-                        let (x, y, z) =
-                            (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
-                        let mut be = template.clone();
-                        be.position = (x, y, z);
-                        s.set_block_entity(crate::block_position::BlockPosition { x, y, z }, be);
-                    }
-                }
-                return Ok(count as i32);
+            // Validate before mutating any position. The shared setter caches the
+            // parsed result after the first placement, while keeping replacement,
+            // jukebox-state, and block-entity behavior identical to set_block.
+            crate::UniversalSchematic::parse_block_string(block_name_str)
+                .map_err(|_| NucleationError::InvalidArgument)?;
+            s.default_region
+                .ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
+            for position in positions.chunks_exact(3) {
+                s.set_block_from_string(position[0], position[1], position[2], block_name_str)
+                    .map_err(|_| NucleationError::InvalidArgument)?;
             }
-
-            let region = &mut s.default_region;
-            region.ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
-            let palette_index = region.get_or_insert_palette_by_name(block_name_str);
-            for i in 0..count {
-                let (x, y, z) = (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
-                region.set_block_at_index_unchecked(palette_index, x, y, z);
-            }
-            Ok(count as i32)
+            Ok(count_i32)
         }
 
         /// Batch-get block names at multiple positions. `positions` is flat

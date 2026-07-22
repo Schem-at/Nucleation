@@ -149,9 +149,25 @@ impl UniversalSchematic {
     }
 
     pub fn set_block_str(&mut self, x: i32, y: i32, z: i32, block_name: &str) -> bool {
-        // Check if string contains properties (bracket notation) or NBT data (braces)
-        if block_name.contains('[') || block_name.ends_with('}') {
-            self.set_block_from_string(x, y, z, block_name).unwrap()
+        self.try_set_block_str(x, y, z, block_name).unwrap_or(false)
+    }
+
+    /// Fallible string-based block placement for language adapters and callers
+    /// that need parser errors instead of the boolean convenience fallback.
+    pub fn try_set_block_str(
+        &mut self,
+        x: i32,
+        y: i32,
+        z: i32,
+        block_name: &str,
+    ) -> Result<bool, String> {
+        // Any delimiter routes through the strict parser, including unmatched
+        // closing delimiters that must fail instead of becoming part of an id.
+        if block_name
+            .chars()
+            .any(|c| matches!(c, '[' | ']' | '{' | '}'))
+        {
+            self.set_block_from_string(x, y, z, block_name)
         } else {
             let block_state = match self.block_state_cache.get(block_name) {
                 Some(cached) => cached.clone(),
@@ -163,7 +179,11 @@ impl UniversalSchematic {
                 }
             };
 
-            self.set_block(x, y, z, &block_state)
+            let placed = self.set_block(x, y, z, &block_state);
+            if placed {
+                self.remove_block_entity((x, y, z));
+            }
+            Ok(placed)
         }
     }
 
@@ -1872,12 +1892,14 @@ impl UniversalSchematic {
             None => {
                 let (mut block_state, nbt_data) = Self::parse_block_string(block_string)?;
 
-                // Special handling for jukebox: set has_record blockstate if RecordItem exists
-                if block_state.name.contains("jukebox") {
-                    if let Some(ref nbt) = nbt_data {
-                        let has_record = nbt.contains_key("RecordItem");
-                        block_state.set_property("has_record", has_record.to_string());
-                    }
+                // Keep the vanilla jukebox block state synchronized in both
+                // directions. Custom block ids that merely contain "jukebox"
+                // are not vanilla jukeboxes and must remain untouched.
+                if block_state.name == "minecraft:jukebox" {
+                    let has_record = nbt_data
+                        .as_ref()
+                        .is_some_and(|nbt| nbt.contains_key("RecordItem"));
+                    block_state.set_property("has_record", has_record.to_string());
                 }
 
                 let nbt = nbt_data.map(|data| {
@@ -1898,6 +1920,10 @@ impl UniversalSchematic {
         if !self.set_block(x, y, z, &block_state) {
             return Ok(false);
         }
+
+        // Replacement is transactional with respect to block-entity state:
+        // a new block string with no NBT must not retain the previous entity.
+        self.remove_block_entity((x, y, z));
 
         // If we have NBT data, create and set the block entity. The NbtMap
         // stays Arc-shared with the cache (copy-on-write via nbt_mut).
@@ -1961,9 +1987,16 @@ impl UniversalSchematic {
     pub fn parse_block_string(
         block_string: &str,
     ) -> Result<(BlockState, Option<HashMap<String, NbtValue>>), String> {
-        let mut parts = block_string.splitn(2, '{');
-        let block_state_str = parts.next().unwrap().trim();
-        let nbt_str = parts.next().map(|s| s.trim_end_matches('}'));
+        Self::validate_block_string_delimiters(block_string)?;
+        let (block_state_str, nbt_str) = match block_string.split_once('{') {
+            Some((block_state, nbt)) => {
+                let nbt = nbt
+                    .strip_suffix('}')
+                    .ok_or("Missing block entity closing brace")?;
+                (block_state.trim(), Some(nbt))
+            }
+            None => (block_string.trim(), None),
+        };
 
         // Parse block state
         let block_state = if block_state_str.contains('[') {
@@ -1972,17 +2005,19 @@ impl UniversalSchematic {
             let properties_str = state_parts
                 .next()
                 .ok_or("Missing properties closing bracket")?
-                .trim_end_matches(']');
+                .strip_suffix(']')
+                .ok_or("Missing properties closing bracket")?;
 
             let mut properties = Vec::new();
             for prop in properties_str.split(',') {
-                let mut kv = prop.split('=');
-                let key = kv.next().ok_or("Missing property key")?.trim();
-                let value = kv
-                    .next()
-                    .ok_or("Missing property value")?
-                    .trim()
-                    .trim_matches(|c| c == '\'' || c == '"');
+                let (key, value) = prop
+                    .split_once('=')
+                    .ok_or("Missing property key or value")?;
+                let key = key.trim();
+                let value = value.trim().trim_matches(|c| c == '\'' || c == '"');
+                if key.is_empty() || value.is_empty() || value.contains('=') {
+                    return Err("Malformed block property".to_string());
+                }
                 properties.push((SmolStr::from(key), SmolStr::from(value)));
             }
 
@@ -2004,6 +2039,51 @@ impl UniversalSchematic {
         };
 
         Ok((block_state, nbt_data))
+    }
+
+    fn validate_block_string_delimiters(block_string: &str) -> Result<(), String> {
+        let mut stack = Vec::new();
+        let mut quote = None;
+        let mut escaped = false;
+
+        for c in block_string.chars() {
+            if quote.is_some() && c == '\\' && !escaped {
+                escaped = true;
+                continue;
+            }
+            if matches!(c, '\'' | '"') && !escaped {
+                match quote {
+                    Some(active) if active == c => quote = None,
+                    None => quote = Some(c),
+                    _ => {}
+                }
+                continue;
+            }
+            if quote.is_none() {
+                match (c, stack.last().copied()) {
+                    ('[' | '{', _) => stack.push(c),
+                    (']', Some('[')) | ('}', Some('{')) => {
+                        stack.pop();
+                    }
+                    (']', _) => {
+                        return Err("Unmatched or misordered ']' in block string".to_string());
+                    }
+                    ('}', _) => {
+                        return Err("Unmatched or misordered '}' in block string".to_string());
+                    }
+                    _ => {}
+                }
+            }
+            escaped = false;
+        }
+
+        if quote.is_some() {
+            return Err("Unterminated quoted string in block string".to_string());
+        }
+        if !stack.is_empty() {
+            return Err("Unclosed delimiter in block string".to_string());
+        }
+        Ok(())
     }
 
     pub fn create_schematic_from_region(&self, bounds: &BoundingBox) -> Self {
@@ -3021,6 +3101,124 @@ mod tests {
         assert_eq!(UniversalSchematic::calculate_items_for_signal(0), 0);
         assert_eq!(UniversalSchematic::calculate_items_for_signal(1), 1);
         assert_eq!(UniversalSchematic::calculate_items_for_signal(15), 1728); // Full barrel
+    }
+
+    #[test]
+    fn test_content_shorthands_create_block_entities_and_jukebox_state() {
+        assert!(UniversalSchematic::parse_block_string("minecraft:chest{items=[diamond]").is_err());
+        assert!(UniversalSchematic::parse_block_string(
+            "minecraft:chest[facing=north{items=[diamond]}"
+        )
+        .is_err());
+        assert!(UniversalSchematic::parse_block_string("minecraft:stone}").is_err());
+        assert!(UniversalSchematic::parse_block_string("minecraft:stone[=north]").is_err());
+        assert!(
+            UniversalSchematic::parse_block_string("minecraft:stone[facing=north=extra]").is_err()
+        );
+
+        let mut invalid = UniversalSchematic::new("Invalid".to_string());
+        assert!(invalid
+            .try_set_block_str(0, 0, 0, "minecraft:chest{signal=bogus}")
+            .is_err());
+        assert!(!invalid.set_block_str(0, 0, 0, "minecraft:chest{signal=bogus}"));
+        assert_ne!(
+            invalid.get_block(0, 0, 0).map(BlockState::get_name),
+            Some("minecraft:chest")
+        );
+        assert!(invalid
+            .get_block_entity(BlockPosition { x: 0, y: 0, z: 0 })
+            .is_none());
+
+        let mut schematic = UniversalSchematic::new("Contents".to_string());
+        schematic
+            .set_block_from_string(0, 0, 0, "minecraft:chest{items=[diamond*64,emerald*12]}")
+            .unwrap();
+        schematic
+            .set_block_from_string(1, 0, 0, "minecraft:jukebox{record=pigstep}")
+            .unwrap();
+
+        let chest = schematic
+            .get_block_entity(BlockPosition { x: 0, y: 0, z: 0 })
+            .unwrap();
+        let Some(NbtValue::List(items)) = chest.nbt.get("Items") else {
+            panic!("chest must contain an Items list");
+        };
+        assert_eq!(items.len(), 2);
+
+        let jukebox = schematic.get_block(1, 0, 0).unwrap();
+        assert_eq!(
+            jukebox.get_property("has_record"),
+            Some(&SmolStr::from("true"))
+        );
+        let jukebox_entity = schematic
+            .get_block_entity(BlockPosition { x: 1, y: 0, z: 0 })
+            .unwrap();
+        let Some(NbtValue::Compound(record)) = jukebox_entity.nbt.get("RecordItem") else {
+            panic!("jukebox must contain a RecordItem compound");
+        };
+        assert_eq!(
+            record.get("id"),
+            Some(&NbtValue::String(
+                "minecraft:music_disc_pigstep".to_string()
+            ))
+        );
+
+        schematic
+            .set_block_from_string(2, 0, 0, "minecraft:jukebox[has_record=true]{signal=0}")
+            .unwrap();
+        assert_eq!(
+            schematic
+                .get_block(2, 0, 0)
+                .unwrap()
+                .get_property("has_record"),
+            Some(&SmolStr::from("false"))
+        );
+        assert!(schematic
+            .get_block_entity(BlockPosition { x: 2, y: 0, z: 0 })
+            .is_none());
+
+        schematic
+            .set_block_from_string(5, 0, 0, "minecraft:jukebox{record=pigstep}")
+            .unwrap();
+        assert!(schematic
+            .get_block_entity(BlockPosition { x: 5, y: 0, z: 0 })
+            .is_some());
+        schematic
+            .set_block_from_string(5, 0, 0, "minecraft:jukebox{signal=0}")
+            .unwrap();
+        assert_eq!(
+            schematic
+                .get_block(5, 0, 0)
+                .unwrap()
+                .get_property("has_record"),
+            Some(&SmolStr::from("false"))
+        );
+        assert!(schematic
+            .get_block_entity(BlockPosition { x: 5, y: 0, z: 0 })
+            .is_none());
+
+        schematic
+            .set_block_from_string(6, 0, 0, "minecraft:chest{items=[diamond]}")
+            .unwrap();
+        assert!(schematic
+            .get_block_entity(BlockPosition { x: 6, y: 0, z: 0 })
+            .is_some());
+        assert!(schematic.set_block_str(6, 0, 0, "minecraft:stone"));
+        assert!(schematic
+            .get_block_entity(BlockPosition { x: 6, y: 0, z: 0 })
+            .is_none());
+
+        schematic
+            .set_block_from_string(3, 0, 0, "mod:jukebox[has_record=true]")
+            .unwrap();
+        assert_eq!(
+            schematic
+                .get_block(3, 0, 0)
+                .unwrap()
+                .get_property("has_record"),
+            Some(&SmolStr::from("true")),
+            "custom ids containing jukebox must not receive vanilla synchronization"
+        );
     }
 
     #[test]

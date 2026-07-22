@@ -95,6 +95,25 @@ Properties are part of the state, so orientation and variants survive format
 round-trips. Use `BlockState` directly when you need to construct or inspect
 properties programmatically.
 
+## Content shorthands
+
+Common block-entity contents do not require hand-written NBT:
+
+```python
+build = Schematic.create("contents")
+build.set_block(0, 0, 0, "minecraft:barrel{signal=13,item=diamond}")
+build.set_block(1, 0, 0, "minecraft:chest{items=[diamond*64,emerald*12]}")
+build.set_block(2, 0, 0, "minecraft:jukebox{record=pigstep}")
+build.set_block(3, 0, 0, "minecraft:jukebox{signal=13}")
+```
+
+`signal=0..15` fills a container for the requested comparator strength; `item=`
+chooses what fills it. In `items=[...]`, entries occupy consecutive slots,
+`*count` defaults to one, and bare item names receive the `minecraft:` namespace.
+A jukebox accepts a disc name through `record=`, or a comparator strength through
+`signal=`. See [Block entities and NBT](block-entities-nbt.md) for explicit NBT
+and [Redstone simulation](redstone-simulation.md) for running circuits.
+
 ## Inspect blocks
 
 `get_block(x, y, z)` returns the complete `BlockState`:
