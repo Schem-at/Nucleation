@@ -787,6 +787,32 @@ impl Region {
         self.merge_block_entities(other);
     }
 
+    /// Merge `other` as a higher-precedence region. Unlike the general merge,
+    /// air cells inside `other`'s allocated portion of its visible content
+    /// bounds overwrite lower-precedence blocks, matching composite reads.
+    pub(crate) fn merge_with_precedence(&mut self, other: &Region) {
+        let visible_bounds = other.get_tight_bounds();
+        self.merge(other);
+
+        let Some(bounds) = visible_bounds else {
+            return;
+        };
+        let air = BlockState::new("minecraft:air".to_string());
+        for y in bounds.min.1..=bounds.max.1 {
+            for z in bounds.min.2..=bounds.max.2 {
+                for x in bounds.min.0..=bounds.max.0 {
+                    if other
+                        .get_block(x, y, z)
+                        .is_some_and(|block| block.name == "minecraft:air")
+                    {
+                        self.set_block(x, y, z, &air);
+                    }
+                }
+            }
+        }
+        self.rebuild_tight_bounds();
+    }
+
     fn merge_entities(&mut self, other: &Region) {
         self.entities.extend(other.entities.iter().cloned());
     }
@@ -1354,11 +1380,13 @@ impl Region {
         let rotations = normalized_degrees / 90;
 
         for _ in 0..rotations {
-            self.rotate_y_90();
+            if self.rotate_y_90_at(self.position).is_err() {
+                return;
+            }
         }
     }
 
-    fn rotate_y_90(&mut self) {
+    pub(crate) fn rotate_y_90_at(&mut self, position: (i32, i32, i32)) -> Result<(), String> {
         use crate::transforms::{transform_block_state_rotate, Axis};
 
         // For 90-degree rotation around Y:
@@ -1370,7 +1398,7 @@ impl Region {
 
         // New dimensions after rotation
         let new_size = (old_size_z, size_y, old_size_x);
-        let new_bbox = BoundingBox::from_position_and_size(self.position, new_size);
+        let new_bbox = BoundingBox::try_from_position_and_size(position, new_size)?;
 
         let new_volume = new_bbox.volume() as usize;
         let air_index = self.cached_air_index;
@@ -1432,6 +1460,7 @@ impl Region {
             entity.position.0 = new_bbox_clone.min.0 as f64 + new_rel_x;
             entity.position.2 = new_bbox_clone.min.2 as f64 + new_rel_z;
         }
+        Ok(())
     }
 
     /// Rotate the region around the X axis
@@ -1445,11 +1474,13 @@ impl Region {
         let rotations = normalized_degrees / 90;
 
         for _ in 0..rotations {
-            self.rotate_x_90();
+            if self.rotate_x_90_at(self.position).is_err() {
+                return;
+            }
         }
     }
 
-    fn rotate_x_90(&mut self) {
+    pub(crate) fn rotate_x_90_at(&mut self, position: (i32, i32, i32)) -> Result<(), String> {
         use crate::transforms::{transform_block_state_rotate, Axis};
 
         let old_bbox = self.bbox.clone();
@@ -1457,7 +1488,7 @@ impl Region {
 
         // New dimensions after rotation around X
         let new_size = (size_x, old_size_z, old_size_y);
-        let new_bbox = BoundingBox::from_position_and_size(self.position, new_size);
+        let new_bbox = BoundingBox::try_from_position_and_size(position, new_size)?;
 
         let new_volume = new_bbox.volume() as usize;
         let air_index = self.cached_air_index;
@@ -1516,6 +1547,7 @@ impl Region {
             entity.position.1 = new_bbox_clone.min.1 as f64 + new_rel_y;
             entity.position.2 = new_bbox_clone.min.2 as f64 + new_rel_z;
         }
+        Ok(())
     }
 
     /// Rotate the region around the Z axis
@@ -1529,11 +1561,13 @@ impl Region {
         let rotations = normalized_degrees / 90;
 
         for _ in 0..rotations {
-            self.rotate_z_90();
+            if self.rotate_z_90_at(self.position).is_err() {
+                return;
+            }
         }
     }
 
-    fn rotate_z_90(&mut self) {
+    pub(crate) fn rotate_z_90_at(&mut self, position: (i32, i32, i32)) -> Result<(), String> {
         use crate::transforms::{transform_block_state_rotate, Axis};
 
         let old_bbox = self.bbox.clone();
@@ -1541,7 +1575,7 @@ impl Region {
 
         // New dimensions after rotation around Z
         let new_size = (old_size_y, old_size_x, size_z);
-        let new_bbox = BoundingBox::from_position_and_size(self.position, new_size);
+        let new_bbox = BoundingBox::try_from_position_and_size(position, new_size)?;
 
         let new_volume = new_bbox.volume() as usize;
         let air_index = self.cached_air_index;
@@ -1600,6 +1634,7 @@ impl Region {
             entity.position.0 = new_bbox_clone.min.0 as f64 + new_rel_x;
             entity.position.1 = new_bbox_clone.min.1 as f64 + new_rel_y;
         }
+        Ok(())
     }
 
     // ── Fast-path methods for Python binding performance ──

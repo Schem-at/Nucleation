@@ -89,20 +89,24 @@ impl BoundingBox {
         (self.min, self.get_dimensions())
     }
 
-    pub fn from_position_and_size(position: (i32, i32, i32), size: (i32, i32, i32)) -> Self {
-        fn endpoint(position: i32, size: i32) -> i32 {
+    pub fn try_from_position_and_size(
+        position: (i32, i32, i32),
+        size: (i32, i32, i32),
+    ) -> Result<Self, String> {
+        fn endpoint(position: i32, size: i32) -> Option<i32> {
             let inclusive_delta = size - size.signum();
-            position
-                .checked_add(inclusive_delta)
-                .expect("bounding box position and size exceed i32 coordinates")
+            position.checked_add(inclusive_delta)
         }
 
         let end = (
-            endpoint(position.0, size.0),
-            endpoint(position.1, size.1),
-            endpoint(position.2, size.2),
+            endpoint(position.0, size.0)
+                .ok_or_else(|| "Bounding box X endpoint overflow".to_string())?,
+            endpoint(position.1, size.1)
+                .ok_or_else(|| "Bounding box Y endpoint overflow".to_string())?,
+            endpoint(position.2, size.2)
+                .ok_or_else(|| "Bounding box Z endpoint overflow".to_string())?,
         );
-        BoundingBox::new(
+        Ok(BoundingBox::new(
             (
                 position.0.min(end.0),
                 position.1.min(end.1),
@@ -113,7 +117,12 @@ impl BoundingBox {
                 position.1.max(end.1),
                 position.2.max(end.2),
             ),
-        )
+        ))
+    }
+
+    pub fn from_position_and_size(position: (i32, i32, i32), size: (i32, i32, i32)) -> Self {
+        Self::try_from_position_and_size(position, size)
+            .expect("bounding box position and size exceed i32 coordinates")
     }
     pub fn volume(&self) -> u64 {
         let (width, height, length) = self.get_dimensions();

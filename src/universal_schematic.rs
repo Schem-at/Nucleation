@@ -938,12 +938,28 @@ impl UniversalSchematic {
     }
 
     pub fn get_merged_region(&self) -> Region {
-        let mut merged_region = self.default_region.clone();
+        let named_regions = Self::sorted_named_regions(self);
+        let mut merged_region = match named_regions.last() {
+            Some(region) => (*region).clone(),
+            None => return self.default_region.clone(),
+        };
 
-        for region in self.other_regions.values() {
-            merged_region.merge(region);
+        for region in named_regions[..named_regions.len() - 1].iter().rev() {
+            merged_region.merge_with_precedence(region);
         }
-
+        merged_region.merge_with_precedence(&self.default_region);
+        merged_region.name = self.default_region_name.clone();
+        merged_region.entities = self
+            .default_region
+            .entities
+            .iter()
+            .chain(
+                named_regions
+                    .iter()
+                    .flat_map(|region| region.entities.iter()),
+            )
+            .cloned()
+            .collect();
         merged_region
     }
 
@@ -2514,15 +2530,14 @@ impl UniversalSchematic {
         let rotate = |region: &mut Region| -> Result<(), String> {
             let old = region.get_bounding_box();
             let old_size_z = old.get_dimensions().2 as i64;
-            region.rotate_x(90);
             let desired_y =
                 global_min_y + global_size_z - (old.min.2 as i64 - global_min_z) - old_size_z;
             let desired_z = global_min_z + (old.min.1 as i64 - global_min_y);
-            region.translate(
-                0,
-                Self::checked_delta(Self::checked_coord(desired_y)?, region.position.1)?,
-                Self::checked_delta(Self::checked_coord(desired_z)?, region.position.2)?,
-            )
+            region.rotate_x_90_at((
+                region.position.0,
+                Self::checked_coord(desired_y)?,
+                Self::checked_coord(desired_z)?,
+            ))
         };
         rotate(&mut self.default_region)?;
         for region in self.other_regions.values_mut() {
@@ -2540,15 +2555,14 @@ impl UniversalSchematic {
         let rotate = |region: &mut Region| -> Result<(), String> {
             let old = region.get_bounding_box();
             let old_size_z = old.get_dimensions().2 as i64;
-            region.rotate_y(90);
             let desired_x =
                 global_min_x + global_size_z - (old.min.2 as i64 - global_min_z) - old_size_z;
             let desired_z = global_min_z + (old.min.0 as i64 - global_min_x);
-            region.translate(
-                Self::checked_delta(Self::checked_coord(desired_x)?, region.position.0)?,
-                0,
-                Self::checked_delta(Self::checked_coord(desired_z)?, region.position.2)?,
-            )
+            region.rotate_y_90_at((
+                Self::checked_coord(desired_x)?,
+                region.position.1,
+                Self::checked_coord(desired_z)?,
+            ))
         };
         rotate(&mut self.default_region)?;
         for region in self.other_regions.values_mut() {
@@ -2566,15 +2580,14 @@ impl UniversalSchematic {
         let rotate = |region: &mut Region| -> Result<(), String> {
             let old = region.get_bounding_box();
             let old_size_y = old.get_dimensions().1 as i64;
-            region.rotate_z(90);
             let desired_x =
                 global_min_x + global_size_y - (old.min.1 as i64 - global_min_y) - old_size_y;
             let desired_y = global_min_y + (old.min.0 as i64 - global_min_x);
-            region.translate(
-                Self::checked_delta(Self::checked_coord(desired_x)?, region.position.0)?,
-                Self::checked_delta(Self::checked_coord(desired_y)?, region.position.1)?,
-                0,
-            )
+            region.rotate_z_90_at((
+                Self::checked_coord(desired_x)?,
+                Self::checked_coord(desired_y)?,
+                region.position.2,
+            ))
         };
         rotate(&mut self.default_region)?;
         for region in self.other_regions.values_mut() {
@@ -3028,6 +3041,27 @@ mod tests {
             assert_eq!(schematic.default_region.position, low);
             assert_eq!(schematic.other_regions["far"].position, high);
         }
+
+        let endpoint_cases = [
+            ('x', (0, i32::MAX, 0), (1, 1, 2)),
+            ('y', (i32::MAX, 0, 0), (1, 1, 2)),
+            ('z', (i32::MAX, 0, 0), (1, 2, 1)),
+        ];
+        for (axis, position, size) in endpoint_cases {
+            let mut schematic = UniversalSchematic::new(format!("endpoint-{axis}"));
+            schematic.default_region = Region::new("Main".to_string(), position, size);
+            let before = schematic.default_region.get_bounding_box();
+
+            let result = match axis {
+                'x' => schematic.rotate_schematic_x(90),
+                'y' => schematic.rotate_schematic_y(90),
+                'z' => schematic.rotate_schematic_z(90),
+                _ => unreachable!(),
+            };
+
+            assert!(result.is_err());
+            assert_eq!(schematic.default_region.get_bounding_box(), before);
+        }
     }
 
     #[test]
@@ -3220,6 +3254,10 @@ mod tests {
         for source in [build_source(false), build_source(true)] {
             assert_eq!(source.get_region_names(), ["Main", "alpha", "zeta"]);
             assert_eq!(source.get_block(10, 0, 0).unwrap().name, "minecraft:stone");
+            assert_eq!(
+                source.get_merged_region().get_block(10, 0, 0).unwrap().name,
+                "minecraft:stone"
+            );
             let mut destination = UniversalSchematic::new("destination".to_string());
             destination
                 .stamp_box(
@@ -3234,6 +3272,57 @@ mod tests {
                 "minecraft:stone"
             );
         }
+
+        let mut main_wins = build_source(false);
+        main_wins.set_block_str(10, 0, 0, "minecraft:diamond_block");
+        assert_eq!(
+            main_wins
+                .get_merged_region()
+                .get_block(10, 0, 0)
+                .unwrap()
+                .name,
+            "minecraft:diamond_block"
+        );
+
+        let mut main_air_masks = build_source(false);
+        main_air_masks.set_block_str(9, 0, 0, "minecraft:stone");
+        main_air_masks.set_block_str(11, 0, 0, "minecraft:stone");
+        assert_eq!(
+            main_air_masks.get_block(10, 0, 0).unwrap().name,
+            "minecraft:air"
+        );
+        assert_eq!(
+            main_air_masks
+                .get_merged_region()
+                .get_block(10, 0, 0)
+                .unwrap()
+                .name,
+            "minecraft:air"
+        );
+
+        let mut named_air_masks = UniversalSchematic::new("named-air".to_string());
+        named_air_masks.set_block_str(0, 0, 0, "minecraft:stone");
+        named_air_masks
+            .try_set_block_in_region_str("alpha", 9, 0, 0, "minecraft:stone")
+            .unwrap();
+        named_air_masks
+            .try_set_block_in_region_str("alpha", 11, 0, 0, "minecraft:stone")
+            .unwrap();
+        named_air_masks
+            .try_set_block_in_region_str("zeta", 10, 0, 0, "minecraft:gold_block")
+            .unwrap();
+        assert_eq!(
+            named_air_masks.get_block(10, 0, 0).unwrap().name,
+            "minecraft:air"
+        );
+        assert_eq!(
+            named_air_masks
+                .get_merged_region()
+                .get_block(10, 0, 0)
+                .unwrap()
+                .name,
+            "minecraft:air"
+        );
 
         let mut padded_main = UniversalSchematic::new("padded-main".to_string());
         padded_main.set_block_str(0, 0, 0, "minecraft:stone");
