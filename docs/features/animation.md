@@ -373,7 +373,10 @@ rc.grid = Some(GridConfig {
 The fitted form uses `floor(min)` and `ceil(max)` from the rendered geometry,
 so an asymmetric build does not receive a misleading origin-centred square.
 Every line remains on a half-integer boundary and therefore meets the edges of
-block models centred on integer coordinates. In generated bindings, call
+block models centred on integer coordinates. When axes are enabled, their origin
+marker is block-aligned at `(-0.5, plane_y, -0.5)`, the minimum X/Z corner of
+block `(0, 0, 0)`, rather than piercing that block's centre. In generated
+bindings, call
 `RenderConfig.set_fitted_grid(margin, spacing, plane_y, ...)`.
 
 ## Screen-space overlays (labels, leader lines, code)

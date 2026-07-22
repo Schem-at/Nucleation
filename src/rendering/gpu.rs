@@ -149,12 +149,16 @@ fn build_grid_vertices(
             .max(min_x.abs())
             .max(max_z.abs())
             .max(min_z.abs());
-        push([0.0, y, 0.0], [0.9, 0.2, 0.2, 1.0]);
-        push([axis_extent, y, 0.0], [0.9, 0.2, 0.2, 1.0]);
-        push([0.0, y, 0.0], [0.2, 0.8, 0.3, 1.0]);
-        push([0.0, y + axis_extent, 0.0], [0.2, 0.8, 0.3, 1.0]);
-        push([0.0, y, 0.0], [0.3, 0.5, 0.95, 1.0]);
-        push([0.0, y, axis_extent], [0.3, 0.5, 0.95, 1.0]);
+        // Blocks are centred on integer coordinates, so the world-coordinate
+        // origin lies at the minimum X/Z corner of block (0, 0, 0). Keep the
+        // marker and coloured axes on the same half-integer lines as the grid.
+        let origin = -0.5;
+        push([origin, y, origin], [0.9, 0.2, 0.2, 1.0]);
+        push([axis_extent, y, origin], [0.9, 0.2, 0.2, 1.0]);
+        push([origin, y, origin], [0.2, 0.8, 0.3, 1.0]);
+        push([origin, y + axis_extent, origin], [0.2, 0.8, 0.3, 1.0]);
+        push([origin, y, origin], [0.3, 0.5, 0.95, 1.0]);
+        push([origin, y, axis_extent], [0.3, 0.5, 0.95, 1.0]);
     }
     v
 }
@@ -220,6 +224,35 @@ mod grid_tests {
         // Centres -4..=4 occupy cells bounded by -4.5..=4.5: 10 X-lines
         // and 10 Z-lines, plus 3 axes = 23 lines = 46 vertices.
         assert_eq!(verts, 46);
+    }
+
+    #[test]
+    fn axes_start_on_the_origin_block_boundary() {
+        let cfg = super::super::GridConfig {
+            half_extent: 2,
+            spacing: 1,
+            plane_y: -0.502,
+            show_axes: true,
+            line_rgba: [1.0; 4],
+            ..Default::default()
+        };
+        let vertices = build_grid_vertices(&cfg, [-1.0, 0.0, -1.0], [2.0, 2.0, 2.0]);
+        let points: Vec<[f32; 3]> = vertices
+            .chunks_exact(7)
+            .map(|v| [v[0], v[1], v[2]])
+            .collect();
+        let axes = &points[points.len() - 6..];
+
+        // Block (0, 0, 0) occupies -0.5..0.5 on X/Z. The origin marker and
+        // all three positive axes must meet at its minimum corner, on actual
+        // grid lines, rather than piercing the block centre at (0, 0).
+        let origin = [-0.5, cfg.plane_y, -0.5];
+        assert_eq!(axes[0], origin);
+        assert_eq!(axes[2], origin);
+        assert_eq!(axes[4], origin);
+        assert_eq!(axes[1], [2.5, cfg.plane_y, -0.5]);
+        assert_eq!(axes[3], [-0.5, cfg.plane_y + 2.5, -0.5]);
+        assert_eq!(axes[5], [-0.5, cfg.plane_y, 2.5]);
     }
 
     #[test]
