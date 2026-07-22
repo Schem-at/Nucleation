@@ -1,11 +1,10 @@
 name: Nucleation CI/CD
 
+# The full cross-platform matrix is intentionally release-only. Use the manual
+# trigger for exceptional validation between versions.
 on:
   push:
-    branches: [ main, master ]
     tags: [ 'v*' ]
-  pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
 
 permissions:
