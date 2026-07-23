@@ -25,9 +25,9 @@ pub fn to_global(local: (i32, i32, i32), tile: TileId, cell_size: u32, min_y: i3
     let (_id, bounds) = region_tile_bounds(tile.x, tile.z, min_y, min_y); // only min corner needed
     let c = cell_size as i32;
     (
-        bounds.min.0 / c + local.0,
+        bounds.min.0.div_euclid(c) + local.0,
         bounds.min.1.div_euclid(c) + local.1,
-        bounds.min.2 / c + local.2,
+        bounds.min.2.div_euclid(c) + local.2,
     )
 }
 
@@ -64,7 +64,8 @@ impl StitchState {
         s
     }
 
-    /// Find with path halving. Absent ids are their own root (defensive).
+    /// Plain walk to the root; no path compression, since `find` takes `&self`.
+    /// Absent ids are their own root (defensive).
     pub fn find(&self, mut x: ClusterId) -> ClusterId {
         while let Some(&p) = self.parent.get(&x) {
             if p == x { break; }
@@ -111,6 +112,13 @@ mod tests {
         // Y uses div_euclid: min_y -64 / 4 = -16, plus ly.
         assert_eq!(to_global((0,0,0), TileId{x:0,z:0}, 4, -64).1, -16);
         assert_eq!(to_global((0,5,0), TileId{x:0,z:0}, 4, -64).1, -11);
+        // Negative region: region -1 origin x = -512, /4 = -128.
+        assert_eq!(to_global((0,0,0), TileId{x:-1,z:0}, 4, -64).0, -128);
+        // Non-divisor cell_size on a negative region: this is the case that
+        // discriminates truncating `/` from `div_euclid`. Region -1 origin
+        // x = -512; -512.div_euclid(6) == -86, but -512 / 6 == -85
+        // (truncates toward zero). Only div_euclid gives -86.
+        assert_eq!(to_global((0,0,0), TileId{x:-1,z:0}, 6, -64).0, -86);
     }
 
     #[test]
