@@ -86,6 +86,56 @@ impl StitchState {
         let (root, child) = if ra < rb { (ra, rb) } else { (rb, ra) };
         self.parent.insert(child, root);
     }
+
+    /// Combine two stitch states: union each forest, concatenate cluster
+    /// payloads and margin entries, then re-resolve cross-tile adjacencies.
+    /// Associative, commutative and idempotent (see module docs).
+    pub fn merge(mut a: StitchState, b: StitchState, closing_radius: u32) -> StitchState {
+        // Fold b's forest and payloads into a.
+        for (id, c) in b.clusters {
+            a.parent.entry(id).or_insert(id);
+            a.clusters.entry(id).or_insert(c);
+        }
+        for (child, parent) in b.parent {
+            // Re-apply b's unions through a's smaller-id-wins rule.
+            a.union(child, parent);
+        }
+        a.margin.extend(b.margin);
+        a.margin.sort_by(|x, y| x.cell.cmp(&y.cell).then(x.cluster.cmp(&y.cluster)));
+        a.margin.dedup();
+        a.resolve_adjacencies(closing_radius);
+        a
+    }
+
+    fn resolve_adjacencies(&mut self, closing_radius: u32) {
+        let r = (2 * closing_radius + 1) as i32;
+        // Spatial index: global cell -> entries there.
+        let mut index: BTreeMap<GlobalCell, Vec<(ClusterId, Option<String>)>> = BTreeMap::new();
+        for e in &self.margin {
+            index.entry(e.cell).or_default().push((e.cluster, e.partition.clone()));
+        }
+        // Collect unions first (do not mutate the forest while iterating).
+        let mut to_union: Vec<(ClusterId, ClusterId)> = Vec::new();
+        for e in &self.margin {
+            for dx in -r..=r {
+                for dy in -r..=r {
+                    for dz in -r..=r {
+                        let n = (e.cell.0 + dx, e.cell.1 + dy, e.cell.2 + dz);
+                        if let Some(others) = index.get(&n) {
+                            for (oc, op) in others {
+                                if *oc != e.cluster && *op == e.partition {
+                                    to_union.push((e.cluster, *oc));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for (a, b) in to_union {
+            self.union(a, b);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -101,6 +151,49 @@ mod tests {
             crate::world_segment::ids::ContentId::of(&[b"t"]),
             tile, None, anchor,
         )
+    }
+
+    fn seg_with(tile: TileId, id: ClusterId, cell: (i32,i32,i32), part: Option<&str>) -> TileSegments {
+        TileSegments {
+            tile_id: tile,
+            clusters: vec![Cluster{ id, bbox:((0,0,0),(1,1,1)), block_count:5, cell_count:1,
+                                    partition_id: part.map(|s| s.to_string()) }],
+            margin: vec![MarginCell{ cell, cluster:id, partition: part.map(|s| s.to_string()) }],
+        }
+    }
+
+    #[test]
+    fn adjacent_clusters_across_a_seam_join() {
+        // Tile (0,0) right edge cell and tile (1,0) left edge cell, one global
+        // cell apart -> within 2R+1 -> same build.
+        let a = cid(TileId{x:0,z:0}, (127,1,1));
+        let b = cid(TileId{x:1,z:0}, (0,1,1));
+        // region 0 local x=127 -> global 127; region 1 local x=0 -> global 128. Distance 1.
+        let sa = StitchState::from(&seg_with(TileId{x:0,z:0}, a, (127,1,1), None), 4, -64);
+        let sb = StitchState::from(&seg_with(TileId{x:1,z:0}, b, (0,1,1), None), 4, -64);
+        let m = StitchState::merge(sa, sb, 2);
+        assert_eq!(m.find(a), m.find(b), "one global cell apart must join");
+    }
+
+    #[test]
+    fn distant_clusters_do_not_join() {
+        let a = cid(TileId{x:0,z:0}, (0,1,1));
+        let b = cid(TileId{x:1,z:0}, (100,1,1)); // far inside region 1 -> global 228, distance >> 2R+1
+        let sa = StitchState::from(&seg_with(TileId{x:0,z:0}, a, (0,1,1), None), 4, -64);
+        let sb = StitchState::from(&seg_with(TileId{x:1,z:0}, b, (100,1,1), None), 4, -64);
+        let m = StitchState::merge(sa, sb, 2);
+        assert_ne!(m.find(a), m.find(b));
+    }
+
+    #[test]
+    fn clusters_in_different_partitions_never_join() {
+        // Same geometry as the joining case, but different partitions.
+        let a = cid(TileId{x:0,z:0}, (127,1,1));
+        let b = cid(TileId{x:1,z:0}, (0,1,1));
+        let sa = StitchState::from(&seg_with(TileId{x:0,z:0}, a, (127,1,1), Some("L")), 4, -64);
+        let sb = StitchState::from(&seg_with(TileId{x:1,z:0}, b, (0,1,1), Some("R")), 4, -64);
+        let m = StitchState::merge(sa, sb, 2);
+        assert_ne!(m.find(a), m.find(b), "different partitions must not union");
     }
 
     #[test]
