@@ -1,9 +1,24 @@
 //! Phase 1: one tile in, clusters out.
 //!
 //! Substrate subtraction -> occupancy grid -> Chebyshev dilation -> connected
-//! components -> assign original cells back to their component. Two structures
-//! land in the same cluster iff their occupied cells are within `2R` cells,
-//! i.e. roughly `2 * closing_radius * cell_size` blocks.
+//! components -> assign original cells back to their component.
+//!
+//! # Merge threshold
+//!
+//! Write `R` for `closing_radius`. Two occupied cells at Chebyshev cell
+//! distance `d`, each dilated into a cube of edge `2R+1`, span `[-R, R]` and
+//! `[d-R, d+R]` on the separating axis. Those cubes *overlap* when `d <= 2R`.
+//! At `d = 2R+1` they no longer overlap — but they are **face-adjacent**
+//! (`max = R`, `min = R+1`), and components are labelled with 6-connectivity,
+//! which fuses face-adjacent cells. So the merge threshold is `2R+1` cells,
+//! i.e. up to about `(2R+1) * cell_size` blocks — not `2R`.
+//!
+//! Precisely: two cells merge when they are within `2R` on every axis, or
+//! exactly `2R+1` apart on one axis and within `2R` on the other two. A pure
+//! diagonal at `2R+1` on two or more axes does *not* merge, because
+//! 6-connectivity requires the two cubes to share a face rather than an edge
+//! or a corner. `2R+1` is therefore the maximum merge distance, reached along
+//! an axis.
 
 use std::collections::BTreeMap;
 
@@ -23,6 +38,21 @@ pub struct SegConfig {
     /// Chebyshev dilation radius, in cells.
     pub closing_radius: u32,
     /// Clusters with fewer blocks than this are not recorded.
+    ///
+    /// # This filter is per-tile and runs *before* stitching
+    ///
+    /// `segment_tile` sees one tile at a time. A build that straddles a tile
+    /// edge arrives here as two independent fragments, and each is measured
+    /// against this threshold on its own. A 30-block build split 18/12 across
+    /// an edge is dropped entirely at `min_cluster_blocks = 20`, because
+    /// neither half reaches 20 — the halves are never summed, since the sum
+    /// only exists after cross-tile stitching, which is stage 2.
+    ///
+    /// The default of `1` drops nothing, so this only bites callers who raise
+    /// it. If you want a "builds smaller than N blocks are noise" rule, apply
+    /// it to stitched clusters downstream, not here. Use this field only for
+    /// what it can honestly do: cheaply discarding per-tile specks before they
+    /// are written out.
     pub min_cluster_blocks: u64,
     pub partition_policy: PartitionPolicy,
     pub algorithm_version: u32,
@@ -51,7 +81,8 @@ pub struct Cluster {
     pub partition_id: Option<String>,
 }
 
-/// A labelled cell within `2R` of a tile face, for cross-tile stitching.
+/// A labelled cell at cell-depth `0..=2R` from a tile face, for cross-tile
+/// stitching. See `segment_tile` step 5 for why the band is `2R+1` cells wide.
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct MarginCell {
     pub cell: (i32, i32, i32),
@@ -160,8 +191,17 @@ pub fn segment_tile(
     }
     clusters.sort_by_key(|c| c.id);
 
-    // 5. Margin band: cells within 2R of any face.
-    let band = (config.closing_radius * 2) as i32;
+    // 5. Margin band: cells at depth 0..=2R from any face, i.e. a band 2R+1
+    // cells wide.
+    //
+    // Width, derived rather than guessed: a cell at depth `a` in this tile and
+    // one at depth `b` in the abutting tile are Chebyshev `a + b + 1` cells
+    // apart (the +1 crosses the face). The merge threshold is `2R+1`, so they
+    // merge when `a + b + 1 <= 2R + 1`, i.e. `a + b <= 2R`. The worst case is
+    // `b = 0`, giving `a <= 2R`. Depths `0..=2R` must therefore all be exported
+    // — that is `2R + 1` layers. A band of `2R` omits depth `2R` and silently
+    // loses joins that stage-2 stitching would otherwise make.
+    let band = (config.closing_radius * 2 + 1) as i32;
     let kept: std::collections::BTreeSet<ClusterId> = clusters.iter().map(|c| c.id).collect();
     let mut margin: Vec<MarginCell> = Vec::new();
     for (id, a) in &acc {
@@ -388,9 +428,13 @@ mod tests {
         // So the builds sit inside the ground's own cell footprint.
         //
         // Build cells: (10/4, 1, 10/4) = (2,1,2) and (30/4, 1, 30/4) = (7,1,7).
-        // Chebyshev distance 5 > 2R = 4, so with substrate subtracted they stay
-        // two clusters. Without subtraction the 40x40 stone slab spans cells
-        // x,z in 0..=9 at cell y = 1 and swallows both into one mass.
+        // They are 5 = 2R+1 apart on BOTH x and z, which is a corner-diagonal,
+        // not an axis step: dilated they span x,z in [0,4] and [5,9], and no
+        // cell of one is 6-adjacent to a cell of the other (that would need the
+        // two boxes to agree on two axes and differ by 1 on the third). So with
+        // substrate subtracted they stay two clusters. Without subtraction the
+        // 40x40 stone slab spans cells x,z in 0..=9 at cell y = 1 and swallows
+        // both into one mass.
         let mut blocks = vec![];
         for x in 0..40 {
             for z in 0..40 {
@@ -406,7 +450,8 @@ mod tests {
     #[test]
     fn a_detached_floating_component_does_not_split() {
         // The other failure mode: closing must bridge intra-build gaps.
-        // cell_size 4 * closing_radius 2 -> merges up to ~16 blocks apart.
+        // cell_size 4, closing_radius 2 -> merges cells up to 2R+1 = 5 apart
+        // along an axis, i.e. roughly 20 blocks.
         let segs = segment_tile(
             &tile(vec![
                 ((10, 10, 10), "minecraft:redstone_wire"),
@@ -599,9 +644,10 @@ mod tests {
         // leave a dangling `margin` entry pointing at a ClusterId that is not
         // in `clusters`. Nothing asserted that, so pin it.
         //
-        // (2,10,2) -> cell (0,18,0): inside the 4-cell band, but a lone block,
-        // so `min_cluster_blocks = 2` drops it.
-        // (64,10,64)/(65,10,64) -> cell (16,18,16): interior, survives.
+        // (2,10,2) -> cell (0,18,0): inside the 5-cell band (0..=4), but a lone
+        // block, so `min_cluster_blocks = 2` drops it.
+        // (64,10,64)/(65,10,64) -> cell (16,18,16): interior (5 <= 16 < 27),
+        // survives.
         let config = SegConfig { min_cluster_blocks: 2, ..cfg() };
         let segs = segment_tile(
             &tile(vec![
@@ -642,40 +688,103 @@ mod tests {
     }
 
     #[test]
-    fn margin_band_covers_cells_within_2r_of_a_face() {
-        // Bounds (0,-64,0)..(127,63,127) at cell_size 4 give dims 32 on every
-        // axis; band = 2 * closing_radius = 4 cells. So the near-face band is
-        // cells 0..=3 and the far-face band starts at cell 32 - 4 = 28.
+    fn two_cells_exactly_2r_plus_1_apart_are_one_cluster() {
+        // Pins the *merge* threshold directly, along a single axis.
         //
-        // Each case is segmented on its own tile: cells (0,18,0) and (3,18,3)
-        // are only 3 apart, within 2R, so together they would merge into one
-        // cluster and stop isolating the depth being tested.
+        // R = 2, cell_size = 4, origin (0,-64,0).
+        //   (40,10,40) -> cell (40/4, (10+64)/4, 40/4) = (10,18,10)
+        //   (60,10,40) -> cell (60/4, 18, 40/4)        = (15,18,10)
+        // Chebyshev cell distance = 15 - 10 = 5 = 2R + 1.
+        //
+        // Dilating each by R=2 gives x-spans [8,12] and [13,17]: they do NOT
+        // overlap (2R+1 > 2R), but cell (12,18,10) and cell (13,18,10) differ
+        // by 1 on exactly one axis, so 6-connectivity fuses them.
+        let segs = segment_tile(
+            &tile(vec![
+                ((40, 10, 40), "minecraft:redstone_wire"),
+                ((60, 10, 40), "minecraft:redstone_wire"),
+            ]),
+            &profile(),
+            &cfg(),
+            &no_hints(),
+        );
+        assert_eq!(
+            segs.clusters.len(),
+            1,
+            "cell distance 2R+1 must merge: the dilated cubes are face-adjacent"
+        );
+    }
+
+    #[test]
+    fn two_cells_2r_plus_2_apart_are_two_clusters() {
+        // The first non-merging distance.
+        //   (40,10,40) -> cell (10,18,10)
+        //   (64,10,40) -> cell (64/4, 18, 10) = (16,18,10)
+        // Chebyshev cell distance = 6 = 2R + 2.
+        //
+        // Dilated x-spans [8,12] and [14,18]: cell x = 13 is empty on both
+        // sides, so the two cubes are neither overlapping nor face-adjacent.
+        let segs = segment_tile(
+            &tile(vec![
+                ((40, 10, 40), "minecraft:redstone_wire"),
+                ((64, 10, 40), "minecraft:redstone_wire"),
+            ]),
+            &profile(),
+            &cfg(),
+            &no_hints(),
+        );
+        assert_eq!(segs.clusters.len(), 2, "cell distance 2R+2 leaves a one-cell gap");
+    }
+
+    #[test]
+    fn margin_band_covers_cell_depths_0_through_2r() {
+        // The band must cover every cell that could still merge with a cell in
+        // the neighbouring tile. A cell at depth `a` here and depth `b` there
+        // are Chebyshev a + b + 1 apart, and the merge threshold is 2R + 1, so
+        // they merge when a + b + 1 <= 2R + 1, i.e. a + b <= 2R. Worst case
+        // b = 0 gives a <= 2R, so depths 0..=2R must be in band — a width of
+        // 2R + 1 cells, not 2R.
+        //
+        // Bounds (0,-64,0)..(127,63,127) at cell_size 4 give dims 32 on every
+        // axis; band = 2 * closing_radius + 1 = 5 cells. So the near-face band
+        // is cells 0..=4 and the far-face band starts at cell 32 - 5 = 27.
+        //
+        // Each case is segmented on its own tile so the depth under test is
+        // isolated and cannot merge with another probe block.
 
         // Depth 0 — trivially in band. (2,10,2) -> (2/4, (10+64)/4, 2/4).
         assert_eq!(margin_cells((2, 10, 2)), vec![(0, 18, 0)]);
 
-        // Depth 3 = 2R - 1: the LAST in-band layer. This is the discriminating
-        // case — it is in-band for width 4 but out-of-band for any width <= 3,
-        // so it is what actually pins the band width.
+        // Depth 3 = 2R - 1, in band under both the old width 4 and the
+        // correct width 5. Kept as a non-regression floor.
         // (13,10,13) -> (13/4, 18, 13/4) = (3,18,3).
-        assert_eq!(
-            margin_cells((13, 10, 13)),
-            vec![(3, 18, 3)],
-            "depth 2R-1 must be in band; this fails for any band width <= 3"
-        );
+        assert_eq!(margin_cells((13, 10, 13)), vec![(3, 18, 3)]);
 
-        // Depth 4 = 2R: the FIRST out-of-band layer, pinning the upper edge.
+        // Depth 4 = 2R: the LAST in-band layer, and the discriminating case.
+        // A cell here is 4 + 0 + 1 = 5 = 2R+1 from a depth-0 cell in the
+        // neighbouring tile, so it can still merge and MUST be stitched.
+        // The old band width of 2R = 4 wrongly excluded it.
         // (17,10,17) -> (17/4, 18, 17/4) = (4,18,4).
-        assert!(
-            margin_cells((17, 10, 17)).is_empty(),
-            "depth 2R must be outside the band; this fails for any width >= 5"
+        assert_eq!(
+            margin_cells((17, 10, 17)),
+            vec![(4, 18, 4)],
+            "depth 2R must be IN band; this fails for any band width <= 4"
         );
 
-        // Same two-sided check against the far faces at cell 28.
-        // (112,10,112) -> (28,18,28), the first in-band far layer.
-        assert_eq!(margin_cells((112, 10, 112)), vec![(28, 18, 28)]);
-        // (111,10,111) -> (27,18,27), the last interior layer.
-        assert!(margin_cells((111, 10, 111)).is_empty(), "cell 27 is interior");
+        // Depth 5 = 2R + 1: the FIRST out-of-band layer, pinning the upper
+        // edge. 5 + 0 + 1 = 6 = 2R+2 from the nearest neighbouring cell, which
+        // cannot merge.
+        // (21,10,21) -> (21/4, 18, 21/4) = (5,18,5).
+        assert!(
+            margin_cells((21, 10, 21)).is_empty(),
+            "depth 2R+1 must be outside the band; this fails for any width >= 6"
+        );
+
+        // Same two-sided check against the far faces, which start at cell 27.
+        // (108,10,108) -> (108/4, 18, 108/4) = (27,18,27), first in-band layer.
+        assert_eq!(margin_cells((108, 10, 108)), vec![(27, 18, 27)]);
+        // (107,10,107) -> (107/4, 18, 107/4) = (26,18,26), last interior layer.
+        assert!(margin_cells((107, 10, 107)).is_empty(), "cell 26 is interior");
     }
 
     #[test]
