@@ -43,7 +43,10 @@ fn merge_is_commutative() {
     let (b, a) = (p.pop().unwrap(), p.pop().unwrap());
     let ab = StitchState::merge(a.clone(), b.clone(), 2).finish();
     let ba = StitchState::merge(b, a, 2).finish();
+    let (ab_len, ba_len) = (ab.len(), ba.len());
     assert_eq!(build_ids(ab), build_ids(ba));
+    assert_eq!(ab_len, 1, "the two-tile chain must collapse to one build");
+    assert_eq!(ba_len, 1, "the two-tile chain must collapse to one build regardless of merge order");
 }
 
 #[test]
@@ -63,7 +66,13 @@ fn merge_is_idempotent() {
     let m = StitchState::merge(p[0].clone(), p[1].clone(), 2);
     let once = m.clone().finish();
     let twice = StitchState::merge(m.clone(), m, 2).finish();
+    let (once_len, twice_len) = (once.len(), twice.len());
+    let once_block_count = once[0].block_count;
+    let twice_block_count = twice[0].block_count;
     assert_eq!(build_ids(once), build_ids(twice));
+    assert_eq!(once_len, 1, "the two-tile chain must collapse to one build");
+    assert_eq!(twice_len, 1, "re-merging the already-merged state must still collapse to one build");
+    assert_eq!(once_block_count, twice_block_count, "idempotent merge must not double-count blocks");
 }
 
 #[test]

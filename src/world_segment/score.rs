@@ -14,7 +14,7 @@ pub enum Tier { Confident, Probable, Debris }
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Signal { pub name: String, pub value: f64 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct ScoreConfig {
     pub debris_max_blocks: u64,
     pub confident_min_blocks: u64,
@@ -98,5 +98,12 @@ mod tests {
         let s = score(&build(1000, ((0,0,0),(9,9,9))), &cfg());
         assert!(s.signals.iter().any(|sg| sg.name == "block_count" && sg.value == 1000.0));
         assert!(s.signals.iter().any(|sg| sg.name == "density" && sg.value == 1.0));
+    }
+
+    #[test]
+    fn score_config_round_trips_through_serde_json() {
+        let c = cfg();
+        let round_tripped: ScoreConfig = serde_json::from_str(&serde_json::to_string(&c).unwrap()).unwrap();
+        assert_eq!(c, round_tripped);
     }
 }
