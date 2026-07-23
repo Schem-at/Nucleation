@@ -56,6 +56,70 @@ fn run(blocks: Vec<((i32, i32, i32), BlockState)>, hints: &PartitionIndex) -> Ti
     segment_tile(&tile, &profile(), &config(), hints)
 }
 
+/// `identical_runs_produce_identical_output` and `output_serializes_stably`
+/// both compare two runs *inside a single process*, where Rust's `HashMap`
+/// seed is fixed for the process lifetime. A `HashMap` reaching the output
+/// would therefore agree with itself and slip straight past them — precisely
+/// the failure they were written to catch.
+///
+/// A golden value closes that hole: the expected hex is baked into the source,
+/// so it was produced by a *different process* on a *different run*. Anything
+/// order-dependent that reaches a `ClusterId` — a re-seeded `HashMap`, a
+/// counter, a clock — changes this string and fails the test.
+///
+/// It also pins the id derivation itself. If the expected value changes, the
+/// id scheme changed, and that is a deliberate, breaking act: every previously
+/// stored `ClusterId` is invalidated. Update the constant only alongside a
+/// version bump (`cluster.vN`, `segconfig.vN`, or `SegConfig::algorithm_version`).
+#[test]
+fn cluster_ids_match_their_golden_values() {
+    // Everything the id depends on is spelled out literally, so that a change
+    // to any `Default` cannot silently alter what is being pinned.
+    let profile = WorldProfile::new(
+        ["minecraft:bedrock", "minecraft:stone"].iter().map(|s| s.to_string()).collect(),
+        (-64, -50),
+    );
+    let cfg = SegConfig {
+        cell_size: 4,
+        closing_radius: 2,
+        min_cluster_blocks: 1,
+        partition_policy: nucleation::world_segment::partition::PartitionPolicy::Off,
+        algorithm_version: 1,
+    };
+    let tile_bounds = TileBounds { min: (0, -64, 0), max: (127, 63, 127) };
+
+    // Two clusters, far enough apart not to merge:
+    //   (40,10,40) -> cell (40/4, (10+64)/4, 40/4) = (10,18,10)
+    //   (41,10,40) -> cell (41/4, 18, 10)          = (10,18,10)  (same cell)
+    //   (100,10,40) -> cell (100/4, 18, 10)        = (25,18,10)
+    // Chebyshev cell distance 25 - 10 = 15, well beyond the 2R+1 = 5 merge
+    // threshold. Anchors are therefore (10,18,10) and (25,18,10).
+    let blocks = vec![
+        ((40, 10, 40), BlockState::new("minecraft:redstone_wire")),
+        ((41, 10, 40), BlockState::new("minecraft:repeater")),
+        ((100, 10, 40), BlockState::new("minecraft:redstone_wire")),
+    ];
+    let tile = VoxelTile::from_blocks(TileId { x: 0, z: 0 }, tile_bounds, blocks.into_iter());
+    let segs = segment_tile(&tile, &profile, &cfg, &PartitionIndex::new(vec![]));
+
+    assert_eq!(segs.clusters.len(), 2, "the fixture must produce exactly two clusters");
+
+    // Sorted by content so the comparison does not depend on the id ordering
+    // that is itself under test.
+    let mut got: Vec<(((i32, i32, i32), (i32, i32, i32)), String)> =
+        segs.clusters.iter().map(|c| (c.bbox, c.id.to_string())).collect();
+    got.sort();
+
+    assert_eq!(
+        got,
+        vec![
+            (((40, 10, 40), (41, 10, 40)), "52e674d539ab4ccdf51f68be866190a7".to_string()),
+            (((100, 10, 40), (100, 10, 40)), "ca797a050ce2aefa1fd0fe28e8b7d150".to_string()),
+        ],
+        "ClusterId hex must be byte-identical across processes and runs"
+    );
+}
+
 #[test]
 fn identical_runs_produce_identical_output() {
     let empty = PartitionIndex::new(vec![]);

@@ -233,9 +233,22 @@ mod tests {
 
     #[test]
     fn dilate_by_zero_is_identity() {
+        // A count check alone passes for *any* single-cell result, including a
+        // wrong one. Compare the whole occupied set, and the grid geometry the
+        // dilation is supposed to carry over unchanged.
         let mut g = grid();
-        g.mark(20, 20, 20);
-        assert_eq!(g.dilated(0).count(), 1);
+        g.mark(20, 20, 20); // cell (5,5,5)
+        g.mark(0, 4, 8); // cell (0,1,2)
+        let d = g.dilated(0);
+
+        assert_eq!(
+            d.occupied_cells().collect::<Vec<_>>(),
+            g.occupied_cells().collect::<Vec<_>>(),
+            "radius 0 must reproduce the occupied set exactly, not merely its size"
+        );
+        assert_eq!(d.occupied_cells().collect::<Vec<_>>(), vec![(0, 1, 2), (5, 5, 5)]);
+        assert_eq!(d.dims(), g.dims(), "dims must be carried over");
+        assert_eq!(d.cell_size(), g.cell_size(), "cell_size must be carried over");
     }
 
     #[test]
