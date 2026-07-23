@@ -168,8 +168,19 @@ impl TileSource for TarGzSource {
             let tiles = crate::world_segment::world_source::WorldSourceTiles::new(
                 source, self.min_y, self.max_y,
             );
-            if let Some(tile) = tiles.tile(TileId { x: tx, z: tz })? {
-                f(tile)?;
+            // A corrupt chunk inside an otherwise valid region header surfaces
+            // here as TileError::Malformed from collect_tile(); report and
+            // skip this region, same as the decode failures above, rather
+            // than aborting the whole archive. `f(tile)?` intentionally still
+            // propagates — a callback error is a legitimate caller-level
+            // abort, not a per-tile decode failure.
+            match tiles.tile(TileId { x: tx, z: tz }) {
+                Ok(Some(tile)) => f(tile)?,
+                Ok(None) => {}
+                Err(e) => {
+                    eprintln!("world_segment: skipping {name}: {e}");
+                    continue;
+                }
             }
         }
         Ok(())
@@ -304,5 +315,24 @@ mod tests {
             result.is_ok(),
             "for_each_tile must skip a malformed region entry, not abort the archive: {result:?}"
         );
+
+        // NOTE: the corrupt-CHUNK-in-an-otherwise-valid-region-header path
+        // (WorldSourceTiles::collect_tile returning TileError::Malformed from
+        // a bad chunk, not a bad header) is NOT exercised here: it needs a
+        // real `.mca` fixture with a valid region header but one corrupt
+        // chunk, which isn't cheap to synthesize in-memory. That branch is
+        // covered by code inspection only (see the match on `tiles.tile(...)`
+        // above in `for_each_tile`), and this gap is recorded intentionally
+        // rather than left silent.
+        //
+        // Same fixture gap for the "callback error still propagates" case:
+        // every entry in this in-memory archive is rejected before a tile is
+        // ever decoded (see call_count == 0 above), so the callback can never
+        // run here either, and a cheap in-memory extension can't drive it.
+        // That behaviour is instead guarded structurally: `f(tile)?` in
+        // `for_each_tile` still uses `?` (only `tiles.tile(...)`'s own Err
+        // was changed to report-and-continue), so any Err the callback
+        // returns is untouched and propagates by construction. Confirmed by
+        // inspection of the match arms above, not by a running test.
     }
 }
