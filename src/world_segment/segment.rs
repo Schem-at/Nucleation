@@ -151,22 +151,8 @@ pub fn segment_tile(
     );
     let origin = bounds.min;
 
-    // 1. Substrate subtraction + voxelization.
-    let mut grid = OccupancyGrid::new(origin, dims, cell);
-    let mut artificial: Vec<(i32, i32, i32)> = Vec::new();
-    for (pos, state) in tile.blocks() {
-        if classify(state, pos.1, profile) == BlockClass::Substrate {
-            continue;
-        }
-        artificial.push(pos);
-        grid.mark(pos.0, pos.1, pos.2);
-    }
-    if artificial.is_empty() {
-        return TileSegments { tile_id: tile.id(), clusters: Vec::new(), margin: Vec::new() };
-    }
-
-    // 2/3. Dilate and label. Under HardCut, each partition is dilated and
-    // labelled in isolation, so a component can never straddle a boundary.
+    // Under HardCut, each partition is dilated and labelled in isolation, so a
+    // component can never straddle a boundary.
     //
     // `Prefer` is NOT handled here on purpose: its documented contract is that
     // crossings are allowed but *recorded*, and crossing-recording is not yet
@@ -178,38 +164,73 @@ pub fn segment_tile(
     let use_partitions =
         config.partition_policy == PartitionPolicy::HardCut && !partitions.is_empty();
 
+    // 1. Substrate subtraction + voxelization, into one occupancy grid per
+    // partition.
+    //
+    // The partition is decided **per block**, not per cell. Deciding per cell
+    // — by, say, the partition containing the cell's low corner — assigns a
+    // whole cell to one side, so a cell straddling a boundary drags the blocks
+    // on the far side along with it and produces a cluster that genuinely
+    // spans the boundary while claiming a single `partition_id`. At
+    // `cell_size = 4` a boundary is cell-aligned only one time in four, so
+    // that was the common case, not the corner case.
+    //
+    // Splitting the blocks first means a single cell may end up occupied in
+    // two partitions' grids at once. That is correct and harmless: the grids
+    // are separate, so the two occupancies never see each other, dilate
+    // independently, and label independently. The only thing it costs is that
+    // an anchor cell is no longer unique on its own — hence the partition is
+    // folded into `ClusterId` alongside the anchor.
+    //
+    // Cost is unchanged in the usual case: grids are sparse `BTreeSet`s, one
+    // per occupied partition, and a block is marked exactly once.
+    let mut artificial: Vec<((i32, i32, i32), Option<u32>)> = Vec::new();
+    let mut grids: BTreeMap<Option<u32>, OccupancyGrid> = BTreeMap::new();
+    for (pos, state) in tile.blocks() {
+        if classify(state, pos.1, profile) == BlockClass::Substrate {
+            continue;
+        }
+        // Keyed by index, not by name, so grouping is independent of the order
+        // the caller supplied the hints in.
+        let pidx =
+            if use_partitions { partitions.id_index_at(pos.0, pos.1, pos.2) } else { None };
+        artificial.push((pos, pidx));
+        grids
+            .entry(pidx)
+            .or_insert_with(|| OccupancyGrid::new(origin, dims, cell))
+            .mark(pos.0, pos.1, pos.2);
+    }
+    if artificial.is_empty() {
+        return TileSegments { tile_id: tile.id(), clusters: Vec::new(), margin: Vec::new() };
+    }
+
+    // An empty grid, used only for its `cell_of` coordinate transform. Sharing
+    // the real transform keeps step 4 from re-deriving floor division and
+    // drifting from `OccupancyGrid`.
+    let geometry = OccupancyGrid::new(origin, dims, cell);
+
+    // 2/3. Dilate and label, one partition at a time.
+    //
     // Cells grouped into clusters. The dilated labelling only *groups*; cluster
     // identity is derived afterwards, from each group's original (undilated)
     // cells. See `assign_ids` for why that matters.
     let mut groups: BTreeMap<GroupKey, GroupAcc> = BTreeMap::new();
-
-    if use_partitions {
-        // Group occupied cells by partition, keyed by index so grouping is
-        // independent of caller-supplied hint order.
-        let mut by_partition: BTreeMap<Option<u32>, Vec<(i32, i32, i32)>> = BTreeMap::new();
-        for cell_coord in grid.occupied_cells() {
-            let w = cell_world_min(origin, cell_coord, cell);
-            by_partition.entry(partitions.id_index_at(w.0, w.1, w.2)).or_default().push(cell_coord);
-        }
-        for (pidx, cells) in by_partition {
-            let mut sub = OccupancyGrid::new(origin, dims, cell);
-            for c in &cells {
-                sub.mark_cell(*c);
-            }
-            let name = pidx.map(|i| partitions.id_of_index(i).to_string());
-            group_into(&sub, config.closing_radius, pidx, &name, &mut groups);
-        }
-    } else {
-        group_into(&grid, config.closing_radius, None, &None, &mut groups);
+    for (pidx, part_grid) in &grids {
+        let name = pidx.map(|i| partitions.id_of_index(i).to_string());
+        group_into(part_grid, config.closing_radius, *pidx, &name, &mut groups);
     }
 
     let (cluster_of_cell, partition_of_cluster) = assign_ids(config_id, tile.id(), groups);
 
     // 4. Fold original blocks back into their cluster.
+    //
+    // Looked up by `(partition, cell)`: a cell shared by two partitions belongs
+    // to a different cluster in each, and each block resolves through its own
+    // partition.
     let mut acc: BTreeMap<ClusterId, ClusterAcc> = BTreeMap::new();
-    for pos in artificial {
-        let cell_coord = grid.cell_of(pos.0, pos.1, pos.2);
-        let Some(id) = cluster_of_cell.get(&cell_coord) else { continue };
+    for (pos, pidx) in artificial {
+        let cell_coord = geometry.cell_of(pos.0, pos.1, pos.2);
+        let Some(id) = cluster_of_cell.get(&(pidx, cell_coord)) else { continue };
         acc.entry(*id).or_insert_with(ClusterAcc::new).push(pos, cell_coord);
     }
 
@@ -334,32 +355,42 @@ fn group_into(
 /// cells in *different* partitions could collide onto one `ClusterId` and
 /// emerge as a single cluster straddling a boundary.
 ///
-/// Anchoring on original cells is injective by construction: groups have
-/// pairwise disjoint cell sets (each occupied cell belongs to exactly one
-/// partition and one component within it), and a set's minimum is a member of
-/// that set, so distinct groups always yield distinct anchors. It is also
+/// Anchoring on original cells is injective *within a partition*: the groups
+/// of one partition are the components of one grid, so their cell sets are
+/// pairwise disjoint, and a set's minimum is a member of that set. It is also
 /// independent of clipping and of `closing_radius`, which removes the whole
 /// class of bug rather than the one instance.
+///
+/// Across partitions the anchor alone is *not* injective: blocks are
+/// partitioned individually, so one cell can be occupied in two partitions'
+/// grids and be the lexmin of a group in each. `(partition, anchor)` is
+/// injective, which is why the partition is hashed into `ClusterId` too, and
+/// why the returned cell map is keyed by `(partition, cell)` rather than by
+/// cell alone.
 fn assign_ids(
     config: ContentId,
     tile: TileId,
     groups: BTreeMap<GroupKey, GroupAcc>,
-) -> (BTreeMap<(i32, i32, i32), ClusterId>, BTreeMap<ClusterId, Option<String>>) {
-    let mut cluster_of_cell: BTreeMap<(i32, i32, i32), ClusterId> = BTreeMap::new();
+) -> (
+    BTreeMap<(Option<u32>, (i32, i32, i32)), ClusterId>,
+    BTreeMap<ClusterId, Option<String>>,
+) {
+    let mut cluster_of_cell: BTreeMap<(Option<u32>, (i32, i32, i32)), ClusterId> = BTreeMap::new();
     let mut partition_of_cluster: BTreeMap<ClusterId, Option<String>> = BTreeMap::new();
 
-    for (_key, group) in groups {
+    for ((pidx, _label), group) in groups {
         let GroupAcc { cells, partition } = group;
         // `BTreeSet` iterates ascending, so the first cell is the lexmin.
         let Some(anchor) = cells.iter().next().copied() else { continue };
         let id = ClusterId::new(config, tile, partition.as_deref(), anchor);
         debug_assert!(
             !partition_of_cluster.contains_key(&id),
-            "ClusterId collision on anchor {anchor:?}: anchors must be unique across groups"
+            "ClusterId collision on anchor {anchor:?} in partition {partition:?}: \
+             (partition, anchor) must be unique across groups"
         );
         partition_of_cluster.insert(id, partition);
         for cell in cells {
-            cluster_of_cell.insert(cell, id);
+            cluster_of_cell.insert((pidx, cell), id);
         }
     }
 
@@ -377,30 +408,6 @@ fn span_cells(lo: i32, hi: i32, cell: u32) -> usize {
         return 0;
     }
     ((span / i64::from(cell.max(1))) + 1) as usize
-}
-
-/// Low corner of a cell, in world coordinates.
-///
-/// A whole cell is assigned to whichever partition contains its low corner, so
-/// a cell straddling a boundary lands entirely on one side. At `cell_size = 4`
-/// that is a sub-cell approximation of the true boundary; it is deterministic,
-/// which is what matters here. If boundary precision ever matters more than
-/// speed, classify per block instead of per cell.
-fn cell_world_min(origin: (i32, i32, i32), cell: (i32, i32, i32), size: u32) -> (i32, i32, i32) {
-    let s = i64::from(size);
-    // Widen, then saturate: `origin + cell * size` can overflow i32 for a cell
-    // coordinate near the grid's far edge on an extreme origin. Saturating
-    // keeps the partition lookup total instead of panicking or wrapping into a
-    // wildly wrong partition.
-    let axis = |o: i32, c: i32| -> i32 {
-        let v = i64::from(o) + i64::from(c) * s;
-        debug_assert!(
-            v >= i64::from(i32::MIN) && v <= i64::from(i32::MAX),
-            "cell_world_min overflowed i32: origin {o} + cell {c} * size {s}"
-        );
-        v.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32
-    };
-    (axis(origin.0, cell.0), axis(origin.1, cell.1), axis(origin.2, cell.2))
 }
 
 fn in_margin(cell: (i32, i32, i32), dims: (usize, usize, usize), band: i32) -> bool {
@@ -621,6 +628,95 @@ mod tests {
             segs.clusters.iter().map(|c| c.partition_id.clone().unwrap()).collect();
         got.sort();
         assert_eq!(got, vec!["far".to_string(), "near".to_string()]);
+    }
+
+    #[test]
+    fn hard_cut_holds_on_a_boundary_that_is_not_cell_aligned() {
+        // The guarantee is "no cluster spans a partition boundary". Assigning a
+        // whole cell to the partition of its low corner only approximates that:
+        // a cell straddling the boundary lands entirely on one side, dragging
+        // the blocks on the other side along with it.
+        //
+        // Boundary at x = 62, deliberately NOT a multiple of cell_size 4
+        // (62 = 15*4 + 2), so one cell genuinely straddles it:
+        //   cell x 15 covers world x 60..=63, and 62 falls strictly inside.
+        //   (60,10,40) -> cell (60/4, (10+64)/4, 40/4) = (15,18,10)   -> "L"
+        //   (63,10,40) -> cell (63/4, 18,       40/4) = (15,18,10)   -> "R"
+        // Same cell, different partitions.
+        //
+        // Per-cell assignment gave that cell to "L" (its low corner, world
+        // x = 60), producing ONE cluster with bbox ((60,10,40),(63,10,40))
+        // labelled "L" while containing a block at x = 63, which is in "R".
+        // Partitioning per block instead puts the two blocks in separate
+        // grids, so the shared cell is occupied in each independently.
+        let hints = PartitionIndex::new(vec![
+            PartitionHint { id: "L".into(), bbox_xz: (0, 61, 0, 127), y_range: None },
+            PartitionHint { id: "R".into(), bbox_xz: (62, 127, 0, 127), y_range: None },
+        ]);
+        let config = SegConfig { partition_policy: PartitionPolicy::HardCut, ..cfg() };
+        let segs = segment_tile(
+            &tile(vec![
+                ((60, 10, 40), "minecraft:redstone_wire"),
+                ((63, 10, 40), "minecraft:redstone_wire"),
+            ]),
+            &profile(),
+            &config,
+            &hints,
+        );
+
+        for c in &segs.clusters {
+            assert!(
+                !(c.bbox.0 .0 <= 61 && c.bbox.1 .0 >= 62),
+                "cluster {} spans the boundary at x=62: bbox {:?}",
+                c.id,
+                c.bbox
+            );
+        }
+        assert_eq!(segs.clusters.len(), 2, "the boundary splits the straddling cell");
+
+        let mut got: Vec<_> = segs
+            .clusters
+            .iter()
+            .map(|c| (c.partition_id.clone().unwrap(), c.bbox))
+            .collect();
+        got.sort();
+        assert_eq!(
+            got,
+            vec![
+                ("L".to_string(), ((60, 10, 40), (60, 10, 40))),
+                ("R".to_string(), ((63, 10, 40), (63, 10, 40))),
+            ],
+            "each block is attributed to the partition it actually sits in"
+        );
+    }
+
+    #[test]
+    fn a_cell_shared_by_two_partitions_yields_two_distinct_ids() {
+        // Per-block partitioning lets one cell be occupied in two partitions'
+        // grids, so two groups can share an anchor cell. They are different
+        // clusters and must not collapse onto one ClusterId — which is why the
+        // partition is folded into the id alongside the anchor.
+        //
+        // Same straddling cell (15,18,10) as above, reached from both sides.
+        let hints = PartitionIndex::new(vec![
+            PartitionHint { id: "L".into(), bbox_xz: (0, 61, 0, 127), y_range: None },
+            PartitionHint { id: "R".into(), bbox_xz: (62, 127, 0, 127), y_range: None },
+        ]);
+        let config = SegConfig { partition_policy: PartitionPolicy::HardCut, ..cfg() };
+        let segs = segment_tile(
+            &tile(vec![
+                ((60, 10, 40), "minecraft:redstone_wire"),
+                ((63, 10, 40), "minecraft:redstone_wire"),
+            ]),
+            &profile(),
+            &config,
+            &hints,
+        );
+        assert_eq!(segs.clusters.len(), 2);
+        assert_ne!(
+            segs.clusters[0].id, segs.clusters[1].id,
+            "a shared anchor cell in two partitions must still give two ids"
+        );
     }
 
     #[test]

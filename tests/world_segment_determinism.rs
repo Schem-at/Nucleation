@@ -166,8 +166,11 @@ fn overlapping_hint_order_does_not_affect_output() {
     assert_eq!(a, b, "overlapping hint order must not reach the output");
 }
 
+/// Weak on its own: the boundary at x = 128 is a multiple of `cell_size` 4, so
+/// no cell ever straddles it and per-cell partition assignment happens to be
+/// exact. See the non-aligned variant below for the discriminating case.
 #[test]
-fn no_cluster_spans_a_partition_boundary_under_hard_cut() {
+fn no_cluster_spans_a_cell_aligned_partition_boundary_under_hard_cut() {
     use nucleation::world_segment::partition::PartitionPolicy;
 
     let hints = vec![
@@ -181,5 +184,29 @@ fn no_cluster_spans_a_partition_boundary_under_hard_cut() {
     for c in &segs.clusters {
         let spans = c.bbox.0 .0 <= 127 && c.bbox.1 .0 >= 128;
         assert!(!spans, "cluster {} spans the boundary: {:?}", c.id, c.bbox);
+    }
+}
+
+/// The case the aligned test cannot see. `cell_size` is 4 and the boundary is
+/// at x = 130 = 32*4 + 2, so cell x = 32 (world x 128..=131) straddles it. Any
+/// scheme that assigns a whole cell to one partition by its low corner will let
+/// a cluster labelled "p1" contain blocks at x >= 130, which are in "p2".
+/// `scene()` places ~600 blocks across x in 0..241 with x/x+1 pairs, so the
+/// straddling column is populated.
+#[test]
+fn no_cluster_spans_a_non_cell_aligned_partition_boundary_under_hard_cut() {
+    use nucleation::world_segment::partition::PartitionPolicy;
+
+    let hints = vec![
+        PartitionHint { id: "p1".into(), bbox_xz: (0, 129, 0, 255), y_range: None },
+        PartitionHint { id: "p2".into(), bbox_xz: (130, 255, 0, 255), y_range: None },
+    ];
+    let cfg = SegConfig { partition_policy: PartitionPolicy::HardCut, ..config() };
+    let tile = VoxelTile::from_blocks(TileId { x: 0, z: 0 }, bounds(), scene().into_iter());
+    let segs = segment_tile(&tile, &profile(), &cfg, &PartitionIndex::new(hints));
+
+    for c in &segs.clusters {
+        let spans = c.bbox.0 .0 <= 129 && c.bbox.1 .0 >= 130;
+        assert!(!spans, "cluster {} spans the boundary at x=130: {:?}", c.id, c.bbox);
     }
 }
