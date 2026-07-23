@@ -14,4 +14,4 @@ pub use ids::{ClusterId, ContentId, TileId};
 pub use tile::{TileBounds, VoxelTile};
 pub use classify::{classify, BlockClass};
 pub use profile::WorldProfile;
-pub use grid::OccupancyGrid;
+pub use grid::{ComponentLabels, OccupancyGrid};

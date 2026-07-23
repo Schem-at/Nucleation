@@ -108,6 +108,74 @@ impl OccupancyGrid {
         }
         out
     }
+
+    /// Label 6-connected components with a flood fill seeded in sorted cell
+    /// order.
+    pub fn label_components(&self) -> ComponentLabels {
+        let mut labels: std::collections::BTreeMap<(i32, i32, i32), u32> = std::collections::BTreeMap::new();
+        let mut anchors: Vec<(i32, i32, i32)> = Vec::new();
+
+        // Sorted order: the first cell reached for a component is by
+        // construction its lexicographic minimum, so it is also the anchor.
+        for seed in self.occupied_cells().collect::<Vec<_>>() {
+            if labels.contains_key(&seed) {
+                continue;
+            }
+            let label = anchors.len() as u32;
+            anchors.push(seed);
+
+            let mut stack = vec![seed];
+            labels.insert(seed, label);
+            while let Some(cell) = stack.pop() {
+                const NEIGHBOURS: [(i32, i32, i32); 6] = [
+                    (1, 0, 0), (-1, 0, 0),
+                    (0, 1, 0), (0, -1, 0),
+                    (0, 0, 1), (0, 0, -1),
+                ];
+                for (dx, dy, dz) in NEIGHBOURS {
+                    let n = (cell.0 + dx, cell.1 + dy, cell.2 + dz);
+                    if self.is_occupied(n) && !labels.contains_key(&n) {
+                        labels.insert(n, label);
+                        stack.push(n);
+                    }
+                }
+            }
+        }
+
+        ComponentLabels { labels, anchors }
+    }
+}
+
+use std::collections::BTreeMap;
+
+/// Component labels over an occupancy grid.
+///
+/// Label *numbers* are positional (assigned by a sorted scan) and are never
+/// used as identity. Identity is `anchor_of`, which is a property of the
+/// component's contents and therefore independent of scan order.
+pub struct ComponentLabels {
+    labels: BTreeMap<(i32, i32, i32), u32>,
+    anchors: Vec<(i32, i32, i32)>,
+}
+
+impl ComponentLabels {
+    pub fn label_of(&self, cell: (i32, i32, i32)) -> Option<u32> {
+        self.labels.get(&cell).copied()
+    }
+
+    pub fn component_count(&self) -> usize {
+        self.anchors.len()
+    }
+
+    /// Lexicographically smallest cell in the component.
+    pub fn anchor_of(&self, label: u32) -> (i32, i32, i32) {
+        self.anchors[label as usize]
+    }
+
+    /// All labelled cells, ascending by cell coordinate.
+    pub fn cells(&self) -> impl Iterator<Item = ((i32, i32, i32), u32)> + '_ {
+        self.labels.iter().map(|(c, l)| (*c, *l))
+    }
 }
 
 #[cfg(test)]
@@ -177,5 +245,51 @@ mod tests {
         let d = g.dilated(1);
         // Only the in-bounds octant survives: 2*2*2.
         assert_eq!(d.count(), 8);
+    }
+
+    #[test]
+    fn separated_cells_are_separate_components() {
+        let mut g = grid();
+        g.mark(0, 0, 0);   // cell (0,0,0)
+        g.mark(40, 0, 0);  // cell (10,0,0)
+        let labels = g.label_components();
+        assert_eq!(labels.component_count(), 2);
+        assert_ne!(labels.label_of((0, 0, 0)), labels.label_of((10, 0, 0)));
+    }
+
+    #[test]
+    fn face_adjacent_cells_are_one_component() {
+        let mut g = grid();
+        g.mark_cell((0, 0, 0));
+        g.mark_cell((1, 0, 0));
+        let labels = g.label_components();
+        assert_eq!(labels.component_count(), 1);
+        assert_eq!(labels.label_of((0, 0, 0)), labels.label_of((1, 0, 0)));
+    }
+
+    #[test]
+    fn diagonal_only_cells_are_separate_under_6_connectivity() {
+        let mut g = grid();
+        g.mark_cell((0, 0, 0));
+        g.mark_cell((1, 1, 0));
+        assert_eq!(g.label_components().component_count(), 2);
+    }
+
+    #[test]
+    fn anchor_is_the_lexicographically_smallest_cell() {
+        let mut g = grid();
+        for c in [(5, 5, 5), (5, 5, 6), (5, 5, 7), (4, 5, 5)] {
+            g.mark_cell(c);
+        }
+        let labels = g.label_components();
+        let label = labels.label_of((5, 5, 5)).unwrap();
+        assert_eq!(labels.anchor_of(label), (4, 5, 5));
+    }
+
+    #[test]
+    fn unoccupied_cells_have_no_label() {
+        let mut g = grid();
+        g.mark_cell((0, 0, 0));
+        assert!(g.label_components().label_of((9, 9, 9)).is_none());
     }
 }
