@@ -5,5 +5,7 @@
 //! the work is ordered or sharded.
 
 pub mod ids;
+pub mod tile;
 
 pub use ids::{ClusterId, ContentId, TileId};
+pub use tile::{TileBounds, VoxelTile};
