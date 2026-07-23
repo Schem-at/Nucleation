@@ -66,3 +66,6 @@ bindings/kotlin/build/
 bindings/kotlin/.gradle/
 bindings/python/build/
 bindings/kotlin/.kotlin/
+
+# WOL project design docs (local, not for the public repo)
+/wol-project/
