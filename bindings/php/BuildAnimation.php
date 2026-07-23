@@ -105,6 +105,334 @@ final class BuildAnimation {
         return $result->ok;
     }
 
+    public function createRegion(string $name,  $min_x,  $min_y,  $min_z,  $max_x,  $max_y,  $max_z) {
+        $__n0 = strlen($name);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $name, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->BuildAnimation_create_region($this->ptr, $__view0, $min_x, $min_y, $min_z, $max_x, $max_y, $max_z);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function setBlockInRegion(string $region,  $x,  $y,  $z, string $block) {
+        $__n0 = strlen($region);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $region, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $__n4 = strlen($block);
+        $__view4 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n4 > 0) {
+            $__buf4 = Lib::ffi()->new("uint8_t[" . $__n4 . "]", false);
+            \FFI::memcpy($__buf4, $block, $__n4);
+            $__view4->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf4[0]));
+        } else {
+            $__view4->data = null;
+        }
+        $__view4->len = $__n4;
+        $result = Lib::ffi()->BuildAnimation_set_block_in_region($this->ptr, $__view0, $x, $y, $z, $__view4);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return $result->ok;
+    }
+
+    public function translate( $x,  $y,  $z,  $duration_ms) {
+        $result = Lib::ffi()->BuildAnimation_translate($this->ptr, $x, $y, $z, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function translateRegion(string $region,  $x,  $y,  $z,  $duration_ms) {
+        $__n0 = strlen($region);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $region, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->BuildAnimation_translate_region($this->ptr, $__view0, $x, $y, $z, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function translateAll( $x,  $y,  $z,  $duration_ms) {
+        $result = Lib::ffi()->BuildAnimation_translate_all($this->ptr, $x, $y, $z, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function rotateX( $degrees,  $duration_ms) {
+        $result = Lib::ffi()->BuildAnimation_rotate_x($this->ptr, $degrees, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function rotateY( $degrees,  $duration_ms) {
+        $result = Lib::ffi()->BuildAnimation_rotate_y($this->ptr, $degrees, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function rotateZ( $degrees,  $duration_ms) {
+        $result = Lib::ffi()->BuildAnimation_rotate_z($this->ptr, $degrees, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function rotateRegionX(string $region,  $degrees,  $duration_ms) {
+        $__n0 = strlen($region);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $region, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->BuildAnimation_rotate_region_x($this->ptr, $__view0, $degrees, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function rotateRegionY(string $region,  $degrees,  $duration_ms) {
+        $__n0 = strlen($region);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $region, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->BuildAnimation_rotate_region_y($this->ptr, $__view0, $degrees, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function rotateRegionZ(string $region,  $degrees,  $duration_ms) {
+        $__n0 = strlen($region);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $region, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->BuildAnimation_rotate_region_z($this->ptr, $__view0, $degrees, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function rotateAllX( $degrees,  $duration_ms) {
+        $result = Lib::ffi()->BuildAnimation_rotate_all_x($this->ptr, $degrees, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function rotateAllY( $degrees,  $duration_ms) {
+        $result = Lib::ffi()->BuildAnimation_rotate_all_y($this->ptr, $degrees, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function rotateAllZ( $degrees,  $duration_ms) {
+        $result = Lib::ffi()->BuildAnimation_rotate_all_z($this->ptr, $degrees, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function flipX( $duration_ms) {
+        $result = Lib::ffi()->BuildAnimation_flip_x($this->ptr, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function flipY( $duration_ms) {
+        $result = Lib::ffi()->BuildAnimation_flip_y($this->ptr, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function flipZ( $duration_ms) {
+        $result = Lib::ffi()->BuildAnimation_flip_z($this->ptr, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function flipRegionX(string $region,  $duration_ms) {
+        $__n0 = strlen($region);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $region, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->BuildAnimation_flip_region_x($this->ptr, $__view0, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function flipRegionY(string $region,  $duration_ms) {
+        $__n0 = strlen($region);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $region, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->BuildAnimation_flip_region_y($this->ptr, $__view0, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function flipRegionZ(string $region,  $duration_ms) {
+        $__n0 = strlen($region);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $region, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->BuildAnimation_flip_region_z($this->ptr, $__view0, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function flipAllX( $duration_ms) {
+        $result = Lib::ffi()->BuildAnimation_flip_all_x($this->ptr, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function flipAllY( $duration_ms) {
+        $result = Lib::ffi()->BuildAnimation_flip_all_y($this->ptr, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function flipAllZ( $duration_ms) {
+        $result = Lib::ffi()->BuildAnimation_flip_all_z($this->ptr, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function stampRegion( $source, string $region,  $x,  $y,  $z, string $exclusions,  $duration_ms) {
+        $__n1 = strlen($region);
+        $__view1 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n1 > 0) {
+            $__buf1 = Lib::ffi()->new("uint8_t[" . $__n1 . "]", false);
+            \FFI::memcpy($__buf1, $region, $__n1);
+            $__view1->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf1[0]));
+        } else {
+            $__view1->data = null;
+        }
+        $__view1->len = $__n1;
+        $__n5 = strlen($exclusions);
+        $__view5 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n5 > 0) {
+            $__buf5 = Lib::ffi()->new("uint8_t[" . $__n5 . "]", false);
+            \FFI::memcpy($__buf5, $exclusions, $__n5);
+            $__view5->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf5[0]));
+        } else {
+            $__view5->data = null;
+        }
+        $__view5->len = $__n5;
+        $result = Lib::ffi()->BuildAnimation_stamp_region($this->ptr, $source->ptr, $__view1, $x, $y, $z, $__view5, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function stampBox( $source,  $min_x,  $min_y,  $min_z,  $max_x,  $max_y,  $max_z,  $x,  $y,  $z, string $exclusions,  $duration_ms) {
+        $__n10 = strlen($exclusions);
+        $__view10 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n10 > 0) {
+            $__buf10 = Lib::ffi()->new("uint8_t[" . $__n10 . "]", false);
+            \FFI::memcpy($__buf10, $exclusions, $__n10);
+            $__view10->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf10[0]));
+        } else {
+            $__view10->data = null;
+        }
+        $__view10->len = $__n10;
+        $result = Lib::ffi()->BuildAnimation_stamp_box($this->ptr, $source->ptr, $min_x, $min_y, $min_z, $max_x, $max_y, $max_z, $x, $y, $z, $__view10, $duration_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function setOperationGizmos( $enabled) {
+        Lib::ffi()->BuildAnimation_set_operation_gizmos($this->ptr, $enabled);
+    }
+
+    public function operationsJson() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->BuildAnimation_operations_json($this->ptr, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function frameJson( $time_ms) {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->BuildAnimation_frame_json($this->ptr, $time_ms, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function fillAlongParameter( $shape,  $brush,  $group_count) {
         $result = Lib::ffi()->BuildAnimation_fill_along_parameter($this->ptr, $shape->ptr, $brush->ptr, $group_count);
         if (!$result->is_ok) {

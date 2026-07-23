@@ -19,6 +19,8 @@ namespace capi { struct BuildAnimation; }
 class BuildAnimation;
 namespace capi { struct RenderConfig; }
 class RenderConfig;
+namespace capi { struct Schematic; }
+class Schematic;
 namespace capi { struct Shape; }
 class Shape;
 class NucleationError;
@@ -76,6 +78,66 @@ public:
   inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> end_group();
 
   inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> set_block(int32_t x, int32_t y, int32_t z, std::string_view block);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> create_region(std::string_view name, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z);
+
+  inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> set_block_in_region(std::string_view region, int32_t x, int32_t y, int32_t z, std::string_view block);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> translate(int32_t x, int32_t y, int32_t z, float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> translate_region(std::string_view region, int32_t x, int32_t y, int32_t z, float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> translate_all(int32_t x, int32_t y, int32_t z, float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> rotate_x(int32_t degrees, float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> rotate_y(int32_t degrees, float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> rotate_z(int32_t degrees, float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> rotate_region_x(std::string_view region, int32_t degrees, float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> rotate_region_y(std::string_view region, int32_t degrees, float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> rotate_region_z(std::string_view region, int32_t degrees, float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> rotate_all_x(int32_t degrees, float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> rotate_all_y(int32_t degrees, float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> rotate_all_z(int32_t degrees, float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> flip_x(float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> flip_y(float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> flip_z(float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> flip_region_x(std::string_view region, float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> flip_region_y(std::string_view region, float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> flip_region_z(std::string_view region, float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> flip_all_x(float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> flip_all_y(float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> flip_all_z(float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> stamp_region(const nucleation::Schematic& source, std::string_view region, int32_t x, int32_t y, int32_t z, std::string_view exclusions, float duration_ms);
+
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> stamp_box(const nucleation::Schematic& source, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z, int32_t x, int32_t y, int32_t z, std::string_view exclusions, float duration_ms);
+
+  inline void set_operation_gizmos(bool enabled);
+
+  inline nucleation::diplomat::result<std::string, nucleation::NucleationError> operations_json() const;
+  template<typename W>
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> operations_json_write(W& writeable_output) const;
+
+  inline nucleation::diplomat::result<std::string, nucleation::NucleationError> frame_json(float time_ms) const;
+  template<typename W>
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> frame_json_write(float time_ms, W& writeable_output) const;
 
   /**
    * Fill a parametric shape and record its voxels as ordered groups in

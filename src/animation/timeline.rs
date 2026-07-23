@@ -70,12 +70,35 @@ impl Target {
 }
 
 /// Everything needed to draw one instant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum GizmoKind {
+    RegionBounds,
+    Pivot,
+    RotationArc,
+    SymmetryPlane,
+    TranslationArrow,
+    StampSourceBounds,
+    StampDestinationBounds,
+    ExcludedCell,
+    DestinationAnchor,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GizmoLine {
+    pub kind: GizmoKind,
+    pub start: [f32; 3],
+    pub end: [f32; 3],
+    pub color: [f32; 4],
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Frame {
     pub time_ms: f32,
     /// Sorted by [`GroupId`], so serialisation is stable.
     pub poses: Vec<(GroupId, Pose)>,
     pub camera: Option<CameraPose>,
+    #[serde(default)]
+    pub gizmos: Vec<GizmoLine>,
 }
 
 impl Frame {
@@ -190,6 +213,7 @@ impl Timeline {
             time_ms: t_ms,
             poses,
             camera,
+            gizmos: Vec::new(),
         }
     }
 

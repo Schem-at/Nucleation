@@ -31,6 +31,9 @@ pub struct Pose {
     pub tint: [f32; 4],
     /// Added after lighting. Alpha is unused; kept for uniform alignment.
     pub emissive: [f32; 4],
+    /// Optional precomposed model matrix used by exact operation animations.
+    #[serde(default)]
+    pub matrix: Option<Mat4>,
 }
 
 impl Pose {
@@ -42,6 +45,7 @@ impl Pose {
         opacity: 1.0,
         tint: [1.0, 1.0, 1.0, 1.0],
         emissive: [0.0; 4],
+        matrix: None,
     };
 
     /// An identity pose rotating and scaling about `pivot`.
@@ -60,6 +64,9 @@ impl Pose {
 
     /// Compose to a model matrix: `translate * to_pivot * rotate * scale * from_pivot`.
     pub fn to_matrix(&self) -> Mat4 {
+        if let Some(matrix) = self.matrix {
+            return matrix;
+        }
         let [rx, ry, rz] = self.rotate_deg.map(f32::to_radians);
         let (sx, cx) = rx.sin_cos();
         let (sy, cy) = ry.sin_cos();

@@ -1418,7 +1418,7 @@ impl UniversalSchematic {
             .find(|region| contains_visible_content(region, x, y, z))
     }
 
-    fn region_stamp_bounds(region: &Region) -> Option<BoundingBox> {
+    pub(crate) fn region_stamp_bounds(region: &Region) -> Option<BoundingBox> {
         let mut bounds = region.get_tight_bounds();
         for entity in &region.entities {
             let position = (

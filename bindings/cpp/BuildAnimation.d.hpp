@@ -17,6 +17,8 @@ namespace diplomat::capi { struct Brush; }
 class Brush;
 namespace diplomat::capi { struct RenderConfig; }
 class RenderConfig;
+namespace diplomat::capi { struct Schematic; }
+class Schematic;
 namespace diplomat::capi { struct Shape; }
 class Shape;
 class NucleationError;
@@ -73,6 +75,66 @@ public:
   inline diplomat::result<uint32_t, NucleationError> end_group();
 
   inline diplomat::result<uint32_t, NucleationError> set_block(int32_t x, int32_t y, int32_t z, std::string_view block);
+
+  inline diplomat::result<std::monostate, NucleationError> create_region(std::string_view name, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z);
+
+  inline diplomat::result<uint32_t, NucleationError> set_block_in_region(std::string_view region, int32_t x, int32_t y, int32_t z, std::string_view block);
+
+  inline diplomat::result<std::monostate, NucleationError> translate(int32_t x, int32_t y, int32_t z, float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> translate_region(std::string_view region, int32_t x, int32_t y, int32_t z, float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> translate_all(int32_t x, int32_t y, int32_t z, float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> rotate_x(int32_t degrees, float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> rotate_y(int32_t degrees, float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> rotate_z(int32_t degrees, float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> rotate_region_x(std::string_view region, int32_t degrees, float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> rotate_region_y(std::string_view region, int32_t degrees, float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> rotate_region_z(std::string_view region, int32_t degrees, float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> rotate_all_x(int32_t degrees, float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> rotate_all_y(int32_t degrees, float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> rotate_all_z(int32_t degrees, float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> flip_x(float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> flip_y(float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> flip_z(float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> flip_region_x(std::string_view region, float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> flip_region_y(std::string_view region, float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> flip_region_z(std::string_view region, float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> flip_all_x(float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> flip_all_y(float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> flip_all_z(float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> stamp_region(const Schematic& source, std::string_view region, int32_t x, int32_t y, int32_t z, std::string_view exclusions, float duration_ms);
+
+  inline diplomat::result<std::monostate, NucleationError> stamp_box(const Schematic& source, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z, int32_t x, int32_t y, int32_t z, std::string_view exclusions, float duration_ms);
+
+  inline void set_operation_gizmos(bool enabled);
+
+  inline diplomat::result<std::string, NucleationError> operations_json() const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> operations_json_write(W& writeable_output) const;
+
+  inline diplomat::result<std::string, NucleationError> frame_json(float time_ms) const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> frame_json_write(float time_ms, W& writeable_output) const;
 
   /**
    * Fill a parametric shape and record its voxels as ordered groups in

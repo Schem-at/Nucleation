@@ -1196,8 +1196,21 @@ impl UniversalSchematic {
         config: &MeshConfig,
         groups: &[crate::animation::Group],
     ) -> Result<Vec<MeshOutput>> {
+        self.mesh_groups_in_region(pack, config, None, groups)
+    }
+
+    pub(crate) fn mesh_groups_in_region(
+        &self,
+        pack: &ResourcePackSource,
+        config: &MeshConfig,
+        region_name: Option<&str>,
+        groups: &[crate::animation::Group],
+    ) -> Result<Vec<MeshOutput>> {
         let mesher_config = config.to_mesher_config();
-        let entities = self.get_entities_as_list();
+        let region = region_name.and_then(|name| self.get_region(name));
+        let entities = region
+            .map(|region| region.entities.clone())
+            .unwrap_or_else(|| self.get_entities_as_list());
         let mut out = Vec::with_capacity(groups.len());
 
         for group in groups {
@@ -1207,11 +1220,13 @@ impl UniversalSchematic {
 
             for &(x, y, z) in &group.blocks {
                 let pos = MesherBlockPosition { x, y, z };
-                let block = self
-                    .get_block(x, y, z)
-                    .filter(|block| !crate::fingerprint::is_air(block.get_name()))
-                    .map(block_state_to_input_block)
-                    .or_else(|| entity_input_at_position(&entities, (x, y, z)));
+                let block = match region {
+                    Some(region) => region.get_block(x, y, z),
+                    None => self.get_block(x, y, z),
+                }
+                .filter(|block| !crate::fingerprint::is_air(block.get_name()))
+                .map(block_state_to_input_block)
+                .or_else(|| entity_input_at_position(&entities, (x, y, z)));
                 let Some(block) = block else {
                     continue;
                 };

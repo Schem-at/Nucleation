@@ -11,6 +11,7 @@
 #include "Brush.d.h"
 #include "NucleationError.d.h"
 #include "RenderConfig.d.h"
+#include "Schematic.d.h"
 #include "Shape.d.h"
 
 #include "BuildAnimation.d.h"
@@ -50,6 +51,89 @@ BuildAnimation_end_group_result BuildAnimation_end_group(BuildAnimation* self);
 
 typedef struct BuildAnimation_set_block_result {union {uint32_t ok; NucleationError err;}; bool is_ok;} BuildAnimation_set_block_result;
 BuildAnimation_set_block_result BuildAnimation_set_block(BuildAnimation* self, int32_t x, int32_t y, int32_t z, DiplomatStringView block);
+
+typedef struct BuildAnimation_create_region_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_create_region_result;
+BuildAnimation_create_region_result BuildAnimation_create_region(BuildAnimation* self, DiplomatStringView name, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z);
+
+typedef struct BuildAnimation_set_block_in_region_result {union {uint32_t ok; NucleationError err;}; bool is_ok;} BuildAnimation_set_block_in_region_result;
+BuildAnimation_set_block_in_region_result BuildAnimation_set_block_in_region(BuildAnimation* self, DiplomatStringView region, int32_t x, int32_t y, int32_t z, DiplomatStringView block);
+
+typedef struct BuildAnimation_translate_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_translate_result;
+BuildAnimation_translate_result BuildAnimation_translate(BuildAnimation* self, int32_t x, int32_t y, int32_t z, float duration_ms);
+
+typedef struct BuildAnimation_translate_region_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_translate_region_result;
+BuildAnimation_translate_region_result BuildAnimation_translate_region(BuildAnimation* self, DiplomatStringView region, int32_t x, int32_t y, int32_t z, float duration_ms);
+
+typedef struct BuildAnimation_translate_all_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_translate_all_result;
+BuildAnimation_translate_all_result BuildAnimation_translate_all(BuildAnimation* self, int32_t x, int32_t y, int32_t z, float duration_ms);
+
+typedef struct BuildAnimation_rotate_x_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_rotate_x_result;
+BuildAnimation_rotate_x_result BuildAnimation_rotate_x(BuildAnimation* self, int32_t degrees, float duration_ms);
+
+typedef struct BuildAnimation_rotate_y_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_rotate_y_result;
+BuildAnimation_rotate_y_result BuildAnimation_rotate_y(BuildAnimation* self, int32_t degrees, float duration_ms);
+
+typedef struct BuildAnimation_rotate_z_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_rotate_z_result;
+BuildAnimation_rotate_z_result BuildAnimation_rotate_z(BuildAnimation* self, int32_t degrees, float duration_ms);
+
+typedef struct BuildAnimation_rotate_region_x_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_rotate_region_x_result;
+BuildAnimation_rotate_region_x_result BuildAnimation_rotate_region_x(BuildAnimation* self, DiplomatStringView region, int32_t degrees, float duration_ms);
+
+typedef struct BuildAnimation_rotate_region_y_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_rotate_region_y_result;
+BuildAnimation_rotate_region_y_result BuildAnimation_rotate_region_y(BuildAnimation* self, DiplomatStringView region, int32_t degrees, float duration_ms);
+
+typedef struct BuildAnimation_rotate_region_z_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_rotate_region_z_result;
+BuildAnimation_rotate_region_z_result BuildAnimation_rotate_region_z(BuildAnimation* self, DiplomatStringView region, int32_t degrees, float duration_ms);
+
+typedef struct BuildAnimation_rotate_all_x_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_rotate_all_x_result;
+BuildAnimation_rotate_all_x_result BuildAnimation_rotate_all_x(BuildAnimation* self, int32_t degrees, float duration_ms);
+
+typedef struct BuildAnimation_rotate_all_y_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_rotate_all_y_result;
+BuildAnimation_rotate_all_y_result BuildAnimation_rotate_all_y(BuildAnimation* self, int32_t degrees, float duration_ms);
+
+typedef struct BuildAnimation_rotate_all_z_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_rotate_all_z_result;
+BuildAnimation_rotate_all_z_result BuildAnimation_rotate_all_z(BuildAnimation* self, int32_t degrees, float duration_ms);
+
+typedef struct BuildAnimation_flip_x_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_flip_x_result;
+BuildAnimation_flip_x_result BuildAnimation_flip_x(BuildAnimation* self, float duration_ms);
+
+typedef struct BuildAnimation_flip_y_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_flip_y_result;
+BuildAnimation_flip_y_result BuildAnimation_flip_y(BuildAnimation* self, float duration_ms);
+
+typedef struct BuildAnimation_flip_z_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_flip_z_result;
+BuildAnimation_flip_z_result BuildAnimation_flip_z(BuildAnimation* self, float duration_ms);
+
+typedef struct BuildAnimation_flip_region_x_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_flip_region_x_result;
+BuildAnimation_flip_region_x_result BuildAnimation_flip_region_x(BuildAnimation* self, DiplomatStringView region, float duration_ms);
+
+typedef struct BuildAnimation_flip_region_y_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_flip_region_y_result;
+BuildAnimation_flip_region_y_result BuildAnimation_flip_region_y(BuildAnimation* self, DiplomatStringView region, float duration_ms);
+
+typedef struct BuildAnimation_flip_region_z_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_flip_region_z_result;
+BuildAnimation_flip_region_z_result BuildAnimation_flip_region_z(BuildAnimation* self, DiplomatStringView region, float duration_ms);
+
+typedef struct BuildAnimation_flip_all_x_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_flip_all_x_result;
+BuildAnimation_flip_all_x_result BuildAnimation_flip_all_x(BuildAnimation* self, float duration_ms);
+
+typedef struct BuildAnimation_flip_all_y_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_flip_all_y_result;
+BuildAnimation_flip_all_y_result BuildAnimation_flip_all_y(BuildAnimation* self, float duration_ms);
+
+typedef struct BuildAnimation_flip_all_z_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_flip_all_z_result;
+BuildAnimation_flip_all_z_result BuildAnimation_flip_all_z(BuildAnimation* self, float duration_ms);
+
+typedef struct BuildAnimation_stamp_region_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_stamp_region_result;
+BuildAnimation_stamp_region_result BuildAnimation_stamp_region(BuildAnimation* self, const Schematic* source, DiplomatStringView region, int32_t x, int32_t y, int32_t z, DiplomatStringView exclusions, float duration_ms);
+
+typedef struct BuildAnimation_stamp_box_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_stamp_box_result;
+BuildAnimation_stamp_box_result BuildAnimation_stamp_box(BuildAnimation* self, const Schematic* source, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z, int32_t x, int32_t y, int32_t z, DiplomatStringView exclusions, float duration_ms);
+
+void BuildAnimation_set_operation_gizmos(BuildAnimation* self, bool enabled);
+
+typedef struct BuildAnimation_operations_json_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_operations_json_result;
+BuildAnimation_operations_json_result BuildAnimation_operations_json(const BuildAnimation* self, DiplomatWrite* write);
+
+typedef struct BuildAnimation_frame_json_result {union { NucleationError err;}; bool is_ok;} BuildAnimation_frame_json_result;
+BuildAnimation_frame_json_result BuildAnimation_frame_json(const BuildAnimation* self, float time_ms, DiplomatWrite* write);
 
 typedef struct BuildAnimation_fill_along_parameter_result {union {uint32_t ok; NucleationError err;}; bool is_ok;} BuildAnimation_fill_along_parameter_result;
 BuildAnimation_fill_along_parameter_result BuildAnimation_fill_along_parameter(BuildAnimation* self, const Shape* shape, const Brush* brush, uint32_t group_count);

@@ -6,6 +6,10 @@ fn utf8(bytes: &[u8]) -> Result<&str, NucleationError> {
     std::str::from_utf8(bytes).map_err(|_| NucleationError::InvalidArgument)
 }
 
+fn exclusions_json(bytes: &[u8]) -> Result<Vec<String>, NucleationError> {
+    serde_json::from_str(utf8(bytes)?).map_err(|_| NucleationError::InvalidArgument)
+}
+
 fn property(name: &str) -> Result<crate::animation::Property, NucleationError> {
     use crate::animation::Property::*;
     match name {
@@ -52,8 +56,11 @@ pub mod ffi {
     use super::super::building::ffi::{Brush, Shape};
     #[cfg(all(feature = "rendering", not(target_arch = "wasm32")))]
     use super::super::rendering::ffi::RenderConfig;
+    use super::super::schematic::ffi::Schematic;
     use super::super::shared::ffi::NucleationError;
-    use super::{easing, property, utf8};
+    use super::{easing, exclusions_json, property, utf8};
+    use diplomat_runtime::DiplomatWrite;
+    use std::fmt::Write;
 
     /// A reusable set of property tracks, modelled after Anime.js object animations.
     #[diplomat::opaque_mut]
@@ -214,6 +221,270 @@ pub mod ffi {
                 .map_err(|_| NucleationError::InvalidArgument)
         }
 
+        pub fn create_region(
+            &mut self,
+            name: &DiplomatStr,
+            min_x: i32,
+            min_y: i32,
+            min_z: i32,
+            max_x: i32,
+            max_y: i32,
+            max_z: i32,
+        ) -> Result<(), NucleationError> {
+            self.0.schematic_mut().create_region(
+                utf8(name)?.to_string(),
+                (min_x, min_y, min_z),
+                (max_x, max_y, max_z),
+            );
+            Ok(())
+        }
+
+        pub fn set_block_in_region(
+            &mut self,
+            region: &DiplomatStr,
+            x: i32,
+            y: i32,
+            z: i32,
+            block: &DiplomatStr,
+        ) -> Result<u32, NucleationError> {
+            self.0
+                .set_block_in_region(utf8(region)?, x, y, z, utf8(block)?)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        pub fn translate(
+            &mut self,
+            x: i32,
+            y: i32,
+            z: i32,
+            duration_ms: f32,
+        ) -> Result<(), NucleationError> {
+            self.0
+                .translate(x, y, z, duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        pub fn translate_region(
+            &mut self,
+            region: &DiplomatStr,
+            x: i32,
+            y: i32,
+            z: i32,
+            duration_ms: f32,
+        ) -> Result<(), NucleationError> {
+            self.0
+                .translate_region(utf8(region)?, x, y, z, duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        pub fn translate_all(
+            &mut self,
+            x: i32,
+            y: i32,
+            z: i32,
+            duration_ms: f32,
+        ) -> Result<(), NucleationError> {
+            self.0
+                .translate_all(x, y, z, duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        pub fn rotate_x(&mut self, degrees: i32, duration_ms: f32) -> Result<(), NucleationError> {
+            self.0
+                .rotate_x(degrees, duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+        pub fn rotate_y(&mut self, degrees: i32, duration_ms: f32) -> Result<(), NucleationError> {
+            self.0
+                .rotate_y(degrees, duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+        pub fn rotate_z(&mut self, degrees: i32, duration_ms: f32) -> Result<(), NucleationError> {
+            self.0
+                .rotate_z(degrees, duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+        pub fn rotate_region_x(
+            &mut self,
+            region: &DiplomatStr,
+            degrees: i32,
+            duration_ms: f32,
+        ) -> Result<(), NucleationError> {
+            self.0
+                .rotate_region_x(utf8(region)?, degrees, duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+        pub fn rotate_region_y(
+            &mut self,
+            region: &DiplomatStr,
+            degrees: i32,
+            duration_ms: f32,
+        ) -> Result<(), NucleationError> {
+            self.0
+                .rotate_region_y(utf8(region)?, degrees, duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+        pub fn rotate_region_z(
+            &mut self,
+            region: &DiplomatStr,
+            degrees: i32,
+            duration_ms: f32,
+        ) -> Result<(), NucleationError> {
+            self.0
+                .rotate_region_z(utf8(region)?, degrees, duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+        pub fn rotate_all_x(
+            &mut self,
+            degrees: i32,
+            duration_ms: f32,
+        ) -> Result<(), NucleationError> {
+            self.0
+                .rotate_all_x(degrees, duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+        pub fn rotate_all_y(
+            &mut self,
+            degrees: i32,
+            duration_ms: f32,
+        ) -> Result<(), NucleationError> {
+            self.0
+                .rotate_all_y(degrees, duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+        pub fn rotate_all_z(
+            &mut self,
+            degrees: i32,
+            duration_ms: f32,
+        ) -> Result<(), NucleationError> {
+            self.0
+                .rotate_all_z(degrees, duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        pub fn flip_x(&mut self, duration_ms: f32) -> Result<(), NucleationError> {
+            self.0
+                .flip_x(duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+        pub fn flip_y(&mut self, duration_ms: f32) -> Result<(), NucleationError> {
+            self.0
+                .flip_y(duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+        pub fn flip_z(&mut self, duration_ms: f32) -> Result<(), NucleationError> {
+            self.0
+                .flip_z(duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+        pub fn flip_region_x(
+            &mut self,
+            region: &DiplomatStr,
+            duration_ms: f32,
+        ) -> Result<(), NucleationError> {
+            self.0
+                .flip_region_x(utf8(region)?, duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+        pub fn flip_region_y(
+            &mut self,
+            region: &DiplomatStr,
+            duration_ms: f32,
+        ) -> Result<(), NucleationError> {
+            self.0
+                .flip_region_y(utf8(region)?, duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+        pub fn flip_region_z(
+            &mut self,
+            region: &DiplomatStr,
+            duration_ms: f32,
+        ) -> Result<(), NucleationError> {
+            self.0
+                .flip_region_z(utf8(region)?, duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+        pub fn flip_all_x(&mut self, duration_ms: f32) -> Result<(), NucleationError> {
+            self.0
+                .flip_all_x(duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+        pub fn flip_all_y(&mut self, duration_ms: f32) -> Result<(), NucleationError> {
+            self.0
+                .flip_all_y(duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+        pub fn flip_all_z(&mut self, duration_ms: f32) -> Result<(), NucleationError> {
+            self.0
+                .flip_all_z(duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        pub fn stamp_region(
+            &mut self,
+            source: &Schematic,
+            region: &DiplomatStr,
+            x: i32,
+            y: i32,
+            z: i32,
+            exclusions: &DiplomatStr,
+            duration_ms: f32,
+        ) -> Result<(), NucleationError> {
+            let excluded = exclusions_json(exclusions)?;
+            self.0
+                .stamp_region(&source.0, utf8(region)?, (x, y, z), &excluded, duration_ms)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        pub fn stamp_box(
+            &mut self,
+            source: &Schematic,
+            min_x: i32,
+            min_y: i32,
+            min_z: i32,
+            max_x: i32,
+            max_y: i32,
+            max_z: i32,
+            x: i32,
+            y: i32,
+            z: i32,
+            exclusions: &DiplomatStr,
+            duration_ms: f32,
+        ) -> Result<(), NucleationError> {
+            let excluded = exclusions_json(exclusions)?;
+            self.0
+                .stamp_box(
+                    &source.0,
+                    crate::BoundingBox::new((min_x, min_y, min_z), (max_x, max_y, max_z)),
+                    (x, y, z),
+                    &excluded,
+                    duration_ms,
+                )
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        pub fn set_operation_gizmos(&mut self, enabled: bool) {
+            self.0.set_operation_gizmos(enabled);
+        }
+
+        pub fn operations_json(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
+            let json = self
+                .0
+                .operations_json()
+                .map_err(|_| NucleationError::Serialize)?;
+            write!(out, "{}", json).map_err(|_| NucleationError::Serialize)
+        }
+
+        pub fn frame_json(
+            &self,
+            time_ms: f32,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let json = serde_json::to_string(&self.0.frame_at(time_ms))
+                .map_err(|_| NucleationError::Serialize)?;
+            write!(out, "{}", json).map_err(|_| NucleationError::Serialize)
+        }
+
         /// Fill a parametric shape and record its voxels as ordered groups in
         /// the same transactional construction operation.
         pub fn fill_along_parameter(
@@ -277,11 +548,9 @@ pub mod ffi {
             let path = utf8(path)?;
             let pack = crate::meshing::ResourcePackSource::from_bytes(pack_zip)
                 .map_err(|_| NucleationError::Parse)?;
-            let groups = self.0.groups();
             let meshes = self
                 .0
-                .schematic()
-                .mesh_groups(&pack, &crate::meshing::MeshConfig::default(), &groups)
+                .mesh_outputs(&pack, &crate::meshing::MeshConfig::default())
                 .map_err(|_| NucleationError::Mesh)?;
             let frames = self.0.frames(fps, hold_ms);
             let pixels = crate::rendering::render_animation(&meshes, &frames, &config.0, None)
@@ -312,11 +581,9 @@ pub mod ffi {
             let prefix = utf8(prefix)?;
             let pack = crate::meshing::ResourcePackSource::from_bytes(pack_zip)
                 .map_err(|_| NucleationError::Parse)?;
-            let groups = self.0.groups();
             let meshes = self
                 .0
-                .schematic()
-                .mesh_groups(&pack, &crate::meshing::MeshConfig::default(), &groups)
+                .mesh_outputs(&pack, &crate::meshing::MeshConfig::default())
                 .map_err(|_| NucleationError::Mesh)?;
             let frames = self.0.frames(fps, hold_ms);
             crate::rendering::render_animation_to_files(&meshes, &frames, &config.0, None, prefix)
@@ -341,7 +608,7 @@ pub mod ffi {
         }
 
         pub fn duration_ms(&self) -> f32 {
-            self.0.timeline().duration_ms()
+            self.0.duration_ms()
         }
     }
 }
@@ -368,6 +635,27 @@ mod tests {
     }
 
     #[test]
+    fn bridge_exposes_transactional_region_operations_and_receipts() {
+        let mut animation = BuildAnimation::create(b"operations");
+        animation
+            .create_region(b"wing", 10, 0, 10, 11, 0, 10)
+            .unwrap();
+        animation
+            .set_block_in_region(b"wing", 10, 0, 10, b"minecraft:oak_stairs[facing=east]")
+            .unwrap();
+        animation.rotate_region_y(b"wing", -270, 250.0).unwrap();
+        assert_eq!(animation.0.operation_count(), 1);
+        assert_eq!(animation.0.operation_receipts()[0].duration_ms, 250.0);
+        assert!(animation.rotate_region_y(b"wing", 45, 250.0).is_err());
+        assert_eq!(animation.0.operation_count(), 1);
+        let receipt = &animation.0.operation_receipts()[0];
+        let frame = animation
+            .0
+            .frame_at(receipt.start_ms + receipt.duration_ms * 0.5);
+        assert!(!frame.gizmos.is_empty());
+    }
+
+    #[test]
     fn bridge_builder_exposes_group_default_override_and_camera_controls() {
         let mut animation = BuildAnimation::create(b"bridge");
         let default = AnimationEffect::drop_and_pop(480.0, 4.5);
@@ -388,6 +676,6 @@ mod tests {
         animation.animate_camera(&camera, 0.0);
         assert_eq!(animation.group_count(), 2);
         assert!(animation.duration_ms() >= 2_000.0);
-        assert_eq!(animation.frame_count(20.0, 1_000.0), 60);
+        assert_eq!(animation.frame_count(20.0, 1_000.0), 61);
     }
 }

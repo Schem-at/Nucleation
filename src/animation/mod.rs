@@ -27,6 +27,7 @@
 
 pub mod builder;
 pub mod easing;
+pub mod operation;
 pub mod pose;
 pub mod presets;
 pub mod stagger;
@@ -35,9 +36,13 @@ pub mod track;
 
 pub use builder::{AnimationEffect, BuildAnimation};
 pub use easing::{Easing, Power};
+pub use operation::{
+    BlockEntityDelta, CellDelta, EntityDelta, LatticeAffine, OperationBounds, OperationKind,
+    OperationReceipt, OperationScope, OperationTransform, TransformAxis,
+};
 pub use pose::{Mat4, Pose};
 pub use stagger::{Axis, Group, GroupId, Grouping, Order, Pos, Spread, Stagger, StaggerFrom};
-pub use timeline::{CameraPose, Frame, Target, Timeline};
+pub use timeline::{CameraPose, Frame, GizmoKind, GizmoLine, Target, Timeline};
 pub use track::{Clip, Keyframe, Modifier, Property, Repeat, Track};
 
 use crate::universal_schematic::UniversalSchematic;

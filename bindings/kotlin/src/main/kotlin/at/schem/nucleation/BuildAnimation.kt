@@ -20,6 +20,34 @@ internal interface BuildAnimationLib: Library {
     fun BuildAnimation_begin_keyed_group(handle: Pointer, key: Float): ResultUnitInt
     fun BuildAnimation_end_group(handle: Pointer): ResultFFIUint32Int
     fun BuildAnimation_set_block(handle: Pointer, x: Int, y: Int, z: Int, block: Slice): ResultFFIUint32Int
+    fun BuildAnimation_create_region(handle: Pointer, name: Slice, minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int): ResultUnitInt
+    fun BuildAnimation_set_block_in_region(handle: Pointer, region: Slice, x: Int, y: Int, z: Int, block: Slice): ResultFFIUint32Int
+    fun BuildAnimation_translate(handle: Pointer, x: Int, y: Int, z: Int, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_translate_region(handle: Pointer, region: Slice, x: Int, y: Int, z: Int, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_translate_all(handle: Pointer, x: Int, y: Int, z: Int, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_rotate_x(handle: Pointer, degrees: Int, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_rotate_y(handle: Pointer, degrees: Int, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_rotate_z(handle: Pointer, degrees: Int, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_rotate_region_x(handle: Pointer, region: Slice, degrees: Int, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_rotate_region_y(handle: Pointer, region: Slice, degrees: Int, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_rotate_region_z(handle: Pointer, region: Slice, degrees: Int, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_rotate_all_x(handle: Pointer, degrees: Int, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_rotate_all_y(handle: Pointer, degrees: Int, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_rotate_all_z(handle: Pointer, degrees: Int, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_flip_x(handle: Pointer, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_flip_y(handle: Pointer, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_flip_z(handle: Pointer, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_flip_region_x(handle: Pointer, region: Slice, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_flip_region_y(handle: Pointer, region: Slice, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_flip_region_z(handle: Pointer, region: Slice, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_flip_all_x(handle: Pointer, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_flip_all_y(handle: Pointer, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_flip_all_z(handle: Pointer, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_stamp_region(handle: Pointer, source: Pointer, region: Slice, x: Int, y: Int, z: Int, exclusions: Slice, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_stamp_box(handle: Pointer, source: Pointer, minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int, x: Int, y: Int, z: Int, exclusions: Slice, durationMs: Float): ResultUnitInt
+    fun BuildAnimation_set_operation_gizmos(handle: Pointer, enabled: Boolean): Unit
+    fun BuildAnimation_operations_json(handle: Pointer, write: Pointer): ResultUnitInt
+    fun BuildAnimation_frame_json(handle: Pointer, timeMs: Float, write: Pointer): ResultUnitInt
     fun BuildAnimation_fill_along_parameter(handle: Pointer, shape: Pointer, brush: Pointer, groupCount: FFIUint32): ResultFFIUint32Int
     fun BuildAnimation_add_armor_stand(handle: Pointer, x: Double, y: Double, z: Double, yaw: Float, armorMaterial: Slice): ResultFFIUint32Int
     fun BuildAnimation_animate_camera(handle: Pointer, effect: Pointer, offsetMs: Float): Unit
@@ -188,6 +216,372 @@ class BuildAnimation internal constructor (
             }
         } finally {
             blockSliceMemory.close()
+        }
+    }
+    
+    fun createRegion(name: String, minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int): Result<Unit> {
+        val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
+        
+        val returnVal = lib.BuildAnimation_create_region(handle, nameSliceMemory.slice, minX, minY, minZ, maxX, maxY, maxZ);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            nameSliceMemory.close()
+        }
+    }
+    
+    fun setBlockInRegion(region: String, x: Int, y: Int, z: Int, block: String): Result<UInt> {
+        val regionSliceMemory = PrimitiveArrayTools.borrowUtf8(region)
+        val blockSliceMemory = PrimitiveArrayTools.borrowUtf8(block)
+        
+        val returnVal = lib.BuildAnimation_set_block_in_region(handle, regionSliceMemory.slice, x, y, z, blockSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return (nativeOkVal.toUInt()).ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            regionSliceMemory.close()
+            blockSliceMemory.close()
+        }
+    }
+    
+    fun translate(x: Int, y: Int, z: Int, durationMs: Float): Result<Unit> {
+        
+        val returnVal = lib.BuildAnimation_translate(handle, x, y, z, durationMs);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    fun translateRegion(region: String, x: Int, y: Int, z: Int, durationMs: Float): Result<Unit> {
+        val regionSliceMemory = PrimitiveArrayTools.borrowUtf8(region)
+        
+        val returnVal = lib.BuildAnimation_translate_region(handle, regionSliceMemory.slice, x, y, z, durationMs);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            regionSliceMemory.close()
+        }
+    }
+    
+    fun translateAll(x: Int, y: Int, z: Int, durationMs: Float): Result<Unit> {
+        
+        val returnVal = lib.BuildAnimation_translate_all(handle, x, y, z, durationMs);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    fun rotateX(degrees: Int, durationMs: Float): Result<Unit> {
+        
+        val returnVal = lib.BuildAnimation_rotate_x(handle, degrees, durationMs);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    fun rotateY(degrees: Int, durationMs: Float): Result<Unit> {
+        
+        val returnVal = lib.BuildAnimation_rotate_y(handle, degrees, durationMs);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    fun rotateZ(degrees: Int, durationMs: Float): Result<Unit> {
+        
+        val returnVal = lib.BuildAnimation_rotate_z(handle, degrees, durationMs);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    fun rotateRegionX(region: String, degrees: Int, durationMs: Float): Result<Unit> {
+        val regionSliceMemory = PrimitiveArrayTools.borrowUtf8(region)
+        
+        val returnVal = lib.BuildAnimation_rotate_region_x(handle, regionSliceMemory.slice, degrees, durationMs);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            regionSliceMemory.close()
+        }
+    }
+    
+    fun rotateRegionY(region: String, degrees: Int, durationMs: Float): Result<Unit> {
+        val regionSliceMemory = PrimitiveArrayTools.borrowUtf8(region)
+        
+        val returnVal = lib.BuildAnimation_rotate_region_y(handle, regionSliceMemory.slice, degrees, durationMs);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            regionSliceMemory.close()
+        }
+    }
+    
+    fun rotateRegionZ(region: String, degrees: Int, durationMs: Float): Result<Unit> {
+        val regionSliceMemory = PrimitiveArrayTools.borrowUtf8(region)
+        
+        val returnVal = lib.BuildAnimation_rotate_region_z(handle, regionSliceMemory.slice, degrees, durationMs);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            regionSliceMemory.close()
+        }
+    }
+    
+    fun rotateAllX(degrees: Int, durationMs: Float): Result<Unit> {
+        
+        val returnVal = lib.BuildAnimation_rotate_all_x(handle, degrees, durationMs);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    fun rotateAllY(degrees: Int, durationMs: Float): Result<Unit> {
+        
+        val returnVal = lib.BuildAnimation_rotate_all_y(handle, degrees, durationMs);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    fun rotateAllZ(degrees: Int, durationMs: Float): Result<Unit> {
+        
+        val returnVal = lib.BuildAnimation_rotate_all_z(handle, degrees, durationMs);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    fun flipX(durationMs: Float): Result<Unit> {
+        
+        val returnVal = lib.BuildAnimation_flip_x(handle, durationMs);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    fun flipY(durationMs: Float): Result<Unit> {
+        
+        val returnVal = lib.BuildAnimation_flip_y(handle, durationMs);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    fun flipZ(durationMs: Float): Result<Unit> {
+        
+        val returnVal = lib.BuildAnimation_flip_z(handle, durationMs);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    fun flipRegionX(region: String, durationMs: Float): Result<Unit> {
+        val regionSliceMemory = PrimitiveArrayTools.borrowUtf8(region)
+        
+        val returnVal = lib.BuildAnimation_flip_region_x(handle, regionSliceMemory.slice, durationMs);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            regionSliceMemory.close()
+        }
+    }
+    
+    fun flipRegionY(region: String, durationMs: Float): Result<Unit> {
+        val regionSliceMemory = PrimitiveArrayTools.borrowUtf8(region)
+        
+        val returnVal = lib.BuildAnimation_flip_region_y(handle, regionSliceMemory.slice, durationMs);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            regionSliceMemory.close()
+        }
+    }
+    
+    fun flipRegionZ(region: String, durationMs: Float): Result<Unit> {
+        val regionSliceMemory = PrimitiveArrayTools.borrowUtf8(region)
+        
+        val returnVal = lib.BuildAnimation_flip_region_z(handle, regionSliceMemory.slice, durationMs);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            regionSliceMemory.close()
+        }
+    }
+    
+    fun flipAllX(durationMs: Float): Result<Unit> {
+        
+        val returnVal = lib.BuildAnimation_flip_all_x(handle, durationMs);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    fun flipAllY(durationMs: Float): Result<Unit> {
+        
+        val returnVal = lib.BuildAnimation_flip_all_y(handle, durationMs);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    fun flipAllZ(durationMs: Float): Result<Unit> {
+        
+        val returnVal = lib.BuildAnimation_flip_all_z(handle, durationMs);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    fun stampRegion(source: Schematic, region: String, x: Int, y: Int, z: Int, exclusions: String, durationMs: Float): Result<Unit> {
+        val regionSliceMemory = PrimitiveArrayTools.borrowUtf8(region)
+        val exclusionsSliceMemory = PrimitiveArrayTools.borrowUtf8(exclusions)
+        
+        val returnVal = lib.BuildAnimation_stamp_region(handle, source.handle, regionSliceMemory.slice, x, y, z, exclusionsSliceMemory.slice, durationMs);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            regionSliceMemory.close()
+            exclusionsSliceMemory.close()
+        }
+    }
+    
+    fun stampBox(source: Schematic, minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int, x: Int, y: Int, z: Int, exclusions: String, durationMs: Float): Result<Unit> {
+        val exclusionsSliceMemory = PrimitiveArrayTools.borrowUtf8(exclusions)
+        
+        val returnVal = lib.BuildAnimation_stamp_box(handle, source.handle, minX, minY, minZ, maxX, maxY, maxZ, x, y, z, exclusionsSliceMemory.slice, durationMs);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            exclusionsSliceMemory.close()
+        }
+    }
+    
+    fun setOperationGizmos(enabled: Boolean): Unit {
+        
+        val returnVal = lib.BuildAnimation_set_operation_gizmos(handle, enabled);
+        
+    }
+    
+    fun operationsJson(): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.BuildAnimation_operations_json(handle, write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    fun frameJson(timeMs: Float): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.BuildAnimation_frame_json(handle, timeMs, write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
     

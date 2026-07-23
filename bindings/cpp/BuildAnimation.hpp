@@ -15,6 +15,7 @@
 #include "Brush.hpp"
 #include "NucleationError.hpp"
 #include "RenderConfig.hpp"
+#include "Schematic.hpp"
 #include "Shape.hpp"
 #include "diplomat_runtime.hpp"
 
@@ -53,6 +54,89 @@ namespace capi {
 
     typedef struct BuildAnimation_set_block_result {union {uint32_t ok; diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_set_block_result;
     BuildAnimation_set_block_result BuildAnimation_set_block(diplomat::capi::BuildAnimation* self, int32_t x, int32_t y, int32_t z, diplomat::capi::DiplomatStringView block);
+
+    typedef struct BuildAnimation_create_region_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_create_region_result;
+    BuildAnimation_create_region_result BuildAnimation_create_region(diplomat::capi::BuildAnimation* self, diplomat::capi::DiplomatStringView name, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z);
+
+    typedef struct BuildAnimation_set_block_in_region_result {union {uint32_t ok; diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_set_block_in_region_result;
+    BuildAnimation_set_block_in_region_result BuildAnimation_set_block_in_region(diplomat::capi::BuildAnimation* self, diplomat::capi::DiplomatStringView region, int32_t x, int32_t y, int32_t z, diplomat::capi::DiplomatStringView block);
+
+    typedef struct BuildAnimation_translate_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_translate_result;
+    BuildAnimation_translate_result BuildAnimation_translate(diplomat::capi::BuildAnimation* self, int32_t x, int32_t y, int32_t z, float duration_ms);
+
+    typedef struct BuildAnimation_translate_region_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_translate_region_result;
+    BuildAnimation_translate_region_result BuildAnimation_translate_region(diplomat::capi::BuildAnimation* self, diplomat::capi::DiplomatStringView region, int32_t x, int32_t y, int32_t z, float duration_ms);
+
+    typedef struct BuildAnimation_translate_all_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_translate_all_result;
+    BuildAnimation_translate_all_result BuildAnimation_translate_all(diplomat::capi::BuildAnimation* self, int32_t x, int32_t y, int32_t z, float duration_ms);
+
+    typedef struct BuildAnimation_rotate_x_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_rotate_x_result;
+    BuildAnimation_rotate_x_result BuildAnimation_rotate_x(diplomat::capi::BuildAnimation* self, int32_t degrees, float duration_ms);
+
+    typedef struct BuildAnimation_rotate_y_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_rotate_y_result;
+    BuildAnimation_rotate_y_result BuildAnimation_rotate_y(diplomat::capi::BuildAnimation* self, int32_t degrees, float duration_ms);
+
+    typedef struct BuildAnimation_rotate_z_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_rotate_z_result;
+    BuildAnimation_rotate_z_result BuildAnimation_rotate_z(diplomat::capi::BuildAnimation* self, int32_t degrees, float duration_ms);
+
+    typedef struct BuildAnimation_rotate_region_x_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_rotate_region_x_result;
+    BuildAnimation_rotate_region_x_result BuildAnimation_rotate_region_x(diplomat::capi::BuildAnimation* self, diplomat::capi::DiplomatStringView region, int32_t degrees, float duration_ms);
+
+    typedef struct BuildAnimation_rotate_region_y_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_rotate_region_y_result;
+    BuildAnimation_rotate_region_y_result BuildAnimation_rotate_region_y(diplomat::capi::BuildAnimation* self, diplomat::capi::DiplomatStringView region, int32_t degrees, float duration_ms);
+
+    typedef struct BuildAnimation_rotate_region_z_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_rotate_region_z_result;
+    BuildAnimation_rotate_region_z_result BuildAnimation_rotate_region_z(diplomat::capi::BuildAnimation* self, diplomat::capi::DiplomatStringView region, int32_t degrees, float duration_ms);
+
+    typedef struct BuildAnimation_rotate_all_x_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_rotate_all_x_result;
+    BuildAnimation_rotate_all_x_result BuildAnimation_rotate_all_x(diplomat::capi::BuildAnimation* self, int32_t degrees, float duration_ms);
+
+    typedef struct BuildAnimation_rotate_all_y_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_rotate_all_y_result;
+    BuildAnimation_rotate_all_y_result BuildAnimation_rotate_all_y(diplomat::capi::BuildAnimation* self, int32_t degrees, float duration_ms);
+
+    typedef struct BuildAnimation_rotate_all_z_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_rotate_all_z_result;
+    BuildAnimation_rotate_all_z_result BuildAnimation_rotate_all_z(diplomat::capi::BuildAnimation* self, int32_t degrees, float duration_ms);
+
+    typedef struct BuildAnimation_flip_x_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_flip_x_result;
+    BuildAnimation_flip_x_result BuildAnimation_flip_x(diplomat::capi::BuildAnimation* self, float duration_ms);
+
+    typedef struct BuildAnimation_flip_y_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_flip_y_result;
+    BuildAnimation_flip_y_result BuildAnimation_flip_y(diplomat::capi::BuildAnimation* self, float duration_ms);
+
+    typedef struct BuildAnimation_flip_z_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_flip_z_result;
+    BuildAnimation_flip_z_result BuildAnimation_flip_z(diplomat::capi::BuildAnimation* self, float duration_ms);
+
+    typedef struct BuildAnimation_flip_region_x_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_flip_region_x_result;
+    BuildAnimation_flip_region_x_result BuildAnimation_flip_region_x(diplomat::capi::BuildAnimation* self, diplomat::capi::DiplomatStringView region, float duration_ms);
+
+    typedef struct BuildAnimation_flip_region_y_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_flip_region_y_result;
+    BuildAnimation_flip_region_y_result BuildAnimation_flip_region_y(diplomat::capi::BuildAnimation* self, diplomat::capi::DiplomatStringView region, float duration_ms);
+
+    typedef struct BuildAnimation_flip_region_z_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_flip_region_z_result;
+    BuildAnimation_flip_region_z_result BuildAnimation_flip_region_z(diplomat::capi::BuildAnimation* self, diplomat::capi::DiplomatStringView region, float duration_ms);
+
+    typedef struct BuildAnimation_flip_all_x_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_flip_all_x_result;
+    BuildAnimation_flip_all_x_result BuildAnimation_flip_all_x(diplomat::capi::BuildAnimation* self, float duration_ms);
+
+    typedef struct BuildAnimation_flip_all_y_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_flip_all_y_result;
+    BuildAnimation_flip_all_y_result BuildAnimation_flip_all_y(diplomat::capi::BuildAnimation* self, float duration_ms);
+
+    typedef struct BuildAnimation_flip_all_z_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_flip_all_z_result;
+    BuildAnimation_flip_all_z_result BuildAnimation_flip_all_z(diplomat::capi::BuildAnimation* self, float duration_ms);
+
+    typedef struct BuildAnimation_stamp_region_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_stamp_region_result;
+    BuildAnimation_stamp_region_result BuildAnimation_stamp_region(diplomat::capi::BuildAnimation* self, const diplomat::capi::Schematic* source, diplomat::capi::DiplomatStringView region, int32_t x, int32_t y, int32_t z, diplomat::capi::DiplomatStringView exclusions, float duration_ms);
+
+    typedef struct BuildAnimation_stamp_box_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_stamp_box_result;
+    BuildAnimation_stamp_box_result BuildAnimation_stamp_box(diplomat::capi::BuildAnimation* self, const diplomat::capi::Schematic* source, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z, int32_t x, int32_t y, int32_t z, diplomat::capi::DiplomatStringView exclusions, float duration_ms);
+
+    void BuildAnimation_set_operation_gizmos(diplomat::capi::BuildAnimation* self, bool enabled);
+
+    typedef struct BuildAnimation_operations_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_operations_json_result;
+    BuildAnimation_operations_json_result BuildAnimation_operations_json(const diplomat::capi::BuildAnimation* self, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct BuildAnimation_frame_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_frame_json_result;
+    BuildAnimation_frame_json_result BuildAnimation_frame_json(const diplomat::capi::BuildAnimation* self, float time_ms, diplomat::capi::DiplomatWrite* write);
 
     typedef struct BuildAnimation_fill_along_parameter_result {union {uint32_t ok; diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_fill_along_parameter_result;
     BuildAnimation_fill_along_parameter_result BuildAnimation_fill_along_parameter(diplomat::capi::BuildAnimation* self, const diplomat::capi::Shape* shape, const diplomat::capi::Brush* brush, uint32_t group_count);
@@ -151,6 +235,245 @@ inline diplomat::result<uint32_t, NucleationError> BuildAnimation::set_block(int
         z,
         {block.data(), block.size()});
     return result.is_ok ? diplomat::result<uint32_t, NucleationError>(diplomat::Ok<uint32_t>(result.ok)) : diplomat::result<uint32_t, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::create_region(std::string_view name, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z) {
+    auto result = diplomat::capi::BuildAnimation_create_region(this->AsFFI(),
+        {name.data(), name.size()},
+        min_x,
+        min_y,
+        min_z,
+        max_x,
+        max_y,
+        max_z);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<uint32_t, NucleationError> BuildAnimation::set_block_in_region(std::string_view region, int32_t x, int32_t y, int32_t z, std::string_view block) {
+    auto result = diplomat::capi::BuildAnimation_set_block_in_region(this->AsFFI(),
+        {region.data(), region.size()},
+        x,
+        y,
+        z,
+        {block.data(), block.size()});
+    return result.is_ok ? diplomat::result<uint32_t, NucleationError>(diplomat::Ok<uint32_t>(result.ok)) : diplomat::result<uint32_t, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::translate(int32_t x, int32_t y, int32_t z, float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_translate(this->AsFFI(),
+        x,
+        y,
+        z,
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::translate_region(std::string_view region, int32_t x, int32_t y, int32_t z, float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_translate_region(this->AsFFI(),
+        {region.data(), region.size()},
+        x,
+        y,
+        z,
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::translate_all(int32_t x, int32_t y, int32_t z, float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_translate_all(this->AsFFI(),
+        x,
+        y,
+        z,
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::rotate_x(int32_t degrees, float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_rotate_x(this->AsFFI(),
+        degrees,
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::rotate_y(int32_t degrees, float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_rotate_y(this->AsFFI(),
+        degrees,
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::rotate_z(int32_t degrees, float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_rotate_z(this->AsFFI(),
+        degrees,
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::rotate_region_x(std::string_view region, int32_t degrees, float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_rotate_region_x(this->AsFFI(),
+        {region.data(), region.size()},
+        degrees,
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::rotate_region_y(std::string_view region, int32_t degrees, float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_rotate_region_y(this->AsFFI(),
+        {region.data(), region.size()},
+        degrees,
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::rotate_region_z(std::string_view region, int32_t degrees, float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_rotate_region_z(this->AsFFI(),
+        {region.data(), region.size()},
+        degrees,
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::rotate_all_x(int32_t degrees, float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_rotate_all_x(this->AsFFI(),
+        degrees,
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::rotate_all_y(int32_t degrees, float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_rotate_all_y(this->AsFFI(),
+        degrees,
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::rotate_all_z(int32_t degrees, float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_rotate_all_z(this->AsFFI(),
+        degrees,
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::flip_x(float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_flip_x(this->AsFFI(),
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::flip_y(float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_flip_y(this->AsFFI(),
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::flip_z(float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_flip_z(this->AsFFI(),
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::flip_region_x(std::string_view region, float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_flip_region_x(this->AsFFI(),
+        {region.data(), region.size()},
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::flip_region_y(std::string_view region, float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_flip_region_y(this->AsFFI(),
+        {region.data(), region.size()},
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::flip_region_z(std::string_view region, float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_flip_region_z(this->AsFFI(),
+        {region.data(), region.size()},
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::flip_all_x(float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_flip_all_x(this->AsFFI(),
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::flip_all_y(float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_flip_all_y(this->AsFFI(),
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::flip_all_z(float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_flip_all_z(this->AsFFI(),
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::stamp_region(const Schematic& source, std::string_view region, int32_t x, int32_t y, int32_t z, std::string_view exclusions, float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_stamp_region(this->AsFFI(),
+        source.AsFFI(),
+        {region.data(), region.size()},
+        x,
+        y,
+        z,
+        {exclusions.data(), exclusions.size()},
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::stamp_box(const Schematic& source, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z, int32_t x, int32_t y, int32_t z, std::string_view exclusions, float duration_ms) {
+    auto result = diplomat::capi::BuildAnimation_stamp_box(this->AsFFI(),
+        source.AsFFI(),
+        min_x,
+        min_y,
+        min_z,
+        max_x,
+        max_y,
+        max_z,
+        x,
+        y,
+        z,
+        {exclusions.data(), exclusions.size()},
+        duration_ms);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline void BuildAnimation::set_operation_gizmos(bool enabled) {
+    diplomat::capi::BuildAnimation_set_operation_gizmos(this->AsFFI(),
+        enabled);
+}
+
+inline diplomat::result<std::string, NucleationError> BuildAnimation::operations_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::BuildAnimation_operations_json(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::operations_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::BuildAnimation_operations_json(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> BuildAnimation::frame_json(float time_ms) const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::BuildAnimation_frame_json(this->AsFFI(),
+        time_ms,
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> BuildAnimation::frame_json_write(float time_ms, W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::BuildAnimation_frame_json(this->AsFFI(),
+        time_ms,
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
 inline diplomat::result<uint32_t, NucleationError> BuildAnimation::fill_along_parameter(const Shape& shape, const Brush& brush, uint32_t group_count) {

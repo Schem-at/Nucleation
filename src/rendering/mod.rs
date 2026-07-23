@@ -221,6 +221,7 @@ pub fn render_animation(
                 }
             }
             renderer.set_poses(&poses);
+            renderer.set_gizmos(&frame.gizmos);
 
             // A camera clip on the same timeline moves the view with the build.
             let camera = match &frame.camera {

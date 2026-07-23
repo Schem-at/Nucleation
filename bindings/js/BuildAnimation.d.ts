@@ -2,6 +2,7 @@
 import type { AnimationEffect } from "./AnimationEffect"
 import type { Brush } from "./Brush"
 import type { NucleationError } from "./NucleationError"
+import type { Schematic } from "./Schematic"
 import type { Shape } from "./Shape"
 import type { pointer, codepoint } from "./diplomat-runtime.d.ts";
 
@@ -54,6 +55,62 @@ export class BuildAnimation {
     endGroup(): number;
 
     setBlock(x: number, y: number, z: number, block: string): number;
+
+    createRegion(name: string, minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number): void;
+
+    setBlockInRegion(region: string, x: number, y: number, z: number, block: string): number;
+
+    translate(x: number, y: number, z: number, durationMs: number): void;
+
+    translateRegion(region: string, x: number, y: number, z: number, durationMs: number): void;
+
+    translateAll(x: number, y: number, z: number, durationMs: number): void;
+
+    rotateX(degrees: number, durationMs: number): void;
+
+    rotateY(degrees: number, durationMs: number): void;
+
+    rotateZ(degrees: number, durationMs: number): void;
+
+    rotateRegionX(region: string, degrees: number, durationMs: number): void;
+
+    rotateRegionY(region: string, degrees: number, durationMs: number): void;
+
+    rotateRegionZ(region: string, degrees: number, durationMs: number): void;
+
+    rotateAllX(degrees: number, durationMs: number): void;
+
+    rotateAllY(degrees: number, durationMs: number): void;
+
+    rotateAllZ(degrees: number, durationMs: number): void;
+
+    flipX(durationMs: number): void;
+
+    flipY(durationMs: number): void;
+
+    flipZ(durationMs: number): void;
+
+    flipRegionX(region: string, durationMs: number): void;
+
+    flipRegionY(region: string, durationMs: number): void;
+
+    flipRegionZ(region: string, durationMs: number): void;
+
+    flipAllX(durationMs: number): void;
+
+    flipAllY(durationMs: number): void;
+
+    flipAllZ(durationMs: number): void;
+
+    stampRegion(source: Schematic, region: string, x: number, y: number, z: number, exclusions: string, durationMs: number): void;
+
+    stampBox(source: Schematic, minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number, x: number, y: number, z: number, exclusions: string, durationMs: number): void;
+
+    setOperationGizmos(enabled: boolean): void;
+
+    operationsJson(): string;
+
+    frameJson(timeMs: number): string;
 
     /**
      * Fill a parametric shape and record its voxels as ordered groups in

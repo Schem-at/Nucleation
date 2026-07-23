@@ -75,11 +75,15 @@ fn hdri_diffuse(normal: vec3<f32>) -> vec3<f32> {
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let tex_color = textureSample(atlas_texture, atlas_sampler, in.uv);
+    let material_alpha = tex_color.a * in.color.a;
     let base_color = tex_color * in.color * draw.tint;
+    if base_color.a <= 0.0001 {
+        discard;
+    }
 
-    // Alpha cutoff for cutout pass
+    // Cutout classification depends on the material, not animation opacity.
     let alpha_cutoff = uniforms.params.x;
-    if alpha_cutoff > 0.0 && base_color.a < alpha_cutoff {
+    if alpha_cutoff > 0.0 && material_alpha < alpha_cutoff {
         discard;
     }
 

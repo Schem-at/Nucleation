@@ -334,6 +334,7 @@ pub struct GpuRenderer {
     // Optional world-space reference grid.
     line_pipeline: wgpu::RenderPipeline,
     grid: std::cell::Cell<Option<super::GridConfig>>,
+    gizmos: std::cell::RefCell<Vec<crate::animation::GizmoLine>>,
     chunks_gpu: Vec<ChunkGpuData>,
     // Headless-only (None in windowed mode)
     render_target: Option<wgpu::Texture>,
@@ -763,8 +764,18 @@ impl GpuRenderer {
                 })
             };
 
-        let opaque_pipeline = make_mesh_pipeline("opaque", None, true, true);
-        let cutout_pipeline = make_mesh_pipeline("cutout", None, true, true);
+        let opaque_pipeline = make_mesh_pipeline(
+            "opaque",
+            Some(wgpu::BlendState::ALPHA_BLENDING),
+            true,
+            false,
+        );
+        let cutout_pipeline = make_mesh_pipeline(
+            "cutout",
+            Some(wgpu::BlendState::ALPHA_BLENDING),
+            true,
+            false,
+        );
         let transparent_pipeline = make_mesh_pipeline(
             "transparent",
             Some(wgpu::BlendState::ALPHA_BLENDING),
@@ -1075,6 +1086,7 @@ impl GpuRenderer {
             draw_stride,
             line_pipeline,
             grid: std::cell::Cell::new(None),
+            gizmos: std::cell::RefCell::new(Vec::new()),
             chunks_gpu,
             render_target,
             render_target_view,
@@ -1144,15 +1156,32 @@ impl GpuRenderer {
 
         let clear_color = clear_color_for(camera.background, self.hdri_enabled);
 
-        // Build the grid vertex buffer before the pass so it outlives it.
-        let grid_lines = self.grid.get().map(|cfg| {
-            let verts = build_grid_vertices(&cfg, self.bounds_min, self.bounds_max);
-            let count = (verts.len() / 7) as u32;
+        // Build the world-space line buffer before the pass so it outlives it.
+        let mut line_vertices = self
+            .grid
+            .get()
+            .map(|cfg| build_grid_vertices(&cfg, self.bounds_min, self.bounds_max))
+            .unwrap_or_default();
+        for line in self.gizmos.borrow().iter() {
+            for point in [line.start, line.end] {
+                line_vertices.extend_from_slice(&[
+                    point[0],
+                    point[1],
+                    point[2],
+                    line.color[0],
+                    line.color[1],
+                    line.color[2],
+                    line.color[3],
+                ]);
+            }
+        }
+        let world_lines = (!line_vertices.is_empty()).then(|| {
+            let count = (line_vertices.len() / 7) as u32;
             let buf = self
                 .device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("grid_lines"),
-                    contents: bytemuck::cast_slice(&verts),
+                    label: Some("world_lines"),
+                    contents: bytemuck::cast_slice(&line_vertices),
                     usage: wgpu::BufferUsages::VERTEX,
                 });
             (buf, count)
@@ -1234,7 +1263,7 @@ impl GpuRenderer {
         }
         // Grid after the opaque/cutout depth is laid down (so blocks occlude it)
         // but before transparent geometry (so glass blends over it).
-        if let Some((buf, count)) = &grid_lines {
+        if let Some((buf, count)) = &world_lines {
             pass.set_pipeline(&self.line_pipeline);
             pass.set_bind_group(0, &opaque_bg, &[]);
             pass.set_vertex_buffer(0, buf.slice(..));
@@ -1296,6 +1325,11 @@ impl GpuRenderer {
     /// the scene. Cheap: the geometry is rebuilt per frame from this config.
     pub fn set_grid(&self, grid: Option<super::GridConfig>) {
         self.grid.set(grid);
+    }
+
+    /// Replace world-space explanatory lines for the next frame.
+    pub fn set_gizmos(&self, gizmos: &[crate::animation::GizmoLine]) {
+        self.gizmos.replace(gizmos.to_vec());
     }
 
     pub fn render_frame(&self, camera: &CameraConfig) -> Result<Vec<u8>, RenderError> {
