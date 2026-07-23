@@ -11,6 +11,7 @@ pub mod profile;
 pub mod grid;
 pub mod partition;
 pub mod segment;
+pub mod source;
 
 pub use ids::{ClusterId, ContentId, TileId};
 pub use tile::{TileBounds, VoxelTile};
@@ -19,3 +20,4 @@ pub use profile::WorldProfile;
 pub use grid::{ComponentLabels, OccupancyGrid};
 pub use partition::{PartitionHint, PartitionIndex, PartitionPolicy};
 pub use segment::{segment_tile, Cluster, MarginCell, SegConfig, TileSegments};
+pub use source::{region_tile_bounds, Access, TileError, TileSource};
