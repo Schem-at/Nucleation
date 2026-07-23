@@ -36,7 +36,17 @@ pub enum PartitionPolicy {
     /// A cluster may never span a boundary. Dilation does not propagate
     /// between differing partitions.
     HardCut,
-    /// Crossing is allowed but recorded, for measuring how often it happens.
+    /// Intended: crossing is allowed but recorded, for measuring how often it
+    /// happens.
+    ///
+    /// **Not implemented yet.** Crossing-recording does not exist, so
+    /// segmentation currently treats `Prefer` exactly like [`Off`]: hints are
+    /// ignored, clusters may span boundaries freely, and every cluster comes
+    /// back with `partition_id: None`. Nothing is recorded. Do not select
+    /// `Prefer` expecting crossing data — you will get silence, not zero
+    /// crossings.
+    ///
+    /// [`Off`]: PartitionPolicy::Off
     Prefer,
     /// Hints are ignored entirely.
     Off,
