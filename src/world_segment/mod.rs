@@ -9,9 +9,11 @@ pub mod tile;
 pub mod classify;
 pub mod profile;
 pub mod grid;
+pub mod partition;
 
 pub use ids::{ClusterId, ContentId, TileId};
 pub use tile::{TileBounds, VoxelTile};
 pub use classify::{classify, BlockClass};
 pub use profile::WorldProfile;
 pub use grid::{ComponentLabels, OccupancyGrid};
+pub use partition::{PartitionHint, PartitionIndex, PartitionPolicy};
