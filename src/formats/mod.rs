@@ -1,11 +1,11 @@
 pub mod anvil;
 pub mod classic_schematic;
 pub mod error;
-pub mod gametest_snbt;
 pub mod litematic;
 pub mod manager;
 pub mod mcstructure;
 pub mod schematic;
 pub mod snapshot;
+pub mod structure_snbt;
 pub mod world;
 pub mod world_stream;

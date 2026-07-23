@@ -1,3 +1,14 @@
+# Nucleation v0.4.0
+
+**General Java structure SNBT naming.** The public format key and Rust module
+are now `structure_snbt`, with `StructureSnbtFormat`, `is_structure_snbt`,
+`from_structure_snbt`, and `to_structure_snbt`. The short-lived
+`gametest_snbt` name has been removed rather than retained as an alias: this is
+the general textual Java structure source format used by mod/data-pack tooling,
+guides, and GameTest suites, not a GameTest-only container.
+
+---
+
 # Nucleation v0.3.19
 
 **Construction animations and operation-aware transforms.** `BuildAnimation`
@@ -8,13 +19,12 @@ available through the generated language bindings, with deterministic region
 precedence, explicit-air masking, tight transformed bounds, and transactional
 failure behavior.
 
-**Java GameTest structure SNBT I/O.** `.snbt` Test Block / GameTest structures
-now auto-detect, import, export, and semantically round-trip block states,
-typed block-entity NBT, entities, dimensions, and `DataVersion`. MCA detection
-now validates the region header and chunk record structure instead of
-misclassifying large text files. Import/export allocation limits fail closed on
-hostile dimensions, and the implementation is exercised against all 33 pinned
-Lithium GameTest structures.
+**Java structure SNBT I/O.** Textual `.snbt` structure sources now auto-detect,
+import, export, and semantically round-trip block states, typed block-entity NBT,
+entities, dimensions, and `DataVersion`. MCA detection now validates the region
+header and chunk record structure instead of misclassifying large text files.
+Import/export allocation limits fail closed on hostile dimensions, and the
+implementation is exercised against all 33 pinned Lithium GameTest structures.
 
 **Documentation and correctness.** The README is now backed by executable,
 downloadable examples for construction animation, regions, transforms,

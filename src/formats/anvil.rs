@@ -72,7 +72,7 @@ pub struct McaFile {
 /// populated location entry points to a complete chunk record whose length and
 /// compression byte fit inside its allocated sectors. Checking only the first
 /// four bytes of a location entry produces false positives for large text files
-/// such as GameTest SNBT.
+/// such as textual structure SNBT.
 pub fn is_mca(data: &[u8]) -> bool {
     const SECTOR_BYTES: usize = 4096;
     const HEADER_BYTES: usize = 2 * SECTOR_BYTES;

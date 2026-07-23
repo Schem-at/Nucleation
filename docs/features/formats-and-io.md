@@ -27,7 +27,7 @@ strings, start with [Basics](basics.md).
 | **Litematica** | `.litematic` | yes | yes | `litematic` | Multi-region native; the reference container |
 | **Sponge Schematic** | `.schem` | yes | yes | `schematic` | WorldEdit/community format; exporter versions `v2` and `v3` |
 | **Bedrock structure** | `.mcstructure` | yes | yes | `mcstructure` | Java block IDs and states are translated through GeyserMC mappings |
-| **Java GameTest structure** | `.snbt` | yes | yes | `gametest_snbt` | Text structures used by GameTest/Test Blocks; preserves data version, block/entity NBT, and entities |
+| **Java structure SNBT source** | `.snbt` | yes | yes | `structure_snbt` | Human-readable structure source used by data packs, mod tooling, guides, and GameTest suites |
 | **Nucleation snapshot** | `.nusn` | yes | yes | `snapshot` | Fast, uncompressed internal interchange format |
 | **Legacy MCEdit** | `.schematic` | yes | no | — | Pre-Flattening numeric IDs; import only |
 
@@ -65,14 +65,15 @@ payload = Path("mystery.bin").read_bytes()
 build = Schematic.from_data(payload)
 ```
 
-The detector recognizes Litematica, Sponge, Bedrock structures, Java GameTest
+The detector recognizes Litematica, Sponge, Bedrock structures, Java structure
 SNBT, Nucleation snapshots, legacy MCEdit schematics, MCA region files, and
 zipped worlds. If no format matches, loading fails instead of constructing a
 partial schematic.
 
-GameTest SNBT is the textual Java structure shape used by Test Blocks and suites
-such as Lithium's: `DataVersion`, `size`, positioned `data` entries, `entities`,
-and a string `palette`. Nucleation accepts GameTest's
+Structure SNBT is a textual Java structure source format used by ordinary mod
+and data-pack tooling as well as Test Blocks and suites such as Lithium's. It
+contains `DataVersion`, `size`, positioned `data` entries, `entities`, and a
+string `palette`. Nucleation accepts its
 `minecraft:block{property:value}` state spelling and maps it to the normal
 editable block-state model. Saving emits a complete rectangular structure; when
 the schematic spans multiple regions, their bounding box is flattened and gaps
@@ -121,7 +122,7 @@ build.save_to_file_with_format(
 ```
 
 The supported named exporter keys are `litematic`, `schematic`, `mcstructure`,
-`gametest_snbt`, `snapshot`, and `world`. An unsupported key, version, or
+`structure_snbt`, `snapshot`, and `world`. An unsupported key, version, or
 extension returns a `NucleationError`; it never writes Litematic as an implicit
 fallback.
 
@@ -138,7 +139,7 @@ The current checkout produced:
 | --- | ---: | --- | --- |
 | Litematica | 483 | `5654c8b94f558113be01dc6a31c0dc8d` | identical |
 | Sponge `.schem` | 328 | `ab2071dca4aa393fe44697bf160ad00b` | equivalent content; reader adds an empty `components` compound |
-| GameTest `.snbt` | 328,906 | `5654c8b94f558113be01dc6a31c0dc8d` | identical |
+| Structure `.snbt` | 328,906 | `5654c8b94f558113be01dc6a31c0dc8d` | identical |
 | Snapshot `.nusn` | 70,202 | `5654c8b94f558113be01dc6a31c0dc8d` | identical |
 | Bedrock `.mcstructure` | 945 | `b881f6eb62f4bd96b8185bcd7b9fad0f` | translated to Bedrock IDs and states |
 
@@ -151,7 +152,7 @@ Download the exact generated outputs:
 - [`round-trip.mcstructure`](../downloads/readme/formats-and-io/round-trip.mcstructure)
 
 “Identical” here means the canonical schematic content fingerprint matches, not
-that container bytes are byte-for-byte identical. GameTest SNBT writes every
+that container bytes are byte-for-byte identical. Structure SNBT writes every
 position in the rectangular structure, including air, so the human-readable
 output is deliberately larger than the binary formats. Sponge preserves
 the fixture's blocks, states, and chest data; its reader adds an empty Minecraft
@@ -162,7 +163,7 @@ round trip. See [Versions and translation](versions-and-translation.md).
 Legacy MCEdit is intentionally import-only: its numeric-ID model cannot express
 modern block states without loss.
 
-GameTest SNBT has additional corpus coverage against all 33 structures in
+Structure SNBT has additional corpus coverage against all 33 structures in
 Lithium's Java GameTest suite. The tests import each fixture, export it back to
 SNBT, re-import it, and compare dimensions, data version, every block state,
 block-entity NBT, and entities. Empty entity placeholders without an `id` are
@@ -173,7 +174,7 @@ ignored in clean checkouts rather than silently passing. With the fixtures
 installed, run it with:
 
 ```shell
-cargo test --test gametest_snbt_tests lithium_fixture_corpus -- --ignored
+cargo test --test structure_snbt_tests lithium_fixture_corpus -- --ignored
 ```
 
 ## Next

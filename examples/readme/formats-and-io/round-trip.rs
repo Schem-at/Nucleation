@@ -11,7 +11,7 @@
 //! No resource pack needed — this is data, not pixels.
 
 use nucleation::fingerprint::{fingerprint, FingerprintSpec};
-use nucleation::formats::{gametest_snbt, litematic, mcstructure, schematic as sponge, snapshot};
+use nucleation::formats::{litematic, mcstructure, schematic as sponge, snapshot, structure_snbt};
 use nucleation::UniversalSchematic;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -52,9 +52,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ("litematic", ".litematic", litematic::to_litematic(&s)?),
         ("sponge", ".schem", sponge::to_schematic(&s)?),
         (
-            "gametest_snbt",
+            "structure_snbt",
             ".snbt",
-            gametest_snbt::to_gametest_snbt(&s)?,
+            structure_snbt::to_structure_snbt(&s)?,
         ),
         ("snapshot", ".nusn", snapshot::to_snapshot(&s)?),
         (

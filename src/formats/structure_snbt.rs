@@ -8,32 +8,32 @@ use crate::{BlockState, UniversalSchematic};
 use quartz_nbt::{NbtCompound, NbtList, NbtTag};
 use std::collections::BTreeSet;
 
-/// GameTest structures are small, rectangular test fixtures. The vanilla
-/// Structure Block limit is 48 blocks per axis; these deliberately generous
-/// limits retain headroom for generated suites while bounding allocations from
-/// untrusted SNBT and sparse multi-region exports.
-pub const MAX_GAMETEST_DIMENSION: i32 = 256;
-pub const MAX_GAMETEST_VOLUME: usize = 262_144;
+/// Java structure SNBT source files are rectangular and can be used by data
+/// packs, mod tooling, guides, and GameTest suites. These deliberately generous
+/// limits retain headroom for generated structures while bounding allocations
+/// from untrusted SNBT and sparse multi-region exports.
+pub const MAX_STRUCTURE_SNBT_DIMENSION: i32 = 256;
+pub const MAX_STRUCTURE_SNBT_VOLUME: usize = 262_144;
 
-pub struct GameTestSnbtFormat;
+pub struct StructureSnbtFormat;
 
-impl SchematicImporter for GameTestSnbtFormat {
+impl SchematicImporter for StructureSnbtFormat {
     fn name(&self) -> String {
-        "gametest_snbt".to_string()
+        "structure_snbt".to_string()
     }
 
     fn detect(&self, data: &[u8]) -> bool {
-        is_gametest_snbt(data)
+        is_structure_snbt(data)
     }
 
     fn read(&self, data: &[u8]) -> Result<UniversalSchematic> {
-        from_gametest_snbt(data)
+        from_structure_snbt(data)
     }
 }
 
-impl SchematicExporter for GameTestSnbtFormat {
+impl SchematicExporter for StructureSnbtFormat {
     fn name(&self) -> String {
-        "gametest_snbt".to_string()
+        "structure_snbt".to_string()
     }
 
     fn extensions(&self) -> Vec<String> {
@@ -51,16 +51,16 @@ impl SchematicExporter for GameTestSnbtFormat {
     fn write(&self, schematic: &UniversalSchematic, version: Option<&str>) -> Result<Vec<u8>> {
         if !matches!(version, None | Some("latest")) {
             return Err(format!(
-                "unsupported GameTest SNBT version {:?}; expected latest",
+                "unsupported structure SNBT version {:?}; expected latest",
                 version.unwrap_or_default()
             )
             .into());
         }
-        to_gametest_snbt(schematic)
+        to_structure_snbt(schematic)
     }
 }
 
-pub fn to_gametest_snbt(schematic: &UniversalSchematic) -> Result<Vec<u8>> {
+pub fn to_structure_snbt(schematic: &UniversalSchematic) -> Result<Vec<u8>> {
     let bounds = schematic.get_bounding_box();
     let min = bounds.min;
     let size = checked_bounds_dimensions(bounds.min, bounds.max)?;
@@ -69,7 +69,7 @@ pub fn to_gametest_snbt(schematic: &UniversalSchematic) -> Result<Vec<u8>> {
     let mut data_entries = Vec::new();
     data_entries.try_reserve_exact(volume).map_err(|error| {
         FormatError::Parse(format!(
-            "cannot allocate GameTest structure with {volume} blocks: {error}"
+            "cannot allocate structure SNBT with {volume} blocks: {error}"
         ))
     })?;
     for y in min.1..=bounds.max.1 {
@@ -79,7 +79,7 @@ pub fn to_gametest_snbt(schematic: &UniversalSchematic) -> Result<Vec<u8>> {
                     .get_block(x, y, z)
                     .cloned()
                     .unwrap_or_else(|| BlockState::new("minecraft:air"));
-                let state_string = format_gametest_block_state(&state);
+                let state_string = format_structure_block_state(&state);
                 palette.insert(state_string.clone());
 
                 let mut entry = NbtCompound::new();
@@ -156,7 +156,7 @@ fn double_list(value: (f64, f64, f64)) -> NbtTag {
     ]))
 }
 
-fn format_gametest_block_state(state: &BlockState) -> String {
+fn format_structure_block_state(state: &BlockState) -> String {
     let mut output = state.name.to_string();
     if !state.properties.is_empty() {
         output.push('{');
@@ -173,7 +173,7 @@ fn format_gametest_block_state(state: &BlockState) -> String {
     output
 }
 
-pub fn is_gametest_snbt(data: &[u8]) -> bool {
+pub fn is_structure_snbt(data: &[u8]) -> bool {
     let Ok(text) = std::str::from_utf8(data) else {
         return false;
     };
@@ -187,17 +187,17 @@ pub fn is_gametest_snbt(data: &[u8]) -> bool {
         && matches!(root.inner().get("palette"), Some(NbtTag::List(_)))
 }
 
-pub fn from_gametest_snbt(data: &[u8]) -> Result<UniversalSchematic> {
+pub fn from_structure_snbt(data: &[u8]) -> Result<UniversalSchematic> {
     let text = std::str::from_utf8(data)
-        .map_err(|error| FormatError::Parse(format!("GameTest SNBT is not UTF-8: {error}")))?;
+        .map_err(|error| FormatError::Parse(format!("structure SNBT is not UTF-8: {error}")))?;
     let root = quartz_nbt::snbt::parse(text)
-        .map_err(|error| FormatError::Parse(format!("invalid GameTest SNBT: {error}")))?;
+        .map_err(|error| FormatError::Parse(format!("invalid structure SNBT: {error}")))?;
 
     let data_version = root.get::<_, i32>("DataVersion")?;
     let size = int_vec3(root.get::<_, &NbtList>("size")?, "size")?;
     checked_structure_volume(size)?;
 
-    let mut schematic = UniversalSchematic::new("GameTest".to_string());
+    let mut schematic = UniversalSchematic::new("Structure SNBT".to_string());
     schematic.metadata.mc_version = Some(data_version);
     schematic.metadata.source_data_version = Some(data_version);
     schematic.default_region =
@@ -206,7 +206,7 @@ pub fn from_gametest_snbt(data: &[u8]) -> Result<UniversalSchematic> {
     let entries = root.get::<_, &NbtList>("data")?;
     for (index, entry) in entries.iter().enumerate() {
         let NbtTag::Compound(entry) = entry else {
-            return Err(format!("GameTest SNBT data[{index}] must be a compound").into());
+            return Err(format!("structure SNBT data[{index}] must be a compound").into());
         };
         import_block_entry(&mut schematic, entry, index, size)?;
     }
@@ -214,7 +214,7 @@ pub fn from_gametest_snbt(data: &[u8]) -> Result<UniversalSchematic> {
     let entities = root.get::<_, &NbtList>("entities")?;
     for (index, entry) in entities.iter().enumerate() {
         let NbtTag::Compound(entry) = entry else {
-            return Err(format!("GameTest SNBT entities[{index}] must be a compound").into());
+            return Err(format!("structure SNBT entities[{index}] must be a compound").into());
         };
         import_entity_entry(&mut schematic, entry, index)?;
     }
@@ -224,14 +224,14 @@ pub fn from_gametest_snbt(data: &[u8]) -> Result<UniversalSchematic> {
 
 fn checked_structure_volume(size: (i32, i32, i32)) -> Result<usize> {
     if size.0 <= 0 || size.1 <= 0 || size.2 <= 0 {
-        return Err(format!("GameTest SNBT size must be positive, got {size:?}").into());
+        return Err(format!("structure SNBT size must be positive, got {size:?}").into());
     }
-    if size.0 > MAX_GAMETEST_DIMENSION
-        || size.1 > MAX_GAMETEST_DIMENSION
-        || size.2 > MAX_GAMETEST_DIMENSION
+    if size.0 > MAX_STRUCTURE_SNBT_DIMENSION
+        || size.1 > MAX_STRUCTURE_SNBT_DIMENSION
+        || size.2 > MAX_STRUCTURE_SNBT_DIMENSION
     {
         return Err(format!(
-            "GameTest structure size {size:?} exceeds the {MAX_GAMETEST_DIMENSION}-block axis limit"
+            "structure SNBT size {size:?} exceeds the {MAX_STRUCTURE_SNBT_DIMENSION}-block axis limit"
         )
         .into());
     }
@@ -240,12 +240,10 @@ fn checked_structure_volume(size: (i32, i32, i32)) -> Result<usize> {
         .ok()
         .and_then(|x| usize::try_from(size.1).ok().and_then(|y| x.checked_mul(y)))
         .and_then(|xy| usize::try_from(size.2).ok().and_then(|z| xy.checked_mul(z)))
-        .ok_or_else(|| {
-            FormatError::Parse(format!("GameTest structure size is too large: {size:?}"))
-        })?;
-    if volume > MAX_GAMETEST_VOLUME {
+        .ok_or_else(|| FormatError::Parse(format!("structure SNBT size is too large: {size:?}")))?;
+    if volume > MAX_STRUCTURE_SNBT_VOLUME {
         return Err(format!(
-            "GameTest structure volume {volume} exceeds the {MAX_GAMETEST_VOLUME}-block limit"
+            "structure SNBT volume {volume} exceeds the {MAX_STRUCTURE_SNBT_VOLUME}-block limit"
         )
         .into());
     }
@@ -260,7 +258,7 @@ fn checked_bounds_dimensions(
         let dimension = i64::from(max) - i64::from(min) + 1;
         i32::try_from(dimension).map_err(|_| {
             FormatError::Parse(format!(
-                "GameTest {name} dimension {dimension} exceeds the supported coordinate range"
+                "structure SNBT {name} dimension {dimension} exceeds the supported coordinate range"
             ))
         })
     }
@@ -280,7 +278,7 @@ fn import_entity_entry(
     let pos = double_vec3(entry.get::<_, &NbtList>("pos")?, "entity pos")?;
     let mut nbt = entry.get::<_, &NbtCompound>("nbt")?.clone();
     // Vanilla's structure loader ignores entity records whose payload has no
-    // type id. GameTest files can contain these empty placeholder records.
+    // type id. Structure SNBT files can contain these empty placeholder records.
     if !nbt.contains_key("id") && !nbt.contains_key("Id") {
         return Ok(());
     }
@@ -294,7 +292,7 @@ fn import_entity_entry(
     );
     let entity = Entity::from_nbt(&nbt).map_err(|error| {
         FormatError::Parse(format!(
-            "invalid entity NBT in GameTest SNBT entities[{index}]: {error}"
+            "invalid entity NBT in structure SNBT entities[{index}]: {error}"
         ))
     })?;
     schematic.add_entity(entity);
@@ -311,13 +309,13 @@ fn import_block_entry(
     if pos.0 < 0 || pos.1 < 0 || pos.2 < 0 || pos.0 >= size.0 || pos.1 >= size.1 || pos.2 >= size.2
     {
         return Err(
-            format!("GameTest SNBT data[{index}] position {pos:?} is outside {size:?}").into(),
+            format!("structure SNBT data[{index}] position {pos:?} is outside {size:?}").into(),
         );
     }
     let state = entry.get::<_, &str>("state")?;
-    let state = parse_gametest_block_state(state).map_err(|error| {
+    let state = parse_structure_block_state(state).map_err(|error| {
         FormatError::Parse(format!(
-            "invalid state in GameTest SNBT data[{index}]: {error}"
+            "invalid state in structure SNBT data[{index}]: {error}"
         ))
     })?;
     schematic.set_block(pos.0, pos.1, pos.2, &state);
@@ -346,7 +344,7 @@ fn import_block_entry(
 
 fn int_vec3(list: &NbtList, field: &str) -> Result<(i32, i32, i32)> {
     if list.len() != 3 {
-        return Err(format!("GameTest SNBT {field} must contain exactly 3 integers").into());
+        return Err(format!("structure SNBT {field} must contain exactly 3 integers").into());
     }
     Ok((
         list.get::<i32>(0)?,
@@ -357,7 +355,7 @@ fn int_vec3(list: &NbtList, field: &str) -> Result<(i32, i32, i32)> {
 
 fn double_vec3(list: &NbtList, field: &str) -> Result<(f64, f64, f64)> {
     if list.len() != 3 {
-        return Err(format!("GameTest SNBT {field} must contain exactly 3 numbers").into());
+        return Err(format!("structure SNBT {field} must contain exactly 3 numbers").into());
     }
     Ok((
         list.get::<f64>(0)?,
@@ -366,7 +364,7 @@ fn double_vec3(list: &NbtList, field: &str) -> Result<(f64, f64, f64)> {
     ))
 }
 
-fn parse_gametest_block_state(value: &str) -> std::result::Result<BlockState, String> {
+fn parse_structure_block_state(value: &str) -> std::result::Result<BlockState, String> {
     let Some(open) = value.find('{') else {
         return BlockState::from_block_string(value);
     };
