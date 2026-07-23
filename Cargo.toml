@@ -216,6 +216,7 @@ num-complex = "0.4"
 base64 = "0.22"
 ffmpeg-sidecar = "2.4"
 winit = "0.30"
+bincode = "1"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 criterion = "0.5.1"
