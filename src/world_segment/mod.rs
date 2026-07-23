@@ -26,4 +26,4 @@ pub use segment::{segment_tile, Cluster, MarginCell, SegConfig, TileSegments};
 pub use source::{region_tile_bounds, Access, TileError, TileSource};
 pub use world_source::WorldSourceTiles;
 pub use targz_source::TarGzSource;
-pub use stitch::{GlobalCell, MarginEntry, StitchState};
+pub use stitch::{Build, GlobalCell, MarginEntry, StitchState};

@@ -60,7 +60,7 @@ impl StitchState {
                 partition: m.partition.clone(),
             });
         }
-        s.margin.sort_by(|a, b| a.cell.cmp(&b.cell).then(a.cluster.cmp(&b.cluster)));
+        s.margin.sort_by(|a, b| a.cell.cmp(&b.cell).then(a.cluster.cmp(&b.cluster)).then(a.partition.cmp(&b.partition)));
         s
     }
 
@@ -93,6 +93,18 @@ impl StitchState {
     pub fn merge(mut a: StitchState, b: StitchState, closing_radius: u32) -> StitchState {
         // Fold b's forest and payloads into a.
         for (id, c) in b.clusters {
+            // `ClusterId` is content-addressed, so the same id can only ever
+            // carry one payload; if it already exists in `a`, the incoming
+            // payload from `b` must be identical. Keep the left side's value
+            // (as before) but assert the invariant instead of trusting it.
+            if let Some(existing) = a.clusters.get(&id) {
+                debug_assert!(
+                    *existing == c,
+                    "ClusterId {:?} maps to two different payloads across merge inputs; \
+                     ClusterId must uniquely determine its Cluster payload",
+                    id
+                );
+            }
             a.parent.entry(id).or_insert(id);
             a.clusters.entry(id).or_insert(c);
         }
@@ -101,7 +113,7 @@ impl StitchState {
             a.union(child, parent);
         }
         a.margin.extend(b.margin);
-        a.margin.sort_by(|x, y| x.cell.cmp(&y.cell).then(x.cluster.cmp(&y.cluster)));
+        a.margin.sort_by(|x, y| x.cell.cmp(&y.cell).then(x.cluster.cmp(&y.cluster)).then(x.partition.cmp(&y.partition)));
         a.margin.dedup();
         a.resolve_adjacencies(closing_radius);
         a
@@ -136,6 +148,47 @@ impl StitchState {
             self.union(a, b);
         }
     }
+
+    /// Consume the stitch state, grouping clusters by their union-find root
+    /// into finished `Build`s. Each build's id is its smallest member
+    /// `ClusterId` (deterministic, independent of merge order). Returned
+    /// sorted by id.
+    pub fn finish(self) -> Vec<Build> {
+        // Group cluster ids by representative root.
+        let mut groups: BTreeMap<ClusterId, Vec<ClusterId>> = BTreeMap::new();
+        for &id in self.clusters.keys() {
+            groups.entry(self.find(id)).or_default().push(id);
+        }
+        let mut builds = Vec::new();
+        for (root, mut ids) in groups {
+            ids.sort();
+            let mut bbox = self.clusters[&ids[0]].bbox;
+            let mut blocks = 0u64;
+            let mut cells = 0u64;
+            let partition = self.clusters[&ids[0]].partition_id.clone();
+            for id in &ids {
+                let c = &self.clusters[id];
+                bbox.0 = (bbox.0.0.min(c.bbox.0.0), bbox.0.1.min(c.bbox.0.1), bbox.0.2.min(c.bbox.0.2));
+                bbox.1 = (bbox.1.0.max(c.bbox.1.0), bbox.1.1.max(c.bbox.1.1), bbox.1.2.max(c.bbox.1.2));
+                blocks += c.block_count;
+                cells += c.cell_count;
+            }
+            builds.push(Build { id: root, cluster_ids: ids, bbox, block_count: blocks,
+                                cell_count: cells, partition_id: partition });
+        }
+        builds.sort_by_key(|b| b.id);
+        builds
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
+pub struct Build {
+    pub id: ClusterId,
+    pub cluster_ids: Vec<ClusterId>,
+    pub bbox: ((i32, i32, i32), (i32, i32, i32)),
+    pub block_count: u64,
+    pub cell_count: u64,
+    pub partition_id: Option<String>,
 }
 
 #[cfg(test)]
@@ -227,5 +280,18 @@ mod tests {
         assert_eq!(s.find(a), a);
         // Its margin entry is now in global coords.
         assert_eq!(s.margin_len(), 1);
+    }
+
+    #[test]
+    fn finish_groups_joined_clusters_into_one_build() {
+        let a = cid(TileId{x:0,z:0}, (127,1,1));
+        let b = cid(TileId{x:1,z:0}, (0,1,1));
+        let sa = StitchState::from(&seg_with(TileId{x:0,z:0}, a, (127,1,1), None), 4, -64);
+        let sb = StitchState::from(&seg_with(TileId{x:1,z:0}, b, (0,1,1), None), 4, -64);
+        let builds = StitchState::merge(sa, sb, 2).finish();
+        assert_eq!(builds.len(), 1);
+        assert_eq!(builds[0].cluster_ids.len(), 2);
+        assert_eq!(builds[0].block_count, 10);
+        assert_eq!(builds[0].id, a.min(b));
     }
 }
