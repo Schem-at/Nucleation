@@ -47,7 +47,9 @@ impl WorldProfile {
 pub struct ProfileParams {
     /// Use every Nth sample tile (in sorted id order). 1 = all.
     pub sample_stride: usize,
-    /// Minimum fraction of the footprint a Y level must fill to count as slab.
+    /// Minimum fraction of the footprint a Y level must fill to count as
+    /// slab. Inclusive: a level whose coverage is at least
+    /// `min_slab_coverage` (coverage == threshold counts as slab) qualifies.
     pub min_slab_coverage: f32,
     /// Inclusive Y range to scan for the slab.
     pub y_scan: (i32, i32),
@@ -59,16 +61,40 @@ impl Default for ProfileParams {
     }
 }
 
+/// Content key for a tile: `ContentId::of` folded over the tile's blocks in
+/// their canonical ascending-position order (see `VoxelTile::blocks`).
+///
+/// Used purely to break ties between samples that share a `TileId` but differ
+/// in contents, so sorting by `(TileId, content_key)` is a total order over
+/// content rather than an order that depends on input position.
+fn content_key(tile: &VoxelTile) -> ContentId {
+    let mut parts: Vec<Vec<u8>> = Vec::new();
+    for ((x, y, z), state) in tile.blocks() {
+        parts.push(x.to_le_bytes().to_vec());
+        parts.push(y.to_le_bytes().to_vec());
+        parts.push(z.to_le_bytes().to_vec());
+        parts.push(state.get_name().as_bytes().to_vec());
+    }
+    let refs: Vec<&[u8]> = parts.iter().map(|p| p.as_slice()).collect();
+    ContentId::of(&refs)
+}
+
 impl WorldProfile {
     /// Derive a pinnable profile from sample tiles by locating the near-solid
-    /// ground slab. Pure and order-independent: samples are processed in sorted
-    /// id order and the result depends only on their contents and `params`.
+    /// ground slab. Pure and order-independent: samples are processed in a
+    /// total order over `(TileId, content_key)` — not merely `TileId` — so two
+    /// samples that happen to share a `TileId` but differ in contents are
+    /// still ordered deterministically by their contents, regardless of the
+    /// order they were supplied in. The result depends only on the samples'
+    /// contents and `params`.
     pub fn derive(samples: &[VoxelTile], params: &ProfileParams) -> WorldProfile {
-        // Sort sample references by tile id for order-independence.
-        let mut ordered: Vec<&VoxelTile> = samples.iter().collect();
-        ordered.sort_by_key(|t| t.id());
+        // Sort sample references by (tile id, content key) for order-independence,
+        // even when two samples share a tile id but differ in contents.
+        let mut ordered: Vec<_> = samples.iter().map(|t| (t.id(), content_key(t), t)).collect();
+        ordered.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
         let stride = params.sample_stride.max(1);
-        let chosen: Vec<&VoxelTile> = ordered.into_iter().step_by(stride).collect();
+        let chosen: Vec<&VoxelTile> =
+            ordered.into_iter().step_by(stride).map(|(_, _, t)| t).collect();
 
         if chosen.is_empty() {
             return WorldProfile::new(BTreeSet::new(), (0, 0));
@@ -170,15 +196,80 @@ mod derive_tests {
         assert!(!profile.substrate_palette.contains("minecraft:repeater"));
     }
 
+    /// A small slab tile at `id` whose blocks are all `material`, on a 4x4
+    /// footprint. Used to build samples that share a `TileId` but differ in
+    /// contents.
+    fn slab_tile(id: TileId, material: &str) -> VoxelTile {
+        let mut blocks = vec![];
+        for x in 0..4 {
+            for z in 0..4 {
+                for y in -64..=-61 {
+                    blocks.push(((x, y, z), BlockState::new(material)));
+                }
+            }
+        }
+        VoxelTile::from_blocks(
+            id,
+            TileBounds { min: (0, -64, 0), max: (3, 63, 3) },
+            blocks.into_iter(),
+        )
+    }
+
     #[test]
     fn derivation_is_independent_of_sample_order() {
-        let params = ProfileParams::default();
-        let a = flat_world_tile();
-        let b = flat_world_tile();
-        // Two identical samples in either order must give the same profile hash.
-        let p1 = WorldProfile::derive(&[a], &params);
-        let p2 = WorldProfile::derive(&[b], &params);
-        assert_eq!(p1.profile_hash(), p2.profile_hash());
+        // Two samples share TileId (0,0) but differ in contents (stone vs
+        // dirt); a third sample has a different TileId. `sample_stride = 2`
+        // makes sub-sampling active, so which of the two same-id samples
+        // survives depends entirely on how ties are broken during sort: a
+        // stable sort keyed only on TileId would let input order decide,
+        // which of them is picked and therefore change the derived palette.
+        let params = ProfileParams { sample_stride: 2, min_slab_coverage: 0.9, y_scan: (-64, 63) };
+
+        let forward = vec![
+            slab_tile(TileId { x: 0, z: 0 }, "minecraft:stone"),
+            slab_tile(TileId { x: 0, z: 0 }, "minecraft:dirt"),
+            slab_tile(TileId { x: 1, z: 0 }, "minecraft:stone"),
+        ];
+        let backward = vec![
+            slab_tile(TileId { x: 1, z: 0 }, "minecraft:stone"),
+            slab_tile(TileId { x: 0, z: 0 }, "minecraft:dirt"),
+            slab_tile(TileId { x: 0, z: 0 }, "minecraft:stone"),
+        ];
+
+        let p1 = WorldProfile::derive(&forward, &params);
+        let p2 = WorldProfile::derive(&backward, &params);
+        assert_eq!(
+            p1.profile_hash(),
+            p2.profile_hash(),
+            "profile must not depend on input order, even when two samples share a TileId"
+        );
+    }
+
+    #[test]
+    fn coverage_exactly_at_threshold_counts_as_slab() {
+        // 10 distinct footprint columns total; only 9 of them are present at
+        // y = -64, so coverage there is exactly 9 / 10 = 0.9, equal to (not
+        // greater than) `min_slab_coverage`. The 10th footprint column is
+        // seeded far below the band so it pads the footprint without itself
+        // qualifying as slab.
+        let params = ProfileParams { sample_stride: 1, min_slab_coverage: 0.9, y_scan: (-70, -60) };
+        let mut blocks = vec![((9, -70, 0), BlockState::new("minecraft:bedrock"))];
+        for x in 0..9 {
+            blocks.push(((x, -64, 0), BlockState::new("minecraft:stone")));
+        }
+        let tile = VoxelTile::from_blocks(
+            TileId { x: 0, z: 0 },
+            TileBounds { min: (0, -70, 0), max: (9, 63, 0) },
+            blocks.into_iter(),
+        );
+
+        let profile = WorldProfile::derive(&[tile], &params);
+        assert_eq!(
+            profile.substrate_y_band,
+            (-64, -64),
+            "a level whose coverage exactly equals min_slab_coverage must count as slab"
+        );
+        assert!(profile.substrate_palette.contains("minecraft:stone"));
     }
 
     #[test]
