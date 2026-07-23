@@ -1097,6 +1097,73 @@ mod tests {
         assert!(margin_cells((107, 10, 107)).is_empty(), "cell 26 is interior");
     }
 
+    /// `margin_cells`, but on a caller-supplied tile so the grid need not be a
+    /// cube.
+    fn margin_cells_of(b: TileBounds, block: (i32, i32, i32)) -> Vec<(i32, i32, i32)> {
+        let t = VoxelTile::from_blocks(
+            TileId { x: 0, z: 0 },
+            b,
+            std::iter::once((block, BlockState::new("minecraft:redstone_wire"))),
+        );
+        let segs = segment_tile(&t, &profile(), &cfg(), &no_hints());
+        assert_eq!(segs.clusters.len(), 1, "one block must give exactly one cluster");
+        segs.margin.iter().map(|m| m.cell).collect()
+    }
+
+    #[test]
+    fn margin_band_measures_each_axis_against_its_own_extent() {
+        // `margin_band_covers_cell_depths_0_through_2r` probes at *equal* depth
+        // on X and Z, on a tile whose dims are 32 on both axes. `in_margin` is
+        // an OR of four terms, so on a square grid with symmetric probes every
+        // permutation of X and Z gives the same answer: mirroring the whole
+        // predicate, or testing one axis against the other's extent, is
+        // completely invisible there.
+        //
+        // Fix both halves at once: a rectangular tile, and probes at different
+        // depths on X and Z.
+        //   bounds (0,-64,0)..(127,63,255) at cell_size 4 -> dims (32, 32, 64)
+        //   band = 2R + 1 = 5
+        //   X band: cells 0..=4 and 27..=31   (32 - 5 = 27)
+        //   Z band: cells 0..=4 and 59..=63   (64 - 5 = 59)
+        let b = TileBounds { min: (0, -64, 0), max: (127, 63, 255) };
+
+        // Near X only, interior Z. (13,10,64) -> cell (13/4, (10+64)/4, 64/4)
+        // = (3,18,16): depth 3 on X, depth 16 on Z.
+        assert_eq!(margin_cells_of(b, (13, 10, 64)), vec![(3, 18, 16)]);
+
+        // Near Z only, interior X. (64,10,13) -> (16,18,3).
+        assert_eq!(margin_cells_of(b, (64, 10, 13)), vec![(16, 18, 3)]);
+
+        // Far X only. (108,10,64) -> (27,18,16). In band because 27 >= 32 - 5.
+        // A predicate that mirrors X and Z, or that tests X against the Z
+        // extent, reads 27 >= 64 - 5 = 59 -> false, and drops this cell.
+        assert_eq!(
+            margin_cells_of(b, (108, 10, 64)),
+            vec![(27, 18, 16)],
+            "the far-X band starts at dims.0 - band, not dims.2 - band"
+        );
+
+        // Far Z only. (64,10,236) -> (16,18,59). In band because 59 >= 64 - 5.
+        assert_eq!(
+            margin_cells_of(b, (64, 10, 236)),
+            vec![(16, 18, 59)],
+            "the far-Z band starts at dims.2 - band"
+        );
+
+        // The negative that pins the same thing from the other side.
+        // (64,10,108) -> (16,18,27). Cell z = 27 is deep interior on an axis
+        // 64 cells long, but is exactly the far-band threshold for the 32-cell
+        // X axis, so testing Z against dims.0 wrongly reports it in band.
+        assert!(
+            margin_cells_of(b, (64, 10, 108)).is_empty(),
+            "cell z = 27 is interior on a 64-cell Z axis"
+        );
+
+        // And the last interior layer before the far-Z band, for the edge.
+        // (64,10,232) -> (16,18,58).
+        assert!(margin_cells_of(b, (64, 10, 232)).is_empty(), "cell z = 58 is interior");
+    }
+
     #[test]
     fn duplicate_positions_do_not_make_the_result_depend_on_input_order() {
         // The determinism guarantee, at its sharpest. Region and chunk readers
@@ -1143,14 +1210,11 @@ mod tests {
         assert_eq!(ids(&cfg(), &profile()), ids(&cfg(), &profile()));
     }
 
-    #[test]
-    fn cluster_ids_change_when_cell_size_changes() {
-        // At cell_size 4 the two blocks land in cell (40/4,18,10) = (10,18,10);
-        // at cell_size 8 they land in cell (40/8,(10+64)/8,40/8) = (5,9,5).
-        // Distinct clusters either way, so the ids must not coincide.
-        let coarse = SegConfig { cell_size: 8, ..cfg() };
-        assert_ne!(ids(&cfg(), &profile()), ids(&coarse, &profile()));
-    }
+    // `cluster_ids_change_when_cell_size_changes` used to live here. It was
+    // deleted rather than kept: changing `cell_size` moves the anchor cell, so
+    // the ids differ whether or not `cell_size` is hashed, and the test passed
+    // with the property it claimed to check removed. The two tests below cover
+    // the property properly, by changing something that cannot move a cell.
 
     #[test]
     fn cluster_ids_change_when_only_a_non_geometric_config_field_changes() {
