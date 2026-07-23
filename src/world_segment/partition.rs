@@ -44,16 +44,27 @@ pub enum PartitionPolicy {
 
 /// Point-in-partition lookup.
 ///
-/// Hints are sorted by id at construction so that index assignment is
-/// independent of the order the caller supplied them in — otherwise two
-/// workers given the same hints in different orders would disagree.
+/// Hints are sorted at construction by a total order over their full
+/// content — `id`, then `bbox_xz`, then `y_range` — so that index assignment
+/// is independent of the order the caller supplied them in, even when
+/// multiple hints share the same `id`. `PartitionHint` does not require ids
+/// to be unique, and a plain sort by `id` alone (a *stable* sort) would
+/// leave same-id hints in their original relative order, letting input
+/// order leak into which hint — and which `u32` index — a point resolves
+/// to. Sorting by the full tuple means ties can only remain between hints
+/// that are entirely identical, which are genuinely interchangeable, so two
+/// workers given the same hints in different orders always agree.
 pub struct PartitionIndex {
     hints: Vec<PartitionHint>,
 }
 
 impl PartitionIndex {
     pub fn new(mut hints: Vec<PartitionHint>) -> Self {
-        hints.sort_by(|a, b| a.id.cmp(&b.id));
+        hints.sort_by(|a, b| {
+            a.id.cmp(&b.id)
+                .then_with(|| a.bbox_xz.cmp(&b.bbox_xz))
+                .then_with(|| a.y_range.cmp(&b.y_range))
+        });
         PartitionIndex { hints }
     }
 
@@ -71,7 +82,19 @@ impl PartitionIndex {
         self.hints.iter().position(|h| h.contains(x, y, z)).map(|i| i as u32)
     }
 
+    /// Looks up the id for a previously-obtained index.
+    ///
+    /// # Invariant
+    /// `index` must have come from [`PartitionIndex::id_index_at`] called on
+    /// this same instance. Passing any other value (e.g. an index obtained
+    /// from a differently-constructed `PartitionIndex`, or one at all
+    /// out-of-range) is a precondition violation and panics.
     pub fn id_of_index(&self, index: u32) -> &str {
+        debug_assert!(
+            (index as usize) < self.hints.len(),
+            "id_of_index: index {index} out of range for {} hints; index must come from id_index_at on this same PartitionIndex",
+            self.hints.len()
+        );
         &self.hints[index as usize].id
     }
 }
@@ -131,5 +154,37 @@ mod tests {
         let b = PartitionIndex::new(shuffled);
         assert_eq!(a.id_index_at(5, 0, 5), b.id_index_at(5, 0, 5));
         assert_eq!(a.id_index_at(15, 0, 5), b.id_index_at(15, 0, 5));
+    }
+
+    #[test]
+    fn duplicate_ids_with_different_boxes_resolve_the_same_regardless_of_input_order() {
+        // Two hints sharing the same id but occupying disjoint boxes. A
+        // sort keyed on `id` alone is stable and would leave these in
+        // whatever relative order the caller passed them in, so which one
+        // `partition_at`/`id_index_at` report first (and which `u32` index
+        // it gets) would depend on input order. Sorting on the full content
+        // tuple (id, bbox_xz, y_range) fixes a single order regardless of
+        // how the caller supplied them.
+        let dup_first = PartitionHint { id: "dup".into(), bbox_xz: (0, 4, 0, 4), y_range: None };
+        let dup_second = PartitionHint { id: "dup".into(), bbox_xz: (10, 14, 0, 4), y_range: None };
+
+        let forward = vec![dup_first.clone(), dup_second.clone()];
+        let mut reversed = forward.clone();
+        reversed.reverse();
+
+        let idx_forward = PartitionIndex::new(forward);
+        let idx_reversed = PartitionIndex::new(reversed);
+
+        // Point inside the first box.
+        assert_eq!(idx_forward.partition_at(2, 0, 2), idx_reversed.partition_at(2, 0, 2));
+        assert_eq!(idx_forward.id_index_at(2, 0, 2), idx_reversed.id_index_at(2, 0, 2));
+
+        // Point inside the second box.
+        assert_eq!(idx_forward.partition_at(12, 0, 2), idx_reversed.partition_at(12, 0, 2));
+        assert_eq!(idx_forward.id_index_at(12, 0, 2), idx_reversed.id_index_at(12, 0, 2));
+
+        // Both boxes resolve to the same id string either way.
+        assert_eq!(idx_forward.partition_at(2, 0, 2), Some("dup"));
+        assert_eq!(idx_forward.partition_at(12, 0, 2), Some("dup"));
     }
 }
