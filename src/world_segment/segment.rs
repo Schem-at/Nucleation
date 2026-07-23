@@ -59,19 +59,39 @@ pub struct SegConfig {
 }
 
 impl SegConfig {
-    /// Stable hash of everything that can change what segmentation produces.
+    /// Stable hash of the inputs, other than the tile's own blocks, that can
+    /// change what segmentation produces.
     ///
     /// Folded into every [`ClusterId`], so an id identifies a cluster *under a
     /// stated configuration* rather than merely a position. Two runs that
     /// disagree on `cell_size`, `closing_radius`, `min_cluster_blocks`,
-    /// `partition_policy`, `algorithm_version` or the world profile can never
-    /// mint the same id, which is what makes the ids safe to use as cache
-    /// keys.
+    /// `partition_policy`, `algorithm_version`, the world profile, or — under
+    /// [`PartitionPolicy::HardCut`] — the partition hints, can never mint the
+    /// same id, which is what makes the ids safe to use as cache keys.
     ///
-    /// Every field of `SegConfig` is covered. If a field is added, add it here
-    /// too — an unhashed field is a silent id collision between runs that
-    /// genuinely differ.
-    pub fn config_hash(&self, profile: &WorldProfile) -> ContentId {
+    /// # What is covered
+    ///
+    /// Every field of `SegConfig`, the [`WorldProfile`]'s own hash, and the
+    /// full geometry of the hints via [`PartitionIndex::hints_hash`]. If a
+    /// `SegConfig` field is added, add it here too — an unhashed field is a
+    /// silent id collision between runs that genuinely differ.
+    ///
+    /// The hints are hashed **only under `HardCut`**, the one policy that reads
+    /// them. Under `Off` and `Prefer` the hints cannot affect a single cluster,
+    /// so folding them in would make ids differ between runs whose output is
+    /// byte-identical; a fixed, domain-separated constant stands in instead.
+    /// `policy_off_reproduces_the_unpartitioned_result` pins that passing hints
+    /// under `Off` is indistinguishable from passing none.
+    ///
+    /// # What is NOT covered
+    ///
+    /// The tile's blocks, its bounds and its [`TileId`]. Those are not config:
+    /// the tile id is hashed into [`ClusterId`] separately, and the blocks are
+    /// what the id is *about*. An id is therefore a claim about a cluster of a
+    /// given tile under a given configuration, and says nothing about whether
+    /// the tile's contents have since changed — a consumer that caches across
+    /// world edits must version the tile itself.
+    pub fn config_hash(&self, profile: &WorldProfile, partitions: &PartitionIndex) -> ContentId {
         // Explicit, pinned discriminants: derived ordering would silently
         // renumber if a variant were inserted, changing ids without any
         // behaviour change.
@@ -80,14 +100,24 @@ impl SegConfig {
             PartitionPolicy::Prefer => 1,
             PartitionPolicy::Off => 2,
         };
+        let hints = match self.partition_policy {
+            PartitionPolicy::HardCut => partitions.hints_hash(),
+            // Domain-separated, and distinct from any real `hints_hash` value:
+            // that one's first framed part is `b"parthints.v1"`.
+            PartitionPolicy::Prefer | PartitionPolicy::Off => {
+                ContentId::of(&[b"parthints.ignored"])
+            }
+        };
         ContentId::of(&[
-            b"segconfig.v1",
+            // v2: the partition hints joined the input in this version.
+            b"segconfig.v2",
             &self.cell_size.to_le_bytes(),
             &self.closing_radius.to_le_bytes(),
             &self.min_cluster_blocks.to_le_bytes(),
             &[policy],
             &self.algorithm_version.to_le_bytes(),
             profile.profile_hash().as_bytes(),
+            hints.as_bytes(),
         ])
     }
 }
@@ -162,7 +192,7 @@ pub fn segment_tile(
     let cell = config.cell_size.max(1);
     // Every ClusterId minted below is bound to this hash, so ids produced
     // under different settings or a different profile can never collide.
-    let config_id = config.config_hash(profile);
+    let config_id = config.config_hash(profile, partitions);
 
     // Grid spans the tile bounds exactly.
     let dims = (
@@ -1135,6 +1165,51 @@ mod tests {
             ids(&cfg(), &profile()),
             ids(&v2, &profile()),
             "a config change with no geometric effect must still change ids"
+        );
+    }
+
+    #[test]
+    fn cluster_ids_change_when_only_the_hint_geometry_changes() {
+        // The cache-poisoning case `config_hash` exists to prevent, reached
+        // through the hints rather than through `SegConfig`.
+        //
+        // Both runs use the identical tile, the identical `SegConfig` (HardCut)
+        // and hints with the identical *ids*. Only the boxes differ: "L" ends at
+        // x = 61 in one and at x = 40 in the other. The probe block sits at
+        // x = 10, inside "L" either way, so both runs produce a cluster in the
+        // same tile, in a partition of the same name, with the same anchor cell
+        // (10/4, (10+64)/4, 40/4) = (2,18,10).
+        //
+        // Every input to `ClusterId` therefore matched, while the segmentation
+        // these two configurations describe is genuinely different — a
+        // downstream cache keyed on the id would serve one run's clusters for
+        // the other's. The hint geometry must be part of the identity.
+        let wide = PartitionIndex::new(vec![
+            PartitionHint { id: "L".into(), bbox_xz: (0, 61, 0, 127), y_range: None },
+            PartitionHint { id: "R".into(), bbox_xz: (62, 127, 0, 127), y_range: None },
+        ]);
+        let narrow = PartitionIndex::new(vec![
+            PartitionHint { id: "L".into(), bbox_xz: (0, 40, 0, 127), y_range: None },
+            PartitionHint { id: "R".into(), bbox_xz: (41, 127, 0, 127), y_range: None },
+        ]);
+        let config = SegConfig { partition_policy: PartitionPolicy::HardCut, ..cfg() };
+        let blocks = vec![((10, 10, 40), "minecraft:redstone_wire")];
+
+        let a = segment_tile(&tile(blocks.clone()), &profile(), &config, &wide);
+        let b = segment_tile(&tile(blocks), &profile(), &config, &narrow);
+
+        // The precondition that makes this sharp: same partition name, same
+        // anchor, same tile, same SegConfig.
+        assert_eq!(a.clusters.len(), 1);
+        assert_eq!(b.clusters.len(), 1);
+        assert_eq!(a.clusters[0].partition_id.as_deref(), Some("L"));
+        assert_eq!(b.clusters[0].partition_id.as_deref(), Some("L"));
+        assert_eq!(a.clusters[0].bbox, b.clusters[0].bbox);
+
+        assert_ne!(
+            a.clusters[0].id, b.clusters[0].id,
+            "hints sharing ids but differing in extent describe different \
+             segmentations and must not mint the same ClusterId"
         );
     }
 

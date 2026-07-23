@@ -110,13 +110,81 @@ fn cluster_ids_match_their_golden_values() {
         segs.clusters.iter().map(|c| (c.bbox, c.id.to_string())).collect();
     got.sort();
 
+    // Recomputed when `config_hash` gained the partition-hint digest and its
+    // domain tag went `segconfig.v1` -> `segconfig.v2`. That is a deliberate,
+    // breaking change to id derivation; see the doc comment above.
     assert_eq!(
         got,
         vec![
-            (((40, 10, 40), (41, 10, 40)), "52e674d539ab4ccdf51f68be866190a7".to_string()),
-            (((100, 10, 40), (100, 10, 40)), "ca797a050ce2aefa1fd0fe28e8b7d150".to_string()),
+            (((40, 10, 40), (41, 10, 40)), "9e38703e70fe5d6e43c629571178e2a8".to_string()),
+            (((100, 10, 40), (100, 10, 40)), "b91d2e9ac3f1708aefffe93e44f0f0ac".to_string()),
         ],
         "ClusterId hex must be byte-identical across processes and runs"
+    );
+}
+
+/// The companion the `Off` golden above cannot provide.
+///
+/// `ClusterId::new` writes a partition *presence byte* and then the partition
+/// *name* into the `cluster.v2` hash input. Under `Off` the presence byte is
+/// always 0 and the name is always empty, so the golden above pins neither: a
+/// change to how the partition is framed — dropping the presence byte,
+/// reordering it against the name, hashing the name with a different encoding —
+/// leaves that value untouched. Under `HardCut` with named partitions both are
+/// live, and this value pins them.
+///
+/// It also pins `PartitionIndex::hints_hash`, which reaches `ClusterId` through
+/// `config_hash`: any change to the hint digest's framing changes this hex and
+/// leaves the `Off` golden alone.
+///
+/// Same update rule as above: change the constants only alongside a deliberate
+/// version bump.
+#[test]
+fn cluster_ids_match_their_golden_values_under_hard_cut() {
+    use nucleation::world_segment::partition::PartitionPolicy;
+
+    let profile = WorldProfile::new(
+        ["minecraft:bedrock", "minecraft:stone"].iter().map(|s| s.to_string()).collect(),
+        (-64, -50),
+    );
+    let cfg = SegConfig {
+        cell_size: 4,
+        closing_radius: 2,
+        min_cluster_blocks: 1,
+        partition_policy: PartitionPolicy::HardCut,
+        algorithm_version: 1,
+    };
+    let tile_bounds = TileBounds { min: (0, -64, 0), max: (127, 63, 127) };
+
+    // Boundary at x = 62 (not a multiple of `cell_size`), so the hints are
+    // genuinely exercised rather than being incidentally cell-aligned.
+    //   (40,10,40), (41,10,40) -> cell (10,18,10), partition "L"
+    //   (100,10,40)            -> cell (25,18,10), partition "R"
+    let hints = vec![
+        PartitionHint { id: "L".into(), bbox_xz: (0, 61, 0, 127), y_range: None },
+        PartitionHint { id: "R".into(), bbox_xz: (62, 127, 0, 127), y_range: None },
+    ];
+    let blocks = vec![
+        ((40, 10, 40), BlockState::new("minecraft:redstone_wire")),
+        ((41, 10, 40), BlockState::new("minecraft:repeater")),
+        ((100, 10, 40), BlockState::new("minecraft:redstone_wire")),
+    ];
+    let tile = VoxelTile::from_blocks(TileId { x: 0, z: 0 }, tile_bounds, blocks.into_iter());
+    let segs = segment_tile(&tile, &profile, &cfg, &PartitionIndex::new(hints));
+
+    assert_eq!(segs.clusters.len(), 2, "the fixture must produce exactly two clusters");
+
+    let mut got: Vec<(Option<String>, String)> =
+        segs.clusters.iter().map(|c| (c.partition_id.clone(), c.id.to_string())).collect();
+    got.sort();
+
+    assert_eq!(
+        got,
+        vec![
+            (Some("L".to_string()), "fca7f13edbc317c227e41deee7d60552".to_string()),
+            (Some("R".to_string()), "26c7af60fb2a193a0b4421de6806e48b".to_string()),
+        ],
+        "ClusterId hex under HardCut must be byte-identical across processes and runs"
     );
 }
 

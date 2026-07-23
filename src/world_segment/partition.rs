@@ -6,6 +6,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::world_segment::ids::ContentId;
+
 /// An axis-aligned region in XZ, optionally bounded in Y.
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct PartitionHint {
@@ -80,6 +82,55 @@ impl PartitionIndex {
 
     pub fn is_empty(&self) -> bool {
         self.hints.is_empty()
+    }
+
+    /// Content digest of every hint this index holds.
+    ///
+    /// Folded into [`SegConfig::config_hash`] so that hint *geometry* is part
+    /// of cluster identity, not just the hint *name* that
+    /// [`ClusterId`](crate::world_segment::ids::ClusterId) records. Two runs
+    /// whose hints share ids but cover different extents — `"L"` over
+    /// `x 0..=61` versus `"L"` over `x 0..=40` — segment differently while
+    /// agreeing on tile, partition name and anchor cell, so without this they
+    /// mint the same id for genuinely different clusters.
+    ///
+    /// Order-independent: [`PartitionIndex::new`] has already sorted the hints
+    /// by their full content, so two callers who supply the same hints in
+    /// different orders digest to the same value. Every part is length-framed
+    /// by [`ContentId::of`], so hints cannot alias through concatenation
+    /// (`id: "ab"` next to `id: "c"` differs from `id: "a"` next to `id: "bc"`),
+    /// and the count is included so a prefix of the hint list cannot collide
+    /// with the whole.
+    ///
+    /// [`SegConfig::config_hash`]: crate::world_segment::segment::SegConfig::config_hash
+    pub fn hints_hash(&self) -> ContentId {
+        let mut parts: Vec<Vec<u8>> = Vec::with_capacity(self.hints.len() * 8 + 2);
+        parts.push(b"parthints.v1".to_vec());
+        parts.push((self.hints.len() as u64).to_le_bytes().to_vec());
+        for h in &self.hints {
+            parts.push(h.id.as_bytes().to_vec());
+            let (x0, x1, z0, z1) = h.bbox_xz;
+            for v in [x0, x1, z0, z1] {
+                parts.push(v.to_le_bytes().to_vec());
+            }
+            // `None` gets its own presence byte rather than a sentinel range,
+            // so an unbounded column cannot collide with a hint that genuinely
+            // names `(i32::MIN, i32::MAX)`.
+            match h.y_range {
+                Some((y0, y1)) => {
+                    parts.push(vec![1]);
+                    parts.push(y0.to_le_bytes().to_vec());
+                    parts.push(y1.to_le_bytes().to_vec());
+                }
+                None => {
+                    parts.push(vec![0]);
+                    parts.push(Vec::new());
+                    parts.push(Vec::new());
+                }
+            }
+        }
+        let refs: Vec<&[u8]> = parts.iter().map(|p| p.as_slice()).collect();
+        ContentId::of(&refs)
     }
 
     pub fn partition_at(&self, x: i32, y: i32, z: i32) -> Option<&str> {
@@ -164,6 +215,60 @@ mod tests {
         let b = PartitionIndex::new(shuffled);
         assert_eq!(a.id_index_at(5, 0, 5), b.id_index_at(5, 0, 5));
         assert_eq!(a.id_index_at(15, 0, 5), b.id_index_at(15, 0, 5));
+    }
+
+    #[test]
+    fn hints_hash_is_order_independent_but_content_sensitive() {
+        let mut reversed = hints();
+        reversed.reverse();
+        assert_eq!(
+            PartitionIndex::new(hints()).hints_hash(),
+            PartitionIndex::new(reversed).hints_hash(),
+            "hints are sorted at construction, so input order cannot reach the digest"
+        );
+
+        // Same ids, different boxes: the case that used to slip through
+        // `config_hash` entirely.
+        let narrower = vec![
+            PartitionHint { id: "a".into(), bbox_xz: (0, 8, 0, 9), y_range: None },
+            PartitionHint { id: "b".into(), bbox_xz: (11, 20, 0, 9), y_range: None },
+            PartitionHint { id: "c".into(), bbox_xz: (0, 9, 11, 20), y_range: Some((0, 10)) },
+        ];
+        assert_ne!(
+            PartitionIndex::new(hints()).hints_hash(),
+            PartitionIndex::new(narrower).hints_hash(),
+            "hint geometry must be part of the digest"
+        );
+
+        // An unbounded column must not collide with an explicitly full one.
+        let full = vec![PartitionHint {
+            id: "a".into(),
+            bbox_xz: (0, 9, 0, 9),
+            y_range: Some((i32::MIN, i32::MAX)),
+        }];
+        let unbounded =
+            vec![PartitionHint { id: "a".into(), bbox_xz: (0, 9, 0, 9), y_range: None }];
+        assert_ne!(
+            PartitionIndex::new(full).hints_hash(),
+            PartitionIndex::new(unbounded).hints_hash()
+        );
+
+        // Ids must not alias through concatenation.
+        let ab_c = vec![
+            PartitionHint { id: "ab".into(), bbox_xz: (0, 0, 0, 0), y_range: None },
+            PartitionHint { id: "c".into(), bbox_xz: (0, 0, 0, 0), y_range: None },
+        ];
+        let a_bc = vec![
+            PartitionHint { id: "a".into(), bbox_xz: (0, 0, 0, 0), y_range: None },
+            PartitionHint { id: "bc".into(), bbox_xz: (0, 0, 0, 0), y_range: None },
+        ];
+        assert_ne!(PartitionIndex::new(ab_c).hints_hash(), PartitionIndex::new(a_bc).hints_hash());
+
+        // A prefix of the hint list must not collide with the whole.
+        assert_ne!(
+            PartitionIndex::new(hints()).hints_hash(),
+            PartitionIndex::new(hints()[..2].to_vec()).hints_hash()
+        );
     }
 
     #[test]
