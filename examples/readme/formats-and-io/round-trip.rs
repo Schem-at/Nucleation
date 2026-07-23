@@ -11,7 +11,7 @@
 //! No resource pack needed — this is data, not pixels.
 
 use nucleation::fingerprint::{fingerprint, FingerprintSpec};
-use nucleation::formats::{litematic, mcstructure, schematic as sponge, snapshot};
+use nucleation::formats::{gametest_snbt, litematic, mcstructure, schematic as sponge, snapshot};
 use nucleation::UniversalSchematic;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -51,6 +51,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let writers: Vec<(&str, &str, Vec<u8>)> = vec![
         ("litematic", ".litematic", litematic::to_litematic(&s)?),
         ("sponge", ".schem", sponge::to_schematic(&s)?),
+        (
+            "gametest_snbt",
+            ".snbt",
+            gametest_snbt::to_gametest_snbt(&s)?,
+        ),
         ("snapshot", ".nusn", snapshot::to_snapshot(&s)?),
         (
             "mcstructure",
@@ -77,7 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         println!("{:<13} {:>8}  {}  {}", name, bytes.len(), hex, verdict);
     }
-    println!("\nwrote {out}/round-trip.{{schem,litematic,nusn,mcstructure}}");
+    println!("\nwrote {out}/round-trip.{{schem,litematic,snbt,nusn,mcstructure}}");
     Ok(())
 }
 

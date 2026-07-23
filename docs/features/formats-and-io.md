@@ -13,9 +13,9 @@ build.save_to_file("build.schem")
 ```
 
 `load_from_file` inspects the bytes rather than trusting the filename. The
-extension matters when writing: `.litematic`, `.schem`, `.mcstructure`, `.nusn`,
-and `.zip` select their corresponding exporters. An unknown output extension is
-an error; Nucleation does not silently choose a fallback format.
+extension matters when writing: `.litematic`, `.schem`, `.mcstructure`, `.snbt`,
+`.nusn`, and `.zip` select their corresponding exporters. An unknown output
+extension is an error; Nucleation does not silently choose a fallback format.
 
 For coordinates, block placement, automatic region growth, and block-state
 strings, start with [Basics](basics.md).
@@ -27,6 +27,7 @@ strings, start with [Basics](basics.md).
 | **Litematica** | `.litematic` | yes | yes | `litematic` | Multi-region native; the reference container |
 | **Sponge Schematic** | `.schem` | yes | yes | `schematic` | WorldEdit/community format; exporter versions `v2` and `v3` |
 | **Bedrock structure** | `.mcstructure` | yes | yes | `mcstructure` | Java block IDs and states are translated through GeyserMC mappings |
+| **Java GameTest structure** | `.snbt` | yes | yes | `gametest_snbt` | Text structures used by GameTest/Test Blocks; preserves data version, block/entity NBT, and entities |
 | **Nucleation snapshot** | `.nusn` | yes | yes | `snapshot` | Fast, uncompressed internal interchange format |
 | **Legacy MCEdit** | `.schematic` | yes | no | — | Pre-Flattening numeric IDs; import only |
 
@@ -64,9 +65,19 @@ payload = Path("mystery.bin").read_bytes()
 build = Schematic.from_data(payload)
 ```
 
-The detector recognizes Litematica, Sponge, Bedrock structures, Nucleation
-snapshots, legacy MCEdit schematics, MCA region files, and zipped worlds. If no
-format matches, loading fails instead of constructing a partial schematic.
+The detector recognizes Litematica, Sponge, Bedrock structures, Java GameTest
+SNBT, Nucleation snapshots, legacy MCEdit schematics, MCA region files, and
+zipped worlds. If no format matches, loading fails instead of constructing a
+partial schematic.
+
+GameTest SNBT is the textual Java structure shape used by Test Blocks and suites
+such as Lithium's: `DataVersion`, `size`, positioned `data` entries, `entities`,
+and a string `palette`. Nucleation accepts GameTest's
+`minecraft:block{property:value}` state spelling and maps it to the normal
+editable block-state model. Saving emits a complete rectangular structure; when
+the schematic spans multiple regions, their bounding box is flattened and gaps
+are written as air. Import and export reject axes larger than 256 blocks or
+volumes larger than 262,144 blocks before allocating the full structure.
 
 ## Byte pipelines
 
@@ -110,8 +121,9 @@ build.save_to_file_with_format(
 ```
 
 The supported named exporter keys are `litematic`, `schematic`, `mcstructure`,
-`snapshot`, and `world`. An unsupported key, version, or extension returns a
-`NucleationError`; it never writes Litematic as an implicit fallback.
+`gametest_snbt`, `snapshot`, and `world`. An unsupported key, version, or
+extension returns a `NucleationError`; it never writes Litematic as an implicit
+fallback.
 
 ## Round-trip fidelity, measured
 
@@ -126,6 +138,7 @@ The current checkout produced:
 | --- | ---: | --- | --- |
 | Litematica | 483 | `5654c8b94f558113be01dc6a31c0dc8d` | identical |
 | Sponge `.schem` | 328 | `ab2071dca4aa393fe44697bf160ad00b` | equivalent content; reader adds an empty `components` compound |
+| GameTest `.snbt` | 328,906 | `5654c8b94f558113be01dc6a31c0dc8d` | identical |
 | Snapshot `.nusn` | 70,202 | `5654c8b94f558113be01dc6a31c0dc8d` | identical |
 | Bedrock `.mcstructure` | 945 | `b881f6eb62f4bd96b8185bcd7b9fad0f` | translated to Bedrock IDs and states |
 
@@ -133,11 +146,14 @@ Download the exact generated outputs:
 
 - [`round-trip.litematic`](../downloads/readme/formats-and-io/round-trip.litematic)
 - [`round-trip.schem`](../downloads/readme/formats-and-io/round-trip.schem)
+- [`round-trip.snbt`](../downloads/readme/formats-and-io/round-trip.snbt)
 - [`round-trip.nusn`](../downloads/readme/formats-and-io/round-trip.nusn)
 - [`round-trip.mcstructure`](../downloads/readme/formats-and-io/round-trip.mcstructure)
 
 “Identical” here means the canonical schematic content fingerprint matches, not
-that compressed container bytes are byte-for-byte identical. Sponge preserves
+that container bytes are byte-for-byte identical. GameTest SNBT writes every
+position in the rectangular structure, including air, so the human-readable
+output is deliberately larger than the binary formats. Sponge preserves
 the fixture's blocks, states, and chest data; its reader adds an empty Minecraft
 1.20.5+ `components` placeholder, which is harmless but visible to an exact NBT
 fingerprint. Bedrock is a translation boundary rather than a same-edition
@@ -145,6 +161,20 @@ round trip. See [Versions and translation](versions-and-translation.md).
 
 Legacy MCEdit is intentionally import-only: its numeric-ID model cannot express
 modern block states without loss.
+
+GameTest SNBT has additional corpus coverage against all 33 structures in
+Lithium's Java GameTest suite. The tests import each fixture, export it back to
+SNBT, re-import it, and compare dimensions, data version, every block state,
+block-entity NBT, and entities. Empty entity placeholders without an `id` are
+ignored, matching vanilla's structure loader.
+
+The pinned Lithium corpus is local and gitignored, so its test is explicitly
+ignored in clean checkouts rather than silently passing. With the fixtures
+installed, run it with:
+
+```shell
+cargo test --test gametest_snbt_tests lithium_fixture_corpus -- --ignored
+```
 
 ## Next
 

@@ -23,6 +23,9 @@ __pycache__/
 # Generated test .nucm files (large binaries, regenerate with gen_test_nucm example)
 examples/nucm-viewer/test-files/
 
+# Upstream Minecraft GameTest fixtures collected for local research
+/tests/fixtures/lithium-gametests/
+
 # Haskell example build output
 examples/haskell/dist-newstyle/
 
@@ -65,4 +68,5 @@ examples/bridge_smoke/python/.venv/
 bindings/kotlin/build/
 bindings/kotlin/.gradle/
 bindings/python/build/
+bindings/python/rust/
 bindings/kotlin/.kotlin/

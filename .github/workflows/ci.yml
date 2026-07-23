@@ -217,7 +217,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - { label: linux-x86_64,  os: ubuntu-latest }
           - { label: macos-aarch64, os: macos-latest }
           - { label: windows-x86_64, os: windows-latest }
     runs-on: ${{ matrix.os }}
@@ -228,24 +227,35 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Verify macOS wheel host architecture
+        if: matrix.label == 'macos-aarch64'
+        run: |
+          [[ "$(uname -m)" == "arm64" ]] || {
+            echo "::error::macos-aarch64 wheel must run on an arm64 host"
+            exit 1
+          }
       - name: Build wheel (${{ matrix.label }})
         env:
           # bridge-full, not bridge: the generated sources bind the entire
           # surface, so the static lib must export every module's symbols
           # (macOS ld fails hard on the gap; ELF defers it to call time).
           NUCLEATION_FEATURES: bridge-full
+          # GitHub's macOS runner may be much newer than the oldest supported
+          # deployment target. Without this, scikit-build-core stamps the host
+          # version into the wheel tag (0.3.18 accidentally shipped macOS 26).
+          MACOSX_DEPLOYMENT_TARGET: ${{ startsWith(matrix.label, 'macos-') && '11.0' || '' }}
+          CMAKE_OSX_DEPLOYMENT_TARGET: ${{ startsWith(matrix.label, 'macos-') && '11.0' || '' }}
         run: |
           python -m pip install --upgrade pip build
           python -m build --wheel bindings/python --outdir wheels
-      - name: Repair linux wheel to manylinux
-        if: matrix.label == 'linux-x86_64'
-        # PyPI rejects plain linux_x86_64 tags; auditwheel grafts external
-        # libs and retags to the runner's actual glibc floor.
+      - name: Verify macOS compatibility tag
+        if: matrix.label == 'macos-aarch64'
         run: |
-          python -m pip install auditwheel patchelf
-          python -m auditwheel repair wheels/*.whl -w wheels-repaired
-          rm wheels/*.whl
-          mv wheels-repaired/*.whl wheels/
+          wheel=$(basename wheels/*.whl)
+          [[ "$wheel" == *-macosx_11_0_arm64.whl ]] || {
+            echo "::error::unexpected macOS wheel tag: $wheel"
+            exit 1
+          }
       - name: Install and exercise wheel (${{ matrix.label }})
         # Building green is not enough: a wheel can be missing native symbols
         # and still build fine (ELF defers unresolved symbols to call time —
@@ -277,6 +287,84 @@ jobs:
         with:
           name: python-wheels-${{ matrix.label }}
           path: wheels/*.whl
+
+  build-python-linux-wheel:
+    needs: [check-version, tests, bindings]
+    runs-on: ubuntu-latest
+    # Build against glibc 2.28. auditwheel cannot lower a wheel built against
+    # Ubuntu 24.04/glibc 2.39; it can only report the symbols already linked.
+    container: quay.io/pypa/manylinux_2_28_x86_64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        shell: bash
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+            | sh -s -- -y --profile minimal --default-toolchain stable
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Build and repair manylinux 2.28 wheel
+        env:
+          NUCLEATION_FEATURES: bridge-full
+        shell: bash
+        run: |
+          PY=/opt/python/cp312-cp312/bin/python
+          "$PY" -m pip install --upgrade pip build auditwheel patchelf
+          "$PY" -m build --wheel bindings/python --outdir wheels-unrepaired
+          "$PY" -m auditwheel repair \
+            --plat manylinux_2_28_x86_64 \
+            wheels-unrepaired/*.whl -w wheels
+          wheel=$(basename wheels/*.whl)
+          [[ "$wheel" == *-manylinux_2_28_x86_64.whl ]] || {
+            echo "::error::unexpected Linux wheel tag: $wheel"
+            exit 1
+          }
+      - name: Install and exercise repaired wheel
+        shell: bash
+        run: |
+          PY=/opt/python/cp312-cp312/bin/python
+          "$PY" -m venv wheel-test-venv
+          wheel-test-venv/bin/python -m pip install wheels/*.whl
+          wheel-test-venv/bin/python - <<'EOF'
+          import nucleation
+          assert nucleation.Schematic.create("linux-wheel")
+          assert nucleation.BuildAnimation.create("animation")
+          print("manylinux wheel functional check OK")
+          EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-wheels-linux-x86_64
+          path: wheels/*.whl
+
+  build-python-sdist:
+    needs: [check-version, tests, bindings]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build self-contained source distribution
+        run: |
+          python tools/stage-python-sdist.py
+          python -m pip install --upgrade pip build
+          python -m build --sdist bindings/python --outdir sdist
+      - name: Verify sdist contains and builds the Rust core
+        env:
+          NUCLEATION_FEATURES: bridge-full
+        run: |
+          mkdir sdist-unpacked
+          tar -xzf sdist/*.tar.gz -C sdist-unpacked
+          test -f sdist-unpacked/nucleation-*/rust/Cargo.toml
+          test -f sdist-unpacked/nucleation-*/rust/src/animation/builder.rs
+          python -m venv sdist-test-venv
+          sdist-test-venv/bin/python -m pip install sdist/*.tar.gz
+          sdist-test-venv/bin/python -c \
+            'from nucleation import BuildAnimation; assert BuildAnimation.create("sdist")'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-sdist
+          path: sdist/*.tar.gz
 
   assemble-jvm-jar:
     # tests/bindings come transitively through build-nucleation.
@@ -339,7 +427,7 @@ jobs:
           path: bindings/kotlin/build/libs/*.jar
 
   publish:
-    needs: [check-version, build-wasm, build-nucleation, build-python-wheels, assemble-jvm-jar, smoke]
+    needs: [check-version, build-wasm, build-nucleation, build-python-wheels, build-python-linux-wheel, build-python-sdist, assemble-jvm-jar, smoke]
     if: needs.check-version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -400,6 +488,11 @@ jobs:
           pattern: python-wheels-*
           path: python-dist
           merge-multiple: true
+      - name: Download Python source distribution
+        uses: actions/download-artifact@v4
+        with:
+          name: python-sdist
+          path: python-dist
       - name: Setup Python
         uses: actions/setup-python@v5
         with:

@@ -62,8 +62,8 @@ fn region_rotation_records_exact_discrete_transform() {
             quarter_turns: 1,
         }
     );
-    assert_eq!(receipts[0].pivot2, Some([85, 0, 20]));
-    assert_eq!(receipts[0].final_pivot2, Some([20, 0, 85]));
+    assert_eq!(receipts[0].pivot2, Some([20, 0, 20]));
+    assert_eq!(receipts[0].final_pivot2, Some([20, 0, 20]));
     assert!(receipts[0].cells.iter().any(|cell| {
         cell.before_block.contains("facing=east") && cell.final_block.contains("facing=south")
     }));
@@ -606,4 +606,122 @@ fn transforms_fail_closed_for_unrecorded_model_content() {
             .get_block_string_in_region("Main", 0, 0, 0),
         before.get_block_string_in_region("Main", 0, 0, 0)
     );
+}
+
+#[test]
+fn rotated_flipped_region_stamp_rebuilds_tight_bounds_and_preserves_cells() {
+    let mut source = nucleation::UniversalSchematic::new("asymmetric-source".into());
+    source.add_region(nucleation::Region::new(
+        "module".into(),
+        (0, 0, 0),
+        (5, 4, 3),
+    ));
+    for x in 0..5 {
+        for y in 0..4 {
+            for z in 0..3 {
+                source
+                    .try_set_block_in_region_str("module", x, y, z, "minecraft:stone")
+                    .unwrap();
+            }
+        }
+    }
+
+    source.rotate_region_y("module", 90).unwrap();
+    source.flip_region_x("module").unwrap();
+
+    let tight = source
+        .get_region("module")
+        .unwrap()
+        .get_tight_bounds()
+        .unwrap();
+    assert_eq!(tight.get_dimensions(), (3, 4, 5));
+
+    let mut animation = BuildAnimation::new("stamp-target");
+    animation
+        .stamp_region(&source, "module", (10, 0, 10), &[], 500.0)
+        .unwrap();
+    let receipt = animation.operation_receipts().remove(0);
+    assert_eq!(receipt.cells.len(), 60);
+    assert_eq!(
+        receipt.before_bounds.unwrap(),
+        nucleation::animation::OperationBounds {
+            min: [0, 0, 0],
+            max: [2, 3, 4],
+        }
+    );
+}
+
+#[test]
+fn rotation_gizmo_uses_the_min_anchor_block_center() {
+    let mut animation = BuildAnimation::new("pivot");
+    animation
+        .create_region("module", (-8, 0, 0), (-6, 1, 0))
+        .unwrap();
+    animation.begin_group(None).unwrap();
+    for x in -8..=-6 {
+        animation
+            .set_block_in_region("module", x, 0, 0, "minecraft:stone")
+            .unwrap();
+    }
+    animation
+        .set_block_in_region("module", -8, 1, 0, "minecraft:sea_lantern")
+        .unwrap();
+    animation.end_group().unwrap();
+    animation.rotate_region_x("module", 90, 1_000.0).unwrap();
+
+    let receipt = &animation.operation_receipts()[0];
+    assert_eq!(receipt.pivot2, Some([-16, 0, 0]));
+    let middle = animation.frame_at(receipt.start_ms + 500.0);
+    let axis = middle
+        .gizmos
+        .iter()
+        .find(|line| line.kind == GizmoKind::Pivot)
+        .unwrap();
+    assert_eq!(axis.start[1], 0.0);
+    assert_eq!(axis.start[2], 0.0);
+    assert_eq!(axis.end[1], 0.0);
+    assert_eq!(axis.end[2], 0.0);
+}
+
+#[test]
+fn animation_region_creation_rejects_duplicates_default_and_excessive_volume() {
+    let mut animation = BuildAnimation::new("safe-region-creation");
+    animation
+        .set_block_in_region("Main", 0, 0, 0, "minecraft:diamond_block")
+        .unwrap();
+
+    assert!(animation
+        .create_region("Main", (0, 0, 0), (1, 1, 1))
+        .is_err());
+    assert_eq!(
+        animation
+            .schematic()
+            .get_block_string_in_region("Main", 0, 0, 0),
+        Some("minecraft:diamond_block".to_string())
+    );
+
+    animation
+        .create_region("module", (10, 0, 10), (11, 1, 11))
+        .unwrap();
+    let original_bounds = animation
+        .schematic()
+        .get_region("module")
+        .unwrap()
+        .get_bounding_box();
+    assert!(animation
+        .create_region("module", (20, 0, 20), (21, 1, 21))
+        .is_err());
+    assert_eq!(
+        animation
+            .schematic()
+            .get_region("module")
+            .unwrap()
+            .get_bounding_box(),
+        original_bounds
+    );
+
+    assert!(animation
+        .create_region("huge", (0, 0, 0), (50_000, 50_000, 50_000))
+        .is_err());
+    assert!(!animation.schematic().has_region("huge"));
 }

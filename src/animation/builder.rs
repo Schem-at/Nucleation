@@ -140,6 +140,56 @@ impl BuildAnimation {
         &mut self.schematic
     }
 
+    /// Create an exactly bounded named storage region for independently animated operations.
+    pub fn create_region(
+        &mut self,
+        name: &str,
+        min: (i32, i32, i32),
+        max: (i32, i32, i32),
+    ) -> Result<(), String> {
+        if name.trim().is_empty() {
+            return Err("region name cannot be empty".to_string());
+        }
+        if self.schematic.has_region(name) {
+            return Err(format!("region '{name}' already exists"));
+        }
+        let dimensions = (
+            max.0
+                .checked_sub(min.0)
+                .and_then(|value| value.checked_add(1))
+                .filter(|value| *value > 0)
+                .ok_or("region X bounds are invalid")?,
+            max.1
+                .checked_sub(min.1)
+                .and_then(|value| value.checked_add(1))
+                .filter(|value| *value > 0)
+                .ok_or("region Y bounds are invalid")?,
+            max.2
+                .checked_sub(min.2)
+                .and_then(|value| value.checked_add(1))
+                .filter(|value| *value > 0)
+                .ok_or("region Z bounds are invalid")?,
+        );
+        const MAX_ANIMATION_REGION_VOLUME: usize = 4_194_304;
+        let volume = usize::try_from(dimensions.0)
+            .ok()
+            .and_then(|x| x.checked_mul(dimensions.1 as usize))
+            .and_then(|xy| xy.checked_mul(dimensions.2 as usize))
+            .ok_or("region volume is too large")?;
+        if volume > MAX_ANIMATION_REGION_VOLUME {
+            return Err(format!(
+                "region volume {volume} exceeds the {MAX_ANIMATION_REGION_VOLUME}-block animation limit"
+            ));
+        }
+
+        let region = crate::Region::try_new(name.to_string(), min, dimensions)?;
+        if self.schematic.add_region(region) {
+            Ok(())
+        } else {
+            Err(format!("region '{name}' already exists"))
+        }
+    }
+
     pub fn set_default_effect(&mut self, effect: impl Into<AnimationEffect>) {
         self.default_effect = effect.into().clip;
     }
@@ -452,12 +502,17 @@ impl BuildAnimation {
         ))
     }
 
-    fn bounds_pivot(bounds: &crate::bounding_box::BoundingBox) -> [f32; 3] {
-        [
-            (bounds.min.0 as f64 + bounds.max.0 as f64) as f32 * 0.5,
-            (bounds.min.1 as f64 + bounds.max.1 as f64) as f32 * 0.5,
-            (bounds.min.2 as f64 + bounds.max.2 as f64) as f32 * 0.5,
-        ]
+    fn rotation_anchors(
+        axis: TransformAxis,
+        bounds: &crate::bounding_box::BoundingBox,
+        degrees: i32,
+    ) -> Result<([f32; 3], [f32; 3]), String> {
+        let min = bounds.min;
+        let final_min = Self::rotate_position(axis, min, bounds, degrees)?;
+        Ok((
+            [min.0 as f32, min.1 as f32, min.2 as f32],
+            [final_min.0 as f32, final_min.1 as f32, final_min.2 as f32],
+        ))
     }
 
     fn inverse_rotation_degrees(axis: TransformAxis, degrees: i32) -> f32 {
@@ -535,8 +590,8 @@ impl BuildAnimation {
                 OperationTransform::Rotate {
                     axis,
                     inverse_degrees: Self::inverse_rotation_degrees(axis, normalized),
-                    pivot: Self::bounds_pivot(&bounds),
-                    final_pivot: Self::bounds_pivot(&final_bounds),
+                    pivot: Self::rotation_anchors(axis, &bounds, normalized)?.0,
+                    final_pivot: Self::rotation_anchors(axis, &bounds, normalized)?.1,
                 },
                 duration_ms,
             )?;
@@ -791,6 +846,18 @@ impl BuildAnimation {
                 })
             })
             .collect();
+        let (pivot2, final_pivot2) = match transform {
+            OperationTransform::Rotate {
+                pivot, final_pivot, ..
+            } => (
+                Some(pivot.map(|value| (value * 2.0).round() as i64)),
+                Some(final_pivot.map(|value| (value * 2.0).round() as i64)),
+            ),
+            _ => (
+                before_bounds.map(OperationBounds::pivot2),
+                final_bounds.map(OperationBounds::pivot2),
+            ),
+        };
         let receipt = OperationReceipt {
             start_ms,
             duration_ms,
@@ -799,8 +866,8 @@ impl BuildAnimation {
             kind,
             before_bounds,
             final_bounds,
-            pivot2: before_bounds.map(OperationBounds::pivot2),
-            final_pivot2: final_bounds.map(OperationBounds::pivot2),
+            pivot2,
+            final_pivot2,
             affine: Some(LatticeAffine { linear, offset }),
             cells,
             excluded_cells: Vec::new(),
@@ -1140,8 +1207,8 @@ impl BuildAnimation {
                 OperationTransform::Rotate {
                     axis,
                     inverse_degrees: Self::inverse_rotation_degrees(axis, normalized),
-                    pivot: Self::bounds_pivot(&bounds),
-                    final_pivot: Self::bounds_pivot(&final_bounds),
+                    pivot: Self::rotation_anchors(axis, &bounds, normalized)?.0,
+                    final_pivot: Self::rotation_anchors(axis, &bounds, normalized)?.1,
                 },
                 duration_ms,
             )?;

@@ -18,8 +18,20 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT)
 find_package(nanobind CONFIG REQUIRED)
 
-set(REPO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..)
-set(RUST_LIB ${REPO_ROOT}/target/release/${CMAKE_STATIC_LIBRARY_PREFIX}nucleation${CMAKE_STATIC_LIBRARY_SUFFIX})
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml")
+  # Self-contained source distribution staged by tools/stage-python-sdist.py.
+  set(REPO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/rust)
+else()
+  # Normal checkout/editable build.
+  set(REPO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+endif()
+if(DEFINED ENV{CARGO_TARGET_DIR} AND NOT "$ENV{CARGO_TARGET_DIR}" STREQUAL "")
+  get_filename_component(CARGO_TARGET_DIR "$ENV{CARGO_TARGET_DIR}" ABSOLUTE
+                         BASE_DIR "${REPO_ROOT}")
+else()
+  set(CARGO_TARGET_DIR "${REPO_ROOT}/target")
+endif()
+set(RUST_LIB ${CARGO_TARGET_DIR}/release/${CMAKE_STATIC_LIBRARY_PREFIX}nucleation${CMAKE_STATIC_LIBRARY_SUFFIX})
 
 # NUCLEATION_FEATURES lets CI choose the feature set baked into the wheel.
 if(NOT DEFINED ENV{NUCLEATION_FEATURES})

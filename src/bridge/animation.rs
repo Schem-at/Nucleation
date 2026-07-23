@@ -231,12 +231,9 @@ pub mod ffi {
             max_y: i32,
             max_z: i32,
         ) -> Result<(), NucleationError> {
-            self.0.schematic_mut().create_region(
-                utf8(name)?.to_string(),
-                (min_x, min_y, min_z),
-                (max_x, max_y, max_z),
-            );
-            Ok(())
+            self.0
+                .create_region(utf8(name)?, (min_x, min_y, min_z), (max_x, max_y, max_z))
+                .map_err(|_| NucleationError::InvalidArgument)
         }
 
         pub fn set_block_in_region(

@@ -56,9 +56,34 @@ pub struct Region {
 
 impl Region {
     pub fn new(name: String, position: (i32, i32, i32), size: (i32, i32, i32)) -> Self {
-        let bounding_box = BoundingBox::from_position_and_size(position, size);
-        let volume = bounding_box.volume() as usize;
-        let position_and_size = bounding_box.to_position_and_size();
+        Self::try_new(name, position, size)
+            .expect("region bounds or allocation exceed supported limits")
+    }
+
+    /// Construct a region without panicking on invalid bounds, arithmetic overflow,
+    /// or allocation failure.
+    pub fn try_new(
+        name: String,
+        position: (i32, i32, i32),
+        size: (i32, i32, i32),
+    ) -> Result<Self, String> {
+        let bounding_box = BoundingBox::try_from_position_and_size(position, size)?;
+        let dimension = |min: i32, max: i32, axis: &str| {
+            let value = i64::from(max) - i64::from(min) + 1;
+            i32::try_from(value)
+                .map_err(|_| format!("Region {axis} dimension {value} exceeds i32 limits"))
+        };
+        let dimensions = (
+            dimension(bounding_box.min.0, bounding_box.max.0, "X")?,
+            dimension(bounding_box.min.1, bounding_box.max.1, "Y")?,
+            dimension(bounding_box.min.2, bounding_box.max.2, "Z")?,
+        );
+        let volume = usize::try_from(dimensions.0)
+            .ok()
+            .and_then(|x| x.checked_mul(dimensions.1 as usize))
+            .and_then(|xy| xy.checked_mul(dimensions.2 as usize))
+            .ok_or_else(|| "Region volume exceeds addressable memory".to_string())?;
+        let position_and_size = (bounding_box.min, dimensions);
 
         let mut palette = Vec::new();
         let mut palette_index: FxHashMap<BlockState, usize> = FxHashMap::default();
@@ -67,11 +92,17 @@ impl Region {
         palette.push(air.clone());
         palette_index.insert(air, 0);
 
+        let mut blocks = Vec::new();
+        blocks
+            .try_reserve_exact(volume)
+            .map_err(|error| format!("Cannot allocate region with {volume} blocks: {error}"))?;
+        blocks.resize(volume, 0);
+
         let mut region = Region {
             name,
             position: position_and_size.0,
             size: position_and_size.1,
-            blocks: vec![0; volume],
+            blocks,
             palette,
             palette_index,
             entities: Vec::new(),
@@ -86,7 +117,7 @@ impl Region {
         };
         region.rebuild_bbox();
         region.rebuild_air_index();
-        region
+        Ok(region)
     }
 
     #[inline(always)]
@@ -1210,6 +1241,7 @@ impl Region {
         self.rebuild_palette_index();
         self.rebuild_air_index();
         self.rebuild_non_air_count();
+        self.rebuild_tight_bounds();
 
         // Transform block entities — pure position remap, no palette work.
         let max_x = self.bbox.max.0;
@@ -1256,6 +1288,7 @@ impl Region {
         self.rebuild_palette_index();
         self.rebuild_air_index();
         self.rebuild_non_air_count();
+        self.rebuild_tight_bounds();
 
         let max_y = self.bbox.max.1;
         let min_y = self.bbox.min.1;
@@ -1303,6 +1336,7 @@ impl Region {
         self.rebuild_palette_index();
         self.rebuild_air_index();
         self.rebuild_non_air_count();
+        self.rebuild_tight_bounds();
 
         let max_z = self.bbox.max.2;
         let min_z = self.bbox.min.2;
@@ -1436,6 +1470,7 @@ impl Region {
         self.rebuild_palette_index();
         self.rebuild_air_index();
         self.rebuild_non_air_count();
+        self.rebuild_tight_bounds();
 
         // Transform block entities — pure position remap.
         let old_min_x = old_bbox.min.0;
@@ -1525,6 +1560,7 @@ impl Region {
         self.rebuild_palette_index();
         self.rebuild_air_index();
         self.rebuild_non_air_count();
+        self.rebuild_tight_bounds();
 
         let old_min_y = old_bbox.min.1;
         let old_min_z = old_bbox.min.2;
@@ -1612,6 +1648,7 @@ impl Region {
         self.rebuild_palette_index();
         self.rebuild_air_index();
         self.rebuild_non_air_count();
+        self.rebuild_tight_bounds();
 
         let old_min_x = old_bbox.min.0;
         let old_min_y = old_bbox.min.1;

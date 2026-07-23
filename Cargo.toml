@@ -1,6 +1,6 @@
 [package]
 name = "nucleation"
-version = "0.3.18"
+version = "0.3.19"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -265,6 +265,10 @@ name = "render_animation"
 required-features = ["rendering"]
 
 [[example]]
+name = "render_animation_operations"
+required-features = ["rendering"]
+
+[[example]]
 name = "render_trefoil"
 required-features = ["rendering"]
 
@@ -314,6 +318,11 @@ required-features = ["rendering"]
 [[example]]
 name = "readme_assemble"
 path = "examples/readme/animation/assemble.rs"
+required-features = ["rendering"]
+
+[[example]]
+name = "readme_regions"
+path = "examples/readme/regions/generate.rs"
 required-features = ["rendering"]
 
 [[example]]

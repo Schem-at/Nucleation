@@ -165,7 +165,10 @@ pub fn transform_block_state_rotate(block: &BlockState, axis: Axis, degrees: i32
 
     // Transform 'facing' property
     if let Some(facing) = block.get_property("facing") {
-        if let Some(dir) = Direction::from_str(facing) {
+        if let Some((new_facing, new_half)) = rotate_stair_facing_half(block, axis, degrees) {
+            new_block.set_property("facing".to_string(), new_facing);
+            new_block.set_property("half".to_string(), new_half);
+        } else if let Some(dir) = Direction::from_str(facing) {
             let new_dir = match axis {
                 Axis::Y => dir.rotate_y(degrees),
                 Axis::X => dir.rotate_x(degrees),
@@ -197,6 +200,42 @@ pub fn transform_block_state_rotate(block: &BlockState, axis: Axis, degrees: i32
     transform_special_block_properties(&mut new_block, axis, true, degrees);
 
     new_block
+}
+
+/// X/Z quarter turns can exchange a stair's horizontal facing with its vertical half.
+/// Encode that rigid orientation with Minecraft's valid horizontal `facing` + `half` states
+/// instead of emitting invalid `facing=up/down` values.
+fn rotate_stair_facing_half(
+    block: &BlockState,
+    axis: Axis,
+    degrees: i32,
+) -> Option<(String, String)> {
+    if !block.get_name().ends_with("_stairs") || axis == Axis::Y {
+        return None;
+    }
+    let mut facing = block.get_property("facing")?.to_string();
+    let mut half = block
+        .get_property("half")
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "bottom".to_string());
+    let rotations = degrees.rem_euclid(360) / 90;
+
+    for _ in 0..rotations {
+        let mapped = match (axis, facing.as_str(), half.as_str()) {
+            (Axis::X, "north", "bottom") => ("north", "top"),
+            (Axis::X, "north", "top") => ("south", "top"),
+            (Axis::X, "south", "bottom") => ("north", "bottom"),
+            (Axis::X, "south", "top") => ("south", "bottom"),
+            (Axis::Z, "east", "bottom") => ("east", "top"),
+            (Axis::Z, "east", "top") => ("west", "top"),
+            (Axis::Z, "west", "bottom") => ("east", "bottom"),
+            (Axis::Z, "west", "top") => ("west", "bottom"),
+            _ => return None,
+        };
+        facing = mapped.0.to_string();
+        half = mapped.1.to_string();
+    }
+    Some((facing, half))
 }
 
 /// Rotate axis property value
@@ -376,6 +415,24 @@ mod tests {
         assert_eq!(
             transformed_180.get_property("facing"),
             Some(&SmolStr::from("south"))
+        );
+    }
+
+    #[test]
+    fn z_rotation_keeps_east_facing_stair_valid_by_flipping_half() {
+        let mut block = BlockState::new("minecraft:oak_stairs".to_string());
+        block.set_property("facing".to_string(), "east".to_string());
+        block.set_property("half".to_string(), "bottom".to_string());
+        block.set_property("shape".to_string(), "straight".to_string());
+
+        let transformed = transform_block_state_rotate(&block, Axis::Z, 90);
+        assert_eq!(
+            transformed.get_property("facing"),
+            Some(&SmolStr::from("east"))
+        );
+        assert_eq!(
+            transformed.get_property("half"),
+            Some(&SmolStr::from("top"))
         );
     }
 
