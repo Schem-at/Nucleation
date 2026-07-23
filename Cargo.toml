@@ -67,7 +67,7 @@ simulation = [
 # Auto-stack: detect repeating structures + resize them (pure-voxel core)
 autostack = []
 # World segmentation: voxel world -> discrete builds (pure, deterministic core)
-world-segment = []
+world-segment = ["dep:tar"]
 # Mesh voxelization: GLB/OBJ models -> building Shapes + textured schematics
 voxelize = ["dep:gltf", "dep:image"]
 # Meshing support - generate 3D meshes from schematics
@@ -90,6 +90,7 @@ serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 quartz_nbt = { version = "0.2.9", features = ["preserve_order"] }
 flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
+tar = { version = "0.4", optional = true }
 log = "0.4.22"
 console = "0.15.8"
 insign = "0.1.1"

@@ -1,0 +1,209 @@
+//! Forward-only tile source over a streaming `.tar.gz` world archive.
+//!
+//! A gzipped tar cannot be seeked, so this is `Access::Forward`: it walks the
+//! archive once, parses each `region/*.mca` entry into a tile, and streams it.
+//! Everything rejected (backups, stray level files, junk coordinates) is
+//! reported, never silently dropped.
+
+use std::fs::File;
+use std::io::{BufReader, Read};
+use std::path::{Path, PathBuf};
+
+use crate::world_segment::ids::TileId;
+use crate::world_segment::source::{Access, TileError, TileSource};
+use crate::world_segment::tile::VoxelTile;
+
+/// Region coords beyond this are name-mangling artifacts, not real regions
+/// (a real MC world spans about +/-117_000 blocks / 512).
+pub const MAX_REASONABLE_REGION_COORD: i32 = 120_000;
+
+/// `.../region/r.<x>.<z>.mca` -> `(x, z)`. Anything else -> `None`.
+pub fn parse_region_coords(name: &str) -> Option<(i32, i32)> {
+    // Must be inside a `region/` dir and end in `.mca` exactly (not .bak/.backup).
+    if !name.contains("/region/") && !name.starts_with("region/") {
+        return None;
+    }
+    let file = name.rsplit('/').next()?;
+    let stem = file.strip_suffix(".mca")?;
+    let mut parts = stem.split('.');
+    if parts.next()? != "r" {
+        return None;
+    }
+    let x: i32 = parts.next()?.parse().ok()?;
+    let z: i32 = parts.next()?.parse().ok()?;
+    if parts.next().is_some() {
+        return None; // trailing junk => not a bare .mca
+    }
+    Some((x, z))
+}
+
+pub fn is_out_of_range(x: i32, z: i32) -> bool {
+    x.abs() > MAX_REASONABLE_REGION_COORD || z.abs() > MAX_REASONABLE_REGION_COORD
+}
+
+/// True if region `(rx,rz)`'s 512-block span lies entirely outside
+/// `[-border, border]` on either axis.
+pub fn region_outside_border(rx: i32, rz: i32, border: i32) -> bool {
+    let span = |r: i32| (r * 512, r * 512 + 511);
+    let (x0, x1) = span(rx);
+    let (z0, z1) = span(rz);
+    x1 < -border || x0 > border || z1 < -border || z0 > border
+}
+
+#[derive(Debug)]
+pub struct RejectedEntry {
+    pub name: String,
+    pub reason: String,
+}
+
+pub struct TarGzSource {
+    path: PathBuf,
+    min_y: i32,
+    max_y: i32,
+    world_border: Option<i32>,
+}
+
+impl TarGzSource {
+    pub fn open(path: impl AsRef<Path>, min_y: i32, max_y: i32) -> Result<Self, TileError> {
+        let path = path.as_ref().to_path_buf();
+        if !path.exists() {
+            return Err(TileError::Io(format!("{} does not exist", path.display())));
+        }
+        Ok(TarGzSource { path, min_y, max_y, world_border: None })
+    }
+
+    pub fn with_world_border(mut self, border_abs: i32) -> Self {
+        self.world_border = Some(border_abs.abs());
+        self
+    }
+
+    /// Classify an entry name. `Ok(coords)` to process; `Err(reason)` to reject
+    /// (caller logs). Non-region entries return `Err` too.
+    fn classify(&self, name: &str) -> Result<(i32, i32), String> {
+        let (x, z) = parse_region_coords(name).ok_or_else(|| "not a region .mca".to_string())?;
+        if is_out_of_range(x, z) {
+            return Err(format!("out-of-range coords ({x},{z})"));
+        }
+        if let Some(border) = self.world_border {
+            if region_outside_border(x, z, border) {
+                return Err(format!("outside world border ({x},{z})"));
+            }
+        }
+        Ok((x, z))
+    }
+}
+
+impl TileSource for TarGzSource {
+    fn access(&self) -> Access {
+        Access::Forward
+    }
+
+    fn tile_ids(&self) -> Result<Vec<TileId>, TileError> {
+        // Ids are not known without a full pass; callers should stream.
+        Ok(Vec::new())
+    }
+
+    fn tile(&self, _id: TileId) -> Result<Option<VoxelTile>, TileError> {
+        Err(TileError::NotRandomAccess)
+    }
+
+    fn for_each_tile(
+        &self,
+        f: &mut dyn FnMut(VoxelTile) -> Result<(), TileError>,
+    ) -> Result<(), TileError> {
+        use flate2::read::GzDecoder;
+        let file = File::open(&self.path).map_err(|e| TileError::Io(e.to_string()))?;
+        let gz = GzDecoder::new(BufReader::new(file));
+        let mut archive = tar::Archive::new(gz);
+        let entries = archive.entries().map_err(|e| TileError::Io(e.to_string()))?;
+        let mut buf: Vec<u8> = Vec::new();
+        for entry in entries {
+            let mut entry = entry.map_err(|e| TileError::Io(e.to_string()))?;
+            let name = entry
+                .path()
+                .map_err(|e| TileError::Io(e.to_string()))?
+                .to_string_lossy()
+                .to_string();
+            let (rx, rz) = match self.classify(&name) {
+                Ok(c) => c,
+                Err(reason) => {
+                    // Report, do not silently drop. eprintln keeps the core
+                    // free of a logging dependency; callers can capture stderr.
+                    eprintln!("world_segment: skipping {name}: {reason}");
+                    continue;
+                }
+            };
+            buf.clear();
+            entry.read_to_end(&mut buf).map_err(|e| TileError::Io(e.to_string()))?;
+            if buf.is_empty() {
+                continue;
+            }
+            // The filename coords (rx,rz) are used ONLY for junk filtering above
+            // (the sign-extension artifact is a filename problem). The tile's
+            // actual id comes from the decoded region via region_positions(),
+            // which reads the region header — this avoids trusting a possibly
+            // mangled filename for identity.
+            let source = crate::formats::world_stream::WorldSource::from_mca_bytes(buf.clone())
+                .map_err(|e| TileError::Malformed(e.to_string()))?;
+            let positions = source
+                .region_positions()
+                .map_err(|e| TileError::Malformed(e.to_string()))?;
+            let (tx, tz) = match positions.first() {
+                Some(&p) => p,
+                None => {
+                    eprintln!("world_segment: skipping {name}: no region position in header");
+                    continue;
+                }
+            };
+            let _ = (rx, rz); // filename coords already served their filtering purpose
+            let tiles = crate::world_segment::world_source::WorldSourceTiles::new(
+                source, self.min_y, self.max_y,
+            );
+            if let Some(tile) = tiles.tile(TileId { x: tx, z: tz })? {
+                f(tile)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_valid_region_names() {
+        assert_eq!(parse_region_coords("world/region/r.0.0.mca"), Some((0, 0)));
+        assert_eq!(parse_region_coords("build/region/r.-1.-2.mca"), Some((-1, -2)));
+        assert_eq!(parse_region_coords("region/r.5.-3.mca"), Some((5, -3)));
+    }
+
+    #[test]
+    fn rejects_non_region_and_backup_entries() {
+        assert_eq!(parse_region_coords("world/region/r.0.0.mca.bak"), None);
+        assert_eq!(parse_region_coords("world/region/r.-2.-8.mca.5409229131383617463.backup"), None);
+        assert_eq!(parse_region_coords("world/level.dat"), None);
+        assert_eq!(parse_region_coords("world/entities/r.0.0.mca"), None); // not /region/
+        assert_eq!(parse_region_coords("world/region/notaregion.mca"), None);
+    }
+
+    #[test]
+    fn flags_sign_extension_coordinates() {
+        // 4194303 = 2^22 - 1 = -1 misread as unsigned 22-bit. Parsed, then
+        // rejected by the range guard.
+        assert!(is_out_of_range(4194303, -3));
+        assert!(!is_out_of_range(5, -3));
+    }
+
+    #[test]
+    fn world_border_excludes_far_regions() {
+        // "Outside" means the span lies ENTIRELY beyond [-border, border].
+        // border 8192: region 17 covers blocks 8704..9215, fully beyond -> excluded.
+        // region 16 covers 8192..8703 and block 8192 is ON the border, so it
+        // TOUCHES and must be kept. region 0 is well inside.
+        assert!(region_outside_border(17, 0, 8192), "fully beyond the border");
+        assert!(!region_outside_border(16, 0, 8192), "touches the border, keep it");
+        assert!(!region_outside_border(15, 0, 8192), "inside");
+        assert!(!region_outside_border(0, 0, 8192), "inside");
+    }
+}

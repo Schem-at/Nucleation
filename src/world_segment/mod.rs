@@ -13,6 +13,7 @@ pub mod partition;
 pub mod segment;
 pub mod source;
 pub mod world_source;
+pub mod targz_source;
 
 pub use ids::{ClusterId, ContentId, TileId};
 pub use tile::{TileBounds, VoxelTile};
@@ -23,3 +24,4 @@ pub use partition::{PartitionHint, PartitionIndex, PartitionPolicy};
 pub use segment::{segment_tile, Cluster, MarginCell, SegConfig, TileSegments};
 pub use source::{region_tile_bounds, Access, TileError, TileSource};
 pub use world_source::WorldSourceTiles;
+pub use targz_source::TarGzSource;
