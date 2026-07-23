@@ -8,8 +8,10 @@ pub mod ids;
 pub mod tile;
 pub mod classify;
 pub mod profile;
+pub mod grid;
 
 pub use ids::{ClusterId, ContentId, TileId};
 pub use tile::{TileBounds, VoxelTile};
 pub use classify::{classify, BlockClass};
 pub use profile::WorldProfile;
+pub use grid::OccupancyGrid;
