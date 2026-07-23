@@ -117,10 +117,31 @@ pub struct Cluster {
 
 /// A labelled cell at cell-depth `0..=2R` from a tile face, for cross-tile
 /// stitching. See `segment_tile` step 5 for why the band is `2R+1` cells wide.
+///
+/// # `cell` is not a key
+///
+/// Under [`PartitionPolicy::HardCut`] blocks are partitioned **per block**, so
+/// a single cell can be occupied in two partitions' grids at once and belong to
+/// a different cluster in each. Both clusters then emit a `MarginCell` with the
+/// *same* `cell` and different `cluster`. That is correct output, not a bug —
+/// see `segment_tile` step 1 and `assign_ids`.
+///
+/// A consumer that stitches clusters across tile faces by looking for margin
+/// entries at coincident cells **must not union two entries whose `partition`
+/// differs**. Doing so re-forms exactly the boundary-spanning cluster that
+/// per-block partitioning exists to prevent. `partition` is carried here for
+/// precisely that reason: `cell` alone cannot tell the two entries apart.
+///
+/// Entries in the same partition (including two `None`s) are the ones a
+/// stitcher may legitimately consider joining.
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct MarginCell {
     pub cell: (i32, i32, i32),
     pub cluster: ClusterId,
+    /// The partition the owning cluster fell in, mirroring
+    /// [`Cluster::partition_id`]. `None` under `Off`/`Prefer`, or when the cell
+    /// lies outside every hint.
+    pub partition: Option<String>,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -266,13 +287,29 @@ pub fn segment_tile(
         if !kept.contains(id) {
             continue;
         }
+        // Cloned once per cluster, not once per cell.
+        let partition = partition_of_cluster.get(id).cloned().flatten();
         for cell_coord in &a.cells {
             if in_margin(*cell_coord, dims, band) {
-                margin.push(MarginCell { cell: *cell_coord, cluster: *id });
+                margin.push(MarginCell {
+                    cell: *cell_coord,
+                    cluster: *id,
+                    partition: partition.clone(),
+                });
             }
         }
     }
-    margin.sort_by(|a, b| a.cell.cmp(&b.cell).then(a.cluster.cmp(&b.cluster)));
+    // `(cell, cluster)` is already unique — a cluster records each of its cells
+    // once — so the `partition` term never actually decides an ordering. It is
+    // appended anyway so that the sort key covers every field of `MarginCell`:
+    // if a future change makes `(cell, cluster)` non-unique, the order stays
+    // total and order-independent instead of silently becoming input-dependent.
+    margin.sort_by(|a, b| {
+        a.cell
+            .cmp(&b.cell)
+            .then_with(|| a.cluster.cmp(&b.cluster))
+            .then_with(|| a.partition.cmp(&b.partition))
+    });
 
     TileSegments { tile_id: tile.id(), clusters, margin }
 }
@@ -717,6 +754,73 @@ mod tests {
             segs.clusters[0].id, segs.clusters[1].id,
             "a shared anchor cell in two partitions must still give two ids"
         );
+    }
+
+    #[test]
+    fn margin_cells_at_a_shared_cell_carry_their_own_partitions() {
+        // Per-block partitioning lets one cell be occupied in two partitions'
+        // grids, so two *different* clusters can emit a margin entry for the
+        // SAME cell. `MarginCell` used to record only (cell, cluster); a
+        // stitching stage keying on `cell` would union the two clusters and
+        // re-form precisely the boundary-spanning cluster that per-block
+        // partitioning exists to prevent. The partition is carried so the
+        // stitcher can refuse that union.
+        //
+        // Boundary at x = 2, deliberately NOT a multiple of cell_size 4, and
+        // deliberately inside the margin band so the entries are exported:
+        //   cell x 0 covers world x 0..=3, and 2 falls strictly inside it.
+        //   (1,10,40) -> cell (1/4, (10+64)/4, 40/4) = (0,18,10)  -> "L"
+        //   (2,10,40) -> cell (2/4, 18,       40/4) = (0,18,10)  -> "R"
+        // cell x = 0 < band 5, so both are in the margin band.
+        let hints = PartitionIndex::new(vec![
+            PartitionHint { id: "L".into(), bbox_xz: (0, 1, 0, 127), y_range: None },
+            PartitionHint { id: "R".into(), bbox_xz: (2, 127, 0, 127), y_range: None },
+        ]);
+        let config = SegConfig { partition_policy: PartitionPolicy::HardCut, ..cfg() };
+        let segs = segment_tile(
+            &tile(vec![
+                ((1, 10, 40), "minecraft:redstone_wire"),
+                ((2, 10, 40), "minecraft:redstone_wire"),
+            ]),
+            &profile(),
+            &config,
+            &hints,
+        );
+
+        assert_eq!(segs.clusters.len(), 2, "the boundary splits the straddling cell");
+
+        let shared: Vec<&MarginCell> =
+            segs.margin.iter().filter(|m| m.cell == (0, 18, 10)).collect();
+        assert_eq!(
+            shared.len(),
+            2,
+            "the shared cell must appear once per partition, got {:?}",
+            segs.margin
+        );
+        assert_ne!(
+            shared[0].cluster, shared[1].cluster,
+            "two distinct clusters occupy the shared cell"
+        );
+        assert_ne!(
+            shared[0].partition, shared[1].partition,
+            "margin entries at a shared cell must be distinguishable by partition; \
+             without this a stitcher keying on `cell` unions across the boundary"
+        );
+
+        // And the partition recorded on each entry must be the one its own
+        // cluster carries — not merely *some* differing value.
+        for m in &shared {
+            let owner = segs
+                .clusters
+                .iter()
+                .find(|c| c.id == m.cluster)
+                .expect("margin entry must reference a surviving cluster");
+            assert_eq!(&m.partition, &owner.partition_id);
+        }
+        let mut names: Vec<Option<String>> =
+            shared.iter().map(|m| m.partition.clone()).collect();
+        names.sort();
+        assert_eq!(names, vec![Some("L".to_string()), Some("R".to_string())]);
     }
 
     #[test]
