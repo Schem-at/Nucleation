@@ -66,6 +66,8 @@ simulation = [
 ]
 # Auto-stack: detect repeating structures + resize them (pure-voxel core)
 autostack = []
+# World segmentation: voxel world -> discrete builds (pure, deterministic core)
+world-segment = []
 # Mesh voxelization: GLB/OBJ models -> building Shapes + textured schematics
 voxelize = ["dep:gltf", "dep:image"]
 # Meshing support - generate 3D meshes from schematics
