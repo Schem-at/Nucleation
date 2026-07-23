@@ -788,6 +788,32 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_positions_do_not_make_the_result_depend_on_input_order() {
+        // The determinism guarantee, at its sharpest. Region and chunk readers
+        // and overlapping tile margins all produce the same position twice.
+        //
+        // (10,-60,10) is inside the profile's substrate y-band (-64..=-50), so
+        // "minecraft:stone" there classifies as Substrate and is discarded,
+        // while "minecraft:redstone_wire" is artificial and yields a cluster.
+        // Last-write-wins therefore gave 0 clusters one way and 1 the other.
+        //
+        // Canonical palette keys: "minecraft:redstone_wire[]" sorts before
+        // "minecraft:stone[]", so redstone_wire wins in both orders.
+        let forward = vec![
+            ((10, -60, 10), "minecraft:stone"),
+            ((10, -60, 10), "minecraft:redstone_wire"),
+        ];
+        let mut reverse = forward.clone();
+        reverse.reverse();
+
+        let a = segment_tile(&tile(forward), &profile(), &cfg(), &no_hints());
+        let b = segment_tile(&tile(reverse), &profile(), &cfg(), &no_hints());
+
+        assert_eq!(a, b, "a duplicated position must not let input order reach the output");
+        assert_eq!(a.clusters.len(), 1, "redstone_wire wins the position, so one cluster");
+    }
+
+    #[test]
     fn interior_clusters_emit_no_margin_cells() {
         let segs = segment_tile(
             &tile(vec![((64, 10, 64), "minecraft:redstone_wire")]),
