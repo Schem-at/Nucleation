@@ -18,7 +18,7 @@ pub mod targz_source;
 pub use ids::{ClusterId, ContentId, TileId};
 pub use tile::{TileBounds, VoxelTile};
 pub use classify::{classify, BlockClass};
-pub use profile::WorldProfile;
+pub use profile::{ProfileParams, WorldProfile};
 pub use grid::{ComponentLabels, OccupancyGrid};
 pub use partition::{PartitionHint, PartitionIndex, PartitionPolicy};
 pub use segment::{segment_tile, Cluster, MarginCell, SegConfig, TileSegments};
