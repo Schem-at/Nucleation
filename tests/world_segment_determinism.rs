@@ -103,8 +103,16 @@ fn output_serializes_stably() {
     assert_eq!(a, b, "serialized bytes must match exactly");
 }
 
+/// Weak by construction: these three hints are pairwise disjoint and have
+/// unique ids, which is precisely the configuration in which hint order
+/// *cannot* matter — every point matches at most one hint, so first-match
+/// selection is unambiguous regardless of vector order, and `id_of_index`
+/// resolves any index back through the same vector to the same id string.
+/// This test would still pass even with `PartitionIndex::new`'s sort deleted
+/// outright. See `overlapping_hint_order_does_not_affect_output` below for
+/// the case that actually exercises the sort.
 #[test]
-fn partition_hint_order_does_not_affect_output() {
+fn disjoint_hint_order_does_not_affect_output() {
     use nucleation::world_segment::partition::PartitionPolicy;
 
     let hints = vec![
@@ -122,6 +130,40 @@ fn partition_hint_order_does_not_affect_output() {
     let a = segment_tile(&tile_a, &profile(), &cfg, &PartitionIndex::new(hints));
     let b = segment_tile(&tile_b, &profile(), &cfg, &PartitionIndex::new(reversed));
     assert_eq!(a, b, "hint order must not reach the output");
+}
+
+/// The discriminating case the test above is missing: two distinct ids whose
+/// boxes *overlap*. First-match selection means a point in the overlap
+/// resolves to whichever hint is scanned first. `PartitionIndex::new` sorts
+/// hints by (id, bbox_xz, y_range) precisely so that "first" is a property of
+/// the hint content, not of the order the caller happened to supply them in.
+///
+/// `"a"` spans x in [0, 200] and `"b"` spans x in [100, 255] (both full z,
+/// full y), so they overlap on x in [100, 200] — a span the `scene()` helper
+/// definitely places blocks across. Without the sort, the forward-ordered
+/// vector resolves that overlap to `"a"` and the reversed vector resolves it
+/// to `"b"`, so clusters straddling the overlap get different
+/// `partition_id`s and the two `TileSegments` differ. With the sort, both
+/// orderings agree ("a" sorts before "b" regardless of input order) and the
+/// assertion holds.
+#[test]
+fn overlapping_hint_order_does_not_affect_output() {
+    use nucleation::world_segment::partition::PartitionPolicy;
+
+    let hints = vec![
+        PartitionHint { id: "a".into(), bbox_xz: (0, 200, 0, 255), y_range: None },
+        PartitionHint { id: "b".into(), bbox_xz: (100, 255, 0, 255), y_range: None },
+    ];
+    let mut reversed = hints.clone();
+    reversed.reverse();
+
+    let cfg = SegConfig { partition_policy: PartitionPolicy::HardCut, ..config() };
+    let tile_a = VoxelTile::from_blocks(TileId { x: 0, z: 0 }, bounds(), scene().into_iter());
+    let tile_b = VoxelTile::from_blocks(TileId { x: 0, z: 0 }, bounds(), scene().into_iter());
+
+    let a = segment_tile(&tile_a, &profile(), &cfg, &PartitionIndex::new(hints));
+    let b = segment_tile(&tile_b, &profile(), &cfg, &PartitionIndex::new(reversed));
+    assert_eq!(a, b, "overlapping hint order must not reach the output");
 }
 
 #[test]
