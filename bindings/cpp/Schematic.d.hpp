@@ -71,12 +71,24 @@ public:
   inline diplomat::result<std::monostate, NucleationError> save_to_file(std::string_view path) const;
 
   /**
+   * Convenience alias for `save_to_file`, matching the established
+   * Python API (`schematic.save("build.schem")`).
+   */
+  inline diplomat::result<std::monostate, NucleationError> save(std::string_view path) const;
+
+  /**
    * Load a schematic from a file, auto-detecting the format from the
    * contents (any supported format, whatever the extension says).
    * Not available in JS: the WASM build has no filesystem — read the
    * bytes yourself and use `from_data`.
    */
   inline static diplomat::result<std::unique_ptr<Schematic>, NucleationError> load_from_file(std::string_view path);
+
+  /**
+   * Convenience alias for `load_from_file`, matching the established
+   * Python API (`Schematic.open("build.schem")`).
+   */
+  inline static diplomat::result<std::unique_ptr<Schematic>, NucleationError> open(std::string_view path);
 
   /**
    * Build a schematic from raw byte data, auto-detecting the format.

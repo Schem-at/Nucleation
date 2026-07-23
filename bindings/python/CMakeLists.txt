@@ -72,6 +72,7 @@ nanobind_add_module(
   ${SUBMODULE_FILES}
 )
 target_include_directories(nucleation PUBLIC "src/include")
+target_include_directories(nucleation PRIVATE "custom")
 # The Diplomat-generated dealloc shim reaches into nanobind's internal
 # nb_inst struct (the reason for the ==2.12.0 pin), so the generated
 # sources compile against nb_internals.h, which needs nanobind's bundled

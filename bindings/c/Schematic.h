@@ -34,8 +34,14 @@ Schematic_get_block_name_result Schematic_get_block_name(const Schematic* self, 
 typedef struct Schematic_save_to_file_result {union { NucleationError err;}; bool is_ok;} Schematic_save_to_file_result;
 Schematic_save_to_file_result Schematic_save_to_file(const Schematic* self, DiplomatStringView path);
 
+typedef struct Schematic_save_result {union { NucleationError err;}; bool is_ok;} Schematic_save_result;
+Schematic_save_result Schematic_save(const Schematic* self, DiplomatStringView path);
+
 typedef struct Schematic_load_from_file_result {union {Schematic* ok; NucleationError err;}; bool is_ok;} Schematic_load_from_file_result;
 Schematic_load_from_file_result Schematic_load_from_file(DiplomatStringView path);
+
+typedef struct Schematic_open_result {union {Schematic* ok; NucleationError err;}; bool is_ok;} Schematic_open_result;
+Schematic_open_result Schematic_open(DiplomatStringView path);
 
 typedef struct Schematic_from_data_result {union {Schematic* ok; NucleationError err;}; bool is_ok;} Schematic_from_data_result;
 Schematic_from_data_result Schematic_from_data(DiplomatU8View data);

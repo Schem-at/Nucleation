@@ -145,6 +145,13 @@ pub mod ffi {
             Ok(())
         }
 
+        /// Convenience alias for `save_to_file`, matching the established
+        /// Python API (`schematic.save("build.schem")`).
+        #[diplomat::attr(js, disable)]
+        pub fn save(&self, path: &DiplomatStr) -> Result<(), NucleationError> {
+            self.save_to_file(path)
+        }
+
         /// Load a schematic from a file, auto-detecting the format from the
         /// contents (any supported format, whatever the extension says).
         /// Not available in JS: the WASM build has no filesystem — read the
@@ -154,6 +161,13 @@ pub mod ffi {
             let path = std::str::from_utf8(path).map_err(|_| NucleationError::InvalidArgument)?;
             let bytes = std::fs::read(path).map_err(|_| NucleationError::Io)?;
             Self::from_data(&bytes)
+        }
+
+        /// Convenience alias for `load_from_file`, matching the established
+        /// Python API (`Schematic.open("build.schem")`).
+        #[diplomat::attr(js, disable)]
+        pub fn open(path: &DiplomatStr) -> Result<Box<Schematic>, NucleationError> {
+            Self::load_from_file(path)
         }
 
         // --- Data I/O (old fns populated an existing schematic; these construct) ---
@@ -1933,5 +1947,31 @@ pub mod ffi {
                 .unwrap_or_else(|_| "{}".to_string());
             let _ = write!(out, "{}", json);
         }
+    }
+}
+
+#[cfg(test)]
+mod file_convenience_alias_tests {
+    use super::ffi::Schematic;
+
+    #[test]
+    fn open_and_save_round_trip_a_file() {
+        let path = std::env::temp_dir().join(format!(
+            "nucleation-python-open-save-{}.schem",
+            std::process::id()
+        ));
+        let path_bytes = path.to_string_lossy();
+
+        let mut schematic = Schematic::create(b"open-save-regression");
+        schematic
+            .set_block(0, 0, 0, b"minecraft:stone")
+            .expect("place block");
+        schematic.save(path_bytes.as_bytes()).expect("save alias");
+
+        let loaded = Schematic::open(path_bytes.as_bytes()).expect("open alias");
+        let dimensions = loaded.dimensions();
+        assert_eq!((dimensions.x, dimensions.y, dimensions.z), (1, 1, 1));
+
+        std::fs::remove_file(path).expect("remove test file");
     }
 }

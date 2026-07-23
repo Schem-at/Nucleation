@@ -2,6 +2,7 @@
 
 
 #include "Schematic.hpp"
+#include "schematic_compat.hpp"
 
 namespace nucleation {
 void add_Schematic_binding(nb::module_ mod) {
@@ -84,6 +85,7 @@ void add_Schematic_binding(nb::module_ mod) {
         .def("mc_version", &nucleation::Schematic::mc_version)
         .def("modified", &nucleation::Schematic::modified)
         .def("name", &nucleation::Schematic::name)
+        .def_static("open", &nucleation::python_compat::schematic_open, "path"_a)
         .def("palette_json", &nucleation::Schematic::palette_json)
         .def("place", &nucleation::Schematic::place, "x"_a, "y"_a, "z"_a, "palette_index"_a)
         .def("prepare_block", &nucleation::Schematic::prepare_block, "block_name"_a)
@@ -105,6 +107,7 @@ void add_Schematic_binding(nb::module_ mod) {
         .def("rotate_x", &nucleation::Schematic::rotate_x, "degrees"_a)
         .def("rotate_y", &nucleation::Schematic::rotate_y, "degrees"_a)
         .def("rotate_z", &nucleation::Schematic::rotate_z, "degrees"_a)
+        .def("save", &nucleation::python_compat::schematic_save, "path"_a, nb::kw_only(), "format"_a = nb::none())
         .def("save_as_b64", &nucleation::Schematic::save_as_b64, "format"_a, "version"_a, "settings"_a)
         .def("save_to_file", &nucleation::Schematic::save_to_file, "path"_a)
         .def("save_to_file_with_format", &nucleation::Schematic::save_to_file_with_format, "path"_a, "format"_a, "version"_a)

@@ -37,8 +37,14 @@ namespace capi {
     typedef struct Schematic_save_to_file_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_save_to_file_result;
     Schematic_save_to_file_result Schematic_save_to_file(const nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatStringView path);
 
+    typedef struct Schematic_save_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_save_result;
+    Schematic_save_result Schematic_save(const nucleation::capi::Schematic* self, nucleation::diplomat::capi::DiplomatStringView path);
+
     typedef struct Schematic_load_from_file_result {union {nucleation::capi::Schematic* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_load_from_file_result;
     Schematic_load_from_file_result Schematic_load_from_file(nucleation::diplomat::capi::DiplomatStringView path);
+
+    typedef struct Schematic_open_result {union {nucleation::capi::Schematic* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_open_result;
+    Schematic_open_result Schematic_open(nucleation::diplomat::capi::DiplomatStringView path);
 
     typedef struct Schematic_from_data_result {union {nucleation::capi::Schematic* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Schematic_from_data_result;
     Schematic_from_data_result Schematic_from_data(nucleation::diplomat::capi::DiplomatU8View data);
@@ -430,8 +436,19 @@ inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError>
     return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::Schematic::save(std::string_view path) const {
+    auto result = nucleation::capi::Schematic_save(this->AsFFI(),
+        {path.data(), path.size()});
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
 inline nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError> nucleation::Schematic::load_from_file(std::string_view path) {
     auto result = nucleation::capi::Schematic_load_from_file({path.data(), path.size()});
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Schematic>>(std::unique_ptr<nucleation::Schematic>(nucleation::Schematic::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError> nucleation::Schematic::open(std::string_view path) {
+    auto result = nucleation::capi::Schematic_open({path.data(), path.size()});
     return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Schematic>>(std::unique_ptr<nucleation::Schematic>(nucleation::Schematic::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 

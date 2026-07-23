@@ -275,10 +275,21 @@ jobs:
           "$VENV_PY" -m pip install wheels/*.whl
           "$VENV_PY" - <<'EOF'
           import nucleation
+          import tempfile
+          from pathlib import Path
           s = nucleation.Schematic.create("t")
           s.set_block_from_string(0, 0, 0, 'minecraft:chest[facing=west]{Items:[{Slot:0b,id:"minecraft:diamond",Count:64b}]}')
           name = s.get_block_name(0, 0, 0)
           assert name == "minecraft:chest", name
+          with tempfile.TemporaryDirectory() as directory:
+              path = Path(directory) / "round-trip.schem"
+              assert s.save(path) is None
+              loaded = nucleation.Schematic.open(path)
+              assert loaded.get_block_name(0, 0, 0) == "minecraft:chest"
+              explicit_path = Path(directory) / "round-trip-without-extension"
+              assert s.save(explicit_path, format="litematic") is None
+              explicit = nucleation.Schematic.open(explicit_path)
+              assert explicit.get_block_name(0, 0, 0) == "minecraft:chest"
           m = nucleation.Value.from_u32(7)
           assert m.as_u32() == 7
           print("wheel functional check OK:", name)

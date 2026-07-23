@@ -1,3 +1,15 @@
+# Nucleation v0.4.1
+
+**Python file I/O compatibility.** The generated Python `Schematic` binding
+once again exposes the established `Schematic.open(path)` and
+`schematic.save(path, format=...)` convenience API, including `pathlib.Path`
+support and Python's normal `None` return for successful saves. The lower-level
+`load_from_file` and `save_to_file` methods remain available. Release wheels now
+exercise real inferred-format and explicit-format save/open round trips so this
+surface cannot disappear unnoticed again.
+
+---
+
 # Nucleation v0.4.0
 
 **General Java structure SNBT naming.** The public format key and Rust module

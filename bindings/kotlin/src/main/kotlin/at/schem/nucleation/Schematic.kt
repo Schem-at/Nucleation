@@ -13,7 +13,9 @@ internal interface SchematicLib: Library {
     fun Schematic_set_block(handle: Pointer, x: Int, y: Int, z: Int, blockName: Slice): ResultByteInt
     fun Schematic_get_block_name(handle: Pointer, x: Int, y: Int, z: Int, write: Pointer): ResultUnitInt
     fun Schematic_save_to_file(handle: Pointer, path: Slice): ResultUnitInt
+    fun Schematic_save(handle: Pointer, path: Slice): ResultUnitInt
     fun Schematic_load_from_file(path: Slice): ResultPointerInt
+    fun Schematic_open(path: Slice): ResultPointerInt
     fun Schematic_from_data(data: Slice): ResultPointerInt
     fun Schematic_from_litematic(data: Slice): ResultPointerInt
     fun Schematic_to_litematic_b64(handle: Pointer, write: Pointer): ResultUnitInt
@@ -195,6 +197,29 @@ class Schematic internal constructor (
             val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
             
             val returnVal = lib.Schematic_load_from_file(pathSliceMemory.slice);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal 
+                    val returnOpaque = Schematic(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                pathSliceMemory.close()
+            }
+        }
+        @JvmStatic
+        
+        /** Convenience alias for `load_from_file`, matching the established
+        *Python API (`Schematic.open("build.schem")`).
+        */
+        fun open(path: String): Result<Schematic> {
+            val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
+            
+            val returnVal = lib.Schematic_open(pathSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
@@ -550,6 +575,25 @@ class Schematic internal constructor (
         val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
         
         val returnVal = lib.Schematic_save_to_file(handle, pathSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return Unit.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            pathSliceMemory.close()
+        }
+    }
+    
+    /** Convenience alias for `save_to_file`, matching the established
+    *Python API (`schematic.save("build.schem")`).
+    */
+    fun save(path: String): Result<Unit> {
+        val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
+        
+        val returnVal = lib.Schematic_save(handle, pathSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {

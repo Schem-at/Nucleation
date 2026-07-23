@@ -37,6 +37,7 @@ clang++ -std=c++20 -shared -fPIC -undefined dynamic_lookup -fvisibility=hidden \
     -I "$NB_DIR/include" \
     -I "$NB_DIR/ext/robin_map/include" \
     -I "$BINDINGS/include" \
+    -I "$ROOT/bindings/python/custom" \
     "$NB_DIR/src/nb_combined.cpp" \
     "$BINDINGS/nucleation_ext.cpp" \
     "$BINDINGS"/sub_modules/nucleation/*.cpp \
