@@ -50,12 +50,6 @@ pub fn region_outside_border(rx: i32, rz: i32, border: i32) -> bool {
     x1 < -border || x0 > border || z1 < -border || z0 > border
 }
 
-#[derive(Debug)]
-pub struct RejectedEntry {
-    pub name: String,
-    pub reason: String,
-}
-
 pub struct TarGzSource {
     path: PathBuf,
     min_y: i32,
@@ -136,6 +130,7 @@ impl TileSource for TarGzSource {
             buf.clear();
             entry.read_to_end(&mut buf).map_err(|e| TileError::Io(e.to_string()))?;
             if buf.is_empty() {
+                eprintln!("world_segment: skipping {name}: empty entry");
                 continue;
             }
             // The filename coords (rx,rz) are used ONLY for junk filtering above
@@ -143,11 +138,25 @@ impl TileSource for TarGzSource {
             // actual id comes from the decoded region via region_positions(),
             // which reads the region header — this avoids trusting a possibly
             // mangled filename for identity.
-            let source = crate::formats::world_stream::WorldSource::from_mca_bytes(buf.clone())
-                .map_err(|e| TileError::Malformed(e.to_string()))?;
-            let positions = source
-                .region_positions()
-                .map_err(|e| TileError::Malformed(e.to_string()))?;
+            //
+            // Per-entry decode failures below are reported and skipped, not
+            // propagated: a single malformed region must never abort the rest
+            // of the archive (see module docs).
+            let source = match crate::formats::world_stream::WorldSource::from_mca_bytes(buf.clone())
+            {
+                Ok(source) => source,
+                Err(e) => {
+                    eprintln!("world_segment: skipping {name}: malformed region data ({e})");
+                    continue;
+                }
+            };
+            let positions = match source.region_positions() {
+                Ok(positions) => positions,
+                Err(e) => {
+                    eprintln!("world_segment: skipping {name}: could not read region positions ({e})");
+                    continue;
+                }
+            };
             let (tx, tz) = match positions.first() {
                 Some(&p) => p,
                 None => {
@@ -205,5 +214,95 @@ mod tests {
         assert!(!region_outside_border(16, 0, 8192), "touches the border, keep it");
         assert!(!region_outside_border(15, 0, 8192), "inside");
         assert!(!region_outside_border(0, 0, 8192), "inside");
+    }
+
+    /// Builds a gzipped tar (in memory) containing several entries that each
+    /// get skipped for a *different* reason, then streams it through
+    /// `for_each_tile`. Pins the continue-on-error contract: none of these
+    /// entries is a valid region, so the callback must never fire, yet
+    /// `for_each_tile` must still return `Ok(())` rather than aborting on the
+    /// first (malformed-region) entry.
+    ///
+    /// No `.mca` fixture is needed: `from_mca_bytes` rejects anything under
+    /// 8192 bytes, so a short byte string is enough to drive the Malformed
+    /// path that Finding 1 fixes.
+    #[test]
+    fn for_each_tile_skips_bad_entries_and_keeps_streaming() {
+        use std::io::Write;
+
+        // Build the archive bytes in memory first.
+        let mut tar_bytes = Vec::new();
+        {
+            let mut builder = tar::Builder::new(&mut tar_bytes);
+
+            // 1. Looks like a region file by name, but is far too small to be
+            //    a real .mca -> from_mca_bytes() returns Err (Finding 1 path).
+            let tiny = b"not a real region file";
+            let mut header = tar::Header::new_gnu();
+            header.set_size(tiny.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            builder
+                .append_data(&mut header, "world/region/r.0.0.mca", &tiny[..])
+                .unwrap();
+
+            // 2. Non-region entry -> rejected by classify().
+            let leveldat = b"junk level.dat contents";
+            let mut header = tar::Header::new_gnu();
+            header.set_size(leveldat.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            builder
+                .append_data(&mut header, "world/level.dat", &leveldat[..])
+                .unwrap();
+
+            // 3. Backup file -> also rejected by classify().
+            let backup = b"backup region bytes";
+            let mut header = tar::Header::new_gnu();
+            header.set_size(backup.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            builder
+                .append_data(&mut header, "world/region/r.0.0.mca.backup", &backup[..])
+                .unwrap();
+
+            builder.finish().unwrap();
+        }
+
+        // Gzip it.
+        let mut gz_bytes = Vec::new();
+        {
+            let mut encoder =
+                flate2::write::GzEncoder::new(&mut gz_bytes, flate2::Compression::default());
+            encoder.write_all(&tar_bytes).unwrap();
+            encoder.finish().unwrap();
+        }
+
+        // Write to a fixed, unique temp path (no tempfile dep: not present in
+        // [dev-dependencies], so use std::env::temp_dir() and clean up after).
+        let path = std::env::temp_dir()
+            .join("nucleation_test_targz_source_skips_bad_entries.tar.gz");
+        std::fs::write(&path, &gz_bytes).unwrap();
+
+        let source = TarGzSource::open(&path, -64, 320).unwrap();
+        let mut call_count = 0usize;
+        let result = source.for_each_tile(&mut |_tile| {
+            call_count += 1;
+            Ok(())
+        });
+
+        std::fs::remove_file(&path).ok();
+
+        // Every entry above is rejected for a different reason; none is a
+        // usable tile.
+        assert_eq!(call_count, 0, "no entry in this archive is a valid region");
+        // The critical assertion: a malformed per-entry decode (entry 1) must
+        // not abort the whole stream. Before Finding 1's fix, the `?` on
+        // `from_mca_bytes` propagated out of `for_each_tile`, turning this
+        // into `Err(..)`.
+        assert!(
+            result.is_ok(),
+            "for_each_tile must skip a malformed region entry, not abort the archive: {result:?}"
+        );
     }
 }

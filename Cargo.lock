@@ -3215,6 +3215,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smol_str",
+ "tar",
  "testcontainers-modules",
  "thiserror 1.0.69",
  "tokio",
