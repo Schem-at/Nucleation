@@ -26,7 +26,7 @@ pub use classify::{classify, BlockClass};
 pub use profile::{ProfileParams, WorldProfile};
 pub use grid::{ComponentLabels, OccupancyGrid};
 pub use partition::{PartitionHint, PartitionIndex, PartitionPolicy};
-pub use segment::{segment_tile, Cluster, MarginCell, SegConfig, TileSegments};
+pub use segment::{segment_tile, segment_tile_membership, Cluster, MarginCell, SegConfig, TileSegments};
 pub use source::{region_tile_bounds, Access, TileError, TileSource};
 pub use world_source::WorldSourceTiles;
 pub use targz_source::TarGzSource;

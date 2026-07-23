@@ -188,6 +188,37 @@ pub fn segment_tile(
     config: &SegConfig,
     partitions: &PartitionIndex,
 ) -> TileSegments {
+    segment_tile_inner(tile, profile, config, partitions, false).0
+}
+
+/// Sibling of [`segment_tile`] that also reports, for every surviving
+/// (non-substrate) world block, which [`ClusterId`] it belongs to.
+///
+/// The returned `TileSegments` is identical to what `segment_tile` produces
+/// for the same input — both are driven by the same inner labelling, so
+/// there is a single source of truth and no risk of the two drifting apart.
+///
+/// The map only contains blocks whose cluster survives the
+/// `min_cluster_blocks` filter; substrate blocks and blocks in dropped
+/// clusters are absent. It is a `BTreeMap` keyed by world position so the
+/// result is order-independent regardless of how the tile's blocks were
+/// iterated.
+pub fn segment_tile_membership(
+    tile: &VoxelTile,
+    profile: &WorldProfile,
+    config: &SegConfig,
+    partitions: &PartitionIndex,
+) -> (TileSegments, BTreeMap<(i32, i32, i32), ClusterId>) {
+    segment_tile_inner(tile, profile, config, partitions, true)
+}
+
+fn segment_tile_inner(
+    tile: &VoxelTile,
+    profile: &WorldProfile,
+    config: &SegConfig,
+    partitions: &PartitionIndex,
+    want_membership: bool,
+) -> (TileSegments, BTreeMap<(i32, i32, i32), ClusterId>) {
     let bounds = tile.bounds();
     let cell = config.cell_size.max(1);
     // Every ClusterId minted below is bound to this hash, so ids produced
@@ -252,7 +283,10 @@ pub fn segment_tile(
             .mark(pos.0, pos.1, pos.2);
     }
     if artificial.is_empty() {
-        return TileSegments { tile_id: tile.id(), clusters: Vec::new(), margin: Vec::new() };
+        return (
+            TileSegments { tile_id: tile.id(), clusters: Vec::new(), margin: Vec::new() },
+            BTreeMap::new(),
+        );
     }
 
     // An empty grid, used only for its `cell_of` coordinate transform. Sharing
@@ -279,10 +313,18 @@ pub fn segment_tile(
     // to a different cluster in each, and each block resolves through its own
     // partition.
     let mut acc: BTreeMap<ClusterId, ClusterAcc> = BTreeMap::new();
+    // Pre-filter membership: every block's cluster, before the
+    // `min_cluster_blocks` filter below decides which clusters survive. Kept
+    // only when the caller actually wants it, so `segment_tile` pays nothing
+    // extra.
+    let mut pos_to_cluster: BTreeMap<(i32, i32, i32), ClusterId> = BTreeMap::new();
     for (pos, pidx) in artificial {
         let cell_coord = geometry.cell_of(pos.0, pos.1, pos.2);
         let Some(id) = cluster_of_cell.get(&(pidx, cell_coord)) else { continue };
         acc.entry(*id).or_insert_with(ClusterAcc::new).push(pos, cell_coord);
+        if want_membership {
+            pos_to_cluster.insert(pos, *id);
+        }
     }
 
     let mut clusters: Vec<Cluster> = Vec::new();
@@ -341,7 +383,16 @@ pub fn segment_tile(
             .then_with(|| a.partition.cmp(&b.partition))
     });
 
-    TileSegments { tile_id: tile.id(), clusters, margin }
+    // Only blocks whose cluster is in `kept` are exported: a block whose
+    // cluster was dropped by `min_cluster_blocks` is not part of any emitted
+    // build, so it must not appear in the membership map either.
+    let membership = if want_membership {
+        pos_to_cluster.into_iter().filter(|(_, id)| kept.contains(id)).collect()
+    } else {
+        BTreeMap::new()
+    };
+
+    (TileSegments { tile_id: tile.id(), clusters, margin }, membership)
 }
 
 struct ClusterAcc {
@@ -1299,5 +1350,41 @@ mod tests {
         );
         assert_eq!(segs.clusters.len(), 1);
         assert!(segs.margin.is_empty(), "a centre cluster is nowhere near a face");
+    }
+
+    #[test]
+    fn membership_maps_every_emitted_block_to_its_cluster() {
+        // Reuse the substrate-standing test's world: two builds on a slab.
+        let profile = WorldProfile::new(
+            ["minecraft:stone"].iter().map(|s| s.to_string()).collect(), (-64,-50));
+        let cfg = SegConfig { cell_size:4, closing_radius:2, min_cluster_blocks:1, ..SegConfig::default() };
+        let mut blocks = vec![];
+        for x in 0..40 { for z in 0..40 { blocks.push(((x,-60,z), BlockState::new("minecraft:stone"))); } }
+        blocks.push(((10,-59,10), BlockState::new("minecraft:redstone_wire")));
+        let t = VoxelTile::from_blocks(TileId{x:0,z:0},
+            TileBounds{min:(0,-64,0),max:(127,63,127)}, blocks.into_iter());
+        let (segs, membership) = segment_tile_membership(&t, &profile, &cfg, &PartitionIndex::new(vec![]));
+        // The one build's block is mapped; substrate is not.
+        assert_eq!(segs.clusters.len(), 1);
+        let cluster = segs.clusters[0].id;
+        assert_eq!(membership.get(&(10,-59,10)), Some(&cluster), "build block maps to its cluster");
+        assert_eq!(membership.get(&(0,-60,0)), None, "substrate is not in the membership map");
+        // Every mapped position belongs to an emitted cluster.
+        for (_pos, cid) in &membership {
+            assert!(segs.clusters.iter().any(|c| c.id == *cid));
+        }
+    }
+
+    #[test]
+    fn segment_tile_and_membership_agree_on_segments() {
+        let profile = WorldProfile::new(
+            ["minecraft:stone"].iter().map(|s| s.to_string()).collect(), (-64,-50));
+        let cfg = SegConfig::default();
+        let t = VoxelTile::from_blocks(TileId{x:0,z:0},
+            TileBounds{min:(0,-64,0),max:(127,63,127)},
+            vec![((10,10,10), BlockState::new("minecraft:redstone_wire"))].into_iter());
+        let a = segment_tile(&t, &profile, &cfg, &PartitionIndex::new(vec![]));
+        let (b, _) = segment_tile_membership(&t, &profile, &cfg, &PartitionIndex::new(vec![]));
+        assert_eq!(a, b, "membership variant must return identical TileSegments");
     }
 }
