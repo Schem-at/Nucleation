@@ -16,6 +16,7 @@ pub mod world_source;
 pub mod targz_source;
 pub mod stitch;
 pub mod score;
+pub mod provenance;
 
 pub use ids::{ClusterId, ContentId, TileId};
 pub use tile::{TileBounds, VoxelTile};
@@ -29,3 +30,4 @@ pub use world_source::WorldSourceTiles;
 pub use targz_source::TarGzSource;
 pub use stitch::{Build, GlobalCell, MarginEntry, StitchState};
 pub use score::{score, ScoreConfig, Scored, Signal, Tier};
+pub use provenance::{Provenance, StableBuildId};
