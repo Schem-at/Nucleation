@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::world_segment::classify::{classify, BlockClass};
 use crate::world_segment::grid::OccupancyGrid;
-use crate::world_segment::ids::{ClusterId, TileId};
+use crate::world_segment::ids::{ClusterId, ContentId, TileId};
 use crate::world_segment::partition::{PartitionIndex, PartitionPolicy};
 use crate::world_segment::profile::WorldProfile;
 use crate::world_segment::tile::VoxelTile;
@@ -56,6 +56,40 @@ pub struct SegConfig {
     pub min_cluster_blocks: u64,
     pub partition_policy: PartitionPolicy,
     pub algorithm_version: u32,
+}
+
+impl SegConfig {
+    /// Stable hash of everything that can change what segmentation produces.
+    ///
+    /// Folded into every [`ClusterId`], so an id identifies a cluster *under a
+    /// stated configuration* rather than merely a position. Two runs that
+    /// disagree on `cell_size`, `closing_radius`, `min_cluster_blocks`,
+    /// `partition_policy`, `algorithm_version` or the world profile can never
+    /// mint the same id, which is what makes the ids safe to use as cache
+    /// keys.
+    ///
+    /// Every field of `SegConfig` is covered. If a field is added, add it here
+    /// too — an unhashed field is a silent id collision between runs that
+    /// genuinely differ.
+    pub fn config_hash(&self, profile: &WorldProfile) -> ContentId {
+        // Explicit, pinned discriminants: derived ordering would silently
+        // renumber if a variant were inserted, changing ids without any
+        // behaviour change.
+        let policy: u8 = match self.partition_policy {
+            PartitionPolicy::HardCut => 0,
+            PartitionPolicy::Prefer => 1,
+            PartitionPolicy::Off => 2,
+        };
+        ContentId::of(&[
+            b"segconfig.v1",
+            &self.cell_size.to_le_bytes(),
+            &self.closing_radius.to_le_bytes(),
+            &self.min_cluster_blocks.to_le_bytes(),
+            &[policy],
+            &self.algorithm_version.to_le_bytes(),
+            profile.profile_hash().as_bytes(),
+        ])
+    }
 }
 
 impl Default for SegConfig {
@@ -105,6 +139,9 @@ pub fn segment_tile(
 ) -> TileSegments {
     let bounds = tile.bounds();
     let cell = config.cell_size.max(1);
+    // Every ClusterId minted below is bound to this hash, so ids produced
+    // under different settings or a different profile can never collide.
+    let config_id = config.config_hash(profile);
 
     // Grid spans the tile bounds exactly.
     let dims = (
@@ -166,7 +203,7 @@ pub fn segment_tile(
         group_into(&grid, config.closing_radius, None, &None, &mut groups);
     }
 
-    let (cluster_of_cell, partition_of_cluster) = assign_ids(tile.id(), groups);
+    let (cluster_of_cell, partition_of_cluster) = assign_ids(config_id, tile.id(), groups);
 
     // 4. Fold original blocks back into their cluster.
     let mut acc: BTreeMap<ClusterId, ClusterAcc> = BTreeMap::new();
@@ -304,6 +341,7 @@ fn group_into(
 /// independent of clipping and of `closing_radius`, which removes the whole
 /// class of bug rather than the one instance.
 fn assign_ids(
+    config: ContentId,
     tile: TileId,
     groups: BTreeMap<GroupKey, GroupAcc>,
 ) -> (BTreeMap<(i32, i32, i32), ClusterId>, BTreeMap<ClusterId, Option<String>>) {
@@ -311,15 +349,16 @@ fn assign_ids(
     let mut partition_of_cluster: BTreeMap<ClusterId, Option<String>> = BTreeMap::new();
 
     for (_key, group) in groups {
+        let GroupAcc { cells, partition } = group;
         // `BTreeSet` iterates ascending, so the first cell is the lexmin.
-        let Some(anchor) = group.cells.iter().next().copied() else { continue };
-        let id = ClusterId::new(tile, anchor);
+        let Some(anchor) = cells.iter().next().copied() else { continue };
+        let id = ClusterId::new(config, tile, partition.as_deref(), anchor);
         debug_assert!(
             !partition_of_cluster.contains_key(&id),
             "ClusterId collision on anchor {anchor:?}: anchors must be unique across groups"
         );
-        partition_of_cluster.insert(id, group.partition);
-        for cell in group.cells {
+        partition_of_cluster.insert(id, partition);
+        for cell in cells {
             cluster_of_cell.insert(cell, id);
         }
     }
@@ -602,14 +641,46 @@ mod tests {
         assert_eq!(with, without);
     }
 
+    /// Everything about a `TileSegments` except the `ClusterId`s: the clusters
+    /// as `(bbox, block_count, cell_count, partition_id)` and the margin as
+    /// bare cells, both in a canonical order.
+    #[allow(clippy::type_complexity)]
+    fn shape_of(
+        segs: &TileSegments,
+    ) -> (
+        Vec<(((i32, i32, i32), (i32, i32, i32)), u64, u64, Option<String>)>,
+        Vec<(i32, i32, i32)>,
+    ) {
+        let mut clusters: Vec<_> = segs
+            .clusters
+            .iter()
+            .map(|c| (c.bbox, c.block_count, c.cell_count, c.partition_id.clone()))
+            .collect();
+        // Sort by content: `segs.clusters` is ordered by ClusterId, which
+        // differs between the two runs being compared here.
+        clusters.sort();
+        let mut margin: Vec<_> = segs.margin.iter().map(|m| m.cell).collect();
+        margin.sort();
+        (clusters, margin)
+    }
+
     #[test]
     fn prefer_policy_is_currently_inert_and_behaves_like_off() {
         // `Prefer` is documented as "crossings allowed but recorded".
         // Recording is NOT implemented yet, so `Prefer` deliberately takes the
-        // unpartitioned path: identical output to `Off`, and no partition ids.
-        // This test pins the deferral so it cannot change without notice — when
-        // crossing-recording lands, this test should be replaced rather than
-        // silently deleted.
+        // unpartitioned path: it segments exactly as `Off` does, and records no
+        // partition ids. This test pins the deferral so it cannot change
+        // without notice — when crossing-recording lands, this test should be
+        // replaced rather than silently deleted.
+        //
+        // The comparison is on segmentation *shape*, not on the whole value,
+        // and deliberately so. `partition_policy` is part of `config_hash`, so
+        // `Prefer` and `Off` are different configurations and MUST mint
+        // different ClusterIds — that is the point of folding config into the
+        // id. What "behaves like Off" means is that every cluster has the same
+        // bbox, block count, cell count and partition attribution, and the
+        // margin covers the same cells. Both facts are asserted below, so this
+        // is strictly more specific than the whole-value equality it replaces.
         let hints = PartitionIndex::new(vec![
             PartitionHint { id: "left".into(), bbox_xz: (0, 13, 0, 127), y_range: None },
             PartitionHint { id: "right".into(), bbox_xz: (14, 127, 0, 127), y_range: None },
@@ -624,7 +695,16 @@ mod tests {
         let prefer_segs = segment_tile(&tile(blocks.clone()), &profile(), &prefer, &hints);
         let off_segs = segment_tile(&tile(blocks.clone()), &profile(), &off, &hints);
 
-        assert_eq!(prefer_segs, off_segs, "Prefer is currently indistinguishable from Off");
+        assert_eq!(prefer_segs.tile_id, off_segs.tile_id);
+        assert_eq!(
+            shape_of(&prefer_segs),
+            shape_of(&off_segs),
+            "Prefer must segment exactly as Off does"
+        );
+        assert_ne!(
+            prefer_segs.clusters[0].id, off_segs.clusters[0].id,
+            "different configs must still mint different ids"
+        );
         assert_eq!(prefer_segs.clusters.len(), 1, "the boundary is not enforced under Prefer");
         assert!(
             prefer_segs.clusters.iter().all(|c| c.partition_id.is_none()),
@@ -811,6 +891,63 @@ mod tests {
 
         assert_eq!(a, b, "a duplicated position must not let input order reach the output");
         assert_eq!(a.clusters.len(), 1, "redstone_wire wins the position, so one cluster");
+    }
+
+    /// The cluster ids a given input/config/profile combination produces.
+    fn ids(config: &SegConfig, profile: &WorldProfile) -> Vec<ClusterId> {
+        let segs = segment_tile(
+            &tile(vec![
+                ((40, 10, 40), "minecraft:redstone_wire"),
+                ((41, 10, 40), "minecraft:repeater"),
+            ]),
+            profile,
+            config,
+            &no_hints(),
+        );
+        assert_eq!(segs.clusters.len(), 1, "the probe input must be a single cluster");
+        segs.clusters.iter().map(|c| c.id).collect()
+    }
+
+    #[test]
+    fn identical_config_and_profile_give_identical_cluster_ids() {
+        assert_eq!(ids(&cfg(), &profile()), ids(&cfg(), &profile()));
+    }
+
+    #[test]
+    fn cluster_ids_change_when_cell_size_changes() {
+        // At cell_size 4 the two blocks land in cell (40/4,18,10) = (10,18,10);
+        // at cell_size 8 they land in cell (40/8,(10+64)/8,40/8) = (5,9,5).
+        // Distinct clusters either way, so the ids must not coincide.
+        let coarse = SegConfig { cell_size: 8, ..cfg() };
+        assert_ne!(ids(&cfg(), &profile()), ids(&coarse, &profile()));
+    }
+
+    #[test]
+    fn cluster_ids_change_when_only_a_non_geometric_config_field_changes() {
+        // The sharp case. `algorithm_version` cannot move a single cell, so
+        // both runs produce the identical anchor cell (10,18,10) in the
+        // identical tile. Hashing only (tile, anchor) therefore returned the
+        // same ClusterId for output produced by a different algorithm — a
+        // cache-poisoning hazard, since a consumer keyed on the id would serve
+        // stale results after an algorithm change.
+        let v2 = SegConfig { algorithm_version: 2, ..cfg() };
+        assert_ne!(
+            ids(&cfg(), &profile()),
+            ids(&v2, &profile()),
+            "a config change with no geometric effect must still change ids"
+        );
+    }
+
+    #[test]
+    fn cluster_ids_change_when_only_the_profile_changes() {
+        // Neither profile classifies redstone_wire or repeater as substrate, so
+        // the clusters are geometrically identical; only the pinned constants
+        // that produced them differ, and the id must record that.
+        let other = WorldProfile::new(
+            ["minecraft:stone"].iter().map(|s| s.to_string()).collect(),
+            (-64, -50),
+        );
+        assert_ne!(ids(&cfg(), &profile()), ids(&cfg(), &other));
     }
 
     #[test]
