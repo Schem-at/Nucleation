@@ -644,6 +644,68 @@ fn solid_angle_at_90_degrees_flat_cap_is_the_equatorial_plane() {
 }
 
 #[test]
+fn cut_sphere_keeps_the_cap_above_the_cut_plane() {
+    let dome = SdfNode::CutSphere {
+        radius: 5.0,
+        height: 2.0,
+    };
+    // North pole: always on the sphere surface, regardless of the cut.
+    assert!(dome.eval(0.0, 5.0, 0.0).abs() < 1e-4);
+    // Center of the flat cut disk: on the flat boundary face.
+    assert!(dome.eval(0.0, 2.0, 0.0).abs() < 1e-4);
+    // Sphere center: excluded (below the cut), 2 units short of the disk.
+    assert!((dome.eval(0.0, 0.0, 0.0) - 2.0).abs() < 1e-4);
+    // Just below the disk, still under its footprint: straight-up distance.
+    assert!((dome.eval(0.0, 1.0, 0.0) - 1.0).abs() < 1e-4);
+}
+
+#[test]
+fn cut_sphere_is_exact_at_the_rim_corner() {
+    let dome = SdfNode::CutSphere {
+        radius: 5.0,
+        height: 2.0,
+    };
+    // Independently solved via calculus: on the cut plane but far out
+    // radially (past the rim at w = sqrt(25-4) ~= 4.583), the nearest
+    // boundary point is the rim vertex itself, distance 10 - w ~= 5.417.
+    // A naive CSG-intersection (max of the two half-space SDFs) would give
+    // ~5.198 here, underestimating at the corner -- exactness requires
+    // explicitly finding the vertex.
+    let w = (25.0f32 - 4.0).sqrt();
+    assert!((dome.eval(10.0, 2.0, 0.0) - (10.0 - w)).abs() < 1e-3);
+}
+
+#[test]
+fn cut_sphere_far_below_the_cap_matches_the_flat_segment() {
+    let dome = SdfNode::CutSphere {
+        radius: 5.0,
+        height: 2.0,
+    };
+    // Independently solved: comparing distance to the flat segment's
+    // nearest point (0,2) [=12] against the arc's nearest reachable point,
+    // the rim vertex [=sqrt(21+144)~=12.845], the flat segment wins.
+    assert!((dome.eval(0.0, -10.0, 0.0) - 12.0).abs() < 1e-3);
+}
+
+#[test]
+fn cut_hollow_sphere_is_a_thin_open_shell_of_the_cap() {
+    let bowl = SdfNode::CutHollowSphere {
+        radius: 5.0,
+        height: 2.0,
+        thickness: 0.3,
+    };
+    // On the generating arc itself (e.g. the pole, or the rim), the shell
+    // core sits at -thickness, same convention as Torus's minor_radius.
+    assert!((bowl.eval(0.0, 5.0, 0.0) - (-0.3)).abs() < 1e-3);
+    let w = (25.0f32 - 4.0).sqrt();
+    assert!((bowl.eval(w, 2.0, 0.0) - (-0.3)).abs() < 1e-3);
+    // Well outside the shell (past the excluded flat "floor" region, at the
+    // equator): positive, roughly the planar gap to the rim minus thickness.
+    let expected = ((5.0f32 - w).powi(2) + 4.0).sqrt() - 0.3;
+    assert!((bowl.eval(5.0, 0.0, 0.0) - expected).abs() < 1e-3);
+}
+
+#[test]
 fn cells_distance_modes_are_nonnegative() {
     for mode in ["f1", "f2", "f2MinusF1"] {
         let json = format!(r#"{{"type":"cells","frequency":0.12,"seed":9,"mode":"{mode}"}}"#);

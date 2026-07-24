@@ -213,6 +213,40 @@ pub mod ffi {
             })))
         }
 
+        /// Sphere cut by the plane `y = height`, keeping the cap above it
+        /// (a dome). `height` must be strictly between `-radius` and
+        /// `radius`.
+        pub fn cut_sphere(radius: f32, height: f32) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[radius])?;
+            finite(&[height])?;
+            if height <= -radius || height >= radius {
+                return Err(NucleationError::InvalidArgument);
+            }
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::CutSphere {
+                radius,
+                height,
+            })))
+        }
+
+        /// Open (hollow) shell of `cut_sphere`'s dome: just the spherical
+        /// cap surface, offset by `thickness`, with no flat floor.
+        pub fn cut_hollow_sphere(
+            radius: f32,
+            height: f32,
+            thickness: f32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[radius, thickness])?;
+            finite(&[height])?;
+            if height <= -radius || height >= radius {
+                return Err(NucleationError::InvalidArgument);
+            }
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::CutHollowSphere {
+                radius,
+                height,
+                thickness,
+            })))
+        }
+
         pub fn capped_cylinder(radius: f32, half_height: f32) -> Result<Box<Sdf>, NucleationError> {
             positive(&[radius, half_height])?;
             Ok(Box::new(Sdf(crate::sdf::SdfNode::CappedCylinder {
@@ -1211,6 +1245,48 @@ mod tests {
         assert!((bounds.max_x - 7.0).abs() < 1e-6);
         assert!((bounds.min_y + 7.0).abs() < 1e-6);
         assert!((bounds.max_y - 7.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn cut_sphere_validates_height_range_and_rejects_huge_radius() {
+        assert!(Sdf::cut_sphere(5.0, 2.0).is_ok());
+        assert!(Sdf::cut_sphere(5.0, 5.0).is_err());
+        assert!(Sdf::cut_sphere(5.0, -5.0).is_err());
+        assert!(Sdf::cut_sphere(5.0, 6.0).is_err());
+        assert!(Sdf::cut_sphere(5.0, f32::NAN).is_err());
+        assert!(Sdf::cut_sphere(-1.0, 0.0).is_err());
+        assert!(Sdf::cut_sphere(0.0, 0.0).is_err());
+
+        let huge = Sdf::cut_sphere(1.0e30, 0.0).unwrap();
+        assert!(
+            huge.to_shape().is_err(),
+            "huge cut sphere exceeds voxel budget"
+        );
+    }
+
+    #[test]
+    fn cut_hollow_sphere_validates_and_rejects_huge_radius() {
+        assert!(Sdf::cut_hollow_sphere(5.0, 2.0, 0.3).is_ok());
+        assert!(Sdf::cut_hollow_sphere(5.0, 5.0, 0.3).is_err());
+        assert!(Sdf::cut_hollow_sphere(5.0, 2.0, 0.0).is_err());
+        assert!(Sdf::cut_hollow_sphere(5.0, 2.0, -1.0).is_err());
+        assert!(Sdf::cut_hollow_sphere(5.0, f32::NAN, 0.3).is_err());
+
+        let huge = Sdf::cut_hollow_sphere(1.0e30, 0.0, 0.1).unwrap();
+        assert!(
+            huge.to_shape().is_err(),
+            "huge cut hollow sphere exceeds voxel budget"
+        );
+    }
+
+    #[test]
+    fn cut_sphere_bounds_are_tighter_than_the_full_sphere() {
+        let dome = Sdf::cut_sphere(5.0, 2.0).unwrap();
+        let bounds = dome.bounds().unwrap();
+        let w = (25.0f32 - 4.0).sqrt();
+        assert!((bounds.min_y - 2.0).abs() < 1e-5);
+        assert!((bounds.max_y - 5.0).abs() < 1e-5);
+        assert!((bounds.max_x - w).abs() < 1e-5);
     }
 
     #[test]

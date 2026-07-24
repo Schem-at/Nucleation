@@ -156,6 +156,22 @@ pub enum SdfNode {
         radius: f32,
         angle: f32,
     },
+    /// Exact. Sphere of `radius` cut by the plane `y = height`, keeping the
+    /// cap above it (`y >= height`): a dome. `height: 0` is a hemisphere;
+    /// `height` near `radius` is a shallow cap; `height` near `-radius` is
+    /// nearly the full sphere.
+    CutSphere {
+        radius: f32,
+        height: f32,
+    },
+    /// Exact. Open (hollow) shell of the same dome as [`SdfNode::CutSphere`]:
+    /// only the spherical cap surface is solid, offset by `thickness`, with
+    /// no flat floor — a bowl.
+    CutHollowSphere {
+        radius: f32,
+        height: f32,
+        thickness: f32,
+    },
     /// Exact. Y-axis aligned.
     CappedCylinder {
         radius: f32,
@@ -339,6 +355,25 @@ fn len3(x: f32, y: f32, z: f32) -> f32 {
 #[inline]
 fn len2(x: f32, y: f32) -> f32 {
     (x * x + y * y).sqrt()
+}
+
+/// Nearest point, in the (radial, y) half-plane, on the sphere-cap arc of
+/// radius `r` cut at `h` (rim at `(w, h)`, `w = sqrt(r*r - h*h)`): the
+/// radial projection of `(rho, y)` onto the full circle, clamped to the
+/// rim when that projection would fall below the cut.
+#[inline]
+fn cap_arc_nearest(rho: f32, y: f32, r: f32, h: f32, w: f32) -> (f32, f32) {
+    let l = len2(rho, y);
+    if l > 1e-9 {
+        let (px, py) = (r * rho / l, r * y / l);
+        if py >= h {
+            (px, py)
+        } else {
+            (w, h)
+        }
+    } else {
+        (0.0, r)
+    }
 }
 
 /// GLSL `sign`: unlike `f32::signum`, zero maps to zero rather than +1.
@@ -529,6 +564,33 @@ impl SdfNode {
                 let my = qy - cos_a * dot_qc;
                 let m = len2(mx, my);
                 l.max(m * glsl_sign(cos_a * qx - sin_a * qy))
+            }
+
+            SdfNode::CutSphere { radius: r, height } => {
+                let rho = len2(x, z);
+                let w = (r * r - height * height).max(0.0).sqrt();
+                let seg_x = rho.clamp(0.0, w);
+                let dist_seg = len2(rho - seg_x, y - height);
+                let (ax, ay) = cap_arc_nearest(rho, y, *r, *height, w);
+                let dist_arc = len2(rho - ax, y - ay);
+                let dist = dist_seg.min(dist_arc);
+                let inside = rho * rho + y * y <= r * r && y >= *height;
+                if inside {
+                    -dist
+                } else {
+                    dist
+                }
+            }
+
+            SdfNode::CutHollowSphere {
+                radius: r,
+                height,
+                thickness,
+            } => {
+                let rho = len2(x, z);
+                let w = (r * r - height * height).max(0.0).sqrt();
+                let (ax, ay) = cap_arc_nearest(rho, y, *r, *height, w);
+                len2(rho - ax, y - ay) - thickness
             }
 
             SdfNode::CappedCylinder {
@@ -869,6 +931,24 @@ impl SdfNode {
                 ],
             }),
             SdfNode::SolidAngle { radius, .. } => sym(*radius, *radius, *radius),
+            SdfNode::CutSphere { radius: r, height } => {
+                let w = (r * r - height * height).max(0.0).sqrt();
+                Some(Aabb {
+                    min: [-w, *height, -w],
+                    max: [w, *r, w],
+                })
+            }
+            SdfNode::CutHollowSphere {
+                radius: r,
+                height,
+                thickness,
+            } => {
+                let w = (r * r - height * height).max(0.0).sqrt();
+                Some(Aabb {
+                    min: [-w - thickness, height - thickness, -w - thickness],
+                    max: [w + thickness, r + thickness, w + thickness],
+                })
+            }
             SdfNode::CappedCylinder {
                 radius,
                 half_height,
