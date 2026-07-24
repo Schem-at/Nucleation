@@ -54,4 +54,20 @@ assert animation.with_effect(effect).set_block(0, 0, 0, "minecraft:stone") == 0
 assert animation.set_block(1, 0, 0, "minecraft:dirt") == 1
 assert animation.group_count() == 2
 
+# --- portable field program: length(position) - 2 ---
+program_builder = m.FieldProgramBuilder.create()
+distance = program_builder.add_slot(m.FieldProgramValueType.Scalar)
+program_builder.set_output(distance)
+program_builder.set_bounds(-2.0, -2.0, -2.0, 2.0, 2.0, 2.0)
+program_builder.set_distance_kind(m.FieldProgramDistanceKind.Exact)
+program_builder.push_pos()
+program_builder.unary_op(m.FieldProgramUnaryOp.Length)
+program_builder.push_const_scalar(2.0)
+program_builder.binary_op(m.FieldProgramBinaryOp.Sub)
+program_builder.store_local(distance)
+program = program_builder.build()
+assert '"version":1' in program.to_json()
+program_sdf = m.Sdf.from_program(program)
+assert program_sdf.eval_at(0.0, 0.0, 0.0) < 0.0
+
 print("bridge smoke (Python) OK")

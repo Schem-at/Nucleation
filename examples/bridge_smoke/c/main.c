@@ -9,10 +9,17 @@
 #include "BuildAnimation.h"
 #include "DefinitionRegion.h"
 #include "Diff.h"
+#include "FieldProgram.h"
+#include "FieldProgramBinaryOp.h"
+#include "FieldProgramBuilder.h"
+#include "FieldProgramDistanceKind.h"
+#include "FieldProgramUnaryOp.h"
+#include "FieldProgramValueType.h"
 #include "Schematic.h"
 #include "SchematicBuilder.h"
 #include "SchematicRegions.h"
 #include "Store.h"
+#include "Sdf.h"
 
 static DiplomatStringView sv(const char *s) {
     DiplomatStringView v = {s, strlen(s)};
@@ -98,6 +105,30 @@ int main(void) {
     assert(BuildAnimation_group_count(animation) == 2);
     AnimationEffect_destroy(effect);
     BuildAnimation_destroy(animation);
+
+    /* --- portable field program: length(position) - 2 --- */
+    FieldProgramBuilder *program_builder = FieldProgramBuilder_create();
+    FieldProgramBuilder_add_slot_result distance_slot =
+        FieldProgramBuilder_add_slot(program_builder, FieldProgramValueType_Scalar);
+    assert(distance_slot.is_ok);
+    assert(FieldProgramBuilder_set_output(program_builder, distance_slot.ok).is_ok);
+    assert(FieldProgramBuilder_set_bounds(program_builder, -2.0f, -2.0f, -2.0f,
+                                          2.0f, 2.0f, 2.0f).is_ok);
+    assert(FieldProgramBuilder_set_distance_kind(
+        program_builder, FieldProgramDistanceKind_Exact).is_ok);
+    assert(FieldProgramBuilder_push_pos(program_builder).is_ok);
+    assert(FieldProgramBuilder_unary_op(program_builder, FieldProgramUnaryOp_Length).is_ok);
+    assert(FieldProgramBuilder_push_const_scalar(program_builder, 2.0f).is_ok);
+    assert(FieldProgramBuilder_binary_op(program_builder, FieldProgramBinaryOp_Sub).is_ok);
+    assert(FieldProgramBuilder_store_local(program_builder, distance_slot.ok).is_ok);
+    FieldProgramBuilder_build_result program_result = FieldProgramBuilder_build(program_builder);
+    assert(program_result.is_ok);
+    FieldProgram *program = program_result.ok;
+    Sdf *program_sdf = Sdf_from_program(program);
+    assert(Sdf_eval_at(program_sdf, 0.0f, 0.0f, 0.0f) < 0.0f);
+    Sdf_destroy(program_sdf);
+    FieldProgram_destroy(program);
+    FieldProgramBuilder_destroy(program_builder);
 
     Schematic_destroy(built);
     Schematic_destroy(loaded);

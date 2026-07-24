@@ -9,6 +9,11 @@ import at.schem.nucleation.Schematic
 import at.schem.nucleation.AnimationEffect
 import at.schem.nucleation.BuildAnimation
 import at.schem.nucleation.SdfExpr
+import at.schem.nucleation.FieldProgramBinaryOp
+import at.schem.nucleation.FieldProgramDistanceKind
+import at.schem.nucleation.FieldProgramDsl
+import at.schem.nucleation.FieldProgramUnaryOp
+import at.schem.nucleation.FieldProgramValueType
 
 fun main() {
     val s = Schematic.create("smoke")
@@ -31,5 +36,34 @@ fun main() {
     check(field.evalAt(0.0f, 0.0f, 0.0f) < 0.0f)
     field.toShape()
 
-    println("JVM smoke OK: schematic + fluent animation effect + typed SDF")
+    val programDsl = FieldProgramDsl.create()
+    val distance = programDsl.addSlot(FieldProgramValueType.Scalar)
+    val program = programDsl
+        .output(distance)
+        .bounds(-4.0f, -4.0f, -4.0f, 4.0f, 4.0f, 4.0f)
+        .distanceKind(FieldProgramDistanceKind.Exact)
+        .pushPosition()
+        .unary(FieldProgramUnaryOp.Length)
+        .pushConst(2.0f)
+        .binary(FieldProgramBinaryOp.Sub)
+        .store(distance)
+        .build()
+    check(program.toJson().getOrThrow().contains("\"version\":1"))
+    check(SdfExpr.fromProgram(program).evalAt(0.0f, 0.0f, 0.0f) < 0.0f)
+
+    val iq = SdfExpr.squarePyramid(2.0f, 4.0f)
+        .elongate(1.0f, 0.0f, 1.0f)
+        .twist(0.1f)
+        .bend(0.05f)
+        .xorWith(SdfExpr.sphere(1.0f))
+    check(iq.evalAt(4.0f, 0.0f, 0.0f).isFinite())
+    check(SdfExpr.infiniteCone(45.0f).evalAt(0.0f, -1.0f, 0.0f) > 0.0f)
+
+    val link = SdfExpr.link(halfLength = 7.0f, majorRadius = 3.0f, minorRadius = 0.5f)
+    val linkTubeCenter = link.evalAt(3.0f, 0.0f, 7.0f)
+    check(kotlin.math.abs(linkTubeCenter + 0.5f) < 1.0e-4f) {
+        "SdfExpr.link argument order mismatch: distance=$linkTubeCenter"
+    }
+
+    println("JVM smoke OK: schematic + fluent animation effect + typed/program SDF")
 }

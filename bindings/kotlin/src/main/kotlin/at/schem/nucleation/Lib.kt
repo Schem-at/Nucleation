@@ -776,6 +776,38 @@ class ResultDimensionsNativeInt: Structure(), Structure.ByValue  {
     }
 
 }
+internal class ResultFFIUint16IntUnion: Union() {
+    @JvmField
+    internal var ok: FFIUint16 = FFIUint16()
+    @JvmField
+    internal var err: Int = 0
+}
+
+class ResultFFIUint16Int: Structure(), Structure.ByValue  {
+    @JvmField
+    internal var union: ResultFFIUint16IntUnion = ResultFFIUint16IntUnion()
+
+    @JvmField
+    internal var isOk: Byte = 0
+
+    // Define the fields of the struct
+    override fun getFieldOrder(): List<String> {
+        return listOf("union", "isOk")
+    }
+    internal fun getNativeOk(): FFIUint16? {
+        if (isOk == 1.toByte()) {
+            return union.getTypedValue(FFIUint16::class.java) as FFIUint16
+        }
+        return null
+    }
+    internal fun getNativeErr(): Int? {
+        if (isOk == 0.toByte()) {
+            return union.getTypedValue(Int::class.java) as Int
+        }
+        return null
+    }
+
+}
 internal class ResultFFIUint32IntUnion: Union() {
     @JvmField
     internal var ok: FFIUint32 = FFIUint32()

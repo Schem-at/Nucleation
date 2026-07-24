@@ -63,6 +63,13 @@ fn json_round_trip_preserves_tree() {
 }
 
 #[test]
+fn sdf_from_json_rejects_oversized_payload_before_parsing() {
+    let mut json = r#"{"type":"sphere","radius":1}"#.to_owned();
+    json.extend(std::iter::repeat_n(' ', 1024 * 1024));
+    assert!(SdfNode::from_json(&json).is_err());
+}
+
+#[test]
 fn transforms_behave() {
     let t = SdfNode::from_json(
         r#"{"type":"translate","offset":[10,0,0],"child":{"type":"sphere","radius":2}}"#,
@@ -448,6 +455,7 @@ fn capped_torus_matches_full_torus_at_180_degrees() {
     for &(x, y, z) in &[
         (5.0, 0.0, 0.0),
         (0.0, 0.0, -5.0),
+        (0.0, 0.0, 5.0),
         (-5.0, 0.0, 0.0),
         (3.0, 1.0, -4.0),
         (0.0, 0.0, 0.0),
@@ -570,6 +578,27 @@ fn round_cone_caps_extend_correctly_beyond_endpoints() {
     // extra length past `center +/- radius`.
     assert!((rc.eval(0.0, -8.0, 0.0) - 5.0).abs() < 1e-4); // 3 (radius) + 5 = 8 below origin
     assert!((rc.eval(0.0, 16.0, 0.0) - 5.0).abs() < 1e-4); // 1 (radius) + 5 = 6 past y=10
+}
+
+#[test]
+fn round_cone_handles_contained_spheres_and_subnormal_axes() {
+    let contained = SdfNode::RoundCone {
+        a: [0.0, 0.0, 0.0],
+        b: [1.0, 0.0, 0.0],
+        r1: 10.0,
+        r2: 1.0,
+    };
+    assert!((contained.eval(0.0, 0.0, 0.0) + 10.0).abs() < 1.0e-5);
+
+    let tiny = SdfNode::RoundCone {
+        a: [0.0, 0.0, 0.0],
+        b: [f32::MIN_POSITIVE, 0.0, 0.0],
+        r1: 1.0,
+        r2: 1.0,
+    };
+    let distance = tiny.eval(0.0, 0.0, 0.0);
+    assert!(distance.is_finite());
+    assert!((distance + 1.0).abs() < 1.0e-5);
 }
 
 #[test]
@@ -706,6 +735,28 @@ fn cut_hollow_sphere_is_a_thin_open_shell_of_the_cap() {
 }
 
 #[test]
+fn negative_cut_sphere_bounds_retain_the_equator() {
+    let solid = SdfNode::CutSphere {
+        radius: 5.0,
+        height: -4.0,
+    }
+    .bounds()
+    .unwrap();
+    assert_eq!(solid.min, [-5.0, -4.0, -5.0]);
+    assert_eq!(solid.max, [5.0, 5.0, 5.0]);
+
+    let hollow = SdfNode::CutHollowSphere {
+        radius: 5.0,
+        height: -4.0,
+        thickness: 0.25,
+    }
+    .bounds()
+    .unwrap();
+    assert_eq!(hollow.min, [-5.25, -4.25, -5.25]);
+    assert_eq!(hollow.max, [5.25, 5.25, 5.25]);
+}
+
+#[test]
 fn infinite_cone_apex_is_on_surface_and_unbounded() {
     let cone = SdfNode::InfiniteCone { angle: 30.0 };
     assert!(cone.eval(0.0, 0.0, 0.0).abs() < 1e-4);
@@ -771,6 +822,55 @@ fn square_pyramid_interior_is_negative_and_exterior_positive() {
         "far outside on the base plane"
     );
     assert!(pyr.eval(0.0, 10.0, 0.0) > 0.0, "far above the apex");
+}
+
+#[test]
+fn square_pyramid_matches_independent_off_surface_distance() {
+    let pyr = SdfNode::SquarePyramid {
+        half_base: 0.5,
+        height: 1.0,
+    };
+    // Reference value from the IQ construction at a point just beyond an
+    // upper edge. Surface/sign-only tests do not catch this coefficient.
+    let distance = pyr.eval(-0.1, 0.6, -0.1);
+    assert!(
+        (distance - 0.173_205_08).abs() < 1.0e-5,
+        "distance={distance}"
+    );
+}
+
+#[test]
+fn square_pyramid_is_continuous_across_its_base() {
+    let pyramid = SdfNode::SquarePyramid {
+        half_base: 0.5,
+        height: 1.0,
+    };
+    let below = pyramid.eval(0.0, -0.500_001, 0.0);
+    let above = pyramid.eval(0.0, -0.499_999, 0.0);
+    assert!((below - 1.0e-6).abs() < 1.0e-7, "below={below}");
+    assert!((above + 1.0e-6).abs() < 1.0e-7, "above={above}");
+}
+
+#[test]
+fn tiny_square_pyramid_evaluation_stays_inside_reported_bounds() {
+    let pyramid = SdfNode::SquarePyramid {
+        half_base: 1.0e-20,
+        height: 1.0,
+    };
+    let bounds = pyramid.bounds().unwrap();
+    assert_eq!(bounds.min[0], -1.0e-20);
+    assert_eq!(bounds.max[0], 1.0e-20);
+    assert!(pyramid.eval(5.0e-10, -0.499, 0.0) > 0.0);
+}
+
+#[test]
+fn square_pyramid_rejects_subnormal_height() {
+    let pyramid = SdfNode::SquarePyramid {
+        half_base: 1.0,
+        height: f32::from_bits(1),
+    };
+    assert!(pyramid.validate().is_err());
+    assert!(SdfNode::from_json(r#"{"type":"squarePyramid","halfBase":1,"height":1e-45}"#).is_err());
 }
 
 #[test]
@@ -853,6 +953,21 @@ fn elongate_bounds_grow_componentwise() {
     assert!((b.max[0] - 4.0).abs() < 1e-5);
     assert!((b.max[1] - 1.5).abs() < 1e-5);
     assert!((b.max[2] - 1.0).abs() < 1e-5);
+}
+
+#[test]
+fn elongate_bounds_cover_folded_off_center_children() {
+    let elongated = SdfNode::Elongate {
+        child: Box::new(SdfNode::Translate {
+            child: Box::new(SdfNode::Sphere { radius: 1.0 }),
+            offset: [10.0, 0.0, 0.0],
+        }),
+        half_lengths: [1.0, 0.0, 0.0],
+    };
+    assert!(elongated.eval(-11.0, 0.0, 0.0) < 0.0);
+    let bounds = elongated.bounds().unwrap();
+    assert_eq!(bounds.min, [-12.0, -1.0, -1.0]);
+    assert_eq!(bounds.max, [12.0, 1.0, 1.0]);
 }
 
 #[test]
@@ -1106,9 +1221,13 @@ fn validate_rejects_invalid_signs_and_ranges() {
     assert_json_valid(r#"{"type":"squarePyramid","halfBase":2,"height":4}"#);
     assert_json_invalid(r#"{"type":"squarePyramid","halfBase":0,"height":4}"#);
     assert_json_valid(r#"{"type":"cutSphere","radius":5,"height":0}"#);
+    assert_json_invalid(r#"{"type":"cutSphere","radius":5,"height":5}"#);
+    assert_json_invalid(r#"{"type":"cutSphere","radius":5,"height":-5}"#);
     assert_json_invalid(r#"{"type":"cutSphere","radius":5,"height":6}"#);
     assert_json_invalid(r#"{"type":"cutSphere","radius":5,"height":-6}"#);
     assert_json_valid(r#"{"type":"cutHollowSphere","radius":5,"height":0,"thickness":0.25}"#);
+    assert_json_invalid(r#"{"type":"cutHollowSphere","radius":5,"height":5,"thickness":0.25}"#);
+    assert_json_invalid(r#"{"type":"cutHollowSphere","radius":5,"height":-5,"thickness":0.25}"#);
     assert_json_invalid(r#"{"type":"cutHollowSphere","radius":5,"height":0,"thickness":0}"#);
 }
 
@@ -1129,6 +1248,12 @@ fn validate_rejects_invalid_enum_specific_constraints() {
     assert_json_valid(&displace(3));
     assert_json_invalid(&displace(0));
     assert_json_invalid(&displace(9));
+}
+
+#[test]
+fn validate_rejects_empty_boolean_nodes() {
+    assert_json_invalid(r#"{"type":"union","children":[]}"#);
+    assert_json_invalid(r#"{"type":"intersect","children":[]}"#);
 }
 
 #[test]
@@ -1218,15 +1343,12 @@ fn validate_rejects_trees_past_the_depth_limit() {
 
 #[test]
 fn validate_rejects_trees_past_the_node_count_limit() {
-    let children: Vec<&str> = std::iter::repeat(r#"{"type":"sphere","radius":1}"#)
-        .take(8000)
-        .collect();
+    let children: Vec<&str> =
+        std::iter::repeat_n(r#"{"type":"sphere","radius":1}"#, 8000).collect();
     let wide = format!(r#"{{"type":"union","children":[{}]}}"#, children.join(","));
     assert_json_invalid(&wide);
 
-    let modest: Vec<&str> = std::iter::repeat(r#"{"type":"sphere","radius":1}"#)
-        .take(50)
-        .collect();
+    let modest: Vec<&str> = std::iter::repeat_n(r#"{"type":"sphere","radius":1}"#, 50).collect();
     let ok = format!(r#"{{"type":"union","children":[{}]}}"#, modest.join(","));
     assert_json_valid(&ok);
 }

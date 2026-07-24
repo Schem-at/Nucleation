@@ -8,11 +8,17 @@ use Stencil\BuildAnimation;
 use Stencil\DefinitionRegion;
 use Stencil\Diff;
 use Stencil\DiplomatError;
+use Stencil\FieldProgramBinaryOp;
+use Stencil\FieldProgramBuilder;
+use Stencil\FieldProgramDistanceKind;
+use Stencil\FieldProgramUnaryOp;
+use Stencil\FieldProgramValueType;
 use Stencil\Lib;
 use Stencil\Schematic;
 use Stencil\SchematicBuilder;
 use Stencil\SchematicRegions;
 use Stencil\Store;
+use Stencil\Sdf;
 
 $lib = getenv('NUCLEATION_LIBRARY_PATH');
 if ($lib === false) {
@@ -96,5 +102,21 @@ unset($borrowed);
 gc_collect_cycles();
 expect($animation->setBlock(1, 0, 0, 'minecraft:dirt') === 1, 'borrowed wrapper did not destroy parent');
 expect($animation->groupCount() === 2, 'effect is one-shot and both targets recorded');
+
+// --- portable field program: length(position) - 2 ---
+$programBuilder = FieldProgramBuilder::create();
+$distance = $programBuilder->addSlot(FieldProgramValueType::Scalar);
+$programBuilder->setOutput($distance);
+$programBuilder->setBounds(-2.0, -2.0, -2.0, 2.0, 2.0, 2.0);
+$programBuilder->setDistanceKind(FieldProgramDistanceKind::Exact);
+$programBuilder->pushPos();
+$programBuilder->unaryOp(FieldProgramUnaryOp::Length);
+$programBuilder->pushConstScalar(2.0);
+$programBuilder->binaryOp(FieldProgramBinaryOp::Sub);
+$programBuilder->storeLocal($distance);
+$program = $programBuilder->build();
+expect(str_contains($program->toJson(), '"version":1'), 'program JSON is versioned');
+$programSdf = Sdf::fromProgram($program);
+expect($programSdf->evalAt(0.0, 0.0, 0.0) < 0.0, 'program composes as an SDF');
 
 echo "bridge smoke (PHP) OK\n";

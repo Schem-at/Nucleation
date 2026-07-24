@@ -92,6 +92,11 @@ impl Aabb {
 ///
 /// Primitives are centered at the origin; use [`SdfNode::Translate`] /
 /// [`SdfNode::Rotate`] / [`SdfNode::Scale`] to position them.
+///
+/// Direct Serde deserialization creates a raw Rust AST, equivalent to manually
+/// constructing enum variants; call [`SdfNode::validate`] before evaluating it.
+/// For untrusted JSON, use [`SdfNode::from_json`], which applies the pre-parse
+/// byte limit and recursive structural validation before returning a node.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(
     tag = "type",
@@ -225,9 +230,9 @@ pub enum SdfNode {
     InfiniteCone {
         angle: f32,
     },
-    /// Exact. Square-base pyramid, vertically centered: base (half-extent
-    /// `half_base` in X/Z) at `y = -height/2`, apex at `y = height/2`. IQ's
-    /// exact pyramid SDF, uniformly scaled to the given base/height.
+    /// Exact closed square-base pyramid, vertically centered: base (half-extent
+    /// `half_base` in X/Z) at `y = -height/2`, apex at `y = height/2`.
+    /// Distance includes both the four triangular sides and square base.
     SquarePyramid {
         half_base: f32,
         height: f32,
@@ -280,7 +285,9 @@ pub enum SdfNode {
     /// Stretches the child outward by `half_lengths` along each axis before
     /// evaluating it (IQ's corrected `opElongate`: `q = abs(p) -
     /// half_lengths`, then `child(max(q,0)) + min(max(q.x,q.y,q.z),0)`).
-    /// Exact for convex children, a conservative bound otherwise.
+    /// Exact only for suitable origin-centered, reflection-symmetric children.
+    /// Off-center/asymmetric children are mirrored by the coordinate fold;
+    /// bounds remain conservative, but the result is only an estimate.
     Elongate {
         child: Box<SdfNode>,
         half_lengths: [f32; 3],
@@ -401,6 +408,10 @@ const MAX_TREE_DEPTH: u32 = 64;
 /// `Union`/`Intersect` with many children) can force regardless of depth.
 const MAX_TREE_NODES: u32 = 5_000;
 
+/// Maximum UTF-8 JSON payload accepted before deserialization. This bounds
+/// parser allocation independently of the post-parse tree budgets.
+const MAX_TREE_JSON_BYTES: usize = 1024 * 1024;
+
 /// All values finite.
 fn finite_all(values: &[f32]) -> Result<(), String> {
     if values.iter().all(|v| v.is_finite()) {
@@ -491,36 +502,117 @@ fn smax(a: f32, b: f32, k: f32) -> f32 {
     -smin(-a, -b, k)
 }
 
-/// iq's exact square-pyramid SDF for the unit pyramid: base half-extent
-/// `0.5` in X/Z at `y = 0`, apex at `(0, h, 0)`.
-#[inline]
-fn sd_pyramid_unit(px: f32, py: f32, pz: f32, h: f32) -> f32 {
-    let m2 = h * h + 0.25;
+/// Exact signed distance to a closed, axis-aligned square pyramid centered on
+/// the origin, including its square base. The four side faces are measured as
+/// triangles so interior points near the base use the base-plane distance
+/// rather than the open-side IQ formulation.
+fn sd_square_pyramid(px: f32, py: f32, pz: f32, half_base: f32, height: f32) -> f32 {
+    type V3 = [f64; 3];
 
-    let (mut ax, mut az) = (px.abs(), pz.abs());
-    if az > ax {
-        std::mem::swap(&mut ax, &mut az);
+    #[inline]
+    fn sub(a: V3, b: V3) -> V3 {
+        [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
     }
-    ax -= 0.5;
-    az -= 0.5;
+    #[inline]
+    fn dot(a: V3, b: V3) -> f64 {
+        a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+    }
+    #[inline]
+    fn length(v: V3) -> f64 {
+        dot(v, v).sqrt()
+    }
+    #[inline]
+    fn segment_point(a: V3, b: V3, t: f64) -> V3 {
+        [
+            a[0] + (b[0] - a[0]) * t,
+            a[1] + (b[1] - a[1]) * t,
+            a[2] + (b[2] - a[2]) * t,
+        ]
+    }
+    fn triangle_distance(p: V3, a: V3, b: V3, c: V3) -> f64 {
+        // Closest-point region tests from Real-Time Collision Detection.
+        let ab = sub(b, a);
+        let ac = sub(c, a);
+        let ap = sub(p, a);
+        let d1 = dot(ab, ap);
+        let d2 = dot(ac, ap);
+        if d1 <= 0.0 && d2 <= 0.0 {
+            return length(ap);
+        }
 
-    let qx = az;
-    let qy = h * py - 0.5 * ax;
-    let qz = h * ax + 0.5 * py;
+        let bp = sub(p, b);
+        let d3 = dot(ab, bp);
+        let d4 = dot(ac, bp);
+        if d3 >= 0.0 && d4 <= d3 {
+            return length(bp);
+        }
 
-    let s = (-qx).max(0.0);
-    let t = ((qy - 0.5 * az) / (m2 + 0.25)).clamp(0.0, 1.0);
+        let vc = d1 * d4 - d3 * d2;
+        if vc <= 0.0 && d1 >= 0.0 && d3 <= 0.0 {
+            return length(sub(p, segment_point(a, b, d1 / (d1 - d3))));
+        }
 
-    let a = m2 * (qx + s) * (qx + s) + qy * qy;
-    let b = m2 * (qx + t * m2) * (qx + t * m2) + (qy - m2 * t) * (qy - m2 * t);
+        let cp = sub(p, c);
+        let d5 = dot(ab, cp);
+        let d6 = dot(ac, cp);
+        if d6 >= 0.0 && d5 <= d6 {
+            return length(cp);
+        }
 
-    let d2 = if qy.min(-qx * m2 - qy * 0.5) > 0.0 {
-        0.0
-    } else {
-        a.min(b)
-    };
+        let vb = d5 * d2 - d1 * d6;
+        if vb <= 0.0 && d2 >= 0.0 && d6 <= 0.0 {
+            return length(sub(p, segment_point(a, c, d2 / (d2 - d6))));
+        }
 
-    ((d2 + qz * qz) / m2).max(0.0).sqrt() * glsl_sign(qz.max(-py))
+        let va = d3 * d6 - d5 * d4;
+        if va <= 0.0 && d4 >= d3 && d5 >= d6 {
+            let t = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+            return length(sub(p, segment_point(b, c, t)));
+        }
+
+        let denom = 1.0 / (va + vb + vc);
+        let v = vb * denom;
+        let w = vc * denom;
+        let closest = [
+            a[0] + ab[0] * v + ac[0] * w,
+            a[1] + ab[1] * v + ac[1] * w,
+            a[2] + ab[2] * v + ac[2] * w,
+        ];
+        length(sub(p, closest))
+    }
+
+    let p = [px as f64, py as f64, pz as f64];
+    let h = height as f64;
+    let r = half_base as f64;
+    let base_y = -0.5 * h;
+    let apex_y = 0.5 * h;
+    let apex = [0.0, apex_y, 0.0];
+    let corners = [
+        [-r, base_y, -r],
+        [r, base_y, -r],
+        [r, base_y, r],
+        [-r, base_y, r],
+    ];
+
+    let mut distance = f64::INFINITY;
+    for index in 0..4 {
+        distance = distance.min(triangle_distance(
+            p,
+            corners[index],
+            corners[(index + 1) % 4],
+            apex,
+        ));
+    }
+
+    let dx = (p[0].abs() - r).max(0.0);
+    let dz = (p[2].abs() - r).max(0.0);
+    let dy = p[1] - base_y;
+    let base_distance = (dx * dx + dy * dy + dz * dz).sqrt();
+    distance = distance.min(base_distance);
+
+    let section = r * ((apex_y - p[1]) / h);
+    let inside = p[1] >= base_y && p[1] <= apex_y && p[0].abs() <= section && p[2].abs() <= section;
+    (if inside { -distance } else { distance }) as f32
 }
 
 /// Column-major 3x3 rotation helpers (row-vector free, plain arrays).
@@ -564,6 +656,11 @@ impl SdfNode {
     /// Parse a node tree from its JSON representation, then recursively
     /// [`validate`](SdfNode::validate) it.
     pub fn from_json(json: &str) -> Result<SdfNode, String> {
+        if json.len() > MAX_TREE_JSON_BYTES {
+            return Err(format!(
+                "SDF JSON exceeds the maximum size of {MAX_TREE_JSON_BYTES} bytes"
+            ));
+        }
         let node: SdfNode =
             serde_json::from_str(json).map_err(|e| format!("Invalid SDF JSON: {e}"))?;
         node.validate()?;
@@ -668,8 +765,8 @@ impl SdfNode {
             SdfNode::CutSphere { radius, height } => {
                 positive_all(&[*radius])?;
                 finite_all(&[*height])?;
-                if *height < -*radius || *height > *radius {
-                    return Err("cut sphere height must be within [-radius, radius]".into());
+                if *height <= -*radius || *height >= *radius {
+                    return Err("cut sphere height must be within (-radius, radius)".into());
                 }
             }
 
@@ -680,8 +777,8 @@ impl SdfNode {
             } => {
                 positive_all(&[*radius, *thickness])?;
                 finite_all(&[*height])?;
-                if *height < -*radius || *height > *radius {
-                    return Err("cut hollow sphere height must be within [-radius, radius]".into());
+                if *height <= -*radius || *height >= *radius {
+                    return Err("cut hollow sphere height must be within (-radius, radius)".into());
                 }
             }
 
@@ -701,6 +798,11 @@ impl SdfNode {
 
             SdfNode::SquarePyramid { half_base, height } => {
                 positive_all(&[*half_base, *height])?;
+                if *height < f32::MIN_POSITIVE {
+                    return Err(
+                        "square pyramid height must be at least the smallest normal f32".into(),
+                    );
+                }
             }
 
             SdfNode::CappedCone {
@@ -756,6 +858,9 @@ impl SdfNode {
             }
 
             SdfNode::Union { children } | SdfNode::Intersect { children } => {
+                if children.is_empty() {
+                    return Err("union/intersection must contain at least one child".into());
+                }
                 for child in children {
                     child.validate_at(depth + 1, budget)?;
                 }
@@ -907,6 +1012,10 @@ impl SdfNode {
                 minor_radius: rb,
                 cap_angle,
             } => {
+                if *cap_angle == 180.0 {
+                    let qx = len2(x, z) - ra;
+                    return len2(qx, y) - rb;
+                }
                 let (sin_a, cos_a) = cap_angle.to_radians().sin_cos();
                 let px = x.abs();
                 let pz = z;
@@ -944,32 +1053,53 @@ impl SdfNode {
             }
 
             SdfNode::RoundCone { a, b, r1, r2 } => {
-                // iq's sdRoundCone: convex hull of two spheres, exact.
-                let ba = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+                // iq's sdRoundCone: exact convex hull of two spheres. The
+                // tangent-frustum formula only applies when neither sphere
+                // contains the other; use the containing sphere directly at
+                // that degeneracy. Work in f64 so distinct f32 endpoints
+                // cannot underflow when their squared axis length is formed.
+                let a64 = [a[0] as f64, a[1] as f64, a[2] as f64];
+                let b64 = [b[0] as f64, b[1] as f64, b[2] as f64];
+                let p = [x as f64, y as f64, z as f64];
+                let ba = [b64[0] - a64[0], b64[1] - a64[1], b64[2] - a64[2]];
                 let l2 = ba[0] * ba[0] + ba[1] * ba[1] + ba[2] * ba[2];
-                let rr = r1 - r2;
-                let a2 = l2 - rr * rr;
-                let il2 = 1.0 / l2;
+                let rr = *r1 as f64 - *r2 as f64;
 
-                let pa = [x - a[0], y - a[1], z - a[2]];
-                let y_ = pa[0] * ba[0] + pa[1] * ba[1] + pa[2] * ba[2];
-                let z_ = y_ - l2;
-                let px = [
-                    pa[0] * l2 - ba[0] * y_,
-                    pa[1] * l2 - ba[1] * y_,
-                    pa[2] * l2 - ba[2] * y_,
-                ];
-                let x2 = px[0] * px[0] + px[1] * px[1] + px[2] * px[2];
-                let y2 = y_ * y_ * l2;
-                let z2 = z_ * z_ * l2;
-
-                let k = rr.signum() * rr * rr * x2;
-                if z_.signum() * a2 * z2 > k {
-                    (x2 + z2).max(0.0).sqrt() * il2 - r2
-                } else if y_.signum() * a2 * y2 < k {
-                    (x2 + y2).max(0.0).sqrt() * il2 - r1
+                let sphere_distance = |center: [f64; 3], radius: f64| {
+                    let dx = p[0] - center[0];
+                    let dy = p[1] - center[1];
+                    let dz = p[2] - center[2];
+                    (dx * dx + dy * dy + dz * dz).sqrt() - radius
+                };
+                if l2.sqrt() <= rr.abs() {
+                    if r1 >= r2 {
+                        sphere_distance(a64, *r1 as f64) as f32
+                    } else {
+                        sphere_distance(b64, *r2 as f64) as f32
+                    }
                 } else {
-                    ((x2 * a2 * il2).max(0.0).sqrt() + y_ * rr) * il2 - r1
+                    let a2 = l2 - rr * rr;
+                    let il2 = 1.0 / l2;
+                    let pa = [p[0] - a64[0], p[1] - a64[1], p[2] - a64[2]];
+                    let y_ = pa[0] * ba[0] + pa[1] * ba[1] + pa[2] * ba[2];
+                    let z_ = y_ - l2;
+                    let px = [
+                        pa[0] * l2 - ba[0] * y_,
+                        pa[1] * l2 - ba[1] * y_,
+                        pa[2] * l2 - ba[2] * y_,
+                    ];
+                    let x2 = px[0] * px[0] + px[1] * px[1] + px[2] * px[2];
+                    let y2 = y_ * y_ * l2;
+                    let z2 = z_ * z_ * l2;
+                    let k = rr.signum() * rr * rr * x2;
+                    let distance = if z_.signum() * a2 * z2 > k {
+                        (x2 + z2).max(0.0).sqrt() * il2 - *r2 as f64
+                    } else if y_.signum() * a2 * y2 < k {
+                        (x2 + y2).max(0.0).sqrt() * il2 - *r1 as f64
+                    } else {
+                        ((x2 * a2 * il2).max(0.0).sqrt() + y_ * rr) * il2 - *r1 as f64
+                    };
+                    distance as f32
                 }
             }
 
@@ -1154,13 +1284,7 @@ impl SdfNode {
             }
 
             SdfNode::SquarePyramid { half_base, height } => {
-                let hb = half_base.max(1e-9);
-                let scale = 2.0 * hb;
-                let h = height / scale;
-                let px = x / scale;
-                let py = (y + height * 0.5) / scale;
-                let pz = z / scale;
-                sd_pyramid_unit(px, py, pz, h) * scale
+                sd_square_pyramid(x, y, z, *half_base, *height)
             }
 
             SdfNode::Union { children } => children
@@ -1406,9 +1530,10 @@ impl SdfNode {
             SdfNode::SolidAngle { radius, .. } => sym(*radius, *radius, *radius),
             SdfNode::CutSphere { radius: r, height } => {
                 let w = (r * r - height * height).max(0.0).sqrt();
+                let radial_max = if *height <= 0.0 { *r } else { w };
                 Some(Aabb {
-                    min: [-w, *height, -w],
-                    max: [w, *r, w],
+                    min: [-radial_max, *height, -radial_max],
+                    max: [radial_max, *r, radial_max],
                 })
             }
             SdfNode::CutHollowSphere {
@@ -1417,9 +1542,18 @@ impl SdfNode {
                 thickness,
             } => {
                 let w = (r * r - height * height).max(0.0).sqrt();
+                let radial_max = if *height <= 0.0 { *r } else { w };
                 Some(Aabb {
-                    min: [-w - thickness, height - thickness, -w - thickness],
-                    max: [w + thickness, r + thickness, w + thickness],
+                    min: [
+                        -radial_max - thickness,
+                        height - thickness,
+                        -radial_max - thickness,
+                    ],
+                    max: [
+                        radial_max + thickness,
+                        r + thickness,
+                        radial_max + thickness,
+                    ],
                 })
             }
             SdfNode::CappedCylinder {
@@ -1501,9 +1635,16 @@ impl SdfNode {
             SdfNode::Elongate {
                 child,
                 half_lengths: h,
-            } => child.bounds().map(|b| Aabb {
-                min: [b.min[0] - h[0], b.min[1] - h[1], b.min[2] - h[2]],
-                max: [b.max[0] + h[0], b.max[1] + h[1], b.max[2] + h[2]],
+            } => child.bounds().map(|b| {
+                let extent = [
+                    b.min[0].abs().max(b.max[0].abs()) + h[0],
+                    b.min[1].abs().max(b.max[1].abs()) + h[1],
+                    b.min[2].abs().max(b.max[2].abs()) + h[2],
+                ];
+                Aabb {
+                    min: [-extent[0], -extent[1], -extent[2]],
+                    max: extent,
+                }
             }),
 
             SdfNode::Translate { child, offset } => child.bounds().map(|b| Aabb {

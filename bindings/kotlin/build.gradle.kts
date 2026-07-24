@@ -28,7 +28,7 @@ kotlin {
 // Smoke program (smoke/Smoke.kt) lives outside src/ because
 // tools/gen-bindings.sh wipes bindings/kotlin/src wholesale on regeneration.
 val smoke: SourceSet by sourceSets.creating {
-    java.setSrcDirs(emptyList<String>())
+    java.setSrcDirs(listOf("smoke-java"))
     resources.setSrcDirs(emptyList<String>())
     kotlin.setSrcDirs(listOf("smoke"))
 }

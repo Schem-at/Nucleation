@@ -11,13 +11,23 @@ internal interface SdfLib: Library {
     fun Sdf_box_shape(halfX: Float, halfY: Float, halfZ: Float, rounding: Float): ResultPointerInt
     fun Sdf_ellipsoid(radiusX: Float, radiusY: Float, radiusZ: Float): ResultPointerInt
     fun Sdf_torus(majorRadius: Float, minorRadius: Float): ResultPointerInt
+    fun Sdf_capped_torus(majorRadius: Float, minorRadius: Float, capAngleDegrees: Float): ResultPointerInt
+    fun Sdf_link(majorRadius: Float, minorRadius: Float, halfLength: Float): ResultPointerInt
     fun Sdf_capsule(ax: Float, ay: Float, az: Float, bx: Float, by: Float, bz: Float, radius: Float): ResultPointerInt
+    fun Sdf_round_cone(ax: Float, ay: Float, az: Float, bx: Float, by: Float, bz: Float, r1: Float, r2: Float): ResultPointerInt
+    fun Sdf_solid_angle(radius: Float, angleDegrees: Float): ResultPointerInt
+    fun Sdf_cut_sphere(radius: Float, height: Float): ResultPointerInt
+    fun Sdf_cut_hollow_sphere(radius: Float, height: Float, thickness: Float): ResultPointerInt
     fun Sdf_capped_cylinder(radius: Float, halfHeight: Float): ResultPointerInt
+    fun Sdf_infinite_cylinder(radius: Float): ResultPointerInt
     fun Sdf_capped_cone(halfHeight: Float, bottomRadius: Float, topRadius: Float): ResultPointerInt
     fun Sdf_plane(normalX: Float, normalY: Float, normalZ: Float, offset: Float): ResultPointerInt
     fun Sdf_octahedron(size: Float): ResultPointerInt
     fun Sdf_hex_prism(radius: Float, halfHeight: Float): ResultPointerInt
     fun Sdf_super_prism(halfX: Float, halfY: Float, halfZ: Float, exponent: Float): ResultPointerInt
+    fun Sdf_box_frame(halfX: Float, halfY: Float, halfZ: Float, thickness: Float): ResultPointerInt
+    fun Sdf_infinite_cone(angleDegrees: Float): ResultPointerInt
+    fun Sdf_square_pyramid(halfBase: Float, height: Float): ResultPointerInt
     fun Sdf_cells(frequency: Float, seed: Int, jitter: Float, mode: Int, threshold: Float): ResultPointerInt
     fun Sdf_union_with(handle: Pointer, other: Pointer): Pointer
     fun Sdf_intersection_with(handle: Pointer, other: Pointer): Pointer
@@ -27,10 +37,14 @@ internal interface SdfLib: Library {
     fun Sdf_smooth_intersection(handle: Pointer, other: Pointer, radius: Float): ResultPointerInt
     fun Sdf_rounded(handle: Pointer, radius: Float): ResultPointerInt
     fun Sdf_shell(handle: Pointer, thickness: Float): ResultPointerInt
+    fun Sdf_xor_with(handle: Pointer, other: Pointer): Pointer
+    fun Sdf_elongate(handle: Pointer, halfX: Float, halfY: Float, halfZ: Float): ResultPointerInt
     fun Sdf_translate(handle: Pointer, x: Float, y: Float, z: Float): ResultPointerInt
     fun Sdf_rotate(handle: Pointer, xDegrees: Float, yDegrees: Float, zDegrees: Float): ResultPointerInt
     fun Sdf_scale(handle: Pointer, factor: Float): ResultPointerInt
     fun Sdf_mirror(handle: Pointer, axis: Int): Pointer
+    fun Sdf_twist(handle: Pointer, amount: Float): ResultPointerInt
+    fun Sdf_bend(handle: Pointer, amount: Float): ResultPointerInt
     fun Sdf_repeat_infinite(handle: Pointer, spacingX: Float, spacingY: Float, spacingZ: Float): ResultPointerInt
     fun Sdf_repeat_counted(handle: Pointer, spacingX: Float, spacingY: Float, spacingZ: Float, countX: FFIUint32, countY: FFIUint32, countZ: FFIUint32): ResultPointerInt
     fun Sdf_displace(handle: Pointer, amplitude: Float, frequency: Float, seed: Int, octaves: FFIUint32): ResultPointerInt
@@ -42,6 +56,7 @@ internal interface SdfLib: Library {
     fun Sdf_to_shape_bounded(handle: Pointer, minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int): ResultPointerInt
     fun Sdf_from_json_string(json: Slice): ResultPointerInt
     fun Sdf_to_json(handle: Pointer, write: Pointer): ResultUnitInt
+    fun Sdf_from_program(program: Pointer): Pointer
     fun Sdf_schematic_from_sdf_auto(sdfJson: Slice, rulesJson: Slice): ResultPointerInt
     fun Sdf_schematic_from_sdf(sdfJson: Slice, rulesJson: Slice, hasBounds: Boolean, minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int): ResultPointerInt
     fun Sdf_eval(sdfJson: Slice, x: Float, y: Float, z: Float): ResultFloatInt
@@ -143,6 +158,43 @@ class Sdf internal constructor (
         }
         @JvmStatic
 
+        /** Torus ring cut down to an arc. `cap_angle_degrees` is the half-aperture
+        *in `(0, 180]`, measured from +X and mirrored across X; `180` is a full
+        *torus.
+        */
+        fun cappedTorus(majorRadius: Float, minorRadius: Float, capAngleDegrees: Float): Result<Sdf> {
+
+            val returnVal = lib.Sdf_capped_torus(majorRadius, minorRadius, capAngleDegrees);
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                val selfEdges: List<Any> = listOf()
+                val handle = nativeOkVal
+                val returnOpaque = Sdf(handle, selfEdges, true)
+                return returnOpaque.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        }
+        @JvmStatic
+
+        /** Chain-link shape: a torus stretched along Z by `half_length` and
+        *capped by two half-tori. `half_length: 0` is a plain torus.
+        */
+        fun link(majorRadius: Float, minorRadius: Float, halfLength: Float): Result<Sdf> {
+
+            val returnVal = lib.Sdf_link(majorRadius, minorRadius, halfLength);
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                val selfEdges: List<Any> = listOf()
+                val handle = nativeOkVal
+                val returnOpaque = Sdf(handle, selfEdges, true)
+                return returnOpaque.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        }
+        @JvmStatic
+
         fun capsule(ax: Float, ay: Float, az: Float, bx: Float, by: Float, bz: Float, radius: Float): Result<Sdf> {
 
             val returnVal = lib.Sdf_capsule(ax, ay, az, bx, by, bz, radius);
@@ -158,9 +210,100 @@ class Sdf internal constructor (
         }
         @JvmStatic
 
+        /** Convex hull of two spheres: a capsule with a linear taper between
+        *`r1` (at `a`) and `r2` (at `b`) instead of one constant radius.
+        */
+        fun roundCone(ax: Float, ay: Float, az: Float, bx: Float, by: Float, bz: Float, r1: Float, r2: Float): Result<Sdf> {
+
+            val returnVal = lib.Sdf_round_cone(ax, ay, az, bx, by, bz, r1, r2);
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                val selfEdges: List<Any> = listOf()
+                val handle = nativeOkVal
+                val returnOpaque = Sdf(handle, selfEdges, true)
+                return returnOpaque.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        }
+        @JvmStatic
+
+        /** Sphere of `radius` intersected with an infinite cone of
+        *half-aperture `angle_degrees` (in `(0, 180)`) from the +Y axis,
+        *apex at the origin.
+        */
+        fun solidAngle(radius: Float, angleDegrees: Float): Result<Sdf> {
+
+            val returnVal = lib.Sdf_solid_angle(radius, angleDegrees);
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                val selfEdges: List<Any> = listOf()
+                val handle = nativeOkVal
+                val returnOpaque = Sdf(handle, selfEdges, true)
+                return returnOpaque.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        }
+        @JvmStatic
+
+        /** Sphere cut by the plane `y = height`, keeping the cap above it
+        *(a dome). `height` must be strictly between `-radius` and
+        *`radius`.
+        */
+        fun cutSphere(radius: Float, height: Float): Result<Sdf> {
+
+            val returnVal = lib.Sdf_cut_sphere(radius, height);
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                val selfEdges: List<Any> = listOf()
+                val handle = nativeOkVal
+                val returnOpaque = Sdf(handle, selfEdges, true)
+                return returnOpaque.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        }
+        @JvmStatic
+
+        /** Open (hollow) shell of `cut_sphere`'s dome: just the spherical
+        *cap surface, offset by `thickness`, with no flat floor.
+        */
+        fun cutHollowSphere(radius: Float, height: Float, thickness: Float): Result<Sdf> {
+
+            val returnVal = lib.Sdf_cut_hollow_sphere(radius, height, thickness);
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                val selfEdges: List<Any> = listOf()
+                val handle = nativeOkVal
+                val returnOpaque = Sdf(handle, selfEdges, true)
+                return returnOpaque.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        }
+        @JvmStatic
+
         fun cappedCylinder(radius: Float, halfHeight: Float): Result<Sdf> {
 
             val returnVal = lib.Sdf_capped_cylinder(radius, halfHeight);
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                val selfEdges: List<Any> = listOf()
+                val handle = nativeOkVal
+                val returnOpaque = Sdf(handle, selfEdges, true)
+                return returnOpaque.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        }
+        @JvmStatic
+
+        /** Exact Y-axis cylinder with infinite extent. Sampling requires explicit bounds.
+        */
+        fun infiniteCylinder(radius: Float): Result<Sdf> {
+
+            val returnVal = lib.Sdf_infinite_cylinder(radius);
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
                 val selfEdges: List<Any> = listOf()
@@ -248,6 +391,61 @@ class Sdf internal constructor (
         }
         @JvmStatic
 
+        /** Hollow wireframe box: only the 12 edge beams are solid.
+        */
+        fun boxFrame(halfX: Float, halfY: Float, halfZ: Float, thickness: Float): Result<Sdf> {
+
+            val returnVal = lib.Sdf_box_frame(halfX, halfY, halfZ, thickness);
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                val selfEdges: List<Any> = listOf()
+                val handle = nativeOkVal
+                val returnOpaque = Sdf(handle, selfEdges, true)
+                return returnOpaque.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        }
+        @JvmStatic
+
+        /** Exact but unbounded Y-axis infinite cone: apex at the origin,
+        *single nappe opening along +Y, half-aperture `angle_degrees`
+        *strictly in `(0, 90)`.
+        */
+        fun infiniteCone(angleDegrees: Float): Result<Sdf> {
+
+            val returnVal = lib.Sdf_infinite_cone(angleDegrees);
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                val selfEdges: List<Any> = listOf()
+                val handle = nativeOkVal
+                val returnOpaque = Sdf(handle, selfEdges, true)
+                return returnOpaque.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        }
+        @JvmStatic
+
+        /** Square-base pyramid, vertically centered: base (half-extent
+        *`half_base`) at `y = -height/2`, apex at `y = height/2`. `height`
+        *must be at least the smallest positive normal `f32`.
+        */
+        fun squarePyramid(halfBase: Float, height: Float): Result<Sdf> {
+
+            val returnVal = lib.Sdf_square_pyramid(halfBase, height);
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                val selfEdges: List<Any> = listOf()
+                val handle = nativeOkVal
+                val returnOpaque = Sdf(handle, selfEdges, true)
+                return returnOpaque.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        }
+        @JvmStatic
+
         fun cells(frequency: Float, seed: Int, jitter: Float, mode: SdfCellMode, threshold: Float): Result<Sdf> {
 
             val returnVal = lib.Sdf_cells(frequency, seed, jitter, mode.toNative(), threshold);
@@ -280,6 +478,20 @@ class Sdf internal constructor (
             } finally {
                 jsonSliceMemory.close()
             }
+        }
+        @JvmStatic
+
+        /** Wrap a validated [FieldProgram] as an `Sdf` graph (cloning it,
+        *with its own explicit bounds and distance-kind metadata), so it
+        *composes with every other combinator.
+        */
+        fun fromProgram(program: FieldProgram): Sdf {
+
+            val returnVal = lib.Sdf_from_program(program.handle);
+            val selfEdges: List<Any> = listOf()
+            val handle = returnVal
+            val returnOpaque = Sdf(handle, selfEdges, true)
+            return returnOpaque
         }
         @JvmStatic
 
@@ -448,6 +660,38 @@ class Sdf internal constructor (
         }
     }
 
+    /** Symmetric difference (XOR): solid where exactly one of `self`/
+    *`other` is solid.
+    */
+    fun xorWith(other: Sdf): Sdf {
+
+        val returnVal = lib.Sdf_xor_with(handle, other.handle);
+        val selfEdges: List<Any> = listOf()
+        val handle = returnVal
+        val returnOpaque = Sdf(handle, selfEdges, true)
+        return returnOpaque
+    }
+
+    /** Stretches this graph with IQ's origin-centered `opElongate` fold.
+    *Exactness requires a suitable origin-centered, reflection-symmetric
+    *child; off-center/asymmetric children are mirrored and produce only
+    *an estimate. Half-lengths must be finite and non-negative, with at
+    *least one strictly positive.
+    */
+    fun elongate(halfX: Float, halfY: Float, halfZ: Float): Result<Sdf> {
+
+        val returnVal = lib.Sdf_elongate(handle, halfX, halfY, halfZ);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            val selfEdges: List<Any> = listOf()
+            val handle = nativeOkVal
+            val returnOpaque = Sdf(handle, selfEdges, true)
+            return returnOpaque.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
     fun translate(x: Float, y: Float, z: Float): Result<Sdf> {
 
         val returnVal = lib.Sdf_translate(handle, x, y, z);
@@ -497,6 +741,42 @@ class Sdf internal constructor (
         val handle = returnVal
         val returnOpaque = Sdf(handle, selfEdges, true)
         return returnOpaque
+    }
+
+    /** Twists this graph about the Y axis by `amount` radians per unit
+    *Y (IQ's `opTwist`). *Distorted*: not guaranteed exact even when
+    *`self` is.
+    */
+    fun twist(amount: Float): Result<Sdf> {
+
+        val returnVal = lib.Sdf_twist(handle, amount);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            val selfEdges: List<Any> = listOf()
+            val handle = nativeOkVal
+            val returnOpaque = Sdf(handle, selfEdges, true)
+            return returnOpaque.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** Cheaply bends this graph by `amount` radians per unit X (IQ's
+    *`opCheapBend`). *Distorted*: not guaranteed exact even when
+    *`self` is.
+    */
+    fun bend(amount: Float): Result<Sdf> {
+
+        val returnVal = lib.Sdf_bend(handle, amount);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            val selfEdges: List<Any> = listOf()
+            val handle = nativeOkVal
+            val returnOpaque = Sdf(handle, selfEdges, true)
+            return returnOpaque.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
     }
 
     fun repeatInfinite(spacingX: Float, spacingY: Float, spacingZ: Float): Result<Sdf> {

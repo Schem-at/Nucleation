@@ -141,28 +141,23 @@ for x in range(n):
 
 ## Mandelbulb
 
-The power-8 Mandelbulb, escape-tested per voxel: raise each point to the eighth
-power in spherical coordinates, add its own position, and keep the ones that
-never fly off to infinity. Tinted like an ember.
+The power-8 Mandelbulb is authored once as bounded, portable field bytecode:
+each point iterates in spherical coordinates, with finite-origin guards and a
+12-iteration maximum. The resulting distance estimate is an ordinary `Sdf`, so the
+same serialized program runs in Python, Java/Kotlin, JavaScript, C++, or PHP.
+Tinted like an ember.
 
 <div align="center">
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/gallery-mandelbulb.png" width="520" alt="A Mandelbulb 3D fractal in blocks with an ember-red to gold gradient">
 </div>
 
 ```python
-for cx, cy, cz in grid(n=132, span=2.5):        # c = each voxel's position
-    x = y = z = 0.0
-    for _ in range(7):
-        r = math.sqrt(x*x + y*y + z*z)
-        if r > 2.0:
-            break                                # escaped, so outside
-        t, p = 8 * math.acos(z / r), 8 * math.atan2(y, x)     # z -> z^8 ...
-        rp = r ** 8
-        x, y, z = (rp*math.sin(t)*math.cos(p) + cx,
-                   rp*math.sin(t)*math.sin(p) + cy,
-                   rp*math.cos(t) + cz)          # ... + c
-    else:
-        s.set_block(gx, gy, gz, pal.closest_block_dithered(*ember(gy), gx, gy, gz))
+from field_program_mandelbulb import mandelbulb
+
+bulb = mandelbulb().scale(48.0)
+# `bulb` remains composable and serializable; this fill crosses no Python
+# callback boundary for each voxel.
+BuildingTool.fill(s, bulb.to_shape(), ember_brush)
 ```
 
 ## Voxelized fox

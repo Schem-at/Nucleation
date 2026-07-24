@@ -103,6 +103,9 @@ jobs:
       - name: C smoke
         run: ./examples/bridge_smoke/c/run.sh
         env: { CC: clang }
+      - name: C++ smoke
+        run: ./examples/bridge_smoke/cpp/run.sh
+        env: { CXX: clang++ }
       - name: PHP smoke
         run: php -d ffi.enable=1 -r 'require "examples/bridge_smoke/php/main.php";'
         env:

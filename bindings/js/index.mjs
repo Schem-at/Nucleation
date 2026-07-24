@@ -90,6 +90,10 @@ export { SchematicBuilder } from "./SchematicBuilder.mjs"
 
 export { Scripting } from "./Scripting.mjs"
 
+export { FieldProgram } from "./FieldProgram.mjs"
+
+export { FieldProgramBuilder } from "./FieldProgramBuilder.mjs"
+
 export { Sdf } from "./Sdf.mjs"
 
 export { CircuitBuilder } from "./CircuitBuilder.mjs"
@@ -131,6 +135,14 @@ export { WorldStream } from "./WorldStream.mjs"
 export { InterpolationSpace } from "./InterpolationSpace.mjs"
 
 export { MeshPhase } from "./MeshPhase.mjs"
+
+export { FieldProgramBinaryOp } from "./FieldProgramBinaryOp.mjs"
+
+export { FieldProgramDistanceKind } from "./FieldProgramDistanceKind.mjs"
+
+export { FieldProgramUnaryOp } from "./FieldProgramUnaryOp.mjs"
+
+export { FieldProgramValueType } from "./FieldProgramValueType.mjs"
 
 export { SdfAxis } from "./SdfAxis.mjs"
 

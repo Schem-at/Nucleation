@@ -39,6 +39,140 @@ Every bounded SDF conversion and sampler validates inclusive spans with widened
 integer arithmetic and rejects work above 16,777,216 voxel centers before
 iteration or allocation. Use tighter explicit bounds or split larger jobs.
 
+## Portable custom fields
+
+Use `FieldProgramBuilder` when a field is mathematical but not a built-in node.
+It records deterministic typed bytecode—scalar, vector, and boolean values;
+local slots; arithmetic and trigonometry; comparisons and selection; and
+statically bounded `repeat`/`breakIf` blocks. `Sdf.from_program(program)` turns
+the validated result into an ordinary node, so it can be transformed, combined,
+serialized, sampled, or used by a field brush exactly like native primitives.
+
+Programs carry explicit finite bounds and a distance classification:
+
+- `Exact`: a true signed distance.
+- `LowerBound`: conservative for distance-guided traversal.
+- `Estimate`: useful as a distance estimate, but not guaranteed exact.
+- `Implicit`: only the sign and zero surface are meaningful.
+
+Construction and JSON import use the same validator. It checks stack and slot
+types, finite constants and bounds, scalar output, loop nesting, static
+instruction count, and worst-case dynamic steps. The serialized format includes
+`version: 1`; unknown versions are rejected. Loops cannot be unbounded and no
+host-language source is executed. SDF-tree and field-program JSON payloads larger
+than 1 MiB are rejected before deserialization; structural validators then enforce
+the node and instruction budgets. Runtime domain failures and non-finite query
+coordinates evaluate to positive infinity (outside), rather than leaking NaNs
+into voxelization.
+
+Normals use forward-mode automatic differentiation through the program. At a
+non-differentiable point, the public normal API falls back to central
+differences. Evaluation scratch storage is reused by each program evaluator,
+avoiding per-voxel heap allocation.
+
+The complete power-8 Mandelbulb program is
+[`examples/field_program_mandelbulb.py`](../../examples/field_program_mandelbulb.py).
+It builds bounded bytecode, round-trips versioned JSON, converts to `Sdf`, and
+composes with native nodes. The release-validation instructions below run it
+manually against a freshly installed wheel; current CI uses a smaller inline
+wheel smoke.
+
+### From formula to animated structure
+
+These are not pre-modelled assets or Python callback renders. Each generator
+constructs a portable `FieldProgram`, evaluates it through the native runtime,
+records the resulting voxels into `BuildAnimation` groups, and asks Nucleation's
+renderer and GIF encoder for the final loop.
+
+<div align="center">
+<img src="../media/features/sdf-and-fields/gyroid-bloom.gif" width="390" alt="A cyan voxel gyroid rotating while a luminous wave travels upward through its labyrinth layers">
+<img src="../media/features/sdf-and-fields/mandelbulb-forge.gif" width="390" alt="A violet and magenta voxel Mandelbulb rotating while a warm pulse travels from its core through radial shells">
+</div>
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<strong>Gyroid bloom</strong><br>
+A compact implicit program evaluates
+<code>|sin x cos y + sin y cos z + sin z cos x| - t</code>, then intersects the
+surface with a native sphere. Non-empty Y layers become animation groups, so the
+emissive pulse climbs through the labyrinth without breaking its silhouette.<br><br>
+<a href="../../examples/features/sdf-and-fields/gyroid_bloom.py">Complete Python generator</a>
+· <a href="../downloads/features/sdf-and-fields/gyroid-bloom.schem">Download .schem</a>
+</td>
+<td width="50%" valign="top">
+<strong>Mandelbulb forge</strong><br>
+The twelve-iteration power-8 estimator is the same versioned program used by the
+portable example above. Its occupied voxels are grouped into radial shells, so a
+warm pulse moves from the core into the fractal boundary while the camera makes
+one exact turn.<br><br>
+<a href="../../examples/features/sdf-and-fields/mandelbulb_forge.py">Complete Python generator</a>
+· <a href="../downloads/features/sdf-and-fields/mandelbulb-forge.schem">Download .schem</a>
+</td>
+</tr>
+</table>
+
+The gyroid's core expression is ordinary typed bytecode:
+
+```python
+p.push_pos()
+p.push_const_scalar(0.42)
+p.binary_op(B.Scale)
+p.store_local(q)
+
+# sin(q.x) * cos(q.y) + sin(q.y) * cos(q.z) + sin(q.z) * cos(q.x)
+for sine_axis, cosine_axis in (
+    (U.VecX, U.VecY), (U.VecY, U.VecZ), (U.VecZ, U.VecX),
+):
+    p.load_local(q); p.unary_op(sine_axis); p.unary_op(U.Sin)
+    p.load_local(q); p.unary_op(cosine_axis); p.unary_op(U.Cos)
+    p.binary_op(B.Mul)
+p.binary_op(B.Add); p.binary_op(B.Add)
+p.unary_op(U.Abs); p.push_const_scalar(0.30); p.binary_op(B.Sub)
+p.store_local(distance)
+```
+
+The animation remains construction-shaped Python rather than timeline plumbing.
+This abbreviated excerpt focuses on grouping and timing; the linked generator is
+the complete executable source, including voxel selection and materials:
+
+```python
+animation.set_default_effect(pulse())
+for y, positions in occupied_layers(field):
+    animation.begin_keyed_group(float(y))
+    for x, y, z in positions:
+        animation.set_block(x, y, z, material(x, y, z))
+    animation.end_group()
+
+animation.set_stagger_total_ms(4_920)
+animation.set_stagger_offset_ms(-6_000)
+animation.set_loop_period_ms(6_000)
+camera = AnimationEffect.turntable(6_000)
+camera.set_repeat_forever()
+animation.animate_camera(camera, 0)
+```
+
+Both tracked generators render 120 frames at 20 FPS. The period is sampled
+without a duplicate endpoint, and the negative stagger carries the traveling
+pulse across the loop boundary. Set `NUCLEATION_PACK` to a resource-pack zip and
+run them directly:
+
+```bash
+NUCLEATION_PACK=/path/to/pack.zip \
+  python examples/features/sdf-and-fields/gyroid_bloom.py
+NUCLEATION_PACK=/path/to/pack.zip \
+  python examples/features/sdf-and-fields/mandelbulb_forge.py
+```
+
+Prefer:
+
+- Native `Sdf` nodes for common shapes and domain operators: they are compact,
+  faster, and often have analytic bounds.
+- `FieldProgram` for portable formulas, iterative fractals, gyroids, and custom
+  implicit surfaces that must work in every generated language.
+- `fill_sdf_function` only for quick host-language experiments; callbacks are
+  neither serializable nor portable and cross the native boundary repeatedly.
+
 <details>
 <summary>Equivalent Java/Kotlin and JavaScript composition</summary>
 
@@ -219,12 +353,23 @@ Python escape hatch for arbitrary runtime functions.
 
 ## Nodes
 
-Primitives: `sphere`, `box_shape`, `torus`, `capsule`, `capped_cylinder`,
-`capped_cone`, `ellipsoid`, `plane` (unbounded), `octahedron`, `hex_prism`,
-`super_prism`, and `cells`. Operators: `union_with`, `intersection_with`,
-`subtract`, `smooth_union`, `smooth_intersection`, `smooth_subtract`, `rounded`,
-and `shell`. Transforms: `translate`, `rotate`, `scale`, `mirror`,
+Primitives: `sphere`, `box_shape`, `box_frame`, `torus`, `capped_torus`,
+`link`, `capsule`, `capped_cylinder`, `capped_cone`, `round_cone`,
+`infinite_cylinder`, `infinite_cone`, `solid_angle`, `cut_sphere`,
+`cut_hollow_sphere`, `ellipsoid`, `plane` (unbounded), `octahedron`,
+`hex_prism`, `square_pyramid`, `super_prism`, and `cells`. Operators:
+`union_with`, `intersection_with`, `subtract`, `xor_with`, `smooth_union`,
+`smooth_intersection`, `smooth_subtract`, `rounded`, `shell`, and `elongate`.
+Transforms: `translate`, `rotate`, `scale`, `twist`, `bend`, `mirror`,
 `repeat_infinite`, and `repeat_counted`. Noise modifiers: `displace` and `warp`.
+
+`Twist` and `Bend` are domain distortions and are not guaranteed exact even
+when their child is exact. `Elongate` applies IQ's origin-centered coordinate
+fold: it is exact only for suitable origin-centered, reflection-symmetric
+children such as a sphere or box. Off-center or asymmetric children are
+mirrored by that fold; their inferred bounds remain conservative, but the
+result is only a distance estimate. Unbounded primitives remain valid typed
+expressions, but conversion to a finite shape requires explicit bounds.
 
 Generated bindings adapt names conventionally: snake_case in Python,
 camelCase in JavaScript/Kotlin/Java. `Brush.field_sdf` consumes a live typed

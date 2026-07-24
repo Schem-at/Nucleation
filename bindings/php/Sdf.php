@@ -46,6 +46,22 @@ final class Sdf {
         return new Sdf($result->ok, true);
     }
 
+    public static function cappedTorus( $major_radius,  $minor_radius,  $cap_angle_degrees) {
+        $result = Lib::ffi()->Sdf_capped_torus($major_radius, $minor_radius, $cap_angle_degrees);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Sdf($result->ok, true);
+    }
+
+    public static function link( $major_radius,  $minor_radius,  $half_length) {
+        $result = Lib::ffi()->Sdf_link($major_radius, $minor_radius, $half_length);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Sdf($result->ok, true);
+    }
+
     public static function capsule( $ax,  $ay,  $az,  $bx,  $by,  $bz,  $radius) {
         $result = Lib::ffi()->Sdf_capsule($ax, $ay, $az, $bx, $by, $bz, $radius);
         if (!$result->is_ok) {
@@ -54,8 +70,48 @@ final class Sdf {
         return new Sdf($result->ok, true);
     }
 
+    public static function roundCone( $ax,  $ay,  $az,  $bx,  $by,  $bz,  $r1,  $r2) {
+        $result = Lib::ffi()->Sdf_round_cone($ax, $ay, $az, $bx, $by, $bz, $r1, $r2);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Sdf($result->ok, true);
+    }
+
+    public static function solidAngle( $radius,  $angle_degrees) {
+        $result = Lib::ffi()->Sdf_solid_angle($radius, $angle_degrees);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Sdf($result->ok, true);
+    }
+
+    public static function cutSphere( $radius,  $height) {
+        $result = Lib::ffi()->Sdf_cut_sphere($radius, $height);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Sdf($result->ok, true);
+    }
+
+    public static function cutHollowSphere( $radius,  $height,  $thickness) {
+        $result = Lib::ffi()->Sdf_cut_hollow_sphere($radius, $height, $thickness);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Sdf($result->ok, true);
+    }
+
     public static function cappedCylinder( $radius,  $half_height) {
         $result = Lib::ffi()->Sdf_capped_cylinder($radius, $half_height);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Sdf($result->ok, true);
+    }
+
+    public static function infiniteCylinder( $radius) {
+        $result = Lib::ffi()->Sdf_infinite_cylinder($radius);
         if (!$result->is_ok) {
             throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
         }
@@ -96,6 +152,30 @@ final class Sdf {
 
     public static function superPrism( $half_x,  $half_y,  $half_z,  $exponent) {
         $result = Lib::ffi()->Sdf_super_prism($half_x, $half_y, $half_z, $exponent);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Sdf($result->ok, true);
+    }
+
+    public static function boxFrame( $half_x,  $half_y,  $half_z,  $thickness) {
+        $result = Lib::ffi()->Sdf_box_frame($half_x, $half_y, $half_z, $thickness);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Sdf($result->ok, true);
+    }
+
+    public static function infiniteCone( $angle_degrees) {
+        $result = Lib::ffi()->Sdf_infinite_cone($angle_degrees);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Sdf($result->ok, true);
+    }
+
+    public static function squarePyramid( $half_base,  $height) {
+        $result = Lib::ffi()->Sdf_square_pyramid($half_base, $height);
         if (!$result->is_ok) {
             throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
         }
@@ -165,6 +245,19 @@ final class Sdf {
         return new Sdf($result->ok, true);
     }
 
+    public function xorWith( $other) {
+        $ret = Lib::ffi()->Sdf_xor_with($this->ptr, $other->ptr);
+        return new Sdf($ret, true);
+    }
+
+    public function elongate( $half_x,  $half_y,  $half_z) {
+        $result = Lib::ffi()->Sdf_elongate($this->ptr, $half_x, $half_y, $half_z);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Sdf($result->ok, true);
+    }
+
     public function translate( $x,  $y,  $z) {
         $result = Lib::ffi()->Sdf_translate($this->ptr, $x, $y, $z);
         if (!$result->is_ok) {
@@ -192,6 +285,22 @@ final class Sdf {
     public function mirror(int $axis) {
         $ret = Lib::ffi()->Sdf_mirror($this->ptr, $axis);
         return new Sdf($ret, true);
+    }
+
+    public function twist( $amount) {
+        $result = Lib::ffi()->Sdf_twist($this->ptr, $amount);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Sdf($result->ok, true);
+    }
+
+    public function bend( $amount) {
+        $result = Lib::ffi()->Sdf_bend($this->ptr, $amount);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Sdf($result->ok, true);
     }
 
     public function repeatInfinite( $spacing_x,  $spacing_y,  $spacing_z) {
@@ -288,6 +397,11 @@ final class Sdf {
             throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
         }
         return Lib::readAndFreeWrite($write);
+    }
+
+    public static function fromProgram( $program) {
+        $ret = Lib::ffi()->Sdf_from_program($program->ptr);
+        return new Sdf($ret, true);
     }
 
     public static function schematicFromSdfAuto(string $sdf_json, string $rules_json) {

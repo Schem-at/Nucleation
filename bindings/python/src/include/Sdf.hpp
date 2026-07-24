@@ -11,6 +11,7 @@
 #include <functional>
 #include <optional>
 #include <cstdlib>
+#include "FieldProgram.hpp"
 #include "NucleationError.hpp"
 #include "Schematic.hpp"
 #include "SdfAxis.hpp"
@@ -37,11 +38,32 @@ namespace capi {
     typedef struct Sdf_torus_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_torus_result;
     Sdf_torus_result Sdf_torus(float major_radius, float minor_radius);
 
+    typedef struct Sdf_capped_torus_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_capped_torus_result;
+    Sdf_capped_torus_result Sdf_capped_torus(float major_radius, float minor_radius, float cap_angle_degrees);
+
+    typedef struct Sdf_link_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_link_result;
+    Sdf_link_result Sdf_link(float major_radius, float minor_radius, float half_length);
+
     typedef struct Sdf_capsule_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_capsule_result;
     Sdf_capsule_result Sdf_capsule(float ax, float ay, float az, float bx, float by, float bz, float radius);
 
+    typedef struct Sdf_round_cone_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_round_cone_result;
+    Sdf_round_cone_result Sdf_round_cone(float ax, float ay, float az, float bx, float by, float bz, float r1, float r2);
+
+    typedef struct Sdf_solid_angle_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_solid_angle_result;
+    Sdf_solid_angle_result Sdf_solid_angle(float radius, float angle_degrees);
+
+    typedef struct Sdf_cut_sphere_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_cut_sphere_result;
+    Sdf_cut_sphere_result Sdf_cut_sphere(float radius, float height);
+
+    typedef struct Sdf_cut_hollow_sphere_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_cut_hollow_sphere_result;
+    Sdf_cut_hollow_sphere_result Sdf_cut_hollow_sphere(float radius, float height, float thickness);
+
     typedef struct Sdf_capped_cylinder_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_capped_cylinder_result;
     Sdf_capped_cylinder_result Sdf_capped_cylinder(float radius, float half_height);
+
+    typedef struct Sdf_infinite_cylinder_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_infinite_cylinder_result;
+    Sdf_infinite_cylinder_result Sdf_infinite_cylinder(float radius);
 
     typedef struct Sdf_capped_cone_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_capped_cone_result;
     Sdf_capped_cone_result Sdf_capped_cone(float half_height, float bottom_radius, float top_radius);
@@ -57,6 +79,15 @@ namespace capi {
 
     typedef struct Sdf_super_prism_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_super_prism_result;
     Sdf_super_prism_result Sdf_super_prism(float half_x, float half_y, float half_z, float exponent);
+
+    typedef struct Sdf_box_frame_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_box_frame_result;
+    Sdf_box_frame_result Sdf_box_frame(float half_x, float half_y, float half_z, float thickness);
+
+    typedef struct Sdf_infinite_cone_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_infinite_cone_result;
+    Sdf_infinite_cone_result Sdf_infinite_cone(float angle_degrees);
+
+    typedef struct Sdf_square_pyramid_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_square_pyramid_result;
+    Sdf_square_pyramid_result Sdf_square_pyramid(float half_base, float height);
 
     typedef struct Sdf_cells_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_cells_result;
     Sdf_cells_result Sdf_cells(float frequency, int32_t seed, float jitter, nucleation::capi::SdfCellMode mode, float threshold);
@@ -82,6 +113,11 @@ namespace capi {
     typedef struct Sdf_shell_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_shell_result;
     Sdf_shell_result Sdf_shell(const nucleation::capi::Sdf* self, float thickness);
 
+    nucleation::capi::Sdf* Sdf_xor_with(const nucleation::capi::Sdf* self, const nucleation::capi::Sdf* other);
+
+    typedef struct Sdf_elongate_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_elongate_result;
+    Sdf_elongate_result Sdf_elongate(const nucleation::capi::Sdf* self, float half_x, float half_y, float half_z);
+
     typedef struct Sdf_translate_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_translate_result;
     Sdf_translate_result Sdf_translate(const nucleation::capi::Sdf* self, float x, float y, float z);
 
@@ -92,6 +128,12 @@ namespace capi {
     Sdf_scale_result Sdf_scale(const nucleation::capi::Sdf* self, float factor);
 
     nucleation::capi::Sdf* Sdf_mirror(const nucleation::capi::Sdf* self, nucleation::capi::SdfAxis axis);
+
+    typedef struct Sdf_twist_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_twist_result;
+    Sdf_twist_result Sdf_twist(const nucleation::capi::Sdf* self, float amount);
+
+    typedef struct Sdf_bend_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_bend_result;
+    Sdf_bend_result Sdf_bend(const nucleation::capi::Sdf* self, float amount);
 
     typedef struct Sdf_repeat_infinite_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_repeat_infinite_result;
     Sdf_repeat_infinite_result Sdf_repeat_infinite(const nucleation::capi::Sdf* self, float spacing_x, float spacing_y, float spacing_z);
@@ -124,6 +166,8 @@ namespace capi {
 
     typedef struct Sdf_to_json_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_to_json_result;
     Sdf_to_json_result Sdf_to_json(const nucleation::capi::Sdf* self, nucleation::diplomat::capi::DiplomatWrite* write);
+
+    nucleation::capi::Sdf* Sdf_from_program(const nucleation::capi::FieldProgram* program);
 
     typedef struct Sdf_schematic_from_sdf_auto_result {union {nucleation::capi::Schematic* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_schematic_from_sdf_auto_result;
     Sdf_schematic_from_sdf_auto_result Sdf_schematic_from_sdf_auto(nucleation::diplomat::capi::DiplomatStringView sdf_json, nucleation::diplomat::capi::DiplomatStringView rules_json);
@@ -166,6 +210,20 @@ inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation
     return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> nucleation::Sdf::capped_torus(float major_radius, float minor_radius, float cap_angle_degrees) {
+    auto result = nucleation::capi::Sdf_capped_torus(major_radius,
+        minor_radius,
+        cap_angle_degrees);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> nucleation::Sdf::link(float major_radius, float minor_radius, float half_length) {
+    auto result = nucleation::capi::Sdf_link(major_radius,
+        minor_radius,
+        half_length);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
 inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> nucleation::Sdf::capsule(float ax, float ay, float az, float bx, float by, float bz, float radius) {
     auto result = nucleation::capi::Sdf_capsule(ax,
         ay,
@@ -177,9 +235,45 @@ inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation
     return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> nucleation::Sdf::round_cone(float ax, float ay, float az, float bx, float by, float bz, float r1, float r2) {
+    auto result = nucleation::capi::Sdf_round_cone(ax,
+        ay,
+        az,
+        bx,
+        by,
+        bz,
+        r1,
+        r2);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> nucleation::Sdf::solid_angle(float radius, float angle_degrees) {
+    auto result = nucleation::capi::Sdf_solid_angle(radius,
+        angle_degrees);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> nucleation::Sdf::cut_sphere(float radius, float height) {
+    auto result = nucleation::capi::Sdf_cut_sphere(radius,
+        height);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> nucleation::Sdf::cut_hollow_sphere(float radius, float height, float thickness) {
+    auto result = nucleation::capi::Sdf_cut_hollow_sphere(radius,
+        height,
+        thickness);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
 inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> nucleation::Sdf::capped_cylinder(float radius, float half_height) {
     auto result = nucleation::capi::Sdf_capped_cylinder(radius,
         half_height);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> nucleation::Sdf::infinite_cylinder(float radius) {
+    auto result = nucleation::capi::Sdf_infinite_cylinder(radius);
     return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
@@ -214,6 +308,25 @@ inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation
         half_y,
         half_z,
         exponent);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> nucleation::Sdf::box_frame(float half_x, float half_y, float half_z, float thickness) {
+    auto result = nucleation::capi::Sdf_box_frame(half_x,
+        half_y,
+        half_z,
+        thickness);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> nucleation::Sdf::infinite_cone(float angle_degrees) {
+    auto result = nucleation::capi::Sdf_infinite_cone(angle_degrees);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> nucleation::Sdf::square_pyramid(float half_base, float height) {
+    auto result = nucleation::capi::Sdf_square_pyramid(half_base,
+        height);
     return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
@@ -277,6 +390,20 @@ inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation
     return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
+inline std::unique_ptr<nucleation::Sdf> nucleation::Sdf::xor_with(const nucleation::Sdf& other) const {
+    auto result = nucleation::capi::Sdf_xor_with(this->AsFFI(),
+        other.AsFFI());
+    return std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> nucleation::Sdf::elongate(float half_x, float half_y, float half_z) const {
+    auto result = nucleation::capi::Sdf_elongate(this->AsFFI(),
+        half_x,
+        half_y,
+        half_z);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
 inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> nucleation::Sdf::translate(float x, float y, float z) const {
     auto result = nucleation::capi::Sdf_translate(this->AsFFI(),
         x,
@@ -303,6 +430,18 @@ inline std::unique_ptr<nucleation::Sdf> nucleation::Sdf::mirror(nucleation::SdfA
     auto result = nucleation::capi::Sdf_mirror(this->AsFFI(),
         axis.AsFFI());
     return std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> nucleation::Sdf::twist(float amount) const {
+    auto result = nucleation::capi::Sdf_twist(this->AsFFI(),
+        amount);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> nucleation::Sdf::bend(float amount) const {
+    auto result = nucleation::capi::Sdf_bend(this->AsFFI(),
+        amount);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
 inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> nucleation::Sdf::repeat_infinite(float spacing_x, float spacing_y, float spacing_z) const {
@@ -397,6 +536,11 @@ inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError>
     auto result = nucleation::capi::Sdf_to_json(this->AsFFI(),
         &write);
     return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline std::unique_ptr<nucleation::Sdf> nucleation::Sdf::from_program(const nucleation::FieldProgram& program) {
+    auto result = nucleation::capi::Sdf_from_program(program.AsFFI());
+    return std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result));
 }
 
 inline nucleation::diplomat::result<std::unique_ptr<nucleation::Schematic>, nucleation::NucleationError> nucleation::Sdf::schematic_from_sdf_auto(std::string_view sdf_json, std::string_view rules_json) {

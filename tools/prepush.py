@@ -17,6 +17,7 @@ CHECKS: list[tuple[str, list[str]]] = [
     ("bindings fresh", ["bash", "-c", "./tools/gen-bindings.sh && git diff --exit-code -- bindings"]),
     ("bridge coverage", ["python3", "tools/check_bridge_coverage.py"]),
     ("smoke: C", ["./examples/bridge_smoke/c/run.sh"]),
+    ("smoke: C++", ["./examples/bridge_smoke/cpp/run.sh"]),
     ("smoke: PHP", ["./examples/bridge_smoke/php/run.sh"]),
     ("smoke: JS", ["./examples/bridge_smoke/js/run.sh"]),
     ("smoke: Python", ["./examples/bridge_smoke/python/run.sh"]),

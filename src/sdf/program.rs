@@ -40,6 +40,9 @@ pub const MAX_REPEAT_ITERATIONS: u32 = 4096;
 /// repeats (`sum(instructions_in_block * product(enclosing repeat counts))`),
 /// checked at validation time so evaluation is always provably bounded.
 pub const MAX_DYNAMIC_STEPS: u64 = 200_000;
+/// Maximum UTF-8 JSON payload accepted before deserialization. This bounds
+/// parser allocation independently of the post-parse instruction budgets.
+const MAX_PROGRAM_JSON_BYTES: usize = 1024 * 1024;
 
 /// The type of a value flowing through the program's stack or held in a slot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -197,7 +200,7 @@ pub enum Instr {
 /// What kind of distance a program's output represents — mirrors the
 /// authoring intent behind [`super::SdfNode`] primitives (most are `Exact`;
 /// `Ellipsoid` is a bound; smooth/noise ops are estimates).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum DistanceKind {
     /// The exact Euclidean signed distance to the surface.
@@ -206,16 +209,11 @@ pub enum DistanceKind {
     /// never overestimates).
     LowerBound,
     /// Neither guaranteed exact nor a bound (e.g. a fractal DE).
+    #[default]
     Estimate,
     /// An implicit function whose sign is meaningful but whose magnitude is
     /// not a distance at all.
     Implicit,
-}
-
-impl Default for DistanceKind {
-    fn default() -> Self {
-        DistanceKind::Estimate
-    }
 }
 
 /// Explicit, finite axis-aligned bounds a program author asserts for their
@@ -248,6 +246,7 @@ pub struct ProgramData {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProgramError {
     UnsupportedVersion(u32),
+    InputTooLarge,
     TooManySlots,
     UnknownSlot(u16),
     InvalidOutputSlot,
@@ -271,6 +270,7 @@ impl std::fmt::Display for ProgramError {
             ProgramError::UnsupportedVersion(version) => {
                 write!(f, "unsupported field program version {version}")
             }
+            ProgramError::InputTooLarge => write!(f, "field program JSON exceeds the size limit"),
             ProgramError::TooManySlots => write!(f, "program declares too many local slots"),
             ProgramError::UnknownSlot(slot) => write!(f, "reference to undeclared slot {slot}"),
             ProgramError::InvalidOutputSlot => {
@@ -429,6 +429,12 @@ impl<'a> ValidateCtx<'a> {
                         return Err(ProgramError::DepthExceeded);
                     }
                     let next_multiplier = multiplier.saturating_mul(u64::from(*count));
+                    // Entering the body has runtime cost even when the body is
+                    // empty; charge one step per iteration before descending.
+                    self.dynamic_steps = self.dynamic_steps.saturating_add(next_multiplier);
+                    if self.dynamic_steps > MAX_DYNAMIC_STEPS {
+                        return Err(ProgramError::DynamicStepBudgetExceeded);
+                    }
                     self.validate_block(body, depth + 1, next_multiplier)?;
                 }
             }
@@ -911,10 +917,10 @@ fn eval_block<S: Field>(
                 }
             }
             Instr::Select => {
-                if let (Some(cond), Some(b), Some(a)) = (stack.pop(), stack.pop(), stack.pop()) {
-                    if let RtValue::Bool(c) = cond {
-                        stack.push(if c { a } else { b });
-                    }
+                if let (Some(RtValue::Bool(c)), Some(b), Some(a)) =
+                    (stack.pop(), stack.pop(), stack.pop())
+                {
+                    stack.push(if c { a } else { b });
                 }
             }
             Instr::MakeVec3 => {
@@ -966,6 +972,9 @@ impl Program {
     /// Parse and validate a program from JSON. Never panics on malformed
     /// input — parse and validation failures both surface as `Err`.
     pub fn from_json(json: &str) -> Result<Program, ProgramError> {
+        if json.len() > MAX_PROGRAM_JSON_BYTES {
+            return Err(ProgramError::InputTooLarge);
+        }
         let data: ProgramData =
             serde_json::from_str(json).map_err(|_| ProgramError::TypeMismatch)?;
         Program::compile(data)
@@ -1033,7 +1042,7 @@ impl Program {
             return None;
         }
         let len = (d.d[0] * d.d[0] + d.d[1] * d.d[1] + d.d[2] * d.d[2]).sqrt();
-        if !(len > f32::EPSILON) {
+        if !len.is_finite() || len <= f32::EPSILON {
             return None;
         }
         Some([d.d[0] / len, d.d[1] / len, d.d[2] / len])
@@ -1784,6 +1793,41 @@ mod tests {
         let aabb = program.aabb();
         assert_eq!(aabb.min, [-50.0, -50.0, -50.0]);
         assert_eq!(aabb.max, [50.0, 50.0, 50.0]);
+    }
+
+    #[test]
+    fn from_json_rejects_oversized_payload_before_parsing() {
+        let mut json = sphere_program(1.0).to_json().unwrap();
+        json.extend(std::iter::repeat_n(' ', 1024 * 1024));
+        assert!(matches!(
+            Program::from_json(&json),
+            Err(ProgramError::InputTooLarge)
+        ));
+    }
+
+    #[test]
+    fn nested_empty_repeats_count_iteration_overhead() {
+        let data = ProgramData {
+            version: PROGRAM_VERSION,
+            slots: vec![ValueType::Scalar],
+            instructions: vec![Instr::Repeat {
+                count: MAX_REPEAT_ITERATIONS,
+                body: vec![Instr::Repeat {
+                    count: MAX_REPEAT_ITERATIONS,
+                    body: vec![],
+                }],
+            }],
+            output_slot: 0,
+            bounds: ProgramBounds {
+                min: [0.0; 3],
+                max: [0.0; 3],
+            },
+            distance_kind: DistanceKind::Implicit,
+        };
+        assert!(matches!(
+            Program::compile(data),
+            Err(ProgramError::DynamicStepBudgetExceeded)
+        ));
     }
 
     #[test]

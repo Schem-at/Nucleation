@@ -360,9 +360,13 @@ pub mod ffi {
         }
 
         /// Square-base pyramid, vertically centered: base (half-extent
-        /// `half_base`) at `y = -height/2`, apex at `y = height/2`.
+        /// `half_base`) at `y = -height/2`, apex at `y = height/2`. `height`
+        /// must be at least the smallest positive normal `f32`.
         pub fn square_pyramid(half_base: f32, height: f32) -> Result<Box<Sdf>, NucleationError> {
             positive(&[half_base, height])?;
+            if height < f32::MIN_POSITIVE {
+                return Err(NucleationError::InvalidArgument);
+            }
             Ok(Box::new(Sdf(crate::sdf::SdfNode::SquarePyramid {
                 half_base,
                 height,
@@ -469,9 +473,11 @@ pub mod ffi {
             }))
         }
 
-        /// Stretches this graph outward by `half_x`/`half_y`/`half_z` along
-        /// each axis (IQ's corrected `opElongate`). Half-lengths must be
-        /// finite and non-negative, with at least one strictly positive.
+        /// Stretches this graph with IQ's origin-centered `opElongate` fold.
+        /// Exactness requires a suitable origin-centered, reflection-symmetric
+        /// child; off-center/asymmetric children are mirrored and produce only
+        /// an estimate. Half-lengths must be finite and non-negative, with at
+        /// least one strictly positive.
         pub fn elongate(
             &self,
             half_x: f32,
@@ -1398,6 +1404,7 @@ mod tests {
         assert!(Sdf::square_pyramid(2.0, 0.0).is_err());
         assert!(Sdf::square_pyramid(-1.0, 4.0).is_err());
         assert!(Sdf::square_pyramid(2.0, f32::NAN).is_err());
+        assert!(Sdf::square_pyramid(1.0, f32::from_bits(1)).is_err());
 
         let pyramid = Sdf::square_pyramid(2.0, 4.0).unwrap();
         let bounds = pyramid.bounds().unwrap();
