@@ -1150,6 +1150,19 @@ fn validate_rejects_malformed_transforms() {
     assert_json_invalid(
         r#"{"type":"repeat","spacing":[0,0,0],"child":{"type":"sphere","radius":1}}"#,
     );
+
+    // Domain operators validate their own parameters and recurse into children.
+    assert_json_valid(
+        r#"{"type":"elongate","halfLengths":[2,0,1],"child":{"type":"sphere","radius":1}}"#,
+    );
+    assert_json_invalid(
+        r#"{"type":"elongate","halfLengths":[0,0,0],"child":{"type":"sphere","radius":1}}"#,
+    );
+    assert_json_invalid(r#"{"type":"twist","amount":1e400,"child":{"type":"sphere","radius":1}}"#);
+    assert_json_invalid(r#"{"type":"bend","amount":0.1,"child":{"type":"sphere","radius":-1}}"#);
+    assert_json_invalid(
+        r#"{"type":"xor","a":{"type":"sphere","radius":1},"b":{"type":"sphere","radius":0}}"#,
+    );
 }
 
 #[test]

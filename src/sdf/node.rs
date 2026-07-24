@@ -761,9 +761,20 @@ impl SdfNode {
                 }
             }
 
-            SdfNode::Subtract { a, b } => {
+            SdfNode::Subtract { a, b } | SdfNode::Xor { a, b } => {
                 a.validate_at(depth + 1, budget)?;
                 b.validate_at(depth + 1, budget)?;
+            }
+
+            SdfNode::Elongate {
+                child,
+                half_lengths,
+            } => {
+                non_negative_all(half_lengths)?;
+                if half_lengths.iter().all(|length| *length == 0.0) {
+                    return Err("elongate half-lengths cannot all be zero".into());
+                }
+                child.validate_at(depth + 1, budget)?;
             }
 
             SdfNode::SmoothUnion { a, b, k }
@@ -796,6 +807,11 @@ impl SdfNode {
 
             SdfNode::Scale { child, factor } => {
                 positive_all(&[*factor])?;
+                child.validate_at(depth + 1, budget)?;
+            }
+
+            SdfNode::Twist { child, amount } | SdfNode::Bend { child, amount } => {
+                finite_all(&[*amount])?;
                 child.validate_at(depth + 1, budget)?;
             }
 
