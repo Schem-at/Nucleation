@@ -32,4 +32,6 @@ pub mod simulation;
 pub mod store_io;
 #[cfg(feature = "voxelize")]
 pub mod voxelize;
+#[cfg(all(feature = "bridge", feature = "world-segment"))]
+pub mod world_segment;
 pub mod world_stream;

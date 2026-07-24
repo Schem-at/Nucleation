@@ -44,6 +44,7 @@ bridge-full = [
     "scripting-lua",
     "scripting-js",
     "voxelize",
+    "world-segment",
 ]
 
 # Storage backends (the `store` module). `mem` is always available; the rest
