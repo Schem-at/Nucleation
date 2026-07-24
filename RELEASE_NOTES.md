@@ -1,3 +1,12 @@
+# Nucleation v0.5.1
+
+**USDZ byte accessor.** `MeshResult` gained a `create_usdz` constructor when
+the bindings migrated to the Diplomat bridge, but the only byte accessor left
+on it was `glb_data_b64` — meshing as USDZ still only ever handed back GLB
+bytes. This restores the USDZ byte path lost in the bindings migration:
+`MeshResult.usdzDataB64()` alongside the GLB accessor, generated across all
+six bindings.
+
 # Nucleation v0.5.0
 
 **World segmentation.** A new `world_segment` module (feature `world-segment`)
