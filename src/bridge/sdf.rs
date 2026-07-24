@@ -198,6 +198,21 @@ pub mod ffi {
             })))
         }
 
+        /// Sphere of `radius` intersected with an infinite cone of
+        /// half-aperture `angle_degrees` (in `(0, 180)`) from the +Y axis,
+        /// apex at the origin.
+        pub fn solid_angle(radius: f32, angle_degrees: f32) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[radius])?;
+            finite(&[angle_degrees])?;
+            if angle_degrees <= 0.0 || angle_degrees >= 180.0 {
+                return Err(NucleationError::InvalidArgument);
+            }
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::SolidAngle {
+                radius,
+                angle: angle_degrees,
+            })))
+        }
+
         pub fn capped_cylinder(radius: f32, half_height: f32) -> Result<Box<Sdf>, NucleationError> {
             positive(&[radius, half_height])?;
             Ok(Box::new(Sdf(crate::sdf::SdfNode::CappedCylinder {
@@ -1169,6 +1184,33 @@ mod tests {
         assert!((bounds.max_y - 11.0).abs() < 1e-6);
         assert!((bounds.min_x + 3.0).abs() < 1e-6);
         assert!((bounds.max_x - 3.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn solid_angle_validates_angle_range_and_rejects_huge_radius() {
+        assert!(Sdf::solid_angle(5.0, 45.0).is_ok());
+        assert!(Sdf::solid_angle(5.0, 0.0).is_err());
+        assert!(Sdf::solid_angle(5.0, 180.0).is_err());
+        assert!(Sdf::solid_angle(5.0, 181.0).is_err());
+        assert!(Sdf::solid_angle(5.0, f32::NAN).is_err());
+        assert!(Sdf::solid_angle(-1.0, 45.0).is_err());
+        assert!(Sdf::solid_angle(0.0, 45.0).is_err());
+
+        let huge = Sdf::solid_angle(1.0e30, 45.0).unwrap();
+        assert!(
+            huge.to_shape().is_err(),
+            "huge solid angle exceeds voxel budget"
+        );
+    }
+
+    #[test]
+    fn solid_angle_bounds_match_the_enclosing_sphere() {
+        let wedge = Sdf::solid_angle(7.0, 45.0).unwrap();
+        let bounds = wedge.bounds().unwrap();
+        assert!((bounds.min_x + 7.0).abs() < 1e-6);
+        assert!((bounds.max_x - 7.0).abs() < 1e-6);
+        assert!((bounds.min_y + 7.0).abs() < 1e-6);
+        assert!((bounds.max_y - 7.0).abs() < 1e-6);
     }
 
     #[test]

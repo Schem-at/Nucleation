@@ -146,6 +146,16 @@ pub enum SdfNode {
         r1: f32,
         r2: f32,
     },
+    /// Exact. Sphere of `radius` intersected with an infinite cone of
+    /// half-aperture `angle` (degrees, in `(0, 180)`) from the +Y axis, apex
+    /// at the origin. The apex is always a boundary corner (distance 0)
+    /// regardless of `angle`; use [`SdfNode::Sphere`] for a full sphere
+    /// rather than `angle: 180`, which degenerates the cone constraint away
+    /// everywhere except that single point.
+    SolidAngle {
+        radius: f32,
+        angle: f32,
+    },
     /// Exact. Y-axis aligned.
     CappedCylinder {
         radius: f32,
@@ -331,6 +341,18 @@ fn len2(x: f32, y: f32) -> f32 {
     (x * x + y * y).sqrt()
 }
 
+/// GLSL `sign`: unlike `f32::signum`, zero maps to zero rather than +1.
+#[inline]
+fn glsl_sign(v: f32) -> f32 {
+    if v > 0.0 {
+        1.0
+    } else if v < 0.0 {
+        -1.0
+    } else {
+        0.0
+    }
+}
+
 #[inline]
 fn mix(a: f32, b: f32, t: f32) -> f32 {
     a + (b - a) * t
@@ -494,6 +516,19 @@ impl SdfNode {
                 } else {
                     ((x2 * a2 * il2).max(0.0).sqrt() + y_ * rr) * il2 - r1
                 }
+            }
+
+            SdfNode::SolidAngle { radius, angle } => {
+                // iq's sdSolidAngle: sphere intersected with a cone from the origin.
+                let (sin_a, cos_a) = angle.to_radians().sin_cos();
+                let qx = len2(x, z);
+                let qy = y;
+                let l = len2(qx, qy) - radius;
+                let dot_qc = (qx * sin_a + qy * cos_a).clamp(0.0, *radius);
+                let mx = qx - sin_a * dot_qc;
+                let my = qy - cos_a * dot_qc;
+                let m = len2(mx, my);
+                l.max(m * glsl_sign(cos_a * qx - sin_a * qy))
             }
 
             SdfNode::CappedCylinder {
@@ -833,6 +868,7 @@ impl SdfNode {
                     (a[2] + r1).max(b[2] + r2),
                 ],
             }),
+            SdfNode::SolidAngle { radius, .. } => sym(*radius, *radius, *radius),
             SdfNode::CappedCylinder {
                 radius,
                 half_height,

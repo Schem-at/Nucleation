@@ -588,6 +588,62 @@ fn round_cone_is_rotationally_symmetric_about_its_axis() {
 }
 
 #[test]
+fn solid_angle_apex_is_on_the_surface() {
+    let wedge = SdfNode::SolidAngle {
+        radius: 10.0,
+        angle: 30.0,
+    };
+    assert!(wedge.eval(0.0, 0.0, 0.0).abs() < 1e-4);
+}
+
+#[test]
+fn solid_angle_axis_interior_matches_lateral_cone_wall() {
+    let wedge = SdfNode::SolidAngle {
+        radius: 10.0,
+        angle: 30.0,
+    };
+    // On-axis, well inside the sphere: for a narrow wedge the slanted cone
+    // wall is closer than the spherical cap. Distance = -y*sin(angle).
+    assert!((wedge.eval(0.0, 5.0, 0.0) - (-2.5)).abs() < 1e-3);
+}
+
+#[test]
+fn solid_angle_beyond_sphere_on_axis_matches_cap_distance() {
+    let wedge = SdfNode::SolidAngle {
+        radius: 10.0,
+        angle: 30.0,
+    };
+    // Straight up the axis past the sphere: nearest surface is the cap, so
+    // distance is simply y - radius.
+    assert!((wedge.eval(0.0, 15.0, 0.0) - 5.0).abs() < 1e-3);
+}
+
+#[test]
+fn solid_angle_behind_apex_matches_distance_to_vertex() {
+    let wedge = SdfNode::SolidAngle {
+        radius: 10.0,
+        angle: 30.0,
+    };
+    // Directly behind the apex (outside the wedge entirely, even though
+    // within the sphere's radius): nearest boundary is the apex itself.
+    assert!((wedge.eval(0.0, -5.0, 0.0) - 5.0).abs() < 1e-3);
+}
+
+#[test]
+fn solid_angle_at_90_degrees_flat_cap_is_the_equatorial_plane() {
+    let hemisphere = SdfNode::SolidAngle {
+        radius: 10.0,
+        angle: 90.0,
+    };
+    // At a right angle the cone's lateral surface degenerates to the flat
+    // y=0 plane, so a point on that plane inside the sphere sits exactly on
+    // the boundary...
+    assert!(hemisphere.eval(3.0, 0.0, 0.0).abs() < 1e-3);
+    // ...and a point just below it is just outside the hemisphere.
+    assert!((hemisphere.eval(3.0, -1.0, 0.0) - 1.0).abs() < 1e-3);
+}
+
+#[test]
 fn cells_distance_modes_are_nonnegative() {
     for mode in ["f1", "f2", "f2MinusF1"] {
         let json = format!(r#"{{"type":"cells","frequency":0.12,"seed":9,"mode":"{mode}"}}"#);
