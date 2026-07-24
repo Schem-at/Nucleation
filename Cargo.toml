@@ -253,6 +253,9 @@ name = "wol_extract"
 required-features = ["world-segment"]
 
 [[example]]
+name = "wol_pack"
+
+[[example]]
 name = "airship_fortress"
 required-features = ["voxelize"]
 
