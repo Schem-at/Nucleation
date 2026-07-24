@@ -5,13 +5,11 @@ final class Voxelizer {
     /** @internal */
     public \FFI\CData $ptr;
     private bool $owned;
-    private ?object $borrowedFrom;
 
     /** @internal */
-    public function __construct(\FFI\CData $ptr, bool $owned, ?object $borrowedFrom = null) {
+    public function __construct(\FFI\CData $ptr, bool $owned) {
         $this->ptr = $ptr;
         $this->owned = $owned;
-        $this->borrowedFrom = $borrowedFrom;
     }
 
     public static function shapeFromGlb(array $data,  $target_size,  $shell) {

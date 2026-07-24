@@ -120,6 +120,14 @@ export { StoreIo } from "./StoreIo"
 
 export { Voxelizer } from "./Voxelizer"
 
+export { WsPartitionHints } from "./WsPartitionHints"
+
+export { WsProfile } from "./WsProfile"
+
+export { WsRunResult } from "./WsRunResult"
+
+export { WsSegmentJob } from "./WsSegmentJob"
+
 export { WorldChunkView } from "./WorldChunkView"
 
 export { WorldSink } from "./WorldSink"

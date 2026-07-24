@@ -99,7 +99,7 @@ pub mod ffi {
     /// span under [`PartitionPolicy::HardCut`]). Order does not matter:
     /// [`PartitionIndex::new`](crate::world_segment::partition::PartitionIndex)
     /// sorts hints by full content at construction time.
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct WsPartitionHints(pub(crate) Vec<PartitionHint>);
 
     impl WsPartitionHints {

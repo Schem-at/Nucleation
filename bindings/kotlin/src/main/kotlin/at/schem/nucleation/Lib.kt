@@ -808,6 +808,70 @@ class ResultFFIUint32Int: Structure(), Structure.ByValue  {
     }
 
 }
+internal class ResultFFIUint64IntUnion: Union() {
+    @JvmField
+    internal var ok: FFIUint64 = FFIUint64()
+    @JvmField
+    internal var err: Int = 0
+}
+
+class ResultFFIUint64Int: Structure(), Structure.ByValue  {
+    @JvmField
+    internal var union: ResultFFIUint64IntUnion = ResultFFIUint64IntUnion()
+
+    @JvmField
+    internal var isOk: Byte = 0
+
+    // Define the fields of the struct
+    override fun getFieldOrder(): List<String> {
+        return listOf("union", "isOk")
+    }
+    internal fun getNativeOk(): FFIUint64? {
+        if (isOk == 1.toByte()) {
+            return union.getTypedValue(FFIUint64::class.java) as FFIUint64
+        }
+        return null
+    }
+    internal fun getNativeErr(): Int? {
+        if (isOk == 0.toByte()) {
+            return union.getTypedValue(Int::class.java) as Int
+        }
+        return null
+    }
+
+}
+internal class ResultFFIUint8IntUnion: Union() {
+    @JvmField
+    internal var ok: FFIUint8 = FFIUint8()
+    @JvmField
+    internal var err: Int = 0
+}
+
+class ResultFFIUint8Int: Structure(), Structure.ByValue  {
+    @JvmField
+    internal var union: ResultFFIUint8IntUnion = ResultFFIUint8IntUnion()
+
+    @JvmField
+    internal var isOk: Byte = 0
+
+    // Define the fields of the struct
+    override fun getFieldOrder(): List<String> {
+        return listOf("union", "isOk")
+    }
+    internal fun getNativeOk(): FFIUint8? {
+        if (isOk == 1.toByte()) {
+            return union.getTypedValue(FFIUint8::class.java) as FFIUint8
+        }
+        return null
+    }
+    internal fun getNativeErr(): Int? {
+        if (isOk == 0.toByte()) {
+            return union.getTypedValue(Int::class.java) as Int
+        }
+        return null
+    }
+
+}
 internal class ResultFloatIntUnion: Union() {
     @JvmField
     internal var ok: Float = 0.0F

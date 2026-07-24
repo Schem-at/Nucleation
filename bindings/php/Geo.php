@@ -5,13 +5,11 @@ final class Geo {
     /** @internal */
     public \FFI\CData $ptr;
     private bool $owned;
-    private ?object $borrowedFrom;
 
     /** @internal */
-    public function __construct(\FFI\CData $ptr, bool $owned, ?object $borrowedFrom = null) {
+    public function __construct(\FFI\CData $ptr, bool $owned) {
         $this->ptr = $ptr;
         $this->owned = $owned;
-        $this->borrowedFrom = $borrowedFrom;
     }
 
     public static function extrudeFootprints(string $buildings_json, string $base_block, string $name) {
