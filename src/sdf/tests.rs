@@ -739,3 +739,251 @@ fn cells_distance_modes_are_nonnegative() {
         }
     }
 }
+
+// ── HexPrism bounds ─────────────────────────────────────────────────────────
+//
+// The public `radius` is the hexagon's apothem (inradius) toward the flat
+// edges, not its circumradius. The cross-section lives in XZ (height along
+// Y): flat edges face Z (extent stays `radius`), but the hexagon's corners
+// stick out along X to the circumradius `2 * radius / sqrt(3)`.
+
+#[test]
+fn hex_prism_corner_sits_on_the_surface_at_the_circumradius() {
+    let radius = 3.0_f32;
+    let half_height = 2.0_f32;
+    let node = SdfNode::HexPrism {
+        radius,
+        half_height,
+    };
+    let circumradius = 2.0 * radius / 3f32.sqrt();
+
+    // The analytic extremum (hex corner, z=0/y=0) must sit on the surface.
+    let at_corner = node.eval(circumradius, 0.0, 0.0);
+    assert!(
+        at_corner.abs() < 1e-3,
+        "expected the hex corner at x={circumradius} to be on the surface, got {at_corner}"
+    );
+    // A point just short of the corner is still inside; just past it is outside.
+    assert!(node.eval(circumradius - 0.05, 0.0, 0.0) < 0.0);
+    assert!(node.eval(circumradius + 0.05, 0.0, 0.0) > 0.0);
+
+    // The old (wrong) bound used the apothem `radius` itself for X, which
+    // sits well inside the true corner and would have clipped the surface.
+    assert!(radius < circumradius);
+    assert!(
+        node.eval(radius, 0.0, 0.0) < 0.0,
+        "apothem-only X bound would clip the corner, which is still solid there"
+    );
+}
+
+#[test]
+fn hex_prism_bounds_cover_the_true_circumradius_without_clipping() {
+    let radius = 3.0_f32;
+    let half_height = 2.0_f32;
+    let node = SdfNode::HexPrism {
+        radius,
+        half_height,
+    };
+    let bounds = node.bounds().expect("hex prism is bounded");
+    let circumradius = 2.0 * radius / 3f32.sqrt();
+
+    // X (through the corners) must reach the circumradius, not just the apothem.
+    assert!(
+        bounds.max[0] >= circumradius - 1e-4,
+        "bounds.max[0]={} must cover the circumradius={circumradius}",
+        bounds.max[0]
+    );
+    assert!(bounds.min[0] <= -circumradius + 1e-4);
+
+    // Z (through the flats) keeps the apothem extent unchanged.
+    assert!((bounds.max[2] - radius).abs() < 1e-4);
+    assert!((bounds.min[2] + radius).abs() < 1e-4);
+
+    // Y (extrusion axis) is untouched — orientation is preserved exactly.
+    assert!((bounds.max[1] - half_height).abs() < 1e-6);
+    assert!((bounds.min[1] + half_height).abs() < 1e-6);
+
+    // A point just outside the reported bounds must be strictly outside the shape.
+    assert!(node.eval(bounds.max[0] + 0.05, 0.0, 0.0) > 0.0);
+    assert!(node.eval(0.0, 0.0, bounds.max[2] + 0.05) > 0.0);
+    assert!(node.eval(0.0, bounds.max[1] + 0.05, 0.0) > 0.0);
+}
+
+// ── SdfNode::validate ────────────────────────────────────────────────────────
+
+fn assert_json_invalid(json: &str) {
+    assert!(
+        SdfNode::from_json(json).is_err(),
+        "expected invalid SDF JSON to be rejected: {json}"
+    );
+}
+
+fn assert_json_valid(json: &str) {
+    assert!(
+        SdfNode::from_json(json).is_ok(),
+        "expected valid SDF JSON to be accepted: {json}"
+    );
+}
+
+#[test]
+fn validate_rejects_non_finite_and_accepts_valid_primitives() {
+    assert_json_valid(r#"{"type":"sphere","radius":5}"#);
+    assert_json_invalid(r#"{"type":"sphere","radius":-5}"#);
+    assert_json_invalid(r#"{"type":"sphere","radius":0}"#);
+    // A JSON literal with an extreme exponent overflows f32 to infinity
+    // without failing to *parse* as JSON — validate() must still reject it.
+    assert_json_invalid(r#"{"type":"sphere","radius":1e400}"#);
+
+    // Direct construction (bypassing JSON) also goes through validate().
+    assert!(SdfNode::Sphere { radius: f32::NAN }.validate().is_err());
+    assert!(SdfNode::Sphere {
+        radius: f32::INFINITY
+    }
+    .validate()
+    .is_err());
+    assert!(SdfNode::Sphere { radius: 5.0 }.validate().is_ok());
+}
+
+#[test]
+fn validate_rejects_invalid_signs_and_ranges() {
+    // Box: rounding cannot exceed the smallest half-extent.
+    assert_json_valid(r#"{"type":"box","halfExtents":[2,3,4],"rounding":2}"#);
+    assert_json_invalid(r#"{"type":"box","halfExtents":[2,3,4],"rounding":5}"#);
+    assert_json_invalid(r#"{"type":"box","halfExtents":[-2,3,4]}"#);
+
+    // BoxFrame: same thickness-vs-extent constraint.
+    assert_json_valid(r#"{"type":"boxFrame","halfExtents":[2,2,2],"thickness":0.25}"#);
+    assert_json_invalid(r#"{"type":"boxFrame","halfExtents":[2,2,2],"thickness":2.5}"#);
+
+    // CappedCone: radii cannot both be zero (degenerate point).
+    assert_json_valid(r#"{"type":"cappedCone","halfHeight":2,"r1":1,"r2":0}"#);
+    assert_json_invalid(r#"{"type":"cappedCone","halfHeight":2,"r1":0,"r2":0}"#);
+    assert_json_invalid(r#"{"type":"cappedCone","halfHeight":-2,"r1":1,"r2":1}"#);
+
+    // Plane: degenerate (zero-length) normal is rejected.
+    assert_json_valid(r#"{"type":"plane","normal":[0,1,0]}"#);
+    assert_json_invalid(r#"{"type":"plane","normal":[0,0,0]}"#);
+
+    // RoundCone: coincident endpoints collapse the axis (division by zero).
+    assert_json_valid(r#"{"type":"roundCone","a":[0,0,0],"b":[0,10,0],"r1":3,"r2":1}"#);
+    assert_json_invalid(r#"{"type":"roundCone","a":[1,1,1],"b":[1,1,1],"r1":3,"r2":1}"#);
+}
+
+#[test]
+fn validate_rejects_invalid_enum_specific_constraints() {
+    // CappedTorus: cap_angle must be in (0, 180].
+    assert_json_valid(r#"{"type":"cappedTorus","majorRadius":5,"minorRadius":1,"capAngle":90}"#);
+    assert_json_invalid(r#"{"type":"cappedTorus","majorRadius":5,"minorRadius":1,"capAngle":0}"#);
+    assert_json_invalid(r#"{"type":"cappedTorus","majorRadius":5,"minorRadius":1,"capAngle":181}"#);
+
+    // Displace: octaves must be in 1..=8.
+    let displace = |octaves: i32| {
+        format!(
+            r#"{{"type":"displace","amplitude":1,"frequency":0.1,"seed":1,"octaves":{octaves},
+                 "child":{{"type":"sphere","radius":1}}}}"#
+        )
+    };
+    assert_json_valid(&displace(3));
+    assert_json_invalid(&displace(0));
+    assert_json_invalid(&displace(9));
+}
+
+#[test]
+fn validate_rejects_malformed_transforms() {
+    // Scale factor must be a positive finite number.
+    assert_json_valid(r#"{"type":"scale","factor":2.0,"child":{"type":"sphere","radius":2}}"#);
+    assert_json_invalid(r#"{"type":"scale","factor":0,"child":{"type":"sphere","radius":2}}"#);
+    assert_json_invalid(r#"{"type":"scale","factor":-1,"child":{"type":"sphere","radius":2}}"#);
+
+    // Translate/Rotate reject non-finite offsets/angles.
+    assert_json_invalid(
+        r#"{"type":"translate","offset":[1e400,0,0],"child":{"type":"sphere","radius":2}}"#,
+    );
+    assert_json_invalid(
+        r#"{"type":"rotate","angles":[1e400,0,0],"child":{"type":"sphere","radius":2}}"#,
+    );
+
+    // Repeat: spacing must be non-negative and not all zero.
+    assert_json_valid(
+        r#"{"type":"repeat","spacing":[4,0,4],"child":{"type":"sphere","radius":1}}"#,
+    );
+    assert_json_invalid(
+        r#"{"type":"repeat","spacing":[-4,0,4],"child":{"type":"sphere","radius":1}}"#,
+    );
+    assert_json_invalid(
+        r#"{"type":"repeat","spacing":[0,0,0],"child":{"type":"sphere","radius":1}}"#,
+    );
+}
+
+#[test]
+fn validate_rejects_invalid_field_program_payloads_at_any_depth() {
+    // output_slot 0 with no declared slots: InvalidOutputSlot.
+    let bad_program = r#"{"version":1,"slots":[],"instructions":[],"outputSlot":0,
+        "bounds":{"min":[-1,-1,-1],"max":[1,1,1]}}"#;
+
+    // Directly as the root node...
+    assert_json_invalid(&format!(r#"{{"type":"program","program":{bad_program}}}"#));
+
+    // ...and nested several levels deep inside operators/transforms.
+    assert_json_invalid(&format!(
+        r#"{{"type":"union","children":[
+            {{"type":"sphere","radius":1}},
+            {{"type":"translate","offset":[1,0,0],"child":
+                {{"type":"round","radius":0.1,"child":
+                    {{"type":"program","program":{bad_program}}}
+                }}
+            }}
+        ]}}"#
+    ));
+
+    // A validly-formed program still parses.
+    let good_program = r#"{"version":1,"slots":["scalar"],"instructions":[
+        {"instr":"pushPos"},{"instr":"unary","op":"length"},
+        {"instr":"pushConst","value":1.0},{"instr":"binary","op":"sub"},
+        {"instr":"storeLocal","slot":0}
+    ],"outputSlot":0,"bounds":{"min":[-1,-1,-1],"max":[1,1,1]}}"#;
+    assert_json_valid(&format!(r#"{{"type":"program","program":{good_program}}}"#));
+}
+
+#[test]
+fn validate_rejects_trees_past_the_depth_limit() {
+    let mut deep = String::from(r#"{"type":"sphere","radius":1}"#);
+    for _ in 0..200 {
+        deep = format!(r#"{{"type":"round","radius":0.1,"child":{deep}}}"#);
+    }
+    assert_json_invalid(&deep);
+
+    let mut shallow = String::from(r#"{"type":"sphere","radius":1}"#);
+    for _ in 0..10 {
+        shallow = format!(r#"{{"type":"round","radius":0.1,"child":{shallow}}}"#);
+    }
+    assert_json_valid(&shallow);
+}
+
+#[test]
+fn validate_rejects_trees_past_the_node_count_limit() {
+    let children: Vec<&str> = std::iter::repeat(r#"{"type":"sphere","radius":1}"#)
+        .take(8000)
+        .collect();
+    let wide = format!(r#"{{"type":"union","children":[{}]}}"#, children.join(","));
+    assert_json_invalid(&wide);
+
+    let modest: Vec<&str> = std::iter::repeat(r#"{"type":"sphere","radius":1}"#)
+        .take(50)
+        .collect();
+    let ok = format!(r#"{{"type":"union","children":[{}]}}"#, modest.join(","));
+    assert_json_valid(&ok);
+}
+
+#[test]
+fn validate_still_accepts_existing_realistic_trees() {
+    assert!(island_tree().validate().is_ok());
+    let json = r#"{
+        "type":"smoothUnion","k":4.0,
+        "a":{"type":"superPrism","halfExtents":[32,2,32],"exponent":6},
+        "b":{"type":"displace","amplitude":3.0,"frequency":0.08,"seed":42,"octaves":3,
+             "child":{"type":"translate","offset":[0,-14,0],
+                      "child":{"type":"ellipsoid","radii":[26,16,26]}}}
+    }"#;
+    assert_json_valid(json);
+}

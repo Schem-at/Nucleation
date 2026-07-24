@@ -347,6 +347,46 @@ fn default_octaves() -> u32 {
     3
 }
 
+/// Maximum nesting depth an [`SdfNode`] tree may reach for
+/// [`SdfNode::validate`] to accept it. Well above any realistically
+/// authored tree, but bounds recursion depth against malicious/generated
+/// JSON (e.g. a long chain of single-child wrapper nodes).
+const MAX_TREE_DEPTH: u32 = 64;
+
+/// Maximum total node count an [`SdfNode`] tree may reach for
+/// [`SdfNode::validate`] to accept it. Bounds the work a wide tree (e.g. a
+/// `Union`/`Intersect` with many children) can force regardless of depth.
+const MAX_TREE_NODES: u32 = 5_000;
+
+/// All values finite.
+fn finite_all(values: &[f32]) -> Result<(), String> {
+    if values.iter().all(|v| v.is_finite()) {
+        Ok(())
+    } else {
+        Err("value must be finite".into())
+    }
+}
+
+/// All values finite and strictly positive.
+fn positive_all(values: &[f32]) -> Result<(), String> {
+    finite_all(values)?;
+    if values.iter().all(|v| *v > 0.0) {
+        Ok(())
+    } else {
+        Err("value must be positive".into())
+    }
+}
+
+/// All values finite and non-negative.
+fn non_negative_all(values: &[f32]) -> Result<(), String> {
+    finite_all(values)?;
+    if values.iter().all(|v| *v >= 0.0) {
+        Ok(())
+    } else {
+        Err("value must be non-negative".into())
+    }
+}
+
 #[inline]
 fn len3(x: f32, y: f32, z: f32) -> f32 {
     (x * x + y * y + z * z).sqrt()
@@ -446,14 +486,264 @@ fn rotate_point(m: &[[f32; 3]; 3], p: [f32; 3]) -> [f32; 3] {
 }
 
 impl SdfNode {
-    /// Parse a node tree from its JSON representation.
+    /// Parse a node tree from its JSON representation, then recursively
+    /// [`validate`](SdfNode::validate) it.
     pub fn from_json(json: &str) -> Result<SdfNode, String> {
-        serde_json::from_str(json).map_err(|e| format!("Invalid SDF JSON: {e}"))
+        let node: SdfNode =
+            serde_json::from_str(json).map_err(|e| format!("Invalid SDF JSON: {e}"))?;
+        node.validate()?;
+        Ok(node)
     }
 
     /// Serialize this tree to JSON.
     pub fn to_json(&self) -> Result<String, String> {
         serde_json::to_string(self).map_err(|e| format!("SDF serialization failed: {e}"))
+    }
+
+    /// Recursively validate every node's parameters: finite values, valid
+    /// signs/ranges, enum-specific constraints, transform sanity, and a
+    /// bound on tree depth/size. Mirrors the checks the typed `Sdf` builder
+    /// API applies at construction time (see `bridge/sdf.rs`), so a JSON
+    /// tree and an equivalent typed tree are held to the same standard.
+    ///
+    /// Called automatically by [`SdfNode::from_json`]; hand-built trees
+    /// (e.g. deserialized manually, or assembled outside the typed builder)
+    /// can call this directly before evaluating or sampling them.
+    pub fn validate(&self) -> Result<(), String> {
+        let mut budget = MAX_TREE_NODES;
+        self.validate_at(0, &mut budget)
+    }
+
+    fn validate_at(&self, depth: u32, budget: &mut u32) -> Result<(), String> {
+        if depth > MAX_TREE_DEPTH {
+            return Err(format!(
+                "SDF tree exceeds the maximum nesting depth of {MAX_TREE_DEPTH}"
+            ));
+        }
+        if *budget == 0 {
+            return Err(format!(
+                "SDF tree exceeds the maximum node count of {MAX_TREE_NODES}"
+            ));
+        }
+        *budget -= 1;
+
+        match self {
+            SdfNode::Sphere { radius } => positive_all(&[*radius])?,
+
+            SdfNode::Box {
+                half_extents,
+                rounding,
+            } => {
+                positive_all(half_extents)?;
+                non_negative_all(&[*rounding])?;
+                if *rounding > half_extents[0].min(half_extents[1]).min(half_extents[2]) {
+                    return Err("box rounding cannot exceed its smallest half-extent".into());
+                }
+            }
+
+            SdfNode::Torus {
+                major_radius,
+                minor_radius,
+            } => positive_all(&[*major_radius, *minor_radius])?,
+
+            SdfNode::CappedTorus {
+                major_radius,
+                minor_radius,
+                cap_angle,
+            } => {
+                positive_all(&[*major_radius, *minor_radius])?;
+                finite_all(&[*cap_angle])?;
+                if *cap_angle <= 0.0 || *cap_angle > 180.0 {
+                    return Err("capped torus cap_angle must be in (0, 180]".into());
+                }
+            }
+
+            SdfNode::Link {
+                major_radius,
+                minor_radius,
+                half_length,
+            } => {
+                positive_all(&[*major_radius, *minor_radius])?;
+                non_negative_all(&[*half_length])?;
+            }
+
+            SdfNode::Capsule { a, b, radius } => {
+                finite_all(a)?;
+                finite_all(b)?;
+                positive_all(&[*radius])?;
+            }
+
+            SdfNode::RoundCone { a, b, r1, r2 } => {
+                finite_all(a)?;
+                finite_all(b)?;
+                positive_all(&[*r1, *r2])?;
+                if a == b {
+                    return Err("round cone endpoints must not coincide".into());
+                }
+            }
+
+            SdfNode::CappedCylinder {
+                radius,
+                half_height,
+            } => positive_all(&[*radius, *half_height])?,
+
+            SdfNode::InfiniteCylinder { radius } => positive_all(&[*radius])?,
+
+            SdfNode::CappedCone {
+                half_height,
+                r1,
+                r2,
+            } => {
+                positive_all(&[*half_height])?;
+                non_negative_all(&[*r1, *r2])?;
+                if *r1 == 0.0 && *r2 == 0.0 {
+                    return Err("capped cone radii cannot both be zero".into());
+                }
+            }
+
+            SdfNode::Plane { normal, offset } => {
+                finite_all(normal)?;
+                finite_all(&[*offset])?;
+                let length = ((normal[0] as f64).powi(2)
+                    + (normal[1] as f64).powi(2)
+                    + (normal[2] as f64).powi(2))
+                .sqrt();
+                if !length.is_finite() || length <= f64::from(f32::EPSILON) {
+                    return Err("plane normal must not be degenerate".into());
+                }
+            }
+
+            SdfNode::Ellipsoid { radii } => positive_all(radii)?,
+
+            SdfNode::Octahedron { size } => positive_all(&[*size])?,
+
+            SdfNode::HexPrism {
+                radius,
+                half_height,
+            } => positive_all(&[*radius, *half_height])?,
+
+            SdfNode::SuperPrism {
+                half_extents,
+                exponent,
+            } => {
+                positive_all(half_extents)?;
+                positive_all(&[*exponent])?;
+            }
+
+            SdfNode::BoxFrame {
+                half_extents,
+                thickness,
+            } => {
+                positive_all(half_extents)?;
+                non_negative_all(&[*thickness])?;
+                if *thickness > half_extents[0].min(half_extents[1]).min(half_extents[2]) {
+                    return Err("box frame thickness cannot exceed its smallest half-extent".into());
+                }
+            }
+
+            SdfNode::Union { children } | SdfNode::Intersect { children } => {
+                for child in children {
+                    child.validate_at(depth + 1, budget)?;
+                }
+            }
+
+            SdfNode::Subtract { a, b } => {
+                a.validate_at(depth + 1, budget)?;
+                b.validate_at(depth + 1, budget)?;
+            }
+
+            SdfNode::SmoothUnion { a, b, k }
+            | SdfNode::SmoothSubtract { a, b, k }
+            | SdfNode::SmoothIntersect { a, b, k } => {
+                positive_all(&[*k])?;
+                a.validate_at(depth + 1, budget)?;
+                b.validate_at(depth + 1, budget)?;
+            }
+
+            SdfNode::Round { child, radius } => {
+                non_negative_all(&[*radius])?;
+                child.validate_at(depth + 1, budget)?;
+            }
+
+            SdfNode::Shell { child, thickness } => {
+                positive_all(&[*thickness])?;
+                child.validate_at(depth + 1, budget)?;
+            }
+
+            SdfNode::Translate { child, offset } => {
+                finite_all(offset)?;
+                child.validate_at(depth + 1, budget)?;
+            }
+
+            SdfNode::Rotate { child, angles } => {
+                finite_all(angles)?;
+                child.validate_at(depth + 1, budget)?;
+            }
+
+            SdfNode::Scale { child, factor } => {
+                positive_all(&[*factor])?;
+                child.validate_at(depth + 1, budget)?;
+            }
+
+            SdfNode::Mirror { child, .. } => {
+                child.validate_at(depth + 1, budget)?;
+            }
+
+            SdfNode::Repeat {
+                child,
+                spacing,
+                count: _,
+            } => {
+                finite_all(spacing)?;
+                if spacing.iter().any(|s| *s < 0.0) || spacing.iter().all(|s| *s == 0.0) {
+                    return Err("repeat spacing must be non-negative and not all zero".into());
+                }
+                child.validate_at(depth + 1, budget)?;
+            }
+
+            SdfNode::Displace {
+                child,
+                amplitude,
+                frequency,
+                octaves,
+                seed: _,
+            } => {
+                non_negative_all(&[*amplitude])?;
+                positive_all(&[*frequency])?;
+                if !(1..=8).contains(octaves) {
+                    return Err("displace octaves must be in 1..=8".into());
+                }
+                child.validate_at(depth + 1, budget)?;
+            }
+
+            SdfNode::Warp {
+                child,
+                amplitude,
+                frequency,
+                seed: _,
+            } => {
+                non_negative_all(&[*amplitude])?;
+                positive_all(&[*frequency])?;
+                child.validate_at(depth + 1, budget)?;
+            }
+
+            SdfNode::Cells {
+                frequency,
+                jitter,
+                threshold,
+                seed: _,
+                mode: _,
+            } => {
+                positive_all(&[*frequency])?;
+                non_negative_all(&[*jitter])?;
+                finite_all(&[*threshold])?;
+            }
+
+            SdfNode::Program { program } => {
+                super::program::validate(program.data()).map_err(String::from)?;
+            }
+        }
+        Ok(())
     }
 
     /// Signed distance at a point (negative = inside).
@@ -968,7 +1258,14 @@ impl SdfNode {
             SdfNode::HexPrism {
                 radius,
                 half_height,
-            } => sym(*radius, *half_height, *radius),
+            } => {
+                // `radius` is the hexagon's apothem (inradius) toward the
+                // flat edges (Z), matching the exact surface there. Along X
+                // the hexagon's corners reach the circumradius instead:
+                // 2 * radius / sqrt(3) (apothem / cos(30°)).
+                const INV_COS_30: f32 = 1.154_700_5; // 2 / sqrt(3)
+                sym(*radius * INV_COS_30, *half_height, *radius)
+            }
             SdfNode::SuperPrism {
                 half_extents: b, ..
             } => sym(b[0], b[1], b[2]),
