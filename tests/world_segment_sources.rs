@@ -48,7 +48,13 @@ impl TileSource for MemSource {
             // borrow checker happy without changing what the brief intended.
             let fresh =
                 VoxelTile::from_blocks(t.id(), *t.bounds(), t.blocks().map(|(p, b)| (p, b.clone())));
-            f(fresh)?;
+            // Honor the `TileError::Stop` early-termination sentinel: stop
+            // iterating and report success, never propagate `Stop` itself.
+            match f(fresh) {
+                Ok(()) => {}
+                Err(TileError::Stop) => return Ok(()),
+                Err(e) => return Err(e),
+            }
         }
         Ok(())
     }

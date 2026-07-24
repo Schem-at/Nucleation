@@ -115,13 +115,14 @@ fn load_plot_hints(path: &std::path::Path) -> Vec<PartitionHint> {
         .collect()
 }
 
-/// Wraps a `TarGzSource` and stops invoking the inner callback after `limit`
-/// tiles have been seen, without aborting the underlying archive walk with an
-/// error (a real error would surface at the caller as a hard failure — we
-/// just want to stop *processing* early). `TarGzSource` is forward-only and
-/// streams the whole tar regardless, so this only bounds how much work the
-/// pipeline itself does downstream of the callback, not how much of the
-/// tarball gets decompressed.
+/// Wraps a `TarGzSource` and stops the archive walk entirely once `limit`
+/// tiles have been handed to the downstream callback, by returning
+/// `Err(TileError::Stop)` from the closure passed to `TarGzSource::for_each_tile`.
+/// `TarGzSource` honors that sentinel (see `TileError::Stop`'s contract) and
+/// returns `Ok(())` without decompressing/parsing the rest of the tarball —
+/// so, unlike the old "keep streaming, just stop calling `f`" approach, this
+/// actually bounds how much of the archive gets read, not just how much work
+/// the pipeline does downstream of the callback.
 struct LimitedSource<'a> {
     inner: &'a TarGzSource,
     limit: usize,
@@ -151,7 +152,10 @@ impl<'a> TileSource for LimitedSource<'a> {
         let limit = self.limit;
         self.inner.for_each_tile(&mut |tile| {
             if seen >= limit {
-                return Ok(());
+                // Request the inner TarGzSource stop walking the archive
+                // entirely, instead of merely skipping the callback for the
+                // remaining entries.
+                return Err(TileError::Stop);
             }
             seen += 1;
             f(tile)
@@ -182,11 +186,19 @@ fn main() {
     let mut samples: Vec<VoxelTile> = Vec::new();
     profile_source
         .for_each_tile(&mut |tile| {
-            if samples.len() >= sample_cap {
-                return Ok(());
+            // Once `--sample` tiles are collected, request the source stop
+            // walking the rest of the (possibly 1.6 GB) archive entirely,
+            // rather than continuing to decompress/parse it just to no-op
+            // the callback for every remaining entry.
+            if sample_cap == 0 {
+                return Err(TileError::Stop);
             }
             samples.push(tile);
-            Ok(())
+            if samples.len() >= sample_cap {
+                Err(TileError::Stop)
+            } else {
+                Ok(())
+            }
         })
         .expect("sampling pass over tarball failed");
     println!("wol_extract: collected {} sample tiles for profile derivation", samples.len());

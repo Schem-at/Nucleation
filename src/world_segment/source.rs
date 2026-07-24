@@ -26,6 +26,11 @@ pub enum TileError {
     NotRandomAccess,
     #[error("malformed source: {0}")]
     Malformed(String),
+    /// Not an error: a callback returns this from `for_each_tile` to request
+    /// early termination. Implementations MUST stop iterating and return
+    /// `Ok(())` — never propagate `Stop` to the caller.
+    #[error("iteration stopped by callback")]
+    Stop,
 }
 
 /// A Minecraft region spans 512 blocks per axis (32 chunks x 16 blocks).
@@ -69,13 +74,22 @@ pub trait TileSource {
 
     /// Stream every non-empty tile through `f`, in the source's natural order.
     /// This is the entry point that works for both `Random` and `Forward`.
+    ///
+    /// Early termination: if `f` returns `Err(TileError::Stop)`, this method
+    /// stops iterating and returns `Ok(())` — `Stop` is a sentinel, not a
+    /// real error, and must never be propagated to the caller. Any other
+    /// `Err` returned by `f` propagates as before.
     fn for_each_tile(
         &self,
         f: &mut dyn FnMut(VoxelTile) -> Result<(), TileError>,
     ) -> Result<(), TileError> {
         for id in self.tile_ids()? {
             if let Some(t) = self.tile(id)? {
-                f(t)?;
+                match f(t) {
+                    Ok(()) => {}
+                    Err(TileError::Stop) => return Ok(()),
+                    Err(e) => return Err(e),
+                }
             }
         }
         Ok(())
@@ -107,5 +121,55 @@ mod tests {
         let a = Access::Forward;
         let _b = a; // Copy
         assert_eq!(a, Access::Forward);
+    }
+
+    /// A random-access source with 3 tiles that does NOT override
+    /// `for_each_tile`, so the default trait impl is exercised directly.
+    struct ThreeTileSource;
+
+    impl TileSource for ThreeTileSource {
+        fn access(&self) -> Access {
+            Access::Random
+        }
+
+        fn tile_ids(&self) -> Result<Vec<TileId>, TileError> {
+            Ok(vec![
+                TileId { x: 0, z: 0 },
+                TileId { x: 1, z: 0 },
+                TileId { x: 2, z: 0 },
+            ])
+        }
+
+        fn tile(&self, id: TileId) -> Result<Option<VoxelTile>, TileError> {
+            Ok(Some(VoxelTile::from_blocks(
+                id,
+                TileBounds { min: (0, 0, 0), max: (15, 15, 15) },
+                std::iter::once((
+                    (0, 0, 0),
+                    crate::block_state::BlockState::new("minecraft:stone"),
+                )),
+            )))
+        }
+    }
+
+    /// Callback returns `Stop` after the first tile of three. The default
+    /// impl must stop iterating right there and report `Ok(())`, not
+    /// propagate `Stop` as an error. If `Stop` were (mis)propagated as a
+    /// plain `Err`, `result.is_ok()` below would be false and this test
+    /// would fail — so this is not a vacuous assertion.
+    #[test]
+    fn default_for_each_tile_stops_on_stop_sentinel_and_reports_ok() {
+        let source = ThreeTileSource;
+        let mut call_count = 0usize;
+        let result = source.for_each_tile(&mut |_tile| {
+            call_count += 1;
+            Err(TileError::Stop)
+        });
+
+        assert!(
+            result.is_ok(),
+            "Stop must not propagate as an error: got {result:?}"
+        );
+        assert_eq!(call_count, 1, "iteration must stop right after the Stop-returning call");
     }
 }
