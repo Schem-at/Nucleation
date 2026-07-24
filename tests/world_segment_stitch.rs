@@ -76,6 +76,40 @@ fn merge_is_idempotent() {
 }
 
 #[test]
+fn transitive_closure_when_endpoints_are_not_directly_adjacent() {
+    // Regression for the classic incremental-resolve bug (lost transitive
+    // closure). A 3-tile chain: C's cell is adjacent to B's, B's to A's, but
+    // C is NOT adjacent to A. chain(3) realises exactly this: tile 0 occupies
+    // global cells {0,127}, tile 1 {128,255}, tile 2 {256,383}. Tile 0<->1 and
+    // tile 1<->2 touch at a 1-cell seam (within r=2R+1=5), but tile 0<->2 are
+    // >=129 cells apart, far outside the neighbourhood. So A and C can only be
+    // joined transitively through B via the union-find forest — never directly.
+    // Both merge groupings must still collapse the chain to ONE build; an
+    // incremental resolver that failed to probe b's full margin against the
+    // accumulated index (or that only re-resolved genuinely-new cells) would
+    // split A from C here.
+    let p = chain(3);
+    let (a, b, c) = (p[0].clone(), p[1].clone(), p[2].clone());
+    let left = StitchState::merge(StitchState::merge(a.clone(), b.clone(), 2), c.clone(), 2).finish();
+    let right = StitchState::merge(a, StitchState::merge(b, c, 2), 2).finish();
+    assert_eq!(left.len(), 1, "(A·B)·C must join the whole chain via B");
+    assert_eq!(right.len(), 1, "A·(B·C) must join the whole chain via B");
+    assert_eq!(build_ids(left), build_ids(right));
+}
+
+#[test]
+fn scale_sanity_folds_a_long_chain_into_one_build() {
+    // Cheap scale check (not a benchmark). Sequentially fold a 200-tile chain.
+    // The old full-rescan resolver re-probed every accumulated margin entry on
+    // every merge -> O(total_margin * 125) per merge, quadratic over the fold.
+    // The incremental resolver probes only each incoming tile's entries, so this
+    // stays near-linear and must still yield exactly one connected build.
+    let n = 200;
+    let builds = reduce_left(chain(n)).finish();
+    assert_eq!(builds.len(), 1, "a {n}-tile seam chain must stitch into one build");
+}
+
+#[test]
 fn reduction_order_does_not_change_the_result() {
     // A 5-chain reduced left-to-right vs in a different grouping must agree.
     let p = chain(5);

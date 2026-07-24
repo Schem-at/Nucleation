@@ -112,23 +112,61 @@ impl StitchState {
             // Re-apply b's unions through a's smaller-id-wins rule.
             a.union(child, parent);
         }
-        a.margin.extend(b.margin);
+        // Capture b's incoming entries BEFORE folding them into `a.margin`.
+        // Only these need probing (see the soundness argument below); a's own
+        // entries were already mutually resolved by earlier merges.
+        let incoming = b.margin;
+        a.margin.extend(incoming.iter().cloned());
         a.margin.sort_by(|x, y| x.cell.cmp(&y.cell).then(x.cluster.cmp(&y.cluster)).then(x.partition.cmp(&y.partition)));
         a.margin.dedup();
-        a.resolve_adjacencies(closing_radius);
+        // Incremental adjacency resolution — the fix for the quadratic
+        // full-rescan. We probe ONLY the entries contributed by `b` against a
+        // spatial index over the full combined margin, rather than re-probing
+        // every accumulated entry on every merge.
+        //
+        // Why this yields the same union-find closure as an all-vs-all rescan,
+        // given the invariant "the entries inside any single StitchState are
+        // already mutually resolved":
+        //  - a-internal pairs: resolved inductively — every prior merge resolved
+        //    its incoming entries against everything then present, and `from()`
+        //    needs no internal resolution (two margin cells of one tile within
+        //    2R+1 in the same partition already share a ClusterId via in-tile
+        //    closing; cross-partition pairs must never union). So no a-a pair
+        //    can newly union here.
+        //  - b-internal pairs: same in-tile argument when `b` comes from
+        //    `from()`; when `b` is itself a merged state its internal pairs were
+        //    already resolved by ITS construction. Probing a b-entry against
+        //    another b-entry therefore either finds an equal ClusterId (skipped)
+        //    or an already-unioned pair (union is a no-op).
+        //  - cross pairs (a<->b): the only genuinely new adjacencies. The
+        //    Chebyshev neighbourhood is symmetric, so probing every b-entry
+        //    against the full index finds every (a,b) adjacency an all-vs-all
+        //    scan would. `incoming` is b's FULL margin, so when `b` is a
+        //    composite this still finds a<->(any member of b) adjacencies,
+        //    preserving transitive closure through the union-find forest.
+        //  - idempotence: merge(m, m) doubles the margin (dedup collapses it) and
+        //    probes m's entries against m's entries -> only already-unioned pairs,
+        //    a no-op.
+        // dedup may drop b-entries that duplicate existing a-entries, but we probe
+        // the captured `incoming` regardless; re-probing a duplicate is a no-op.
+        a.resolve_incremental(&incoming, closing_radius);
         a
     }
 
-    fn resolve_adjacencies(&mut self, closing_radius: u32) {
+    /// Probe the given `incoming` entries against a spatial index built over the
+    /// full current margin, unioning clusters whose global cells fall within a
+    /// `2R+1` Chebyshev radius and share a partition. Unlike a full rescan this
+    /// is O(incoming * 125 + margin) per call, not O(margin * 125).
+    fn resolve_incremental(&mut self, incoming: &[MarginEntry], closing_radius: u32) {
         let r = (2 * closing_radius + 1) as i32;
-        // Spatial index: global cell -> entries there.
+        // Spatial index: global cell -> entries there (over the full margin).
         let mut index: BTreeMap<GlobalCell, Vec<(ClusterId, Option<String>)>> = BTreeMap::new();
         for e in &self.margin {
             index.entry(e.cell).or_default().push((e.cluster, e.partition.clone()));
         }
         // Collect unions first (do not mutate the forest while iterating).
         let mut to_union: Vec<(ClusterId, ClusterId)> = Vec::new();
-        for e in &self.margin {
+        for e in incoming {
             for dx in -r..=r {
                 for dy in -r..=r {
                     for dz in -r..=r {
