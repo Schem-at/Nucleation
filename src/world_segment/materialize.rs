@@ -45,7 +45,12 @@ pub fn materialize(
         snapshot_id: ctx.snapshot_id.to_string(),
         world_bbox: build.bbox,
         origin_offset: min,
-        block_count: build.block_count,
+        // Provenance describes the schematic actually materialized from `blocks`,
+        // not the build's nominal count; the debug_assert above is the dev-time
+        // signal that a caller assembled `blocks` incorrectly for `build`.
+        block_count: blocks.len() as u64,
+        // Counts the build's member clusters; a cluster that contributed zero
+        // blocks (e.g. fully subtracted) is still counted here. Benign.
         cluster_count: build.cluster_ids.len() as u32,
         fingerprint: fp.0,
         tier,
@@ -111,5 +116,22 @@ mod tests {
         let (_, p1) = materialize(&build(), &blocks, Tier::Confident, sid, &ctx());
         let (_, p2) = materialize(&build(), &blocks, Tier::Confident, sid, &ctx());
         assert_eq!(p1, p2, "same inputs → identical provenance (incl. fingerprint)");
+    }
+
+    /// provenance.block_count tracks the materialized `blocks` map, not
+    /// `build.block_count` — they happen to agree here (the debug_assert
+    /// requires it), but the assertion is written against `blocks.len()` to
+    /// document the actual source of truth. In release builds (where the
+    /// debug_assert compiles out), a caller-supplied `blocks` map of a
+    /// different length would still produce a correct `provenance.block_count`
+    /// because it's derived from `blocks`, not from `build`.
+    #[test]
+    fn provenance_block_count_tracks_materialized_blocks_not_build() {
+        let mut blocks = BTreeMap::new();
+        blocks.insert((10,-60,10), BlockState::new("minecraft:redstone_wire"));
+        blocks.insert((11,-60,10), BlockState::new("minecraft:repeater"));
+        let sid = StableBuildId::seed("w", build().id);
+        let (_, prov) = materialize(&build(), &blocks, Tier::Confident, sid, &ctx());
+        assert_eq!(prov.block_count, blocks.len() as u64);
     }
 }
