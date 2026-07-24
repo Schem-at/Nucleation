@@ -42,6 +42,7 @@ struct Cli {
     out: PathBuf,
     limit: Option<usize>,
     sample: usize,
+    coverage: f32,
 }
 
 fn parse_args() -> Cli {
@@ -50,7 +51,11 @@ fn parse_args() -> Cli {
     let mut plots = PathBuf::from("wol-project/data-ore-plots-build-20260723.json");
     let mut out = PathBuf::from("wol-project/m10-out");
     let mut limit: Option<usize> = None;
-    let mut sample: usize = 30;
+    // Now affordable thanks to `TileError::Stop` early-termination: the
+    // sampling pass only walks tiles until it finds this many that intersect
+    // the plotted-area bbox, instead of paying for every skipped outskirt tile.
+    let mut sample: usize = 24;
+    let mut coverage: f32 = 0.5;
 
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut i = 0;
@@ -85,6 +90,14 @@ fn parse_args() -> Cli {
                     .expect("--sample must be a number");
                 i += 2;
             }
+            "--coverage" => {
+                coverage = args
+                    .get(i + 1)
+                    .expect("--coverage needs a value")
+                    .parse()
+                    .expect("--coverage must be a float");
+                i += 2;
+            }
             other => {
                 eprintln!("wol_extract: ignoring unrecognized argument {other}");
                 i += 1;
@@ -92,7 +105,7 @@ fn parse_args() -> Cli {
         }
     }
 
-    Cli { tarball, plots, out, limit, sample }
+    Cli { tarball, plots, out, limit, sample, coverage }
 }
 
 /// One row of `wol-project/data-ore-plots-build-20260723.json`.
@@ -170,6 +183,27 @@ fn main() {
     let hints = load_plot_hints(&cli.plots);
     println!("wol_extract: loaded {} plot partition hints from {}", hints.len(), cli.plots.display());
 
+    // Overall bbox of every plot, so the sampling pass below can restrict
+    // itself to tiles that actually cover the plotted area, instead of
+    // whatever happens to come first in tar archive order (outskirt regions
+    // that are unrepresentative of the plotted center — see the module doc
+    // comment for the real-data failure this fixes).
+    let has_bbox = !hints.is_empty();
+    let (bbox_min_x, bbox_max_x, bbox_min_z, bbox_max_z) = hints.iter().fold(
+        (i32::MAX, i32::MIN, i32::MAX, i32::MIN),
+        |(minx, maxx, minz, maxz), h| {
+            let (x0, x1, z0, z1) = h.bbox_xz;
+            (minx.min(x0).min(x1), maxx.max(x0).max(x1), minz.min(z0).min(z1), maxz.max(z0).max(z1))
+        },
+    );
+    if has_bbox {
+        println!(
+            "wol_extract: plotted-area bbox = x[{bbox_min_x},{bbox_max_x}] z[{bbox_min_z},{bbox_max_z}]"
+        );
+    } else {
+        println!("wol_extract: no plot hints loaded — sampling pass will not filter by bbox");
+    }
+
     // 2. Derive the world profile from a fresh, sample-limited pass over the
     //    tarball. `TarGzSource` is forward-only, so this source is consumed
     //    entirely by sampling and CANNOT be reused for the main run below.
@@ -178,7 +212,7 @@ fn main() {
         None => cli.sample,
     };
     println!(
-        "wol_extract: deriving world profile from up to {sample_cap} sample tiles ({})",
+        "wol_extract: deriving world profile from up to {sample_cap} sample tiles intersecting the plotted-area bbox ({})",
         cli.tarball.display()
     );
     let profile_source = TarGzSource::open(&cli.tarball, -64, 320)
@@ -186,12 +220,26 @@ fn main() {
     let mut samples: Vec<VoxelTile> = Vec::new();
     profile_source
         .for_each_tile(&mut |tile| {
-            // Once `--sample` tiles are collected, request the source stop
-            // walking the rest of the (possibly 1.6 GB) archive entirely,
-            // rather than continuing to decompress/parse it just to no-op
-            // the callback for every remaining entry.
+            // Once `--sample` matching tiles are collected, request the
+            // source stop walking the rest of the (possibly 1.6 GB) archive
+            // entirely, rather than continuing to decompress/parse it just
+            // to no-op the callback for every remaining entry.
             if sample_cap == 0 {
                 return Err(TileError::Stop);
+            }
+            if has_bbox {
+                // Region world span from the tile's id: a region covers a
+                // fixed 512-block-wide square in both x and z.
+                let id = tile.id();
+                let (tile_x0, tile_x1) = (id.x * 512, id.x * 512 + 511);
+                let (tile_z0, tile_z1) = (id.z * 512, id.z * 512 + 511);
+                let intersects_bbox = tile_x0 <= bbox_max_x
+                    && tile_x1 >= bbox_min_x
+                    && tile_z0 <= bbox_max_z
+                    && tile_z1 >= bbox_min_z;
+                if !intersects_bbox {
+                    return Ok(());
+                }
             }
             samples.push(tile);
             if samples.len() >= sample_cap {
@@ -203,13 +251,43 @@ fn main() {
         .expect("sampling pass over tarball failed");
     println!("wol_extract: collected {} sample tiles for profile derivation", samples.len());
 
-    let profile = WorldProfile::derive(&samples, &ProfileParams::default());
-    let palette_preview: Vec<&String> = profile.substrate_palette.iter().take(10).collect();
+    // Diagnostics: per-Y-level column coverage across the collected samples,
+    // mirroring `WorldProfile::derive`'s slab-detection logic, so band
+    // problems (e.g. a slab that never reaches typical coverage, or gets
+    // dragged down by player digging) are debuggable without reading the
+    // derive implementation.
+    let profile_params = ProfileParams { min_slab_coverage: cli.coverage, ..ProfileParams::default() };
+    {
+        let mut footprint: BTreeSet<(i32, i32)> = BTreeSet::new();
+        let mut cols_at_y: std::collections::BTreeMap<i32, BTreeSet<(i32, i32)>> =
+            std::collections::BTreeMap::new();
+        for tile in &samples {
+            for ((x, y, z), _state) in tile.blocks() {
+                if y < profile_params.y_scan.0 || y > profile_params.y_scan.1 {
+                    continue;
+                }
+                footprint.insert((x, z));
+                cols_at_y.entry(y).or_default().insert((x, z));
+            }
+        }
+        let footprint_size = footprint.len().max(1) as f32;
+        println!(
+            "wol_extract: per-Y column coverage (footprint = {} distinct columns):",
+            footprint.len()
+        );
+        for y in -64..=-40 {
+            let coverage =
+                cols_at_y.get(&y).map(|s| s.len()).unwrap_or(0) as f32 / footprint_size;
+            println!("wol_extract:   y={y} coverage={coverage:.3}");
+        }
+    }
+
+    let profile = WorldProfile::derive(&samples, &profile_params);
     println!(
-        "wol_extract: derived profile — substrate_y_band = {:?}, palette ({} names, first 10) = {:?}",
+        "wol_extract: derived profile — substrate_y_band = {:?}, palette ({} names) = {:?}",
         profile.substrate_y_band,
         profile.substrate_palette.len(),
-        palette_preview
+        profile.substrate_palette
     );
     drop(samples);
 
