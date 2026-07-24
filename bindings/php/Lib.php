@@ -570,6 +570,8 @@ typedef struct MeshResult_create_usdz_result { union { MeshResult* ok; Nucleatio
 MeshResult_create_usdz_result MeshResult_create_usdz(Schematic* schematic, ResourcePack* pack, MeshConfig* config);
 typedef struct MeshResult_glb_data_b64_result { union { NucleationError err; }; bool is_ok; } MeshResult_glb_data_b64_result;
 MeshResult_glb_data_b64_result MeshResult_glb_data_b64(MeshResult* self, DiplomatWrite* write);
+typedef struct MeshResult_usdz_data_b64_result { union { NucleationError err; }; bool is_ok; } MeshResult_usdz_data_b64_result;
+MeshResult_usdz_data_b64_result MeshResult_usdz_data_b64(MeshResult* self, DiplomatWrite* write);
 void MeshResult_nucm_data_b64(MeshResult* self, DiplomatWrite* write);
 uint32_t MeshResult_vertex_count(MeshResult* self);
 uint32_t MeshResult_triangle_count(MeshResult* self);

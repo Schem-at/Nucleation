@@ -10,6 +10,7 @@ internal interface MeshResultLib: Library {
     fun MeshResult_create(schematic: Pointer, pack: Pointer, config: Pointer): ResultPointerInt
     fun MeshResult_create_usdz(schematic: Pointer, pack: Pointer, config: Pointer): ResultPointerInt
     fun MeshResult_glb_data_b64(handle: Pointer, write: Pointer): ResultUnitInt
+    fun MeshResult_usdz_data_b64(handle: Pointer, write: Pointer): ResultUnitInt
     fun MeshResult_nucm_data_b64(handle: Pointer, write: Pointer): Unit
     fun MeshResult_vertex_count(handle: Pointer): FFIUint32
     fun MeshResult_triangle_count(handle: Pointer): FFIUint32
@@ -85,6 +86,21 @@ class MeshResult internal constructor (
     fun glbDataB64(): Result<String> {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.MeshResult_glb_data_b64(handle, write);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            
+            val returnString = DW.writeToString(write)
+            return returnString.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    /** The mesh as a USDZ archive, base64-encoded.
+    */
+    fun usdzDataB64(): Result<String> {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.MeshResult_usdz_data_b64(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
             

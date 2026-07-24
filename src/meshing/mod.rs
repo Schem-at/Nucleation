@@ -2124,6 +2124,54 @@ mod tests {
     }
 
     #[test]
+    fn to_usdz_and_to_glb_produce_genuinely_different_container_formats() {
+        // Regression for the bridge gap: `MeshResult` gained a `create_usdz`
+        // constructor but, until now, only exposed `glb_data_b64` — so a
+        // consumer could mesh as USDZ and still only ever get GLB bytes back.
+        // This proves `MeshOutput::to_usdz()` (which the new
+        // `usdz_data_b64` bridge accessor wraps) returns a real ZIP/USDZ
+        // archive, distinct from `to_glb()`'s binary glTF container, using
+        // the same minimal-mesh construction as `test_mesh_output_is_empty`.
+        use schematic_mesher::TextureAtlas;
+
+        let mut opaque = MeshLayer::default();
+        opaque.positions = vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
+        opaque.normals = vec![[0.0, 1.0, 0.0]; 3];
+        opaque.uvs = vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
+        opaque.colors = vec![[1.0, 1.0, 1.0, 1.0]; 3];
+        opaque.indices = vec![0, 1, 2];
+
+        let output = MeshOutput {
+            opaque,
+            cutout: MeshLayer::default(),
+            transparent: MeshLayer::default(),
+            atlas: TextureAtlas::empty(),
+            greedy_materials: Vec::new(),
+            animated_textures: Vec::new(),
+            bounds: MesherBoundingBox::new([0.0, 0.0, 0.0], [1.0, 1.0, 0.0]),
+            chunk_coord: None,
+            lod_level: 0,
+        };
+
+        let glb = output.to_glb().expect("to_glb should succeed for a minimal mesh");
+        let usdz = output
+            .to_usdz()
+            .expect("to_usdz should succeed for a minimal mesh");
+
+        assert_eq!(&glb[0..4], b"glTF", "GLB container must start with the glTF magic");
+        assert_eq!(
+            &usdz[0..4],
+            b"PK\x03\x04",
+            "USDZ (ZIP) container must start with the ZIP local-file magic"
+        );
+        assert_ne!(
+            &glb[0..4],
+            &usdz[0..4],
+            "usdz_data_b64 and glb_data_b64 must return genuinely different formats"
+        );
+    }
+
+    #[test]
     fn test_mesh_result_alias_compiles() {
         use schematic_mesher::TextureAtlas;
 

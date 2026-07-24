@@ -29,6 +29,9 @@ MeshResult_create_usdz_result MeshResult_create_usdz(const Schematic* schematic,
 typedef struct MeshResult_glb_data_b64_result {union { NucleationError err;}; bool is_ok;} MeshResult_glb_data_b64_result;
 MeshResult_glb_data_b64_result MeshResult_glb_data_b64(const MeshResult* self, DiplomatWrite* write);
 
+typedef struct MeshResult_usdz_data_b64_result {union { NucleationError err;}; bool is_ok;} MeshResult_usdz_data_b64_result;
+MeshResult_usdz_data_b64_result MeshResult_usdz_data_b64(const MeshResult* self, DiplomatWrite* write);
+
 void MeshResult_nucm_data_b64(const MeshResult* self, DiplomatWrite* write);
 
 uint32_t MeshResult_vertex_count(const MeshResult* self);

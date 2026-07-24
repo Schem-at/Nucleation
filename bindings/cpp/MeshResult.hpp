@@ -32,6 +32,9 @@ namespace capi {
     typedef struct MeshResult_glb_data_b64_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} MeshResult_glb_data_b64_result;
     MeshResult_glb_data_b64_result MeshResult_glb_data_b64(const diplomat::capi::MeshResult* self, diplomat::capi::DiplomatWrite* write);
 
+    typedef struct MeshResult_usdz_data_b64_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} MeshResult_usdz_data_b64_result;
+    MeshResult_usdz_data_b64_result MeshResult_usdz_data_b64(const diplomat::capi::MeshResult* self, diplomat::capi::DiplomatWrite* write);
+
     void MeshResult_nucm_data_b64(const diplomat::capi::MeshResult* self, diplomat::capi::DiplomatWrite* write);
 
     uint32_t MeshResult_vertex_count(const diplomat::capi::MeshResult* self);
@@ -73,6 +76,21 @@ template<typename W>
 inline diplomat::result<std::monostate, NucleationError> MeshResult::glb_data_b64_write(W& writeable) const {
     diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
     auto result = diplomat::capi::MeshResult_glb_data_b64(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> MeshResult::usdz_data_b64() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::MeshResult_usdz_data_b64(this->AsFFI(),
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> MeshResult::usdz_data_b64_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::MeshResult_usdz_data_b64(this->AsFFI(),
         &write);
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
