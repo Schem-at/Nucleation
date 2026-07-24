@@ -773,6 +773,35 @@ report = json.loads(build.convert_to_data_version(1343, build.canonical_data_ver
 lost = [e["path"] for e in report if e["severity"] == "loss"]   # what 1.12.2 cannot represent
 ```
 
+## Segment worlds into builds
+
+Point `world_segment` at a whole world — a save directory or a streamed `.tar.gz`
+backup — and get back every discrete build in it as its own schematic, plus a
+provenance envelope saying exactly where it came from. Natural ground is learned
+from the world itself and subtracted, so terrain stops gluing structures
+together; morphological closing keeps a machine and its floating wiring as one
+build; optional **partition hints** (a plot grid, districts — any named boxes)
+guarantee no build ever spans a boundary. Builds are tiered
+`Confident`/`Probable`/`Debris` with explainable signals, and re-extracting a
+newer snapshot matches builds by overlap so an edited build keeps its stable id
+and simply gains a new fingerprint.
+
+The whole pipeline is deterministic — same bytes and config in, byte-identical
+builds and provenance out, whatever order the work runs in. In validation, an
+845-region world (1.6 GB) became ~4,500 addressable builds in about half an
+hour, twice, with identical output.
+
+```rust
+let profile = WorldProfile::derive(&samples, &params);         // learn the ground, pin it
+WorldSegmenter::run_streaming(&source, &profile, &partitions, &job, &prior, &mut |b| {
+    save(b.schematic, b.provenance);                           // one build at a time
+});
+```
+
+Feature `world-segment`. The full story — calibration knobs, partition floors,
+stitch algebra, snapshot identity, gotchas — is in the
+[world segmentation guide](docs/guides/world-segmentation.md).
+
 ## The block database
 
 Under it all sits a block database extracted from Mojang's own data generator
@@ -908,6 +937,7 @@ int main(void) {
   feature guides ([shapes & brushes](docs/guides/shapes-and-brushes.md),
   [palettes](docs/guides/palettes.md), [SDF terrain](docs/guides/sdf-terrain.md),
   [scripting](docs/guides/scripting.md),
+  [world segmentation](docs/guides/world-segmentation.md),
   [block database](docs/guides/minecraft-block-data.md))
 - [`docs/readme-snippets/`](docs/readme-snippets/): every snippet above with its
   verified output
