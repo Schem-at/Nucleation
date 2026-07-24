@@ -117,6 +117,42 @@ pub mod ffi {
             })))
         }
 
+        /// Torus ring cut down to an arc. `cap_angle_degrees` is the half-aperture
+        /// in `(0, 180]`, measured from +X and mirrored across X; `180` is a full
+        /// torus.
+        pub fn capped_torus(
+            major_radius: f32,
+            minor_radius: f32,
+            cap_angle_degrees: f32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[major_radius, minor_radius])?;
+            finite(&[cap_angle_degrees])?;
+            if cap_angle_degrees <= 0.0 || cap_angle_degrees > 180.0 {
+                return Err(NucleationError::InvalidArgument);
+            }
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::CappedTorus {
+                major_radius,
+                minor_radius,
+                cap_angle: cap_angle_degrees,
+            })))
+        }
+
+        /// Chain-link shape: a torus stretched along Z by `half_length` and
+        /// capped by two half-tori. `half_length: 0` is a plain torus.
+        pub fn link(
+            major_radius: f32,
+            minor_radius: f32,
+            half_length: f32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[major_radius, minor_radius])?;
+            non_negative(&[half_length])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::Link {
+                major_radius,
+                minor_radius,
+                half_length,
+            })))
+        }
+
         #[allow(clippy::too_many_arguments)]
         pub fn capsule(
             ax: f32,
@@ -141,6 +177,14 @@ pub mod ffi {
             Ok(Box::new(Sdf(crate::sdf::SdfNode::CappedCylinder {
                 radius,
                 half_height,
+            })))
+        }
+
+        /// Exact Y-axis cylinder with infinite extent. Sampling requires explicit bounds.
+        pub fn infinite_cylinder(radius: f32) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[radius])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::InfiniteCylinder {
+                radius,
             })))
         }
 
@@ -206,6 +250,24 @@ pub mod ffi {
             Ok(Box::new(Sdf(crate::sdf::SdfNode::SuperPrism {
                 half_extents: [half_x, half_y, half_z],
                 exponent,
+            })))
+        }
+
+        /// Hollow wireframe box: only the 12 edge beams are solid.
+        pub fn box_frame(
+            half_x: f32,
+            half_y: f32,
+            half_z: f32,
+            thickness: f32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[half_x, half_y, half_z])?;
+            non_negative(&[thickness])?;
+            if thickness > half_x.min(half_y).min(half_z) {
+                return Err(NucleationError::InvalidArgument);
+            }
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::BoxFrame {
+                half_extents: [half_x, half_y, half_z],
+                thickness,
             })))
         }
 
@@ -1001,6 +1063,59 @@ mod tests {
             .is_err());
         assert!(plane.to_shape_bounded(0, 0, 0, 255, 255, 255).is_ok());
         assert!(plane.to_shape_bounded(0, 0, 0, 256, 255, 255).is_err());
+    }
+
+    #[test]
+    fn box_frame_validates_and_bounds_match_outer_extents() {
+        assert!(Sdf::box_frame(2.0, 2.0, 2.0, 0.25).is_ok());
+        // Thickness cannot exceed the smallest half-extent.
+        assert!(Sdf::box_frame(2.0, 2.0, 2.0, 2.5).is_err());
+        assert!(Sdf::box_frame(-1.0, 2.0, 2.0, 0.25).is_err());
+        assert!(Sdf::box_frame(f32::NAN, 2.0, 2.0, 0.25).is_err());
+        assert!(Sdf::box_frame(f32::INFINITY, 2.0, 2.0, 0.25).is_err());
+
+        let huge = Sdf::box_frame(1.0e30, 1.0e30, 1.0e30, 0.1).unwrap();
+        assert!(huge.to_shape().is_err(), "huge frame exceeds voxel budget");
+
+        let frame = Sdf::box_frame(2.0, 2.0, 2.0, 0.25).unwrap();
+        let bounds = frame.bounds().unwrap();
+        assert!((bounds.min_x + 2.0).abs() < 1e-6);
+        assert!((bounds.max_x - 2.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn capped_torus_validates_angle_and_rejects_huge_radii() {
+        assert!(Sdf::capped_torus(5.0, 1.0, 90.0).is_ok());
+        assert!(Sdf::capped_torus(5.0, 1.0, 0.0).is_err());
+        assert!(Sdf::capped_torus(5.0, 1.0, 181.0).is_err());
+        assert!(Sdf::capped_torus(5.0, 1.0, f32::NAN).is_err());
+        assert!(Sdf::capped_torus(-1.0, 1.0, 90.0).is_err());
+
+        let huge = Sdf::capped_torus(1.0e30, 1.0, 90.0).unwrap();
+        assert!(huge.to_shape().is_err(), "huge torus exceeds voxel budget");
+    }
+
+    #[test]
+    fn link_validates_and_rejects_huge_radii() {
+        assert!(Sdf::link(3.0, 0.75, 4.0).is_ok());
+        assert!(Sdf::link(3.0, 0.75, 0.0).is_ok());
+        assert!(Sdf::link(-1.0, 0.75, 4.0).is_err());
+        assert!(Sdf::link(3.0, 0.75, -1.0).is_err());
+        assert!(Sdf::link(3.0, 0.75, f32::NAN).is_err());
+
+        let huge = Sdf::link(1.0e30, 1.0, 1.0e30).unwrap();
+        assert!(huge.to_shape().is_err(), "huge link exceeds voxel budget");
+    }
+
+    #[test]
+    fn infinite_cylinder_is_typed_unbounded_and_validated() {
+        assert!(Sdf::infinite_cylinder(2.0).is_ok());
+        assert!(Sdf::infinite_cylinder(0.0).is_err());
+        assert!(Sdf::infinite_cylinder(-1.0).is_err());
+        assert!(Sdf::infinite_cylinder(f32::NAN).is_err());
+        let cylinder = Sdf::infinite_cylinder(2.0).unwrap();
+        assert!(cylinder.bounds().is_err());
+        assert!((cylinder.eval_at(5.0, 1.0e9, 0.0) - 3.0).abs() < 1e-3);
     }
 
     #[test]

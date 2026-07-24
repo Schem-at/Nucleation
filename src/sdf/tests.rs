@@ -417,6 +417,101 @@ fn cells_value_is_unit_range_and_unbounded() {
 }
 
 #[test]
+fn box_frame_is_hollow_shell_of_box_edges() {
+    let f = SdfNode::BoxFrame {
+        half_extents: [2.0, 2.0, 2.0],
+        thickness: 0.25,
+    };
+    // Center of a face (not near an edge) is outside the frame (hollow).
+    assert!(f.eval(0.0, 0.0, 2.0) > 0.0);
+    // Just inside from an edge (within `thickness` of two faces), the frame is solid.
+    assert!(f.eval(1.9, 1.9, 0.0) < 0.0);
+    // Exactly on the outer ridge is the beam's own surface.
+    assert!(f.eval(2.0, 2.0, 0.0).abs() < 1e-5);
+    // Far outside is outside.
+    assert!(f.eval(10.0, 0.0, 0.0) > 0.0);
+    // Deep interior (away from all edges/faces) is outside the hollow frame.
+    assert!(f.eval(0.0, 0.0, 0.0) > 0.0);
+}
+
+#[test]
+fn capped_torus_matches_full_torus_at_180_degrees() {
+    let full = SdfNode::Torus {
+        major_radius: 5.0,
+        minor_radius: 1.0,
+    };
+    let capped = SdfNode::CappedTorus {
+        major_radius: 5.0,
+        minor_radius: 1.0,
+        cap_angle: 180.0,
+    };
+    for &(x, y, z) in &[
+        (5.0, 0.0, 0.0),
+        (0.0, 0.0, -5.0),
+        (-5.0, 0.0, 0.0),
+        (3.0, 1.0, -4.0),
+        (0.0, 0.0, 0.0),
+    ] {
+        assert!(
+            (full.eval(x, y, z) - capped.eval(x, y, z)).abs() < 1e-4,
+            "mismatch at ({x},{y},{z}): full={}, capped={}",
+            full.eval(x, y, z),
+            capped.eval(x, y, z)
+        );
+    }
+}
+
+#[test]
+fn capped_torus_cuts_the_ring_by_aperture_angle() {
+    let capped = SdfNode::CappedTorus {
+        major_radius: 5.0,
+        minor_radius: 1.0,
+        cap_angle: 90.0,
+    };
+    // Near x-axis at the tube center: still present (inside the open arc).
+    assert!((capped.eval(5.0, 0.0, 0.0) - (-1.0)).abs() < 1e-4);
+    // Directly behind (z negative, x=0): this part of the ring is capped away.
+    assert!(capped.eval(0.0, 0.0, -5.0) > 5.0);
+}
+
+#[test]
+fn link_matches_torus_at_zero_length_and_stretches_along_z() {
+    let full = SdfNode::Torus {
+        major_radius: 3.0,
+        minor_radius: 0.75,
+    };
+    let link = SdfNode::Link {
+        major_radius: 3.0,
+        minor_radius: 0.75,
+        half_length: 0.0,
+    };
+    for &(x, y, z) in &[(3.0, 0.0, 0.0), (0.0, 0.0, -3.0), (1.0, 0.5, 2.0)] {
+        assert!((full.eval(x, y, z) - link.eval(x, y, z)).abs() < 1e-4);
+    }
+
+    let stretched = SdfNode::Link {
+        major_radius: 3.0,
+        minor_radius: 0.75,
+        half_length: 4.0,
+    };
+    // Tube center of the far elongated cap: deep inside (~ -minor_radius).
+    assert!((stretched.eval(0.0, 0.0, 7.0) - (-0.75)).abs() < 1e-4);
+    // A plain torus would be far outside here; the link is not.
+    assert!(full.eval(0.0, 0.0, 7.0) > 0.0);
+}
+
+#[test]
+fn infinite_cylinder_is_exact_and_unbounded_along_y() {
+    let c = SdfNode::InfiniteCylinder { radius: 2.0 };
+    assert!((c.eval(0.0, 0.0, 0.0) - (-2.0)).abs() < 1e-6);
+    assert!((c.eval(2.0, 0.0, 0.0) - 0.0).abs() < 1e-6);
+    assert!((c.eval(5.0, 0.0, 0.0) - 3.0).abs() < 1e-6);
+    // Distance is independent of Y, however far out.
+    assert!((c.eval(5.0, 1.0e9, 0.0) - 3.0).abs() < 1e-3);
+    assert!(c.bounds().is_none(), "infinite cylinder is unbounded");
+}
+
+#[test]
 fn cells_distance_modes_are_nonnegative() {
     for mode in ["f1", "f2", "f2MinusF1"] {
         let json = format!(r#"{{"type":"cells","frequency":0.12,"seed":9,"mode":"{mode}"}}"#);

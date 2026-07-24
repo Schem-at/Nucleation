@@ -115,6 +115,22 @@ pub enum SdfNode {
         major_radius: f32,
         minor_radius: f32,
     },
+    /// Exact. Ring in the XZ plane cut down to an arc: `cap_angle` (degrees, in
+    /// `(0, 180]`) is the half-aperture measured from the +X axis, mirrored
+    /// across X by symmetry. `cap_angle: 180` is identical to [`SdfNode::Torus`].
+    CappedTorus {
+        major_radius: f32,
+        minor_radius: f32,
+        cap_angle: f32,
+    },
+    /// Exact. Chain-link shape: a torus (`major_radius`/`minor_radius`, ring in
+    /// XZ, tube toward Y) stretched by `half_length` along Z, capped by two
+    /// half-tori. `half_length: 0` is identical to [`SdfNode::Torus`].
+    Link {
+        major_radius: f32,
+        minor_radius: f32,
+        half_length: f32,
+    },
     /// Exact. Line segment `a`→`b` with radius.
     Capsule {
         a: [f32; 3],
@@ -125,6 +141,10 @@ pub enum SdfNode {
     CappedCylinder {
         radius: f32,
         half_height: f32,
+    },
+    /// Exact but unbounded along Y — sampling requires explicit bounds.
+    InfiniteCylinder {
+        radius: f32,
     },
     /// Exact (iq's sdCappedCone). Y-axis aligned; `r1` bottom, `r2` top.
     CappedCone {
@@ -156,6 +176,13 @@ pub enum SdfNode {
     SuperPrism {
         half_extents: [f32; 3],
         exponent: f32,
+    },
+    /// Exact. Hollow wireframe of a box: only the 12 edge beams (each
+    /// `thickness` thick) are solid. `half_extents` are the outer half-extents
+    /// of the box the frame is cut from.
+    BoxFrame {
+        half_extents: [f32; 3],
+        thickness: f32,
     },
 
     // ── Operators ──────────────────────────────────────────────────────────
@@ -389,6 +416,35 @@ impl SdfNode {
                 len2(qx, y) - minor_radius
             }
 
+            SdfNode::CappedTorus {
+                major_radius: ra,
+                minor_radius: rb,
+                cap_angle,
+            } => {
+                let (sin_a, cos_a) = cap_angle.to_radians().sin_cos();
+                let px = x.abs();
+                let pz = z;
+                let k = if cos_a * px > sin_a * pz {
+                    px * sin_a + pz * cos_a
+                } else {
+                    len2(px, pz)
+                };
+                (px * px + pz * pz + y * y + ra * ra - 2.0 * ra * k)
+                    .max(0.0)
+                    .sqrt()
+                    - rb
+            }
+
+            SdfNode::Link {
+                major_radius,
+                minor_radius,
+                half_length,
+            } => {
+                let qz = (z.abs() - half_length).max(0.0);
+                let ring = len2(x, qz) - major_radius;
+                len2(ring, y) - minor_radius
+            }
+
             SdfNode::Capsule { a, b, radius } => {
                 let pa = [x - a[0], y - a[1], z - a[2]];
                 let ba = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
@@ -409,6 +465,8 @@ impl SdfNode {
                 let dy = y.abs() - half_height;
                 dx.max(dy).min(0.0) + len2(dx.max(0.0), dy.max(0.0))
             }
+
+            SdfNode::InfiniteCylinder { radius } => len2(x, z) - radius,
 
             SdfNode::CappedCone {
                 half_height,
@@ -503,6 +561,28 @@ impl SdfNode {
                 let d_xz = (s.powf(1.0 / p) - 1.0) * b[0].min(b[2]);
                 let d_y = y.abs() - b[1];
                 d_xz.max(d_y).min(0.0) + len2(d_xz.max(0.0), d_y.max(0.0))
+            }
+
+            SdfNode::BoxFrame {
+                half_extents: b,
+                thickness: e,
+            } => {
+                let p = [x.abs() - b[0], y.abs() - b[1], z.abs() - b[2]];
+                let q = [
+                    (p[0] + e).abs() - e,
+                    (p[1] + e).abs() - e,
+                    (p[2] + e).abs() - e,
+                ];
+                // iq sdBoxFrame: three axis-aligned "leg" distances, each keeping
+                // one coordinate at the un-shrunk `p` value.
+                let leg = |v: [f32; 3]| {
+                    len3(v[0].max(0.0), v[1].max(0.0), v[2].max(0.0))
+                        + v[0].max(v[1]).max(v[2]).min(0.0)
+                };
+                let d1 = leg([p[0], q[1], q[2]]);
+                let d2 = leg([q[0], p[1], q[2]]);
+                let d3 = leg([q[0], q[1], p[2]]);
+                d1.min(d2).min(d3)
             }
 
             SdfNode::Union { children } => children
@@ -672,6 +752,24 @@ impl SdfNode {
                 *minor_radius,
                 major_radius + minor_radius,
             ),
+            SdfNode::CappedTorus {
+                major_radius,
+                minor_radius,
+                ..
+            } => sym(
+                major_radius + minor_radius,
+                *minor_radius,
+                major_radius + minor_radius,
+            ),
+            SdfNode::Link {
+                major_radius,
+                minor_radius,
+                half_length,
+            } => sym(
+                major_radius + minor_radius,
+                *minor_radius,
+                major_radius + minor_radius + half_length,
+            ),
             SdfNode::Capsule { a, b, radius } => Some(Aabb {
                 min: [
                     a[0].min(b[0]) - radius,
@@ -688,6 +786,7 @@ impl SdfNode {
                 radius,
                 half_height,
             } => sym(*radius, *half_height, *radius),
+            SdfNode::InfiniteCylinder { .. } => None,
             SdfNode::CappedCone {
                 half_height,
                 r1,
@@ -704,6 +803,9 @@ impl SdfNode {
                 half_height,
             } => sym(*radius, *half_height, *radius),
             SdfNode::SuperPrism {
+                half_extents: b, ..
+            } => sym(b[0], b[1], b[2]),
+            SdfNode::BoxFrame {
                 half_extents: b, ..
             } => sym(b[0], b[1], b[2]),
 
