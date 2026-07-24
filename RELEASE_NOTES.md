@@ -1,3 +1,35 @@
+# Nucleation v0.5.0
+
+**World segmentation.** A new `world_segment` module (feature `world-segment`)
+turns a whole world save — a directory or a streamed `.tar.gz` backup — into
+individual builds, each a normal schematic plus a provenance envelope recording
+where it came from. The natural ground is learned from the world itself
+(`WorldProfile::derive`) and subtracted so terrain stops gluing structures
+together; morphological closing keeps a machine and its floating wiring as one
+build; clusters that cross region boundaries are stitched back together by a
+merge that is associative, commutative, and idempotent (property-tested), so
+partial results combine in any order. Every build is tiered
+`Confident`/`Probable`/`Debris` from explainable signals — debris is labeled,
+never deleted.
+
+The pipeline is deterministic end to end: no clock, no randomness, no
+iteration-order dependence — the same bytes and configuration produce
+byte-identical builds and provenance, verified by re-running a real 845-region
+(1.6 GB) world to identical output. That world became ~4,500 addressable builds
+in about half an hour through the streaming runner
+(`WorldSegmenter::run_streaming`), which emits builds one at a time instead of
+holding them all.
+
+Optional **partition hints** (any set of named boxes — a plot grid, districts)
+guarantee no build ever spans a boundary, with per-partition floor detection for
+parcelled worlds where each owner floors their plot differently. Re-extracting a
+newer snapshot matches builds by overlap (`match_snapshots`), so an edited build
+keeps its `StableBuildId` and simply gains a new fingerprint — splits and merges
+are labeled as such. The full story, calibration knobs, and gotchas are in
+[the world segmentation guide](docs/features/world-segmentation.md); the runner
+is exposed across the generated bindings (`WsSegmentJob`, `WsPartitionHints`,
+`WsProfile`, `WsRunResult`).
+
 # Nucleation v0.4.1
 
 **Python file I/O compatibility.** The generated Python `Schematic` binding
