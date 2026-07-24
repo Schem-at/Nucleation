@@ -44,6 +44,7 @@ struct Cli {
     sample: usize,
     coverage: f32,
     palette_share: f32,
+    floor_share: f32,
 }
 
 fn parse_args() -> Cli {
@@ -60,6 +61,12 @@ fn parse_args() -> Cli {
     // band at -63 and missed the rest of the natural slab.
     let mut coverage: f32 = 0.3;
     let mut palette_share: f32 = 0.01;
+    // Partition-scoped floor subtraction: a name filling at least this share of
+    // a plot's in-band blocks is subtracted as that plot's floor, on top of the
+    // global palette. 0 or negative disables it. Fixes the real-data failure
+    // where owner-chosen floors (globally rare, locally dominant) form 255x255
+    // sheets that closing fuses into whole-plot mega-clusters.
+    let mut floor_share: f32 = 0.3;
 
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut i = 0;
@@ -110,6 +117,14 @@ fn parse_args() -> Cli {
                     .expect("--palette-share must be a float");
                 i += 2;
             }
+            "--floor-share" => {
+                floor_share = args
+                    .get(i + 1)
+                    .expect("--floor-share needs a value")
+                    .parse()
+                    .expect("--floor-share must be a float");
+                i += 2;
+            }
             other => {
                 eprintln!("wol_extract: ignoring unrecognized argument {other}");
                 i += 1;
@@ -117,7 +132,7 @@ fn parse_args() -> Cli {
         }
     }
 
-    Cli { tarball, plots, out, limit, sample, coverage, palette_share }
+    Cli { tarball, plots, out, limit, sample, coverage, palette_share, floor_share }
 }
 
 /// One row of `wol-project/data-ore-plots-build-20260723.json`.
@@ -340,11 +355,18 @@ fn main() {
     drop(samples);
 
     // 3. Build the segmentation job.
+    // 0 or negative disables the per-partition floor subtraction entirely.
+    let partition_floor_share = if cli.floor_share > 0.0 { Some(cli.floor_share) } else { None };
+    println!(
+        "wol_extract: partition_floor_share = {partition_floor_share:?} (from --floor-share {})",
+        cli.floor_share
+    );
     let job = SegmentJob {
         config: SegConfig {
             cell_size: 4,
             closing_radius: 2,
             partition_policy: PartitionPolicy::HardCut,
+            partition_floor_share,
             ..SegConfig::default()
         },
         score_config: ScoreConfig::default(),

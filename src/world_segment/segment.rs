@@ -31,7 +31,11 @@ use crate::world_segment::partition::{PartitionIndex, PartitionPolicy};
 use crate::world_segment::profile::WorldProfile;
 use crate::world_segment::tile::VoxelTile;
 
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+// `Eq` is deliberately absent: `partition_floor_share` is an `Option<f32>`, and
+// `f32` is only `PartialEq`, not `Eq`. No consumer needs `SegConfig: Eq`
+// (`SegmentJob` derives only `Clone`/`Debug`, and the tests compare
+// `TileSegments`, not configs), so `PartialEq` alone is sufficient.
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct SegConfig {
     /// Occupancy cell edge, in blocks.
     pub cell_size: u32,
@@ -56,6 +60,24 @@ pub struct SegConfig {
     pub min_cluster_blocks: u64,
     pub partition_policy: PartitionPolicy,
     pub algorithm_version: u32,
+    /// If set, names that account for at least this share of a partition's
+    /// blocks within the substrate Y band are subtracted as that partition's
+    /// floor, in addition to the global palette. `None` disables (default).
+    /// Generic: floors are whatever material locally dominates a partition's
+    /// band layer.
+    ///
+    /// # Scope
+    ///
+    /// This is a *per-partition* subtraction, so it only bites where a block
+    /// actually falls inside some hint. It is therefore inert unless partitions
+    /// are in force — i.e. [`PartitionPolicy::HardCut`] with non-empty hints.
+    /// Under [`PartitionPolicy::Off`] and [`PartitionPolicy::Prefer`] no block
+    /// has a partition (both take the unpartitioned path), so no floor material
+    /// is ever detected and classification stays global-palette-only. A block
+    /// that lies outside every hint under `HardCut` likewise keeps
+    /// global-palette-only classification, since it belongs to no partition
+    /// whose local floor could be defined.
+    pub partition_floor_share: Option<f32>,
 }
 
 impl SegConfig {
@@ -65,9 +87,10 @@ impl SegConfig {
     /// Folded into every [`ClusterId`], so an id identifies a cluster *under a
     /// stated configuration* rather than merely a position. Two runs that
     /// disagree on `cell_size`, `closing_radius`, `min_cluster_blocks`,
-    /// `partition_policy`, `algorithm_version`, the world profile, or — under
-    /// [`PartitionPolicy::HardCut`] — the partition hints, can never mint the
-    /// same id, which is what makes the ids safe to use as cache keys.
+    /// `partition_policy`, `algorithm_version`, `partition_floor_share`, the
+    /// world profile, or — under [`PartitionPolicy::HardCut`] — the partition
+    /// hints, can never mint the same id, which is what makes the ids safe to
+    /// use as cache keys.
     ///
     /// # What is covered
     ///
@@ -108,17 +131,46 @@ impl SegConfig {
                 ContentId::of(&[b"parthints.ignored"])
             }
         };
-        ContentId::of(&[
+        // `partition_floor_share` is folded in as a **backward-compatible
+        // extension**, not a format bump: a `None` config appends nothing and
+        // therefore digests byte-for-byte identically to the pre-feature `v2`
+        // layout, so every existing `ClusterId` — golden-pinned in the
+        // determinism suite — is unchanged, honouring "None preserves behavior
+        // byte-for-byte". A `Some` config appends one extra `[1u8, f32 LE]`
+        // part; since `ContentId::of` length-frames each part *and* the running
+        // digest distinguishes an 8-part input from a 9-part one, a `Some`
+        // config can never collide with any `None` config, and two `Some`s
+        // differ by their float bits. `Some(0.0)` is thus distinct from `None`.
+        let floor_share: Option<[u8; 5]> = self.partition_floor_share.map(|s| {
+            let mut v = [1u8; 5];
+            v[1..].copy_from_slice(&s.to_le_bytes());
+            v
+        });
+        // Bound to locals so the `to_le_bytes` temporaries outlive the
+        // `ContentId::of` call rather than being dropped at the end of a `let`.
+        let cell = self.cell_size.to_le_bytes();
+        let closing = self.closing_radius.to_le_bytes();
+        let min = self.min_cluster_blocks.to_le_bytes();
+        let algo = self.algorithm_version.to_le_bytes();
+        let policy_bytes = [policy];
+        let profile_hash = profile.profile_hash();
+        let mut parts: Vec<&[u8]> = vec![
             // v2: the partition hints joined the input in this version.
+            // `partition_floor_share` is a backward-compatible extension of v2
+            // (appended only when `Some`), so the version stays v2.
             b"segconfig.v2",
-            &self.cell_size.to_le_bytes(),
-            &self.closing_radius.to_le_bytes(),
-            &self.min_cluster_blocks.to_le_bytes(),
-            &[policy],
-            &self.algorithm_version.to_le_bytes(),
-            profile.profile_hash().as_bytes(),
+            &cell,
+            &closing,
+            &min,
+            &policy_bytes,
+            &algo,
+            profile_hash.as_bytes(),
             hints.as_bytes(),
-        ])
+        ];
+        if let Some(bytes) = floor_share.as_ref() {
+            parts.push(bytes);
+        }
+        ContentId::of(&parts)
     }
 }
 
@@ -130,6 +182,7 @@ impl Default for SegConfig {
             min_cluster_blocks: 1,
             partition_policy: PartitionPolicy::Off,
             algorithm_version: 1,
+            partition_floor_share: None,
         }
     }
 }
@@ -266,6 +319,18 @@ fn segment_tile_inner(
     //
     // Cost is unchanged in the usual case: grids are sparse `BTreeSet`s, one
     // per occupied partition, and a block is marked exactly once.
+    // Partition-scoped floor materials, keyed by the SAME partition index the
+    // loop below resolves each block to. Empty (and skipped entirely) unless the
+    // caller opted in with `partition_floor_share` AND partitions are in force,
+    // so the `None` default is byte-for-byte inert: `floor_materials.get(..)` is
+    // always `None` and the extra `continue` branch never fires.
+    let (band_lo, band_hi) = profile.substrate_y_band;
+    let floor_materials: BTreeMap<u32, std::collections::BTreeSet<String>> =
+        match (use_partitions, config.partition_floor_share) {
+            (true, Some(share)) => partition_floor_materials(tile, profile, partitions, share),
+            _ => BTreeMap::new(),
+        };
+
     let mut artificial: Vec<((i32, i32, i32), Option<u32>)> = Vec::new();
     let mut grids: BTreeMap<Option<u32>, OccupancyGrid> = BTreeMap::new();
     for (pos, state) in tile.blocks() {
@@ -276,6 +341,20 @@ fn segment_tile_inner(
         // the caller supplied the hints in.
         let pidx =
             if use_partitions { partitions.id_index_at(pos.0, pos.1, pos.2) } else { None };
+        // Partition-scoped floor subtraction: a block in the substrate band
+        // whose name locally dominates its own partition's band layer is that
+        // partition's floor, and is dropped exactly like global substrate. This
+        // is *in addition to* the global palette check above; a block outside
+        // every hint has `pidx == None` and is never touched here.
+        if let Some(p) = pidx {
+            if pos.1 >= band_lo && pos.1 <= band_hi {
+                if let Some(names) = floor_materials.get(&p) {
+                    if names.contains(state.get_name()) {
+                        continue;
+                    }
+                }
+            }
+        }
         artificial.push((pos, pidx));
         grids
             .entry(pidx)
@@ -513,6 +592,58 @@ fn assign_ids(
     }
 
     (cluster_of_cell, partition_of_cluster)
+}
+
+/// For each partition present in the tile, the set of block names that
+/// locally dominate that partition's blocks *within the substrate Y band* —
+/// i.e. names whose count reaches `share` of the partition's in-band block
+/// total. These are subtracted as the partition's floor in addition to the
+/// global palette.
+///
+/// The scope is deliberately per-partition: a plot's floor is an owner-chosen
+/// material that is globally rare (so no global palette can catch it) yet
+/// locally dominant within its own plot. A global threshold structurally
+/// cannot express that; the partition is the right scope, and this is the one
+/// place that knows each block's partition.
+///
+/// # Determinism
+///
+/// Counting is into a `BTreeMap` keyed by `(partition index, name)`, and the
+/// per-partition total into a `BTreeMap` keyed by index, so neither the counts
+/// nor which names cross the threshold depend on the order the tile's blocks
+/// were iterated. Membership depends only on content.
+///
+/// Only blocks that actually fall inside some hint (`id_index_at` is `Some`)
+/// are counted; a block outside every hint has no partition whose local floor
+/// it could define.
+fn partition_floor_materials(
+    tile: &VoxelTile,
+    profile: &WorldProfile,
+    partitions: &PartitionIndex,
+    share: f32,
+) -> BTreeMap<u32, std::collections::BTreeSet<String>> {
+    let (lo, hi) = profile.substrate_y_band;
+    let mut counts: BTreeMap<(u32, String), u64> = BTreeMap::new();
+    let mut totals: BTreeMap<u32, u64> = BTreeMap::new();
+    for (pos, state) in tile.blocks() {
+        if pos.1 < lo || pos.1 > hi {
+            continue;
+        }
+        let Some(p) = partitions.id_index_at(pos.0, pos.1, pos.2) else { continue };
+        *counts.entry((p, state.get_name().to_string())).or_insert(0) += 1;
+        *totals.entry(p).or_insert(0) += 1;
+    }
+
+    let share = share as f64;
+    let mut floors: BTreeMap<u32, std::collections::BTreeSet<String>> = BTreeMap::new();
+    for ((p, name), count) in counts {
+        // `totals[&p]` exists and is >= count >= 1, so the division is safe.
+        let total = totals[&p];
+        if (count as f64) / (total as f64) >= share {
+            floors.entry(p).or_default().insert(name);
+        }
+    }
+    floors
 }
 
 /// Number of cells spanning the inclusive range `[lo, hi]`.
@@ -1386,5 +1517,196 @@ mod tests {
         let a = segment_tile(&t, &profile, &cfg, &PartitionIndex::new(vec![]));
         let (b, _) = segment_tile_membership(&t, &profile, &cfg, &PartitionIndex::new(vec![]));
         assert_eq!(a, b, "membership variant must return identical TileSegments");
+    }
+
+    /// Profile whose only *global* substrate is stone; the plot floors below
+    /// (wool, concrete) are globally rare, so a global palette cannot catch
+    /// them — only the per-partition floor pass can.
+    fn floor_profile() -> WorldProfile {
+        WorldProfile::new(["minecraft:stone"].iter().map(|s| s.to_string()).collect(), (-64, -57))
+    }
+
+    /// Two plots side by side, each a solid floor sheet with two redstone
+    /// builds standing on it 24 blocks apart. Returns `(hints, blocks)`.
+    ///
+    /// # Hand-verified arithmetic (cell_size 4, closing_radius 2, origin.y -64)
+    ///
+    /// Merge threshold is `2R+1 = 5` cells along an axis.
+    /// * L floor: blue_wool at y=-60, x 4..=35, z 4..=15 (32*12 = 384 blocks).
+    ///   Cells x 1..=8, z 1..=3, y-cell (-60+64)/4 = 1 — a solid rectangle.
+    /// * L builds: redstone_wire at (8,-59,10) and (32,-59,10). Cells
+    ///   (2,1,2) and (8,1,2): both lie *inside* the sheet's cell footprint, so
+    ///   with the floor present all of L is one component (1 cluster). Their
+    ///   Chebyshev cell distance is 8-2 = 6 = 2R+2, so with the floor removed
+    ///   they do NOT merge (2 clusters).
+    /// * R is the mirror: white_concrete at y=-60, x 68..=99, z 4..=15; builds
+    ///   at (72,-59,10) cell (18,1,2) and (96,-59,10) cell (24,1,2), distance 6.
+    /// * Band (-64,-57) contains both y=-60 and y=-59. In L the band holds
+    ///   384 wool + 2 redstone = 386 blocks: wool 384/386 = 99.5% >= 0.3 is
+    ///   floor, redstone 2/386 = 0.5% < 0.3 is kept. R is identical with
+    ///   concrete. Boundary x=63|64 is between the plots, cell-aligned and never
+    ///   crossed by any block (L ends at x=35, R starts at x=68).
+    fn two_plots() -> (PartitionIndex, Vec<((i32, i32, i32), &'static str)>) {
+        let hints = PartitionIndex::new(vec![
+            PartitionHint { id: "L".into(), bbox_xz: (0, 63, 0, 127), y_range: None },
+            PartitionHint { id: "R".into(), bbox_xz: (64, 127, 0, 127), y_range: None },
+        ]);
+        let mut blocks: Vec<((i32, i32, i32), &'static str)> = Vec::new();
+        for x in 4..=35 {
+            for z in 4..=15 {
+                blocks.push(((x, -60, z), "minecraft:blue_wool"));
+            }
+        }
+        for x in 68..=99 {
+            for z in 4..=15 {
+                blocks.push(((x, -60, z), "minecraft:white_concrete"));
+            }
+        }
+        blocks.push(((8, -59, 10), "minecraft:redstone_wire"));
+        blocks.push(((32, -59, 10), "minecraft:redstone_wire"));
+        blocks.push(((72, -59, 10), "minecraft:redstone_wire"));
+        blocks.push(((96, -59, 10), "minecraft:redstone_wire"));
+        (hints, blocks)
+    }
+
+    #[test]
+    fn partition_floor_is_subtracted_per_partition() {
+        let (hints, blocks) = two_plots();
+
+        // With the floor pass ON: each plot's dominant floor material is
+        // subtracted, leaving only the two builds per plot — 24 blocks apart,
+        // so they do not merge. Four small builds, no plot-sheet mega-cluster.
+        let on = SegConfig {
+            partition_policy: PartitionPolicy::HardCut,
+            partition_floor_share: Some(0.3),
+            ..cfg()
+        };
+        let segs = segment_tile(&tile(blocks.clone()), &floor_profile(), &on, &hints);
+        assert_eq!(
+            segs.clusters.len(),
+            4,
+            "floor subtracted: two separate builds per plot, four total; got {:?}",
+            segs.clusters.iter().map(|c| (c.bbox, c.block_count)).collect::<Vec<_>>()
+        );
+        for c in &segs.clusters {
+            let x_extent = c.bbox.1 .0 - c.bbox.0 .0;
+            assert!(
+                x_extent < 15,
+                "each build is small; a plot-sheet bbox would span the whole plot. bbox {:?}",
+                c.bbox
+            );
+            assert_eq!(
+                c.block_count, 1,
+                "only the one-block build survives, not the 384-block floor sheet"
+            );
+        }
+
+        // With the floor pass OFF (None): the floor sheet survives as an
+        // artificial slab and morphological closing fuses both builds and the
+        // whole sheet into one mega-cluster per plot — the exact real-data
+        // failure. This is the discriminating case: None => merged blobs.
+        let off = SegConfig { partition_policy: PartitionPolicy::HardCut, ..cfg() };
+        assert!(off.partition_floor_share.is_none());
+        let merged = segment_tile(&tile(blocks), &floor_profile(), &off, &hints);
+        assert_eq!(
+            merged.clusters.len(),
+            2,
+            "no floor subtraction: one whole-plot mega-cluster per partition"
+        );
+        for c in &merged.clusters {
+            assert!(
+                c.block_count > 300,
+                "the merged cluster swallows the ~384-block floor sheet; got {}",
+                c.block_count
+            );
+        }
+    }
+
+    #[test]
+    fn floor_share_none_is_behavior_preserving() {
+        // The default disables the feature entirely.
+        assert!(SegConfig::default().partition_floor_share.is_none());
+
+        // An explicit `None` must be byte-for-byte identical to the pre-feature
+        // path across every existing scenario shape: a plain build, a build on
+        // global substrate, and a HardCut split. `cfg()` already carries
+        // `partition_floor_share: None` via `..SegConfig::default()`, so an
+        // explicit `None` cannot diverge from it — but pin it against a config
+        // that never mentions the field, exercised on real inputs.
+        let explicit_none = SegConfig { partition_floor_share: None, ..cfg() };
+
+        // (a) plain build.
+        let plain = vec![
+            ((10, 10, 10), "minecraft:redstone_wire"),
+            ((18, 10, 10), "minecraft:redstone_wire"),
+        ];
+        assert_eq!(
+            segment_tile(&tile(plain.clone()), &profile(), &cfg(), &no_hints()),
+            segment_tile(&tile(plain), &profile(), &explicit_none, &no_hints()),
+        );
+
+        // (b) build standing on global substrate.
+        let mut slab = vec![];
+        for x in 0..40 {
+            for z in 0..40 {
+                slab.push(((x, -60, z), "minecraft:stone"));
+            }
+        }
+        slab.push(((10, -59, 10), "minecraft:redstone_wire"));
+        slab.push(((30, -59, 30), "minecraft:redstone_wire"));
+        assert_eq!(
+            segment_tile(&tile(slab.clone()), &profile(), &cfg(), &no_hints()),
+            segment_tile(&tile(slab), &profile(), &explicit_none, &no_hints()),
+        );
+
+        // (c) HardCut with hints, floor feature off: partitions still enforced,
+        // floor pass inert.
+        let hints = PartitionIndex::new(vec![
+            PartitionHint { id: "left".into(), bbox_xz: (0, 13, 0, 127), y_range: None },
+            PartitionHint { id: "right".into(), bbox_xz: (14, 127, 0, 127), y_range: None },
+        ]);
+        let hard = SegConfig { partition_policy: PartitionPolicy::HardCut, ..cfg() };
+        let hard_none = SegConfig { partition_floor_share: None, ..hard.clone() };
+        let split = vec![
+            ((10, 10, 10), "minecraft:redstone_wire"),
+            ((18, 10, 10), "minecraft:redstone_wire"),
+        ];
+        assert_eq!(
+            segment_tile(&tile(split.clone()), &profile(), &hard, &hints),
+            segment_tile(&tile(split), &profile(), &hard_none, &hints),
+        );
+    }
+
+    #[test]
+    fn config_hash_changes_with_floor_share() {
+        // Two configs differing only in `partition_floor_share` must digest
+        // differently, so a downstream cache keyed on `ClusterId` cannot serve
+        // one run's clusters for the other's.
+        let parts = PartitionIndex::new(vec![PartitionHint {
+            id: "L".into(),
+            bbox_xz: (0, 63, 0, 127),
+            y_range: None,
+        }]);
+        let base = SegConfig { partition_policy: PartitionPolicy::HardCut, ..cfg() };
+        let with_floor = SegConfig { partition_floor_share: Some(0.3), ..base.clone() };
+        assert_ne!(
+            base.config_hash(&floor_profile(), &parts),
+            with_floor.config_hash(&floor_profile(), &parts),
+            "partition_floor_share must be folded into config_hash"
+        );
+
+        // And the difference reaches the minted ClusterIds. The single build is
+        // outside the band (y=10), so the floor pass cannot change its geometry
+        // — only the hash differs, isolating the id change to config_hash.
+        let probe = vec![((10, 10, 40), "minecraft:redstone_wire")];
+        let a = segment_tile(&tile(probe.clone()), &floor_profile(), &base, &parts);
+        let b = segment_tile(&tile(probe), &floor_profile(), &with_floor, &parts);
+        assert_eq!(a.clusters.len(), 1);
+        assert_eq!(b.clusters.len(), 1);
+        assert_eq!(a.clusters[0].bbox, b.clusters[0].bbox, "geometry identical");
+        assert_ne!(
+            a.clusters[0].id, b.clusters[0].id,
+            "different partition_floor_share must mint different ids"
+        );
     }
 }
