@@ -40,23 +40,23 @@ class IoLayout internal constructor (
         internal val libClass: Class<IoLayoutLib> = IoLayoutLib::class.java
         internal val lib: IoLayoutLib = Native.load("nucleation", libClass)
     }
-    
+
     /** Input names as a JSON array string.
     */
     fun inputNamesJson(): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.IoLayout_input_names_json(handle, write);
-        
+
         val returnString = DW.writeToString(write)
         return returnString
     }
-    
+
     /** Output names as a JSON array string.
     */
     fun outputNamesJson(): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.IoLayout_output_names_json(handle, write);
-        
+
         val returnString = DW.writeToString(write)
         return returnString
     }

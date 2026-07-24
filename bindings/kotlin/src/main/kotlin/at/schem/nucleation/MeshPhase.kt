@@ -23,7 +23,7 @@ enum class MeshPhase {
 
     companion object {
         internal val libClass: Class<MeshPhaseLib> = MeshPhaseLib::class.java
-        internal val lib: MeshPhaseLib = Native.load("nucleation", libClass) 
+        internal val lib: MeshPhaseLib = Native.load("nucleation", libClass)
         fun fromNative(native: Int): MeshPhase {
             return MeshPhase.entries[native]
         }

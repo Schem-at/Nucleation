@@ -10,7 +10,7 @@ void add_ResourcePack_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::ResourcePack::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::ResourcePack> opaque(mod, "ResourcePack", nb::type_slots(nucleation_ResourcePack_slots));
     opaque
         .def("add_blockstate_json", &nucleation::ResourcePack::add_blockstate_json, "name"_a, "json"_a)
@@ -32,4 +32,4 @@ void add_ResourcePack_binding(nb::module_ mod) {
         .def("texture_count", &nucleation::ResourcePack::texture_count);
 }
 
-} 
+}

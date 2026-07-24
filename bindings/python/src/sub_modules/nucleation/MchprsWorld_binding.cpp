@@ -10,7 +10,7 @@ void add_MchprsWorld_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::MchprsWorld::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::MchprsWorld> opaque(mod, "MchprsWorld", nb::type_slots(nucleation_MchprsWorld_slots));
     opaque
         .def("check_custom_io_changes", &nucleation::MchprsWorld::check_custom_io_changes)
@@ -36,4 +36,4 @@ void add_MchprsWorld_binding(nb::module_ mod) {
         .def("tick", &nucleation::MchprsWorld::tick, "ticks"_a);
 }
 
-} 
+}

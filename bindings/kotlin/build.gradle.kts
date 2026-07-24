@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "at.schem"
-version = (findProperty("nucleationVersion") as String?) ?: "0.3.0"
+version = (findProperty("nucleationVersion") as String?) ?: "0.4.1"
 
 repositories {
     mavenCentral()
@@ -20,6 +20,9 @@ dependencies {
 
 kotlin {
     jvmToolchain(21)
+    sourceSets.named("main") {
+        kotlin.srcDir("custom")
+    }
 }
 
 // Smoke program (smoke/Smoke.kt) lives outside src/ because

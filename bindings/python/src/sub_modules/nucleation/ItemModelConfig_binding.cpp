@@ -9,7 +9,7 @@ void add_ItemModelConfig_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::ItemModelConfig::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::ItemModelConfig> opaque(mod, "ItemModelConfig", nb::type_slots(nucleation_ItemModelConfig_slots));
     opaque
         .def_static("create", std::move(maybe_op_unwrap(&nucleation::ItemModelConfig::create)), "model_name"_a)
@@ -23,4 +23,4 @@ void add_ItemModelConfig_binding(nb::module_ mod) {
         .def("set_texture_resolution", &nucleation::ItemModelConfig::set_texture_resolution, "resolution"_a);
 }
 
-} 
+}

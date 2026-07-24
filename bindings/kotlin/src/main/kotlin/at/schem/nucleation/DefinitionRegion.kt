@@ -82,45 +82,45 @@ class DefinitionRegion internal constructor (
         internal val libClass: Class<DefinitionRegionLib> = DefinitionRegionLib::class.java
         internal val lib: DefinitionRegionLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Create a new empty region (no boxes, no metadata).
         */
         fun create(): DefinitionRegion {
-            
+
             val returnVal = lib.DefinitionRegion_create();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = DefinitionRegion(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** A region consisting of a single inclusive box. Min/max are swapped
         *per axis if given out of order.
         */
         fun fromBounds(minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int): DefinitionRegion {
-            
+
             val returnVal = lib.DefinitionRegion_from_bounds(minX, minY, minZ, maxX, maxY, maxZ);
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = DefinitionRegion(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Build a region from single-block positions crossing as flat `[i32]`
         *chunked in threes (PORTING rule 7). Errors with `InvalidArgument` if
         *the length is not a multiple of 3.
         */
         fun fromPositions(positions: IntArray): Result<DefinitionRegion> {
             val positionsSliceMemory = PrimitiveArrayTools.borrow(positions)
-            
+
             val returnVal = lib.DefinitionRegion_from_positions(positionsSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = DefinitionRegion(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -131,20 +131,20 @@ class DefinitionRegion internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Build a region from bounding boxes crossing as flat `[i32]` chunked in
         *sixes (`min_x, min_y, min_z, max_x, max_y, max_z` per box). Errors
         *with `InvalidArgument` if the length is not a multiple of 6.
         */
         fun fromBoundingBoxes(boxes: IntArray): Result<DefinitionRegion> {
             val boxesSliceMemory = PrimitiveArrayTools.borrow(boxes)
-            
+
             val returnVal = lib.DefinitionRegion_from_bounding_boxes(boxesSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = DefinitionRegion(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -155,30 +155,30 @@ class DefinitionRegion internal constructor (
             }
         }
     }
-    
+
     /** Add an inclusive box to the region. Min/max are swapped per axis if
     *given out of order.
     */
     fun addBounds(minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int): Unit {
-        
+
         val returnVal = lib.DefinitionRegion_add_bounds(handle, minX, minY, minZ, maxX, maxY, maxZ);
-        
+
     }
-    
+
     /** Add a single block position (a 1x1x1 box) to the region.
     */
     fun addPoint(x: Int, y: Int, z: Int): Unit {
-        
+
         val returnVal = lib.DefinitionRegion_add_point(handle, x, y, z);
-        
+
     }
-    
+
     /** Set a metadata entry (insert or overwrite the key).
     */
     fun setMetadata(key: String, value: String): Result<Unit> {
         val keySliceMemory = PrimitiveArrayTools.borrowUtf8(key)
         val valueSliceMemory = PrimitiveArrayTools.borrowUtf8(value)
-        
+
         val returnVal = lib.DefinitionRegion_set_metadata(handle, keySliceMemory.slice, valueSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -192,7 +192,7 @@ class DefinitionRegion internal constructor (
             valueSliceMemory.close()
         }
     }
-    
+
     /** Errors with `NotFound` when the key is absent.
     */
     fun getMetadata(key: String): Result<String> {
@@ -202,7 +202,7 @@ class DefinitionRegion internal constructor (
         try {
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
-                
+
                 val returnString = DW.writeToString(write)
                 return returnString.ok()
             } else {
@@ -212,7 +212,7 @@ class DefinitionRegion internal constructor (
             keySliceMemory.close()
         }
     }
-    
+
     /** The full metadata map, written as a JSON object string (the old ABI
     *returned an array of `"key=value"` strings).
     */
@@ -221,14 +221,14 @@ class DefinitionRegion internal constructor (
         val returnVal = lib.DefinitionRegion_all_metadata_json(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** The metadata keys, written as a JSON array string.
     */
     fun metadataKeysJson(): Result<String> {
@@ -236,20 +236,20 @@ class DefinitionRegion internal constructor (
         val returnVal = lib.DefinitionRegion_metadata_keys_json(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Store a filter expression in the region's metadata under the `filter`
     *key.
     */
     fun addFilter(filter: String): Result<Unit> {
         val filterSliceMemory = PrimitiveArrayTools.borrowUtf8(filter)
-        
+
         val returnVal = lib.DefinitionRegion_add_filter(handle, filterSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -262,113 +262,113 @@ class DefinitionRegion internal constructor (
             filterSliceMemory.close()
         }
     }
-    
+
     /** `true` if the region contains no boxes.
     */
     fun isEmpty(): Boolean {
-        
+
         val returnVal = lib.DefinitionRegion_is_empty(handle);
         return (returnVal > 0)
     }
-    
+
     /** The total volume in blocks, summed box by box: positions covered by
     *several overlapping boxes are counted once per box.
     */
     fun volume(): ULong {
-        
+
         val returnVal = lib.DefinitionRegion_volume(handle);
         return (returnVal.toULong())
     }
-    
+
     /** Whether the position lies inside any of the region's boxes.
     */
     fun contains(x: Int, y: Int, z: Int): Boolean {
-        
+
         val returnVal = lib.DefinitionRegion_contains(handle, x, y, z);
         return (returnVal > 0)
     }
-    
+
     /** Translate every box by (`dx`, `dy`, `dz`) in place.
     */
     fun shift(dx: Int, dy: Int, dz: Int): Unit {
-        
+
         val returnVal = lib.DefinitionRegion_shift(handle, dx, dy, dz);
-        
+
     }
-    
+
     /** Grow every box in place by (`x`, `y`, `z`) outward on both sides of
     *each axis. Negative values contract; boxes that shrink away are
     *removed.
     */
     fun expand(x: Int, y: Int, z: Int): Unit {
-        
+
         val returnVal = lib.DefinitionRegion_expand(handle, x, y, z);
-        
+
     }
-    
+
     /** Shrink every box in place by `amount` on all sides (the inverse of
     *a uniform `expand`); boxes that shrink away are removed.
     */
     fun contract(amount: Int): Unit {
-        
+
         val returnVal = lib.DefinitionRegion_contract(handle, amount);
-        
+
     }
-    
+
     /** A new region: the intersection of `self` and `other`.
     */
     fun intersected(other: DefinitionRegion): DefinitionRegion {
-        
+
         val returnVal = lib.DefinitionRegion_intersected(handle, other.handle);
         val selfEdges: List<Any> = listOf()
-        val handle = returnVal 
+        val handle = returnVal
         val returnOpaque = DefinitionRegion(handle, selfEdges, true)
         return returnOpaque
     }
-    
+
     /** A new region: the union of `self` and `other`.
     */
     fun unionWith(other: DefinitionRegion): DefinitionRegion {
-        
+
         val returnVal = lib.DefinitionRegion_union_with(handle, other.handle);
         val selfEdges: List<Any> = listOf()
-        val handle = returnVal 
+        val handle = returnVal
         val returnOpaque = DefinitionRegion(handle, selfEdges, true)
         return returnOpaque
     }
-    
+
     /** A new region: `self` minus `other`.
     */
     fun subtracted(other: DefinitionRegion): DefinitionRegion {
-        
+
         val returnVal = lib.DefinitionRegion_subtracted(handle, other.handle);
         val selfEdges: List<Any> = listOf()
-        val handle = returnVal 
+        val handle = returnVal
         val returnOpaque = DefinitionRegion(handle, selfEdges, true)
         return returnOpaque
     }
-    
+
     /** Merge `other`'s boxes and metadata into `self`.
     */
     fun merge(other: DefinitionRegion): Unit {
-        
+
         val returnVal = lib.DefinitionRegion_merge(handle, other.handle);
-        
+
     }
-    
+
     /** Union `other`'s boxes into `self` in place.
     */
     fun unionInto(other: DefinitionRegion): Unit {
-        
+
         val returnVal = lib.DefinitionRegion_union_into(handle, other.handle);
-        
+
     }
-    
+
     /** The overall bounding box. Errors with `NotFound` when the region is
     *empty.
     */
     fun bounds(): Result<RegionBounds> {
-        
+
         val returnVal = lib.DefinitionRegion_bounds(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -378,22 +378,22 @@ class DefinitionRegion internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** The (width, height, length) of the overall bounding box; all zeros
     *when the region is empty.
     */
     fun dimensions(): Dimensions {
-        
+
         val returnVal = lib.DefinitionRegion_dimensions(handle);
         val returnStruct = Dimensions.fromNative(returnVal)
         return returnStruct
     }
-    
+
     /** The center block position. Errors with `NotFound` when the region is
     *empty.
     */
     fun center(): Result<BlockPos> {
-        
+
         val returnVal = lib.DefinitionRegion_center(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -403,7 +403,7 @@ class DefinitionRegion internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** The exact (fractional) center, written as a JSON `[x, y, z]` array of
     *floats. Errors with `NotFound` when the region is empty.
     */
@@ -412,14 +412,14 @@ class DefinitionRegion internal constructor (
         val returnVal = lib.DefinitionRegion_center_f32_json(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Every contained position, written as a flat JSON array of ints
     *(`[x0, y0, z0, x1, y1, z1, …]`), deduplicated, in box order.
     */
@@ -428,14 +428,14 @@ class DefinitionRegion internal constructor (
         val returnVal = lib.DefinitionRegion_positions_json(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Every contained position in sorted (y, z, x) order, written as a flat
     *JSON array of ints.
     */
@@ -444,26 +444,26 @@ class DefinitionRegion internal constructor (
         val returnVal = lib.DefinitionRegion_positions_sorted_json(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** The number of boxes making up this region.
     */
     fun boxCount(): UInt {
-        
+
         val returnVal = lib.DefinitionRegion_box_count(handle);
         return (returnVal.toUInt())
     }
-    
+
     /** The box at `index`. Errors with `NotFound` when out of range.
     */
     fun getBox(index: UInt): Result<RegionBounds> {
-        
+
         val returnVal = lib.DefinitionRegion_get_box(handle, FFIUint32(index));
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -473,7 +473,7 @@ class DefinitionRegion internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Every box, written as a flat JSON array of ints (six ints per box:
     *`min_x, min_y, min_z, max_x, max_y, max_z`).
     */
@@ -482,52 +482,52 @@ class DefinitionRegion internal constructor (
         val returnVal = lib.DefinitionRegion_boxes_json(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Whether all positions form a single face-connected (6-connectivity)
     *component. `true` for empty and single-block regions.
     */
     fun isContiguous(): Boolean {
-        
+
         val returnVal = lib.DefinitionRegion_is_contiguous(handle);
         return (returnVal > 0)
     }
-    
+
     /** The number of face-connected (6-connectivity) components; 0 when
     *the region is empty.
     */
     fun connectedComponents(): UInt {
-        
+
         val returnVal = lib.DefinitionRegion_connected_components(handle);
         return (returnVal.toUInt())
     }
-    
+
     /** Merge overlapping/adjacent boxes into a minimal representation.
     */
     fun simplify(): Unit {
-        
+
         val returnVal = lib.DefinitionRegion_simplify(handle);
-        
+
     }
-    
+
     /** A new region containing only the positions where `schematic` has a
     *block named `block_name`.
     */
     fun filterByBlock(schematic: Schematic, blockName: String): Result<DefinitionRegion> {
         val blockNameSliceMemory = PrimitiveArrayTools.borrowUtf8(blockName)
-        
+
         val returnVal = lib.DefinitionRegion_filter_by_block(handle, schematic.handle, blockNameSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
                 val selfEdges: List<Any> = listOf()
-                val handle = nativeOkVal 
+                val handle = nativeOkVal
                 val returnOpaque = DefinitionRegion(handle, selfEdges, true)
                 return returnOpaque.ok()
             } else {
@@ -537,20 +537,20 @@ class DefinitionRegion internal constructor (
             blockNameSliceMemory.close()
         }
     }
-    
+
     /** A new region containing only the positions where the block in
     *`schematic` matches every property in `properties_json` (a JSON
     *object of property name → value strings).
     */
     fun filterByProperties(schematic: Schematic, propertiesJson: String): Result<DefinitionRegion> {
         val propertiesJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(propertiesJson)
-        
+
         val returnVal = lib.DefinitionRegion_filter_by_properties(handle, schematic.handle, propertiesJsonSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
                 val selfEdges: List<Any> = listOf()
-                val handle = nativeOkVal 
+                val handle = nativeOkVal
                 val returnOpaque = DefinitionRegion(handle, selfEdges, true)
                 return returnOpaque.ok()
             } else {
@@ -560,13 +560,13 @@ class DefinitionRegion internal constructor (
             propertiesJsonSliceMemory.close()
         }
     }
-    
+
     /** Remove every position where `schematic` has a block named
     *`block_name` (in place).
     */
     fun excludeBlock(schematic: Schematic, blockName: String): Result<Unit> {
         val blockNameSliceMemory = PrimitiveArrayTools.borrowUtf8(blockName)
-        
+
         val returnVal = lib.DefinitionRegion_exclude_block(handle, schematic.handle, blockNameSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -579,68 +579,68 @@ class DefinitionRegion internal constructor (
             blockNameSliceMemory.close()
         }
     }
-    
+
     /** Whether any of the region's boxes intersects the given inclusive
     *box (useful for frustum culling).
     */
     fun intersectsBounds(minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int): Boolean {
-        
+
         val returnVal = lib.DefinitionRegion_intersects_bounds(handle, minX, minY, minZ, maxX, maxY, maxZ);
         return (returnVal > 0)
     }
-    
+
     /** A new region shifted by (`dx`, `dy`, `dz`).
     */
     fun shifted(dx: Int, dy: Int, dz: Int): DefinitionRegion {
-        
+
         val returnVal = lib.DefinitionRegion_shifted(handle, dx, dy, dz);
         val selfEdges: List<Any> = listOf()
-        val handle = returnVal 
+        val handle = returnVal
         val returnOpaque = DefinitionRegion(handle, selfEdges, true)
         return returnOpaque
     }
-    
+
     /** A new region expanded by (`x`, `y`, `z`) on each axis.
     */
     fun expanded(x: Int, y: Int, z: Int): DefinitionRegion {
-        
+
         val returnVal = lib.DefinitionRegion_expanded(handle, x, y, z);
         val selfEdges: List<Any> = listOf()
-        val handle = returnVal 
+        val handle = returnVal
         val returnOpaque = DefinitionRegion(handle, selfEdges, true)
         return returnOpaque
     }
-    
+
     /** A new region contracted by `amount` on every axis.
     */
     fun contracted(amount: Int): DefinitionRegion {
-        
+
         val returnVal = lib.DefinitionRegion_contracted(handle, amount);
         val selfEdges: List<Any> = listOf()
-        val handle = returnVal 
+        val handle = returnVal
         val returnOpaque = DefinitionRegion(handle, selfEdges, true)
         return returnOpaque
     }
-    
+
     /** A deep copy of this region.
     */
     fun copy(): DefinitionRegion {
-        
+
         val returnVal = lib.DefinitionRegion_copy(handle);
         val selfEdges: List<Any> = listOf()
-        val handle = returnVal 
+        val handle = returnVal
         val returnOpaque = DefinitionRegion(handle, selfEdges, true)
         return returnOpaque
     }
-    
+
     /** Store a display color (`0xRRGGBB`) in the region's metadata.
     */
     fun setColor(color: UInt): Unit {
-        
+
         val returnVal = lib.DefinitionRegion_set_color(handle, FFIUint32(color));
-        
+
     }
-    
+
     /** The blocks of `schematic` inside this region, written as a JSON array
     *of `{"x", "y", "z", "name", "properties"}` objects (the old ABI
     *returned a `CBlockArray`).
@@ -650,20 +650,20 @@ class DefinitionRegion internal constructor (
         val returnVal = lib.DefinitionRegion_blocks_json(handle, schematic.handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Write this region into `schematic`'s definition-region map under
     *`name` (insert or overwrite).
     */
     fun sync(schematic: Schematic, name: String): Result<Unit> {
         val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
-        
+
         val returnVal = lib.DefinitionRegion_sync(handle, schematic.handle /* note this is a mutable reference. Think carefully about using, especially concurrently */, nameSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();

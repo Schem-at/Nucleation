@@ -10,7 +10,7 @@ void add_WorldSink_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::WorldSink::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::WorldSink> opaque(mod, "WorldSink", nb::type_slots(nucleation_WorldSink_slots));
     opaque
         .def_static("create", std::move(maybe_op_unwrap(&nucleation::WorldSink::create)), "dir"_a, "options_json"_a)
@@ -20,4 +20,4 @@ void add_WorldSink_binding(nb::module_ mod) {
         .def("write_chunk", &nucleation::WorldSink::write_chunk, "view"_a);
 }
 
-} 
+}

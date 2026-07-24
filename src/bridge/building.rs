@@ -8,6 +8,7 @@
 #[diplomat::bridge]
 pub mod ffi {
     use super::super::schematic::ffi::Schematic;
+    use super::super::sdf::ffi::Sdf;
     use super::super::shared::ffi::NucleationError;
     use diplomat_runtime::DiplomatWrite;
     use std::fmt::Write;
@@ -389,7 +390,8 @@ pub mod ffi {
                 node,
                 (min_x, min_y, min_z),
                 (max_x, max_y, max_z),
-            );
+            )
+            .ok_or(NucleationError::InvalidArgument)?;
             Ok(Box::new(Shape(crate::building::ShapeEnum::Sdf(shape))))
         }
 
@@ -955,9 +957,7 @@ pub mod ffi {
             colors: &[u8],
             space: InterpolationSpace,
         ) -> Result<Box<Brush>, NucleationError> {
-            if stops.is_empty() || colors.len() != stops.len() * 3 {
-                return Err(NucleationError::InvalidArgument);
-            }
+            validate_gradient_data(stops, colors)?;
             let stops: Vec<(f64, (u8, u8, u8))> = stops
                 .iter()
                 .zip(colors.chunks_exact(3))
@@ -969,15 +969,21 @@ pub mod ffi {
             ))))
         }
 
-        /// A field brush: color every voxel by evaluating a scalar field at its
-        /// center, remapping `[lo, hi]` to `[0, 1]`, and reading a multi-stop
-        /// gradient (`stops` in `[0, 1]`, `colors` as flat RGB triples). The
-        /// field is any SDF JSON — the same language that builds geometry — so a
-        /// `cells` node paints a Voronoi mosaic (`mode: value`) or cracks
-        /// (`mode: f2MinusF1`), an fbm field a marble, a coordinate expression a
-        /// stripe. Call `set_palette` to choose the block set. Errors with
-        /// `Parse` on bad field JSON and `InvalidArgument` on a stops/colors
-        /// length mismatch.
+        /// Color every voxel by evaluating a typed SDF/field graph at its center.
+        /// `stops` are in `[0, 1]`; `colors` are flat RGB triples. The sampled
+        /// value is remapped from `[lo, hi]` before reading the gradient.
+        pub fn field_sdf(
+            field: &Sdf,
+            stops: &[f32],
+            colors: &[u8],
+            lo: f32,
+            hi: f32,
+            space: InterpolationSpace,
+        ) -> Result<Box<Brush>, NucleationError> {
+            field_brush(field.0.clone(), stops, colors, lo, hi, space)
+        }
+
+        /// Legacy JSON-first field brush. Prefer `field_sdf` for new code.
         pub fn field(
             field_json: &DiplomatStr,
             stops: &[f32],
@@ -988,21 +994,8 @@ pub mod ffi {
         ) -> Result<Box<Brush>, NucleationError> {
             let json =
                 std::str::from_utf8(field_json).map_err(|_| NucleationError::InvalidArgument)?;
-            if stops.is_empty() || colors.len() != stops.len() * 3 {
-                return Err(NucleationError::InvalidArgument);
-            }
             let node = crate::sdf::SdfNode::from_json(json).map_err(|_| NucleationError::Parse)?;
-            let gstops: Vec<crate::building::GradientStop> = stops
-                .iter()
-                .zip(colors.chunks_exact(3))
-                .map(|(t, c)| crate::building::GradientStop {
-                    position: *t as f64,
-                    color: crate::blockpedia::ExtendedColorData::from_rgb(c[0], c[1], c[2]),
-                })
-                .collect();
-            let brush = crate::building::FieldBrush::new(node, gstops, lo as f64, hi as f64)
-                .with_space(space.to_core());
-            Ok(Box::new(Brush(crate::building::BrushEnum::Field(brush))))
+            field_brush(node, stops, colors, lo, hi, space)
         }
     }
 
@@ -1063,5 +1056,82 @@ pub mod ffi {
             );
             Ok(())
         }
+    }
+
+    fn field_brush(
+        node: crate::sdf::SdfNode,
+        stops: &[f32],
+        colors: &[u8],
+        lo: f32,
+        hi: f32,
+        space: InterpolationSpace,
+    ) -> Result<Box<Brush>, NucleationError> {
+        validate_gradient_data(stops, colors)?;
+        if !lo.is_finite() || !hi.is_finite() || lo == hi {
+            return Err(NucleationError::InvalidArgument);
+        }
+        let gstops = stops
+            .iter()
+            .zip(colors.chunks_exact(3))
+            .map(|(position, color)| crate::building::GradientStop {
+                position: *position as f64,
+                color: crate::blockpedia::ExtendedColorData::from_rgb(color[0], color[1], color[2]),
+            })
+            .collect();
+        let brush = crate::building::FieldBrush::new(node, gstops, lo as f64, hi as f64)
+            .with_space(space.to_core());
+        Ok(Box::new(Brush(crate::building::BrushEnum::Field(brush))))
+    }
+
+    fn validate_gradient_data(stops: &[f32], colors: &[u8]) -> Result<(), NucleationError> {
+        let expected_colors = stops
+            .len()
+            .checked_mul(3)
+            .ok_or(NucleationError::InvalidArgument)?;
+        if stops.is_empty()
+            || colors.len() != expected_colors
+            || stops
+                .iter()
+                .any(|stop| !stop.is_finite() || !(0.0..=1.0).contains(stop))
+        {
+            return Err(NucleationError::InvalidArgument);
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod sdf_gradient_validation_tests {
+    use super::ffi::{Brush, InterpolationSpace};
+    use crate::bridge::sdf::ffi::Sdf;
+
+    #[test]
+    fn gradients_reject_non_finite_or_out_of_range_inputs() {
+        let colors = [0_u8, 0, 0, 255, 255, 255];
+        for invalid in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -0.1, 1.1] {
+            assert!(
+                Brush::curve_gradient(&[0.0, invalid], &colors, InterpolationSpace::Rgb).is_err()
+            );
+        }
+
+        let field = Sdf::sphere(1.0).unwrap();
+        assert!(Brush::field_sdf(
+            &field,
+            &[0.0, 1.0],
+            &colors,
+            f32::NAN,
+            1.0,
+            InterpolationSpace::Rgb,
+        )
+        .is_err());
+        assert!(Brush::field(
+            br#"{"type":"sphere","radius":1}"#,
+            &[0.0, f32::INFINITY],
+            &colors,
+            -1.0,
+            1.0,
+            InterpolationSpace::Rgb,
+        )
+        .is_err());
     }
 }

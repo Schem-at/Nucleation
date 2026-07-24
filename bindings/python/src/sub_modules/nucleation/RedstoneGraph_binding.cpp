@@ -9,7 +9,7 @@ void add_RedstoneGraph_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::RedstoneGraph::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::RedstoneGraph> opaque(mod, "RedstoneGraph", nb::type_slots(nucleation_RedstoneGraph_slots));
     opaque
         .def("edge_count", &nucleation::RedstoneGraph::edge_count)
@@ -22,4 +22,4 @@ void add_RedstoneGraph_binding(nb::module_ mod) {
         .def("to_json", &nucleation::RedstoneGraph::to_json);
 }
 
-} 
+}

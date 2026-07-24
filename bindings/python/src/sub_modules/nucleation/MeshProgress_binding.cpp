@@ -15,4 +15,4 @@ void add_MeshProgress_binding(nb::module_ mod) {
         .def_rw("total", &nucleation::MeshProgress::total);
 }
 
-} 
+}

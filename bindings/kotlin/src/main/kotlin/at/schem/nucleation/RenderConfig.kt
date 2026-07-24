@@ -52,47 +52,47 @@ class RenderConfig internal constructor (
         internal val libClass: Class<RenderConfigLib> = RenderConfigLib::class.java
         internal val lib: RenderConfigLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Create a config with the given output size in pixels. Camera starts
         *at the defaults: yaw 45°, pitch 30°, zoom 1.0, fov 45°, perspective
         *projection, default sky background.
         */
         fun create(width: UInt, height: UInt): RenderConfig {
-            
+
             val returnVal = lib.RenderConfig_create(FFIUint32(width), FFIUint32(height));
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = RenderConfig(handle, selfEdges, true)
             return returnOpaque
         }
     }
-    
+
     /** Set the camera yaw (horizontal orbit angle) in degrees. Default: 45.
     */
     fun setYaw(yaw: Float): Unit {
-        
+
         val returnVal = lib.RenderConfig_set_yaw(handle, yaw);
-        
+
     }
-    
+
     /** Set the camera pitch (downward tilt) in degrees. Default: 30.
     */
     fun setPitch(pitch: Float): Unit {
-        
+
         val returnVal = lib.RenderConfig_set_pitch(handle, pitch);
-        
+
     }
-    
+
     /** Set the zoom factor applied to the auto-fitted framing
     *(1.0 = frame the whole model; 2.0 = twice as close; 0.5 = twice
     *as far). Default: 1.0.
     */
     fun setZoom(zoom: Float): Unit {
-        
+
         val returnVal = lib.RenderConfig_set_zoom(handle, zoom);
-        
+
     }
-    
+
     /** Fit the camera to the model's bounding sphere instead of its
     *yaw-dependent silhouette. The sphere is rotation invariant, so
     *orbiting cameras (turntables) keep a constant distance instead
@@ -100,24 +100,24 @@ class RenderConfig internal constructor (
     *than the default fit. Default: false.
     */
     fun setSphereFit(sphereFit: Boolean): Unit {
-        
+
         val returnVal = lib.RenderConfig_set_sphere_fit(handle, sphereFit);
-        
+
     }
-    
+
     /** Set the vertical field of view in degrees (perspective projection
     *only). Default: 45.
     */
     fun setFov(fov: Float): Unit {
-        
+
         val returnVal = lib.RenderConfig_set_fov(handle, fov);
-        
+
     }
-    
+
     /** Set the world-space directional light and its non-negative intensity.
     */
     fun setDirectionalLight(x: Float, y: Float, z: Float, intensity: Float): Result<Unit> {
-        
+
         val returnVal = lib.RenderConfig_set_directional_light(handle, x, y, z, intensity);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -126,11 +126,11 @@ class RenderConfig internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Set the unlit floor for non-HDRI rendering, in `0..=1`.
     */
     fun setAmbientLight(ambient: Float): Result<Unit> {
-        
+
         val returnVal = lib.RenderConfig_set_ambient_light(handle, ambient);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -139,63 +139,63 @@ class RenderConfig internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Set a solid RGBA clear color (linear 0.0–1.0). Alpha < 1.0 yields a
     *transparent PNG. Ignored when HDRI is enabled.
     */
     fun setBackground(r: Float, g: Float, b: Float, a: Float): Unit {
-        
+
         val returnVal = lib.RenderConfig_set_background(handle, r, g, b, a);
-        
+
     }
-    
+
     /** Clear the custom background — revert to default sky / HDRI.
     */
     fun clearBackground(): Unit {
-        
+
         val returnVal = lib.RenderConfig_clear_background(handle);
-        
+
     }
-    
+
     /** Configure a one-block world grid. Models are centred on integer
     *schematic coordinates, so grid lines are placed on half-integer
     *block boundaries automatically.
     */
     fun setGrid(halfExtent: Int, spacing: Int, planeY: Float, showAxes: Boolean, red: Float, green: Float, blue: Float, alpha: Float): Unit {
-        
+
         val returnVal = lib.RenderConfig_set_grid(handle, halfExtent, spacing, planeY, showAxes, red, green, blue, alpha);
-        
+
     }
-    
+
     /** Configure a compact grid fitted to half-integer block boundaries.
     */
     fun setFittedGrid(margin: Int, spacing: Int, planeY: Float, showAxes: Boolean, red: Float, green: Float, blue: Float, alpha: Float): Unit {
-        
+
         val returnVal = lib.RenderConfig_set_fitted_grid(handle, margin, spacing, planeY, showAxes, red, green, blue, alpha);
-        
+
     }
-    
+
     fun clearGrid(): Unit {
-        
+
         val returnVal = lib.RenderConfig_clear_grid(handle);
-        
+
     }
-    
+
     /** Enable (`true`) or disable orthographic projection.
     */
     fun setOrthographic(orthographic: Boolean): Unit {
-        
+
         val returnVal = lib.RenderConfig_set_orthographic(handle, orthographic);
-        
+
     }
-    
+
     /** Configure a true isometric view: orthographic at yaw 45° /
     *pitch ≈35.264° (preserves the current width/height).
     */
     fun setIsometric(): Unit {
-        
+
         val returnVal = lib.RenderConfig_set_isometric(handle);
-        
+
     }
 
 }

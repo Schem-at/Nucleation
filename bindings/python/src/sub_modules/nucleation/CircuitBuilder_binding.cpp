@@ -13,7 +13,7 @@ void add_CircuitBuilder_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::CircuitBuilder::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::CircuitBuilder> opaque(mod, "CircuitBuilder", nb::type_slots(nucleation_CircuitBuilder_slots));
     opaque
         .def("build", std::move(maybe_op_unwrap(&nucleation::CircuitBuilder::build)))
@@ -37,4 +37,4 @@ void add_CircuitBuilder_binding(nb::module_ mod) {
         .def("with_state_mode", &nucleation::CircuitBuilder::with_state_mode, "mode"_a);
 }
 
-} 
+}

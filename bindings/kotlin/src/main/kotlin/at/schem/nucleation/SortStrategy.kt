@@ -51,154 +51,154 @@ class SortStrategy internal constructor (
         internal val libClass: Class<SortStrategyLib> = SortStrategyLib::class.java
         internal val lib: SortStrategyLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Sort by Y ascending, then X, then Z (default Minecraft layer
         *order). The first position after sorting is bit 0 (LSB).
         */
         fun yxz(): SortStrategy {
-            
+
             val returnVal = lib.SortStrategy_yxz();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = SortStrategy(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Sort by X ascending, then Y, then Z.
         */
         fun xyz(): SortStrategy {
-            
+
             val returnVal = lib.SortStrategy_xyz();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = SortStrategy(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Sort by Z ascending, then Y, then X.
         */
         fun zyx(): SortStrategy {
-            
+
             val returnVal = lib.SortStrategy_zyx();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = SortStrategy(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Sort by Y descending, then X ascending, then Z ascending.
         */
         fun yDescXz(): SortStrategy {
-            
+
             val returnVal = lib.SortStrategy_y_desc_xz();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = SortStrategy(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Sort by X descending, then Y ascending, then Z ascending.
         */
         fun xDescYz(): SortStrategy {
-            
+
             val returnVal = lib.SortStrategy_x_desc_yz();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = SortStrategy(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Sort by Z descending, then Y ascending, then X ascending.
         */
         fun zDescYx(): SortStrategy {
-            
+
             val returnVal = lib.SortStrategy_z_desc_yx();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = SortStrategy(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Old ABI name: `sort_strategy_descending`.
         */
         fun descending(): SortStrategy {
-            
+
             val returnVal = lib.SortStrategy_descending();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = SortStrategy(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Sort by Euclidean distance from the reference point, closest
         *first (ties broken by Y, X, Z ascending).
         */
         fun distanceFrom(x: Int, y: Int, z: Int): SortStrategy {
-            
+
             val returnVal = lib.SortStrategy_distance_from(x, y, z);
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = SortStrategy(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Sort by Euclidean distance from the reference point, farthest
         *first (ties broken by Y, X, Z descending).
         */
         fun distanceFromDesc(x: Int, y: Int, z: Int): SortStrategy {
-            
+
             val returnVal = lib.SortStrategy_distance_from_desc(x, y, z);
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = SortStrategy(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Keep positions in the order they were added (no sorting). Useful
         *when positions were ordered manually or box order matters.
         */
         fun preserve(): SortStrategy {
-            
+
             val returnVal = lib.SortStrategy_preserve();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = SortStrategy(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Reverse of the order positions were added.
         */
         fun reverse(): SortStrategy {
-            
+
             val returnVal = lib.SortStrategy_reverse();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = SortStrategy(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Parse from a name (e.g. "yxz", "descending", "preserve").
         */
         fun fromString(s: String): Result<SortStrategy> {
             val sSliceMemory = PrimitiveArrayTools.borrowUtf8(s)
-            
+
             val returnVal = lib.SortStrategy_from_string(sSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = SortStrategy(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -209,13 +209,13 @@ class SortStrategy internal constructor (
             }
         }
     }
-    
+
     /** The strategy name.
     */
     fun name(): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.SortStrategy_name(handle, write);
-        
+
         val returnString = DW.writeToString(write)
         return returnString
     }

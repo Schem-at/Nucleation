@@ -13,7 +13,7 @@ void add_ItemModelResult_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::ItemModelResult::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::ItemModelResult> opaque(mod, "ItemModelResult", nb::type_slots(nucleation_ItemModelResult_slots));
     opaque
         .def("add_to_pack", &nucleation::ItemModelResult::add_to_pack, "builder"_a)
@@ -27,4 +27,4 @@ void add_ItemModelResult_binding(nb::module_ mod) {
         .def("to_resource_pack_zip_b64", &nucleation::ItemModelResult::to_resource_pack_zip_b64);
 }
 
-} 
+}

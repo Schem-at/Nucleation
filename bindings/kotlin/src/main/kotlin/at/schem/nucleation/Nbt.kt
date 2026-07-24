@@ -42,7 +42,7 @@ class Nbt internal constructor (
         internal val libClass: Class<NbtLib> = NbtLib::class.java
         internal val lib: NbtLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Build a Minecraft JSON text-component string.
         *
         *`color` may be empty (no color). `bold` and `italic` use `-1` for
@@ -56,7 +56,7 @@ class Nbt internal constructor (
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
-                    
+
                     val returnString = DW.writeToString(write)
                     return returnString.ok()
                 } else {
@@ -68,7 +68,7 @@ class Nbt internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Build a chest-NBT SNBT string for use as the `{...}` portion of a block
         *string.
         *
@@ -87,7 +87,7 @@ class Nbt internal constructor (
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
-                    
+
                     val returnString = DW.writeToString(write)
                     return returnString.ok()
                 } else {
@@ -99,7 +99,7 @@ class Nbt internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Build a modern (1.20+) sign-NBT SNBT string.
         *
         *`front_json` and `back_json` are JSON arrays of up to 4 line strings
@@ -117,7 +117,7 @@ class Nbt internal constructor (
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
-                    
+
                     val returnString = DW.writeToString(write)
                     return returnString.ok()
                 } else {

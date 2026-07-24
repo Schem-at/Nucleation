@@ -42,36 +42,36 @@ class BuildingTool internal constructor (
         internal val libClass: Class<BuildingToolLib> = BuildingToolLib::class.java
         internal val lib: BuildingToolLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Fill `shape` into `schematic` using `brush`.
         */
         fun fill(schematic: Schematic, shape: Shape, brush: Brush): Unit {
-            
+
             val returnVal = lib.BuildingTool_fill(schematic.handle /* note this is a mutable reference. Think carefully about using, especially concurrently */, shape.handle, brush.handle);
-            
+
         }
         @JvmStatic
-        
+
         /** Fill `count` copies of `shape`, each offset by `offset * i`.
         */
         fun rstack(schematic: Schematic, shape: Shape, brush: Brush, count: ULong, offsetX: Int, offsetY: Int, offsetZ: Int): Unit {
-            
+
             val returnVal = lib.BuildingTool_rstack(schematic.handle /* note this is a mutable reference. Think carefully about using, especially concurrently */, shape.handle, brush.handle, FFISizet(count), offsetX, offsetY, offsetZ);
-            
+
         }
         @JvmStatic
-        
+
         /** Masked fill that preserves everything already placed: `brush` is
         *only written where `schematic` currently has air (or nothing at
         *all), so existing structures inside `shape` survive untouched.
         */
         fun fillOnlyAir(schematic: Schematic, shape: Shape, brush: Brush): Unit {
-            
+
             val returnVal = lib.BuildingTool_fill_only_air(schematic.handle /* note this is a mutable reference. Think carefully about using, especially concurrently */, shape.handle, brush.handle);
-            
+
         }
         @JvmStatic
-        
+
         /** Masked fill that only overwrites the listed blocks: `targets_json`
         *is a JSON array of block ids (e.g. `["minecraft:stone"]`, state
         *properties ignored) and every cell of `shape` whose current block
@@ -80,7 +80,7 @@ class BuildingTool internal constructor (
         */
         fun fillReplacing(schematic: Schematic, shape: Shape, brush: Brush, targetsJson: String): Result<Unit> {
             val targetsJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(targetsJson)
-            
+
             val returnVal = lib.BuildingTool_fill_replacing(schematic.handle /* note this is a mutable reference. Think carefully about using, especially concurrently */, shape.handle, brush.handle, targetsJsonSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();

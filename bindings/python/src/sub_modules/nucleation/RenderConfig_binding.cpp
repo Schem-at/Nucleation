@@ -9,7 +9,7 @@ void add_RenderConfig_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::RenderConfig::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::RenderConfig> opaque(mod, "RenderConfig", nb::type_slots(nucleation_RenderConfig_slots));
     opaque
         .def("clear_background", &nucleation::RenderConfig::clear_background)
@@ -29,4 +29,4 @@ void add_RenderConfig_binding(nb::module_ mod) {
         .def("set_zoom", &nucleation::RenderConfig::set_zoom, "zoom"_a);
 }
 
-} 
+}

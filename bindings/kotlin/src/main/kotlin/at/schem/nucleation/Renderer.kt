@@ -43,7 +43,7 @@ class Renderer internal constructor (
         internal val libClass: Class<RendererLib> = RendererLib::class.java
         internal val lib: RendererLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Render a schematic to raw RGBA pixel bytes, written as base64
         *(PORTING rule 6). `pack_zip` is a resource-pack zip in memory.
         */
@@ -54,7 +54,7 @@ class Renderer internal constructor (
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
-                    
+
                     val returnString = DW.writeToString(write)
                     return returnString.ok()
                 } else {
@@ -65,7 +65,7 @@ class Renderer internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Render a schematic to PNG bytes, written as base64 (PORTING rule 6).
         *`pack_zip` is a resource-pack zip in memory.
         */
@@ -76,7 +76,7 @@ class Renderer internal constructor (
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
-                    
+
                     val returnString = DW.writeToString(write)
                     return returnString.ok()
                 } else {
@@ -87,13 +87,13 @@ class Renderer internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Render a schematic to a PNG file at `path`.
         */
         fun renderToFile(schematic: Schematic, packZip: UByteArray, config: RenderConfig, path: String): Result<Unit> {
             val packZipSliceMemory = PrimitiveArrayTools.borrow(packZip)
             val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
-            
+
             val returnVal = lib.Renderer_render_to_file(schematic.handle, packZipSliceMemory.slice, config.handle, pathSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
@@ -108,12 +108,12 @@ class Renderer internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Render with an already parsed resource pack, avoiding repeated ZIP parsing.
         */
         fun renderToFileWithPack(schematic: Schematic, pack: ResourcePack, config: RenderConfig, path: String): Result<Unit> {
             val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
-            
+
             val returnVal = lib.Renderer_render_to_file_with_pack(schematic.handle, pack.handle, config.handle, pathSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
@@ -127,7 +127,7 @@ class Renderer internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Render raw RGBA pixels with an already parsed resource pack.
         */
         fun renderPixelsB64WithPack(schematic: Schematic, pack: ResourcePack, config: RenderConfig): Result<String> {
@@ -135,7 +135,7 @@ class Renderer internal constructor (
             val returnVal = lib.Renderer_render_pixels_b64_with_pack(schematic.handle, pack.handle, config.handle, write);
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
-                
+
                 val returnString = DW.writeToString(write)
                 return returnString.ok()
             } else {
@@ -143,7 +143,7 @@ class Renderer internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Render PNG bytes with an already parsed resource pack.
         */
         fun renderPngB64WithPack(schematic: Schematic, pack: ResourcePack, config: RenderConfig): Result<String> {
@@ -151,7 +151,7 @@ class Renderer internal constructor (
             val returnVal = lib.Renderer_render_png_b64_with_pack(schematic.handle, pack.handle, config.handle, write);
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
-                
+
                 val returnString = DW.writeToString(write)
                 return returnString.ok()
             } else {

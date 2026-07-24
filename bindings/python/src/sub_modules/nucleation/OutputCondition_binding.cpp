@@ -10,7 +10,7 @@ void add_OutputCondition_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::OutputCondition::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::OutputCondition> opaque(mod, "OutputCondition", nb::type_slots(nucleation_OutputCondition_slots));
     opaque
         .def_static("bitwise_and", std::move(maybe_op_unwrap(&nucleation::OutputCondition::bitwise_and)), "mask"_a)
@@ -20,4 +20,4 @@ void add_OutputCondition_binding(nb::module_ mod) {
         .def_static("not_equals", std::move(maybe_op_unwrap(&nucleation::OutputCondition::not_equals)), "value"_a);
 }
 
-} 
+}

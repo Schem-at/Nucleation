@@ -9,11 +9,11 @@ void add_IoLayout_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::IoLayout::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::IoLayout> opaque(mod, "IoLayout", nb::type_slots(nucleation_IoLayout_slots));
     opaque
         .def("input_names_json", &nucleation::IoLayout::input_names_json)
         .def("output_names_json", &nucleation::IoLayout::output_names_json);
 }
 
-} 
+}

@@ -1,35 +1,71 @@
 # SDF shapes, terrain, and fields
 
-## Terrain from a JSON description
+## Typed, composable fields
 
-
-The same SDF trees that work as shapes scale up to whole terrains: sampled
-through declarative material rules (surface shells, depth bands, gradients,
-scatter) instead of a single brush. Deterministic: same JSON, same terrain,
-every language.
+SDF authoring is object-based. Primitives, boolean operations, transforms, and
+noise modifiers return immutable `Sdf` graphs; JSON is only an explicit
+serialization and compatibility boundary.
 
 ```python
-from nucleation import Sdf
+from nucleation import (
+    Brush, BuildingTool, InterpolationSpace, Palette, Schematic, Sdf,
+)
 
-island = '''{"type": "displace", "amplitude": 3, "frequency": 0.1, "seed": 7,
-             "child": {"type": "ellipsoid", "radii": [14, 8, 14]}}'''
-rules = '''{"fill": [
-  {"when": {"depthBelowSurface": {"min": 0, "max": 0}}, "block": "minecraft:grass_block"},
-  {"when": {"depthBelowSurface": {"min": 1, "max": 3}}, "block": "minecraft:dirt"},
-  {"block": "minecraft:stone"}]}'''
+island = Sdf.ellipsoid(14, 8, 14).displace(
+    amplitude=3,
+    frequency=0.1,
+    seed=7,
+    octaves=3,
+)
 
-terrain = Sdf.schematic_from_sdf_auto(island, rules)
-# → 29×18×29, 6,927 blocks
+brush = Brush.linear_gradient(
+    0, -8, 0, 45, 70, 170,
+    0,  8, 0, 235, 190, 70,
+    InterpolationSpace.Oklab,
+)
+brush.set_palette(Palette.concrete().dithered())
+
+terrain = Schematic.create("island")
+BuildingTool.fill(terrain, island.to_shape(), brush)
 ```
 
-<div align="center">
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/terrain-minimal.png" width="560" alt="The island the snippet above produces">
-</div>
+The graph can be evaluated (`eval_at`), queried for bounds and normals, reused
+as geometry (`to_shape`), reused as color (`Brush.field_sdf`), and explicitly
+serialized (`to_json`). `Sdf.from_json_string` imports old recipes. The legacy
+`schematic_from_sdf*` entry points remain available for JSON material-rule
+recipes, but are no longer the primary construction API.
 
-That's the minimal version; the volcano up top adds smooth-blended cones, a
-cylinder-cored lava crater, and noise-gated snow. Smooth booleans even animate
-into metaballs. Recipes, node and rule schemas, and the gradient fill rules live
-in the [SDF terrain guide](sdf-and-fields.md).
+Every bounded SDF conversion and sampler validates inclusive spans with widened
+integer arithmetic and rejects work above 16,777,216 voxel centers before
+iteration or allocation. Use tighter explicit bounds or split larger jobs.
+
+<details>
+<summary>Equivalent Java/Kotlin and JavaScript composition</summary>
+
+Java uses the exception-based `SdfExpr` façade, avoiding Kotlin `Result` and
+unsigned-type interop:
+
+```java
+var field = SdfExpr.sphere(12.0f)
+    .subtract(SdfExpr.cappedCylinder(4.0f, 20.0f).rotate(90.0f, 0.0f, 0.0f))
+    .smoothUnion(SdfExpr.sphere(5.0f).translate(10.0f, 0.0f, 0.0f), 2.0f);
+```
+
+JavaScript/TypeScript uses the generated `Sdf` directly:
+
+```ts
+const field = Sdf.sphere(12)
+  .subtract(Sdf.cappedCylinder(4, 20).rotate(90, 0, 0))
+  .smoothUnion(Sdf.sphere(5).translate(10, 0, 0), 2);
+```
+
+</details>
+
+For Flow, use an `sdf` domain type and pass live WASM `Sdf` objects between
+nodes. Primitive nodes output `Sdf`; operator/transform nodes consume and return
+`Sdf`; `toShape` or a fill node is the terminal conversion. Flow persistence
+may store `toJson()` output, but graph execution does not serialize between
+nodes.
 
 Slice the hero island in half and the material rules show their work: a grass
 and dirt skin over a stone core that grades from deepslate at the roots up
@@ -56,9 +92,9 @@ surf = "grass_block" if ny > 0.82 else "stone"             # + snow on high flat
 ## Fields and patterns
 
 
-A pattern is a scalar field, and nucleation already speaks fields: the SDF JSON
-that builds terrain. The `cells` node adds Worley / Voronoi noise to that
-language, so one field stamps a pattern two ways. Point a **field brush** at it
+A pattern is a scalar field, and typed `Sdf` graphs represent both geometry and
+standalone fields. The `cells` node adds Worley / Voronoi noise to that graph,
+so one field stamps a pattern two ways. Point a **field brush** at it
 to color by the field (each cell a flat color), or feed its value into
 **geometry** (each cell's value drives a column's height):
 
@@ -67,15 +103,15 @@ to color by the field (each cell a flat color), or feed its value into
 </div>
 
 ```python
-field = '{"type": "cells", "frequency": 0.11, "seed": 7, "mode": "value"}'
+field = Sdf.cells(0.11, 7, 1.0, SdfCellMode.CellValue, 0.0)
 
 # Texture: color every voxel by which Voronoi cell it falls in.
-brush = Brush.field(field, stops, colors, 0.0, 1.0, InterpolationSpace.Oklab)
+brush = Brush.field_sdf(field, stops, colors, 0.0, 1.0, InterpolationSpace.Oklab)
 BuildingTool.fill(s, Shape.sphere(0, 0, 0, 28), brush)
 
 # Geometry: raise each column to its cell's value.
 for x, z in grid:
-    h = Sdf.eval(field, x, 0, z)                    # 0..1 per cell
+    h = field.eval_at(x, 0, z)                     # 0..1 per cell
     s.fill_cuboid(x, 0, z, x, round(1 + h * 20), z, block_for(h))
 ```
 
@@ -98,16 +134,16 @@ shroomlight fading into glowstone toward the core:
 </div>
 
 ```python
-f1    = '{"type": "cells", "frequency": 0.09, "seed": 4, "mode": "f1"}'
-crack = '{"type": "cells", "frequency": 0.09, "seed": 4, "mode": "f2MinusF1"}'
+f1    = Sdf.cells(0.09, 4, 1.0, SdfCellMode.F1, 0.0)
+crack = Sdf.cells(0.09, 4, 1.0, SdfCellMode.F2MinusF1, 0.0)
 for x, y, z in inside_sphere(R):
     depth = R - length(x, y, z)                     # distance along the surface normal
     if depth > crust:                               # glowing core
         block = glow.snap(depth)                    # glass shell, then emitters deeper
-    elif Sdf.eval(crack, x, y, z) < crack_w:        # recessed buffer groove
+    elif crack.eval_at(x, y, z) < crack_w:          # recessed buffer groove
         block = None if depth < inset else glow.snap(depth)
     else:                                            # cell crust
-        block = cells.snap(shade(Sdf.eval(f1, x, y, z)))   # light center, dark rim
+        block = cells.snap(shade(f1.eval_at(x, y, z)))     # light center, dark rim
 ```
 
 None of that is sphere-specific: it is three fields over `(x, y, z)` plus a
@@ -146,31 +182,55 @@ expose. None of it is a built-in, each is a short rule:
 
 ## Reference
 
-Signed distance fields describe geometry as JSON trees — primitives,
-boolean/smooth operators, transforms, and seeded noise — which nucleation
-samples into blocks through declarative material rules. Identical inputs
-yield identical schematics in every language.
+Signed distance fields are immutable typed expression graphs. Identical graphs
+yield identical values and schematics in every language. JSON import/export is
+available for persistence and old recipes, not required for composition.
 
 ## Entry points
 
 ```python
-Sdf.schematic_from_sdf_auto(sdf_json, rules_json)          # tree's own bounds
-Sdf.schematic_from_sdf(sdf_json, rules_json, True, x0, y0, z0, x1, y1, z1)
-Sdf.eval(sdf_json, x, y, z)                                # point query
+field = Sdf.sphere(12).translate(0, 8, 0)
+field = field.smooth_union(Sdf.torus(16, 4), 2)
+value = field.eval_at(x, y, z)
+normal = field.normal(x, y, z, 0.01)
+shape = field.to_shape()                    # inferred finite bounds
+shape = field.to_shape_bounded(*bounds)     # required for unbounded graphs
+json_data = field.to_json()
+field = Sdf.from_json_string(json_data)
 ```
+
+Python additionally supports exact user functions as a bounded, synchronous
+fill. The callable is not retained or serialized. Exceptions propagate and the
+destination schematic is unchanged; omit `normal` for central differences:
+
+```python
+BuildingTool.fill_sdf_function(
+    schematic, brush,
+    -32, -16, -32, 31, 15, 31,
+    lambda x, y, z: custom_distance(x, y, z),
+    normal=lambda x, y, z: custom_gradient(x, y, z),
+    epsilon=0.5,
+)
+```
+
+The callback volume is capped at 16,777,216 voxels. Typed SDF graphs are the
+portable path for Rust, JVM, JavaScript/WASM, and Python; callbacks are the
+Python escape hatch for arbitrary runtime functions.
 
 ## Nodes
 
-Primitives: `sphere`, `box`, `torus`, `capsule`, `cappedCylinder`,
-`cappedCone`, `ellipsoid`, `plane` (unbounded — needs explicit bounds),
-`superPrism`. Operators: `union` (n-ary), `intersection`, `difference`,
-`smoothUnion` / `smoothIntersection` / `smoothDifference` (with blend
-radius `k`). Transforms: `translate`, `rotate`, `scale`. Noise:
-`displace` (`amplitude`, `frequency`, `seed`, optional `octaves`) and `warp`;
-`cells` for Worley / Voronoi (`frequency`, `seed`, `jitter`, `mode` one of
-`f1` / `f2` / `f2MinusF1` / `value`, optional `threshold`). Any node also drives
-color through `Brush.field`, and any point through `Sdf.eval`. Field names are
-camelCase; see `src/sdf/node.rs` for the full schema.
+Primitives: `sphere`, `box_shape`, `torus`, `capsule`, `capped_cylinder`,
+`capped_cone`, `ellipsoid`, `plane` (unbounded), `octahedron`, `hex_prism`,
+`super_prism`, and `cells`. Operators: `union_with`, `intersection_with`,
+`subtract`, `smooth_union`, `smooth_intersection`, `smooth_subtract`, `rounded`,
+and `shell`. Transforms: `translate`, `rotate`, `scale`, `mirror`,
+`repeat_infinite`, and `repeat_counted`. Noise modifiers: `displace` and `warp`.
+
+Generated bindings adapt names conventionally: snake_case in Python,
+camelCase in JavaScript/Kotlin/Java. `Brush.field_sdf` consumes a live typed
+graph for scalar-field color; legacy `Brush.field` accepts JSON. The old
+`Sdf.eval(json, ...)` and `Sdf.schematic_from_sdf*` APIs remain for
+compatibility.
 
 ## Material rules
 

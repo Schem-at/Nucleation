@@ -10,7 +10,7 @@ void add_WorldChunkView_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::WorldChunkView::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::WorldChunkView> opaque(mod, "WorldChunkView", nb::type_slots(nucleation_WorldChunkView_slots));
     opaque
         .def("biome_palette_json", &nucleation::WorldChunkView::biome_palette_json)
@@ -23,4 +23,4 @@ void add_WorldChunkView_binding(nb::module_ mod) {
         .def("to_schematic", std::move(maybe_op_unwrap(&nucleation::WorldChunkView::to_schematic)));
 }
 
-} 
+}

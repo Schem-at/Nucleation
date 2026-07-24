@@ -42,18 +42,18 @@ class Curve3D internal constructor (
         internal val libClass: Class<Curve3DLib> = Curve3DLib::class.java
         internal val lib: Curve3DLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Create a curve from flat `[x0, y0, z0, x1, y1, z1, …]` coordinates.
         */
         fun fromPoints(coordinates: DoubleArray, closed: Boolean): Result<Curve3D> {
             val coordinatesSliceMemory = PrimitiveArrayTools.borrow(coordinates)
-            
+
             val returnVal = lib.Curve3D_from_points(coordinatesSliceMemory.slice, closed);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = Curve3D(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -64,15 +64,15 @@ class Curve3D internal constructor (
             }
         }
     }
-    
+
     fun pointCount(): UInt {
-        
+
         val returnVal = lib.Curve3D_point_count(handle);
         return (returnVal.toUInt())
     }
-    
+
     fun isClosed(): Boolean {
-        
+
         val returnVal = lib.Curve3D_is_closed(handle);
         return (returnVal > 0)
     }

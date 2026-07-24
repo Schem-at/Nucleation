@@ -9,7 +9,7 @@ void add_Nbt_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::Nbt::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::Nbt> opaque(mod, "Nbt", nb::type_slots(nucleation_Nbt_slots));
     opaque
         .def_static("chest_build", &nucleation::Nbt::chest_build, "items_json"_a, "name"_a)
@@ -17,4 +17,4 @@ void add_Nbt_binding(nb::module_ mod) {
         .def_static("text_build", &nucleation::Nbt::text_build, "s"_a, "color"_a, "bold"_a, "italic"_a);
 }
 
-} 
+}

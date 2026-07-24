@@ -6,11 +6,11 @@ NB_MAKE_OPAQUE(std::vector<nucleation::RegionBounds>)
 
 namespace nucleation {
 void add_RegionBounds_binding(nb::module_ mod) {
-    
+
     // Python lists are represented as PyObject**, which runs somewhat counter to any use cases where we want to be able to transparently pass over lists without copying over memory in any ways.
     // bind_vector solves this issue by exposing std::vector<nucleation::RegionBounds> as a type that will exist inside of C++, with functions to access its memory from Python.
-    // TL;DR: this creates a faux list type that makes it easier to pass vectors of this type in Python without copying. 
-    nb::bind_vector<std::vector<nucleation::RegionBounds>>(mod, "RegionBoundsSlice"); 
+    // TL;DR: this creates a faux list type that makes it easier to pass vectors of this type in Python without copying.
+    nb::bind_vector<std::vector<nucleation::RegionBounds>>(mod, "RegionBoundsSlice");
     nb::class_<nucleation::RegionBounds> st(mod, "RegionBounds");
     st
         .def(nb::init<>())
@@ -23,4 +23,4 @@ void add_RegionBounds_binding(nb::module_ mod) {
         .def_rw("max_z", &nucleation::RegionBounds::max_z);
 }
 
-} 
+}

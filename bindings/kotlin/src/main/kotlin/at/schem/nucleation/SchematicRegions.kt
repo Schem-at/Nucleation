@@ -52,12 +52,12 @@ class SchematicRegions internal constructor (
         internal val libClass: Class<SchematicRegionsLib> = SchematicRegionsLib::class.java
         internal val lib: SchematicRegionsLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Insert (or overwrite) `region` under `name`.
         */
         fun add(schematic: Schematic, name: String, region: DefinitionRegion): Result<Unit> {
             val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
-            
+
             val returnVal = lib.SchematicRegions_add(schematic.handle /* note this is a mutable reference. Think carefully about using, especially concurrently */, nameSliceMemory.slice, region.handle);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
@@ -71,14 +71,14 @@ class SchematicRegions internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Overwrite the region stored under `name` (identical to `add` in the
         *old ABI too; kept as a separate method for 1:1 coverage of
         *`schematic_update_region`).
         */
         fun update(schematic: Schematic, name: String, region: DefinitionRegion): Result<Unit> {
             val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
-            
+
             val returnVal = lib.SchematicRegions_update(schematic.handle /* note this is a mutable reference. Think carefully about using, especially concurrently */, nameSliceMemory.slice, region.handle);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
@@ -92,19 +92,19 @@ class SchematicRegions internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** A copy of the region stored under `name`. Errors with `NotFound` when
         *absent.
         */
         fun get(schematic: Schematic, name: String): Result<DefinitionRegion> {
             val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
-            
+
             val returnVal = lib.SchematicRegions_get(schematic.handle, nameSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = DefinitionRegion(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -115,13 +115,13 @@ class SchematicRegions internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Remove the region stored under `name`. Errors with `NotFound` when
         *absent.
         */
         fun remove(schematic: Schematic, name: String): Result<Unit> {
             val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
-            
+
             val returnVal = lib.SchematicRegions_remove(schematic.handle /* note this is a mutable reference. Think carefully about using, especially concurrently */, nameSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
@@ -135,7 +135,7 @@ class SchematicRegions internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** The names of every definition region, written as a JSON array string.
         */
         fun namesJson(schematic: Schematic): Result<String> {
@@ -143,7 +143,7 @@ class SchematicRegions internal constructor (
             val returnVal = lib.SchematicRegions_names_json(schematic.handle, write);
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
-                
+
                 val returnString = DW.writeToString(write)
                 return returnString.ok()
             } else {
@@ -151,12 +151,12 @@ class SchematicRegions internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Create an empty region under `name`.
         */
         fun create(schematic: Schematic, name: String): Result<Unit> {
             val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
-            
+
             val returnVal = lib.SchematicRegions_create(schematic.handle /* note this is a mutable reference. Think carefully about using, especially concurrently */, nameSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
@@ -170,12 +170,12 @@ class SchematicRegions internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Create a single-point region under `name`.
         */
         fun createFromPoint(schematic: Schematic, name: String, x: Int, y: Int, z: Int): Result<Unit> {
             val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
-            
+
             val returnVal = lib.SchematicRegions_create_from_point(schematic.handle /* note this is a mutable reference. Think carefully about using, especially concurrently */, nameSliceMemory.slice, x, y, z);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
@@ -189,12 +189,12 @@ class SchematicRegions internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Create a single-box region under `name`.
         */
         fun createFromBounds(schematic: Schematic, name: String, minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int): Result<Unit> {
             val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
-            
+
             val returnVal = lib.SchematicRegions_create_from_bounds(schematic.handle /* note this is a mutable reference. Think carefully about using, especially concurrently */, nameSliceMemory.slice, minX, minY, minZ, maxX, maxY, maxZ);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
@@ -208,18 +208,18 @@ class SchematicRegions internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Create a single-box region under `name` and return a copy of it.
         */
         fun createRegion(schematic: Schematic, name: String, minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int): Result<DefinitionRegion> {
             val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
-            
+
             val returnVal = lib.SchematicRegions_create_region(schematic.handle /* note this is a mutable reference. Think carefully about using, especially concurrently */, nameSliceMemory.slice, minX, minY, minZ, maxX, maxY, maxZ);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = DefinitionRegion(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -230,13 +230,13 @@ class SchematicRegions internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Add a box to the region stored under `name`. Errors with `NotFound`
         *when absent.
         */
         fun addBoundsTo(schematic: Schematic, name: String, minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int): Result<Unit> {
             val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
-            
+
             val returnVal = lib.SchematicRegions_add_bounds_to(schematic.handle /* note this is a mutable reference. Think carefully about using, especially concurrently */, nameSliceMemory.slice, minX, minY, minZ, maxX, maxY, maxZ);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
@@ -250,13 +250,13 @@ class SchematicRegions internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Add a point to the region stored under `name`. Errors with `NotFound`
         *when absent.
         */
         fun addPointTo(schematic: Schematic, name: String, x: Int, y: Int, z: Int): Result<Unit> {
             val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
-            
+
             val returnVal = lib.SchematicRegions_add_point_to(schematic.handle /* note this is a mutable reference. Think carefully about using, especially concurrently */, nameSliceMemory.slice, x, y, z);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
@@ -270,7 +270,7 @@ class SchematicRegions internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Set a metadata entry on the region stored under `name`. Errors with
         *`NotFound` when absent.
         */
@@ -278,7 +278,7 @@ class SchematicRegions internal constructor (
             val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
             val keySliceMemory = PrimitiveArrayTools.borrowUtf8(key)
             val valueSliceMemory = PrimitiveArrayTools.borrowUtf8(value)
-            
+
             val returnVal = lib.SchematicRegions_set_metadata_on(schematic.handle /* note this is a mutable reference. Think carefully about using, especially concurrently */, nameSliceMemory.slice, keySliceMemory.slice, valueSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
@@ -294,13 +294,13 @@ class SchematicRegions internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Shift the region stored under `name` by (`dx`, `dy`, `dz`). Errors
         *with `NotFound` when absent.
         */
         fun shiftRegion(schematic: Schematic, name: String, dx: Int, dy: Int, dz: Int): Result<Unit> {
             val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
-            
+
             val returnVal = lib.SchematicRegions_shift_region(schematic.handle /* note this is a mutable reference. Think carefully about using, especially concurrently */, nameSliceMemory.slice, dx, dy, dz);
             try {
                 val nativeOkVal = returnVal.getNativeOk();

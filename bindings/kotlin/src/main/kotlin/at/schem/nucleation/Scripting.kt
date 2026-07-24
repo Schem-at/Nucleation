@@ -41,20 +41,20 @@ class Scripting internal constructor (
         internal val libClass: Class<ScriptingLib> = ScriptingLib::class.java
         internal val lib: ScriptingLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Run a Lua script file. Returns the schematic the script assigns to
         *`result`; `NotFound` if it produced none, `Parse` if it failed, and
         *`InvalidArgument` when built without the `scripting-lua` feature.
         */
         fun runLuaScript(path: String): Result<Schematic> {
             val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
-            
+
             val returnVal = lib.Scripting_run_lua_script(pathSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = Schematic(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -65,20 +65,20 @@ class Scripting internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Run a JS script file. Returns the schematic the script assigns to
         *`result`; `NotFound` if it produced none, `Parse` if it failed, and
         *`InvalidArgument` when built without the `scripting-js` feature.
         */
         fun runJsScript(path: String): Result<Schematic> {
             val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
-            
+
             val returnVal = lib.Scripting_run_js_script(pathSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = Schematic(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -89,7 +89,7 @@ class Scripting internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Run a script file, auto-detecting the engine by extension (`.lua` or
         *`.js`). Returns the schematic the script assigns to `result`; `NotFound`
         *if it produced none, `Parse` if it failed (including unsupported
@@ -97,13 +97,13 @@ class Scripting internal constructor (
         */
         fun runScript(path: String): Result<Schematic> {
             val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
-            
+
             val returnVal = lib.Scripting_run_script(pathSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = Schematic(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {

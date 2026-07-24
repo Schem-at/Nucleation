@@ -8,6 +8,7 @@
 import at.schem.nucleation.Schematic
 import at.schem.nucleation.AnimationEffect
 import at.schem.nucleation.BuildAnimation
+import at.schem.nucleation.SdfExpr
 
 fun main() {
     val s = Schematic.create("smoke")
@@ -24,5 +25,11 @@ fun main() {
     check(animation.setBlock(1, 0, 0, "minecraft:dirt").getOrThrow() == 1u)
     check(animation.groupCount() == 2u)
 
-    println("JVM smoke OK: schematic + fluent animation effect")
+    val field = SdfExpr.sphere(4.0f)
+        .smoothUnion(SdfExpr.sphere(3.0f).translate(4.0f, 0.0f, 0.0f), 1.0f)
+        .displace(0.5f, 0.1f, 7)
+    check(field.evalAt(0.0f, 0.0f, 0.0f) < 0.0f)
+    field.toShape()
+
+    println("JVM smoke OK: schematic + fluent animation effect + typed SDF")
 }

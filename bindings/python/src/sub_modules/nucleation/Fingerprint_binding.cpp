@@ -10,7 +10,7 @@ void add_Fingerprint_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::Fingerprint::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::Fingerprint> opaque(mod, "Fingerprint", nb::type_slots(nucleation_Fingerprint_slots));
     opaque
         .def_static("compute", &nucleation::Fingerprint::compute, "schematic"_a, "preset"_a)
@@ -20,4 +20,4 @@ void add_Fingerprint_binding(nb::module_ mod) {
         .def_static("signature_json", &nucleation::Fingerprint::signature_json, "schematic"_a, "preset"_a);
 }
 
-} 
+}

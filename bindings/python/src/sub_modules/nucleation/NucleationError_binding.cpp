@@ -6,7 +6,7 @@
 namespace nucleation {
 void add_NucleationError_binding(nb::module_ mod) {
     nb::class_<nucleation::NucleationError> e_class(mod, "NucleationError");
-    
+
         nb::enum_<nucleation::NucleationError::Value> enumerator(e_class, "NucleationError");
         enumerator
             .value("NullArgument", nucleation::NucleationError::NullArgument)
@@ -22,7 +22,7 @@ void add_NucleationError_binding(nb::module_ mod) {
             .value("AlreadyConsumed", nucleation::NucleationError::AlreadyConsumed)
             .value("NotFound", nucleation::NucleationError::NotFound)
             .export_values();
-    
+
         e_class
             .def(nb::init_implicit<nucleation::NucleationError::Value>())
             .def(nb::self == nucleation::NucleationError::Value())
@@ -31,4 +31,4 @@ void add_NucleationError_binding(nb::module_ mod) {
             });
 }
 
-} 
+}

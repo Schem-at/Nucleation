@@ -55,18 +55,18 @@ class ResourcePack internal constructor (
         internal val libClass: Class<ResourcePackLib> = ResourcePackLib::class.java
         internal val lib: ResourcePackLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Load a resource pack from an in-memory ZIP buffer.
         */
         fun fromBytes(data: UByteArray): Result<ResourcePack> {
             val dataSliceMemory = PrimitiveArrayTools.borrow(data)
-            
+
             val returnVal = lib.ResourcePack_from_bytes(dataSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = ResourcePack(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -77,16 +77,16 @@ class ResourcePack internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Load and merge multiple resource packs, lowest priority first.
         */
         fun fromList(list: ResourcePackList): Result<ResourcePack> {
-            
+
             val returnVal = lib.ResourcePack_from_list(list.handle);
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
                 val selfEdges: List<Any> = listOf()
-                val handle = nativeOkVal 
+                val handle = nativeOkVal
                 val returnOpaque = ResourcePack(handle, selfEdges, true)
                 return returnOpaque.ok()
             } else {
@@ -94,71 +94,71 @@ class ResourcePack internal constructor (
             }
         }
     }
-    
+
     /** Number of blockstate definitions in the pack.
     */
     fun blockstateCount(): UInt {
-        
+
         val returnVal = lib.ResourcePack_blockstate_count(handle);
         return (returnVal.toUInt())
     }
-    
+
     /** Number of model definitions in the pack.
     */
     fun modelCount(): UInt {
-        
+
         val returnVal = lib.ResourcePack_model_count(handle);
         return (returnVal.toUInt())
     }
-    
+
     /** Number of textures in the pack.
     */
     fun textureCount(): UInt {
-        
+
         val returnVal = lib.ResourcePack_texture_count(handle);
         return (returnVal.toUInt())
     }
-    
+
     /** Namespaces present in the pack, as a JSON array string.
     */
     fun namespacesJson(): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.ResourcePack_namespaces_json(handle, write);
-        
+
         val returnString = DW.writeToString(write)
         return returnString
     }
-    
+
     /** All blockstate identifiers, as a JSON array string.
     */
     fun listBlockstatesJson(): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.ResourcePack_list_blockstates_json(handle, write);
-        
+
         val returnString = DW.writeToString(write)
         return returnString
     }
-    
+
     /** All model identifiers, as a JSON array string.
     */
     fun listModelsJson(): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.ResourcePack_list_models_json(handle, write);
-        
+
         val returnString = DW.writeToString(write)
         return returnString
     }
-    
+
     /** All texture identifiers, as a JSON array string.
     */
     fun listTexturesJson(): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.ResourcePack_list_textures_json(handle, write);
-        
+
         val returnString = DW.writeToString(write)
         return returnString
     }
-    
+
     /** The blockstate definition JSON for `name`; `NotFound` if absent.
     */
     fun getBlockstateJson(name: String): Result<String> {
@@ -168,7 +168,7 @@ class ResourcePack internal constructor (
         try {
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
-                
+
                 val returnString = DW.writeToString(write)
                 return returnString.ok()
             } else {
@@ -178,7 +178,7 @@ class ResourcePack internal constructor (
             nameSliceMemory.close()
         }
     }
-    
+
     /** The model definition JSON for `name`; `NotFound` if absent.
     */
     fun getModelJson(name: String): Result<String> {
@@ -188,7 +188,7 @@ class ResourcePack internal constructor (
         try {
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
-                
+
                 val returnString = DW.writeToString(write)
                 return returnString.ok()
             } else {
@@ -198,12 +198,12 @@ class ResourcePack internal constructor (
             nameSliceMemory.close()
         }
     }
-    
+
     /** Texture metadata (size, animation flag, frame count).
     */
     fun getTextureInfo(name: String): Result<TextureInfo> {
         val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
-        
+
         val returnVal = lib.ResourcePack_get_texture_info(handle, nameSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -217,7 +217,7 @@ class ResourcePack internal constructor (
             nameSliceMemory.close()
         }
     }
-    
+
     /** Raw RGBA pixels of a texture, base64-encoded.
     */
     fun getTexturePixelsB64(name: String): Result<String> {
@@ -227,7 +227,7 @@ class ResourcePack internal constructor (
         try {
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
-                
+
                 val returnString = DW.writeToString(write)
                 return returnString.ok()
             } else {
@@ -237,13 +237,13 @@ class ResourcePack internal constructor (
             nameSliceMemory.close()
         }
     }
-    
+
     /** Add (or override) a blockstate definition from a JSON string.
     */
     fun addBlockstateJson(name: String, json: String): Result<Unit> {
         val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
         val jsonSliceMemory = PrimitiveArrayTools.borrowUtf8(json)
-        
+
         val returnVal = lib.ResourcePack_add_blockstate_json(handle, nameSliceMemory.slice, jsonSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -257,13 +257,13 @@ class ResourcePack internal constructor (
             jsonSliceMemory.close()
         }
     }
-    
+
     /** Add (or override) a model definition from a JSON string.
     */
     fun addModelJson(name: String, json: String): Result<Unit> {
         val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
         val jsonSliceMemory = PrimitiveArrayTools.borrowUtf8(json)
-        
+
         val returnVal = lib.ResourcePack_add_model_json(handle, nameSliceMemory.slice, jsonSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -277,13 +277,13 @@ class ResourcePack internal constructor (
             jsonSliceMemory.close()
         }
     }
-    
+
     /** Add a raw RGBA texture (`pixels` length must be `width * height * 4`).
     */
     fun addTexture(name: String, width: UInt, height: UInt, pixels: UByteArray): Result<Unit> {
         val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
         val pixelsSliceMemory = PrimitiveArrayTools.borrow(pixels)
-        
+
         val returnVal = lib.ResourcePack_add_texture(handle, nameSliceMemory.slice, FFIUint32(width), FFIUint32(height), pixelsSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -297,12 +297,12 @@ class ResourcePack internal constructor (
             pixelsSliceMemory.close()
         }
     }
-    
+
     /** Register a MeshExporter with the FormatManager so `save_as("mesh", ...)`
     *works. (Old ABI: `schematic_register_mesh_exporter`.)
     */
     fun registerMeshExporter(): Result<Unit> {
-        
+
         val returnVal = lib.ResourcePack_register_mesh_exporter(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {

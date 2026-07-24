@@ -49,19 +49,19 @@ class Store internal constructor (
         internal val libClass: Class<StoreLib> = StoreLib::class.java
         internal val lib: StoreLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Open a store from a URL. Errors with `Store` on an unknown scheme or
         *connection failure.
         */
         fun open(url: String): Result<Store> {
             val urlSliceMemory = PrimitiveArrayTools.borrowUtf8(url)
-            
+
             val returnVal = lib.Store_open(urlSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = Store(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -72,7 +72,7 @@ class Store internal constructor (
             }
         }
     }
-    
+
     /** Fetch `key`, writing the value as base64 (PORTING rule 6). Errors with
     *`NotFound` when the key is absent.
     */
@@ -83,7 +83,7 @@ class Store internal constructor (
         try {
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
-                
+
                 val returnString = DW.writeToString(write)
                 return returnString.ok()
             } else {
@@ -93,13 +93,13 @@ class Store internal constructor (
             keySliceMemory.close()
         }
     }
-    
+
     /** Store `data` at `key`.
     */
     fun put(key: String, data: UByteArray): Result<Unit> {
         val keySliceMemory = PrimitiveArrayTools.borrowUtf8(key)
         val dataSliceMemory = PrimitiveArrayTools.borrow(data)
-        
+
         val returnVal = lib.Store_put(handle, keySliceMemory.slice, dataSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -113,12 +113,12 @@ class Store internal constructor (
             dataSliceMemory.close()
         }
     }
-    
+
     /** Whether `key` exists.
     */
     fun exists(key: String): Result<Boolean> {
         val keySliceMemory = PrimitiveArrayTools.borrowUtf8(key)
-        
+
         val returnVal = lib.Store_exists(handle, keySliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -131,12 +131,12 @@ class Store internal constructor (
             keySliceMemory.close()
         }
     }
-    
+
     /** Delete `key` (idempotent).
     */
     fun delete(key: String): Result<Unit> {
         val keySliceMemory = PrimitiveArrayTools.borrowUtf8(key)
-        
+
         val returnVal = lib.Store_delete(handle, keySliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -149,7 +149,7 @@ class Store internal constructor (
             keySliceMemory.close()
         }
     }
-    
+
     /** List keys under `prefix`, written as a JSON array string.
     */
     fun list(prefix: String): Result<String> {
@@ -159,7 +159,7 @@ class Store internal constructor (
         try {
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
-                
+
                 val returnString = DW.writeToString(write)
                 return returnString.ok()
             } else {
@@ -169,14 +169,14 @@ class Store internal constructor (
             prefixSliceMemory.close()
         }
     }
-    
+
     /** Atomically write `data` at `key` only if it does not already exist.
     *Returns `true` if written, `false` if the key existed.
     */
     fun putIfAbsent(key: String, data: UByteArray): Result<Boolean> {
         val keySliceMemory = PrimitiveArrayTools.borrowUtf8(key)
         val dataSliceMemory = PrimitiveArrayTools.borrow(data)
-        
+
         val returnVal = lib.Store_put_if_absent(handle, keySliceMemory.slice, dataSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -190,7 +190,7 @@ class Store internal constructor (
             dataSliceMemory.close()
         }
     }
-    
+
     /** A keyset page of keys under `prefix`. `after` is the exclusive cursor
     *(empty string for the first page); at most `limit` keys are returned.
     *Writes a JSON object string `{"keys":[...],"next":"…"|null}`.
@@ -203,7 +203,7 @@ class Store internal constructor (
         try {
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
-                
+
                 val returnString = DW.writeToString(write)
                 return returnString.ok()
             } else {
@@ -214,11 +214,11 @@ class Store internal constructor (
             afterSliceMemory.close()
         }
     }
-    
+
     /** Health check: `Ok` when the store is usable.
     */
     fun health(): Result<Unit> {
-        
+
         val returnVal = lib.Store_health(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -227,20 +227,20 @@ class Store internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Open a schematic stored at `key` in this store. Works for every
     *backend, including `redis://`/`postgres://`/`mem://` that the
     *single-string URI form (`StoreIo::open`) rejects.
     */
     fun openSchematic(key: String): Result<Schematic> {
         val keySliceMemory = PrimitiveArrayTools.borrowUtf8(key)
-        
+
         val returnVal = lib.Store_open_schematic(handle, keySliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
                 val selfEdges: List<Any> = listOf()
-                val handle = nativeOkVal 
+                val handle = nativeOkVal
                 val returnOpaque = Schematic(handle, selfEdges, true)
                 return returnOpaque.ok()
             } else {
@@ -250,7 +250,7 @@ class Store internal constructor (
             keySliceMemory.close()
         }
     }
-    
+
     /** Save a schematic at `key` in this store. `version` selects the format
     *version (empty string = format default). Works for every backend,
     *including `redis://`/`postgres://`/`mem://` that the single-string URI
@@ -259,7 +259,7 @@ class Store internal constructor (
     fun saveSchematic(schematic: Schematic, key: String, version: String): Result<Unit> {
         val keySliceMemory = PrimitiveArrayTools.borrowUtf8(key)
         val versionSliceMemory = PrimitiveArrayTools.borrowUtf8(version)
-        
+
         val returnVal = lib.Store_save_schematic(handle, schematic.handle, keySliceMemory.slice, versionSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();

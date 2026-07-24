@@ -9,7 +9,7 @@ void add_BlockState_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::BlockState::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::BlockState> opaque(mod, "BlockState", nb::type_slots(nucleation_BlockState_slots));
     opaque
         .def_static("create", std::move(maybe_op_unwrap(&nucleation::BlockState::create)), "name"_a)
@@ -18,4 +18,4 @@ void add_BlockState_binding(nb::module_ mod) {
         .def("with_property", std::move(maybe_op_unwrap(&nucleation::BlockState::with_property)), "key"_a, "value"_a);
 }
 
-} 
+}

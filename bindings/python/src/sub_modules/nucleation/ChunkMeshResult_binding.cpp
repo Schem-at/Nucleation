@@ -13,7 +13,7 @@ void add_ChunkMeshResult_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::ChunkMeshResult::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::ChunkMeshResult> opaque(mod, "ChunkMeshResult", nb::type_slots(nucleation_ChunkMeshResult_slots));
     opaque
         .def("chunk_coordinate_at", &nucleation::ChunkMeshResult::chunk_coordinate_at, "index"_a)
@@ -28,4 +28,4 @@ void add_ChunkMeshResult_binding(nb::module_ mod) {
         .def("total_vertex_count", &nucleation::ChunkMeshResult::total_vertex_count);
 }
 
-} 
+}

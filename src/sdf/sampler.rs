@@ -193,7 +193,9 @@ impl ResolvedGradient {
         if self.max == self.min || self.ids.len() == 1 {
             return &self.ids[0];
         }
-        let t = ((v - self.min) as f32 / (self.max - self.min) as f32).clamp(0.0, 1.0);
+        let delta = i64::from(v) - i64::from(self.min);
+        let span = i64::from(self.max) - i64::from(self.min);
+        let t = (delta as f64 / span as f64).clamp(0.0, 1.0) as f32;
         let pos = t * (self.ids.len() - 1) as f32;
         if !self.dither {
             return &self.ids[pos.round() as usize];
@@ -209,8 +211,8 @@ impl ResolvedGradient {
         let lo = pos.floor() as usize;
         let hi = (lo + 1).min(self.ids.len() - 1);
         let frac = pos - pos.floor();
-        let bx = ((x + y) & 3) as usize;
-        let bz = ((z + (y >> 2)) & 3) as usize;
+        let bx = (x.wrapping_add(y) & 3) as usize;
+        let bz = (z.wrapping_add(y >> 2) & 3) as usize;
         let threshold = (BAYER[bx][bz] + 0.5) / 16.0;
         if frac > threshold {
             &self.ids[hi]
@@ -293,8 +295,6 @@ pub fn auto_bounds(node: &SdfNode) -> Result<SampleBounds, String> {
     })
 }
 
-const MAX_SAMPLE_VOLUME: i64 = 512 * 512 * 512;
-
 /// Sample the SDF into a new schematic. Blocks are placed at integer
 /// coordinates whose cell center (x+0.5, y+0.5, z+0.5) lies inside the
 /// surface (distance ≤ 0).
@@ -308,19 +308,7 @@ pub fn sample_to_schematic(
         Some(b) => b,
         None => auto_bounds(node)?,
     };
-    for a in 0..3 {
-        if bounds.min[a] > bounds.max[a] {
-            return Err(format!("Degenerate sampling bounds on axis {a}"));
-        }
-    }
-    let volume = (bounds.max[0] - bounds.min[0] + 1) as i64
-        * (bounds.max[1] - bounds.min[1] + 1) as i64
-        * (bounds.max[2] - bounds.min[2] + 1) as i64;
-    if volume > MAX_SAMPLE_VOLUME {
-        return Err(format!(
-            "Sampling volume {volume} exceeds limit {MAX_SAMPLE_VOLUME}; pass tighter bounds"
-        ));
-    }
+    super::checked_sample_volume(bounds.min, bounds.max)?;
 
     // Validate every fill rule up front and pre-resolve gradients into
     // ready-to-index block ramps (one find_closest per ramp step, not per
@@ -439,7 +427,10 @@ fn apply_surface(
                 rule.seed.wrapping_add(1),
             );
             let idx = ((pick * rule.blocks.len() as f32) as usize).min(rule.blocks.len() - 1);
-            schematic.set_block_str(x, surface_y + 1, z, &rule.blocks[idx]);
+            let Some(decoration_y) = surface_y.checked_add(1) else {
+                continue;
+            };
+            schematic.set_block_str(x, decoration_y, z, &rule.blocks[idx]);
             return; // first matching scatter rule wins per column
         }
     }

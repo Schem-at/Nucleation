@@ -53,75 +53,75 @@ class MeshConfig internal constructor (
         internal val libClass: Class<MeshConfigLib> = MeshConfigLib::class.java
         internal val lib: MeshConfigLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Create a config with default settings: hidden-face culling on,
         *ambient occlusion on (intensity 0.4), no biome, atlas max size 4096,
         *occluded-block culling on, greedy meshing off.
         */
         fun create(): MeshConfig {
-            
+
             val returnVal = lib.MeshConfig_create();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = MeshConfig(handle, selfEdges, true)
             return returnOpaque
         }
     }
-    
+
     /** Enable face culling between adjacent solid blocks (default: true).
     */
     fun setCullHiddenFaces(val_: Boolean): Unit {
-        
+
         val returnVal = lib.MeshConfig_set_cull_hidden_faces(handle, val_);
-        
+
     }
-    
+
     /** Whether hidden-face culling is enabled.
     */
     fun cullHiddenFaces(): Boolean {
-        
+
         val returnVal = lib.MeshConfig_cull_hidden_faces(handle);
         return (returnVal > 0)
     }
-    
+
     /** Enable ambient occlusion (default: true).
     */
     fun setAmbientOcclusion(val_: Boolean): Unit {
-        
+
         val returnVal = lib.MeshConfig_set_ambient_occlusion(handle, val_);
-        
+
     }
-    
+
     /** Whether ambient occlusion is enabled.
     */
     fun ambientOcclusion(): Boolean {
-        
+
         val returnVal = lib.MeshConfig_ambient_occlusion(handle);
         return (returnVal > 0)
     }
-    
+
     /** Set ambient-occlusion intensity, 0.0 (no darkening) to 1.0 (full
     *darkening). Default: 0.4.
     */
     fun setAoIntensity(val_: Float): Unit {
-        
+
         val returnVal = lib.MeshConfig_set_ao_intensity(handle, val_);
-        
+
     }
-    
+
     /** The ambient-occlusion intensity (0.0–1.0).
     */
     fun aoIntensity(): Float {
-        
+
         val returnVal = lib.MeshConfig_ao_intensity(handle);
         return (returnVal)
     }
-    
+
     /** Set the biome used for tinting (e.g. "plains", "swamp").
     */
     fun setBiome(biome: String): Result<Unit> {
         val biomeSliceMemory = PrimitiveArrayTools.borrowUtf8(biome)
-        
+
         val returnVal = lib.MeshConfig_set_biome(handle, biomeSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -134,15 +134,15 @@ class MeshConfig internal constructor (
             biomeSliceMemory.close()
         }
     }
-    
+
     /** Clear the biome (old ABI: `meshconfig_set_biome(NULL)`).
     */
     fun clearBiome(): Unit {
-        
+
         val returnVal = lib.MeshConfig_clear_biome(handle);
-        
+
     }
-    
+
     /** The configured biome; `NotFound` if none is set.
     */
     fun biome(): Result<String> {
@@ -150,60 +150,60 @@ class MeshConfig internal constructor (
         val returnVal = lib.MeshConfig_biome(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Set the maximum texture-atlas dimension in pixels (default: 4096).
     */
     fun setAtlasMaxSize(size: UInt): Unit {
-        
+
         val returnVal = lib.MeshConfig_set_atlas_max_size(handle, FFIUint32(size));
-        
+
     }
-    
+
     /** The maximum texture-atlas dimension in pixels.
     */
     fun atlasMaxSize(): UInt {
-        
+
         val returnVal = lib.MeshConfig_atlas_max_size(handle);
         return (returnVal.toUInt())
     }
-    
+
     /** Skip blocks fully hidden by opaque neighbors on all 6 sides
     *(default: true).
     */
     fun setCullOccludedBlocks(val_: Boolean): Unit {
-        
+
         val returnVal = lib.MeshConfig_set_cull_occluded_blocks(handle, val_);
-        
+
     }
-    
+
     /** Whether occluded-block culling is enabled.
     */
     fun cullOccludedBlocks(): Boolean {
-        
+
         val returnVal = lib.MeshConfig_cull_occluded_blocks(handle);
         return (returnVal > 0)
     }
-    
+
     /** Merge adjacent coplanar faces into larger quads to reduce triangle
     *count (default: false).
     */
     fun setGreedyMeshing(val_: Boolean): Unit {
-        
+
         val returnVal = lib.MeshConfig_set_greedy_meshing(handle, val_);
-        
+
     }
-    
+
     /** Whether greedy meshing is enabled.
     */
     fun greedyMeshing(): Boolean {
-        
+
         val returnVal = lib.MeshConfig_greedy_meshing(handle);
         return (returnVal > 0)
     }

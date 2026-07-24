@@ -10,7 +10,7 @@ void add_Shape_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::Shape::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::Shape> opaque(mod, "Shape", nb::type_slots(nucleation_Shape_slots));
     opaque
         .def_static("bezier", std::move(maybe_op_unwrap(&nucleation::Shape::bezier)), "control_points"_a, "thickness"_a, "resolution"_a)
@@ -36,4 +36,4 @@ void add_Shape_binding(nb::module_ mod) {
         .def("union_with", std::move(maybe_op_unwrap(&nucleation::Shape::union_with)), "other"_a);
 }
 
-} 
+}

@@ -13,7 +13,7 @@ import java.util.Collections
 val CLEANER = java.lang.ref.Cleaner.create()
 
 interface DiplomatWriteLib: Library {
-    fun diplomat_buffer_write_create(size: Long): Pointer 
+    fun diplomat_buffer_write_create(size: Long): Pointer
     fun diplomat_buffer_write_get_bytes(diplomatWrite: Pointer): Pointer
     fun diplomat_buffer_write_len(diplomatWrite: Pointer): Long
     fun diplomat_buffer_write_destroy(diplomatWrite: Pointer)
@@ -957,6 +957,70 @@ class ResultRegionBoundsNativeInt: Structure(), Structure.ByValue  {
     internal fun getNativeOk(): RegionBoundsNative? {
         if (isOk == 1.toByte()) {
             return union.getTypedValue(RegionBoundsNative::class.java) as RegionBoundsNative
+        }
+        return null
+    }
+    internal fun getNativeErr(): Int? {
+        if (isOk == 0.toByte()) {
+            return union.getTypedValue(Int::class.java) as Int
+        }
+        return null
+    }
+
+}
+internal class ResultSdfBoundsNativeIntUnion: Union() {
+    @JvmField
+    internal var ok: SdfBoundsNative = SdfBoundsNative()
+    @JvmField
+    internal var err: Int = 0
+}
+
+class ResultSdfBoundsNativeInt: Structure(), Structure.ByValue  {
+    @JvmField
+    internal var union: ResultSdfBoundsNativeIntUnion = ResultSdfBoundsNativeIntUnion()
+
+    @JvmField
+    internal var isOk: Byte = 0
+
+    // Define the fields of the struct
+    override fun getFieldOrder(): List<String> {
+        return listOf("union", "isOk")
+    }
+    internal fun getNativeOk(): SdfBoundsNative? {
+        if (isOk == 1.toByte()) {
+            return union.getTypedValue(SdfBoundsNative::class.java) as SdfBoundsNative
+        }
+        return null
+    }
+    internal fun getNativeErr(): Int? {
+        if (isOk == 0.toByte()) {
+            return union.getTypedValue(Int::class.java) as Int
+        }
+        return null
+    }
+
+}
+internal class ResultSdfNormalNativeIntUnion: Union() {
+    @JvmField
+    internal var ok: SdfNormalNative = SdfNormalNative()
+    @JvmField
+    internal var err: Int = 0
+}
+
+class ResultSdfNormalNativeInt: Structure(), Structure.ByValue  {
+    @JvmField
+    internal var union: ResultSdfNormalNativeIntUnion = ResultSdfNormalNativeIntUnion()
+
+    @JvmField
+    internal var isOk: Byte = 0
+
+    // Define the fields of the struct
+    override fun getFieldOrder(): List<String> {
+        return listOf("union", "isOk")
+    }
+    internal fun getNativeOk(): SdfNormalNative? {
+        if (isOk == 1.toByte()) {
+            return union.getTypedValue(SdfNormalNative::class.java) as SdfNormalNative
         }
         return null
     }

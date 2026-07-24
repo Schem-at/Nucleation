@@ -42,7 +42,7 @@ class Fingerprint internal constructor (
         internal val libClass: Class<FingerprintLib> = FingerprintLib::class.java
         internal val lib: FingerprintLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** The fingerprint of a schematic for the given preset, as a hex string.
         *Errors with `InvalidArgument` on an unknown preset.
         */
@@ -53,7 +53,7 @@ class Fingerprint internal constructor (
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
-                    
+
                     val returnString = DW.writeToString(write)
                     return returnString.ok()
                 } else {
@@ -64,7 +64,7 @@ class Fingerprint internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** The structural signature (JSON) of a schematic for the given preset.
         */
         fun signatureJson(schematic: Schematic, preset: String): Result<String> {
@@ -74,7 +74,7 @@ class Fingerprint internal constructor (
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
-                    
+
                     val returnString = DW.writeToString(write)
                     return returnString.ok()
                 } else {
@@ -85,12 +85,12 @@ class Fingerprint internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Translation-invariant fuzzy distance between two builds' footprints.
         */
         fun footprintDistance(a: Schematic, b: Schematic, preset: String): Result<Float> {
             val presetSliceMemory = PrimitiveArrayTools.borrowUtf8(preset)
-            
+
             val returnVal = lib.Fingerprint_footprint_distance(a.handle, b.handle, presetSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
@@ -104,7 +104,7 @@ class Fingerprint internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** The schematic's translation/scale-invariant FFT shape footprint as a
         *JSON array of floats.
         */
@@ -115,7 +115,7 @@ class Fingerprint internal constructor (
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
-                    
+
                     val returnString = DW.writeToString(write)
                     return returnString.ok()
                 } else {
@@ -126,12 +126,12 @@ class Fingerprint internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Whether two schematics share the same fingerprint for the given preset.
         */
         fun isDuplicate(a: Schematic, b: Schematic, preset: String): Result<Boolean> {
             val presetSliceMemory = PrimitiveArrayTools.borrowUtf8(preset)
-            
+
             val returnVal = lib.Fingerprint_is_duplicate(a.handle, b.handle, presetSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();

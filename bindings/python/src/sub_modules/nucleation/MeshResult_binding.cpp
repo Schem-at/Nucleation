@@ -12,7 +12,7 @@ void add_MeshResult_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::MeshResult::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::MeshResult> opaque(mod, "MeshResult", nb::type_slots(nucleation_MeshResult_slots));
     opaque
         .def("bounds", &nucleation::MeshResult::bounds)
@@ -25,4 +25,4 @@ void add_MeshResult_binding(nb::module_ mod) {
         .def("vertex_count", &nucleation::MeshResult::vertex_count);
 }
 
-} 
+}

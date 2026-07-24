@@ -17,4 +17,4 @@ void add_MeshBounds_binding(nb::module_ mod) {
         .def_rw("max_z", &nucleation::MeshBounds::max_z);
 }
 
-} 
+}

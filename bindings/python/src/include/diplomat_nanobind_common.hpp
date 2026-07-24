@@ -136,10 +136,10 @@ namespace nanobind::detail
 
             return nullptr;
         }
-        
+
         template <typename T_>
         using Cast = Value;
-        operator Value() { 
+        operator Value() {
             if (is_ok) {
                 return nucleation::diplomat::Ok<T>(forward_like_<U>(ok_val.value()));
             } else {
@@ -229,7 +229,7 @@ namespace nanobind::detail
             }
 
             // Attempt to convert a native sequence. We must convert all elements & store
-            // them in a temporary object which will be cleaned up 
+            // them in a temporary object which will be cleaned up
             if (std::is_const_v<T> &&
                 (!std::is_pointer_v<T> || is_base_caster_v<make_caster<T>>)) {
                 ListCaster caster;
@@ -316,7 +316,7 @@ void diplomat_tp_dealloc(PyObject *self);
 // but if a function returns a std::unique_ptr of the same address as one it has seen before, then Nanobind panics.
 //
 // The solution then (without modifying the rest of Diplomat to provide information on what is/isn't an opaque ZST)
-// is to hijack functions which return std::unique_ptr and check if they have ZSTs. This chain starts with maybe_op_unwrap 
+// is to hijack functions which return std::unique_ptr and check if they have ZSTs. This chain starts with maybe_op_unwrap
 // and ends with maybe_alloc_zst.
 template<typename Return>
 inline std::unique_ptr<Return> maybe_alloc_zst(std::unique_ptr<Return> pointer) {
@@ -356,7 +356,7 @@ struct get_diplomat_result<nucleation::diplomat::result<T, E>> : std::true_type 
     typedef nucleation::diplomat::Ok<T> ok;
     typedef nucleation::diplomat::Err<E> err;
 
-    typedef T success; 
+    typedef T success;
     typedef E error;
 };
 
@@ -380,7 +380,7 @@ map_inner(Return to_wrap) {
     }
 }
 
-// Helper for taking a function of a signature and returning a new function which 
+// Helper for taking a function of a signature and returning a new function which
 // potentially modifies the returned type (if it's a ZST opaque).
 template<typename Func>
 struct maybe_op_unwrapper {};
@@ -412,7 +412,7 @@ struct maybe_op_unwrapper<Return(Class::*)(Args...)> {
         auto out = (c->*f)(args...);
         return map_inner<Return>(std::move(out));
     }
-    
+
     static std::function<Return(Class*, Args...)> get_bound_mapper(Return (Class::*f)(Args...)) {
         std::function<Return(Class*, Args...)> out = std::bind_front(maybe_op_unwrapper<Return(Class::*)(Args...)>::bound_map, f);
         return out;
@@ -428,7 +428,7 @@ struct maybe_op_unwrapper<Return(Class::*)(Args...) const> {
         auto out = (c->*f)(args...);
         return map_inner<Return>(std::move(out));
     }
-    
+
     static std::function<Return(Class*, Args...)> get_bound_mapper(Return (Class::*f)(Args...) const) {
         std::function<Return(Class*, Args...)> out = std::bind_front(maybe_op_unwrapper<Return(Class::*)(Args...) const>::bound_map, f);
         return out;

@@ -12,7 +12,7 @@ void add_RawMeshExport_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::RawMeshExport::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::RawMeshExport> opaque(mod, "RawMeshExport", nb::type_slots(nucleation_RawMeshExport_slots));
     opaque
         .def("colors_b64", &nucleation::RawMeshExport::colors_b64)
@@ -28,4 +28,4 @@ void add_RawMeshExport_binding(nb::module_ mod) {
         .def("vertex_count", &nucleation::RawMeshExport::vertex_count);
 }
 
-} 
+}

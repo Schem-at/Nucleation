@@ -58,132 +58,132 @@ class Palette internal constructor (
         internal val libClass: Class<PaletteLib> = PaletteLib::class.java
         internal val lib: PaletteLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Every block blockpedia knows a color for (the default palette
         *brushes use when none is set).
         */
         fun all(): Palette {
-            
+
             val returnVal = lib.Palette_all();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = Palette(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Only solid blocks: no transparency, gravity, tile entities, or
         *support requirements.
         */
         fun solid(): Palette {
-            
+
             val returnVal = lib.Palette_solid();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = Palette(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Conservative structural set (full building blocks).
         */
         fun structural(): Palette {
-            
+
             val returnVal = lib.Palette_structural();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = Palette(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Decorative set: allows stairs/slabs but no tile entities.
         */
         fun decorative(): Palette {
-            
+
             val returnVal = lib.Palette_decorative();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = Palette(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** The 16 concrete colors (excludes concrete powder).
         */
         fun concrete(): Palette {
-            
+
             val returnVal = lib.Palette_concrete();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = Palette(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** The 16 wool colors.
         */
         fun wool(): Palette {
-            
+
             val returnVal = lib.Palette_wool();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = Palette(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Terracotta colors (excludes glazed variants).
         */
         fun terracotta(): Palette {
-            
+
             val returnVal = lib.Palette_terracotta();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = Palette(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Genuinely gray blocks: opaque full cubes whose measured color
         *is near-neutral (low Oklab chroma) — judged from color data,
         *not names.
         */
         fun grayscale(): Palette {
-            
+
             val returnVal = lib.Palette_grayscale();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = Palette(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** The planks family — a natural light→dark wood ramp.
         */
         fun wood(): Palette {
-            
+
             val returnVal = lib.Palette_wood();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = Palette(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Custom palette from a JSON array of block ids, e.g.
         *`["minecraft:stone", "minecraft:oak_planks"]`. Ids blockpedia has
         *no color for are silently skipped — check `len` afterwards.
         */
         fun fromBlockIds(idsJson: String): Result<Palette> {
             val idsJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(idsJson)
-            
+
             val returnVal = lib.Palette_from_block_ids(idsJsonSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = Palette(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -194,7 +194,7 @@ class Palette internal constructor (
             }
         }
     }
-    
+
     /** A copy of this palette with ordered dithering enabled: brushes
     *snapping through it alternate between the two nearest blocks per
     *voxel (4x4 Bayer threshold, deterministic in position), which
@@ -202,27 +202,27 @@ class Palette internal constructor (
     *trick. Ramp and list queries are unaffected.
     */
     fun dithered(): Palette {
-        
+
         val returnVal = lib.Palette_dithered(handle);
         val selfEdges: List<Any> = listOf()
-        val handle = returnVal 
+        val handle = returnVal
         val returnOpaque = Palette(handle, selfEdges, true)
         return returnOpaque
     }
-    
+
     /** A copy of this palette ordered by perceptual lightness (Oklab L,
     *dark → light). Combined with `block_ids_json`, gives a
     *ready-to-index ramp: `ids[i]` for intensity `i / (len - 1)`.
     */
     fun sortedByLightness(): Palette {
-        
+
         val returnVal = lib.Palette_sorted_by_lightness(handle);
         val selfEdges: List<Any> = listOf()
-        val handle = returnVal 
+        val handle = returnVal
         val returnOpaque = Palette(handle, selfEdges, true)
         return returnOpaque
     }
-    
+
     /** JSON array of exactly `steps` DISTINCT block ids forming the
     *smoothest ramp this palette can make from (`r1`,`g1`,`b1`) to
     *(`r2`,`g2`,`b2`): targets are evenly spaced along the Oklab line
@@ -236,14 +236,14 @@ class Palette internal constructor (
         val returnVal = lib.Palette_ramp_ids_json(handle, FFIUint8(r1), FFIUint8(g1), FFIUint8(b1), FFIUint8(r2), FFIUint8(g2), FFIUint8(b2), FFIUint32(steps), write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** JSON array of exactly `steps` block ids sampling the color
     *gradient from (`r1`,`g1`,`b1`) to (`r2`,`g2`,`b2`) in Oklab
     *space, each step snapped to this palette's closest block. Built
@@ -256,32 +256,32 @@ class Palette internal constructor (
         val returnVal = lib.Palette_gradient_ids_json(handle, FFIUint8(r1), FFIUint8(g1), FFIUint8(b1), FFIUint8(r2), FFIUint8(g2), FFIUint8(b2), FFIUint32(steps), write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Number of blocks in the palette.
     */
     fun len(): ULong {
-        
+
         val returnVal = lib.Palette_len(handle);
         return (returnVal.toULong())
     }
-    
+
     /** The palette's block ids as a JSON array string.
     */
     fun blockIdsJson(): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.Palette_block_ids_json(handle, write);
-        
+
         val returnString = DW.writeToString(write)
         return returnString
     }
-    
+
     /** Position-aware dithered snap: the block for the given RGB at
     *voxel (x, y, z), alternating between the two nearest palette
     *blocks per position (4x4 Bayer) — the per-pixel entry point for
@@ -293,14 +293,14 @@ class Palette internal constructor (
         val returnVal = lib.Palette_closest_block_dithered(handle, FFIUint8(r), FFIUint8(g), FFIUint8(b), x, y, z, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** The palette block whose color is closest (Oklab distance) to the
     *given RGB. Errors with `NotFound` on an empty palette.
     */
@@ -309,7 +309,7 @@ class Palette internal constructor (
         val returnVal = lib.Palette_closest_block(handle, FFIUint8(r), FFIUint8(g), FFIUint8(b), write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {

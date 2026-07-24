@@ -51,7 +51,7 @@ class Blocks internal constructor (
         internal val libClass: Class<BlocksLib> = BlocksLib::class.java
         internal val lib: BlocksLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Full facts for one block as a JSON object:
         *`{id, kind, base_block, tags: [...], full_cube, transparent,
         *color: [r, g, b] | null, properties: {name: [values...]},
@@ -68,7 +68,7 @@ class Blocks internal constructor (
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
-                    
+
                     val returnString = DW.writeToString(write)
                     return returnString.ok()
                 } else {
@@ -79,18 +79,18 @@ class Blocks internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** All known block ids as a sorted JSON array string.
         */
         fun idsJson(): String {
             val write = DW.lib.diplomat_buffer_write_create(0)
             val returnVal = lib.Blocks_ids_json(write);
-            
+
             val returnString = DW.writeToString(write)
             return returnString
         }
         @JvmStatic
-        
+
         /** Ids of every block carrying the vanilla block tag, as a sorted
         *Blocks whose measured texture color is within `max_distance`
         *(Oklab; ~0.05 = same color family, ~0.15 = generous) of the given
@@ -102,7 +102,7 @@ class Blocks internal constructor (
             val returnVal = lib.Blocks_by_color_json(FFIUint8(r), FFIUint8(g), FFIUint8(b), maxDistance, write);
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
-                
+
                 val returnString = DW.writeToString(write)
                 return returnString.ok()
             } else {
@@ -110,7 +110,7 @@ class Blocks internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** JSON array string (`[]` for unknown tags). Accepts
         *`minecraft:wool` and short `wool` forms, including nested paths
         *like `mineable/pickaxe`.
@@ -122,7 +122,7 @@ class Blocks internal constructor (
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
-                    
+
                     val returnString = DW.writeToString(write)
                     return returnString.ok()
                 } else {
@@ -133,7 +133,7 @@ class Blocks internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Ids of every block of the given official definition kind
         *(`minecraft:stair`, `minecraft:slab`, `minecraft:door`, ...), as
         *a sorted JSON array string (`[]` for unknown kinds).
@@ -145,7 +145,7 @@ class Blocks internal constructor (
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
-                    
+
                     val returnString = DW.writeToString(write)
                     return returnString.ok()
                 } else {
@@ -156,7 +156,7 @@ class Blocks internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** The base block followed by all its shape variants — blocks whose
         *`base_block` is `base_id` (stairs, slabs, walls, fences of the
         *base) — as a JSON array string. The base itself is always first;
@@ -170,7 +170,7 @@ class Blocks internal constructor (
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
-                    
+
                     val returnString = DW.writeToString(write)
                     return returnString.ok()
                 } else {
@@ -181,19 +181,19 @@ class Blocks internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** All known vanilla block tag names as a sorted JSON array string
         *(`minecraft:`-prefixed, e.g. `minecraft:wool`).
         */
         fun tagsJson(): String {
             val write = DW.lib.diplomat_buffer_write_create(0)
             val returnVal = lib.Blocks_tags_json(write);
-            
+
             val returnString = DW.writeToString(write)
             return returnString
         }
         @JvmStatic
-        
+
         /** Every property-value combination of the block as a JSON array of
         *`{prop: value}` objects (a single `{}` entry for property-less
         *blocks). Errors with `NotFound` for unknown ids and with
@@ -208,7 +208,7 @@ class Blocks internal constructor (
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
-                    
+
                     val returnString = DW.writeToString(write)
                     return returnString.ok()
                 } else {
@@ -219,11 +219,11 @@ class Blocks internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Total number of blocks in the table.
         */
         fun count(): ULong {
-            
+
             val returnVal = lib.Blocks_count();
             return (returnVal.toULong())
         }

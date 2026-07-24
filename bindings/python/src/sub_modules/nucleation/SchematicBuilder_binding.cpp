@@ -9,7 +9,7 @@ void add_SchematicBuilder_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::SchematicBuilder::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::SchematicBuilder> opaque(mod, "SchematicBuilder", nb::type_slots(nucleation_SchematicBuilder_slots));
     opaque
         .def("build", std::move(maybe_op_unwrap(&nucleation::SchematicBuilder::build)))
@@ -28,4 +28,4 @@ void add_SchematicBuilder_binding(nb::module_ mod) {
         .def("validate", &nucleation::SchematicBuilder::validate);
 }
 
-} 
+}

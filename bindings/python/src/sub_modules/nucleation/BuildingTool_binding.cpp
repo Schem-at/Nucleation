@@ -3,6 +3,7 @@
 
 #include "Brush.hpp"
 #include "BuildingTool.hpp"
+#include "sdf_callback.hpp"
 #include "Schematic.hpp"
 #include "Shape.hpp"
 
@@ -12,13 +13,14 @@ void add_BuildingTool_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::BuildingTool::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::BuildingTool> opaque(mod, "BuildingTool", nb::type_slots(nucleation_BuildingTool_slots));
     opaque
         .def_static("fill", &nucleation::BuildingTool::fill, "schematic"_a, "shape"_a, "brush"_a)
+        .def_static("fill_sdf_function", &nucleation::fill_sdf_function, "schematic"_a, "brush"_a, "min_x"_a, "min_y"_a, "min_z"_a, "max_x"_a, "max_y"_a, "max_z"_a, "function"_a, "normal"_a = nb::none(), "epsilon"_a = 0.5)
         .def_static("fill_only_air", &nucleation::BuildingTool::fill_only_air, "schematic"_a, "shape"_a, "brush"_a)
         .def_static("fill_replacing", &nucleation::BuildingTool::fill_replacing, "schematic"_a, "shape"_a, "brush"_a, "targets_json"_a)
         .def_static("rstack", &nucleation::BuildingTool::rstack, "schematic"_a, "shape"_a, "brush"_a, "count"_a, "offset_x"_a, "offset_y"_a, "offset_z"_a);
 }
 
-} 
+}

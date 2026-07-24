@@ -9,7 +9,7 @@ void add_SortStrategy_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::SortStrategy::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::SortStrategy> opaque(mod, "SortStrategy", nb::type_slots(nucleation_SortStrategy_slots));
     opaque
         .def_static("descending", std::move(maybe_op_unwrap(&nucleation::SortStrategy::descending)))
@@ -27,4 +27,4 @@ void add_SortStrategy_binding(nb::module_ mod) {
         .def_static("zyx", std::move(maybe_op_unwrap(&nucleation::SortStrategy::zyx)));
 }
 
-} 
+}

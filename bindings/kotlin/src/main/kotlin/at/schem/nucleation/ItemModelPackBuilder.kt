@@ -41,27 +41,27 @@ class ItemModelPackBuilder internal constructor (
         internal val libClass: Class<ItemModelPackBuilderLib> = ItemModelPackBuilderLib::class.java
         internal val lib: ItemModelPackBuilderLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Create an empty pack builder.
         */
         fun create(): ItemModelPackBuilder {
-            
+
             val returnVal = lib.ItemModelPackBuilder_create();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = ItemModelPackBuilder(handle, selfEdges, true)
             return returnOpaque
         }
     }
-    
+
     /** Number of results added so far.
     */
     fun len(): UInt {
-        
+
         val returnVal = lib.ItemModelPackBuilder_len(handle);
         return (returnVal.toUInt())
     }
-    
+
     /** Build a resource pack ZIP from every added result, base64-encoded.
     */
     fun buildZipB64(): Result<String> {
@@ -69,7 +69,7 @@ class ItemModelPackBuilder internal constructor (
         val returnVal = lib.ItemModelPackBuilder_build_zip_b64(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {

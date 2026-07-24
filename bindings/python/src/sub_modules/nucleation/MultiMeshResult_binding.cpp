@@ -12,7 +12,7 @@ void add_MultiMeshResult_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::MultiMeshResult::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::MultiMeshResult> opaque(mod, "MultiMeshResult", nb::type_slots(nucleation_MultiMeshResult_slots));
     opaque
         .def_static("create", std::move(maybe_op_unwrap(&nucleation::MultiMeshResult::create)), "schematic"_a, "pack"_a, "config"_a)
@@ -23,4 +23,4 @@ void add_MultiMeshResult_binding(nb::module_ mod) {
         .def("total_vertex_count", &nucleation::MultiMeshResult::total_vertex_count);
 }
 
-} 
+}

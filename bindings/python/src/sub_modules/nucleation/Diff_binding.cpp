@@ -10,7 +10,7 @@ void add_Diff_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::Diff::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::Diff> opaque(mod, "Diff", nb::type_slots(nucleation_Diff_slots));
     opaque
         .def("added", std::move(maybe_op_unwrap(&nucleation::Diff::added)))
@@ -28,4 +28,4 @@ void add_Diff_binding(nb::module_ mod) {
         .def("to_overlay_glb_b64", &nucleation::Diff::to_overlay_glb_b64, "after_glb"_a);
 }
 
-} 
+}

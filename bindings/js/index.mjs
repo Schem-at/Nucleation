@@ -14,6 +14,10 @@ export { BlockPos } from "./BlockPos.mjs"
 
 export { Dimensions } from "./Dimensions.mjs"
 
+export { SdfBounds } from "./SdfBounds.mjs"
+
+export { SdfNormal } from "./SdfNormal.mjs"
+
 export { AnimationEffect } from "./AnimationEffect.mjs"
 
 export { BuildAnimation } from "./BuildAnimation.mjs"
@@ -127,6 +131,10 @@ export { WorldStream } from "./WorldStream.mjs"
 export { InterpolationSpace } from "./InterpolationSpace.mjs"
 
 export { MeshPhase } from "./MeshPhase.mjs"
+
+export { SdfAxis } from "./SdfAxis.mjs"
+
+export { SdfCellMode } from "./SdfCellMode.mjs"
 
 export { NucleationError } from "./NucleationError.mjs"
 

@@ -11,7 +11,7 @@ void add_SchematicRegions_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::SchematicRegions::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::SchematicRegions> opaque(mod, "SchematicRegions", nb::type_slots(nucleation_SchematicRegions_slots));
     opaque
         .def_static("add", &nucleation::SchematicRegions::add, "schematic"_a, "name"_a, "region"_a)
@@ -29,4 +29,4 @@ void add_SchematicRegions_binding(nb::module_ mod) {
         .def_static("update", &nucleation::SchematicRegions::update, "schematic"_a, "name"_a, "region"_a);
 }
 
-} 
+}

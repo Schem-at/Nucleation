@@ -16,6 +16,7 @@ internal interface BrushLib: Library {
     fun Brush_spotlight(px: Float, py: Float, pz: Float, dx: Float, dy: Float, dz: Float, coneAngleDeg: Float, r: FFIUint8, g: FFIUint8, b: FFIUint8): Pointer
     fun Brush_set_palette(handle: Pointer, palette: Pointer): Unit
     fun Brush_curve_gradient(stops: Slice, colors: Slice, space: Int): ResultPointerInt
+    fun Brush_field_sdf(field: Pointer, stops: Slice, colors: Slice, lo: Float, hi: Float, space: Int): ResultPointerInt
     fun Brush_field(fieldJson: Slice, stops: Slice, colors: Slice, lo: Float, hi: Float, space: Int): ResultPointerInt
 }
 /** Decides which block goes at each point of a filled shape. Wraps `BrushEnum`.
@@ -47,18 +48,18 @@ class Brush internal constructor (
         internal val libClass: Class<BrushLib> = BrushLib::class.java
         internal val lib: BrushLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Every point becomes `block_name` (a block-state string).
         */
         fun solid(blockName: String): Result<Brush> {
             val blockNameSliceMemory = PrimitiveArrayTools.borrowUtf8(blockName)
-            
+
             val returnVal = lib.Brush_solid(blockNameSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = Brush(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -69,57 +70,57 @@ class Brush internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Nearest-block-to-RGB-color brush.
         */
         fun color(r: UByte, g: UByte, b: UByte): Brush {
-            
+
             val returnVal = lib.Brush_color(FFIUint8(r), FFIUint8(g), FFIUint8(b));
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = Brush(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Linear color gradient between two anchored points.
         */
         fun linearGradient(x1: Int, y1: Int, z1: Int, r1: UByte, g1: UByte, b1: UByte, x2: Int, y2: Int, z2: Int, r2: UByte, g2: UByte, b2: UByte, space: InterpolationSpace): Brush {
-            
+
             val returnVal = lib.Brush_linear_gradient(x1, y1, z1, FFIUint8(r1), FFIUint8(g1), FFIUint8(b1), x2, y2, z2, FFIUint8(r2), FFIUint8(g2), FFIUint8(b2), space.toNative());
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = Brush(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Base color shaded by surface normal against light direction
         *(`lx`, `ly`, `lz`).
         */
         fun shaded(r: UByte, g: UByte, b: UByte, lx: Float, ly: Float, lz: Float): Brush {
-            
+
             val returnVal = lib.Brush_shaded(FFIUint8(r), FFIUint8(g), FFIUint8(b), lx, ly, lz);
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = Brush(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Bilinear gradient over the patch `origin + s*u + t*v` with corner colors
         *c00/c10/c01/c11.
         */
         fun bilinearGradient(ox: Int, oy: Int, oz: Int, ux: Int, uy: Int, uz: Int, vx: Int, vy: Int, vz: Int, r00: UByte, g00: UByte, b00: UByte, r10: UByte, g10: UByte, b10: UByte, r01: UByte, g01: UByte, b01: UByte, r11: UByte, g11: UByte, b11: UByte, space: InterpolationSpace): Brush {
-            
+
             val returnVal = lib.Brush_bilinear_gradient(ox, oy, oz, ux, uy, uz, vx, vy, vz, FFIUint8(r00), FFIUint8(g00), FFIUint8(b00), FFIUint8(r10), FFIUint8(g10), FFIUint8(b10), FFIUint8(r01), FFIUint8(g01), FFIUint8(b01), FFIUint8(r11), FFIUint8(g11), FFIUint8(b11), space.toNative());
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = Brush(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Inverse-distance-weighted gradient between colored anchor points.
         *`positions` is flat `[x0, y0, z0, x1, …]` and `colors` is flat
         *`[r0, g0, b0, r1, …]`; both must describe the same non-zero number of
@@ -128,13 +129,13 @@ class Brush internal constructor (
         fun pointGradient(positions: IntArray, colors: UByteArray, falloff: Float, space: InterpolationSpace): Result<Brush> {
             val positionsSliceMemory = PrimitiveArrayTools.borrow(positions)
             val colorsSliceMemory = PrimitiveArrayTools.borrow(colors)
-            
+
             val returnVal = lib.Brush_point_gradient(positionsSliceMemory.slice, colorsSliceMemory.slice, falloff, space.toNative());
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = Brush(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -146,7 +147,7 @@ class Brush internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Spotlight-lit base color (`r`, `g`, `b`): Lambert shading toward a
         *cone light at (`px`, `py`, `pz`) aimed along (`dx`, `dy`, `dz`).
         *Full intensity inside 0.7 × `cone_angle_deg`, smoothstep falloff
@@ -154,15 +155,15 @@ class Brush internal constructor (
         *drop to a 4% ambient floor.
         */
         fun spotlight(px: Float, py: Float, pz: Float, dx: Float, dy: Float, dz: Float, coneAngleDeg: Float, r: UByte, g: UByte, b: UByte): Brush {
-            
+
             val returnVal = lib.Brush_spotlight(px, py, pz, dx, dy, dz, coneAngleDeg, FFIUint8(r), FFIUint8(g), FFIUint8(b));
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = Brush(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Gradient along a parametric curve: `stops` holds the curve parameters in
         *`[0, 1]` and `colors` the matching flat RGB triples
         *(`colors.len() == stops.len() * 3`, `stops` non-empty).
@@ -170,13 +171,13 @@ class Brush internal constructor (
         fun curveGradient(stops: FloatArray, colors: UByteArray, space: InterpolationSpace): Result<Brush> {
             val stopsSliceMemory = PrimitiveArrayTools.borrow(stops)
             val colorsSliceMemory = PrimitiveArrayTools.borrow(colors)
-            
+
             val returnVal = lib.Brush_curve_gradient(stopsSliceMemory.slice, colorsSliceMemory.slice, space.toNative());
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = Brush(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -188,28 +189,46 @@ class Brush internal constructor (
             }
         }
         @JvmStatic
-        
-        /** A field brush: color every voxel by evaluating a scalar field at its
-        *center, remapping `[lo, hi]` to `[0, 1]`, and reading a multi-stop
-        *gradient (`stops` in `[0, 1]`, `colors` as flat RGB triples). The
-        *field is any SDF JSON — the same language that builds geometry — so a
-        *`cells` node paints a Voronoi mosaic (`mode: value`) or cracks
-        *(`mode: f2MinusF1`), an fbm field a marble, a coordinate expression a
-        *stripe. Call `set_palette` to choose the block set. Errors with
-        *`Parse` on bad field JSON and `InvalidArgument` on a stops/colors
-        *length mismatch.
+
+        /** Color every voxel by evaluating a typed SDF/field graph at its center.
+        *`stops` are in `[0, 1]`; `colors` are flat RGB triples. The sampled
+        *value is remapped from `[lo, hi]` before reading the gradient.
+        */
+        fun fieldSdf(field: Sdf, stops: FloatArray, colors: UByteArray, lo: Float, hi: Float, space: InterpolationSpace): Result<Brush> {
+            val stopsSliceMemory = PrimitiveArrayTools.borrow(stops)
+            val colorsSliceMemory = PrimitiveArrayTools.borrow(colors)
+
+            val returnVal = lib.Brush_field_sdf(field.handle, stopsSliceMemory.slice, colorsSliceMemory.slice, lo, hi, space.toNative());
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal
+                    val returnOpaque = Brush(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                stopsSliceMemory.close()
+                colorsSliceMemory.close()
+            }
+        }
+        @JvmStatic
+
+        /** Legacy JSON-first field brush. Prefer `field_sdf` for new code.
         */
         fun field(fieldJson: String, stops: FloatArray, colors: UByteArray, lo: Float, hi: Float, space: InterpolationSpace): Result<Brush> {
             val fieldJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(fieldJson)
             val stopsSliceMemory = PrimitiveArrayTools.borrow(stops)
             val colorsSliceMemory = PrimitiveArrayTools.borrow(colors)
-            
+
             val returnVal = lib.Brush_field(fieldJsonSliceMemory.slice, stopsSliceMemory.slice, colorsSliceMemory.slice, lo, hi, space.toNative());
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = Brush(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -222,16 +241,16 @@ class Brush internal constructor (
             }
         }
     }
-    
+
     /** Use `palette` for this brush's color→block snapping instead of the
     *default all-blocks palette. No-op for `solid` brushes, which place
     *a fixed block state. Set it before filling; the palette is shared,
     *not copied.
     */
     fun setPalette(palette: Palette): Unit {
-        
+
         val returnVal = lib.Brush_set_palette(handle, palette.handle);
-        
+
     }
 
 }

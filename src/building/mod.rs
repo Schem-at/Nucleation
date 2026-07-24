@@ -61,6 +61,68 @@ impl<'a> BuildingTool<'a> {
         });
     }
 
+    /// Fill an explicitly bounded signed-distance function.
+    ///
+    /// The operation is transactional: callback errors leave the destination
+    /// schematic unchanged. `normal` may return an analytic vector or `None`
+    /// to request a central-difference estimate from `eval`.
+    #[cfg(any(test, not(target_arch = "wasm32")))]
+    pub(crate) fn fill_sdf_function<E, F, N>(
+        &mut self,
+        bounds: (i32, i32, i32, i32, i32, i32),
+        epsilon: f64,
+        mut eval: F,
+        mut normal: N,
+        brush: &BrushEnum,
+    ) -> Result<(), E>
+    where
+        F: FnMut(f64, f64, f64) -> Result<f64, E>,
+        N: FnMut(f64, f64, f64) -> Result<Option<(f64, f64, f64)>, E>,
+    {
+        let (min_x, min_y, min_z, max_x, max_y, max_z) = bounds;
+        let mut staged = self.schematic.clone();
+        staged.ensure_bounds((min_x, min_y, min_z), (max_x, max_y, max_z));
+
+        for y in min_y..=max_y {
+            for z in min_z..=max_z {
+                for x in min_x..=max_x {
+                    let (fx, fy, fz) = (x as f64 + 0.5, y as f64 + 0.5, z as f64 + 0.5);
+                    if eval(fx, fy, fz)? > 0.0 {
+                        continue;
+                    }
+
+                    let gradient = match normal(fx, fy, fz)? {
+                        Some(value) => value,
+                        None => (
+                            eval(fx + epsilon, fy, fz)? - eval(fx - epsilon, fy, fz)?,
+                            eval(fx, fy + epsilon, fz)? - eval(fx, fy - epsilon, fz)?,
+                            eval(fx, fy, fz + epsilon)? - eval(fx, fy, fz - epsilon)?,
+                        ),
+                    };
+                    let length = (gradient.0 * gradient.0
+                        + gradient.1 * gradient.1
+                        + gradient.2 * gradient.2)
+                        .sqrt();
+                    let normal = if length > 1e-12 && length.is_finite() {
+                        (
+                            gradient.0 / length,
+                            gradient.1 / length,
+                            gradient.2 / length,
+                        )
+                    } else {
+                        (0.0, 1.0, 0.0)
+                    };
+                    if let Some(block) = brush.get_block_with_parameter(x, y, z, normal, None) {
+                        staged.set_block(x, y, z, &block);
+                    }
+                }
+            }
+        }
+
+        *self.schematic = staged;
+        Ok(())
+    }
+
     /// Repeat a shape+brush fill at regular offset intervals.
     /// Creates `count` copies of the shape, each offset by `offset * i` from the original.
     pub fn rstack(
@@ -143,5 +205,58 @@ impl Shape for TranslatedShape<'_> {
         self.inner.for_each_point(|x, y, z| {
             f(x + dx, y + dy, z + dz);
         });
+    }
+}
+
+#[cfg(test)]
+mod callback_sdf_tests {
+    use super::{BrushEnum, BuildingTool, SolidBrush};
+    use crate::{BlockState, UniversalSchematic};
+
+    #[test]
+    fn callback_sdf_uses_the_normal_brush_pipeline() {
+        let mut schematic = UniversalSchematic::new("callback".to_string());
+        let brush = BrushEnum::Solid(SolidBrush::new(BlockState::new("minecraft:stone")));
+
+        BuildingTool::new(&mut schematic)
+            .fill_sdf_function(
+                (-2, -2, -2, 2, 2, 2),
+                0.5,
+                |x, y, z| Ok::<_, ()>((x * x + y * y + z * z).sqrt() - 2.0),
+                |_x, _y, _z| Ok::<_, ()>(None),
+                &brush,
+            )
+            .unwrap();
+
+        assert!(schematic.total_blocks() > 0);
+        assert!(schematic.total_blocks() < 125);
+    }
+
+    #[test]
+    fn callback_failure_does_not_partially_mutate_the_schematic() {
+        let mut schematic = UniversalSchematic::new("callback".to_string());
+        schematic.set_block(20, 20, 20, &BlockState::new("minecraft:gold_block"));
+        let brush = BrushEnum::Solid(SolidBrush::new(BlockState::new("minecraft:stone")));
+
+        let result = BuildingTool::new(&mut schematic).fill_sdf_function(
+            (-2, -2, -2, 2, 2, 2),
+            0.5,
+            |x, y, z| {
+                if x > 0.0 && y > 0.0 && z > 0.0 {
+                    Err("callback failed")
+                } else {
+                    Ok(-1.0)
+                }
+            },
+            |_x, _y, _z| Ok(None),
+            &brush,
+        );
+
+        assert_eq!(result, Err("callback failed"));
+        assert_eq!(schematic.total_blocks(), 1);
+        assert_eq!(
+            schematic.get_block(20, 20, 20).unwrap().get_name(),
+            "minecraft:gold_block"
+        );
     }
 }

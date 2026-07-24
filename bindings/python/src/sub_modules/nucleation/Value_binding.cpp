@@ -9,7 +9,7 @@ void add_Value_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::Value::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::Value> opaque(mod, "Value", nb::type_slots(nucleation_Value_slots));
     opaque
         .def("as_bool", &nucleation::Value::as_bool)
@@ -25,4 +25,4 @@ void add_Value_binding(nb::module_ mod) {
         .def("type_name", &nucleation::Value::type_name);
 }
 
-} 
+}

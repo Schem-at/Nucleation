@@ -41,17 +41,17 @@ class TextureAtlas internal constructor (
         internal val libClass: Class<TextureAtlasLib> = TextureAtlasLib::class.java
         internal val lib: TextureAtlasLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Build a single shared atlas from every unique block state in the
         *schematic (old ABI: `schematic_build_global_atlas`).
         */
         fun buildGlobal(schematic: Schematic, pack: ResourcePack, config: MeshConfig): Result<TextureAtlas> {
-            
+
             val returnVal = lib.TextureAtlas_build_global(schematic.handle, pack.handle, config.handle);
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
                 val selfEdges: List<Any> = listOf()
-                val handle = nativeOkVal 
+                val handle = nativeOkVal
                 val returnOpaque = TextureAtlas(handle, selfEdges, true)
                 return returnOpaque.ok()
             } else {
@@ -59,29 +59,29 @@ class TextureAtlas internal constructor (
             }
         }
     }
-    
+
     /** Atlas width in pixels.
     */
     fun width(): UInt {
-        
+
         val returnVal = lib.TextureAtlas_width(handle);
         return (returnVal.toUInt())
     }
-    
+
     /** Atlas height in pixels.
     */
     fun height(): UInt {
-        
+
         val returnVal = lib.TextureAtlas_height(handle);
         return (returnVal.toUInt())
     }
-    
+
     /** Raw RGBA atlas pixels, base64-encoded.
     */
     fun rgbaDataB64(): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.TextureAtlas_rgba_data_b64(handle, write);
-        
+
         val returnString = DW.writeToString(write)
         return returnString
     }

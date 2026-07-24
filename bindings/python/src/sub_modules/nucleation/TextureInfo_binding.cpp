@@ -15,4 +15,4 @@ void add_TextureInfo_binding(nb::module_ mod) {
         .def_rw("frame_count", &nucleation::TextureInfo::frame_count);
 }
 
-} 
+}

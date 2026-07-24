@@ -93,6 +93,42 @@ fn unbounded_trees_require_explicit_bounds() {
     assert!(err.is_err());
 }
 
+#[test]
+fn checked_sampling_bounds_enforce_exact_cap_without_overflow() {
+    assert_eq!(
+        checked_sample_volume([0, 0, 0], [255, 255, 255]).unwrap(),
+        MAX_SDF_SAMPLE_VOLUME
+    );
+    assert!(checked_sample_volume([0, 0, 0], [256, 255, 255]).is_err());
+    assert!(checked_sample_volume([i32::MIN, 0, 0], [i32::MAX, 0, 0]).is_err());
+    assert!(checked_sample_volume([1, 0, 0], [0, 0, 0]).is_err());
+}
+
+#[test]
+fn surface_decoration_at_max_y_is_skipped_without_overflow() {
+    let node = SdfNode::Plane {
+        normal: [0.0, -1.0, 0.0],
+        offset: -f32::MAX,
+    };
+    let rules = MaterialRules::from_json(
+        r#"{
+            "fill": [{"block": "minecraft:stone"}],
+            "surface": [{"density": 1.0, "blocks": ["minecraft:short_grass"]}]
+        }"#,
+    )
+    .unwrap();
+    let bounds = SampleBounds {
+        min: [0, i32::MAX, 0],
+        max: [0, i32::MAX, 0],
+    };
+    let schematic = sample_to_schematic(&node, &rules, Some(bounds), "max-y").unwrap();
+    assert_eq!(schematic.total_blocks(), 1);
+    assert_eq!(
+        schematic.get_block(0, i32::MAX, 0).unwrap().get_name(),
+        "minecraft:stone"
+    );
+}
+
 fn island_tree() -> SdfNode {
     SdfNode::from_json(
         r#"{

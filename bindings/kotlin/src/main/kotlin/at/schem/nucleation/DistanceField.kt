@@ -40,47 +40,47 @@ class DistanceField internal constructor (
         internal val libClass: Class<DistanceFieldLib> = DistanceFieldLib::class.java
         internal val lib: DistanceFieldLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Distance transform of a build's occupied voxels: every solid block
         *learns how many blocks it sits below the surface, and the gradient of
         *that depth gives the outward normal. Computed once over the
         *schematic's bounding box.
         */
         fun fromSchematic(schematic: Schematic): DistanceField {
-            
+
             val returnVal = lib.DistanceField_from_schematic(schematic.handle);
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = DistanceField(handle, selfEdges, true)
             return returnOpaque
         }
     }
-    
+
     /** Blocks below the surface at a voxel: 0 for empty/outside, 1 at the
     *surface, increasing inward.
     */
     fun depth(x: Int, y: Int, z: Int): Int {
-        
+
         val returnVal = lib.DistanceField_depth(handle, x, y, z);
         return (returnVal)
     }
-    
+
     /** The upward component of the outward surface normal: 1 on flat ground,
     *0 on a vertical face, negative under an overhang. The scalar to key
     *slope-based landscaping on (grass on the flats, stone on the steeps).
     */
     fun slope(x: Int, y: Int, z: Int): Float {
-        
+
         val returnVal = lib.DistanceField_slope(handle, x, y, z);
         return (returnVal)
     }
-    
+
     /** The full outward surface normal as JSON `[nx, ny, nz]`.
     */
     fun normalJson(x: Int, y: Int, z: Int): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.DistanceField_normal_json(handle, x, y, z, write);
-        
+
         val returnString = DW.writeToString(write)
         return returnString
     }

@@ -13,6 +13,8 @@
 
 namespace diplomat::capi { struct Palette; }
 class Palette;
+namespace diplomat::capi { struct Sdf; }
+class Sdf;
 class InterpolationSpace;
 class NucleationError;
 
@@ -91,15 +93,14 @@ public:
   inline static diplomat::result<std::unique_ptr<Brush>, NucleationError> curve_gradient(diplomat::span<const float> stops, diplomat::span<const uint8_t> colors, InterpolationSpace space);
 
   /**
-   * A field brush: color every voxel by evaluating a scalar field at its
-   * center, remapping `[lo, hi]` to `[0, 1]`, and reading a multi-stop
-   * gradient (`stops` in `[0, 1]`, `colors` as flat RGB triples). The
-   * field is any SDF JSON — the same language that builds geometry — so a
-   * `cells` node paints a Voronoi mosaic (`mode: value`) or cracks
-   * (`mode: f2MinusF1`), an fbm field a marble, a coordinate expression a
-   * stripe. Call `set_palette` to choose the block set. Errors with
-   * `Parse` on bad field JSON and `InvalidArgument` on a stops/colors
-   * length mismatch.
+   * Color every voxel by evaluating a typed SDF/field graph at its center.
+   * `stops` are in `[0, 1]`; `colors` are flat RGB triples. The sampled
+   * value is remapped from `[lo, hi]` before reading the gradient.
+   */
+  inline static diplomat::result<std::unique_ptr<Brush>, NucleationError> field_sdf(const Sdf& field, diplomat::span<const float> stops, diplomat::span<const uint8_t> colors, float lo, float hi, InterpolationSpace space);
+
+  /**
+   * Legacy JSON-first field brush. Prefer `field_sdf` for new code.
    */
   inline static diplomat::result<std::unique_ptr<Brush>, NucleationError> field(std::string_view field_json, diplomat::span<const float> stops, diplomat::span<const uint8_t> colors, float lo, float hi, InterpolationSpace space);
 

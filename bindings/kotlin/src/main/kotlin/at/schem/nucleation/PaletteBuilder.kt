@@ -57,23 +57,23 @@ class PaletteBuilder internal constructor (
         internal val libClass: Class<PaletteBuilderLib> = PaletteBuilderLib::class.java
         internal val lib: PaletteBuilderLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** A builder matching every colored block (no filters yet).
         */
         fun create(): PaletteBuilder {
-            
+
             val returnVal = lib.PaletteBuilder_create();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = PaletteBuilder(handle, selfEdges, true)
             return returnOpaque
         }
     }
-    
+
     /** Exclude gravity-affected blocks (sand, gravel, ...).
     */
     fun excludeFalling(): Result<Unit> {
-        
+
         val returnVal = lib.PaletteBuilder_exclude_falling(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -82,11 +82,11 @@ class PaletteBuilder internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Exclude blocks with block entities (chests, furnaces, ...).
     */
     fun excludeTileEntities(): Result<Unit> {
-        
+
         val returnVal = lib.PaletteBuilder_exclude_tile_entities(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -95,13 +95,13 @@ class PaletteBuilder internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Keep only full cube blocks (no stairs, slabs, fences, ...).
     *Metadata-driven: uses the official model geometry extracted from
     *the vanilla jars, not block-name guessing.
     */
     fun fullBlocksOnly(): Result<Unit> {
-        
+
         val returnVal = lib.PaletteBuilder_full_blocks_only(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -110,11 +110,11 @@ class PaletteBuilder internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Exclude blocks that need supporting blocks (torches, rails, ...).
     */
     fun excludeNeedsSupport(): Result<Unit> {
-        
+
         val returnVal = lib.PaletteBuilder_exclude_needs_support(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -123,13 +123,13 @@ class PaletteBuilder internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Exclude transparent/translucent blocks (glass, leaves, ...).
     *Metadata-driven: uses the per-block transparency flag from the
     *block-data pipeline, not block-name guessing.
     */
     fun excludeTransparent(): Result<Unit> {
-        
+
         val returnVal = lib.PaletteBuilder_exclude_transparent(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -138,11 +138,11 @@ class PaletteBuilder internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Exclude light-emitting blocks (glowstone, lanterns, ...).
     */
     fun excludeLightSources(): Result<Unit> {
-        
+
         val returnVal = lib.PaletteBuilder_exclude_light_sources(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -151,11 +151,11 @@ class PaletteBuilder internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Keep only blocks obtainable in survival.
     */
     fun survivalOnly(): Result<Unit> {
-        
+
         val returnVal = lib.PaletteBuilder_survival_only(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -164,12 +164,12 @@ class PaletteBuilder internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Exclude blocks whose id contains `keyword`.
     */
     fun excludeKeyword(keyword: String): Result<Unit> {
         val keywordSliceMemory = PrimitiveArrayTools.borrowUtf8(keyword)
-        
+
         val returnVal = lib.PaletteBuilder_exclude_keyword(handle, keywordSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -182,13 +182,13 @@ class PaletteBuilder internal constructor (
             keywordSliceMemory.close()
         }
     }
-    
+
     /** Keep only blocks whose id contains `keyword` (repeatable; matches
     *any of the included keywords).
     */
     fun includeKeyword(keyword: String): Result<Unit> {
         val keywordSliceMemory = PrimitiveArrayTools.borrowUtf8(keyword)
-        
+
         val returnVal = lib.PaletteBuilder_include_keyword(handle, keywordSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -201,14 +201,14 @@ class PaletteBuilder internal constructor (
             keywordSliceMemory.close()
         }
     }
-    
+
     /** Require the vanilla block tag `t` (`minecraft:wool` or short
     *`wool`, nested paths like `mineable/pickaxe` too). Repeatable —
     *a block must carry ALL required tags (AND semantics).
     */
     fun tag(t: String): Result<Unit> {
         val tSliceMemory = PrimitiveArrayTools.borrowUtf8(t)
-        
+
         val returnVal = lib.PaletteBuilder_tag(handle, tSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -221,13 +221,13 @@ class PaletteBuilder internal constructor (
             tSliceMemory.close()
         }
     }
-    
+
     /** Exclude blocks carrying the vanilla block tag `t` (any listed
     *tag disqualifies). Repeatable.
     */
     fun excludeTag(t: String): Result<Unit> {
         val tSliceMemory = PrimitiveArrayTools.borrowUtf8(t)
-        
+
         val returnVal = lib.PaletteBuilder_exclude_tag(handle, tSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -240,7 +240,7 @@ class PaletteBuilder internal constructor (
             tSliceMemory.close()
         }
     }
-    
+
     /** Keep only blocks of the official definition kind `k`
     *(`minecraft:stair` or short `stair`; plain full blocks are
     *`minecraft:block`). Repeatable — a block matching ANY listed
@@ -248,7 +248,7 @@ class PaletteBuilder internal constructor (
     */
     fun kind(k: String): Result<Unit> {
         val kSliceMemory = PrimitiveArrayTools.borrowUtf8(k)
-        
+
         val returnVal = lib.PaletteBuilder_kind(handle, kSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -261,12 +261,12 @@ class PaletteBuilder internal constructor (
             kSliceMemory.close()
         }
     }
-    
+
     /** Keep only blocks whose measured Oklab lightness L is within
     *`[min, max]` (0.0 = black, 1.0 = white).
     */
     fun lightnessBetween(min: Float, max: Float): Result<Unit> {
-        
+
         val returnVal = lib.PaletteBuilder_lightness_between(handle, min, max);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -275,12 +275,12 @@ class PaletteBuilder internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Keep only near-neutral blocks: measured Oklab chroma at most
     *`max` (the grayscale preset uses 0.022).
     */
     fun chromaBelow(max: Float): Result<Unit> {
-        
+
         val returnVal = lib.PaletteBuilder_chroma_below(handle, max);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -289,12 +289,12 @@ class PaletteBuilder internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Keep only blocks whose measured color is within `max_distance`
     *(Oklab; ~0.05 = same family, ~0.15 = generous) of the RGB color.
     */
     fun colorNear(r: UByte, g: UByte, b: UByte, maxDistance: Float): Result<Unit> {
-        
+
         val returnVal = lib.PaletteBuilder_color_near(handle, FFIUint8(r), FFIUint8(g), FFIUint8(b), maxDistance);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -303,16 +303,16 @@ class PaletteBuilder internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Build the palette; consumes the builder.
     */
     fun build(): Result<Palette> {
-        
+
         val returnVal = lib.PaletteBuilder_build(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
             val selfEdges: List<Any> = listOf()
-            val handle = nativeOkVal 
+            val handle = nativeOkVal
             val returnOpaque = Palette(handle, selfEdges, true)
             return returnOpaque.ok()
         } else {

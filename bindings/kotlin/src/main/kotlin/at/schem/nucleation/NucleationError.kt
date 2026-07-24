@@ -33,7 +33,7 @@ enum class NucleationError {
 
     companion object {
         internal val libClass: Class<NucleationErrorLib> = NucleationErrorLib::class.java
-        internal val lib: NucleationErrorLib = Native.load("nucleation", libClass) 
+        internal val lib: NucleationErrorLib = Native.load("nucleation", libClass)
         fun fromNative(native: Int): NucleationError {
             return NucleationError.entries[native]
         }

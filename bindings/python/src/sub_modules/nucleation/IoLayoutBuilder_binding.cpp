@@ -11,7 +11,7 @@ void add_IoLayoutBuilder_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::IoLayoutBuilder::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::IoLayoutBuilder> opaque(mod, "IoLayoutBuilder", nb::type_slots(nucleation_IoLayoutBuilder_slots));
     opaque
         .def("add_input", &nucleation::IoLayoutBuilder::add_input, "name"_a, "io_type"_a, "layout"_a, "positions"_a)
@@ -26,4 +26,4 @@ void add_IoLayoutBuilder_binding(nb::module_ mod) {
         .def_static("create", std::move(maybe_op_unwrap(&nucleation::IoLayoutBuilder::create)));
 }
 
-} 
+}

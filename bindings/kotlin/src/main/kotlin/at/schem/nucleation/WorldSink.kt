@@ -44,7 +44,7 @@ class WorldSink internal constructor (
         internal val libClass: Class<WorldSinkLib> = WorldSinkLib::class.java
         internal val lib: WorldSinkLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Create a new world sink that writes fresh chunk data to `dir`.
         *`options_json` is a serialized `WorldExportOptions` (empty string =
         *defaults).
@@ -52,13 +52,13 @@ class WorldSink internal constructor (
         fun create(dir: String, optionsJson: String): Result<WorldSink> {
             val dirSliceMemory = PrimitiveArrayTools.borrowUtf8(dir)
             val optionsJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(optionsJson)
-            
+
             val returnVal = lib.WorldSink_create(dirSliceMemory.slice, optionsJsonSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = WorldSink(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -70,18 +70,18 @@ class WorldSink internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Open an existing world directory for patching via `put_chunk`.
         */
         fun openExisting(dir: String): Result<WorldSink> {
             val dirSliceMemory = PrimitiveArrayTools.borrowUtf8(dir)
-            
+
             val returnVal = lib.WorldSink_open_existing(dirSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = WorldSink(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -92,11 +92,11 @@ class WorldSink internal constructor (
             }
         }
     }
-    
+
     /** Write (append) a chunk view into the sink. The view is not consumed.
     */
     fun writeChunk(view: WorldChunkView): Result<Unit> {
-        
+
         val returnVal = lib.WorldSink_write_chunk(handle, view.handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -105,14 +105,14 @@ class WorldSink internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Overwrite the chunk at (`view.cx`, `view.cz`) of the sink's world with
     *the supplied view's block data. Only valid on sinks opened with
     *`open_existing`; errors with `Io` on a create-mode sink. The view is
     *not consumed.
     */
     fun putChunk(view: WorldChunkView): Result<Unit> {
-        
+
         val returnVal = lib.WorldSink_put_chunk(handle, view.handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -121,12 +121,12 @@ class WorldSink internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Finalise and flush all pending writes. Consuming (PORTING rule 11):
     *afterwards every method on this sink returns `AlreadyConsumed`.
     */
     fun finish(): Result<Unit> {
-        
+
         val returnVal = lib.WorldSink_finish(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {

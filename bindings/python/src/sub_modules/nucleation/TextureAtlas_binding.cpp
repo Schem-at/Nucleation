@@ -12,7 +12,7 @@ void add_TextureAtlas_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::TextureAtlas::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::TextureAtlas> opaque(mod, "TextureAtlas", nb::type_slots(nucleation_TextureAtlas_slots));
     opaque
         .def_static("build_global", std::move(maybe_op_unwrap(&nucleation::TextureAtlas::build_global)), "schematic"_a, "pack"_a, "config"_a)
@@ -21,4 +21,4 @@ void add_TextureAtlas_binding(nb::module_ mod) {
         .def("width", &nucleation::TextureAtlas::width);
 }
 
-} 
+}

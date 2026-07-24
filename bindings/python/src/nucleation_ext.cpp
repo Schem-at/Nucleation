@@ -2,7 +2,7 @@
 
 // Forward declarations for binding add functions
 namespace nucleation{
-  
+
 void add_RegionBounds_binding(nb::module_);
 void add_ItemScale_binding(nb::module_);
 void add_MeshBounds_binding(nb::module_);
@@ -10,6 +10,8 @@ void add_MeshProgress_binding(nb::module_);
 void add_TextureInfo_binding(nb::module_);
 void add_BlockPos_binding(nb::module_);
 void add_Dimensions_binding(nb::module_);
+void add_SdfBounds_binding(nb::module_);
+void add_SdfNormal_binding(nb::module_);
 void add_AnimationEffect_binding(nb::module_);
 void add_BuildAnimation_binding(nb::module_);
 void add_VideoConfig_binding(nb::module_);
@@ -67,6 +69,8 @@ void add_WorldSink_binding(nb::module_);
 void add_WorldStream_binding(nb::module_);
 void add_InterpolationSpace_binding(nb::module_);
 void add_MeshPhase_binding(nb::module_);
+void add_SdfAxis_binding(nb::module_);
+void add_SdfCellMode_binding(nb::module_);
 void add_NucleationError_binding(nb::module_);
 }
 
@@ -138,6 +142,8 @@ NB_MODULE(nucleation, mod)
     add_TextureInfo_binding(mod);
     add_BlockPos_binding(mod);
     add_Dimensions_binding(mod);
+    add_SdfBounds_binding(mod);
+    add_SdfNormal_binding(mod);
     add_AnimationEffect_binding(mod);
     add_BuildAnimation_binding(mod);
     add_VideoConfig_binding(mod);
@@ -195,7 +201,9 @@ NB_MODULE(nucleation, mod)
     add_WorldStream_binding(mod);
     add_InterpolationSpace_binding(mod);
     add_MeshPhase_binding(mod);
+    add_SdfAxis_binding(mod);
+    add_SdfCellMode_binding(mod);
     add_NucleationError_binding(mod);
-    
-    
+
+
 }

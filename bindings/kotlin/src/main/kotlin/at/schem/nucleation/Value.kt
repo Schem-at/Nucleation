@@ -48,66 +48,66 @@ class Value internal constructor (
         internal val libClass: Class<ValueLib> = ValueLib::class.java
         internal val lib: ValueLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Create an unsigned 32-bit integer value.
         */
         fun fromU32(v: UInt): Value {
-            
+
             val returnVal = lib.Value_from_u32(FFIUint32(v));
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = Value(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Create a signed 32-bit integer value.
         */
         fun fromI32(v: Int): Value {
-            
+
             val returnVal = lib.Value_from_i32(v);
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = Value(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Create a 32-bit IEEE 754 float value.
         */
         fun fromF32(v: Float): Value {
-            
+
             val returnVal = lib.Value_from_f32(v);
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = Value(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Create a boolean value.
         */
         fun fromBool(v: Boolean): Value {
-            
+
             val returnVal = lib.Value_from_bool(v);
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = Value(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Create a string value. Fails if the bytes are not valid UTF-8.
         */
         fun fromString(s: String): Result<Value> {
             val sSliceMemory = PrimitiveArrayTools.borrowUtf8(s)
-            
+
             val returnVal = lib.Value_from_string(sSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = Value(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -118,12 +118,12 @@ class Value internal constructor (
             }
         }
     }
-    
+
     /** The value as u32. Also accepts u64/non-negative signed ints that
     *fit, and bool (false → 0, true → 1); fails otherwise.
     */
     fun asU32(): Result<UInt> {
-        
+
         val returnVal = lib.Value_as_u32(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -132,12 +132,12 @@ class Value internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** The value as i32. Also accepts i64 values in i32 range; fails for
     *other types.
     */
     fun asI32(): Result<Int> {
-        
+
         val returnVal = lib.Value_as_i32(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -146,11 +146,11 @@ class Value internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** The value as f32; fails if this is not an f32 value.
     */
     fun asF32(): Result<Float> {
-        
+
         val returnVal = lib.Value_as_f32(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -159,11 +159,11 @@ class Value internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** The value as bool; fails if this is not a bool value.
     */
     fun asBool(): Result<Boolean> {
-        
+
         val returnVal = lib.Value_as_bool(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -172,7 +172,7 @@ class Value internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** The string payload; fails if this is not a string value.
     */
     fun asString(): Result<String> {
@@ -180,20 +180,20 @@ class Value internal constructor (
         val returnVal = lib.Value_as_string(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** The type name (e.g. "u32", "bool", "string").
     */
     fun typeName(): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.Value_type_name(handle, write);
-        
+
         val returnString = DW.writeToString(write)
         return returnString
     }

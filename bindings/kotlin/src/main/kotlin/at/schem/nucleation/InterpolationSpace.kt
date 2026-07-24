@@ -22,7 +22,7 @@ enum class InterpolationSpace {
 
     companion object {
         internal val libClass: Class<InterpolationSpaceLib> = InterpolationSpaceLib::class.java
-        internal val lib: InterpolationSpaceLib = Native.load("nucleation", libClass) 
+        internal val lib: InterpolationSpaceLib = Native.load("nucleation", libClass)
         fun fromNative(native: Int): InterpolationSpace {
             return InterpolationSpace.entries[native]
         }

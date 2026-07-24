@@ -44,40 +44,40 @@ class MeshJob internal constructor (
         internal val libClass: Class<MeshJobLib> = MeshJobLib::class.java
         internal val lib: MeshJobLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Kick off chunk meshing with a shared atlas on a background thread
         *and return immediately. Takes the same parameters as
         *[ChunkMeshResult::create_with_atlas].
         */
         fun start(schematic: Schematic, pack: ResourcePack, config: MeshConfig, chunkSize: Int, atlas: TextureAtlas): MeshJob {
-            
+
             val returnVal = lib.MeshJob_start(schematic.handle, pack.handle, config.handle, chunkSize, atlas.handle);
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = MeshJob(handle, selfEdges, true)
             return returnOpaque
         }
     }
-    
+
     /** Cheap, non-blocking progress snapshot. Call from a timer/poll loop.
     */
     fun pollProgress(): MeshProgress {
-        
+
         val returnVal = lib.MeshJob_poll_progress(handle);
         val returnStruct = MeshProgress.fromNative(returnVal)
         return returnStruct
     }
-    
+
     /** Block until the job finishes (if it hasn't already) and return the
     *result. Consumes the job: a second call returns `AlreadyConsumed`.
     */
     fun takeResult(): Result<ChunkMeshResult> {
-        
+
         val returnVal = lib.MeshJob_take_result(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
             val selfEdges: List<Any> = listOf()
-            val handle = nativeOkVal 
+            val handle = nativeOkVal
             val returnOpaque = ChunkMeshResult(handle, selfEdges, true)
             return returnOpaque.ok()
         } else {

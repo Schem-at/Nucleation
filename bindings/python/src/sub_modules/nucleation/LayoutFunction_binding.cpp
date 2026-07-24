@@ -9,7 +9,7 @@ void add_LayoutFunction_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::LayoutFunction::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::LayoutFunction> opaque(mod, "LayoutFunction", nb::type_slots(nucleation_LayoutFunction_slots));
     opaque
         .def_static("column_major", std::move(maybe_op_unwrap(&nucleation::LayoutFunction::column_major)), "rows"_a, "cols"_a, "bits_per_element"_a)
@@ -20,4 +20,4 @@ void add_LayoutFunction_binding(nb::module_ mod) {
         .def_static("scanline", std::move(maybe_op_unwrap(&nucleation::LayoutFunction::scanline)), "width"_a, "height"_a, "bits_per_pixel"_a);
 }
 
-} 
+}

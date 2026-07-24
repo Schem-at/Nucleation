@@ -41,7 +41,7 @@ class Voxelizer internal constructor (
         internal val libClass: Class<VoxelizerLib> = VoxelizerLib::class.java
         internal val lib: VoxelizerLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Load a binary glTF (`.glb`, embedded buffers/images) and voxelize
         *it into a fillable Shape: the model is uniformly scaled so its
         *largest dimension equals `target_size` voxels, centered on x/z
@@ -57,13 +57,13 @@ class Voxelizer internal constructor (
         */
         fun shapeFromGlb(data: UByteArray, targetSize: Float, shell: Float): Result<Shape> {
             val dataSliceMemory = PrimitiveArrayTools.borrow(data)
-            
+
             val returnVal = lib.Voxelizer_shape_from_glb(dataSliceMemory.slice, targetSize, shell);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = Shape(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -74,7 +74,7 @@ class Voxelizer internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Load a Wavefront OBJ (`v`/`vt`/`f` lines; polygon faces are
         *fan-triangulated, negative indices supported, materials ignored)
         *and voxelize it into a fillable Shape, fitted and shelled exactly
@@ -84,13 +84,13 @@ class Voxelizer internal constructor (
         */
         fun shapeFromObj(text: String, targetSize: Float, shell: Float): Result<Shape> {
             val textSliceMemory = PrimitiveArrayTools.borrowUtf8(text)
-            
+
             val returnVal = lib.Voxelizer_shape_from_obj(textSliceMemory.slice, targetSize, shell);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = Shape(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -101,7 +101,7 @@ class Voxelizer internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Load a binary glTF and voxelize it directly into a textured
         *schematic named `name`: every solid voxel becomes the `palette`
         *block closest to its nearest-surface texture color (interior
@@ -114,13 +114,13 @@ class Voxelizer internal constructor (
         fun schematicFromGlbTextured(data: UByteArray, targetSize: Float, shell: Float, palette: Palette, name: String): Result<Schematic> {
             val dataSliceMemory = PrimitiveArrayTools.borrow(data)
             val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
-            
+
             val returnVal = lib.Voxelizer_schematic_from_glb_textured(dataSliceMemory.slice, targetSize, shell, palette.handle, nameSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = Schematic(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {

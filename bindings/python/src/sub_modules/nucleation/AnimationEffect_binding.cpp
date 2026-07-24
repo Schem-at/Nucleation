@@ -9,7 +9,7 @@ void add_AnimationEffect_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::AnimationEffect::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::AnimationEffect> opaque(mod, "AnimationEffect", nb::type_slots(nucleation_AnimationEffect_slots));
     opaque
         .def("add_keyframe", &nucleation::AnimationEffect::add_keyframe, "property_name"_a, "at"_a, "value"_a, "easing_name"_a)
@@ -24,4 +24,4 @@ void add_AnimationEffect_binding(nb::module_ mod) {
         .def_static("turntable", std::move(maybe_op_unwrap(&nucleation::AnimationEffect::turntable)), "duration_ms"_a);
 }
 
-} 
+}

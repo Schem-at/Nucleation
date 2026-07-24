@@ -9,7 +9,7 @@ void add_VideoConfig_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::VideoConfig::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::VideoConfig> opaque(mod, "VideoConfig", nb::type_slots(nucleation_VideoConfig_slots));
     opaque
         .def_static("h264", std::move(maybe_op_unwrap(&nucleation::VideoConfig::h264)), "fps"_a)
@@ -17,4 +17,4 @@ void add_VideoConfig_binding(nb::module_ mod) {
         .def("set_ffmpeg_path", &nucleation::VideoConfig::set_ffmpeg_path, "path"_a);
 }
 
-} 
+}

@@ -41,32 +41,32 @@ class ExecutionMode internal constructor (
         internal val libClass: Class<ExecutionModeLib> = ExecutionModeLib::class.java
         internal val lib: ExecutionModeLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Run for exactly `ticks` ticks.
         */
         fun fixedTicks(ticks: UInt): ExecutionMode {
-            
+
             val returnVal = lib.ExecutionMode_fixed_ticks(FFIUint32(ticks));
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = ExecutionMode(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Run until the output named `output_name` meets `condition`,
         *checking every `check_interval` ticks, giving up after `max_ticks`
         *ticks (the result's `condition_met` reports which happened).
         */
         fun untilCondition(outputName: String, condition: OutputCondition, maxTicks: UInt, checkInterval: UInt): Result<ExecutionMode> {
             val outputNameSliceMemory = PrimitiveArrayTools.borrowUtf8(outputName)
-            
+
             val returnVal = lib.ExecutionMode_until_condition(outputNameSliceMemory.slice, condition.handle, FFIUint32(maxTicks), FFIUint32(checkInterval));
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = ExecutionMode(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -77,29 +77,29 @@ class ExecutionMode internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Run until any output changes from its initial reading, checking
         *every `check_interval` ticks, giving up after `max_ticks` ticks.
         */
         fun untilChange(maxTicks: UInt, checkInterval: UInt): ExecutionMode {
-            
+
             val returnVal = lib.ExecutionMode_until_change(FFIUint32(maxTicks), FFIUint32(checkInterval));
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = ExecutionMode(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Run (one tick at a time) until all outputs have been unchanged for
         *`stable_ticks` consecutive ticks, giving up after `max_ticks`
         *ticks (the result's `condition_met` reports stability).
         */
         fun untilStable(stableTicks: UInt, maxTicks: UInt): ExecutionMode {
-            
+
             val returnVal = lib.ExecutionMode_until_stable(FFIUint32(stableTicks), FFIUint32(maxTicks));
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = ExecutionMode(handle, selfEdges, true)
             return returnOpaque
         }

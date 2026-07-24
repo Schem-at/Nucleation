@@ -10,7 +10,7 @@ void add_DistanceField_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::DistanceField::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::DistanceField> opaque(mod, "DistanceField", nb::type_slots(nucleation_DistanceField_slots));
     opaque
         .def("depth", &nucleation::DistanceField::depth, "x"_a, "y"_a, "z"_a)
@@ -19,4 +19,4 @@ void add_DistanceField_binding(nb::module_ mod) {
         .def("slope", &nucleation::DistanceField::slope, "x"_a, "y"_a, "z"_a);
 }
 
-} 
+}

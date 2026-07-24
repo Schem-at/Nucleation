@@ -10,7 +10,7 @@ void add_StoreIo_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::StoreIo::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::StoreIo> opaque(mod, "StoreIo", nb::type_slots(nucleation_StoreIo_slots));
     opaque
         .def_static("default_format_version", &nucleation::StoreIo::default_format_version, "format"_a)
@@ -23,4 +23,4 @@ void add_StoreIo_binding(nb::module_ mod) {
         .def_static("supported_import_formats", &nucleation::StoreIo::supported_import_formats);
 }
 
-} 
+}

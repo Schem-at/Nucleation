@@ -9,7 +9,7 @@ void add_PaletteBuilder_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::PaletteBuilder::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::PaletteBuilder> opaque(mod, "PaletteBuilder", nb::type_slots(nucleation_PaletteBuilder_slots));
     opaque
         .def("build", std::move(maybe_op_unwrap(&nucleation::PaletteBuilder::build)))
@@ -31,4 +31,4 @@ void add_PaletteBuilder_binding(nb::module_ mod) {
         .def("tag", &nucleation::PaletteBuilder::tag, "t"_a);
 }
 
-} 
+}

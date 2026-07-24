@@ -8,13 +8,12 @@ back. Either way the whole world never sits in memory at once.
 ```python
 import tempfile, json
 from nucleation import (Schematic, Shape, Brush, BuildingTool, WorldChunkView,
-                        WorldSink, WorldStream)
+                        WorldSink, WorldStream, Sdf)
 
 # GENERATE: an SDF island streamed to a world one chunk at a time. Intersecting
 # the SDF with each chunk's cuboid means it's only evaluated inside that chunk,
 # so a world of any size streams in flat memory.
-sdf = Shape.sdf('{"type": "displace", "amplitude": 5, "frequency": 0.08, "seed": 3,'
-                ' "child": {"type": "ellipsoid", "radii": [40, 10, 40]}}')
+sdf = Sdf.ellipsoid(40, 10, 40).displace(5, 0.08, 3, 3).to_shape()
 stone = Brush.solid("minecraft:stone")
 gen_dir = tempfile.mkdtemp(suffix="-world")
 sink = WorldSink.create(gen_dir, "")
@@ -61,6 +60,6 @@ generated chunks: 32
 filtered chunks: 32 | gold: 66318 | stone left: 0
 ```
 
-_Environment: CPython 3.14.6 + nucleation 0.3.16 wheel (bridge-full, cp312-abi3), macOS arm64._
+_Environment: CPython 3.12.11 + nucleation 0.4.1 wheel (bridge-full, cp312-abi3), macOS arm64._
 
 <!-- The generator source is arbitrary: swap the SDF for Geo.extrude_footprints (OSM), a heightmap, a mandelbrot, layered noise — anything that fills a schematic. Clip with `shape.intersection_with(chunk_box)` so only the current chunk is evaluated. WorldChunkView.from_schematic ignores blocks outside the (cx, cz) column, so slightly-oversized fills are fine. -->

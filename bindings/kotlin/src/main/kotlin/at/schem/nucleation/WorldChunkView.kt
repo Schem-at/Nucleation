@@ -45,7 +45,7 @@ class WorldChunkView internal constructor (
         internal val libClass: Class<WorldChunkViewLib> = WorldChunkViewLib::class.java
         internal val lib: WorldChunkViewLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Create an empty chunk view at the given chunk coordinates — the
         *starting point for generating worlds from scratch. Sections are
         *created on demand by `set_block`. Serialized with
@@ -53,15 +53,15 @@ class WorldChunkView internal constructor (
         *and the default data version.
         */
         fun create(cx: Int, cz: Int): WorldChunkView {
-            
+
             val returnVal = lib.WorldChunkView_create(cx, cz);
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = WorldChunkView(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Build a chunk view at (`cx`, `cz`) from a schematic — every non-air
         *block whose world (x, z) falls in this chunk is copied in, the rest
         *ignored. The write-side twin of `to_schematic`: this is how the
@@ -72,42 +72,42 @@ class WorldChunkView internal constructor (
         *`to_schematic` a streamed chunk, edit it, rebuild with this.
         */
         fun fromSchematic(schematic: Schematic, cx: Int, cz: Int): WorldChunkView {
-            
+
             val returnVal = lib.WorldChunkView_from_schematic(schematic.handle, cx, cz);
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = WorldChunkView(handle, selfEdges, true)
             return returnOpaque
         }
     }
-    
+
     /** The chunk X coordinate (in chunk units).
     */
     fun cx(): Int {
-        
+
         val returnVal = lib.WorldChunkView_cx(handle);
         return (returnVal)
     }
-    
+
     /** The chunk Z coordinate (in chunk units).
     */
     fun cz(): Int {
-        
+
         val returnVal = lib.WorldChunkView_cz(handle);
         return (returnVal)
     }
-    
+
     /** Convert the chunk view to a standalone schematic.
     */
     fun toSchematic(): Schematic {
-        
+
         val returnVal = lib.WorldChunkView_to_schematic(handle);
         val selfEdges: List<Any> = listOf()
-        val handle = returnVal 
+        val handle = returnVal
         val returnOpaque = Schematic(handle, selfEdges, true)
         return returnOpaque
     }
-    
+
     /** Set a block at absolute world coordinates inside this chunk view.
     *`block_name` must be a valid Minecraft block identifier (e.g.
     *`minecraft:stone`). Errors with `InvalidArgument` if (x, z) is outside
@@ -115,7 +115,7 @@ class WorldChunkView internal constructor (
     */
     fun setBlock(x: Int, y: Int, z: Int, blockName: String): Result<Unit> {
         val blockNameSliceMemory = PrimitiveArrayTools.borrowUtf8(blockName)
-        
+
         val returnVal = lib.WorldChunkView_set_block(handle, x, y, z, blockNameSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -128,14 +128,14 @@ class WorldChunkView internal constructor (
             blockNameSliceMemory.close()
         }
     }
-    
+
     /** Overwrite the biome of every currently-present section of the chunk
     *view with `biome_name` (e.g. `minecraft:desert`). Sections are created
     *lazily by `set_block`, so call this AFTER placing blocks.
     */
     fun setBiome(biomeName: String): Result<Unit> {
         val biomeNameSliceMemory = PrimitiveArrayTools.borrowUtf8(biomeName)
-        
+
         val returnVal = lib.WorldChunkView_set_biome(handle, biomeNameSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -148,7 +148,7 @@ class WorldChunkView internal constructor (
             biomeNameSliceMemory.close()
         }
     }
-    
+
     /** Deduped union of all sections' biome palette entries, in order of
     *first appearance, written as a JSON array string (`[]` if no section
     *carries biome data).
@@ -158,7 +158,7 @@ class WorldChunkView internal constructor (
         val returnVal = lib.WorldChunkView_biome_palette_json(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {

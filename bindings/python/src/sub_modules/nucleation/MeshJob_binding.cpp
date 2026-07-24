@@ -13,7 +13,7 @@ void add_MeshJob_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::MeshJob::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::MeshJob> opaque(mod, "MeshJob", nb::type_slots(nucleation_MeshJob_slots));
     opaque
         .def("poll_progress", &nucleation::MeshJob::poll_progress)
@@ -21,4 +21,4 @@ void add_MeshJob_binding(nb::module_ mod) {
         .def("take_result", std::move(maybe_op_unwrap(&nucleation::MeshJob::take_result)));
 }
 
-} 
+}

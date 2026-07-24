@@ -40,16 +40,16 @@ class VideoConfig internal constructor (
         internal val libClass: Class<VideoConfigLib> = VideoConfigLib::class.java
         internal val lib: VideoConfigLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Alpha-preserving ProRes 4444 in a MOV container.
         */
         fun prores4444(fps: Double): Result<VideoConfig> {
-            
+
             val returnVal = lib.VideoConfig_prores_4444(fps);
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
                 val selfEdges: List<Any> = listOf()
-                val handle = nativeOkVal 
+                val handle = nativeOkVal
                 val returnOpaque = VideoConfig(handle, selfEdges, true)
                 return returnOpaque.ok()
             } else {
@@ -57,16 +57,16 @@ class VideoConfig internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** H.264 in an MP4 or MOV container. H.264 does not preserve alpha.
         */
         fun h264(fps: Double): Result<VideoConfig> {
-            
+
             val returnVal = lib.VideoConfig_h264(fps);
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
                 val selfEdges: List<Any> = listOf()
-                val handle = nativeOkVal 
+                val handle = nativeOkVal
                 val returnOpaque = VideoConfig(handle, selfEdges, true)
                 return returnOpaque.ok()
             } else {
@@ -74,12 +74,12 @@ class VideoConfig internal constructor (
             }
         }
     }
-    
+
     /** Override the FFmpeg executable. The default resolves `ffmpeg` on PATH.
     */
     fun setFfmpegPath(path: String): Result<Unit> {
         val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
-        
+
         val returnVal = lib.VideoConfig_set_ffmpeg_path(handle, pathSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();

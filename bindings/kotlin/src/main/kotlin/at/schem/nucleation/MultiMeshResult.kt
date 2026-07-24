@@ -43,16 +43,16 @@ class MultiMeshResult internal constructor (
         internal val libClass: Class<MultiMeshResultLib> = MultiMeshResultLib::class.java
         internal val lib: MultiMeshResultLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Mesh each region separately (old ABI: `schematic_mesh_by_region`).
         */
         fun create(schematic: Schematic, pack: ResourcePack, config: MeshConfig): Result<MultiMeshResult> {
-            
+
             val returnVal = lib.MultiMeshResult_create(schematic.handle, pack.handle, config.handle);
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
                 val selfEdges: List<Any> = listOf()
-                val handle = nativeOkVal 
+                val handle = nativeOkVal
                 val returnOpaque = MultiMeshResult(handle, selfEdges, true)
                 return returnOpaque.ok()
             } else {
@@ -60,28 +60,28 @@ class MultiMeshResult internal constructor (
             }
         }
     }
-    
+
     /** Region names, as a JSON array string.
     */
     fun regionNamesJson(): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.MultiMeshResult_region_names_json(handle, write);
-        
+
         val returnString = DW.writeToString(write)
         return returnString
     }
-    
+
     /** The mesh for one region (cloned).
     */
     fun getMesh(regionName: String): Result<MeshResult> {
         val regionNameSliceMemory = PrimitiveArrayTools.borrowUtf8(regionName)
-        
+
         val returnVal = lib.MultiMeshResult_get_mesh(handle, regionNameSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
                 val selfEdges: List<Any> = listOf()
-                val handle = nativeOkVal 
+                val handle = nativeOkVal
                 val returnOpaque = MeshResult(handle, selfEdges, true)
                 return returnOpaque.ok()
             } else {
@@ -91,27 +91,27 @@ class MultiMeshResult internal constructor (
             regionNameSliceMemory.close()
         }
     }
-    
+
     /** Total vertex count across all region meshes.
     */
     fun totalVertexCount(): UInt {
-        
+
         val returnVal = lib.MultiMeshResult_total_vertex_count(handle);
         return (returnVal.toUInt())
     }
-    
+
     /** Total triangle count across all region meshes.
     */
     fun totalTriangleCount(): UInt {
-        
+
         val returnVal = lib.MultiMeshResult_total_triangle_count(handle);
         return (returnVal.toUInt())
     }
-    
+
     /** Number of region meshes.
     */
     fun meshCount(): UInt {
-        
+
         val returnVal = lib.MultiMeshResult_mesh_count(handle);
         return (returnVal.toUInt())
     }

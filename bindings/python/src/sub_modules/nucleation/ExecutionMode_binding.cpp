@@ -10,7 +10,7 @@ void add_ExecutionMode_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::ExecutionMode::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::ExecutionMode> opaque(mod, "ExecutionMode", nb::type_slots(nucleation_ExecutionMode_slots));
     opaque
         .def_static("fixed_ticks", std::move(maybe_op_unwrap(&nucleation::ExecutionMode::fixed_ticks)), "ticks"_a)
@@ -19,4 +19,4 @@ void add_ExecutionMode_binding(nb::module_ mod) {
         .def_static("until_stable", std::move(maybe_op_unwrap(&nucleation::ExecutionMode::until_stable)), "stable_ticks"_a, "max_ticks"_a);
 }
 
-} 
+}

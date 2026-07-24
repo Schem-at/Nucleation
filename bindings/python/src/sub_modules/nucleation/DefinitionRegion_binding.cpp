@@ -10,7 +10,7 @@ void add_DefinitionRegion_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::DefinitionRegion::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::DefinitionRegion> opaque(mod, "DefinitionRegion", nb::type_slots(nucleation_DefinitionRegion_slots));
     opaque
         .def("add_bounds", &nucleation::DefinitionRegion::add_bounds, "min_x"_a, "min_y"_a, "min_z"_a, "max_x"_a, "max_y"_a, "max_z"_a)
@@ -60,4 +60,4 @@ void add_DefinitionRegion_binding(nb::module_ mod) {
         .def("volume", &nucleation::DefinitionRegion::volume);
 }
 
-} 
+}

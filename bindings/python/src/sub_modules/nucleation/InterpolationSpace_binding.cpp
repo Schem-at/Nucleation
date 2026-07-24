@@ -6,13 +6,13 @@
 namespace nucleation {
 void add_InterpolationSpace_binding(nb::module_ mod) {
     nb::class_<nucleation::InterpolationSpace> e_class(mod, "InterpolationSpace");
-    
+
         nb::enum_<nucleation::InterpolationSpace::Value> enumerator(e_class, "InterpolationSpace");
         enumerator
             .value("Rgb", nucleation::InterpolationSpace::Rgb)
             .value("Oklab", nucleation::InterpolationSpace::Oklab)
             .export_values();
-    
+
         e_class
             .def(nb::init_implicit<nucleation::InterpolationSpace::Value>())
             .def(nb::self == nucleation::InterpolationSpace::Value())
@@ -21,4 +21,4 @@ void add_InterpolationSpace_binding(nb::module_ mod) {
             });
 }
 
-} 
+}

@@ -9,7 +9,7 @@ void add_ResourcePackList_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::ResourcePackList::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::ResourcePackList> opaque(mod, "ResourcePackList", nb::type_slots(nucleation_ResourcePackList_slots));
     opaque
         .def("add", &nucleation::ResourcePackList::add, "data"_a)
@@ -17,4 +17,4 @@ void add_ResourcePackList_binding(nb::module_ mod) {
         .def("len", &nucleation::ResourcePackList::len);
 }
 
-} 
+}

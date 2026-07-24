@@ -47,77 +47,77 @@ class AnimationEffect internal constructor (
         internal val libClass: Class<AnimationEffectLib> = AnimationEffectLib::class.java
         internal val lib: AnimationEffectLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         fun create(durationMs: Float): AnimationEffect {
-            
+
             val returnVal = lib.AnimationEffect_create(durationMs);
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = AnimationEffect(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         fun instant(): AnimationEffect {
-            
+
             val returnVal = lib.AnimationEffect_instant();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = AnimationEffect(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         fun popIn(durationMs: Float): AnimationEffect {
-            
+
             val returnVal = lib.AnimationEffect_pop_in(durationMs);
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = AnimationEffect(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         fun dropIn(durationMs: Float, height: Float): AnimationEffect {
-            
+
             val returnVal = lib.AnimationEffect_drop_in(durationMs, height);
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = AnimationEffect(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         fun dropAndPop(durationMs: Float, height: Float): AnimationEffect {
-            
+
             val returnVal = lib.AnimationEffect_drop_and_pop(durationMs, height);
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = AnimationEffect(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         fun spinIn(durationMs: Float, turns: Float): AnimationEffect {
-            
+
             val returnVal = lib.AnimationEffect_spin_in(durationMs, turns);
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = AnimationEffect(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         fun turntable(durationMs: Float): AnimationEffect {
-            
+
             val returnVal = lib.AnimationEffect_turntable(durationMs);
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = AnimationEffect(handle, selfEdges, true)
             return returnOpaque
         }
     }
-    
+
     /** Add a two-key property tween. Property names follow Anime.js/Three.js:
     *`x`, `y`, `z`, `rotateX`, `rotateY`, `rotateZ`, `scale`, `opacity`,
     *`tintR/G/B/A`, and `emissiveR/G/B`.
@@ -125,7 +125,7 @@ class AnimationEffect internal constructor (
     fun addTween(propertyName: String, from: Float, to: Float, easingName: String): Result<Unit> {
         val propertyNameSliceMemory = PrimitiveArrayTools.borrowUtf8(propertyName)
         val easingNameSliceMemory = PrimitiveArrayTools.borrowUtf8(easingName)
-        
+
         val returnVal = lib.AnimationEffect_add_tween(handle, propertyNameSliceMemory.slice, from, to, easingNameSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -139,13 +139,13 @@ class AnimationEffect internal constructor (
             easingNameSliceMemory.close()
         }
     }
-    
+
     /** Add a normalised keyframe (`at` in `0..=1`) to a property track.
     */
     fun addKeyframe(propertyName: String, at: Float, value: Float, easingName: String): Result<Unit> {
         val propertyNameSliceMemory = PrimitiveArrayTools.borrowUtf8(propertyName)
         val easingNameSliceMemory = PrimitiveArrayTools.borrowUtf8(easingName)
-        
+
         val returnVal = lib.AnimationEffect_add_keyframe(handle, propertyNameSliceMemory.slice, at, value, easingNameSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -159,11 +159,11 @@ class AnimationEffect internal constructor (
             easingNameSliceMemory.close()
         }
     }
-    
+
     fun setRepeatForever(): Unit {
-        
+
         val returnVal = lib.AnimationEffect_set_repeat_forever(handle);
-        
+
     }
 
 }

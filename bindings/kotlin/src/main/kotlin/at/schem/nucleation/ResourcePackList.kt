@@ -41,37 +41,37 @@ class ResourcePackList internal constructor (
         internal val libClass: Class<ResourcePackListLib> = ResourcePackListLib::class.java
         internal val lib: ResourcePackListLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Create an empty resource-pack list.
         */
         fun create(): ResourcePackList {
-            
+
             val returnVal = lib.ResourcePackList_create();
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = ResourcePackList(handle, selfEdges, true)
             return returnOpaque
         }
     }
-    
+
     /** Append one resource-pack ZIP buffer. Later buffers overlay earlier
     *ones on per-key collision (Minecraft pack-ordering semantics).
     */
     fun add(data: UByteArray): Unit {
         val dataSliceMemory = PrimitiveArrayTools.borrow(data)
-        
+
         val returnVal = lib.ResourcePackList_add(handle, dataSliceMemory.slice);
         try {
-            
+
         } finally {
             dataSliceMemory.close()
         }
     }
-    
+
     /** Number of pack buffers added so far.
     */
     fun len(): UInt {
-        
+
         val returnVal = lib.ResourcePackList_len(handle);
         return (returnVal.toUInt())
     }

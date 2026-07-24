@@ -9,7 +9,7 @@ void add_Palette_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::Palette::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::Palette> opaque(mod, "Palette", nb::type_slots(nucleation_Palette_slots));
     opaque
         .def_static("all", std::move(maybe_op_unwrap(&nucleation::Palette::all)))
@@ -32,4 +32,4 @@ void add_Palette_binding(nb::module_ mod) {
         .def_static("wool", std::move(maybe_op_unwrap(&nucleation::Palette::wool)));
 }
 
-} 
+}

@@ -15,6 +15,8 @@ namespace capi { struct Brush; }
 class Brush;
 namespace capi { struct Palette; }
 class Palette;
+namespace capi { struct Sdf; }
+class Sdf;
 class InterpolationSpace;
 class NucleationError;
 } // namespace nucleation
@@ -94,15 +96,14 @@ public:
   inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Brush>, nucleation::NucleationError> curve_gradient(nucleation::diplomat::span<const float> stops, nucleation::diplomat::span<const uint8_t> colors, nucleation::InterpolationSpace space);
 
   /**
-   * A field brush: color every voxel by evaluating a scalar field at its
-   * center, remapping `[lo, hi]` to `[0, 1]`, and reading a multi-stop
-   * gradient (`stops` in `[0, 1]`, `colors` as flat RGB triples). The
-   * field is any SDF JSON — the same language that builds geometry — so a
-   * `cells` node paints a Voronoi mosaic (`mode: value`) or cracks
-   * (`mode: f2MinusF1`), an fbm field a marble, a coordinate expression a
-   * stripe. Call `set_palette` to choose the block set. Errors with
-   * `Parse` on bad field JSON and `InvalidArgument` on a stops/colors
-   * length mismatch.
+   * Color every voxel by evaluating a typed SDF/field graph at its center.
+   * `stops` are in `[0, 1]`; `colors` are flat RGB triples. The sampled
+   * value is remapped from `[lo, hi]` before reading the gradient.
+   */
+  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Brush>, nucleation::NucleationError> field_sdf(const nucleation::Sdf& field, nucleation::diplomat::span<const float> stops, nucleation::diplomat::span<const uint8_t> colors, float lo, float hi, nucleation::InterpolationSpace space);
+
+  /**
+   * Legacy JSON-first field brush. Prefer `field_sdf` for new code.
    */
   inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Brush>, nucleation::NucleationError> field(std::string_view field_json, nucleation::diplomat::span<const float> stops, nucleation::diplomat::span<const uint8_t> colors, float lo, float hi, nucleation::InterpolationSpace space);
 

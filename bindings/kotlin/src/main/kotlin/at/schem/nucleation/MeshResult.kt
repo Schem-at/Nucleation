@@ -45,16 +45,16 @@ class MeshResult internal constructor (
         internal val libClass: Class<MeshResultLib> = MeshResultLib::class.java
         internal val lib: MeshResultLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Mesh an entire schematic in one pass (old ABI: `schematic_to_mesh`).
         */
         fun create(schematic: Schematic, pack: ResourcePack, config: MeshConfig): Result<MeshResult> {
-            
+
             val returnVal = lib.MeshResult_create(schematic.handle, pack.handle, config.handle);
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
                 val selfEdges: List<Any> = listOf()
-                val handle = nativeOkVal 
+                val handle = nativeOkVal
                 val returnOpaque = MeshResult(handle, selfEdges, true)
                 return returnOpaque.ok()
             } else {
@@ -62,16 +62,16 @@ class MeshResult internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Mesh a schematic with USDZ-compatible output (old ABI: `schematic_to_usdz`).
         */
         fun createUsdz(schematic: Schematic, pack: ResourcePack, config: MeshConfig): Result<MeshResult> {
-            
+
             val returnVal = lib.MeshResult_create_usdz(schematic.handle, pack.handle, config.handle);
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
                 val selfEdges: List<Any> = listOf()
-                val handle = nativeOkVal 
+                val handle = nativeOkVal
                 val returnOpaque = MeshResult(handle, selfEdges, true)
                 return returnOpaque.ok()
             } else {
@@ -79,7 +79,7 @@ class MeshResult internal constructor (
             }
         }
     }
-    
+
     /** The mesh as a binary GLB, base64-encoded.
     */
     fun glbDataB64(): Result<String> {
@@ -87,52 +87,52 @@ class MeshResult internal constructor (
         val returnVal = lib.MeshResult_glb_data_b64(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** The mesh serialized in the NUCM cache format, base64-encoded.
     */
     fun nucmDataB64(): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.MeshResult_nucm_data_b64(handle, write);
-        
+
         val returnString = DW.writeToString(write)
         return returnString
     }
-    
+
     /** Total number of vertices in the mesh.
     */
     fun vertexCount(): UInt {
-        
+
         val returnVal = lib.MeshResult_vertex_count(handle);
         return (returnVal.toUInt())
     }
-    
+
     /** Total number of triangles in the mesh.
     */
     fun triangleCount(): UInt {
-        
+
         val returnVal = lib.MeshResult_triangle_count(handle);
         return (returnVal.toUInt())
     }
-    
+
     /** Whether the mesh contains any transparent or translucent geometry.
     */
     fun hasTransparency(): Boolean {
-        
+
         val returnVal = lib.MeshResult_has_transparency(handle);
         return (returnVal > 0)
     }
-    
+
     /** Axis-aligned bounding box of the mesh, in world units.
     */
     fun bounds(): MeshBounds {
-        
+
         val returnVal = lib.MeshResult_bounds(handle);
         val returnStruct = MeshBounds.fromNative(returnVal)
         return returnStruct

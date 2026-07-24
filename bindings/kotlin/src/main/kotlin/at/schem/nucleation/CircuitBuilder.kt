@@ -58,28 +58,28 @@ class CircuitBuilder internal constructor (
         internal val libClass: Class<CircuitBuilderLib> = CircuitBuilderLib::class.java
         internal val lib: CircuitBuilderLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Create a builder for a schematic (cloned; no IO defined yet).
         */
         fun create(schematic: Schematic): CircuitBuilder {
-            
+
             val returnVal = lib.CircuitBuilder_create(schematic.handle);
             val selfEdges: List<Any> = listOf()
-            val handle = returnVal 
+            val handle = returnVal
             val returnOpaque = CircuitBuilder(handle, selfEdges, true)
             return returnOpaque
         }
         @JvmStatic
-        
+
         /** Create a builder pre-populated from Insign annotations.
         */
         fun fromInsign(schematic: Schematic): Result<CircuitBuilder> {
-            
+
             val returnVal = lib.CircuitBuilder_from_insign(schematic.handle);
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
                 val selfEdges: List<Any> = listOf()
-                val handle = nativeOkVal 
+                val handle = nativeOkVal
                 val returnOpaque = CircuitBuilder(handle, selfEdges, true)
                 return returnOpaque.ok()
             } else {
@@ -87,13 +87,13 @@ class CircuitBuilder internal constructor (
             }
         }
     }
-    
+
     /** Add an input with full control.
     */
     fun withInput(name: String, ioType: IoType, layout: LayoutFunction, regionPositions: IntArray): Result<Unit> {
         val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
         val regionPositionsSliceMemory = PrimitiveArrayTools.borrow(regionPositions)
-        
+
         val returnVal = lib.CircuitBuilder_with_input(handle, nameSliceMemory.slice, ioType.handle, layout.handle, regionPositionsSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -107,13 +107,13 @@ class CircuitBuilder internal constructor (
             regionPositionsSliceMemory.close()
         }
     }
-    
+
     /** Add an input with full control and a custom sort strategy.
     */
     fun withInputSorted(name: String, ioType: IoType, layout: LayoutFunction, regionPositions: IntArray, sort: SortStrategy): Result<Unit> {
         val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
         val regionPositionsSliceMemory = PrimitiveArrayTools.borrow(regionPositions)
-        
+
         val returnVal = lib.CircuitBuilder_with_input_sorted(handle, nameSliceMemory.slice, ioType.handle, layout.handle, regionPositionsSliceMemory.slice, sort.handle);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -127,13 +127,13 @@ class CircuitBuilder internal constructor (
             regionPositionsSliceMemory.close()
         }
     }
-    
+
     /** Add an input with automatic layout inference.
     */
     fun withInputAuto(name: String, ioType: IoType, regionPositions: IntArray): Result<Unit> {
         val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
         val regionPositionsSliceMemory = PrimitiveArrayTools.borrow(regionPositions)
-        
+
         val returnVal = lib.CircuitBuilder_with_input_auto(handle, nameSliceMemory.slice, ioType.handle, regionPositionsSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -147,13 +147,13 @@ class CircuitBuilder internal constructor (
             regionPositionsSliceMemory.close()
         }
     }
-    
+
     /** Add an input with automatic layout inference and a custom sort.
     */
     fun withInputAutoSorted(name: String, ioType: IoType, regionPositions: IntArray, sort: SortStrategy): Result<Unit> {
         val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
         val regionPositionsSliceMemory = PrimitiveArrayTools.borrow(regionPositions)
-        
+
         val returnVal = lib.CircuitBuilder_with_input_auto_sorted(handle, nameSliceMemory.slice, ioType.handle, regionPositionsSliceMemory.slice, sort.handle);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -167,13 +167,13 @@ class CircuitBuilder internal constructor (
             regionPositionsSliceMemory.close()
         }
     }
-    
+
     /** Add an output with full control.
     */
     fun withOutput(name: String, ioType: IoType, layout: LayoutFunction, regionPositions: IntArray): Result<Unit> {
         val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
         val regionPositionsSliceMemory = PrimitiveArrayTools.borrow(regionPositions)
-        
+
         val returnVal = lib.CircuitBuilder_with_output(handle, nameSliceMemory.slice, ioType.handle, layout.handle, regionPositionsSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -187,13 +187,13 @@ class CircuitBuilder internal constructor (
             regionPositionsSliceMemory.close()
         }
     }
-    
+
     /** Add an output with full control and a custom sort strategy.
     */
     fun withOutputSorted(name: String, ioType: IoType, layout: LayoutFunction, regionPositions: IntArray, sort: SortStrategy): Result<Unit> {
         val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
         val regionPositionsSliceMemory = PrimitiveArrayTools.borrow(regionPositions)
-        
+
         val returnVal = lib.CircuitBuilder_with_output_sorted(handle, nameSliceMemory.slice, ioType.handle, layout.handle, regionPositionsSliceMemory.slice, sort.handle);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -207,13 +207,13 @@ class CircuitBuilder internal constructor (
             regionPositionsSliceMemory.close()
         }
     }
-    
+
     /** Add an output with automatic layout inference.
     */
     fun withOutputAuto(name: String, ioType: IoType, regionPositions: IntArray): Result<Unit> {
         val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
         val regionPositionsSliceMemory = PrimitiveArrayTools.borrow(regionPositions)
-        
+
         val returnVal = lib.CircuitBuilder_with_output_auto(handle, nameSliceMemory.slice, ioType.handle, regionPositionsSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -227,13 +227,13 @@ class CircuitBuilder internal constructor (
             regionPositionsSliceMemory.close()
         }
     }
-    
+
     /** Add an output with automatic layout inference and a custom sort.
     */
     fun withOutputAutoSorted(name: String, ioType: IoType, regionPositions: IntArray, sort: SortStrategy): Result<Unit> {
         val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
         val regionPositionsSliceMemory = PrimitiveArrayTools.borrow(regionPositions)
-        
+
         val returnVal = lib.CircuitBuilder_with_output_auto_sorted(handle, nameSliceMemory.slice, ioType.handle, regionPositionsSliceMemory.slice, sort.handle);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -247,11 +247,11 @@ class CircuitBuilder internal constructor (
             regionPositionsSliceMemory.close()
         }
     }
-    
+
     /** Set simulation options.
     */
     fun withOptions(optimize: Boolean, ioOnly: Boolean): Result<Unit> {
-        
+
         val returnVal = lib.CircuitBuilder_with_options(handle, optimize, ioOnly);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -260,12 +260,12 @@ class CircuitBuilder internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Set the state mode ("stateless" | "stateful" | "manual").
     */
     fun withStateMode(mode: String): Result<Unit> {
         val modeSliceMemory = PrimitiveArrayTools.borrowUtf8(mode)
-        
+
         val returnVal = lib.CircuitBuilder_with_state_mode(handle, modeSliceMemory.slice);
         try {
             val nativeOkVal = returnVal.getNativeOk();
@@ -278,11 +278,11 @@ class CircuitBuilder internal constructor (
             modeSliceMemory.close()
         }
     }
-    
+
     /** Validate the configuration without consuming the builder.
     */
     fun validate(): Result<Unit> {
-        
+
         val returnVal = lib.CircuitBuilder_validate(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -291,55 +291,55 @@ class CircuitBuilder internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Build the executor. Consumes the builder.
     */
     fun build(): Result<TypedCircuitExecutor> {
-        
+
         val returnVal = lib.CircuitBuilder_build(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
             val selfEdges: List<Any> = listOf()
-            val handle = nativeOkVal 
+            val handle = nativeOkVal
             val returnOpaque = TypedCircuitExecutor(handle, selfEdges, true)
             return returnOpaque.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Build the executor with validation. Consumes the builder.
     */
     fun buildValidated(): Result<TypedCircuitExecutor> {
-        
+
         val returnVal = lib.CircuitBuilder_build_validated(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
             val selfEdges: List<Any> = listOf()
-            val handle = nativeOkVal 
+            val handle = nativeOkVal
             val returnOpaque = TypedCircuitExecutor(handle, selfEdges, true)
             return returnOpaque.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Number of inputs defined so far (0 if the builder was consumed).
     */
     fun inputCount(): UInt {
-        
+
         val returnVal = lib.CircuitBuilder_input_count(handle);
         return (returnVal.toUInt())
     }
-    
+
     /** Number of outputs defined so far (0 if the builder was consumed).
     */
     fun outputCount(): UInt {
-        
+
         val returnVal = lib.CircuitBuilder_output_count(handle);
         return (returnVal.toUInt())
     }
-    
+
     /** Input names as a JSON array string.
     */
     fun inputNamesJson(): Result<String> {
@@ -347,14 +347,14 @@ class CircuitBuilder internal constructor (
         val returnVal = lib.CircuitBuilder_input_names_json(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Output names as a JSON array string.
     */
     fun outputNamesJson(): Result<String> {
@@ -362,7 +362,7 @@ class CircuitBuilder internal constructor (
         val returnVal = lib.CircuitBuilder_output_names_json(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {

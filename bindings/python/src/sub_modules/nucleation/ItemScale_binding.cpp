@@ -14,4 +14,4 @@ void add_ItemScale_binding(nb::module_ mod) {
         .def_rw("z", &nucleation::ItemScale::z);
 }
 
-} 
+}

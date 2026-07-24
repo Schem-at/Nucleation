@@ -14,7 +14,7 @@ void add_TypedCircuitExecutor_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::TypedCircuitExecutor::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::TypedCircuitExecutor> opaque(mod, "TypedCircuitExecutor", nb::type_slots(nucleation_TypedCircuitExecutor_slots));
     opaque
         .def("execute", &nucleation::TypedCircuitExecutor::execute, "inputs_json"_a, "mode"_a)
@@ -34,4 +34,4 @@ void add_TypedCircuitExecutor_binding(nb::module_ mod) {
         .def("tick", &nucleation::TypedCircuitExecutor::tick, "ticks"_a);
 }
 
-} 
+}

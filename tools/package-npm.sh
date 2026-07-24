@@ -13,7 +13,7 @@ cargo build --release --target wasm32-unknown-unknown --lib --features bridge,si
 
 rm -rf "$OUT"
 mkdir -p "$OUT"
-cp bindings/js/*.mjs bindings/js/*.d.ts "$OUT/"
+cp bindings/js/*.mjs bindings/js/*.d.ts bindings/js/*.d.mts "$OUT"/
 cp target/wasm32-unknown-unknown/release/nucleation.wasm "$OUT/"
 cp bindings/npm/package.json "$OUT/"
 cp bindings/npm/README.md "$OUT/"

@@ -9,7 +9,7 @@ void add_MeshConfig_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::MeshConfig::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::MeshConfig> opaque(mod, "MeshConfig", nb::type_slots(nucleation_MeshConfig_slots));
     opaque
         .def("ambient_occlusion", &nucleation::MeshConfig::ambient_occlusion)
@@ -30,4 +30,4 @@ void add_MeshConfig_binding(nb::module_ mod) {
         .def("set_greedy_meshing", &nucleation::MeshConfig::set_greedy_meshing, "val"_a);
 }
 
-} 
+}

@@ -10,7 +10,7 @@ void add_Schematic_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::Schematic::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::Schematic> opaque(mod, "Schematic", nb::type_slots(nucleation_Schematic_slots));
     opaque
         .def("add_armor_stand", &nucleation::Schematic::add_armor_stand, "x"_a, "y"_a, "z"_a, "yaw"_a, "armor_material"_a)
@@ -149,4 +149,4 @@ void add_Schematic_binding(nb::module_ mod) {
         .def("we_version", &nucleation::Schematic::we_version);
 }
 
-} 
+}

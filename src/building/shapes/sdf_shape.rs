@@ -22,13 +22,14 @@ impl SdfShape {
     pub fn new(node: SdfNode) -> Option<Self> {
         let b = node.bounds()?;
         let bounds = (
-            b.min[0].floor() as i32,
-            b.min[1].floor() as i32,
-            b.min[2].floor() as i32,
-            b.max[0].ceil() as i32,
-            b.max[1].ceil() as i32,
-            b.max[2].ceil() as i32,
+            checked_floor(b.min[0])?,
+            checked_floor(b.min[1])?,
+            checked_floor(b.min[2])?,
+            checked_ceil(b.max[0])?,
+            checked_ceil(b.max[1])?,
+            checked_ceil(b.max[2])?,
         );
+        validate_bounds(bounds)?;
         Some(Self {
             node: Arc::new(node),
             bounds,
@@ -36,17 +37,46 @@ impl SdfShape {
     }
 
     /// Wrap a tree with explicit sampling bounds (inclusive block coords).
-    pub fn with_bounds(node: SdfNode, min: (i32, i32, i32), max: (i32, i32, i32)) -> Self {
-        Self {
+    pub fn with_bounds(node: SdfNode, min: (i32, i32, i32), max: (i32, i32, i32)) -> Option<Self> {
+        let bounds = (min.0, min.1, min.2, max.0, max.1, max.2);
+        validate_bounds(bounds)?;
+        Some(Self {
             node: Arc::new(node),
-            bounds: (min.0, min.1, min.2, max.0, max.1, max.2),
-        }
+            bounds,
+        })
     }
 
     fn eval_center(&self, x: i32, y: i32, z: i32) -> f32 {
         self.node
             .eval(x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5)
     }
+}
+
+fn checked_floor(value: f32) -> Option<i32> {
+    checked_rounded(value, f32::floor)
+}
+
+fn checked_ceil(value: f32) -> Option<i32> {
+    checked_rounded(value, f32::ceil)
+}
+
+fn checked_rounded(value: f32, round: fn(f32) -> f32) -> Option<i32> {
+    let rounded = round(value);
+    if !rounded.is_finite()
+        || f64::from(rounded) < f64::from(i32::MIN)
+        || f64::from(rounded) > f64::from(i32::MAX)
+    {
+        return None;
+    }
+    Some(rounded as i32)
+}
+
+fn validate_bounds(bounds: (i32, i32, i32, i32, i32, i32)) -> Option<u64> {
+    crate::sdf::checked_sample_volume(
+        [bounds.0, bounds.1, bounds.2],
+        [bounds.3, bounds.4, bounds.5],
+    )
+    .ok()
 }
 
 impl Shape for SdfShape {
@@ -68,18 +98,10 @@ impl Shape for SdfShape {
     }
 
     fn normal_at(&self, x: i32, y: i32, z: i32) -> (f64, f64, f64) {
-        // Central-difference gradient of the field at the block center.
         let (fx, fy, fz) = (x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5);
-        const H: f32 = 0.5;
-        let nx = self.node.eval(fx + H, fy, fz) - self.node.eval(fx - H, fy, fz);
-        let ny = self.node.eval(fx, fy + H, fz) - self.node.eval(fx, fy - H, fz);
-        let nz = self.node.eval(fx, fy, fz + H) - self.node.eval(fx, fy, fz - H);
-        let len = ((nx * nx + ny * ny + nz * nz) as f64).sqrt();
-        if len < 1e-9 {
-            (0.0, 1.0, 0.0)
-        } else {
-            (nx as f64 / len, ny as f64 / len, nz as f64 / len)
-        }
+        crate::sdf::numerical_normal(&self.node, [fx, fy, fz], 0.5)
+            .map(|normal| (normal[0], normal[1], normal[2]))
+            .unwrap_or((0.0, 1.0, 0.0))
     }
 
     fn bounds(&self) -> (i32, i32, i32, i32, i32, i32) {
@@ -100,5 +122,28 @@ impl Shape for SdfShape {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SdfShape, Shape};
+    use crate::sdf::SdfNode;
+
+    #[test]
+    fn normal_at_extreme_valid_coordinate_uses_representable_neighbors() {
+        let shape = SdfShape::with_bounds(
+            SdfNode::Plane {
+                normal: [1.0, 0.0, 0.0],
+                offset: 0.0,
+            },
+            (i32::MAX, 0, 0),
+            (i32::MAX, 0, 0),
+        )
+        .unwrap();
+        let normal = shape.normal_at(i32::MAX, 0, 0);
+        assert!((normal.0 - 1.0).abs() < 1e-9);
+        assert!(normal.1.abs() < 1e-9);
+        assert!(normal.2.abs() < 1e-9);
     }
 }

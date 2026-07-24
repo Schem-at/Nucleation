@@ -50,16 +50,16 @@ class ItemModelResult internal constructor (
         internal val libClass: Class<ItemModelResultLib> = ItemModelResultLib::class.java
         internal val lib: ItemModelResultLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Generate an item model from a schematic (old ABI: `schematic_to_item_model`).
         */
         fun create(schematic: Schematic, pack: ResourcePack, config: ItemModelConfig): Result<ItemModelResult> {
-            
+
             val returnVal = lib.ItemModelResult_create(schematic.handle, pack.handle, config.handle);
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
                 val selfEdges: List<Any> = listOf()
-                val handle = nativeOkVal 
+                val handle = nativeOkVal
                 val returnOpaque = ItemModelResult(handle, selfEdges, true)
                 return returnOpaque.ok()
             } else {
@@ -67,7 +67,7 @@ class ItemModelResult internal constructor (
             }
         }
     }
-    
+
     /** The Minecraft item model JSON.
     */
     fun modelJson(): Result<String> {
@@ -75,18 +75,18 @@ class ItemModelResult internal constructor (
         val returnVal = lib.ItemModelResult_model_json(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Number of elements (cuboids) in the generated model.
     */
     fun elementCount(): Result<UInt> {
-        
+
         val returnVal = lib.ItemModelResult_element_count(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -95,11 +95,11 @@ class ItemModelResult internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Number of textures the generated model uses.
     */
     fun textureCount(): Result<UInt> {
-        
+
         val returnVal = lib.ItemModelResult_texture_count(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -108,11 +108,11 @@ class ItemModelResult internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Number of textured planes in the generated model.
     */
     fun planeCount(): Result<UInt> {
-        
+
         val returnVal = lib.ItemModelResult_plane_count(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -121,11 +121,11 @@ class ItemModelResult internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Source schematic dimensions in blocks.
     */
     fun dimensions(): Result<Dimensions> {
-        
+
         val returnVal = lib.ItemModelResult_dimensions(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -135,11 +135,11 @@ class ItemModelResult internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** The applied model scale (old ABI: `itemmodel_result_scale`).
     */
     fun scale(): Result<ItemScale> {
-        
+
         val returnVal = lib.ItemModelResult_scale(handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
@@ -149,7 +149,7 @@ class ItemModelResult internal constructor (
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** A single-model resource pack ZIP, base64-encoded.
     */
     fun toResourcePackZipB64(): Result<String> {
@@ -157,19 +157,19 @@ class ItemModelResult internal constructor (
         val returnVal = lib.ItemModelResult_to_resource_pack_zip_b64(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Move this result into a pack builder. Consumes the result: further
     *accessor calls return `AlreadyConsumed`.
     */
     fun addToPack(builder: ItemModelPackBuilder): Result<Unit> {
-        
+
         val returnVal = lib.ItemModelResult_add_to_pack(handle, builder.handle);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {

@@ -9,7 +9,7 @@ void add_Blocks_binding(nb::module_ mod) {
         {Py_tp_free, (void *)nucleation::Blocks::operator delete },
         {Py_tp_dealloc, (void *)diplomat_tp_dealloc},
         {0, nullptr}};
-    
+
     nb::class_<nucleation::Blocks> opaque(mod, "Blocks", nb::type_slots(nucleation_Blocks_slots));
     opaque
         .def_static("by_color_json", &nucleation::Blocks::by_color_json, "r"_a, "g"_a, "b"_a, "max_distance"_a)
@@ -23,4 +23,4 @@ void add_Blocks_binding(nb::module_ mod) {
         .def_static("variants_of_json", &nucleation::Blocks::variants_of_json, "base_id"_a);
 }
 
-} 
+}

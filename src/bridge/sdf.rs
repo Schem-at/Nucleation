@@ -1,21 +1,488 @@
-//! SDF (signed distance field) sampling. Port of `ffi/sdf.rs`.
+//! Typed signed-distance-field graphs plus legacy JSON sampling entry points.
 
 #[diplomat::bridge]
 pub mod ffi {
+    use super::super::building::ffi::Shape;
     use super::super::schematic::ffi::Schematic;
     use super::super::shared::ffi::NucleationError;
+    use diplomat_runtime::DiplomatWrite;
+    use std::fmt::Write;
 
-    /// Namespace for the SDF free functions of the old ABI (`schematic_from_sdf`,
-    /// `sdf_eval`).
+    /// Axis used by mirror operations.
+    pub enum SdfAxis {
+        X,
+        Y,
+        Z,
+    }
+
+    impl SdfAxis {
+        fn to_core(self) -> crate::sdf::Axis {
+            match self {
+                SdfAxis::X => crate::sdf::Axis::X,
+                SdfAxis::Y => crate::sdf::Axis::Y,
+                SdfAxis::Z => crate::sdf::Axis::Z,
+            }
+        }
+    }
+
+    /// Cellular/Worley field output.
+    pub enum SdfCellMode {
+        F1,
+        F2,
+        F2MinusF1,
+        CellValue,
+    }
+
+    impl SdfCellMode {
+        fn to_core(self) -> crate::sdf::CellMode {
+            match self {
+                SdfCellMode::F1 => crate::sdf::CellMode::F1,
+                SdfCellMode::F2 => crate::sdf::CellMode::F2,
+                SdfCellMode::F2MinusF1 => crate::sdf::CellMode::F2MinusF1,
+                SdfCellMode::CellValue => crate::sdf::CellMode::Value,
+            }
+        }
+    }
+
+    /// Continuous bounds of a bounded SDF graph.
+    #[diplomat::out]
+    pub struct SdfBounds {
+        pub min_x: f32,
+        pub min_y: f32,
+        pub min_z: f32,
+        pub max_x: f32,
+        pub max_y: f32,
+        pub max_z: f32,
+    }
+
+    /// Unit surface normal estimated from the SDF gradient.
+    #[diplomat::out]
+    pub struct SdfNormal {
+        pub x: f32,
+        pub y: f32,
+        pub z: f32,
+    }
+
+    /// An immutable, composable signed-distance-field expression graph.
+    ///
+    /// Primitive constructors and every combinator return a new graph, so values
+    /// can be shared safely between Flow nodes and across Kotlin/Java, JavaScript,
+    /// and Python bindings. JSON is retained only for explicit import/export and
+    /// the legacy sampling helpers.
     #[diplomat::opaque]
-    pub struct Sdf;
+    pub struct Sdf(pub(crate) crate::sdf::SdfNode);
 
     impl Sdf {
-        /// Builds a schematic by sampling an SDF JSON tree with material rules JSON.
-        /// Sample an SDF tree into a schematic using the tree's own AABB —
-        /// the ergonomic path for bounded trees (all primitives except
-        /// `plane`). Fails with `InvalidArgument` for unbounded trees; use
-        /// `schematic_from_sdf` with explicit bounds for those.
+        // ── Typed primitives ──────────────────────────────────────────────
+
+        pub fn sphere(radius: f32) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[radius])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::Sphere { radius })))
+        }
+
+        /// Axis-aligned rounded box, centered at the origin.
+        pub fn box_shape(
+            half_x: f32,
+            half_y: f32,
+            half_z: f32,
+            rounding: f32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[half_x, half_y, half_z])?;
+            non_negative(&[rounding])?;
+            if rounding > half_x.min(half_y).min(half_z) {
+                return Err(NucleationError::InvalidArgument);
+            }
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::Box {
+                half_extents: [half_x, half_y, half_z],
+                rounding,
+            })))
+        }
+
+        pub fn ellipsoid(
+            radius_x: f32,
+            radius_y: f32,
+            radius_z: f32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[radius_x, radius_y, radius_z])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::Ellipsoid {
+                radii: [radius_x, radius_y, radius_z],
+            })))
+        }
+
+        pub fn torus(major_radius: f32, minor_radius: f32) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[major_radius, minor_radius])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::Torus {
+                major_radius,
+                minor_radius,
+            })))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub fn capsule(
+            ax: f32,
+            ay: f32,
+            az: f32,
+            bx: f32,
+            by: f32,
+            bz: f32,
+            radius: f32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            finite(&[ax, ay, az, bx, by, bz])?;
+            positive(&[radius])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::Capsule {
+                a: [ax, ay, az],
+                b: [bx, by, bz],
+                radius,
+            })))
+        }
+
+        pub fn capped_cylinder(radius: f32, half_height: f32) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[radius, half_height])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::CappedCylinder {
+                radius,
+                half_height,
+            })))
+        }
+
+        pub fn capped_cone(
+            half_height: f32,
+            bottom_radius: f32,
+            top_radius: f32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[half_height])?;
+            non_negative(&[bottom_radius, top_radius])?;
+            if bottom_radius == 0.0 && top_radius == 0.0 {
+                return Err(NucleationError::InvalidArgument);
+            }
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::CappedCone {
+                half_height,
+                r1: bottom_radius,
+                r2: top_radius,
+            })))
+        }
+
+        pub fn plane(
+            normal_x: f32,
+            normal_y: f32,
+            normal_z: f32,
+            offset: f32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            finite(&[normal_x, normal_y, normal_z, offset])?;
+            let length =
+                ((normal_x as f64).powi(2) + (normal_y as f64).powi(2) + (normal_z as f64).powi(2))
+                    .sqrt();
+            if !length.is_finite() || length <= f64::from(f32::EPSILON) {
+                return Err(NucleationError::InvalidArgument);
+            }
+            let normal = [
+                (f64::from(normal_x) / length) as f32,
+                (f64::from(normal_y) / length) as f32,
+                (f64::from(normal_z) / length) as f32,
+            ];
+            finite(&normal)?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::Plane { normal, offset })))
+        }
+
+        pub fn octahedron(size: f32) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[size])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::Octahedron { size })))
+        }
+
+        pub fn hex_prism(radius: f32, half_height: f32) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[radius, half_height])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::HexPrism {
+                radius,
+                half_height,
+            })))
+        }
+
+        pub fn super_prism(
+            half_x: f32,
+            half_y: f32,
+            half_z: f32,
+            exponent: f32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[half_x, half_y, half_z, exponent])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::SuperPrism {
+                half_extents: [half_x, half_y, half_z],
+                exponent,
+            })))
+        }
+
+        pub fn cells(
+            frequency: f32,
+            seed: i32,
+            jitter: f32,
+            mode: SdfCellMode,
+            threshold: f32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[frequency])?;
+            non_negative(&[jitter])?;
+            finite(&[threshold])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::Cells {
+                frequency,
+                seed,
+                jitter,
+                mode: mode.to_core(),
+                threshold,
+            })))
+        }
+
+        // ── Immutable composition ─────────────────────────────────────────
+
+        pub fn union_with(&self, other: &Sdf) -> Box<Sdf> {
+            Box::new(Sdf(crate::sdf::SdfNode::Union {
+                children: vec![self.0.clone(), other.0.clone()],
+            }))
+        }
+
+        pub fn intersection_with(&self, other: &Sdf) -> Box<Sdf> {
+            Box::new(Sdf(crate::sdf::SdfNode::Intersect {
+                children: vec![self.0.clone(), other.0.clone()],
+            }))
+        }
+
+        pub fn subtract(&self, other: &Sdf) -> Box<Sdf> {
+            Box::new(Sdf(crate::sdf::SdfNode::Subtract {
+                a: Box::new(self.0.clone()),
+                b: Box::new(other.0.clone()),
+            }))
+        }
+
+        pub fn smooth_union(&self, other: &Sdf, radius: f32) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[radius])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::SmoothUnion {
+                a: Box::new(self.0.clone()),
+                b: Box::new(other.0.clone()),
+                k: radius,
+            })))
+        }
+
+        pub fn smooth_subtract(
+            &self,
+            other: &Sdf,
+            radius: f32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[radius])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::SmoothSubtract {
+                a: Box::new(self.0.clone()),
+                b: Box::new(other.0.clone()),
+                k: radius,
+            })))
+        }
+
+        pub fn smooth_intersection(
+            &self,
+            other: &Sdf,
+            radius: f32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[radius])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::SmoothIntersect {
+                a: Box::new(self.0.clone()),
+                b: Box::new(other.0.clone()),
+                k: radius,
+            })))
+        }
+
+        pub fn rounded(&self, radius: f32) -> Result<Box<Sdf>, NucleationError> {
+            non_negative(&[radius])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::Round {
+                child: Box::new(self.0.clone()),
+                radius,
+            })))
+        }
+
+        pub fn shell(&self, thickness: f32) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[thickness])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::Shell {
+                child: Box::new(self.0.clone()),
+                thickness,
+            })))
+        }
+
+        // ── Immutable transforms and modifiers ────────────────────────────
+
+        pub fn translate(&self, x: f32, y: f32, z: f32) -> Result<Box<Sdf>, NucleationError> {
+            finite(&[x, y, z])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::Translate {
+                child: Box::new(self.0.clone()),
+                offset: [x, y, z],
+            })))
+        }
+
+        pub fn rotate(
+            &self,
+            x_degrees: f32,
+            y_degrees: f32,
+            z_degrees: f32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            finite(&[x_degrees, y_degrees, z_degrees])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::Rotate {
+                child: Box::new(self.0.clone()),
+                angles: [x_degrees, y_degrees, z_degrees],
+            })))
+        }
+
+        pub fn scale(&self, factor: f32) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[factor])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::Scale {
+                child: Box::new(self.0.clone()),
+                factor,
+            })))
+        }
+
+        pub fn mirror(&self, axis: SdfAxis) -> Box<Sdf> {
+            Box::new(Sdf(crate::sdf::SdfNode::Mirror {
+                child: Box::new(self.0.clone()),
+                axis: axis.to_core(),
+            }))
+        }
+
+        pub fn repeat_infinite(
+            &self,
+            spacing_x: f32,
+            spacing_y: f32,
+            spacing_z: f32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            repeat(self, spacing_x, spacing_y, spacing_z, None)
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub fn repeat_counted(
+            &self,
+            spacing_x: f32,
+            spacing_y: f32,
+            spacing_z: f32,
+            count_x: u32,
+            count_y: u32,
+            count_z: u32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            repeat(
+                self,
+                spacing_x,
+                spacing_y,
+                spacing_z,
+                Some([count_x, count_y, count_z]),
+            )
+        }
+
+        pub fn displace(
+            &self,
+            amplitude: f32,
+            frequency: f32,
+            seed: i32,
+            octaves: u32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            non_negative(&[amplitude])?;
+            positive(&[frequency])?;
+            if !(1..=8).contains(&octaves) {
+                return Err(NucleationError::InvalidArgument);
+            }
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::Displace {
+                child: Box::new(self.0.clone()),
+                amplitude,
+                frequency,
+                seed,
+                octaves,
+            })))
+        }
+
+        pub fn warp(
+            &self,
+            amplitude: f32,
+            frequency: f32,
+            seed: i32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            non_negative(&[amplitude])?;
+            positive(&[frequency])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::Warp {
+                child: Box::new(self.0.clone()),
+                amplitude,
+                frequency,
+                seed,
+            })))
+        }
+
+        // ── Evaluation, conversion, and explicit serialization ────────────
+
+        pub fn eval_at(&self, x: f32, y: f32, z: f32) -> f32 {
+            self.0.eval(x, y, z)
+        }
+
+        pub fn normal(
+            &self,
+            x: f32,
+            y: f32,
+            z: f32,
+            epsilon: f32,
+        ) -> Result<SdfNormal, NucleationError> {
+            finite(&[x, y, z])?;
+            positive(&[epsilon])?;
+            let [nx, ny, nz] = crate::sdf::numerical_normal(&self.0, [x, y, z], epsilon)
+                .ok_or(NucleationError::InvalidArgument)?;
+            Ok(SdfNormal {
+                x: nx as f32,
+                y: ny as f32,
+                z: nz as f32,
+            })
+        }
+
+        pub fn bounds(&self) -> Result<SdfBounds, NucleationError> {
+            self.0
+                .bounds()
+                .map(|bounds| SdfBounds {
+                    min_x: bounds.min[0],
+                    min_y: bounds.min[1],
+                    min_z: bounds.min[2],
+                    max_x: bounds.max[0],
+                    max_y: bounds.max[1],
+                    max_z: bounds.max[2],
+                })
+                .ok_or(NucleationError::InvalidArgument)
+        }
+
+        pub fn to_shape(&self) -> Result<Box<Shape>, NucleationError> {
+            crate::building::SdfShape::new(self.0.clone())
+                .map(|shape| Box::new(Shape(crate::building::ShapeEnum::Sdf(shape))))
+                .ok_or(NucleationError::InvalidArgument)
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub fn to_shape_bounded(
+            &self,
+            min_x: i32,
+            min_y: i32,
+            min_z: i32,
+            max_x: i32,
+            max_y: i32,
+            max_z: i32,
+        ) -> Result<Box<Shape>, NucleationError> {
+            let shape = crate::building::SdfShape::with_bounds(
+                self.0.clone(),
+                (min_x, min_y, min_z),
+                (max_x, max_y, max_z),
+            )
+            .ok_or(NucleationError::InvalidArgument)?;
+            Ok(Box::new(Shape(crate::building::ShapeEnum::Sdf(shape))))
+        }
+
+        pub fn from_json_string(json: &DiplomatStr) -> Result<Box<Sdf>, NucleationError> {
+            let json = std::str::from_utf8(json).map_err(|_| NucleationError::InvalidArgument)?;
+            crate::sdf::SdfNode::from_json(json)
+                .map(|node| Box::new(Sdf(node)))
+                .map_err(|_| NucleationError::Parse)
+        }
+
+        pub fn to_json(&self, write: &mut DiplomatWrite) -> Result<(), NucleationError> {
+            let json = self.0.to_json().map_err(|_| NucleationError::Serialize)?;
+            let _ = write!(write, "{json}");
+            Ok(())
+        }
+
+        // ── Legacy JSON-first API ─────────────────────────────────────────
+
+        /// Legacy JSON-first terrain helper. Prefer typed constructors and
+        /// `to_shape()` with `BuildingTool.fill()` for new code.
         pub fn schematic_from_sdf_auto(
             sdf_json: &DiplomatStr,
             rules_json: &DiplomatStr,
@@ -23,9 +490,7 @@ pub mod ffi {
             Self::schematic_from_sdf(sdf_json, rules_json, false, 0, 0, 0, 0, 0, 0)
         }
 
-        /// When `has_bounds` is false the tree's own AABB is used (fails with
-        /// `InvalidArgument` for unbounded trees) and the `min_*`/`max_*` arguments
-        /// are ignored.
+        /// Legacy JSON-first terrain helper with optional explicit bounds.
         #[allow(clippy::too_many_arguments)]
         pub fn schematic_from_sdf(
             sdf_json: &DiplomatStr,
@@ -42,7 +507,6 @@ pub mod ffi {
                 std::str::from_utf8(sdf_json).map_err(|_| NucleationError::InvalidArgument)?;
             let rules_str =
                 std::str::from_utf8(rules_json).map_err(|_| NucleationError::InvalidArgument)?;
-
             let node =
                 crate::sdf::SdfNode::from_json(sdf_str).map_err(|_| NucleationError::Parse)?;
             let rules = crate::sdf::MaterialRules::from_json(rules_str)
@@ -56,11 +520,11 @@ pub mod ffi {
                 None
             };
             crate::sdf::sample_to_schematic(&node, &rules, bounds, "sdf")
-                .map(|s| Box::new(Schematic(s)))
+                .map(|schematic| Box::new(Schematic(schematic)))
                 .map_err(|_| NucleationError::InvalidArgument)
         }
 
-        /// Evaluates an SDF JSON tree at a point, returning the signed distance.
+        /// Legacy JSON-first evaluator. Prefer `Sdf.from_json_string(...).eval_at(...)`.
         pub fn eval(
             sdf_json: &DiplomatStr,
             x: f32,
@@ -73,5 +537,116 @@ pub mod ffi {
                 crate::sdf::SdfNode::from_json(sdf_str).map_err(|_| NucleationError::Parse)?;
             Ok(node.eval(x, y, z))
         }
+    }
+
+    fn finite(values: &[f32]) -> Result<(), NucleationError> {
+        if values.iter().all(|value| value.is_finite()) {
+            Ok(())
+        } else {
+            Err(NucleationError::InvalidArgument)
+        }
+    }
+
+    fn positive(values: &[f32]) -> Result<(), NucleationError> {
+        finite(values)?;
+        if values.iter().all(|value| *value > 0.0) {
+            Ok(())
+        } else {
+            Err(NucleationError::InvalidArgument)
+        }
+    }
+
+    fn non_negative(values: &[f32]) -> Result<(), NucleationError> {
+        finite(values)?;
+        if values.iter().all(|value| *value >= 0.0) {
+            Ok(())
+        } else {
+            Err(NucleationError::InvalidArgument)
+        }
+    }
+
+    fn repeat(
+        sdf: &Sdf,
+        spacing_x: f32,
+        spacing_y: f32,
+        spacing_z: f32,
+        count: Option<[u32; 3]>,
+    ) -> Result<Box<Sdf>, NucleationError> {
+        finite(&[spacing_x, spacing_y, spacing_z])?;
+        if spacing_x < 0.0
+            || spacing_y < 0.0
+            || spacing_z < 0.0
+            || (spacing_x == 0.0 && spacing_y == 0.0 && spacing_z == 0.0)
+        {
+            return Err(NucleationError::InvalidArgument);
+        }
+        Ok(Box::new(Sdf(crate::sdf::SdfNode::Repeat {
+            child: Box::new(sdf.0.clone()),
+            spacing: [spacing_x, spacing_y, spacing_z],
+            count,
+        })))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ffi::Sdf;
+
+    #[test]
+    fn typed_sdf_graph_composes_without_json() {
+        let left = Sdf::sphere(4.0).unwrap().translate(-3.0, 0.0, 0.0).unwrap();
+        let right = Sdf::box_shape(3.0, 3.0, 3.0, 0.5)
+            .unwrap()
+            .translate(3.0, 0.0, 0.0)
+            .unwrap();
+        let field = left.smooth_union(&right, 1.25).unwrap();
+
+        assert!(field.eval_at(-3.0, 0.0, 0.0) < 0.0);
+        assert!(field.eval_at(3.0, 0.0, 0.0) < 0.0);
+        assert!(field.eval_at(20.0, 0.0, 0.0) > 0.0);
+
+        let bounds = field.bounds().unwrap();
+        assert!(bounds.min_x <= -7.0 && bounds.max_x >= 6.5);
+        assert!(field.to_shape().is_ok());
+    }
+
+    #[test]
+    fn typed_sdf_exposes_normal_and_explicit_json_roundtrip() {
+        let field = Sdf::ellipsoid(2.0, 3.0, 4.0).unwrap();
+        let normal = field.normal(2.0, 0.0, 0.0, 0.01).unwrap();
+        assert!((normal.x - 1.0).abs() < 0.01);
+        assert!(normal.y.abs() < 0.01);
+        assert!(normal.z.abs() < 0.01);
+
+        let json = field.0.to_json().unwrap();
+        let restored = Sdf::from_json_string(json.as_bytes()).unwrap();
+        assert!((restored.eval_at(2.0, 0.0, 0.0) - field.eval_at(2.0, 0.0, 0.0)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn typed_shapes_reject_unsafe_inferred_and_explicit_bounds() {
+        assert!(Sdf::sphere(20_000_000.0).unwrap().to_shape().is_err());
+        let plane = Sdf::plane(0.0, 1.0, 0.0, 0.0).unwrap();
+        assert!(plane
+            .to_shape_bounded(i32::MIN, 0, 0, i32::MAX, 0, 0)
+            .is_err());
+        assert!(plane.to_shape_bounded(0, 0, 0, 255, 255, 255).is_ok());
+        assert!(plane.to_shape_bounded(0, 0, 0, 256, 255, 255).is_err());
+    }
+
+    #[test]
+    fn plane_normalization_is_robust_for_large_finite_components() {
+        let plane = Sdf::plane(f32::MAX, 0.0, 0.0, 0.0).unwrap();
+        assert!((plane.eval_at(2.0, 0.0, 0.0) - 2.0).abs() < 1e-6);
+        let normal = plane.normal(0.0, 0.0, 0.0, 0.01).unwrap();
+        assert!((normal.x - 1.0).abs() < 1e-6);
+        assert!(normal.y.abs() < 1e-6);
+        assert!(normal.z.abs() < 1e-6);
+        let extreme = plane.normal(i32::MAX as f32, 0.0, 0.0, 0.5).unwrap();
+        assert!((extreme.x - 1.0).abs() < 1e-6);
+        assert!(extreme.y.abs() < 1e-6);
+        assert!(extreme.z.abs() < 1e-6);
+        let endpoint = plane.normal(f32::MAX, 0.0, 0.0, 0.5).unwrap();
+        assert!((endpoint.x - 1.0).abs() < 1e-6);
     }
 }

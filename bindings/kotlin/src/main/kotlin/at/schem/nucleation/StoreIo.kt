@@ -46,7 +46,7 @@ class StoreIo internal constructor (
         internal val libClass: Class<StoreIoLib> = StoreIoLib::class.java
         internal val lib: StoreIoLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Open a schematic from a URI: a local path, `file://...`, or
         *`s3://bucket/key.schem`. The format is auto-detected from the URI's
         *extension. Single-string URIs for `redis://`, `postgres://`, and
@@ -55,13 +55,13 @@ class StoreIo internal constructor (
         */
         fun open(uri: String): Result<Schematic> {
             val uriSliceMemory = PrimitiveArrayTools.borrowUtf8(uri)
-            
+
             val returnVal = lib.StoreIo_open(uriSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = Schematic(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -72,7 +72,7 @@ class StoreIo internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Save a schematic to a URI: a local path, `file://...`, or
         *`s3://bucket/key.schem`. The format is auto-detected from the URI's
         *extension; `version` selects the format version (empty string =
@@ -83,7 +83,7 @@ class StoreIo internal constructor (
         fun save(schematic: Schematic, uri: String, version: String): Result<Unit> {
             val uriSliceMemory = PrimitiveArrayTools.borrowUtf8(uri)
             val versionSliceMemory = PrimitiveArrayTools.borrowUtf8(version)
-            
+
             val returnVal = lib.StoreIo_save(schematic.handle, uriSliceMemory.slice, versionSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
@@ -98,7 +98,7 @@ class StoreIo internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** The JSON schema describing the export settings of `format`. Errors
         *with `NotFound` for an unknown format.
         */
@@ -109,7 +109,7 @@ class StoreIo internal constructor (
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
-                    
+
                     val returnString = DW.writeToString(write)
                     return returnString.ok()
                 } else {
@@ -120,7 +120,7 @@ class StoreIo internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** The JSON schema describing the import settings of `format`. Errors
         *with `NotFound` for an unknown format.
         */
@@ -131,7 +131,7 @@ class StoreIo internal constructor (
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
-                    
+
                     val returnString = DW.writeToString(write)
                     return returnString.ok()
                 } else {
@@ -142,7 +142,7 @@ class StoreIo internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** The supported import formats, written as a JSON array string.
         */
         fun supportedImportFormats(): Result<String> {
@@ -150,7 +150,7 @@ class StoreIo internal constructor (
             val returnVal = lib.StoreIo_supported_import_formats(write);
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
-                
+
                 val returnString = DW.writeToString(write)
                 return returnString.ok()
             } else {
@@ -158,7 +158,7 @@ class StoreIo internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** The supported export formats, written as a JSON array string.
         */
         fun supportedExportFormats(): Result<String> {
@@ -166,7 +166,7 @@ class StoreIo internal constructor (
             val returnVal = lib.StoreIo_supported_export_formats(write);
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
-                
+
                 val returnString = DW.writeToString(write)
                 return returnString.ok()
             } else {
@@ -174,7 +174,7 @@ class StoreIo internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** The known versions of an export format, written as a JSON array string
         *(empty array for an unknown format, matching the old ABI).
         */
@@ -185,7 +185,7 @@ class StoreIo internal constructor (
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
-                    
+
                     val returnString = DW.writeToString(write)
                     return returnString.ok()
                 } else {
@@ -196,7 +196,7 @@ class StoreIo internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** The default version of an export format. Errors with `NotFound` for an
         *unknown format.
         */
@@ -207,7 +207,7 @@ class StoreIo internal constructor (
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
-                    
+
                     val returnString = DW.writeToString(write)
                     return returnString.ok()
                 } else {

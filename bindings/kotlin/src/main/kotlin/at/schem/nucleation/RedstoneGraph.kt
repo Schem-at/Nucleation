@@ -46,18 +46,18 @@ class RedstoneGraph internal constructor (
         internal val libClass: Class<RedstoneGraphLib> = RedstoneGraphLib::class.java
         internal val lib: RedstoneGraphLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Deserialize a graph from a JSON string.
         */
         fun fromJson(json: String): Result<RedstoneGraph> {
             val jsonSliceMemory = PrimitiveArrayTools.borrowUtf8(json)
-            
+
             val returnVal = lib.RedstoneGraph_from_json(jsonSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = RedstoneGraph(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -68,23 +68,23 @@ class RedstoneGraph internal constructor (
             }
         }
     }
-    
+
     /** Number of nodes in the graph.
     */
     fun nodeCount(): UInt {
-        
+
         val returnVal = lib.RedstoneGraph_node_count(handle);
         return (returnVal.toUInt())
     }
-    
+
     /** Total number of directed edges in the graph.
     */
     fun edgeCount(): UInt {
-        
+
         val returnVal = lib.RedstoneGraph_edge_count(handle);
         return (returnVal.toUInt())
     }
-    
+
     /** The nodes as a JSON array string.
     */
     fun nodesJson(): Result<String> {
@@ -92,14 +92,14 @@ class RedstoneGraph internal constructor (
         val returnVal = lib.RedstoneGraph_nodes_json(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** The directed edges as a JSON array string.
     */
     fun edgesJson(): Result<String> {
@@ -107,14 +107,14 @@ class RedstoneGraph internal constructor (
         val returnVal = lib.RedstoneGraph_edges_json(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Computed graph features as a JSON object string.
     */
     fun featuresJson(): Result<String> {
@@ -122,14 +122,14 @@ class RedstoneGraph internal constructor (
         val returnVal = lib.RedstoneGraph_features_json(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
     }
-    
+
     /** Fingerprint (hex string) for `preset` ("structural" | "functional" |
     *"exact"; empty defaults to "structural").
     */
@@ -140,7 +140,7 @@ class RedstoneGraph internal constructor (
         try {
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {
-                
+
                 val returnString = DW.writeToString(write)
                 return returnString.ok()
             } else {
@@ -150,7 +150,7 @@ class RedstoneGraph internal constructor (
             presetSliceMemory.close()
         }
     }
-    
+
     /** Serialize the whole graph to JSON.
     */
     fun toJson(): Result<String> {
@@ -158,7 +158,7 @@ class RedstoneGraph internal constructor (
         val returnVal = lib.RedstoneGraph_to_json(handle, write);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
-            
+
             val returnString = DW.writeToString(write)
             return returnString.ok()
         } else {

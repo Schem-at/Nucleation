@@ -40,7 +40,7 @@ class Geo internal constructor (
         internal val libClass: Class<GeoLib> = GeoLib::class.java
         internal val lib: GeoLib = Native.load("nucleation", libClass)
         @JvmStatic
-        
+
         /** Extrude building footprints into a massed schematic. `buildings_json`
         *is a JSON array of objects:
         *`{"polygon": [[x, z], ...], "height": <blocks>, "block": "minecraft:...",
@@ -53,13 +53,13 @@ class Geo internal constructor (
             val buildingsJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(buildingsJson)
             val baseBlockSliceMemory = PrimitiveArrayTools.borrowUtf8(baseBlock)
             val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
-            
+
             val returnVal = lib.Geo_extrude_footprints(buildingsJsonSliceMemory.slice, baseBlockSliceMemory.slice, nameSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = Schematic(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
@@ -72,7 +72,7 @@ class Geo internal constructor (
             }
         }
         @JvmStatic
-        
+
         /** Raise terrain from a heightmap. `heights_json` is a flat row-major
         *JSON array of per-column heights (blocks); `width` is columns per row.
         *`surface_blocks_json` is a JSON array of block names — one entry (the
@@ -87,13 +87,13 @@ class Geo internal constructor (
             val surfaceBlocksJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(surfaceBlocksJson)
             val subsurfaceBlockSliceMemory = PrimitiveArrayTools.borrowUtf8(subsurfaceBlock)
             val nameSliceMemory = PrimitiveArrayTools.borrowUtf8(name)
-            
+
             val returnVal = lib.Geo_heightmap_terrain(heightsJsonSliceMemory.slice, width, surfaceBlocksJsonSliceMemory.slice, subsurfaceBlockSliceMemory.slice, surfaceDepth, nameSliceMemory.slice);
             try {
                 val nativeOkVal = returnVal.getNativeOk();
                 if (nativeOkVal != null) {
                     val selfEdges: List<Any> = listOf()
-                    val handle = nativeOkVal 
+                    val handle = nativeOkVal
                     val returnOpaque = Schematic(handle, selfEdges, true)
                     return returnOpaque.ok()
                 } else {
