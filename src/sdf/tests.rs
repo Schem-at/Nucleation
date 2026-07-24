@@ -706,6 +706,27 @@ fn cut_hollow_sphere_is_a_thin_open_shell_of_the_cap() {
 }
 
 #[test]
+fn new_iq_primitives_round_trip_through_json() {
+    let cases = [
+        r#"{"type":"roundCone","a":[0,0,0],"b":[0,10,0],"r1":3.0,"r2":1.0}"#,
+        r#"{"type":"solidAngle","radius":5.0,"angle":45.0}"#,
+        r#"{"type":"cutSphere","radius":5.0,"height":2.0}"#,
+        r#"{"type":"cutHollowSphere","radius":5.0,"height":2.0,"thickness":0.3}"#,
+    ];
+    for json in cases {
+        let n = SdfNode::from_json(json).unwrap_or_else(|e| panic!("{json}: {e}"));
+        let re = SdfNode::from_json(&n.to_json().unwrap()).unwrap();
+        for &(x, y, z) in &[(0.0, 0.0, 0.0), (2.0, 3.0, -1.0), (10.0, -4.0, 6.0)] {
+            assert_eq!(
+                n.eval(x, y, z).to_bits(),
+                re.eval(x, y, z).to_bits(),
+                "{json} mismatch at ({x},{y},{z})"
+            );
+        }
+    }
+}
+
+#[test]
 fn cells_distance_modes_are_nonnegative() {
     for mode in ["f1", "f2", "f2MinusF1"] {
         let json = format!(r#"{{"type":"cells","frequency":0.12,"seed":9,"mode":"{mode}"}}"#);
