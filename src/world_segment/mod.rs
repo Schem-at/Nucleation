@@ -36,4 +36,4 @@ pub use score::{score, ScoreConfig, Scored, Signal, Tier};
 pub use provenance::{Provenance, StableBuildId};
 pub use materialize::{materialize, MaterializeCtx};
 pub use identity::{bbox_iou, match_snapshots, Outcome, PriorBuild, SnapshotMatch};
-pub use runner::{MaterializedBuild, SegmentJob, WorldSegmenter};
+pub use runner::{MaterializedBuild, RunStats, SegmentJob, WorldSegmenter};

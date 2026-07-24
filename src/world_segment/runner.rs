@@ -19,7 +19,7 @@ use crate::world_segment::materialize::{materialize, MaterializeCtx};
 use crate::world_segment::partition::PartitionIndex;
 use crate::world_segment::profile::WorldProfile;
 use crate::world_segment::provenance::Provenance;
-use crate::world_segment::score::{score, ScoreConfig};
+use crate::world_segment::score::{score, ScoreConfig, Tier};
 use crate::world_segment::segment::{segment_tile_membership, SegConfig};
 use crate::world_segment::source::TileSource;
 use crate::world_segment::stitch::StitchState;
@@ -47,6 +47,19 @@ pub struct MaterializedBuild {
     pub provenance: Provenance,
 }
 
+/// Aggregate counters produced by a run, without holding every materialized
+/// build in memory at once. Populated identically by `run` and
+/// `run_streaming` (the former simply also collects the builds).
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct RunStats {
+    pub builds: u64,
+    pub tier_confident: u64,
+    pub tier_probable: u64,
+    pub tier_debris: u64,
+    pub cross_tile: u64,
+    pub largest_block_count: u64,
+}
+
 /// Single-process pipeline runner: streams every tile from `source` through
 /// segmentation, stitches the results into whole builds, scores and
 /// identity-matches them, and materializes each into a schematic.
@@ -60,6 +73,24 @@ impl WorldSegmenter {
         job: &SegmentJob,
         prior: &[PriorBuild],
     ) -> Vec<MaterializedBuild> {
+        let mut out = Vec::new();
+        Self::run_streaming(source, profile, partitions, job, prior, &mut |mb| out.push(mb));
+        out
+    }
+
+    /// Same pipeline as [`Self::run`], but emits each build to `emit` and
+    /// drops it immediately after, instead of accumulating a `Vec` — so a
+    /// whole-world run doesn't hold every output schematic in memory at
+    /// once. Builds are still emitted in the same deterministic order `run`
+    /// returns them in (sorted by stable build id).
+    pub fn run_streaming(
+        source: &dyn TileSource,
+        profile: &WorldProfile,
+        partitions: &PartitionIndex,
+        job: &SegmentJob,
+        prior: &[PriorBuild],
+        emit: &mut dyn FnMut(MaterializedBuild),
+    ) -> RunStats {
         let mut stitch = StitchState::empty();
         // Every surviving (non-substrate, non-dropped-cluster) block, grouped
         // by the per-tile ClusterId it belonged to before stitching. A build's
@@ -101,8 +132,17 @@ impl WorldSegmenter {
         let config_hash = job.config.config_hash(profile, partitions);
         let profile_hash = profile.profile_hash();
 
-        let mut out: Vec<MaterializedBuild> = Vec::with_capacity(builds.len());
-        for build in &builds {
+        // Sort builds by stable id up front so they're emitted in the same
+        // deterministic order `run` used to return them in.
+        let mut ordered_builds: Vec<&crate::world_segment::stitch::Build> = builds.iter().collect();
+        ordered_builds.sort_by_key(|build| {
+            *stable_by_build
+                .get(&build.id)
+                .expect("match_snapshots returns exactly one match per current build")
+        });
+
+        let mut stats = RunStats::default();
+        for build in ordered_builds {
             // Union the blocks of every cluster this build absorbed.
             let mut blocks: BTreeMap<(i32, i32, i32), BlockState> = BTreeMap::new();
             for cid in &build.cluster_ids {
@@ -127,11 +167,22 @@ impl WorldSegmenter {
             };
             let (schematic, provenance) =
                 materialize(build, &blocks, scored.tier, stable_id, &ctx);
-            out.push(MaterializedBuild { schematic, provenance });
+
+            stats.builds += 1;
+            match scored.tier {
+                Tier::Confident => stats.tier_confident += 1,
+                Tier::Probable => stats.tier_probable += 1,
+                Tier::Debris => stats.tier_debris += 1,
+            }
+            if build.cluster_ids.len() > 1 {
+                stats.cross_tile += 1;
+            }
+            stats.largest_block_count = stats.largest_block_count.max(build.block_count);
+
+            emit(MaterializedBuild { schematic, provenance });
         }
 
-        out.sort_by_key(|b| b.provenance.stable_build_id);
-        out
+        stats
     }
 }
 
@@ -182,6 +233,64 @@ mod tests {
             ["minecraft:stone"].iter().map(|s| s.to_string()).collect(),
             (-64, -50),
         )
+    }
+
+    #[test]
+    fn run_streaming_emits_each_build_and_counts_stats() {
+        let mut blocks: Vec<((i32, i32, i32), BlockState)> = Vec::new();
+        // Flat stone substrate slab, 16x16, at y = -60 (inside the profile's band).
+        for x in 0..16 {
+            for z in 0..16 {
+                blocks.push(((x, -60, z), BlockState::new("minecraft:stone")));
+            }
+        }
+        // One small artificial build, standing on the slab: a redstone wire next
+        // to a repeater, one block apart, forming a single cluster.
+        blocks.push(((5, -59, 5), BlockState::new("minecraft:redstone_wire")));
+        blocks.push(((6, -59, 5), BlockState::new("minecraft:repeater")));
+        // A 1-block debris speck, far from the build, on the substrate.
+        blocks.push(((14, -59, 14), BlockState::new("minecraft:redstone_wire")));
+
+        let source = MemSource {
+            id: TileId { x: 0, z: 0 },
+            bounds: TileBounds { min: (0, -64, 0), max: (15, 63, 15) },
+            blocks,
+        };
+
+        let profile = profile();
+        let partitions = PartitionIndex::new(vec![]);
+        let job = SegmentJob {
+            config: SegConfig::default(),
+            score_config: ScoreConfig::default(),
+            source_id: "src".to_string(),
+            snapshot_id: "snap1".to_string(),
+            min_y: -64,
+            max_y: 63,
+            extracted_at: 1_700_000_000,
+            match_iou: 0.5,
+        };
+
+        let mut emitted: Vec<MaterializedBuild> = Vec::new();
+        let stats = WorldSegmenter::run_streaming(
+            &source,
+            &profile,
+            &partitions,
+            &job,
+            &[],
+            &mut |mb| emitted.push(mb),
+        );
+
+        assert_eq!(stats.builds, emitted.len() as u64);
+        assert!(stats.tier_debris >= 1, "the speck should be scored as debris");
+
+        let expected = WorldSegmenter::run(&source, &profile, &partitions, &job, &[]);
+        let mut expected_provenance: Vec<Provenance> =
+            expected.into_iter().map(|mb| mb.provenance).collect();
+        let mut emitted_provenance: Vec<Provenance> =
+            emitted.into_iter().map(|mb| mb.provenance).collect();
+        expected_provenance.sort_by_key(|p| p.stable_build_id);
+        emitted_provenance.sort_by_key(|p| p.stable_build_id);
+        assert_eq!(emitted_provenance, expected_provenance);
     }
 
     #[test]
