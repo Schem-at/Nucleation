@@ -526,6 +526,28 @@ pub mod ffi {
             }))
         }
 
+        /// Twists this graph about the Y axis by `amount` radians per unit
+        /// Y (IQ's `opTwist`). *Distorted*: not guaranteed exact even when
+        /// `self` is.
+        pub fn twist(&self, amount: f32) -> Result<Box<Sdf>, NucleationError> {
+            finite(&[amount])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::Twist {
+                child: Box::new(self.0.clone()),
+                amount,
+            })))
+        }
+
+        /// Cheaply bends this graph by `amount` radians per unit X (IQ's
+        /// `opCheapBend`). *Distorted*: not guaranteed exact even when
+        /// `self` is.
+        pub fn bend(&self, amount: f32) -> Result<Box<Sdf>, NucleationError> {
+            finite(&[amount])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::Bend {
+                child: Box::new(self.0.clone()),
+                amount,
+            })))
+        }
+
         pub fn repeat_infinite(
             &self,
             spacing_x: f32,
@@ -1416,6 +1438,36 @@ mod tests {
         assert!((bounds.max_x - 4.0).abs() < 1e-5);
         assert!((bounds.max_y - 1.0).abs() < 1e-5);
         assert!((elongated.eval_at(4.0, 0.0, 0.0)).abs() < 1e-4);
+    }
+
+    #[test]
+    fn twist_validates_finite_amount_and_preserves_y_bounds() {
+        let box_shape = Sdf::box_shape(1.0, 5.0, 1.0, 0.0).unwrap();
+        assert!(box_shape.twist(0.5).is_ok());
+        assert!(box_shape.twist(f32::NAN).is_err());
+        assert!(box_shape.twist(f32::INFINITY).is_err());
+
+        let twisted = box_shape.twist(0.5).unwrap();
+        let bounds = twisted.bounds().unwrap();
+        assert!((bounds.min_y + 5.0).abs() < 1e-5);
+        assert!((bounds.max_y - 5.0).abs() < 1e-5);
+        // Untwisted at the origin: deep inside the box, by its smallest half-extent.
+        assert!((twisted.eval_at(0.0, 0.0, 0.0) + 1.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn bend_validates_finite_amount_and_preserves_z_bounds() {
+        let box_shape = Sdf::box_shape(5.0, 1.0, 1.0, 0.0).unwrap();
+        assert!(box_shape.bend(0.5).is_ok());
+        assert!(box_shape.bend(f32::NAN).is_err());
+        assert!(box_shape.bend(f32::INFINITY).is_err());
+
+        let bent = box_shape.bend(0.5).unwrap();
+        let bounds = bent.bounds().unwrap();
+        assert!((bounds.min_z + 1.0).abs() < 1e-5);
+        assert!((bounds.max_z - 1.0).abs() < 1e-5);
+        // Unbent at the origin: deep inside the box, by its smallest half-extent.
+        assert!((bent.eval_at(0.0, 0.0, 0.0) + 1.0).abs() < 1e-4);
     }
 
     use super::ffi::{

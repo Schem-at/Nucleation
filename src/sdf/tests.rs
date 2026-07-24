@@ -856,6 +856,78 @@ fn elongate_bounds_grow_componentwise() {
 }
 
 #[test]
+fn twist_preserves_y_range_and_rotates_off_axis_points() {
+    let box_node = SdfNode::Box {
+        half_extents: [1.0, 5.0, 1.0],
+        rounding: 0.0,
+    };
+    let twisted = SdfNode::Twist {
+        child: Box::new(box_node.clone()),
+        amount: std::f32::consts::FRAC_PI_2,
+    };
+    // On the Y axis, twisting has no effect (rotation fixes the origin of XZ).
+    assert!((twisted.eval(0.0, 0.0, 0.0) - box_node.eval(0.0, 0.0, 0.0)).abs() < 1e-4);
+    // At y=1, a 90-degree-per-unit twist rotates the sample point 90 degrees;
+    // evaluating the untwisted box at the rotated coordinates matches.
+    let d_twisted = twisted.eval(1.0, 1.0, 0.0);
+    let d_expected = box_node.eval(0.0, 1.0, 1.0);
+    assert!((d_twisted - d_expected).abs() < 1e-4);
+}
+
+#[test]
+fn twist_bounds_preserve_y_and_grow_radially() {
+    let child = SdfNode::Box {
+        half_extents: [1.0, 5.0, 1.0],
+        rounding: 0.0,
+    };
+    let twisted = SdfNode::Twist {
+        child: Box::new(child),
+        amount: 0.5,
+    };
+    let b = twisted.bounds().unwrap();
+    assert!((b.min[1] + 5.0).abs() < 1e-5);
+    assert!((b.max[1] - 5.0).abs() < 1e-5);
+    let expected_r = (2.0f32).sqrt();
+    assert!((b.max[0] - expected_r).abs() < 1e-4);
+    assert!((b.max[2] - expected_r).abs() < 1e-4);
+}
+
+#[test]
+fn bend_preserves_z_range_and_rotates_off_axis_points() {
+    let box_node = SdfNode::Box {
+        half_extents: [5.0, 1.0, 1.0],
+        rounding: 0.0,
+    };
+    let bent = SdfNode::Bend {
+        child: Box::new(box_node.clone()),
+        amount: std::f32::consts::FRAC_PI_2,
+    };
+    assert!((bent.eval(0.0, 0.0, 0.0) - box_node.eval(0.0, 0.0, 0.0)).abs() < 1e-4);
+    // A 90-degree-per-unit bend rotates the sample point at x=1 by 90 degrees.
+    let d_bent = bent.eval(1.0, 0.0, 0.0);
+    let d_expected = box_node.eval(0.0, 1.0, 0.0);
+    assert!((d_bent - d_expected).abs() < 1e-4);
+}
+
+#[test]
+fn bend_bounds_preserve_z_and_grow_radially() {
+    let child = SdfNode::Box {
+        half_extents: [5.0, 1.0, 1.0],
+        rounding: 0.0,
+    };
+    let bent = SdfNode::Bend {
+        child: Box::new(child),
+        amount: 0.5,
+    };
+    let b = bent.bounds().unwrap();
+    assert!((b.min[2] + 1.0).abs() < 1e-5);
+    assert!((b.max[2] - 1.0).abs() < 1e-5);
+    let expected_r = (26.0f32).sqrt();
+    assert!((b.max[0] - expected_r).abs() < 1e-4);
+    assert!((b.max[1] - expected_r).abs() < 1e-4);
+}
+
+#[test]
 fn new_iq_primitives_round_trip_through_json() {
     let cases = [
         r#"{"type":"roundCone","a":[0,0,0],"b":[0,10,0],"r1":3.0,"r2":1.0}"#,

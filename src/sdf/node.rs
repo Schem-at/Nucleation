@@ -315,6 +315,21 @@ pub enum SdfNode {
         #[serde(default)]
         count: Option<[u32; 3]>,
     },
+    /// Twists the child about the Y axis (IQ's `opTwist`): rotates the XZ
+    /// plane by `amount` radians per unit Y before evaluating the child. Y
+    /// itself is unchanged. *Distorted*: not guaranteed exact even when the
+    /// child is.
+    Twist {
+        child: Box<SdfNode>,
+        amount: f32,
+    },
+    /// Cheaply bends the child (IQ's `opCheapBend`): rotates the XY plane by
+    /// `amount` radians per unit X before evaluating the child. Z itself is
+    /// unchanged. *Distorted*: not guaranteed exact even when the child is.
+    Bend {
+        child: Box<SdfNode>,
+        amount: f32,
+    },
 
     // ── Noise ──────────────────────────────────────────────────────────────
     /// Adds seeded FBM value noise to the child's distance (surface displacement).
@@ -1213,6 +1228,20 @@ impl SdfNode {
                 )
             }
 
+            SdfNode::Twist { child, amount } => {
+                let (s, c) = (amount * y).sin_cos();
+                let qx = c * x - s * z;
+                let qz = s * x + c * z;
+                child.eval(qx, y, qz)
+            }
+
+            SdfNode::Bend { child, amount } => {
+                let (s, c) = (amount * x).sin_cos();
+                let qx = c * x - s * y;
+                let qy = s * x + c * y;
+                child.eval(qx, qy, z)
+            }
+
             SdfNode::Displace {
                 child,
                 amplitude,
@@ -1541,6 +1570,32 @@ impl SdfNode {
                         }
                     }
                 }
+            }
+            SdfNode::Twist { child, .. } => {
+                let b = child.bounds()?;
+                let mut max_r: f32 = 0.0;
+                for &xx in &[b.min[0], b.max[0]] {
+                    for &zz in &[b.min[2], b.max[2]] {
+                        max_r = max_r.max(len2(xx, zz));
+                    }
+                }
+                Some(Aabb {
+                    min: [-max_r, b.min[1], -max_r],
+                    max: [max_r, b.max[1], max_r],
+                })
+            }
+            SdfNode::Bend { child, .. } => {
+                let b = child.bounds()?;
+                let mut max_r: f32 = 0.0;
+                for &xx in &[b.min[0], b.max[0]] {
+                    for &yy in &[b.min[1], b.max[1]] {
+                        max_r = max_r.max(len2(xx, yy));
+                    }
+                }
+                Some(Aabb {
+                    min: [-max_r, -max_r, b.min[2]],
+                    max: [max_r, max_r, b.max[2]],
+                })
             }
             SdfNode::Displace {
                 child, amplitude, ..
