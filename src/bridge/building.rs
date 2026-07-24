@@ -28,12 +28,56 @@ pub mod ffi {
         }
     }
 
+    /// A sampled 3D polyline. Closed curves include the final segment back to
+    /// the first point and retain arc-length parameterisation for animation.
+    /// Oversized point sets and overflowing segment lengths are rejected.
+    #[diplomat::opaque]
+    pub struct Curve3D(pub(crate) crate::building::Curve3D);
+
+    impl Curve3D {
+        /// Create a curve from flat `[x0, y0, z0, x1, y1, z1, …]` coordinates.
+        pub fn from_points(
+            coordinates: &[f64],
+            closed: bool,
+        ) -> Result<Box<Curve3D>, NucleationError> {
+            if coordinates.len() % 3 != 0 {
+                return Err(NucleationError::InvalidArgument);
+            }
+            if coordinates.len() / 3 > crate::building::Curve3D::MAX_POINTS {
+                return Err(NucleationError::InvalidArgument);
+            }
+            let points = coordinates
+                .chunks_exact(3)
+                .map(|point| (point[0], point[1], point[2]))
+                .collect();
+            crate::building::Curve3D::new(points, closed)
+                .map(|curve| Box::new(Curve3D(curve)))
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        pub fn point_count(&self) -> u32 {
+            self.0.points().len() as u32
+        }
+
+        pub fn is_closed(&self) -> bool {
+            self.0.is_closed()
+        }
+    }
+
     /// A solid region of blocks: primitives (sphere, cuboid, …) and boolean
     /// combinations thereof. Wraps `ShapeEnum`.
     #[diplomat::opaque]
     pub struct Shape(pub(crate) crate::building::ShapeEnum);
 
     impl Shape {
+        /// Thicken a sampled 3D curve into a parametric tube with the given radius.
+        /// Inputs outside voxel-coordinate or bounded-work limits are rejected.
+        pub fn tube_along(curve: &Curve3D, radius: f64) -> Result<Box<Shape>, NucleationError> {
+            crate::building::TubePath::new(curve.0.clone(), radius)
+                .map(|tube| Box::new(Shape(crate::building::ShapeEnum::TubePath(tube))))
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
         /// Sphere centered at (`cx`, `cy`, `cz`) (truncated to block coordinates,
         /// matching the old `shape_sphere`).
         pub fn sphere(cx: f32, cy: f32, cz: f32, radius: f32) -> Box<Shape> {
@@ -68,8 +112,8 @@ pub mod ffi {
             y_min: i32,
             y_max: i32,
         ) -> Result<Box<Shape>, NucleationError> {
-            let json = std::str::from_utf8(polygon_json)
-                .map_err(|_| NucleationError::InvalidArgument)?;
+            let json =
+                std::str::from_utf8(polygon_json).map_err(|_| NucleationError::InvalidArgument)?;
             let verts: Vec<(f64, f64)> =
                 serde_json::from_str(json).map_err(|_| NucleationError::Parse)?;
             if verts.len() < 3 {
@@ -320,8 +364,7 @@ pub mod ffi {
         pub fn sdf(sdf_json: &DiplomatStr) -> Result<Box<Shape>, NucleationError> {
             let json =
                 std::str::from_utf8(sdf_json).map_err(|_| NucleationError::InvalidArgument)?;
-            let node =
-                crate::sdf::SdfNode::from_json(json).map_err(|_| NucleationError::Parse)?;
+            let node = crate::sdf::SdfNode::from_json(json).map_err(|_| NucleationError::Parse)?;
             let shape =
                 crate::building::SdfShape::new(node).ok_or(NucleationError::InvalidArgument)?;
             Ok(Box::new(Shape(crate::building::ShapeEnum::Sdf(shape))))
@@ -341,8 +384,7 @@ pub mod ffi {
         ) -> Result<Box<Shape>, NucleationError> {
             let json =
                 std::str::from_utf8(sdf_json).map_err(|_| NucleationError::InvalidArgument)?;
-            let node =
-                crate::sdf::SdfNode::from_json(json).map_err(|_| NucleationError::Parse)?;
+            let node = crate::sdf::SdfNode::from_json(json).map_err(|_| NucleationError::Parse)?;
             let shape = crate::building::SdfShape::with_bounds(
                 node,
                 (min_x, min_y, min_z),
@@ -520,7 +562,9 @@ pub mod ffi {
             if self.0.is_empty() {
                 return Err(NucleationError::NotFound);
             }
-            let ids = self.0.gradient_ids((r1, g1, b1), (r2, g2, b2), steps as usize);
+            let ids = self
+                .0
+                .gradient_ids((r1, g1, b1), (r2, g2, b2), steps as usize);
             let _ = write!(out, "{}", serde_json::to_string(&ids).unwrap_or_default());
             Ok(())
         }
@@ -584,7 +628,10 @@ pub mod ffi {
             out: &mut DiplomatWrite,
         ) -> Result<(), NucleationError> {
             let target = crate::blockpedia::ExtendedColorData::from_rgb(r, g, b);
-            let id = self.0.find_closest(&target).ok_or(NucleationError::NotFound)?;
+            let id = self
+                .0
+                .find_closest(&target)
+                .ok_or(NucleationError::NotFound)?;
             let _ = write!(out, "{}", id);
             Ok(())
         }

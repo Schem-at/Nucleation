@@ -11,6 +11,7 @@
 #include <functional>
 #include <optional>
 #include <cstdlib>
+#include "NucleationError.hpp"
 #include "diplomat_runtime.hpp"
 
 
@@ -30,9 +31,21 @@ namespace capi {
 
     void RenderConfig_set_fov(nucleation::capi::RenderConfig* self, float fov);
 
+    typedef struct RenderConfig_set_directional_light_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} RenderConfig_set_directional_light_result;
+    RenderConfig_set_directional_light_result RenderConfig_set_directional_light(nucleation::capi::RenderConfig* self, float x, float y, float z, float intensity);
+
+    typedef struct RenderConfig_set_ambient_light_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} RenderConfig_set_ambient_light_result;
+    RenderConfig_set_ambient_light_result RenderConfig_set_ambient_light(nucleation::capi::RenderConfig* self, float ambient);
+
     void RenderConfig_set_background(nucleation::capi::RenderConfig* self, float r, float g, float b, float a);
 
     void RenderConfig_clear_background(nucleation::capi::RenderConfig* self);
+
+    void RenderConfig_set_grid(nucleation::capi::RenderConfig* self, int32_t half_extent, int32_t spacing, float plane_y, bool show_axes, float red, float green, float blue, float alpha);
+
+    void RenderConfig_set_fitted_grid(nucleation::capi::RenderConfig* self, int32_t margin, int32_t spacing, float plane_y, bool show_axes, float red, float green, float blue, float alpha);
+
+    void RenderConfig_clear_grid(nucleation::capi::RenderConfig* self);
 
     void RenderConfig_set_orthographic(nucleation::capi::RenderConfig* self, bool orthographic);
 
@@ -75,6 +88,21 @@ inline void nucleation::RenderConfig::set_fov(float fov) {
         fov);
 }
 
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::RenderConfig::set_directional_light(float x, float y, float z, float intensity) {
+    auto result = nucleation::capi::RenderConfig_set_directional_light(this->AsFFI(),
+        x,
+        y,
+        z,
+        intensity);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::RenderConfig::set_ambient_light(float ambient) {
+    auto result = nucleation::capi::RenderConfig_set_ambient_light(this->AsFFI(),
+        ambient);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
 inline void nucleation::RenderConfig::set_background(float r, float g, float b, float a) {
     nucleation::capi::RenderConfig_set_background(this->AsFFI(),
         r,
@@ -85,6 +113,34 @@ inline void nucleation::RenderConfig::set_background(float r, float g, float b, 
 
 inline void nucleation::RenderConfig::clear_background() {
     nucleation::capi::RenderConfig_clear_background(this->AsFFI());
+}
+
+inline void nucleation::RenderConfig::set_grid(int32_t half_extent, int32_t spacing, float plane_y, bool show_axes, float red, float green, float blue, float alpha) {
+    nucleation::capi::RenderConfig_set_grid(this->AsFFI(),
+        half_extent,
+        spacing,
+        plane_y,
+        show_axes,
+        red,
+        green,
+        blue,
+        alpha);
+}
+
+inline void nucleation::RenderConfig::set_fitted_grid(int32_t margin, int32_t spacing, float plane_y, bool show_axes, float red, float green, float blue, float alpha) {
+    nucleation::capi::RenderConfig_set_fitted_grid(this->AsFFI(),
+        margin,
+        spacing,
+        plane_y,
+        show_axes,
+        red,
+        green,
+        blue,
+        alpha);
+}
+
+inline void nucleation::RenderConfig::clear_grid() {
+    nucleation::capi::RenderConfig_clear_grid(this->AsFFI());
 }
 
 inline void nucleation::RenderConfig::set_orthographic(bool orthographic) {

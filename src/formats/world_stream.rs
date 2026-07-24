@@ -890,7 +890,10 @@ mod from_schematic_tests {
         assert_eq!(view.cx(), 0);
         assert!(view.get_block(0, 4, 0).is_some(), "in-chunk block copied");
         assert!(view.get_block(15, 4, 0).is_some(), "chunk edge copied");
-        assert!(view.get_block(16, 4, 0).is_none(), "next chunk's block not copied");
+        assert!(
+            view.get_block(16, 4, 0).is_none(),
+            "next chunk's block not copied"
+        );
         assert!(view.get_block(31, 4, 0).is_none(), "far block not copied");
     }
 }

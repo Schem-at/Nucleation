@@ -1,8 +1,9 @@
 # The Nucleation Gallery
 
-Ten builds that show what composes. Every one is a real recipe in
-[`tools/readme-media/generate.py`](../tools/readme-media/generate.py), rendered
-by nucleation itself, and small enough to read in a sitting. Back to the
+Ten builds that show what composes. The static recipes live in
+[`tools/readme-media/generate.py`](../tools/readme-media/generate.py); the
+animated trefoil has its own public-Python generator. Everything is rendered by
+Nucleation itself and small enough to read in a sitting. Back to the
 [README](../README.md).
 
 Snippets below assume `from nucleation import *`, an empty schematic `s`, and a
@@ -33,23 +34,40 @@ for i in range(260):
 
 ## Trefoil knot
 
-A parametric knot stamped as a fat tube of overlapping spheres, hue running
-along its length so the over-and-under reads at a glance.
+A sampled closed curve thickened into a voxel tube, coloured and partitioned by
+arc length in one Rust-side construction operation. A staggered repeating effect
+then travels across the loop boundary while the camera completes exactly one
+turn per six-second period.
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/gallery-knot.png" width="460" alt="A trefoil knot rendered as a thick rainbow tube of blocks">
+<img src="media/gallery/trefoil.gif" width="460" alt="A seamless animated trefoil knot assembling and dissolving as a rainbow wave travels around it">
 </div>
 
 ```python
-pal = Palette.concrete()
-for i in range(480):
-    t = i / 480 * 2 * math.pi
-    x = 11 * (math.sin(t) + 2 * math.sin(2 * t))
-    y = 11 * (math.cos(t) - 2 * math.cos(2 * t))
-    z = 11 * (-math.sin(3 * t))
-    BuildingTool.fill(s, Shape.sphere(round(x), round(y), round(z), 3),
-                      Brush.solid(pal.closest_block(*hsv(i / 480))))
+points = [component
+          for i in range(520)
+          for component in trefoil(i / 520)]
+curve = Curve3D.from_points(points, closed=True)
+shape = Shape.tube_along(curve, radius=2.85)
+
+stops = [i / 12 for i in range(13)]
+colors = [component for t in stops for component in hsv(1 - t)]
+brush = Brush.curve_gradient(stops, colors, InterpolationSpace.Oklab)
+brush.set_palette(full_block_palette())
+
+animation = BuildAnimation.create("trefoil")
+animation.fill_along_parameter(shape, brush, group_count=90)
+animation.set_default_effect(looping_wave(duration_ms=6_000))
+animation.set_stagger_total_ms(2_400)
+animation.set_stagger_offset_ms(-6_000)  # wave crosses the capture boundary
+animation.set_loop_period_ms(6_000)      # samples [0, period), no duplicate frame
+camera = AnimationEffect.turntable(6_000)
+camera.set_repeat_forever()
+animation.animate_camera(camera, 0)
 ```
+
+[Complete Python generator](../examples/gallery/trefoil/generate.py) ·
+[Download the generated schematic](downloads/gallery/trefoil.schem)
 
 ## Menger sponge
 

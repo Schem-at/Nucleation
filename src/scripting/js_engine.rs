@@ -127,16 +127,16 @@ impl JsSchematic {
         self.inner.flip_z();
     }
 
-    pub fn rotate_x(&mut self, degrees: i32) {
-        self.inner.rotate_x(degrees);
+    pub fn rotate_x(&mut self, degrees: i32) -> rquickjs::Result<()> {
+        self.inner.rotate_x(degrees).map_err(|e| make_js_err(&e))
     }
 
-    pub fn rotate_y(&mut self, degrees: i32) {
-        self.inner.rotate_y(degrees);
+    pub fn rotate_y(&mut self, degrees: i32) -> rquickjs::Result<()> {
+        self.inner.rotate_y(degrees).map_err(|e| make_js_err(&e))
     }
 
-    pub fn rotate_z(&mut self, degrees: i32) {
-        self.inner.rotate_z(degrees);
+    pub fn rotate_z(&mut self, degrees: i32) -> rquickjs::Result<()> {
+        self.inner.rotate_z(degrees).map_err(|e| make_js_err(&e))
     }
 
     // -- Export --
@@ -209,9 +209,7 @@ fn setup_js(ctx: &Ctx<'_>) -> JsResult<()> {
         "palette_gradient_ids",
         Function::new(
             ctx.clone(),
-            |name: String,
-             args: rquickjs::function::Rest<i32>|
-             -> rquickjs::Result<Vec<String>> {
+            |name: String, args: rquickjs::function::Rest<i32>| -> rquickjs::Result<Vec<String>> {
                 let a = &args.0;
                 if a.len() != 7 {
                     return Err(make_js_err(
@@ -221,8 +219,8 @@ fn setup_js(ctx: &Ctx<'_>) -> JsResult<()> {
                 let channel = |v: i32| -> rquickjs::Result<u8> {
                     u8::try_from(v).map_err(|_| make_js_err("color channels must be 0-255"))
                 };
-                let steps = usize::try_from(a[6])
-                    .map_err(|_| make_js_err("steps must be non-negative"))?;
+                let steps =
+                    usize::try_from(a[6]).map_err(|_| make_js_err("steps must be non-negative"))?;
                 crate::scripting::shared::palette_gradient_ids(
                     &name,
                     (channel(a[0])?, channel(a[1])?, channel(a[2])?),

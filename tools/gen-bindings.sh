@@ -37,4 +37,8 @@ rm -rf bindings/c bindings/cpp bindings/js bindings/kotlin/src bindings/python/s
 "$DT" nanobind bindings/python/src -e "$ENTRY" -s --config-file tools/bindgen/nanobind.toml
 "$DT" php     bindings/php     -e "$ENTRY" -s --config-file tools/bindgen/php.toml
 
+# Diplomat deliberately emits the same low-level surface for every language.
+# Reapply the small, Python-only ergonomic compatibility layer after generation.
+python3 tools/patch-python-bindings.py
+
 echo "bindings regenerated from $ENTRY"

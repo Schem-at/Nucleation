@@ -149,9 +149,25 @@ impl UniversalSchematic {
     }
 
     pub fn set_block_str(&mut self, x: i32, y: i32, z: i32, block_name: &str) -> bool {
-        // Check if string contains properties (bracket notation) or NBT data (braces)
-        if block_name.contains('[') || block_name.ends_with('}') {
-            self.set_block_from_string(x, y, z, block_name).unwrap()
+        self.try_set_block_str(x, y, z, block_name).unwrap_or(false)
+    }
+
+    /// Fallible string-based block placement for language adapters and callers
+    /// that need parser errors instead of the boolean convenience fallback.
+    pub fn try_set_block_str(
+        &mut self,
+        x: i32,
+        y: i32,
+        z: i32,
+        block_name: &str,
+    ) -> Result<bool, String> {
+        // Any delimiter routes through the strict parser, including unmatched
+        // closing delimiters that must fail instead of becoming part of an id.
+        if block_name
+            .chars()
+            .any(|c| matches!(c, '[' | ']' | '{' | '}'))
+        {
+            self.set_block_from_string(x, y, z, block_name)
         } else {
             let block_state = match self.block_state_cache.get(block_name) {
                 Some(cached) => cached.clone(),
@@ -163,7 +179,11 @@ impl UniversalSchematic {
                 }
             };
 
-            self.set_block(x, y, z, &block_state)
+            let placed = self.set_block(x, y, z, &block_state);
+            if placed {
+                self.remove_block_entity((x, y, z));
+            }
+            Ok(placed)
         }
     }
 
@@ -176,12 +196,19 @@ impl UniversalSchematic {
         block: &BlockState,
     ) -> bool {
         if region_name == self.default_region_name {
+            if self.default_region.size == (1, 1, 1) && self.default_region.is_empty() {
+                self.default_region =
+                    Region::new(self.default_region_name.clone(), (x, y, z), (1, 1, 1));
+            }
             self.default_region.set_block(x, y, z, block)
         } else {
             let region = self
                 .other_regions
                 .entry(region_name.to_string())
                 .or_insert_with(|| Region::new(region_name.to_string(), (x, y, z), (1, 1, 1)));
+            if region.size == (1, 1, 1) && region.is_empty() {
+                *region = Region::new(region_name.to_string(), (x, y, z), (1, 1, 1));
+            }
             region.set_block(x, y, z, block)
         }
     }
@@ -217,6 +244,36 @@ impl UniversalSchematic {
             .unwrap_or_default()
     }
 
+    pub fn try_set_block_in_region_str(
+        &mut self,
+        region_name: &str,
+        x: i32,
+        y: i32,
+        z: i32,
+        block_name: &str,
+    ) -> Result<bool, String> {
+        if region_name.is_empty() {
+            return Err("Region name cannot be empty".to_string());
+        }
+
+        let (block_state, nbt) = self.parse_block_string_cached(block_name)?;
+        if !self.set_block_in_region(region_name, x, y, z, &block_state) {
+            return Ok(false);
+        }
+
+        self.remove_block_entity_in_region(region_name, (x, y, z));
+        if let Some(nbt) = nbt {
+            let block_entity = BlockEntity {
+                id: block_state.name.to_string(),
+                position: (x, y, z),
+                nbt,
+            };
+            self.set_block_entity_in_region(region_name, BlockPosition { x, y, z }, block_entity);
+        }
+
+        Ok(true)
+    }
+
     pub fn set_block_in_region_str(
         &mut self,
         region_name: &str,
@@ -225,18 +282,8 @@ impl UniversalSchematic {
         z: i32,
         block_name: &str,
     ) -> bool {
-        // Get cached block state
-        let block_state = match self.block_state_cache.get(block_name) {
-            Some(cached) => cached.clone(),
-            None => {
-                let new_block = BlockState::new(block_name.to_string());
-                self.block_state_cache
-                    .insert(block_name.to_string(), new_block.clone());
-                new_block
-            }
-        };
-
-        self.set_block_in_region(region_name, x, y, z, &block_state)
+        self.try_set_block_in_region_str(region_name, x, y, z, block_name)
+            .unwrap_or(false)
     }
 
     pub fn from_layers(
@@ -300,8 +347,8 @@ impl UniversalSchematic {
             return self.default_region.get_block(x, y, z);
         }
 
-        // Check other regions
-        for region in self.other_regions.values() {
+        // Check named regions in stable lexicographic precedence.
+        for region in Self::sorted_named_regions(self) {
             if region.get_bounding_box().contains((x, y, z)) {
                 return region.get_block(x, y, z);
             }
@@ -321,8 +368,8 @@ impl UniversalSchematic {
             }
         }
 
-        // Check other regions
-        for region in self.other_regions.values() {
+        // Check named regions in stable lexicographic precedence.
+        for region in Self::sorted_named_regions(self) {
             if region
                 .get_bounding_box()
                 .contains((position.x, position.y, position.z))
@@ -338,7 +385,7 @@ impl UniversalSchematic {
     pub fn get_block_entities_as_list(&self) -> Vec<BlockEntity> {
         let mut block_entities = Vec::new();
         block_entities.extend(self.default_region.get_block_entities_as_list());
-        for region in self.other_regions.values() {
+        for region in Self::sorted_named_regions(self) {
             block_entities.extend(region.get_block_entities_as_list());
         }
         block_entities
@@ -461,8 +508,8 @@ impl UniversalSchematic {
             blocks.push(default_palette[*block_index].clone());
         }
 
-        // Add blocks from other regions
-        for region in self.other_regions.values() {
+        // Add blocks from named regions in stable order.
+        for region in Self::sorted_named_regions(self) {
             let region_palette = region.get_palette();
             for block_index in &region.blocks {
                 blocks.push(region_palette[*block_index].clone());
@@ -473,7 +520,9 @@ impl UniversalSchematic {
 
     pub fn get_region_names(&self) -> Vec<String> {
         let mut names = vec![self.default_region_name.clone()];
-        names.extend(self.other_regions.keys().cloned());
+        let mut named: Vec<_> = self.other_regions.keys().cloned().collect();
+        named.sort();
+        names.extend(named);
         names
     }
 
@@ -481,7 +530,7 @@ impl UniversalSchematic {
         if index == 0 {
             Some(&self.default_region)
         } else {
-            self.other_regions.values().nth(index - 1)
+            Self::sorted_named_regions(self).get(index - 1).copied()
         }
     }
 
@@ -499,6 +548,57 @@ impl UniversalSchematic {
                 .get(region_name)
                 .and_then(|region| region.get_block(x, y, z))
         }
+    }
+
+    /// Read a block from exactly one region, without composite overlap lookup.
+    pub fn get_block_in_region(
+        &self,
+        region_name: &str,
+        x: i32,
+        y: i32,
+        z: i32,
+    ) -> Option<&BlockState> {
+        self.get_block_from_region(region_name, x, y, z)
+    }
+
+    /// Read a block-state string from exactly one region.
+    pub fn get_block_string_in_region(
+        &self,
+        region_name: &str,
+        x: i32,
+        y: i32,
+        z: i32,
+    ) -> Option<String> {
+        self.get_block_in_region(region_name, x, y, z)
+            .map(ToString::to_string)
+    }
+
+    /// Read a position-aware owned block entity from exactly one region.
+    ///
+    /// Block-entity templates are internally deduplicated, so borrowed template
+    /// positions are not authoritative after transforms. This accessor always
+    /// materializes the queried store coordinate.
+    pub fn get_block_entity_in_region(
+        &self,
+        region_name: &str,
+        x: i32,
+        y: i32,
+        z: i32,
+    ) -> Option<BlockEntity> {
+        let position = BlockPosition { x, y, z };
+        let mut entity = self
+            .get_region(region_name)?
+            .get_block_entity(position)?
+            .clone();
+        entity.position = (x, y, z);
+        Some(entity)
+    }
+
+    /// Position-aware owned counterpart to the historical borrowed accessor.
+    pub fn get_block_entity_owned(&self, position: BlockPosition) -> Option<BlockEntity> {
+        let mut entity = self.get_block_entity(position)?.clone();
+        entity.position = (position.x, position.y, position.z);
+        Some(entity)
     }
 
     pub fn get_dimensions(&self) -> (i32, i32, i32) {
@@ -623,6 +723,58 @@ impl UniversalSchematic {
         } else {
             self.other_regions.remove(name)
         }
+    }
+
+    pub fn has_region(&self, name: &str) -> bool {
+        name == self.default_region_name || self.other_regions.contains_key(name)
+    }
+
+    pub fn create_schematic_region(&mut self, name: &str) -> Result<(), String> {
+        if name.trim().is_empty() {
+            return Err("Region name cannot be empty".to_string());
+        }
+        if self.has_region(name) {
+            return Err(format!("Region '{name}' already exists"));
+        }
+
+        self.other_regions.insert(
+            name.to_string(),
+            Region::new(name.to_string(), (0, 0, 0), (1, 1, 1)),
+        );
+        Ok(())
+    }
+
+    pub fn remove_schematic_region(&mut self, name: &str) -> Result<Region, String> {
+        if name == self.default_region_name {
+            return Err("The default region cannot be removed".to_string());
+        }
+        self.other_regions
+            .remove(name)
+            .ok_or_else(|| format!("Region '{name}' not found"))
+    }
+
+    pub fn rename_schematic_region(
+        &mut self,
+        old_name: &str,
+        new_name: &str,
+    ) -> Result<(), String> {
+        if old_name == self.default_region_name {
+            return Err("The default region cannot be renamed".to_string());
+        }
+        if new_name.trim().is_empty() {
+            return Err("Region name cannot be empty".to_string());
+        }
+        if self.has_region(new_name) {
+            return Err(format!("Region '{new_name}' already exists"));
+        }
+
+        let mut region = self
+            .other_regions
+            .remove(old_name)
+            .ok_or_else(|| format!("Region '{old_name}' not found"))?;
+        region.name = new_name.to_string();
+        self.other_regions.insert(new_name.to_string(), region);
+        Ok(())
     }
 
     pub fn get_region(&self, name: &str) -> Option<&Region> {
@@ -786,12 +938,28 @@ impl UniversalSchematic {
     }
 
     pub fn get_merged_region(&self) -> Region {
-        let mut merged_region = self.default_region.clone();
+        let named_regions = Self::sorted_named_regions(self);
+        let mut merged_region = match named_regions.last() {
+            Some(region) => (*region).clone(),
+            None => return self.default_region.clone(),
+        };
 
-        for region in self.other_regions.values() {
-            merged_region.merge(region);
+        for region in named_regions[..named_regions.len() - 1].iter().rev() {
+            merged_region.merge_with_precedence(region);
         }
-
+        merged_region.merge_with_precedence(&self.default_region);
+        merged_region.name = self.default_region_name.clone();
+        merged_region.entities = self
+            .default_region
+            .entities
+            .iter()
+            .chain(
+                named_regions
+                    .iter()
+                    .flat_map(|region| region.entities.iter()),
+            )
+            .cloned()
+            .collect();
         merged_region
     }
 
@@ -1222,171 +1390,214 @@ impl UniversalSchematic {
         block_counts
     }
 
-    pub fn copy_region(
-        &mut self,
-        from_schematic: &UniversalSchematic,
-        bounds: &BoundingBox,
-        target_position: (i32, i32, i32),
-        excluded_blocks: &[BlockState],
-    ) -> Result<(), String> {
-        let offset = (
-            target_position.0 - bounds.min.0,
-            target_position.1 - bounds.min.1,
-            target_position.2 - bounds.min.2,
-        );
+    fn sorted_named_regions(source: &UniversalSchematic) -> Vec<&Region> {
+        let mut regions: Vec<_> = source.other_regions.iter().collect();
+        regions.sort_by(|(left, _), (right, _)| left.cmp(right));
+        regions.into_iter().map(|(_, region)| region).collect()
+    }
 
-        let air_block = BlockState::new("minecraft:air".to_string());
-
-        // Copy blocks.
-        //
-        // Fast path (single-region source, the common case): translate source
-        // palette indices to target palette indices once, then copy raw
-        // indices. This replaces a per-block BlockState hash + clone with a
-        // per-block Vec lookup. Cells outside the source region are left
-        // untouched, matching the get_block() -> None behavior below.
-        if from_schematic.other_regions.is_empty() {
-            let src = &from_schematic.default_region;
-            let src_bbox = src.get_bounding_box();
-            let min = (
-                bounds.min.0.max(src_bbox.min.0),
-                bounds.min.1.max(src_bbox.min.1),
-                bounds.min.2.max(src_bbox.min.2),
-            );
-            let max = (
-                bounds.max.0.min(src_bbox.max.0),
-                bounds.max.1.min(src_bbox.max.1),
-                bounds.max.2.min(src_bbox.max.2),
-            );
-            if min.0 <= max.0 && min.1 <= max.1 && min.2 <= max.2 {
-                self.ensure_bounds(
-                    (min.0 + offset.0, min.1 + offset.1, min.2 + offset.2),
-                    (max.0 + offset.0, max.1 + offset.1, max.2 + offset.2),
-                );
-                let target = &mut self.default_region;
-                let palette_map: Vec<usize> = src
-                    .palette
-                    .iter()
-                    .map(|block| {
-                        if excluded_blocks.contains(block) {
-                            target.get_or_insert_in_palette(&air_block)
-                        } else {
-                            target.get_or_insert_in_palette(block)
-                        }
-                    })
-                    .collect();
-                for y in min.1..=max.1 {
-                    for z in min.2..=max.2 {
-                        for x in min.0..=max.0 {
-                            let src_index = src.coords_to_index(x, y, z);
-                            let mapped = palette_map[src.blocks[src_index]];
-                            target.set_block_at_index_unchecked(
-                                mapped,
-                                x + offset.0,
-                                y + offset.1,
-                                z + offset.2,
-                            );
-                        }
-                    }
-                }
-            }
-        } else {
-            for x in bounds.min.0..=bounds.max.0 {
-                for y in bounds.min.1..=bounds.max.1 {
-                    for z in bounds.min.2..=bounds.max.2 {
-                        if let Some(block) = from_schematic.get_block(x, y, z) {
-                            let new_x = x + offset.0;
-                            let new_y = y + offset.1;
-                            let new_z = z + offset.2;
-
-                            if excluded_blocks.contains(block) {
-                                // Set air block instead of skipping
-                                self.set_block(new_x, new_y, new_z, &air_block);
-                            } else {
-                                self.set_block(new_x, new_y, new_z, block);
-                            }
-                        }
-                    }
-                }
-            }
+    fn source_region_at<'a>(
+        source: &'a UniversalSchematic,
+        named_regions: &[&'a Region],
+        x: i32,
+        y: i32,
+        z: i32,
+    ) -> Option<&'a Region> {
+        fn contains_visible_content(region: &Region, x: i32, y: i32, z: i32) -> bool {
+            region
+                .get_tight_bounds()
+                .is_some_and(|bounds| bounds.contains((x, y, z)))
         }
 
-        // Rest of the method remains the same...
-        // Copy block entities
-        for x in bounds.min.0..=bounds.max.0 {
-            for y in bounds.min.1..=bounds.max.1 {
-                for z in bounds.min.2..=bounds.max.2 {
-                    let pos = BlockPosition { x, y, z };
-                    if let Some(block_entity) = from_schematic.get_block_entity(pos) {
-                        let mut new_block_entity = block_entity.clone();
-                        new_block_entity.position = (
-                            block_entity.position.0 + offset.0,
-                            block_entity.position.1 + offset.1,
-                            block_entity.position.2 + offset.2,
-                        );
-                        self.set_block_entity(
-                            BlockPosition {
-                                x: x + offset.0,
-                                y: y + offset.1,
-                                z: z + offset.2,
-                            },
-                            new_block_entity,
-                        );
-                    }
-                }
-            }
+        if contains_visible_content(&source.default_region, x, y, z) {
+            return Some(&source.default_region);
         }
+        named_regions
+            .iter()
+            .copied()
+            .find(|region| contains_visible_content(region, x, y, z))
+    }
 
-        // Copy entities that are within the bounds
-        let mut entities_to_copy = Vec::new();
-
-        // Collect entities from default region
-        for entity in &from_schematic.default_region.entities {
-            let entity_pos = (
+    pub(crate) fn region_stamp_bounds(region: &Region) -> Option<BoundingBox> {
+        let mut bounds = region.get_tight_bounds();
+        for entity in &region.entities {
+            let position = (
                 entity.position.0.floor() as i32,
                 entity.position.1.floor() as i32,
                 entity.position.2.floor() as i32,
             );
+            match &mut bounds {
+                Some(bounds) => {
+                    bounds.min.0 = bounds.min.0.min(position.0);
+                    bounds.min.1 = bounds.min.1.min(position.1);
+                    bounds.min.2 = bounds.min.2.min(position.2);
+                    bounds.max.0 = bounds.max.0.max(position.0);
+                    bounds.max.1 = bounds.max.1.max(position.1);
+                    bounds.max.2 = bounds.max.2.max(position.2);
+                }
+                None => bounds = Some(BoundingBox::new(position, position)),
+            }
+        }
+        bounds
+    }
 
-            if bounds.contains(entity_pos) {
-                let mut new_entity = entity.clone();
-                new_entity.position = (
+    fn stamp_offset(bounds: &BoundingBox, target: (i32, i32, i32)) -> (i64, i64, i64) {
+        (
+            target.0 as i64 - bounds.min.0 as i64,
+            target.1 as i64 - bounds.min.1 as i64,
+            target.2 as i64 - bounds.min.2 as i64,
+        )
+    }
+
+    fn stamp_destination(
+        source: (i32, i32, i32),
+        offset: (i64, i64, i64),
+    ) -> Result<(i32, i32, i32), String> {
+        Ok((
+            Self::checked_coord(source.0 as i64 + offset.0)?,
+            Self::checked_coord(source.1 as i64 + offset.1)?,
+            Self::checked_coord(source.2 as i64 + offset.2)?,
+        ))
+    }
+
+    fn stamp_cell_from_region(
+        &mut self,
+        source_region: &Region,
+        source: (i32, i32, i32),
+        destination: (i32, i32, i32),
+        excluded_blocks: &[BlockState],
+    ) {
+        let Some(block) = source_region.get_block(source.0, source.1, source.2) else {
+            return;
+        };
+        if excluded_blocks.contains(block) {
+            return;
+        }
+        let destination = BlockPosition {
+            x: destination.0,
+            y: destination.1,
+            z: destination.2,
+        };
+        self.set_block(destination.x, destination.y, destination.z, block);
+        self.remove_block_entity((destination.x, destination.y, destination.z));
+        let source = BlockPosition {
+            x: source.0,
+            y: source.1,
+            z: source.2,
+        };
+        if let Some(block_entity) = source_region.get_block_entity(source) {
+            let mut copied = block_entity.clone();
+            copied.position = (destination.x, destination.y, destination.z);
+            self.set_block_entity(destination, copied);
+        }
+    }
+
+    /// Stamp a merged schematic box into the default region. Excluded source blocks are skipped,
+    /// preserving the destination. Written cells, including air, clear stale block entities.
+    pub fn stamp_box(
+        &mut self,
+        source: &UniversalSchematic,
+        bounds: &BoundingBox,
+        target: (i32, i32, i32),
+        excluded_blocks: &[BlockState],
+    ) -> Result<(), String> {
+        let offset = Self::stamp_offset(bounds, target);
+        Self::stamp_destination(bounds.min, offset)?;
+        Self::stamp_destination(bounds.max, offset)?;
+        let named_regions = Self::sorted_named_regions(source);
+        for x in bounds.min.0..=bounds.max.0 {
+            for y in bounds.min.1..=bounds.max.1 {
+                for z in bounds.min.2..=bounds.max.2 {
+                    let Some(source_region) =
+                        Self::source_region_at(source, &named_regions, x, y, z)
+                    else {
+                        continue;
+                    };
+                    let destination = Self::stamp_destination((x, y, z), offset)?;
+                    self.stamp_cell_from_region(
+                        source_region,
+                        (x, y, z),
+                        destination,
+                        excluded_blocks,
+                    );
+                }
+            }
+        }
+        for entity in source.default_region.entities.iter().chain(
+            named_regions
+                .iter()
+                .flat_map(|region| region.entities.iter()),
+        ) {
+            let position = (
+                entity.position.0.floor() as i32,
+                entity.position.1.floor() as i32,
+                entity.position.2.floor() as i32,
+            );
+            if bounds.contains(position) {
+                let mut copied = entity.clone();
+                copied.position = (
                     entity.position.0 + offset.0 as f64,
                     entity.position.1 + offset.1 as f64,
                     entity.position.2 + offset.2 as f64,
                 );
-                entities_to_copy.push(new_entity);
+                self.add_entity(copied);
             }
         }
-
-        // Collect entities from other regions
-        for region in from_schematic.other_regions.values() {
-            for entity in &region.entities {
-                let entity_pos = (
-                    entity.position.0.floor() as i32,
-                    entity.position.1.floor() as i32,
-                    entity.position.2.floor() as i32,
-                );
-
-                if bounds.contains(entity_pos) {
-                    let mut new_entity = entity.clone();
-                    new_entity.position = (
-                        entity.position.0 + offset.0 as f64,
-                        entity.position.1 + offset.1 as f64,
-                        entity.position.2 + offset.2 as f64,
-                    );
-                    entities_to_copy.push(new_entity);
-                }
-            }
-        }
-
-        // Add all collected entities
-        for entity in entities_to_copy {
-            self.add_entity(entity);
-        }
-
         Ok(())
     }
 
+    /// Stamp one explicitly named source region into the default region.
+    pub fn stamp_region(
+        &mut self,
+        source: &UniversalSchematic,
+        region_name: &str,
+        target: (i32, i32, i32),
+        excluded_blocks: &[BlockState],
+    ) -> Result<(), String> {
+        let source_region = source
+            .get_region(region_name)
+            .ok_or_else(|| format!("Region '{region_name}' not found"))?;
+        let Some(bounds) = Self::region_stamp_bounds(source_region) else {
+            return Ok(());
+        };
+        let offset = Self::stamp_offset(&bounds, target);
+        Self::stamp_destination(bounds.min, offset)?;
+        Self::stamp_destination(bounds.max, offset)?;
+        for x in bounds.min.0..=bounds.max.0 {
+            for y in bounds.min.1..=bounds.max.1 {
+                for z in bounds.min.2..=bounds.max.2 {
+                    let destination = Self::stamp_destination((x, y, z), offset)?;
+                    self.stamp_cell_from_region(
+                        source_region,
+                        (x, y, z),
+                        destination,
+                        excluded_blocks,
+                    );
+                }
+            }
+        }
+        for entity in &source_region.entities {
+            let mut copied = entity.clone();
+            copied.position = (
+                entity.position.0 + offset.0 as f64,
+                entity.position.1 + offset.1 as f64,
+                entity.position.2 + offset.2 as f64,
+            );
+            self.add_entity(copied);
+        }
+        Ok(())
+    }
+
+    /// Compatibility alias for `stamp_box`.
+    pub fn copy_region(
+        &mut self,
+        source: &UniversalSchematic,
+        bounds: &BoundingBox,
+        target: (i32, i32, i32),
+        excluded_blocks: &[BlockState],
+    ) -> Result<(), String> {
+        self.stamp_box(source, bounds, target, excluded_blocks)
+    }
     pub fn split_into_chunks(
         &self,
         chunk_width: i32,
@@ -1857,6 +2068,34 @@ impl UniversalSchematic {
         self.iter_chunks(chunk_width, chunk_height, chunk_length, None)
     }
 
+    fn parse_block_string_cached(
+        &mut self,
+        block_string: &str,
+    ) -> Result<(BlockState, Option<std::sync::Arc<NbtMap>>), String> {
+        if let Some((state, nbt)) = self.block_string_cache.get(block_string) {
+            return Ok((state.clone(), nbt.clone()));
+        }
+
+        let (mut block_state, nbt_data) = Self::parse_block_string(block_string)?;
+        if block_state.name == "minecraft:jukebox" {
+            let has_record = nbt_data
+                .as_ref()
+                .is_some_and(|nbt| nbt.contains_key("RecordItem"));
+            block_state.set_property("has_record", has_record.to_string());
+        }
+
+        let nbt = nbt_data.map(|data| {
+            let mut map = NbtMap::new();
+            for (key, value) in data {
+                map.insert(key, value);
+            }
+            std::sync::Arc::new(map)
+        });
+        self.block_string_cache
+            .insert(block_string.to_string(), (block_state.clone(), nbt.clone()));
+        Ok((block_state, nbt))
+    }
+
     pub fn set_block_from_string(
         &mut self,
         x: i32,
@@ -1864,42 +2103,16 @@ impl UniversalSchematic {
         z: i32,
         block_string: &str,
     ) -> Result<bool, String> {
-        // Parse once per distinct string: repeated placements of the same
-        // block string (the common case when filling) hit the cache and skip
-        // property/NBT parsing entirely.
-        let (block_state, nbt) = match self.block_string_cache.get(block_string) {
-            Some((state, nbt)) => (state.clone(), nbt.clone()),
-            None => {
-                let (mut block_state, nbt_data) = Self::parse_block_string(block_string)?;
-
-                // Special handling for jukebox: set has_record blockstate if RecordItem exists
-                if block_state.name.contains("jukebox") {
-                    if let Some(ref nbt) = nbt_data {
-                        let has_record = nbt.contains_key("RecordItem");
-                        block_state.set_property("has_record", has_record.to_string());
-                    }
-                }
-
-                let nbt = nbt_data.map(|data| {
-                    let mut map = NbtMap::new();
-                    for (key, value) in data {
-                        map.insert(key, value);
-                    }
-                    std::sync::Arc::new(map)
-                });
-
-                self.block_string_cache.insert(
-                    block_string.to_string(),
-                    (block_state.clone(), nbt.clone()),
-                );
-                (block_state, nbt)
-            }
-        };
+        let (block_state, nbt) = self.parse_block_string_cached(block_string)?;
 
         // Set the basic block first
         if !self.set_block(x, y, z, &block_state) {
             return Ok(false);
         }
+
+        // Replacement is transactional with respect to block-entity state:
+        // a new block string with no NBT must not retain the previous entity.
+        self.remove_block_entity((x, y, z));
 
         // If we have NBT data, create and set the block entity. The NbtMap
         // stays Arc-shared with the cache (copy-on-write via nbt_mut).
@@ -1963,9 +2176,16 @@ impl UniversalSchematic {
     pub fn parse_block_string(
         block_string: &str,
     ) -> Result<(BlockState, Option<HashMap<String, NbtValue>>), String> {
-        let mut parts = block_string.splitn(2, '{');
-        let block_state_str = parts.next().unwrap().trim();
-        let nbt_str = parts.next().map(|s| s.trim_end_matches('}'));
+        Self::validate_block_string_delimiters(block_string)?;
+        let (block_state_str, nbt_str) = match block_string.split_once('{') {
+            Some((block_state, nbt)) => {
+                let nbt = nbt
+                    .strip_suffix('}')
+                    .ok_or("Missing block entity closing brace")?;
+                (block_state.trim(), Some(nbt))
+            }
+            None => (block_string.trim(), None),
+        };
 
         // Parse block state
         let block_state = if block_state_str.contains('[') {
@@ -1974,17 +2194,19 @@ impl UniversalSchematic {
             let properties_str = state_parts
                 .next()
                 .ok_or("Missing properties closing bracket")?
-                .trim_end_matches(']');
+                .strip_suffix(']')
+                .ok_or("Missing properties closing bracket")?;
 
             let mut properties = Vec::new();
             for prop in properties_str.split(',') {
-                let mut kv = prop.split('=');
-                let key = kv.next().ok_or("Missing property key")?.trim();
-                let value = kv
-                    .next()
-                    .ok_or("Missing property value")?
-                    .trim()
-                    .trim_matches(|c| c == '\'' || c == '"');
+                let (key, value) = prop
+                    .split_once('=')
+                    .ok_or("Missing property key or value")?;
+                let key = key.trim();
+                let value = value.trim().trim_matches(|c| c == '\'' || c == '"');
+                if key.is_empty() || value.is_empty() || value.contains('=') {
+                    return Err("Malformed block property".to_string());
+                }
                 properties.push((SmolStr::from(key), SmolStr::from(value)));
             }
 
@@ -2006,6 +2228,51 @@ impl UniversalSchematic {
         };
 
         Ok((block_state, nbt_data))
+    }
+
+    fn validate_block_string_delimiters(block_string: &str) -> Result<(), String> {
+        let mut stack = Vec::new();
+        let mut quote = None;
+        let mut escaped = false;
+
+        for c in block_string.chars() {
+            if quote.is_some() && c == '\\' && !escaped {
+                escaped = true;
+                continue;
+            }
+            if matches!(c, '\'' | '"') && !escaped {
+                match quote {
+                    Some(active) if active == c => quote = None,
+                    None => quote = Some(c),
+                    _ => {}
+                }
+                continue;
+            }
+            if quote.is_none() {
+                match (c, stack.last().copied()) {
+                    ('[' | '{', _) => stack.push(c),
+                    (']', Some('[')) | ('}', Some('{')) => {
+                        stack.pop();
+                    }
+                    (']', _) => {
+                        return Err("Unmatched or misordered ']' in block string".to_string());
+                    }
+                    ('}', _) => {
+                        return Err("Unmatched or misordered '}' in block string".to_string());
+                    }
+                    _ => {}
+                }
+            }
+            escaped = false;
+        }
+
+        if quote.is_some() {
+            return Err("Unterminated quoted string in block string".to_string());
+        }
+        if !stack.is_empty() {
+            return Err("Unclosed delimiter in block string".to_string());
+        }
+        Ok(())
     }
 
     pub fn create_schematic_from_region(&self, bounds: &BoundingBox) -> Self {
@@ -2118,114 +2385,306 @@ impl UniversalSchematic {
         )
     }
 
-    // Transformation methods (convenience wrappers for default region)
+    // Transformation methods (convenience wrappers for the default region)
 
-    /// Flip the default region along the X axis
+    fn normalized_quarter_turn(degrees: i32) -> Result<i32, String> {
+        if degrees % 90 != 0 {
+            return Err(format!(
+                "Rotation must be a multiple of 90 degrees, got {degrees}"
+            ));
+        }
+        Ok(degrees.rem_euclid(360))
+    }
+
+    fn checked_coord(value: i64) -> Result<i32, String> {
+        i32::try_from(value).map_err(|_| "Transform exceeds the i32 coordinate range".to_string())
+    }
+
+    fn checked_delta(target: i32, current: i32) -> Result<i32, String> {
+        Self::checked_coord(target as i64 - current as i64)
+    }
+
+    /// Flip the default region along the X axis.
     pub fn flip_x(&mut self) {
         self.default_region.flip_x();
     }
 
-    /// Flip the default region along the Y axis
+    /// Flip the default region along the Y axis.
     pub fn flip_y(&mut self) {
         self.default_region.flip_y();
     }
 
-    /// Flip the default region along the Z axis
+    /// Flip the default region along the Z axis.
     pub fn flip_z(&mut self) {
         self.default_region.flip_z();
     }
 
-    /// Rotate the default region around the Y axis (horizontal plane)
-    pub fn rotate_y(&mut self, degrees: i32) {
-        self.default_region.rotate_y(degrees);
+    /// Rotate the default region around the Y axis (horizontal plane).
+    pub fn rotate_y(&mut self, degrees: i32) -> Result<(), String> {
+        self.default_region
+            .rotate_y(Self::normalized_quarter_turn(degrees)?);
+        Ok(())
     }
 
-    /// Rotate the default region around the X axis
-    pub fn rotate_x(&mut self, degrees: i32) {
-        self.default_region.rotate_x(degrees);
+    /// Rotate the default region around the X axis.
+    pub fn rotate_x(&mut self, degrees: i32) -> Result<(), String> {
+        self.default_region
+            .rotate_x(Self::normalized_quarter_turn(degrees)?);
+        Ok(())
     }
 
-    /// Rotate the default region around the Z axis
-    pub fn rotate_z(&mut self, degrees: i32) {
-        self.default_region.rotate_z(degrees);
+    /// Rotate the default region around the Z axis.
+    pub fn rotate_z(&mut self, degrees: i32) -> Result<(), String> {
+        self.default_region
+            .rotate_z(Self::normalized_quarter_turn(degrees)?);
+        Ok(())
     }
 
-    /// Flip a specific region along the X axis
+    /// Translate the default region.
+    pub fn translate(&mut self, dx: i32, dy: i32, dz: i32) -> Result<(), String> {
+        self.default_region.translate(dx, dy, dz)
+    }
+
+    /// Flip a specific region along the X axis.
     pub fn flip_region_x(&mut self, region_name: &str) -> Result<(), String> {
-        if region_name == self.default_region_name {
-            self.default_region.flip_x();
-            Ok(())
-        } else if let Some(region) = self.other_regions.get_mut(region_name) {
-            region.flip_x();
-            Ok(())
-        } else {
-            Err(format!("Region '{}' not found", region_name))
-        }
+        self.get_region_mut(region_name)
+            .ok_or_else(|| format!("Region '{region_name}' not found"))?
+            .flip_x();
+        Ok(())
     }
 
-    /// Flip a specific region along the Y axis
+    /// Flip a specific region along the Y axis.
     pub fn flip_region_y(&mut self, region_name: &str) -> Result<(), String> {
-        if region_name == self.default_region_name {
-            self.default_region.flip_y();
-            Ok(())
-        } else if let Some(region) = self.other_regions.get_mut(region_name) {
-            region.flip_y();
-            Ok(())
-        } else {
-            Err(format!("Region '{}' not found", region_name))
-        }
+        self.get_region_mut(region_name)
+            .ok_or_else(|| format!("Region '{region_name}' not found"))?
+            .flip_y();
+        Ok(())
     }
 
-    /// Flip a specific region along the Z axis
+    /// Flip a specific region along the Z axis.
     pub fn flip_region_z(&mut self, region_name: &str) -> Result<(), String> {
-        if region_name == self.default_region_name {
-            self.default_region.flip_z();
-            Ok(())
-        } else if let Some(region) = self.other_regions.get_mut(region_name) {
-            region.flip_z();
-            Ok(())
-        } else {
-            Err(format!("Region '{}' not found", region_name))
-        }
+        self.get_region_mut(region_name)
+            .ok_or_else(|| format!("Region '{region_name}' not found"))?
+            .flip_z();
+        Ok(())
     }
 
-    /// Rotate a specific region around the Y axis
+    /// Rotate a specific region around the Y axis.
     pub fn rotate_region_y(&mut self, region_name: &str, degrees: i32) -> Result<(), String> {
-        if region_name == self.default_region_name {
-            self.default_region.rotate_y(degrees);
-            Ok(())
-        } else if let Some(region) = self.other_regions.get_mut(region_name) {
-            region.rotate_y(degrees);
-            Ok(())
-        } else {
-            Err(format!("Region '{}' not found", region_name))
-        }
+        let degrees = Self::normalized_quarter_turn(degrees)?;
+        self.get_region_mut(region_name)
+            .ok_or_else(|| format!("Region '{region_name}' not found"))?
+            .rotate_y(degrees);
+        Ok(())
     }
 
-    /// Rotate a specific region around the X axis
+    /// Rotate a specific region around the X axis.
     pub fn rotate_region_x(&mut self, region_name: &str, degrees: i32) -> Result<(), String> {
-        if region_name == self.default_region_name {
-            self.default_region.rotate_x(degrees);
-            Ok(())
-        } else if let Some(region) = self.other_regions.get_mut(region_name) {
-            region.rotate_x(degrees);
-            Ok(())
-        } else {
-            Err(format!("Region '{}' not found", region_name))
-        }
+        let degrees = Self::normalized_quarter_turn(degrees)?;
+        self.get_region_mut(region_name)
+            .ok_or_else(|| format!("Region '{region_name}' not found"))?
+            .rotate_x(degrees);
+        Ok(())
     }
 
-    /// Rotate a specific region around the Z axis
+    /// Rotate a specific region around the Z axis.
     pub fn rotate_region_z(&mut self, region_name: &str, degrees: i32) -> Result<(), String> {
-        if region_name == self.default_region_name {
-            self.default_region.rotate_z(degrees);
-            Ok(())
-        } else if let Some(region) = self.other_regions.get_mut(region_name) {
-            region.rotate_z(degrees);
-            Ok(())
-        } else {
-            Err(format!("Region '{}' not found", region_name))
+        let degrees = Self::normalized_quarter_turn(degrees)?;
+        self.get_region_mut(region_name)
+            .ok_or_else(|| format!("Region '{region_name}' not found"))?
+            .rotate_z(degrees);
+        Ok(())
+    }
+
+    /// Translate a specific region without affecting its siblings.
+    pub fn translate_region(
+        &mut self,
+        region_name: &str,
+        dx: i32,
+        dy: i32,
+        dz: i32,
+    ) -> Result<(), String> {
+        self.get_region_mut(region_name)
+            .ok_or_else(|| format!("Region '{region_name}' not found"))?
+            .translate(dx, dy, dz)
+    }
+
+    /// Translate every schematic region as one rigid object. The operation is
+    /// transactional: coordinate overflow leaves the schematic unchanged.
+    pub fn translate_schematic(&mut self, dx: i32, dy: i32, dz: i32) -> Result<(), String> {
+        let mut transformed = self.clone();
+        transformed.default_region.translate(dx, dy, dz)?;
+        for region in transformed.other_regions.values_mut() {
+            region.translate(dx, dy, dz)?;
         }
+        *self = transformed;
+        Ok(())
+    }
+
+    fn rotate_schematic_x_90(&mut self) -> Result<(), String> {
+        let overall = self
+            .get_schematic_bounding_box()
+            .ok_or_else(|| "Schematic has no bounds".to_string())?;
+        let global_size_z = overall.max.2 as i64 - overall.min.2 as i64 + 1;
+        let (global_min_y, global_min_z) = (overall.min.1 as i64, overall.min.2 as i64);
+        let rotate = |region: &mut Region| -> Result<(), String> {
+            let old = region.get_bounding_box();
+            let old_size_z = old.get_dimensions().2 as i64;
+            let desired_y =
+                global_min_y + global_size_z - (old.min.2 as i64 - global_min_z) - old_size_z;
+            let desired_z = global_min_z + (old.min.1 as i64 - global_min_y);
+            region.rotate_x_90_at((
+                region.position.0,
+                Self::checked_coord(desired_y)?,
+                Self::checked_coord(desired_z)?,
+            ))
+        };
+        rotate(&mut self.default_region)?;
+        for region in self.other_regions.values_mut() {
+            rotate(region)?;
+        }
+        Ok(())
+    }
+
+    fn rotate_schematic_y_90(&mut self) -> Result<(), String> {
+        let overall = self
+            .get_schematic_bounding_box()
+            .ok_or_else(|| "Schematic has no bounds".to_string())?;
+        let global_size_z = overall.max.2 as i64 - overall.min.2 as i64 + 1;
+        let (global_min_x, global_min_z) = (overall.min.0 as i64, overall.min.2 as i64);
+        let rotate = |region: &mut Region| -> Result<(), String> {
+            let old = region.get_bounding_box();
+            let old_size_z = old.get_dimensions().2 as i64;
+            let desired_x =
+                global_min_x + global_size_z - (old.min.2 as i64 - global_min_z) - old_size_z;
+            let desired_z = global_min_z + (old.min.0 as i64 - global_min_x);
+            region.rotate_y_90_at((
+                Self::checked_coord(desired_x)?,
+                region.position.1,
+                Self::checked_coord(desired_z)?,
+            ))
+        };
+        rotate(&mut self.default_region)?;
+        for region in self.other_regions.values_mut() {
+            rotate(region)?;
+        }
+        Ok(())
+    }
+
+    fn rotate_schematic_z_90(&mut self) -> Result<(), String> {
+        let overall = self
+            .get_schematic_bounding_box()
+            .ok_or_else(|| "Schematic has no bounds".to_string())?;
+        let global_size_y = overall.max.1 as i64 - overall.min.1 as i64 + 1;
+        let (global_min_x, global_min_y) = (overall.min.0 as i64, overall.min.1 as i64);
+        let rotate = |region: &mut Region| -> Result<(), String> {
+            let old = region.get_bounding_box();
+            let old_size_y = old.get_dimensions().1 as i64;
+            let desired_x =
+                global_min_x + global_size_y - (old.min.1 as i64 - global_min_y) - old_size_y;
+            let desired_y = global_min_y + (old.min.0 as i64 - global_min_x);
+            region.rotate_z_90_at((
+                Self::checked_coord(desired_x)?,
+                Self::checked_coord(desired_y)?,
+                region.position.2,
+            ))
+        };
+        rotate(&mut self.default_region)?;
+        for region in self.other_regions.values_mut() {
+            rotate(region)?;
+        }
+        Ok(())
+    }
+
+    fn rotate_schematic_with(
+        &mut self,
+        degrees: i32,
+        quarter_turn: fn(&mut Self) -> Result<(), String>,
+    ) -> Result<(), String> {
+        let rotations = Self::normalized_quarter_turn(degrees)? / 90;
+        let mut transformed = self.clone();
+        for _ in 0..rotations {
+            quarter_turn(&mut transformed)?;
+        }
+        *self = transformed;
+        Ok(())
+    }
+
+    pub fn rotate_schematic_x(&mut self, degrees: i32) -> Result<(), String> {
+        self.rotate_schematic_with(degrees, Self::rotate_schematic_x_90)
+    }
+
+    pub fn rotate_schematic_y(&mut self, degrees: i32) -> Result<(), String> {
+        self.rotate_schematic_with(degrees, Self::rotate_schematic_y_90)
+    }
+
+    pub fn rotate_schematic_z(&mut self, degrees: i32) -> Result<(), String> {
+        self.rotate_schematic_with(degrees, Self::rotate_schematic_z_90)
+    }
+
+    fn flip_schematic_axis(&mut self, axis: char) -> Result<(), String> {
+        let overall = self
+            .get_schematic_bounding_box()
+            .ok_or_else(|| "Schematic has no bounds".to_string())?;
+        let mut transformed = self.clone();
+        let flip = |region: &mut Region| -> Result<(), String> {
+            let old = region.get_bounding_box();
+            let (target, current) = match axis {
+                'x' => {
+                    region.flip_x();
+                    (
+                        Self::checked_coord(
+                            overall.min.0 as i64 + overall.max.0 as i64 - old.max.0 as i64,
+                        )?,
+                        region.position.0,
+                    )
+                }
+                'y' => {
+                    region.flip_y();
+                    (
+                        Self::checked_coord(
+                            overall.min.1 as i64 + overall.max.1 as i64 - old.max.1 as i64,
+                        )?,
+                        region.position.1,
+                    )
+                }
+                'z' => {
+                    region.flip_z();
+                    (
+                        Self::checked_coord(
+                            overall.min.2 as i64 + overall.max.2 as i64 - old.max.2 as i64,
+                        )?,
+                        region.position.2,
+                    )
+                }
+                _ => unreachable!(),
+            };
+            let delta = Self::checked_delta(target, current)?;
+            match axis {
+                'x' => region.translate(delta, 0, 0),
+                'y' => region.translate(0, delta, 0),
+                'z' => region.translate(0, 0, delta),
+                _ => unreachable!(),
+            }
+        };
+        flip(&mut transformed.default_region)?;
+        for region in transformed.other_regions.values_mut() {
+            flip(region)?;
+        }
+        *self = transformed;
+        Ok(())
+    }
+
+    pub fn flip_schematic_x(&mut self) -> Result<(), String> {
+        self.flip_schematic_axis('x')
+    }
+
+    pub fn flip_schematic_y(&mut self) -> Result<(), String> {
+        self.flip_schematic_axis('y')
+    }
+
+    pub fn flip_schematic_z(&mut self) -> Result<(), String> {
+        self.flip_schematic_axis('z')
     }
 
     /// Create a new definition region and return a mutable reference to it for chaining
@@ -2288,6 +2747,604 @@ mod tests {
     use crate::item::ItemStack;
     use quartz_nbt::io::{read_nbt, write_nbt};
     use std::io::Cursor;
+
+    #[test]
+    fn named_region_block_strings_parse_and_replace_block_entities() {
+        let mut schematic = UniversalSchematic::new("regions".to_string());
+
+        schematic
+            .try_set_block_in_region_str(
+                "wing",
+                10,
+                0,
+                0,
+                "minecraft:chest[facing=east]{items=[diamond]}",
+            )
+            .unwrap();
+
+        let state = schematic
+            .get_block_from_region("wing", 10, 0, 0)
+            .expect("named-region block should exist");
+        assert_eq!(state.name, "minecraft:chest");
+        assert_eq!(
+            state.get_property("facing").map(|value| value.as_str()),
+            Some("east")
+        );
+        assert!(schematic
+            .get_region("wing")
+            .unwrap()
+            .get_block_entity(BlockPosition { x: 10, y: 0, z: 0 })
+            .is_some());
+
+        schematic.rotate_region_y("wing", 90).unwrap();
+        let rotated = schematic
+            .get_block_from_region("wing", 10, 0, 0)
+            .expect("rotated block should remain at the one-cell region anchor");
+        assert_eq!(
+            rotated.get_property("facing").map(|value| value.as_str()),
+            Some("south")
+        );
+
+        schematic
+            .try_set_block_in_region_str("wing", 10, 0, 0, "minecraft:stone")
+            .unwrap();
+        assert!(schematic
+            .get_region("wing")
+            .unwrap()
+            .get_block_entity(BlockPosition { x: 10, y: 0, z: 0 })
+            .is_none());
+    }
+
+    #[test]
+    fn schematic_region_lifecycle_is_explicit_and_safe() {
+        let mut schematic = UniversalSchematic::new("regions".to_string());
+
+        schematic.create_schematic_region("wing").unwrap();
+        assert!(schematic.has_region("wing"));
+        assert!(schematic.create_schematic_region("wing").is_err());
+        assert!(schematic.create_schematic_region("").is_err());
+        assert!(schematic.create_schematic_region("Main").is_err());
+
+        schematic
+            .try_set_block_in_region_str("wing", 4, 5, 6, "minecraft:copper_block")
+            .unwrap();
+        let initial_bounds = schematic.get_region_bounding_box("wing").unwrap();
+        assert_eq!(initial_bounds.min, (4, 5, 6));
+        assert_eq!(initial_bounds.max, (4, 5, 6));
+        schematic
+            .rename_schematic_region("wing", "east_wing")
+            .unwrap();
+        assert!(!schematic.has_region("wing"));
+        assert!(schematic.has_region("east_wing"));
+        assert_eq!(
+            schematic
+                .get_block_from_region("east_wing", 4, 5, 6)
+                .unwrap()
+                .name,
+            "minecraft:copper_block"
+        );
+        assert_eq!(schematic.get_region("east_wing").unwrap().name, "east_wing");
+
+        assert!(schematic
+            .rename_schematic_region("east_wing", "Main")
+            .is_err());
+        assert!(schematic.remove_schematic_region("Main").is_err());
+        schematic.remove_schematic_region("east_wing").unwrap();
+        assert!(!schematic.has_region("east_wing"));
+        assert!(schematic.has_region("Main"));
+    }
+
+    #[test]
+    fn rotations_reject_non_quarter_turns_without_mutation() {
+        let mut schematic = UniversalSchematic::new("rotations".to_string());
+        schematic.set_block_str(1, 2, 3, "minecraft:stone");
+        schematic
+            .try_set_block_in_region_str("wing", 10, 0, 0, "minecraft:gold_block")
+            .unwrap();
+
+        assert!(schematic.rotate_y(45).is_err());
+        assert!(schematic.rotate_region_y("wing", -45).is_err());
+        assert_eq!(
+            schematic.get_block(1, 2, 3).unwrap().name,
+            "minecraft:stone"
+        );
+        assert_eq!(
+            schematic
+                .get_block_from_region("wing", 10, 0, 0)
+                .unwrap()
+                .name,
+            "minecraft:gold_block"
+        );
+    }
+
+    #[test]
+    fn translation_moves_region_content_and_attachments() {
+        let mut schematic = UniversalSchematic::new("translation".to_string());
+        schematic
+            .set_block_from_string(1, 2, 3, "minecraft:chest{items=[diamond]}")
+            .unwrap();
+        schematic.add_entity(Entity::new(
+            "minecraft:armor_stand".to_string(),
+            (1.5, 2.0, 3.5),
+        ));
+
+        schematic.translate(10, -2, 4).unwrap();
+
+        assert!(schematic.get_block(1, 2, 3).is_none());
+        assert_eq!(
+            schematic.get_block(11, 0, 7).unwrap().name,
+            "minecraft:chest"
+        );
+        assert!(schematic
+            .get_block_entity(BlockPosition { x: 11, y: 0, z: 7 })
+            .is_some());
+        assert_eq!(
+            schematic.get_block_entities_as_list()[0].position,
+            (11, 0, 7)
+        );
+        assert_eq!(
+            schematic.default_region.entities[0].position,
+            (11.5, 0.0, 7.5)
+        );
+    }
+
+    #[test]
+    fn translation_overflow_is_transactional() {
+        let mut schematic = UniversalSchematic::new("overflow".to_string());
+        schematic.set_block_str(i32::MAX - 1, 0, 0, "minecraft:stone");
+        schematic
+            .try_set_block_in_region_str("wing", 0, 0, 0, "minecraft:gold_block")
+            .unwrap();
+
+        assert!(schematic.translate_schematic(2, 0, 0).is_err());
+        assert_eq!(
+            schematic.get_block(i32::MAX - 1, 0, 0).unwrap().name,
+            "minecraft:stone"
+        );
+        assert_eq!(
+            schematic
+                .get_block_from_region("wing", 0, 0, 0)
+                .unwrap()
+                .name,
+            "minecraft:gold_block"
+        );
+    }
+
+    #[test]
+    fn named_and_schematic_transforms_have_distinct_scope() {
+        let mut schematic = UniversalSchematic::new("multi".to_string());
+        schematic.set_block_str(0, 0, 0, "minecraft:stone");
+        schematic
+            .try_set_block_in_region_str("wing", 2, 0, 0, "minecraft:oak_stairs[facing=east]")
+            .unwrap();
+
+        schematic.translate_region("wing", 3, 0, 0).unwrap();
+        assert_eq!(
+            schematic.get_block(0, 0, 0).unwrap().name,
+            "minecraft:stone"
+        );
+        assert_eq!(
+            schematic
+                .get_block_from_region("wing", 5, 0, 0)
+                .unwrap()
+                .name,
+            "minecraft:oak_stairs"
+        );
+
+        schematic.translate_schematic(-3, 0, 0).unwrap();
+        assert_eq!(
+            schematic.get_block(-3, 0, 0).unwrap().name,
+            "minecraft:stone"
+        );
+        assert_eq!(
+            schematic
+                .get_block_from_region("wing", 2, 0, 0)
+                .unwrap()
+                .name,
+            "minecraft:oak_stairs"
+        );
+
+        schematic.rotate_schematic_y(90).unwrap();
+        assert_eq!(
+            schematic.get_block(-3, 0, 0).unwrap().name,
+            "minecraft:stone"
+        );
+        let wing = schematic.get_block_from_region("wing", -3, 0, 5).unwrap();
+        assert_eq!(wing.name, "minecraft:oak_stairs");
+        assert_eq!(
+            wing.get_property("facing").map(|value| value.as_str()),
+            Some("south")
+        );
+
+        schematic.flip_schematic_z().unwrap();
+        assert_eq!(
+            schematic.get_block(-3, 0, 5).unwrap().name,
+            "minecraft:stone"
+        );
+        assert_eq!(
+            schematic
+                .get_block_from_region("wing", -3, 0, 0)
+                .unwrap()
+                .name,
+            "minecraft:oak_stairs"
+        );
+    }
+
+    #[test]
+    fn quarter_turn_coordinates_and_facing_use_the_same_matrix() {
+        let cases = [
+            ('y', (1, 0, 0), (0, 0, 1), "east", "south"),
+            ('x', (0, 0, 1), (0, 0, 0), "south", "down"),
+            ('z', (0, 1, 0), (0, 0, 0), "up", "west"),
+        ];
+
+        for (axis, source, expected, facing, expected_facing) in cases {
+            let mut schematic = UniversalSchematic::new(format!("axis-{axis}"));
+            let size = match axis {
+                'x' => (1, 1, 2),
+                'y' => (2, 1, 1),
+                'z' => (1, 2, 1),
+                _ => unreachable!(),
+            };
+            schematic.default_region = Region::new("Main".to_string(), (0, 0, 0), size);
+            schematic.set_block_str(0, 0, 0, "minecraft:stone");
+            schematic
+                .set_block_from_string(
+                    source.0,
+                    source.1,
+                    source.2,
+                    &format!("minecraft:observer[facing={facing}]"),
+                )
+                .unwrap();
+
+            match axis {
+                'x' => schematic.rotate_x(90).unwrap(),
+                'y' => schematic.rotate_y(90).unwrap(),
+                'z' => schematic.rotate_z(90).unwrap(),
+                _ => unreachable!(),
+            }
+
+            let rotated = schematic
+                .get_block(expected.0, expected.1, expected.2)
+                .unwrap();
+            assert_eq!(rotated.name, "minecraft:observer");
+            assert_eq!(
+                rotated.get_property("facing").map(|value| value.as_str()),
+                Some(expected_facing)
+            );
+        }
+    }
+
+    #[test]
+    fn whole_rotations_reject_signed_range_spans_without_mutation() {
+        for axis in ['x', 'y', 'z'] {
+            let (low, high) = match axis {
+                'x' => ((0, i32::MIN, 0), (0, i32::MAX, 0)),
+                'y' | 'z' => ((i32::MIN, 0, 0), (i32::MAX, 0, 0)),
+                _ => unreachable!(),
+            };
+            let mut schematic = UniversalSchematic::new(format!("span-{axis}"));
+            schematic.default_region = Region::new("Main".to_string(), low, (1, 1, 1));
+            schematic.other_regions.insert(
+                "far".to_string(),
+                Region::new("far".to_string(), high, (1, 1, 1)),
+            );
+
+            let result = match axis {
+                'x' => schematic.rotate_schematic_x(90),
+                'y' => schematic.rotate_schematic_y(90),
+                'z' => schematic.rotate_schematic_z(90),
+                _ => unreachable!(),
+            };
+
+            assert!(result.is_err());
+            assert_eq!(schematic.default_region.position, low);
+            assert_eq!(schematic.other_regions["far"].position, high);
+        }
+
+        let endpoint_cases = [
+            ('x', (0, i32::MAX, 0), (1, 1, 2)),
+            ('y', (i32::MAX, 0, 0), (1, 1, 2)),
+            ('z', (i32::MAX, 0, 0), (1, 2, 1)),
+        ];
+        for (axis, position, size) in endpoint_cases {
+            let mut schematic = UniversalSchematic::new(format!("endpoint-{axis}"));
+            schematic.default_region = Region::new("Main".to_string(), position, size);
+            let before = schematic.default_region.get_bounding_box();
+
+            let result = match axis {
+                'x' => schematic.rotate_schematic_x(90),
+                'y' => schematic.rotate_schematic_y(90),
+                'z' => schematic.rotate_schematic_z(90),
+                _ => unreachable!(),
+            };
+
+            assert!(result.is_err());
+            assert_eq!(schematic.default_region.get_bounding_box(), before);
+        }
+    }
+
+    #[test]
+    fn stamp_exclusions_preserve_destination_and_written_cells_replace_block_entities() {
+        let mut source = UniversalSchematic::new("source".to_string());
+        source
+            .set_block_from_string(
+                0,
+                0,
+                0,
+                r#"minecraft:chest[facing=east]{CustomName:'"source"'}"#,
+            )
+            .unwrap();
+        source.set_block_str(1, 0, 0, "minecraft:stone");
+
+        let mut destination = UniversalSchematic::new("destination".to_string());
+        destination.set_block_str(10, 0, 0, "minecraft:barrel");
+        destination.set_block_entity(
+            BlockPosition { x: 10, y: 0, z: 0 },
+            BlockEntity::new("minecraft:barrel".to_string(), (10, 0, 0)),
+        );
+        destination.set_block_str(11, 0, 0, "minecraft:gold_block");
+        destination.set_block_entity(
+            BlockPosition { x: 11, y: 0, z: 0 },
+            BlockEntity::new("minecraft:barrel".to_string(), (11, 0, 0)),
+        );
+
+        destination
+            .stamp_box(
+                &source,
+                &BoundingBox::new((0, 0, 0), (1, 0, 0)),
+                (10, 0, 0),
+                &[BlockState::new("minecraft:stone".to_string())],
+            )
+            .unwrap();
+
+        assert_eq!(
+            destination.get_block(10, 0, 0).unwrap().name,
+            "minecraft:chest"
+        );
+        assert!(destination
+            .get_block_entity(BlockPosition { x: 10, y: 0, z: 0 })
+            .is_some());
+        assert_eq!(
+            destination.get_block(11, 0, 0).unwrap().name,
+            "minecraft:gold_block"
+        );
+        assert!(destination
+            .get_block_entity(BlockPosition { x: 11, y: 0, z: 0 })
+            .is_some());
+
+        destination
+            .stamp_box(
+                &source,
+                &BoundingBox::new((1, 0, 0), (1, 0, 0)),
+                (10, 0, 0),
+                &[],
+            )
+            .unwrap();
+        assert_eq!(
+            destination.get_block(10, 0, 0).unwrap().name,
+            "minecraft:stone"
+        );
+        assert!(destination
+            .get_block_entity(BlockPosition { x: 10, y: 0, z: 0 })
+            .is_none());
+    }
+
+    #[test]
+    fn stamp_box_writes_source_air_and_stamp_region_selects_one_region() {
+        let mut source = UniversalSchematic::new("source".to_string());
+        source.set_block_str(0, 0, 0, "minecraft:stone");
+        source.set_block_str(2, 0, 0, "minecraft:stone");
+        source
+            .try_set_block_in_region_str("wing", 4, 0, 0, "minecraft:diamond_block")
+            .unwrap();
+
+        let mut destination = UniversalSchematic::new("destination".to_string());
+        destination.set_block_str(10, 0, 0, "minecraft:barrel");
+        destination.set_block_entity(
+            BlockPosition { x: 10, y: 0, z: 0 },
+            BlockEntity::new("minecraft:barrel".to_string(), (10, 0, 0)),
+        );
+
+        destination
+            .stamp_box(
+                &source,
+                &BoundingBox::new((1, 0, 0), (1, 0, 0)),
+                (10, 0, 0),
+                &[],
+            )
+            .unwrap();
+        assert_eq!(
+            destination.get_block(10, 0, 0).unwrap().name,
+            "minecraft:air"
+        );
+        assert!(destination
+            .get_block_entity(BlockPosition { x: 10, y: 0, z: 0 })
+            .is_none());
+
+        destination
+            .stamp_region(&source, "wing", (20, 0, 0), &[])
+            .unwrap();
+        assert_eq!(
+            destination.get_block(20, 0, 0).unwrap().name,
+            "minecraft:diamond_block"
+        );
+        assert!(destination
+            .stamp_region(&source, "missing", (30, 0, 0), &[])
+            .is_err());
+    }
+
+    #[test]
+    fn stamping_overflow_is_transactional() {
+        let mut source = UniversalSchematic::new("source".to_string());
+        source.set_block_str(0, 0, 0, "minecraft:stone");
+        source.set_block_str(1, 0, 0, "minecraft:gold_block");
+        let mut destination = UniversalSchematic::new("destination".to_string());
+        destination.set_block_str(0, 0, 0, "minecraft:diamond_block");
+
+        let result = destination.stamp_box(
+            &source,
+            &BoundingBox::new((0, 0, 0), (1, 0, 0)),
+            (i32::MAX, 0, 0),
+            &[],
+        );
+
+        assert!(result.is_err());
+        assert_eq!(
+            destination.get_block(0, 0, 0).unwrap().name,
+            "minecraft:diamond_block"
+        );
+        assert!(destination.get_block(i32::MAX, 0, 0).is_none());
+        assert!(destination.default_region.entities.is_empty());
+    }
+
+    #[test]
+    fn stamp_region_uses_tight_bounds_after_negative_expansion() {
+        let mut source = UniversalSchematic::new("source".to_string());
+        source
+            .try_set_block_in_region_str("wing", 10, 0, 0, "minecraft:gold_block")
+            .unwrap();
+        source
+            .try_set_block_in_region_str("wing", -1, 0, 0, "minecraft:stone")
+            .unwrap();
+        let mut destination = UniversalSchematic::new("destination".to_string());
+        destination.set_block_str(36, 0, 0, "minecraft:diamond_block");
+
+        destination
+            .stamp_region(&source, "wing", (100, 0, 0), &[])
+            .unwrap();
+
+        assert_eq!(
+            destination.get_block(100, 0, 0).unwrap().name,
+            "minecraft:stone"
+        );
+        assert_eq!(
+            destination.get_block(111, 0, 0).unwrap().name,
+            "minecraft:gold_block"
+        );
+        assert_eq!(
+            destination.get_block(36, 0, 0).unwrap().name,
+            "minecraft:diamond_block"
+        );
+    }
+
+    #[test]
+    fn overlapping_named_regions_have_stable_lexicographic_precedence() {
+        let build_source = |reverse: bool| {
+            let mut source = UniversalSchematic::new("source".to_string());
+            let entries = if reverse {
+                [
+                    ("zeta", "minecraft:gold_block"),
+                    ("alpha", "minecraft:stone"),
+                ]
+            } else {
+                [
+                    ("alpha", "minecraft:stone"),
+                    ("zeta", "minecraft:gold_block"),
+                ]
+            };
+            for (name, block) in entries {
+                source
+                    .try_set_block_in_region_str(name, 10, 0, 0, block)
+                    .unwrap();
+            }
+            source
+        };
+
+        for source in [build_source(false), build_source(true)] {
+            assert_eq!(source.get_region_names(), ["Main", "alpha", "zeta"]);
+            assert_eq!(source.get_block(10, 0, 0).unwrap().name, "minecraft:stone");
+            assert_eq!(
+                source.get_merged_region().get_block(10, 0, 0).unwrap().name,
+                "minecraft:stone"
+            );
+            let mut destination = UniversalSchematic::new("destination".to_string());
+            destination
+                .stamp_box(
+                    &source,
+                    &BoundingBox::new((10, 0, 0), (10, 0, 0)),
+                    (0, 0, 0),
+                    &[],
+                )
+                .unwrap();
+            assert_eq!(
+                destination.get_block(0, 0, 0).unwrap().name,
+                "minecraft:stone"
+            );
+        }
+
+        let mut main_wins = build_source(false);
+        main_wins.set_block_str(10, 0, 0, "minecraft:diamond_block");
+        assert_eq!(
+            main_wins
+                .get_merged_region()
+                .get_block(10, 0, 0)
+                .unwrap()
+                .name,
+            "minecraft:diamond_block"
+        );
+
+        let mut main_air_masks = build_source(false);
+        main_air_masks.set_block_str(9, 0, 0, "minecraft:stone");
+        main_air_masks.set_block_str(11, 0, 0, "minecraft:stone");
+        assert_eq!(
+            main_air_masks.get_block(10, 0, 0).unwrap().name,
+            "minecraft:air"
+        );
+        assert_eq!(
+            main_air_masks
+                .get_merged_region()
+                .get_block(10, 0, 0)
+                .unwrap()
+                .name,
+            "minecraft:air"
+        );
+
+        let mut named_air_masks = UniversalSchematic::new("named-air".to_string());
+        named_air_masks.set_block_str(0, 0, 0, "minecraft:stone");
+        named_air_masks
+            .try_set_block_in_region_str("alpha", 9, 0, 0, "minecraft:stone")
+            .unwrap();
+        named_air_masks
+            .try_set_block_in_region_str("alpha", 11, 0, 0, "minecraft:stone")
+            .unwrap();
+        named_air_masks
+            .try_set_block_in_region_str("zeta", 10, 0, 0, "minecraft:gold_block")
+            .unwrap();
+        assert_eq!(
+            named_air_masks.get_block(10, 0, 0).unwrap().name,
+            "minecraft:air"
+        );
+        assert_eq!(
+            named_air_masks
+                .get_merged_region()
+                .get_block(10, 0, 0)
+                .unwrap()
+                .name,
+            "minecraft:air"
+        );
+
+        let mut padded_main = UniversalSchematic::new("padded-main".to_string());
+        padded_main.set_block_str(0, 0, 0, "minecraft:stone");
+        padded_main.set_block_str(-1, 0, 0, "minecraft:stone");
+        padded_main
+            .try_set_block_in_region_str("alpha", -10, 0, 0, "minecraft:diamond_block")
+            .unwrap();
+
+        let mut destination = UniversalSchematic::new("destination".to_string());
+        destination
+            .stamp_box(
+                &padded_main,
+                &BoundingBox::new((-10, 0, 0), (-10, 0, 0)),
+                (0, 0, 0),
+                &[],
+            )
+            .unwrap();
+        assert_eq!(
+            destination.get_block(0, 0, 0).unwrap().name,
+            "minecraft:diamond_block"
+        );
+    }
 
     #[test]
     fn copy_region_fast_path_matches_slow_path() {
@@ -2646,7 +3703,7 @@ mod tests {
         let stone = BlockState::new("minecraft:stone".to_string());
         let dirt = BlockState::new("minecraft:dirt".to_string());
         let diamond = BlockState::new("minecraft:diamond_block".to_string());
-        let air = BlockState::new("minecraft:air".to_string());
+        let gold = BlockState::new("minecraft:gold_block".to_string());
 
         // Create a 2x2x2 cube with different blocks
         source.set_block(0, 0, 0, &stone);
@@ -2654,8 +3711,10 @@ mod tests {
         source.set_block(1, 0, 0, &diamond);
         source.set_block(1, 1, 0, &dirt);
 
-        // Create target schematic
+        // Create target schematic and preload the cells covered by exclusions.
         let mut target = UniversalSchematic::new("Target".to_string());
+        target.set_block(10, 10, 10, &gold);
+        target.set_block(11, 10, 10, &gold);
 
         // Define bounds that include all blocks
         let bounds = BoundingBox::new((0, 0, 0), (1, 1, 0));
@@ -2681,16 +3740,16 @@ mod tests {
             "Dirt block should be copied at (11, 11, 10)"
         );
 
-        // Check that excluded blocks were not copied (they should be air within the expanded region)
+        // Excluded source cells preserve existing destination content.
         assert_eq!(
             target.get_block(10, 10, 10),
-            Some(&air),
-            "Stone block should not be copied at (10, 10, 10) - should be air"
+            Some(&gold),
+            "Stone exclusion should preserve the destination"
         );
         assert_eq!(
             target.get_block(11, 10, 10),
-            Some(&air),
-            "Diamond block should not be copied at (11, 10, 10) - should be air"
+            Some(&gold),
+            "Diamond exclusion should preserve the destination"
         );
 
         // Count the total number of dirt blocks
@@ -3023,6 +4082,124 @@ mod tests {
         assert_eq!(UniversalSchematic::calculate_items_for_signal(0), 0);
         assert_eq!(UniversalSchematic::calculate_items_for_signal(1), 1);
         assert_eq!(UniversalSchematic::calculate_items_for_signal(15), 1728); // Full barrel
+    }
+
+    #[test]
+    fn test_content_shorthands_create_block_entities_and_jukebox_state() {
+        assert!(UniversalSchematic::parse_block_string("minecraft:chest{items=[diamond]").is_err());
+        assert!(UniversalSchematic::parse_block_string(
+            "minecraft:chest[facing=north{items=[diamond]}"
+        )
+        .is_err());
+        assert!(UniversalSchematic::parse_block_string("minecraft:stone}").is_err());
+        assert!(UniversalSchematic::parse_block_string("minecraft:stone[=north]").is_err());
+        assert!(
+            UniversalSchematic::parse_block_string("minecraft:stone[facing=north=extra]").is_err()
+        );
+
+        let mut invalid = UniversalSchematic::new("Invalid".to_string());
+        assert!(invalid
+            .try_set_block_str(0, 0, 0, "minecraft:chest{signal=bogus}")
+            .is_err());
+        assert!(!invalid.set_block_str(0, 0, 0, "minecraft:chest{signal=bogus}"));
+        assert_ne!(
+            invalid.get_block(0, 0, 0).map(BlockState::get_name),
+            Some("minecraft:chest")
+        );
+        assert!(invalid
+            .get_block_entity(BlockPosition { x: 0, y: 0, z: 0 })
+            .is_none());
+
+        let mut schematic = UniversalSchematic::new("Contents".to_string());
+        schematic
+            .set_block_from_string(0, 0, 0, "minecraft:chest{items=[diamond*64,emerald*12]}")
+            .unwrap();
+        schematic
+            .set_block_from_string(1, 0, 0, "minecraft:jukebox{record=pigstep}")
+            .unwrap();
+
+        let chest = schematic
+            .get_block_entity(BlockPosition { x: 0, y: 0, z: 0 })
+            .unwrap();
+        let Some(NbtValue::List(items)) = chest.nbt.get("Items") else {
+            panic!("chest must contain an Items list");
+        };
+        assert_eq!(items.len(), 2);
+
+        let jukebox = schematic.get_block(1, 0, 0).unwrap();
+        assert_eq!(
+            jukebox.get_property("has_record"),
+            Some(&SmolStr::from("true"))
+        );
+        let jukebox_entity = schematic
+            .get_block_entity(BlockPosition { x: 1, y: 0, z: 0 })
+            .unwrap();
+        let Some(NbtValue::Compound(record)) = jukebox_entity.nbt.get("RecordItem") else {
+            panic!("jukebox must contain a RecordItem compound");
+        };
+        assert_eq!(
+            record.get("id"),
+            Some(&NbtValue::String(
+                "minecraft:music_disc_pigstep".to_string()
+            ))
+        );
+
+        schematic
+            .set_block_from_string(2, 0, 0, "minecraft:jukebox[has_record=true]{signal=0}")
+            .unwrap();
+        assert_eq!(
+            schematic
+                .get_block(2, 0, 0)
+                .unwrap()
+                .get_property("has_record"),
+            Some(&SmolStr::from("false"))
+        );
+        assert!(schematic
+            .get_block_entity(BlockPosition { x: 2, y: 0, z: 0 })
+            .is_none());
+
+        schematic
+            .set_block_from_string(5, 0, 0, "minecraft:jukebox{record=pigstep}")
+            .unwrap();
+        assert!(schematic
+            .get_block_entity(BlockPosition { x: 5, y: 0, z: 0 })
+            .is_some());
+        schematic
+            .set_block_from_string(5, 0, 0, "minecraft:jukebox{signal=0}")
+            .unwrap();
+        assert_eq!(
+            schematic
+                .get_block(5, 0, 0)
+                .unwrap()
+                .get_property("has_record"),
+            Some(&SmolStr::from("false"))
+        );
+        assert!(schematic
+            .get_block_entity(BlockPosition { x: 5, y: 0, z: 0 })
+            .is_none());
+
+        schematic
+            .set_block_from_string(6, 0, 0, "minecraft:chest{items=[diamond]}")
+            .unwrap();
+        assert!(schematic
+            .get_block_entity(BlockPosition { x: 6, y: 0, z: 0 })
+            .is_some());
+        assert!(schematic.set_block_str(6, 0, 0, "minecraft:stone"));
+        assert!(schematic
+            .get_block_entity(BlockPosition { x: 6, y: 0, z: 0 })
+            .is_none());
+
+        schematic
+            .set_block_from_string(3, 0, 0, "mod:jukebox[has_record=true]")
+            .unwrap();
+        assert_eq!(
+            schematic
+                .get_block(3, 0, 0)
+                .unwrap()
+                .get_property("has_record"),
+            Some(&SmolStr::from("true")),
+            "custom ids containing jukebox must not receive vanilla synchronization"
+        );
     }
 
     #[test]

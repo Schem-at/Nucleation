@@ -61,6 +61,23 @@ export class Schematic {
     }
 
     /**
+     * Return an independent deep copy. Subsequent block, region, entity,
+     * metadata, or transform changes do not affect the original.
+     */
+    deepClone() {
+
+        const result = wasm.Schematic_deep_clone(this.ffiValue);
+
+        try {
+            return new Schematic(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
      * The allocated dimensions (width, height, length) of the schematic's
      * bounding box.
      */
@@ -820,8 +837,65 @@ export class Schematic {
     }
 
     /**
-     * Copy a region from `source` into this schematic. `excluded_blocks_json`
-     * is a JSON array of block strings to skip (empty string or `[]` for none).
+     * Stamp a merged source box into the default region. Excluded blocks
+     * are skipped, preserving destination content. Empty string or `[]`
+     * means no exclusions.
+     */
+    stampBox(source, minX, minY, minZ, maxX, maxY, maxZ, targetX, targetY, targetZ, excludedBlocksJson) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const excludedBlocksJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, excludedBlocksJson)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_stamp_box(diplomatReceive.buffer, this.ffiValue, source.ffiValue, minX, minY, minZ, maxX, maxY, maxZ, targetX, targetY, targetZ, excludedBlocksJsonSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Stamp one explicitly named source region into the default region.
+     * The region's minimum corner is mapped to the target position.
+     */
+    stampRegion(source, sourceRegionName, targetX, targetY, targetZ, excludedBlocksJson) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const sourceRegionNameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, sourceRegionName)));
+        const excludedBlocksJsonSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, excludedBlocksJson)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_stamp_region(diplomatReceive.buffer, this.ffiValue, source.ffiValue, sourceRegionNameSlice.ptr, targetX, targetY, targetZ, excludedBlocksJsonSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Compatibility alias for `stamp_box`.
      */
     copyRegion(source, minX, minY, minZ, maxX, maxY, maxZ, targetX, targetY, targetZ, excludedBlocksJson) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
@@ -848,7 +922,32 @@ export class Schematic {
     }
 
     /**
+     * The full block state at a position. `NotFound` if the position is
+     * outside every region.
+     */
+    getBlock(x, y, z) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_get_block(diplomatReceive.buffer, this.ffiValue, x, y, z);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new BlockState(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
      * The block at a position with its properties, as a `BlockState`.
+     * Kept as an explicit alias for callers migrating from the older API.
      */
     getBlockWithProperties(x, y, z) {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
@@ -867,6 +966,66 @@ export class Schematic {
         finally {
             diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
             diplomatReceive.free();
+        }
+    }
+
+    /**
+     * The full block state at a position in one specific region. This
+     * avoids composite lookup ambiguity when regions overlap.
+     */
+    getBlockInRegion(regionName, x, y, z) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const regionNameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, regionName)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_get_block_in_region(diplomatReceive.buffer, this.ffiValue, regionNameSlice.ptr, x, y, z);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new BlockState(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * The block string at a position in one specific region.
+     */
+    getBlockStringInRegion(regionName, x, y, z) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const regionNameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, regionName)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Schematic_get_block_string_in_region(diplomatReceive.buffer, this.ffiValue, regionNameSlice.ptr, x, y, z, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
         }
     }
 
@@ -918,6 +1077,37 @@ export class Schematic {
 
         finally {
             diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
+     * The block entity at a position in one specific region as JSON.
+     */
+    getBlockEntityJsonInRegion(regionName, x, y, z) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const regionNameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, regionName)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Schematic_get_block_entity_json_in_region(diplomatReceive.buffer, this.ffiValue, regionNameSlice.ptr, x, y, z, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
             diplomatReceive.free();
             write.free();
         }
@@ -989,6 +1179,36 @@ export class Schematic {
 
 
         const result = wasm.Schematic_add_entity(diplomatReceive.buffer, this.ffiValue, idSlice.ptr, x, y, z, nbtJsonSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Add an armor stand without hand-authoring entity NBT.
+     *
+     * `armor_material` accepts `diamond`, `netherite`, `iron`, etc.; an
+     * empty string creates an unarmored stand. `yaw` uses Minecraft degrees.
+     */
+    addArmorStand(x, y, z, yaw, armorMaterial) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const armorMaterialSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, armorMaterial)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_add_armor_stand(diplomatReceive.buffer, this.ffiValue, x, y, z, yaw, armorMaterialSlice.ptr);
 
         try {
             if (!diplomatReceive.resultFlag) {
@@ -1817,8 +2037,7 @@ export class Schematic {
 
     /**
      * Mirror the default region along the X axis (in place). Block
-     * orientations (e.g. `facing` properties), block entities, and
-     * entities are mirrored too.
+     * orientations, block entities, and entities are mirrored too.
      */
     flipX() {
     wasm.Schematic_flip_x(this.ffiValue);
@@ -1831,8 +2050,7 @@ export class Schematic {
     }
 
     /**
-     * Mirror the default region along the Y axis (in place). Block
-     * orientations, block entities, and entities are mirrored too.
+     * Mirror the default region along the Y axis (in place).
      */
     flipY() {
     wasm.Schematic_flip_y(this.ffiValue);
@@ -1845,8 +2063,7 @@ export class Schematic {
     }
 
     /**
-     * Mirror the default region along the Z axis (in place). Block
-     * orientations, block entities, and entities are mirrored too.
+     * Mirror the default region along the Z axis (in place).
      */
     flipZ() {
     wasm.Schematic_flip_z(this.ffiValue);
@@ -1859,57 +2076,100 @@ export class Schematic {
     }
 
     /**
-     * Rotate the default region about the X axis. `degrees` must be a
-     * multiple of 90 (anything else is a no-op; negative values wrap).
-     * +90° maps +Z onto +Y (south face rotates up). The region keeps its
-     * minimum corner; block orientations and entities are updated.
+     * Rotate the default region about the X axis. +90° maps south (+Z)
+     * to down (-Y). Only multiples of 90 are accepted; invalid angles
+     * return `InvalidArgument` without changing the schematic. Negative
+     * values wrap.
      */
     rotateX(degrees) {
-    wasm.Schematic_rotate_x(this.ffiValue, degrees);
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
-        try {}
+
+        const result = wasm.Schematic_rotate_x(diplomatReceive.buffer, this.ffiValue, degrees);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
 
         finally {
             diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
         }
     }
 
     /**
-     * Rotate the default region about the Y axis (horizontal plane).
-     * `degrees` must be a multiple of 90 (anything else is a no-op;
-     * negative values wrap). +90° maps +X onto -Z (east to north, i.e.
-     * counterclockwise seen from above). The region keeps its minimum
-     * corner; block orientations and entities are updated.
+     * Rotate the default region clockwise about the Y axis when viewed
+     * from above. +90° maps east (+X) to south (+Z).
      */
     rotateY(degrees) {
-    wasm.Schematic_rotate_y(this.ffiValue, degrees);
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
-        try {}
+
+        const result = wasm.Schematic_rotate_y(diplomatReceive.buffer, this.ffiValue, degrees);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
 
         finally {
             diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
         }
     }
 
     /**
-     * Rotate the default region about the Z axis. `degrees` must be a
-     * multiple of 90 (anything else is a no-op; negative values wrap).
-     * +90° maps +Y onto +X (up rotates east). The region keeps its
-     * minimum corner; block orientations and entities are updated.
+     * Rotate the default region about the Z axis. +90° maps up (+Y) to
+     * west (-X).
      */
     rotateZ(degrees) {
-    wasm.Schematic_rotate_z(this.ffiValue, degrees);
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
-        try {}
+
+        const result = wasm.Schematic_rotate_z(diplomatReceive.buffer, this.ffiValue, degrees);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
 
         finally {
             diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
         }
     }
 
     /**
-     * Mirror a named region along the X axis (like `flip_x`). `NotFound`
-     * if no region has that name.
+     * Move the default region and all attached block entities/entities.
+     */
+    translate(dx, dy, dz) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_translate(diplomatReceive.buffer, this.ffiValue, dx, dy, dz);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Mirror a named region along the X axis.
      */
     flipRegionX(regionName) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
@@ -1936,8 +2196,7 @@ export class Schematic {
     }
 
     /**
-     * Mirror a named region along the Y axis (like `flip_y`). `NotFound`
-     * if no region has that name.
+     * Mirror a named region along the Y axis.
      */
     flipRegionY(regionName) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
@@ -1964,8 +2223,7 @@ export class Schematic {
     }
 
     /**
-     * Mirror a named region along the Z axis (like `flip_z`). `NotFound`
-     * if no region has that name.
+     * Mirror a named region along the Z axis.
      */
     flipRegionZ(regionName) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
@@ -1992,9 +2250,7 @@ export class Schematic {
     }
 
     /**
-     * Rotate a named region about the X axis by a multiple of 90 degrees
-     * (same semantics as `rotate_x`). `NotFound` if no region has that
-     * name.
+     * Rotate a named region about the X axis by a multiple of 90 degrees.
      */
     rotateRegionX(regionName, degrees) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
@@ -2021,9 +2277,8 @@ export class Schematic {
     }
 
     /**
-     * Rotate a named region about the Y axis by a multiple of 90 degrees
-     * (same semantics as `rotate_y`). `NotFound` if no region has that
-     * name.
+     * Rotate a named region clockwise about the Y axis by a multiple of
+     * 90 degrees.
      */
     rotateRegionY(regionName, degrees) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
@@ -2050,9 +2305,7 @@ export class Schematic {
     }
 
     /**
-     * Rotate a named region about the Z axis by a multiple of 90 degrees
-     * (same semantics as `rotate_z`). `NotFound` if no region has that
-     * name.
+     * Rotate a named region about the Z axis by a multiple of 90 degrees.
      */
     rotateRegionZ(regionName, degrees) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
@@ -2074,6 +2327,187 @@ export class Schematic {
             diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
             functionCleanupArena.free();
 
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Move one named region without affecting its siblings.
+     */
+    translateRegion(regionName, dx, dy, dz) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const regionNameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, regionName)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_translate_region(diplomatReceive.buffer, this.ffiValue, regionNameSlice.ptr, dx, dy, dz);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Rotate every region as one rigid schematic around the shared bounds.
+     */
+    rotateSchematicX(degrees) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_rotate_schematic_x(diplomatReceive.buffer, this.ffiValue, degrees);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Rotate every region as one rigid schematic around the shared bounds.
+     */
+    rotateSchematicY(degrees) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_rotate_schematic_y(diplomatReceive.buffer, this.ffiValue, degrees);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Rotate every region as one rigid schematic around the shared bounds.
+     */
+    rotateSchematicZ(degrees) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_rotate_schematic_z(diplomatReceive.buffer, this.ffiValue, degrees);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Mirror every region across the shared schematic X bounds.
+     */
+    flipSchematicX() {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_flip_schematic_x(diplomatReceive.buffer, this.ffiValue);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Mirror every region across the shared schematic Y bounds.
+     */
+    flipSchematicY() {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_flip_schematic_y(diplomatReceive.buffer, this.ffiValue);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Mirror every region across the shared schematic Z bounds.
+     */
+    flipSchematicZ() {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_flip_schematic_z(diplomatReceive.buffer, this.ffiValue);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Move every region by the same delta, preserving their relative layout.
+     */
+    translateSchematic(dx, dy, dz) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_translate_schematic(diplomatReceive.buffer, this.ffiValue, dx, dy, dz);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
             diplomatReceive.free();
         }
     }
@@ -2266,6 +2700,116 @@ export class Schematic {
 
 
         const result = wasm.Schematic_set_block_in_region(diplomatReceive.buffer, this.ffiValue, regionNameSlice.ptr, x, y, z, blockNameSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Whether a default or named schematic region exists.
+     */
+    hasRegion(regionName) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const regionNameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, regionName)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 1, true);
+
+
+        const result = wasm.Schematic_has_region(diplomatReceive.buffer, this.ffiValue, regionNameSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return (new Uint8Array(wasm.memory.buffer, diplomatReceive.buffer, 1))[0] === 1;
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Create an empty named region. Its first block anchors its bounds.
+     */
+    createRegion(regionName) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const regionNameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, regionName)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_create_region(diplomatReceive.buffer, this.ffiValue, regionNameSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Remove a named region. The default region cannot be removed.
+     */
+    removeRegion(regionName) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const regionNameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, regionName)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_remove_region(diplomatReceive.buffer, this.ffiValue, regionNameSlice.ptr);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Rename a named region. The default region cannot be renamed.
+     */
+    renameRegion(oldName, newName) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const oldNameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, oldName)));
+        const newNameSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, newName)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.Schematic_rename_region(diplomatReceive.buffer, this.ffiValue, oldNameSlice.ptr, newNameSlice.ptr);
 
         try {
             if (!diplomatReceive.resultFlag) {

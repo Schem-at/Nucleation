@@ -1,9 +1,9 @@
 use crate::building::{
     BezierCurve, BilinearGradientBrush, BlockPalette, Brush, ColorBrush, Cone, Cuboid,
-    CurveGradientBrush, Cylinder, Difference, Disk, Ellipsoid, FieldBrush, Hollow, Intersection, Line,
-    LinearGradientBrush, MultiPointGradientBrush, ParametricShape, Plane, PointGradientBrush,
+    CurveGradientBrush, Cylinder, Difference, Disk, Ellipsoid, FieldBrush, Hollow, Intersection,
+    Line, LinearGradientBrush, MultiPointGradientBrush, ParametricShape, Plane, PointGradientBrush,
     PolygonPrism, Pyramid, SdfShape, ShadedBrush, Shape, SolidBrush, Sphere, SpotlightBrush, Torus,
-    Triangle, Union,
+    Triangle, TubePath, Union,
 };
 use crate::BlockState;
 
@@ -57,6 +57,7 @@ macro_rules! delegate_shape {
             ShapeEnum::Triangle(s) => s.$method($($arg),*),
             ShapeEnum::Line(s) => s.$method($($arg),*),
             ShapeEnum::BezierCurve(s) => s.$method($($arg),*),
+            ShapeEnum::TubePath(s) => s.$method($($arg),*),
             ShapeEnum::Sdf(s) => s.$method($($arg),*),
             ShapeEnum::Hollow(s) => s.$method($($arg),*),
             ShapeEnum::Union(s) => s.$method($($arg),*),
@@ -85,6 +86,7 @@ pub enum ShapeEnum {
     Triangle(Triangle),
     Line(Line),
     BezierCurve(BezierCurve),
+    TubePath(TubePath),
     Sdf(SdfShape),
     /// A voxelized triangle mesh (GLB/OBJ). Only with the `voxelize` feature.
     #[cfg(feature = "voxelize")]
@@ -105,6 +107,7 @@ impl ShapeEnum {
             Self::Torus(s) => Some(s.parameter_at(x, y, z)),
             Self::Pyramid(s) => Some(s.parameter_at(x, y, z)),
             Self::BezierCurve(s) => Some(s.parameter_at(x, y, z)),
+            Self::TubePath(s) => Some(s.parameter_at(x, y, z)),
             Self::Hollow(s) => s.inner.parameter_at(x, y, z),
             Self::Union(s) => {
                 if s.a.contains(x, y, z) {
@@ -214,5 +217,23 @@ impl BrushEnum {
             BrushEnum::CurveGradient(b) => b.get_block_parametric(x, y, z, normal, t),
             _ => self.get_block(x, y, z, normal),
         }
+    }
+}
+
+#[cfg(test)]
+mod sampled_curve_enum_tests {
+    use super::*;
+
+    #[test]
+    fn tube_path_retains_parameter_through_shape_enum() {
+        let curve = crate::building::Curve3D::new(
+            vec![(0.0, 0.0, 0.0), (4.0, 0.0, 0.0), (4.0, 0.0, 4.0)],
+            true,
+        )
+        .unwrap();
+        let shape = ShapeEnum::TubePath(crate::building::TubePath::new(curve, 0.6).unwrap());
+
+        assert!(shape.contains(2, 0, 2));
+        assert!(shape.parameter_at(2, 0, 2).unwrap() > 0.66);
     }
 }

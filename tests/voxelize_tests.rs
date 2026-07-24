@@ -73,7 +73,10 @@ fn obj_cube_voxelizes_solid() {
     );
     // Normal near the bottom face points down.
     let (_, ny_bottom, _) = shape.normal_at(0, 0, 0);
-    assert!(ny_bottom < -0.9, "-y face normal should point down, got {ny_bottom}");
+    assert!(
+        ny_bottom < -0.9,
+        "-y face normal should point down, got {ny_bottom}"
+    );
 }
 
 /// Surface-only voxelization keeps a skin and skips the parity interior fill:
@@ -87,7 +90,10 @@ fn surface_shell_skips_the_interior_fill() {
     let skin = MeshShape::new(model).with_surface_shell(1.0);
 
     // Deep interior is empty — a solid/parity cube would fill it.
-    assert!(!skin.contains(0, 8, 0), "surface-only cube must be hollow at the center");
+    assert!(
+        !skin.contains(0, 8, 0),
+        "surface-only cube must be hollow at the center"
+    );
     // The faces themselves are present.
     assert!(skin.contains(0, 0, 0), "bottom face voxel present");
     assert!(skin.contains(0, 15, 0), "top face voxel present");
@@ -147,7 +153,10 @@ f 1 4 6
             }
         }
     }
-    assert!(analytic > 100, "analytic octahedron unexpectedly small: {analytic}");
+    assert!(
+        analytic > 100,
+        "analytic octahedron unexpectedly small: {analytic}"
+    );
     assert_eq!(
         mismatches, 0,
         "parity voxels disagree with the analytic octahedron away from the surface"
@@ -172,7 +181,11 @@ f 1 4 6
 fn glb_boxtextured_voxelizes_with_texture_colors() {
     let bytes = std::fs::read("tests/samples/BoxTextured.glb").expect("committed sample");
     let mut model = MeshModel::from_glb_bytes(&bytes).expect("BoxTextured loads");
-    assert_eq!(model.triangles.len(), 12, "BoxTextured is a 12-triangle cube");
+    assert_eq!(
+        model.triangles.len(),
+        12,
+        "BoxTextured is a 12-triangle cube"
+    );
     assert!(
         model.materials.iter().flatten().next().is_some(),
         "BoxTextured must decode its embedded texture"
@@ -217,9 +230,21 @@ fn spotlight_brush_lights_and_shades() {
     let outside = brush.get_block(40, 0, 0, (0.0, 1.0, 0.0)).unwrap();
 
     let (l_lit, l_back, l_out) = (lightness(&lit), lightness(&back), lightness(&outside));
-    assert!(l_lit > 0.8, "lit face should be bright, got {l_lit} ({})", lit.name);
-    assert!(l_back < 0.45, "back face should be dark, got {l_back} ({})", back.name);
-    assert!(l_out < 0.45, "outside-cone face should be dark, got {l_out} ({})", outside.name);
+    assert!(
+        l_lit > 0.8,
+        "lit face should be bright, got {l_lit} ({})",
+        lit.name
+    );
+    assert!(
+        l_back < 0.45,
+        "back face should be dark, got {l_back} ({})",
+        back.name
+    );
+    assert!(
+        l_out < 0.45,
+        "outside-cone face should be dark, got {l_out} ({})",
+        outside.name
+    );
     assert!(l_lit > l_back + 0.3);
     assert!(l_lit > l_out + 0.3);
 }

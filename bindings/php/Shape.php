@@ -5,11 +5,21 @@ final class Shape {
     /** @internal */
     public \FFI\CData $ptr;
     private bool $owned;
+    private ?object $borrowedFrom;
 
     /** @internal */
-    public function __construct(\FFI\CData $ptr, bool $owned) {
+    public function __construct(\FFI\CData $ptr, bool $owned, ?object $borrowedFrom = null) {
         $this->ptr = $ptr;
         $this->owned = $owned;
+        $this->borrowedFrom = $borrowedFrom;
+    }
+
+    public static function tubeAlong( $curve,  $radius) {
+        $result = Lib::ffi()->Shape_tube_along($curve->ptr, $radius);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Shape($result->ok, true);
     }
 
     public static function sphere( $cx,  $cy,  $cz,  $radius) {

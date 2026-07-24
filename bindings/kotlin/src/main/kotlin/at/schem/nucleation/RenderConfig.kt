@@ -13,8 +13,13 @@ internal interface RenderConfigLib: Library {
     fun RenderConfig_set_zoom(handle: Pointer, zoom: Float): Unit
     fun RenderConfig_set_sphere_fit(handle: Pointer, sphereFit: Boolean): Unit
     fun RenderConfig_set_fov(handle: Pointer, fov: Float): Unit
+    fun RenderConfig_set_directional_light(handle: Pointer, x: Float, y: Float, z: Float, intensity: Float): ResultUnitInt
+    fun RenderConfig_set_ambient_light(handle: Pointer, ambient: Float): ResultUnitInt
     fun RenderConfig_set_background(handle: Pointer, r: Float, g: Float, b: Float, a: Float): Unit
     fun RenderConfig_clear_background(handle: Pointer): Unit
+    fun RenderConfig_set_grid(handle: Pointer, halfExtent: Int, spacing: Int, planeY: Float, showAxes: Boolean, red: Float, green: Float, blue: Float, alpha: Float): Unit
+    fun RenderConfig_set_fitted_grid(handle: Pointer, margin: Int, spacing: Int, planeY: Float, showAxes: Boolean, red: Float, green: Float, blue: Float, alpha: Float): Unit
+    fun RenderConfig_clear_grid(handle: Pointer): Unit
     fun RenderConfig_set_orthographic(handle: Pointer, orthographic: Boolean): Unit
     fun RenderConfig_set_isometric(handle: Pointer): Unit
 }
@@ -109,6 +114,32 @@ class RenderConfig internal constructor (
         
     }
     
+    /** Set the world-space directional light and its non-negative intensity.
+    */
+    fun setDirectionalLight(x: Float, y: Float, z: Float, intensity: Float): Result<Unit> {
+        
+        val returnVal = lib.RenderConfig_set_directional_light(handle, x, y, z, intensity);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
+    /** Set the unlit floor for non-HDRI rendering, in `0..=1`.
+    */
+    fun setAmbientLight(ambient: Float): Result<Unit> {
+        
+        val returnVal = lib.RenderConfig_set_ambient_light(handle, ambient);
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            return Unit.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+    
     /** Set a solid RGBA clear color (linear 0.0–1.0). Alpha < 1.0 yields a
     *transparent PNG. Ignored when HDRI is enabled.
     */
@@ -123,6 +154,30 @@ class RenderConfig internal constructor (
     fun clearBackground(): Unit {
         
         val returnVal = lib.RenderConfig_clear_background(handle);
+        
+    }
+    
+    /** Configure a one-block world grid. Models are centred on integer
+    *schematic coordinates, so grid lines are placed on half-integer
+    *block boundaries automatically.
+    */
+    fun setGrid(halfExtent: Int, spacing: Int, planeY: Float, showAxes: Boolean, red: Float, green: Float, blue: Float, alpha: Float): Unit {
+        
+        val returnVal = lib.RenderConfig_set_grid(handle, halfExtent, spacing, planeY, showAxes, red, green, blue, alpha);
+        
+    }
+    
+    /** Configure a compact grid fitted to half-integer block boundaries.
+    */
+    fun setFittedGrid(margin: Int, spacing: Int, planeY: Float, showAxes: Boolean, red: Float, green: Float, blue: Float, alpha: Float): Unit {
+        
+        val returnVal = lib.RenderConfig_set_fitted_grid(handle, margin, spacing, planeY, showAxes, red, green, blue, alpha);
+        
+    }
+    
+    fun clearGrid(): Unit {
+        
+        val returnVal = lib.RenderConfig_clear_grid(handle);
         
     }
     

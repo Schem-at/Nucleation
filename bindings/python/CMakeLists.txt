@@ -18,8 +18,20 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT)
 find_package(nanobind CONFIG REQUIRED)
 
-set(REPO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..)
-set(RUST_LIB ${REPO_ROOT}/target/release/${CMAKE_STATIC_LIBRARY_PREFIX}nucleation${CMAKE_STATIC_LIBRARY_SUFFIX})
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml")
+  # Self-contained source distribution staged by tools/stage-python-sdist.py.
+  set(REPO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/rust)
+else()
+  # Normal checkout/editable build.
+  set(REPO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+endif()
+if(DEFINED ENV{CARGO_TARGET_DIR} AND NOT "$ENV{CARGO_TARGET_DIR}" STREQUAL "")
+  get_filename_component(CARGO_TARGET_DIR "$ENV{CARGO_TARGET_DIR}" ABSOLUTE
+                         BASE_DIR "${REPO_ROOT}")
+else()
+  set(CARGO_TARGET_DIR "${REPO_ROOT}/target")
+endif()
+set(RUST_LIB ${CARGO_TARGET_DIR}/release/${CMAKE_STATIC_LIBRARY_PREFIX}nucleation${CMAKE_STATIC_LIBRARY_SUFFIX})
 
 # NUCLEATION_FEATURES lets CI choose the feature set baked into the wheel.
 if(NOT DEFINED ENV{NUCLEATION_FEATURES})
@@ -46,8 +58,9 @@ if(WIN32)
 endif()
 if(APPLE)
   # wgpu (rendering feature) needs the system frameworks
+  # CoreGraphics: wgpu_hal color-space symbols used by Metal surfaces
   # Foundation: wgpu_hal's Metal layer observer uses NSKeyValueChange* symbols
-  target_link_libraries(nucleation_rust INTERFACE "-framework Metal" "-framework QuartzCore" "-framework CoreFoundation" "-framework Foundation")
+  target_link_libraries(nucleation_rust INTERFACE "-framework Metal" "-framework QuartzCore" "-framework CoreGraphics" "-framework CoreFoundation" "-framework Foundation")
 endif()
 
 file(GLOB_RECURSE SUBMODULE_FILES src/sub_modules/*.cpp)
@@ -59,6 +72,7 @@ nanobind_add_module(
   ${SUBMODULE_FILES}
 )
 target_include_directories(nucleation PUBLIC "src/include")
+target_include_directories(nucleation PRIVATE "custom")
 # The Diplomat-generated dealloc shim reaches into nanobind's internal
 # nb_inst struct (the reason for the ==2.12.0 pin), so the generated
 # sources compile against nb_internals.h, which needs nanobind's bundled

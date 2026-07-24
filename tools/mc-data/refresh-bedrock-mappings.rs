@@ -54,7 +54,8 @@ use std::fs;
 use std::io::Read;
 use std::path::Path;
 
-const DEFAULT_SOURCE: &str = "https://raw.githubusercontent.com/GeyserMC/mappings/master/blocks.nbt";
+const DEFAULT_SOURCE: &str =
+    "https://raw.githubusercontent.com/GeyserMC/mappings/master/blocks.nbt";
 const SNAPSHOT_PATH: &str = "data/blockpedia/prismarinejs_blocks.json.gz";
 const BEDROCK_STATES_PATH: &str = "data/blockpedia/bedrock_block_states.json.gz";
 const OUTPUT_PATH: &str = "data/blockpedia/geyser_mappings.json.gz";
@@ -101,7 +102,10 @@ fn main() -> Result<()> {
     // --- upstream mapping list (gzipped NBT) ---
     let nbt_bytes = fetch_source(&source)?;
     let upstream = parse_blocks_nbt(&nbt_bytes)?;
-    println!("Upstream blocks.nbt: {} bedrock_mappings entries", upstream.len());
+    println!(
+        "Upstream blocks.nbt: {} bedrock_mappings entries",
+        upstream.len()
+    );
 
     // --- Java blockstates, in runtime state-id order, from the snapshot ---
     let java_states = enumerate_java_states()?;
@@ -159,7 +163,10 @@ fn main() -> Result<()> {
                 } else if palette.contains(&java.bare_name) {
                     // Documented fallback: identity mapping (default state).
                     fallback_identity += 1;
-                    Some(BedrockState { identifier: java.bare_name.clone(), state: None })
+                    Some(BedrockState {
+                        identifier: java.bare_name.clone(),
+                        state: None,
+                    })
                 } else {
                     unmapped += 1;
                     None
@@ -177,13 +184,20 @@ fn main() -> Result<()> {
         if bedrock.identifier == java.bare_name {
             identity_ids += 1;
         }
-        let bare = bedrock.identifier.rsplit(':').next().unwrap_or(&bedrock.identifier);
+        let bare = bedrock
+            .identifier
+            .rsplit(':')
+            .next()
+            .unwrap_or(&bedrock.identifier);
         if !palette.contains(bare) {
             missing_in_palette.insert(bedrock.identifier.clone());
         }
 
         let mut java_obj = Map::new();
-        java_obj.insert("Name".into(), json!(format!("minecraft:{}", java.bare_name)));
+        java_obj.insert(
+            "Name".into(),
+            json!(format!("minecraft:{}", java.bare_name)),
+        );
         if !java.properties.is_empty() {
             let props: Map<String, Value> = java
                 .properties
@@ -226,7 +240,9 @@ fn main() -> Result<()> {
     println!("  identity-fallback states (skew only):     {fallback_identity}");
     println!("  unmapped states left without an entry:    {unmapped}");
     if missing_in_palette.is_empty() {
-        println!("  bedrock palette coverage: every bedrock_identifier exists in {BEDROCK_STATES_PATH}");
+        println!(
+            "  bedrock palette coverage: every bedrock_identifier exists in {BEDROCK_STATES_PATH}"
+        );
     } else {
         println!(
             "  WARNING: {} bedrock ids missing from {BEDROCK_STATES_PATH}: {:?}",
@@ -322,7 +338,9 @@ fn enumerate_java_states() -> Result<Vec<JavaState>> {
     let mut expected_id = 0u64;
     for block in ordered {
         let name = block["name"].as_str().context("block missing name")?;
-        let min_id = block["minStateId"].as_u64().context("block missing minStateId")?;
+        let min_id = block["minStateId"]
+            .as_u64()
+            .context("block missing minStateId")?;
         if min_id != expected_id {
             bail!("state-id gap before minecraft:{name}: expected {expected_id}, got {min_id}");
         }
@@ -331,7 +349,10 @@ fn enumerate_java_states() -> Result<Vec<JavaState>> {
         let mut props: Vec<(String, Vec<String>)> = Vec::new();
         if let Some(states) = block["states"].as_array() {
             for s in states {
-                let pname = s["name"].as_str().context("state missing name")?.to_string();
+                let pname = s["name"]
+                    .as_str()
+                    .context("state missing name")?
+                    .to_string();
                 let values = property_values(s)
                     .with_context(|| format!("minecraft:{name}: bad property {pname}"))?;
                 props.push((pname, values));
@@ -379,7 +400,9 @@ fn property_values(state: &Value) -> Result<Vec<String>> {
                     })
                     .collect())
             } else if state["type"].as_str() == Some("int") {
-                let n = state["num_values"].as_u64().context("int property without num_values")?;
+                let n = state["num_values"]
+                    .as_u64()
+                    .context("int property without num_values")?;
                 Ok((0..n).map(|i| i.to_string()).collect())
             } else {
                 bail!("enum property without values array")
@@ -420,7 +443,10 @@ fn align_via_report(
     let mut by_id: HashMap<u64, (String, JavaState)> = HashMap::new();
     for (id, entry) in report {
         let bare = id.strip_prefix("minecraft:").unwrap_or(id);
-        for s in entry["states"].as_array().context("report entry without states")? {
+        for s in entry["states"]
+            .as_array()
+            .context("report entry without states")?
+        {
             let sid = s["id"].as_u64().context("report state without id")?;
             let properties = s["properties"]
                 .as_object()
@@ -430,7 +456,10 @@ fn align_via_report(
                         .collect()
                 })
                 .unwrap_or_default();
-            let js = JavaState { bare_name: bare.to_string(), properties };
+            let js = JavaState {
+                bare_name: bare.to_string(),
+                properties,
+            };
             by_id.insert(sid, (state_key(&js), js));
         }
     }
@@ -536,7 +565,8 @@ fn diff_against_previous(new_mappings: &[Value]) -> Result<()> {
 // ---------------------------------------------------------------------------
 
 fn read_gz(path: &Path) -> Result<String> {
-    let file = fs::File::open(path).with_context(|| format!("Failed to open {}", path.display()))?;
+    let file =
+        fs::File::open(path).with_context(|| format!("Failed to open {}", path.display()))?;
     let mut decoder = flate2::read::GzDecoder::new(file);
     let mut out = String::new();
     decoder.read_to_string(&mut out)?;

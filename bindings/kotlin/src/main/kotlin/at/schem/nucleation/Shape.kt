@@ -7,6 +7,7 @@ import com.sun.jna.Structure
 
 internal interface ShapeLib: Library {
     fun Shape_destroy(handle: Pointer)
+    fun Shape_tube_along(curve: Pointer, radius: Double): ResultPointerInt
     fun Shape_sphere(cx: Float, cy: Float, cz: Float, radius: Float): Pointer
     fun Shape_cuboid(minX: Int, minY: Int, minZ: Int, maxX: Int, maxY: Int, maxZ: Int): Pointer
     fun Shape_polygon_prism(polygonJson: Slice, yMin: Int, yMax: Int): ResultPointerInt
@@ -57,6 +58,24 @@ class Shape internal constructor (
     companion object {
         internal val libClass: Class<ShapeLib> = ShapeLib::class.java
         internal val lib: ShapeLib = Native.load("nucleation", libClass)
+        @JvmStatic
+        
+        /** Thicken a sampled 3D curve into a parametric tube with the given radius.
+        *Inputs outside voxel-coordinate or bounded-work limits are rejected.
+        */
+        fun tubeAlong(curve: Curve3D, radius: Double): Result<Shape> {
+            
+            val returnVal = lib.Shape_tube_along(curve.handle, radius);
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                val selfEdges: List<Any> = listOf()
+                val handle = nativeOkVal 
+                val returnOpaque = Shape(handle, selfEdges, true)
+                return returnOpaque.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        }
         @JvmStatic
         
         /** Sphere centered at (`cx`, `cy`, `cz`) (truncated to block coordinates,

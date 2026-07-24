@@ -56,9 +56,34 @@ pub struct Region {
 
 impl Region {
     pub fn new(name: String, position: (i32, i32, i32), size: (i32, i32, i32)) -> Self {
-        let bounding_box = BoundingBox::from_position_and_size(position, size);
-        let volume = bounding_box.volume() as usize;
-        let position_and_size = bounding_box.to_position_and_size();
+        Self::try_new(name, position, size)
+            .expect("region bounds or allocation exceed supported limits")
+    }
+
+    /// Construct a region without panicking on invalid bounds, arithmetic overflow,
+    /// or allocation failure.
+    pub fn try_new(
+        name: String,
+        position: (i32, i32, i32),
+        size: (i32, i32, i32),
+    ) -> Result<Self, String> {
+        let bounding_box = BoundingBox::try_from_position_and_size(position, size)?;
+        let dimension = |min: i32, max: i32, axis: &str| {
+            let value = i64::from(max) - i64::from(min) + 1;
+            i32::try_from(value)
+                .map_err(|_| format!("Region {axis} dimension {value} exceeds i32 limits"))
+        };
+        let dimensions = (
+            dimension(bounding_box.min.0, bounding_box.max.0, "X")?,
+            dimension(bounding_box.min.1, bounding_box.max.1, "Y")?,
+            dimension(bounding_box.min.2, bounding_box.max.2, "Z")?,
+        );
+        let volume = usize::try_from(dimensions.0)
+            .ok()
+            .and_then(|x| x.checked_mul(dimensions.1 as usize))
+            .and_then(|xy| xy.checked_mul(dimensions.2 as usize))
+            .ok_or_else(|| "Region volume exceeds addressable memory".to_string())?;
+        let position_and_size = (bounding_box.min, dimensions);
 
         let mut palette = Vec::new();
         let mut palette_index: FxHashMap<BlockState, usize> = FxHashMap::default();
@@ -67,11 +92,17 @@ impl Region {
         palette.push(air.clone());
         palette_index.insert(air, 0);
 
+        let mut blocks = Vec::new();
+        blocks
+            .try_reserve_exact(volume)
+            .map_err(|error| format!("Cannot allocate region with {volume} blocks: {error}"))?;
+        blocks.resize(volume, 0);
+
         let mut region = Region {
             name,
             position: position_and_size.0,
             size: position_and_size.1,
-            blocks: vec![0; volume],
+            blocks,
             palette,
             palette_index,
             entities: Vec::new(),
@@ -86,7 +117,7 @@ impl Region {
         };
         region.rebuild_bbox();
         region.rebuild_air_index();
-        region
+        Ok(region)
     }
 
     #[inline(always)]
@@ -163,7 +194,14 @@ impl Region {
     }
 
     pub fn get_block_entities_as_list(&self) -> Vec<BlockEntity> {
-        self.block_entities.values().cloned().collect()
+        self.block_entities
+            .iter()
+            .map(|(position, template)| {
+                let mut entity = template.clone();
+                entity.position = position;
+                entity
+            })
+            .collect()
     }
 
     pub fn set_block(&mut self, x: i32, y: i32, z: i32, block: &BlockState) -> bool {
@@ -780,6 +818,32 @@ impl Region {
         self.merge_block_entities(other);
     }
 
+    /// Merge `other` as a higher-precedence region. Unlike the general merge,
+    /// air cells inside `other`'s allocated portion of its visible content
+    /// bounds overwrite lower-precedence blocks, matching composite reads.
+    pub(crate) fn merge_with_precedence(&mut self, other: &Region) {
+        let visible_bounds = other.get_tight_bounds();
+        self.merge(other);
+
+        let Some(bounds) = visible_bounds else {
+            return;
+        };
+        let air = BlockState::new("minecraft:air".to_string());
+        for y in bounds.min.1..=bounds.max.1 {
+            for z in bounds.min.2..=bounds.max.2 {
+                for x in bounds.min.0..=bounds.max.0 {
+                    if other
+                        .get_block(x, y, z)
+                        .is_some_and(|block| block.name == "minecraft:air")
+                    {
+                        self.set_block(x, y, z, &air);
+                    }
+                }
+            }
+        }
+        self.rebuild_tight_bounds();
+    }
+
     fn merge_entities(&mut self, other: &Region) {
         self.entities.extend(other.entities.iter().cloned());
     }
@@ -1177,6 +1241,7 @@ impl Region {
         self.rebuild_palette_index();
         self.rebuild_air_index();
         self.rebuild_non_air_count();
+        self.rebuild_tight_bounds();
 
         // Transform block entities — pure position remap, no palette work.
         let max_x = self.bbox.max.0;
@@ -1223,6 +1288,7 @@ impl Region {
         self.rebuild_palette_index();
         self.rebuild_air_index();
         self.rebuild_non_air_count();
+        self.rebuild_tight_bounds();
 
         let max_y = self.bbox.max.1;
         let min_y = self.bbox.min.1;
@@ -1270,6 +1336,7 @@ impl Region {
         self.rebuild_palette_index();
         self.rebuild_air_index();
         self.rebuild_non_air_count();
+        self.rebuild_tight_bounds();
 
         let max_z = self.bbox.max.2;
         let min_z = self.bbox.min.2;
@@ -1280,6 +1347,60 @@ impl Region {
             let rel_z = entity.position.2 - self.bbox.min.2 as f64;
             entity.position.2 = self.bbox.max.2 as f64 - rel_z;
         }
+    }
+
+    /// Move this region and all attached content by an integer offset.
+    pub fn translate(&mut self, dx: i32, dy: i32, dz: i32) -> Result<(), String> {
+        let shifted = |value: i32, delta: i32| {
+            value
+                .checked_add(delta)
+                .ok_or_else(|| "Region translation exceeds the i32 coordinate range".to_string())
+        };
+
+        let new_position = (
+            shifted(self.position.0, dx)?,
+            shifted(self.position.1, dy)?,
+            shifted(self.position.2, dz)?,
+        );
+        shifted(self.bbox.max.0, dx)?;
+        shifted(self.bbox.max.1, dy)?;
+        shifted(self.bbox.max.2, dz)?;
+        for &(x, y, z) in self.block_entities.keys() {
+            shifted(x, dx)?;
+            shifted(y, dy)?;
+            shifted(z, dz)?;
+        }
+
+        let new_tight_bounds = self
+            .tight_bounds
+            .as_ref()
+            .map(|bounds| {
+                Ok::<BoundingBox, String>(BoundingBox::new(
+                    (
+                        shifted(bounds.min.0, dx)?,
+                        shifted(bounds.min.1, dy)?,
+                        shifted(bounds.min.2, dz)?,
+                    ),
+                    (
+                        shifted(bounds.max.0, dx)?,
+                        shifted(bounds.max.1, dy)?,
+                        shifted(bounds.max.2, dz)?,
+                    ),
+                ))
+            })
+            .transpose()?;
+
+        self.position = new_position;
+        self.tight_bounds = new_tight_bounds;
+        self.block_entities
+            .remap_positions(|(x, y, z)| (x + dx, y + dy, z + dz));
+        for entity in &mut self.entities {
+            entity.position.0 += dx as f64;
+            entity.position.1 += dy as f64;
+            entity.position.2 += dz as f64;
+        }
+        self.rebuild_bbox();
+        Ok(())
     }
 
     /// Rotate the region around the Y axis (horizontal plane)
@@ -1293,11 +1414,13 @@ impl Region {
         let rotations = normalized_degrees / 90;
 
         for _ in 0..rotations {
-            self.rotate_y_90();
+            if self.rotate_y_90_at(self.position).is_err() {
+                return;
+            }
         }
     }
 
-    fn rotate_y_90(&mut self) {
+    pub(crate) fn rotate_y_90_at(&mut self, position: (i32, i32, i32)) -> Result<(), String> {
         use crate::transforms::{transform_block_state_rotate, Axis};
 
         // For 90-degree rotation around Y:
@@ -1309,7 +1432,7 @@ impl Region {
 
         // New dimensions after rotation
         let new_size = (old_size_z, size_y, old_size_x);
-        let new_bbox = BoundingBox::from_position_and_size(self.position, new_size);
+        let new_bbox = BoundingBox::try_from_position_and_size(position, new_size)?;
 
         let new_volume = new_bbox.volume() as usize;
         let air_index = self.cached_air_index;
@@ -1322,8 +1445,8 @@ impl Region {
             let rel_x = x - old_bbox.min.0;
             let rel_z = z - old_bbox.min.2;
 
-            let new_rel_x = rel_z;
-            let new_rel_z = old_size_x - 1 - rel_x;
+            let new_rel_x = old_size_z - 1 - rel_z;
+            let new_rel_z = rel_x;
 
             let new_x = new_bbox.min.0 + new_rel_x;
             let new_z = new_bbox.min.2 + new_rel_z;
@@ -1347,18 +1470,19 @@ impl Region {
         self.rebuild_palette_index();
         self.rebuild_air_index();
         self.rebuild_non_air_count();
+        self.rebuild_tight_bounds();
 
         // Transform block entities — pure position remap.
         let old_min_x = old_bbox.min.0;
         let old_min_z = old_bbox.min.2;
         let new_min_x = new_bbox_clone.min.0;
         let new_min_z = new_bbox_clone.min.2;
-        let osize_x = old_size_x;
+        let osize_z = old_size_z;
         self.block_entities.remap_positions(move |(x, y, z)| {
             let rel_x = x - old_min_x;
             let rel_z = z - old_min_z;
-            let new_rel_x = rel_z;
-            let new_rel_z = osize_x - 1 - rel_x;
+            let new_rel_x = osize_z - 1 - rel_z;
+            let new_rel_z = rel_x;
             (new_min_x + new_rel_x, y, new_min_z + new_rel_z)
         });
 
@@ -1366,11 +1490,12 @@ impl Region {
         for entity in &mut self.entities {
             let rel_x = entity.position.0 - old_bbox.min.0 as f64;
             let rel_z = entity.position.2 - old_bbox.min.2 as f64;
-            let new_rel_x = rel_z;
-            let new_rel_z = old_size_x as f64 - 1.0 - rel_x;
+            let new_rel_x = old_size_z as f64 - 1.0 - rel_z;
+            let new_rel_z = rel_x;
             entity.position.0 = new_bbox_clone.min.0 as f64 + new_rel_x;
             entity.position.2 = new_bbox_clone.min.2 as f64 + new_rel_z;
         }
+        Ok(())
     }
 
     /// Rotate the region around the X axis
@@ -1384,11 +1509,13 @@ impl Region {
         let rotations = normalized_degrees / 90;
 
         for _ in 0..rotations {
-            self.rotate_x_90();
+            if self.rotate_x_90_at(self.position).is_err() {
+                return;
+            }
         }
     }
 
-    fn rotate_x_90(&mut self) {
+    pub(crate) fn rotate_x_90_at(&mut self, position: (i32, i32, i32)) -> Result<(), String> {
         use crate::transforms::{transform_block_state_rotate, Axis};
 
         let old_bbox = self.bbox.clone();
@@ -1396,7 +1523,7 @@ impl Region {
 
         // New dimensions after rotation around X
         let new_size = (size_x, old_size_z, old_size_y);
-        let new_bbox = BoundingBox::from_position_and_size(self.position, new_size);
+        let new_bbox = BoundingBox::try_from_position_and_size(position, new_size)?;
 
         let new_volume = new_bbox.volume() as usize;
         let air_index = self.cached_air_index;
@@ -1408,8 +1535,8 @@ impl Region {
             let rel_y = y - old_bbox.min.1;
             let rel_z = z - old_bbox.min.2;
 
-            let new_rel_y = rel_z;
-            let new_rel_z = old_size_y - 1 - rel_y;
+            let new_rel_y = old_size_z - 1 - rel_z;
+            let new_rel_z = rel_y;
 
             let new_y = new_bbox.min.1 + new_rel_y;
             let new_z = new_bbox.min.2 + new_rel_z;
@@ -1433,28 +1560,30 @@ impl Region {
         self.rebuild_palette_index();
         self.rebuild_air_index();
         self.rebuild_non_air_count();
+        self.rebuild_tight_bounds();
 
         let old_min_y = old_bbox.min.1;
         let old_min_z = old_bbox.min.2;
         let new_min_y = new_bbox_clone.min.1;
         let new_min_z = new_bbox_clone.min.2;
-        let osize_y = old_size_y;
+        let osize_z = old_size_z;
         self.block_entities.remap_positions(move |(x, y, z)| {
             let rel_y = y - old_min_y;
             let rel_z = z - old_min_z;
-            let new_rel_y = rel_z;
-            let new_rel_z = osize_y - 1 - rel_y;
+            let new_rel_y = osize_z - 1 - rel_z;
+            let new_rel_z = rel_y;
             (x, new_min_y + new_rel_y, new_min_z + new_rel_z)
         });
 
         for entity in &mut self.entities {
             let rel_y = entity.position.1 - old_bbox.min.1 as f64;
             let rel_z = entity.position.2 - old_bbox.min.2 as f64;
-            let new_rel_y = rel_z;
-            let new_rel_z = old_size_y as f64 - 1.0 - rel_y;
+            let new_rel_y = old_size_z as f64 - 1.0 - rel_z;
+            let new_rel_z = rel_y;
             entity.position.1 = new_bbox_clone.min.1 as f64 + new_rel_y;
             entity.position.2 = new_bbox_clone.min.2 as f64 + new_rel_z;
         }
+        Ok(())
     }
 
     /// Rotate the region around the Z axis
@@ -1468,11 +1597,13 @@ impl Region {
         let rotations = normalized_degrees / 90;
 
         for _ in 0..rotations {
-            self.rotate_z_90();
+            if self.rotate_z_90_at(self.position).is_err() {
+                return;
+            }
         }
     }
 
-    fn rotate_z_90(&mut self) {
+    pub(crate) fn rotate_z_90_at(&mut self, position: (i32, i32, i32)) -> Result<(), String> {
         use crate::transforms::{transform_block_state_rotate, Axis};
 
         let old_bbox = self.bbox.clone();
@@ -1480,7 +1611,7 @@ impl Region {
 
         // New dimensions after rotation around Z
         let new_size = (old_size_y, old_size_x, size_z);
-        let new_bbox = BoundingBox::from_position_and_size(self.position, new_size);
+        let new_bbox = BoundingBox::try_from_position_and_size(position, new_size)?;
 
         let new_volume = new_bbox.volume() as usize;
         let air_index = self.cached_air_index;
@@ -1492,8 +1623,8 @@ impl Region {
             let rel_x = x - old_bbox.min.0;
             let rel_y = y - old_bbox.min.1;
 
-            let new_rel_x = rel_y;
-            let new_rel_y = old_size_x - 1 - rel_x;
+            let new_rel_x = old_size_y - 1 - rel_y;
+            let new_rel_y = rel_x;
 
             let new_x = new_bbox.min.0 + new_rel_x;
             let new_y = new_bbox.min.1 + new_rel_y;
@@ -1517,28 +1648,30 @@ impl Region {
         self.rebuild_palette_index();
         self.rebuild_air_index();
         self.rebuild_non_air_count();
+        self.rebuild_tight_bounds();
 
         let old_min_x = old_bbox.min.0;
         let old_min_y = old_bbox.min.1;
         let new_min_x = new_bbox_clone.min.0;
         let new_min_y = new_bbox_clone.min.1;
-        let osize_x = old_size_x;
+        let osize_y = old_size_y;
         self.block_entities.remap_positions(move |(x, y, z)| {
             let rel_x = x - old_min_x;
             let rel_y = y - old_min_y;
-            let new_rel_x = rel_y;
-            let new_rel_y = osize_x - 1 - rel_x;
+            let new_rel_x = osize_y - 1 - rel_y;
+            let new_rel_y = rel_x;
             (new_min_x + new_rel_x, new_min_y + new_rel_y, z)
         });
 
         for entity in &mut self.entities {
             let rel_x = entity.position.0 - old_bbox.min.0 as f64;
             let rel_y = entity.position.1 - old_bbox.min.1 as f64;
-            let new_rel_x = rel_y;
-            let new_rel_y = old_size_x as f64 - 1.0 - rel_x;
+            let new_rel_x = old_size_y as f64 - 1.0 - rel_y;
+            let new_rel_y = rel_x;
             entity.position.0 = new_bbox_clone.min.0 as f64 + new_rel_x;
             entity.position.1 = new_bbox_clone.min.1 as f64 + new_rel_y;
         }
+        Ok(())
     }
 
     // ── Fast-path methods for Python binding performance ──

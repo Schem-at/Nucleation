@@ -11,6 +11,7 @@
 #include <functional>
 #include <optional>
 #include <cstdlib>
+#include "NucleationError.hpp"
 #include "diplomat_runtime.hpp"
 
 
@@ -30,9 +31,21 @@ namespace capi {
 
     void RenderConfig_set_fov(diplomat::capi::RenderConfig* self, float fov);
 
+    typedef struct RenderConfig_set_directional_light_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} RenderConfig_set_directional_light_result;
+    RenderConfig_set_directional_light_result RenderConfig_set_directional_light(diplomat::capi::RenderConfig* self, float x, float y, float z, float intensity);
+
+    typedef struct RenderConfig_set_ambient_light_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} RenderConfig_set_ambient_light_result;
+    RenderConfig_set_ambient_light_result RenderConfig_set_ambient_light(diplomat::capi::RenderConfig* self, float ambient);
+
     void RenderConfig_set_background(diplomat::capi::RenderConfig* self, float r, float g, float b, float a);
 
     void RenderConfig_clear_background(diplomat::capi::RenderConfig* self);
+
+    void RenderConfig_set_grid(diplomat::capi::RenderConfig* self, int32_t half_extent, int32_t spacing, float plane_y, bool show_axes, float red, float green, float blue, float alpha);
+
+    void RenderConfig_set_fitted_grid(diplomat::capi::RenderConfig* self, int32_t margin, int32_t spacing, float plane_y, bool show_axes, float red, float green, float blue, float alpha);
+
+    void RenderConfig_clear_grid(diplomat::capi::RenderConfig* self);
 
     void RenderConfig_set_orthographic(diplomat::capi::RenderConfig* self, bool orthographic);
 
@@ -75,6 +88,21 @@ inline void RenderConfig::set_fov(float fov) {
         fov);
 }
 
+inline diplomat::result<std::monostate, NucleationError> RenderConfig::set_directional_light(float x, float y, float z, float intensity) {
+    auto result = diplomat::capi::RenderConfig_set_directional_light(this->AsFFI(),
+        x,
+        y,
+        z,
+        intensity);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> RenderConfig::set_ambient_light(float ambient) {
+    auto result = diplomat::capi::RenderConfig_set_ambient_light(this->AsFFI(),
+        ambient);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
 inline void RenderConfig::set_background(float r, float g, float b, float a) {
     diplomat::capi::RenderConfig_set_background(this->AsFFI(),
         r,
@@ -85,6 +113,34 @@ inline void RenderConfig::set_background(float r, float g, float b, float a) {
 
 inline void RenderConfig::clear_background() {
     diplomat::capi::RenderConfig_clear_background(this->AsFFI());
+}
+
+inline void RenderConfig::set_grid(int32_t half_extent, int32_t spacing, float plane_y, bool show_axes, float red, float green, float blue, float alpha) {
+    diplomat::capi::RenderConfig_set_grid(this->AsFFI(),
+        half_extent,
+        spacing,
+        plane_y,
+        show_axes,
+        red,
+        green,
+        blue,
+        alpha);
+}
+
+inline void RenderConfig::set_fitted_grid(int32_t margin, int32_t spacing, float plane_y, bool show_axes, float red, float green, float blue, float alpha) {
+    diplomat::capi::RenderConfig_set_fitted_grid(this->AsFFI(),
+        margin,
+        spacing,
+        plane_y,
+        show_axes,
+        red,
+        green,
+        blue,
+        alpha);
+}
+
+inline void RenderConfig::clear_grid() {
+    diplomat::capi::RenderConfig_clear_grid(this->AsFFI());
 }
 
 inline void RenderConfig::set_orthographic(bool orthographic) {

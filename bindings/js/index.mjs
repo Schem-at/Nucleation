@@ -14,6 +14,12 @@ export { BlockPos } from "./BlockPos.mjs"
 
 export { Dimensions } from "./Dimensions.mjs"
 
+export { AnimationEffect } from "./AnimationEffect.mjs"
+
+export { BuildAnimation } from "./BuildAnimation.mjs"
+
+export { VideoConfig } from "./VideoConfig.mjs"
+
 export { Autostack } from "./Autostack.mjs"
 
 export { Blocks } from "./Blocks.mjs"
@@ -21,6 +27,8 @@ export { Blocks } from "./Blocks.mjs"
 export { Brush } from "./Brush.mjs"
 
 export { BuildingTool } from "./BuildingTool.mjs"
+
+export { Curve3D } from "./Curve3D.mjs"
 
 export { Palette } from "./Palette.mjs"
 
@@ -125,4 +133,4 @@ export { NucleationError } from "./NucleationError.mjs"
 import wasm from "./diplomat-wasm.mjs";
 import {FUNCTION_PARAM_ALLOC, internalConstructor} from "./diplomat-runtime.mjs";
 
-FUNCTION_PARAM_ALLOC.reserve(internalConstructor, wasm, 52);
+FUNCTION_PARAM_ALLOC.reserve(internalConstructor, wasm, 56);

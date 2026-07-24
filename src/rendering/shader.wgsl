@@ -4,8 +4,24 @@
 struct Uniforms {
     view_proj: mat4x4<f32>,
     inv_view_proj: mat4x4<f32>,
-    // x: alpha_cutoff, y: hdri_enabled (>0.5 = yes), z: hdri_intensity, w: unused
+    // x: alpha_cutoff, y: hdri_enabled (>0.5 = yes), z: hdri_intensity, w: ambient
     params: vec4<f32>,
+    // xyz: world-space direction toward the light, w: directional intensity
+    light: vec4<f32>,
+};
+
+// Per-draw animation state. Written by the animation layer as a `Pose`; an
+// un-animated draw supplies the identity value, which is a no-op in the maths
+// below so posed and un-posed rendering agree bit for bit.
+struct DrawUniforms {
+    model: mat4x4<f32>,
+    // Inverse-transpose of the model's upper 3x3. Required, or rotated and
+    // non-uniformly scaled geometry shades wrong.
+    normal_mat: mat3x3<f32>,
+    // Multiplied into the base colour. Identity is (1, 1, 1, 1).
+    tint: vec4<f32>,
+    // Added after lighting. Identity is (0, 0, 0, 0).
+    emissive: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -13,6 +29,7 @@ struct Uniforms {
 @group(1) @binding(1) var atlas_sampler: sampler;
 @group(2) @binding(0) var hdri_texture: texture_2d<f32>;
 @group(2) @binding(1) var hdri_sampler: sampler;
+@group(3) @binding(0) var<uniform> draw: DrawUniforms;
 
 // ─── Mesh rendering ─────────────────────────────────────────────────────────
 
@@ -33,8 +50,9 @@ struct VertexOutput {
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
-    out.clip_position = uniforms.view_proj * vec4<f32>(in.position, 1.0);
-    out.world_normal = in.normal;
+    let world = draw.model * vec4<f32>(in.position, 1.0);
+    out.clip_position = uniforms.view_proj * world;
+    out.world_normal = draw.normal_mat * in.normal;
     out.uv = in.uv;
     out.color = in.color;
     return out;
@@ -59,17 +77,23 @@ fn hdri_diffuse(normal: vec3<f32>) -> vec3<f32> {
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let tex_color = textureSample(atlas_texture, atlas_sampler, in.uv);
-    let base_color = tex_color * in.color;
+    let material_alpha = tex_color.a * in.color.a;
+    let base_color = tex_color * in.color * draw.tint;
+    if base_color.a <= 0.0001 {
+        discard;
+    }
 
-    // Alpha cutoff for cutout pass
+    // Cutout classification depends on the material, not animation opacity.
     let alpha_cutoff = uniforms.params.x;
-    if alpha_cutoff > 0.0 && base_color.a < alpha_cutoff {
+    if alpha_cutoff > 0.0 && material_alpha < alpha_cutoff {
         discard;
     }
 
     let n = normalize(in.world_normal);
     let hdri_enabled = uniforms.params.y > 0.5;
     let hdri_intensity = uniforms.params.z;
+    let light_dir = normalize(uniforms.light.xyz);
+    let directional_intensity = uniforms.light.w;
 
     var lighting: f32;
     var ambient_color: vec3<f32>;
@@ -78,22 +102,48 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         // Image-based lighting from HDRI
         let ibl = hdri_diffuse(n) * hdri_intensity;
         // Key light for definition
-        let light_dir = normalize(vec3<f32>(0.3, 1.0, 0.5));
         let n_dot_l = max(dot(n, light_dir), 0.0);
         // Minimum ambient floor to prevent total darkness
         let min_ambient = vec3<f32>(0.15);
-        ambient_color = base_color.rgb * max(ibl + 0.35 * n_dot_l, min_ambient);
+        ambient_color = base_color.rgb * max(ibl + 0.35 * directional_intensity * n_dot_l, min_ambient);
         // Tonemap mesh colors too (matches skybox)
         let mapped = ambient_color / (ambient_color + vec3<f32>(1.0));
-        return vec4<f32>(mapped, base_color.a);
+        return vec4<f32>(mapped + draw.emissive.rgb, base_color.a);
     } else {
         // Fallback: simple directional lighting
-        let light_dir = normalize(vec3<f32>(0.3, 1.0, 0.5));
         let n_dot_l = max(dot(n, light_dir), 0.0);
-        let ambient = 0.4;
-        lighting = ambient + (1.0 - ambient) * n_dot_l;
-        return vec4<f32>(base_color.rgb * lighting, base_color.a);
+        let ambient = uniforms.params.w;
+        lighting = ambient + (1.0 - ambient) * directional_intensity * n_dot_l;
+        return vec4<f32>(base_color.rgb * lighting + draw.emissive.rgb, base_color.a);
     }
+}
+
+// ─── Grid / axis lines ──────────────────────────────────────────────────────
+// A world-space reference grid, drawn with the scene's view-projection so it
+// sits under the build and shares its perspective. No lighting or texturing —
+// each vertex just carries its own colour.
+
+struct LineVertex {
+    @location(0) position: vec3<f32>,
+    @location(1) color: vec4<f32>,
+};
+
+struct LineOutput {
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) color: vec4<f32>,
+};
+
+@vertex
+fn vs_line(in: LineVertex) -> LineOutput {
+    var out: LineOutput;
+    out.clip_position = uniforms.view_proj * vec4<f32>(in.position, 1.0);
+    out.color = in.color;
+    return out;
+}
+
+@fragment
+fn fs_line(in: LineOutput) -> @location(0) vec4<f32> {
+    return in.color;
 }
 
 // ─── Skybox rendering ───────────────────────────────────────────────────────

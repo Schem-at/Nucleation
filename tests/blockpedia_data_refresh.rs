@@ -119,11 +119,19 @@ fn color_coverage_is_nearly_complete() {
     // not the grayscale texture average)
     let grass = get_block("minecraft:grass_block").unwrap();
     let [r, g, b] = grass.extras.color.unwrap().rgb;
-    assert!(g > r && g > b, "grass_block should be green: {:?}", [r, g, b]);
+    assert!(
+        g > r && g > b,
+        "grass_block should be green: {:?}",
+        [r, g, b]
+    );
 
     let leaves = get_block("minecraft:oak_leaves").unwrap();
     let [r, g, b] = leaves.extras.color.unwrap().rgb;
-    assert!(g > r && g > b, "oak_leaves should be green: {:?}", [r, g, b]);
+    assert!(
+        g > r && g > b,
+        "oak_leaves should be green: {:?}",
+        [r, g, b]
+    );
 
     let water = get_block("minecraft:water").unwrap();
     let [r, g, b] = water.extras.color.unwrap().rgb;

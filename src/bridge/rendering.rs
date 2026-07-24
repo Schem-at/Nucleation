@@ -14,6 +14,7 @@
 
 #[diplomat::bridge]
 pub mod ffi {
+    use super::super::meshing::ffi::ResourcePack;
     use super::super::schematic::ffi::Schematic;
     use super::super::shared::ffi::NucleationError;
     use base64::Engine;
@@ -68,6 +69,26 @@ pub mod ffi {
             self.0.fov = fov;
         }
 
+        /// Set the world-space directional light and its non-negative intensity.
+        pub fn set_directional_light(
+            &mut self,
+            x: f32,
+            y: f32,
+            z: f32,
+            intensity: f32,
+        ) -> Result<(), NucleationError> {
+            self.0
+                .set_directional_light([x, y, z], intensity)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Set the unlit floor for non-HDRI rendering, in `0..=1`.
+        pub fn set_ambient_light(&mut self, ambient: f32) -> Result<(), NucleationError> {
+            self.0
+                .set_ambient_light(ambient)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
         /// Set a solid RGBA clear color (linear 0.0–1.0). Alpha < 1.0 yields a
         /// transparent PNG. Ignored when HDRI is enabled.
         pub fn set_background(&mut self, r: f32, g: f32, b: f32, a: f32) {
@@ -77,6 +98,58 @@ pub mod ffi {
         /// Clear the custom background — revert to default sky / HDRI.
         pub fn clear_background(&mut self) {
             self.0.background = None;
+        }
+
+        /// Configure a one-block world grid. Models are centred on integer
+        /// schematic coordinates, so grid lines are placed on half-integer
+        /// block boundaries automatically.
+        pub fn set_grid(
+            &mut self,
+            half_extent: i32,
+            spacing: i32,
+            plane_y: f32,
+            show_axes: bool,
+            red: f32,
+            green: f32,
+            blue: f32,
+            alpha: f32,
+        ) {
+            self.0.grid = Some(crate::rendering::GridConfig {
+                half_extent,
+                fit_to_bounds: false,
+                margin: 1,
+                spacing,
+                plane_y,
+                show_axes,
+                line_rgba: [red, green, blue, alpha],
+            });
+        }
+
+        /// Configure a compact grid fitted to half-integer block boundaries.
+        pub fn set_fitted_grid(
+            &mut self,
+            margin: i32,
+            spacing: i32,
+            plane_y: f32,
+            show_axes: bool,
+            red: f32,
+            green: f32,
+            blue: f32,
+            alpha: f32,
+        ) {
+            self.0.grid = Some(crate::rendering::GridConfig {
+                half_extent: 1,
+                fit_to_bounds: true,
+                margin,
+                spacing,
+                plane_y,
+                show_axes,
+                line_rgba: [red, green, blue, alpha],
+            });
+        }
+
+        pub fn clear_grid(&mut self) {
+            self.0.grid = None;
         }
 
         /// Enable (`true`) or disable orthographic projection.
@@ -115,6 +188,16 @@ pub mod ffi {
             schematic
                 .0
                 .to_mesh(&pack, &mesh_config)
+                .map_err(|_| NucleationError::Mesh)
+        }
+
+        fn mesh_with_pack(
+            schematic: &Schematic,
+            pack: &ResourcePack,
+        ) -> Result<crate::meshing::MeshOutput, NucleationError> {
+            schematic
+                .0
+                .to_mesh(&pack.0, &crate::meshing::MeshConfig::default())
                 .map_err(|_| NucleationError::Mesh)
         }
 
@@ -171,5 +254,69 @@ pub mod ffi {
                 .render_to_file(&pack, path, &config.0)
                 .map_err(|_| NucleationError::Render)
         }
+        /// Render with an already parsed resource pack, avoiding repeated ZIP parsing.
+        pub fn render_to_file_with_pack(
+            schematic: &Schematic,
+            pack: &ResourcePack,
+            config: &RenderConfig,
+            path: &DiplomatStr,
+        ) -> Result<(), NucleationError> {
+            let path = std::str::from_utf8(path).map_err(|_| NucleationError::InvalidArgument)?;
+            schematic
+                .0
+                .render_to_file(&pack.0, path, &config.0)
+                .map_err(|_| NucleationError::Render)
+        }
+
+        /// Render raw RGBA pixels with an already parsed resource pack.
+        pub fn render_pixels_b64_with_pack(
+            schematic: &Schematic,
+            pack: &ResourcePack,
+            config: &RenderConfig,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let mesh = Self::mesh_with_pack(schematic, pack)?;
+            let pixels = crate::rendering::render_meshes(&[mesh], &config.0, None)
+                .map_err(|_| NucleationError::Render)?;
+            let _ = write!(
+                out,
+                "{}",
+                base64::engine::general_purpose::STANDARD.encode(&pixels)
+            );
+            Ok(())
+        }
+
+        /// Render PNG bytes with an already parsed resource pack.
+        pub fn render_png_b64_with_pack(
+            schematic: &Schematic,
+            pack: &ResourcePack,
+            config: &RenderConfig,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let mesh = Self::mesh_with_pack(schematic, pack)?;
+            let png = crate::rendering::render_meshes_png(&[mesh], &config.0, None)
+                .map_err(|_| NucleationError::Render)?;
+            let _ = write!(
+                out,
+                "{}",
+                base64::engine::general_purpose::STANDARD.encode(&png)
+            );
+            Ok(())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ffi::RenderConfig;
+
+    #[test]
+    fn bridge_render_config_exposes_aligned_world_grid() {
+        let mut config = RenderConfig::create(420, 420);
+        config.set_grid(10, 1, 0.0, false, 0.42, 0.52, 0.60, 0.38);
+        let grid = config.0.grid.unwrap();
+        assert_eq!(grid.spacing, 1);
+        assert_eq!(grid.plane_y, 0.0);
+        assert_eq!(grid.line_rgba[3], 0.38);
     }
 }

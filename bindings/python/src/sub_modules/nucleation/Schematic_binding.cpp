@@ -2,6 +2,7 @@
 
 
 #include "Schematic.hpp"
+#include "schematic_compat.hpp"
 
 namespace nucleation {
 void add_Schematic_binding(nb::module_ mod) {
@@ -12,6 +13,7 @@ void add_Schematic_binding(nb::module_ mod) {
     
     nb::class_<nucleation::Schematic> opaque(mod, "Schematic", nb::type_slots(nucleation_Schematic_slots));
     opaque
+        .def("add_armor_stand", &nucleation::Schematic::add_armor_stand, "x"_a, "y"_a, "z"_a, "yaw"_a, "armor_material"_a)
         .def("add_entity", &nucleation::Schematic::add_entity, "id"_a, "x"_a, "y"_a, "z"_a, "nbt_json"_a)
         .def("add_entity_from_snbt", &nucleation::Schematic::add_entity_from_snbt, "snbt"_a)
         .def("all_palettes_json", &nucleation::Schematic::all_palettes_json)
@@ -26,10 +28,12 @@ void add_Schematic_binding(nb::module_ mod) {
         .def("convert_to_version", &nucleation::Schematic::convert_to_version, "target_data_version"_a)
         .def("copy_region", &nucleation::Schematic::copy_region, "source"_a, "min_x"_a, "min_y"_a, "min_z"_a, "max_x"_a, "max_y"_a, "max_z"_a, "target_x"_a, "target_y"_a, "target_z"_a, "excluded_blocks_json"_a)
         .def_static("create", std::move(maybe_op_unwrap(&nucleation::Schematic::create)), "name"_a)
+        .def("create_region", &nucleation::Schematic::create_region, "region_name"_a)
         .def("created", &nucleation::Schematic::created)
         .def("debug_info", &nucleation::Schematic::debug_info)
         .def("debug_json_string", &nucleation::Schematic::debug_json_string)
         .def("debug_string", &nucleation::Schematic::debug_string)
+        .def("deep_clone", std::move(maybe_op_unwrap(&nucleation::Schematic::deep_clone)))
         .def("default_region_palette_json", &nucleation::Schematic::default_region_palette_json)
         .def("description", &nucleation::Schematic::description)
         .def("dimensions", &nucleation::Schematic::dimensions)
@@ -40,6 +44,9 @@ void add_Schematic_binding(nb::module_ mod) {
         .def("flip_region_x", &nucleation::Schematic::flip_region_x, "region_name"_a)
         .def("flip_region_y", &nucleation::Schematic::flip_region_y, "region_name"_a)
         .def("flip_region_z", &nucleation::Schematic::flip_region_z, "region_name"_a)
+        .def("flip_schematic_x", &nucleation::Schematic::flip_schematic_x)
+        .def("flip_schematic_y", &nucleation::Schematic::flip_schematic_y)
+        .def("flip_schematic_z", &nucleation::Schematic::flip_schematic_z)
         .def("flip_x", &nucleation::Schematic::flip_x)
         .def("flip_y", &nucleation::Schematic::flip_y)
         .def("flip_z", &nucleation::Schematic::flip_z)
@@ -57,10 +64,14 @@ void add_Schematic_binding(nb::module_ mod) {
         .def("get_all_block_entities_json", &nucleation::Schematic::get_all_block_entities_json)
         .def("get_all_block_entities_snbt_json", &nucleation::Schematic::get_all_block_entities_snbt_json)
         .def("get_all_blocks_json", &nucleation::Schematic::get_all_blocks_json)
+        .def("get_block", std::move(maybe_op_unwrap(&nucleation::Schematic::get_block)), "x"_a, "y"_a, "z"_a)
         .def("get_block_entity_json", &nucleation::Schematic::get_block_entity_json, "x"_a, "y"_a, "z"_a)
+        .def("get_block_entity_json_in_region", &nucleation::Schematic::get_block_entity_json_in_region, "region_name"_a, "x"_a, "y"_a, "z"_a)
         .def("get_block_entity_snbt", &nucleation::Schematic::get_block_entity_snbt, "x"_a, "y"_a, "z"_a)
+        .def("get_block_in_region", std::move(maybe_op_unwrap(&nucleation::Schematic::get_block_in_region)), "region_name"_a, "x"_a, "y"_a, "z"_a)
         .def("get_block_name", &nucleation::Schematic::get_block_name, "x"_a, "y"_a, "z"_a)
         .def("get_block_string", &nucleation::Schematic::get_block_string, "x"_a, "y"_a, "z"_a)
+        .def("get_block_string_in_region", &nucleation::Schematic::get_block_string_in_region, "region_name"_a, "x"_a, "y"_a, "z"_a)
         .def("get_block_with_properties", std::move(maybe_op_unwrap(&nucleation::Schematic::get_block_with_properties)), "x"_a, "y"_a, "z"_a)
         .def("get_blocks_json", &nucleation::Schematic::get_blocks_json, "positions"_a)
         .def("get_chunk_blocks_json", &nucleation::Schematic::get_chunk_blocks_json, "offset_x"_a, "offset_y"_a, "offset_z"_a, "width"_a, "height"_a, "length"_a)
@@ -68,11 +79,13 @@ void add_Schematic_binding(nb::module_ mod) {
         .def("get_chunks_with_strategy_json", &nucleation::Schematic::get_chunks_with_strategy_json, "chunk_width"_a, "chunk_height"_a, "chunk_length"_a, "strategy"_a, "camera_x"_a, "camera_y"_a, "camera_z"_a)
         .def("get_entities_json", &nucleation::Schematic::get_entities_json)
         .def("get_entities_snbt_json", &nucleation::Schematic::get_entities_snbt_json)
+        .def("has_region", &nucleation::Schematic::has_region, "region_name"_a)
         .def("lm_version", &nucleation::Schematic::lm_version)
         .def_static("load_from_file", std::move(maybe_op_unwrap(&nucleation::Schematic::load_from_file)), "path"_a)
         .def("mc_version", &nucleation::Schematic::mc_version)
         .def("modified", &nucleation::Schematic::modified)
         .def("name", &nucleation::Schematic::name)
+        .def_static("open", &nucleation::python_compat::schematic_open, "path"_a)
         .def("palette_json", &nucleation::Schematic::palette_json)
         .def("place", &nucleation::Schematic::place, "x"_a, "y"_a, "z"_a, "palette_index"_a)
         .def("prepare_block", &nucleation::Schematic::prepare_block, "block_name"_a)
@@ -83,12 +96,18 @@ void add_Schematic_binding(nb::module_ mod) {
         .def("region_palette_json", &nucleation::Schematic::region_palette_json, "region_name"_a)
         .def("remove_block_entity", &nucleation::Schematic::remove_block_entity, "x"_a, "y"_a, "z"_a)
         .def("remove_entity", &nucleation::Schematic::remove_entity, "index"_a)
+        .def("remove_region", &nucleation::Schematic::remove_region, "region_name"_a)
+        .def("rename_region", &nucleation::Schematic::rename_region, "old_name"_a, "new_name"_a)
         .def("rotate_region_x", &nucleation::Schematic::rotate_region_x, "region_name"_a, "degrees"_a)
         .def("rotate_region_y", &nucleation::Schematic::rotate_region_y, "region_name"_a, "degrees"_a)
         .def("rotate_region_z", &nucleation::Schematic::rotate_region_z, "region_name"_a, "degrees"_a)
+        .def("rotate_schematic_x", &nucleation::Schematic::rotate_schematic_x, "degrees"_a)
+        .def("rotate_schematic_y", &nucleation::Schematic::rotate_schematic_y, "degrees"_a)
+        .def("rotate_schematic_z", &nucleation::Schematic::rotate_schematic_z, "degrees"_a)
         .def("rotate_x", &nucleation::Schematic::rotate_x, "degrees"_a)
         .def("rotate_y", &nucleation::Schematic::rotate_y, "degrees"_a)
         .def("rotate_z", &nucleation::Schematic::rotate_z, "degrees"_a)
+        .def("save", &nucleation::python_compat::schematic_save, "path"_a, nb::kw_only(), "format"_a = nb::none())
         .def("save_as_b64", &nucleation::Schematic::save_as_b64, "format"_a, "version"_a, "settings"_a)
         .def("save_to_file", &nucleation::Schematic::save_to_file, "path"_a)
         .def("save_to_file_with_format", &nucleation::Schematic::save_to_file_with_format, "path"_a, "format"_a, "version"_a)
@@ -110,6 +129,8 @@ void add_Schematic_binding(nb::module_ mod) {
         .def("set_source_data_version", &nucleation::Schematic::set_source_data_version, "version"_a)
         .def("set_we_version", &nucleation::Schematic::set_we_version, "version"_a)
         .def("source_data_version", &nucleation::Schematic::source_data_version)
+        .def("stamp_box", &nucleation::Schematic::stamp_box, "source"_a, "min_x"_a, "min_y"_a, "min_z"_a, "max_x"_a, "max_y"_a, "max_z"_a, "target_x"_a, "target_y"_a, "target_z"_a, "excluded_blocks_json"_a)
+        .def("stamp_region", &nucleation::Schematic::stamp_region, "source"_a, "source_region_name"_a, "target_x"_a, "target_y"_a, "target_z"_a, "excluded_blocks_json"_a)
         .def("tight_bounds_max", &nucleation::Schematic::tight_bounds_max)
         .def("tight_bounds_min", &nucleation::Schematic::tight_bounds_min)
         .def("tight_dimensions", &nucleation::Schematic::tight_dimensions)
@@ -121,6 +142,9 @@ void add_Schematic_binding(nb::module_ mod) {
         .def("to_snapshot_b64", &nucleation::Schematic::to_snapshot_b64)
         .def("to_world_json", &nucleation::Schematic::to_world_json, "options_json"_a)
         .def("to_world_zip_b64", &nucleation::Schematic::to_world_zip_b64, "options_json"_a)
+        .def("translate", &nucleation::Schematic::translate, "dx"_a, "dy"_a, "dz"_a)
+        .def("translate_region", &nucleation::Schematic::translate_region, "region_name"_a, "dx"_a, "dy"_a, "dz"_a)
+        .def("translate_schematic", &nucleation::Schematic::translate_schematic, "dx"_a, "dy"_a, "dz"_a)
         .def("volume", &nucleation::Schematic::volume)
         .def("we_version", &nucleation::Schematic::we_version);
 }

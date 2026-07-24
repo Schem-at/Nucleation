@@ -67,27 +67,73 @@ pub struct McaFile {
 // ─── Detection ──────────────────────────────────────────────────────────────
 
 /// Check if data looks like an MCA region file.
-/// Must be at least 8192 bytes (two 4KiB tables) and have at least one valid location entry.
+///
+/// A valid region is sector-aligned, has two 4 KiB header tables, and every
+/// populated location entry points to a complete chunk record whose length and
+/// compression byte fit inside its allocated sectors. Checking only the first
+/// four bytes of a location entry produces false positives for large text files
+/// such as textual structure SNBT.
 pub fn is_mca(data: &[u8]) -> bool {
-    if data.len() < 8192 {
+    const SECTOR_BYTES: usize = 4096;
+    const HEADER_BYTES: usize = 2 * SECTOR_BYTES;
+
+    if data.len() < HEADER_BYTES || !data.len().is_multiple_of(SECTOR_BYTES) {
         return false;
     }
-    // Reject zip files (PK\x03\x04 magic) — these are handled by WorldZipFormat
-    if data[0] == 0x50 && data[1] == 0x4B && data[2] == 0x03 && data[3] == 0x04 {
+    // Reject zip files (PK\x03\x04 magic) — these are handled by WorldZipFormat.
+    if data.starts_with(&[0x50, 0x4B, 0x03, 0x04]) {
         return false;
     }
-    // Check for at least one valid location entry with offset >= 2
+
+    let mut found_chunk = false;
     for i in 0..1024 {
         let offset = i * 4;
-        let loc_offset = ((data[offset] as u32) << 16)
-            | ((data[offset + 1] as u32) << 8)
-            | (data[offset + 2] as u32);
-        let sector_count = data[offset + 3];
-        if loc_offset >= 2 && sector_count > 0 {
-            return true;
+        let sector_offset = ((data[offset] as usize) << 16)
+            | ((data[offset + 1] as usize) << 8)
+            | data[offset + 2] as usize;
+        let sector_count = data[offset + 3] as usize;
+
+        if sector_offset == 0 && sector_count == 0 {
+            continue;
         }
+        if sector_offset < 2 || sector_count == 0 {
+            return false;
+        }
+
+        let Some(byte_offset) = sector_offset.checked_mul(SECTOR_BYTES) else {
+            return false;
+        };
+        let Some(allocated_bytes) = sector_count.checked_mul(SECTOR_BYTES) else {
+            return false;
+        };
+        let Some(allocated_end) = byte_offset.checked_add(allocated_bytes) else {
+            return false;
+        };
+        if byte_offset + 5 > data.len() || allocated_end > data.len() {
+            return false;
+        }
+
+        let chunk_len = u32::from_be_bytes([
+            data[byte_offset],
+            data[byte_offset + 1],
+            data[byte_offset + 2],
+            data[byte_offset + 3],
+        ]) as usize;
+        let Some(record_len) = chunk_len.checked_add(4) else {
+            return false;
+        };
+        let Some(chunk_end) = byte_offset.checked_add(record_len) else {
+            return false;
+        };
+        if chunk_len <= 1 || record_len > allocated_bytes || chunk_end > data.len() {
+            return false;
+        }
+        if !matches!(data[byte_offset + 4], 1..=4) {
+            return false;
+        }
+        found_chunk = true;
     }
-    false
+    found_chunk
 }
 
 // ─── Read Path ──────────────────────────────────────────────────────────────
@@ -1229,13 +1275,17 @@ mod tests {
         // Valid header but all-zero location entries = no chunks
         assert!(!is_mca(&[0; 8192]));
 
-        // Valid: one location entry at offset 2 (first data sector after headers)
+        // Valid: one location entry at offset 2 with a complete chunk record.
         let mut data = vec![0u8; 8192 + 4096];
-        // Location entry 0: 3-byte BE offset = 2, 1-byte sector count = 1
+        // Location entry 0: 3-byte BE offset = 2, 1-byte sector count = 1.
         data[0] = 0;
         data[1] = 0;
         data[2] = 2;
         data[3] = 1;
+        // Chunk record: BE length includes one compression byte plus payload.
+        data[8192..8196].copy_from_slice(&2u32.to_be_bytes());
+        data[8196] = CompressionType::Zlib as u8;
+        data[8197] = 0;
         assert!(is_mca(&data));
     }
 

@@ -1,6 +1,6 @@
 [package]
 name = "nucleation"
-version = "0.3.18"
+version = "0.4.1"
 edition = "2021"
 description = "A high-performance Minecraft schematic parser and utility library"
 authors = ["Nano nano@schem.at"]
@@ -155,7 +155,7 @@ testcontainers-modules = { version = "0.11", features = [
 schematic-mesher = { version = "0.2.0", git = "https://github.com/Schem-at/Schematic-Mesher.git", rev = "d22d39ca6b0664f97b14e059d411240932cd9d22", optional = true }
 
 # Rendering dependencies - optional
-wgpu = { version = "24", optional = true }
+wgpu = { version = "30", optional = true }
 image = { version = "0.24", optional = true }
 pollster = { version = "0.4", optional = true }
 
@@ -248,9 +248,33 @@ harness = false
 name = "fingerprint_bench"
 harness = false
 
+[[example]]
+name = "airship_fortress"
+required-features = ["voxelize"]
+
+[[example]]
+name = "voxelize_course"
+required-features = ["voxelize"]
+
 # Examples requiring the meshing feature
 [[example]]
 name = "render_schematic"
+required-features = ["rendering"]
+
+[[example]]
+name = "render_smoke"
+required-features = ["rendering"]
+
+[[example]]
+name = "render_animation"
+required-features = ["rendering"]
+
+[[example]]
+name = "render_animation_operations"
+required-features = ["rendering"]
+
+[[example]]
+name = "render_trefoil"
 required-features = ["rendering"]
 
 [[example]]
@@ -289,6 +313,27 @@ required-features = ["meshing"]
 name = "entity_mesh_test"
 required-features = ["meshing"]
 
+# README media generators live under examples/readme/<section>/ so the root
+# examples directory stays navigable as the feature showcase grows.
+[[example]]
+name = "readme_setblock"
+path = "examples/readme/animation/set-block.rs"
+required-features = ["rendering"]
+
+[[example]]
+name = "readme_assemble"
+path = "examples/readme/animation/assemble.rs"
+required-features = ["rendering"]
+
+[[example]]
+name = "readme_regions"
+path = "examples/readme/regions/generate.rs"
+required-features = ["rendering"]
+
+[[example]]
+name = "readme_formats"
+path = "examples/readme/formats-and-io/round-trip.rs"
+
 # Store backends against real services via testcontainers (docker required).
 [[test]]
 name = "store_testcontainers"
@@ -304,4 +349,5 @@ opt-level = 3
 # Patch for MCHPRS compatibility
 [patch.crates-io]
 hematite-nbt = { git = "https://github.com/StackDoubleFlow/hematite_nbt" }
+
 

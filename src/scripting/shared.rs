@@ -149,16 +149,16 @@ impl ScriptingSchematic {
         self.inner.flip_z();
     }
 
-    pub fn rotate_x(&mut self, degrees: i32) {
-        self.inner.rotate_x(degrees);
+    pub fn rotate_x(&mut self, degrees: i32) -> Result<(), String> {
+        self.inner.rotate_x(degrees)
     }
 
-    pub fn rotate_y(&mut self, degrees: i32) {
-        self.inner.rotate_y(degrees);
+    pub fn rotate_y(&mut self, degrees: i32) -> Result<(), String> {
+        self.inner.rotate_y(degrees)
     }
 
-    pub fn rotate_z(&mut self, degrees: i32) {
-        self.inner.rotate_z(degrees);
+    pub fn rotate_z(&mut self, degrees: i32) -> Result<(), String> {
+        self.inner.rotate_z(degrees)
     }
 
     // -- Export --

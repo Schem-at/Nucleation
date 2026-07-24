@@ -208,8 +208,8 @@ fn main() -> Result<()> {
 
 fn write_gz(path: &Path, contents: &str) -> Result<()> {
     use std::io::Write;
-    let file = fs::File::create(path)
-        .with_context(|| format!("Failed to create {}", path.display()))?;
+    let file =
+        fs::File::create(path).with_context(|| format!("Failed to create {}", path.display()))?;
     let mut encoder = flate2::write::GzEncoder::new(file, flate2::Compression::best());
     encoder.write_all(contents.as_bytes())?;
     encoder.finish()?;

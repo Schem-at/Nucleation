@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include "diplomat_runtime.h"
 
+#include "Curve3D.d.h"
 #include "NucleationError.d.h"
 
 #include "Shape.d.h"
@@ -15,6 +16,9 @@
 
 
 
+
+typedef struct Shape_tube_along_result {union {Shape* ok; NucleationError err;}; bool is_ok;} Shape_tube_along_result;
+Shape_tube_along_result Shape_tube_along(const Curve3D* curve, double radius);
 
 Shape* Shape_sphere(float cx, float cy, float cz, float radius);
 

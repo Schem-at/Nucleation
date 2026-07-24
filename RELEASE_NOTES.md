@@ -1,3 +1,57 @@
+# Nucleation v0.4.1
+
+**Python file I/O compatibility.** The generated Python `Schematic` binding
+once again exposes the established `Schematic.open(path)` and
+`schematic.save(path, format=...)` convenience API, including `pathlib.Path`
+support and Python's normal `None` return for successful saves. The lower-level
+`load_from_file` and `save_to_file` methods remain available. Release wheels now
+exercise real inferred-format and explicit-format save/open round trips so this
+surface cannot disappear unnoticed again.
+
+---
+
+# Nucleation v0.4.0
+
+**General Java structure SNBT naming.** The public format key and Rust module
+are now `structure_snbt`, with `StructureSnbtFormat`, `is_structure_snbt`,
+`from_structure_snbt`, and `to_structure_snbt`. The short-lived
+`gametest_snbt` name has been removed rather than retained as an alias: this is
+the general textual Java structure source format used by mod/data-pack tooling,
+guides, and GameTest suites, not a GameTest-only container.
+
+---
+
+# Nucleation v0.3.19
+
+**Construction animations and operation-aware transforms.** `BuildAnimation`
+now records grouped edits, region and whole-schematic rotations, translations,
+flips, stamps, receipts, exact lattice transforms, pivots, and gizmos while
+keeping authoritative schematic state separate from presentation. The API is
+available through the generated language bindings, with deterministic region
+precedence, explicit-air masking, tight transformed bounds, and transactional
+failure behavior.
+
+**Java structure SNBT I/O.** Textual `.snbt` structure sources now auto-detect,
+import, export, and semantically round-trip block states, typed block-entity NBT,
+entities, dimensions, and `DataVersion`. MCA detection now validates the region
+header and chunk record structure instead of misclassifying large text files.
+Import/export allocation limits fail closed on hostile dimensions, and the
+implementation is exercised against all 33 pinned Lithium GameTest structures.
+
+**Documentation and correctness.** The README is now backed by executable,
+downloadable examples for construction animation, regions, transforms,
+stamping, overlap precedence, and all supported schematic containers. Region
+transforms rebuild tight bounds, X/Z stair rotations preserve valid Minecraft
+states, block-entity content shorthands are stricter, and sampled-curve work is
+bounded against pathological inputs.
+
+**Release packaging.** Python artifacts now include a self-contained source
+archive, build Linux wheels against the manylinux 2.28 glibc floor, and pin the
+Apple Silicon wheel to macOS 11 compatibility instead of inheriting the runner's
+host OS version.
+
+---
+
 # Nucleation v0.3.18
 
 **A material system over any geometry.** New `DistanceField` primitive:

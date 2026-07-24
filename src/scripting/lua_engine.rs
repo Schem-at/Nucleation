@@ -99,15 +99,24 @@ impl LuaUserData for LuaSchematic {
             Ok(())
         });
         methods.add_method_mut("rotate_x", |_, this, degrees: i32| {
-            this.0.borrow_mut().rotate_x(degrees);
+            this.0
+                .borrow_mut()
+                .rotate_x(degrees)
+                .map_err(LuaError::external)?;
             Ok(())
         });
         methods.add_method_mut("rotate_y", |_, this, degrees: i32| {
-            this.0.borrow_mut().rotate_y(degrees);
+            this.0
+                .borrow_mut()
+                .rotate_y(degrees)
+                .map_err(LuaError::external)?;
             Ok(())
         });
         methods.add_method_mut("rotate_z", |_, this, degrees: i32| {
-            this.0.borrow_mut().rotate_z(degrees);
+            this.0
+                .borrow_mut()
+                .rotate_z(degrees)
+                .map_err(LuaError::external)?;
             Ok(())
         });
 
@@ -213,8 +222,8 @@ fn setup_lua(lua: &Lua) -> LuaResult<()> {
     lua.globals().set(
         "palette_block_ids",
         lua.create_function(|lua, name: String| {
-            let ids = crate::scripting::shared::palette_block_ids(&name)
-                .map_err(LuaError::external)?;
+            let ids =
+                crate::scripting::shared::palette_block_ids(&name).map_err(LuaError::external)?;
             let table = lua.create_table()?;
             for (i, id) in ids.iter().enumerate() {
                 table.set(i + 1, id.as_str())?;

@@ -1,6 +1,6 @@
-use crate::BlockState;
 use crate::blockpedia::color::block_palettes::BlockFilter;
 use crate::blockpedia::{all_blocks, BlockFacts, ExtendedColorData};
+use crate::BlockState;
 use std::sync::{Arc, OnceLock};
 
 pub struct PaletteBuilder {
@@ -131,7 +131,9 @@ impl PaletteBuilder {
             if !is_buildable(f) || !filter.allows_block(f) {
                 return false;
             }
-            let Some(c) = &f.extras.color else { return false };
+            let Some(c) = &f.extras.color else {
+                return false;
+            };
             let ok = c.to_extended();
             let l = ok.oklab[0];
             if min_l.is_some_and(|m| l < m) || max_l.is_some_and(|m| l > m) {
@@ -233,7 +235,10 @@ impl BlockPalette {
                 }
             }
         }
-        Self { blocks, dither: false }
+        Self {
+            blocks,
+            dither: false,
+        }
     }
 
     /// Create a palette containing only concrete blocks
@@ -288,14 +293,22 @@ impl BlockPalette {
                 .partial_cmp(&b.0.oklab[0])
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
-        Self { blocks, dither: false }
+        Self {
+            blocks,
+            dither: false,
+        }
     }
 
     /// Sample an N-step color gradient from `start` to `end` (Oklab
     /// interpolation), snapping every step to this palette's closest block.
     /// Returns exactly `steps` ids (consecutive entries may repeat when the
     /// palette is coarse); empty when the palette is empty.
-    pub fn gradient_ids(&self, start: (u8, u8, u8), end: (u8, u8, u8), steps: usize) -> Vec<String> {
+    pub fn gradient_ids(
+        &self,
+        start: (u8, u8, u8),
+        end: (u8, u8, u8),
+        steps: usize,
+    ) -> Vec<String> {
         let a = ExtendedColorData::from_rgb(start.0, start.1, start.2);
         let b = ExtendedColorData::from_rgb(end.0, end.1, end.2);
         (0..steps)
@@ -324,7 +337,12 @@ impl BlockPalette {
     /// line, so off-hue blocks are naturally penalized and the result
     /// stays ordered. Returns `None` when the palette has fewer than
     /// `steps` distinct blocks (or `steps` is 0).
-    pub fn ramp_ids(&self, start: (u8, u8, u8), end: (u8, u8, u8), steps: usize) -> Option<Vec<String>> {
+    pub fn ramp_ids(
+        &self,
+        start: (u8, u8, u8),
+        end: (u8, u8, u8),
+        steps: usize,
+    ) -> Option<Vec<String>> {
         if steps == 0 || self.blocks.len() < steps {
             return None;
         }
@@ -354,11 +372,7 @@ impl BlockPalette {
         let n = cands.len();
         let cost = |target: usize, cand: usize| -> f32 {
             let t = target as f32 / (steps as f32 - 1.0).max(1.0);
-            let goal = [
-                a[0] + axis[0] * t,
-                a[1] + axis[1] * t,
-                a[2] + axis[2] * t,
-            ];
+            let goal = [a[0] + axis[0] * t, a[1] + axis[1] * t, a[2] + axis[2] * t];
             let c = &self.blocks[cands[cand].1].0.oklab;
             let d = [c[0] - goal[0], c[1] - goal[1], c[2] - goal[2]];
             d[0] * d[0] + d[1] * d[1] + d[2] * d[2]
@@ -417,7 +431,10 @@ impl BlockPalette {
                 }
             }
         }
-        Self { blocks, dither: false }
+        Self {
+            blocks,
+            dither: false,
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -1010,7 +1027,10 @@ impl Brush for PointGradientBrush {
             let dist = dist_sq.sqrt();
 
             if dist < 1e-6 {
-                return self.palette.snap(&point.color, x, y, z).map(BlockState::new);
+                return self
+                    .palette
+                    .snap(&point.color, x, y, z)
+                    .map(BlockState::new);
             }
 
             let weight = 1.0 / dist.powf(self.falloff);
@@ -1203,10 +1223,9 @@ impl SpotlightBrush {
         cone_angle_deg: f64,
         color: (u8, u8, u8),
     ) -> Self {
-        let len = (direction.0 * direction.0
-            + direction.1 * direction.1
-            + direction.2 * direction.2)
-            .sqrt();
+        let len =
+            (direction.0 * direction.0 + direction.1 * direction.1 + direction.2 * direction.2)
+                .sqrt();
         let direction = if len < 1e-12 {
             (0.0, -1.0, 0.0)
         } else {
@@ -1449,9 +1468,8 @@ fn sample_stops(stops: &[GradientStop], t: f64, space: InterpolationSpace) -> Ex
     };
     match space {
         InterpolationSpace::Rgb => {
-            let mix = |i: usize| {
-                (a.color.rgb[i] as f32 * (1.0 - lt) + b.color.rgb[i] as f32 * lt) as u8
-            };
+            let mix =
+                |i: usize| (a.color.rgb[i] as f32 * (1.0 - lt) + b.color.rgb[i] as f32 * lt) as u8;
             ExtendedColorData::from_rgb(mix(0), mix(1), mix(2))
         }
         InterpolationSpace::Oklab => {

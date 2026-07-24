@@ -186,8 +186,7 @@ impl ColorExtractor {
         let k = (k.max(1) as usize).min(pixels.len());
 
         // Deterministic seeding: evenly-spaced samples across the pixel list.
-        let mut centroids: Vec<[f32; 3]> =
-            (0..k).map(|i| pixels[i * pixels.len() / k]).collect();
+        let mut centroids: Vec<[f32; 3]> = (0..k).map(|i| pixels[i * pixels.len() / k]).collect();
         let mut assign = vec![0usize; pixels.len()];
 
         for _ in 0..12 {
@@ -197,7 +196,8 @@ impl ColorExtractor {
                 let mut best = 0usize;
                 let mut best_d = f32::MAX;
                 for (ci, c) in centroids.iter().enumerate() {
-                    let d = (px[0] - c[0]).powi(2) + (px[1] - c[1]).powi(2) + (px[2] - c[2]).powi(2);
+                    let d =
+                        (px[0] - c[0]).powi(2) + (px[1] - c[1]).powi(2) + (px[2] - c[2]).powi(2);
                     if d < best_d {
                         best_d = d;
                         best = ci;
@@ -318,9 +318,18 @@ mod tests {
             .unwrap()
             .rgb;
         // The mean is dragged toward the white specks; k-means and median stay red.
-        assert!(mean[1] > dominant[1] + 5, "mean {mean:?} should be washed lighter than dominant {dominant:?}");
-        assert!(dominant[0] > dominant[1] + 100, "dominant {dominant:?} should be strongly red");
-        assert!(median[0] > median[1] + 100, "median {median:?} should be strongly red");
+        assert!(
+            mean[1] > dominant[1] + 5,
+            "mean {mean:?} should be washed lighter than dominant {dominant:?}"
+        );
+        assert!(
+            dominant[0] > dominant[1] + 100,
+            "dominant {dominant:?} should be strongly red"
+        );
+        assert!(
+            median[0] > median[1] + 100,
+            "median {median:?} should be strongly red"
+        );
     }
 }
 

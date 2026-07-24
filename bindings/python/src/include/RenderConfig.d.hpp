@@ -13,6 +13,7 @@
 namespace nucleation {
 namespace capi { struct RenderConfig; }
 class RenderConfig;
+class NucleationError;
 } // namespace nucleation
 
 
@@ -70,6 +71,16 @@ public:
   inline void set_fov(float fov);
 
   /**
+   * Set the world-space directional light and its non-negative intensity.
+   */
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> set_directional_light(float x, float y, float z, float intensity);
+
+  /**
+   * Set the unlit floor for non-HDRI rendering, in `0..=1`.
+   */
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> set_ambient_light(float ambient);
+
+  /**
    * Set a solid RGBA clear color (linear 0.0–1.0). Alpha < 1.0 yields a
    * transparent PNG. Ignored when HDRI is enabled.
    */
@@ -79,6 +90,20 @@ public:
    * Clear the custom background — revert to default sky / HDRI.
    */
   inline void clear_background();
+
+  /**
+   * Configure a one-block world grid. Models are centred on integer
+   * schematic coordinates, so grid lines are placed on half-integer
+   * block boundaries automatically.
+   */
+  inline void set_grid(int32_t half_extent, int32_t spacing, float plane_y, bool show_axes, float red, float green, float blue, float alpha);
+
+  /**
+   * Configure a compact grid fitted to half-integer block boundaries.
+   */
+  inline void set_fitted_grid(int32_t margin, int32_t spacing, float plane_y, bool show_axes, float red, float green, float blue, float alpha);
+
+  inline void clear_grid();
 
   /**
    * Enable (`true`) or disable orthographic projection.

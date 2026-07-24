@@ -116,6 +116,20 @@ nbt = chest([
 nbt = sign([text("LOOT", color="gold", bold=True), "Inside"], waxed=True)
 ```
 
+## Entity helpers
+
+For common entities, prefer typed helpers over manually serializing `nbt_json`.
+Armor stands accept a position, Minecraft yaw in degrees, and an armor material;
+the helper builds `Rotation`, `ShowArms`, and correctly ordered `ArmorItems` NBT.
+
+```python
+# South-facing armor stand wearing a full diamond set.
+schem.add_armor_stand(0.5, 1.0, -0.5, 0.0, "diamond")
+```
+
+Pass `""` for an unarmored stand. Other full-set materials such as `iron`,
+`golden`, and `netherite` work the same way.
+
 ## Simulation
 
 `Schematic.simulate()` runs the redstone simulator and syncs the result back
@@ -538,14 +552,15 @@ if report:
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `set_block` | `set_block(x: int, y: int, z: int, block_name: str) -> bool` | Set a block by name. Returns success. |
-| `set_block_in_region` | `set_block_in_region(region_name: str, x: int, y: int, z: int, block_name: str) -> bool` | Set a block in a named region. |
+| `set_block` | `set_block(x: int, y: int, z: int, block_name: str) -> None` | Set or replace a block by name. Use `minecraft:air` to remove it. |
+| `set_block_in_region` | `set_block_in_region(region_name: str, x: int, y: int, z: int, block_name: str) -> None` | Set a block in a named region. |
 | `set_block_from_string` | `set_block_from_string(x: int, y: int, z: int, block_string: str) -> None` | Parse a full block string with properties and NBT, e.g. `"minecraft:chest[facing=north]{Items:[...]}"`. |
 | `set_block_with_properties` | `set_block_with_properties(x: int, y: int, z: int, block_name: str, properties: dict[str, str]) -> None` | Set a block with a property dict. |
 | `set_block_with_nbt` | `set_block_with_nbt(x: int, y: int, z: int, block_name: str, nbt_data: dict) -> None` | Set a block with block entity NBT data. |
-| `get_block` | `get_block(x, y, z)` or `get_block((x, y, z)) -> Optional[BlockState]` | Get the BlockState at a position. Accepts a tuple for symmetry with `set_block`. |
-| `get_block_string` | `get_block_string(x, y, z)` or `get_block_string((x, y, z)) -> Optional[str]` | String form. Same coord conventions. |
-| `get_block_with_properties` | `get_block_with_properties(x: int, y: int, z: int) -> Optional[BlockState]` | Get the full BlockState. |
+| `get_block` | `get_block(x: int, y: int, z: int) -> BlockState` | Get the complete block state at a position. Returns a `NotFound` error outside every region. |
+| `get_block_name` | `get_block_name(x: int, y: int, z: int) -> str` | Get only the namespaced block identifier. |
+| `get_block_string` | `get_block_string(x: int, y: int, z: int) -> str` | Get the serialised block string, including properties and NBT. |
+| `get_block_with_properties` | `get_block_with_properties(x: int, y: int, z: int) -> BlockState` | Explicit compatibility alias for `get_block`. |
 
 #### Batch Block Operations
 

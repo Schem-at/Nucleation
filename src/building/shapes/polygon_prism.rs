@@ -19,8 +19,12 @@ pub struct PolygonPrism {
 impl PolygonPrism {
     pub fn new(verts: Vec<(f64, f64)>, y0: i32, y1: i32) -> Self {
         let (y_min, y_max) = (y0.min(y1), y0.max(y1));
-        let (mut lo_x, mut lo_z, mut hi_x, mut hi_z) =
-            (f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
+        let (mut lo_x, mut lo_z, mut hi_x, mut hi_z) = (
+            f64::INFINITY,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NEG_INFINITY,
+        );
         for &(x, z) in &verts {
             lo_x = lo_x.min(x);
             lo_z = lo_z.min(z);
@@ -87,7 +91,9 @@ impl Shape for PolygonPrism {
     }
 
     fn bounds(&self) -> (i32, i32, i32, i32, i32, i32) {
-        (self.min_x, self.y_min, self.min_z, self.max_x, self.y_max, self.max_z)
+        (
+            self.min_x, self.y_min, self.min_z, self.max_x, self.y_max, self.max_z,
+        )
     }
 
     fn for_each_point<F>(&self, mut f: F)

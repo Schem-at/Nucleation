@@ -13,6 +13,8 @@
 
 namespace diplomat::capi { struct RenderConfig; }
 class RenderConfig;
+namespace diplomat::capi { struct ResourcePack; }
+class ResourcePack;
 namespace diplomat::capi { struct Schematic; }
 class Schematic;
 class NucleationError;
@@ -52,6 +54,25 @@ public:
    * Render a schematic to a PNG file at `path`.
    */
   inline static diplomat::result<std::monostate, NucleationError> render_to_file(const Schematic& schematic, diplomat::span<const uint8_t> pack_zip, const RenderConfig& config, std::string_view path);
+
+  /**
+   * Render with an already parsed resource pack, avoiding repeated ZIP parsing.
+   */
+  inline static diplomat::result<std::monostate, NucleationError> render_to_file_with_pack(const Schematic& schematic, const ResourcePack& pack, const RenderConfig& config, std::string_view path);
+
+  /**
+   * Render raw RGBA pixels with an already parsed resource pack.
+   */
+  inline static diplomat::result<std::string, NucleationError> render_pixels_b64_with_pack(const Schematic& schematic, const ResourcePack& pack, const RenderConfig& config);
+  template<typename W>
+  inline static diplomat::result<std::monostate, NucleationError> render_pixels_b64_with_pack_write(const Schematic& schematic, const ResourcePack& pack, const RenderConfig& config, W& writeable_output);
+
+  /**
+   * Render PNG bytes with an already parsed resource pack.
+   */
+  inline static diplomat::result<std::string, NucleationError> render_png_b64_with_pack(const Schematic& schematic, const ResourcePack& pack, const RenderConfig& config);
+  template<typename W>
+  inline static diplomat::result<std::monostate, NucleationError> render_png_b64_with_pack_write(const Schematic& schematic, const ResourcePack& pack, const RenderConfig& config, W& writeable_output);
 
     inline const diplomat::capi::Renderer* AsFFI() const;
     inline diplomat::capi::Renderer* AsFFI();

@@ -24,6 +24,8 @@ namespace capi {
 
     diplomat::capi::Schematic* Schematic_create(diplomat::capi::DiplomatStringView name);
 
+    diplomat::capi::Schematic* Schematic_deep_clone(const diplomat::capi::Schematic* self);
+
     diplomat::capi::Dimensions Schematic_dimensions(const diplomat::capi::Schematic* self);
 
     typedef struct Schematic_set_block_result {union {bool ok; diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_set_block_result;
@@ -35,8 +37,14 @@ namespace capi {
     typedef struct Schematic_save_to_file_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_save_to_file_result;
     Schematic_save_to_file_result Schematic_save_to_file(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView path);
 
+    typedef struct Schematic_save_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_save_result;
+    Schematic_save_result Schematic_save(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView path);
+
     typedef struct Schematic_load_from_file_result {union {diplomat::capi::Schematic* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_load_from_file_result;
     Schematic_load_from_file_result Schematic_load_from_file(diplomat::capi::DiplomatStringView path);
+
+    typedef struct Schematic_open_result {union {diplomat::capi::Schematic* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_open_result;
+    Schematic_open_result Schematic_open(diplomat::capi::DiplomatStringView path);
 
     typedef struct Schematic_from_data_result {union {diplomat::capi::Schematic* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_from_data_result;
     Schematic_from_data_result Schematic_from_data(diplomat::capi::DiplomatU8View data);
@@ -110,17 +118,35 @@ namespace capi {
     typedef struct Schematic_get_blocks_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_get_blocks_json_result;
     Schematic_get_blocks_json_result Schematic_get_blocks_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatI32View positions, diplomat::capi::DiplomatWrite* write);
 
+    typedef struct Schematic_stamp_box_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_stamp_box_result;
+    Schematic_stamp_box_result Schematic_stamp_box(diplomat::capi::Schematic* self, const diplomat::capi::Schematic* source, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z, int32_t target_x, int32_t target_y, int32_t target_z, diplomat::capi::DiplomatStringView excluded_blocks_json);
+
+    typedef struct Schematic_stamp_region_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_stamp_region_result;
+    Schematic_stamp_region_result Schematic_stamp_region(diplomat::capi::Schematic* self, const diplomat::capi::Schematic* source, diplomat::capi::DiplomatStringView source_region_name, int32_t target_x, int32_t target_y, int32_t target_z, diplomat::capi::DiplomatStringView excluded_blocks_json);
+
     typedef struct Schematic_copy_region_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_copy_region_result;
     Schematic_copy_region_result Schematic_copy_region(diplomat::capi::Schematic* self, const diplomat::capi::Schematic* source, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z, int32_t target_x, int32_t target_y, int32_t target_z, diplomat::capi::DiplomatStringView excluded_blocks_json);
 
+    typedef struct Schematic_get_block_result {union {diplomat::capi::BlockState* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_get_block_result;
+    Schematic_get_block_result Schematic_get_block(const diplomat::capi::Schematic* self, int32_t x, int32_t y, int32_t z);
+
     typedef struct Schematic_get_block_with_properties_result {union {diplomat::capi::BlockState* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_get_block_with_properties_result;
     Schematic_get_block_with_properties_result Schematic_get_block_with_properties(const diplomat::capi::Schematic* self, int32_t x, int32_t y, int32_t z);
+
+    typedef struct Schematic_get_block_in_region_result {union {diplomat::capi::BlockState* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_get_block_in_region_result;
+    Schematic_get_block_in_region_result Schematic_get_block_in_region(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView region_name, int32_t x, int32_t y, int32_t z);
+
+    typedef struct Schematic_get_block_string_in_region_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_get_block_string_in_region_result;
+    Schematic_get_block_string_in_region_result Schematic_get_block_string_in_region(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView region_name, int32_t x, int32_t y, int32_t z, diplomat::capi::DiplomatWrite* write);
 
     typedef struct Schematic_get_block_string_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_get_block_string_result;
     Schematic_get_block_string_result Schematic_get_block_string(const diplomat::capi::Schematic* self, int32_t x, int32_t y, int32_t z, diplomat::capi::DiplomatWrite* write);
 
     typedef struct Schematic_get_block_entity_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_get_block_entity_json_result;
     Schematic_get_block_entity_json_result Schematic_get_block_entity_json(const diplomat::capi::Schematic* self, int32_t x, int32_t y, int32_t z, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Schematic_get_block_entity_json_in_region_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_get_block_entity_json_in_region_result;
+    Schematic_get_block_entity_json_in_region_result Schematic_get_block_entity_json_in_region(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView region_name, int32_t x, int32_t y, int32_t z, diplomat::capi::DiplomatWrite* write);
 
     void Schematic_get_all_block_entities_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
 
@@ -130,6 +156,9 @@ namespace capi {
 
     typedef struct Schematic_add_entity_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_add_entity_result;
     Schematic_add_entity_result Schematic_add_entity(diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView id, double x, double y, double z, diplomat::capi::DiplomatStringView nbt_json);
+
+    typedef struct Schematic_add_armor_stand_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_add_armor_stand_result;
+    Schematic_add_armor_stand_result Schematic_add_armor_stand(diplomat::capi::Schematic* self, double x, double y, double z, float yaw, diplomat::capi::DiplomatStringView armor_material);
 
     typedef struct Schematic_remove_entity_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_remove_entity_result;
     Schematic_remove_entity_result Schematic_remove_entity(diplomat::capi::Schematic* self, uint32_t index);
@@ -231,11 +260,17 @@ namespace capi {
 
     void Schematic_flip_z(diplomat::capi::Schematic* self);
 
-    void Schematic_rotate_x(diplomat::capi::Schematic* self, int32_t degrees);
+    typedef struct Schematic_rotate_x_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_rotate_x_result;
+    Schematic_rotate_x_result Schematic_rotate_x(diplomat::capi::Schematic* self, int32_t degrees);
 
-    void Schematic_rotate_y(diplomat::capi::Schematic* self, int32_t degrees);
+    typedef struct Schematic_rotate_y_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_rotate_y_result;
+    Schematic_rotate_y_result Schematic_rotate_y(diplomat::capi::Schematic* self, int32_t degrees);
 
-    void Schematic_rotate_z(diplomat::capi::Schematic* self, int32_t degrees);
+    typedef struct Schematic_rotate_z_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_rotate_z_result;
+    Schematic_rotate_z_result Schematic_rotate_z(diplomat::capi::Schematic* self, int32_t degrees);
+
+    typedef struct Schematic_translate_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_translate_result;
+    Schematic_translate_result Schematic_translate(diplomat::capi::Schematic* self, int32_t dx, int32_t dy, int32_t dz);
 
     typedef struct Schematic_flip_region_x_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_flip_region_x_result;
     Schematic_flip_region_x_result Schematic_flip_region_x(diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView region_name);
@@ -254,6 +289,30 @@ namespace capi {
 
     typedef struct Schematic_rotate_region_z_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_rotate_region_z_result;
     Schematic_rotate_region_z_result Schematic_rotate_region_z(diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView region_name, int32_t degrees);
+
+    typedef struct Schematic_translate_region_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_translate_region_result;
+    Schematic_translate_region_result Schematic_translate_region(diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView region_name, int32_t dx, int32_t dy, int32_t dz);
+
+    typedef struct Schematic_rotate_schematic_x_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_rotate_schematic_x_result;
+    Schematic_rotate_schematic_x_result Schematic_rotate_schematic_x(diplomat::capi::Schematic* self, int32_t degrees);
+
+    typedef struct Schematic_rotate_schematic_y_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_rotate_schematic_y_result;
+    Schematic_rotate_schematic_y_result Schematic_rotate_schematic_y(diplomat::capi::Schematic* self, int32_t degrees);
+
+    typedef struct Schematic_rotate_schematic_z_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_rotate_schematic_z_result;
+    Schematic_rotate_schematic_z_result Schematic_rotate_schematic_z(diplomat::capi::Schematic* self, int32_t degrees);
+
+    typedef struct Schematic_flip_schematic_x_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_flip_schematic_x_result;
+    Schematic_flip_schematic_x_result Schematic_flip_schematic_x(diplomat::capi::Schematic* self);
+
+    typedef struct Schematic_flip_schematic_y_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_flip_schematic_y_result;
+    Schematic_flip_schematic_y_result Schematic_flip_schematic_y(diplomat::capi::Schematic* self);
+
+    typedef struct Schematic_flip_schematic_z_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_flip_schematic_z_result;
+    Schematic_flip_schematic_z_result Schematic_flip_schematic_z(diplomat::capi::Schematic* self);
+
+    typedef struct Schematic_translate_schematic_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_translate_schematic_result;
+    Schematic_translate_schematic_result Schematic_translate_schematic(diplomat::capi::Schematic* self, int32_t dx, int32_t dy, int32_t dz);
 
     typedef struct Schematic_fill_cuboid_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_fill_cuboid_result;
     Schematic_fill_cuboid_result Schematic_fill_cuboid(diplomat::capi::Schematic* self, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z, diplomat::capi::DiplomatStringView block_name);
@@ -278,6 +337,18 @@ namespace capi {
 
     typedef struct Schematic_set_block_in_region_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_set_block_in_region_result;
     Schematic_set_block_in_region_result Schematic_set_block_in_region(diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView region_name, int32_t x, int32_t y, int32_t z, diplomat::capi::DiplomatStringView block_name);
+
+    typedef struct Schematic_has_region_result {union {bool ok; diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_has_region_result;
+    Schematic_has_region_result Schematic_has_region(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView region_name);
+
+    typedef struct Schematic_create_region_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_create_region_result;
+    Schematic_create_region_result Schematic_create_region(diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView region_name);
+
+    typedef struct Schematic_remove_region_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_remove_region_result;
+    Schematic_remove_region_result Schematic_remove_region(diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView region_name);
+
+    typedef struct Schematic_rename_region_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Schematic_rename_region_result;
+    Schematic_rename_region_result Schematic_rename_region(diplomat::capi::Schematic* self, diplomat::capi::DiplomatStringView old_name, diplomat::capi::DiplomatStringView new_name);
 
     void Schematic_bounding_box_json(const diplomat::capi::Schematic* self, diplomat::capi::DiplomatWrite* write);
 
@@ -316,6 +387,11 @@ namespace capi {
 
 inline std::unique_ptr<Schematic> Schematic::create(std::string_view name) {
     auto result = diplomat::capi::Schematic_create({name.data(), name.size()});
+    return std::unique_ptr<Schematic>(Schematic::FromFFI(result));
+}
+
+inline std::unique_ptr<Schematic> Schematic::deep_clone() const {
+    auto result = diplomat::capi::Schematic_deep_clone(this->AsFFI());
     return std::unique_ptr<Schematic>(Schematic::FromFFI(result));
 }
 
@@ -360,8 +436,19 @@ inline diplomat::result<std::monostate, NucleationError> Schematic::save_to_file
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
+inline diplomat::result<std::monostate, NucleationError> Schematic::save(std::string_view path) const {
+    auto result = diplomat::capi::Schematic_save(this->AsFFI(),
+        {path.data(), path.size()});
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
 inline diplomat::result<std::unique_ptr<Schematic>, NucleationError> Schematic::load_from_file(std::string_view path) {
     auto result = diplomat::capi::Schematic_load_from_file({path.data(), path.size()});
+    return result.is_ok ? diplomat::result<std::unique_ptr<Schematic>, NucleationError>(diplomat::Ok<std::unique_ptr<Schematic>>(std::unique_ptr<Schematic>(Schematic::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Schematic>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<Schematic>, NucleationError> Schematic::open(std::string_view path) {
+    auto result = diplomat::capi::Schematic_open({path.data(), path.size()});
     return result.is_ok ? diplomat::result<std::unique_ptr<Schematic>, NucleationError>(diplomat::Ok<std::unique_ptr<Schematic>>(std::unique_ptr<Schematic>(Schematic::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Schematic>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
@@ -597,6 +684,33 @@ inline diplomat::result<std::monostate, NucleationError> Schematic::get_blocks_j
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
+inline diplomat::result<std::monostate, NucleationError> Schematic::stamp_box(const Schematic& source, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z, int32_t target_x, int32_t target_y, int32_t target_z, std::string_view excluded_blocks_json) {
+    auto result = diplomat::capi::Schematic_stamp_box(this->AsFFI(),
+        source.AsFFI(),
+        min_x,
+        min_y,
+        min_z,
+        max_x,
+        max_y,
+        max_z,
+        target_x,
+        target_y,
+        target_z,
+        {excluded_blocks_json.data(), excluded_blocks_json.size()});
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> Schematic::stamp_region(const Schematic& source, std::string_view source_region_name, int32_t target_x, int32_t target_y, int32_t target_z, std::string_view excluded_blocks_json) {
+    auto result = diplomat::capi::Schematic_stamp_region(this->AsFFI(),
+        source.AsFFI(),
+        {source_region_name.data(), source_region_name.size()},
+        target_x,
+        target_y,
+        target_z,
+        {excluded_blocks_json.data(), excluded_blocks_json.size()});
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
 inline diplomat::result<std::monostate, NucleationError> Schematic::copy_region(const Schematic& source, int32_t min_x, int32_t min_y, int32_t min_z, int32_t max_x, int32_t max_y, int32_t max_z, int32_t target_x, int32_t target_y, int32_t target_z, std::string_view excluded_blocks_json) {
     auto result = diplomat::capi::Schematic_copy_region(this->AsFFI(),
         source.AsFFI(),
@@ -613,12 +727,52 @@ inline diplomat::result<std::monostate, NucleationError> Schematic::copy_region(
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
+inline diplomat::result<std::unique_ptr<BlockState>, NucleationError> Schematic::get_block(int32_t x, int32_t y, int32_t z) const {
+    auto result = diplomat::capi::Schematic_get_block(this->AsFFI(),
+        x,
+        y,
+        z);
+    return result.is_ok ? diplomat::result<std::unique_ptr<BlockState>, NucleationError>(diplomat::Ok<std::unique_ptr<BlockState>>(std::unique_ptr<BlockState>(BlockState::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<BlockState>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
 inline diplomat::result<std::unique_ptr<BlockState>, NucleationError> Schematic::get_block_with_properties(int32_t x, int32_t y, int32_t z) const {
     auto result = diplomat::capi::Schematic_get_block_with_properties(this->AsFFI(),
         x,
         y,
         z);
     return result.is_ok ? diplomat::result<std::unique_ptr<BlockState>, NucleationError>(diplomat::Ok<std::unique_ptr<BlockState>>(std::unique_ptr<BlockState>(BlockState::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<BlockState>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<BlockState>, NucleationError> Schematic::get_block_in_region(std::string_view region_name, int32_t x, int32_t y, int32_t z) const {
+    auto result = diplomat::capi::Schematic_get_block_in_region(this->AsFFI(),
+        {region_name.data(), region_name.size()},
+        x,
+        y,
+        z);
+    return result.is_ok ? diplomat::result<std::unique_ptr<BlockState>, NucleationError>(diplomat::Ok<std::unique_ptr<BlockState>>(std::unique_ptr<BlockState>(BlockState::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<BlockState>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Schematic::get_block_string_in_region(std::string_view region_name, int32_t x, int32_t y, int32_t z) const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Schematic_get_block_string_in_region(this->AsFFI(),
+        {region_name.data(), region_name.size()},
+        x,
+        y,
+        z,
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Schematic::get_block_string_in_region_write(std::string_view region_name, int32_t x, int32_t y, int32_t z, W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Schematic_get_block_string_in_region(this->AsFFI(),
+        {region_name.data(), region_name.size()},
+        x,
+        y,
+        z,
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
 inline diplomat::result<std::string, NucleationError> Schematic::get_block_string(int32_t x, int32_t y, int32_t z) const {
@@ -656,6 +810,29 @@ template<typename W>
 inline diplomat::result<std::monostate, NucleationError> Schematic::get_block_entity_json_write(int32_t x, int32_t y, int32_t z, W& writeable) const {
     diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
     auto result = diplomat::capi::Schematic_get_block_entity_json(this->AsFFI(),
+        x,
+        y,
+        z,
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Schematic::get_block_entity_json_in_region(std::string_view region_name, int32_t x, int32_t y, int32_t z) const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Schematic_get_block_entity_json_in_region(this->AsFFI(),
+        {region_name.data(), region_name.size()},
+        x,
+        y,
+        z,
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Schematic::get_block_entity_json_in_region_write(std::string_view region_name, int32_t x, int32_t y, int32_t z, W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Schematic_get_block_entity_json_in_region(this->AsFFI(),
+        {region_name.data(), region_name.size()},
         x,
         y,
         z,
@@ -703,6 +880,16 @@ inline diplomat::result<std::monostate, NucleationError> Schematic::add_entity(s
         y,
         z,
         {nbt_json.data(), nbt_json.size()});
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> Schematic::add_armor_stand(double x, double y, double z, float yaw, std::string_view armor_material) {
+    auto result = diplomat::capi::Schematic_add_armor_stand(this->AsFFI(),
+        x,
+        y,
+        z,
+        yaw,
+        {armor_material.data(), armor_material.size()});
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
@@ -1158,19 +1345,30 @@ inline void Schematic::flip_z() {
     diplomat::capi::Schematic_flip_z(this->AsFFI());
 }
 
-inline void Schematic::rotate_x(int32_t degrees) {
-    diplomat::capi::Schematic_rotate_x(this->AsFFI(),
+inline diplomat::result<std::monostate, NucleationError> Schematic::rotate_x(int32_t degrees) {
+    auto result = diplomat::capi::Schematic_rotate_x(this->AsFFI(),
         degrees);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
-inline void Schematic::rotate_y(int32_t degrees) {
-    diplomat::capi::Schematic_rotate_y(this->AsFFI(),
+inline diplomat::result<std::monostate, NucleationError> Schematic::rotate_y(int32_t degrees) {
+    auto result = diplomat::capi::Schematic_rotate_y(this->AsFFI(),
         degrees);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
-inline void Schematic::rotate_z(int32_t degrees) {
-    diplomat::capi::Schematic_rotate_z(this->AsFFI(),
+inline diplomat::result<std::monostate, NucleationError> Schematic::rotate_z(int32_t degrees) {
+    auto result = diplomat::capi::Schematic_rotate_z(this->AsFFI(),
         degrees);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> Schematic::translate(int32_t dx, int32_t dy, int32_t dz) {
+    auto result = diplomat::capi::Schematic_translate(this->AsFFI(),
+        dx,
+        dy,
+        dz);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
 inline diplomat::result<std::monostate, NucleationError> Schematic::flip_region_x(std::string_view region_name) {
@@ -1209,6 +1407,56 @@ inline diplomat::result<std::monostate, NucleationError> Schematic::rotate_regio
     auto result = diplomat::capi::Schematic_rotate_region_z(this->AsFFI(),
         {region_name.data(), region_name.size()},
         degrees);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> Schematic::translate_region(std::string_view region_name, int32_t dx, int32_t dy, int32_t dz) {
+    auto result = diplomat::capi::Schematic_translate_region(this->AsFFI(),
+        {region_name.data(), region_name.size()},
+        dx,
+        dy,
+        dz);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> Schematic::rotate_schematic_x(int32_t degrees) {
+    auto result = diplomat::capi::Schematic_rotate_schematic_x(this->AsFFI(),
+        degrees);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> Schematic::rotate_schematic_y(int32_t degrees) {
+    auto result = diplomat::capi::Schematic_rotate_schematic_y(this->AsFFI(),
+        degrees);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> Schematic::rotate_schematic_z(int32_t degrees) {
+    auto result = diplomat::capi::Schematic_rotate_schematic_z(this->AsFFI(),
+        degrees);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> Schematic::flip_schematic_x() {
+    auto result = diplomat::capi::Schematic_flip_schematic_x(this->AsFFI());
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> Schematic::flip_schematic_y() {
+    auto result = diplomat::capi::Schematic_flip_schematic_y(this->AsFFI());
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> Schematic::flip_schematic_z() {
+    auto result = diplomat::capi::Schematic_flip_schematic_z(this->AsFFI());
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> Schematic::translate_schematic(int32_t dx, int32_t dy, int32_t dz) {
+    auto result = diplomat::capi::Schematic_translate_schematic(this->AsFFI(),
+        dx,
+        dy,
+        dz);
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
@@ -1310,6 +1558,31 @@ inline diplomat::result<std::monostate, NucleationError> Schematic::set_block_in
         y,
         z,
         {block_name.data(), block_name.size()});
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<bool, NucleationError> Schematic::has_region(std::string_view region_name) const {
+    auto result = diplomat::capi::Schematic_has_region(this->AsFFI(),
+        {region_name.data(), region_name.size()});
+    return result.is_ok ? diplomat::result<bool, NucleationError>(diplomat::Ok<bool>(result.ok)) : diplomat::result<bool, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> Schematic::create_region(std::string_view region_name) {
+    auto result = diplomat::capi::Schematic_create_region(this->AsFFI(),
+        {region_name.data(), region_name.size()});
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> Schematic::remove_region(std::string_view region_name) {
+    auto result = diplomat::capi::Schematic_remove_region(this->AsFFI(),
+        {region_name.data(), region_name.size()});
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> Schematic::rename_region(std::string_view old_name, std::string_view new_name) {
+    auto result = diplomat::capi::Schematic_rename_region(this->AsFFI(),
+        {old_name.data(), old_name.size()},
+        {new_name.data(), new_name.size()});
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 

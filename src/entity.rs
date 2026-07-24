@@ -19,6 +19,28 @@ pub enum NbtValue {
     Compound(HashMap<String, NbtValue>),
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ArmorStandEquipment {
+    pub helmet: Option<String>,
+    pub chestplate: Option<String>,
+    pub leggings: Option<String>,
+    pub boots: Option<String>,
+}
+
+impl ArmorStandEquipment {
+    /// Create a complete armor set from `diamond`, `netherite`, `iron`, etc.
+    pub fn full_set(material: &str) -> Self {
+        let material = material.strip_prefix("minecraft:").unwrap_or(material);
+        let item = |piece: &str| Some(format!("minecraft:{material}_{piece}"));
+        Self {
+            helmet: item("helmet"),
+            chestplate: item("chestplate"),
+            leggings: item("leggings"),
+            boots: item("boots"),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Entity {
     pub id: String,
@@ -33,6 +55,39 @@ impl Entity {
             position,
             nbt: HashMap::new(),
         }
+    }
+
+    /// Construct an armor stand with typed equipment instead of hand-authored NBT.
+    /// Equipment is stored in Minecraft's boots-to-helmet `ArmorItems` order.
+    pub fn armor_stand(
+        position: (f64, f64, f64),
+        yaw: f32,
+        equipment: ArmorStandEquipment,
+    ) -> Self {
+        let item = |id: Option<String>| {
+            let mut compound = HashMap::new();
+            if let Some(id) = id {
+                compound.insert("id".to_string(), NbtValue::String(id));
+                compound.insert("Count".to_string(), NbtValue::Byte(1));
+            }
+            NbtValue::Compound(compound)
+        };
+        let mut entity = Self::new("minecraft:armor_stand".to_string(), position);
+        entity.nbt.insert(
+            "Rotation".to_string(),
+            NbtValue::List(vec![NbtValue::Float(yaw), NbtValue::Float(0.0)]),
+        );
+        entity.nbt.insert("ShowArms".to_string(), NbtValue::Byte(1));
+        entity.nbt.insert(
+            "ArmorItems".to_string(),
+            NbtValue::List(vec![
+                item(equipment.boots),
+                item(equipment.leggings),
+                item(equipment.chestplate),
+                item(equipment.helmet),
+            ]),
+        );
+        entity
     }
 
     pub fn with_nbt_data(mut self, key: String, value: String) -> Self {
@@ -425,6 +480,65 @@ mod tests {
             assert_eq!(deserialized2.id, "minecraft:creeper");
         } else {
             panic!("Expected Compound NBT tag");
+        }
+    }
+
+    #[test]
+    fn armor_stand_equipment_full_set_expands_a_material_name() {
+        let equipment = ArmorStandEquipment::full_set("diamond");
+
+        assert_eq!(
+            equipment.helmet.as_deref(),
+            Some("minecraft:diamond_helmet")
+        );
+        assert_eq!(
+            equipment.chestplate.as_deref(),
+            Some("minecraft:diamond_chestplate")
+        );
+        assert_eq!(
+            equipment.leggings.as_deref(),
+            Some("minecraft:diamond_leggings")
+        );
+        assert_eq!(equipment.boots.as_deref(), Some("minecraft:diamond_boots"));
+    }
+
+    #[test]
+    fn armor_stand_constructor_builds_typed_equipment_and_rotation_nbt() {
+        let entity = Entity::armor_stand(
+            (0.5, 1.0, 0.5),
+            180.0,
+            ArmorStandEquipment {
+                helmet: Some("minecraft:diamond_helmet".to_string()),
+                chestplate: Some("minecraft:diamond_chestplate".to_string()),
+                leggings: Some("minecraft:diamond_leggings".to_string()),
+                boots: Some("minecraft:diamond_boots".to_string()),
+            },
+        );
+
+        assert_eq!(entity.id, "minecraft:armor_stand");
+        assert_eq!(
+            entity.nbt.get("Rotation"),
+            Some(&NbtValue::List(vec![
+                NbtValue::Float(180.0),
+                NbtValue::Float(0.0),
+            ]))
+        );
+        let NbtValue::List(items) = entity.nbt.get("ArmorItems").unwrap() else {
+            panic!("ArmorItems should be a list");
+        };
+        assert_eq!(items.len(), 4);
+        for (item, suffix) in items
+            .iter()
+            .zip(["boots", "leggings", "chestplate", "helmet"])
+        {
+            let NbtValue::Compound(item) = item else {
+                panic!("armor item should be a compound");
+            };
+            assert_eq!(
+                item.get("id"),
+                Some(&NbtValue::String(format!("minecraft:diamond_{suffix}")))
+            );
+            assert_eq!(item.get("Count"), Some(&NbtValue::Byte(1)));
         }
     }
 

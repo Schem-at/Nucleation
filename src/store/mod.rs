@@ -49,7 +49,6 @@ pub mod pg;
 #[cfg(feature = "store-pg")]
 pub use pg::{PgConfig, PgStore};
 
-
 /// Backend-agnostic behavioural contract suite. Public when `store-testkit` is
 /// enabled so integration tests (e.g. testcontainers) can exercise any backend.
 #[cfg(any(test, feature = "store-testkit"))]

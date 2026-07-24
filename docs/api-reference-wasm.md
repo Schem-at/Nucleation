@@ -1023,7 +1023,7 @@ These methods are available on `SchematicWrapper` when the `meshing` feature is 
 > of times along its lattice vector — a 4-bit adder becomes 8-bit, a 32×32 screen
 > becomes 64×64. These methods live on [`SchematicWrapper`](#schematicwrapper).
 >
-> Full design, maths, and worked examples: [`autostack.md`](autostack.md) and the
+> Full design, maths, and worked examples: [`autostack.md`](features/analysis.md) and the
 > companion `autostack-design.pdf`.
 
 ### SchematicWrapper.detectStructures
@@ -1104,7 +1104,7 @@ console.log(out.get_block_count(), "blocks");
 
 The same logical methods exist across Python (`detect_structures`,
 `autostack_resize_1d`, `autostack_resize_2d`), FFI, and PHP — see
-[`autostack.md`](autostack.md). The Python/WASM/FFI trio is checked by
+[`autostack.md`](features/analysis.md). The Python/WASM/FFI trio is checked by
 `tools/check_api_parity.rs`.
 
 ---

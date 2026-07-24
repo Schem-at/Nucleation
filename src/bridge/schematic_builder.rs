@@ -45,7 +45,11 @@ pub mod ffi {
 
         /// Map a palette character to a block string. `ch` must contain exactly
         /// one character (its first char is used).
-        pub fn map(&mut self, ch: &DiplomatStr, block: &DiplomatStr) -> Result<(), NucleationError> {
+        pub fn map(
+            &mut self,
+            ch: &DiplomatStr,
+            block: &DiplomatStr,
+        ) -> Result<(), NucleationError> {
             let ch = Self::utf8(ch)?
                 .chars()
                 .next()
@@ -74,7 +78,8 @@ pub mod ffi {
         /// e.g. `["abc", "def"]`. Equivalent to a one-element layers array.
         pub fn layer(&mut self, rows_json: &DiplomatStr) -> Result<(), NucleationError> {
             let json = Self::utf8(rows_json)?;
-            let rows: Vec<String> = serde_json::from_str(json).map_err(|_| NucleationError::Parse)?;
+            let rows: Vec<String> =
+                serde_json::from_str(json).map_err(|_| NucleationError::Parse)?;
             self.apply(|b| {
                 let row_refs: Vec<&str> = rows.iter().map(|s| s.as_str()).collect();
                 b.layer(&row_refs)
@@ -124,7 +129,9 @@ pub mod ffi {
         /// Run pre-build validation without consuming the builder.
         pub fn validate(&self) -> Result<(), NucleationError> {
             let inner = self.0.as_ref().ok_or(NucleationError::AlreadyConsumed)?;
-            inner.validate().map_err(|_| NucleationError::InvalidArgument)
+            inner
+                .validate()
+                .map_err(|_| NucleationError::InvalidArgument)
         }
 
         /// Serialize the builder back into the canonical template format.

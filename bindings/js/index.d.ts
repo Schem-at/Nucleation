@@ -16,6 +16,12 @@ export { BlockPos, BlockPos_obj } from "./BlockPos"
 
 export { Dimensions, Dimensions_obj } from "./Dimensions"
 
+export { AnimationEffect } from "./AnimationEffect"
+
+export { BuildAnimation } from "./BuildAnimation"
+
+export { VideoConfig } from "./VideoConfig"
+
 export { Autostack } from "./Autostack"
 
 export { Blocks } from "./Blocks"
@@ -23,6 +29,8 @@ export { Blocks } from "./Blocks"
 export { Brush } from "./Brush"
 
 export { BuildingTool } from "./BuildingTool"
+
+export { Curve3D } from "./Curve3D"
 
 export { Palette } from "./Palette"
 
