@@ -479,6 +479,15 @@ pub mod ffi {
             Ok(())
         }
 
+        /// Wrap a validated [`FieldProgram`] as an `Sdf` graph (cloning it,
+        /// with its own explicit bounds and distance-kind metadata), so it
+        /// composes with every other combinator.
+        pub fn from_program(program: &FieldProgram) -> Box<Sdf> {
+            Box::new(Sdf(crate::sdf::SdfNode::Program {
+                program: Box::new(program.0.clone()),
+            }))
+        }
+
         // ── Legacy JSON-first API ─────────────────────────────────────────
 
         /// Legacy JSON-first terrain helper. Prefer typed constructors and
@@ -536,6 +545,361 @@ pub mod ffi {
             let node =
                 crate::sdf::SdfNode::from_json(sdf_str).map_err(|_| NucleationError::Parse)?;
             Ok(node.eval(x, y, z))
+        }
+    }
+
+    // ── Portable custom field programs ─────────────────────────────────────
+
+    /// The type of a value on a [`FieldProgramBuilder`]'s stack or in a slot.
+    pub enum FieldProgramValueType {
+        Scalar,
+        Vec3,
+        Bool,
+    }
+
+    impl FieldProgramValueType {
+        fn to_core(self) -> crate::sdf::ValueType {
+            match self {
+                FieldProgramValueType::Scalar => crate::sdf::ValueType::Scalar,
+                FieldProgramValueType::Vec3 => crate::sdf::ValueType::Vec3,
+                FieldProgramValueType::Bool => crate::sdf::ValueType::Bool,
+            }
+        }
+    }
+
+    /// Unary field-program operations (see `crate::sdf::UnaryOp`).
+    pub enum FieldProgramUnaryOp {
+        Neg,
+        Abs,
+        Sqrt,
+        Log,
+        Sin,
+        Cos,
+        Acos,
+        VecX,
+        VecY,
+        VecZ,
+        Length,
+        Normalize,
+    }
+
+    impl FieldProgramUnaryOp {
+        fn to_core(self) -> crate::sdf::UnaryOp {
+            use crate::sdf::UnaryOp as U;
+            match self {
+                FieldProgramUnaryOp::Neg => U::Neg,
+                FieldProgramUnaryOp::Abs => U::Abs,
+                FieldProgramUnaryOp::Sqrt => U::Sqrt,
+                FieldProgramUnaryOp::Log => U::Log,
+                FieldProgramUnaryOp::Sin => U::Sin,
+                FieldProgramUnaryOp::Cos => U::Cos,
+                FieldProgramUnaryOp::Acos => U::Acos,
+                FieldProgramUnaryOp::VecX => U::VecX,
+                FieldProgramUnaryOp::VecY => U::VecY,
+                FieldProgramUnaryOp::VecZ => U::VecZ,
+                FieldProgramUnaryOp::Length => U::Length,
+                FieldProgramUnaryOp::Normalize => U::Normalize,
+            }
+        }
+    }
+
+    /// Binary field-program operations (see `crate::sdf::BinaryOp`). `Add`
+    /// and `Sub` accept either two scalars or two vec3s.
+    pub enum FieldProgramBinaryOp {
+        Add,
+        Sub,
+        Mul,
+        Div,
+        Min,
+        Max,
+        Pow,
+        Atan2,
+        Lt,
+        Le,
+        Gt,
+        Ge,
+        Eq,
+        Dot,
+        Cross,
+        /// `vec3 * scalar`, componentwise.
+        Scale,
+    }
+
+    impl FieldProgramBinaryOp {
+        fn to_core(self) -> crate::sdf::BinaryOp {
+            use crate::sdf::BinaryOp as B;
+            match self {
+                FieldProgramBinaryOp::Add => B::Add,
+                FieldProgramBinaryOp::Sub => B::Sub,
+                FieldProgramBinaryOp::Mul => B::Mul,
+                FieldProgramBinaryOp::Div => B::Div,
+                FieldProgramBinaryOp::Min => B::Min,
+                FieldProgramBinaryOp::Max => B::Max,
+                FieldProgramBinaryOp::Pow => B::Pow,
+                FieldProgramBinaryOp::Atan2 => B::Atan2,
+                FieldProgramBinaryOp::Lt => B::Lt,
+                FieldProgramBinaryOp::Le => B::Le,
+                FieldProgramBinaryOp::Gt => B::Gt,
+                FieldProgramBinaryOp::Ge => B::Ge,
+                FieldProgramBinaryOp::Eq => B::Eq,
+                FieldProgramBinaryOp::Dot => B::Dot,
+                FieldProgramBinaryOp::Cross => B::Cross,
+                FieldProgramBinaryOp::Scale => B::Scale,
+            }
+        }
+    }
+
+    /// What kind of distance a field program's output represents.
+    pub enum FieldProgramDistanceKind {
+        Exact,
+        LowerBound,
+        Estimate,
+        Implicit,
+    }
+
+    impl FieldProgramDistanceKind {
+        fn to_core(self) -> crate::sdf::DistanceKind {
+            match self {
+                FieldProgramDistanceKind::Exact => crate::sdf::DistanceKind::Exact,
+                FieldProgramDistanceKind::LowerBound => crate::sdf::DistanceKind::LowerBound,
+                FieldProgramDistanceKind::Estimate => crate::sdf::DistanceKind::Estimate,
+                FieldProgramDistanceKind::Implicit => crate::sdf::DistanceKind::Implicit,
+            }
+        }
+
+        fn from_core(kind: crate::sdf::DistanceKind) -> Self {
+            match kind {
+                crate::sdf::DistanceKind::Exact => FieldProgramDistanceKind::Exact,
+                crate::sdf::DistanceKind::LowerBound => FieldProgramDistanceKind::LowerBound,
+                crate::sdf::DistanceKind::Estimate => FieldProgramDistanceKind::Estimate,
+                crate::sdf::DistanceKind::Implicit => FieldProgramDistanceKind::Implicit,
+            }
+        }
+    }
+
+    /// A validated, sandboxed custom SDF field program: deterministic typed
+    /// bytecode over scalar/vec3/bool values with bounded loops, carrying
+    /// its own explicit finite bounds and distance-kind metadata. Build one
+    /// with [`FieldProgramBuilder`] or import it from JSON.
+    #[diplomat::opaque]
+    pub struct FieldProgram(pub(crate) crate::sdf::Program);
+
+    impl FieldProgram {
+        pub fn from_json_string(json: &DiplomatStr) -> Result<Box<FieldProgram>, NucleationError> {
+            let json = std::str::from_utf8(json).map_err(|_| NucleationError::InvalidArgument)?;
+            crate::sdf::Program::from_json(json)
+                .map(|program| Box::new(FieldProgram(program)))
+                .map_err(|_| NucleationError::Parse)
+        }
+
+        pub fn to_json(&self, write: &mut DiplomatWrite) -> Result<(), NucleationError> {
+            let json = self.0.to_json().map_err(|_| NucleationError::Serialize)?;
+            let _ = write!(write, "{json}");
+            Ok(())
+        }
+
+        pub fn eval_at(&self, x: f32, y: f32, z: f32) -> f32 {
+            self.0.eval(x, y, z)
+        }
+
+        /// Unit-length gradient of the scalar output at `(x, y, z)`: the
+        /// program's own forward-mode analytic gradient where it's
+        /// differentiable there, falling back to a numerical estimate
+        /// (central differences via `epsilon`) otherwise.
+        pub fn gradient(
+            &self,
+            x: f32,
+            y: f32,
+            z: f32,
+            epsilon: f32,
+        ) -> Result<SdfNormal, NucleationError> {
+            finite(&[x, y, z])?;
+            positive(&[epsilon])?;
+            let normal = self.0.analytic_gradient(x, y, z).or_else(|| {
+                let node = crate::sdf::SdfNode::Program {
+                    program: Box::new(self.0.clone()),
+                };
+                crate::sdf::numerical_normal(&node, [x, y, z], epsilon)
+                    .map(|n| [n[0] as f32, n[1] as f32, n[2] as f32])
+            });
+            let normal = normal.ok_or(NucleationError::InvalidArgument)?;
+            Ok(SdfNormal {
+                x: normal[0],
+                y: normal[1],
+                z: normal[2],
+            })
+        }
+
+        pub fn bounds(&self) -> SdfBounds {
+            let aabb = self.0.aabb();
+            SdfBounds {
+                min_x: aabb.min[0],
+                min_y: aabb.min[1],
+                min_z: aabb.min[2],
+                max_x: aabb.max[0],
+                max_y: aabb.max[1],
+                max_z: aabb.max[2],
+            }
+        }
+
+        pub fn distance_kind(&self) -> FieldProgramDistanceKind {
+            FieldProgramDistanceKind::from_core(self.0.distance_kind())
+        }
+    }
+
+    /// Programmatic builder for a [`FieldProgram`]: append typed stack
+    /// instructions, then [`FieldProgramBuilder::build`] to validate and
+    /// obtain a [`FieldProgram`]. Consuming: every method after `build()`
+    /// (successful or not) returns `AlreadyConsumed`.
+    #[diplomat::opaque_mut]
+    pub struct FieldProgramBuilder(Option<crate::sdf::ProgramBuilder>);
+
+    impl FieldProgramBuilder {
+        pub fn create() -> Box<FieldProgramBuilder> {
+            Box::new(FieldProgramBuilder(Some(crate::sdf::ProgramBuilder::new())))
+        }
+
+        /// Declare a new typed local slot and return its index.
+        pub fn add_slot(
+            &mut self,
+            value_type: FieldProgramValueType,
+        ) -> Result<u16, NucleationError> {
+            Ok(self.inner_mut()?.add_slot(value_type.to_core()))
+        }
+
+        pub fn push_const_scalar(&mut self, value: f32) -> Result<(), NucleationError> {
+            finite(&[value])?;
+            self.inner_mut()?
+                .push_const(crate::sdf::Const::Scalar(value));
+            Ok(())
+        }
+
+        pub fn push_const_vec3(&mut self, x: f32, y: f32, z: f32) -> Result<(), NucleationError> {
+            finite(&[x, y, z])?;
+            self.inner_mut()?
+                .push_const(crate::sdf::Const::Vec3([x, y, z]));
+            Ok(())
+        }
+
+        pub fn push_const_bool(&mut self, value: bool) -> Result<(), NucleationError> {
+            self.inner_mut()?.push_const(crate::sdf::Const::Bool(value));
+            Ok(())
+        }
+
+        /// Push the `Vec3` position the program is being evaluated at.
+        pub fn push_pos(&mut self) -> Result<(), NucleationError> {
+            self.inner_mut()?.push_pos();
+            Ok(())
+        }
+
+        pub fn load_local(&mut self, slot: u16) -> Result<(), NucleationError> {
+            self.inner_mut()?.load_local(slot);
+            Ok(())
+        }
+
+        pub fn store_local(&mut self, slot: u16) -> Result<(), NucleationError> {
+            self.inner_mut()?.store_local(slot);
+            Ok(())
+        }
+
+        /// Discard the top of the stack.
+        pub fn pop(&mut self) -> Result<(), NucleationError> {
+            self.inner_mut()?.pop();
+            Ok(())
+        }
+
+        pub fn unary_op(&mut self, op: FieldProgramUnaryOp) -> Result<(), NucleationError> {
+            self.inner_mut()?.unary(op.to_core());
+            Ok(())
+        }
+
+        pub fn binary_op(&mut self, op: FieldProgramBinaryOp) -> Result<(), NucleationError> {
+            self.inner_mut()?.binary(op.to_core());
+            Ok(())
+        }
+
+        /// Pop `(x, lo, hi)`, push `x` clamped to `[lo, hi]`.
+        pub fn clamp(&mut self) -> Result<(), NucleationError> {
+            self.inner_mut()?.clamp();
+            Ok(())
+        }
+
+        /// Pop `(a, b, cond)`, push `a` if `cond` else `b`.
+        pub fn select(&mut self) -> Result<(), NucleationError> {
+            self.inner_mut()?.select();
+            Ok(())
+        }
+
+        /// Pop `(x, y, z)`, push `Vec3([x, y, z])`.
+        pub fn make_vec3(&mut self) -> Result<(), NucleationError> {
+            self.inner_mut()?.make_vec3();
+            Ok(())
+        }
+
+        /// Pop a `Bool`; if true, stop the nearest enclosing repeat after
+        /// this iteration. Only valid inside `beginRepeat`/`endRepeat`.
+        pub fn break_if(&mut self) -> Result<(), NucleationError> {
+            self.inner_mut()?.break_if();
+            Ok(())
+        }
+
+        /// Open a new statically bounded repeat block; subsequent
+        /// instructions append to its body until `endRepeat`.
+        pub fn begin_repeat(&mut self, count: u32) -> Result<(), NucleationError> {
+            self.inner_mut()?.begin_repeat(count);
+            Ok(())
+        }
+
+        /// Close the innermost open repeat block.
+        pub fn end_repeat(&mut self) -> Result<(), NucleationError> {
+            self.inner_mut()?
+                .end_repeat()
+                .map_err(|_| NucleationError::InvalidArgument)?;
+            Ok(())
+        }
+
+        /// Declare which scalar slot holds the program's output.
+        pub fn set_output(&mut self, slot: u16) -> Result<(), NucleationError> {
+            self.inner_mut()?.set_output(slot);
+            Ok(())
+        }
+
+        /// Set the program's explicit, author-asserted finite bounds.
+        #[allow(clippy::too_many_arguments)]
+        pub fn set_bounds(
+            &mut self,
+            min_x: f32,
+            min_y: f32,
+            min_z: f32,
+            max_x: f32,
+            max_y: f32,
+            max_z: f32,
+        ) -> Result<(), NucleationError> {
+            finite(&[min_x, min_y, min_z, max_x, max_y, max_z])?;
+            self.inner_mut()?
+                .set_bounds([min_x, min_y, min_z], [max_x, max_y, max_z]);
+            Ok(())
+        }
+
+        pub fn set_distance_kind(
+            &mut self,
+            kind: FieldProgramDistanceKind,
+        ) -> Result<(), NucleationError> {
+            self.inner_mut()?.set_distance_kind(kind.to_core());
+            Ok(())
+        }
+
+        /// Validate and finalize. Consumes the builder even on failure.
+        pub fn build(&mut self) -> Result<Box<FieldProgram>, NucleationError> {
+            let inner = self.0.take().ok_or(NucleationError::AlreadyConsumed)?;
+            inner
+                .build()
+                .map(|program| Box::new(FieldProgram(program)))
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        fn inner_mut(&mut self) -> Result<&mut crate::sdf::ProgramBuilder, NucleationError> {
+            self.0.as_mut().ok_or(NucleationError::AlreadyConsumed)
         }
     }
 
@@ -648,5 +1012,117 @@ mod tests {
         assert!(extreme.z.abs() < 1e-6);
         let endpoint = plane.normal(f32::MAX, 0.0, 0.0, 0.5).unwrap();
         assert!((endpoint.x - 1.0).abs() < 1e-6);
+    }
+
+    use super::ffi::{
+        FieldProgram, FieldProgramBinaryOp, FieldProgramBuilder, FieldProgramDistanceKind,
+        FieldProgramUnaryOp, FieldProgramValueType,
+    };
+
+    fn sphere_builder(radius: f32) -> (Box<FieldProgramBuilder>, u16) {
+        let mut b = FieldProgramBuilder::create();
+        let out = b.add_slot(FieldProgramValueType::Scalar).unwrap();
+        b.set_output(out).unwrap();
+        b.set_bounds(-radius, -radius, -radius, radius, radius, radius)
+            .unwrap();
+        b.set_distance_kind(FieldProgramDistanceKind::Exact)
+            .unwrap();
+        b.push_pos().unwrap();
+        b.unary_op(FieldProgramUnaryOp::Length).unwrap();
+        b.push_const_scalar(radius).unwrap();
+        b.binary_op(FieldProgramBinaryOp::Sub).unwrap();
+        b.store_local(out).unwrap();
+        (b, out)
+    }
+
+    #[test]
+    fn field_program_builder_builds_sphere_and_evaluates() {
+        let (mut b, _) = sphere_builder(2.0);
+        let program = b.build().unwrap();
+        assert!(program.eval_at(0.0, 0.0, 0.0) < 0.0);
+        assert!((program.eval_at(2.0, 0.0, 0.0)).abs() < 1e-5);
+        assert!(program.eval_at(10.0, 0.0, 0.0) > 0.0);
+        let bounds = program.bounds();
+        assert_eq!(bounds.min_x, -2.0);
+        assert_eq!(bounds.max_x, 2.0);
+    }
+
+    #[test]
+    fn field_program_builder_rejects_invalid_output_slot() {
+        let mut b = FieldProgramBuilder::create();
+        let flag = b.add_slot(FieldProgramValueType::Bool).unwrap();
+        b.set_output(flag).unwrap();
+        b.set_bounds(-1.0, -1.0, -1.0, 1.0, 1.0, 1.0).unwrap();
+        b.push_const_bool(true).unwrap();
+        b.store_local(flag).unwrap();
+        assert!(b.build().is_err());
+    }
+
+    #[test]
+    fn field_program_builder_after_build_is_already_consumed() {
+        let (mut b, out) = sphere_builder(1.0);
+        assert!(b.build().is_ok());
+        assert!(b.store_local(out).is_err());
+        assert!(b.build().is_err());
+    }
+
+    #[test]
+    fn field_program_json_roundtrip() {
+        let (mut b, _) = sphere_builder(3.5);
+        let program = b.build().unwrap();
+        let json = program.0.to_json().unwrap();
+        let restored = FieldProgram::from_json_string(json.as_bytes()).unwrap();
+        assert!((program.eval_at(1.0, 1.0, 1.0) - restored.eval_at(1.0, 1.0, 1.0)).abs() < 1e-6);
+        assert!(FieldProgram::from_json_string(b"{ not json").is_err());
+    }
+
+    #[test]
+    fn field_program_builder_bounded_repeat_break_if() {
+        let mut b = FieldProgramBuilder::create();
+        let counter = b.add_slot(FieldProgramValueType::Scalar).unwrap();
+        b.set_output(counter).unwrap();
+        b.set_bounds(-1.0, -1.0, -1.0, 1.0, 1.0, 1.0).unwrap();
+
+        b.begin_repeat(1000).unwrap();
+        b.load_local(counter).unwrap();
+        b.push_const_scalar(1.0).unwrap();
+        b.binary_op(FieldProgramBinaryOp::Add).unwrap();
+        b.store_local(counter).unwrap();
+
+        b.load_local(counter).unwrap();
+        b.push_const_scalar(5.0).unwrap();
+        b.binary_op(FieldProgramBinaryOp::Ge).unwrap();
+        b.break_if().unwrap();
+        b.end_repeat().unwrap();
+
+        let program = b.build().unwrap();
+        assert!((program.eval_at(0.0, 0.0, 0.0) - 5.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn field_program_gradient_returns_unit_normal() {
+        let (mut b, _) = sphere_builder(2.0);
+        let program = b.build().unwrap();
+        let normal = program.gradient(2.0, 0.0, 0.0, 0.01).unwrap();
+        assert!((normal.x - 1.0).abs() < 1e-3);
+        assert!(normal.y.abs() < 1e-3);
+        assert!(normal.z.abs() < 1e-3);
+    }
+
+    #[test]
+    fn sdf_from_program_composes_and_reports_bounds() {
+        let (mut b, _) = sphere_builder(2.0);
+        let program = b.build().unwrap();
+        let field = Sdf::from_program(&program);
+        let other = Sdf::sphere(1.0).unwrap().translate(10.0, 0.0, 0.0).unwrap();
+        let union = field.union_with(&other);
+
+        assert!(union.eval_at(0.0, 0.0, 0.0) < 0.0);
+        assert!(union.eval_at(10.0, 0.0, 0.0) < 0.0);
+        assert!(union.eval_at(5.0, 0.0, 0.0) > 0.0);
+
+        let bounds = union.bounds().unwrap();
+        assert!(bounds.min_x <= -2.0);
+        assert!(bounds.max_x >= 11.0);
     }
 }
