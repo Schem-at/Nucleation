@@ -25,6 +25,12 @@ pub fn materialize(
     stable_id: StableBuildId,
     ctx: &MaterializeCtx,
 ) -> (UniversalSchematic, Provenance) {
+    debug_assert!(
+        blocks.len() as u64 == build.block_count,
+        "materialize: {} blocks vs build.block_count {}",
+        blocks.len(),
+        build.block_count
+    );
     let min = build.bbox.0;
     let mut schem = UniversalSchematic::new(stable_id.to_string());
     // BTreeMap iteration is sorted → deterministic placement.

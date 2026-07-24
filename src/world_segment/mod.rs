@@ -19,6 +19,7 @@ pub mod score;
 pub mod provenance;
 pub mod materialize;
 pub mod identity;
+pub mod runner;
 
 pub use ids::{ClusterId, ContentId, TileId};
 pub use tile::{TileBounds, VoxelTile};
@@ -35,3 +36,4 @@ pub use score::{score, ScoreConfig, Scored, Signal, Tier};
 pub use provenance::{Provenance, StableBuildId};
 pub use materialize::{materialize, MaterializeCtx};
 pub use identity::{bbox_iou, match_snapshots, Outcome, PriorBuild, SnapshotMatch};
+pub use runner::{MaterializedBuild, SegmentJob, WorldSegmenter};
