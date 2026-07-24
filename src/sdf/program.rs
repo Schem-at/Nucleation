@@ -23,6 +23,12 @@ use std::cell::RefCell;
 
 /// Maximum number of typed local slots a program may declare.
 pub const MAX_SLOTS: usize = 64;
+/// Current serialized field-program bytecode format.
+pub const PROGRAM_VERSION: u32 = 1;
+
+fn default_program_version() -> u32 {
+    PROGRAM_VERSION
+}
 /// Maximum number of `Instr` nodes in a program's syntax tree (counting
 /// every instruction nested inside `Repeat` bodies once, not per-iteration).
 pub const MAX_STATIC_INSTRUCTIONS: usize = 2048;
@@ -227,6 +233,8 @@ pub struct ProgramBounds {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProgramData {
+    #[serde(default = "default_program_version")]
+    pub version: u32,
     pub slots: Vec<ValueType>,
     pub instructions: Vec<Instr>,
     pub output_slot: u16,
@@ -239,6 +247,7 @@ pub struct ProgramData {
 /// [`ProgramBuilder`] can be misused.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProgramError {
+    UnsupportedVersion(u32),
     TooManySlots,
     UnknownSlot(u16),
     InvalidOutputSlot,
@@ -259,6 +268,9 @@ pub enum ProgramError {
 impl std::fmt::Display for ProgramError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            ProgramError::UnsupportedVersion(version) => {
+                write!(f, "unsupported field program version {version}")
+            }
             ProgramError::TooManySlots => write!(f, "program declares too many local slots"),
             ProgramError::UnknownSlot(slot) => write!(f, "reference to undeclared slot {slot}"),
             ProgramError::InvalidOutputSlot => {
@@ -434,6 +446,9 @@ impl<'a> ValidateCtx<'a> {
 /// is safe to evaluate an unbounded number of times without panicking,
 /// looping forever, or exceeding [`MAX_DYNAMIC_STEPS`] worst-case steps.
 pub fn validate(data: &ProgramData) -> Result<(), ProgramError> {
+    if data.version != PROGRAM_VERSION {
+        return Err(ProgramError::UnsupportedVersion(data.version));
+    }
     if data.slots.len() > MAX_SLOTS {
         return Err(ProgramError::TooManySlots);
     }
@@ -1210,6 +1225,7 @@ impl ProgramBuilder {
         let output_slot = self.output_slot.ok_or(ProgramError::InvalidOutputSlot)?;
         let bounds = self.bounds.ok_or(ProgramError::InvalidBounds)?;
         let data = ProgramData {
+            version: PROGRAM_VERSION,
             slots: self.slots,
             instructions,
             output_slot,
@@ -1439,10 +1455,17 @@ mod tests {
     fn json_roundtrip_preserves_evaluation() {
         let program = sphere_program(3.5);
         let json = program.to_json().expect("serialize");
+        assert!(json.contains("\"version\":1"));
         let restored = Program::from_json(&json).expect("deserialize + validate");
         for p in [(0.0, 0.0, 0.0), (3.5, 0.0, 0.0), (10.0, -2.0, 4.0)] {
             assert!((program.eval(p.0, p.1, p.2) - restored.eval(p.0, p.1, p.2)).abs() < 1e-6);
         }
+
+        let future = json.replacen("\"version\":1", "\"version\":2", 1);
+        assert_eq!(
+            Program::from_json(&future).unwrap_err(),
+            ProgramError::UnsupportedVersion(2)
+        );
     }
 
     #[test]

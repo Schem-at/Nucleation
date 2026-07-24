@@ -41,7 +41,7 @@ pub use node::{Aabb, Axis, CellMode, SdfNode};
 pub use program::{
     BinaryOp, Const, DistanceKind, Program, ProgramBounds, ProgramBuilder, ProgramData,
     ProgramError, UnaryOp, ValueType, MAX_DYNAMIC_STEPS, MAX_REPEAT_DEPTH, MAX_REPEAT_ITERATIONS,
-    MAX_SLOTS, MAX_STATIC_INSTRUCTIONS,
+    MAX_SLOTS, MAX_STATIC_INSTRUCTIONS, PROGRAM_VERSION,
 };
 pub use sampler::{
     auto_bounds, sample_to_schematic, FillRule, GradientAxis, GradientFill, MaterialRules,
