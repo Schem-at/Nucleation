@@ -53,11 +53,24 @@ pub struct ProfileParams {
     pub min_slab_coverage: f32,
     /// Inclusive Y range to scan for the slab.
     pub y_scan: (i32, i32),
+    /// Minimum fraction of in-band block count a name must reach to be kept
+    /// in the derived palette. `0.0` (default) keeps every name that appears
+    /// at all within the band — byte-identical to the pre-dominance-filter
+    /// behavior. On real-world data, a wide-enough band to cover ground
+    /// naturally also covers the bottom of player builds, so raising this
+    /// filters out rare non-substrate names (redstone, repeaters, etc.)
+    /// while keeping the truly dominant ground materials.
+    pub palette_min_share: f32,
 }
 
 impl Default for ProfileParams {
     fn default() -> Self {
-        ProfileParams { sample_stride: 1, min_slab_coverage: 0.9, y_scan: (-64, 320) }
+        ProfileParams {
+            sample_stride: 1,
+            min_slab_coverage: 0.9,
+            y_scan: (-64, 320),
+            palette_min_share: 0.0,
+        }
     }
 }
 
@@ -100,9 +113,13 @@ impl WorldProfile {
             return WorldProfile::new(BTreeSet::new(), (0, 0));
         }
 
-        // Per-Y distinct occupied columns, and per-Y block-name set.
+        // Per-Y distinct occupied columns, and per-Y block-name counts (used
+        // both for palette membership and, via `palette_min_share`, for
+        // filtering out names that are rare within the band even though they
+        // appear at all — e.g. a couple of stray redstone_wire blocks sitting
+        // inside an otherwise-natural ground band).
         let mut cols_at_y: BTreeMap<i32, BTreeSet<(i32, i32)>> = BTreeMap::new();
-        let mut names_at_y: BTreeMap<i32, BTreeSet<String>> = BTreeMap::new();
+        let mut counts_at_y: BTreeMap<i32, BTreeMap<String, u64>> = BTreeMap::new();
         // Footprint = distinct (x,z) columns seen anywhere in the samples.
         let mut footprint: BTreeSet<(i32, i32)> = BTreeSet::new();
 
@@ -113,7 +130,11 @@ impl WorldProfile {
                 }
                 footprint.insert((x, z));
                 cols_at_y.entry(y).or_default().insert((x, z));
-                names_at_y.entry(y).or_default().insert(state.get_name().to_string());
+                *counts_at_y
+                    .entry(y)
+                    .or_default()
+                    .entry(state.get_name().to_string())
+                    .or_insert(0) += 1;
             }
         }
 
@@ -145,13 +166,31 @@ impl WorldProfile {
             _ => return WorldProfile::new(BTreeSet::new(), (0, 0)),
         };
 
-        // Palette = block names appearing within the band.
-        let mut palette: BTreeSet<String> = BTreeSet::new();
+        // Palette = block names appearing within the band, filtered by
+        // dominance: a name qualifies only if its share of the band's total
+        // block count is at least `palette_min_share`. With the default
+        // 0.0, every count is `>= 0.0`, so this is byte-identical to "every
+        // name that appears at all within the band".
+        let mut counts: BTreeMap<String, u64> = BTreeMap::new();
+        let mut total_band_blocks: u64 = 0;
         for y in lo..=hi {
-            if let Some(names) = names_at_y.get(&y) {
-                palette.extend(names.iter().cloned());
+            if let Some(names) = counts_at_y.get(&y) {
+                for (name, count) in names {
+                    *counts.entry(name.clone()).or_insert(0) += count;
+                    total_band_blocks += count;
+                }
             }
         }
+
+        let min_share = params.palette_min_share as f64;
+        let palette: BTreeSet<String> = counts
+            .into_iter()
+            .filter(|(_, count)| {
+                total_band_blocks == 0
+                    || (*count as f64 / total_band_blocks as f64) >= min_share
+            })
+            .map(|(name, _)| name)
+            .collect();
 
         WorldProfile::new(palette, (lo, hi))
     }
@@ -186,7 +225,12 @@ mod derive_tests {
 
     #[test]
     fn derives_the_slab_band_and_palette() {
-        let params = ProfileParams { sample_stride: 1, min_slab_coverage: 0.9, y_scan: (-64, 63) };
+        let params = ProfileParams {
+            sample_stride: 1,
+            min_slab_coverage: 0.9,
+            y_scan: (-64, 63),
+            ..Default::default()
+        };
         let profile = WorldProfile::derive(&[flat_world_tile()], &params);
         // Band starts at the bottom and covers the four solid layers.
         assert_eq!(profile.substrate_y_band, (-64, -61));
@@ -223,7 +267,12 @@ mod derive_tests {
         // survives depends entirely on how ties are broken during sort: a
         // stable sort keyed only on TileId would let input order decide,
         // which of them is picked and therefore change the derived palette.
-        let params = ProfileParams { sample_stride: 2, min_slab_coverage: 0.9, y_scan: (-64, 63) };
+        let params = ProfileParams {
+            sample_stride: 2,
+            min_slab_coverage: 0.9,
+            y_scan: (-64, 63),
+            ..Default::default()
+        };
 
         let forward = vec![
             slab_tile(TileId { x: 0, z: 0 }, "minecraft:stone"),
@@ -252,7 +301,12 @@ mod derive_tests {
         // greater than) `min_slab_coverage`. The 10th footprint column is
         // seeded far below the band so it pads the footprint without itself
         // qualifying as slab.
-        let params = ProfileParams { sample_stride: 1, min_slab_coverage: 0.9, y_scan: (-70, -60) };
+        let params = ProfileParams {
+            sample_stride: 1,
+            min_slab_coverage: 0.9,
+            y_scan: (-70, -60),
+            ..Default::default()
+        };
         let mut blocks = vec![((9, -70, 0), BlockState::new("minecraft:bedrock"))];
         for x in 0..9 {
             blocks.push(((x, -64, 0), BlockState::new("minecraft:stone")));
@@ -276,5 +330,62 @@ mod derive_tests {
     fn empty_samples_yield_an_empty_profile() {
         let profile = WorldProfile::derive(&[], &ProfileParams::default());
         assert!(profile.substrate_palette.is_empty());
+    }
+
+    #[test]
+    fn palette_dominance_filter_excludes_rare_names() {
+        // 10x10 stone slab across y=-64..-61 (400 blocks). Plus 2
+        // redstone_wire blocks at y=-63, on footprint columns that don't
+        // overlap the stone columns (so they don't overwrite slab blocks),
+        // but the columns are only occupied at that single Y — they don't
+        // themselves reach slab coverage at other levels, so the band is
+        // unaffected: it stays -64..-61, exactly mirroring the real-data
+        // failure (player redstone sitting inside an otherwise-natural band).
+        fn build_tile() -> VoxelTile {
+            let mut blocks = vec![];
+            for x in 0..10 {
+                for z in 0..10 {
+                    for y in -64..=-61 {
+                        blocks.push(((x, y, z), BlockState::new("minecraft:stone")));
+                    }
+                }
+            }
+            blocks.push(((20, -63, 20), BlockState::new("minecraft:redstone_wire")));
+            blocks.push(((21, -63, 20), BlockState::new("minecraft:redstone_wire")));
+            VoxelTile::from_blocks(
+                TileId { x: 0, z: 0 },
+                TileBounds { min: (0, -64, 0), max: (21, 63, 21) },
+                blocks.into_iter(),
+            )
+        }
+
+        // total in-band blocks = 400 stone + 2 redstone = 402;
+        // redstone share = 2/402 ~= 0.005 < 0.01 -> excluded.
+        let filtered_params = ProfileParams {
+            sample_stride: 1,
+            min_slab_coverage: 0.9,
+            y_scan: (-64, -61),
+            palette_min_share: 0.01,
+        };
+        let filtered = WorldProfile::derive(&[build_tile()], &filtered_params);
+        assert_eq!(filtered.substrate_y_band, (-64, -61));
+        assert!(filtered.substrate_palette.contains("minecraft:stone"));
+        assert!(
+            !filtered.substrate_palette.contains("minecraft:redstone_wire"),
+            "rare name below palette_min_share must be filtered out"
+        );
+
+        // Default (0.0) must preserve today's behavior: every present name
+        // qualifies.
+        let default_params = ProfileParams {
+            sample_stride: 1,
+            min_slab_coverage: 0.9,
+            y_scan: (-64, -61),
+            ..Default::default()
+        };
+        let unfiltered = WorldProfile::derive(&[build_tile()], &default_params);
+        assert_eq!(unfiltered.substrate_y_band, (-64, -61));
+        assert!(unfiltered.substrate_palette.contains("minecraft:stone"));
+        assert!(unfiltered.substrate_palette.contains("minecraft:redstone_wire"));
     }
 }

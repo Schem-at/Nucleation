@@ -43,6 +43,7 @@ struct Cli {
     limit: Option<usize>,
     sample: usize,
     coverage: f32,
+    palette_share: f32,
 }
 
 fn parse_args() -> Cli {
@@ -55,7 +56,10 @@ fn parse_args() -> Cli {
     // sampling pass only walks tiles until it finds this many that intersect
     // the plotted-area bbox, instead of paying for every skipped outskirt tile.
     let mut sample: usize = 24;
-    let mut coverage: f32 = 0.5;
+    // Measured ORE ground layers sit at 0.31-0.40 coverage; 0.5 stopped the
+    // band at -63 and missed the rest of the natural slab.
+    let mut coverage: f32 = 0.3;
+    let mut palette_share: f32 = 0.01;
 
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut i = 0;
@@ -98,6 +102,14 @@ fn parse_args() -> Cli {
                     .expect("--coverage must be a float");
                 i += 2;
             }
+            "--palette-share" => {
+                palette_share = args
+                    .get(i + 1)
+                    .expect("--palette-share needs a value")
+                    .parse()
+                    .expect("--palette-share must be a float");
+                i += 2;
+            }
             other => {
                 eprintln!("wol_extract: ignoring unrecognized argument {other}");
                 i += 1;
@@ -105,7 +117,7 @@ fn parse_args() -> Cli {
         }
     }
 
-    Cli { tarball, plots, out, limit, sample, coverage }
+    Cli { tarball, plots, out, limit, sample, coverage, palette_share }
 }
 
 /// One row of `wol-project/data-ore-plots-build-20260723.json`.
@@ -256,7 +268,11 @@ fn main() {
     // problems (e.g. a slab that never reaches typical coverage, or gets
     // dragged down by player digging) are debuggable without reading the
     // derive implementation.
-    let profile_params = ProfileParams { min_slab_coverage: cli.coverage, ..ProfileParams::default() };
+    let profile_params = ProfileParams {
+        min_slab_coverage: cli.coverage,
+        palette_min_share: cli.palette_share,
+        ..ProfileParams::default()
+    };
     {
         let mut footprint: BTreeSet<(i32, i32)> = BTreeSet::new();
         let mut cols_at_y: std::collections::BTreeMap<i32, BTreeSet<(i32, i32)>> =
@@ -284,8 +300,40 @@ fn main() {
 
     let profile = WorldProfile::derive(&samples, &profile_params);
     println!(
-        "wol_extract: derived profile — substrate_y_band = {:?}, palette ({} names) = {:?}",
-        profile.substrate_y_band,
+        "wol_extract: derived profile — substrate_y_band = {:?}, palette_min_share = {}",
+        profile.substrate_y_band, cli.palette_share
+    );
+
+    // Dominance diagnostics: top 15 block names by in-band block count, with
+    // their share of the band's total block count, so palette calibration
+    // (picking --palette-share) is visible instead of a black box.
+    {
+        let (lo, hi) = profile.substrate_y_band;
+        let mut counts: std::collections::BTreeMap<String, u64> = std::collections::BTreeMap::new();
+        let mut total: u64 = 0;
+        for tile in &samples {
+            for ((_x, y, _z), state) in tile.blocks() {
+                if y < lo || y > hi {
+                    continue;
+                }
+                *counts.entry(state.get_name().to_string()).or_insert(0) += 1;
+                total += 1;
+            }
+        }
+        let mut by_count: Vec<(String, u64)> = counts.into_iter().collect();
+        by_count.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        println!(
+            "wol_extract: top block names in band {:?} by count (total {total} blocks):",
+            profile.substrate_y_band
+        );
+        for (name, count) in by_count.iter().take(15) {
+            let share = if total > 0 { *count as f64 / total as f64 } else { 0.0 };
+            println!("wol_extract:   {name} {count} ({:.1}%)", share * 100.0);
+        }
+    }
+
+    println!(
+        "wol_extract: final filtered palette ({} names) = {:?}",
         profile.substrate_palette.len(),
         profile.substrate_palette
     );
