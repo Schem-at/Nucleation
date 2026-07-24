@@ -5,8 +5,10 @@
 #include "Brush.hpp"
 #include "BuildAnimation.hpp"
 #include "RenderConfig.hpp"
+#include "ResourcePack.hpp"
 #include "Schematic.hpp"
 #include "Shape.hpp"
+#include "VideoConfig.hpp"
 
 namespace nucleation {
 void add_BuildAnimation_binding(nb::module_ mod) {
@@ -18,6 +20,7 @@ void add_BuildAnimation_binding(nb::module_ mod) {
     nb::class_<nucleation::BuildAnimation> opaque(mod, "BuildAnimation", nb::type_slots(nucleation_BuildAnimation_slots));
     opaque
         .def("add_armor_stand", &nucleation::BuildAnimation::add_armor_stand, "x"_a, "y"_a, "z"_a, "yaw"_a, "armor_material"_a)
+        .def("animate_all", &nucleation::BuildAnimation::animate_all, "effect"_a)
         .def("animate_camera", &nucleation::BuildAnimation::animate_camera, "effect"_a, "offset_ms"_a)
         .def("begin_group", &nucleation::BuildAnimation::begin_group)
         .def("begin_keyed_group", &nucleation::BuildAnimation::begin_keyed_group, "key"_a)
@@ -39,10 +42,13 @@ void add_BuildAnimation_binding(nb::module_ mod) {
         .def("flip_z", &nucleation::BuildAnimation::flip_z, "duration_ms"_a)
         .def("frame_count", &nucleation::BuildAnimation::frame_count, "fps"_a, "hold_ms"_a)
         .def("frame_json", &nucleation::BuildAnimation::frame_json, "time_ms"_a)
+        .def_static("from_schematic", std::move(maybe_op_unwrap(&nucleation::BuildAnimation::from_schematic)), "schematic"_a)
         .def("group_count", &nucleation::BuildAnimation::group_count)
         .def("operations_json", &nucleation::BuildAnimation::operations_json)
         .def("render_frames", &nucleation::BuildAnimation::render_frames, "pack_zip"_a, "config"_a, "prefix"_a, "fps"_a, "hold_ms"_a)
         .def("render_gif", &nucleation::BuildAnimation::render_gif, "pack_zip"_a, "config"_a, "path"_a, "fps"_a, "hold_ms"_a)
+        .def("render_video", &nucleation::BuildAnimation::render_video, "pack_zip"_a, "config"_a, "video"_a, "path"_a, "hold_ms"_a)
+        .def("render_video_with_pack", &nucleation::BuildAnimation::render_video_with_pack, "pack"_a, "config"_a, "video"_a, "path"_a, "hold_ms"_a)
         .def("rotate_all_x", &nucleation::BuildAnimation::rotate_all_x, "degrees"_a, "duration_ms"_a)
         .def("rotate_all_y", &nucleation::BuildAnimation::rotate_all_y, "degrees"_a, "duration_ms"_a)
         .def("rotate_all_z", &nucleation::BuildAnimation::rotate_all_z, "degrees"_a, "duration_ms"_a)

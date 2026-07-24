@@ -61,6 +61,44 @@ export class BuildAnimation {
         }
     }
 
+    /**
+     * Clone an existing schematic into one animation group. Entity-only
+     * schematics are supported; overlapping block/entity integer positions
+     * are rejected rather than silently dropping a model.
+     */
+    static fromSchematic(schematic) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.BuildAnimation_from_schematic(diplomatReceive.buffer, schematic.ffiValue);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new BuildAnimation(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Apply one effect to every existing animation group.
+     */
+    animateAll(effect) {
+    wasm.BuildAnimation_animate_all(this.ffiValue, effect.ffiValue);
+
+        try {}
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
     setDefaultEffect(effect) {
     wasm.BuildAnimation_set_default_effect(this.ffiValue, effect.ffiValue);
 

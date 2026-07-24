@@ -9,6 +9,7 @@
 
 #include "NucleationError.d.h"
 #include "RenderConfig.d.h"
+#include "ResourcePack.d.h"
 #include "Schematic.d.h"
 
 #include "Renderer.d.h"
@@ -26,6 +27,15 @@ Renderer_render_png_b64_result Renderer_render_png_b64(const Schematic* schemati
 
 typedef struct Renderer_render_to_file_result {union { NucleationError err;}; bool is_ok;} Renderer_render_to_file_result;
 Renderer_render_to_file_result Renderer_render_to_file(const Schematic* schematic, DiplomatU8View pack_zip, const RenderConfig* config, DiplomatStringView path);
+
+typedef struct Renderer_render_to_file_with_pack_result {union { NucleationError err;}; bool is_ok;} Renderer_render_to_file_with_pack_result;
+Renderer_render_to_file_with_pack_result Renderer_render_to_file_with_pack(const Schematic* schematic, const ResourcePack* pack, const RenderConfig* config, DiplomatStringView path);
+
+typedef struct Renderer_render_pixels_b64_with_pack_result {union { NucleationError err;}; bool is_ok;} Renderer_render_pixels_b64_with_pack_result;
+Renderer_render_pixels_b64_with_pack_result Renderer_render_pixels_b64_with_pack(const Schematic* schematic, const ResourcePack* pack, const RenderConfig* config, DiplomatWrite* write);
+
+typedef struct Renderer_render_png_b64_with_pack_result {union { NucleationError err;}; bool is_ok;} Renderer_render_png_b64_with_pack_result;
+Renderer_render_png_b64_with_pack_result Renderer_render_png_b64_with_pack(const Schematic* schematic, const ResourcePack* pack, const RenderConfig* config, DiplomatWrite* write);
 
 void Renderer_destroy(Renderer* self);
 

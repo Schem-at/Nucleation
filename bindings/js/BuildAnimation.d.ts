@@ -20,6 +20,18 @@ export class BuildAnimation {
 
     static create(name: string): BuildAnimation;
 
+    /**
+     * Clone an existing schematic into one animation group. Entity-only
+     * schematics are supported; overlapping block/entity integer positions
+     * are rejected rather than silently dropping a model.
+     */
+    static fromSchematic(schematic: Schematic): BuildAnimation;
+
+    /**
+     * Apply one effect to every existing animation group.
+     */
+    animateAll(effect: AnimationEffect): void;
+
     setDefaultEffect(effect: AnimationEffect): void;
 
     /**

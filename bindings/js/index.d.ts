@@ -20,6 +20,8 @@ export { AnimationEffect } from "./AnimationEffect"
 
 export { BuildAnimation } from "./BuildAnimation"
 
+export { VideoConfig } from "./VideoConfig"
+
 export { Autostack } from "./Autostack"
 
 export { Blocks } from "./Blocks"

@@ -17,10 +17,14 @@ namespace diplomat::capi { struct Brush; }
 class Brush;
 namespace diplomat::capi { struct RenderConfig; }
 class RenderConfig;
+namespace diplomat::capi { struct ResourcePack; }
+class ResourcePack;
 namespace diplomat::capi { struct Schematic; }
 class Schematic;
 namespace diplomat::capi { struct Shape; }
 class Shape;
+namespace diplomat::capi { struct VideoConfig; }
+class VideoConfig;
 class NucleationError;
 
 
@@ -39,6 +43,18 @@ class BuildAnimation {
 public:
 
   inline static std::unique_ptr<BuildAnimation> create(std::string_view name);
+
+  /**
+   * Clone an existing schematic into one animation group. Entity-only
+   * schematics are supported; overlapping block/entity integer positions
+   * are rejected rather than silently dropping a model.
+   */
+  inline static diplomat::result<std::unique_ptr<BuildAnimation>, NucleationError> from_schematic(const Schematic& schematic);
+
+  /**
+   * Apply one effect to every existing animation group.
+   */
+  inline void animate_all(const AnimationEffect& effect);
 
   inline void set_default_effect(const AnimationEffect& effect);
 
@@ -153,6 +169,17 @@ public:
    * GIF encoder all live in the Rust core; no ffmpeg subprocess is needed.
    */
   inline diplomat::result<uint32_t, NucleationError> render_gif(diplomat::span<const uint8_t> pack_zip, const RenderConfig& config, std::string_view path, double fps, float hold_ms) const;
+
+  /**
+   * Render and stream with an already parsed resource pack.
+   */
+  inline diplomat::result<uint32_t, NucleationError> render_video_with_pack(const ResourcePack& pack, const RenderConfig& config, const VideoConfig& video, std::string_view path, float hold_ms) const;
+
+  /**
+   * Render and stream directly to video. The GPU renderer and meshes are
+   * reused for the complete animation and no frame sequence is retained.
+   */
+  inline diplomat::result<uint32_t, NucleationError> render_video(diplomat::span<const uint8_t> pack_zip, const RenderConfig& config, const VideoConfig& video, std::string_view path, float hold_ms) const;
 
   /**
    * Render numbered PNG frames (`prefix0000.png`, ...) for an external

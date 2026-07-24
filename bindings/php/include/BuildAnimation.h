@@ -11,8 +11,10 @@
 #include "Brush.d.h"
 #include "NucleationError.d.h"
 #include "RenderConfig.d.h"
+#include "ResourcePack.d.h"
 #include "Schematic.d.h"
 #include "Shape.d.h"
+#include "VideoConfig.d.h"
 
 #include "BuildAnimation.d.h"
 
@@ -22,6 +24,11 @@
 
 
 BuildAnimation* BuildAnimation_create(DiplomatStringView name);
+
+typedef struct BuildAnimation_from_schematic_result {union {BuildAnimation* ok; NucleationError err;}; bool is_ok;} BuildAnimation_from_schematic_result;
+BuildAnimation_from_schematic_result BuildAnimation_from_schematic(const Schematic* schematic);
+
+void BuildAnimation_animate_all(BuildAnimation* self, const AnimationEffect* effect);
 
 void BuildAnimation_set_default_effect(BuildAnimation* self, const AnimationEffect* effect);
 
@@ -147,6 +154,12 @@ uint32_t BuildAnimation_frame_count(const BuildAnimation* self, double fps, floa
 
 typedef struct BuildAnimation_render_gif_result {union {uint32_t ok; NucleationError err;}; bool is_ok;} BuildAnimation_render_gif_result;
 BuildAnimation_render_gif_result BuildAnimation_render_gif(const BuildAnimation* self, DiplomatU8View pack_zip, const RenderConfig* config, DiplomatStringView path, double fps, float hold_ms);
+
+typedef struct BuildAnimation_render_video_with_pack_result {union {uint32_t ok; NucleationError err;}; bool is_ok;} BuildAnimation_render_video_with_pack_result;
+BuildAnimation_render_video_with_pack_result BuildAnimation_render_video_with_pack(const BuildAnimation* self, const ResourcePack* pack, const RenderConfig* config, const VideoConfig* video, DiplomatStringView path, float hold_ms);
+
+typedef struct BuildAnimation_render_video_result {union {uint32_t ok; NucleationError err;}; bool is_ok;} BuildAnimation_render_video_result;
+BuildAnimation_render_video_result BuildAnimation_render_video(const BuildAnimation* self, DiplomatU8View pack_zip, const RenderConfig* config, const VideoConfig* video, DiplomatStringView path, float hold_ms);
 
 typedef struct BuildAnimation_render_frames_result {union {uint32_t ok; NucleationError err;}; bool is_ok;} BuildAnimation_render_frames_result;
 BuildAnimation_render_frames_result BuildAnimation_render_frames(const BuildAnimation* self, DiplomatU8View pack_zip, const RenderConfig* config, DiplomatStringView prefix, double fps, float hold_ms);

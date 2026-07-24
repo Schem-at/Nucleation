@@ -46,7 +46,8 @@ fn clear_color_for(background: Option<[f32; 4]>, hdri_enabled: bool) -> wgpu::Co
 struct Uniforms {
     view_proj: [[f32; 4]; 4],
     inv_view_proj: [[f32; 4]; 4],
-    params: [f32; 4], // x = alpha_cutoff, y = hdri_enabled, z = hdri_intensity
+    params: [f32; 4], // x = alpha_cutoff, y = hdri_enabled, z = hdri_intensity, w = ambient
+    light: [f32; 4],  // xyz = world direction, w = directional intensity
 }
 
 /// Per-draw animation state, mirroring `DrawUniforms` in the shader.
@@ -1121,7 +1122,18 @@ impl GpuRenderer {
             Uniforms {
                 view_proj,
                 inv_view_proj,
-                params: [alpha_cutoff, hdri_flag, hdri_intensity, 0.0],
+                params: [
+                    alpha_cutoff,
+                    hdri_flag,
+                    hdri_intensity,
+                    camera.ambient_light,
+                ],
+                light: [
+                    camera.light_direction[0],
+                    camera.light_direction[1],
+                    camera.light_direction[2],
+                    camera.directional_intensity,
+                ],
             }
         };
 

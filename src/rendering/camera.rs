@@ -32,6 +32,12 @@ pub struct CameraConfig {
     /// invariant, so orbiting the camera (turntables) keeps a constant
     /// distance instead of pulsing with the silhouette.
     pub sphere_fit: bool,
+    /// World-space direction from the surface toward the directional light.
+    pub light_direction: [f32; 3],
+    /// Directional-light multiplier.
+    pub directional_intensity: f32,
+    /// Unlit floor for non-HDRI rendering.
+    pub ambient_light: f32,
 }
 
 impl Default for CameraConfig {
@@ -45,6 +51,9 @@ impl Default for CameraConfig {
             projection: Projection::Perspective,
             background: None,
             sphere_fit: false,
+            light_direction: [0.3, 1.0, 0.5],
+            directional_intensity: 1.0,
+            ambient_light: 0.4,
         }
     }
 }
@@ -427,6 +436,7 @@ mod view_proj_tests {
             projection: Projection::Orthographic,
             background: None,
             sphere_fit: false,
+            ..CameraConfig::default()
         };
         let (vp, _) = compute_view_proj([0.0, 0.0, 0.0], [4.0, 2.0, 6.0], 16.0 / 9.0, &cam);
 
@@ -470,6 +480,7 @@ mod view_proj_tests {
             projection: Projection::Perspective,
             background: None,
             sphere_fit: true,
+            ..CameraConfig::default()
         };
         let (vp, _) = compute_view_proj([0.0; 3], [10.0; 3], 1.0, &cam);
         let (px, py) = project_point(&vp, [5.0, 5.0, 5.0], 800, 600).unwrap();
@@ -490,6 +501,7 @@ mod view_proj_tests {
             projection: Projection::Perspective,
             background: None,
             sphere_fit: true,
+            ..CameraConfig::default()
         };
         let (vp, _) = compute_view_proj([-5.0, -5.0, -5.0], [5.0, 5.0, 5.0], 1.0, &cam);
         let (_, top) = project_point(&vp, [0.0, 3.0, 0.0], 400, 400).unwrap();
@@ -508,6 +520,7 @@ mod view_proj_tests {
             projection: Projection::Perspective,
             background: None,
             sphere_fit: true,
+            ..CameraConfig::default()
         };
         let (vp, _) = compute_view_proj([-5.0; 3], [5.0; 3], 1.0, &cam);
         // The camera looks down -Z from +Z, so a point far behind it (large +Z)

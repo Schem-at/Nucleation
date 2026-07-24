@@ -8,6 +8,8 @@ import com.sun.jna.Structure
 internal interface BuildAnimationLib: Library {
     fun BuildAnimation_destroy(handle: Pointer)
     fun BuildAnimation_create(name: Slice): Pointer
+    fun BuildAnimation_from_schematic(schematic: Pointer): ResultPointerInt
+    fun BuildAnimation_animate_all(handle: Pointer, effect: Pointer): Unit
     fun BuildAnimation_set_default_effect(handle: Pointer, effect: Pointer): Unit
     fun BuildAnimation_with_effect(handle: Pointer, effect: Pointer): Pointer
     fun BuildAnimation_set_step_ms(handle: Pointer, stepMs: Float): Unit
@@ -53,6 +55,8 @@ internal interface BuildAnimationLib: Library {
     fun BuildAnimation_animate_camera(handle: Pointer, effect: Pointer, offsetMs: Float): Unit
     fun BuildAnimation_frame_count(handle: Pointer, fps: Double, holdMs: Float): FFIUint32
     fun BuildAnimation_render_gif(handle: Pointer, packZip: Slice, config: Pointer, path: Slice, fps: Double, holdMs: Float): ResultFFIUint32Int
+    fun BuildAnimation_render_video_with_pack(handle: Pointer, pack: Pointer, config: Pointer, video: Pointer, path: Slice, holdMs: Float): ResultFFIUint32Int
+    fun BuildAnimation_render_video(handle: Pointer, packZip: Slice, config: Pointer, video: Pointer, path: Slice, holdMs: Float): ResultFFIUint32Int
     fun BuildAnimation_render_frames(handle: Pointer, packZip: Slice, config: Pointer, prefix: Slice, fps: Double, holdMs: Float): ResultFFIUint32Int
     fun BuildAnimation_save_to_file(handle: Pointer, path: Slice): ResultUnitInt
     fun BuildAnimation_group_count(handle: Pointer): FFIUint32
@@ -101,6 +105,33 @@ class BuildAnimation internal constructor (
                 nameSliceMemory.close()
             }
         }
+        @JvmStatic
+        
+        /** Clone an existing schematic into one animation group. Entity-only
+        *schematics are supported; overlapping block/entity integer positions
+        *are rejected rather than silently dropping a model.
+        */
+        fun fromSchematic(schematic: Schematic): Result<BuildAnimation> {
+            
+            val returnVal = lib.BuildAnimation_from_schematic(schematic.handle);
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                val selfEdges: List<Any> = listOf()
+                val handle = nativeOkVal 
+                val returnOpaque = BuildAnimation(handle, selfEdges, true)
+                return returnOpaque.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        }
+    }
+    
+    /** Apply one effect to every existing animation group.
+    */
+    fun animateAll(effect: AnimationEffect): Unit {
+        
+        val returnVal = lib.BuildAnimation_animate_all(handle, effect.handle);
+        
     }
     
     fun setDefaultEffect(effect: AnimationEffect): Unit {
@@ -635,6 +666,45 @@ class BuildAnimation internal constructor (
         val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
         
         val returnVal = lib.BuildAnimation_render_gif(handle, packZipSliceMemory.slice, config.handle, pathSliceMemory.slice, fps, holdMs);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return (nativeOkVal.toUInt()).ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            packZipSliceMemory.close()
+            pathSliceMemory.close()
+        }
+    }
+    
+    /** Render and stream with an already parsed resource pack.
+    */
+    fun renderVideoWithPack(pack: ResourcePack, config: RenderConfig, video: VideoConfig, path: String, holdMs: Float): Result<UInt> {
+        val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
+        
+        val returnVal = lib.BuildAnimation_render_video_with_pack(handle, pack.handle, config.handle, video.handle, pathSliceMemory.slice, holdMs);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                return (nativeOkVal.toUInt()).ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            pathSliceMemory.close()
+        }
+    }
+    
+    /** Render and stream directly to video. The GPU renderer and meshes are
+    *reused for the complete animation and no frame sequence is retained.
+    */
+    fun renderVideo(packZip: UByteArray, config: RenderConfig, video: VideoConfig, path: String, holdMs: Float): Result<UInt> {
+        val packZipSliceMemory = PrimitiveArrayTools.borrow(packZip)
+        val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
+        
+        val returnVal = lib.BuildAnimation_render_video(handle, packZipSliceMemory.slice, config.handle, video.handle, pathSliceMemory.slice, holdMs);
         try {
             val nativeOkVal = returnVal.getNativeOk();
             if (nativeOkVal != null) {

@@ -54,6 +54,8 @@ fn easing(name: &str) -> Result<crate::animation::Easing, NucleationError> {
 #[diplomat::bridge]
 pub mod ffi {
     use super::super::building::ffi::{Brush, Shape};
+    #[cfg(feature = "meshing")]
+    use super::super::meshing::ffi::ResourcePack;
     #[cfg(all(feature = "rendering", not(target_arch = "wasm32")))]
     use super::super::rendering::ffi::RenderConfig;
     use super::super::schematic::ffi::Schematic;
@@ -138,6 +140,39 @@ pub mod ffi {
         }
     }
 
+    /// Native FFmpeg video output preset.
+    #[cfg(all(feature = "rendering", not(target_arch = "wasm32")))]
+    #[diplomat::opaque_mut]
+    pub struct VideoConfig(pub(crate) crate::rendering::VideoConfig);
+
+    #[cfg(all(feature = "rendering", not(target_arch = "wasm32")))]
+    impl VideoConfig {
+        /// Alpha-preserving ProRes 4444 in a MOV container.
+        #[diplomat::attr(js, disable)]
+        pub fn prores_4444(fps: f64) -> Result<Box<Self>, NucleationError> {
+            crate::rendering::VideoConfig::prores_4444(fps)
+                .map(Self)
+                .map(Box::new)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// H.264 in an MP4 or MOV container. H.264 does not preserve alpha.
+        #[diplomat::attr(js, disable)]
+        pub fn h264(fps: f64) -> Result<Box<Self>, NucleationError> {
+            crate::rendering::VideoConfig::h264(fps)
+                .map(Self)
+                .map(Box::new)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Override the FFmpeg executable. The default resolves `ffmpeg` on PATH.
+        #[diplomat::attr(js, disable)]
+        pub fn set_ffmpeg_path(&mut self, path: &DiplomatStr) -> Result<(), NucleationError> {
+            self.0.set_ffmpeg_path(utf8(path)?);
+            Ok(())
+        }
+    }
+
     /// A schematic wrapper that records construction calls as animation targets.
     #[diplomat::opaque_mut]
     pub struct BuildAnimation(pub(crate) crate::animation::BuildAnimation);
@@ -146,6 +181,21 @@ pub mod ffi {
         pub fn create(name: &DiplomatStr) -> Box<Self> {
             let name = std::str::from_utf8(name).unwrap_or("animation");
             Box::new(Self(crate::animation::BuildAnimation::new(name)))
+        }
+
+        /// Clone an existing schematic into one animation group. Entity-only
+        /// schematics are supported; overlapping block/entity integer positions
+        /// are rejected rather than silently dropping a model.
+        pub fn from_schematic(schematic: &Schematic) -> Result<Box<Self>, NucleationError> {
+            crate::animation::BuildAnimation::from_schematic(&schematic.0)
+                .map(Self)
+                .map(Box::new)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Apply one effect to every existing animation group.
+        pub fn animate_all(&mut self, effect: &AnimationEffect) {
+            self.0.animate_all(effect.0.clone());
         }
 
         pub fn set_default_effect(&mut self, effect: &AnimationEffect) {
@@ -560,6 +610,67 @@ pub mod ffi {
                 path,
             )
             .map_err(|_| NucleationError::Io)?;
+            Ok(frames.len() as u32)
+        }
+
+        /// Render and stream with an already parsed resource pack.
+        #[diplomat::attr(js, disable)]
+        #[cfg(all(feature = "rendering", not(target_arch = "wasm32")))]
+        pub fn render_video_with_pack(
+            &self,
+            pack: &ResourcePack,
+            config: &RenderConfig,
+            video: &VideoConfig,
+            path: &DiplomatStr,
+            hold_ms: f32,
+        ) -> Result<u32, NucleationError> {
+            let path = utf8(path)?;
+            let meshes = self
+                .0
+                .mesh_outputs(&pack.0, &crate::meshing::MeshConfig::default())
+                .map_err(|_| NucleationError::Mesh)?;
+            let frames = self.0.frames(video.0.fps, hold_ms);
+            crate::rendering::render_animation_to_video(
+                &meshes,
+                &frames,
+                &config.0,
+                None,
+                &video.0,
+                std::path::Path::new(path),
+            )
+            .map_err(|_| NucleationError::Render)?;
+            Ok(frames.len() as u32)
+        }
+
+        /// Render and stream directly to video. The GPU renderer and meshes are
+        /// reused for the complete animation and no frame sequence is retained.
+        #[diplomat::attr(js, disable)]
+        #[cfg(all(feature = "rendering", not(target_arch = "wasm32")))]
+        pub fn render_video(
+            &self,
+            pack_zip: &[u8],
+            config: &RenderConfig,
+            video: &VideoConfig,
+            path: &DiplomatStr,
+            hold_ms: f32,
+        ) -> Result<u32, NucleationError> {
+            let path = utf8(path)?;
+            let pack = crate::meshing::ResourcePackSource::from_bytes(pack_zip)
+                .map_err(|_| NucleationError::Parse)?;
+            let meshes = self
+                .0
+                .mesh_outputs(&pack, &crate::meshing::MeshConfig::default())
+                .map_err(|_| NucleationError::Mesh)?;
+            let frames = self.0.frames(video.0.fps, hold_ms);
+            crate::rendering::render_animation_to_video(
+                &meshes,
+                &frames,
+                &config.0,
+                None,
+                &video.0,
+                std::path::Path::new(path),
+            )
+            .map_err(|_| NucleationError::Render)?;
             Ok(frames.len() as u32)
         }
 

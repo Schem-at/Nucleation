@@ -10,6 +10,9 @@ internal interface RendererLib: Library {
     fun Renderer_render_pixels_b64(schematic: Pointer, packZip: Slice, config: Pointer, write: Pointer): ResultUnitInt
     fun Renderer_render_png_b64(schematic: Pointer, packZip: Slice, config: Pointer, write: Pointer): ResultUnitInt
     fun Renderer_render_to_file(schematic: Pointer, packZip: Slice, config: Pointer, path: Slice): ResultUnitInt
+    fun Renderer_render_to_file_with_pack(schematic: Pointer, pack: Pointer, config: Pointer, path: Slice): ResultUnitInt
+    fun Renderer_render_pixels_b64_with_pack(schematic: Pointer, pack: Pointer, config: Pointer, write: Pointer): ResultUnitInt
+    fun Renderer_render_png_b64_with_pack(schematic: Pointer, pack: Pointer, config: Pointer, write: Pointer): ResultUnitInt
 }
 /** Namespace type for the render entry points (PORTING rule 12).
 */
@@ -102,6 +105,57 @@ class Renderer internal constructor (
             } finally {
                 packZipSliceMemory.close()
                 pathSliceMemory.close()
+            }
+        }
+        @JvmStatic
+        
+        /** Render with an already parsed resource pack, avoiding repeated ZIP parsing.
+        */
+        fun renderToFileWithPack(schematic: Schematic, pack: ResourcePack, config: RenderConfig, path: String): Result<Unit> {
+            val pathSliceMemory = PrimitiveArrayTools.borrowUtf8(path)
+            
+            val returnVal = lib.Renderer_render_to_file_with_pack(schematic.handle, pack.handle, config.handle, pathSliceMemory.slice);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    return Unit.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                pathSliceMemory.close()
+            }
+        }
+        @JvmStatic
+        
+        /** Render raw RGBA pixels with an already parsed resource pack.
+        */
+        fun renderPixelsB64WithPack(schematic: Schematic, pack: ResourcePack, config: RenderConfig): Result<String> {
+            val write = DW.lib.diplomat_buffer_write_create(0)
+            val returnVal = lib.Renderer_render_pixels_b64_with_pack(schematic.handle, pack.handle, config.handle, write);
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        }
+        @JvmStatic
+        
+        /** Render PNG bytes with an already parsed resource pack.
+        */
+        fun renderPngB64WithPack(schematic: Schematic, pack: ResourcePack, config: RenderConfig): Result<String> {
+            val write = DW.lib.diplomat_buffer_write_create(0)
+            val returnVal = lib.Renderer_render_png_b64_with_pack(schematic.handle, pack.handle, config.handle, write);
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
             }
         }
     }

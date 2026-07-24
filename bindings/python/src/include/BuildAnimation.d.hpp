@@ -19,10 +19,14 @@ namespace capi { struct BuildAnimation; }
 class BuildAnimation;
 namespace capi { struct RenderConfig; }
 class RenderConfig;
+namespace capi { struct ResourcePack; }
+class ResourcePack;
 namespace capi { struct Schematic; }
 class Schematic;
 namespace capi { struct Shape; }
 class Shape;
+namespace capi { struct VideoConfig; }
+class VideoConfig;
 class NucleationError;
 } // namespace nucleation
 
@@ -42,6 +46,18 @@ class BuildAnimation {
 public:
 
   inline static std::unique_ptr<nucleation::BuildAnimation> create(std::string_view name);
+
+  /**
+   * Clone an existing schematic into one animation group. Entity-only
+   * schematics are supported; overlapping block/entity integer positions
+   * are rejected rather than silently dropping a model.
+   */
+  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::BuildAnimation>, nucleation::NucleationError> from_schematic(const nucleation::Schematic& schematic);
+
+  /**
+   * Apply one effect to every existing animation group.
+   */
+  inline void animate_all(const nucleation::AnimationEffect& effect);
 
   inline void set_default_effect(const nucleation::AnimationEffect& effect);
 
@@ -156,6 +172,17 @@ public:
    * GIF encoder all live in the Rust core; no ffmpeg subprocess is needed.
    */
   inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> render_gif(nucleation::diplomat::span<const uint8_t> pack_zip, const nucleation::RenderConfig& config, std::string_view path, double fps, float hold_ms) const;
+
+  /**
+   * Render and stream with an already parsed resource pack.
+   */
+  inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> render_video_with_pack(const nucleation::ResourcePack& pack, const nucleation::RenderConfig& config, const nucleation::VideoConfig& video, std::string_view path, float hold_ms) const;
+
+  /**
+   * Render and stream directly to video. The GPU renderer and meshes are
+   * reused for the complete animation and no frame sequence is retained.
+   */
+  inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> render_video(nucleation::diplomat::span<const uint8_t> pack_zip, const nucleation::RenderConfig& config, const nucleation::VideoConfig& video, std::string_view path, float hold_ms) const;
 
   /**
    * Render numbered PNG frames (`prefix0000.png`, ...) for an external

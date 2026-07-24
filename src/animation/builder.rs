@@ -73,6 +73,7 @@ struct RecordedStep {
     region: String,
     mesh_region: Option<String>,
     effect: Option<Clip>,
+    effect_offset_ms: Option<f32>,
     key: f32,
     mesh_source: UniversalSchematic,
     visible_from_ms: f32,
@@ -129,6 +130,65 @@ impl BuildAnimation {
             camera: Vec::new(),
             operations: Vec::new(),
             operation_gizmos: true,
+        }
+    }
+
+    /// Clone an existing schematic into one animation group.
+    ///
+    /// Entity-only schematics are supported. A block and entity cannot currently
+    /// share one integer mesh position in a grouped draw, so that ambiguous case
+    /// is rejected instead of silently dropping either model.
+    pub fn from_schematic(schematic: &UniversalSchematic) -> Result<Self, String> {
+        let mut positions: BTreeSet<(i32, i32, i32)> =
+            super::non_air_positions(schematic).into_iter().collect();
+        for entity in schematic.get_entities_as_list() {
+            let position = (
+                entity.position.0.floor() as i32,
+                entity.position.1.floor() as i32,
+                entity.position.2.floor() as i32,
+            );
+            if !positions.insert(position) {
+                return Err(format!(
+                    "entity '{}' shares integer position ({}, {}, {}) with another grouped model; overlapping grouped models are unsupported",
+                    entity.id, position.0, position.1, position.2
+                ));
+            }
+        }
+        let blocks: Vec<_> = positions.into_iter().collect();
+        if blocks.is_empty() {
+            return Err("cannot animate an empty schematic".to_string());
+        }
+        let mut animation = Self::new(
+            schematic
+                .metadata
+                .name
+                .clone()
+                .unwrap_or_else(|| "Animation".to_string()),
+        );
+        animation.schematic = schematic.clone();
+        animation.steps.push(RecordedStep {
+            blocks,
+            region: "Main".to_string(),
+            mesh_region: None,
+            effect: Some(Clip::new(0.0)),
+            effect_offset_ms: None,
+            key: 0.0,
+            mesh_source: schematic.clone(),
+            visible_from_ms: 0.0,
+            visible_until_ms: None,
+        });
+        animation.operation_gizmos = false;
+        Ok(animation)
+    }
+
+    /// Apply one effect to every existing animation group.
+    pub fn animate_all(&mut self, effect: impl Into<AnimationEffect>) {
+        let clip = effect.into().clip;
+        for step in &mut self.steps {
+            step.effect = Some(clip.clone());
+            // `animate_all` is one global animation phase, including temporary
+            // and final draws representing the same timed operation.
+            step.effect_offset_ms = None;
         }
     }
 
@@ -260,6 +320,7 @@ impl BuildAnimation {
             region: group.region.clone().unwrap_or_else(|| "Main".to_string()),
             mesh_region: Some(group.region.unwrap_or_else(|| "Main".to_string())),
             effect: group.effect,
+            effect_offset_ms: None,
             key: group.key,
             mesh_source: self.schematic.clone(),
             visible_from_ms: 0.0,
@@ -345,6 +406,7 @@ impl BuildAnimation {
                 region: "Main".to_string(),
                 mesh_region: Some("Main".to_string()),
                 effect: effect.clone(),
+                effect_offset_ms: None,
                 key: index as f32,
                 mesh_source: self.schematic.clone(),
                 visible_from_ms: 0.0,
@@ -397,6 +459,7 @@ impl BuildAnimation {
             region: region.to_string(),
             mesh_region: Some(region.to_string()),
             effect,
+            effect_offset_ms: None,
             key: id as f32,
             mesh_source: self.schematic.clone(),
             visible_from_ms: 0.0,
@@ -423,6 +486,7 @@ impl BuildAnimation {
             region: "Main".to_string(),
             mesh_region: Some("Main".to_string()),
             effect,
+            effect_offset_ms: None,
             key: id as f32,
             mesh_source: self.schematic.clone(),
             visible_from_ms: 0.0,
@@ -772,6 +836,7 @@ impl BuildAnimation {
                 mesh_region: Some(before.region.clone()),
                 region: before.region,
                 effect: Some(Clip::new(0.0)),
+                effect_offset_ms: None,
                 key: self.steps.len() as f32 + final_steps.len() as f32,
                 mesh_source: self.schematic.clone(),
                 visible_from_ms: end_ms,
@@ -960,6 +1025,7 @@ impl BuildAnimation {
         final_positions: Vec<(i32, i32, i32)>,
         start_ms: f32,
         duration_ms: f32,
+        effect: Option<Clip>,
     ) -> GroupId {
         let end_ms = start_ms + duration_ms;
         let mut retired = Vec::new();
@@ -985,12 +1051,29 @@ impl BuildAnimation {
         }
         self.steps.extend(retired);
 
+        if duration_ms <= f32::EPSILON {
+            let final_id = self.steps.len() as GroupId;
+            self.steps.push(RecordedStep {
+                blocks: final_positions,
+                region: "Main".to_string(),
+                mesh_region: Some("Main".to_string()),
+                effect: Some(effect.unwrap_or_else(|| Clip::new(0.0))),
+                effect_offset_ms: Some(start_ms),
+                key: final_id as f32,
+                mesh_source: self.schematic.clone(),
+                visible_from_ms: start_ms,
+                visible_until_ms: None,
+            });
+            return final_id;
+        }
+
         let moving_id = self.steps.len() as GroupId;
         self.steps.push(RecordedStep {
             blocks: source_positions,
             region: "Main".to_string(),
             mesh_region: source_region.map(str::to_string),
             effect: Some(Clip::new(0.0)),
+            effect_offset_ms: None,
             key: moving_id as f32,
             mesh_source: source.clone(),
             visible_from_ms: start_ms,
@@ -1001,7 +1084,8 @@ impl BuildAnimation {
             blocks: final_positions,
             region: "Main".to_string(),
             mesh_region: Some("Main".to_string()),
-            effect: Some(Clip::new(0.0)),
+            effect: Some(effect.unwrap_or_else(|| Clip::new(0.0))),
+            effect_offset_ms: None,
             key: final_id as f32,
             mesh_source: self.schematic.clone(),
             visible_from_ms: end_ms,
@@ -1344,6 +1428,13 @@ impl BuildAnimation {
         excluded_blocks: &[String],
         duration_ms: f32,
     ) -> Result<(), String> {
+        let pending_effect = self.pending_effect.take();
+        if pending_effect.is_some() && duration_ms.abs() > f32::EPSILON {
+            return Err(
+                "with_effect can decorate only an instant stamp; use animate_all after a timed stamp"
+                    .to_string(),
+            );
+        }
         self.validate_operation(duration_ms)?;
         let excluded: Vec<crate::block_state::BlockState> = excluded_blocks
             .iter()
@@ -1449,6 +1540,7 @@ impl BuildAnimation {
                 written,
                 start_ms,
                 duration_ms,
+                pending_effect,
             )]
         };
         let before_bounds = OperationBounds::from(bounds.clone());
@@ -1512,6 +1604,13 @@ impl BuildAnimation {
         excluded_blocks: &[String],
         duration_ms: f32,
     ) -> Result<(), String> {
+        let pending_effect = self.pending_effect.take();
+        if pending_effect.is_some() && duration_ms.abs() > f32::EPSILON {
+            return Err(
+                "with_effect can decorate only an instant stamp; use animate_all after a timed stamp"
+                    .to_string(),
+            );
+        }
         self.validate_operation(duration_ms)?;
         let excluded: Vec<crate::block_state::BlockState> = excluded_blocks
             .iter()
@@ -1621,6 +1720,7 @@ impl BuildAnimation {
                 written,
                 start_ms,
                 duration_ms,
+                pending_effect,
             )]
         };
 
@@ -2027,18 +2127,18 @@ impl BuildAnimation {
         let mut timeline = Timeline::new(groups);
         let delays = self.delays();
         for (i, step) in self.steps.iter().enumerate() {
-            let offset = if step.visible_from_ms > 0.0 {
-                0.0
-            } else {
-                delays[i]
-            };
-            timeline.add(
-                step.effect
-                    .clone()
-                    .unwrap_or_else(|| self.default_effect.clone()),
-                Target::Group(i as GroupId),
-                offset,
-            );
+            let effect = step
+                .effect
+                .clone()
+                .unwrap_or_else(|| self.default_effect.clone());
+            let offset = step.effect_offset_ms.unwrap_or_else(|| {
+                if step.visible_from_ms > 0.0 {
+                    0.0
+                } else {
+                    delays[i]
+                }
+            });
+            timeline.add(effect, Target::Group(i as GroupId), offset);
         }
         for (clip, offset) in &self.camera {
             timeline.add(clip.clone(), Target::Camera, *offset);
@@ -2175,6 +2275,161 @@ mod tests {
                 .get_name(),
             "minecraft:wall_torch"
         );
+    }
+
+    #[test]
+    fn existing_entity_only_schematic_becomes_one_group() {
+        let mut source = UniversalSchematic::new("entity".to_string());
+        source.add_entity(crate::entity::Entity::new(
+            "minecraft:item_display".to_string(),
+            (1.25, 2.5, -3.0),
+        ));
+
+        let animation = BuildAnimation::from_schematic(&source).unwrap();
+        assert_eq!(animation.groups().len(), 1);
+        assert_eq!(animation.groups()[0].blocks, vec![(1, 2, -3)]);
+    }
+
+    #[test]
+    fn existing_schematic_rejects_entity_block_collisions_instead_of_dropping_entities() {
+        let mut source = UniversalSchematic::new("collision".to_string());
+        source
+            .set_block_from_string(1, 2, 3, "minecraft:stone")
+            .unwrap();
+        source.add_entity(crate::entity::Entity::new(
+            "minecraft:item_display".to_string(),
+            (1.25, 2.5, 3.0),
+        ));
+
+        let error = BuildAnimation::from_schematic(&source).unwrap_err();
+        assert!(error.contains("shares integer position"), "{error}");
+    }
+
+    #[test]
+    fn existing_schematic_becomes_one_animatable_group() {
+        let mut source = UniversalSchematic::new("existing".to_string());
+        source
+            .set_block_from_string(-2, 0, 0, "minecraft:stone")
+            .unwrap();
+        source
+            .set_block_from_string(3, 1, 1, "minecraft:gold_block")
+            .unwrap();
+
+        let mut animation = BuildAnimation::from_schematic(&source).unwrap();
+        animation.animate_all(presets::turntable(1_000.0));
+        animation.set_loop_period_ms(Some(1_000.0));
+
+        assert_eq!(animation.groups().len(), 1);
+        assert_eq!(animation.groups()[0].blocks, vec![(-2, 0, 0), (3, 1, 1)]);
+        assert_eq!(animation.schematic().total_blocks(), 2);
+        assert!((animation.frame_at(250.0).pose(0).unwrap().rotate_deg[1] - 90.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn empty_schematic_cannot_become_an_animation() {
+        let source = UniversalSchematic::new("empty".to_string());
+        assert!(BuildAnimation::from_schematic(&source).is_err());
+    }
+
+    #[test]
+    fn pending_effect_decorates_an_instant_stamp() {
+        let mut source = UniversalSchematic::new("source".to_string());
+        source
+            .set_block_from_string(0, 0, 0, "minecraft:stone")
+            .unwrap();
+        let mut animation = BuildAnimation::new("stamp");
+        animation
+            .with_effect(presets::turntable(1_000.0))
+            .stamp_box(
+                &source,
+                crate::BoundingBox::new((0, 0, 0), (0, 0, 0)),
+                (0, 0, 0),
+                &[],
+                0.0,
+            )
+            .unwrap();
+
+        assert!(animation
+            .frame_at(250.0)
+            .poses
+            .iter()
+            .any(|(_, pose)| (pose.rotate_deg[1] - 90.0).abs() < 0.01));
+    }
+
+    #[test]
+    fn animate_all_keeps_one_phase_across_a_timed_stamp_handoff() {
+        let mut source = UniversalSchematic::new("source".to_string());
+        source
+            .set_block_from_string(0, 0, 0, "minecraft:stone")
+            .unwrap();
+        let mut animation = BuildAnimation::new("stamp");
+        animation
+            .stamp_box(
+                &source,
+                crate::BoundingBox::new((0, 0, 0), (0, 0, 0)),
+                (2, 0, 0),
+                &[],
+                600.0,
+            )
+            .unwrap();
+        animation.animate_all(presets::turntable(1_000.0));
+
+        let before = animation.frame_at(599.0).pose(0).unwrap().rotate_deg[1];
+        let after = animation.frame_at(600.0).pose(1).unwrap().rotate_deg[1];
+        assert!((before - 215.64).abs() < 0.02, "{before}");
+        assert!((after - 216.0).abs() < 0.02, "{after}");
+    }
+
+    #[test]
+    fn pending_effect_on_a_later_instant_stamp_starts_when_the_stamp_appears() {
+        let mut source = UniversalSchematic::new("source".to_string());
+        source
+            .set_block_from_string(0, 0, 0, "minecraft:stone")
+            .unwrap();
+        let bounds = crate::BoundingBox::new((0, 0, 0), (0, 0, 0));
+        let mut animation = BuildAnimation::new("stamp");
+        animation
+            .stamp_box(&source, bounds.clone(), (0, 0, 0), &[], 600.0)
+            .unwrap();
+        animation
+            .with_effect(presets::turntable(1_000.0))
+            .stamp_box(&source, bounds, (2, 0, 0), &[], 0.0)
+            .unwrap();
+        let final_group = animation.groups().len() as GroupId - 1;
+
+        let at_appearance = animation
+            .frame_at(600.0)
+            .pose(final_group)
+            .unwrap()
+            .rotate_deg[1];
+        let quarter_turn = animation
+            .frame_at(850.0)
+            .pose(final_group)
+            .unwrap()
+            .rotate_deg[1];
+        assert!(at_appearance.abs() < 0.01, "{at_appearance}");
+        assert!((quarter_turn - 90.0).abs() < 0.01, "{quarter_turn}");
+    }
+
+    #[test]
+    fn pending_effect_rejects_a_timed_stamp_instead_of_silently_ignoring_it() {
+        let mut source = UniversalSchematic::new("source".to_string());
+        source
+            .set_block_from_string(0, 0, 0, "minecraft:stone")
+            .unwrap();
+        let mut animation = BuildAnimation::new("stamp");
+        let error = animation
+            .with_effect(presets::turntable(1_000.0))
+            .stamp_box(
+                &source,
+                crate::BoundingBox::new((0, 0, 0), (0, 0, 0)),
+                (0, 0, 0),
+                &[],
+                500.0,
+            )
+            .unwrap_err();
+
+        assert!(error.contains("instant stamp"));
     }
 
     #[test]

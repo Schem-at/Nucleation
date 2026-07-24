@@ -11,6 +11,7 @@
 #include <functional>
 #include <optional>
 #include <cstdlib>
+#include "NucleationError.hpp"
 #include "diplomat_runtime.hpp"
 
 
@@ -29,6 +30,12 @@ namespace capi {
     void RenderConfig_set_sphere_fit(diplomat::capi::RenderConfig* self, bool sphere_fit);
 
     void RenderConfig_set_fov(diplomat::capi::RenderConfig* self, float fov);
+
+    typedef struct RenderConfig_set_directional_light_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} RenderConfig_set_directional_light_result;
+    RenderConfig_set_directional_light_result RenderConfig_set_directional_light(diplomat::capi::RenderConfig* self, float x, float y, float z, float intensity);
+
+    typedef struct RenderConfig_set_ambient_light_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} RenderConfig_set_ambient_light_result;
+    RenderConfig_set_ambient_light_result RenderConfig_set_ambient_light(diplomat::capi::RenderConfig* self, float ambient);
 
     void RenderConfig_set_background(diplomat::capi::RenderConfig* self, float r, float g, float b, float a);
 
@@ -79,6 +86,21 @@ inline void RenderConfig::set_sphere_fit(bool sphere_fit) {
 inline void RenderConfig::set_fov(float fov) {
     diplomat::capi::RenderConfig_set_fov(this->AsFFI(),
         fov);
+}
+
+inline diplomat::result<std::monostate, NucleationError> RenderConfig::set_directional_light(float x, float y, float z, float intensity) {
+    auto result = diplomat::capi::RenderConfig_set_directional_light(this->AsFFI(),
+        x,
+        y,
+        z,
+        intensity);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, NucleationError> RenderConfig::set_ambient_light(float ambient) {
+    auto result = diplomat::capi::RenderConfig_set_ambient_light(this->AsFFI(),
+        ambient);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
 inline void RenderConfig::set_background(float r, float g, float b, float a) {

@@ -13,6 +13,8 @@
 namespace nucleation {
 namespace capi { struct RenderConfig; }
 class RenderConfig;
+namespace capi { struct ResourcePack; }
+class ResourcePack;
 namespace capi { struct Schematic; }
 class Schematic;
 class NucleationError;
@@ -53,6 +55,25 @@ public:
    * Render a schematic to a PNG file at `path`.
    */
   inline static nucleation::diplomat::result<std::monostate, nucleation::NucleationError> render_to_file(const nucleation::Schematic& schematic, nucleation::diplomat::span<const uint8_t> pack_zip, const nucleation::RenderConfig& config, std::string_view path);
+
+  /**
+   * Render with an already parsed resource pack, avoiding repeated ZIP parsing.
+   */
+  inline static nucleation::diplomat::result<std::monostate, nucleation::NucleationError> render_to_file_with_pack(const nucleation::Schematic& schematic, const nucleation::ResourcePack& pack, const nucleation::RenderConfig& config, std::string_view path);
+
+  /**
+   * Render raw RGBA pixels with an already parsed resource pack.
+   */
+  inline static nucleation::diplomat::result<std::string, nucleation::NucleationError> render_pixels_b64_with_pack(const nucleation::Schematic& schematic, const nucleation::ResourcePack& pack, const nucleation::RenderConfig& config);
+  template<typename W>
+  inline static nucleation::diplomat::result<std::monostate, nucleation::NucleationError> render_pixels_b64_with_pack_write(const nucleation::Schematic& schematic, const nucleation::ResourcePack& pack, const nucleation::RenderConfig& config, W& writeable_output);
+
+  /**
+   * Render PNG bytes with an already parsed resource pack.
+   */
+  inline static nucleation::diplomat::result<std::string, nucleation::NucleationError> render_png_b64_with_pack(const nucleation::Schematic& schematic, const nucleation::ResourcePack& pack, const nucleation::RenderConfig& config);
+  template<typename W>
+  inline static nucleation::diplomat::result<std::monostate, nucleation::NucleationError> render_png_b64_with_pack_write(const nucleation::Schematic& schematic, const nucleation::ResourcePack& pack, const nucleation::RenderConfig& config, W& writeable_output);
 
     inline const nucleation::capi::Renderer* AsFFI() const;
     inline nucleation::capi::Renderer* AsFFI();

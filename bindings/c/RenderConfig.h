@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include "diplomat_runtime.h"
 
+#include "NucleationError.d.h"
 
 #include "RenderConfig.d.h"
 
@@ -26,6 +27,12 @@ void RenderConfig_set_zoom(RenderConfig* self, float zoom);
 void RenderConfig_set_sphere_fit(RenderConfig* self, bool sphere_fit);
 
 void RenderConfig_set_fov(RenderConfig* self, float fov);
+
+typedef struct RenderConfig_set_directional_light_result {union { NucleationError err;}; bool is_ok;} RenderConfig_set_directional_light_result;
+RenderConfig_set_directional_light_result RenderConfig_set_directional_light(RenderConfig* self, float x, float y, float z, float intensity);
+
+typedef struct RenderConfig_set_ambient_light_result {union { NucleationError err;}; bool is_ok;} RenderConfig_set_ambient_light_result;
+RenderConfig_set_ambient_light_result RenderConfig_set_ambient_light(RenderConfig* self, float ambient);
 
 void RenderConfig_set_background(RenderConfig* self, float r, float g, float b, float a);
 

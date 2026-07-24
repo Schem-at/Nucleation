@@ -29,6 +29,18 @@ final class BuildAnimation {
         return new BuildAnimation($ret, true);
     }
 
+    public static function fromSchematic( $schematic) {
+        $result = Lib::ffi()->BuildAnimation_from_schematic($schematic->ptr);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new BuildAnimation($result->ok, true);
+    }
+
+    public function animateAll( $effect) {
+        Lib::ffi()->BuildAnimation_animate_all($this->ptr, $effect->ptr);
+    }
+
     public function setDefaultEffect( $effect) {
         Lib::ffi()->BuildAnimation_set_default_effect($this->ptr, $effect->ptr);
     }
@@ -490,6 +502,52 @@ final class BuildAnimation {
         }
         $__view2->len = $__n2;
         $result = Lib::ffi()->BuildAnimation_render_gif($this->ptr, $__view0, $config->ptr, $__view2, $fps, $hold_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return $result->ok;
+    }
+
+    public function renderVideoWithPack( $pack,  $config,  $video, string $path,  $hold_ms) {
+        $__n3 = strlen($path);
+        $__view3 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n3 > 0) {
+            $__buf3 = Lib::ffi()->new("uint8_t[" . $__n3 . "]", false);
+            \FFI::memcpy($__buf3, $path, $__n3);
+            $__view3->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf3[0]));
+        } else {
+            $__view3->data = null;
+        }
+        $__view3->len = $__n3;
+        $result = Lib::ffi()->BuildAnimation_render_video_with_pack($this->ptr, $pack->ptr, $config->ptr, $video->ptr, $__view3, $hold_ms);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return $result->ok;
+    }
+
+    public function renderVideo(array $pack_zip,  $config,  $video, string $path,  $hold_ms) {
+        $__n0 = count($pack_zip);
+        $__view0 = Lib::ffi()->new('DiplomatU8View');
+        if ($__n0 > 0) {
+            $__arr0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            foreach ($pack_zip as $__i0 => $__v0) { $__arr0[$__i0] = $__v0; }
+            $__view0->data = \FFI::addr($__arr0[0]);
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $__n3 = strlen($path);
+        $__view3 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n3 > 0) {
+            $__buf3 = Lib::ffi()->new("uint8_t[" . $__n3 . "]", false);
+            \FFI::memcpy($__buf3, $path, $__n3);
+            $__view3->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf3[0]));
+        } else {
+            $__view3->data = null;
+        }
+        $__view3->len = $__n3;
+        $result = Lib::ffi()->BuildAnimation_render_video($this->ptr, $__view0, $config->ptr, $video->ptr, $__view3, $hold_ms);
         if (!$result->is_ok) {
             throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
         }

@@ -18,6 +18,8 @@ export { AnimationEffect } from "./AnimationEffect.mjs"
 
 export { BuildAnimation } from "./BuildAnimation.mjs"
 
+export { VideoConfig } from "./VideoConfig.mjs"
+
 export { Autostack } from "./Autostack.mjs"
 
 export { Blocks } from "./Blocks.mjs"

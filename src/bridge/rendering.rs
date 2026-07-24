@@ -14,6 +14,7 @@
 
 #[diplomat::bridge]
 pub mod ffi {
+    use super::super::meshing::ffi::ResourcePack;
     use super::super::schematic::ffi::Schematic;
     use super::super::shared::ffi::NucleationError;
     use base64::Engine;
@@ -66,6 +67,26 @@ pub mod ffi {
         /// only). Default: 45.
         pub fn set_fov(&mut self, fov: f32) {
             self.0.fov = fov;
+        }
+
+        /// Set the world-space directional light and its non-negative intensity.
+        pub fn set_directional_light(
+            &mut self,
+            x: f32,
+            y: f32,
+            z: f32,
+            intensity: f32,
+        ) -> Result<(), NucleationError> {
+            self.0
+                .set_directional_light([x, y, z], intensity)
+                .map_err(|_| NucleationError::InvalidArgument)
+        }
+
+        /// Set the unlit floor for non-HDRI rendering, in `0..=1`.
+        pub fn set_ambient_light(&mut self, ambient: f32) -> Result<(), NucleationError> {
+            self.0
+                .set_ambient_light(ambient)
+                .map_err(|_| NucleationError::InvalidArgument)
         }
 
         /// Set a solid RGBA clear color (linear 0.0–1.0). Alpha < 1.0 yields a
@@ -170,6 +191,16 @@ pub mod ffi {
                 .map_err(|_| NucleationError::Mesh)
         }
 
+        fn mesh_with_pack(
+            schematic: &Schematic,
+            pack: &ResourcePack,
+        ) -> Result<crate::meshing::MeshOutput, NucleationError> {
+            schematic
+                .0
+                .to_mesh(&pack.0, &crate::meshing::MeshConfig::default())
+                .map_err(|_| NucleationError::Mesh)
+        }
+
         /// Render a schematic to raw RGBA pixel bytes, written as base64
         /// (PORTING rule 6). `pack_zip` is a resource-pack zip in memory.
         pub fn render_pixels_b64(
@@ -222,6 +253,55 @@ pub mod ffi {
                 .0
                 .render_to_file(&pack, path, &config.0)
                 .map_err(|_| NucleationError::Render)
+        }
+        /// Render with an already parsed resource pack, avoiding repeated ZIP parsing.
+        pub fn render_to_file_with_pack(
+            schematic: &Schematic,
+            pack: &ResourcePack,
+            config: &RenderConfig,
+            path: &DiplomatStr,
+        ) -> Result<(), NucleationError> {
+            let path = std::str::from_utf8(path).map_err(|_| NucleationError::InvalidArgument)?;
+            schematic
+                .0
+                .render_to_file(&pack.0, path, &config.0)
+                .map_err(|_| NucleationError::Render)
+        }
+
+        /// Render raw RGBA pixels with an already parsed resource pack.
+        pub fn render_pixels_b64_with_pack(
+            schematic: &Schematic,
+            pack: &ResourcePack,
+            config: &RenderConfig,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let mesh = Self::mesh_with_pack(schematic, pack)?;
+            let pixels = crate::rendering::render_meshes(&[mesh], &config.0, None)
+                .map_err(|_| NucleationError::Render)?;
+            let _ = write!(
+                out,
+                "{}",
+                base64::engine::general_purpose::STANDARD.encode(&pixels)
+            );
+            Ok(())
+        }
+
+        /// Render PNG bytes with an already parsed resource pack.
+        pub fn render_png_b64_with_pack(
+            schematic: &Schematic,
+            pack: &ResourcePack,
+            config: &RenderConfig,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let mesh = Self::mesh_with_pack(schematic, pack)?;
+            let png = crate::rendering::render_meshes_png(&[mesh], &config.0, None)
+                .map_err(|_| NucleationError::Render)?;
+            let _ = write!(
+                out,
+                "{}",
+                base64::engine::general_purpose::STANDARD.encode(&png)
+            );
+            Ok(())
         }
     }
 }

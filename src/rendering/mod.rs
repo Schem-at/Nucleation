@@ -13,6 +13,11 @@
 pub mod camera;
 pub mod gpu;
 pub mod hdri;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod video;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub use video::{VideoCodec, VideoConfig};
 
 pub use camera::CameraConfig;
 pub use camera::Projection;
@@ -82,6 +87,12 @@ pub struct RenderConfig {
     /// Optional world-space reference grid. `None` (the default) draws nothing
     /// and leaves rendering bit-for-bit identical to before this existed.
     pub grid: Option<GridConfig>,
+    /// World-space direction from the surface toward the directional light.
+    pub light_direction: [f32; 3],
+    /// Directional-light multiplier. Must be finite and non-negative.
+    pub directional_intensity: f32,
+    /// Unlit floor for non-HDRI rendering, in `0..=1`.
+    pub ambient_light: f32,
 }
 
 impl Default for RenderConfig {
@@ -98,6 +109,9 @@ impl Default for RenderConfig {
             projection: Projection::Perspective,
             sphere_fit: false,
             grid: None,
+            light_direction: [0.3, 1.0, 0.5],
+            directional_intensity: 1.0,
+            ambient_light: 0.4,
         }
     }
 }
@@ -113,7 +127,40 @@ impl RenderConfig {
             projection: self.projection,
             background: self.background,
             sphere_fit: self.sphere_fit,
+            light_direction: self.light_direction,
+            directional_intensity: self.directional_intensity,
+            ambient_light: self.ambient_light,
         }
+    }
+
+    pub fn set_directional_light(
+        &mut self,
+        direction: [f32; 3],
+        intensity: f32,
+    ) -> Result<(), String> {
+        let length_squared = direction.iter().map(|value| value * value).sum::<f32>();
+        if !direction.iter().all(|value| value.is_finite())
+            || !length_squared.is_finite()
+            || length_squared <= f32::EPSILON
+            || !intensity.is_finite()
+            || intensity < 0.0
+        {
+            return Err(
+                "direction must be finite and non-zero; intensity must be finite and non-negative"
+                    .to_string(),
+            );
+        }
+        self.light_direction = direction;
+        self.directional_intensity = intensity;
+        Ok(())
+    }
+
+    pub fn set_ambient_light(&mut self, ambient: f32) -> Result<(), String> {
+        if !ambient.is_finite() || !(0.0..=1.0).contains(&ambient) {
+            return Err("ambient light must be finite and in 0..=1".to_string());
+        }
+        self.ambient_light = ambient;
+        Ok(())
     }
 
     /// A config preset for a true isometric view: orthographic projection at
@@ -139,6 +186,8 @@ pub enum RenderError {
     RenderFailed(String),
     /// PNG encoding failed.
     PngEncode(String),
+    /// Video encoder setup, streaming, or completion failed.
+    VideoEncode(String),
     /// I/O error.
     Io(std::io::Error),
 }
@@ -153,6 +202,7 @@ impl std::fmt::Display for RenderError {
             Self::DeviceCreation(e) => write!(f, "Failed to create GPU device: {}", e),
             Self::RenderFailed(e) => write!(f, "Render failed: {}", e),
             Self::PngEncode(e) => write!(f, "PNG encoding failed: {}", e),
+            Self::VideoEncode(e) => write!(f, "Video encoding failed: {}", e),
             Self::Io(e) => write!(f, "I/O error: {}", e),
         }
     }
@@ -197,24 +247,23 @@ pub async fn render_meshes_async(
 /// Frame times come from [`crate::animation::Timeline::frame_times`], so the
 /// output is deterministic and regenerating it is byte-identical.
 #[cfg(not(target_arch = "wasm32"))]
-pub fn render_animation(
+pub fn render_animation_stream(
     meshes: &[MeshOutput],
     frames: &[crate::animation::Frame],
     config: &RenderConfig,
     hdri: Option<&HdriData>,
-) -> Result<Vec<Vec<u8>>, RenderError> {
+    mut consume: impl FnMut(usize, &[u8]) -> Result<(), RenderError>,
+) -> Result<(), RenderError> {
     pollster::block_on(async {
         let renderer = GpuRenderer::new(meshes, config.width, config.height, hdri).await?;
         renderer.set_grid(config.grid);
         let base = config.to_camera();
-        let mut out = Vec::with_capacity(frames.len());
         let mut poses = vec![crate::animation::Pose::IDENTITY; meshes.len()];
 
-        for frame in frames {
-            // Frame poses are keyed by GroupId; slot i drives mesh i.
+        for (index, frame) in frames.iter().enumerate() {
             poses
                 .iter_mut()
-                .for_each(|p| *p = crate::animation::Pose::IDENTITY);
+                .for_each(|pose| *pose = crate::animation::Pose::IDENTITY);
             for (id, pose) in &frame.poses {
                 if let Some(slot) = poses.get_mut(*id as usize) {
                     *slot = *pose;
@@ -223,21 +272,36 @@ pub fn render_animation(
             renderer.set_poses(&poses);
             renderer.set_gizmos(&frame.gizmos);
 
-            // A camera clip on the same timeline moves the view with the build.
             let camera = match &frame.camera {
-                Some(c) => {
-                    let mut cfg = config.clone();
-                    cfg.yaw += c.yaw;
-                    cfg.pitch += c.pitch;
-                    cfg.zoom *= c.zoom;
-                    cfg.to_camera()
+                Some(camera_pose) => {
+                    let mut frame_config = config.clone();
+                    frame_config.yaw += camera_pose.yaw;
+                    frame_config.pitch += camera_pose.pitch;
+                    frame_config.zoom *= camera_pose.zoom;
+                    frame_config.to_camera()
                 }
                 None => base.clone(),
             };
-            out.push(renderer.render_frame(&camera)?);
+            let pixels = renderer.render_frame(&camera)?;
+            consume(index, &pixels)?;
         }
-        Ok(out)
+        Ok(())
     })
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn render_animation(
+    meshes: &[MeshOutput],
+    frames: &[crate::animation::Frame],
+    config: &RenderConfig,
+    hdri: Option<&HdriData>,
+) -> Result<Vec<Vec<u8>>, RenderError> {
+    let mut output = Vec::with_capacity(frames.len());
+    render_animation_stream(meshes, frames, config, hdri, |_, pixels| {
+        output.push(pixels.to_vec());
+        Ok(())
+    })?;
+    Ok(output)
 }
 
 /// Render an animation straight to numbered PNG files (`{prefix}{i:04}.png`).
@@ -252,15 +316,32 @@ pub fn render_animation_to_files(
     hdri: Option<&HdriData>,
     prefix: &str,
 ) -> Result<Vec<String>, RenderError> {
-    let pixels = render_animation(meshes, frames, config, hdri)?;
-    let mut paths = Vec::with_capacity(pixels.len());
-    for (i, px) in pixels.iter().enumerate() {
-        let path = format!("{prefix}{i:04}.png");
-        let png = encode_png(px, config.width, config.height)?;
+    let mut paths = Vec::with_capacity(frames.len());
+    render_animation_stream(meshes, frames, config, hdri, |index, pixels| {
+        let path = format!("{prefix}{index:04}.png");
+        let png = encode_png(pixels, config.width, config.height)?;
         std::fs::write(&path, &png).map_err(RenderError::Io)?;
         paths.push(path);
-    }
+        Ok(())
+    })?;
     Ok(paths)
+}
+
+/// Render and stream an animation directly to FFmpeg without retaining frames.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn render_animation_to_video(
+    meshes: &[MeshOutput],
+    frames: &[crate::animation::Frame],
+    config: &RenderConfig,
+    hdri: Option<&HdriData>,
+    video: &VideoConfig,
+    output: &std::path::Path,
+) -> Result<(), RenderError> {
+    let mut encoder = video::VideoEncoder::start(video, config.width, config.height, output)?;
+    render_animation_stream(meshes, frames, config, hdri, |_, pixels| {
+        encoder.write_frame(pixels)
+    })?;
+    encoder.finish()
 }
 
 /// The exact view-projection matrix used for each frame of an animation.
@@ -435,6 +516,54 @@ mod config_tests {
         assert_eq!(c.projection, Projection::Orthographic);
         assert!((c.yaw - 45.0).abs() < 1e-4);
         assert!((c.pitch - 35.264).abs() < 1e-3);
+    }
+
+    #[test]
+    fn lighting_defaults_preserve_the_legacy_renderer() {
+        let c = RenderConfig::default();
+        assert_eq!(c.light_direction, [0.3, 1.0, 0.5]);
+        assert!((c.directional_intensity - 1.0).abs() < f32::EPSILON);
+        assert!((c.ambient_light - 0.4).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn lighting_setters_validate_physical_inputs() {
+        let mut c = RenderConfig::default();
+        c.set_directional_light([0.75, 0.4, 0.55], 1.25).unwrap();
+        c.set_ambient_light(0.18).unwrap();
+        assert_eq!(c.light_direction, [0.75, 0.4, 0.55]);
+        assert!((c.directional_intensity - 1.25).abs() < f32::EPSILON);
+        assert!((c.ambient_light - 0.18).abs() < f32::EPSILON);
+
+        assert!(c.set_directional_light([0.0; 3], 1.0).is_err());
+        assert!(c.set_directional_light([1.0, 0.0, 0.0], -0.1).is_err());
+        assert!(c.set_ambient_light(-0.1).is_err());
+        assert!(c.set_ambient_light(1.1).is_err());
+    }
+
+    #[test]
+    fn prores_4444_video_config_emits_an_alpha_preserving_raw_rgba_pipeline() {
+        let config = VideoConfig::prores_4444(20.0).unwrap();
+        let args = config.ffmpeg_args(840, 840, std::path::Path::new("earth.mov"));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair == ["-pixel_format", "rgba"]));
+        assert!(args.windows(2).any(|pair| pair == ["-c:v", "prores_ks"]));
+        assert!(args.windows(2).any(|pair| pair == ["-profile:v", "4"]));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair == ["-pix_fmt", "yuva444p10le"]));
+    }
+
+    #[test]
+    fn video_config_rejects_invalid_rate_and_container() {
+        assert!(VideoConfig::prores_4444(0.0).is_err());
+        assert!(VideoConfig::h264(0.5).is_err());
+        assert!(VideoConfig::h264(f64::NAN).is_err());
+        let config = VideoConfig::prores_4444(20.0).unwrap();
+        assert!(config
+            .validate_output(std::path::Path::new("earth.mp4"))
+            .is_err());
     }
 
     #[test]

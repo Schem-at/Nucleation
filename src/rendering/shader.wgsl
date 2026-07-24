@@ -4,8 +4,10 @@
 struct Uniforms {
     view_proj: mat4x4<f32>,
     inv_view_proj: mat4x4<f32>,
-    // x: alpha_cutoff, y: hdri_enabled (>0.5 = yes), z: hdri_intensity, w: unused
+    // x: alpha_cutoff, y: hdri_enabled (>0.5 = yes), z: hdri_intensity, w: ambient
     params: vec4<f32>,
+    // xyz: world-space direction toward the light, w: directional intensity
+    light: vec4<f32>,
 };
 
 // Per-draw animation state. Written by the animation layer as a `Pose`; an
@@ -90,6 +92,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let n = normalize(in.world_normal);
     let hdri_enabled = uniforms.params.y > 0.5;
     let hdri_intensity = uniforms.params.z;
+    let light_dir = normalize(uniforms.light.xyz);
+    let directional_intensity = uniforms.light.w;
 
     var lighting: f32;
     var ambient_color: vec3<f32>;
@@ -98,20 +102,18 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         // Image-based lighting from HDRI
         let ibl = hdri_diffuse(n) * hdri_intensity;
         // Key light for definition
-        let light_dir = normalize(vec3<f32>(0.3, 1.0, 0.5));
         let n_dot_l = max(dot(n, light_dir), 0.0);
         // Minimum ambient floor to prevent total darkness
         let min_ambient = vec3<f32>(0.15);
-        ambient_color = base_color.rgb * max(ibl + 0.35 * n_dot_l, min_ambient);
+        ambient_color = base_color.rgb * max(ibl + 0.35 * directional_intensity * n_dot_l, min_ambient);
         // Tonemap mesh colors too (matches skybox)
         let mapped = ambient_color / (ambient_color + vec3<f32>(1.0));
         return vec4<f32>(mapped + draw.emissive.rgb, base_color.a);
     } else {
         // Fallback: simple directional lighting
-        let light_dir = normalize(vec3<f32>(0.3, 1.0, 0.5));
         let n_dot_l = max(dot(n, light_dir), 0.0);
-        let ambient = 0.4;
-        lighting = ambient + (1.0 - ambient) * n_dot_l;
+        let ambient = uniforms.params.w;
+        lighting = ambient + (1.0 - ambient) * directional_intensity * n_dot_l;
         return vec4<f32>(base_color.rgb * lighting + draw.emissive.rgb, base_color.a);
     }
 }

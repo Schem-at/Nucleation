@@ -15,8 +15,10 @@
 #include "Brush.hpp"
 #include "NucleationError.hpp"
 #include "RenderConfig.hpp"
+#include "ResourcePack.hpp"
 #include "Schematic.hpp"
 #include "Shape.hpp"
+#include "VideoConfig.hpp"
 #include "diplomat_runtime.hpp"
 
 
@@ -25,6 +27,11 @@ namespace capi {
     extern "C" {
 
     diplomat::capi::BuildAnimation* BuildAnimation_create(diplomat::capi::DiplomatStringView name);
+
+    typedef struct BuildAnimation_from_schematic_result {union {diplomat::capi::BuildAnimation* ok; diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_from_schematic_result;
+    BuildAnimation_from_schematic_result BuildAnimation_from_schematic(const diplomat::capi::Schematic* schematic);
+
+    void BuildAnimation_animate_all(diplomat::capi::BuildAnimation* self, const diplomat::capi::AnimationEffect* effect);
 
     void BuildAnimation_set_default_effect(diplomat::capi::BuildAnimation* self, const diplomat::capi::AnimationEffect* effect);
 
@@ -151,6 +158,12 @@ namespace capi {
     typedef struct BuildAnimation_render_gif_result {union {uint32_t ok; diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_render_gif_result;
     BuildAnimation_render_gif_result BuildAnimation_render_gif(const diplomat::capi::BuildAnimation* self, diplomat::capi::DiplomatU8View pack_zip, const diplomat::capi::RenderConfig* config, diplomat::capi::DiplomatStringView path, double fps, float hold_ms);
 
+    typedef struct BuildAnimation_render_video_with_pack_result {union {uint32_t ok; diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_render_video_with_pack_result;
+    BuildAnimation_render_video_with_pack_result BuildAnimation_render_video_with_pack(const diplomat::capi::BuildAnimation* self, const diplomat::capi::ResourcePack* pack, const diplomat::capi::RenderConfig* config, const diplomat::capi::VideoConfig* video, diplomat::capi::DiplomatStringView path, float hold_ms);
+
+    typedef struct BuildAnimation_render_video_result {union {uint32_t ok; diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_render_video_result;
+    BuildAnimation_render_video_result BuildAnimation_render_video(const diplomat::capi::BuildAnimation* self, diplomat::capi::DiplomatU8View pack_zip, const diplomat::capi::RenderConfig* config, const diplomat::capi::VideoConfig* video, diplomat::capi::DiplomatStringView path, float hold_ms);
+
     typedef struct BuildAnimation_render_frames_result {union {uint32_t ok; diplomat::capi::NucleationError err;}; bool is_ok;} BuildAnimation_render_frames_result;
     BuildAnimation_render_frames_result BuildAnimation_render_frames(const diplomat::capi::BuildAnimation* self, diplomat::capi::DiplomatU8View pack_zip, const diplomat::capi::RenderConfig* config, diplomat::capi::DiplomatStringView prefix, double fps, float hold_ms);
 
@@ -170,6 +183,16 @@ namespace capi {
 inline std::unique_ptr<BuildAnimation> BuildAnimation::create(std::string_view name) {
     auto result = diplomat::capi::BuildAnimation_create({name.data(), name.size()});
     return std::unique_ptr<BuildAnimation>(BuildAnimation::FromFFI(result));
+}
+
+inline diplomat::result<std::unique_ptr<BuildAnimation>, NucleationError> BuildAnimation::from_schematic(const Schematic& schematic) {
+    auto result = diplomat::capi::BuildAnimation_from_schematic(schematic.AsFFI());
+    return result.is_ok ? diplomat::result<std::unique_ptr<BuildAnimation>, NucleationError>(diplomat::Ok<std::unique_ptr<BuildAnimation>>(std::unique_ptr<BuildAnimation>(BuildAnimation::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<BuildAnimation>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline void BuildAnimation::animate_all(const AnimationEffect& effect) {
+    diplomat::capi::BuildAnimation_animate_all(this->AsFFI(),
+        effect.AsFFI());
 }
 
 inline void BuildAnimation::set_default_effect(const AnimationEffect& effect) {
@@ -513,6 +536,26 @@ inline diplomat::result<uint32_t, NucleationError> BuildAnimation::render_gif(di
         config.AsFFI(),
         {path.data(), path.size()},
         fps,
+        hold_ms);
+    return result.is_ok ? diplomat::result<uint32_t, NucleationError>(diplomat::Ok<uint32_t>(result.ok)) : diplomat::result<uint32_t, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<uint32_t, NucleationError> BuildAnimation::render_video_with_pack(const ResourcePack& pack, const RenderConfig& config, const VideoConfig& video, std::string_view path, float hold_ms) const {
+    auto result = diplomat::capi::BuildAnimation_render_video_with_pack(this->AsFFI(),
+        pack.AsFFI(),
+        config.AsFFI(),
+        video.AsFFI(),
+        {path.data(), path.size()},
+        hold_ms);
+    return result.is_ok ? diplomat::result<uint32_t, NucleationError>(diplomat::Ok<uint32_t>(result.ok)) : diplomat::result<uint32_t, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<uint32_t, NucleationError> BuildAnimation::render_video(diplomat::span<const uint8_t> pack_zip, const RenderConfig& config, const VideoConfig& video, std::string_view path, float hold_ms) const {
+    auto result = diplomat::capi::BuildAnimation_render_video(this->AsFFI(),
+        {pack_zip.data(), pack_zip.size()},
+        config.AsFFI(),
+        video.AsFFI(),
+        {path.data(), path.size()},
         hold_ms);
     return result.is_ok ? diplomat::result<uint32_t, NucleationError>(diplomat::Ok<uint32_t>(result.ok)) : diplomat::result<uint32_t, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }

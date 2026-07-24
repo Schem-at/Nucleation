@@ -11,6 +11,7 @@ require_once __DIR__ . '/BlockPos.php';
 require_once __DIR__ . '/Dimensions.php';
 require_once __DIR__ . '/AnimationEffect.php';
 require_once __DIR__ . '/BuildAnimation.php';
+require_once __DIR__ . '/VideoConfig.php';
 require_once __DIR__ . '/Autostack.php';
 require_once __DIR__ . '/Blocks.php';
 require_once __DIR__ . '/Brush.php';

@@ -39,6 +39,20 @@ final class RenderConfig {
         Lib::ffi()->RenderConfig_set_fov($this->ptr, $fov);
     }
 
+    public function setDirectionalLight( $x,  $y,  $z,  $intensity) {
+        $result = Lib::ffi()->RenderConfig_set_directional_light($this->ptr, $x, $y, $z, $intensity);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
+    public function setAmbientLight( $ambient) {
+        $result = Lib::ffi()->RenderConfig_set_ambient_light($this->ptr, $ambient);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+    }
+
     public function setBackground( $r,  $g,  $b,  $a) {
         Lib::ffi()->RenderConfig_set_background($this->ptr, $r, $g, $b, $a);
     }

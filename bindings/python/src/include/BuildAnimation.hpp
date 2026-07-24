@@ -15,8 +15,10 @@
 #include "Brush.hpp"
 #include "NucleationError.hpp"
 #include "RenderConfig.hpp"
+#include "ResourcePack.hpp"
 #include "Schematic.hpp"
 #include "Shape.hpp"
+#include "VideoConfig.hpp"
 #include "diplomat_runtime.hpp"
 
 
@@ -25,6 +27,11 @@ namespace capi {
     extern "C" {
 
     nucleation::capi::BuildAnimation* BuildAnimation_create(nucleation::diplomat::capi::DiplomatStringView name);
+
+    typedef struct BuildAnimation_from_schematic_result {union {nucleation::capi::BuildAnimation* ok; nucleation::capi::NucleationError err;}; bool is_ok;} BuildAnimation_from_schematic_result;
+    BuildAnimation_from_schematic_result BuildAnimation_from_schematic(const nucleation::capi::Schematic* schematic);
+
+    void BuildAnimation_animate_all(nucleation::capi::BuildAnimation* self, const nucleation::capi::AnimationEffect* effect);
 
     void BuildAnimation_set_default_effect(nucleation::capi::BuildAnimation* self, const nucleation::capi::AnimationEffect* effect);
 
@@ -151,6 +158,12 @@ namespace capi {
     typedef struct BuildAnimation_render_gif_result {union {uint32_t ok; nucleation::capi::NucleationError err;}; bool is_ok;} BuildAnimation_render_gif_result;
     BuildAnimation_render_gif_result BuildAnimation_render_gif(const nucleation::capi::BuildAnimation* self, nucleation::diplomat::capi::DiplomatU8View pack_zip, const nucleation::capi::RenderConfig* config, nucleation::diplomat::capi::DiplomatStringView path, double fps, float hold_ms);
 
+    typedef struct BuildAnimation_render_video_with_pack_result {union {uint32_t ok; nucleation::capi::NucleationError err;}; bool is_ok;} BuildAnimation_render_video_with_pack_result;
+    BuildAnimation_render_video_with_pack_result BuildAnimation_render_video_with_pack(const nucleation::capi::BuildAnimation* self, const nucleation::capi::ResourcePack* pack, const nucleation::capi::RenderConfig* config, const nucleation::capi::VideoConfig* video, nucleation::diplomat::capi::DiplomatStringView path, float hold_ms);
+
+    typedef struct BuildAnimation_render_video_result {union {uint32_t ok; nucleation::capi::NucleationError err;}; bool is_ok;} BuildAnimation_render_video_result;
+    BuildAnimation_render_video_result BuildAnimation_render_video(const nucleation::capi::BuildAnimation* self, nucleation::diplomat::capi::DiplomatU8View pack_zip, const nucleation::capi::RenderConfig* config, const nucleation::capi::VideoConfig* video, nucleation::diplomat::capi::DiplomatStringView path, float hold_ms);
+
     typedef struct BuildAnimation_render_frames_result {union {uint32_t ok; nucleation::capi::NucleationError err;}; bool is_ok;} BuildAnimation_render_frames_result;
     BuildAnimation_render_frames_result BuildAnimation_render_frames(const nucleation::capi::BuildAnimation* self, nucleation::diplomat::capi::DiplomatU8View pack_zip, const nucleation::capi::RenderConfig* config, nucleation::diplomat::capi::DiplomatStringView prefix, double fps, float hold_ms);
 
@@ -170,6 +183,16 @@ namespace capi {
 inline std::unique_ptr<nucleation::BuildAnimation> nucleation::BuildAnimation::create(std::string_view name) {
     auto result = nucleation::capi::BuildAnimation_create({name.data(), name.size()});
     return std::unique_ptr<nucleation::BuildAnimation>(nucleation::BuildAnimation::FromFFI(result));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::BuildAnimation>, nucleation::NucleationError> nucleation::BuildAnimation::from_schematic(const nucleation::Schematic& schematic) {
+    auto result = nucleation::capi::BuildAnimation_from_schematic(schematic.AsFFI());
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::BuildAnimation>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::BuildAnimation>>(std::unique_ptr<nucleation::BuildAnimation>(nucleation::BuildAnimation::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::BuildAnimation>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline void nucleation::BuildAnimation::animate_all(const nucleation::AnimationEffect& effect) {
+    nucleation::capi::BuildAnimation_animate_all(this->AsFFI(),
+        effect.AsFFI());
 }
 
 inline void nucleation::BuildAnimation::set_default_effect(const nucleation::AnimationEffect& effect) {
@@ -513,6 +536,26 @@ inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> nucle
         config.AsFFI(),
         {path.data(), path.size()},
         fps,
+        hold_ms);
+    return result.is_ok ? nucleation::diplomat::result<uint32_t, nucleation::NucleationError>(nucleation::diplomat::Ok<uint32_t>(result.ok)) : nucleation::diplomat::result<uint32_t, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> nucleation::BuildAnimation::render_video_with_pack(const nucleation::ResourcePack& pack, const nucleation::RenderConfig& config, const nucleation::VideoConfig& video, std::string_view path, float hold_ms) const {
+    auto result = nucleation::capi::BuildAnimation_render_video_with_pack(this->AsFFI(),
+        pack.AsFFI(),
+        config.AsFFI(),
+        video.AsFFI(),
+        {path.data(), path.size()},
+        hold_ms);
+    return result.is_ok ? nucleation::diplomat::result<uint32_t, nucleation::NucleationError>(nucleation::diplomat::Ok<uint32_t>(result.ok)) : nucleation::diplomat::result<uint32_t, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<uint32_t, nucleation::NucleationError> nucleation::BuildAnimation::render_video(nucleation::diplomat::span<const uint8_t> pack_zip, const nucleation::RenderConfig& config, const nucleation::VideoConfig& video, std::string_view path, float hold_ms) const {
+    auto result = nucleation::capi::BuildAnimation_render_video(this->AsFFI(),
+        {pack_zip.data(), pack_zip.size()},
+        config.AsFFI(),
+        video.AsFFI(),
+        {path.data(), path.size()},
         hold_ms);
     return result.is_ok ? nucleation::diplomat::result<uint32_t, nucleation::NucleationError>(nucleation::diplomat::Ok<uint32_t>(result.ok)) : nucleation::diplomat::result<uint32_t, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
