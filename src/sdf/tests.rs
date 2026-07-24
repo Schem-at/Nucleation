@@ -512,6 +512,82 @@ fn infinite_cylinder_is_exact_and_unbounded_along_y() {
 }
 
 #[test]
+fn round_cone_matches_capsule_when_radii_equal() {
+    let capsule = SdfNode::Capsule {
+        a: [0.0, 0.0, 0.0],
+        b: [0.0, 10.0, 0.0],
+        radius: 2.0,
+    };
+    let round_cone = SdfNode::RoundCone {
+        a: [0.0, 0.0, 0.0],
+        b: [0.0, 10.0, 0.0],
+        r1: 2.0,
+        r2: 2.0,
+    };
+    for &(x, y, z) in &[
+        (0.0, -5.0, 0.0),
+        (0.0, 0.0, 0.0),
+        (5.0, 5.0, 0.0),
+        (0.0, 5.0, 1.5),
+        (0.0, 10.0, 0.0),
+        (0.0, 15.0, 0.0),
+        (3.0, 3.0, 4.0),
+    ] {
+        let a = capsule.eval(x, y, z);
+        let b = round_cone.eval(x, y, z);
+        assert!(
+            (a - b).abs() < 1e-4,
+            "mismatch at ({x},{y},{z}): capsule={a}, round_cone={b}"
+        );
+    }
+}
+
+#[test]
+fn round_cone_centers_are_exactly_inside_by_their_radius() {
+    let rc = SdfNode::RoundCone {
+        a: [0.0, 0.0, 0.0],
+        b: [0.0, 10.0, 0.0],
+        r1: 3.0,
+        r2: 1.0,
+    };
+    // The center of each end sphere is always fully enclosed by that sphere,
+    // and the round-cone surface can never cut into the sphere, so the
+    // nearest-surface distance from a center is exactly its own radius.
+    assert!((rc.eval(0.0, 0.0, 0.0) - (-3.0)).abs() < 1e-4);
+    assert!((rc.eval(0.0, 10.0, 0.0) - (-1.0)).abs() < 1e-4);
+}
+
+#[test]
+fn round_cone_caps_extend_correctly_beyond_endpoints() {
+    let rc = SdfNode::RoundCone {
+        a: [0.0, 0.0, 0.0],
+        b: [0.0, 10.0, 0.0],
+        r1: 3.0,
+        r2: 1.0,
+    };
+    // Straight out along the axis beyond either endpoint, the nearest surface
+    // is the spherical cap directly on the axis: distance is exactly the
+    // extra length past `center +/- radius`.
+    assert!((rc.eval(0.0, -8.0, 0.0) - 5.0).abs() < 1e-4); // 3 (radius) + 5 = 8 below origin
+    assert!((rc.eval(0.0, 16.0, 0.0) - 5.0).abs() < 1e-4); // 1 (radius) + 5 = 6 past y=10
+}
+
+#[test]
+fn round_cone_is_rotationally_symmetric_about_its_axis() {
+    let rc = SdfNode::RoundCone {
+        a: [0.0, 0.0, 0.0],
+        b: [0.0, 10.0, 0.0],
+        r1: 3.0,
+        r2: 1.0,
+    };
+    let d0 = rc.eval(3.0, 5.0, 0.0);
+    let d1 = rc.eval(0.0, 5.0, 3.0);
+    let d2 = rc.eval(2.121_320_3, 5.0, 2.121_320_3);
+    assert!((d0 - d1).abs() < 1e-4);
+    assert!((d0 - d2).abs() < 1e-4);
+}
+
+#[test]
 fn cells_distance_modes_are_nonnegative() {
     for mode in ["f1", "f2", "f2MinusF1"] {
         let json = format!(r#"{{"type":"cells","frequency":0.12,"seed":9,"mode":"{mode}"}}"#);

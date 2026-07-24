@@ -172,6 +172,32 @@ pub mod ffi {
             })))
         }
 
+        /// Convex hull of two spheres: a capsule with a linear taper between
+        /// `r1` (at `a`) and `r2` (at `b`) instead of one constant radius.
+        #[allow(clippy::too_many_arguments)]
+        pub fn round_cone(
+            ax: f32,
+            ay: f32,
+            az: f32,
+            bx: f32,
+            by: f32,
+            bz: f32,
+            r1: f32,
+            r2: f32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            finite(&[ax, ay, az, bx, by, bz])?;
+            positive(&[r1, r2])?;
+            if ax == bx && ay == by && az == bz {
+                return Err(NucleationError::InvalidArgument);
+            }
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::RoundCone {
+                a: [ax, ay, az],
+                b: [bx, by, bz],
+                r1,
+                r2,
+            })))
+        }
+
         pub fn capped_cylinder(radius: f32, half_height: f32) -> Result<Box<Sdf>, NucleationError> {
             positive(&[radius, half_height])?;
             Ok(Box::new(Sdf(crate::sdf::SdfNode::CappedCylinder {
@@ -1116,6 +1142,33 @@ mod tests {
         let cylinder = Sdf::infinite_cylinder(2.0).unwrap();
         assert!(cylinder.bounds().is_err());
         assert!((cylinder.eval_at(5.0, 1.0e9, 0.0) - 3.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn round_cone_validates_and_rejects_degenerate_axis() {
+        assert!(Sdf::round_cone(0.0, 0.0, 0.0, 0.0, 10.0, 0.0, 3.0, 1.0).is_ok());
+        // Coincident endpoints collapse the axis to a point (division by zero).
+        assert!(Sdf::round_cone(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 3.0, 1.0).is_err());
+        assert!(Sdf::round_cone(0.0, 0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 1.0).is_err());
+        assert!(Sdf::round_cone(0.0, 0.0, 0.0, 0.0, 10.0, 0.0, -1.0, 1.0).is_err());
+        assert!(Sdf::round_cone(0.0, 0.0, 0.0, 0.0, 10.0, 0.0, f32::NAN, 1.0).is_err());
+        assert!(Sdf::round_cone(f32::INFINITY, 0.0, 0.0, 0.0, 10.0, 0.0, 3.0, 1.0).is_err());
+
+        let huge = Sdf::round_cone(0.0, 0.0, 0.0, 0.0, 1.0e30, 0.0, 1.0e30, 1.0).unwrap();
+        assert!(
+            huge.to_shape().is_err(),
+            "huge round cone exceeds voxel budget"
+        );
+    }
+
+    #[test]
+    fn round_cone_bounds_span_both_end_spheres() {
+        let rc = Sdf::round_cone(0.0, 0.0, 0.0, 0.0, 10.0, 0.0, 3.0, 1.0).unwrap();
+        let bounds = rc.bounds().unwrap();
+        assert!((bounds.min_y + 3.0).abs() < 1e-6);
+        assert!((bounds.max_y - 11.0).abs() < 1e-6);
+        assert!((bounds.min_x + 3.0).abs() < 1e-6);
+        assert!((bounds.max_x - 3.0).abs() < 1e-6);
     }
 
     #[test]

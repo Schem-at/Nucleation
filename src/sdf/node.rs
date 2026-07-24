@@ -137,6 +137,15 @@ pub enum SdfNode {
         b: [f32; 3],
         radius: f32,
     },
+    /// Exact. Convex hull of two spheres (`radius` `r1` at `a`, `r2` at `b`):
+    /// a capsule with a linear taper between the two end radii instead of a
+    /// constant one. `r1 == r2` is identical to [`SdfNode::Capsule`].
+    RoundCone {
+        a: [f32; 3],
+        b: [f32; 3],
+        r1: f32,
+        r2: f32,
+    },
     /// Exact. Y-axis aligned.
     CappedCylinder {
         radius: f32,
@@ -455,6 +464,36 @@ impl SdfNode {
                     0.0
                 };
                 len3(pa[0] - ba[0] * h, pa[1] - ba[1] * h, pa[2] - ba[2] * h) - radius
+            }
+
+            SdfNode::RoundCone { a, b, r1, r2 } => {
+                // iq's sdRoundCone: convex hull of two spheres, exact.
+                let ba = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+                let l2 = ba[0] * ba[0] + ba[1] * ba[1] + ba[2] * ba[2];
+                let rr = r1 - r2;
+                let a2 = l2 - rr * rr;
+                let il2 = 1.0 / l2;
+
+                let pa = [x - a[0], y - a[1], z - a[2]];
+                let y_ = pa[0] * ba[0] + pa[1] * ba[1] + pa[2] * ba[2];
+                let z_ = y_ - l2;
+                let px = [
+                    pa[0] * l2 - ba[0] * y_,
+                    pa[1] * l2 - ba[1] * y_,
+                    pa[2] * l2 - ba[2] * y_,
+                ];
+                let x2 = px[0] * px[0] + px[1] * px[1] + px[2] * px[2];
+                let y2 = y_ * y_ * l2;
+                let z2 = z_ * z_ * l2;
+
+                let k = rr.signum() * rr * rr * x2;
+                if z_.signum() * a2 * z2 > k {
+                    (x2 + z2).max(0.0).sqrt() * il2 - r2
+                } else if y_.signum() * a2 * y2 < k {
+                    (x2 + y2).max(0.0).sqrt() * il2 - r1
+                } else {
+                    ((x2 * a2 * il2).max(0.0).sqrt() + y_ * rr) * il2 - r1
+                }
             }
 
             SdfNode::CappedCylinder {
@@ -780,6 +819,18 @@ impl SdfNode {
                     a[0].max(b[0]) + radius,
                     a[1].max(b[1]) + radius,
                     a[2].max(b[2]) + radius,
+                ],
+            }),
+            SdfNode::RoundCone { a, b, r1, r2 } => Some(Aabb {
+                min: [
+                    (a[0] - r1).min(b[0] - r2),
+                    (a[1] - r1).min(b[1] - r2),
+                    (a[2] - r1).min(b[2] - r2),
+                ],
+                max: [
+                    (a[0] + r1).max(b[0] + r2),
+                    (a[1] + r1).max(b[1] + r2),
+                    (a[2] + r1).max(b[2] + r2),
                 ],
             }),
             SdfNode::CappedCylinder {
