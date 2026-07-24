@@ -582,6 +582,34 @@ impl SdfNode {
                 }
             }
 
+            SdfNode::SolidAngle { radius, angle } => {
+                positive_all(&[*radius])?;
+                finite_all(&[*angle])?;
+                if *angle <= 0.0 || *angle >= 180.0 {
+                    return Err("solid angle must be in (0, 180) degrees".into());
+                }
+            }
+
+            SdfNode::CutSphere { radius, height } => {
+                positive_all(&[*radius])?;
+                finite_all(&[*height])?;
+                if *height < -*radius || *height > *radius {
+                    return Err("cut sphere height must be within [-radius, radius]".into());
+                }
+            }
+
+            SdfNode::CutHollowSphere {
+                radius,
+                height,
+                thickness,
+            } => {
+                positive_all(&[*radius, *thickness])?;
+                finite_all(&[*height])?;
+                if *height < -*radius || *height > *radius {
+                    return Err("cut hollow sphere height must be within [-radius, radius]".into());
+                }
+            }
+
             SdfNode::CappedCylinder {
                 radius,
                 half_height,

@@ -867,6 +867,16 @@ fn validate_rejects_invalid_signs_and_ranges() {
     // RoundCone: coincident endpoints collapse the axis (division by zero).
     assert_json_valid(r#"{"type":"roundCone","a":[0,0,0],"b":[0,10,0],"r1":3,"r2":1}"#);
     assert_json_invalid(r#"{"type":"roundCone","a":[1,1,1],"b":[1,1,1],"r1":3,"r2":1}"#);
+
+    // Later exact IQ primitives retain the same constraints through JSON.
+    assert_json_valid(r#"{"type":"solidAngle","radius":5,"angle":60}"#);
+    assert_json_invalid(r#"{"type":"solidAngle","radius":5,"angle":0}"#);
+    assert_json_invalid(r#"{"type":"solidAngle","radius":5,"angle":180}"#);
+    assert_json_valid(r#"{"type":"cutSphere","radius":5,"height":0}"#);
+    assert_json_invalid(r#"{"type":"cutSphere","radius":5,"height":6}"#);
+    assert_json_invalid(r#"{"type":"cutSphere","radius":5,"height":-6}"#);
+    assert_json_valid(r#"{"type":"cutHollowSphere","radius":5,"height":0,"thickness":0.25}"#);
+    assert_json_invalid(r#"{"type":"cutHollowSphere","radius":5,"height":0,"thickness":0}"#);
 }
 
 #[test]
