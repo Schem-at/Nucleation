@@ -955,6 +955,11 @@ fn validate_rejects_invalid_signs_and_ranges() {
     assert_json_valid(r#"{"type":"solidAngle","radius":5,"angle":60}"#);
     assert_json_invalid(r#"{"type":"solidAngle","radius":5,"angle":0}"#);
     assert_json_invalid(r#"{"type":"solidAngle","radius":5,"angle":180}"#);
+    assert_json_valid(r#"{"type":"infiniteCone","angle":45}"#);
+    assert_json_invalid(r#"{"type":"infiniteCone","angle":0}"#);
+    assert_json_invalid(r#"{"type":"infiniteCone","angle":90}"#);
+    assert_json_valid(r#"{"type":"squarePyramid","halfBase":2,"height":4}"#);
+    assert_json_invalid(r#"{"type":"squarePyramid","halfBase":0,"height":4}"#);
     assert_json_valid(r#"{"type":"cutSphere","radius":5,"height":0}"#);
     assert_json_invalid(r#"{"type":"cutSphere","radius":5,"height":6}"#);
     assert_json_invalid(r#"{"type":"cutSphere","radius":5,"height":-6}"#);

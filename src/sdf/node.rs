@@ -662,6 +662,17 @@ impl SdfNode {
 
             SdfNode::InfiniteCylinder { radius } => positive_all(&[*radius])?,
 
+            SdfNode::InfiniteCone { angle } => {
+                finite_all(&[*angle])?;
+                if *angle <= 0.0 || *angle >= 90.0 {
+                    return Err("infinite cone angle must be in (0, 90) degrees".into());
+                }
+            }
+
+            SdfNode::SquarePyramid { half_base, height } => {
+                positive_all(&[*half_base, *height])?;
+            }
+
             SdfNode::CappedCone {
                 half_height,
                 r1,
