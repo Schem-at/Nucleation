@@ -346,6 +346,29 @@ pub mod ffi {
             })))
         }
 
+        /// Exact but unbounded Y-axis infinite cone: apex at the origin,
+        /// single nappe opening along +Y, half-aperture `angle_degrees`
+        /// strictly in `(0, 90)`.
+        pub fn infinite_cone(angle_degrees: f32) -> Result<Box<Sdf>, NucleationError> {
+            finite(&[angle_degrees])?;
+            if angle_degrees <= 0.0 || angle_degrees >= 90.0 {
+                return Err(NucleationError::InvalidArgument);
+            }
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::InfiniteCone {
+                angle: angle_degrees,
+            })))
+        }
+
+        /// Square-base pyramid, vertically centered: base (half-extent
+        /// `half_base`) at `y = -height/2`, apex at `y = height/2`.
+        pub fn square_pyramid(half_base: f32, height: f32) -> Result<Box<Sdf>, NucleationError> {
+            positive(&[half_base, height])?;
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::SquarePyramid {
+                half_base,
+                height,
+            })))
+        }
+
         pub fn cells(
             frequency: f32,
             seed: i32,
@@ -1303,6 +1326,42 @@ mod tests {
         assert!(extreme.z.abs() < 1e-6);
         let endpoint = plane.normal(f32::MAX, 0.0, 0.0, 0.5).unwrap();
         assert!((endpoint.x - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn infinite_cone_validates_angle_range_and_is_unbounded() {
+        assert!(Sdf::infinite_cone(45.0).is_ok());
+        assert!(Sdf::infinite_cone(0.0).is_err());
+        assert!(Sdf::infinite_cone(90.0).is_err());
+        assert!(Sdf::infinite_cone(91.0).is_err());
+        assert!(Sdf::infinite_cone(f32::NAN).is_err());
+
+        let cone = Sdf::infinite_cone(30.0).unwrap();
+        assert!(cone.bounds().is_err());
+        assert!(cone.eval_at(0.0, 0.0, 0.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn square_pyramid_validates_and_bounds_match_half_extents() {
+        assert!(Sdf::square_pyramid(2.0, 4.0).is_ok());
+        assert!(Sdf::square_pyramid(0.0, 4.0).is_err());
+        assert!(Sdf::square_pyramid(2.0, 0.0).is_err());
+        assert!(Sdf::square_pyramid(-1.0, 4.0).is_err());
+        assert!(Sdf::square_pyramid(2.0, f32::NAN).is_err());
+
+        let pyramid = Sdf::square_pyramid(2.0, 4.0).unwrap();
+        let bounds = pyramid.bounds().unwrap();
+        assert!((bounds.min_x + 2.0).abs() < 1e-5);
+        assert!((bounds.max_x - 2.0).abs() < 1e-5);
+        assert!((bounds.min_y + 2.0).abs() < 1e-5);
+        assert!((bounds.max_y - 2.0).abs() < 1e-5);
+        assert!(pyramid.eval_at(0.0, 2.0, 0.0).abs() < 1e-3);
+
+        let huge = Sdf::square_pyramid(1.0e30, 1.0e30).unwrap();
+        assert!(
+            huge.to_shape().is_err(),
+            "huge pyramid exceeds voxel budget"
+        );
     }
 
     use super::ffi::{

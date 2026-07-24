@@ -706,6 +706,89 @@ fn cut_hollow_sphere_is_a_thin_open_shell_of_the_cap() {
 }
 
 #[test]
+fn infinite_cone_apex_is_on_surface_and_unbounded() {
+    let cone = SdfNode::InfiniteCone { angle: 30.0 };
+    assert!(cone.eval(0.0, 0.0, 0.0).abs() < 1e-4);
+    assert!(cone.bounds().is_none(), "infinite cone is unbounded");
+}
+
+#[test]
+fn infinite_cone_lateral_wall_and_behind_apex() {
+    let cone = SdfNode::InfiniteCone { angle: 30.0 };
+    // On-axis interior: nearest boundary is the slanted wall, distance = -y*sin(angle).
+    let sin30 = 30f32.to_radians().sin();
+    assert!((cone.eval(0.0, 5.0, 0.0) - (-5.0 * sin30)).abs() < 1e-3);
+    // Directly behind the apex (negative Y): outside the single nappe.
+    assert!(cone.eval(0.0, -5.0, 0.0) > 0.0);
+    // Extends forever along +Y without ever closing off (unlike SolidAngle's
+    // sphere cap): still deep inside arbitrarily far up the axis.
+    assert!(cone.eval(0.0, 1.0e6, 0.0) < 0.0);
+}
+
+#[test]
+fn infinite_cone_is_exact_at_a_hand_solved_lateral_point() {
+    let angle_deg = 20.0f32;
+    let cone = SdfNode::InfiniteCone { angle: angle_deg };
+    // A point exactly on the cone wall, displaced further out along the
+    // wall's own normal, is at a known exact distance from the surface.
+    let a = angle_deg.to_radians();
+    let (sin_a, cos_a) = a.sin_cos();
+    let y0 = 4.0f32;
+    let x0 = y0 * sin_a / cos_a; // on-wall point at height y0
+    let normal_offset = 1.5f32;
+    let (nx, ny) = (cos_a, -sin_a); // outward wall normal in the XY half-plane
+    let px = x0 + nx * normal_offset;
+    let py = y0 + ny * normal_offset;
+    assert!((cone.eval(px, py, 0.0) - normal_offset).abs() < 1e-3);
+}
+
+#[test]
+fn square_pyramid_apex_and_base_are_on_surface() {
+    let pyr = SdfNode::SquarePyramid {
+        half_base: 2.0,
+        height: 4.0,
+    };
+    // Apex at y = height/2.
+    assert!(pyr.eval(0.0, 2.0, 0.0).abs() < 1e-3);
+    // Base center at y = -height/2.
+    assert!(pyr.eval(0.0, -2.0, 0.0).abs() < 1e-3);
+    // Base corner.
+    assert!(pyr.eval(2.0, -2.0, 2.0).abs() < 1e-3);
+}
+
+#[test]
+fn square_pyramid_interior_is_negative_and_exterior_positive() {
+    let pyr = SdfNode::SquarePyramid {
+        half_base: 2.0,
+        height: 4.0,
+    };
+    assert!(
+        pyr.eval(0.0, -1.9, 0.0) < 0.0,
+        "just above base, near center"
+    );
+    assert!(
+        pyr.eval(0.0, -2.0, 10.0) > 0.0,
+        "far outside on the base plane"
+    );
+    assert!(pyr.eval(0.0, 10.0, 0.0) > 0.0, "far above the apex");
+}
+
+#[test]
+fn square_pyramid_bounds_are_tight_and_finite() {
+    let pyr = SdfNode::SquarePyramid {
+        half_base: 3.0,
+        height: 6.0,
+    };
+    let b = pyr.bounds().unwrap();
+    assert!((b.min[0] + 3.0).abs() < 1e-6);
+    assert!((b.max[0] - 3.0).abs() < 1e-6);
+    assert!((b.min[1] + 3.0).abs() < 1e-6);
+    assert!((b.max[1] - 3.0).abs() < 1e-6);
+    assert!((b.min[2] + 3.0).abs() < 1e-6);
+    assert!((b.max[2] - 3.0).abs() < 1e-6);
+}
+
+#[test]
 fn new_iq_primitives_round_trip_through_json() {
     let cases = [
         r#"{"type":"roundCone","a":[0,0,0],"b":[0,10,0],"r1":3.0,"r2":1.0}"#,

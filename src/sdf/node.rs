@@ -219,6 +219,19 @@ pub enum SdfNode {
         half_extents: [f32; 3],
         thickness: f32,
     },
+    /// Exact but unbounded — sampling requires explicit bounds. Single-nappe
+    /// cone, apex at the origin, axis +Y, half-aperture `angle` (degrees,
+    /// strictly in `(0, 90)`) measured from that axis.
+    InfiniteCone {
+        angle: f32,
+    },
+    /// Exact. Square-base pyramid, vertically centered: base (half-extent
+    /// `half_base` in X/Z) at `y = -height/2`, apex at `y = height/2`. IQ's
+    /// exact pyramid SDF, uniformly scaled to the given base/height.
+    SquarePyramid {
+        half_base: f32,
+        height: f32,
+    },
 
     // ── Operators ──────────────────────────────────────────────────────────
     Union {
@@ -446,6 +459,38 @@ fn smin(a: f32, b: f32, k: f32) -> f32 {
 #[inline]
 fn smax(a: f32, b: f32, k: f32) -> f32 {
     -smin(-a, -b, k)
+}
+
+/// iq's exact square-pyramid SDF for the unit pyramid: base half-extent
+/// `0.5` in X/Z at `y = 0`, apex at `(0, h, 0)`.
+#[inline]
+fn sd_pyramid_unit(px: f32, py: f32, pz: f32, h: f32) -> f32 {
+    let m2 = h * h + 0.25;
+
+    let (mut ax, mut az) = (px.abs(), pz.abs());
+    if az > ax {
+        std::mem::swap(&mut ax, &mut az);
+    }
+    ax -= 0.5;
+    az -= 0.5;
+
+    let qx = az;
+    let qy = h * py - 0.5 * ax;
+    let qz = h * ax + 0.5 * py;
+
+    let s = (-qx).max(0.0);
+    let t = ((qy - 0.5 * az) / (m2 + 0.25)).clamp(0.0, 1.0);
+
+    let a = m2 * (qx + s) * (qx + s) + qy * qy;
+    let b = m2 * (qx + t * m2) * (qx + t * m2) + (qy - m2 * t) * (qy - m2 * t);
+
+    let d2 = if qy.min(-qx * m2 - qy * 0.5) > 0.0 {
+        0.0
+    } else {
+        a.min(b)
+    };
+
+    ((d2 + qz * qz) / m2).max(0.0).sqrt() * glsl_sign(qz.max(-py))
 }
 
 /// Column-major 3x3 rotation helpers (row-vector free, plain arrays).
@@ -1039,6 +1084,28 @@ impl SdfNode {
                 d1.min(d2).min(d3)
             }
 
+            SdfNode::InfiniteCone { angle } => {
+                // iq's sdCone (infinite, single nappe), axis +Y, apex at origin.
+                let (sin_a, cos_a) = angle.to_radians().sin_cos();
+                let qx = len2(x, z);
+                let qy = y;
+                let dot_qc = (qx * sin_a + qy * cos_a).max(0.0);
+                let mx = qx - sin_a * dot_qc;
+                let my = qy - cos_a * dot_qc;
+                let d = len2(mx, my);
+                d * glsl_sign(qx * cos_a - qy * sin_a)
+            }
+
+            SdfNode::SquarePyramid { half_base, height } => {
+                let hb = half_base.max(1e-9);
+                let scale = 2.0 * hb;
+                let h = height / scale;
+                let px = x / scale;
+                let py = (y + height * 0.5) / scale;
+                let pz = z / scale;
+                sd_pyramid_unit(px, py, pz, h) * scale
+            }
+
             SdfNode::Union { children } => children
                 .iter()
                 .map(|c| c.eval(x, y, z))
@@ -1300,6 +1367,10 @@ impl SdfNode {
             SdfNode::BoxFrame {
                 half_extents: b, ..
             } => sym(b[0], b[1], b[2]),
+            SdfNode::InfiniteCone { .. } => None,
+            SdfNode::SquarePyramid { half_base, height } => {
+                sym(*half_base, height * 0.5, *half_base)
+            }
 
             SdfNode::Union { children } => {
                 let mut acc: Option<Aabb> = None;
