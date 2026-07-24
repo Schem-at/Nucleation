@@ -5,11 +5,13 @@ final class WsSegmentJob {
     /** @internal */
     public \FFI\CData $ptr;
     private bool $owned;
+    private ?object $borrowedFrom;
 
     /** @internal */
-    public function __construct(\FFI\CData $ptr, bool $owned) {
+    public function __construct(\FFI\CData $ptr, bool $owned, ?object $borrowedFrom = null) {
         $this->ptr = $ptr;
         $this->owned = $owned;
+        $this->borrowedFrom = $borrowedFrom;
     }
 
     public static function create( $cell_size,  $closing_radius,  $min_cluster_blocks, string $source_id, string $snapshot_id,  $min_y,  $max_y,  $extracted_at,  $match_iou,  $hard_cut) {
