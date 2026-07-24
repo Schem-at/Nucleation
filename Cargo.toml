@@ -249,6 +249,10 @@ name = "fingerprint_bench"
 harness = false
 
 [[example]]
+name = "wol_extract"
+required-features = ["world-segment"]
+
+[[example]]
 name = "airship_fortress"
 required-features = ["voxelize"]
 
