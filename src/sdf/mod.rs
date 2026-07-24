@@ -34,9 +34,15 @@
 
 mod node;
 pub mod noise;
+pub mod program;
 mod sampler;
 
 pub use node::{Aabb, Axis, CellMode, SdfNode};
+pub use program::{
+    BinaryOp, Const, DistanceKind, Program, ProgramBounds, ProgramBuilder, ProgramData,
+    ProgramError, UnaryOp, ValueType, MAX_DYNAMIC_STEPS, MAX_REPEAT_DEPTH, MAX_REPEAT_ITERATIONS,
+    MAX_SLOTS, MAX_STATIC_INSTRUCTIONS,
+};
 pub use sampler::{
     auto_bounds, sample_to_schematic, FillRule, GradientAxis, GradientFill, MaterialRules,
     NoiseCondition, PaletteSpec, RampMode, Range, SampleBounds, SurfaceRule, When,

@@ -7,6 +7,7 @@
 //! distance — safe for inside/outside sampling, imprecise for sphere tracing.
 
 use super::noise::{fbm3, hash01_3, value_noise3};
+use super::program::Program;
 use serde::{Deserialize, Serialize};
 
 /// What a `Cells` (Worley / cellular) node returns per point.
@@ -262,6 +263,13 @@ pub enum SdfNode {
         mode: CellMode,
         #[serde(default)]
         threshold: f32,
+    },
+
+    /// A portable, sandboxed custom field: a validated, serde-serializable
+    /// stack-based typed bytecode [`Program`] with explicit finite bounds
+    /// and distance-kind metadata. See [`super::program`].
+    Program {
+        program: Box<Program>,
     },
 }
 
@@ -637,6 +645,8 @@ impl SdfNode {
                 };
                 raw - threshold
             }
+
+            SdfNode::Program { program } => program.eval(x, y, z),
         }
     }
 
@@ -820,6 +830,7 @@ impl SdfNode {
                 child, amplitude, ..
             } => child.bounds().map(|b| b.grow(amplitude.abs())),
             SdfNode::Cells { .. } => None,
+            SdfNode::Program { program } => Some(program.aabb()),
         }
     }
 }
