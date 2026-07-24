@@ -789,6 +789,73 @@ fn square_pyramid_bounds_are_tight_and_finite() {
 }
 
 #[test]
+fn xor_is_solid_in_exactly_one_child_not_both_or_neither() {
+    let xor = SdfNode::Xor {
+        a: Box::new(SdfNode::Sphere { radius: 3.0 }),
+        b: Box::new(SdfNode::Translate {
+            child: Box::new(SdfNode::Sphere { radius: 3.0 }),
+            offset: [4.0, 0.0, 0.0],
+        }),
+    };
+    // Deep inside only the left sphere.
+    assert!(xor.eval(-2.0, 0.0, 0.0) < 0.0);
+    // Deep inside only the right sphere.
+    assert!(xor.eval(6.0, 0.0, 0.0) < 0.0);
+    // Inside both spheres (overlap region near x=2): excluded by XOR.
+    assert!(xor.eval(2.0, 0.0, 0.0) > 0.0);
+    // Outside both.
+    assert!(xor.eval(20.0, 0.0, 0.0) > 0.0);
+}
+
+#[test]
+fn xor_bounds_union_only_when_both_children_bounded() {
+    let bounded = SdfNode::Xor {
+        a: Box::new(SdfNode::Sphere { radius: 3.0 }),
+        b: Box::new(SdfNode::Translate {
+            child: Box::new(SdfNode::Sphere { radius: 2.0 }),
+            offset: [10.0, 0.0, 0.0],
+        }),
+    };
+    let b = bounded.bounds().unwrap();
+    assert!((b.max[0] - 12.0).abs() < 1e-5);
+    assert!((b.min[0] + 3.0).abs() < 1e-5);
+
+    let unbounded = SdfNode::Xor {
+        a: Box::new(SdfNode::Sphere { radius: 3.0 }),
+        b: Box::new(SdfNode::Plane {
+            normal: [0.0, 1.0, 0.0],
+            offset: 0.0,
+        }),
+    };
+    assert!(unbounded.bounds().is_none());
+}
+
+#[test]
+fn elongate_grows_a_sphere_into_a_capsule_shaped_footprint() {
+    let elongated = SdfNode::Elongate {
+        child: Box::new(SdfNode::Sphere { radius: 1.0 }),
+        half_lengths: [3.0, 0.0, 0.0],
+    };
+    // Along the elongation axis, the surface sits `half_length` further out.
+    assert!((elongated.eval(4.0, 0.0, 0.0) - 0.0).abs() < 1e-4);
+    assert!(elongated.eval(0.0, 0.0, 0.0) < 0.0);
+    // Perpendicular cross-section still matches the plain sphere radius.
+    assert!((elongated.eval(0.0, 1.0, 0.0) - 0.0).abs() < 1e-4);
+}
+
+#[test]
+fn elongate_bounds_grow_componentwise() {
+    let elongated = SdfNode::Elongate {
+        child: Box::new(SdfNode::Sphere { radius: 1.0 }),
+        half_lengths: [3.0, 0.5, 0.0],
+    };
+    let b = elongated.bounds().unwrap();
+    assert!((b.max[0] - 4.0).abs() < 1e-5);
+    assert!((b.max[1] - 1.5).abs() < 1e-5);
+    assert!((b.max[2] - 1.0).abs() < 1e-5);
+}
+
+#[test]
 fn new_iq_primitives_round_trip_through_json() {
     let cases = [
         r#"{"type":"roundCone","a":[0,0,0],"b":[0,10,0],"r1":3.0,"r2":1.0}"#,

@@ -460,6 +460,34 @@ pub mod ffi {
             })))
         }
 
+        /// Symmetric difference (XOR): solid where exactly one of `self`/
+        /// `other` is solid.
+        pub fn xor_with(&self, other: &Sdf) -> Box<Sdf> {
+            Box::new(Sdf(crate::sdf::SdfNode::Xor {
+                a: Box::new(self.0.clone()),
+                b: Box::new(other.0.clone()),
+            }))
+        }
+
+        /// Stretches this graph outward by `half_x`/`half_y`/`half_z` along
+        /// each axis (IQ's corrected `opElongate`). Half-lengths must be
+        /// finite and non-negative, with at least one strictly positive.
+        pub fn elongate(
+            &self,
+            half_x: f32,
+            half_y: f32,
+            half_z: f32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            non_negative(&[half_x, half_y, half_z])?;
+            if half_x <= 0.0 && half_y <= 0.0 && half_z <= 0.0 {
+                return Err(NucleationError::InvalidArgument);
+            }
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::Elongate {
+                child: Box::new(self.0.clone()),
+                half_lengths: [half_x, half_y, half_z],
+            })))
+        }
+
         // ── Immutable transforms and modifiers ────────────────────────────
 
         pub fn translate(&self, x: f32, y: f32, z: f32) -> Result<Box<Sdf>, NucleationError> {
@@ -1362,6 +1390,32 @@ mod tests {
             huge.to_shape().is_err(),
             "huge pyramid exceeds voxel budget"
         );
+    }
+
+    #[test]
+    fn xor_with_is_solid_in_exactly_one_child() {
+        let left = Sdf::sphere(3.0).unwrap();
+        let right = Sdf::sphere(3.0).unwrap().translate(4.0, 0.0, 0.0).unwrap();
+        let xor = left.xor_with(&right);
+        assert!(xor.eval_at(-2.0, 0.0, 0.0) < 0.0);
+        assert!(xor.eval_at(6.0, 0.0, 0.0) < 0.0);
+        assert!(xor.eval_at(2.0, 0.0, 0.0) > 0.0, "overlap is excluded");
+        assert!(xor.eval_at(20.0, 0.0, 0.0) > 0.0);
+    }
+
+    #[test]
+    fn elongate_validates_half_lengths_and_grows_bounds() {
+        let sphere = Sdf::sphere(1.0).unwrap();
+        assert!(sphere.elongate(3.0, 0.0, 0.0).is_ok());
+        assert!(sphere.elongate(0.0, 0.0, 0.0).is_err());
+        assert!(sphere.elongate(-1.0, 0.0, 0.0).is_err());
+        assert!(sphere.elongate(f32::NAN, 0.0, 0.0).is_err());
+
+        let elongated = sphere.elongate(3.0, 0.0, 0.0).unwrap();
+        let bounds = elongated.bounds().unwrap();
+        assert!((bounds.max_x - 4.0).abs() < 1e-5);
+        assert!((bounds.max_y - 1.0).abs() < 1e-5);
+        assert!((elongated.eval_at(4.0, 0.0, 0.0)).abs() < 1e-4);
     }
 
     use super::ffi::{

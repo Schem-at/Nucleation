@@ -270,6 +270,21 @@ pub enum SdfNode {
         child: Box<SdfNode>,
         thickness: f32,
     },
+    /// Symmetric difference (XOR) of two children: `max(min(a,b), -max(a,b))`.
+    /// Exact outside both shapes and inside exactly one; only a conservative
+    /// bound (like [`SdfNode::Intersect`]) where their interiors overlap.
+    Xor {
+        a: Box<SdfNode>,
+        b: Box<SdfNode>,
+    },
+    /// Stretches the child outward by `half_lengths` along each axis before
+    /// evaluating it (IQ's corrected `opElongate`: `q = abs(p) -
+    /// half_lengths`, then `child(max(q,0)) + min(max(q.x,q.y,q.z),0)`).
+    /// Exact for convex children, a conservative bound otherwise.
+    Elongate {
+        child: Box<SdfNode>,
+        half_lengths: [f32; 3],
+    },
 
     // ── Transforms ─────────────────────────────────────────────────────────
     Translate {
@@ -1136,6 +1151,23 @@ impl SdfNode {
             SdfNode::Round { child, radius } => child.eval(x, y, z) - radius,
             SdfNode::Shell { child, thickness } => child.eval(x, y, z).abs() - thickness,
 
+            SdfNode::Xor { a, b } => {
+                let da = a.eval(x, y, z);
+                let db = b.eval(x, y, z);
+                da.min(db).max(-da.max(db))
+            }
+
+            SdfNode::Elongate {
+                child,
+                half_lengths: h,
+            } => {
+                let qx = x.abs() - h[0];
+                let qy = y.abs() - h[1];
+                let qz = z.abs() - h[2];
+                let d = child.eval(qx.max(0.0), qy.max(0.0), qz.max(0.0));
+                d + qx.max(qy.max(qz)).min(0.0)
+            }
+
             SdfNode::Translate { child, offset } => {
                 child.eval(x - offset[0], y - offset[1], z - offset[2])
             }
@@ -1417,6 +1449,17 @@ impl SdfNode {
             },
             SdfNode::Round { child, radius } => child.bounds().map(|b| b.grow(*radius)),
             SdfNode::Shell { child, thickness } => child.bounds().map(|b| b.grow(*thickness)),
+            SdfNode::Xor { a, b } => match (a.bounds(), b.bounds()) {
+                (Some(ab), Some(bb)) => Some(ab.union(bb)),
+                _ => None,
+            },
+            SdfNode::Elongate {
+                child,
+                half_lengths: h,
+            } => child.bounds().map(|b| Aabb {
+                min: [b.min[0] - h[0], b.min[1] - h[1], b.min[2] - h[2]],
+                max: [b.max[0] + h[0], b.max[1] + h[1], b.max[2] + h[2]],
+            }),
 
             SdfNode::Translate { child, offset } => child.bounds().map(|b| Aabb {
                 min: [
