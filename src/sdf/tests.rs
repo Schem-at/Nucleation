@@ -934,6 +934,12 @@ fn new_iq_primitives_round_trip_through_json() {
         r#"{"type":"solidAngle","radius":5.0,"angle":45.0}"#,
         r#"{"type":"cutSphere","radius":5.0,"height":2.0}"#,
         r#"{"type":"cutHollowSphere","radius":5.0,"height":2.0,"thickness":0.3}"#,
+        r#"{"type":"infiniteCone","angle":30.0}"#,
+        r#"{"type":"squarePyramid","halfBase":2.0,"height":4.0}"#,
+        r#"{"type":"xor","a":{"type":"sphere","radius":3.0},"b":{"type":"translate","offset":[4,0,0],"child":{"type":"sphere","radius":3.0}}}"#,
+        r#"{"type":"elongate","halfLengths":[3.0,0.0,0.0],"child":{"type":"sphere","radius":1.0}}"#,
+        r#"{"type":"twist","amount":0.5,"child":{"type":"box","halfExtents":[1,5,1]}}"#,
+        r#"{"type":"bend","amount":0.5,"child":{"type":"box","halfExtents":[5,1,1]}}"#,
     ];
     for json in cases {
         let n = SdfNode::from_json(json).unwrap_or_else(|e| panic!("{json}: {e}"));
