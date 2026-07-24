@@ -19,6 +19,7 @@
 
 use super::Aabb;
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
 
 /// Maximum number of typed local slots a program may declare.
 pub const MAX_SLOTS: usize = 64;
@@ -707,6 +708,23 @@ enum RtValue<S> {
     Bool(bool),
 }
 
+struct EvalScratch<S> {
+    slots: Vec<RtValue<S>>,
+    stack: Vec<RtValue<S>>,
+}
+
+thread_local! {
+    // Sampling calls the same immutable program once per voxel. Reusing one
+    // scratch arena per worker thread removes the two heap allocations that
+    // would otherwise occur for every sample while remaining lock-free.
+    static F32_SCRATCH: RefCell<EvalScratch<f32>> = const {
+        RefCell::new(EvalScratch { slots: Vec::new(), stack: Vec::new() })
+    };
+    static DUAL_SCRATCH: RefCell<EvalScratch<Dual>> = const {
+        RefCell::new(EvalScratch { slots: Vec::new(), stack: Vec::new() })
+    };
+}
+
 fn rt_scalar<S: Field>(v: RtValue<S>) -> S {
     match v {
         RtValue::Scalar(s) => s,
@@ -943,21 +961,31 @@ impl Program {
         serde_json::to_string(&self.0).map_err(|_| ProgramError::TypeMismatch)
     }
 
-    /// Evaluate the program's scalar output at `(x, y, z)`. Deterministic
-    /// pure `f32` arithmetic — degenerate operations (e.g. division by zero)
-    /// yield `NaN`/`inf` per IEEE 754 rather than panicking.
+    /// Evaluate the program's scalar output at `(x, y, z)`. Non-finite input
+    /// or output is mapped to `+inf`, making malformed runtime domains
+    /// deterministically outside rather than leaking NaNs into sampling.
     pub fn eval(&self, x: f32, y: f32, z: f32) -> f32 {
-        let mut slots: Vec<RtValue<f32>> = self
-            .0
-            .slots
-            .iter()
-            .map(|ty| default_slot_value(*ty))
-            .collect();
-        let mut stack: Vec<RtValue<f32>> = Vec::new();
-        eval_block(&self.0.instructions, &mut stack, &mut slots, [x, y, z]);
-        match slots.get(self.0.output_slot as usize) {
-            Some(RtValue::Scalar(v)) => *v,
-            _ => f32::NAN,
+        if !x.is_finite() || !y.is_finite() || !z.is_finite() {
+            return f32::INFINITY;
+        }
+        let value = F32_SCRATCH.with(|cell| {
+            let mut scratch = cell.borrow_mut();
+            scratch.slots.clear();
+            scratch
+                .slots
+                .extend(self.0.slots.iter().map(|ty| default_slot_value(*ty)));
+            scratch.stack.clear();
+            let EvalScratch { slots, stack } = &mut *scratch;
+            eval_block(&self.0.instructions, stack, slots, [x, y, z]);
+            match slots.get(self.0.output_slot as usize) {
+                Some(RtValue::Scalar(v)) => *v,
+                _ => f32::INFINITY,
+            }
+        });
+        if value.is_finite() {
+            value
+        } else {
+            f32::INFINITY
         }
     }
 
@@ -968,19 +996,24 @@ impl Program {
     /// fall back to a numerical estimate (see [`super::numerical_normal`])
     /// in that case.
     pub fn analytic_gradient(&self, x: f32, y: f32, z: f32) -> Option<[f32; 3]> {
-        let mut slots: Vec<RtValue<Dual>> = self
-            .0
-            .slots
-            .iter()
-            .map(|ty| default_slot_value(*ty))
-            .collect();
-        let mut stack: Vec<RtValue<Dual>> = Vec::new();
+        if !x.is_finite() || !y.is_finite() || !z.is_finite() {
+            return None;
+        }
         let pos = [Dual::seed(x, 0), Dual::seed(y, 1), Dual::seed(z, 2)];
-        eval_block(&self.0.instructions, &mut stack, &mut slots, pos);
-        let d = match slots.get(self.0.output_slot as usize) {
-            Some(RtValue::Scalar(d)) => *d,
-            _ => return None,
-        };
+        let d = DUAL_SCRATCH.with(|cell| {
+            let mut scratch = cell.borrow_mut();
+            scratch.slots.clear();
+            scratch
+                .slots
+                .extend(self.0.slots.iter().map(|ty| default_slot_value(*ty)));
+            scratch.stack.clear();
+            let EvalScratch { slots, stack } = &mut *scratch;
+            eval_block(&self.0.instructions, stack, slots, pos);
+            match slots.get(self.0.output_slot as usize) {
+                Some(RtValue::Scalar(d)) => Some(*d),
+                _ => None,
+            }
+        })?;
         if !d.v.is_finite() || !d.d.iter().all(|c| c.is_finite()) {
             return None;
         }
@@ -1037,6 +1070,7 @@ pub struct ProgramBuilder {
     output_slot: Option<u16>,
     bounds: Option<ProgramBounds>,
     distance_kind: DistanceKind,
+    recording_error: Option<ProgramError>,
 }
 
 impl Default for ProgramBuilder {
@@ -1054,12 +1088,18 @@ impl ProgramBuilder {
             output_slot: None,
             bounds: None,
             distance_kind: DistanceKind::default(),
+            recording_error: None,
         }
     }
 
     /// Declare a new typed local slot, initialized to a type-appropriate
     /// zero value, and return its index.
     pub fn add_slot(&mut self, ty: ValueType) -> u16 {
+        if self.slots.len() >= MAX_SLOTS {
+            self.recording_error
+                .get_or_insert(ProgramError::TooManySlots);
+            return u16::MAX;
+        }
         let idx = self.slots.len() as u16;
         self.slots.push(ty);
         idx
@@ -1160,6 +1200,9 @@ impl ProgramBuilder {
 
     /// Finalize and validate the program.
     pub fn build(mut self) -> Result<Program, ProgramError> {
+        if let Some(error) = self.recording_error {
+            return Err(error);
+        }
         if self.blocks.len() != 1 {
             return Err(ProgramError::UnclosedRepeat);
         }
@@ -1216,6 +1259,17 @@ mod tests {
         b.push_const(Const::Bool(true));
         b.store_local(flag);
         assert_eq!(b.build().unwrap_err(), ProgramError::InvalidOutputSlot);
+    }
+
+    #[test]
+    fn builder_stops_declaring_slots_at_the_validated_limit() {
+        let mut b = ProgramBuilder::new();
+        for _ in 0..MAX_SLOTS {
+            assert_ne!(b.add_slot(ValueType::Scalar), u16::MAX);
+        }
+        assert_eq!(b.add_slot(ValueType::Scalar), u16::MAX);
+        assert_eq!(b.slots.len(), MAX_SLOTS);
+        assert_eq!(b.build().unwrap_err(), ProgramError::TooManySlots);
     }
 
     #[test]
@@ -1673,6 +1727,22 @@ mod tests {
         let bounds = union.bounds().expect("both children are bounded");
         assert!(bounds.min[0] <= -2.0);
         assert!(bounds.max[0] >= 11.0);
+    }
+
+    #[test]
+    fn sdf_node_program_treats_non_finite_results_as_outside() {
+        let mut b = ProgramBuilder::new();
+        let out = b.add_slot(ValueType::Scalar);
+        b.set_output(out);
+        b.set_bounds([-1.0, -1.0, -1.0], [1.0, 1.0, 1.0]);
+        b.push_const(Const::Scalar(0.0));
+        b.push_const(Const::Scalar(0.0));
+        b.binary(BinaryOp::Div);
+        b.store_local(out);
+        let node = crate::sdf::SdfNode::Program {
+            program: Box::new(b.build().unwrap()),
+        };
+        assert_eq!(node.eval(0.0, 0.0, 0.0), f32::INFINITY);
     }
 
     #[test]

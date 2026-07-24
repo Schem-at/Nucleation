@@ -764,7 +764,12 @@ pub mod ffi {
             &mut self,
             value_type: FieldProgramValueType,
         ) -> Result<u16, NucleationError> {
-            Ok(self.inner_mut()?.add_slot(value_type.to_core()))
+            let slot = self.inner_mut()?.add_slot(value_type.to_core());
+            if slot == u16::MAX {
+                Err(NucleationError::InvalidArgument)
+            } else {
+                Ok(slot)
+            }
         }
 
         pub fn push_const_scalar(&mut self, value: f32) -> Result<(), NucleationError> {
@@ -1059,6 +1064,15 @@ mod tests {
     }
 
     #[test]
+    fn field_program_builder_rejects_slots_past_the_limit_immediately() {
+        let mut builder = FieldProgramBuilder::create();
+        for _ in 0..crate::sdf::MAX_SLOTS {
+            builder.add_slot(FieldProgramValueType::Scalar).unwrap();
+        }
+        assert!(builder.add_slot(FieldProgramValueType::Scalar).is_err());
+    }
+
+    #[test]
     fn field_program_builder_after_build_is_already_consumed() {
         let (mut b, out) = sphere_builder(1.0);
         assert!(b.build().is_ok());
@@ -1107,6 +1121,23 @@ mod tests {
         assert!((normal.x - 1.0).abs() < 1e-3);
         assert!(normal.y.abs() < 1e-3);
         assert!(normal.z.abs() < 1e-3);
+    }
+
+    #[test]
+    fn field_program_eval_rejects_non_finite_inputs_and_results() {
+        let mut builder = FieldProgramBuilder::create();
+        let output = builder.add_slot(FieldProgramValueType::Scalar).unwrap();
+        builder.set_output(output).unwrap();
+        builder.set_bounds(-1.0, -1.0, -1.0, 1.0, 1.0, 1.0).unwrap();
+        builder.push_const_scalar(0.0).unwrap();
+        builder.push_const_scalar(0.0).unwrap();
+        builder.binary_op(FieldProgramBinaryOp::Div).unwrap();
+        builder.store_local(output).unwrap();
+        let program = builder.build().unwrap();
+
+        assert_eq!(program.eval_at(0.0, 0.0, 0.0), f32::INFINITY);
+        assert_eq!(program.eval_at(f32::NAN, 0.0, 0.0), f32::INFINITY);
+        assert_eq!(program.eval_at(f32::INFINITY, 0.0, 0.0), f32::INFINITY);
     }
 
     #[test]
