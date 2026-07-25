@@ -276,7 +276,7 @@ mod tests {
         events: &'a mut EventQueue,
         states: &'a StateRegistry,
     ) -> TickCtx<'a> {
-        TickCtx { world, ticks, events, states, tick: 0 }
+        TickCtx { world, ticks, events, states, tick: 0, updates: Box::leak(Box::new(Vec::new())) }
     }
 
     #[test]

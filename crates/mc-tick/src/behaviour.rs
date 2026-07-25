@@ -45,6 +45,12 @@ pub struct TickCtx<'a> {
     pub states: &'a StateRegistry,
     /// The tick currently being executed.
     pub tick: u64,
+    /// Neighbour notifications raised by [`TickCtx::set`], drained by the driver.
+    ///
+    /// Collected rather than dispatched inline: a behaviour that could re-enter
+    /// other behaviours would make ordering depend on call depth instead of on the
+    /// phase, which is the one thing this engine exists to get right.
+    pub updates: &'a mut Vec<(Pos, Dir)>,
 }
 
 impl TickCtx<'_> {
@@ -63,12 +69,25 @@ impl TickCtx<'_> {
         self.world.get(pos)
     }
 
-    /// Set the state at `pos`.
+    /// Set the state at `pos` and notify its six neighbours.
     ///
-    /// Does **not** yet notify neighbours — neighbour propagation is part of the
-    /// redstone work and will route through here once it exists. Until then a
-    /// behaviour that changes a block must schedule whatever follow-up it needs.
+    /// Notifications are queued, not dispatched here; see [`TickCtx::updates`].
+    /// Nothing is queued if the write changed nothing, which is what stops two
+    /// blocks that keep re-asserting the same state from looping forever.
     pub fn set(&mut self, pos: Pos, state: StateId) {
+        let previous = self.world.get(pos);
+        if previous == state {
+            return;
+        }
+        self.world.set(pos, state);
+        for dir in crate::pos::ALL_DIRS {
+            // The neighbour is told which way the change came from, relative to it.
+            self.updates.push((pos.offset(dir), dir.opposite()));
+        }
+    }
+
+    /// Set a block without notifying anything, for loading a structure.
+    pub fn set_silent(&mut self, pos: Pos, state: StateId) {
         self.world.set(pos, state);
     }
 }
@@ -361,6 +380,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            updates: &mut Vec::new(),
         };
         source.on_neighbor_changed(&mut ctx, Pos::new(0, 0, 0), Dir::Up);
         source.on_scheduled_tick(&mut ctx, Pos::new(0, 0, 0));
@@ -380,6 +400,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 10,
+            updates: &mut Vec::new(),
         };
         ctx.schedule(Pos::new(1, 1, 1), 2, TickPriority::High);
         ctx.queue_event(Pos::new(2, 2, 2), 1, 3);

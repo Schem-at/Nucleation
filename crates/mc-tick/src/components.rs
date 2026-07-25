@@ -408,6 +408,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            updates: &mut Vec::new(),
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
 
@@ -434,6 +435,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            updates: &mut Vec::new(),
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
 
@@ -467,6 +469,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            updates: &mut Vec::new(),
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
 
@@ -495,6 +498,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            updates: &mut Vec::new(),
         };
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
@@ -525,6 +529,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            updates: &mut Vec::new(),
         };
         torch.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::Down);
 
@@ -556,6 +561,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            updates: &mut Vec::new(),
         };
         torch.on_scheduled_tick(&mut ctx, torch_pos);
 
@@ -598,6 +604,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            updates: &mut Vec::new(),
         };
         comparator.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
 

@@ -70,6 +70,8 @@ pub struct Simulation {
     /// Accumulated during dispatch, where the table cannot be mutated, and folded
     /// back in by [`Simulation::unknown_report`].
     unknown_seen: Vec<StateId>,
+    /// Scratch buffer for neighbour notifications; reused every dispatch.
+    updates: Vec<(Pos, crate::pos::Dir)>,
     tick: u64,
     /// The state to return to on [`Simulation::reset`].
     ///
@@ -95,6 +97,7 @@ impl Simulation {
             events: EventQueue::new(),
             behaviours: BehaviourTable::new(),
             unknown_seen: Vec::new(),
+            updates: Vec::new(),
             tick: 0,
             initial,
         }
@@ -258,6 +261,51 @@ impl Simulation {
         self.restore(&initial);
     }
 
+    /// Deliver queued neighbour notifications until none remain.
+    ///
+    /// Bounded: a circuit that keeps re-notifying itself would otherwise hang, and
+    /// a reported limit is far better than a simulation that never returns. The
+    /// `set` guard against no-op writes means real circuits terminate long before
+    /// this.
+    fn propagate(&mut self) {
+        const MAX_UPDATE_CASCADE: usize = 8192;
+
+        let mut delivered = 0;
+        while let Some((pos, from)) = self.updates.pop() {
+            delivered += 1;
+            if delivered > MAX_UPDATE_CASCADE {
+                self.updates.clear();
+                break;
+            }
+            let state = self.world.get(pos);
+            let Some(behaviour) = self.behaviours.get(state) else {
+                if state != StateId::AIR {
+                    self.unknown_seen.push(state);
+                }
+                continue;
+            };
+            let mut ctx = TickCtx {
+                world: &mut self.world,
+                ticks: &mut self.ticks,
+                events: &mut self.events,
+                states: &self.registry,
+                tick: self.tick,
+                updates: &mut self.updates,
+            };
+            behaviour.on_neighbor_changed(&mut ctx, pos, from);
+        }
+    }
+
+    /// Notify the neighbours of `pos`, as an external change would.
+    ///
+    /// This is how a lever flip or a block break enters the simulation.
+    pub fn notify_neighbors(&mut self, pos: Pos) {
+        for dir in crate::pos::ALL_DIRS {
+            self.updates.push((pos.offset(dir), dir.opposite()));
+        }
+        self.propagate();
+    }
+
     /// Run one phase. `Some(stop)` aborts the tick.
     fn run_phase(&mut self, phase: Phase) -> Option<StopReason> {
         match phase {
@@ -285,8 +333,10 @@ impl Simulation {
                         events: &mut self.events,
                         states: &self.registry,
                         tick: self.tick,
+                        updates: &mut self.updates,
                     };
                     behaviour.on_scheduled_tick(&mut ctx, entry.pos);
+                    self.propagate();
                 }
                 None
             }
@@ -321,8 +371,10 @@ impl Simulation {
                     events: &mut self.events,
                     states: &self.registry,
                     tick: self.tick,
+                    updates: &mut self.updates,
                 };
                 behaviour.on_block_event(&mut ctx, event.pos, event.id, event.param);
+                self.propagate();
             }
         }
         // Still not empty after the cap: report instead of spinning.
