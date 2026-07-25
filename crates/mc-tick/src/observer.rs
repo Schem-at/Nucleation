@@ -142,6 +142,7 @@ mod tests {
             world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
             updates: &mut Vec::new(), moves: &mut Vec::new(),
             toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
+            log: None,
         };
         o.on_neighbor_changed(&mut ctx, pos, Dir::West);
         assert_eq!(t.len(), 1, "a watched change must schedule");
@@ -158,6 +159,7 @@ mod tests {
             world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
             updates: &mut Vec::new(), moves: &mut Vec::new(),
             toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
+            log: None,
         };
         for dir in [Dir::East, Dir::North, Dir::South, Dir::Up, Dir::Down] {
             o.on_neighbor_changed(&mut ctx, pos, dir);
@@ -178,6 +180,7 @@ mod tests {
                 world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
                 updates: &mut Vec::new(), moves: &mut Vec::new(),
                 toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
+                log: None,
             };
             observer(false).on_scheduled_tick(&mut ctx, pos);
         }
@@ -193,6 +196,7 @@ mod tests {
                 tick: OBSERVER_PULSE_TICKS,
                 updates: &mut Vec::new(), moves: &mut Vec::new(),
                 toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
+                log: None,
             };
             observer(true).on_scheduled_tick(&mut ctx, pos);
         }
@@ -221,6 +225,7 @@ mod tests {
             world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
             updates: &mut Vec::new(), moves: &mut Vec::new(),
             toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
+            log: None,
         };
         o.on_neighbor_changed(&mut ctx, pos, Dir::West);
         assert!(t.is_empty(), "a pulse in flight must not be retriggered");

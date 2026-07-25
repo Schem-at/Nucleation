@@ -275,6 +275,12 @@ public final class TraceCapture {
         System.out.printf("captured %d tick(s) with changes -> %s%n", ticks.size(), out);
 
         server.halt(false);
+
+        // Delete the world. Each run creates a full Minecraft save — all three
+        // dimensions with region files — and a session that captures a dozen
+        // traces will fill a disk. Regenerating it costs a few seconds.
+        deleteRecursively(Paths.get(universe));
+
         System.exit(0);
     }
 
@@ -311,6 +317,24 @@ public final class TraceCapture {
             return text.substring(open + 1, close) + text.substring(close + 1);
         }
         return text;
+    }
+
+    /** Remove a directory tree, ignoring anything that resists. */
+    private static void deleteRecursively(Path root) {
+        if (!Files.exists(root)) {
+            return;
+        }
+        try (var walk = Files.walk(root)) {
+            walk.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (Exception ignored) {
+                    // Best effort: a leftover file is not worth failing a capture.
+                }
+            });
+        } catch (Exception ignored) {
+            // Likewise.
+        }
     }
 
     private static String arg(String[] args, String name, String fallback) {

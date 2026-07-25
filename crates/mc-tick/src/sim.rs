@@ -8,7 +8,7 @@
 //! project via a registry; this module's job is to be the thing whose ordering
 //! is already right when that happens.
 
-use crate::behaviour::{BehaviourTable, PendingMove, TickCtx};
+use crate::behaviour::{BehaviourTable, BlockChange, PendingMove, TickCtx};
 use crate::phase::{Phase, PHASE_ORDER};
 use crate::pos::{Bounds, Pos};
 use crate::schedule::{BlockEvent, EventQueue, TickPriority, TickQueue};
@@ -78,6 +78,8 @@ pub struct Simulation {
     toggles: Vec<(Pos, u64)>,
     /// Stored comparator output strengths; vanilla's ComparatorBlockEntity.
     comparator_out: std::collections::HashMap<Pos, u8>,
+    /// Recorded block changes, when recording is enabled.
+    log: Option<Vec<BlockChange>>,
     tick: u64,
     /// The state to return to on [`Simulation::reset`].
     ///
@@ -107,9 +109,23 @@ impl Simulation {
             moves: Vec::new(),
             toggles: Vec::new(),
             comparator_out: std::collections::HashMap::new(),
+            log: None,
             tick: 0,
             initial,
         }
+    }
+
+    /// Start recording block changes, for comparison against a vanilla trace.
+    ///
+    /// Off by default: the tick loop should not pay for observability nobody asked
+    /// for, and a simulation used for timing runs millions of ticks.
+    pub fn record(&mut self) {
+        self.log = Some(Vec::new());
+    }
+
+    /// The changes recorded since [`Simulation::record`], in order.
+    pub fn recorded(&self) -> &[BlockChange] {
+        self.log.as_deref().unwrap_or(&[])
     }
 
     /// The behaviour table.
@@ -179,6 +195,11 @@ impl Simulation {
     /// The state registry, mutably, for interning while loading.
     pub fn registry_mut(&mut self) -> &mut StateRegistry {
         &mut self.registry
+    }
+
+    /// Registry and world together, for loaders that must intern while writing.
+    pub fn registry_and_world_mut(&mut self) -> (&mut StateRegistry, &mut World) {
+        (&mut self.registry, &mut self.world)
     }
 
     /// Schedule a block tick, as a block would.
@@ -306,6 +327,7 @@ impl Simulation {
                 moves: &mut self.moves,
                         toggles: &mut self.toggles,
                         comparator_out: &mut self.comparator_out,
+                        log: self.log.as_mut(),
             };
             behaviour.on_neighbor_changed(&mut ctx, pos, from);
         }
@@ -352,6 +374,7 @@ impl Simulation {
                 moves: &mut self.moves,
                         toggles: &mut self.toggles,
                         comparator_out: &mut self.comparator_out,
+                        log: self.log.as_mut(),
                     };
                     behaviour.on_scheduled_tick(&mut ctx, entry.pos);
                     self.propagate();
@@ -368,15 +391,36 @@ impl Simulation {
                 // event that started them. Captured from vanilla:
                 //   tick 0  stone -> moving_piston
                 //   tick 2  moving_piston -> stone (at its destination)
-                let due: Vec<PendingMove> = self
+                let mut due: Vec<PendingMove> = self
                     .moves
                     .iter()
                     .filter(|m| m.resolve_on <= self.tick)
                     .copied()
                     .collect();
+                // Resolve in the world's canonical order rather than the order the
+                // moves happened to be queued. The captured trace lands the head
+                // slot before the block beyond it, which insertion order gets
+                // backwards — and an order-sensitive diff treats that as a
+                // divergence, correctly, because update order is observable.
+                due.sort_by_key(|m| (m.resolve_on, m.pos.y, m.pos.z, m.pos.x));
                 self.moves.retain(|m| m.resolve_on > self.tick);
                 for entry in due {
+                    let previous = self.world.get(entry.pos);
+                    if previous == entry.state {
+                        continue;
+                    }
                     self.world.set(entry.pos, entry.state);
+                    // Record here too. These writes bypass TickCtx, and leaving
+                    // them out of the log made a trace end two ticks early —
+                    // the movement landed but the diff never saw it.
+                    if let Some(log) = self.log.as_mut() {
+                        log.push(BlockChange {
+                            tick: self.tick,
+                            pos: entry.pos,
+                            from: previous,
+                            to: entry.state,
+                        });
+                    }
                     for dir in crate::pos::ALL_DIRS {
                         self.updates.push((entry.pos.offset(dir), dir.opposite()));
                     }
@@ -415,6 +459,7 @@ impl Simulation {
                 moves: &mut self.moves,
                         toggles: &mut self.toggles,
                         comparator_out: &mut self.comparator_out,
+                        log: self.log.as_mut(),
                 };
                 behaviour.on_block_event(&mut ctx, event.pos, event.id, event.param);
                 self.propagate();

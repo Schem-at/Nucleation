@@ -308,18 +308,25 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 if !plan.possible {
                     return false;
                 }
+                // Read every source state *before* writing anything: the writes
+                // below overwrite positions that later entries still need to read.
+                let carried: Vec<(Pos, StateId)> = plan
+                    .to_push
+                    .iter()
+                    .map(|from| (*from, ctx.world.get(*from)))
+                    .collect();
+
                 // Vanilla replaces both ends with `moving_piston` placeholders now
                 // and resolves them two ticks later in the block-entities phase.
-                // Far end first, so each block reads its source before the next
-                // write disturbs it.
-                for from in &plan.to_push {
-                    let state = ctx.world.get(*from);
-                    let to = from.offset(self.facing);
-                    ctx.set(to, self.moving);
-                    ctx.set(*from, self.moving);
-                    ctx.defer(to, state, PISTON_MOVE_TICKS);
-                }
+                // The write order matches a captured trace: the piston's own state
+                // first, then each moved block from nearest to furthest.
                 ctx.set(pos, self.states.get(true));
+                for (from, state) in carried.iter().rev() {
+                    let to = from.offset(self.facing);
+                    ctx.set(*from, self.moving);
+                    ctx.set(to, self.moving);
+                    ctx.defer(to, *state, PISTON_MOVE_TICKS);
+                }
                 // The head slot is itself in motion until the move completes.
                 ctx.set(pos.offset(self.facing), self.moving);
                 ctx.defer(pos.offset(self.facing), self.head, PISTON_MOVE_TICKS);
@@ -449,7 +456,7 @@ mod tests {
         updates: Box::leak(Box::new(Vec::new())),
         moves: Box::leak(Box::new(Vec::new())),
         toggles: Box::leak(Box::new(Vec::new())),
-        comparator_out: Box::leak(Box::new(Default::default())) }
+        comparator_out: Box::leak(Box::new(Default::default())), log: None }
     }
 
     #[test]
@@ -500,6 +507,7 @@ mod tests {
                 updates: &mut Vec::new(), moves: &mut ctx_moves,
                 toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
+                log: None,
             };
             assert!(p.on_block_event(&mut ctx, pos, TRIGGER_EXTEND, 0));
         }
@@ -595,6 +603,7 @@ mod tests {
                 world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
+                log: None,
             };
             assert!(p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0));
         }
@@ -632,6 +641,7 @@ mod tests {
                 world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
+                log: None,
             };
             p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0);
         }
@@ -674,6 +684,7 @@ mod tests {
                 world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
+                log: None,
             };
             p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0);
         }

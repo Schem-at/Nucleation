@@ -25,18 +25,24 @@
 //! and diffed by people far more often than they are generated, and a failing
 //! assertion should be legible without tooling.
 //!
-//! # Where `.snbt` fits
+//! # Structures
 //!
-//! Lithium's gametest structures are Java structure SNBT, and loading them is a
-//! `load foo.snbt` directive away — see [`Directive`]. It is not implemented yet
-//! on purpose: until block behaviour exists there is nothing for a loaded
-//! structure to do, and the right home for the SNBT reader (a crate shared with
-//! nucleation, rather than a second copy of one) is a decision better made when
-//! the Java capture mod needs to agree on it too.
+//! `load <name>.snbt` reads a Java structure from `tests/corpus/structures/` — the
+//! same format the vanilla oracle in `tools/gametest` runs. That is the point: the
+//! engine and the game consume the *identical file*, so a disagreement is about
+//! behaviour rather than about two different inputs.
+//!
+//! A loaded structure sizes the region itself, with [`STRUCTURE_MARGIN`] of
+//! padding, because out-of-bounds neighbours read as air and a contraption flush
+//! against the edge would simulate differently than it does in game.
 
 use mc_tick::{Bounds, Pos, Simulation, StopReason, TickPriority};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
+
+/// Padding around a loaded structure. Out-of-bounds neighbours read as air,
+/// so a contraption flush against the edge would simulate differently.
+const STRUCTURE_MARGIN: i32 = 4;
 
 /// Root of the case corpus, relative to this crate.
 const CORPUS_DIR: &str = "tests/corpus";
@@ -49,6 +55,7 @@ const CORPUS_DIR: &str = "tests/corpus";
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Directive {
     Bounds(Bounds),
+    Load(String),
     Set { pos: Pos, descriptor: String },
     Schedule { pos: Pos, delay: u64, priority: TickPriority },
     Event { pos: Pos, id: u8, param: u8 },
@@ -187,11 +194,9 @@ fn parse_directive(tokens: &[&str]) -> Result<Directive, String> {
         "run_until_quiescent" => Ok(Directive::RunUntilQuiescent(
             tokens.get(1).unwrap_or(&"1000").parse().unwrap_or(1000),
         )),
-        "load" => Err(
-            "`load` (structure SNBT) is not implemented yet — see the module docs \
-             for why it waits for block behaviour"
-                .into(),
-        ),
+        "load" => Ok(Directive::Load(
+            tokens.get(1).ok_or("load needs a structure file")?.to_string(),
+        )),
         "expect" => parse_expectation(&tokens[1..]),
         other => Err(format!("unknown directive {other:?}")),
     }
@@ -260,6 +265,20 @@ fn parse_case(source: &str) -> Result<Vec<Directive>, ParseError> {
 fn run_case(directives: &[Directive]) -> Vec<String> {
     let mut failures = Vec::new();
 
+    // A `load` sizes the region from the structure itself, with padding — the
+    // out-of-bounds-reads-air divergence makes an unpadded load simulate
+    // differently than the game would.
+    let loaded: Option<(mc_tick::Structure, PathBuf)> = directives.iter().find_map(|d| match d {
+        Directive::Load(name) => {
+            let path = corpus_root().join("structures").join(name);
+            std::fs::read_to_string(&path)
+                .ok()
+                .and_then(|text| mc_tick::Structure::parse(&text).ok())
+                .map(|s| (s, path))
+        }
+        _ => None,
+    });
+
     // A default region, so a case that only cares about scheduling need not
     // declare bounds.
     let bounds = directives
@@ -268,6 +287,7 @@ fn run_case(directives: &[Directive]) -> Vec<String> {
             Directive::Bounds(b) => Some(*b),
             _ => None,
         })
+        .or_else(|| loaded.as_ref().map(|(s, _)| s.bounds(STRUCTURE_MARGIN)))
         .unwrap_or_else(|| Bounds::new(Pos::new(0, 0, 0), Pos::new(15, 15, 15)));
 
     let mut sim = Simulation::new(bounds);
@@ -277,6 +297,21 @@ fn run_case(directives: &[Directive]) -> Vec<String> {
     for directive in directives {
         match directive {
             Directive::Bounds(_) => {}
+
+            Directive::Load(name) => {
+                let path = corpus_root().join("structures").join(name);
+                match std::fs::read_to_string(&path) {
+                    Err(e) => failures.push(format!("load {name}: {e}")),
+                    Ok(text) => match mc_tick::Structure::parse(&text) {
+                        Err(e) => failures.push(format!("load {name}: {e}")),
+                        Ok(structure) => {
+                            let (registry, world) = sim.registry_and_world_mut();
+                            structure.place(world, registry, Pos::new(0, 0, 0));
+                            sim.mark_initial();
+                        }
+                    },
+                }
+            }
 
             Directive::Set { pos, descriptor } => {
                 match sim.registry_mut().intern(descriptor) {
@@ -484,10 +519,28 @@ fn expectation_failures_are_all_reported_not_just_the_first() {
 }
 
 #[test]
-fn load_directive_fails_loudly_rather_than_silently_doing_nothing() {
-    // If `load` were quietly ignored, a corpus of structure-based cases would
-    // report green while simulating an empty world — the worst possible failure
-    // mode for this project.
-    let error = parse_case("load door.snbt\n").expect_err("load must not be a no-op");
-    assert!(error.reason.contains("not implemented"), "{}", error.reason);
+fn load_reads_the_same_structures_the_oracle_runs() {
+    // The whole point of the reader: engine and game consume the identical file.
+    let path = corpus_root().join("structures").join("piston_qc.snbt");
+    let text = std::fs::read_to_string(&path).expect("structure must exist");
+    let structure = mc_tick::Structure::parse(&text).expect("must parse");
+
+    assert_eq!(structure.size, (3, 3, 1));
+    assert!(
+        structure.palette.iter().any(|d| d.starts_with("minecraft:piston")),
+        "palette: {:?}",
+        structure.palette
+    );
+}
+
+#[test]
+fn a_missing_structure_fails_loudly_rather_than_simulating_nothing() {
+    // A silently-ignored load would let a structure corpus report green while
+    // running an empty world — the worst failure mode available to this project.
+    let directives = parse_case("load does_not_exist.snbt\nrun 1\n").unwrap();
+    let failures = run_case(&directives);
+    assert!(
+        failures.iter().any(|f| f.contains("does_not_exist")),
+        "must report the missing file: {failures:?}"
+    );
 }

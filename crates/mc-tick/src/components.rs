@@ -579,6 +579,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            log: None,
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
 
@@ -609,6 +610,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            log: None,
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
 
@@ -646,6 +648,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            log: None,
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
 
@@ -678,6 +681,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            log: None,
         };
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
@@ -712,6 +716,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            log: None,
         };
         torch.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::Down);
 
@@ -747,6 +752,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            log: None,
         };
         torch.on_scheduled_tick(&mut ctx, torch_pos);
 
@@ -794,6 +800,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            log: None,
         };
         comparator.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
 
@@ -835,6 +842,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            log: None,
         };
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
 
@@ -871,6 +879,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            log: None,
         };
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
 
@@ -965,6 +974,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut toggles,
             comparator_out: &mut Default::default(),
+            log: None,
         };
         torch.on_scheduled_tick(&mut ctx, pos);
 
@@ -999,6 +1009,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut toggles,
             comparator_out: &mut Default::default(),
+            log: None,
         };
         torch.on_scheduled_tick(&mut ctx, pos);
 
@@ -1035,6 +1046,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut toggles,
             comparator_out: &mut Default::default(),
+            log: None,
         };
         torch.on_scheduled_tick(&mut ctx, pos);
 
@@ -1104,6 +1116,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut stored,
+            log: None,
         };
         comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);
 
@@ -1131,6 +1144,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut stored,
+            log: None,
         };
         comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);
 
@@ -1160,6 +1174,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut stored,
+            log: None,
         };
         comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);
 
@@ -1197,6 +1212,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut stored,
+            log: None,
         };
         comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);
 

@@ -1,0 +1,13 @@
+# Load the same quasi-connectivity structure the oracle ran, and check every block
+# arrived. The region is sized from the structure plus padding automatically.
+#
+# No behaviour is registered in the corpus runner, so nothing simulates here —
+# this case is about the load path being faithful, which is the prerequisite for
+# comparing against a vanilla trace at all.
+
+load piston_qc.snbt
+
+expect block 0 1 0 minecraft:piston[extended=false,facing=east]
+expect block 1 2 0 minecraft:redstone_block
+expect block 1 1 0 minecraft:stone
+expect non_air_count 5

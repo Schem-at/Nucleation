@@ -39,6 +39,7 @@ pub mod redstone;
 pub mod schedule;
 pub mod sim;
 pub mod state;
+pub mod structure;
 pub mod world;
 
 pub use behaviour::{BehaviourTable, BlockBehaviour, Inert, TickCtx};
@@ -53,4 +54,5 @@ pub use redstone::{RedstoneNetwork, MAX_POWER};
 pub use schedule::{BlockEvent, EventQueue, ScheduledTick, TickPriority, TickQueue};
 pub use sim::{Checkpoint, Simulation, StopReason};
 pub use state::{StateError, StateId, StateRegistry};
+pub use structure::{Structure, StructureError};
 pub use world::World;

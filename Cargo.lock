@@ -2896,6 +2896,7 @@ dependencies = [
 name = "mc-tick"
 version = "0.1.0"
 dependencies = [
+ "mc-tick-trace",
  "serde",
  "serde_json",
  "smallvec",

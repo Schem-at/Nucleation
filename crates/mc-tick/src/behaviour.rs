@@ -28,6 +28,19 @@ use crate::state::{StateId, StateRegistry};
 use crate::world::World;
 use std::collections::BTreeSet;
 
+/// One recorded block change, for comparison against a captured vanilla trace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BlockChange {
+    /// The tick it happened on.
+    pub tick: u64,
+    /// Where.
+    pub pos: Pos,
+    /// State before.
+    pub from: StateId,
+    /// State after.
+    pub to: StateId,
+}
+
 /// A block write scheduled to land in a later tick's block-entities phase.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PendingMove {
@@ -63,6 +76,12 @@ pub struct TickCtx<'a> {
     /// two ticks later. Modelling it as a deferred write puts the resolution in the
     /// same phase the game uses, so door timings come out right.
     pub moves: &'a mut Vec<PendingMove>,
+    /// Block changes made this tick, when recording is on.
+    ///
+    /// Populated by [`TickCtx::set`] so a run can be compared against a trace
+    /// captured from the real game. `None` when recording is off, which is the
+    /// default — the tick loop should not pay for observability nobody asked for.
+    pub log: Option<&'a mut Vec<BlockChange>>,
     /// Each comparator's last emitted output strength.
     ///
     /// Vanilla keeps this in a `ComparatorBlockEntity`, because the block *state*
@@ -111,6 +130,9 @@ impl TickCtx<'_> {
             return;
         }
         self.world.set(pos, state);
+        if let Some(log) = self.log.as_deref_mut() {
+            log.push(BlockChange { tick: self.tick, pos, from: previous, to: state });
+        }
         for dir in crate::pos::ALL_DIRS {
             // The neighbour is told which way the change came from, relative to it.
             self.updates.push((pos.offset(dir), dir.opposite()));
@@ -448,6 +470,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            log: None,
         };
         source.on_neighbor_changed(&mut ctx, Pos::new(0, 0, 0), Dir::Up);
         source.on_scheduled_tick(&mut ctx, Pos::new(0, 0, 0));
@@ -471,6 +494,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            log: None,
         };
         ctx.schedule(Pos::new(1, 1, 1), 2, TickPriority::High);
         ctx.queue_event(Pos::new(2, 2, 2), 1, 3);

@@ -13,6 +13,11 @@ REPORT="$WORK/report.xml"
 
 mkdir -p "$WORK"
 
+# Each run creates a full Minecraft save — three dimensions with region files —
+# and a session capturing many traces will fill a disk. The jar and compiled
+# classes are worth caching; the world is not.
+trap 'rm -rf "$WORK/universe"' EXIT
+
 # --- acquire the server jar (cached) -----------------------------------------
 # Mirrors the approach in tools/mc-data/refresh-block-data.rs, which already
 # downloads and runs this jar for block data.
@@ -70,6 +75,7 @@ done < <(find pack -path '*/test_instance/*.json')
 
 # --- run ----------------------------------------------------------------------
 echo "==> running ${#EXPECTED[@]} test(s) in Minecraft $MC_VERSION"
+# Each run makes a full Minecraft save; leaving them around fills disks.
 rm -rf "$WORK/universe"
 java -cp "$WORK/classes:$CP" RunGameTests \
     --universe "$WORK/universe" \

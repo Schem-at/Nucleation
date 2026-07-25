@@ -1,0 +1,73 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:piston_qc",
+  "detail": "normal",
+  "ticks": [
+    {
+      "tick": 0,
+      "events": [
+        {
+          "phase": "tick_end",
+          "kind": "block_changed",
+          "pos": [
+            0,
+            1,
+            0
+          ],
+          "from": "minecraft:piston[extended=false,facing=east]",
+          "to": "minecraft:piston[extended=true,facing=east]"
+        },
+        {
+          "phase": "tick_end",
+          "kind": "block_changed",
+          "pos": [
+            1,
+            1,
+            0
+          ],
+          "from": "minecraft:stone",
+          "to": "minecraft:moving_piston[facing=east,type=normal]"
+        },
+        {
+          "phase": "tick_end",
+          "kind": "block_changed",
+          "pos": [
+            2,
+            1,
+            0
+          ],
+          "from": "minecraft:air",
+          "to": "minecraft:moving_piston[facing=east,type=normal]"
+        }
+      ]
+    },
+    {
+      "tick": 2,
+      "events": [
+        {
+          "phase": "tick_end",
+          "kind": "block_changed",
+          "pos": [
+            1,
+            1,
+            0
+          ],
+          "from": "minecraft:moving_piston[facing=east,type=normal]",
+          "to": "minecraft:piston_head[facing=east,short=false,type=normal]"
+        },
+        {
+          "phase": "tick_end",
+          "kind": "block_changed",
+          "pos": [
+            2,
+            1,
+            0
+          ],
+          "from": "minecraft:moving_piston[facing=east,type=normal]",
+          "to": "minecraft:stone"
+        }
+      ]
+    }
+  ]
+}

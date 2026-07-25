@@ -1,0 +1,17 @@
+{
+  DataVersion: 4903,
+  size: [3, 3, 1],
+  palette: [
+    {Name: "minecraft:stone"},
+    {Name: "minecraft:redstone_block"},
+    {Name: "minecraft:piston", Properties: {facing: "east", extended: "false"}}
+  ],
+  blocks: [
+    {pos: [0, 0, 0], state: 0},
+    {pos: [1, 0, 0], state: 0},
+    {pos: [0, 1, 0], state: 2},
+    {pos: [1, 1, 0], state: 0},
+    {pos: [1, 2, 0], state: 1}
+  ],
+  entities: []
+}
