@@ -1,0 +1,16 @@
+[package]
+name = "mc-tick-trace"
+version = "0.1.0"
+edition = "2021"
+description = "The trace format shared by the Rust tick engine and the Java vanilla-capture mod"
+license = "MIT"
+
+# serde is a real dependency here, unlike in mc-tick where it stays dev-only.
+# This crate exists to be serialised; the engine does not depend on it, so the
+# fast edit->test loop is unaffected.
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints.rust]
+missing_docs = "warn"
