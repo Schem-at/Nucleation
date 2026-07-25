@@ -18,7 +18,28 @@ is not a failing test; it is a plausible number that is silently off by a tick.
 
 ---
 
-## 1. Wire the trace differ into the corpus — *do this first*
+## Done since this was written
+
+Items 1-4 are complete: the differ is wired (`tests/conformance.rs`), observers are
+implemented, both inlined constants are captured, and `.snbt` loading plus a
+`vanilla` descriptor-to-behaviour registry mean an arbitrary structure can be run
+without hand-registering anything.
+
+Four real defects fell out of the diff, none of which unit tests would have caught:
+a vacated source becomes **air** rather than a placeholder; a position that is both
+source and destination must not be cleared; a piston is **not part of its own
+structure** (slime beside it dragged it along); and deferred writes were bypassing
+the change log, so a movement landed while the trace ended two ticks early.
+
+It also corrected a *method* error. Goldens captured by diffing snapshots between
+ticks cannot know intra-tick order — what they record is the capture's scan order.
+Comparing that strictly compares two arbitrary iteration orders, so both sides are
+now canonicalised. An instrumented capture would know the real order and must not
+be canonicalised; `Trace::canonicalize` says so.
+
+---
+
+## 1. ~~Wire the trace differ into the corpus~~ — done
 
 **Why first:** captures are currently compared **by eye**. `mc-tick-trace` already
 has `diff`, tolerance handling and divergence reporting, and `tools/gametest` can
@@ -33,7 +54,7 @@ item on this list gets cheaper.
 
 **Done when** breaking a delay constant fails a corpus case naming the exact tick.
 
-## 2. Observers — the gap that matters most for doors
+## 2. ~~Observers~~ — done
 
 **Not implemented, and most piston doors need one.** An observer watches the block
 it faces and emits a short pulse on change. That pulse interacts directly with the
@@ -43,7 +64,7 @@ product rather than a nice-to-have.
 Capture first: pulse length in game ticks, tick priority, and whether it fires on
 its own placement.
 
-## 3. Retire the two assumed constants
+## 3. ~~Retire the two assumed constants~~ — done
 
 `MAX_PUSH_DEPTH` (12) and `MAX_RECENT_TOGGLES` (8) are javac-inlined, so they were
 taken from convention and asserted in tests rather than read. Both are now cheap to
@@ -52,7 +73,7 @@ settle empirically:
 - push depth: a 12-block column versus 13, one moves and one does not
 - burnout: toggle a torch clock and count the toggles before it stalls
 
-## 4. Close the Rust side of the load/execute/verify loop
+## 4. ~~Close the Rust side of the load/execute/verify loop~~ — done
 
 The oracle loads `.snbt` and runs it; the engine cannot. Until it can, the two
 sides are compared through hand-written corpus cases rather than the *same input*.
@@ -64,6 +85,14 @@ sides are compared through hand-written corpus cases rather than the *same input
   purpose.
 - This is also the natural **UniversalSchematic** touchpoint: conversion at the
   boundary, with the engine keeping its interned `u16` states.
+
+## 4b. Run a real schematic
+
+`tests/samples/trencher.litematic` is a genuine machine — 664 sticky pistons, 574
+observers, 1620 slime blocks. It is the natural next conformance subject, and the
+first thing likely to name blocks the `vanilla` registry does not yet cover. The
+missing link is a litematic-to-SNBT step, which nucleation can already do
+(`to_structure_snbt`); `examples/dump_schematic.rs` is the starting point.
 
 ## 5. Remaining redstone components
 

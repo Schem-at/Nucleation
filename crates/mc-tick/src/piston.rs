@@ -140,6 +140,12 @@ pub fn resolve_push(
     while let Some(start) = frontier.pop() {
         let mut cursor = start;
         loop {
+            if cursor == piston {
+                // A piston is not part of its own structure. Slime adjacent to the
+                // piston would otherwise drag it along, and it would push itself
+                // out of existence.
+                break;
+            }
             if movability.is_empty(world, cursor) {
                 break; // this line has somewhere to go
             }
@@ -159,7 +165,10 @@ pub fn resolve_push(
             if let Some(kind) = movability.sticky(world, cursor) {
                 for side in crate::pos::ALL_DIRS {
                     let neighbour = cursor.offset(side);
-                    if movability.is_empty(world, neighbour) || chosen.contains(&neighbour) {
+                    if neighbour == piston
+                        || movability.is_empty(world, neighbour)
+                        || chosen.contains(&neighbour)
+                    {
                         continue;
                     }
                     if adheres(Some(kind), movability.sticky(world, neighbour)) {
@@ -320,16 +329,33 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // and resolves them two ticks later in the block-entities phase.
                 // The write order matches a captured trace: the piston's own state
                 // first, then each moved block from nearest to furthest.
+                let head_slot = pos.offset(self.facing);
+                // A position can be both a source and a destination: in a column,
+                // every block but the last moves into a slot another block just
+                // vacated. Clearing those would wipe what had only just arrived, so
+                // only positions that purely lose a block become air.
+                let destinations: Vec<Pos> = carried
+                    .iter()
+                    .map(|(from, _)| from.offset(self.facing))
+                    .collect();
+
                 ctx.set(pos, self.states.get(true));
                 for (from, state) in carried.iter().rev() {
                     let to = from.offset(self.facing);
-                    ctx.set(*from, self.moving);
+                    // A vacated source becomes **air**, not a placeholder — captured
+                    // from vanilla, where a slime block's dragged neighbours left
+                    // `stone -> air` behind them. Only the slot directly in front of
+                    // the piston holds a placeholder, because that one resolves into
+                    // the head rather than emptying.
+                    if *from != head_slot && !destinations.contains(from) {
+                        ctx.set(*from, StateId::AIR);
+                    }
                     ctx.set(to, self.moving);
                     ctx.defer(to, *state, PISTON_MOVE_TICKS);
                 }
                 // The head slot is itself in motion until the move completes.
-                ctx.set(pos.offset(self.facing), self.moving);
-                ctx.defer(pos.offset(self.facing), self.head, PISTON_MOVE_TICKS);
+                ctx.set(head_slot, self.moving);
+                ctx.defer(head_slot, self.head, PISTON_MOVE_TICKS);
                 true
             }
             TRIGGER_CONTRACT => {

@@ -343,6 +343,31 @@ impl Simulation {
         self.propagate();
     }
 
+    /// Give every non-air block a chance to react, as placing a build does.
+    ///
+    /// Vanilla blocks receive `onPlace` when they are put down, and several use it
+    /// to evaluate their surroundings immediately — `PistonBaseBlock.onPlace` calls
+    /// `checkIfExtend`, which is why a piston with a quasi-connectivity source
+    /// diagonally above it extends the moment a structure is placed, without any
+    /// neighbour of the piston having changed.
+    ///
+    /// Call this after loading a structure and before running. Without it a build
+    /// sits inert until something happens to touch it, which is not what the game
+    /// does and made an early conformance run produce no events at all.
+    pub fn settle(&mut self) {
+        let occupied: Vec<Pos> = self
+            .world
+            .iter_non_air()
+            .map(|(pos, _)| pos)
+            .collect();
+        for pos in occupied {
+            // Each block is told to re-examine itself. The direction is nominal —
+            // nothing here claims a specific neighbour changed.
+            self.updates.push((pos, crate::pos::Dir::Up));
+        }
+        self.propagate();
+    }
+
     /// Run one phase. `Some(stop)` aborts the tick.
     fn run_phase(&mut self, phase: Phase) -> Option<StopReason> {
         match phase {

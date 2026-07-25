@@ -40,6 +40,7 @@ pub mod schedule;
 pub mod sim;
 pub mod state;
 pub mod structure;
+pub mod vanilla;
 pub mod world;
 
 pub use behaviour::{BehaviourTable, BlockBehaviour, Inert, TickCtx};
@@ -55,4 +56,5 @@ pub use schedule::{BlockEvent, EventQueue, ScheduledTick, TickPriority, TickQueu
 pub use sim::{Checkpoint, Simulation, StopReason};
 pub use state::{StateError, StateId, StateRegistry};
 pub use structure::{Structure, StructureError};
+pub use vanilla::{intern_companions, register_all, Descriptor, VanillaRules};
 pub use world::World;

@@ -25,52 +25,11 @@
 //! does not exist yet — see `ROADMAP.md`. Until it does, conformance tests
 //! register the handful of blocks their structure uses, explicitly, here.
 
-use mc_tick::behaviour::Inert;
-use mc_tick::components::{PowerSource, StatePair};
-use mc_tick::piston::{Movability, Piston, Sticky};
-use mc_tick::{Dir, Pos, Simulation, StateId, Structure, World};
+use mc_tick::{Pos, Simulation, Structure};
 use mc_tick_trace::{Detail, EventKind, Trace, TracePos};
 
 /// Padding round a loaded structure; matches the corpus runner.
 const MARGIN: i32 = 4;
-
-/// Minecraft's real block semantics for the small set a structure uses.
-#[derive(Clone)]
-struct Vanilla {
-    powered: Vec<StateId>,
-    immovable: Vec<StateId>,
-    slime: Vec<StateId>,
-    honey: Vec<StateId>,
-}
-
-impl PowerSource for Vanilla {
-    fn is_powered(&self, world: &World, pos: Pos, _toward: Dir) -> bool {
-        self.powered.contains(&world.get(pos))
-    }
-    fn is_diode(&self, _world: &World, _pos: Pos) -> bool {
-        false
-    }
-    fn diode_facing(&self, _world: &World, _pos: Pos) -> Option<Dir> {
-        None
-    }
-}
-
-impl Movability for Vanilla {
-    fn is_movable(&self, world: &World, pos: Pos) -> bool {
-        let s = world.get(pos);
-        s != StateId::AIR && !self.immovable.contains(&s)
-    }
-    fn sticky(&self, world: &World, pos: Pos) -> Option<Sticky> {
-        let s = world.get(pos);
-        if self.slime.contains(&s) {
-            Some(Sticky::Slime)
-        } else if self.honey.contains(&s) {
-            Some(Sticky::Honey)
-        } else {
-            None
-        }
-    }
-}
 
 fn structure(name: &str) -> Structure {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -118,6 +77,59 @@ fn engine_trace(sim: &Simulation, name: &str, ticks: u64) -> Trace {
     trace
 }
 
+/// Load a structure, wire vanilla behaviour to it, settle, and run.
+///
+/// No hand-registration: `mc_tick::vanilla` turns descriptors into behaviour, which
+/// is what makes running an arbitrary schematic possible at all.
+fn run_conformance(structure_file: &str, golden_file: &str, label: &str) {
+    let structure = structure(structure_file);
+    // The goldens are snapshot-derived, so intra-tick order is the capture's scan
+    // order rather than the game's causal order. Canonicalising both sides compares
+    // *what* changed each tick, which is what such a capture actually knows.
+    // An instrumented capture would know the real order and must not be canonicalised.
+    let expected = golden(golden_file).canonicalized();
+
+    let mut sim = Simulation::new(structure.bounds(MARGIN));
+    {
+        let (registry, world) = sim.registry_and_world_mut();
+        structure.place(world, registry, Pos::new(0, 0, 0));
+    }
+
+    // A build only contains the states it was saved with; a block needs its
+    // counterparts to be able to change at all.
+    mc_tick::intern_companions(sim.registry_mut());
+    {
+        let mut table = std::mem::take(sim.behaviours_mut());
+        mc_tick::register_all(sim.registry_mut(), &mut table);
+        *sim.behaviours_mut() = table;
+    }
+
+    assert_eq!(
+        sim.unknown_report(),
+        None,
+        "{label}: every block must have behaviour, or this compares vanilla against \
+         a partially-simulated world"
+    );
+
+    sim.record();
+    // Placing a build gives every block a chance to react, exactly as vanilla's
+    // onPlace does — which is why a piston notices a quasi-connectivity source that
+    // touches it nowhere.
+    sim.settle();
+
+    let horizon = expected.ticks.last().map(|t| t.tick + 1).unwrap_or(0);
+    sim.run(horizon);
+
+    let actual = engine_trace(&sim, label, horizon).canonicalized();
+    if let Some(divergence) = expected.diff(&actual) {
+        panic!(
+            "{label} diverges from vanilla at {divergence}\n\nexpected (vanilla):\n{}\n\nactual (engine):\n{}",
+            expected.to_json().unwrap(),
+            actual.to_json().unwrap()
+        );
+    }
+}
+
 #[test]
 fn the_golden_traces_are_well_formed_and_from_the_right_version() {
     // A golden captured from another Minecraft version looks authoritative while
@@ -130,83 +142,10 @@ fn the_golden_traces_are_well_formed_and_from_the_right_version() {
 
 #[test]
 fn piston_qc_matches_vanilla_tick_for_tick() {
-    let name = "piston_qc.snbt";
-    let structure = structure(name);
-    let expected = golden("piston_qc.json");
+    run_conformance("piston_qc.snbt", "piston_qc.json", "nucleation:piston_qc");
+}
 
-    let mut sim = Simulation::new(structure.bounds(MARGIN));
-    {
-        let (registry, world) = sim.registry_and_world_mut();
-        structure.place(world, registry, Pos::new(0, 0, 0));
-    }
-
-    // Intern the states this structure needs, then register their behaviour.
-    let id = |sim: &mut Simulation, d: &str| sim.registry_mut().intern(d).unwrap();
-    let stone = id(&mut sim, "minecraft:stone");
-    let redstone_block = id(&mut sim, "minecraft:redstone_block");
-    let piston_off = id(&mut sim, "minecraft:piston[extended=false,facing=east]");
-    let piston_on = id(&mut sim, "minecraft:piston[extended=true,facing=east]");
-    let head = id(&mut sim, "minecraft:piston_head[facing=east,short=false,type=normal]");
-    let moving = id(&mut sim, "minecraft:moving_piston[facing=east,type=normal]");
-
-    let model = Vanilla {
-        powered: vec![redstone_block],
-        immovable: vec![moving, head],
-        slime: vec![],
-        honey: vec![],
-    };
-
-    for (state, name) in [
-        (stone, "stone"),
-        (redstone_block, "redstone_block"),
-        (head, "piston_head"),
-        (moving, "moving_piston"),
-    ] {
-        sim.behaviours_mut().register(state, Box::new(Inert::new(name)));
-    }
-    for (state, extended) in [(piston_off, false), (piston_on, true)] {
-        sim.behaviours_mut().register(
-            state,
-            Box::new(Piston {
-                facing: Dir::East,
-                extended,
-                sticky: false,
-                states: StatePair { off: piston_off, on: piston_on },
-                head,
-                moving,
-                power: model.clone(),
-                movability: model.clone(),
-            }),
-        );
-    }
-
-    assert_eq!(
-        sim.unknown_report(),
-        None,
-        "every block in the structure must have behaviour, or the comparison is \
-         between vanilla and a partially-simulated world"
-    );
-
-    // The capture's clock starts after placement has settled, so ours must too.
-    sim.record();
-    // Vanilla's redstone updates reach neighbours *and neighbours of neighbours*,
-    // which is precisely what lets a quasi-connectivity source — diagonal to the
-    // piston, touching it nowhere — ever be noticed. `TickCtx::set` only does the
-    // first order, so the second is supplied here explicitly. See ROADMAP.md.
-    sim.notify_neighbors(Pos::new(1, 2, 0)); // the redstone block
-    sim.notify_neighbors(Pos::new(0, 2, 0)); // the space above the piston
-
-    let horizon = expected.ticks.last().map(|t| t.tick + 1).unwrap_or(0);
-    sim.run(horizon);
-
-    let actual = engine_trace(&sim, "nucleation:piston_qc", horizon);
-
-    if let Some(divergence) = expected.diff(&actual) {
-        panic!(
-            "engine diverges from vanilla at {divergence}\n\n\
-             expected (vanilla):\n{}\n\nactual (engine):\n{}",
-            expected.to_json().unwrap(),
-            actual.to_json().unwrap()
-        );
-    }
+#[test]
+fn slime_adhesion_matches_vanilla_tick_for_tick() {
+    run_conformance("slime_drag.snbt", "slime_drag.json", "nucleation:slime_drag");
 }

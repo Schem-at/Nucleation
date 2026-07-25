@@ -240,6 +240,46 @@ impl Trace {
         serde_json::from_str(json)
     }
 
+    /// Sort each tick's events into a canonical order.
+    ///
+    /// # When this is the right thing, and when it is a lie
+    ///
+    /// A trace captured by **diffing snapshots between ticks** cannot observe the
+    /// order events happened in — what it records is the scan order of whatever
+    /// walked the region. Comparing that against an engine's emission order
+    /// compares two arbitrary iteration orders and calls the difference a bug.
+    /// Canonicalising both sides first is the honest comparison: it asserts *what*
+    /// changed on each tick, which is exactly what such a capture knows.
+    ///
+    /// A trace captured by **instrumenting the tick loop** does know the real
+    /// order, and canonicalising it would throw away the most valuable thing it
+    /// has. Do not call this on one.
+    ///
+    /// Ordering is by position in the world's canonical order (y, then z, then x),
+    /// then by the event's own debug rendering to break remaining ties.
+    pub fn canonicalize(&mut self) {
+        for record in &mut self.ticks {
+            record.events.sort_by_key(|event| {
+                let pos = match &event.kind {
+                    EventKind::BlockChanged { pos, .. }
+                    | EventKind::ScheduledTickAdded { pos, .. }
+                    | EventKind::ScheduledTickFired { pos, .. }
+                    | EventKind::BlockEvent { pos, .. }
+                    | EventKind::NeighborUpdate { pos, .. } => *pos,
+                    EventKind::EntityMoved { .. } => TracePos::new(0, 0, 0),
+                };
+                (pos.1, pos.2, pos.0, format!("{:?}", event.kind))
+            });
+        }
+    }
+
+    /// A copy with each tick's events canonically ordered. See [`Trace::canonicalize`].
+    pub fn canonicalized(&self) -> Trace {
+        let mut copy = self.clone();
+        copy.canonicalize();
+        copy
+    }
+
     /// Compare against `other` exactly, returning the first divergence.
     ///
     /// `self` is the expected (golden) side and `other` the actual.
