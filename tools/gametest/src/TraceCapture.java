@@ -189,6 +189,7 @@ public final class TraceCapture {
         // provoked, and they cannot be produced by --break alone.
         String pulseAt = arg(args, "--pulse", null);
         int pulseTicks = Integer.parseInt(arg(args, "--pulse-ticks", "1"));
+        int pulsePeriod = Integer.parseInt(arg(args, "--pulse-period", "0"));
         BlockPos pulsePos = null;
         if (pulseAt != null) {
             String[] pp = pulseAt.split(",");
@@ -223,8 +224,17 @@ public final class TraceCapture {
         }
 
         for (int tick = 0; tick < maxTicks; tick++) {
-            if (pulseTarget != null && tick == pulseTicks) {
-                level.setBlock(pulseTarget, Blocks.AIR.defaultBlockState(), 3);
+            if (pulseTarget != null) {
+                if (pulsePeriod > 0) {
+                    // Square wave: drives a component hard enough to provoke
+                    // rate limits such as redstone-torch burnout.
+                    boolean on = ((tick / pulsePeriod) % 2) == 0;
+                    level.setBlock(pulseTarget, on
+                            ? Blocks.REDSTONE_BLOCK.defaultBlockState()
+                            : Blocks.AIR.defaultBlockState(), 3);
+                } else if (tick == pulseTicks) {
+                    level.setBlock(pulseTarget, Blocks.AIR.defaultBlockState(), 3);
+                }
             }
             tickServer.invoke(server, (BooleanSupplier) () -> true);
             waitUntilNextTick.invoke(server);

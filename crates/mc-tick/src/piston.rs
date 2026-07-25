@@ -39,10 +39,8 @@ pub const TRIGGER_DROP: u8 = 2;
 
 /// How many blocks a piston can push.
 ///
-/// `PistonStructureResolver.MAX_PUSH_DEPTH`. The constant is inlined by javac so it
-/// could not be read directly from the bytecode; 12 is the long-established value
-/// and is asserted by a test so that if it is ever wrong, it fails loudly rather
-/// than quietly truncating a build.
+/// `PistonStructureResolver.MAX_PUSH_DEPTH`. Inlined by javac, so it was captured
+/// rather than read: a twelve-block column moved, a thirteen-block column did not.
 pub const MAX_PUSH_DEPTH: usize = 12;
 
 /// Game ticks a piston's blocks spend in motion before landing.

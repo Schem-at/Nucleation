@@ -56,11 +56,22 @@ pub const TORCH_DELAY: u64 = 2;
 /// class's bytecode.
 pub const TORCH_BURNOUT_WINDOW: u64 = 60;
 
-/// Toggles within [`TORCH_BURNOUT_WINDOW`] before a torch burns out.
+/// Turn-offs within [`TORCH_BURNOUT_WINDOW`] before a torch burns out.
 ///
-/// `RedstoneTorchBlock.MAX_RECENT_TOGGLES`. javac inlines it, so unlike the window
-/// this is the long-established value rather than one read from the class — and it
-/// is the reason a fast clock built on torches stalls.
+/// `RedstoneTorchBlock.MAX_RECENT_TOGGLES`. javac inlines it, so it was captured
+/// rather than read — and the capture corrected a mistake. Driving a torch with a
+/// 4-tick square wave produced:
+///
+/// ```text
+/// turn-OFF at ticks  3, 11, 19, 27, 35, 43, 51, 59   (8)
+/// turn-ON  at ticks  7, 15, 23, 31, 39, 47, 55       (7)
+/// then nothing, while the driving repeater kept toggling to tick 157
+/// ```
+///
+/// Fifteen state changes but **eight burnouts**: only the transitions to *unlit*
+/// count. An implementation counting every toggle stalls a torch at eight state
+/// changes instead of fifteen — very nearly half the real budget, which would make
+/// any torch-driven clock diverge from the game well before it should.
 pub const MAX_RECENT_TOGGLES: usize = 8;
 
 /// Game ticks a comparator takes to act. Fixed, unlike a repeater's.
@@ -359,7 +370,12 @@ impl<P: PowerSource> BlockBehaviour for Torch<P> {
         if ctx.recent_toggles(pos, TORCH_BURNOUT_WINDOW) >= MAX_RECENT_TOGGLES {
             return;
         }
-        ctx.record_toggle(pos);
+        // Only turning *off* counts toward burnout — confirmed by capture. The
+        // torch is lit exactly when its support is unpowered, so `powered` here
+        // means it is about to go dark.
+        if powered {
+            ctx.record_toggle(pos);
+        }
         ctx.set(pos, self.states.get(!powered));
     }
 
