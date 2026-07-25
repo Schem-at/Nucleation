@@ -74,3 +74,6 @@ bindings/kotlin/.kotlin/
 
 # WOL project design docs (local, not for the public repo)
 /wol-project/
+
+# Vanilla oracle scratch: server jar, extracted libraries, test worlds.
+/tools/gametest/work/
