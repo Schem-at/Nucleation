@@ -63,6 +63,13 @@ pub struct TickCtx<'a> {
     /// two ticks later. Modelling it as a deferred write puts the resolution in the
     /// same phase the game uses, so door timings come out right.
     pub moves: &'a mut Vec<PendingMove>,
+    /// Each comparator's last emitted output strength.
+    ///
+    /// Vanilla keeps this in a `ComparatorBlockEntity`, because the block *state*
+    /// only carries `powered` and `mode` — it cannot express "I am on at strength
+    /// 9". Comparator priming is exactly the consequence: a comparator schedules a
+    /// tick when its output *strength* changes even though `powered` does not.
+    pub comparator_out: &'a mut std::collections::HashMap<Pos, u8>,
     /// Recent redstone-torch toggles, for burnout detection.
     ///
     /// Burnout is the one behaviour that depends on *history* rather than on the
@@ -113,6 +120,16 @@ impl TickCtx<'_> {
     /// Set a block without notifying anything, for loading a structure.
     pub fn set_silent(&mut self, pos: Pos, state: StateId) {
         self.world.set(pos, state);
+    }
+
+    /// The output strength a comparator at `pos` last emitted.
+    pub fn stored_comparator_output(&self, pos: Pos) -> u8 {
+        self.comparator_out.get(&pos).copied().unwrap_or(0)
+    }
+
+    /// Remember the output strength a comparator at `pos` is now emitting.
+    pub fn store_comparator_output(&mut self, pos: Pos, strength: u8) {
+        self.comparator_out.insert(pos, strength);
     }
 
     /// Record that a torch at `pos` toggled on this tick.
@@ -430,6 +447,7 @@ mod tests {
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
+            comparator_out: &mut Default::default(),
         };
         source.on_neighbor_changed(&mut ctx, Pos::new(0, 0, 0), Dir::Up);
         source.on_scheduled_tick(&mut ctx, Pos::new(0, 0, 0));
@@ -452,6 +470,7 @@ mod tests {
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
+            comparator_out: &mut Default::default(),
         };
         ctx.schedule(Pos::new(1, 1, 1), 2, TickPriority::High);
         ctx.queue_event(Pos::new(2, 2, 2), 1, 3);

@@ -90,9 +90,24 @@ reading produces something subtly wrong.
   `60L` in the class; `MAX_RECENT_TOGGLES` (8) is inlined by javac, so it is the
   conventional value rather than one read from the bytecode.
 
-Still outstanding: **comparator priming**. It needs a trace of a comparator
-scheduled at NORMAL alongside diodes at HIGH, and that ordering encoded — the one
-behaviour on this page still deliberately unimplemented.
+- **Comparator priming** — implemented, and the mechanism turned out to be
+  concrete rather than folklore. `ComparatorBlock.checkTickOnNeighbor` schedules
+  when `output != storedOutput || powered != shouldTurnOn`, where the stored value
+  lives in a `ComparatorBlockEntity`. The block *state* only carries `powered` and
+  `mode`, so it cannot express "on at strength 9" — hence the block entity, and
+  hence priming: a comparator can hold a pending tick caused purely by a strength
+  change. Its priority is `HIGH` when diode-fed and `NORMAL` otherwise, never the
+  `VERY_HIGH`/`EXTREMELY_HIGH` a repeater uses, so a primed comparator always
+  resolves after every repeater in the same tick.
+- **Slime and honey** — trace-verified. Adhesion drags on every face, dragged
+  blocks start push lines of their own, and slime does not stick to honey.
+- **Immovable blocks** — one immovable block anywhere in a resolved structure
+  cancels the entire push, including when reached through adhesion. Blocks already
+  in motion (`moving_piston`) are immovable.
+
+Nothing on this page is now unimplemented. The remaining known gap is the
+*side-input* arithmetic for comparators, where only the pass-through case was
+observed; the compare/subtract rules are implemented from documentation.
 
 ## What to do next, in order
 

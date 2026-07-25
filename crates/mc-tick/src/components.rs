@@ -423,19 +423,43 @@ impl<P: PowerSource> Comparator<P> {
 }
 
 impl<P: PowerSource> BlockBehaviour for Comparator<P> {
+    /// `ComparatorBlock.checkTickOnNeighbor` — and the source of comparator priming.
+    ///
+    /// A comparator differs from a repeater in two ways, both read from the class:
+    ///
+    /// 1. It schedules when its **output strength** changes, not only when its
+    ///    powered flag would. The comparison is against a value held in a
+    ///    `ComparatorBlockEntity`, because the block state cannot express "on at
+    ///    strength 9". A comparator can therefore sit with a pending tick caused
+    ///    purely by a strength change — *primed* — and resolve later alongside
+    ///    components that never saw a change at all.
+    /// 2. Its priority is `HIGH` when fed by a diode and `NORMAL` otherwise. It
+    ///    never uses the `VERY_HIGH`/`EXTREMELY_HIGH` that a repeater reaches for,
+    ///    so a primed comparator resolves *after* every repeater in the same tick.
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
-        schedule_diode(
-            ctx,
-            &self.power,
-            pos,
-            self.facing,
-            self.powered,
-            COMPARATOR_DELAY,
-        );
+        if ctx.ticks.has_pending_at(pos, ctx.tick) {
+            return;
+        }
+        let output = self.output_strength(ctx.world, pos);
+        let stored = ctx.stored_comparator_output(pos);
+        let should_be_on = output > 0;
+
+        if output == stored && should_be_on == self.powered {
+            return;
+        }
+
+        let priority = if should_prioritize(ctx.world, &self.power, pos, self.facing) {
+            TickPriority::High
+        } else {
+            TickPriority::Normal
+        };
+        ctx.schedule(pos, COMPARATOR_DELAY, priority);
     }
 
     fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
-        let should_be_on = self.output_strength(ctx.world, pos) > 0;
+        let output = self.output_strength(ctx.world, pos);
+        ctx.store_comparator_output(pos, output);
+        let should_be_on = output > 0;
         if should_be_on != self.powered {
             ctx.set(pos, self.states.get(should_be_on));
         }
@@ -533,6 +557,7 @@ mod tests {
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
+            comparator_out: &mut Default::default(),
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
 
@@ -562,6 +587,7 @@ mod tests {
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
+            comparator_out: &mut Default::default(),
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
 
@@ -598,6 +624,7 @@ mod tests {
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
+            comparator_out: &mut Default::default(),
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
 
@@ -629,6 +656,7 @@ mod tests {
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
+            comparator_out: &mut Default::default(),
         };
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
@@ -662,6 +690,7 @@ mod tests {
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
+            comparator_out: &mut Default::default(),
         };
         torch.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::Down);
 
@@ -696,6 +725,7 @@ mod tests {
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
+            comparator_out: &mut Default::default(),
         };
         torch.on_scheduled_tick(&mut ctx, torch_pos);
 
@@ -742,6 +772,7 @@ mod tests {
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
+            comparator_out: &mut Default::default(),
         };
         comparator.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
 
@@ -782,6 +813,7 @@ mod tests {
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
+            comparator_out: &mut Default::default(),
         };
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
 
@@ -817,6 +849,7 @@ mod tests {
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
+            comparator_out: &mut Default::default(),
         };
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
 
@@ -906,6 +939,7 @@ mod tests {
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut toggles,
+            comparator_out: &mut Default::default(),
         };
         torch.on_scheduled_tick(&mut ctx, pos);
 
@@ -939,6 +973,7 @@ mod tests {
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut toggles,
+            comparator_out: &mut Default::default(),
         };
         torch.on_scheduled_tick(&mut ctx, pos);
 
@@ -974,10 +1009,174 @@ mod tests {
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut toggles,
+            comparator_out: &mut Default::default(),
         };
         torch.on_scheduled_tick(&mut ctx, pos);
 
         assert_eq!(world.get(pos), unlit, "expired toggles must not burn it out");
+    }
+
+    /// A power model with per-position strengths, needed to exercise priming.
+    #[derive(Clone)]
+    struct Levels {
+        levels: Vec<(Pos, u8)>,
+        diodes: Vec<(StateId, Dir)>,
+    }
+
+    impl PowerSource for Levels {
+        fn is_powered(&self, world: &World, pos: Pos, toward: Dir) -> bool {
+            self.signal_strength(world, pos, toward) > 0
+        }
+        fn is_diode(&self, world: &World, pos: Pos) -> bool {
+            let s = world.get(pos);
+            self.diodes.iter().any(|(d, _)| *d == s)
+        }
+        fn diode_facing(&self, world: &World, pos: Pos) -> Option<Dir> {
+            let s = world.get(pos);
+            self.diodes.iter().find(|(d, _)| *d == s).map(|(_, f)| *f)
+        }
+        fn signal_strength(&self, _world: &World, pos: Pos, _toward: Dir) -> u8 {
+            self.levels
+                .iter()
+                .find(|(p, _)| *p == pos)
+                .map(|(_, l)| *l)
+                .unwrap_or(0)
+        }
+    }
+
+    fn primed_comparator(levels: Levels, powered: bool) -> Comparator<Levels> {
+        Comparator {
+            facing: Dir::East,
+            powered,
+            mode: ComparatorMode::Subtract,
+            states: StatePair { off: StateId(1), on: StateId(2) },
+            power: levels,
+        }
+    }
+
+    #[test]
+    fn a_comparator_schedules_on_a_strength_change_alone() {
+        // Priming. The comparator stays on either way — only the *strength* moves,
+        // from a stored 15 to a computed 9. A repeater in the same situation would
+        // do nothing, because its powered flag is unchanged.
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let pos = Pos::new(0, 1, 0);
+        let comparator = primed_comparator(
+            Levels { levels: vec![(pos.offset(Dir::East), 9)], diodes: vec![] },
+            true,
+        );
+
+        let mut stored = std::collections::HashMap::new();
+        stored.insert(pos, 15u8);
+
+        let mut ctx = TickCtx {
+            world: &mut world,
+            ticks: &mut ticks,
+            events: &mut events,
+            states: &states,
+            tick: 0,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
+            comparator_out: &mut stored,
+        };
+        comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);
+
+        assert_eq!(ticks.len(), 1, "a strength-only change must still schedule");
+    }
+
+    #[test]
+    fn a_comparator_whose_output_is_unchanged_schedules_nothing() {
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let pos = Pos::new(0, 1, 0);
+        let comparator = primed_comparator(
+            Levels { levels: vec![(pos.offset(Dir::East), 15)], diodes: vec![] },
+            true,
+        );
+        let mut stored = std::collections::HashMap::new();
+        stored.insert(pos, 15u8);
+
+        let mut ctx = TickCtx {
+            world: &mut world,
+            ticks: &mut ticks,
+            events: &mut events,
+            states: &states,
+            tick: 0,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
+            comparator_out: &mut stored,
+        };
+        comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);
+
+        assert!(ticks.is_empty(), "nothing changed, nothing scheduled");
+    }
+
+    #[test]
+    fn a_primed_comparator_resolves_after_every_repeater() {
+        // A comparator only ever schedules at HIGH or NORMAL, never the VERY_HIGH or
+        // EXTREMELY_HIGH a repeater reaches for. So when both fire in one tick the
+        // repeater always goes first — which is what makes priming observable.
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let pos = Pos::new(0, 1, 0);
+        let comparator = primed_comparator(
+            Levels { levels: vec![(pos.offset(Dir::East), 9)], diodes: vec![] },
+            false,
+        );
+        let mut stored = std::collections::HashMap::new();
+
+        let mut ctx = TickCtx {
+            world: &mut world,
+            ticks: &mut ticks,
+            events: &mut events,
+            states: &states,
+            tick: 0,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
+            comparator_out: &mut stored,
+        };
+        comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);
+
+        let due = ticks.drain_due(COMPARATOR_DELAY);
+        assert_eq!(due[0].priority, TickPriority::Normal, "not fed by a diode");
+        assert!(
+            TickPriority::VeryHigh < TickPriority::Normal,
+            "a repeater turning off outranks it"
+        );
+    }
+
+    #[test]
+    fn a_comparator_fed_by_a_diode_schedules_at_high() {
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let pos = Pos::new(0, 1, 0);
+        let upstream = StateId(5);
+        world.set(pos.offset(Dir::East), upstream);
+
+        let comparator = primed_comparator(
+            Levels {
+                levels: vec![(pos.offset(Dir::East), 9)],
+                diodes: vec![(upstream, Dir::East)],
+            },
+            false,
+        );
+        let mut stored = std::collections::HashMap::new();
+
+        let mut ctx = TickCtx {
+            world: &mut world,
+            ticks: &mut ticks,
+            events: &mut events,
+            states: &states,
+            tick: 0,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
+            comparator_out: &mut stored,
+        };
+        comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);
+
+        let due = ticks.drain_due(COMPARATOR_DELAY);
+        assert_eq!(due[0].priority, TickPriority::High, "diode-fed comparators prioritise");
     }
 
     #[test]

@@ -76,6 +76,8 @@ pub struct Simulation {
     moves: Vec<PendingMove>,
     /// Torch toggle history for burnout, pruned as it ages out.
     toggles: Vec<(Pos, u64)>,
+    /// Stored comparator output strengths; vanilla's ComparatorBlockEntity.
+    comparator_out: std::collections::HashMap<Pos, u8>,
     tick: u64,
     /// The state to return to on [`Simulation::reset`].
     ///
@@ -104,6 +106,7 @@ impl Simulation {
             updates: Vec::new(),
             moves: Vec::new(),
             toggles: Vec::new(),
+            comparator_out: std::collections::HashMap::new(),
             tick: 0,
             initial,
         }
@@ -302,6 +305,7 @@ impl Simulation {
                 updates: &mut self.updates,
                 moves: &mut self.moves,
                         toggles: &mut self.toggles,
+                        comparator_out: &mut self.comparator_out,
             };
             behaviour.on_neighbor_changed(&mut ctx, pos, from);
         }
@@ -347,6 +351,7 @@ impl Simulation {
                         updates: &mut self.updates,
                 moves: &mut self.moves,
                         toggles: &mut self.toggles,
+                        comparator_out: &mut self.comparator_out,
                     };
                     behaviour.on_scheduled_tick(&mut ctx, entry.pos);
                     self.propagate();
@@ -409,6 +414,7 @@ impl Simulation {
                     updates: &mut self.updates,
                 moves: &mut self.moves,
                         toggles: &mut self.toggles,
+                        comparator_out: &mut self.comparator_out,
                 };
                 behaviour.on_block_event(&mut ctx, event.pos, event.id, event.param);
                 self.propagate();

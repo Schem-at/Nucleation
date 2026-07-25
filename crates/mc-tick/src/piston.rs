@@ -450,7 +450,8 @@ mod tests {
         TickCtx { world, ticks, events, states, tick: 0,
         updates: Box::leak(Box::new(Vec::new())),
         moves: Box::leak(Box::new(Vec::new())),
-        toggles: Box::leak(Box::new(Vec::new())) }
+        toggles: Box::leak(Box::new(Vec::new())),
+        comparator_out: Box::leak(Box::new(Default::default())) }
     }
 
     #[test]
@@ -500,6 +501,7 @@ mod tests {
                 world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
                 updates: &mut Vec::new(), moves: &mut ctx_moves,
                 toggles: &mut Vec::new(),
+                comparator_out: &mut Default::default(),
             };
             assert!(p.on_block_event(&mut ctx, pos, TRIGGER_EXTEND, 0));
         }
@@ -594,6 +596,7 @@ mod tests {
             let mut ctx = TickCtx {
                 world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
+                comparator_out: &mut Default::default(),
             };
             assert!(p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0));
         }
@@ -630,6 +633,7 @@ mod tests {
             let mut ctx = TickCtx {
                 world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
+                comparator_out: &mut Default::default(),
             };
             p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0);
         }
