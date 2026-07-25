@@ -2,6 +2,37 @@
 //!
 //! Reference: <https://techmcdocs.github.io/pages/GameTick/>
 //!
+//! # Verified against the game, not just the docs
+//!
+//! Minecraft 26.2 ships its server jar **unobfuscated**, so this order was
+//! confirmed by reading the call sequence in `ServerLevel.tick` directly:
+//!
+//! ```text
+//! WorldBorder.tick            -> WorldBorder
+//! advanceWeatherCycle, ...    -> Weather
+//! LevelTicks.tick   (blocks)  -> BlockTicks
+//! LevelTicks.tick   (fluids)  -> FluidTicks
+//! Raids.tick                  -> Raids
+//! ServerChunkCache.tick       -> ChunkManager
+//! runBlockEvents              -> BlockEvents
+//! EntityTickList.forEach      -> Entities
+//! tickBlockEntities           -> BlockEntities
+//! ```
+//!
+//! Two details that came out of that reading and are worth recording:
+//!
+//! - `ServerLevel` holds block events in an `ObjectLinkedOpenHashSet`, which is
+//!   insertion-ordered. That is the direct source of the ordering guarantee
+//!   [`Phase::BlockEvents`] documents, rather than an inference from behaviour.
+//! - There is also a `blockEventsToReschedule` list and a
+//!   `MAX_SCHEDULED_TICKS_PER_TICK` cap. Neither is modelled yet. They are noted
+//!   because a contraption dense enough to hit the cap would diverge from us in a
+//!   way no amount of block-behaviour work would explain.
+//!
+//! [`Phase::PlayerInputs`] is not part of `ServerLevel.tick` — it happens in the
+//! server loop's packet handling, which is why the docs list it as part of the
+//! overall game tick rather than the level tick.
+//!
 //! This module deliberately contains no logic. It exists so that the phase
 //! order is a single declared fact that the scheduler walks, rather than an
 //! emergent property of however the code happens to be arranged. When a trace
