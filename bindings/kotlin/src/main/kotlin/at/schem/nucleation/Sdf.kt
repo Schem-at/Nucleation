@@ -47,7 +47,9 @@ internal interface SdfLib: Library {
     fun Sdf_bend(handle: Pointer, amount: Float): ResultPointerInt
     fun Sdf_repeat_infinite(handle: Pointer, spacingX: Float, spacingY: Float, spacingZ: Float): ResultPointerInt
     fun Sdf_repeat_counted(handle: Pointer, spacingX: Float, spacingY: Float, spacingZ: Float, countX: FFIUint32, countY: FFIUint32, countZ: FFIUint32): ResultPointerInt
+    fun Sdf_repeat_points(handle: Pointer, offsets: Slice): ResultPointerInt
     fun Sdf_displace(handle: Pointer, amplitude: Float, frequency: Float, seed: Int, octaves: FFIUint32): ResultPointerInt
+    fun Sdf_offset_by_field(handle: Pointer, field: Pointer, amplitude: Float): ResultPointerInt
     fun Sdf_warp(handle: Pointer, amplitude: Float, frequency: Float, seed: Int): ResultPointerInt
     fun Sdf_eval_at(handle: Pointer, x: Float, y: Float, z: Float): Float
     fun Sdf_normal(handle: Pointer, x: Float, y: Float, z: Float, epsilon: Float): ResultSdfNormalNativeInt
@@ -807,9 +809,49 @@ class Sdf internal constructor (
         }
     }
 
+    /** Finite rigid instances of this graph at arbitrary XYZ offsets.
+    *`offsets` is flat `[x0, y0, z0, x1, y1, z1, ...]` and may contain
+    *at most 4096 points.
+    */
+    fun repeatPoints(offsets: FloatArray): Result<Sdf> {
+        val offsetsSliceMemory = PrimitiveArrayTools.borrow(offsets)
+
+        val returnVal = lib.Sdf_repeat_points(handle, offsetsSliceMemory.slice);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+                val selfEdges: List<Any> = listOf()
+                val handle = nativeOkVal
+                val returnOpaque = Sdf(handle, selfEdges, true)
+                return returnOpaque.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            offsetsSliceMemory.close()
+        }
+    }
+
     fun displace(amplitude: Float, frequency: Float, seed: Int, octaves: UInt): Result<Sdf> {
 
         val returnVal = lib.Sdf_displace(handle, amplitude, frequency, seed, FFIUint32(octaves));
+        val nativeOkVal = returnVal.getNativeOk();
+        if (nativeOkVal != null) {
+            val selfEdges: List<Any> = listOf()
+            val handle = nativeOkVal
+            val returnOpaque = Sdf(handle, selfEdges, true)
+            return returnOpaque.ok()
+        } else {
+            return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** Offset this surface by a reusable scalar field. The resulting zero
+    *set is generally an approximate field, not an exact distance field.
+    */
+    fun offsetByField(field: Field3, amplitude: Float): Result<Sdf> {
+
+        val returnVal = lib.Sdf_offset_by_field(handle, field.handle, amplitude);
         val nativeOkVal = returnVal.getNativeOk();
         if (nativeOkVal != null) {
             val selfEdges: List<Any> = listOf()
@@ -853,6 +895,9 @@ class Sdf internal constructor (
         }
     }
 
+    /** Conservative finite bounds, or `NotFound` for an unbounded graph
+    *(a bare `plane` or `infinite_cylinder` has no finite extent).
+    */
     fun bounds(): Result<SdfBounds> {
 
         val returnVal = lib.Sdf_bounds(handle);

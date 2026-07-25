@@ -21,6 +21,7 @@ void add_NucleationError_binding(nb::module_ mod) {
             .value("Simulation", nucleation::NucleationError::Simulation)
             .value("AlreadyConsumed", nucleation::NucleationError::AlreadyConsumed)
             .value("NotFound", nucleation::NucleationError::NotFound)
+            .value("Generation", nucleation::NucleationError::Generation)
             .export_values();
 
         e_class

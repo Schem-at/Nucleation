@@ -17,6 +17,7 @@ pub mod dataconverter;
 pub mod definition_region;
 pub mod diff;
 mod entity;
+pub mod field;
 pub mod fingerprint;
 pub mod formats;
 pub mod geo;
@@ -34,6 +35,7 @@ pub mod store_io;
 mod transforms;
 mod universal_schematic;
 pub mod utils;
+pub mod world_generation;
 
 // Feature-specific modules
 #[cfg(feature = "autostack")]

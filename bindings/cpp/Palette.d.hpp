@@ -122,6 +122,16 @@ public:
   inline diplomat::result<std::monostate, NucleationError> gradient_ids_json_write(uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2, uint32_t steps, W& writeable_output) const;
 
   /**
+   * JSON array of exactly `steps` block ids sampling an Oklab gradient
+   * whose endpoints are the measured texture colors of `start_block`
+   * and `end_block`. Errors with `NotFound` when either id is unknown
+   * or has no measured color, or when this palette is empty.
+   */
+  inline diplomat::result<std::string, NucleationError> gradient_ids_between_blocks_json(std::string_view start_block, std::string_view end_block, uint32_t steps) const;
+  template<typename W>
+  inline diplomat::result<std::monostate, NucleationError> gradient_ids_between_blocks_json_write(std::string_view start_block, std::string_view end_block, uint32_t steps, W& writeable_output) const;
+
+  /**
    * Custom palette from a JSON array of block ids, e.g.
    * `["minecraft:stone", "minecraft:oak_planks"]`. Ids blockpedia has
    * no color for are silently skipped — check `len` afterwards.

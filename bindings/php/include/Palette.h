@@ -44,6 +44,9 @@ Palette_ramp_ids_json_result Palette_ramp_ids_json(const Palette* self, uint8_t 
 typedef struct Palette_gradient_ids_json_result {union { NucleationError err;}; bool is_ok;} Palette_gradient_ids_json_result;
 Palette_gradient_ids_json_result Palette_gradient_ids_json(const Palette* self, uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2, uint32_t steps, DiplomatWrite* write);
 
+typedef struct Palette_gradient_ids_between_blocks_json_result {union { NucleationError err;}; bool is_ok;} Palette_gradient_ids_between_blocks_json_result;
+Palette_gradient_ids_between_blocks_json_result Palette_gradient_ids_between_blocks_json(const Palette* self, DiplomatStringView start_block, DiplomatStringView end_block, uint32_t steps, DiplomatWrite* write);
+
 typedef struct Palette_from_block_ids_result {union {Palette* ok; NucleationError err;}; bool is_ok;} Palette_from_block_ids_result;
 Palette_from_block_ids_result Palette_from_block_ids(DiplomatStringView ids_json);
 

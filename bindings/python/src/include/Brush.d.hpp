@@ -13,6 +13,8 @@
 namespace nucleation {
 namespace capi { struct Brush; }
 class Brush;
+namespace capi { struct Field3; }
+class Field3;
 namespace capi { struct Palette; }
 class Palette;
 namespace capi { struct Sdf; }
@@ -96,14 +98,22 @@ public:
   inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Brush>, nucleation::NucleationError> curve_gradient(nucleation::diplomat::span<const float> stops, nucleation::diplomat::span<const uint8_t> colors, nucleation::InterpolationSpace space);
 
   /**
-   * Color every voxel by evaluating a typed SDF/field graph at its center.
+   * Compatibility path that colors voxels by evaluating an SDF graph as
+   * a scalar field. Prefer `field3` for new code.
    * `stops` are in `[0, 1]`; `colors` are flat RGB triples. The sampled
    * value is remapped from `[lo, hi]` before reading the gradient.
    */
   inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Brush>, nucleation::NucleationError> field_sdf(const nucleation::Sdf& field, nucleation::diplomat::span<const float> stops, nucleation::diplomat::span<const uint8_t> colors, float lo, float hi, nucleation::InterpolationSpace space);
 
   /**
-   * Legacy JSON-first field brush. Prefer `field_sdf` for new code.
+   * Color every voxel by evaluating a geometry-neutral scalar field at
+   * its center. The field is cloned into the brush, so both wrappers
+   * may be independently destroyed after construction.
+   */
+  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Brush>, nucleation::NucleationError> field3(const nucleation::Field3& field, nucleation::diplomat::span<const float> stops, nucleation::diplomat::span<const uint8_t> colors, float lo, float hi, nucleation::InterpolationSpace space);
+
+  /**
+   * Legacy JSON-first field brush. Prefer `field3` for new code.
    */
   inline static nucleation::diplomat::result<std::unique_ptr<nucleation::Brush>, nucleation::NucleationError> field(std::string_view field_json, nucleation::diplomat::span<const float> stops, nucleation::diplomat::span<const uint8_t> colors, float lo, float hi, nucleation::InterpolationSpace space);
 

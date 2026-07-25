@@ -24,7 +24,8 @@ export class NucleationError {
         ["Render", 8],
         ["Simulation", 9],
         ["AlreadyConsumed", 10],
-        ["NotFound", 11]
+        ["NotFound", 11],
+        ["Generation", 12]
     ]);
 
     static getAllEntries() {
@@ -82,6 +83,7 @@ export class NucleationError {
         new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.internalConstructor, 9),
         new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.internalConstructor, 10),
         new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.internalConstructor, 11),
+        new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.internalConstructor, 12),
     ];
 
     static NullArgument = NucleationError.#objectValues[0];
@@ -96,6 +98,11 @@ export class NucleationError {
     static Simulation = NucleationError.#objectValues[9];
     static AlreadyConsumed = NucleationError.#objectValues[10];
     static NotFound = NucleationError.#objectValues[11];
+    /**
+     * A world-generation source failed while producing a chunk, even though
+     * the request itself was well-formed (see `world_generation`).
+     */
+    static Generation = NucleationError.#objectValues[12];
 
 
     constructor(value) {

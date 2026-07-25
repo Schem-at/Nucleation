@@ -319,8 +319,34 @@ final class Sdf {
         return new Sdf($result->ok, true);
     }
 
+    public function repeatPoints(array $offsets) {
+        $__n0 = count($offsets);
+        $__view0 = Lib::ffi()->new('DiplomatF32View');
+        if ($__n0 > 0) {
+            $__arr0 = Lib::ffi()->new("float[" . $__n0 . "]", false);
+            foreach ($offsets as $__i0 => $__v0) { $__arr0[$__i0] = $__v0; }
+            $__view0->data = \FFI::addr($__arr0[0]);
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $result = Lib::ffi()->Sdf_repeat_points($this->ptr, $__view0);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Sdf($result->ok, true);
+    }
+
     public function displace( $amplitude,  $frequency,  $seed,  $octaves) {
         $result = Lib::ffi()->Sdf_displace($this->ptr, $amplitude, $frequency, $seed, $octaves);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new Sdf($result->ok, true);
+    }
+
+    public function offsetByField( $field,  $amplitude) {
+        $result = Lib::ffi()->Sdf_offset_by_field($this->ptr, $field->ptr, $amplitude);
         if (!$result->is_ok) {
             throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
         }

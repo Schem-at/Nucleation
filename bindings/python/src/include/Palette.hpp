@@ -47,6 +47,9 @@ namespace capi {
     typedef struct Palette_gradient_ids_json_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Palette_gradient_ids_json_result;
     Palette_gradient_ids_json_result Palette_gradient_ids_json(const nucleation::capi::Palette* self, uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2, uint32_t steps, nucleation::diplomat::capi::DiplomatWrite* write);
 
+    typedef struct Palette_gradient_ids_between_blocks_json_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} Palette_gradient_ids_between_blocks_json_result;
+    Palette_gradient_ids_between_blocks_json_result Palette_gradient_ids_between_blocks_json(const nucleation::capi::Palette* self, nucleation::diplomat::capi::DiplomatStringView start_block, nucleation::diplomat::capi::DiplomatStringView end_block, uint32_t steps, nucleation::diplomat::capi::DiplomatWrite* write);
+
     typedef struct Palette_from_block_ids_result {union {nucleation::capi::Palette* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Palette_from_block_ids_result;
     Palette_from_block_ids_result Palette_from_block_ids(nucleation::diplomat::capi::DiplomatStringView ids_json);
 
@@ -174,6 +177,27 @@ inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError>
         r2,
         g2,
         b2,
+        steps,
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::Palette::gradient_ids_between_blocks_json(std::string_view start_block, std::string_view end_block, uint32_t steps) const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    auto result = nucleation::capi::Palette_gradient_ids_between_blocks_json(this->AsFFI(),
+        {start_block.data(), start_block.size()},
+        {end_block.data(), end_block.size()},
+        steps,
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Ok<std::string>(std::move(output))) : nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::Palette::gradient_ids_between_blocks_json_write(std::string_view start_block, std::string_view end_block, uint32_t steps, W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = nucleation::capi::Palette_gradient_ids_between_blocks_json(this->AsFFI(),
+        {start_block.data(), start_block.size()},
+        {end_block.data(), end_block.size()},
         steps,
         &write);
     return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));

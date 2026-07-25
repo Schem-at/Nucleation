@@ -840,6 +840,38 @@ class ResultFFIUint32Int: Structure(), Structure.ByValue  {
     }
 
 }
+internal class ResultFieldRangeNativeIntUnion: Union() {
+    @JvmField
+    internal var ok: FieldRangeNative = FieldRangeNative()
+    @JvmField
+    internal var err: Int = 0
+}
+
+class ResultFieldRangeNativeInt: Structure(), Structure.ByValue  {
+    @JvmField
+    internal var union: ResultFieldRangeNativeIntUnion = ResultFieldRangeNativeIntUnion()
+
+    @JvmField
+    internal var isOk: Byte = 0
+
+    // Define the fields of the struct
+    override fun getFieldOrder(): List<String> {
+        return listOf("union", "isOk")
+    }
+    internal fun getNativeOk(): FieldRangeNative? {
+        if (isOk == 1.toByte()) {
+            return union.getTypedValue(FieldRangeNative::class.java) as FieldRangeNative
+        }
+        return null
+    }
+    internal fun getNativeErr(): Int? {
+        if (isOk == 0.toByte()) {
+            return union.getTypedValue(Int::class.java) as Int
+        }
+        return null
+    }
+
+}
 internal class ResultFloatIntUnion: Union() {
     @JvmField
     internal var ok: Float = 0.0F

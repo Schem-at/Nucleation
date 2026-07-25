@@ -87,6 +87,35 @@ final class Palette {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function gradientIdsBetweenBlocksJson(string $start_block, string $end_block,  $steps) {
+        $__n0 = strlen($start_block);
+        $__view0 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n0 > 0) {
+            $__buf0 = Lib::ffi()->new("uint8_t[" . $__n0 . "]", false);
+            \FFI::memcpy($__buf0, $start_block, $__n0);
+            $__view0->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf0[0]));
+        } else {
+            $__view0->data = null;
+        }
+        $__view0->len = $__n0;
+        $__n1 = strlen($end_block);
+        $__view1 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n1 > 0) {
+            $__buf1 = Lib::ffi()->new("uint8_t[" . $__n1 . "]", false);
+            \FFI::memcpy($__buf1, $end_block, $__n1);
+            $__view1->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf1[0]));
+        } else {
+            $__view1->data = null;
+        }
+        $__view1->len = $__n1;
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->Palette_gradient_ids_between_blocks_json($this->ptr, $__view0, $__view1, $steps, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public static function fromBlockIds(string $ids_json) {
         $__n0 = strlen($ids_json);
         $__view0 = Lib::ffi()->new('DiplomatStringView');

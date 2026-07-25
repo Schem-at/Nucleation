@@ -30,6 +30,11 @@ export class NucleationError {
     static Simulation : NucleationError;
     static AlreadyConsumed : NucleationError;
     static NotFound : NucleationError;
+    /**
+     * A world-generation source failed while producing a chunk, even though
+     * the request itself was well-formed (see `world_generation`).
+     */
+    static Generation : NucleationError;
 
 
     constructor(value: NucleationError | string );

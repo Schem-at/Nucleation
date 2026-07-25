@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include "diplomat_runtime.h"
 
+#include "Field3.d.h"
 #include "FieldProgram.d.h"
 #include "NucleationError.d.h"
 #include "Schematic.d.h"
@@ -138,8 +139,14 @@ Sdf_repeat_infinite_result Sdf_repeat_infinite(const Sdf* self, float spacing_x,
 typedef struct Sdf_repeat_counted_result {union {Sdf* ok; NucleationError err;}; bool is_ok;} Sdf_repeat_counted_result;
 Sdf_repeat_counted_result Sdf_repeat_counted(const Sdf* self, float spacing_x, float spacing_y, float spacing_z, uint32_t count_x, uint32_t count_y, uint32_t count_z);
 
+typedef struct Sdf_repeat_points_result {union {Sdf* ok; NucleationError err;}; bool is_ok;} Sdf_repeat_points_result;
+Sdf_repeat_points_result Sdf_repeat_points(const Sdf* self, DiplomatF32View offsets);
+
 typedef struct Sdf_displace_result {union {Sdf* ok; NucleationError err;}; bool is_ok;} Sdf_displace_result;
 Sdf_displace_result Sdf_displace(const Sdf* self, float amplitude, float frequency, int32_t seed, uint32_t octaves);
+
+typedef struct Sdf_offset_by_field_result {union {Sdf* ok; NucleationError err;}; bool is_ok;} Sdf_offset_by_field_result;
+Sdf_offset_by_field_result Sdf_offset_by_field(const Sdf* self, const Field3* field, float amplitude);
 
 typedef struct Sdf_warp_result {union {Sdf* ok; NucleationError err;}; bool is_ok;} Sdf_warp_result;
 Sdf_warp_result Sdf_warp(const Sdf* self, float amplitude, float frequency, int32_t seed);

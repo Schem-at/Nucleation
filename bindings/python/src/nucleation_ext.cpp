@@ -10,6 +10,7 @@ void add_MeshProgress_binding(nb::module_);
 void add_TextureInfo_binding(nb::module_);
 void add_BlockPos_binding(nb::module_);
 void add_Dimensions_binding(nb::module_);
+void add_FieldRange_binding(nb::module_);
 void add_SdfBounds_binding(nb::module_);
 void add_SdfNormal_binding(nb::module_);
 void add_AnimationEffect_binding(nb::module_);
@@ -28,6 +29,7 @@ void add_SchematicRegions_binding(nb::module_);
 void add_Diff_binding(nb::module_);
 void add_Fingerprint_binding(nb::module_);
 void add_DistanceField_binding(nb::module_);
+void add_Field3_binding(nb::module_);
 void add_Geo_binding(nb::module_);
 void add_ChunkMeshResult_binding(nb::module_);
 void add_ItemModelConfig_binding(nb::module_);
@@ -66,6 +68,10 @@ void add_Value_binding(nb::module_);
 void add_Store_binding(nb::module_);
 void add_StoreIo_binding(nb::module_);
 void add_Voxelizer_binding(nb::module_);
+void add_CellularSdfConfig_binding(nb::module_);
+void add_GeneratedChunk_binding(nb::module_);
+void add_GeneratedWorldStream_binding(nb::module_);
+void add_WorldGenerator_binding(nb::module_);
 void add_WorldChunkView_binding(nb::module_);
 void add_WorldSink_binding(nb::module_);
 void add_WorldStream_binding(nb::module_);
@@ -78,6 +84,8 @@ void add_FieldProgramValueType_binding(nb::module_);
 void add_SdfAxis_binding(nb::module_);
 void add_SdfCellMode_binding(nb::module_);
 void add_NucleationError_binding(nb::module_);
+void add_GeneratedChunkCoverage_binding(nb::module_);
+void add_GeneratedChunkOverlayMode_binding(nb::module_);
 }
 
 // Nanobind does not usually support custom deleters, so we're shimming some of the machinery to add that ability.
@@ -148,6 +156,7 @@ NB_MODULE(nucleation, mod)
     add_TextureInfo_binding(mod);
     add_BlockPos_binding(mod);
     add_Dimensions_binding(mod);
+    add_FieldRange_binding(mod);
     add_SdfBounds_binding(mod);
     add_SdfNormal_binding(mod);
     add_AnimationEffect_binding(mod);
@@ -166,6 +175,7 @@ NB_MODULE(nucleation, mod)
     add_Diff_binding(mod);
     add_Fingerprint_binding(mod);
     add_DistanceField_binding(mod);
+    add_Field3_binding(mod);
     add_Geo_binding(mod);
     add_ChunkMeshResult_binding(mod);
     add_ItemModelConfig_binding(mod);
@@ -204,6 +214,10 @@ NB_MODULE(nucleation, mod)
     add_Store_binding(mod);
     add_StoreIo_binding(mod);
     add_Voxelizer_binding(mod);
+    add_CellularSdfConfig_binding(mod);
+    add_GeneratedChunk_binding(mod);
+    add_GeneratedWorldStream_binding(mod);
+    add_WorldGenerator_binding(mod);
     add_WorldChunkView_binding(mod);
     add_WorldSink_binding(mod);
     add_WorldStream_binding(mod);
@@ -216,6 +230,8 @@ NB_MODULE(nucleation, mod)
     add_SdfAxis_binding(mod);
     add_SdfCellMode_binding(mod);
     add_NucleationError_binding(mod);
+    add_GeneratedChunkCoverage_binding(mod);
+    add_GeneratedChunkOverlayMode_binding(mod);
 
 
 }

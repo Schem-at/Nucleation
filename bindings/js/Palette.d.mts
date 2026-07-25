@@ -104,6 +104,14 @@ export class Palette {
     gradientIdsJson(r1: number, g1: number, b1: number, r2: number, g2: number, b2: number, steps: number): string;
 
     /**
+     * JSON array of exactly `steps` block ids sampling an Oklab gradient
+     * whose endpoints are the measured texture colors of `start_block`
+     * and `end_block`. Errors with `NotFound` when either id is unknown
+     * or has no measured color, or when this palette is empty.
+     */
+    gradientIdsBetweenBlocksJson(startBlock: string, endBlock: string, steps: number): string;
+
+    /**
      * Custom palette from a JSON array of block ids, e.g.
      * `["minecraft:stone", "minecraft:oak_planks"]`. Ids blockpedia has
      * no color for are silently skipped — check `len` afterwards.

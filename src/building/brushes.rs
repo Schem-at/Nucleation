@@ -329,6 +329,27 @@ impl BlockPalette {
             .collect()
     }
 
+    /// Sample an Oklab gradient using the measured texture colors of two
+    /// block ids as endpoints. Returns `None` when either block is unknown or
+    /// has no measured color.
+    pub fn gradient_ids_between_blocks(
+        &self,
+        start_block: &str,
+        end_block: &str,
+        steps: usize,
+    ) -> Option<Vec<String>> {
+        let color_of = |id: &str| {
+            all_blocks()
+                .find(|facts| facts.id == id)
+                .and_then(|facts| facts.extras.color.as_ref().map(|color| color.rgb))
+        };
+        Some(self.gradient_ids(
+            color_of(start_block)?.into(),
+            color_of(end_block)?.into(),
+            steps,
+        ))
+    }
+
     /// Choose exactly `steps` DISTINCT blocks from this palette forming the
     /// smoothest ramp from `start` to `end` (unlike [`Self::gradient_ids`],
     /// which snaps per-step and may repeat blocks). The line is interpolated
@@ -1482,14 +1503,27 @@ fn sample_stops(stops: &[GradientStop], t: f64, space: InterpolationSpace) -> Ex
     }
 }
 
-/// A brush that colors each voxel by a scalar field (any [`crate::sdf::SdfNode`]):
-/// evaluate the field at the voxel center, remap `[lo, hi]` to `[0, 1]`, and read
-/// a multi-stop gradient. A cellular/Voronoi field paints a mosaic, an FBM field
-/// a marble, a coordinate expression a stripe — the same field language that
-/// drives geometry, pointed at color.
+/// Internal compatibility source for the pre-v2 SDF/JSON field-brush entry points.
+#[derive(Clone)]
+enum FieldBrushSource {
+    Field3(crate::field::Field3),
+    LegacySdf(crate::sdf::SdfNode),
+}
+
+impl FieldBrushSource {
+    fn eval(&self, x: f32, y: f32, z: f32) -> f32 {
+        match self {
+            FieldBrushSource::Field3(field) => field.eval(x, y, z),
+            FieldBrushSource::LegacySdf(field) => field.eval(x, y, z),
+        }
+    }
+}
+
+/// A brush that colors each voxel from a scalar source: evaluate the source at
+/// the voxel center, remap `[lo, hi]` to `[0, 1]`, and read a multi-stop gradient.
 #[derive(Clone)]
 pub struct FieldBrush {
-    field: crate::sdf::SdfNode,
+    field: FieldBrushSource,
     stops: Vec<GradientStop>,
     lo: f64,
     hi: f64,
@@ -1498,15 +1532,49 @@ pub struct FieldBrush {
 }
 
 impl FieldBrush {
+    /// Construct from an existing SDF-shaped scalar source.
+    ///
+    /// This retains the historical Rust API. New geometry-neutral scalar fields
+    /// should use [`Self::from_field3`].
     pub fn new(field: crate::sdf::SdfNode, stops: Vec<GradientStop>, lo: f64, hi: f64) -> Self {
         Self {
-            field,
+            field: FieldBrushSource::LegacySdf(field),
             stops,
             lo,
             hi,
             palette: get_default_palette(),
             space: InterpolationSpace::Oklab,
         }
+    }
+
+    /// Construct from a geometry-neutral reusable [`crate::field::Field3`].
+    pub fn from_field3(
+        field: crate::field::Field3,
+        stops: Vec<GradientStop>,
+        lo: f64,
+        hi: f64,
+    ) -> Result<Self, String> {
+        if stops.is_empty()
+            || !lo.is_finite()
+            || !hi.is_finite()
+            || lo >= hi
+            || stops
+                .iter()
+                .any(|stop| !stop.position.is_finite() || !(0.0..=1.0).contains(&stop.position))
+            || stops
+                .windows(2)
+                .any(|pair| pair[0].position > pair[1].position)
+        {
+            return Err("field3 brush requires lo < hi and nondecreasing stops in [0, 1]".into());
+        }
+        Ok(Self {
+            field: FieldBrushSource::Field3(field),
+            stops,
+            lo,
+            hi,
+            palette: get_default_palette(),
+            space: InterpolationSpace::Oklab,
+        })
     }
 
     pub fn with_space(mut self, space: InterpolationSpace) -> Self {

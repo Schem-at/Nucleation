@@ -27,6 +27,7 @@ namespace capi {
       NucleationError_Simulation = 9,
       NucleationError_AlreadyConsumed = 10,
       NucleationError_NotFound = 11,
+      NucleationError_Generation = 12,
     };
 
     typedef struct NucleationError_option {union { NucleationError ok; }; bool is_ok; } NucleationError_option;
@@ -53,6 +54,11 @@ public:
         Simulation = 9,
         AlreadyConsumed = 10,
         NotFound = 11,
+        /**
+         * A world-generation source failed while producing a chunk, even though
+         * the request itself was well-formed (see `world_generation`).
+         */
+        Generation = 12,
     };
 
     NucleationError(): value(Value::NullArgument) {}

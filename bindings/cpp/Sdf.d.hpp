@@ -11,6 +11,8 @@
 #include <cstdlib>
 #include "diplomat_runtime.hpp"
 
+namespace diplomat::capi { struct Field3; }
+class Field3;
 namespace diplomat::capi { struct FieldProgram; }
 class FieldProgram;
 namespace diplomat::capi { struct Schematic; }
@@ -190,7 +192,20 @@ public:
 
   inline diplomat::result<std::unique_ptr<Sdf>, NucleationError> repeat_counted(float spacing_x, float spacing_y, float spacing_z, uint32_t count_x, uint32_t count_y, uint32_t count_z) const;
 
+  /**
+   * Finite rigid instances of this graph at arbitrary XYZ offsets.
+   * `offsets` is flat `[x0, y0, z0, x1, y1, z1, ...]` and may contain
+   * at most 4096 points.
+   */
+  inline diplomat::result<std::unique_ptr<Sdf>, NucleationError> repeat_points(diplomat::span<const float> offsets) const;
+
   inline diplomat::result<std::unique_ptr<Sdf>, NucleationError> displace(float amplitude, float frequency, int32_t seed, uint32_t octaves) const;
+
+  /**
+   * Offset this surface by a reusable scalar field. The resulting zero
+   * set is generally an approximate field, not an exact distance field.
+   */
+  inline diplomat::result<std::unique_ptr<Sdf>, NucleationError> offset_by_field(const Field3& field, float amplitude) const;
 
   inline diplomat::result<std::unique_ptr<Sdf>, NucleationError> warp(float amplitude, float frequency, int32_t seed) const;
 
@@ -198,6 +213,10 @@ public:
 
   inline diplomat::result<SdfNormal, NucleationError> normal(float x, float y, float z, float epsilon) const;
 
+  /**
+   * Conservative finite bounds, or `NotFound` for an unbounded graph
+   * (a bare `plane` or `infinite_cylinder` has no finite extent).
+   */
   inline diplomat::result<SdfBounds, NucleationError> bounds() const;
 
   inline diplomat::result<std::unique_ptr<Shape>, NucleationError> to_shape() const;

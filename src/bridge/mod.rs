@@ -17,6 +17,7 @@ pub mod building;
 pub mod definition_region;
 pub mod diff;
 pub mod distance_field;
+pub mod field;
 pub mod geo;
 #[cfg(feature = "meshing")]
 pub mod meshing;
@@ -33,4 +34,5 @@ pub mod simulation;
 pub mod store_io;
 #[cfg(feature = "voxelize")]
 pub mod voxelize;
+pub mod world_generation;
 pub mod world_stream;

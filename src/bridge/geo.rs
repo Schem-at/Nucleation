@@ -31,25 +31,8 @@ pub mod ffi {
                 std::str::from_utf8(base_block).map_err(|_| NucleationError::InvalidArgument)?;
             let name = std::str::from_utf8(name).map_err(|_| NucleationError::InvalidArgument)?;
 
-            #[derive(serde::Deserialize)]
-            struct RawFootprint {
-                polygon: Vec<(f64, f64)>,
-                height: i32,
-                #[serde(default)]
-                min_y: Option<i32>,
-                block: String,
-            }
-            let raw: Vec<RawFootprint> =
-                serde_json::from_str(json).map_err(|_| NucleationError::Parse)?;
-            let footprints: Vec<crate::geo::Footprint> = raw
-                .into_iter()
-                .map(|b| crate::geo::Footprint {
-                    polygon: b.polygon,
-                    y_min: b.min_y.unwrap_or(1),
-                    y_max: b.height,
-                    block: b.block,
-                })
-                .collect();
+            let footprints =
+                crate::geo::parse_footprints_json(json).map_err(|_| NucleationError::Parse)?;
             let base_opt = if base.is_empty() { None } else { Some(base) };
             let s = crate::geo::extrude_footprints(name, &footprints, base_opt);
             Ok(Box::new(Schematic(s)))

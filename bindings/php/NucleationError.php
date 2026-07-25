@@ -14,6 +14,7 @@ final class NucleationError {
     const Simulation = 9;
     const AlreadyConsumed = 10;
     const NotFound = 11;
+    const Generation = 12;
 
     public static function name(int $value): string {
         return match ($value) {
@@ -29,6 +30,7 @@ final class NucleationError {
             self::Simulation => 'Simulation',
             self::AlreadyConsumed => 'AlreadyConsumed',
             self::NotFound => 'NotFound',
+            self::Generation => 'Generation',
             default => "Unknown({$value})",
         };
     }

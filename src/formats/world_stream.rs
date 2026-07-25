@@ -380,6 +380,29 @@ impl Iterator for ChunkIter {
 }
 
 impl WorldChunkView {
+    /// Construct a generated chunk from already-packed native sections.
+    ///
+    /// Kept crate-private so generators can avoid the per-block mutation path
+    /// without exposing Anvil storage details as public API.
+    pub(crate) fn from_generated_sections(
+        cx: i32,
+        cz: i32,
+        sections: Vec<crate::formats::anvil::ChunkSection>,
+    ) -> Self {
+        WorldChunkView {
+            data: ChunkData {
+                x: cx,
+                z: cz,
+                data_version: crate::formats::world::default_data_version(),
+                status: "minecraft:full".to_string(),
+                sections,
+                block_entities: Vec::new(),
+                entities: Vec::new(),
+                y_pos: -4,
+            },
+        }
+    }
+
     pub fn cx(&self) -> i32 {
         self.data.x
     }

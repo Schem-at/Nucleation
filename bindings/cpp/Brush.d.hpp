@@ -11,6 +11,8 @@
 #include <cstdlib>
 #include "diplomat_runtime.hpp"
 
+namespace diplomat::capi { struct Field3; }
+class Field3;
 namespace diplomat::capi { struct Palette; }
 class Palette;
 namespace diplomat::capi { struct Sdf; }
@@ -93,14 +95,22 @@ public:
   inline static diplomat::result<std::unique_ptr<Brush>, NucleationError> curve_gradient(diplomat::span<const float> stops, diplomat::span<const uint8_t> colors, InterpolationSpace space);
 
   /**
-   * Color every voxel by evaluating a typed SDF/field graph at its center.
+   * Compatibility path that colors voxels by evaluating an SDF graph as
+   * a scalar field. Prefer `field3` for new code.
    * `stops` are in `[0, 1]`; `colors` are flat RGB triples. The sampled
    * value is remapped from `[lo, hi]` before reading the gradient.
    */
   inline static diplomat::result<std::unique_ptr<Brush>, NucleationError> field_sdf(const Sdf& field, diplomat::span<const float> stops, diplomat::span<const uint8_t> colors, float lo, float hi, InterpolationSpace space);
 
   /**
-   * Legacy JSON-first field brush. Prefer `field_sdf` for new code.
+   * Color every voxel by evaluating a geometry-neutral scalar field at
+   * its center. The field is cloned into the brush, so both wrappers
+   * may be independently destroyed after construction.
+   */
+  inline static diplomat::result<std::unique_ptr<Brush>, NucleationError> field3(const Field3& field, diplomat::span<const float> stops, diplomat::span<const uint8_t> colors, float lo, float hi, InterpolationSpace space);
+
+  /**
+   * Legacy JSON-first field brush. Prefer `field3` for new code.
    */
   inline static diplomat::result<std::unique_ptr<Brush>, NucleationError> field(std::string_view field_json, diplomat::span<const float> stops, diplomat::span<const uint8_t> colors, float lo, float hi, InterpolationSpace space);
 

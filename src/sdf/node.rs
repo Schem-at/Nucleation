@@ -8,6 +8,7 @@
 
 use super::noise::{fbm3, hash01_3, value_noise3};
 use super::program::Program;
+use crate::field::Field3;
 use serde::{Deserialize, Serialize};
 
 /// What a `Cells` (Worley / cellular) node returns per point.
@@ -322,6 +323,13 @@ pub enum SdfNode {
         #[serde(default)]
         count: Option<[u32; 3]>,
     },
+    /// Finite repetition at arbitrary translation offsets. Each instance is a
+    /// rigid copy of `child`; unlike domain warping, instance geometry is not
+    /// distorted.
+    RepeatPoints {
+        child: Box<SdfNode>,
+        offsets: Vec<[f32; 3]>,
+    },
     /// Twists the child about the Y axis (IQ's `opTwist`): rotates the XZ
     /// plane by `amount` radians per unit Y before evaluating the child. Y
     /// itself is unchanged. *Distorted*: not guaranteed exact even when the
@@ -348,6 +356,14 @@ pub enum SdfNode {
         seed: i32,
         #[serde(default = "default_octaves")]
         octaves: u32,
+    },
+    /// Perturbs the child's zero set by a reusable scalar field:
+    /// `child(p) + amplitude * field(p)`. This generally does not preserve
+    /// exact signed-distance magnitude.
+    OffsetByField {
+        child: Box<SdfNode>,
+        field: Field3,
+        amplitude: f32,
     },
     /// Domain-warps the sample point with seeded value noise before
     /// evaluating the child. *Approximate*: bounds grow by `amplitude`.
@@ -672,6 +688,29 @@ impl SdfNode {
         serde_json::to_string(self).map_err(|e| format!("SDF serialization failed: {e}"))
     }
 
+    /// Perturb this surface with a reusable bounded scalar field. Bounds grow
+    /// by the maximum possible absolute offset proven by the field's range.
+    pub fn offset_by_field(self, field: Field3, amplitude: f32) -> Result<SdfNode, String> {
+        if !amplitude.is_finite()
+            || amplitude < 0.0
+            || field.validate().is_err()
+            || field.output_range().is_none()
+        {
+            return Err(
+                "offsetByField requires a non-negative finite amplitude and bounded field range"
+                    .into(),
+            );
+        }
+        if amplitude == 0.0 {
+            return Ok(self);
+        }
+        Ok(SdfNode::OffsetByField {
+            child: Box::new(self),
+            field,
+            amplitude,
+        })
+    }
+
     /// Recursively validate every node's parameters: finite values, valid
     /// signs/ranges, enum-specific constraints, transform sanity, and a
     /// bound on tree depth/size. Mirrors the checks the typed `Sdf` builder
@@ -936,6 +975,16 @@ impl SdfNode {
                 child.validate_at(depth + 1, budget)?;
             }
 
+            SdfNode::RepeatPoints { child, offsets } => {
+                if offsets.is_empty() || offsets.len() > 4096 {
+                    return Err("repeatPoints offsets must contain 1..=4096 points".into());
+                }
+                for offset in offsets {
+                    finite_all(offset)?;
+                }
+                child.validate_at(depth + 1, budget)?;
+            }
+
             SdfNode::Displace {
                 child,
                 amplitude,
@@ -947,6 +996,19 @@ impl SdfNode {
                 positive_all(&[*frequency])?;
                 if !(1..=8).contains(octaves) {
                     return Err("displace octaves must be in 1..=8".into());
+                }
+                child.validate_at(depth + 1, budget)?;
+            }
+
+            SdfNode::OffsetByField {
+                child,
+                field,
+                amplitude,
+            } => {
+                non_negative_all(&[*amplitude])?;
+                field.validate().map_err(|error| error.to_string())?;
+                if field.output_range().is_none() {
+                    return Err("offsetByField requires a bounded field range".into());
                 }
                 child.validate_at(depth + 1, budget)?;
             }
@@ -1368,6 +1430,11 @@ impl SdfNode {
                 )
             }
 
+            SdfNode::RepeatPoints { child, offsets } => offsets
+                .iter()
+                .map(|offset| child.eval(x - offset[0], y - offset[1], z - offset[2]))
+                .fold(f32::INFINITY, f32::min),
+
             SdfNode::Twist { child, amount } => {
                 let (s, c) = (amount * y).sin_cos();
                 let qx = c * x - s * z;
@@ -1389,6 +1456,20 @@ impl SdfNode {
                 seed,
                 octaves,
             } => child.eval(x, y, z) + fbm3(x, y, z, *seed, *frequency, *octaves) * amplitude,
+
+            SdfNode::OffsetByField {
+                child,
+                field,
+                amplitude,
+            } => {
+                let value = field.eval(x, y, z);
+                match field.output_range() {
+                    Some([lo, hi]) if value.is_finite() && (lo..=hi).contains(&value) => {
+                        child.eval(x, y, z) + value * amplitude
+                    }
+                    _ => f32::INFINITY,
+                }
+            }
 
             SdfNode::Warp {
                 child,
@@ -1728,6 +1809,18 @@ impl SdfNode {
                     }
                 }
             }
+            SdfNode::RepeatPoints { child, offsets } => {
+                let b = child.bounds()?;
+                let mut min = [f32::INFINITY; 3];
+                let mut max = [f32::NEG_INFINITY; 3];
+                for offset in offsets {
+                    for axis in 0..3 {
+                        min[axis] = min[axis].min(b.min[axis] + offset[axis]);
+                        max[axis] = max[axis].max(b.max[axis] + offset[axis]);
+                    }
+                }
+                Some(Aabb { min, max })
+            }
             SdfNode::Twist { child, .. } => {
                 let b = child.bounds()?;
                 let mut max_r: f32 = 0.0;
@@ -1757,6 +1850,15 @@ impl SdfNode {
             SdfNode::Displace {
                 child, amplitude, ..
             } => child.bounds().map(|b| b.grow(amplitude.abs())),
+            SdfNode::OffsetByField {
+                child,
+                field,
+                amplitude,
+            } => {
+                let range = field.output_range()?;
+                let max_abs = range[0].abs().max(range[1].abs());
+                child.bounds().map(|b| b.grow(amplitude.abs() * max_abs))
+            }
             SdfNode::Warp {
                 child, amplitude, ..
             } => child.bounds().map(|b| b.grow(amplitude.abs())),

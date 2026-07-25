@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include "diplomat_runtime.h"
 
+#include "Field3.d.h"
 #include "InterpolationSpace.d.h"
 #include "NucleationError.d.h"
 #include "Palette.d.h"
@@ -42,6 +43,9 @@ Brush_curve_gradient_result Brush_curve_gradient(DiplomatF32View stops, Diplomat
 
 typedef struct Brush_field_sdf_result {union {Brush* ok; NucleationError err;}; bool is_ok;} Brush_field_sdf_result;
 Brush_field_sdf_result Brush_field_sdf(const Sdf* field, DiplomatF32View stops, DiplomatU8View colors, float lo, float hi, InterpolationSpace space);
+
+typedef struct Brush_field3_result {union {Brush* ok; NucleationError err;}; bool is_ok;} Brush_field3_result;
+Brush_field3_result Brush_field3(const Field3* field, DiplomatF32View stops, DiplomatU8View colors, float lo, float hi, InterpolationSpace space);
 
 typedef struct Brush_field_result {union {Brush* ok; NucleationError err;}; bool is_ok;} Brush_field_result;
 Brush_field_result Brush_field(DiplomatStringView field_json, DiplomatF32View stops, DiplomatU8View colors, float lo, float hi, InterpolationSpace space);

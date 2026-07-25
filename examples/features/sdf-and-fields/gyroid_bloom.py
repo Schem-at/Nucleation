@@ -24,7 +24,8 @@ from nucleation import (
 RADIUS = 15
 FREQUENCY = 0.42
 THICKNESS = 0.30
-PERIOD_MS = 6_000.0
+EFFECT_MS = 5_000.0
+STAGGER_MS = 1_500.0
 FPS = 20.0
 
 
@@ -64,15 +65,18 @@ def gyroid() -> Sdf:
     return Sdf.from_program(p.build()).intersection_with(Sdf.sphere(RADIUS - 0.5))
 
 
-def pulse() -> AnimationEffect:
-    effect = AnimationEffect.create(PERIOD_MS)
-    for at, scale in ((0.0, 0.97), (0.18, 1.035), (0.38, 0.97), (1.0, 0.97)):
-        effect.add_keyframe("scale", at, scale, "inOutSine")
-    for at, strength in ((0.0, 0.0), (0.14, 0.7), (0.31, 0.0), (1.0, 0.0)):
-        effect.add_keyframe("emissiveR", at, strength * 0.18, "inOutSine")
-        effect.add_keyframe("emissiveG", at, strength * 0.80, "inOutSine")
-        effect.add_keyframe("emissiveB", at, strength, "inOutSine")
-    effect.set_repeat_forever()
+def materialize() -> AnimationEffect:
+    effect = AnimationEffect.create(EFFECT_MS)
+    for at, scale in (
+        (0.00, 0.0), (0.04, 0.0), (0.15, 1.0),
+        (0.76, 1.0), (0.89, 0.0), (1.00, 0.0),
+    ):
+        effect.add_keyframe("scale", at, scale, "inOutCubic")
+    for at, opacity in (
+        (0.00, 0.0), (0.05, 0.0), (0.13, 1.0),
+        (0.78, 1.0), (0.90, 0.0), (1.00, 0.0),
+    ):
+        effect.add_keyframe("opacity", at, opacity, "inOutSine")
     return effect
 
 
@@ -92,33 +96,31 @@ def material(x: int, y: int, z: int) -> str:
 def build_animation() -> BuildAnimation:
     field = gyroid()
     animation = BuildAnimation.create("field-program-gyroid")
-    animation.set_default_effect(pulse())
+    animation.set_default_effect(materialize())
 
     groups = 0
     blocks = 0
+    order = 0
     for y in range(-RADIUS, RADIUS + 1):
-        positions = [
-            (x, y, z)
-            for x in range(-RADIUS, RADIUS + 1)
-            for z in range(-RADIUS, RADIUS + 1)
-            if field.eval_at(x, y, z) <= 0.0
-        ]
-        if not positions:
-            continue
-        animation.begin_keyed_group(float(y + RADIUS))
-        for x, yy, z in positions:
-            animation.set_block(x, yy, z, material(x, yy, z))
-        animation.end_group()
-        groups += 1
-        blocks += len(positions)
+        for x0 in range(-RADIUS, RADIUS + 1, 5):
+            positions = [
+                (x, y, z)
+                for x in range(x0, min(x0 + 5, RADIUS + 1))
+                for z in range(-RADIUS, RADIUS + 1)
+                if field.eval_at(x, y, z) <= 0.0
+            ]
+            if not positions:
+                continue
+            animation.begin_keyed_group(float(order))
+            for x, yy, z in positions:
+                animation.set_block(x, yy, z, material(x, yy, z))
+            animation.end_group()
+            groups += 1
+            blocks += len(positions)
+            order += 1
 
-    animation.set_stagger_total_ms(PERIOD_MS * 0.82)
-    animation.set_stagger_offset_ms(-PERIOD_MS)
-    animation.set_loop_period_ms(PERIOD_MS)
-    camera = AnimationEffect.turntable(PERIOD_MS)
-    camera.set_repeat_forever()
-    animation.animate_camera(camera, 0.0)
-    print(f"gyroid: {blocks} blocks in {groups} animated layers")
+    animation.set_stagger_total_ms(STAGGER_MS)
+    print(f"gyroid: {blocks} blocks in {groups} assembly clusters")
     return animation
 
 

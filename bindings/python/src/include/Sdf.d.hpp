@@ -11,6 +11,8 @@
 #include <cstdlib>
 #include "diplomat_runtime.hpp"
 namespace nucleation {
+namespace capi { struct Field3; }
+class Field3;
 namespace capi { struct FieldProgram; }
 class FieldProgram;
 namespace capi { struct Schematic; }
@@ -193,7 +195,20 @@ public:
 
   inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> repeat_counted(float spacing_x, float spacing_y, float spacing_z, uint32_t count_x, uint32_t count_y, uint32_t count_z) const;
 
+  /**
+   * Finite rigid instances of this graph at arbitrary XYZ offsets.
+   * `offsets` is flat `[x0, y0, z0, x1, y1, z1, ...]` and may contain
+   * at most 4096 points.
+   */
+  inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> repeat_points(nucleation::diplomat::span<const float> offsets) const;
+
   inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> displace(float amplitude, float frequency, int32_t seed, uint32_t octaves) const;
+
+  /**
+   * Offset this surface by a reusable scalar field. The resulting zero
+   * set is generally an approximate field, not an exact distance field.
+   */
+  inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> offset_by_field(const nucleation::Field3& field, float amplitude) const;
 
   inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> warp(float amplitude, float frequency, int32_t seed) const;
 
@@ -201,6 +216,10 @@ public:
 
   inline nucleation::diplomat::result<nucleation::SdfNormal, nucleation::NucleationError> normal(float x, float y, float z, float epsilon) const;
 
+  /**
+   * Conservative finite bounds, or `NotFound` for an unbounded graph
+   * (a bare `plane` or `infinite_cylinder` has no finite extent).
+   */
   inline nucleation::diplomat::result<nucleation::SdfBounds, nucleation::NucleationError> bounds() const;
 
   inline nucleation::diplomat::result<std::unique_ptr<nucleation::Shape>, nucleation::NucleationError> to_shape() const;

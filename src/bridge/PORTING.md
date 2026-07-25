@@ -83,16 +83,26 @@ Keep old doc comments (adapted).
 cd <your worktree root>
 cargo build --lib --features bridge[,<extra features your module needs>]
 
-DT=/Users/harrison/code/stencil/diplomat/target/release/diplomat-tool
+DT=diplomat-tool            # from PATH — see the warning below
 E=src/bridge/mod.rs
 rm -rf /tmp/gen_check_$$ && mkdir -p /tmp/gen_check_$$
 $DT c       /tmp/gen_check_$$/c  -e $E -s
 $DT cpp     /tmp/gen_check_$$/cp -e $E -s
 $DT js      /tmp/gen_check_$$/js -e $E -s
-$DT kotlin  /tmp/gen_check_$$/kt -e $E -s --config-file /Users/harrison/code/stencil/configs/kotlin.toml
-$DT nanobind /tmp/gen_check_$$/py -e $E -s --config-file /Users/harrison/code/stencil/configs/nanobind.toml
-$DT php     /tmp/gen_check_$$/ph -e $E -s --config-file /Users/harrison/code/stencil/configs/nucleation-php.toml
+$DT kotlin  /tmp/gen_check_$$/kt -e $E -s --config-file tools/bindgen/kotlin.toml
+$DT nanobind /tmp/gen_check_$$/py -e $E -s --config-file tools/bindgen/nanobind.toml
+$DT php     /tmp/gen_check_$$/ph -e $E -s --config-file tools/bindgen/php.toml
 ```
+
+**Use the `diplomat-tool` on your PATH (the `cargo install`ed fork), not a binary
+from a `stencil/diplomat` checkout.** Those checkouts go stale, and an older build
+silently regenerates the PHP bindings *without* the `borrowedFrom` field that keeps
+a borrowed object's owner alive — a use-after-free waiting to happen, and a diff
+that looks like an innocent cleanup. `tools/gen-bindings.sh` already defaults to
+PATH; don't override `DIPLOMAT_TOOL` unless you know your checkout is newer.
+
+Config files live at `tools/bindgen/*.toml` in this repo — they are the ones
+`tools/gen-bindings.sh` uses, so verification matches what CI regenerates.
 
 All seven commands must exit 0 with no `Lowering error` output. If a backend rejects a
 construct, fix the API shape (rules above) rather than disabling the method; use

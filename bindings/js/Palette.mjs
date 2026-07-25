@@ -292,6 +292,41 @@ export class Palette {
     }
 
     /**
+     * JSON array of exactly `steps` block ids sampling an Oklab gradient
+     * whose endpoints are the measured texture colors of `start_block`
+     * and `end_block`. Errors with `NotFound` when either id is unknown
+     * or has no measured color, or when this palette is empty.
+     */
+    gradientIdsBetweenBlocksJson(startBlock, endBlock, steps) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const startBlockSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, startBlock)));
+        const endBlockSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, endBlock)));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.Palette_gradient_ids_between_blocks_json(diplomatReceive.buffer, this.ffiValue, startBlockSlice.ptr, endBlockSlice.ptr, steps, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
      * Custom palette from a JSON array of block ids, e.g.
      * `["minecraft:stone", "minecraft:oak_planks"]`. Ids blockpedia has
      * no color for are silently skipped — check `len` afterwards.

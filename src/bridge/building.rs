@@ -7,6 +7,7 @@
 
 #[diplomat::bridge]
 pub mod ffi {
+    use super::super::field::ffi::Field3;
     use super::super::schematic::ffi::Schematic;
     use super::super::sdf::ffi::Sdf;
     use super::super::shared::ffi::NucleationError;
@@ -571,6 +572,32 @@ pub mod ffi {
             Ok(())
         }
 
+        /// JSON array of exactly `steps` block ids sampling an Oklab gradient
+        /// whose endpoints are the measured texture colors of `start_block`
+        /// and `end_block`. Errors with `NotFound` when either id is unknown
+        /// or has no measured color, or when this palette is empty.
+        pub fn gradient_ids_between_blocks_json(
+            &self,
+            start_block: &DiplomatStr,
+            end_block: &DiplomatStr,
+            steps: u32,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            if self.0.is_empty() {
+                return Err(NucleationError::NotFound);
+            }
+            let start =
+                std::str::from_utf8(start_block).map_err(|_| NucleationError::InvalidArgument)?;
+            let end =
+                std::str::from_utf8(end_block).map_err(|_| NucleationError::InvalidArgument)?;
+            let ids = self
+                .0
+                .gradient_ids_between_blocks(start, end, steps as usize)
+                .ok_or(NucleationError::NotFound)?;
+            let _ = write!(out, "{}", serde_json::to_string(&ids).unwrap_or_default());
+            Ok(())
+        }
+
         /// Custom palette from a JSON array of block ids, e.g.
         /// `["minecraft:stone", "minecraft:oak_planks"]`. Ids blockpedia has
         /// no color for are silently skipped — check `len` afterwards.
@@ -969,7 +996,8 @@ pub mod ffi {
             ))))
         }
 
-        /// Color every voxel by evaluating a typed SDF/field graph at its center.
+        /// Compatibility path that colors voxels by evaluating an SDF graph as
+        /// a scalar field. Prefer `field3` for new code.
         /// `stops` are in `[0, 1]`; `colors` are flat RGB triples. The sampled
         /// value is remapped from `[lo, hi]` before reading the gradient.
         pub fn field_sdf(
@@ -983,7 +1011,21 @@ pub mod ffi {
             field_brush(field.0.clone(), stops, colors, lo, hi, space)
         }
 
-        /// Legacy JSON-first field brush. Prefer `field_sdf` for new code.
+        /// Color every voxel by evaluating a geometry-neutral scalar field at
+        /// its center. The field is cloned into the brush, so both wrappers
+        /// may be independently destroyed after construction.
+        pub fn field3(
+            field: &Field3,
+            stops: &[f32],
+            colors: &[u8],
+            lo: f32,
+            hi: f32,
+            space: InterpolationSpace,
+        ) -> Result<Box<Brush>, NucleationError> {
+            field3_brush(field.0.clone(), stops, colors, lo, hi, space)
+        }
+
+        /// Legacy JSON-first field brush. Prefer `field3` for new code.
         pub fn field(
             field_json: &DiplomatStr,
             stops: &[f32],
@@ -1067,7 +1109,7 @@ pub mod ffi {
         space: InterpolationSpace,
     ) -> Result<Box<Brush>, NucleationError> {
         validate_gradient_data(stops, colors)?;
-        if !lo.is_finite() || !hi.is_finite() || lo == hi {
+        if !lo.is_finite() || !hi.is_finite() || lo >= hi {
             return Err(NucleationError::InvalidArgument);
         }
         let gstops = stops
@@ -1083,6 +1125,32 @@ pub mod ffi {
         Ok(Box::new(Brush(crate::building::BrushEnum::Field(brush))))
     }
 
+    fn field3_brush(
+        field: crate::field::Field3,
+        stops: &[f32],
+        colors: &[u8],
+        lo: f32,
+        hi: f32,
+        space: InterpolationSpace,
+    ) -> Result<Box<Brush>, NucleationError> {
+        validate_gradient_data(stops, colors)?;
+        if !lo.is_finite() || !hi.is_finite() || lo >= hi {
+            return Err(NucleationError::InvalidArgument);
+        }
+        let gstops = stops
+            .iter()
+            .zip(colors.chunks_exact(3))
+            .map(|(position, color)| crate::building::GradientStop {
+                position: *position as f64,
+                color: crate::blockpedia::ExtendedColorData::from_rgb(color[0], color[1], color[2]),
+            })
+            .collect();
+        let brush = crate::building::FieldBrush::from_field3(field, gstops, lo as f64, hi as f64)
+            .map_err(|_| NucleationError::InvalidArgument)?
+            .with_space(space.to_core());
+        Ok(Box::new(Brush(crate::building::BrushEnum::Field(brush))))
+    }
+
     fn validate_gradient_data(stops: &[f32], colors: &[u8]) -> Result<(), NucleationError> {
         let expected_colors = stops
             .len()
@@ -1093,6 +1161,7 @@ pub mod ffi {
             || stops
                 .iter()
                 .any(|stop| !stop.is_finite() || !(0.0..=1.0).contains(stop))
+            || stops.windows(2).any(|pair| pair[0] > pair[1])
         {
             return Err(NucleationError::InvalidArgument);
         }
@@ -1103,6 +1172,7 @@ pub mod ffi {
 #[cfg(test)]
 mod sdf_gradient_validation_tests {
     use super::ffi::{Brush, InterpolationSpace};
+    use crate::bridge::field::ffi::Field3;
     use crate::bridge::sdf::ffi::Sdf;
 
     #[test]
@@ -1133,5 +1203,40 @@ mod sdf_gradient_validation_tests {
             InterpolationSpace::Rgb,
         )
         .is_err());
+    }
+
+    #[test]
+    fn field3_rejects_reversed_domains_and_descending_stops() {
+        let field = Field3::value_noise_fbm(0.125, 17, 4).unwrap();
+        let two_colors = [0_u8, 0, 0, 255, 255, 255];
+        assert!(Brush::field3(
+            &field,
+            &[0.0, 1.0],
+            &two_colors,
+            1.0,
+            -1.0,
+            InterpolationSpace::Rgb,
+        )
+        .is_err());
+        assert!(Brush::field3(
+            &field,
+            &[1.0, 0.0],
+            &two_colors,
+            -1.0,
+            1.0,
+            InterpolationSpace::Rgb,
+        )
+        .is_err());
+
+        let three_colors = [0_u8, 0, 0, 127, 127, 127, 255, 255, 255];
+        assert!(Brush::field3(
+            &field,
+            &[0.0, 0.0, 1.0],
+            &three_colors,
+            -1.0,
+            1.0,
+            InterpolationSpace::Rgb,
+        )
+        .is_ok());
     }
 }

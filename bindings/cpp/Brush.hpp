@@ -11,6 +11,7 @@
 #include <functional>
 #include <optional>
 #include <cstdlib>
+#include "Field3.hpp"
 #include "InterpolationSpace.hpp"
 #include "NucleationError.hpp"
 #include "Palette.hpp"
@@ -45,6 +46,9 @@ namespace capi {
 
     typedef struct Brush_field_sdf_result {union {diplomat::capi::Brush* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Brush_field_sdf_result;
     Brush_field_sdf_result Brush_field_sdf(const diplomat::capi::Sdf* field, diplomat::capi::DiplomatF32View stops, diplomat::capi::DiplomatU8View colors, float lo, float hi, diplomat::capi::InterpolationSpace space);
+
+    typedef struct Brush_field3_result {union {diplomat::capi::Brush* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Brush_field3_result;
+    Brush_field3_result Brush_field3(const diplomat::capi::Field3* field, diplomat::capi::DiplomatF32View stops, diplomat::capi::DiplomatU8View colors, float lo, float hi, diplomat::capi::InterpolationSpace space);
 
     typedef struct Brush_field_result {union {diplomat::capi::Brush* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Brush_field_result;
     Brush_field_result Brush_field(diplomat::capi::DiplomatStringView field_json, diplomat::capi::DiplomatF32View stops, diplomat::capi::DiplomatU8View colors, float lo, float hi, diplomat::capi::InterpolationSpace space);
@@ -156,6 +160,16 @@ inline diplomat::result<std::unique_ptr<Brush>, NucleationError> Brush::curve_gr
 
 inline diplomat::result<std::unique_ptr<Brush>, NucleationError> Brush::field_sdf(const Sdf& field, diplomat::span<const float> stops, diplomat::span<const uint8_t> colors, float lo, float hi, InterpolationSpace space) {
     auto result = diplomat::capi::Brush_field_sdf(field.AsFFI(),
+        {stops.data(), stops.size()},
+        {colors.data(), colors.size()},
+        lo,
+        hi,
+        space.AsFFI());
+    return result.is_ok ? diplomat::result<std::unique_ptr<Brush>, NucleationError>(diplomat::Ok<std::unique_ptr<Brush>>(std::unique_ptr<Brush>(Brush::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Brush>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<Brush>, NucleationError> Brush::field3(const Field3& field, diplomat::span<const float> stops, diplomat::span<const uint8_t> colors, float lo, float hi, InterpolationSpace space) {
+    auto result = diplomat::capi::Brush_field3(field.AsFFI(),
         {stops.data(), stops.size()},
         {colors.data(), colors.size()},
         lo,

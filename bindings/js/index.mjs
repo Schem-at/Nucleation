@@ -14,6 +14,8 @@ export { BlockPos } from "./BlockPos.mjs"
 
 export { Dimensions } from "./Dimensions.mjs"
 
+export { FieldRange } from "./FieldRange.mjs"
+
 export { SdfBounds } from "./SdfBounds.mjs"
 
 export { SdfNormal } from "./SdfNormal.mjs"
@@ -49,6 +51,8 @@ export { Diff } from "./Diff.mjs"
 export { Fingerprint } from "./Fingerprint.mjs"
 
 export { DistanceField } from "./DistanceField.mjs"
+
+export { Field3 } from "./Field3.mjs"
 
 export { Geo } from "./Geo.mjs"
 
@@ -126,6 +130,14 @@ export { StoreIo } from "./StoreIo.mjs"
 
 export { Voxelizer } from "./Voxelizer.mjs"
 
+export { CellularSdfConfig } from "./CellularSdfConfig.mjs"
+
+export { GeneratedChunk } from "./GeneratedChunk.mjs"
+
+export { GeneratedWorldStream } from "./GeneratedWorldStream.mjs"
+
+export { WorldGenerator } from "./WorldGenerator.mjs"
+
 export { WorldChunkView } from "./WorldChunkView.mjs"
 
 export { WorldSink } from "./WorldSink.mjs"
@@ -150,7 +162,11 @@ export { SdfCellMode } from "./SdfCellMode.mjs"
 
 export { NucleationError } from "./NucleationError.mjs"
 
+export { GeneratedChunkCoverage } from "./GeneratedChunkCoverage.mjs"
+
+export { GeneratedChunkOverlayMode } from "./GeneratedChunkOverlayMode.mjs"
+
 import wasm from "./diplomat-wasm.mjs";
 import {FUNCTION_PARAM_ALLOC, internalConstructor} from "./diplomat-runtime.mjs";
 
-FUNCTION_PARAM_ALLOC.reserve(internalConstructor, wasm, 56);
+FUNCTION_PARAM_ALLOC.reserve(internalConstructor, wasm, 60);

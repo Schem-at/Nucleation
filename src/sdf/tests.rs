@@ -509,6 +509,22 @@ fn link_matches_torus_at_zero_length_and_stretches_along_z() {
 }
 
 #[test]
+fn repeat_points_instances_child_at_arbitrary_offsets_and_tracks_bounds() {
+    let repeated = SdfNode::RepeatPoints {
+        child: Box::new(SdfNode::Sphere { radius: 1.0 }),
+        offsets: vec![[-5.0, 2.0, 3.0], [7.0, -1.0, 4.0]],
+    };
+
+    assert!((repeated.eval(-5.0, 2.0, 3.0) + 1.0).abs() < 1e-5);
+    assert!((repeated.eval(7.0, -1.0, 4.0) + 1.0).abs() < 1e-5);
+    assert!(repeated.eval(0.0, 0.0, 0.0) > 0.0);
+
+    let bounds = repeated.bounds().expect("finite child and offsets");
+    assert_eq!(bounds.min, [-6.0, -2.0, 2.0]);
+    assert_eq!(bounds.max, [8.0, 3.0, 5.0]);
+}
+
+#[test]
 fn infinite_cylinder_is_exact_and_unbounded_along_y() {
     let c = SdfNode::InfiniteCylinder { radius: 2.0 };
     assert!((c.eval(0.0, 0.0, 0.0) - (-2.0)).abs() < 1e-6);

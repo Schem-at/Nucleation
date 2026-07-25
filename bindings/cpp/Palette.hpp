@@ -47,6 +47,9 @@ namespace capi {
     typedef struct Palette_gradient_ids_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Palette_gradient_ids_json_result;
     Palette_gradient_ids_json_result Palette_gradient_ids_json(const diplomat::capi::Palette* self, uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2, uint32_t steps, diplomat::capi::DiplomatWrite* write);
 
+    typedef struct Palette_gradient_ids_between_blocks_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} Palette_gradient_ids_between_blocks_json_result;
+    Palette_gradient_ids_between_blocks_json_result Palette_gradient_ids_between_blocks_json(const diplomat::capi::Palette* self, diplomat::capi::DiplomatStringView start_block, diplomat::capi::DiplomatStringView end_block, uint32_t steps, diplomat::capi::DiplomatWrite* write);
+
     typedef struct Palette_from_block_ids_result {union {diplomat::capi::Palette* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Palette_from_block_ids_result;
     Palette_from_block_ids_result Palette_from_block_ids(diplomat::capi::DiplomatStringView ids_json);
 
@@ -174,6 +177,27 @@ inline diplomat::result<std::monostate, NucleationError> Palette::gradient_ids_j
         r2,
         g2,
         b2,
+        steps,
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> Palette::gradient_ids_between_blocks_json(std::string_view start_block, std::string_view end_block, uint32_t steps) const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::Palette_gradient_ids_between_blocks_json(this->AsFFI(),
+        {start_block.data(), start_block.size()},
+        {end_block.data(), end_block.size()},
+        steps,
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> Palette::gradient_ids_between_blocks_json_write(std::string_view start_block, std::string_view end_block, uint32_t steps, W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::Palette_gradient_ids_between_blocks_json(this->AsFFI(),
+        {start_block.data(), start_block.size()},
+        {end_block.data(), end_block.size()},
         steps,
         &write);
     return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));

@@ -70,3 +70,4 @@ bindings/kotlin/.gradle/
 bindings/python/build/
 bindings/python/rust/
 bindings/kotlin/.kotlin/
+/generated-world/

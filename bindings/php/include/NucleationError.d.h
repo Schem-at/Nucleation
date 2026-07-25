@@ -24,6 +24,7 @@ typedef enum NucleationError {
   NucleationError_Simulation = 9,
   NucleationError_AlreadyConsumed = 10,
   NucleationError_NotFound = 11,
+  NucleationError_Generation = 12,
 } NucleationError;
 
 typedef struct NucleationError_option {union { NucleationError ok; }; bool is_ok; } NucleationError_option;

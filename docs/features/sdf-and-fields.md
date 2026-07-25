@@ -8,19 +8,19 @@ serialization and compatibility boundary.
 
 ```python
 from nucleation import (
-    Brush, BuildingTool, InterpolationSpace, Palette, Schematic, Sdf,
+    Brush, BuildingTool, Field3, InterpolationSpace, Palette, Schematic, Sdf,
 )
 
-island = Sdf.ellipsoid(14, 8, 14).displace(
-    amplitude=3,
-    frequency=0.1,
-    seed=7,
-    octaves=3,
-)
+detail = Field3.value_noise_fbm(frequency=0.1, seed=7, octaves=3)
+island = Sdf.ellipsoid(14, 8, 14).offset_by_field(detail, amplitude=3)
 
-brush = Brush.linear_gradient(
-    0, -8, 0, 45, 70, 170,
-    0,  8, 0, 235, 190, 70,
+# The same scalar field drives material without being converted into an SDF.
+brush = Brush.field3(
+    detail,
+    [0.0, 1.0],
+    [45, 70, 170, 235, 190, 70],
+    -1.0,
+    1.0,
     InterpolationSpace.Oklab,
 )
 brush.set_palette(Palette.concrete().dithered())
@@ -29,15 +29,57 @@ terrain = Schematic.create("island")
 BuildingTool.fill(terrain, island.to_shape(), brush)
 ```
 
-The graph can be evaluated (`eval_at`), queried for bounds and normals, reused
-as geometry (`to_shape`), reused as color (`Brush.field_sdf`), and explicitly
-serialized (`to_json`). `Sdf.from_json_string` imports old recipes. The legacy
-`schematic_from_sdf*` entry points remain available for JSON material-rule
-recipes, but are no longer the primary construction API.
+`Field3` has scalar semantics: it can be evaluated (`eval_at`), explicitly
+serialized (`to_json`), reused by geometry (`Sdf.offset_by_field`), and reused
+by materials (`Brush.field3`). `Sdf` remains the surface/solid graph and provides
+bounds, normals, and `to_shape`. Both consumers snapshot the immutable field, so
+their lifetime does not depend on the source wrapper. The legacy `Sdf.displace`,
+`Brush.field_sdf`, JSON field-brush, and `schematic_from_sdf*` paths remain for
+compatibility but are no longer the primary construction API.
 
 Every bounded SDF conversion and sampler validates inclusive spans with widened
 integer arithmetic and rejects work above 16,777,216 voxel centers before
 iteration or allocation. Use tighter explicit bounds or split larger jobs.
+
+## Build a shape from primitives
+
+Start with named pieces, transform them into place, then combine them. This
+rocket is only cylinders, cones, rounded boxes, smooth unions, and one
+subtraction. Each line remains an ordinary `Sdf`, so intermediate terms can be
+evaluated, bounded, rendered, or replaced independently.
+
+```python
+body = Sdf.capped_cylinder(4.5, 8.0)
+nose = Sdf.capped_cone(4.0, 4.5, 0.0).translate(0, 12, 0)
+
+fin_x = Sdf.box_shape(2.0, 3.5, 1.2, 0.65)
+fin_z = Sdf.box_shape(1.2, 3.5, 2.0, 0.65)
+fins = (
+    fin_x.translate( 4.5, -5,  0).union_with(fin_x.translate(-4.5, -5, 0))
+    .union_with(fin_z.translate(0, -5,  4.5))
+    .union_with(fin_z.translate(0, -5, -4.5))
+)
+
+nozzle = Sdf.capped_cone(2.0, 0.8, 1.9).translate(0, -10, 0)
+window_cut = Sdf.capped_cylinder(2.1, 1.2).rotate(90, 0, 0).translate(0, 3.5, 4.1)
+window = Sdf.capped_cylinder(1.55, 0.55).rotate(90, 0, 0).translate(0, 3.5, 4.2)
+
+hull = body.smooth_union(nose, 1.1).smooth_union(fins, 0.75).union_with(nozzle)
+rocket = hull.subtract(window_cut).union_with(window)
+```
+
+<div align="center">
+<img src="../media/features/sdf-and-fields/primitive-rocket.gif" width="420" alt="A small red and white voxel rocket materializing from clustered block layers, holding complete, then dematerializing">
+</div>
+
+The animation evaluates that exact graph at voxel centers. Small fragments of
+each Y layer become construction groups, making the blocks visibly assemble
+without hiding the composition behind custom rendering code.
+
+<div align="center">
+<a href="../../examples/features/sdf-and-fields/primitive_rocket.py">Complete Python generator</a>
+· <a href="../downloads/features/sdf-and-fields/primitive-rocket.schem">Download .schem</a>
+</div>
 
 ## Portable custom fields
 
@@ -77,7 +119,7 @@ composes with native nodes. The release-validation instructions below run it
 manually against a freshly installed wheel; current CI uses a smaller inline
 wheel smoke.
 
-### From formula to animated structure
+### Advanced formulas, assembled the same way
 
 These are not pre-modelled assets or Python callback renders. Each generator
 constructs a portable `FieldProgram`, evaluates it through the native runtime,
@@ -85,8 +127,8 @@ records the resulting voxels into `BuildAnimation` groups, and asks Nucleation's
 renderer and GIF encoder for the final loop.
 
 <div align="center">
-<img src="../media/features/sdf-and-fields/gyroid-bloom.gif" width="390" alt="A cyan voxel gyroid rotating while a luminous wave travels upward through its labyrinth layers">
-<img src="../media/features/sdf-and-fields/mandelbulb-forge.gif" width="390" alt="A violet and magenta voxel Mandelbulb rotating while a warm pulse travels from its core through radial shells">
+<img src="../media/features/sdf-and-fields/gyroid-bloom.gif" width="390" alt="A cyan voxel gyroid assembling upward from spatial block clusters, holding complete, then dematerializing">
+<img src="../media/features/sdf-and-fields/mandelbulb-forge.gif" width="390" alt="A violet and magenta voxel Mandelbulb assembling outward from radial block clusters, holding complete, then dematerializing">
 </div>
 
 <table>
@@ -95,17 +137,16 @@ renderer and GIF encoder for the final loop.
 <strong>Gyroid bloom</strong><br>
 A compact implicit program evaluates
 <code>|sin x cos y + sin y cos z + sin z cos x| - t</code>, then intersects the
-surface with a native sphere. Non-empty Y layers become animation groups, so the
-emissive pulse climbs through the labyrinth without breaking its silhouette.<br><br>
+surface with a native sphere. Non-empty Y layers are split into small spatial
+groups, so the labyrinth visibly assembles from bottom to top.<br><br>
 <a href="../../examples/features/sdf-and-fields/gyroid_bloom.py">Complete Python generator</a>
 · <a href="../downloads/features/sdf-and-fields/gyroid-bloom.schem">Download .schem</a>
 </td>
 <td width="50%" valign="top">
 <strong>Mandelbulb forge</strong><br>
 The twelve-iteration power-8 estimator is the same versioned program used by the
-portable example above. Its occupied voxels are grouped into radial shells, so a
-warm pulse moves from the core into the fractal boundary while the camera makes
-one exact turn.<br><br>
+portable example above. Its occupied voxels are grouped by radius, angular
+sector, and hemisphere, so the fractal assembles from its core outward.<br><br>
 <a href="../../examples/features/sdf-and-fields/mandelbulb_forge.py">Complete Python generator</a>
 · <a href="../downloads/features/sdf-and-fields/mandelbulb-forge.schem">Download .schem</a>
 </td>
@@ -132,32 +173,29 @@ p.unary_op(U.Abs); p.push_const_scalar(0.30); p.binary_op(B.Sub)
 p.store_local(distance)
 ```
 
-The animation remains construction-shaped Python rather than timeline plumbing.
-This abbreviated excerpt focuses on grouping and timing; the linked generator is
-the complete executable source, including voxel selection and materials:
+The animation remains construction-shaped Python rather than compositor or
+frame-generation plumbing. A reusable scale/opacity effect starts and ends
+empty, while staggered spatial groups create the assembly traversal:
 
 ```python
-animation.set_default_effect(pulse())
-for y, positions in occupied_layers(field):
-    animation.begin_keyed_group(float(y))
+animation.set_default_effect(materialize())
+for order, positions in enumerate(occupied_clusters(field)):
+    animation.begin_keyed_group(float(order))
     for x, y, z in positions:
         animation.set_block(x, y, z, material(x, y, z))
     animation.end_group()
 
-animation.set_stagger_total_ms(4_920)
-animation.set_stagger_offset_ms(-6_000)
-animation.set_loop_period_ms(6_000)
-camera = AnimationEffect.turntable(6_000)
-camera.set_repeat_forever()
-animation.animate_camera(camera, 0)
+animation.set_stagger_total_ms(1_500)
 ```
 
-Both tracked generators render 120 frames at 20 FPS. The period is sampled
-without a duplicate endpoint, and the negative stagger carries the traveling
-pulse across the loop boundary. Set `NUCLEATION_PACK` to a resource-pack zip and
-run them directly:
+All three tracked generators render 131 frames at 20 FPS. They begin empty,
+assemble into a stable complete hold, and dematerialize back to the same empty
+state for a clean GIF loop. Set `NUCLEATION_PACK` to a resource-pack zip and run
+them directly:
 
 ```bash
+NUCLEATION_PACK=/path/to/pack.zip \
+  python examples/features/sdf-and-fields/primitive_rocket.py
 NUCLEATION_PACK=/path/to/pack.zip \
   python examples/features/sdf-and-fields/gyroid_bloom.py
 NUCLEATION_PACK=/path/to/pack.zip \
@@ -371,10 +409,10 @@ mirrored by that fold; their inferred bounds remain conservative, but the
 result is only a distance estimate. Unbounded primitives remain valid typed
 expressions, but conversion to a finite shape requires explicit bounds.
 
-Generated bindings adapt names conventionally: snake_case in Python,
-camelCase in JavaScript/Kotlin/Java. `Brush.field_sdf` consumes a live typed
-graph for scalar-field color; legacy `Brush.field` accepts JSON. The old
-`Sdf.eval(json, ...)` and `Sdf.schematic_from_sdf*` APIs remain for
+Generated bindings adapt names conventionally: snake_case in Python and
+camelCase in JavaScript/Kotlin/Java. `Brush.field3` consumes a live `Field3`;
+`Brush.field_sdf` is the SDF compatibility path and legacy `Brush.field` accepts
+JSON. The old `Sdf.eval(json, ...)` and `Sdf.schematic_from_sdf*` APIs remain for
 compatibility.
 
 ## Material rules

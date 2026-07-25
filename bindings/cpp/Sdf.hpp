@@ -11,6 +11,7 @@
 #include <functional>
 #include <optional>
 #include <cstdlib>
+#include "Field3.hpp"
 #include "FieldProgram.hpp"
 #include "NucleationError.hpp"
 #include "Schematic.hpp"
@@ -141,8 +142,14 @@ namespace capi {
     typedef struct Sdf_repeat_counted_result {union {diplomat::capi::Sdf* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Sdf_repeat_counted_result;
     Sdf_repeat_counted_result Sdf_repeat_counted(const diplomat::capi::Sdf* self, float spacing_x, float spacing_y, float spacing_z, uint32_t count_x, uint32_t count_y, uint32_t count_z);
 
+    typedef struct Sdf_repeat_points_result {union {diplomat::capi::Sdf* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Sdf_repeat_points_result;
+    Sdf_repeat_points_result Sdf_repeat_points(const diplomat::capi::Sdf* self, diplomat::capi::DiplomatF32View offsets);
+
     typedef struct Sdf_displace_result {union {diplomat::capi::Sdf* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Sdf_displace_result;
     Sdf_displace_result Sdf_displace(const diplomat::capi::Sdf* self, float amplitude, float frequency, int32_t seed, uint32_t octaves);
+
+    typedef struct Sdf_offset_by_field_result {union {diplomat::capi::Sdf* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Sdf_offset_by_field_result;
+    Sdf_offset_by_field_result Sdf_offset_by_field(const diplomat::capi::Sdf* self, const diplomat::capi::Field3* field, float amplitude);
 
     typedef struct Sdf_warp_result {union {diplomat::capi::Sdf* ok; diplomat::capi::NucleationError err;}; bool is_ok;} Sdf_warp_result;
     Sdf_warp_result Sdf_warp(const diplomat::capi::Sdf* self, float amplitude, float frequency, int32_t seed);
@@ -463,12 +470,25 @@ inline diplomat::result<std::unique_ptr<Sdf>, NucleationError> Sdf::repeat_count
     return result.is_ok ? diplomat::result<std::unique_ptr<Sdf>, NucleationError>(diplomat::Ok<std::unique_ptr<Sdf>>(std::unique_ptr<Sdf>(Sdf::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Sdf>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
+inline diplomat::result<std::unique_ptr<Sdf>, NucleationError> Sdf::repeat_points(diplomat::span<const float> offsets) const {
+    auto result = diplomat::capi::Sdf_repeat_points(this->AsFFI(),
+        {offsets.data(), offsets.size()});
+    return result.is_ok ? diplomat::result<std::unique_ptr<Sdf>, NucleationError>(diplomat::Ok<std::unique_ptr<Sdf>>(std::unique_ptr<Sdf>(Sdf::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Sdf>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
 inline diplomat::result<std::unique_ptr<Sdf>, NucleationError> Sdf::displace(float amplitude, float frequency, int32_t seed, uint32_t octaves) const {
     auto result = diplomat::capi::Sdf_displace(this->AsFFI(),
         amplitude,
         frequency,
         seed,
         octaves);
+    return result.is_ok ? diplomat::result<std::unique_ptr<Sdf>, NucleationError>(diplomat::Ok<std::unique_ptr<Sdf>>(std::unique_ptr<Sdf>(Sdf::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Sdf>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<Sdf>, NucleationError> Sdf::offset_by_field(const Field3& field, float amplitude) const {
+    auto result = diplomat::capi::Sdf_offset_by_field(this->AsFFI(),
+        field.AsFFI(),
+        amplitude);
     return result.is_ok ? diplomat::result<std::unique_ptr<Sdf>, NucleationError>(diplomat::Ok<std::unique_ptr<Sdf>>(std::unique_ptr<Sdf>(Sdf::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Sdf>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 

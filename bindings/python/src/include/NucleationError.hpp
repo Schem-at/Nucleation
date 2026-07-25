@@ -38,6 +38,7 @@ inline nucleation::NucleationError nucleation::NucleationError::FromFFI(nucleati
         case nucleation::capi::NucleationError_Simulation:
         case nucleation::capi::NucleationError_AlreadyConsumed:
         case nucleation::capi::NucleationError_NotFound:
+        case nucleation::capi::NucleationError_Generation:
             return static_cast<nucleation::NucleationError::Value>(c_enum);
         default:
             std::abort();

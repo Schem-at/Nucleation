@@ -107,10 +107,11 @@ fn test_auto_register_conversion() {
         );
     }
 
-    // 4. Export to .schem
+    // 4. Export to .schem. Write to the build directory, never back into
+    // tests/samples/ — that fixture is tracked, and overwriting it made every
+    // `cargo test` run leave the working tree dirty.
     let schem_data = to_schematic(&schematic).expect("Failed to export to .schem");
-    let output_path =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/samples/auto_register.schem");
+    let output_path = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("auto_register.schem");
     let mut file = std::fs::File::create(&output_path).expect("Failed to create output file");
     file.write_all(&schem_data)
         .expect("Failed to write to file");

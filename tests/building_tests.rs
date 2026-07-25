@@ -594,6 +594,37 @@ fn palette_from_block_ids_and_introspection() {
 }
 
 #[test]
+fn gradient_ids_between_blocks_uses_measured_endpoint_colors() {
+    use nucleation::building::BlockPalette;
+
+    let palette = BlockPalette::new_solid();
+    let from_blocks = palette
+        .gradient_ids_between_blocks(
+            "minecraft:blue_terracotta",
+            "minecraft:waxed_copper_block",
+            16,
+        )
+        .expect("both endpoint blocks have measured colors");
+    let from_colors = palette.gradient_ids((74, 60, 91), (192, 108, 80), 16);
+
+    assert_eq!(from_blocks, from_colors);
+}
+
+#[test]
+fn gradient_ids_between_blocks_rejects_unknown_endpoint() {
+    use nucleation::building::BlockPalette;
+
+    let palette = BlockPalette::new_solid();
+    assert!(palette
+        .gradient_ids_between_blocks(
+            "minecraft:not_a_real_block",
+            "minecraft:waxed_copper_block",
+            16,
+        )
+        .is_none());
+}
+
+#[test]
 fn set_palette_constrains_fill_to_palette_blocks() {
     use nucleation::building::{BlockPalette, ColorBrush, Cuboid};
 

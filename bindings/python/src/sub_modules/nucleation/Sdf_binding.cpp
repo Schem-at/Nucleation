@@ -1,6 +1,7 @@
 #include "diplomat_nanobind_common.hpp"
 
 
+#include "Field3.hpp"
 #include "FieldProgram.hpp"
 #include "Sdf.hpp"
 #include "SdfAxis.hpp"
@@ -41,9 +42,11 @@ void add_Sdf_binding(nb::module_ mod) {
         .def("mirror", std::move(maybe_op_unwrap(&nucleation::Sdf::mirror)), "axis"_a)
         .def("normal", &nucleation::Sdf::normal, "x"_a, "y"_a, "z"_a, "epsilon"_a)
         .def_static("octahedron", std::move(maybe_op_unwrap(&nucleation::Sdf::octahedron)), "size"_a)
+        .def("offset_by_field", std::move(maybe_op_unwrap(&nucleation::Sdf::offset_by_field)), "field"_a, "amplitude"_a)
         .def_static("plane", std::move(maybe_op_unwrap(&nucleation::Sdf::plane)), "normal_x"_a, "normal_y"_a, "normal_z"_a, "offset"_a)
         .def("repeat_counted", std::move(maybe_op_unwrap(&nucleation::Sdf::repeat_counted)), "spacing_x"_a, "spacing_y"_a, "spacing_z"_a, "count_x"_a, "count_y"_a, "count_z"_a)
         .def("repeat_infinite", std::move(maybe_op_unwrap(&nucleation::Sdf::repeat_infinite)), "spacing_x"_a, "spacing_y"_a, "spacing_z"_a)
+        .def("repeat_points", std::move(maybe_op_unwrap(&nucleation::Sdf::repeat_points)), "offsets"_a)
         .def("rotate", std::move(maybe_op_unwrap(&nucleation::Sdf::rotate)), "x_degrees"_a, "y_degrees"_a, "z_degrees"_a)
         .def_static("round_cone", std::move(maybe_op_unwrap(&nucleation::Sdf::round_cone)), "ax"_a, "ay"_a, "az"_a, "bx"_a, "by"_a, "bz"_a, "r1"_a, "r2"_a)
         .def("rounded", std::move(maybe_op_unwrap(&nucleation::Sdf::rounded)), "radius"_a)

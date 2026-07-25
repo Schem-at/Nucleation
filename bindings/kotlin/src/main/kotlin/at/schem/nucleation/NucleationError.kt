@@ -24,7 +24,8 @@ enum class NucleationError {
     Render,
     Simulation,
     AlreadyConsumed,
-    NotFound;
+    NotFound,
+    Generation;
 
     fun toNative(): Int {
         return this.ordinal

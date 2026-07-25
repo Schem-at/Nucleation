@@ -3,6 +3,7 @@
 #[diplomat::bridge]
 pub mod ffi {
     use super::super::building::ffi::Shape;
+    use super::super::field::ffi::Field3;
     use super::super::schematic::ffi::Schematic;
     use super::super::shared::ffi::NucleationError;
     use diplomat_runtime::DiplomatWrite;
@@ -582,6 +583,24 @@ pub mod ffi {
             )
         }
 
+        /// Finite rigid instances of this graph at arbitrary XYZ offsets.
+        /// `offsets` is flat `[x0, y0, z0, x1, y1, z1, ...]` and may contain
+        /// at most 4096 points.
+        pub fn repeat_points(&self, offsets: &[f32]) -> Result<Box<Sdf>, NucleationError> {
+            if offsets.is_empty() || offsets.len() % 3 != 0 || offsets.len() > 4096 * 3 {
+                return Err(NucleationError::InvalidArgument);
+            }
+            finite(offsets)?;
+            let offsets = offsets
+                .chunks_exact(3)
+                .map(|p| [p[0], p[1], p[2]])
+                .collect();
+            Ok(Box::new(Sdf(crate::sdf::SdfNode::RepeatPoints {
+                child: Box::new(self.0.clone()),
+                offsets,
+            })))
+        }
+
         pub fn displace(
             &self,
             amplitude: f32,
@@ -601,6 +620,20 @@ pub mod ffi {
                 seed,
                 octaves,
             })))
+        }
+
+        /// Offset this surface by a reusable scalar field. The resulting zero
+        /// set is generally an approximate field, not an exact distance field.
+        pub fn offset_by_field(
+            &self,
+            field: &Field3,
+            amplitude: f32,
+        ) -> Result<Box<Sdf>, NucleationError> {
+            self.0
+                .clone()
+                .offset_by_field(field.0.clone(), amplitude)
+                .map(|node| Box::new(Sdf(node)))
+                .map_err(|_| NucleationError::InvalidArgument)
         }
 
         pub fn warp(
@@ -643,6 +676,8 @@ pub mod ffi {
             })
         }
 
+        /// Conservative finite bounds, or `NotFound` for an unbounded graph
+        /// (a bare `plane` or `infinite_cylinder` has no finite extent).
         pub fn bounds(&self) -> Result<SdfBounds, NucleationError> {
             self.0
                 .bounds()
@@ -654,7 +689,7 @@ pub mod ffi {
                     max_y: bounds.max[1],
                     max_z: bounds.max[2],
                 })
-                .ok_or(NucleationError::InvalidArgument)
+                .ok_or(NucleationError::NotFound)
         }
 
         pub fn to_shape(&self) -> Result<Box<Shape>, NucleationError> {

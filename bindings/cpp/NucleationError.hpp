@@ -38,6 +38,7 @@ inline NucleationError NucleationError::FromFFI(diplomat::capi::NucleationError 
         case diplomat::capi::NucleationError_Simulation:
         case diplomat::capi::NucleationError_AlreadyConsumed:
         case diplomat::capi::NucleationError_NotFound:
+        case diplomat::capi::NucleationError_Generation:
             return static_cast<NucleationError::Value>(c_enum);
         default:
             std::abort();

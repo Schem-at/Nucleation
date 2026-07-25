@@ -11,6 +11,7 @@
 #include <functional>
 #include <optional>
 #include <cstdlib>
+#include "Field3.hpp"
 #include "FieldProgram.hpp"
 #include "NucleationError.hpp"
 #include "Schematic.hpp"
@@ -141,8 +142,14 @@ namespace capi {
     typedef struct Sdf_repeat_counted_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_repeat_counted_result;
     Sdf_repeat_counted_result Sdf_repeat_counted(const nucleation::capi::Sdf* self, float spacing_x, float spacing_y, float spacing_z, uint32_t count_x, uint32_t count_y, uint32_t count_z);
 
+    typedef struct Sdf_repeat_points_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_repeat_points_result;
+    Sdf_repeat_points_result Sdf_repeat_points(const nucleation::capi::Sdf* self, nucleation::diplomat::capi::DiplomatF32View offsets);
+
     typedef struct Sdf_displace_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_displace_result;
     Sdf_displace_result Sdf_displace(const nucleation::capi::Sdf* self, float amplitude, float frequency, int32_t seed, uint32_t octaves);
+
+    typedef struct Sdf_offset_by_field_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_offset_by_field_result;
+    Sdf_offset_by_field_result Sdf_offset_by_field(const nucleation::capi::Sdf* self, const nucleation::capi::Field3* field, float amplitude);
 
     typedef struct Sdf_warp_result {union {nucleation::capi::Sdf* ok; nucleation::capi::NucleationError err;}; bool is_ok;} Sdf_warp_result;
     Sdf_warp_result Sdf_warp(const nucleation::capi::Sdf* self, float amplitude, float frequency, int32_t seed);
@@ -463,12 +470,25 @@ inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation
     return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> nucleation::Sdf::repeat_points(nucleation::diplomat::span<const float> offsets) const {
+    auto result = nucleation::capi::Sdf_repeat_points(this->AsFFI(),
+        {offsets.data(), offsets.size()});
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
 inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> nucleation::Sdf::displace(float amplitude, float frequency, int32_t seed, uint32_t octaves) const {
     auto result = nucleation::capi::Sdf_displace(this->AsFFI(),
         amplitude,
         frequency,
         seed,
         octaves);
+    return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError> nucleation::Sdf::offset_by_field(const nucleation::Field3& field, float amplitude) const {
+    auto result = nucleation::capi::Sdf_offset_by_field(this->AsFFI(),
+        field.AsFFI(),
+        amplitude);
     return result.is_ok ? nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Ok<std::unique_ptr<nucleation::Sdf>>(std::unique_ptr<nucleation::Sdf>(nucleation::Sdf::FromFFI(result.ok)))) : nucleation::diplomat::result<std::unique_ptr<nucleation::Sdf>, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
 

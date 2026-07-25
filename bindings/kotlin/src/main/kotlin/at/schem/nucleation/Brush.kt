@@ -17,6 +17,7 @@ internal interface BrushLib: Library {
     fun Brush_set_palette(handle: Pointer, palette: Pointer): Unit
     fun Brush_curve_gradient(stops: Slice, colors: Slice, space: Int): ResultPointerInt
     fun Brush_field_sdf(field: Pointer, stops: Slice, colors: Slice, lo: Float, hi: Float, space: Int): ResultPointerInt
+    fun Brush_field3(field: Pointer, stops: Slice, colors: Slice, lo: Float, hi: Float, space: Int): ResultPointerInt
     fun Brush_field(fieldJson: Slice, stops: Slice, colors: Slice, lo: Float, hi: Float, space: Int): ResultPointerInt
 }
 /** Decides which block goes at each point of a filled shape. Wraps `BrushEnum`.
@@ -190,7 +191,8 @@ class Brush internal constructor (
         }
         @JvmStatic
 
-        /** Color every voxel by evaluating a typed SDF/field graph at its center.
+        /** Compatibility path that colors voxels by evaluating an SDF graph as
+        *a scalar field. Prefer `field3` for new code.
         *`stops` are in `[0, 1]`; `colors` are flat RGB triples. The sampled
         *value is remapped from `[lo, hi]` before reading the gradient.
         */
@@ -216,7 +218,33 @@ class Brush internal constructor (
         }
         @JvmStatic
 
-        /** Legacy JSON-first field brush. Prefer `field_sdf` for new code.
+        /** Color every voxel by evaluating a geometry-neutral scalar field at
+        *its center. The field is cloned into the brush, so both wrappers
+        *may be independently destroyed after construction.
+        */
+        fun field3(field: Field3, stops: FloatArray, colors: UByteArray, lo: Float, hi: Float, space: InterpolationSpace): Result<Brush> {
+            val stopsSliceMemory = PrimitiveArrayTools.borrow(stops)
+            val colorsSliceMemory = PrimitiveArrayTools.borrow(colors)
+
+            val returnVal = lib.Brush_field3(field.handle, stopsSliceMemory.slice, colorsSliceMemory.slice, lo, hi, space.toNative());
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal
+                    val returnOpaque = Brush(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                stopsSliceMemory.close()
+                colorsSliceMemory.close()
+            }
+        }
+        @JvmStatic
+
+        /** Legacy JSON-first field brush. Prefer `field3` for new code.
         */
         fun field(fieldJson: String, stops: FloatArray, colors: UByteArray, lo: Float, hi: Float, space: InterpolationSpace): Result<Brush> {
             val fieldJsonSliceMemory = PrimitiveArrayTools.borrowUtf8(fieldJson)

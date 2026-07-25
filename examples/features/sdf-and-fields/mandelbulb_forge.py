@@ -16,19 +16,23 @@ from field_program_mandelbulb import mandelbulb  # noqa: E402
 SCALE = 13.5
 LIMIT = 18
 GROUPS = 24
-PERIOD_MS = 6_000.0
+EFFECT_MS = 5_000.0
+STAGGER_MS = 1_500.0
 FPS = 20.0
 
 
-def pulse() -> AnimationEffect:
-    effect = AnimationEffect.create(PERIOD_MS)
-    for at, scale in ((0.0, 0.96), (0.17, 1.045), (0.36, 0.96), (1.0, 0.96)):
-        effect.add_keyframe("scale", at, scale, "inOutSine")
-    for at, strength in ((0.0, 0.0), (0.12, 0.78), (0.30, 0.0), (1.0, 0.0)):
-        effect.add_keyframe("emissiveR", at, strength, "inOutSine")
-        effect.add_keyframe("emissiveG", at, strength * 0.32, "inOutSine")
-        effect.add_keyframe("emissiveB", at, strength * 0.58, "inOutSine")
-    effect.set_repeat_forever()
+def materialize() -> AnimationEffect:
+    effect = AnimationEffect.create(EFFECT_MS)
+    for at, scale in (
+        (0.00, 0.0), (0.04, 0.0), (0.15, 1.0),
+        (0.76, 1.0), (0.89, 0.0), (1.00, 0.0),
+    ):
+        effect.add_keyframe("scale", at, scale, "inOutCubic")
+    for at, opacity in (
+        (0.00, 0.0), (0.05, 0.0), (0.13, 1.0),
+        (0.78, 1.0), (0.90, 0.0), (1.00, 0.0),
+    ):
+        effect.add_keyframe("opacity", at, opacity, "inOutSine")
     return effect
 
 
@@ -49,7 +53,7 @@ def material(x: int, y: int, z: int) -> str:
 def build_animation() -> BuildAnimation:
     # The program's 12-iteration loop runs in native code for every query.
     field = mandelbulb(iterations=12).scale(SCALE)
-    shells: dict[int, list[tuple[int, int, int]]] = defaultdict(list)
+    shells: dict[tuple[int, int, int], list[tuple[int, int, int]]] = defaultdict(list)
     max_radius = float(LIMIT)
     for x in range(-LIMIT, LIMIT + 1):
         for y in range(-LIMIT, LIMIT + 1):
@@ -57,25 +61,23 @@ def build_animation() -> BuildAnimation:
                 if field.eval_at(x, y, z) <= 0.0:
                     radius = sqrt(x * x + y * y + z * z)
                     shell = min(GROUPS - 1, int(radius / max_radius * GROUPS))
-                    shells[shell].append((x, y, z))
+                    angle = (atan2(z, x) / (2.0 * pi)) % 1.0
+                    sector = min(7, int(angle * 8))
+                    hemisphere = int(y >= 0)
+                    shells[(shell, sector, hemisphere)].append((x, y, z))
 
     animation = BuildAnimation.create("field-program-mandelbulb")
-    animation.set_default_effect(pulse())
+    animation.set_default_effect(materialize())
     block_count = 0
-    for shell in sorted(shells):
-        animation.begin_keyed_group(float(shell))
+    for order, shell in enumerate(sorted(shells)):
+        animation.begin_keyed_group(float(order))
         for x, y, z in shells[shell]:
             animation.set_block(x, y, z, material(x, y, z))
         animation.end_group()
         block_count += len(shells[shell])
 
-    animation.set_stagger_total_ms(PERIOD_MS * 0.76)
-    animation.set_stagger_offset_ms(-PERIOD_MS)
-    animation.set_loop_period_ms(PERIOD_MS)
-    camera = AnimationEffect.turntable(PERIOD_MS)
-    camera.set_repeat_forever()
-    animation.animate_camera(camera, 0.0)
-    print(f"mandelbulb: {block_count} blocks in {len(shells)} radial shells")
+    animation.set_stagger_total_ms(STAGGER_MS)
+    print(f"mandelbulb: {block_count} blocks in {len(shells)} assembly clusters")
     return animation
 
 

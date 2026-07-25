@@ -20,6 +20,7 @@ internal interface PaletteLib: Library {
     fun Palette_sorted_by_lightness(handle: Pointer): Pointer
     fun Palette_ramp_ids_json(handle: Pointer, r1: FFIUint8, g1: FFIUint8, b1: FFIUint8, r2: FFIUint8, g2: FFIUint8, b2: FFIUint8, steps: FFIUint32, write: Pointer): ResultUnitInt
     fun Palette_gradient_ids_json(handle: Pointer, r1: FFIUint8, g1: FFIUint8, b1: FFIUint8, r2: FFIUint8, g2: FFIUint8, b2: FFIUint8, steps: FFIUint32, write: Pointer): ResultUnitInt
+    fun Palette_gradient_ids_between_blocks_json(handle: Pointer, startBlock: Slice, endBlock: Slice, steps: FFIUint32, write: Pointer): ResultUnitInt
     fun Palette_from_block_ids(idsJson: Slice): ResultPointerInt
     fun Palette_len(handle: Pointer): FFISizet
     fun Palette_block_ids_json(handle: Pointer, write: Pointer): Unit
@@ -261,6 +262,31 @@ class Palette internal constructor (
             return returnString.ok()
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+        }
+    }
+
+    /** JSON array of exactly `steps` block ids sampling an Oklab gradient
+    *whose endpoints are the measured texture colors of `start_block`
+    *and `end_block`. Errors with `NotFound` when either id is unknown
+    *or has no measured color, or when this palette is empty.
+    */
+    fun gradientIdsBetweenBlocksJson(startBlock: String, endBlock: String, steps: UInt): Result<String> {
+        val startBlockSliceMemory = PrimitiveArrayTools.borrowUtf8(startBlock)
+        val endBlockSliceMemory = PrimitiveArrayTools.borrowUtf8(endBlock)
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.Palette_gradient_ids_between_blocks_json(handle, startBlockSliceMemory.slice, endBlockSliceMemory.slice, FFIUint32(steps), write);
+        try {
+            val nativeOkVal = returnVal.getNativeOk();
+            if (nativeOkVal != null) {
+
+                val returnString = DW.writeToString(write)
+                return returnString.ok()
+            } else {
+                return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+            }
+        } finally {
+            startBlockSliceMemory.close()
+            endBlockSliceMemory.close()
         }
     }
 

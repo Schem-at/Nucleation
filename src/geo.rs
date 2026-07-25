@@ -19,6 +19,35 @@ pub struct Footprint {
     pub block: String,
 }
 
+/// The JSON wire form of a [`Footprint`], as accepted by every binding that
+/// takes footprint data:
+/// `[{"polygon":[[x,z],...],"height":40,"min_y":1,"block":"minecraft:bricks"}]`.
+///
+/// `height` is the absolute top Y and `min_y` defaults to 1. Defined once here
+/// so the schematic and world-generation entry points cannot drift apart.
+#[derive(serde::Deserialize)]
+struct RawFootprint {
+    polygon: Vec<(f64, f64)>,
+    height: i32,
+    #[serde(default)]
+    min_y: Option<i32>,
+    block: String,
+}
+
+/// Parse the footprint JSON wire form into [`Footprint`] values.
+pub fn parse_footprints_json(json: &str) -> Result<Vec<Footprint>, serde_json::Error> {
+    let raw: Vec<RawFootprint> = serde_json::from_str(json)?;
+    Ok(raw
+        .into_iter()
+        .map(|feature| Footprint {
+            polygon: feature.polygon,
+            y_min: feature.min_y.unwrap_or(1),
+            y_max: feature.height,
+            block: feature.block,
+        })
+        .collect())
+}
+
 /// Stamp building footprints into a massed schematic. Footprints are filled
 /// tallest-last, so where they overlap each column keeps its tallest occupant
 /// (the way `building:part` refinements sit on top of a base outline). When
@@ -114,6 +143,30 @@ pub fn heightmap_terrain(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn footprint_json_parses_shared_wire_form() {
+        // One parser serves both the schematic and world-generation entry
+        // points, so this pins the schema they must agree on: `height` is the
+        // absolute top Y and `min_y` defaults to 1 when omitted.
+        let parsed = parse_footprints_json(
+            r#"[
+                {"polygon":[[0,0],[4,0],[4,4]],"height":40,"min_y":7,"block":"minecraft:bricks"},
+                {"polygon":[[0,0],[2,0],[2,2]],"height":5,"block":"minecraft:stone"}
+            ]"#,
+        )
+        .expect("valid footprint json");
+
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].y_min, 7);
+        assert_eq!(parsed[0].y_max, 40);
+        assert_eq!(parsed[0].block, "minecraft:bricks");
+        assert_eq!(parsed[0].polygon, vec![(0.0, 0.0), (4.0, 0.0), (4.0, 4.0)]);
+        assert_eq!(parsed[1].y_min, 1, "min_y must default to 1");
+        assert_eq!(parsed[1].y_max, 5);
+
+        assert!(parse_footprints_json("not json").is_err());
+    }
 
     #[test]
     fn footprints_extrude_tallest_wins() {

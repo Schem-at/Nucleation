@@ -2,6 +2,7 @@
 
 
 #include "Brush.hpp"
+#include "Field3.hpp"
 #include "InterpolationSpace.hpp"
 #include "Palette.hpp"
 #include "Sdf.hpp"
@@ -19,6 +20,7 @@ void add_Brush_binding(nb::module_ mod) {
         .def_static("color", std::move(maybe_op_unwrap(&nucleation::Brush::color)), "r"_a, "g"_a, "b"_a)
         .def_static("curve_gradient", std::move(maybe_op_unwrap(&nucleation::Brush::curve_gradient)), "stops"_a, "colors"_a, "space"_a)
         .def_static("field", std::move(maybe_op_unwrap(&nucleation::Brush::field)), "field_json"_a, "stops"_a, "colors"_a, "lo"_a, "hi"_a, "space"_a)
+        .def_static("field3", std::move(maybe_op_unwrap(&nucleation::Brush::field3)), "field"_a, "stops"_a, "colors"_a, "lo"_a, "hi"_a, "space"_a)
         .def_static("field_sdf", std::move(maybe_op_unwrap(&nucleation::Brush::field_sdf)), "field"_a, "stops"_a, "colors"_a, "lo"_a, "hi"_a, "space"_a)
         .def_static("linear_gradient", std::move(maybe_op_unwrap(&nucleation::Brush::linear_gradient)), "x1"_a, "y1"_a, "z1"_a, "r1"_a, "g1"_a, "b1"_a, "x2"_a, "y2"_a, "z2"_a, "r2"_a, "g2"_a, "b2"_a, "space"_a)
         .def_static("point_gradient", std::move(maybe_op_unwrap(&nucleation::Brush::point_gradient)), "positions"_a, "colors"_a, "falloff"_a, "space"_a)

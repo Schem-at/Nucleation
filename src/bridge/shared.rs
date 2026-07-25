@@ -20,6 +20,9 @@ pub mod ffi {
         Simulation,
         AlreadyConsumed,
         NotFound,
+        /// A world-generation source failed while producing a chunk, even though
+        /// the request itself was well-formed (see `world_generation`).
+        Generation,
     }
 
     #[diplomat::attr(auto, abi_compatible)]
