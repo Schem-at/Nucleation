@@ -93,8 +93,16 @@ public final class TraceCapture {
         Method initServer = MinecraftServer.class.getDeclaredMethod("initServer");
         Method tickServer = MinecraftServer.class.getDeclaredMethod(
                 "tickServer", BooleanSupplier.class);
+        // runServer() does more than tickServer per iteration: it also drains the
+        // server task queue. Chunk entity loading is dispatched through that queue,
+        // and until it completes LevelTicks refuses to run a chunk's scheduled
+        // ticks (it gates on isPositionTickingWithEntitiesLoaded). Ticking without
+        // pumping tasks therefore looks exactly like redstone that ignores input.
+        Method waitUntilNextTick = MinecraftServer.class
+                .getDeclaredMethod("waitUntilNextTick");
         initServer.setAccessible(true);
         tickServer.setAccessible(true);
+        waitUntilNextTick.setAccessible(true);
         initServer.invoke(server);
 
         ServerLevel level = server.overworld();
@@ -140,6 +148,7 @@ public final class TraceCapture {
         int warmup = 0;
         while (!level.isPositionTickingWithEntitiesLoaded(centre.pack()) && warmup < 600) {
             tickServer.invoke(server, (BooleanSupplier) () -> true);
+            waitUntilNextTick.invoke(server);
             warmup++;
         }
         System.out.printf("  warmup ticks until entity-ticking: %d (ready=%s)%n",
@@ -200,6 +209,7 @@ public final class TraceCapture {
 
         for (int tick = 0; tick < maxTicks; tick++) {
             tickServer.invoke(server, (BooleanSupplier) () -> true);
+            waitUntilNextTick.invoke(server);
             if (tick < 3) {
                 System.out.printf("    t%d gameTime=%d pending=%d%n",
                         tick, level.getGameTime(), level.getBlockTicks().count());
