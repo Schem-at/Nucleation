@@ -29,6 +29,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod behaviour;
 pub mod phase;
 pub mod pos;
 pub mod schedule;
@@ -36,6 +37,7 @@ pub mod sim;
 pub mod state;
 pub mod world;
 
+pub use behaviour::{BehaviourTable, BlockBehaviour, Inert, TickCtx};
 pub use phase::{Phase, PHASE_ORDER};
 pub use pos::{Bounds, Dir, Pos, ALL_DIRS};
 pub use schedule::{BlockEvent, EventQueue, ScheduledTick, TickPriority, TickQueue};

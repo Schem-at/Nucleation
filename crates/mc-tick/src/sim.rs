@@ -8,10 +8,11 @@
 //! project via a registry; this module's job is to be the thing whose ordering
 //! is already right when that happens.
 
+use crate::behaviour::{BehaviourTable, TickCtx};
 use crate::phase::{Phase, PHASE_ORDER};
 use crate::pos::{Bounds, Pos};
 use crate::schedule::{BlockEvent, EventQueue, TickPriority, TickQueue};
-use crate::state::StateRegistry;
+use crate::state::{StateId, StateRegistry};
 use crate::world::World;
 
 /// How many times the block-events phase may chain within one tick before the
@@ -52,12 +53,23 @@ pub struct Checkpoint {
 }
 
 /// A controllable, deterministic simulation of a bounded region.
-#[derive(Debug, Clone)]
+///
+/// Not `Clone`: it owns trait-object behaviours, which cannot be duplicated
+/// meaningfully. Duplicating a *run* is what [`Checkpoint`] is for, and that
+/// carries the mutable state rather than the behaviour table — which is
+/// immutable once built anyway.
+#[derive(Debug)]
 pub struct Simulation {
     registry: StateRegistry,
     world: World,
     ticks: TickQueue,
     events: EventQueue,
+    behaviours: BehaviourTable,
+    /// States encountered during a tick with no registered behaviour.
+    ///
+    /// Accumulated during dispatch, where the table cannot be mutated, and folded
+    /// back in by [`Simulation::unknown_report`].
+    unknown_seen: Vec<StateId>,
     tick: u64,
     /// The state to return to on [`Simulation::reset`].
     ///
@@ -81,9 +93,36 @@ impl Simulation {
             world,
             ticks: TickQueue::new(),
             events: EventQueue::new(),
+            behaviours: BehaviourTable::new(),
+            unknown_seen: Vec::new(),
             tick: 0,
             initial,
         }
+    }
+
+    /// The behaviour table.
+    pub fn behaviours(&self) -> &BehaviourTable {
+        &self.behaviours
+    }
+
+    /// The behaviour table, for registering block behaviour.
+    pub fn behaviours_mut(&mut self) -> &mut BehaviourTable {
+        &mut self.behaviours
+    }
+
+    /// A report of every block state encountered without a behaviour, or `None`.
+    ///
+    /// **Check this before trusting a result.** A contraption containing one
+    /// unimplemented component simulates that component as nothing and produces a
+    /// plausible, wrong answer — which is the one failure mode that would quietly
+    /// undermine this whole project.
+    pub fn unknown_report(&mut self) -> Option<String> {
+        let seen = std::mem::take(&mut self.unknown_seen);
+        for state in seen {
+            self.behaviours.note_unknown(state);
+        }
+        self.behaviours.note_unknown_in(&self.world);
+        self.behaviours.unknown_report(&self.registry)
     }
 
     /// Treat the current state as the baseline that [`Simulation::reset`] returns to.
@@ -227,10 +266,28 @@ impl Simulation {
             Phase::WorldBorder | Phase::Weather | Phase::Raids | Phase::ChunkManager => None,
 
             Phase::BlockTicks => {
-                // Drained here; dispatch to block behaviour arrives with the
-                // behaviour registry. Draining already exercises the ordering
-                // contract, which is the part worth getting right first.
-                let _due = self.ticks.drain_due(self.tick);
+                // Drain first, then dispatch: a behaviour may schedule further
+                // ticks, and those belong to a later tick rather than extending
+                // this drain. Draining into a Vec is what keeps that boundary
+                // sharp.
+                let due = self.ticks.drain_due(self.tick);
+                for entry in due {
+                    let state = self.world.get(entry.pos);
+                    let Some(behaviour) = self.behaviours.get(state) else {
+                        // Unregistered: record it rather than treating the block
+                        // as inert. See BehaviourTable's module docs.
+                        self.unknown_seen.push(state);
+                        continue;
+                    };
+                    let mut ctx = TickCtx {
+                        world: &mut self.world,
+                        ticks: &mut self.ticks,
+                        events: &mut self.events,
+                        states: &self.registry,
+                        tick: self.tick,
+                    };
+                    behaviour.on_scheduled_tick(&mut ctx, entry.pos);
+                }
                 None
             }
 
@@ -249,9 +306,24 @@ impl Simulation {
             if batch.is_empty() {
                 return None;
             }
-            // Handlers land here once behaviour exists. Each batch may enqueue
-            // the next, which is why this loops rather than draining once.
-            for _event in batch {}
+            // Each batch may enqueue the next, which is why this loops rather
+            // than draining once — the game chains block events within a tick and
+            // piston contraptions depend on it.
+            for event in batch {
+                let state = self.world.get(event.pos);
+                let Some(behaviour) = self.behaviours.get(state) else {
+                    self.unknown_seen.push(state);
+                    continue;
+                };
+                let mut ctx = TickCtx {
+                    world: &mut self.world,
+                    ticks: &mut self.ticks,
+                    events: &mut self.events,
+                    states: &self.registry,
+                    tick: self.tick,
+                };
+                behaviour.on_block_event(&mut ctx, event.pos, event.id, event.param);
+            }
         }
         // Still not empty after the cap: report instead of spinning.
         if self.events.is_empty() {
@@ -361,6 +433,102 @@ mod tests {
         let reason = s.run_until_quiescent(100);
         assert_eq!(reason, StopReason::Quiescent);
         assert!(s.tick_count() >= 3, "must reach the scheduled tick");
+    }
+
+    /// Turns itself into `becomes` when its scheduled tick fires.
+    struct Transmute {
+        becomes: StateId,
+    }
+    impl crate::behaviour::BlockBehaviour for Transmute {
+        fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+            ctx.set(pos, self.becomes);
+        }
+        fn name(&self) -> &'static str {
+            "transmute"
+        }
+    }
+
+    /// Queues a block event when ticked, and records the event by setting a block.
+    struct EventEcho {
+        marker: StateId,
+    }
+    impl crate::behaviour::BlockBehaviour for EventEcho {
+        fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+            ctx.queue_event(pos, 7, 3);
+        }
+        fn on_block_event(&self, ctx: &mut TickCtx<'_>, pos: Pos, id: u8, param: u8) -> bool {
+            if id == 7 && param == 3 {
+                ctx.set(pos.offset(crate::pos::Dir::Up), self.marker);
+            }
+            true
+        }
+        fn name(&self) -> &'static str {
+            "event_echo"
+        }
+    }
+
+    #[test]
+    fn a_scheduled_tick_dispatches_to_the_registered_behaviour() {
+        let mut s = sim();
+        let before = s.registry_mut().intern("test:before").unwrap();
+        let after = s.registry_mut().intern("test:after").unwrap();
+        s.behaviours_mut()
+            .register(before, Box::new(Transmute { becomes: after }));
+        // The block we turn *into* needs a behaviour too. Without this the run
+        // reports `test:after` as unimplemented — which is the loud-failure
+        // mechanism working: a block produced mid-simulation is just as capable
+        // of being an unhandled component as one placed at load.
+        s.behaviours_mut()
+            .register(after, Box::new(crate::behaviour::Inert::new("after")));
+
+        let pos = Pos::new(2, 2, 2);
+        s.world_mut().set(pos, before);
+        s.schedule_tick(pos, 2, TickPriority::Normal);
+
+        s.run_until_quiescent(50);
+        assert_eq!(s.world().get(pos), after, "behaviour must have run");
+        assert_eq!(s.unknown_report(), None, "everything present was registered");
+    }
+
+    #[test]
+    fn a_block_event_reaches_its_behaviour_in_the_same_tick() {
+        // The scheduled tick queues an event; the event runs in phase 7 of that
+        // same tick, so one tick is enough for both to have happened.
+        let mut s = sim();
+        let echo = s.registry_mut().intern("test:echo").unwrap();
+        let marker = s.registry_mut().intern("test:marker").unwrap();
+        s.behaviours_mut()
+            .register(echo, Box::new(EventEcho { marker }));
+        s.behaviours_mut()
+            .register(marker, Box::new(crate::behaviour::Inert::new("marker")));
+
+        let pos = Pos::new(3, 3, 3);
+        s.world_mut().set(pos, echo);
+        s.schedule_tick(pos, 0, TickPriority::Normal);
+
+        s.step();
+        assert_eq!(
+            s.world().get(pos.offset(crate::pos::Dir::Up)),
+            marker,
+            "block event must dispatch in the same tick as the scheduled tick"
+        );
+    }
+
+    #[test]
+    fn an_unregistered_block_is_reported_rather_than_simulated_as_nothing() {
+        // The failure mode this project cannot tolerate: an unimplemented
+        // component silently behaving as air and yielding a plausible, wrong
+        // answer.
+        let mut s = sim();
+        let observer = s.registry_mut().intern("minecraft:observer[facing=up]").unwrap();
+        let pos = Pos::new(1, 1, 1);
+        s.world_mut().set(pos, observer);
+        s.schedule_tick(pos, 1, TickPriority::Normal);
+
+        s.run_until_quiescent(20);
+
+        let report = s.unknown_report().expect("must report the gap");
+        assert!(report.contains("minecraft:observer"), "{report}");
     }
 
     #[test]
