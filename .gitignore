@@ -77,3 +77,4 @@ bindings/kotlin/.kotlin/
 
 # Vanilla oracle scratch: server jar, extracted libraries, test worlds.
 /tools/gametest/work/
+/tools/gametest/logs/
