@@ -86,6 +86,7 @@ fn cluster_ids_match_their_golden_values() {
         partition_policy: nucleation::world_segment::partition::PartitionPolicy::Off,
         algorithm_version: 1,
         partition_floor_share: None,
+        split_disconnected: None,
     };
     let tile_bounds = TileBounds { min: (0, -64, 0), max: (127, 63, 127) };
 
@@ -155,6 +156,7 @@ fn cluster_ids_match_their_golden_values_under_hard_cut() {
         partition_policy: PartitionPolicy::HardCut,
         algorithm_version: 1,
         partition_floor_share: None,
+        split_disconnected: None,
     };
     let tile_bounds = TileBounds { min: (0, -64, 0), max: (127, 63, 127) };
 

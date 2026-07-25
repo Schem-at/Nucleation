@@ -78,6 +78,78 @@ pub struct SegConfig {
     /// global-palette-only classification, since it belongs to no partition
     /// whose local floor could be defined.
     pub partition_floor_share: Option<f32>,
+    /// When `Some`, undo the morphological closing where it has fused two
+    /// genuinely disconnected builds.
+    ///
+    /// The closing (dilate by `closing_radius` then label) is *meant* to unify
+    /// a single build's near-parts: two occupied cells within `2R` on every
+    /// axis merge, bridging gaps up to about `(2R + 1) * cell_size` blocks.
+    /// That is correct for one build's scattered pieces, but it also fuses two
+    /// separate builds that merely happen to sit that close — the failure that
+    /// produced a single "build" spanning two spatially-disconnected plots.
+    ///
+    /// With this set, each merged cluster's **original (undilated)** cells are
+    /// re-examined: if they fall into two or more six-connected components that
+    /// are each substantial (see [`DisconnectedSplit`]) and genuinely far
+    /// apart, the cluster is split into one cluster per substantial component,
+    /// with the small leftover fragments attached to their nearest substantial
+    /// component. Clusters that do not meet the criteria are left exactly as
+    /// the closing produced them, so a single build whose parts the closing was
+    /// meant to unify is never fragmented.
+    ///
+    /// `None` (default) disables the split. Because it is folded into
+    /// [`SegConfig::config_hash`] as a backward-compatible extension that
+    /// appends nothing when `None`, every existing `ClusterId` is preserved
+    /// byte-for-byte and the determinism goldens are unchanged. A future
+    /// extraction opts in by setting this; already-extracted builds stay as
+    /// they were until re-extracted.
+    pub split_disconnected: Option<DisconnectedSplit>,
+}
+
+/// Thresholds governing [`SegConfig::split_disconnected`].
+///
+/// All three conditions must hold for a merged cluster to be split, which is
+/// what keeps the split from fragmenting a legitimate single build:
+///
+/// * **`min_component_blocks`** — a component must hold at least this many
+///   blocks to count as a *seed* (a build in its own right). A single build's
+///   detached bits (a lamp, a wire run, a stray pillar) fall below this and are
+///   attached to the nearest seed rather than split off.
+/// * **`min_component_share`** — a seed must also account for at least this
+///   fraction of the merged cluster's blocks. At the `0.40` default at most two
+///   components can qualify, so a cluster only splits when it is dominated by
+///   two comparably-sized masses — the signature of two builds accidentally
+///   fused, not of one build with many small parts.
+/// * **`min_gap_cells`** — two seeds are only split apart when the empty gap
+///   between them is at least this many cells (Chebyshev, in occupancy cells).
+///   A smaller gap is treated as internal to one build — precisely the
+///   near-parts the closing is meant to unify.
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub struct DisconnectedSplit {
+    /// Minimum blocks for a component to be treated as a standalone build.
+    pub min_component_blocks: u64,
+    /// Minimum share (0.0..=1.0) of the merged cluster's blocks a seed must hold.
+    pub min_component_share: f32,
+    /// Minimum Chebyshev cell gap between two seeds for them to be split apart.
+    pub min_gap_cells: u32,
+}
+
+impl Default for DisconnectedSplit {
+    fn default() -> Self {
+        // Defaults chosen to catch the demonstrated failure (two ~180k-block
+        // plot builds fused across a 7-block / 2-cell gap) while leaving
+        // legitimate multi-part single builds untouched:
+        //   - a real standalone build is far larger than 4_096 blocks;
+        //   - two comparable halves each >= 40% is the two-builds signature and
+        //     mathematically admits at most two seeds;
+        //   - a >= 2-cell gap means a genuine empty cell layer separates them,
+        //     not merely a diagonal touch.
+        DisconnectedSplit {
+            min_component_blocks: 4_096,
+            min_component_share: 0.40,
+            min_gap_cells: 2,
+        }
+    }
 }
 
 impl SegConfig {
@@ -146,6 +218,23 @@ impl SegConfig {
             v[1..].copy_from_slice(&s.to_le_bytes());
             v
         });
+        // `split_disconnected` is folded in as a second backward-compatible
+        // extension, on exactly the same terms as `partition_floor_share`: a
+        // `None` config appends nothing and therefore digests byte-for-byte
+        // identically to the pre-feature layout, so every golden-pinned
+        // `ClusterId` is unchanged. A `Some` config appends one framed part
+        // `[1u8, min_component_blocks LE(8), min_component_share LE(4),
+        // min_gap_cells LE(4)]` (17 bytes); `ContentId::of` length-frames each
+        // part and the running digest distinguishes part counts, so a `Some`
+        // can never collide with any `None`, and two `Some`s differ by content.
+        let split: Option<[u8; 17]> = self.split_disconnected.as_ref().map(|s| {
+            let mut v = [0u8; 17];
+            v[0] = 1;
+            v[1..9].copy_from_slice(&s.min_component_blocks.to_le_bytes());
+            v[9..13].copy_from_slice(&s.min_component_share.to_le_bytes());
+            v[13..17].copy_from_slice(&s.min_gap_cells.to_le_bytes());
+            v
+        });
         // Bound to locals so the `to_le_bytes` temporaries outlive the
         // `ContentId::of` call rather than being dropped at the end of a `let`.
         let cell = self.cell_size.to_le_bytes();
@@ -170,6 +259,15 @@ impl SegConfig {
         if let Some(bytes) = floor_share.as_ref() {
             parts.push(bytes);
         }
+        // Ordering matters: `split_disconnected` is appended *after*
+        // `partition_floor_share`. A config with only `split_disconnected` set
+        // must not digest like one with only `partition_floor_share` set — the
+        // two extension parts have different lengths (5 vs 17) and length
+        // framing keeps them distinct, but appending in a fixed order also
+        // keeps the two independent `Some`/`None` combinations unambiguous.
+        if let Some(bytes) = split.as_ref() {
+            parts.push(bytes);
+        }
         ContentId::of(&parts)
     }
 }
@@ -183,6 +281,7 @@ impl Default for SegConfig {
             partition_policy: PartitionPolicy::Off,
             algorithm_version: 1,
             partition_floor_share: None,
+            split_disconnected: None,
         }
     }
 }
@@ -384,7 +483,28 @@ fn segment_tile_inner(
         group_into(part_grid, config.closing_radius, *pidx, &name, &mut groups);
     }
 
-    let (cluster_of_cell, partition_of_cluster) = assign_ids(config_id, tile.id(), groups);
+    let (cluster_of_cell, mut partition_of_cluster) = assign_ids(config_id, tile.id(), groups);
+
+    // 3b. Undo the closing where it fused two disconnected builds.
+    //
+    // The closing at step 2/3 groups by the *dilated* occupancy, so two builds
+    // that sit within `2R` cells of each other land in one group even though
+    // their original cells never touch. When enabled, re-examine each group's
+    // original cells and split it back apart if it is really two (or more)
+    // substantial, well-separated builds. Disabled (`None`) by default, in
+    // which case this is a no-op and `cluster_of_cell` is untouched.
+    let cluster_of_cell = match &config.split_disconnected {
+        Some(policy) => split_disconnected_clusters(
+            policy,
+            config_id,
+            tile.id(),
+            &artificial,
+            &geometry,
+            cluster_of_cell,
+            &mut partition_of_cluster,
+        ),
+        None => cluster_of_cell,
+    };
 
     // 4. Fold original blocks back into their cluster.
     //
@@ -592,6 +712,218 @@ fn assign_ids(
     }
 
     (cluster_of_cell, partition_of_cluster)
+}
+
+/// Undo the closing where it fused two disconnected builds into one cluster.
+///
+/// See [`SegConfig::split_disconnected`] and [`DisconnectedSplit`]. Runs only
+/// when the caller opted in, and rewrites the finished `cluster_of_cell`:
+///
+/// * the six-connected components of each `(partition, cluster)`'s **original**
+///   cells are re-derived — the dilation is deliberately not consulted, since
+///   that is exactly what over-merged them;
+/// * a component is a *seed* if it clears both `min_component_blocks` and
+///   `min_component_share` of the merged cluster;
+/// * if two or more seeds exist and every seed pair is at least `min_gap_cells`
+///   apart (Chebyshev, in cells), the cluster is split: one fresh `ClusterId`
+///   per seed, anchored on that seed's own lexmin cell — which keeps the
+///   anchor-injectivity invariant `assign_ids` relies on, and re-mints the
+///   *same* id for the seed that still owns the original global lexmin — and
+///   every non-seed fragment is attached to its nearest seed;
+/// * clusters that are one component, or lack two well-separated seeds, are
+///   returned byte-for-byte unchanged.
+///
+/// Determinism: cell groups come from a `BTreeMap` scan (ascending), components
+/// are emitted in ascending-lexmin order, seed ids derive from content, and
+/// fragment attachment breaks ties on the smaller seed anchor — so the output
+/// depends only on content, never on iteration accidents.
+fn split_disconnected_clusters(
+    policy: &DisconnectedSplit,
+    config: ContentId,
+    tile: TileId,
+    artificial: &[((i32, i32, i32), Option<u32>)],
+    geometry: &OccupancyGrid,
+    cluster_of_cell: BTreeMap<(Option<u32>, (i32, i32, i32)), ClusterId>,
+    partition_of_cluster: &mut BTreeMap<ClusterId, Option<String>>,
+) -> BTreeMap<(Option<u32>, (i32, i32, i32)), ClusterId> {
+    // Blocks per (partition, cell): the substantiality thresholds are in
+    // blocks, but the closing and this split both work in cells, so we need the
+    // per-cell block tally step 4 would otherwise be the first to compute.
+    let mut cell_blocks: BTreeMap<(Option<u32>, (i32, i32, i32)), u64> = BTreeMap::new();
+    for (pos, pidx) in artificial {
+        let cell = geometry.cell_of(pos.0, pos.1, pos.2);
+        *cell_blocks.entry((*pidx, cell)).or_insert(0) += 1;
+    }
+
+    // The cells of each merged cluster, keyed by `(partition, cluster)` so the
+    // per-partition `HardCut` case (one cell in two partitions' clusters) stays
+    // separated exactly as `cluster_of_cell` already keeps it.
+    let mut cells_of: BTreeMap<(Option<u32>, ClusterId), Vec<(i32, i32, i32)>> = BTreeMap::new();
+    for ((pidx, cell), id) in &cluster_of_cell {
+        cells_of.entry((*pidx, *id)).or_default().push(*cell);
+    }
+
+    let mut out: BTreeMap<(Option<u32>, (i32, i32, i32)), ClusterId> = BTreeMap::new();
+    for ((pidx, old_id), cells) in cells_of {
+        let comps = six_connected_components(&cells);
+        if comps.len() < 2 {
+            // One component: nothing the closing bridged. Leave it be.
+            for c in &cells {
+                out.insert((pidx, *c), old_id);
+            }
+            continue;
+        }
+        let partition = partition_of_cluster.get(&old_id).cloned().flatten();
+        let comp_blocks: Vec<u64> = comps
+            .iter()
+            .map(|comp| {
+                comp.iter().map(|c| cell_blocks.get(&(pidx, *c)).copied().unwrap_or(0)).sum()
+            })
+            .collect();
+        let total: u64 = comp_blocks.iter().sum();
+        // A seed is substantial both absolutely and as a share of the whole.
+        let share_floor = (f64::from(policy.min_component_share) * total as f64).ceil() as u64;
+        let seeds: Vec<usize> = (0..comps.len())
+            .filter(|&i| {
+                comp_blocks[i] >= policy.min_component_blocks && comp_blocks[i] >= share_floor
+            })
+            .collect();
+        // Two-plus seeds, and every seed pair clears the gap tolerance: only
+        // then is the "two separate builds" reading safe. Otherwise the closing
+        // was doing its job — leave the cluster whole.
+        let split_ok = seeds.len() >= 2
+            && seeds.iter().enumerate().all(|(a, &si)| {
+                seeds[a + 1..]
+                    .iter()
+                    .all(|&sj| min_cell_gap_at_least(&comps[si], &comps[sj], policy.min_gap_cells))
+            });
+        if !split_ok {
+            for c in &cells {
+                out.insert((pidx, *c), old_id);
+            }
+            continue;
+        }
+        // Mint one id per seed, anchored on the seed's own lexmin original cell.
+        let mut seeds_meta: Vec<(usize, ClusterId, (i32, i32, i32))> = Vec::new();
+        for &si in &seeds {
+            let anchor = *comps[si].iter().min().expect("a seed component is non-empty");
+            let id = ClusterId::new(config, tile, partition.as_deref(), anchor);
+            partition_of_cluster.entry(id).or_insert_with(|| partition.clone());
+            for c in &comps[si] {
+                out.insert((pidx, *c), id);
+            }
+            seeds_meta.push((si, id, anchor));
+        }
+        // Attach each non-seed fragment to its nearest seed, by Chebyshev
+        // distance between component centroids, ties broken on the smaller seed
+        // anchor. A fragment is small by definition, so the exact metric barely
+        // matters; what matters is that it is deterministic and every block
+        // keeps a home (no debris, no leftover of the old id).
+        let seed_set: std::collections::BTreeSet<usize> = seeds.iter().copied().collect();
+        for (ci, comp) in comps.iter().enumerate() {
+            if seed_set.contains(&ci) {
+                continue;
+            }
+            let cc = centroid(comp);
+            let mut best: Option<(i64, (i32, i32, i32), ClusterId)> = None;
+            for (si, id, anchor) in &seeds_meta {
+                let d = cheb(cc, centroid(&comps[*si]));
+                let cand = (d, *anchor, *id);
+                let take = match &best {
+                    None => true,
+                    Some(b) => cand.0 < b.0 || (cand.0 == b.0 && cand.1 < b.1),
+                };
+                if take {
+                    best = Some(cand);
+                }
+            }
+            let id = best.expect("at least one seed exists").2;
+            for c in comp {
+                out.insert((pidx, *c), id);
+            }
+        }
+    }
+    out
+}
+
+/// Six-connected components of a set of cells, each returned sorted ascending
+/// and the whole list in ascending-lexmin order, so callers get a deterministic
+/// grouping independent of the input slice's order.
+fn six_connected_components(cells: &[(i32, i32, i32)]) -> Vec<Vec<(i32, i32, i32)>> {
+    let set: std::collections::BTreeSet<(i32, i32, i32)> = cells.iter().copied().collect();
+    let mut seen: std::collections::BTreeSet<(i32, i32, i32)> = std::collections::BTreeSet::new();
+    let mut comps: Vec<Vec<(i32, i32, i32)>> = Vec::new();
+    for &start in &set {
+        if seen.contains(&start) {
+            continue;
+        }
+        seen.insert(start);
+        let mut stack = vec![start];
+        let mut comp: Vec<(i32, i32, i32)> = Vec::new();
+        while let Some(c) = stack.pop() {
+            comp.push(c);
+            let nbrs = [
+                (c.0 - 1, c.1, c.2),
+                (c.0 + 1, c.1, c.2),
+                (c.0, c.1 - 1, c.2),
+                (c.0, c.1 + 1, c.2),
+                (c.0, c.1, c.2 - 1),
+                (c.0, c.1, c.2 + 1),
+            ];
+            for nb in nbrs {
+                if set.contains(&nb) && seen.insert(nb) {
+                    stack.push(nb);
+                }
+            }
+        }
+        comp.sort_unstable();
+        comps.push(comp);
+    }
+    comps
+}
+
+/// True iff the minimum Chebyshev cell distance between `a` and `b` is at least
+/// `g`. Tests, rather than computes, the distance: it scans the smaller set and
+/// looks only in the `(2g-1)^3` box around each cell, so cost is
+/// `O(min(|a|,|b|) * (2g-1)^3)` with `g` the small gap tolerance — never the
+/// quadratic all-pairs distance.
+fn min_cell_gap_at_least(a: &[(i32, i32, i32)], b: &[(i32, i32, i32)], g: u32) -> bool {
+    if g == 0 {
+        return true;
+    }
+    let (scan, other) = if a.len() <= b.len() { (a, b) } else { (b, a) };
+    let other_set: std::collections::BTreeSet<(i32, i32, i32)> = other.iter().copied().collect();
+    let r = (g - 1) as i32;
+    for c in scan {
+        for dx in -r..=r {
+            for dy in -r..=r {
+                for dz in -r..=r {
+                    if other_set.contains(&(c.0 + dx, c.1 + dy, c.2 + dz)) {
+                        // A cell within Chebyshev `g-1` exists, so gap < g.
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+    true
+}
+
+/// Integer centroid (floored mean) of a non-empty cell set.
+fn centroid(cells: &[(i32, i32, i32)]) -> (i64, i64, i64) {
+    let n = cells.len() as i64;
+    let (mut sx, mut sy, mut sz) = (0i64, 0i64, 0i64);
+    for c in cells {
+        sx += i64::from(c.0);
+        sy += i64::from(c.1);
+        sz += i64::from(c.2);
+    }
+    (sx / n, sy / n, sz / n)
+}
+
+/// Chebyshev distance between two points.
+fn cheb(a: (i64, i64, i64), b: (i64, i64, i64)) -> i64 {
+    (a.0 - b.0).abs().max((a.1 - b.1).abs()).max((a.2 - b.2).abs())
 }
 
 /// For each partition present in the tile, the set of block names that
@@ -1707,6 +2039,119 @@ mod tests {
         assert_ne!(
             a.clusters[0].id, b.clusters[0].id,
             "different partition_floor_share must mint different ids"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // split_disconnected: undo the closing where it fused two separate builds
+    // -----------------------------------------------------------------------
+
+    /// A solid cuboid of one block name, `[x0,x1] x [y0,y1] x [z0,z1]`.
+    fn cuboid(
+        x0: i32,
+        x1: i32,
+        y0: i32,
+        y1: i32,
+        z0: i32,
+        z1: i32,
+        name: &str,
+    ) -> Vec<((i32, i32, i32), &str)> {
+        let mut v = Vec::new();
+        for x in x0..=x1 {
+            for y in y0..=y1 {
+                for z in z0..=z1 {
+                    v.push(((x, y, z), name));
+                }
+            }
+        }
+        v
+    }
+
+    /// Small-threshold policy so a tiny test grid can exercise the split.
+    fn split_policy() -> DisconnectedSplit {
+        DisconnectedSplit { min_component_blocks: 8, min_component_share: 0.40, min_gap_cells: 2 }
+    }
+
+    /// Two 4x4x4 builds (64 blocks each), 12 blocks / 3 cells apart on z. That
+    /// is inside the closing's `2R = 4`-cell reach at `closing_radius = 2`, so
+    /// the default (split off) fuses them into one cluster — the exact bug.
+    fn two_disconnected_builds() -> Vec<((i32, i32, i32), &'static str)> {
+        let mut b = cuboid(8, 11, 0, 3, 8, 11, "minecraft:oak_planks");
+        b.extend(cuboid(8, 11, 0, 3, 20, 23, "minecraft:oak_planks"));
+        b
+    }
+
+    #[test]
+    fn closing_merges_two_disconnected_builds_by_default() {
+        // Documents the bug: with `split_disconnected: None` the morphological
+        // closing bridges the 12-block gap and reports ONE build.
+        let t = tile(two_disconnected_builds());
+        let segs = segment_tile(&t, &profile(), &cfg(), &no_hints());
+        assert_eq!(
+            segs.clusters.len(),
+            1,
+            "closing fuses two builds within 2R+1 cells into one cluster"
+        );
+        assert_eq!(segs.clusters[0].block_count, 128, "both builds land in the one cluster");
+    }
+
+    #[test]
+    fn split_disconnected_separates_two_substantial_builds() {
+        // The fix: the same input, with the split enabled, comes back as two
+        // clusters — one per build — and no block is lost.
+        let t = tile(two_disconnected_builds());
+        let on = SegConfig { split_disconnected: Some(split_policy()), ..cfg() };
+        let segs = segment_tile(&t, &profile(), &on, &no_hints());
+        assert_eq!(segs.clusters.len(), 2, "two disconnected substantial builds must split");
+        let counts: Vec<u64> = segs.clusters.iter().map(|c| c.block_count).collect();
+        assert_eq!(counts, vec![64, 64], "each build keeps its own 64 blocks");
+        assert_ne!(segs.clusters[0].id, segs.clusters[1].id, "distinct clusters get distinct ids");
+    }
+
+    #[test]
+    fn split_does_not_fragment_a_single_build_with_a_minor_detached_part() {
+        // A legitimate single build: one 4x4x4 mass (64 blocks) plus a small
+        // detached fixture (a 2x2x2, 8 blocks) 12 blocks away — the kind of
+        // near-part the closing is meant to unify. The fixture is below the
+        // 40% share (8 / 72 = 11%), so it is not a second seed: the cluster
+        // stays whole, the fragment attached to the mass.
+        let mut blocks = cuboid(8, 11, 0, 3, 8, 11, "minecraft:oak_planks");
+        blocks.extend(cuboid(8, 9, 0, 1, 20, 21, "minecraft:oak_planks"));
+        let t = tile(blocks);
+        let on = SegConfig { split_disconnected: Some(split_policy()), ..cfg() };
+        let segs = segment_tile(&t, &profile(), &on, &no_hints());
+        assert_eq!(segs.clusters.len(), 1, "a minor detached part must not split the build");
+        assert_eq!(segs.clusters[0].block_count, 72, "every block stays in the one cluster");
+    }
+
+    #[test]
+    fn split_respects_the_gap_tolerance() {
+        // Two 64-block seeds that are only ONE cell apart (a diagonal touch,
+        // gap < min_gap_cells) read as internal to one build, not two. Placed
+        // at cells (2,16,2) and (3,16,3): Chebyshev cell distance 1.
+        let mut blocks = cuboid(8, 11, 0, 3, 8, 11, "minecraft:oak_planks");
+        blocks.extend(cuboid(12, 15, 0, 3, 12, 15, "minecraft:oak_planks"));
+        let t = tile(blocks);
+        let on = SegConfig { split_disconnected: Some(split_policy()), ..cfg() };
+        let segs = segment_tile(&t, &profile(), &on, &no_hints());
+        assert_eq!(segs.clusters.len(), 1, "seeds closer than min_gap_cells stay merged");
+    }
+
+    #[test]
+    fn split_disconnected_is_folded_into_config_hash() {
+        // A backward-compatible extension, exactly like partition_floor_share:
+        // `None` digests identically to the pre-feature layout, `Some` differs.
+        let base = cfg();
+        let with_split = SegConfig { split_disconnected: Some(split_policy()), ..cfg() };
+        assert_eq!(
+            base.config_hash(&profile(), &no_hints()),
+            SegConfig { split_disconnected: None, ..cfg() }.config_hash(&profile(), &no_hints()),
+            "None must be byte-for-byte inert in config_hash"
+        );
+        assert_ne!(
+            base.config_hash(&profile(), &no_hints()),
+            with_split.config_hash(&profile(), &no_hints()),
+            "split_disconnected must be folded into config_hash"
         );
     }
 }

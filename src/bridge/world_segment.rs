@@ -81,6 +81,7 @@ pub mod ffi {
                 partition_policy: if hard_cut { PartitionPolicy::HardCut } else { PartitionPolicy::Off },
                 algorithm_version: SegConfig::default().algorithm_version,
                 partition_floor_share: SegConfig::default().partition_floor_share,
+                split_disconnected: SegConfig::default().split_disconnected,
             };
             Ok(Box::new(WsSegmentJob(SegmentJob {
                 config,
