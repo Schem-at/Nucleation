@@ -3153,7 +3153,7 @@ dependencies = [
 
 [[package]]
 name = "nucleation"
-version = "0.4.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "aws-sdk-s3",
@@ -3197,6 +3197,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smol_str",
+ "tar",
  "testcontainers-modules",
  "thiserror 1.0.69",
  "tokio",

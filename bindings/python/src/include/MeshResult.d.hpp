@@ -56,6 +56,13 @@ public:
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> glb_data_b64_write(W& writeable_output) const;
 
   /**
+   * The mesh as a USDZ archive, base64-encoded.
+   */
+  inline nucleation::diplomat::result<std::string, nucleation::NucleationError> usdz_data_b64() const;
+  template<typename W>
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> usdz_data_b64_write(W& writeable_output) const;
+
+  /**
    * The mesh serialized in the NUCM cache format, base64-encoded.
    */
   inline std::string nucm_data_b64() const;

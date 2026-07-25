@@ -45,6 +45,7 @@ Every capability, with its own deep-dive doc:
 - [Geodata](docs/features/geo.md) — elevation grids and OSM footprints
 - [Composition](docs/features/composition.md) — stacking the primitives
 - [Chunk iteration, streaming, worlds](docs/features/streaming-and-worlds.md) — constant-memory pipelines and world I/O
+- [World segmentation](docs/features/world-segmentation.md) — a whole world into individual builds with provenance, deterministically
 - [Block entities, entities, NBT](docs/features/block-entities-nbt.md) — SNBT round-trips
 - [Redstone simulation](docs/features/redstone-simulation.md) — MCHPRS redpiler, typed circuit executors
 - [Meshing and rendering](docs/features/meshing-and-rendering.md) — GLB/glTF/USDZ and the headless renderer

@@ -54,6 +54,8 @@ pub mod scripting;
 pub mod simulation;
 #[cfg(feature = "voxelize")]
 pub mod voxelize;
+#[cfg(feature = "world-segment")]
+pub mod world_segment;
 
 // The Diplomat wasm module carries no wasm-bindgen glue, so getrandom's "js" source is
 // unavailable; register a deterministic splitmix64 stream instead. Non-crypto by design:
@@ -84,6 +86,8 @@ pub use block_state::BlockState;
 pub use bounding_box::BoundingBox;
 pub use entity::{ArmorStandEquipment, Entity};
 pub use formats::{litematic, schematic, world_stream};
+#[cfg(not(target_arch = "wasm32"))]
+pub use formats::world_pack;
 pub use print_utils::{format_json_schematic, format_schematic};
 pub use region::Region;
 pub use schematic_builder::{

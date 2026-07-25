@@ -8,4 +8,6 @@ pub mod schematic;
 pub mod snapshot;
 pub mod structure_snbt;
 pub mod world;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod world_pack;
 pub mod world_stream;

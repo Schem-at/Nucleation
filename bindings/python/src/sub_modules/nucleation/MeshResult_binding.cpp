@@ -22,6 +22,7 @@ void add_MeshResult_binding(nb::module_ mod) {
         .def("has_transparency", &nucleation::MeshResult::has_transparency)
         .def("nucm_data_b64", &nucleation::MeshResult::nucm_data_b64)
         .def("triangle_count", &nucleation::MeshResult::triangle_count)
+        .def("usdz_data_b64", &nucleation::MeshResult::usdz_data_b64)
         .def("vertex_count", &nucleation::MeshResult::vertex_count);
 }
 

@@ -140,6 +140,14 @@ export { GeneratedWorldStream } from "./GeneratedWorldStream.mjs"
 
 export { WorldGenerator } from "./WorldGenerator.mjs"
 
+export { WsPartitionHints } from "./WsPartitionHints.mjs"
+
+export { WsProfile } from "./WsProfile.mjs"
+
+export { WsRunResult } from "./WsRunResult.mjs"
+
+export { WsSegmentJob } from "./WsSegmentJob.mjs"
+
 export { WorldChunkView } from "./WorldChunkView.mjs"
 
 export { WorldSink } from "./WorldSink.mjs"

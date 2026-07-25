@@ -43,6 +43,10 @@ Each with a verified Python snippet:
   pipeline ([snippet](readme-snippets/12-chunk-iteration-python.md)), and the
   `to_schematic` ↔ `from_schematic` bridge that makes any fill (SDF, OSM,
   heightmap, noise) a custom world **generator** or **filter**
+- [World segmentation](features/world-segmentation.md) — turn a whole world
+  save into individual builds: learned-substrate subtraction, morphological
+  clustering, cross-tile stitching, tiers, partition hints, snapshot identity,
+  and a provenance envelope per build — byte-identical on every re-run
   ([snippet](readme-snippets/17-world-generator-python.md))
 - [Block entities, entities & NBT](features/block-entities-nbt.md)
   ([snippet](readme-snippets/14-block-entities-nbt-python.md))

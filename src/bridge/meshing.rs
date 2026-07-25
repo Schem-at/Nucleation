@@ -422,6 +422,13 @@ pub mod ffi {
             Ok(())
         }
 
+        /// The mesh as a USDZ archive, base64-encoded.
+        pub fn usdz_data_b64(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
+            let data = self.0.to_usdz().map_err(|_| NucleationError::Serialize)?;
+            super::write_b64(&data, out);
+            Ok(())
+        }
+
         /// The mesh serialized in the NUCM cache format, base64-encoded.
         pub fn nucm_data_b64(&self, out: &mut DiplomatWrite) {
             let data = crate::meshing::cache::serialize_meshes(&[self.0.clone()]);

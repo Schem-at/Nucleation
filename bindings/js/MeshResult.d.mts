@@ -34,6 +34,11 @@ export class MeshResult {
     glbDataB64(): string;
 
     /**
+     * The mesh as a USDZ archive, base64-encoded.
+     */
+    usdzDataB64(): string;
+
+    /**
      * The mesh serialized in the NUCM cache format, base64-encoded.
      */
     nucmDataB64(): string;

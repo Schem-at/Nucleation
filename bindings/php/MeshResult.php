@@ -39,6 +39,15 @@ final class MeshResult {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function usdzDataB64() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->MeshResult_usdz_data_b64($this->ptr, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function nucmDataB64() {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         Lib::ffi()->MeshResult_nucm_data_b64($this->ptr, $write);

@@ -410,6 +410,18 @@ impl Signature {
 }
 
 pub fn fingerprint(schem: &UniversalSchematic, spec: &FingerprintSpec) -> Fingerprint {
+    let elements = spec.symmetry.elements();
+    // The exact preset (and any single-orbit spec) is the memory-critical path:
+    // dense fills materialize one cell per block. Take a lean route that never
+    // clones a per-cell token string, never builds an intermediate `cell_list`,
+    // and streams the canonical bytes straight into the hasher instead of
+    // collecting a multi-hundred-MB `Vec<u8>`. Byte-for-byte identical to the
+    // general path below when there is only one group element (see the
+    // exact-fingerprint golden tests).
+    if elements.len() == 1 {
+        return fingerprint_single_orbit(schem, spec, &elements[0]);
+    }
+
     // Resolve the palette once — builds repeat blockstates heavily, so each
     // orbit element only tokenizes the distinct entries, not every cell.
     let mut palette: Vec<&BlockState> = Vec::new();
@@ -504,6 +516,146 @@ fn serialize_cells(cells: &[((i32, i32, i32), Token)]) -> Vec<u8> {
         out.extend_from_slice(tok.as_bytes());
     }
     out
+}
+
+/// Memory-lean fingerprint for a spec with a single group element (the `exact`
+/// preset and any `Symmetry::None` spec).
+///
+/// The general [`fingerprint`] path stores one `((i32,i32,i32), Token)` per
+/// occupied cell — the owned token string per cell dominates peak RAM on dense
+/// fills — and then materializes the whole canonical byte stream into a `Vec`.
+/// With one orbit element there is nothing to minimize across, so we can:
+///   * keep only a compact `(x,y,z, palette_id, nbt_id)` record per cell (no
+///     per-cell token string, no `cell_list`), and
+///   * stream the canonical bytes straight into the hasher.
+///
+/// The emitted bytes are identical to `serialize_cells` over the equivalent
+/// `((i32,i32,i32), Token)` vector, so the resulting fingerprint is
+/// byte-for-byte identical to the general path (asserted by the exact goldens).
+fn fingerprint_single_orbit(
+    schem: &UniversalSchematic,
+    spec: &FingerprintSpec,
+    g: &crate::fingerprint::symmetry::RigidOp,
+) -> Fingerprint {
+    // Compact cell: (x, y, z, palette id, nbt-token id). `NO_NBT` marks a cell
+    // with no block-entity token, matching the general path's `tok.clone()`.
+    const NO_NBT: u32 = u32::MAX;
+
+    let ignore_directional = spec.symmetry != Symmetry::None;
+
+    let mut index: HashMap<&BlockState, u32> = HashMap::new();
+    // Token per palette entry under `g` (`None` = air / ignored, cell dropped).
+    let mut toks: Vec<Option<Token>> = Vec::new();
+
+    // Block-entity NBT tokens are rotation-invariant; serializations are
+    // memoized by NBT identity so template-shared entities hash once.
+    let mut nbt_memo: HashMap<*const NbtMap, Option<Token>> = HashMap::new();
+    let mut nbt_tokens: Vec<Token> = Vec::new();
+
+    let mut cells: Vec<(i32, i32, i32, u32, u32)> = Vec::new();
+    for (pos, block) in schem.iter_blocks() {
+        let id = *index.entry(block).or_insert_with(|| {
+            toks.push(spec.blocks.tokenize(&g.apply_block(block)));
+            (toks.len() - 1) as u32
+        });
+        if toks[id as usize].is_none() {
+            continue;
+        }
+        let nbt_id = if spec.block_entities {
+            match schem.get_block_entity(crate::block_position::BlockPosition {
+                x: pos.x,
+                y: pos.y,
+                z: pos.z,
+            }) {
+                Some(be) => {
+                    let key = std::sync::Arc::as_ptr(&be.nbt);
+                    let tok = nbt_memo
+                        .entry(key)
+                        .or_insert_with(|| stable_nbt_token(&be.nbt, ignore_directional))
+                        .clone();
+                    match tok {
+                        Some(t) => {
+                            nbt_tokens.push(t);
+                            (nbt_tokens.len() - 1) as u32
+                        }
+                        None => NO_NBT,
+                    }
+                }
+                None => NO_NBT,
+            }
+        } else {
+            NO_NBT
+        };
+        let (x, y, z) = g.apply_pos((pos.x, pos.y, pos.z));
+        cells.push((x, y, z, id, nbt_id));
+    }
+
+    // Empty build: matches the general path's `best.unwrap_or_default()` (an
+    // empty byte string) hashed by blake3.
+    let hash = if cells.is_empty() {
+        blake3::hash(&[])
+    } else {
+        let mn = cells.iter().fold((i32::MAX, i32::MAX, i32::MAX), |m, c| {
+            (m.0.min(c.0), m.1.min(c.1), m.2.min(c.2))
+        });
+        for c in cells.iter_mut() {
+            c.0 -= mn.0;
+            c.1 -= mn.1;
+            c.2 -= mn.2;
+        }
+
+        // Same canonical order as the general path, which sorts
+        // `((x,y,z), Token)`. Positions are unique for a single region, so the
+        // token tie-break only matters when regions overlap; reconstruct the
+        // full token (base + NBT) on ties so the ordering is identical.
+        let reconstruct = |pid: u32, nbt_id: u32| -> Token {
+            let base = toks[pid as usize].as_ref().unwrap();
+            if nbt_id == NO_NBT {
+                base.clone()
+            } else {
+                token_with_nbt(base, &nbt_tokens[nbt_id as usize])
+            }
+        };
+        cells.sort_by(|a, b| {
+            (a.0, a.1, a.2).cmp(&(b.0, b.1, b.2)).then_with(|| {
+                reconstruct(a.3, a.4)
+                    .as_str()
+                    .cmp(reconstruct(b.3, b.4).as_str())
+            })
+        });
+
+        // Stream the same bytes `serialize_cells` would produce, flushing a
+        // bounded buffer into the hasher instead of holding the whole stream.
+        let mut hasher = blake3::Hasher::new();
+        let mut buf: Vec<u8> = Vec::with_capacity(1 << 16);
+        buf.extend_from_slice(&(cells.len() as u32).to_le_bytes());
+        for &(x, y, z, pid, nbt_id) in &cells {
+            buf.extend_from_slice(&x.to_le_bytes());
+            buf.extend_from_slice(&y.to_le_bytes());
+            buf.extend_from_slice(&z.to_le_bytes());
+            let base = toks[pid as usize].as_ref().unwrap();
+            if nbt_id == NO_NBT {
+                buf.extend_from_slice(&(base.len() as u32).to_le_bytes());
+                buf.extend_from_slice(base.as_bytes());
+            } else {
+                let full = token_with_nbt(base, &nbt_tokens[nbt_id as usize]);
+                buf.extend_from_slice(&(full.len() as u32).to_le_bytes());
+                buf.extend_from_slice(full.as_bytes());
+            }
+            if buf.len() >= 1 << 16 {
+                hasher.update(&buf);
+                buf.clear();
+            }
+        }
+        if !buf.is_empty() {
+            hasher.update(&buf);
+        }
+        hasher.finalize()
+    };
+
+    let mut out = [0u8; 16];
+    out.copy_from_slice(&hash.as_bytes()[..16]);
+    Fingerprint(u128::from_le_bytes(out))
 }
 
 #[cfg(test)]
@@ -766,5 +918,161 @@ mod smoke {
     #[test]
     fn module_compiles() {
         assert_eq!(2 + 2, 4);
+    }
+}
+
+/// Output-preservation safety net for the exact-fingerprint memory refactor.
+///
+/// The exact fingerprint value is a stable identity used by a live schemati DB
+/// (3,405 stored fingerprints) plus flow/schemati dedup. The memory refactor of
+/// [`fingerprint`] must be byte-identical. These goldens were captured on the
+/// pre-refactor code; any drift here is a correctness regression, never an
+/// optimization.
+#[cfg(test)]
+mod exact_memory_goldens {
+    use super::*;
+    use crate::block_entity::BlockEntity;
+    use crate::block_position::BlockPosition;
+    use crate::fingerprint::testgen::{filled_box, translated};
+    use crate::utils::NbtValue;
+
+    /// A spread of builds: small, medium/mixed-palette, directional props,
+    /// single + multiple block entities, and a dense fill (the memory-stress
+    /// shape). Names are stable golden keys.
+    fn fixtures() -> Vec<(&'static str, UniversalSchematic)> {
+        let mut v: Vec<(&'static str, UniversalSchematic)> = Vec::new();
+
+        v.push(("small_stone", filled_box((0, 0, 0), (2, 2, 2), "minecraft:stone")));
+
+        {
+            let mut s = UniversalSchematic::new("g".into());
+            for x in 0..20 {
+                for y in 0..8 {
+                    for z in 0..12 {
+                        let name = match (x + y + z) % 3 {
+                            0 => "minecraft:stone",
+                            1 => "minecraft:oak_planks",
+                            _ => "minecraft:glass",
+                        };
+                        s.set_block(x, y, z, &BlockState::new(name));
+                    }
+                }
+            }
+            v.push(("medium_mixed", s));
+        }
+
+        {
+            let faces = ["north", "south", "east", "west"];
+            let mut s = UniversalSchematic::new("g".into());
+            for x in 0..10 {
+                for z in 0..10 {
+                    let f = faces[((x + z) as usize) % 4];
+                    s.set_block(
+                        x,
+                        0,
+                        z,
+                        &BlockState::new("minecraft:repeater")
+                            .with_properties(vec![("facing".into(), f.into())]),
+                    );
+                }
+            }
+            v.push(("directional", s));
+        }
+
+        {
+            let at = (1, 2, 3);
+            let mut s = filled_box(at, (at.0 + 1, at.1, at.2), "minecraft:oak_sign");
+            s.set_block_entity(
+                BlockPosition {
+                    x: at.0,
+                    y: at.1,
+                    z: at.2,
+                },
+                BlockEntity::new("minecraft:oak_sign".to_string(), at)
+                    .with_nbt_data("Text1".to_string(), NbtValue::String("Alpha".to_string())),
+            );
+            v.push(("single_sign", s));
+        }
+
+        {
+            let mut s = filled_box((0, 0, 0), (4, 0, 0), "minecraft:chest");
+            for x in 0..=4 {
+                s.set_block_entity(
+                    BlockPosition { x, y: 0, z: 0 },
+                    BlockEntity::new("minecraft:chest".to_string(), (x, 0, 0)).with_nbt_data(
+                        "Lock".to_string(),
+                        NbtValue::String(format!("key{x}")),
+                    ),
+                );
+            }
+            v.push(("multi_be", s));
+        }
+
+        v.push((
+            "dense_fill",
+            filled_box((0, 0, 0), (40, 40, 40), "minecraft:stone"),
+        ));
+
+        {
+            // Two-palette dense fill so palette + tokens are non-trivial.
+            let mut s = UniversalSchematic::new("g".into());
+            for x in 0..30 {
+                for y in 0..30 {
+                    for z in 0..30 {
+                        let name = if (x * 7 + y * 13 + z) % 5 == 0 {
+                            "minecraft:glass"
+                        } else {
+                            "minecraft:stone"
+                        };
+                        s.set_block(x, y, z, &BlockState::new(name));
+                    }
+                }
+            }
+            v.push(("dense_two_palette", s));
+        }
+
+        v
+    }
+
+    /// Golden exact-fingerprint hex per fixture. Captured on pre-refactor code.
+    const GOLDENS: &[(&str, &str)] = &[
+        ("small_stone", "df3e2b19f2380b53c06e7f75fa543e8c"),
+        ("medium_mixed", "60528fd493f006f74afa098a6d84eba0"),
+        ("directional", "3a71c16dafd6244f6aef8b59c29cfcbf"),
+        ("single_sign", "a5e179503d27ef3951337afd223156a4"),
+        ("multi_be", "b48400517f6760bae33601b1d645993e"),
+        ("dense_fill", "17f19f9a0e2bd65f5979ded604079c49"),
+        ("dense_two_palette", "dc670e931be3a5887b113b56d8fffde2"),
+    ];
+
+    #[test]
+    fn exact_fingerprint_is_byte_identical_to_goldens() {
+        let spec = FingerprintSpec::exact();
+        let map: std::collections::HashMap<&str, &str> = GOLDENS.iter().copied().collect();
+        let mut missing = false;
+        for (name, s) in fixtures() {
+            let hx = fingerprint(&s, &spec).to_hex();
+            match map.get(name) {
+                Some(exp) if *exp == "PLACEHOLDER" => {
+                    eprintln!("GOLDEN\t{name}\t{hx}");
+                    missing = true;
+                }
+                Some(exp) => assert_eq!(&hx, exp, "exact fingerprint drift for `{name}`"),
+                None => {
+                    eprintln!("GOLDEN\t{name}\t{hx}");
+                    missing = true;
+                }
+            }
+        }
+        assert!(!missing, "fill in PLACEHOLDER goldens from the printed lines");
+    }
+
+    /// The refactor must not disturb translation invariance of the exact preset.
+    #[test]
+    fn exact_dense_fill_translation_invariant() {
+        let spec = FingerprintSpec::exact();
+        let a = filled_box((0, 0, 0), (20, 20, 20), "minecraft:stone");
+        let b = translated(&a, (37, -11, 5));
+        assert_eq!(fingerprint(&a, &spec), fingerprint(&b, &spec));
     }
 }

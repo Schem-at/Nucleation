@@ -71,3 +71,6 @@ bindings/python/build/
 bindings/python/rust/
 bindings/kotlin/.kotlin/
 /generated-world/
+
+# WOL project design docs (local, not for the public repo)
+/wol-project/

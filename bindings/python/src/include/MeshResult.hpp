@@ -32,6 +32,9 @@ namespace capi {
     typedef struct MeshResult_glb_data_b64_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} MeshResult_glb_data_b64_result;
     MeshResult_glb_data_b64_result MeshResult_glb_data_b64(const nucleation::capi::MeshResult* self, nucleation::diplomat::capi::DiplomatWrite* write);
 
+    typedef struct MeshResult_usdz_data_b64_result {union { nucleation::capi::NucleationError err;}; bool is_ok;} MeshResult_usdz_data_b64_result;
+    MeshResult_usdz_data_b64_result MeshResult_usdz_data_b64(const nucleation::capi::MeshResult* self, nucleation::diplomat::capi::DiplomatWrite* write);
+
     void MeshResult_nucm_data_b64(const nucleation::capi::MeshResult* self, nucleation::diplomat::capi::DiplomatWrite* write);
 
     uint32_t MeshResult_vertex_count(const nucleation::capi::MeshResult* self);
@@ -73,6 +76,21 @@ template<typename W>
 inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::MeshResult::glb_data_b64_write(W& writeable) const {
     nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
     auto result = nucleation::capi::MeshResult_glb_data_b64(this->AsFFI(),
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+
+inline nucleation::diplomat::result<std::string, nucleation::NucleationError> nucleation::MeshResult::usdz_data_b64() const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    auto result = nucleation::capi::MeshResult_usdz_data_b64(this->AsFFI(),
+        &write);
+    return result.is_ok ? nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Ok<std::string>(std::move(output))) : nucleation::diplomat::result<std::string, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> nucleation::MeshResult::usdz_data_b64_write(W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = nucleation::capi::MeshResult_usdz_data_b64(this->AsFFI(),
         &write);
     return result.is_ok ? nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Ok<std::monostate>()) : nucleation::diplomat::result<std::monostate, nucleation::NucleationError>(nucleation::diplomat::Err<nucleation::NucleationError>(nucleation::NucleationError::FromFFI(result.err)));
 }
