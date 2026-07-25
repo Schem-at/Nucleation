@@ -649,6 +649,45 @@ mod tests {
     }
 
     #[test]
+    fn a_sticky_piston_drops_its_block_on_a_short_pulse() {
+        // Captured from vanilla with a one-tick pulse:
+        //   tick 0  piston extends; stone -> moving_piston
+        //   tick 1  piston starts retracting while the stone is STILL MOVING
+        //   final   stone left at its pushed position, not pulled back
+        // Against a four-tick pulse, where the extension completes at tick 2 and the
+        // stone is pulled home at tick 6.
+        //
+        // The cause is PISTON_MOVE_TICKS: retraction begins before the extension
+        // finishes, so there is no settled block to grab. Our model reproduces it
+        // because a block in motion is immovable, so the pull simply finds nothing.
+        let mut w = world();
+        let mut t = TickQueue::new();
+        let mut e = EventQueue::new();
+        let s = StateRegistry::new();
+        let pos = Pos::new(0, 1, 0);
+        w.set(pos, EXTENDED);
+        w.set(Pos::new(1, 1, 0), HEAD);
+        w.set(Pos::new(2, 1, 0), MOVING); // still in flight
+
+        let p = piston(true, true);
+        let mut pulled = Vec::new();
+        {
+            let mut ctx = TickCtx {
+                world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
+                updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
+                comparator_out: &mut Default::default(),
+            };
+            p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0);
+        }
+
+        assert!(
+            pulled.is_empty(),
+            "a block still in motion cannot be grabbed: {pulled:?}"
+        );
+        assert_eq!(w.get(pos), RETRACTED, "the piston still retracts");
+    }
+
+    #[test]
     fn a_plain_piston_leaves_the_block_behind_on_retract() {
         let mut w = world();
         let mut t = TickQueue::new();

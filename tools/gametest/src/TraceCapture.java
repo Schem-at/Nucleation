@@ -184,6 +184,21 @@ public final class TraceCapture {
         List<String> ticks = new ArrayList<>();
         Map<BlockPos, String> previous = snapshot(level, min, max);
 
+        // --pulse places a power source at a position, holds it for --pulse-ticks,
+        // then removes it. Short pulses are how several piston behaviours are
+        // provoked, and they cannot be produced by --break alone.
+        String pulseAt = arg(args, "--pulse", null);
+        int pulseTicks = Integer.parseInt(arg(args, "--pulse-ticks", "1"));
+        BlockPos pulsePos = null;
+        if (pulseAt != null) {
+            String[] pp = pulseAt.split(",");
+            pulsePos = ORIGIN.offset(Integer.parseInt(pp[0].trim()),
+                    Integer.parseInt(pp[1].trim()), Integer.parseInt(pp[2].trim()));
+            level.setBlock(pulsePos, Blocks.REDSTONE_BLOCK.defaultBlockState(), 3);
+            System.out.printf("  pulse: powered %s for %d tick(s)%n", pulseAt, pulseTicks);
+        }
+        final BlockPos pulseTarget = pulsePos;
+
         String breakAt = arg(args, "--break", null);
         if (breakAt != null) {
             String[] parts = breakAt.split(",");
@@ -208,6 +223,9 @@ public final class TraceCapture {
         }
 
         for (int tick = 0; tick < maxTicks; tick++) {
+            if (pulseTarget != null && tick == pulseTicks) {
+                level.setBlock(pulseTarget, Blocks.AIR.defaultBlockState(), 3);
+            }
             tickServer.invoke(server, (BooleanSupplier) () -> true);
             waitUntilNextTick.invoke(server);
             if (tick < 3) {

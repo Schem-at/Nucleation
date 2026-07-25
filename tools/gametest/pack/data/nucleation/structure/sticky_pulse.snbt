@@ -1,0 +1,16 @@
+{
+  DataVersion: 4903,
+  size: [4, 3, 1],
+  palette: [
+    {Name: "minecraft:stone"},
+    {Name: "minecraft:sticky_piston", Properties: {facing: "east", extended: "false"}}
+  ],
+  blocks: [
+    {pos: [0, 0, 0], state: 0},
+    {pos: [1, 0, 0], state: 0},
+    {pos: [2, 0, 0], state: 0},
+    {pos: [0, 1, 0], state: 1},
+    {pos: [1, 1, 0], state: 0}
+  ],
+  entities: []
+}
