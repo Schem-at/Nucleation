@@ -1,0 +1,20 @@
+{
+  DataVersion: 4903,
+  size: [3, 3, 1],
+  palette: [
+    {Name: "minecraft:stone"},
+    {Name: "minecraft:redstone_block"},
+    {Name: "minecraft:redstone_torch", Properties: {lit: "true"}},
+    {Name: "minecraft:repeater", Properties: {facing: "east", delay: "1", locked: "false", powered: "false"}}
+  ],
+  blocks: [
+    {pos: [0, 0, 0], state: 0},
+    {pos: [1, 0, 0], state: 0},
+    {pos: [2, 0, 0], state: 0},
+    {pos: [0, 1, 0], state: 0},
+    {pos: [1, 1, 0], state: 3},
+    {pos: [2, 1, 0], state: 1},
+    {pos: [0, 2, 0], state: 2}
+  ],
+  entities: []
+}

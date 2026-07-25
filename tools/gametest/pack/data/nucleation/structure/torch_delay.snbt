@@ -1,0 +1,15 @@
+{
+  DataVersion: 4903,
+  size: [2, 2, 1],
+  palette: [
+    {Name: "minecraft:stone"},
+    {Name: "minecraft:redstone_block"},
+    {Name: "minecraft:redstone_torch", Properties: {lit: "true"}}
+  ],
+  blocks: [
+    {pos: [0, 0, 0], state: 0},
+    {pos: [1, 0, 0], state: 1},
+    {pos: [0, 1, 0], state: 2}
+  ],
+  entities: []
+}

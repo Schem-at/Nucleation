@@ -66,7 +66,7 @@ public final class TraceCapture {
     private static final String PHASE_TICK_END = "tick_end";
 
     /** Where the structure is placed. Arbitrary but fixed, so traces are comparable. */
-    private static final BlockPos ORIGIN = new BlockPos(0, 64, 0);
+    private static BlockPos ORIGIN = new BlockPos(0, 64, 0);
 
     /** Blocks of slack around the structure, to catch anything it pushes outward. */
     private static final int MARGIN = 4;
@@ -99,6 +99,13 @@ public final class TraceCapture {
 
         ServerLevel level = server.overworld();
 
+        // Anchor to spawn: those chunks are held at a ticking level by the
+        // server, whereas a far-off forced chunk loads but never activates its
+        // tick containers.
+        BlockPos spawn = level.getRespawnData().pos();
+        ORIGIN = new BlockPos(spawn.getX(), 100, spawn.getZ());
+        System.out.printf("  origin: %s%n", ORIGIN);
+
         StructureTemplate template = server.getStructureManager()
                 .get(Identifier.parse(structureId))
                 .orElseThrow(() -> new IllegalStateException(
@@ -110,19 +117,40 @@ public final class TraceCapture {
         BlockPos max = ORIGIN.offset(size.getX() + MARGIN, size.getY() + MARGIN,
                 size.getZ() + MARGIN);
 
-        // Force-load the region, then flatten it, so the trace reflects the
-        // structure rather than whatever terrain generated underneath.
+        // The region must *simulate*, not merely be loaded. setChunkForced alone
+        // keeps chunks in memory but does not raise them to a ticking level, so
+        // scheduled block ticks never fire — which looks exactly like a torch that
+        // ignores its input, because a torch changes only on a scheduled tick.
+        // Dust hid this: it settles synchronously on neighbour updates and works
+        // either way. PLAYER_SIMULATION is the ticket that grants ticking.
+        var centre = new net.minecraft.world.level.ChunkPos(ORIGIN.getX() >> 4, ORIGIN.getZ() >> 4);
+        level.getChunkSource().addTicketWithRadius(
+                net.minecraft.server.level.TicketType.PLAYER_SIMULATION, centre, 3);
+        level.getChunkSource().addTicketWithRadius(
+                net.minecraft.server.level.TicketType.FORCED, centre, 3);
         for (int cx = min.getX() >> 4; cx <= max.getX() >> 4; cx++) {
             for (int cz = min.getZ() >> 4; cz <= max.getZ() >> 4; cz++) {
                 level.setChunkForced(cx, cz, true);
             }
         }
+        // Entity loading is asynchronous, and LevelTicks will not run a chunk's
+        // scheduled ticks until its entities are loaded. Wait for it rather than
+        // guessing a tick count — a region that is loaded but not entity-ticking
+        // looks exactly like redstone that ignores its input.
+        int warmup = 0;
+        while (!level.isPositionTickingWithEntitiesLoaded(centre.pack()) && warmup < 600) {
+            tickServer.invoke(server, (BooleanSupplier) () -> true);
+            warmup++;
+        }
+        System.out.printf("  warmup ticks until entity-ticking: %d (ready=%s)%n",
+                warmup, level.isPositionTickingWithEntitiesLoaded(centre.pack()));
+
         for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
             level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
         }
 
         if (!template.placeInWorld(level, ORIGIN, ORIGIN, new StructurePlaceSettings(),
-                RandomSource.create(0), 2)) {
+                RandomSource.create(0), 3)) {
             throw new IllegalStateException("failed to place " + structureId);
         }
 
@@ -130,6 +158,20 @@ public final class TraceCapture {
         // taken from here alone records nothing. To observe propagation we have to
         // disturb the settled state: --break removes a block (typically the power
         // source) and the ticks that follow are the circuit's response.
+        // Decisive diagnostic: a region that is loaded but not in block-ticking
+        // range looks exactly like a circuit that ignores its input.
+        System.out.printf("  block-ticking here: %s%n",
+                level.shouldTickBlocksAt(centre.pack()));
+        System.out.printf("  pending block ticks: %d%n", level.getBlockTicks().count());
+        System.out.printf("  runs normally: %s%n",
+                level.tickRateManager().runsNormally());
+        // LevelTicks gates on this, not on block-ticking range: a chunk can be
+        // block-tickable yet have no active tick container if its entities are
+        // not loaded, and then scheduled ticks sit pending forever.
+        System.out.printf("  entities loaded / pos ticking: %s / %s%n",
+                level.areEntitiesLoaded(centre.pack()),
+                level.isPositionTickingWithEntitiesLoaded(centre.pack()));
+
         List<String> ticks = new ArrayList<>();
         Map<BlockPos, String> previous = snapshot(level, min, max);
 
@@ -158,6 +200,10 @@ public final class TraceCapture {
 
         for (int tick = 0; tick < maxTicks; tick++) {
             tickServer.invoke(server, (BooleanSupplier) () -> true);
+            if (tick < 3) {
+                System.out.printf("    t%d gameTime=%d pending=%d%n",
+                        tick, level.getGameTime(), level.getBlockTicks().count());
+            }
 
             Map<BlockPos, String> current = snapshot(level, min, max);
             List<String> events = new ArrayList<>();

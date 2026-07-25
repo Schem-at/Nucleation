@@ -30,6 +30,7 @@
 #![forbid(unsafe_code)]
 
 pub mod behaviour;
+pub mod components;
 pub mod phase;
 pub mod pos;
 pub mod redstone;
@@ -39,6 +40,8 @@ pub mod state;
 pub mod world;
 
 pub use behaviour::{BehaviourTable, BlockBehaviour, Inert, TickCtx};
+pub use components::{Comparator, PowerSource, Repeater, StatePair, Torch,
+    COMPARATOR_DELAY, REPEATER_TICKS_PER_DELAY, TORCH_DELAY};
 pub use phase::{Phase, PHASE_ORDER};
 pub use pos::{Bounds, Dir, Pos, ALL_DIRS};
 pub use redstone::{RedstoneNetwork, MAX_POWER};
