@@ -145,10 +145,15 @@ pub enum ComparatorMode {
 impl ComparatorMode {
     /// The output strength for a given rear and side signal.
     ///
-    /// Trace-confirmed for the no-side-input case: a comparator in `subtract` mode
-    /// fed 15 from behind with nothing at its sides output 15, lighting dust at
-    /// 15 then 14. The side-input arithmetic follows the documented rules and is
-    /// marked in `redstone_components.md` as wanting a trace of its own.
+    /// Every case below was captured from the real game rather than taken from
+    /// documentation:
+    ///
+    /// ```text
+    /// subtract  rear 15, side  0  -> 15   (dust beyond read 15 then 14)
+    /// subtract  rear 15, side 14  ->  1
+    /// compare   rear 15, side 14  -> 15   (side loses, passes through)
+    /// compare   rear 13, side 14  ->  0   (side wins, comparator unpowered)
+    /// ```
     pub fn output(self, rear: u8, side: u8) -> u8 {
         match self {
             ComparatorMode::Compare => {
@@ -873,15 +878,19 @@ mod tests {
 
     #[test]
     fn subtract_mode_reduces_by_the_side_signal() {
+        // Captured: rear 15 against a side dust at 14 lit the output dust at 1.
+        assert_eq!(ComparatorMode::Subtract.output(15, 14), 1);
         assert_eq!(ComparatorMode::Subtract.output(15, 4), 11);
         assert_eq!(ComparatorMode::Subtract.output(3, 9), 0, "never below zero");
     }
 
     #[test]
     fn compare_mode_is_all_or_nothing() {
-        assert_eq!(ComparatorMode::Compare.output(15, 4), 15, "side loses, pass through");
+        // Both captured: rear 15 / side 14 passed 15 through, while rear 13 against
+        // a side of 14 left the comparator unpowered and its output dust at 0.
+        assert_eq!(ComparatorMode::Compare.output(15, 14), 15, "side loses, pass through");
+        assert_eq!(ComparatorMode::Compare.output(13, 14), 0, "side wins, output nothing");
         assert_eq!(ComparatorMode::Compare.output(15, 15), 15, "a tie still passes");
-        assert_eq!(ComparatorMode::Compare.output(4, 9), 0, "side wins, output nothing");
     }
 
     #[test]

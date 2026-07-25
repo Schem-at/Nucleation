@@ -105,9 +105,18 @@ reading produces something subtly wrong.
   cancels the entire push, including when reached through adhesion. Blocks already
   in motion (`moving_piston`) are immovable.
 
-Nothing on this page is now unimplemented. The remaining known gap is the
-*side-input* arithmetic for comparators, where only the pass-through case was
-observed; the compare/subtract rules are implemented from documentation.
+- **Comparator side-input arithmetic** — captured, no longer taken from
+  documentation:
+
+  ```text
+  subtract  rear 15, side  0  -> 15
+  subtract  rear 15, side 14  ->  1
+  compare   rear 15, side 14  -> 15   (side loses, passes through)
+  compare   rear 13, side 14  ->  0   (side wins, comparator unpowered)
+  ```
+
+Nothing on this page is unimplemented, and every rule on it is now backed by
+either a captured trace or the game's own bytecode.
 
 ## What to do next, in order
 
