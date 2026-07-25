@@ -8,7 +8,7 @@
 //! project via a registry; this module's job is to be the thing whose ordering
 //! is already right when that happens.
 
-use crate::behaviour::{BehaviourTable, TickCtx};
+use crate::behaviour::{BehaviourTable, PendingMove, TickCtx};
 use crate::phase::{Phase, PHASE_ORDER};
 use crate::pos::{Bounds, Pos};
 use crate::schedule::{BlockEvent, EventQueue, TickPriority, TickQueue};
@@ -72,6 +72,8 @@ pub struct Simulation {
     unknown_seen: Vec<StateId>,
     /// Scratch buffer for neighbour notifications; reused every dispatch.
     updates: Vec<(Pos, crate::pos::Dir)>,
+    /// Deferred writes awaiting their block-entities phase.
+    moves: Vec<PendingMove>,
     tick: u64,
     /// The state to return to on [`Simulation::reset`].
     ///
@@ -98,6 +100,7 @@ impl Simulation {
             behaviours: BehaviourTable::new(),
             unknown_seen: Vec::new(),
             updates: Vec::new(),
+            moves: Vec::new(),
             tick: 0,
             initial,
         }
@@ -187,7 +190,7 @@ impl Simulation {
     /// Quiescence is the natural stopping condition for timing a contraption:
     /// run until the build stops doing anything.
     pub fn is_quiescent(&self) -> bool {
-        self.ticks.is_empty() && self.events.is_empty()
+        self.ticks.is_empty() && self.events.is_empty() && self.moves.is_empty()
     }
 
     /// Run exactly one tick, walking all ten phases in order.
@@ -291,6 +294,7 @@ impl Simulation {
                 states: &self.registry,
                 tick: self.tick,
                 updates: &mut self.updates,
+                moves: &mut self.moves,
             };
             behaviour.on_neighbor_changed(&mut ctx, pos, from);
         }
@@ -334,6 +338,7 @@ impl Simulation {
                         states: &self.registry,
                         tick: self.tick,
                         updates: &mut self.updates,
+                moves: &mut self.moves,
                     };
                     behaviour.on_scheduled_tick(&mut ctx, entry.pos);
                     self.propagate();
@@ -345,7 +350,29 @@ impl Simulation {
 
             Phase::BlockEvents => self.run_block_events(),
 
-            Phase::Entities | Phase::BlockEntities | Phase::PlayerInputs => None,
+            Phase::BlockEntities => {
+                // Where a moving piston's blocks land, two ticks after the block
+                // event that started them. Captured from vanilla:
+                //   tick 0  stone -> moving_piston
+                //   tick 2  moving_piston -> stone (at its destination)
+                let due: Vec<PendingMove> = self
+                    .moves
+                    .iter()
+                    .filter(|m| m.resolve_on <= self.tick)
+                    .copied()
+                    .collect();
+                self.moves.retain(|m| m.resolve_on > self.tick);
+                for entry in due {
+                    self.world.set(entry.pos, entry.state);
+                    for dir in crate::pos::ALL_DIRS {
+                        self.updates.push((entry.pos.offset(dir), dir.opposite()));
+                    }
+                }
+                self.propagate();
+                None
+            }
+
+            Phase::Entities | Phase::PlayerInputs => None,
         }
     }
 
@@ -372,6 +399,7 @@ impl Simulation {
                     states: &self.registry,
                     tick: self.tick,
                     updates: &mut self.updates,
+                moves: &mut self.moves,
                 };
                 behaviour.on_block_event(&mut ctx, event.pos, event.id, event.param);
                 self.propagate();

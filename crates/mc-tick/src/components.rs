@@ -148,6 +148,20 @@ fn schedule_diode(
     ctx.schedule(pos, delay, priority);
 }
 
+/// The two horizontal directions perpendicular to `facing`.
+///
+/// Locking is checked on these, and only these — a diode above or below cannot
+/// lock a repeater.
+fn perpendicular(facing: Dir) -> [Dir; 2] {
+    match facing {
+        Dir::North | Dir::South => [Dir::East, Dir::West],
+        Dir::East | Dir::West => [Dir::North, Dir::South],
+        // A vertical facing is not a valid diode orientation; return the horizontal
+        // pair that cannot match rather than panicking mid-tick.
+        Dir::Up | Dir::Down => [Dir::North, Dir::South],
+    }
+}
+
 /// `DiodeBlock.shouldPrioritize`: is the block behind us a diode facing us?
 fn should_prioritize(world: &World, power: &dyn PowerSource, pos: Pos, facing: Dir) -> bool {
     let behind = pos.offset(facing);
@@ -176,6 +190,22 @@ pub struct Repeater<P: PowerSource> {
 }
 
 impl<P: PowerSource> Repeater<P> {
+    /// Whether the repeater at `pos` is locked by a diode powering it from the side.
+    ///
+    /// `DiodeBlock.isLocked`: a repeater fed from either side by a *powered* diode
+    /// ignores its input entirely — `checkTickOnNeighbor` returns early, so a locked
+    /// repeater schedules nothing and holds whatever output it had.
+    pub fn locked_at(&self, world: &World, pos: Pos) -> bool {
+        for side in perpendicular(self.facing) {
+            let neighbour = pos.offset(side);
+            if self.power.is_diode(world, neighbour)
+                && self.power.is_powered(world, neighbour, side.opposite())
+            {
+                return true;
+            }
+        }
+        false
+    }
     /// Delay in game ticks.
     pub fn delay_ticks(&self) -> u64 {
         u64::from(self.delay) * REPEATER_TICKS_PER_DELAY
@@ -184,6 +214,11 @@ impl<P: PowerSource> Repeater<P> {
 
 impl<P: PowerSource> BlockBehaviour for Repeater<P> {
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        // A locked repeater schedules nothing: the game returns early before
+        // checkTickOnNeighbor ever considers the input.
+        if self.locked_at(ctx.world, pos) {
+            return;
+        }
         let delay = self.delay_ticks();
         schedule_diode(ctx, &self.power, pos, self.facing, self.powered, delay);
     }
@@ -409,6 +444,7 @@ mod tests {
             states: &states,
             tick: 0,
             updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
 
@@ -436,6 +472,7 @@ mod tests {
             states: &states,
             tick: 0,
             updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
 
@@ -470,6 +507,7 @@ mod tests {
             states: &states,
             tick: 0,
             updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
 
@@ -499,6 +537,7 @@ mod tests {
             states: &states,
             tick: 0,
             updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
         };
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
@@ -530,6 +569,7 @@ mod tests {
             states: &states,
             tick: 0,
             updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
         };
         torch.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::Down);
 
@@ -562,6 +602,7 @@ mod tests {
             states: &states,
             tick: 0,
             updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
         };
         torch.on_scheduled_tick(&mut ctx, torch_pos);
 
@@ -605,12 +646,91 @@ mod tests {
             states: &states,
             tick: 0,
             updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
         };
         comparator.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
 
         let due = ticks.drain_due(COMPARATOR_DELAY);
         assert_eq!(due.len(), 1);
         assert_eq!(due[0].target, COMPARATOR_DELAY, "always 2, unlike a repeater");
+    }
+
+    #[test]
+    fn a_repeater_locked_from_the_side_schedules_nothing() {
+        // DiodeBlock.isLocked returns early, before the input is even considered.
+        // A locked repeater that still scheduled would flicker its output whenever
+        // its input moved, which is precisely what locking exists to prevent.
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let source = StateId(9);
+        let side_diode = StateId(5);
+        let pos = Pos::new(0, 1, 0);
+
+        world.set(pos.offset(Dir::East), source); // live input
+        world.set(pos.offset(Dir::North), side_diode); // locking diode on the side
+
+        let repeater = Repeater {
+            facing: Dir::East,
+            delay: 1,
+            powered: false,
+            states: StatePair { off: StateId(1), on: StateId(2) },
+            power: Sources {
+                powered: vec![source, side_diode],
+                diodes: vec![(side_diode, Dir::South)],
+            },
+        };
+        let mut ctx = TickCtx {
+            world: &mut world,
+            ticks: &mut ticks,
+            events: &mut events,
+            states: &states,
+            tick: 0,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+        };
+        repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
+
+        assert!(ticks.is_empty(), "a locked repeater must schedule nothing");
+    }
+
+    #[test]
+    fn only_a_powered_side_diode_locks() {
+        // An unpowered diode beside a repeater does not lock it.
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let source = StateId(9);
+        let side_diode = StateId(5);
+        let pos = Pos::new(0, 1, 0);
+        world.set(pos.offset(Dir::East), source);
+        world.set(pos.offset(Dir::North), side_diode);
+
+        let repeater = Repeater {
+            facing: Dir::East,
+            delay: 1,
+            powered: false,
+            states: StatePair { off: StateId(1), on: StateId(2) },
+            power: Sources {
+                powered: vec![source], // side diode present but NOT powered
+                diodes: vec![(side_diode, Dir::South)],
+            },
+        };
+        let mut ctx = TickCtx {
+            world: &mut world,
+            ticks: &mut ticks,
+            events: &mut events,
+            states: &states,
+            tick: 0,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+        };
+        repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
+
+        assert_eq!(ticks.len(), 1, "an unpowered side diode must not lock");
+    }
+
+    #[test]
+    fn a_diode_above_or_below_cannot_lock() {
+        // Locking is checked only on the two horizontal perpendicular sides.
+        assert_eq!(perpendicular(Dir::East), [Dir::North, Dir::South]);
+        assert_eq!(perpendicular(Dir::North), [Dir::East, Dir::West]);
     }
 
     #[test]

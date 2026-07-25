@@ -70,6 +70,21 @@ the `--break` actuation in `tools/gametest` is the tool for it — and encode th
 observed ordering. This is precisely the class of behaviour where a plausible
 reading produces something subtly wrong.
 
+## Status update — now implemented and trace-verified
+
+- **Quasi-connectivity** — confirmed by capture: a redstone block adjacent only to
+  the space *above* a piston, touching it nowhere, extends it. Implemented.
+- **Moving-block entity** — captured: blocks become `moving_piston` at tick 0 and
+  resolve at tick 2, in the block-entities phase. Implemented as deferred writes
+  applied in that phase.
+- **Repeater locking** — implemented from `DiodeBlock.isLocked`; a powered diode on
+  either perpendicular side makes the repeater schedule nothing.
+- **Torch delay = 2** — confirmed by capture (torch flipped exactly two ticks after
+  its repeater), no longer an assumption.
+
+Still outstanding: **comparator modes and priming**, and **torch burnout**. Both
+need traces before implementation.
+
 ## What to do next, in order
 
 1. **Capture traces before writing any of it.** A structure per component:

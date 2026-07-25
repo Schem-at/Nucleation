@@ -70,6 +70,7 @@ fn build(repeater_delay: u8) -> Circuit {
     let piston_in = intern(&mut sim, "minecraft:piston[extended=false]");
     let piston_out = intern(&mut sim, "minecraft:piston[extended=true]");
     let head = intern(&mut sim, "minecraft:piston_head");
+    let moving = intern(&mut sim, "minecraft:moving_piston");
     let stone = intern(&mut sim, "minecraft:stone");
 
     let model = Model {
@@ -80,7 +81,7 @@ fn build(repeater_delay: u8) -> Circuit {
 
     // Lever and stone are inert; they only matter as power sources and cargo.
     for (state, name) in [(lever_off, "lever"), (lever_on, "lever"), (stone, "stone"),
-                          (head, "piston_head")] {
+                          (head, "piston_head"), (moving, "moving_piston")] {
         sim.behaviours_mut().register(state, Box::new(Inert::new(name)));
     }
 
@@ -106,6 +107,7 @@ fn build(repeater_delay: u8) -> Circuit {
                 sticky: false,
                 states: StatePair { off: piston_in, on: piston_out },
                 head,
+                moving,
                 power: model.clone(),
                 movability: model.clone(),
             }),

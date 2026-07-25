@@ -45,6 +45,20 @@ pub const TRIGGER_DROP: u8 = 2;
 /// than quietly truncating a build.
 pub const MAX_PUSH_DEPTH: usize = 12;
 
+/// Game ticks a piston's blocks spend in motion before landing.
+///
+/// Captured from vanilla, not assumed:
+///
+/// ```text
+/// tick 0  piston -> extended;  stone -> moving_piston;  air -> moving_piston
+/// tick 2  moving_piston -> piston_head;  moving_piston -> stone
+/// ```
+///
+/// The blocks become `moving_piston` placeholders immediately and resolve two ticks
+/// later in the block-entities phase. Moving them instantly — as a first
+/// implementation naturally does — reports every door two ticks early.
+pub const PISTON_MOVE_TICKS: u64 = 2;
+
 /// Which blocks a piston may move.
 ///
 /// Supplied by the caller: obsidian and bedrock are immovable, most blocks are
@@ -126,6 +140,8 @@ pub struct Piston<P: PowerSource, M: Movability> {
     pub states: StatePair,
     /// The block placed as the piston head when extended.
     pub head: StateId,
+    /// The `moving_piston` placeholder occupying a block while it travels.
+    pub moving: StateId,
     /// How power is read.
     pub power: P,
     /// Which blocks may be pushed.
@@ -133,12 +149,22 @@ pub struct Piston<P: PowerSource, M: Movability> {
 }
 
 impl<P: PowerSource, M: Movability> Piston<P, M> {
-    /// Whether any side is currently powering this piston.
+    /// Whether the piston is powered, **including quasi-connectivity**.
     ///
-    /// Quasi-connectivity is **not** included: vanilla also checks a block one
-    /// higher, and that rule is left out until a trace pins it down, because a
-    /// half-remembered QC rule is worse than none.
+    /// A piston reads power from its own neighbours *and* from the neighbours of the
+    /// block directly above it. Confirmed by a captured trace: a redstone block
+    /// placed adjacent only to the space above a piston — touching the piston
+    /// nowhere — extended it anyway.
+    ///
+    /// QC is not a quirk to be tidied away; a great many door designs depend on it,
+    /// and a simulator without it silently disagrees with the game on exactly the
+    /// builds people care about.
     fn is_powered(&self, world: &World, pos: Pos) -> bool {
+        self.has_direct_signal(world, pos) || self.has_direct_signal(world, pos.offset(Dir::Up))
+    }
+
+    /// Whether any neighbour of `pos` emits toward it.
+    fn has_direct_signal(&self, world: &World, pos: Pos) -> bool {
         crate::pos::ALL_DIRS.iter().any(|dir| {
             self.power
                 .is_powered(world, pos.offset(*dir), dir.opposite())
@@ -170,14 +196,21 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 if !plan.possible {
                     return false;
                 }
-                // Far end first, so each block moves into space already vacated.
+                // Vanilla replaces both ends with `moving_piston` placeholders now
+                // and resolves them two ticks later in the block-entities phase.
+                // Far end first, so each block reads its source before the next
+                // write disturbs it.
                 for from in &plan.to_push {
                     let state = ctx.world.get(*from);
-                    ctx.set(from.offset(self.facing), state);
-                    ctx.set(*from, StateId::AIR);
+                    let to = from.offset(self.facing);
+                    ctx.set(to, self.moving);
+                    ctx.set(*from, self.moving);
+                    ctx.defer(to, state, PISTON_MOVE_TICKS);
                 }
                 ctx.set(pos, self.states.get(true));
-                ctx.set(pos.offset(self.facing), self.head);
+                // The head slot is itself in motion until the move completes.
+                ctx.set(pos.offset(self.facing), self.moving);
+                ctx.defer(pos.offset(self.facing), self.head, PISTON_MOVE_TICKS);
                 true
             }
             TRIGGER_CONTRACT => {
@@ -249,6 +282,7 @@ mod tests {
     const STONE: StateId = StateId(4);
     const OBSIDIAN: StateId = StateId(5);
     const LEVER: StateId = StateId(6);
+    const MOVING: StateId = StateId(7);
 
     fn piston(extended: bool, sticky: bool) -> Piston<Model, Model> {
         let model = Model {
@@ -261,6 +295,7 @@ mod tests {
             sticky,
             states: StatePair { off: RETRACTED, on: EXTENDED },
             head: HEAD,
+            moving: MOVING,
             power: model.clone(),
             movability: model,
         }
@@ -276,7 +311,9 @@ mod tests {
         events: &'a mut EventQueue,
         states: &'a StateRegistry,
     ) -> TickCtx<'a> {
-        TickCtx { world, ticks, events, states, tick: 0, updates: Box::leak(Box::new(Vec::new())) }
+        TickCtx { world, ticks, events, states, tick: 0,
+        updates: Box::leak(Box::new(Vec::new())),
+        moves: Box::leak(Box::new(Vec::new())) }
     }
 
     #[test]
@@ -320,13 +357,29 @@ mod tests {
         w.set(Pos::new(2, 1, 0), STONE);
 
         let p = piston(false, false);
-        let mut ctx = run(&mut w, &mut t, &mut e, &s);
-        assert!(p.on_block_event(&mut ctx, pos, TRIGGER_EXTEND, 0));
+        let mut ctx_moves = Vec::new();
+        {
+            let mut ctx = TickCtx {
+                world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
+                updates: &mut Vec::new(), moves: &mut ctx_moves,
+            };
+            assert!(p.on_block_event(&mut ctx, pos, TRIGGER_EXTEND, 0));
+        }
 
+        // Immediately: the piston is extended and the moved blocks are placeholders.
         assert_eq!(w.get(pos), EXTENDED);
-        assert_eq!(w.get(Pos::new(1, 1, 0)), HEAD, "head takes the first space");
-        assert_eq!(w.get(Pos::new(2, 1, 0)), STONE, "column shifted one east");
-        assert_eq!(w.get(Pos::new(3, 1, 0)), STONE);
+        assert_eq!(w.get(Pos::new(1, 1, 0)), MOVING, "head slot is in motion");
+        assert_eq!(w.get(Pos::new(2, 1, 0)), MOVING);
+        assert_eq!(w.get(Pos::new(3, 1, 0)), MOVING);
+
+        // The real states are deferred to the block-entities phase, two ticks out,
+        // exactly as the captured trace shows.
+        let mut resolved: Vec<_> = ctx_moves.iter().map(|m| (m.pos, m.state, m.resolve_on)).collect();
+        resolved.sort_by_key(|(p, _, _)| (p.x, p.y, p.z));
+        assert!(resolved.iter().all(|(_, _, on)| *on == PISTON_MOVE_TICKS),
+            "all writes land {PISTON_MOVE_TICKS} ticks later: {resolved:?}");
+        assert_eq!(resolved[0].1, HEAD, "head resolves into the first slot");
+        assert_eq!(resolved[1].1, STONE, "column lands one east");
     }
 
     #[test]
@@ -438,6 +491,47 @@ mod tests {
         let mut ctx = run(&mut w, &mut t, &mut e, &s);
         p.on_neighbor_changed(&mut ctx, pos, Dir::Up);
         assert!(e.is_empty(), "no power, no event");
+    }
+
+    #[test]
+    fn quasi_connectivity_powers_a_piston_nothing_touches() {
+        // Captured from vanilla: a redstone block adjacent only to the space *above*
+        // a piston, touching the piston nowhere, extends it anyway. Many door
+        // designs depend on this, so a simulator without it disagrees with the game
+        // on exactly the builds people care about.
+        let mut w = world();
+        let mut t = TickQueue::new();
+        let mut e = EventQueue::new();
+        let s = StateRegistry::new();
+        let pos = Pos::new(0, 1, 0);
+        w.set(pos, RETRACTED);
+        // Diagonally up-and-across: adjacent to pos.above(), not to pos.
+        w.set(Pos::new(1, 2, 0), LEVER);
+
+        let p = piston(false, false);
+        let mut ctx = run(&mut w, &mut t, &mut e, &s);
+        p.on_neighbor_changed(&mut ctx, pos, Dir::Up);
+
+        assert_eq!(e.len(), 1, "QC must power the piston");
+    }
+
+    #[test]
+    fn a_piston_with_no_signal_anywhere_stays_put() {
+        // The other half of QC: it must not power pistons spuriously.
+        let mut w = world();
+        let mut t = TickQueue::new();
+        let mut e = EventQueue::new();
+        let s = StateRegistry::new();
+        let pos = Pos::new(0, 1, 0);
+        w.set(pos, RETRACTED);
+        // Two above: adjacent to neither the piston nor the block above it.
+        w.set(Pos::new(1, 3, 0), LEVER);
+
+        let p = piston(false, false);
+        let mut ctx = run(&mut w, &mut t, &mut e, &s);
+        p.on_neighbor_changed(&mut ctx, pos, Dir::Up);
+
+        assert!(e.is_empty(), "QC reaches one block up, not two");
     }
 
     #[test]

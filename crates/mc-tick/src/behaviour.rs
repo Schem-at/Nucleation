@@ -28,6 +28,17 @@ use crate::state::{StateId, StateRegistry};
 use crate::world::World;
 use std::collections::BTreeSet;
 
+/// A block write scheduled to land in a later tick's block-entities phase.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PendingMove {
+    /// Where the write lands.
+    pub pos: Pos,
+    /// What it becomes.
+    pub state: StateId,
+    /// The tick whose block-entities phase applies it.
+    pub resolve_on: u64,
+}
+
 /// What a behaviour is given when it runs.
 ///
 /// Holds the world and the queues, but deliberately **not** the behaviour table:
@@ -45,6 +56,13 @@ pub struct TickCtx<'a> {
     pub states: &'a StateRegistry,
     /// The tick currently being executed.
     pub tick: u64,
+    /// Deferred block writes, applied in the block-entities phase.
+    ///
+    /// Vanilla's moving pistons work this way: the block event replaces the moved
+    /// blocks with `moving_piston` placeholders, and a block entity resolves them
+    /// two ticks later. Modelling it as a deferred write puts the resolution in the
+    /// same phase the game uses, so door timings come out right.
+    pub moves: &'a mut Vec<PendingMove>,
     /// Neighbour notifications raised by [`TickCtx::set`], drained by the driver.
     ///
     /// Collected rather than dispatched inline: a behaviour that could re-enter
@@ -89,6 +107,16 @@ impl TickCtx<'_> {
     /// Set a block without notifying anything, for loading a structure.
     pub fn set_silent(&mut self, pos: Pos, state: StateId) {
         self.world.set(pos, state);
+    }
+
+    /// Schedule a block write for `delay` ticks from now, resolved in the
+    /// block-entities phase.
+    pub fn defer(&mut self, pos: Pos, state: StateId, delay: u64) {
+        self.moves.push(PendingMove {
+            pos,
+            state,
+            resolve_on: self.tick + delay,
+        });
     }
 }
 
@@ -381,6 +409,7 @@ mod tests {
             states: &states,
             tick: 0,
             updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
         };
         source.on_neighbor_changed(&mut ctx, Pos::new(0, 0, 0), Dir::Up);
         source.on_scheduled_tick(&mut ctx, Pos::new(0, 0, 0));
@@ -401,6 +430,7 @@ mod tests {
             states: &states,
             tick: 10,
             updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
         };
         ctx.schedule(Pos::new(1, 1, 1), 2, TickPriority::High);
         ctx.queue_event(Pos::new(2, 2, 2), 1, 3);
