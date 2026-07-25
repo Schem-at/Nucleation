@@ -59,17 +59,52 @@ pub const MAX_PUSH_DEPTH: usize = 12;
 /// implementation naturally does — reports every door two ticks early.
 pub const PISTON_MOVE_TICKS: u64 = 2;
 
-/// Which blocks a piston may move.
+/// The two sticky block kinds.
+///
+/// They behave identically when dragging ordinary blocks, and differ in one rule
+/// that matters: **slime and honey do not stick to each other**. Builds rely on
+/// that to separate two halves of a contraption, so collapsing the distinction
+/// would quietly fuse structures the game keeps apart.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Sticky {
+    /// Slime block.
+    Slime,
+    /// Honey block.
+    Honey,
+}
+
+/// Which blocks a piston may move, and which of them are sticky.
 ///
 /// Supplied by the caller: obsidian and bedrock are immovable, most blocks are
 /// pushable, and this crate holds no Minecraft block list of its own.
 pub trait Movability: Send + Sync {
     /// Whether the block at `pos` can be pushed.
+    ///
+    /// Must return false for genuinely immovable blocks — obsidian, bedrock, a
+    /// block currently in motion (`moving_piston`), and an extended piston base.
+    /// One immovable block anywhere in a resolved structure cancels the whole push.
     fn is_movable(&self, world: &World, pos: Pos) -> bool;
 
     /// Whether the block at `pos` is air, i.e. free space for a push to end in.
     fn is_empty(&self, world: &World, pos: Pos) -> bool {
         world.get(pos) == StateId::AIR
+    }
+
+    /// The sticky kind of the block at `pos`, if it is one.
+    fn sticky(&self, _world: &World, _pos: Pos) -> Option<Sticky> {
+        None
+    }
+}
+
+/// Whether two adjacent blocks drag one another.
+///
+/// A sticky block adheres to any movable neighbour, **except** that slime and
+/// honey do not adhere to each other.
+fn adheres(a: Option<Sticky>, b: Option<Sticky>) -> bool {
+    match (a, b) {
+        (None, None) => false,
+        (Some(x), Some(y)) => x == y,
+        _ => true,
     }
 }
 
@@ -96,33 +131,112 @@ pub fn resolve_push(
     piston: Pos,
     dir: Dir,
 ) -> PushPlan {
-    let mut column = Vec::new();
-    let mut cursor = piston.offset(dir);
+    let failed = || PushPlan { to_push: Vec::new(), possible: false };
 
-    loop {
-        if movability.is_empty(world, cursor) {
-            // Free space: the column has somewhere to go.
-            return PushPlan {
-                to_push: column.into_iter().rev().collect(),
-                possible: true,
-            };
+    let mut chosen: Vec<Pos> = Vec::new();
+    // Lines still to explore. A dragged block starts its own line forward, which is
+    // how a slime block pulling a floor block can go on to push whatever that floor
+    // block runs into — observed in the captured trace.
+    let mut frontier: Vec<Pos> = vec![piston.offset(dir)];
+
+    while let Some(start) = frontier.pop() {
+        let mut cursor = start;
+        loop {
+            if movability.is_empty(world, cursor) {
+                break; // this line has somewhere to go
+            }
+            if !movability.is_movable(world, cursor) {
+                return failed(); // one immovable block cancels everything
+            }
+            if chosen.contains(&cursor) {
+                break; // already accounted for by another line
+            }
+            if chosen.len() >= MAX_PUSH_DEPTH {
+                return failed();
+            }
+            chosen.push(cursor);
+
+            // Adhesion: a sticky block drags its neighbours, and each of those
+            // becomes a line of its own.
+            if let Some(kind) = movability.sticky(world, cursor) {
+                for side in crate::pos::ALL_DIRS {
+                    let neighbour = cursor.offset(side);
+                    if movability.is_empty(world, neighbour) || chosen.contains(&neighbour) {
+                        continue;
+                    }
+                    if adheres(Some(kind), movability.sticky(world, neighbour)) {
+                        frontier.push(neighbour);
+                    }
+                }
+            }
+
+            cursor = cursor.offset(dir);
         }
-        if !movability.is_movable(world, cursor) {
-            // Immovable block: nothing moves at all.
-            return PushPlan {
-                to_push: Vec::new(),
-                possible: false,
-            };
-        }
-        if column.len() >= MAX_PUSH_DEPTH {
-            return PushPlan {
-                to_push: Vec::new(),
-                possible: false,
-            };
-        }
-        column.push(cursor);
-        cursor = cursor.offset(dir);
     }
+
+    // Apply far-end-first *along the push axis*, so every block is written into
+    // space an earlier write has already vacated. With adhesion the set is no
+    // longer a single line, so this ordering has to be computed rather than
+    // assumed.
+    chosen.sort_by_key(|pos| -axis(*pos, dir));
+
+    PushPlan { to_push: chosen, possible: true }
+}
+
+/// Work out what a sticky piston retracting would pull back.
+///
+/// `start` is the block directly in front of the head and `dir` points back toward
+/// the piston. Unlike a push there is no column ahead to shove — only the pulled
+/// block and whatever adheres to it — so a blocked destination simply means that
+/// piece stays put rather than cancelling the retraction.
+pub fn resolve_pull(
+    world: &World,
+    movability: &dyn Movability,
+    start: Pos,
+    dir: Dir,
+) -> PushPlan {
+    if movability.is_empty(world, start) || !movability.is_movable(world, start) {
+        return PushPlan { to_push: Vec::new(), possible: false };
+    }
+
+    let mut chosen: Vec<Pos> = Vec::new();
+    let mut frontier: Vec<Pos> = vec![start];
+
+    while let Some(pos) = frontier.pop() {
+        if chosen.contains(&pos) || chosen.len() >= MAX_PUSH_DEPTH {
+            continue;
+        }
+        if movability.is_empty(world, pos) || !movability.is_movable(world, pos) {
+            continue;
+        }
+        // Only pull into space that is actually free.
+        let destination = pos.offset(dir);
+        if !movability.is_empty(world, destination) && !chosen.contains(&destination) {
+            continue;
+        }
+        chosen.push(pos);
+
+        if let Some(kind) = movability.sticky(world, pos) {
+            for side in crate::pos::ALL_DIRS {
+                let neighbour = pos.offset(side);
+                if adheres(Some(kind), movability.sticky(world, neighbour)) {
+                    frontier.push(neighbour);
+                }
+            }
+        }
+    }
+
+    // Nearest-first along the pull direction, so each block moves into space that
+    // is already clear.
+    chosen.sort_by_key(|pos| -axis(*pos, dir));
+
+    PushPlan { possible: !chosen.is_empty(), to_push: chosen }
+}
+
+/// A position's coordinate along `dir`, increasing in the direction of travel.
+fn axis(pos: Pos, dir: Dir) -> i32 {
+    let (dx, dy, dz) = dir.delta();
+    pos.x * dx + pos.y * dy + pos.z * dz
 }
 
 /// A piston.
@@ -219,12 +333,18 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     ctx.set(head, StateId::AIR);
                 }
                 if self.sticky {
-                    // Sticky pistons drag the block that was in front of the head.
-                    let dragged = head.offset(self.facing);
-                    if self.movability.is_movable(ctx.world, dragged) {
-                        let state = ctx.world.get(dragged);
-                        ctx.set(head, state);
-                        ctx.set(dragged, StateId::AIR);
+                    // A sticky piston pulls, and a pulled slime block drags its own
+                    // neighbours exactly as a pushed one does. Pulling matters as
+                    // much as pushing for doors: it is the return stroke.
+                    let back = self.facing.opposite();
+                    let plan =
+                        resolve_pull(ctx.world, &self.movability, head.offset(self.facing), back);
+                    for from in &plan.to_push {
+                        let state = ctx.world.get(*from);
+                        let to = from.offset(back);
+                        ctx.set(to, self.moving);
+                        ctx.set(*from, self.moving);
+                        ctx.defer(to, state, PISTON_MOVE_TICKS);
                     }
                 }
                 ctx.set(pos, self.states.get(false));
@@ -255,6 +375,8 @@ mod tests {
     struct Model {
         powered: Vec<StateId>,
         immovable: Vec<StateId>,
+        slime: Vec<StateId>,
+        honey: Vec<StateId>,
     }
 
     impl PowerSource for Model {
@@ -274,6 +396,16 @@ mod tests {
             let state = world.get(pos);
             state != StateId::AIR && !self.immovable.contains(&state)
         }
+        fn sticky(&self, world: &World, pos: Pos) -> Option<Sticky> {
+            let state = world.get(pos);
+            if self.slime.contains(&state) {
+                Some(Sticky::Slime)
+            } else if self.honey.contains(&state) {
+                Some(Sticky::Honey)
+            } else {
+                None
+            }
+        }
     }
 
     const RETRACTED: StateId = StateId(1);
@@ -283,11 +415,15 @@ mod tests {
     const OBSIDIAN: StateId = StateId(5);
     const LEVER: StateId = StateId(6);
     const MOVING: StateId = StateId(7);
+    const SLIME: StateId = StateId(8);
+    const HONEY: StateId = StateId(9);
 
     fn piston(extended: bool, sticky: bool) -> Piston<Model, Model> {
         let model = Model {
             powered: vec![LEVER],
-            immovable: vec![OBSIDIAN],
+            immovable: vec![OBSIDIAN, MOVING],
+            slime: vec![SLIME],
+            honey: vec![HONEY],
         };
         Piston {
             facing: Dir::East,
@@ -453,12 +589,59 @@ mod tests {
         w.set(Pos::new(2, 1, 0), STONE);
 
         let p = piston(true, true);
-        let mut ctx = run(&mut w, &mut t, &mut e, &s);
-        assert!(p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0));
+        let mut pulled = Vec::new();
+        {
+            let mut ctx = TickCtx {
+                world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
+                updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
+            };
+            assert!(p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0));
+        }
 
         assert_eq!(w.get(pos), RETRACTED);
-        assert_eq!(w.get(Pos::new(1, 1, 0)), STONE, "dragged back into the head slot");
-        assert_eq!(w.get(Pos::new(2, 1, 0)), StateId::AIR);
+        // Retraction travels like extension: placeholders now, real states in the
+        // block-entities phase two ticks later.
+        assert_eq!(w.get(Pos::new(1, 1, 0)), MOVING, "head slot is in motion");
+        assert!(
+            pulled.iter().any(|m| m.pos == Pos::new(1, 1, 0)
+                && m.state == STONE
+                && m.resolve_on == PISTON_MOVE_TICKS),
+            "the stone must be scheduled into the head slot: {pulled:?}"
+        );
+    }
+
+    #[test]
+    fn a_sticky_piston_pulls_a_slime_structure_back_whole() {
+        // The return stroke matters as much as the push: a pulled slime block drags
+        // its neighbours exactly as a pushed one does.
+        let mut w = world();
+        let mut t = TickQueue::new();
+        let mut e = EventQueue::new();
+        let s = StateRegistry::new();
+        let pos = Pos::new(0, 1, 0);
+        w.set(pos, EXTENDED);
+        w.set(Pos::new(1, 1, 0), HEAD);
+        w.set(Pos::new(2, 1, 0), SLIME);
+        w.set(Pos::new(2, 2, 0), STONE); // stuck on top of the slime
+
+        let p = piston(true, true);
+        let mut pulled = Vec::new();
+        {
+            let mut ctx = TickCtx {
+                world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
+                updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
+            };
+            p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0);
+        }
+
+        assert!(
+            pulled.iter().any(|m| m.pos == Pos::new(1, 1, 0) && m.state == SLIME),
+            "slime pulled into the head slot: {pulled:?}"
+        );
+        assert!(
+            pulled.iter().any(|m| m.pos == Pos::new(1, 2, 0) && m.state == STONE),
+            "and the block stuck to it came along: {pulled:?}"
+        );
     }
 
     #[test]
@@ -493,6 +676,148 @@ mod tests {
         let mut ctx = run(&mut w, &mut t, &mut e, &s);
         p.on_neighbor_changed(&mut ctx, pos, Dir::Up);
         assert!(e.is_empty(), "no power, no event");
+    }
+
+    #[test]
+    fn slime_drags_blocks_on_every_face() {
+        // Captured from vanilla: pushing a slime block east also moved the stone
+        // above it and the stone below it, neither of which the piston touched.
+        let mut w = world();
+        let pos = Pos::new(0, 1, 0);
+        w.set(pos, RETRACTED);
+        w.set(Pos::new(1, 1, 0), SLIME);
+        w.set(Pos::new(1, 2, 0), STONE); // above the slime
+        w.set(Pos::new(1, 0, 0), STONE); // below the slime
+
+        let p = piston(false, false);
+        let plan = resolve_push(&w, &p.movability, pos, Dir::East);
+
+        assert!(plan.possible);
+        assert!(plan.to_push.contains(&Pos::new(1, 1, 0)), "the slime itself");
+        assert!(plan.to_push.contains(&Pos::new(1, 2, 0)), "dragged from above");
+        assert!(plan.to_push.contains(&Pos::new(1, 0, 0)), "dragged from below");
+    }
+
+    #[test]
+    fn a_dragged_block_pushes_whatever_it_runs_into() {
+        // Also captured: the stone dragged from beneath the slime shoved the stone
+        // already sitting in its path one further east. Adhesion starts new push
+        // lines; it does not merely translate blocks.
+        let mut w = world();
+        let pos = Pos::new(0, 1, 0);
+        w.set(pos, RETRACTED);
+        w.set(Pos::new(1, 1, 0), SLIME);
+        w.set(Pos::new(1, 0, 0), STONE);
+        w.set(Pos::new(2, 0, 0), STONE); // in the dragged block's way
+
+        let p = piston(false, false);
+        let plan = resolve_push(&w, &p.movability, pos, Dir::East);
+
+        assert!(plan.possible);
+        assert!(
+            plan.to_push.contains(&Pos::new(2, 0, 0)),
+            "the block the dragged one runs into must move too: {:?}",
+            plan.to_push
+        );
+    }
+
+    #[test]
+    fn slime_and_honey_do_not_stick_to_each_other() {
+        // The one rule that separates them, and builds depend on it to keep two
+        // halves of a contraption apart.
+        let mut w = world();
+        let pos = Pos::new(0, 1, 0);
+        w.set(pos, RETRACTED);
+        w.set(Pos::new(1, 1, 0), SLIME);
+        w.set(Pos::new(1, 2, 0), HONEY);
+
+        let p = piston(false, false);
+        let plan = resolve_push(&w, &p.movability, pos, Dir::East);
+
+        assert!(plan.possible);
+        assert!(
+            !plan.to_push.contains(&Pos::new(1, 2, 0)),
+            "honey must not be dragged by slime: {:?}",
+            plan.to_push
+        );
+    }
+
+    #[test]
+    fn honey_drags_ordinary_blocks_just_like_slime() {
+        let mut w = world();
+        let pos = Pos::new(0, 1, 0);
+        w.set(pos, RETRACTED);
+        w.set(Pos::new(1, 1, 0), HONEY);
+        w.set(Pos::new(1, 2, 0), STONE);
+
+        let p = piston(false, false);
+        let plan = resolve_push(&w, &p.movability, pos, Dir::East);
+        assert!(plan.to_push.contains(&Pos::new(1, 2, 0)));
+    }
+
+    #[test]
+    fn slime_touching_the_same_kind_still_sticks() {
+        let mut w = world();
+        let pos = Pos::new(0, 1, 0);
+        w.set(pos, RETRACTED);
+        w.set(Pos::new(1, 1, 0), SLIME);
+        w.set(Pos::new(1, 2, 0), SLIME);
+
+        let p = piston(false, false);
+        let plan = resolve_push(&w, &p.movability, pos, Dir::East);
+        assert!(plan.to_push.contains(&Pos::new(1, 2, 0)), "slime sticks to slime");
+    }
+
+    #[test]
+    fn an_immovable_block_dragged_by_slime_cancels_the_whole_push() {
+        // One immovable block anywhere in the resolved structure stops everything —
+        // not just the line it sits in.
+        let mut w = world();
+        let pos = Pos::new(0, 1, 0);
+        w.set(pos, RETRACTED);
+        w.set(Pos::new(1, 1, 0), SLIME);
+        w.set(Pos::new(1, 2, 0), OBSIDIAN); // stuck to the slime, cannot move
+
+        let p = piston(false, false);
+        let plan = resolve_push(&w, &p.movability, pos, Dir::East);
+        assert!(!plan.possible, "obsidian on the slime must cancel the push");
+        assert!(plan.to_push.is_empty());
+    }
+
+    #[test]
+    fn a_block_already_in_motion_is_immovable() {
+        // moving_piston placeholders cannot be pushed; a piston cannot shove a
+        // structure that is still travelling.
+        let mut w = world();
+        let pos = Pos::new(0, 1, 0);
+        w.set(pos, RETRACTED);
+        w.set(Pos::new(1, 1, 0), MOVING);
+
+        let p = piston(false, false);
+        let plan = resolve_push(&w, &p.movability, pos, Dir::East);
+        assert!(!plan.possible, "a block in motion must block the push");
+    }
+
+    #[test]
+    fn the_push_order_is_far_end_first_along_the_push_axis() {
+        // With adhesion the moved set is no longer a single line, so the ordering
+        // has to be computed. Every block must still be written into space an
+        // earlier write vacated.
+        let mut w = world();
+        let pos = Pos::new(0, 1, 0);
+        w.set(pos, RETRACTED);
+        w.set(Pos::new(1, 1, 0), SLIME);
+        w.set(Pos::new(2, 1, 0), STONE);
+        w.set(Pos::new(1, 2, 0), STONE);
+
+        let p = piston(false, false);
+        let plan = resolve_push(&w, &p.movability, pos, Dir::East);
+
+        let xs: Vec<i32> = plan.to_push.iter().map(|p| p.x).collect();
+        assert!(
+            xs.windows(2).all(|w| w[0] >= w[1]),
+            "must be ordered by descending x for an eastward push: {xs:?}"
+        );
     }
 
     #[test]
