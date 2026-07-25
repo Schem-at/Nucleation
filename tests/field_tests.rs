@@ -209,6 +209,7 @@ fn bridge_field_is_owned_by_surface_and_material_consumers() {
     assert!(schematic.block_count() > 0);
 }
 
+#[cfg(feature = "bridge")]
 #[test]
 fn bridge_field_reports_its_range_as_a_single_checked_value() {
     // The range crosses the bindings as one fallible struct rather than two
