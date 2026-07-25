@@ -1,3 +1,11 @@
+[workspace]
+# The root package is implicitly a member. `crates/*` holds components that must
+# stay independent of nucleation itself — most importantly `mc-tick`, whose whole
+# value is that `cargo test -p mc-tick` does not rebuild this 188k-line crate and
+# its 159 dependencies.
+members = ["crates/*"]
+resolver = "2"
+
 [package]
 name = "nucleation"
 version = "0.7.0"

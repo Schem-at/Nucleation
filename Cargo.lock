@@ -2893,6 +2893,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "mc-tick"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "smallvec",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "mchprs_blocks"
 version = "0.4.1"
 source = "git+https://github.com/Nano112/MCHPRS.git?rev=2e62496#2e62496cffef19e9c4aa7471af0b1a46bb643299"
