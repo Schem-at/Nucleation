@@ -1,0 +1,12 @@
+# Running an already-quiescent world to quiescence must not advance time.
+#
+# Worth pinning: a naive loop that steps once before checking would report every
+# door as one tick slower than it is.
+
+bounds 0 0 0 3 3 3
+
+expect quiescent
+run_until_quiescent 500
+
+expect tick 0
+expect stop quiescent

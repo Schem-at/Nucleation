@@ -94,7 +94,14 @@ impl Simulation {
         self.initial = self.checkpoint();
     }
 
-    /// The current tick number.
+    /// The number of **completed** ticks, i.e. the index of the tick that will
+    /// run next.
+    ///
+    /// The distinction matters and is a classic source of off-by-one errors in
+    /// timing work: a tick scheduled for tick 4 fires *during* tick 4, and once
+    /// tick 4 has finished this reads **5**. So after running a contraption to
+    /// quiescence, this is one greater than the last tick on which anything
+    /// happened — not the tick the last event occurred on.
     pub fn tick_count(&self) -> u64 {
         self.tick
     }

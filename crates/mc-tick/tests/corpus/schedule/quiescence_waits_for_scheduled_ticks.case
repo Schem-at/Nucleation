@@ -1,0 +1,21 @@
+# A world with a pending scheduled tick is not quiescent, and running to
+# quiescence must advance far enough to fire it.
+#
+# Quiescence is how the product will decide a door has finished moving, so
+# "stopped early" and "never stops" are both product bugs, not just engine bugs.
+
+bounds 0 0 0 7 7 7
+
+schedule 2 2 2 delay=4 priority=normal
+expect not_quiescent
+
+run_until_quiescent 100
+
+expect quiescent
+expect stop quiescent
+
+# 5, not 4. The tick scheduled for tick 4 fires *during* tick 4, and tick_count
+# reports completed ticks — so once tick 4 has finished, the counter reads 5.
+# Written out because this off-by-one is precisely the kind that would make every
+# reported door timing one tick wrong.
+expect tick 5

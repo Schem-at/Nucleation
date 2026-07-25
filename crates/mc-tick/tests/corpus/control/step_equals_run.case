@@ -1,0 +1,15 @@
+# Stepping N times must be indistinguishable from run(N).
+# Part of the control-surface contract: the product will single-step a door and
+# also batch-run it, and those two paths must not drift.
+
+bounds 0 0 0 7 7 7
+
+step
+step
+step
+step
+step
+
+expect tick 5
+expect quiescent
+expect stop completed

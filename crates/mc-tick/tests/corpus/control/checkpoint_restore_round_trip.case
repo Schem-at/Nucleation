@@ -1,0 +1,25 @@
+# A checkpoint taken mid-run must restore exactly: same tick, same blocks.
+# This is the mechanism the product uses to explore "what if the input fired
+# here instead", so an inexact restore would silently corrupt every comparison.
+
+bounds 0 0 0 7 7 7
+set 1 1 1 minecraft:stone
+set 2 1 1 minecraft:redstone_block
+
+run 3
+checkpoint
+
+# Diverge: advance time and change the world.
+run 10
+set 1 1 1 minecraft:air
+
+expect tick 13
+expect non_air_count 1
+
+# Coming back must undo both the time and the block change.
+restore
+
+expect tick 3
+expect block 1 1 1 minecraft:stone
+expect block 2 1 1 minecraft:redstone_block
+expect non_air_count 2

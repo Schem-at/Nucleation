@@ -1,0 +1,23 @@
+# reset() means "back to the build as loaded", not "back to an empty region".
+# mark_initial is what draws that line, and timing runs depend on it: every
+# measurement of a door starts from the same loaded state.
+
+bounds 0 0 0 7 7 7
+set 3 1 3 minecraft:sticky_piston[facing=east,extended=false]
+set 4 1 3 minecraft:slime_block
+mark_initial
+
+# Wreck it.
+set 3 1 3 minecraft:air
+set 4 1 3 minecraft:air
+run 7
+
+expect tick 7
+expect non_air_count 0
+
+reset
+
+expect tick 0
+expect block 3 1 3 minecraft:sticky_piston[facing=east,extended=false]
+expect block 4 1 3 minecraft:slime_block
+expect non_air_count 2
