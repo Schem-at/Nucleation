@@ -1,3 +1,45 @@
+# Nucleation v0.7.0
+
+**Generated worlds.** A new `world_generation` module turns chunk sources into
+whole worlds without ever leaving Rust. `WorldGenerator` builds from an SDF
+volume, a hashed-cell motif scattered once per deterministically transformed
+cell, projected building footprints, or an ordered composite of any of those.
+`stream()` walks an inclusive chunk rectangle lazily in canonical region-major
+order, and each `GeneratedChunk` carries coverage plus source/version
+provenance before handing its payload to the existing `WorldChunkView` — so
+generated worlds flow straight into the Anvil path already there. The bindings
+expose concrete source constructors rather than host callbacks, which keeps
+SDF evaluation and block placement off the FFI boundary entirely.
+
+**Portable field programs.** `FieldProgram` and `FieldProgramBuilder` add a
+sandboxed stack-based VM for field graphs that can cross a language boundary as
+JSON. Slots, instruction count, repeat depth, repeat iterations, and total
+dynamic steps are all capped, so a program arriving from an untrusted caller
+cannot run away. `Sdf.from_program` turns one into geometry.
+
+**Field3.** A scalar field with no distance semantics, so geometry
+(`Sdf.offset_by_field`) and materials (`Brush.field3`) can share one field
+without it being reinterpreted as a signed distance. `output_range` reports the
+analytically proven bounds as a single checked value.
+
+**The SDF bridge is now complete.** It grew from a 4-method stub to the full
+typed surface: 23 IQ primitives, boolean/smooth/domain-warp operators,
+transforms, evaluation, and JSON round-trip — every constructor validating its
+arguments. `Brush.field_sdf` and `Palette.gradient_ids_between_blocks_json`
+round out the material side.
+
+**Error fidelity.** World-generation failures on a well-formed request now
+report a new `NucleationError::Generation` instead of collapsing into
+`InvalidArgument`, so bindings can tell "you asked for something impossible"
+apart from "the generator broke". `Sdf.bounds` returns `NotFound` for an
+unbounded graph, per the bridge's error convention.
+
+**Breaking.** `SdfShape::with_bounds` returns `Option<Self>`, validating its
+bounds rather than trusting them. On the bindings, `Field3.output_min` and
+`Field3.output_max` are replaced by `Field3.output_range`, which errors when no
+range can be proven instead of silently returning NaN — check any call site
+that fed those into a gradient's bounds.
+
 # Nucleation v0.5.1
 
 **USDZ byte accessor.** `MeshResult` gained a `create_usdz` constructor when
