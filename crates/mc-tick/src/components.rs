@@ -50,6 +50,19 @@ use crate::world::World;
 /// at [`TickPriority::Normal`].
 pub const TORCH_DELAY: u64 = 2;
 
+/// How far back burnout detection looks, in game ticks.
+///
+/// `RedstoneTorchBlock.RECENT_TOGGLE_TIMER`, read as the literal `60L` in the
+/// class's bytecode.
+pub const TORCH_BURNOUT_WINDOW: u64 = 60;
+
+/// Toggles within [`TORCH_BURNOUT_WINDOW`] before a torch burns out.
+///
+/// `RedstoneTorchBlock.MAX_RECENT_TOGGLES`. javac inlines it, so unlike the window
+/// this is the long-established value rather than one read from the class — and it
+/// is the reason a fast clock built on torches stalls.
+pub const MAX_RECENT_TOGGLES: usize = 8;
+
 /// Game ticks a comparator takes to act. Fixed, unlike a repeater's.
 pub const COMPARATOR_DELAY: u64 = 2;
 
@@ -105,6 +118,49 @@ pub trait PowerSource: Send + Sync {
 
     /// Which way the diode at `pos` faces, if it is one.
     fn diode_facing(&self, world: &World, pos: Pos) -> Option<Dir>;
+
+    /// The signal strength `pos` emits toward `toward`, 0-15.
+    ///
+    /// Defaults to the boolean answer widened to full strength, so a power model
+    /// that only cares about on/off need not implement it. Comparators are the one
+    /// component whose output genuinely depends on the *level*.
+    fn signal_strength(&self, world: &World, pos: Pos, toward: Dir) -> u8 {
+        if self.is_powered(world, pos, toward) {
+            15
+        } else {
+            0
+        }
+    }
+}
+
+/// How a comparator combines its rear and side inputs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ComparatorMode {
+    /// Output the rear signal, unless a side beats it, in which case nothing.
+    Compare,
+    /// Output the rear signal reduced by the strongest side.
+    Subtract,
+}
+
+impl ComparatorMode {
+    /// The output strength for a given rear and side signal.
+    ///
+    /// Trace-confirmed for the no-side-input case: a comparator in `subtract` mode
+    /// fed 15 from behind with nothing at its sides output 15, lighting dust at
+    /// 15 then 14. The side-input arithmetic follows the documented rules and is
+    /// marked in `redstone_components.md` as wanting a trace of its own.
+    pub fn output(self, rear: u8, side: u8) -> u8 {
+        match self {
+            ComparatorMode::Compare => {
+                if side > rear {
+                    0
+                } else {
+                    rear
+                }
+            }
+            ComparatorMode::Subtract => rear.saturating_sub(side),
+        }
+    }
 }
 
 /// Shared scheduling logic for repeaters and comparators.
@@ -289,9 +345,17 @@ impl<P: PowerSource> BlockBehaviour for Torch<P> {
         let powered = self
             .power
             .is_powered(ctx.world, support, self.attached.opposite());
-        if self.lit == powered {
-            ctx.set(pos, self.states.get(!powered));
+        if self.lit != powered {
+            return;
         }
+        // Burnout: a torch driven too hard stops responding. Without this a
+        // torch-based clock would run forever in simulation and stall in the game,
+        // which is the sort of divergence that invalidates a whole timing result.
+        if ctx.recent_toggles(pos, TORCH_BURNOUT_WINDOW) >= MAX_RECENT_TOGGLES {
+            return;
+        }
+        ctx.record_toggle(pos);
+        ctx.set(pos, self.states.get(!powered));
     }
 
     fn redstone_power(&self, _world: &World, _pos: Pos, dir: Dir) -> u8 {
@@ -318,10 +382,44 @@ pub struct Comparator<P: PowerSource> {
     pub facing: Dir,
     /// Whether this state is powered.
     pub powered: bool,
+    /// Compare or subtract.
+    pub mode: ComparatorMode,
     /// Powered/unpowered states.
     pub states: StatePair,
     /// How power is read.
     pub power: P,
+}
+
+impl<P: PowerSource> Comparator<P> {
+    /// The side this comparator reads its main input from.
+    fn input_side(&self) -> Dir {
+        if INPUT_IS_FACING_SIDE {
+            self.facing
+        } else {
+            self.facing.opposite()
+        }
+    }
+
+    /// The strength this comparator should be emitting.
+    ///
+    /// Rear input comes from [`Comparator::input_side`]; side inputs from the two
+    /// horizontal directions perpendicular to it, matching the game's use of the
+    /// same perpendicular pair that governs repeater locking.
+    pub fn output_strength(&self, world: &World, pos: Pos) -> u8 {
+        let back = self.input_side();
+        let rear = self
+            .power
+            .signal_strength(world, pos.offset(back), back.opposite());
+        let side = perpendicular(back)
+            .into_iter()
+            .map(|dir| {
+                self.power
+                    .signal_strength(world, pos.offset(dir), dir.opposite())
+            })
+            .max()
+            .unwrap_or(0);
+        self.mode.output(rear, side)
+    }
 }
 
 impl<P: PowerSource> BlockBehaviour for Comparator<P> {
@@ -337,27 +435,16 @@ impl<P: PowerSource> BlockBehaviour for Comparator<P> {
     }
 
     fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
-        let input_side = if INPUT_IS_FACING_SIDE {
-            self.facing
-        } else {
-            self.facing.opposite()
-        };
-        let input =
-            self.power
-                .is_powered(ctx.world, pos.offset(input_side), input_side.opposite());
-        if input != self.powered {
-            ctx.set(pos, self.states.get(input));
+        let should_be_on = self.output_strength(ctx.world, pos) > 0;
+        if should_be_on != self.powered {
+            ctx.set(pos, self.states.get(should_be_on));
         }
     }
 
-    fn redstone_power(&self, _world: &World, _pos: Pos, dir: Dir) -> u8 {
-        let output = if INPUT_IS_FACING_SIDE {
-            self.facing.opposite()
-        } else {
-            self.facing
-        };
-        if self.powered && dir == output {
-            15
+    fn redstone_power(&self, world: &World, pos: Pos, dir: Dir) -> u8 {
+        let output = self.input_side().opposite();
+        if dir == output {
+            self.output_strength(world, pos)
         } else {
             0
         }
@@ -445,6 +532,7 @@ mod tests {
             tick: 0,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
 
@@ -473,6 +561,7 @@ mod tests {
             tick: 0,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
 
@@ -508,6 +597,7 @@ mod tests {
             tick: 0,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
 
@@ -538,6 +628,7 @@ mod tests {
             tick: 0,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
         };
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
@@ -570,6 +661,7 @@ mod tests {
             tick: 0,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
         };
         torch.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::Down);
 
@@ -603,6 +695,7 @@ mod tests {
             tick: 0,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
         };
         torch.on_scheduled_tick(&mut ctx, torch_pos);
 
@@ -636,6 +729,7 @@ mod tests {
         let comparator = Comparator {
             facing: Dir::East,
             powered: false,
+            mode: ComparatorMode::Subtract,
             states: StatePair { off: StateId(1), on: StateId(2) },
             power: Sources { powered: vec![source], diodes: vec![] },
         };
@@ -647,6 +741,7 @@ mod tests {
             tick: 0,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
         };
         comparator.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
 
@@ -686,6 +781,7 @@ mod tests {
             tick: 0,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
         };
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
 
@@ -720,6 +816,7 @@ mod tests {
             tick: 0,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
         };
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
 
@@ -731,6 +828,156 @@ mod tests {
         // Locking is checked only on the two horizontal perpendicular sides.
         assert_eq!(perpendicular(Dir::East), [Dir::North, Dir::South]);
         assert_eq!(perpendicular(Dir::North), [Dir::East, Dir::West]);
+    }
+
+    #[test]
+    fn subtract_mode_passes_the_rear_signal_when_no_side_input() {
+        // Trace-confirmed: a subtract comparator fed 15 from behind with nothing at
+        // its sides output 15, lighting the dust beyond it at 15 then 14.
+        assert_eq!(ComparatorMode::Subtract.output(15, 0), 15);
+        assert_eq!(ComparatorMode::Subtract.output(9, 0), 9);
+    }
+
+    #[test]
+    fn subtract_mode_reduces_by_the_side_signal() {
+        assert_eq!(ComparatorMode::Subtract.output(15, 4), 11);
+        assert_eq!(ComparatorMode::Subtract.output(3, 9), 0, "never below zero");
+    }
+
+    #[test]
+    fn compare_mode_is_all_or_nothing() {
+        assert_eq!(ComparatorMode::Compare.output(15, 4), 15, "side loses, pass through");
+        assert_eq!(ComparatorMode::Compare.output(15, 15), 15, "a tie still passes");
+        assert_eq!(ComparatorMode::Compare.output(4, 9), 0, "side wins, output nothing");
+    }
+
+    #[test]
+    fn a_comparator_emits_only_from_its_output_side() {
+        let (mut world, _t, _e, _s) = ctx_parts();
+        let source = StateId(9);
+        let pos = Pos::new(0, 1, 0);
+        world.set(pos.offset(Dir::East), source);
+
+        let comparator = Comparator {
+            facing: Dir::East,
+            powered: true,
+            mode: ComparatorMode::Subtract,
+            states: StatePair { off: StateId(1), on: StateId(2) },
+            power: Sources { powered: vec![source], diodes: vec![] },
+        };
+        // Input arrives on the facing side, so output leaves the opposite side.
+        assert_eq!(comparator.redstone_power(&world, pos, Dir::West), 15);
+        assert_eq!(comparator.redstone_power(&world, pos, Dir::East), 0);
+        assert_eq!(comparator.redstone_power(&world, pos, Dir::North), 0);
+    }
+
+    #[test]
+    fn a_torch_burns_out_when_driven_too_hard() {
+        // Without this a torch clock runs forever in simulation and stalls in the
+        // game — a divergence that invalidates any timing result built on it.
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let source = StateId(9);
+        let lit = StateId(2);
+        let unlit = StateId(1);
+        let pos = Pos::new(0, 1, 0);
+        let support = Pos::new(0, 0, 0);
+        world.set(support, source);
+        world.set(pos, lit);
+
+        let mut toggles = Vec::new();
+        let torch = Torch {
+            attached: Dir::Down,
+            lit: true,
+            states: StatePair { off: unlit, on: lit },
+            power: Sources { powered: vec![source], diodes: vec![] },
+        };
+
+        // Pre-load the history with the maximum allowed toggles inside the window.
+        for t in 0..MAX_RECENT_TOGGLES {
+            toggles.push((pos, t as u64));
+        }
+
+        let mut ctx = TickCtx {
+            world: &mut world,
+            ticks: &mut ticks,
+            events: &mut events,
+            states: &states,
+            tick: 10,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut toggles,
+        };
+        torch.on_scheduled_tick(&mut ctx, pos);
+
+        assert_eq!(world.get(pos), lit, "burnt out: the torch must not toggle");
+    }
+
+    #[test]
+    fn a_torch_toggles_normally_below_the_burnout_threshold() {
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let source = StateId(9);
+        let lit = StateId(2);
+        let unlit = StateId(1);
+        let pos = Pos::new(0, 1, 0);
+        world.set(Pos::new(0, 0, 0), source);
+        world.set(pos, lit);
+
+        let mut toggles: Vec<(Pos, u64)> =
+            (0..MAX_RECENT_TOGGLES - 1).map(|t| (pos, t as u64)).collect();
+        let torch = Torch {
+            attached: Dir::Down,
+            lit: true,
+            states: StatePair { off: unlit, on: lit },
+            power: Sources { powered: vec![source], diodes: vec![] },
+        };
+        let mut ctx = TickCtx {
+            world: &mut world,
+            ticks: &mut ticks,
+            events: &mut events,
+            states: &states,
+            tick: 10,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut toggles,
+        };
+        torch.on_scheduled_tick(&mut ctx, pos);
+
+        assert_eq!(world.get(pos), unlit, "one below the limit still toggles");
+    }
+
+    #[test]
+    fn toggles_outside_the_window_do_not_count_toward_burnout() {
+        // RECENT_TOGGLE_TIMER is 60 ticks, read as the literal 60L in the class.
+        let (mut world, mut ticks, mut events, states) = ctx_parts();
+        let source = StateId(9);
+        let lit = StateId(2);
+        let unlit = StateId(1);
+        let pos = Pos::new(0, 1, 0);
+        world.set(Pos::new(0, 0, 0), source);
+        world.set(pos, lit);
+
+        // Plenty of toggles, but all long expired.
+        let mut toggles: Vec<(Pos, u64)> =
+            (0..MAX_RECENT_TOGGLES * 2).map(|t| (pos, t as u64)).collect();
+        let torch = Torch {
+            attached: Dir::Down,
+            lit: true,
+            states: StatePair { off: unlit, on: lit },
+            power: Sources { powered: vec![source], diodes: vec![] },
+        };
+        let mut ctx = TickCtx {
+            world: &mut world,
+            ticks: &mut ticks,
+            events: &mut events,
+            states: &states,
+            tick: 500,
+            updates: &mut Vec::new(),
+            moves: &mut Vec::new(),
+            toggles: &mut toggles,
+        };
+        torch.on_scheduled_tick(&mut ctx, pos);
+
+        assert_eq!(world.get(pos), unlit, "expired toggles must not burn it out");
     }
 
     #[test]

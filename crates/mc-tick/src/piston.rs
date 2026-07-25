@@ -313,7 +313,8 @@ mod tests {
     ) -> TickCtx<'a> {
         TickCtx { world, ticks, events, states, tick: 0,
         updates: Box::leak(Box::new(Vec::new())),
-        moves: Box::leak(Box::new(Vec::new())) }
+        moves: Box::leak(Box::new(Vec::new())),
+        toggles: Box::leak(Box::new(Vec::new())) }
     }
 
     #[test]
@@ -362,6 +363,7 @@ mod tests {
             let mut ctx = TickCtx {
                 world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
                 updates: &mut Vec::new(), moves: &mut ctx_moves,
+                toggles: &mut Vec::new(),
             };
             assert!(p.on_block_event(&mut ctx, pos, TRIGGER_EXTEND, 0));
         }

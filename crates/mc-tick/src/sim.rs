@@ -74,6 +74,8 @@ pub struct Simulation {
     updates: Vec<(Pos, crate::pos::Dir)>,
     /// Deferred writes awaiting their block-entities phase.
     moves: Vec<PendingMove>,
+    /// Torch toggle history for burnout, pruned as it ages out.
+    toggles: Vec<(Pos, u64)>,
     tick: u64,
     /// The state to return to on [`Simulation::reset`].
     ///
@@ -101,6 +103,7 @@ impl Simulation {
             unknown_seen: Vec::new(),
             updates: Vec::new(),
             moves: Vec::new(),
+            toggles: Vec::new(),
             tick: 0,
             initial,
         }
@@ -203,6 +206,9 @@ impl Simulation {
             }
         }
         self.tick += 1;
+        // Burnout only looks back a fixed window, so anything older is dead weight.
+        let horizon = self.tick.saturating_sub(crate::components::TORCH_BURNOUT_WINDOW);
+        self.toggles.retain(|(_, t)| *t >= horizon);
         StopReason::Completed
     }
 
@@ -295,6 +301,7 @@ impl Simulation {
                 tick: self.tick,
                 updates: &mut self.updates,
                 moves: &mut self.moves,
+                        toggles: &mut self.toggles,
             };
             behaviour.on_neighbor_changed(&mut ctx, pos, from);
         }
@@ -339,6 +346,7 @@ impl Simulation {
                         tick: self.tick,
                         updates: &mut self.updates,
                 moves: &mut self.moves,
+                        toggles: &mut self.toggles,
                     };
                     behaviour.on_scheduled_tick(&mut ctx, entry.pos);
                     self.propagate();
@@ -400,6 +408,7 @@ impl Simulation {
                     tick: self.tick,
                     updates: &mut self.updates,
                 moves: &mut self.moves,
+                        toggles: &mut self.toggles,
                 };
                 behaviour.on_block_event(&mut ctx, event.pos, event.id, event.param);
                 self.propagate();

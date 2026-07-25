@@ -82,8 +82,17 @@ reading produces something subtly wrong.
 - **Torch delay = 2** — confirmed by capture (torch flipped exactly two ticks after
   its repeater), no longer an assumption.
 
-Still outstanding: **comparator modes and priming**, and **torch burnout**. Both
-need traces before implementation.
+- **Comparator modes** — trace-confirmed for the pass-through case: a subtract
+  comparator fed 15 from behind with no side input output 15, lighting dust at
+  15 then 14. Compare/subtract arithmetic implemented; the *side-input* arithmetic
+  follows the documented rules and still wants a trace of its own.
+- **Torch burnout** — implemented. `RECENT_TOGGLE_TIMER` is 60, read as the literal
+  `60L` in the class; `MAX_RECENT_TOGGLES` (8) is inlined by javac, so it is the
+  conventional value rather than one read from the bytecode.
+
+Still outstanding: **comparator priming**. It needs a trace of a comparator
+scheduled at NORMAL alongside diodes at HIGH, and that ordering encoded — the one
+behaviour on this page still deliberately unimplemented.
 
 ## What to do next, in order
 

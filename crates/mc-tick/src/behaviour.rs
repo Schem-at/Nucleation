@@ -63,6 +63,12 @@ pub struct TickCtx<'a> {
     /// two ticks later. Modelling it as a deferred write puts the resolution in the
     /// same phase the game uses, so door timings come out right.
     pub moves: &'a mut Vec<PendingMove>,
+    /// Recent redstone-torch toggles, for burnout detection.
+    ///
+    /// Burnout is the one behaviour that depends on *history* rather than on the
+    /// current world, and behaviours are shared and immutable — so the record lives
+    /// with the simulation and is reached through here.
+    pub toggles: &'a mut Vec<(Pos, u64)>,
     /// Neighbour notifications raised by [`TickCtx::set`], drained by the driver.
     ///
     /// Collected rather than dispatched inline: a behaviour that could re-enter
@@ -107,6 +113,19 @@ impl TickCtx<'_> {
     /// Set a block without notifying anything, for loading a structure.
     pub fn set_silent(&mut self, pos: Pos, state: StateId) {
         self.world.set(pos, state);
+    }
+
+    /// Record that a torch at `pos` toggled on this tick.
+    pub fn record_toggle(&mut self, pos: Pos) {
+        self.toggles.push((pos, self.tick));
+    }
+
+    /// How many times a torch at `pos` toggled within the last `window` ticks.
+    pub fn recent_toggles(&self, pos: Pos, window: u64) -> usize {
+        self.toggles
+            .iter()
+            .filter(|(p, t)| *p == pos && self.tick.saturating_sub(*t) < window)
+            .count()
     }
 
     /// Schedule a block write for `delay` ticks from now, resolved in the
@@ -410,6 +429,7 @@ mod tests {
             tick: 0,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
         };
         source.on_neighbor_changed(&mut ctx, Pos::new(0, 0, 0), Dir::Up);
         source.on_scheduled_tick(&mut ctx, Pos::new(0, 0, 0));
@@ -431,6 +451,7 @@ mod tests {
             tick: 10,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
+            toggles: &mut Vec::new(),
         };
         ctx.schedule(Pos::new(1, 1, 1), 2, TickPriority::High);
         ctx.queue_event(Pos::new(2, 2, 2), 1, 3);
