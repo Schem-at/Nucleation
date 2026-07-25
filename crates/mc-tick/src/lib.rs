@@ -32,6 +32,7 @@
 pub mod behaviour;
 pub mod components;
 pub mod phase;
+pub mod piston;
 pub mod pos;
 pub mod redstone;
 pub mod schedule;
@@ -43,6 +44,8 @@ pub use behaviour::{BehaviourTable, BlockBehaviour, Inert, TickCtx};
 pub use components::{Comparator, PowerSource, Repeater, StatePair, Torch,
     COMPARATOR_DELAY, REPEATER_TICKS_PER_DELAY, TORCH_DELAY};
 pub use phase::{Phase, PHASE_ORDER};
+pub use piston::{resolve_push, Movability, Piston, PushPlan, MAX_PUSH_DEPTH,
+    TRIGGER_CONTRACT, TRIGGER_DROP, TRIGGER_EXTEND};
 pub use pos::{Bounds, Dir, Pos, ALL_DIRS};
 pub use redstone::{RedstoneNetwork, MAX_POWER};
 pub use schedule::{BlockEvent, EventQueue, ScheduledTick, TickPriority, TickQueue};
