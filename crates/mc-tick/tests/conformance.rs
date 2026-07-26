@@ -366,8 +366,8 @@ fn run_conformance_full(
 
     // Item physics needs to know which states are solid and how slippery.
     {
-        let (solidity, frictions) = mc_tick::vanilla::physics_tables(sim.registry());
-        sim.set_physics_tables(solidity, frictions);
+        let (solidity, frictions, heights, webs) = mc_tick::vanilla::physics_tables(sim.registry());
+        sim.set_physics_tables(solidity, frictions, heights, webs);
         let (water_kinds, bubble_kinds) = mc_tick::vanilla::fluid_tables(sim.registry());
         sim.set_fluid_tables(water_kinds, bubble_kinds);
     }
@@ -937,6 +937,59 @@ fn bubble_columns_lift_and_sink_items() {
         "bubble.snbt",
         "bubble.json",
         "nucleation:bubble",
+        &[],
+        &[],
+        None,
+        Settle::Quiet,
+        1.0e-6,
+    );
+}
+
+#[test]
+fn blue_ice_lets_an_item_glide_and_stone_stops_it() {
+    // Milestone E's first surface: two identical items launched at 0.25/tick,
+    // one over blue ice (ground drag 0.98 × 0.989), one over stone (0.98 ×
+    // 0.6). A hundred ticks later the ice item is still gliding past x=9 while
+    // the stone item stopped short — the friction table, pinned end to end.
+    run_conformance_full(
+        "item_ice.snbt",
+        "item_ice.json",
+        "nucleation:item_ice",
+        &[],
+        &[],
+        None,
+        Settle::Quiet,
+        1.0e-6,
+    );
+}
+
+#[test]
+fn a_cobweb_slows_a_falling_item_to_a_crawl() {
+    // WebBlock.entityInside arms Entity.stuckSpeedMultiplier (0.25, 0.05f,
+    // 0.25): the next move is scaled per axis and the velocity zeroed, every
+    // tick the box still touches the web — a 0.04 gravity step becomes a
+    // 0.002 descent, for as long as the golden runs.
+    run_conformance_full(
+        "item_web.snbt",
+        "item_web.json",
+        "nucleation:item_web",
+        &[],
+        &[],
+        None,
+        Settle::Quiet,
+        1.0e-6,
+    );
+}
+
+#[test]
+fn an_item_rests_on_soul_sand_at_fourteen_sixteenths() {
+    // Soul sand's collision column tops at 14/16: the item dropped on it
+    // lands at exactly y = 0.875 while its stone-lane twin lands at 1.0 —
+    // the partial-height solid in the collision clip.
+    run_conformance_full(
+        "item_soulsand.snbt",
+        "item_soulsand.json",
+        "nucleation:item_soulsand",
         &[],
         &[],
         None,

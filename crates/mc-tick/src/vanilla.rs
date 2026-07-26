@@ -412,6 +412,10 @@ const INERT: &[&str] = &[
     "minecraft:redstone_block",
     "minecraft:soul_sand",
     "minecraft:magma_block",
+    "minecraft:ice",
+    "minecraft:packed_ice",
+    "minecraft:blue_ice",
+    "minecraft:cobweb",
 ];
 
 /// Register vanilla behaviour for every state currently in `registry`.
@@ -839,6 +843,9 @@ fn is_conductor(descriptor: &Descriptor) -> bool {
 fn is_full_cube(descriptor: &Descriptor) -> bool {
     match descriptor.name.as_str() {
         "minecraft:air" | "minecraft:water" | "minecraft:bubble_column" => false,
+        // Soul sand's collision column tops at 14/16: not a full cube, so it
+        // neither conducts nor blocks hopper suction (isCollisionShapeFullBlock).
+        "minecraft:soul_sand" | "minecraft:cobweb" => false,
         "minecraft:redstone_wire"
         | "minecraft:redstone_torch"
         | "minecraft:redstone_wall_torch"
@@ -861,25 +868,42 @@ fn is_full_cube(descriptor: &Descriptor) -> bool {
 
 /// Collision and friction tables for item physics, indexed by `StateId`.
 ///
-/// Friction is `Block.getFriction`: 0.6 for almost everything, 0.8 for slime.
-pub fn physics_tables(registry: &StateRegistry) -> (Vec<bool>, Vec<f32>) {
+/// Friction is `Block.getFriction` from the `Blocks` static initialiser: 0.6
+/// default, slime 0.8, ice/packed/frosted 0.98, blue ice 0.989. The third
+/// table is each solid state's collision-box height (soul sand tops at 14/16;
+/// everything else solid is a full cube here). The fourth marks cobwebs,
+/// whose `entityInside` sets the stuck-speed multiplier.
+pub fn physics_tables(registry: &StateRegistry) -> (Vec<bool>, Vec<f32>, Vec<f32>, Vec<bool>) {
     let mut solidity = Vec::with_capacity(registry.len());
     let mut frictions = Vec::with_capacity(registry.len());
+    let mut heights = Vec::with_capacity(registry.len());
+    let mut webs = Vec::with_capacity(registry.len());
     for index in 0..registry.len() {
         let descriptor = registry
             .descriptor(StateId(index as u16))
             .map(Descriptor::parse);
-        let (solid, friction) = match &descriptor {
-            None => (false, 0.6),
-            Some(d) => (
-                is_full_cube(d),
-                if d.name == "minecraft:slime_block" { 0.8 } else { 0.6 },
-            ),
+        let (solid, friction, height, web) = match &descriptor {
+            None => (false, 0.6, 1.0, false),
+            Some(d) => {
+                let friction = match d.name.as_str() {
+                    "minecraft:slime_block" => 0.8,
+                    "minecraft:ice" | "minecraft:packed_ice" | "minecraft:frosted_ice" => 0.98,
+                    "minecraft:blue_ice" => 0.989,
+                    _ => 0.6,
+                };
+                match d.name.as_str() {
+                    "minecraft:soul_sand" => (true, friction, 0.875, false),
+                    "minecraft:cobweb" => (false, friction, 1.0, true),
+                    _ => (is_full_cube(d), friction, 1.0, false),
+                }
+            }
         };
         solidity.push(solid);
         frictions.push(friction);
+        heights.push(height);
+        webs.push(web);
     }
-    (solidity, frictions)
+    (solidity, frictions, heights, webs)
 }
 
 /// Fluid tables for item physics, indexed by `StateId`: the water in each

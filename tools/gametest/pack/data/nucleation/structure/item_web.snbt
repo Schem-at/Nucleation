@@ -1,0 +1,23 @@
+{
+  DataVersion: 4903,
+  size: [3, 7, 3],
+  palette: [
+    {Name: "minecraft:stone"},
+    {Name: "minecraft:cobweb"}
+  ],
+  blocks: [
+    {pos: [0, 0, 0], state: 0},
+    {pos: [1, 0, 0], state: 0},
+    {pos: [2, 0, 0], state: 0},
+    {pos: [0, 0, 1], state: 0},
+    {pos: [1, 0, 1], state: 0},
+    {pos: [2, 0, 1], state: 0},
+    {pos: [0, 0, 2], state: 0},
+    {pos: [1, 0, 2], state: 0},
+    {pos: [2, 0, 2], state: 0},
+    {pos: [1, 2, 1], state: 1}
+  ],
+  entities: [
+    {blockPos: [1, 5, 1], pos: [1.5d, 5.0d, 1.5d], nbt: {id: "minecraft:item", Item: {id: "minecraft:iron_ingot", count: 1}, Motion: [0.0d, 0.0d, 0.0d], PickupDelay: 0s, Age: 0s}}
+  ]
+}

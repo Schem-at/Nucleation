@@ -61,6 +61,9 @@ pub struct ItemEntityState {
     pub pickup_delay: u32,
     /// Set when discarded; removed (and reported) at end of tick.
     pub removed: bool,
+    /// `Entity.stuckSpeedMultiplier`, armed by a cobweb: the next move is
+    /// scaled by it per axis and the velocity zeroed, then it clears.
+    pub stuck: Option<[f64; 3]>,
 }
 
 /// All item entities plus the id counter — one bundle so the tick context
@@ -126,6 +129,7 @@ impl ItemEntities {
             age: 0,
             pickup_delay,
             removed: false,
+            stuck: None,
         });
     }
 }
@@ -150,6 +154,37 @@ pub trait CollisionWorld {
     /// (`BubbleColumnBlock.entityInside` reads the state *above*).
     fn is_air(&self, _pos: Pos) -> bool {
         false
+    }
+    /// The collision-box height of a solid block at `pos` (1.0 for full
+    /// cubes; soul sand answers 0.875).
+    fn solid_height(&self, _pos: Pos) -> f64 {
+        1.0
+    }
+    /// Whether `pos` is a cobweb (`WebBlock.entityInside`).
+    fn is_web(&self, _pos: Pos) -> bool {
+        false
+    }
+}
+
+/// The web's stuck-speed multiplier, `WebBlock.entityInside`'s
+/// `Vec3(0.25, 0.05f, 0.25)`.
+const WEB_MULTIPLIER: [f64; 3] = [0.25, 0.05000000074505806, 0.25];
+
+/// Scan the cells the item's box overlaps and re-arm the stuck multiplier if
+/// any is a cobweb — the `checkInsideBlocks` dispatch that runs with (and, via
+/// `applyEffectsFromBlocksForLastMovements`, without) a move.
+fn apply_webs(entity: &mut ItemEntityState, world: &dyn CollisionWorld) {
+    let (min, max) = item_aabb(entity.pos);
+    const EPSILON: f64 = 1.0e-7;
+    for x in ((min[0] + EPSILON).floor() as i32)..=((max[0] - EPSILON).floor() as i32) {
+        for y in ((min[1] + EPSILON).floor() as i32)..=((max[1] - EPSILON).floor() as i32) {
+            for z in ((min[2] + EPSILON).floor() as i32)..=((max[2] - EPSILON).floor() as i32) {
+                if world.is_web(Pos::new(x, y, z)) {
+                    entity.stuck = Some(WEB_MULTIPLIER);
+                    return;
+                }
+            }
+        }
     }
 }
 
@@ -279,10 +314,28 @@ pub fn tick_item(entity: &mut ItemEntityState, world: &dyn CollisionWorld) -> bo
         // a drag column keeps its velocity pinned downward, which is why the
         // flush tick never lifts it off the floor.
         apply_bubble_columns(entity, world);
+        apply_webs(entity, world);
     } else {
-        move_with_collision(entity, world);
-        // Bubble columns act during the move (`checkInsideBlocks`), before drag.
+        // Entity.move: an armed stuck multiplier scales this move per axis and
+        // zeroes the velocity, then clears — a cobweb re-arms it every tick
+        // the box still touches it.
+        let movement = match entity.stuck.take() {
+            Some(multiplier) => {
+                let scaled = [
+                    entity.vel[0] * multiplier[0],
+                    entity.vel[1] * multiplier[1],
+                    entity.vel[2] * multiplier[2],
+                ];
+                entity.vel = [0.0; 3];
+                scaled
+            }
+            None => entity.vel,
+        };
+        move_with_collision(entity, world, movement);
+        // Bubble columns and webs act during the move (`checkInsideBlocks`),
+        // before drag.
         apply_bubble_columns(entity, world);
+        apply_webs(entity, world);
         let drag = AIR_DRAG;
         let mut ground_drag = drag;
         if entity.on_ground {
@@ -331,13 +384,19 @@ pub fn item_aabb(pos: [f64; 3]) -> ([f64; 3], [f64; 3]) {
     )
 }
 
-/// Move with axis-clipped collision against full-cube blocks: Y first, then
-/// the larger horizontal axis — `Entity.collideBoundingBox`'s order. A clipped
+/// Move with axis-clipped collision against solid blocks: Y first, then the
+/// larger horizontal axis — `Entity.collideBoundingBox`'s order. A clipped
 /// axis zeroes its velocity component; a downward Y clip sets `on_ground`.
-fn move_with_collision(entity: &mut ItemEntityState, world: &dyn CollisionWorld) {
+/// `movement` is usually the velocity, but a stuck multiplier scales it.
+fn move_with_collision(
+    entity: &mut ItemEntityState,
+    world: &dyn CollisionWorld,
+    movement: [f64; 3],
+) {
     let (mut min, mut max) = item_aabb(entity.pos);
-    let mut movement = entity.vel;
+    let mut movement = movement;
 
+    let attempted_y = movement[1];
     let clipped_y = {
         let clipped = clip_axis(world, min, max, 1, movement[1]);
         let hit = clipped != movement[1];
@@ -357,13 +416,20 @@ fn move_with_collision(entity: &mut ItemEntityState, world: &dyn CollisionWorld)
         movement[axis] = clipped;
     }
 
-    entity.pos[0] += movement[0];
-    entity.pos[1] += movement[1];
-    entity.pos[2] += movement[2];
+    // Entity.move only applies the position when the collided movement is
+    // longer than sqrt(1e-7) — a gliding item's last sub-millimetre drifts
+    // never land, which is what finally parks it. Collision flags and the
+    // velocity zeroing below still run either way.
+    let sqr = movement[0] * movement[0] + movement[1] * movement[1] + movement[2] * movement[2];
+    if sqr > 1.0e-7 {
+        entity.pos[0] += movement[0];
+        entity.pos[1] += movement[1];
+        entity.pos[2] += movement[2];
+    }
 
     // Vanilla zeroes collided components and derives onGround from a downward
-    // vertical collision.
-    entity.on_ground = clipped_y && entity.vel[1] < 0.0;
+    // vertical collision of the attempted movement.
+    entity.on_ground = clipped_y && attempted_y < 0.0;
     if clipped_y {
         entity.vel[1] = 0.0;
     }
@@ -403,11 +469,17 @@ fn clip_axis(
     for x in lo(sweep_min[0])..=hi(sweep_max[0]) {
         for y in lo(sweep_min[1])..=hi(sweep_max[1]) {
             for z in lo(sweep_min[2])..=hi(sweep_max[2]) {
-                if !world.is_solid(Pos::new(x, y, z)) {
+                let cell = Pos::new(x, y, z);
+                if !world.is_solid(cell) {
                     continue;
                 }
                 let block_min = [f64::from(x), f64::from(y), f64::from(z)];
-                let block_max = [block_min[0] + 1.0, block_min[1] + 1.0, block_min[2] + 1.0];
+                let block_max = [
+                    block_min[0] + 1.0,
+                    // Partial-height solids (soul sand: 14/16) top out early.
+                    block_min[1] + world.solid_height(cell),
+                    block_min[2] + 1.0,
+                ];
                 // Must overlap on the other two axes to matter.
                 let others: [usize; 2] = match axis {
                     0 => [1, 2],
@@ -519,6 +591,7 @@ mod tests {
             age: 0,
             pickup_delay: 0,
             removed: false,
+            stuck: None,
         }
     }
 

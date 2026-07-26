@@ -50,6 +50,8 @@ struct SimCollision<'a> {
     world: &'a World,
     solidity: &'a [bool],
     frictions: &'a [f32],
+    heights: &'a [f32],
+    webs: &'a [bool],
     water_kinds: &'a [Option<crate::fluid::WaterKind>],
     bubble_kinds: &'a [Option<bool>],
 }
@@ -73,6 +75,14 @@ impl crate::entity::CollisionWorld for SimCollision<'_> {
     }
     fn is_air(&self, pos: Pos) -> bool {
         self.world.get(pos) == StateId::AIR
+    }
+    fn solid_height(&self, pos: Pos) -> f64 {
+        let state = self.world.get(pos);
+        f64::from(self.heights.get(state.raw() as usize).copied().unwrap_or(1.0))
+    }
+    fn is_web(&self, pos: Pos) -> bool {
+        let state = self.world.get(pos);
+        self.webs.get(state.raw() as usize).copied().unwrap_or(false)
     }
 }
 
@@ -150,6 +160,10 @@ pub struct Simulation {
     solidity: Vec<bool>,
     /// Block friction, indexed by `StateId`.
     frictions: Vec<f32>,
+    /// Solid collision-box heights, indexed by `StateId`.
+    heights: Vec<f32>,
+    /// Cobwebs, indexed by `StateId`.
+    webs: Vec<bool>,
     /// Water per state, indexed by `StateId`; see [`Simulation::set_fluid_tables`].
     water_kinds: Vec<Option<crate::fluid::WaterKind>>,
     /// Bubble columns per state (`Some(drag_down)`), indexed by `StateId`.
@@ -227,6 +241,8 @@ impl Simulation {
             item_entities: crate::entity::ItemEntities::default(),
             solidity: Vec::new(),
             frictions: Vec::new(),
+            heights: Vec::new(),
+            webs: Vec::new(),
             water_kinds: Vec::new(),
             bubble_kinds: Vec::new(),
             entity_snapshot: std::collections::HashMap::new(),
@@ -310,9 +326,17 @@ impl Simulation {
     ///
     /// Built by `vanilla::physics_tables` after every state is interned. Item
     /// physics reads these; without them everything but air is vacuum.
-    pub fn set_physics_tables(&mut self, solidity: Vec<bool>, frictions: Vec<f32>) {
+    pub fn set_physics_tables(
+        &mut self,
+        solidity: Vec<bool>,
+        frictions: Vec<f32>,
+        heights: Vec<f32>,
+        webs: Vec<bool>,
+    ) {
         self.solidity = solidity;
         self.frictions = frictions;
+        self.heights = heights;
+        self.webs = webs;
     }
 
     /// Set the fluid tables, indexed by `StateId`.
@@ -992,6 +1016,8 @@ impl Simulation {
                     world: &self.world,
                     solidity: &self.solidity,
                     frictions: &self.frictions,
+                    heights: &self.heights,
+                    webs: &self.webs,
                     water_kinds: &self.water_kinds,
                     bubble_kinds: &self.bubble_kinds,
                 };

@@ -1,0 +1,488 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:item_web",
+  "detail": "normal",
+  "ticks": [
+    {
+      "tick": 0,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 4.959999999999994, 1.5], "velocity": [0.0, -0.03920000076293945, 0.0]}
+      ]
+    },
+    {
+      "tick": 1,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 4.880799999237055, 1.5], "velocity": [0.0, -0.0776160022583008, 0.0]}
+      ]
+    },
+    {
+      "tick": 2,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 4.7631839969787535, 1.5], "velocity": [0.0, -0.115263684456482, 0.0]}
+      ]
+    },
+    {
+      "tick": 3,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 4.607920312522268, 1.5], "velocity": [0.0, -0.15215841372877212, 0.0]}
+      ]
+    },
+    {
+      "tick": 4,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 4.415761898793491, 1.5], "velocity": [0.0, -0.18831524911932757, 0.0]}
+      ]
+    },
+    {
+      "tick": 5,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 4.187446649674158, 1.5], "velocity": [0.0, -0.22374894849170882, 0.0]}
+      ]
+    },
+    {
+      "tick": 6,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 3.923697701182448, 1.5], "velocity": [0.0, -0.2584739745524866, 0.0]}
+      ]
+    },
+    {
+      "tick": 7,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 3.6252237266299545, 1.5], "velocity": [0.0, -0.2925045007543761, 0.0]}
+      ]
+    },
+    {
+      "tick": 8,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 3.2927192258755724, 1.5], "velocity": [0.0, -0.32585441708130863, 0.0]}
+      ]
+    },
+    {
+      "tick": 9,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.9268648087942637, 1.5], "velocity": [0.0, -0.35853733571780166, 0.0]}
+      ]
+    },
+    {
+      "tick": 10,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.9069379417114334, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 11,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.904937941681638, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 12,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.9029379416518424, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 13,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.900937941622047, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 14,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8989379415922514, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 15,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.896937941562456, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 16,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8949379415326604, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 17,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.892937941502865, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 18,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8909379414730694, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 19,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.888937941443274, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 20,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8869379414134784, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 21,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.884937941383683, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 22,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8829379413538874, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 23,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.880937941324092, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 24,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8789379412942964, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 25,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.876937941264501, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 26,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8749379412347054, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 27,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.87293794120491, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 28,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8709379411751144, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 29,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.868937941145319, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 30,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8669379411155234, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 31,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.864937941085728, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 32,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8629379410559324, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 33,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.860937941026137, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 34,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8589379409963414, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 35,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.856937940966546, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 36,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8549379409367504, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 37,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.852937940906955, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 38,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8509379408771593, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 39,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.848937940847364, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 40,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8469379408175683, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 41,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.844937940787773, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 42,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8429379407579773, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 43,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.840937940728182, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 44,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8389379406983863, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 45,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.836937940668591, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 46,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8349379406387953, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 47,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.832937940609, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 48,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8309379405792043, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 49,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.828937940549409, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 50,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8269379405196133, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 51,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.824937940489818, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 52,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8229379404600223, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 53,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.820937940430227, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 54,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8189379404004313, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 55,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.816937940370636, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 56,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8149379403408403, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 57,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.812937940311045, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 58,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8109379402812493, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 59,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.808937940251454, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 60,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8069379402216583, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 61,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.804937940191863, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 62,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.8029379401620673, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 63,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.800937940132272, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 64,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.7989379401024763, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 65,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.796937940072681, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 66,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.7949379400428853, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 67,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.79293794001309, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 68,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.7909379399832943, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 69,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.788937939953499, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 70,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.7869379399237033, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 71,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.784937939893908, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 72,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.7829379398641123, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 73,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.780937939834317, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 74,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.7789379398045213, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 75,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.776937939774726, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 76,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.7749379397449303, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 77,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.772937939715135, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 78,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.7709379396853393, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 79,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [1.5, 2.768937939655544, 1.5], "velocity": [0.0, 0.0, 0.0]}
+      ]
+    }
+  ]
+}
