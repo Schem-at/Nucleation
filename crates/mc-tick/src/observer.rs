@@ -54,6 +54,24 @@ impl Observer {
     pub fn output_side(&self) -> Dir {
         self.facing.opposite()
     }
+
+    /// `ObserverBlock.updateNeighborsInFront`: notify the block behind the
+    /// observer (the one it strongly powers) and that block's other neighbours.
+    ///
+    /// The neighbour back toward the observer is excluded, as vanilla's
+    /// `updateNeighborsAtExceptFromFacing` excludes it.
+    fn update_neighbors_in_front(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        let front = pos.offset(self.output_side());
+        // From the front block's perspective, the observer sits on its `facing`
+        // side.
+        ctx.updates.push((front, self.facing));
+        for dir in crate::pos::ALL_DIRS {
+            if dir == self.facing {
+                continue; // that neighbour is the observer itself
+            }
+            ctx.updates.push((front.offset(dir), dir.opposite()));
+        }
+    }
 }
 
 impl BlockBehaviour for Observer {
@@ -79,6 +97,30 @@ impl BlockBehaviour for Observer {
             ctx.set(pos, self.states.get(true));
             ctx.schedule(pos, OBSERVER_PULSE_TICKS, TickPriority::Normal);
         }
+        // `ObserverBlock.tick` ends with `updateNeighborsInFront` on both edges:
+        // the block the pulse strongly powers, and *that block's* neighbours,
+        // are told about the change. This is the extra block of reach that lets
+        // an observer drive a piston through a slime block — the piston is not
+        // adjacent to the observer and would otherwise never re-check.
+        self.update_neighbors_in_front(ctx, pos);
+    }
+
+    /// `ObserverBlock.onPlace`: a powered observer written into the world with
+    /// no pending tick clears its own powered flag, silently.
+    ///
+    /// This is how a moved mid-pulse observer lands unpowered: its turn-off
+    /// tick is stranded at the position it was pushed out of, so without this
+    /// it would stay lit forever. Captured — the flying machine's east
+    /// observer is pushed while pulsing and lands `powered=false`
+    /// (`flying_machine.json`, tick 3).
+    fn on_placed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if !self.powered || ctx.ticks.has_pending_at(pos, ctx.tick) {
+            return;
+        }
+        // Vanilla writes with flag 18 — visible, but no neighbour updates —
+        // and then updates the front only.
+        ctx.set_quiet(pos, self.states.get(false));
+        self.update_neighbors_in_front(ctx, pos);
     }
 
     fn redstone_power(&self, _world: &World, _pos: Pos, dir: Dir) -> u8 {
@@ -205,6 +247,41 @@ mod tests {
             observer(true).on_scheduled_tick(&mut ctx, pos);
         }
         assert_eq!(w.get(pos), OFF, "pulse ends");
+    }
+
+    #[test]
+    fn a_powered_observer_landing_without_a_pending_tick_clears_itself() {
+        // ObserverBlock.onPlace: a moved mid-pulse observer's turn-off tick is
+        // stranded at its old position, so on landing it un-powers itself —
+        // silently, like vanilla's flag-18 write. Captured: the flying
+        // machine's east observer lands powered=false.
+        let (mut w, mut t, mut e, s) = parts();
+        let pos = Pos::new(1, 1, 0);
+        w.set(pos, ON);
+        let o = observer(true);
+        let mut ctx = TickCtx {
+            world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 5,
+            boundary: false,
+            updates: &mut Vec::new(), moves: &mut Vec::new(),
+            toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
+            log: None,
+        };
+        o.on_placed(&mut ctx, pos);
+        assert_eq!(ctx.world.get(pos), OFF, "must clear its own powered flag");
+
+        // With a pending tick the pulse is legitimate and must be left alone.
+        let (mut w, mut t, mut e, s) = parts();
+        w.set(pos, ON);
+        t.schedule(pos, 5, 2, crate::schedule::TickPriority::Normal);
+        let mut ctx = TickCtx {
+            world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 5,
+            boundary: false,
+            updates: &mut Vec::new(), moves: &mut Vec::new(),
+            toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
+            log: None,
+        };
+        o.on_placed(&mut ctx, pos);
+        assert_eq!(ctx.world.get(pos), ON, "a scheduled pulse is left to finish");
     }
 
     #[test]

@@ -191,6 +191,35 @@ writes (vanilla suppresses block updates but still fires shape updates there).
 Nothing captured so far distinguishes the two; an observer watching a slot a
 block moves *into* mid-flight would.
 
+## Flying-machine session — conducted power and mid-pulse moves
+
+`flying_machine.snbt` is a 6-block two-piston machine that does **not** fly:
+the placement pulse pushes its front half one block east and it sits split in
+two from tick 5 on. Reproducing that broken behaviour exactly
+(`flying_machine.json`) forced three more mechanisms, each read from bytecode:
+
+- **Strong power through conductors** — an observer *strongly* powers the block
+  behind it, and `Level.getSignal` lets a conductor re-emit weak power on every
+  face. That is how the observer drives a piston through a slime block it never
+  touches. `VanillaRules` now carries `strong_into` (observers) and a
+  capture-driven `conductors` list (slime is on it because this trace proves
+  the signal crossed it; glass is not).
+- **`updateNeighborsInFront`** — an observer's tick notifies the block it
+  strongly powers *and that block's neighbours* on both pulse edges. Without
+  this extra block of reach, the non-adjacent piston would never re-check and
+  never retract.
+- **`ObserverBlock.onPlace`** — a powered observer written into the world with
+  no pending tick clears its own powered flag, silently (flag 18), then updates
+  its front. This is how an observer pushed *mid-pulse* lands `powered=false`:
+  its turn-off tick is stranded at the position it left. Engine:
+  `BlockBehaviour::on_placed`, dispatched when a move lands — after the
+  landing's shape updates, whose ordering matters (they must see the carried
+  mid-pulse state so they do not start a pulse vanilla never starts).
+- **Settle order is placement order** — two racing piston triggers queue their
+  block events in the order the placement pass walks the block list, and the
+  first event to run moves the other piston's blocks out from under its event.
+  The engine's settle dispatches in that same order.
+
 ## What to do next, in order
 
 1. **Capture traces before writing any of it.** A structure per component:

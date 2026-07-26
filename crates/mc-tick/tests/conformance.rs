@@ -262,6 +262,20 @@ fn the_manual_engine_runs_its_placement_cycle_tick_for_tick() {
 }
 
 #[test]
+fn the_broken_flying_machine_breaks_the_same_way_vanilla_breaks_it() {
+    // A 6-block two-piston flying machine that does not, in fact, fly: the
+    // placement pulse pushes the front half one block east, nothing re-triggers,
+    // and the machine sits split in two from tick 5 on. Reproducing a *broken*
+    // contraption matters as much as reproducing a working one — a simulator
+    // that "fixes" it is wrong.
+    run_conformance(
+        "flying_machine.snbt",
+        "flying_machine.json",
+        "nucleation:flying_machine",
+    );
+}
+
+#[test]
 fn clicking_the_manual_engine_advances_it_two_more_steps() {
     // The same engine, placed with room to fly: padded to the east end of the
     // capture's chunk so nothing crosses the frozen chunk border. Placement

@@ -406,7 +406,14 @@ impl Simulation {
             .iter_non_air()
             .map(|(pos, _)| pos)
             .collect();
-        for pos in occupied {
+        // The updates queue is a stack, so blocks are pushed in *reverse*: the
+        // dispatch order then matches vanilla's placement pass, which walks the
+        // block list in order. The order is observable — two pistons whose
+        // triggers race queue their block events by it, and the first event to
+        // run moves the other piston's blocks out from under its event
+        // (captured: `flying_machine.json`, where the west observer's piston
+        // wins and the east one's event finds only a placeholder).
+        for pos in occupied.into_iter().rev() {
             for dir in crate::pos::ALL_DIRS {
                 self.updates.push((pos, dir));
             }
@@ -535,11 +542,13 @@ impl Simulation {
                 // block entity in a non-ticking chunk is suspended, not gone.
                 self.moves
                     .retain(|m| m.resolve_on > self.tick || !in_ticking(m.pos));
+                let mut landed: Vec<Pos> = Vec::new();
                 for entry in due {
                     let previous = self.world.get(entry.pos);
                     if previous == entry.state {
                         continue;
                     }
+                    landed.push(entry.pos);
                     self.world.set(entry.pos, entry.state);
                     // Record here too. These writes bypass TickCtx, and leaving
                     // them out of the log made a trace end two ticks early —
@@ -566,6 +575,37 @@ impl Simulation {
                     }
                 }
                 self.propagate();
+                // `onPlace` for each landed block, *after* the landing updates
+                // have run. Ordering matters: vanilla's shape update reaches a
+                // moved observer while it still carries its mid-pulse powered
+                // state (so it does not re-schedule), and only then does
+                // onPlace clear that flag. Dispatching on_placed first would
+                // let the self-update see an unpowered observer and start a
+                // pulse vanilla never starts.
+                for pos in landed {
+                    let state = self.world.get(pos);
+                    let Some(behaviour) = self.behaviours.get(state) else {
+                        if state != StateId::AIR {
+                            self.unknown_seen.push(state);
+                        }
+                        continue;
+                    };
+                    let mut ctx = TickCtx {
+                        world: &mut self.world,
+                        ticks: &mut self.ticks,
+                        events: &mut self.events,
+                        states: &self.registry,
+                        tick: self.tick,
+                        boundary: false,
+                        updates: &mut self.updates,
+                        moves: &mut self.moves,
+                        toggles: &mut self.toggles,
+                        comparator_out: &mut self.comparator_out,
+                        log: self.log.as_mut(),
+                    };
+                    behaviour.on_placed(&mut ctx, pos);
+                    self.propagate();
+                }
                 None
             }
 

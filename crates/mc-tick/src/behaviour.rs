@@ -238,6 +238,14 @@ pub trait BlockBehaviour: Send + Sync {
     /// contraption manual.
     fn on_used(&self, _ctx: &mut TickCtx<'_>, _pos: Pos) {}
 
+    /// This block was just written into the world by a completed piston move.
+    ///
+    /// Mirrors the `onPlace` a landed block receives from vanilla's `setBlock`.
+    /// The one behaviour that needs it so far: an observer that lands still
+    /// mid-pulse, with its turn-off tick stranded at its old position, clears
+    /// its own powered flag (captured: `flying_machine.json`, tick 3).
+    fn on_placed(&self, _ctx: &mut TickCtx<'_>, _pos: Pos) {}
+
     /// Redstone power this block emits toward `dir`, 0-15.
     fn redstone_power(&self, _world: &World, _pos: Pos, _dir: Dir) -> u8 {
         0

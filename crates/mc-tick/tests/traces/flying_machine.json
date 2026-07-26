@@ -1,0 +1,36 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:flying_machine",
+  "detail": "normal",
+  "ticks": [
+    {
+      "tick": 1,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [0, 0, 0], "from": "minecraft:observer[facing=west,powered=false]", "to": "minecraft:observer[facing=west,powered=true]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 0, 0], "from": "minecraft:sticky_piston[extended=false,facing=east]", "to": "minecraft:sticky_piston[extended=true,facing=east]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [3, 0, 0], "from": "minecraft:sticky_piston[extended=false,facing=west]", "to": "minecraft:moving_piston[facing=east,type=sticky]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [4, 0, 0], "from": "minecraft:slime_block", "to": "minecraft:moving_piston[facing=east,type=normal]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [5, 0, 0], "from": "minecraft:observer[facing=east,powered=false]", "to": "minecraft:moving_piston[facing=east,type=normal]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [6, 0, 0], "from": "minecraft:air", "to": "minecraft:moving_piston[facing=east,type=normal]"}
+      ]
+    },
+    {
+      "tick": 3,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [0, 0, 0], "from": "minecraft:observer[facing=west,powered=true]", "to": "minecraft:observer[facing=west,powered=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 0, 0], "from": "minecraft:sticky_piston[extended=true,facing=east]", "to": "minecraft:moving_piston[facing=east,type=sticky]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [3, 0, 0], "from": "minecraft:moving_piston[facing=east,type=sticky]", "to": "minecraft:air"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [4, 0, 0], "from": "minecraft:moving_piston[facing=east,type=normal]", "to": "minecraft:sticky_piston[extended=false,facing=west]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [5, 0, 0], "from": "minecraft:moving_piston[facing=east,type=normal]", "to": "minecraft:slime_block"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [6, 0, 0], "from": "minecraft:moving_piston[facing=east,type=normal]", "to": "minecraft:observer[facing=east,powered=false]"}
+      ]
+    },
+    {
+      "tick": 5,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 0, 0], "from": "minecraft:moving_piston[facing=east,type=sticky]", "to": "minecraft:sticky_piston[extended=false,facing=east]"}
+      ]
+    }
+  ]
+}

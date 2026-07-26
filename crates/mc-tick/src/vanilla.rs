@@ -134,17 +134,44 @@ pub struct VanillaRules {
     /// it was watching, which re-triggered it forever. States absent from this
     /// map emit every way, like a redstone block.
     emit_only: HashMap<StateId, Dir>,
+    /// States that **strongly** power the block in the given direction.
+    ///
+    /// A strongly powered conductor re-emits weak power on every face —
+    /// `Level.getSignal` falls back to `getDirectSignal` when the queried block
+    /// `isRedstoneConductor`. This is how an observer drives a piston through a
+    /// slime block (captured: `flying_machine.json`, tick 1).
+    strong_into: HashMap<StateId, Dir>,
+    /// States that conduct strong power.
+    ///
+    /// Growing this list is capture-driven: slime is on it because the flying
+    /// machine's trace proves the signal crossed it. Glass famously is not.
+    conductors: Vec<StateId>,
     immovable: Vec<StateId>,
     slime: Vec<StateId>,
     honey: Vec<StateId>,
     diodes: HashMap<StateId, Dir>,
 }
 
+impl VanillaRules {
+    /// Whether any neighbour of `pos` strongly powers into it.
+    fn strongly_powered(&self, world: &World, pos: Pos) -> bool {
+        crate::pos::ALL_DIRS.iter().any(|dir| {
+            let neighbour = world.get(pos.offset(*dir));
+            self.strong_into.get(&neighbour) == Some(&dir.opposite())
+        })
+    }
+}
+
 impl PowerSource for VanillaRules {
     fn is_powered(&self, world: &World, pos: Pos, toward: Dir) -> bool {
         let state = world.get(pos);
-        self.powered.contains(&state)
+        if self.powered.contains(&state)
             && self.emit_only.get(&state).is_none_or(|only| *only == toward)
+        {
+            return true;
+        }
+        // A strongly powered conductor re-emits weak power on every face.
+        self.conductors.contains(&state) && self.strongly_powered(world, pos)
     }
     fn is_diode(&self, world: &World, pos: Pos) -> bool {
         self.diodes.contains_key(&world.get(pos))
@@ -230,7 +257,12 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
     for (id, descriptor) in &descriptors {
         match descriptor.name.as_str() {
             n if CONSTANT_SOURCES.contains(&n) => rules.powered.push(*id),
-            "minecraft:slime_block" => rules.slime.push(*id),
+            "minecraft:slime_block" => {
+                rules.slime.push(*id);
+                // Capture-verified conductor: the flying machine's observer
+                // drives its piston through a slime block.
+                rules.conductors.push(*id);
+            }
             "minecraft:honey_block" => rules.honey.push(*id),
             _ => {}
         }
@@ -248,10 +280,12 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
         };
         if emits {
             rules.powered.push(*id);
-            // An observer's pulse leaves through its back face only.
+            // An observer's pulse leaves through its back face only — and it
+            // powers that block *strongly*, which a conductor then re-emits.
             if descriptor.name == "minecraft:observer" {
                 if let Some(facing) = descriptor.facing() {
                     rules.emit_only.insert(*id, facing.opposite());
+                    rules.strong_into.insert(*id, facing.opposite());
                 }
             }
         }
@@ -606,6 +640,42 @@ mod tests {
         table.note_unknown(hopper);
         let report = table.unknown_report(&registry).expect("must be reported");
         assert!(report.contains("minecraft:hopper"), "{report}");
+    }
+
+    #[test]
+    fn a_strongly_powered_conductor_re_emits_on_every_face() {
+        // Captured with the flying machine: an observer's back strongly powers
+        // a slime block, and the piston on the slime's far side reads that
+        // signal. Glass-like blocks are not conductors and stay dark.
+        let mut registry = StateRegistry::new();
+        let observer_on = registry
+            .intern("minecraft:observer[facing=west,powered=true]")
+            .unwrap();
+        let slime = registry.intern("minecraft:slime_block").unwrap();
+        let glass = registry.intern("minecraft:white_stained_glass").unwrap();
+        registry
+            .intern("minecraft:observer[facing=west,powered=false]")
+            .unwrap();
+        let mut table = BehaviourTable::new();
+        let rules = register_all(&mut registry, &mut table);
+
+        let mut world = World::new(crate::pos::Bounds::new(
+            Pos::new(0, 0, 0),
+            Pos::new(7, 1, 1),
+        ));
+        // observer(facing west, so its back is east) | slime | reader at x=2
+        world.set(Pos::new(0, 0, 0), observer_on);
+        world.set(Pos::new(1, 0, 0), slime);
+        assert!(
+            rules.is_powered(&world, Pos::new(1, 0, 0), Dir::East),
+            "the slime re-emits the strong power behind the observer"
+        );
+
+        world.set(Pos::new(1, 0, 0), glass);
+        assert!(
+            !rules.is_powered(&world, Pos::new(1, 0, 0), Dir::East),
+            "glass does not conduct"
+        );
     }
 
     #[test]
