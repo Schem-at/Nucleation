@@ -143,15 +143,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut item_mesh_range = Vec::new();
     for track in &item_tracks {
         let mut one = UniversalSchematic::new("item".to_string());
-        // Item ids are not block ids; ingots at least have a block to show,
-        // and a cauldron is the closest block silhouette to a cart.
-        let drawn = if track.item == "minecraft:minecart" {
-            "minecraft:cauldron".to_string()
+        if track.item == "minecraft:minecart" {
+            // A cart-shaped mini-structure: a 3×3 iron floor with a one-high
+            // rim, scaled down to the cart's 0.98 × 0.7 box by its pose.
+            for x in 0..3 {
+                for z in 0..3 {
+                    one.set_block_from_string(x, 0, z, "minecraft:polished_deepslate").ok();
+                    if x != 1 || z != 1 {
+                        one.set_block_from_string(x, 1, z, "minecraft:polished_deepslate").ok();
+                    }
+                }
+            }
         } else {
-            track.item.replace("_ingot", "_block")
-        };
-        if one.set_block_from_string(0, 0, 0, &drawn).is_err() {
-            one.set_block_from_string(0, 0, 0, "minecraft:stone").ok();
+            // Item ids are not block ids; ingots at least have a block to show.
+            let drawn = track.item.replace("_ingot", "_block");
+            if one.set_block_from_string(0, 0, 0, &drawn).is_err() {
+                one.set_block_from_string(0, 0, 0, "minecraft:stone").ok();
+            }
         }
         item_mesh_range.push(meshes.len());
         let mesh = one.to_mesh(&pack, &mesh_config)?;
@@ -219,15 +227,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(p) = position {
                 let mut pose = Pose::IDENTITY;
                 let cart = track.item == "minecraft:minecart";
-                pose.scale = if cart { [0.9, 0.6, 0.9] } else { [0.25; 3] };
+                // The cart mesh is 3×2×3, squeezed to the real 0.98 × 0.7 box.
+                pose.scale = if cart {
+                    [0.98 / 3.0, 0.7 / 2.0, 0.98 / 3.0]
+                } else {
+                    [0.25; 3]
+                };
                 // Scale in place about the block's centre, then translate that
                 // centre to the entity position (plus half the scaled height).
-                pose.pivot = [0.5, 0.5, 0.5];
-                pose.translate = if cart {
-                    [p[0] as f32 - 0.5, p[1] as f32 + 0.3 - 0.5, p[2] as f32 - 0.5]
+                if cart {
+                    // Scale about the mesh's bottom centre, then put that
+                    // point at the entity position.
+                    pose.pivot = [1.5, 0.0, 1.5];
+                    pose.translate = [p[0] as f32 - 1.5, p[1] as f32, p[2] as f32 - 1.5];
                 } else {
-                    [p[0] as f32 - 0.5, p[1] as f32 + 0.125 - 0.5, p[2] as f32 - 0.5]
-                };
+                    pose.pivot = [0.5, 0.5, 0.5];
+                    pose.translate = [
+                        p[0] as f32 - 0.5,
+                        p[1] as f32 + 0.125 - 0.5,
+                        p[2] as f32 - 0.5,
+                    ];
+                }
                 poses[item_mesh_range[track_index]] = pose;
             }
         }
