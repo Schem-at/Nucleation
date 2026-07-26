@@ -306,6 +306,16 @@ leverage:
       conductor (soft power), and a **locational** case where
       alternate-current's non-locational model would differ — the deviation
       the sources table has warned about since day one.
+
+      The **solid-vs-transparent rules** live here too, and they are exactly
+      where folklore is least trustworthy — capture every one:
+      - dust climbing vs descending past **glass**: up works, down does not,
+        which is the classic *glass diode*; same family, **slabs** — dust
+        cannot step down onto a line below a top slab. These are one-way
+        vertical connection rules, and a discriminating capture each way is
+        cheap.
+      - which blocks cut dust lines, conduct soft power, and support dust at
+        all (glass supports dust but does not conduct; slabs depend on half).
 - [ ] **Buttons and pressure plates.** Buttons are pure `use_block` (the input
       path exists): capture pulse lengths per material — stone and wood
       differ. Pressure plates now have something to press them: **item
@@ -326,14 +336,49 @@ on `ItemEntity` velocity (`setUnderwaterMovement` is already visible in the
 bytecode dumps, waiting). Also the prerequisite for waterlogged-component
 doors.
 
-## 9. Milestone E — remaining entities
+- **Waterlogged blocks** — the `waterlogged` property is a per-state flag the
+  descriptor registry already carries for free; the work is fluid-source
+  semantics (a waterlogged block is a source) and how components behave
+  submerged.
+- **Bubble columns** — soul sand (up) and magma (down) under water: a fluid
+  block state whose whole point is the vertical force it applies to entities.
+  Deterministic item-entity captures work here exactly like Milestone B's
+  falls: author an item over the column, no RNG anywhere.
 
-1. **Minecarts** — rails, momentum, curves, powered rails
+## 9. Milestone E — remaining entities and the surfaces they ride
+
+1. **Minecarts** — rails, momentum, curves, powered rails, and the surface
+   effects that farms tune against:
+   - **soul sand**: a lowered collision box (its top is below a full block)
+     plus a 0.4 speed factor — the classic minecart brake;
+   - **ice / packed ice / blue ice**: friction 0.98 / 0.98 / 0.989 against the
+     0.6 default. The engine's friction table already exists
+     (`vanilla::physics_tables`, currently 0.6/slime 0.8) — read the exact
+     values from `Blocks` static-init bytecode when adding, and note ice
+     affects **items** too, which makes an RNG-free item-slide capture the
+     cheap verification before any minecart exists.
+   - **cobwebs**: `stuckSpeedMultiplier` movement damping — applies to every
+     entity type, items included, so it can also be captured item-first.
 2. **Armor stands** — mostly static, but needed for interaction and collision
 3. **Player pickup** of items (needs a player model; hoppers ignore
    `pickupDelay`, players do not)
 
 The entity capture/tolerance machinery from Milestone B carries over directly.
+
+## 9b. Milestone F — TNT, explosions, and duplication
+
+The precision showcase. Primed TNT is an entity (fuse 80, its own physics);
+explosions are ray-based block destruction plus entity knockback; **TNT
+minecarts** combine both. The reason this earns a milestone rather than a
+bullet: **TNT duplication** — the mechanism tunnel bores and world-eaters run
+on — is a pure update-order artifact (a piston moves a TNT block in the same
+window it is ignited, so the block both becomes an entity and travels), and
+getting it right is exactly the class of claim this engine exists to make.
+Before implementing, study real dupers and tunnel-bore schematics to design
+the discriminating captures; folklore about *why* duping works is abundant
+and unreliable, the bytecode and traces are not. RNG note: explosion rays and
+TNT entity spawn velocities are randomized — expect the Milestone B split
+(deterministic engine policy + tolerance/effect-level conformance) to apply.
 
 ## 10. Throughput
 
