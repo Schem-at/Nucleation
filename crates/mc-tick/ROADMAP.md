@@ -86,13 +86,69 @@ sides are compared through hand-written corpus cases rather than the *same input
 - This is also the natural **UniversalSchematic** touchpoint: conversion at the
   boundary, with the engine keeping its interned `u16` states.
 
-## 4b. Run a real schematic
+## 4b. Run the manual engine — NEXT UP, for the next agent
 
-`tests/samples/trencher.litematic` is a genuine machine — 664 sticky pistons, 574
-observers, 1620 slime blocks. It is the natural next conformance subject, and the
-first thing likely to name blocks the `vanilla` registry does not yet cover. The
-missing link is a litematic-to-SNBT step, which nucleation can already do
-(`to_structure_snbt`); `examples/dump_schematic.rs` is the starting point.
+**The concrete first real-schematic target is downloaded and waiting:**
+`tools/gametest/samples/manual_engine.litematic` — a "2-Step 9gt Manual Engine",
+a real community slimestone flying-machine engine. Small and self-contained
+(5×3×3), which is why it beats `trencher.litematic` (15×378×21, too big for a first
+run) as the first end-to-end conformance case.
+
+Contents (via `cargo run --example dump_schematic <file>`):
+
+```
+1  note_block          <- the manual trigger; a PLAYER clicks it to start the engine
+3  observer            done
+3  piston + 1 sticky   done
+4  slime_block         done (adhesion)
+1  redstone_block      done
+3  white_stained_glass inert; add to vanilla.rs INERT list
+```
+
+The pistons, sticky pull, slime adhesion and observers are already implemented and
+trace-verified. **Two things block the run, and they are exactly items on the
+near-term list above:**
+
+### (a) Note blocks
+Flagged historically as mishandled ("flagged for no apparent reason"). Capture
+first — what a note block does on a redstone-power change, and whether/what it emits
+or schedules. It plays a note via a **block event** (like a piston), so it likely
+belongs in the `BlockEvents` phase. Get a trace of a redstone-block → note-block
+before writing any Rust.
+
+### (b) Player interaction — a new input path
+This engine is *manual*: it does nothing until a player **right-clicks the note
+block**, which is a use-block action. The simulation has no notion of this yet.
+
+- It belongs in **`Phase::PlayerInputs`** (phase 10, currently a named no-op) —
+  which is correct, and is why an input applied "now" is only observed next tick.
+- Needs a public API on `Simulation`, e.g. `use_block(pos)`, that injects the
+  interaction and lets the block's behaviour respond.
+- `BlockBehaviour` needs a `fn on_used(...)` hook (default no-op), mirroring
+  vanilla's `useWithoutItem`.
+- **Capture the click.** Author a minimal structure (note block + the engine's first
+  observer/piston), drive `TraceCapture` while performing a use-block on the note
+  block, and record what the click produces. TraceCapture currently supports
+  `--break`/`--pulse` only; it will need a `--use x,y,z` actuation that calls the
+  block's use handler on the given tick. `useWithoutItem` on the server side is the
+  method to invoke.
+
+### Sequence for the next agent
+1. `manual_engine.litematic` → SNBT. nucleation can already do this
+   (`nucleation::formats::structure_snbt::to_structure_snbt`); wire a tiny converter
+   or extend `examples/dump_schematic.rs`. Drop the `.snbt` in
+   `tools/gametest/pack/data/nucleation/structure/` and in
+   `crates/mc-tick/tests/corpus/structures/`.
+2. Add `--use` actuation to `TraceCapture.java` (calls `useWithoutItem`).
+3. Capture note-block behaviour in isolation → implement `NoteBlock` → conformance.
+4. Capture the note-block click → add `Simulation::use_block` + `on_used` +
+   `Phase::PlayerInputs` handling → conformance.
+5. Run the whole `manual_engine` through `tests/conformance.rs`. Expect it to name
+   any still-missing block loudly (that is the design) — `white_stained_glass` at
+   least needs adding to `vanilla.rs`'s `INERT` list.
+
+Everything needed to *verify* each step already exists — this is capture-then-
+implement, per the discipline, not new infrastructure.
 
 ## 5. Remaining redstone components
 

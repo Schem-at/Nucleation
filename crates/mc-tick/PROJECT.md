@@ -168,14 +168,19 @@ adding a file, no recompilation. `load <name>.snbt` runs a real structure.
 Ordered roughly by leverage for the door-timing goal. Each item means **capture
 first, then implement** — the coding is small once the trace exists.
 
-### Near-term (unblocks real schematics)
-- [ ] **Run a real schematic end-to-end.** `trencher.litematic` was too big for a
-      first target; need a small self-contained one. `spinny` (9×9×8, droppers +
-      comparators) is a candidate. Needs litematic→SNBT (`nucleation::to_structure_snbt`).
-- [ ] **Note blocks** — flagged as previously mishandled; needed by manual engines.
-- [ ] **Player interaction** — right-click / use-block (a manual engine needs a note
-      block *clicked*). The 2-Step 9gt Manual Engine schematic is a concrete target
-      here. **(Not yet captured or downloaded — the earlier attempt was interrupted.)**
+### Near-term (unblocks real schematics) — **NEXT AGENT STARTS HERE**
+The concrete target is downloaded: `tools/gametest/samples/manual_engine.litematic`
+(a real 5×3×3 "2-Step 9gt Manual Engine"). **See `ROADMAP.md` §4b for the full
+step-by-step handoff** — it has the exact sequence, the APIs to add, and the
+TraceCapture change needed. In brief:
+- [ ] **Run the manual engine end-to-end.** Pistons/slime/observers are done; the
+      two blockers below are the only gaps. `white_stained_glass` needs adding to
+      `vanilla.rs` `INERT`.
+- [ ] **Note blocks** — flagged historically as mishandled; plays via a block event.
+      Capture a redstone→noteblock trace first.
+- [ ] **Player interaction** — the "manual" click. New `Simulation::use_block`,
+      `BlockBehaviour::on_used`, handled in `Phase::PlayerInputs` (phase 10), plus a
+      `--use` actuation in `TraceCapture.java` (`useWithoutItem`). Capture first.
 - [ ] **Buttons & pressure plates** — pulse lengths differ per material.
 
 ### Redstone completeness
