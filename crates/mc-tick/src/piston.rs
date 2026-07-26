@@ -585,7 +585,9 @@ mod tests {
         moves: Box::leak(Box::new(Vec::new())),
         toggles: Box::leak(Box::new(Vec::new())),
         comparator_out: Box::leak(Box::new(Default::default())),
-        inventories: Box::leak(Box::new(Default::default())), log: None }
+        inventories: Box::leak(Box::new(Default::default())),
+        hopper_state: Box::leak(Box::new(Default::default())),
+        inv_log: None, log: None }
     }
 
     #[test]
@@ -641,6 +643,8 @@ mod tests {
                 toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
                 log: None,
             };
             assert!(p.on_block_event(&mut ctx, pos, TRIGGER_EXTEND, 0));
@@ -739,6 +743,8 @@ mod tests {
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
                 log: None,
             };
             assert!(p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0));
@@ -791,6 +797,8 @@ mod tests {
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
                 log: None,
             };
             p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0);
@@ -836,6 +844,8 @@ mod tests {
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
                 log: None,
             };
             p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0);

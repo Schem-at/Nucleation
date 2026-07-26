@@ -54,6 +54,7 @@ pub struct Checkpoint {
     toggles: Vec<(Pos, u64)>,
     comparator_out: std::collections::HashMap<Pos, u8>,
     inventories: std::collections::HashMap<Pos, crate::inventory::Inventory>,
+    hopper_state: std::collections::HashMap<Pos, crate::behaviour::HopperState>,
 }
 
 /// A controllable, deterministic simulation of a bounded region.
@@ -84,8 +85,18 @@ pub struct Simulation {
     comparator_out: std::collections::HashMap<Pos, u8>,
     /// Container contents by position; vanilla's inventory block entities.
     inventories: std::collections::HashMap<Pos, crate::inventory::Inventory>,
+    /// Per-hopper cooldown and tick bookkeeping.
+    hopper_state: std::collections::HashMap<Pos, crate::behaviour::HopperState>,
+    /// Ticking block entities, in registration order.
+    ///
+    /// Vanilla's `tickBlockEntities` walks its list in insertion order — for a
+    /// placed structure, block order. Only hoppers register so far. Blocks with
+    /// block entities cannot be pushed, so the list is stable during a run.
+    tickers: Vec<Pos>,
     /// Recorded block changes, when recording is enabled.
     log: Option<Vec<BlockChange>>,
+    /// Recorded container-slot changes, when recording is enabled.
+    inv_log: Option<Vec<crate::behaviour::InventoryChange>>,
     /// Whether a tick's phase walk is currently executing.
     ///
     /// Dispatches outside of one — settling a freshly placed structure, a block
@@ -124,6 +135,7 @@ impl Simulation {
             toggles: Vec::new(),
             comparator_out: std::collections::HashMap::new(),
             inventories: std::collections::HashMap::new(),
+            hopper_state: std::collections::HashMap::new(),
         };
         Self {
             registry: StateRegistry::new(),
@@ -137,7 +149,10 @@ impl Simulation {
             toggles: Vec::new(),
             comparator_out: std::collections::HashMap::new(),
             inventories: std::collections::HashMap::new(),
+            hopper_state: std::collections::HashMap::new(),
+            tickers: Vec::new(),
             log: None,
+            inv_log: None,
             in_tick: false,
             ticking: None,
             tick: 0,
@@ -163,6 +178,22 @@ impl Simulation {
     /// for, and a simulation used for timing runs millions of ticks.
     pub fn record(&mut self) {
         self.log = Some(Vec::new());
+        self.inv_log = Some(Vec::new());
+    }
+
+    /// The container-slot changes recorded since [`Simulation::record`].
+    pub fn recorded_inventory(&self) -> &[crate::behaviour::InventoryChange] {
+        self.inv_log.as_deref().unwrap_or(&[])
+    }
+
+    /// Register a ticking block entity at `pos`.
+    ///
+    /// Order matters and is preserved: it is vanilla's `tickBlockEntities`
+    /// insertion order, which decides which of two hoppers moves first.
+    pub fn add_block_entity_ticker(&mut self, pos: Pos) {
+        if !self.tickers.contains(&pos) {
+            self.tickers.push(pos);
+        }
     }
 
     /// The changes recorded since [`Simulation::record`], in order.
@@ -321,6 +352,7 @@ impl Simulation {
             toggles: self.toggles.clone(),
             comparator_out: self.comparator_out.clone(),
             inventories: self.inventories.clone(),
+            hopper_state: self.hopper_state.clone(),
         }
     }
 
@@ -339,6 +371,7 @@ impl Simulation {
         self.toggles = checkpoint.toggles.clone();
         self.comparator_out = checkpoint.comparator_out.clone();
         self.inventories = checkpoint.inventories.clone();
+        self.hopper_state = checkpoint.hopper_state.clone();
     }
 
     /// Set the container contents at `pos`, as loading a structure does.
@@ -394,6 +427,8 @@ impl Simulation {
                 toggles: &mut self.toggles,
                 comparator_out: &mut self.comparator_out,
                 inventories: &mut self.inventories,
+                hopper_state: &mut self.hopper_state,
+                inv_log: self.inv_log.as_mut(),
                 log: self.log.as_mut(),
             };
             behaviour.on_neighbor_changed(&mut ctx, pos, from);
@@ -512,6 +547,8 @@ impl Simulation {
             toggles: &mut self.toggles,
             comparator_out: &mut self.comparator_out,
                 inventories: &mut self.inventories,
+                hopper_state: &mut self.hopper_state,
+                inv_log: self.inv_log.as_mut(),
             log: self.log.as_mut(),
         };
         behaviour.on_used(&mut ctx, pos);
@@ -551,6 +588,8 @@ impl Simulation {
                         toggles: &mut self.toggles,
                         comparator_out: &mut self.comparator_out,
                 inventories: &mut self.inventories,
+                hopper_state: &mut self.hopper_state,
+                inv_log: self.inv_log.as_mut(),
                         log: self.log.as_mut(),
                     };
                     behaviour.on_scheduled_tick(&mut ctx, entry.pos);
@@ -564,6 +603,37 @@ impl Simulation {
             Phase::BlockEvents => self.run_block_events(),
 
             Phase::BlockEntities => {
+                // Ticking block entities first: they were registered at load
+                // time, so they precede any moving-piston block entity in
+                // vanilla's insertion-ordered list.
+                for index in 0..self.tickers.len() {
+                    let pos = self.tickers[index];
+                    let state = self.world.get(pos);
+                    let Some(behaviour) = self.behaviours.get(state) else {
+                        if state != StateId::AIR {
+                            self.unknown_seen.push(state);
+                        }
+                        continue;
+                    };
+                    let mut ctx = TickCtx {
+                        world: &mut self.world,
+                        ticks: &mut self.ticks,
+                        events: &mut self.events,
+                        states: &self.registry,
+                        tick: self.tick,
+                        boundary: false,
+                        updates: &mut self.updates,
+                        moves: &mut self.moves,
+                        toggles: &mut self.toggles,
+                        comparator_out: &mut self.comparator_out,
+                        inventories: &mut self.inventories,
+                        hopper_state: &mut self.hopper_state,
+                        inv_log: self.inv_log.as_mut(),
+                        log: self.log.as_mut(),
+                    };
+                    behaviour.on_block_entity_tick(&mut ctx, pos);
+                    self.propagate();
+                }
                 // Where a moving piston's blocks land, two ticks after the block
                 // event that started them. Captured from vanilla:
                 //   tick 0  stone -> moving_piston
@@ -647,6 +717,8 @@ impl Simulation {
                         toggles: &mut self.toggles,
                         comparator_out: &mut self.comparator_out,
                 inventories: &mut self.inventories,
+                hopper_state: &mut self.hopper_state,
+                inv_log: self.inv_log.as_mut(),
                         log: self.log.as_mut(),
                     };
                     behaviour.on_placed(&mut ctx, pos);
@@ -687,6 +759,8 @@ impl Simulation {
                         toggles: &mut self.toggles,
                         comparator_out: &mut self.comparator_out,
                 inventories: &mut self.inventories,
+                hopper_state: &mut self.hopper_state,
+                inv_log: self.inv_log.as_mut(),
                         log: self.log.as_mut(),
                 };
                 behaviour.on_block_event(&mut ctx, event.pos, event.id, event.param);

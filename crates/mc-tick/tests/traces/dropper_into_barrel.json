@@ -1,0 +1,28 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:dropper_into_barrel",
+  "detail": "normal",
+  "ticks": [
+    {
+      "tick": 0,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [0, 1, 0], "from": "minecraft:dropper[facing=east,triggered=false]", "to": "minecraft:dropper[facing=east,triggered=true]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 1, 0], "from": "minecraft:air", "to": "minecraft:redstone_block"}
+      ]
+    },
+    {
+      "tick": 2,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [0, 1, 0], "from": "minecraft:dropper[facing=east,triggered=true]", "to": "minecraft:dropper[facing=east,triggered=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 1, 0], "from": "minecraft:redstone_block", "to": "minecraft:air"}
+      ]
+    },
+    {
+      "tick": 3,
+      "events": [
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [0, 1, 0], "slot": 4, "from": "2x minecraft:redstone", "to": "1x minecraft:redstone"}
+      ]
+    }
+  ]
+}

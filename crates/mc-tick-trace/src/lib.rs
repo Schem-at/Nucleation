@@ -120,6 +120,23 @@ pub enum EventKind {
         from: TracePos,
     },
 
+    /// A container slot's contents changed.
+    ///
+    /// The observable of item logistics: a hopper transfer changes only
+    /// block-entity NBT, which a block-state diff cannot see. `from` and `to`
+    /// render as `"<count>x <id>"` (`"3x minecraft:redstone"`), or `""` for an
+    /// empty slot — strings for the same reason block states are.
+    InventoryChanged {
+        /// The container's position.
+        pos: TracePos,
+        /// Which slot.
+        slot: u32,
+        /// Contents before.
+        from: String,
+        /// Contents after.
+        to: String,
+    },
+
     /// An entity moved.
     ///
     /// The only event compared with tolerance rather than exactly. See the module
@@ -265,7 +282,8 @@ impl Trace {
                     | EventKind::ScheduledTickAdded { pos, .. }
                     | EventKind::ScheduledTickFired { pos, .. }
                     | EventKind::BlockEvent { pos, .. }
-                    | EventKind::NeighborUpdate { pos, .. } => *pos,
+                    | EventKind::NeighborUpdate { pos, .. }
+                    | EventKind::InventoryChanged { pos, .. } => *pos,
                     EventKind::EntityMoved { .. } => TracePos::new(0, 0, 0),
                 };
                 (pos.1, pos.2, pos.0, format!("{:?}", event.kind))

@@ -244,3 +244,44 @@ in `BlockEvents`, and finishes in `BlockEntities` (see [`crate::phase`]). The
 tick on which it *decides* is chosen by the diode priorities above. Get the
 priorities wrong and the piston fires on the wrong tick, and every door timing
 downstream is wrong with it.
+
+## Milestone A session — containers and item transfer
+
+All from `HopperBlockEntity`, `HopperBlock`, `DispenserBlock` and `DropperBlock`
+bytecode, pinned by the captures named:
+
+- **Hopper tick** (`pushItemsTick`) — decrement cooldown, stamp
+  `tickedGameTime`, and when off cooldown: **eject first, then suck**; either
+  success sets cooldown 8 (`hopper_pull.json`: ticks 0/8/16).
+- **Transfers move one item** from the first occupied slot into the first
+  empty-or-mergeable slot, in slot order. Merging requires the same item below
+  a full stack (max-stack assumed 64, documented in `crate::inventory`).
+- **Destination-cooldown rule** (`tryMoveInItem`) — inserting into a
+  *completely empty* hopper sets that hopper's cooldown to
+  `8 - (dest.tickedGameTime >= source.tickedGameTime)`: 7 when the destination
+  already ticked this game tick (earlier in block-entity order), 8 otherwise.
+  A hopper that has never ticked must compare *before* tick 0 — the engine's
+  sentinel is `ticked_at = -1`, and getting it wrong shifted every transfer in
+  `hopper_race.json` by one tick.
+- **Block-entity tick order is insertion order** — for a placed structure,
+  block order. `hopper_race.json` is the discriminating capture.
+- **`enabled` is `!hasNeighborSignal`** (no quasi-connectivity), written with
+  flag 2 — silent but snapshot-visible (`hopper_locked.json`).
+- **Dispenser/dropper trigger** — `hasNeighborSignal(pos) ||
+  hasNeighborSignal(pos.above())`: full QC, no direction skips. Rising edge
+  schedules 4gt and flips TRIGGERED with flag 2; falling edge clears it.
+  A boundary pulse therefore dispenses on tick 3 (`dropper_fill.json`).
+- **Droppers insert into containers; dispensers never do.** With no container
+  in front the item becomes an item entity — Milestone B — and the engine
+  models the container-visible decrement only.
+- **Random slot selection** (`getRandomSlot`) is the one place vanilla is
+  nondeterministic here; the engine deterministically takes the first occupied
+  slot, identical whenever at most one slot is occupied, which conformance
+  structures keep to.
+- **Container changes notify** — `setChanged` reaches
+  `updateNeighbourForOutputSignal`; the engine's `set_inventory_slot` notifies
+  the container's neighbours, which is how a comparator follows a draining
+  barrel and goes dark 2gt after the last item (`comparator_drain.json`).
+- A capture-method gotcha that cost one recapture: a support-less comparator is
+  destroyed by the placement update pass *before the first snapshot*, so it
+  silently never exists. Structures must stand on their own.

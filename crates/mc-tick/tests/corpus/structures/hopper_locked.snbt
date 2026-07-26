@@ -1,0 +1,17 @@
+{
+  DataVersion: 4903,
+  size: [2, 3, 1],
+  palette: [
+    {Name: "minecraft:stone"},
+    {Name: "minecraft:hopper", Properties: {enabled: "false", facing: "down"}},
+    {Name: "minecraft:barrel", Properties: {facing: "up", open: "false"}},
+    {Name: "minecraft:redstone_block"}
+  ],
+  blocks: [
+    {pos: [0, 0, 0], state: 0},
+    {pos: [0, 1, 0], state: 1, nbt: {id: "minecraft:hopper"}},
+    {pos: [1, 1, 0], state: 3},
+    {pos: [0, 2, 0], state: 2, nbt: {id: "minecraft:barrel", Items: [{Slot: 0b, id: "minecraft:redstone", count: 2}]}}
+  ],
+  entities: []
+}

@@ -186,6 +186,8 @@ mod tests {
             updates: &mut Vec::new(), moves: &mut Vec::new(),
             toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         o.on_neighbor_changed(&mut ctx, pos, Dir::West);
@@ -205,6 +207,8 @@ mod tests {
             updates: &mut Vec::new(), moves: &mut Vec::new(),
             toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         for dir in [Dir::East, Dir::North, Dir::South, Dir::Up, Dir::Down] {
@@ -228,6 +232,8 @@ mod tests {
                 updates: &mut Vec::new(), moves: &mut Vec::new(),
                 toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
                 log: None,
             };
             observer(false).on_scheduled_tick(&mut ctx, pos);
@@ -246,6 +252,8 @@ mod tests {
                 updates: &mut Vec::new(), moves: &mut Vec::new(),
                 toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
                 log: None,
             };
             observer(true).on_scheduled_tick(&mut ctx, pos);
@@ -269,6 +277,8 @@ mod tests {
             updates: &mut Vec::new(), moves: &mut Vec::new(),
             toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         o.on_placed(&mut ctx, pos);
@@ -284,6 +294,8 @@ mod tests {
             updates: &mut Vec::new(), moves: &mut Vec::new(),
             toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         o.on_placed(&mut ctx, pos);
@@ -314,6 +326,8 @@ mod tests {
             updates: &mut Vec::new(), moves: &mut Vec::new(),
             toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         o.on_neighbor_changed(&mut ctx, pos, Dir::West);

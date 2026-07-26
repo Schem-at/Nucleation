@@ -203,6 +203,7 @@ public final class TraceCapture {
 
         List<String> ticks = new ArrayList<>();
         Map<BlockPos, String> previous = snapshot(level, min, max);
+        Map<BlockPos, String[]> previousInv = snapshotContainers(level, min, max);
 
         // --pulse places a power source at a position, holds it for --pulse-ticks,
         // then removes it. Short pulses are how several piston behaviours are
@@ -284,6 +285,7 @@ public final class TraceCapture {
             }
 
             Map<BlockPos, String> current = snapshot(level, min, max);
+            Map<BlockPos, String[]> currentInv = snapshotContainers(level, min, max);
             List<String> events = new ArrayList<>();
             for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
                 String was = previous.get(pos);
@@ -291,8 +293,29 @@ public final class TraceCapture {
                 if (!java.util.Objects.equals(was, now)) {
                     events.add(blockChanged(pos, was, now));
                 }
+                // Container contents are invisible to the block diff — a hopper
+                // transfer changes only block-entity NBT — so containers are
+                // diffed slot by slot.
+                String[] invWas = previousInv.get(pos);
+                String[] invNow = currentInv.get(pos);
+                int slots = Math.max(invWas == null ? 0 : invWas.length,
+                        invNow == null ? 0 : invNow.length);
+                for (int slot = 0; slot < slots; slot++) {
+                    String slotWas = invWas != null && slot < invWas.length ? invWas[slot] : "";
+                    String slotNow = invNow != null && slot < invNow.length ? invNow[slot] : "";
+                    if (!slotWas.equals(slotNow)) {
+                        events.add(String.format(
+                                "        {\"phase\": \"%s\", \"kind\": \"inventory_changed\", "
+                                        + "\"pos\": [%d, %d, %d], \"slot\": %d, "
+                                        + "\"from\": \"%s\", \"to\": \"%s\"}",
+                                PHASE_TICK_END, pos.getX() - ORIGIN.getX(),
+                                pos.getY() - ORIGIN.getY(), pos.getZ() - ORIGIN.getZ(),
+                                slot, slotWas, slotNow));
+                    }
+                }
             }
             previous = current;
+            previousInv = currentInv;
 
             if (!events.isEmpty()) {
                 ticks.add("    {\n      \"tick\": " + tick + ",\n      \"events\": [\n"
@@ -361,6 +384,33 @@ public final class TraceCapture {
         }
         // GameTestHelper would fall through to ItemStack.useOn here; the hand is
         // empty by construction, so there is nothing to use.
+    }
+
+    /**
+     * Container contents for every container in the box, one string per slot.
+     *
+     * <p>Slots render as {@code "<count>x <id>"} or {@code ""}, matching the
+     * engine's rendering, so the two sides diff string-for-string.
+     */
+    private static Map<BlockPos, String[]> snapshotContainers(
+            ServerLevel level, BlockPos min, BlockPos max) {
+        Map<BlockPos, String[]> containers = new HashMap<>();
+        for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
+            if (level.getBlockEntity(pos)
+                    instanceof net.minecraft.world.level.block.entity.BaseContainerBlockEntity container) {
+                String[] slots = new String[container.getContainerSize()];
+                for (int slot = 0; slot < slots.length; slot++) {
+                    net.minecraft.world.item.ItemStack stack = container.getItem(slot);
+                    slots[slot] = stack.isEmpty()
+                            ? ""
+                            : stack.getCount() + "x "
+                                    + net.minecraft.core.registries.BuiltInRegistries.ITEM
+                                            .getKey(stack.getItem());
+                }
+                containers.put(pos.immutable(), slots);
+            }
+        }
+        return containers;
     }
 
     /** Descriptors for every position in the box, so comparison is order-independent. */

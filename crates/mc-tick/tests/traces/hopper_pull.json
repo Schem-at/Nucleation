@@ -1,0 +1,29 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:hopper_pull",
+  "detail": "normal",
+  "ticks": [
+    {
+      "tick": 0,
+      "events": [
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [0, 1, 0], "slot": 0, "from": "", "to": "1x minecraft:redstone"},
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [0, 2, 0], "slot": 0, "from": "3x minecraft:redstone", "to": "2x minecraft:redstone"}
+      ]
+    },
+    {
+      "tick": 8,
+      "events": [
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [0, 1, 0], "slot": 0, "from": "1x minecraft:redstone", "to": "2x minecraft:redstone"},
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [0, 2, 0], "slot": 0, "from": "2x minecraft:redstone", "to": "1x minecraft:redstone"}
+      ]
+    },
+    {
+      "tick": 16,
+      "events": [
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [0, 1, 0], "slot": 0, "from": "2x minecraft:redstone", "to": "3x minecraft:redstone"},
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [0, 2, 0], "slot": 0, "from": "1x minecraft:redstone", "to": ""}
+      ]
+    }
+  ]
+}

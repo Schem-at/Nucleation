@@ -217,12 +217,32 @@ Sequenced for the fastest verified loop:
       Known gap, deliberate: `redstone_power` has no inventory view, so a
       container-fed comparator's *strength* is invisible to that path — nothing
       consumes it yet (dust is not integrated); revisit with dust.
-- [ ] **Capture upgrade** — per-tick container-NBT snapshots in TraceCapture,
-      `inventory_changed` in mc-tick-trace, engine-side inventory logging.
-- [ ] **Hopper** — 8gt transfer cooldown, pull-from-above / push-to-facing,
-      powered lock, block-entity tick order.
-- [ ] **Dropper / dispenser into containers** — QC-powered like pistons,
-      rising-edge activation, 4gt scheduled tick. Container-to-container only.
+- [x] **Capture upgrade** — done. TraceCapture diffs container block-entity
+      contents slot-by-slot each tick (`"<count>x <id>"` strings, matching the
+      engine's rendering); `EventKind::InventoryChanged` in mc-tick-trace; the
+      engine logs slot changes through `TickCtx::set_inventory_slot`, which
+      also notifies the blocks around the container the way vanilla's
+      `updateNeighbourForOutputSignal` does.
+- [x] **Hopper** — done, all from `HopperBlockEntity` bytecode and pinned by
+      capture: 8gt cooldown (`hopper_pull.json`: transfers at ticks 0/8/16),
+      eject-then-suck order, one item per move into the first
+      empty-or-mergeable slot, the `enabled` gate (`hopper_locked.json`:
+      breaking the power flips enabled and transfers the same tick), and the
+      **block-entity tick order** with the destination-cooldown rule
+      (`hopper_race.json`: an empty hopper receiving from an earlier-ordered
+      hopper forwards after 7 ticks, not 8 — the `tickedGameTime` comparison,
+      including the never-ticked sentinel). `comparator_drain.json` closes the
+      loop: a comparator follows a barrel while a hopper drains it, going dark
+      2gt after the last item.
+- [x] **Dropper / dispenser** — done. `DispenserBlock.neighborChanged` from
+      bytecode: `hasNeighborSignal(pos) || hasNeighborSignal(above)` (full QC),
+      rising edge schedules 4gt and flips TRIGGERED silently.
+      `dropper_fill.json`: one item into the barrel in front (boundary
+      schedule fires at tick 3); `dropper_into_barrel.json`: with no container
+      in front the item leaves as an entity — Milestone B's territory — and
+      the engine models exactly the container-visible decrement. Known
+      simplification: vanilla picks a random occupied slot; the engine takes
+      the first, identical whenever at most one slot is occupied.
 
 Still on the board, small and orthogonal: **buttons and pressure plates**
 (pulse lengths differ per material), redstone lamp, target block.

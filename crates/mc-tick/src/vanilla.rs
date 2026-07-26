@@ -23,7 +23,8 @@
 
 use crate::behaviour::{BehaviourTable, Inert};
 use crate::components::{
-    Comparator, ComparatorMode, NoteBlock, PowerSource, Repeater, StatePair, Torch,
+    Comparator, ComparatorMode, Dropper, Hopper, NoteBlock, PowerSource, Repeater, StatePair,
+    Torch,
 };
 use crate::observer::Observer;
 use crate::piston::{Movability, Piston, Sticky};
@@ -148,6 +149,8 @@ pub struct VanillaRules {
     conductors: Vec<StateId>,
     /// Container states and their slot counts, for the comparator's analog read.
     containers: HashMap<StateId, u32>,
+    /// Hopper states, for the destination-cooldown rule.
+    hoppers: Vec<StateId>,
     immovable: Vec<StateId>,
     slime: Vec<StateId>,
     honey: Vec<StateId>,
@@ -184,6 +187,14 @@ impl PowerSource for VanillaRules {
 
     fn is_conductor(&self, world: &World, pos: Pos) -> bool {
         self.conductors.contains(&world.get(pos))
+    }
+
+    fn container_slots_at(&self, world: &World, pos: Pos) -> Option<u32> {
+        self.containers.get(&world.get(pos)).copied()
+    }
+
+    fn hopper_at(&self, world: &World, pos: Pos) -> bool {
+        self.hoppers.contains(&world.get(pos))
     }
 
     fn is_powered(&self, world: &World, pos: Pos, toward: Dir) -> bool {
@@ -226,6 +237,13 @@ const CONSTANT_SOURCES: &[&str] = &["minecraft:redstone_block"];
 
 /// Blocks nothing can push.
 const IMMOVABLE: &[&str] = &[
+    // Blocks with block entities have PushReaction.BLOCK.
+    "minecraft:barrel",
+    "minecraft:chest",
+    "minecraft:trapped_chest",
+    "minecraft:hopper",
+    "minecraft:dropper",
+    "minecraft:dispenser",
     "minecraft:obsidian",
     "minecraft:crying_obsidian",
     "minecraft:bedrock",
@@ -292,6 +310,9 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
             "minecraft:honey_block" => rules.honey.push(*id),
             n if container_slots(n).is_some() => {
                 rules.containers.insert(*id, container_slots(n).unwrap());
+                if n == "minecraft:hopper" {
+                    rules.hoppers.push(*id);
+                }
             }
             _ => {}
         }
@@ -472,6 +493,33 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
                     }),
                 );
             }
+            "minecraft:hopper" => {
+                let Some(facing) = descriptor.facing() else { continue };
+                let Some(states) = enabled_pair(registry, descriptor) else { continue };
+                table.register(
+                    *id,
+                    Box::new(Hopper {
+                        facing,
+                        enabled: descriptor.get("enabled") != Some("false"),
+                        states,
+                        power: rules.clone(),
+                    }),
+                );
+            }
+            "minecraft:dropper" | "minecraft:dispenser" => {
+                let Some(facing) = descriptor.facing() else { continue };
+                let Some(states) = triggered_pair(registry, descriptor) else { continue };
+                table.register(
+                    *id,
+                    Box::new(Dropper {
+                        facing,
+                        triggered: descriptor.flag("triggered"),
+                        states,
+                        dispenser: name == "minecraft:dispenser",
+                        power: rules.clone(),
+                    }),
+                );
+            }
             // Anything else stays unregistered, and will be named in the report.
             _ => {}
         }
@@ -508,6 +556,20 @@ fn lit_pair(registry: &StateRegistry, descriptor: &Descriptor) -> Option<StatePa
     Some(StatePair {
         off: registry.get(&descriptor.with("lit", "false"))?,
         on: registry.get(&descriptor.with("lit", "true"))?,
+    })
+}
+
+fn enabled_pair(registry: &StateRegistry, descriptor: &Descriptor) -> Option<StatePair> {
+    Some(StatePair {
+        off: registry.get(&descriptor.with("enabled", "false"))?,
+        on: registry.get(&descriptor.with("enabled", "true"))?,
+    })
+}
+
+fn triggered_pair(registry: &StateRegistry, descriptor: &Descriptor) -> Option<StatePair> {
+    Some(StatePair {
+        off: registry.get(&descriptor.with("triggered", "false"))?,
+        on: registry.get(&descriptor.with("triggered", "true"))?,
     })
 }
 
@@ -549,6 +611,15 @@ pub fn intern_companions(registry: &mut StateRegistry) {
             }
             "minecraft:redstone_torch" | "minecraft:redstone_wall_torch" => {
                 vec![descriptor.with("lit", "false"), descriptor.with("lit", "true")]
+            }
+            "minecraft:hopper" => {
+                vec![descriptor.with("enabled", "false"), descriptor.with("enabled", "true")]
+            }
+            "minecraft:dropper" | "minecraft:dispenser" => {
+                vec![
+                    descriptor.with("triggered", "false"),
+                    descriptor.with("triggered", "true"),
+                ]
             }
             "minecraft:note_block" => {
                 // Every pitch, powered and not: a click cycles `note` and wraps at

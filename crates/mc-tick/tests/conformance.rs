@@ -27,6 +27,7 @@
 
 use mc_tick::{Pos, Simulation, Structure};
 use mc_tick_trace::{Detail, EventKind, Trace, TracePos};
+use std::collections::HashMap;
 
 /// Padding round a loaded structure; matches the corpus runner.
 const MARGIN: i32 = 4;
@@ -76,7 +77,7 @@ fn engine_trace(sim: &Simulation, name: &str, ticks: u64) -> Trace {
                 }
             }
         }
-        let events: Vec<_> = first_seen
+        let mut events: Vec<_> = first_seen
             .into_iter()
             .filter_map(|pos| {
                 let (from, to) = net[&pos];
@@ -93,6 +94,41 @@ fn engine_trace(sim: &Simulation, name: &str, ticks: u64) -> Trace {
                 })
             })
             .collect();
+
+        // Container-slot changes, identically net-collapsed: the capture diffs
+        // NBT snapshots, so it sees each slot's net change per tick.
+        let render = |stack: &Option<(String, u8)>| match stack {
+            None => String::new(),
+            Some((id, count)) => format!("{count}x {id}"),
+        };
+        let mut inv_first: Vec<(mc_tick::Pos, u8)> = Vec::new();
+        let mut inv_net: HashMap<(mc_tick::Pos, u8), (String, String)> = HashMap::new();
+        for change in sim.recorded_inventory().iter().filter(|c| c.tick == tick) {
+            match inv_net.entry((change.pos, change.slot)) {
+                std::collections::hash_map::Entry::Vacant(slot) => {
+                    slot.insert((render(&change.from), render(&change.to)));
+                    inv_first.push((change.pos, change.slot));
+                }
+                std::collections::hash_map::Entry::Occupied(mut slot) => {
+                    slot.get_mut().1 = render(&change.to);
+                }
+            }
+        }
+        for key in inv_first {
+            let (from, to) = inv_net[&key].clone();
+            if from == to {
+                continue;
+            }
+            events.push(mc_tick_trace::TraceEvent {
+                phase: "tick_end".to_string(),
+                kind: EventKind::InventoryChanged {
+                    pos: TracePos::new(key.0.x, key.0.y, key.0.z),
+                    slot: u32::from(key.1),
+                    from,
+                    to,
+                },
+            });
+        }
         if !events.is_empty() {
             trace.ticks.push(mc_tick_trace::TickRecord { tick, events });
         }
@@ -215,6 +251,19 @@ fn run_conformance_bounded(
         "{label}: every block must have behaviour, or this compares vanilla against \
          a partially-simulated world"
     );
+
+    // Ticking block entities register in structure order — vanilla's
+    // tickBlockEntities insertion order for a placed structure, which is what
+    // decides which of two hoppers moves first.
+    for (pos, entry) in &structure.blocks {
+        let state = sim.registry().get(&structure.palette[*entry]);
+        let is_ticker = state
+            .and_then(|s| sim.behaviours().get(s))
+            .is_some_and(|b| b.ticks_as_block_entity());
+        if is_ticker {
+            sim.add_block_entity_ticker(*pos);
+        }
+    }
 
     if let Some(bounds) = ticking {
         sim.set_ticking_bounds(bounds);
@@ -384,6 +433,83 @@ fn an_empty_container_turns_a_lit_comparator_off() {
         "comparator_barrel_off.snbt",
         "comparator_barrel_off.json",
         "nucleation:comparator_barrel_off",
+    );
+}
+
+#[test]
+fn a_hopper_pulls_one_item_every_eight_ticks() {
+    // A barrel above a hopper: one item moves per 8 game ticks, the first on
+    // tick 0 — the hopper's block entity ticks in phase 9 of the very first tick.
+    run_conformance("hopper_pull.snbt", "hopper_pull.json", "nucleation:hopper_pull");
+}
+
+#[test]
+fn two_hoppers_race_in_block_entity_order() {
+    // The discriminating capture for tick order. Hopper A (placed first, ticks
+    // first) pushes into empty hopper B on tick 0; the destination-cooldown
+    // rule gives B cooldown 8, B's own tick the same game tick decrements it to
+    // 7, so B forwards to the barrel on tick 7 — not 8. An engine with the
+    // wrong block-entity order or without the tickedGameTime comparison gets
+    // every following tick wrong.
+    run_conformance("hopper_race.snbt", "hopper_race.json", "nucleation:hopper_race");
+}
+
+#[test]
+fn a_powered_hopper_is_locked_until_the_power_is_broken() {
+    // Authored disabled beside a redstone block; breaking the block flips
+    // `enabled` (silently, flag 2 — but visible) and the first transfer lands
+    // the same tick.
+    run_conformance_actuated(
+        "hopper_locked.snbt",
+        "hopper_locked.json",
+        "nucleation:hopper_locked",
+        &[],
+        &[(0, Actuate::Place(Pos::new(1, 1, 0), "minecraft:air"))],
+    );
+}
+
+#[test]
+fn a_dropper_with_no_container_ejects_into_the_world() {
+    // The pulse triggers at tick 0 (TRIGGERED flips, 4-tick boundary schedule
+    // fires at tick 3); the front is air by then, so the item leaves as an item
+    // entity — Milestone B's territory — and the container-side effect is
+    // exactly the decrement.
+    run_conformance_actuated(
+        "dropper_into_barrel.snbt",
+        "dropper_into_barrel.json",
+        "nucleation:dropper_into_barrel",
+        &["minecraft:redstone_block"],
+        &[
+            (0, Actuate::Place(Pos::new(1, 1, 0), "minecraft:redstone_block")),
+            (2, Actuate::Place(Pos::new(1, 1, 0), "minecraft:air")),
+        ],
+    );
+}
+
+#[test]
+fn a_dropper_facing_a_container_transfers_into_it() {
+    run_conformance_actuated(
+        "dropper_fill.snbt",
+        "dropper_fill.json",
+        "nucleation:dropper_fill",
+        &["minecraft:redstone_block"],
+        &[
+            (0, Actuate::Place(Pos::new(0, 2, 0), "minecraft:redstone_block")),
+            (2, Actuate::Place(Pos::new(0, 2, 0), "minecraft:air")),
+        ],
+    );
+}
+
+#[test]
+fn a_comparator_follows_a_container_a_hopper_is_draining() {
+    // The full chain: hopper transfers mutate the barrel, each mutation
+    // notifies the comparator (vanilla's updateNeighbourForOutputSignal), and
+    // when the last item leaves at tick 16 the comparator schedules its
+    // 2-game-tick delay and goes dark at tick 18.
+    run_conformance(
+        "comparator_drain.snbt",
+        "comparator_drain.json",
+        "nucleation:comparator_drain",
     );
 }
 

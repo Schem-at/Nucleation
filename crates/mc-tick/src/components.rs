@@ -143,6 +143,17 @@ pub trait PowerSource: Send + Sync {
         false
     }
 
+    /// The slot count of the container block at `pos`, if it is one.
+    fn container_slots_at(&self, _world: &World, _pos: Pos) -> Option<u32> {
+        None
+    }
+
+    /// Whether the block at `pos` is a hopper — the destination-cooldown rule
+    /// applies only to hoppers.
+    fn hopper_at(&self, _world: &World, _pos: Pos) -> bool {
+        false
+    }
+
     /// Whether the block at `pos` is a diode, for repeater-priority purposes.
     fn is_diode(&self, world: &World, pos: Pos) -> bool;
 
@@ -543,6 +554,306 @@ impl<P: PowerSource> BlockBehaviour for Comparator<P> {
     }
 }
 
+/// The cooldown a hopper takes after moving an item, in block-entity ticks.
+///
+/// `HopperBlockEntity.MOVE_ITEM_SPEED` — one transfer per 8 game ticks.
+pub const HOPPER_COOLDOWN: i32 = 8;
+
+/// A hopper's slot count.
+pub const HOPPER_SLOTS: u8 = 5;
+
+/// Ticks between a dispenser's trigger and its dispense.
+///
+/// `DispenserBlock.neighborChanged` schedules with delay 4.
+pub const DISPENSER_DELAY: u64 = 4;
+
+/// The assumed max stack size; see `crate::inventory`'s module docs.
+const MERGE_LIMIT: u8 = 64;
+
+/// A hopper.
+///
+/// Mechanics from `HopperBlockEntity` bytecode, pinned by capture:
+///
+/// - `pushItemsTick` runs every block-entity tick: decrement the cooldown,
+///   stamp `tickedGameTime`, and when off cooldown try to move — **eject
+///   first, then suck**; either success sets the cooldown to 8.
+/// - `ejectItems` moves **one** item from the first occupied slot into the
+///   container the hopper faces (first empty-or-mergeable slot, in slot order).
+/// - `suckInItems` pulls one item from the first occupied slot of the container
+///   above.
+/// - Inserting into a **completely empty hopper** puts that hopper on cooldown
+///   `8 - 1` when it has already ticked this game tick (it is earlier in the
+///   block-entity order), else `8` — `tryMoveInItem`'s `tickedGameTime`
+///   comparison, and the reason hopper order is observable.
+/// - The `enabled` property gates everything; `HopperBlock` keeps it at
+///   `!hasNeighborSignal` (no quasi-connectivity), written silently (flag 2).
+pub struct Hopper<P: PowerSource> {
+    /// The output direction — down, or one of the four horizontals.
+    pub facing: Dir,
+    /// Whether this state is the enabled (unpowered) one.
+    pub enabled: bool,
+    /// Disabled/enabled states (`off` = `enabled=false`).
+    pub states: StatePair,
+    /// How power and containers are read.
+    pub power: P,
+}
+
+impl<P: PowerSource> Hopper<P> {
+    fn is_empty(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        ctx.inventories
+            .get(&pos)
+            .is_none_or(crate::inventory::Inventory::is_empty)
+    }
+
+    fn is_full(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        inventory_is_full(ctx, pos, u32::from(HOPPER_SLOTS))
+    }
+
+    /// `ejectItems`: one item from our first occupied slot into the container
+    /// we face.
+    fn eject(&self, ctx: &mut TickCtx<'_>, pos: Pos) -> bool {
+        let target = pos.offset(self.facing);
+        let Some(target_slots) = self.power.container_slots_at(ctx.world, target) else {
+            return false;
+        };
+        if inventory_is_full(ctx, target, target_slots) {
+            return false;
+        }
+        for slot in 0..HOPPER_SLOTS {
+            if let Some((id, count)) = ctx.inventory_slot(pos, slot) {
+                if insert_one(ctx, &self.power, Some(pos), target, target_slots, &id) {
+                    let remaining = count - 1;
+                    ctx.set_inventory_slot(
+                        pos,
+                        slot,
+                        (remaining > 0).then(|| (id, remaining)),
+                    );
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// `suckInItems`: one item from the first occupied slot of the container
+    /// above us. (Item entities above are Milestone B.)
+    fn suck(&self, ctx: &mut TickCtx<'_>, pos: Pos) -> bool {
+        let source = pos.offset(Dir::Up);
+        let Some(source_slots) = self.power.container_slots_at(ctx.world, source) else {
+            return false;
+        };
+        for slot in 0..source_slots.min(255) as u8 {
+            if let Some((id, count)) = ctx.inventory_slot(source, slot) {
+                if insert_one(ctx, &self.power, None, pos, u32::from(HOPPER_SLOTS), &id) {
+                    let remaining = count - 1;
+                    ctx.set_inventory_slot(
+                        source,
+                        slot,
+                        (remaining > 0).then(|| (id, remaining)),
+                    );
+                    return true;
+                }
+            }
+        }
+        false
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for Hopper<P> {
+    /// `HopperBlock.checkPoweredState`: enabled tracks `!hasNeighborSignal`,
+    /// written silently.
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        let powered = crate::pos::ALL_DIRS.iter().any(|dir| {
+            self.power
+                .is_powered(ctx.world, pos.offset(*dir), dir.opposite())
+        });
+        let enabled = !powered;
+        if enabled != self.enabled {
+            ctx.set_quiet(pos, self.states.get(enabled));
+        }
+    }
+
+    /// `HopperBlockEntity.pushItemsTick`.
+    fn on_block_entity_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        {
+            let state = ctx.hopper_state.entry(pos).or_default();
+            state.cooldown -= 1;
+            state.ticked_at = ctx.tick as i64;
+            if state.cooldown > 0 {
+                return;
+            }
+            state.cooldown = 0;
+        }
+        if !self.enabled {
+            return;
+        }
+        let mut moved = false;
+        if !self.is_empty(ctx, pos) {
+            moved = self.eject(ctx, pos);
+        }
+        if !self.is_full(ctx, pos) {
+            moved |= self.suck(ctx, pos);
+        }
+        if moved {
+            ctx.hopper_state.entry(pos).or_default().cooldown = HOPPER_COOLDOWN;
+        }
+    }
+
+    fn ticks_as_block_entity(&self) -> bool {
+        true
+    }
+
+    fn name(&self) -> &'static str {
+        "hopper"
+    }
+}
+
+/// Whether every slot of the container at `pos` holds a full stack.
+fn inventory_is_full(ctx: &TickCtx<'_>, pos: Pos, slots: u32) -> bool {
+    let Some(inventory) = ctx.inventories.get(&pos) else {
+        return slots == 0;
+    };
+    let occupied = inventory
+        .stacks
+        .iter()
+        .filter(|stack| stack.count >= MERGE_LIMIT)
+        .count() as u32;
+    occupied >= slots
+}
+
+/// `HopperBlockEntity.addItem`/`tryMoveInItem`: place one `id` item into the
+/// first slot of `target` that is empty or mergeable, in slot order.
+///
+/// `source_hopper` is the ticking hopper doing the insert, if any — the
+/// destination-cooldown rule needs its `tickedGameTime`.
+fn insert_one<P: PowerSource>(
+    ctx: &mut TickCtx<'_>,
+    power: &P,
+    source_hopper: Option<Pos>,
+    target: Pos,
+    target_slots: u32,
+    id: &str,
+) -> bool {
+    let target_was_empty = ctx
+        .inventories
+        .get(&target)
+        .is_none_or(crate::inventory::Inventory::is_empty);
+    for slot in 0..target_slots.min(255) as u8 {
+        match ctx.inventory_slot(target, slot) {
+            None => {
+                ctx.set_inventory_slot(target, slot, Some((id.to_string(), 1)));
+                // A previously-empty destination hopper is put on cooldown by
+                // the *inserter*: 7 when it already ticked this game tick,
+                // 8 otherwise.
+                if target_was_empty && power.hopper_at(ctx.world, target) {
+                    let source_ticked = source_hopper
+                        .and_then(|p| ctx.hopper_state.get(&p))
+                        .map(|s| s.ticked_at);
+                    let already_ticked = match source_ticked {
+                        Some(source) => {
+                            ctx.hopper_state.entry(target).or_default().ticked_at >= source
+                        }
+                        None => false,
+                    };
+                    ctx.hopper_state.entry(target).or_default().cooldown =
+                        HOPPER_COOLDOWN - i32::from(already_ticked);
+                }
+                return true;
+            }
+            Some((existing, count)) if existing == id && count < MERGE_LIMIT => {
+                ctx.set_inventory_slot(target, slot, Some((existing, count + 1)));
+                return true;
+            }
+            Some(_) => continue,
+        }
+    }
+    false
+}
+
+/// A dropper or dispenser.
+///
+/// Trigger mechanics from `DispenserBlock.neighborChanged`: powered is
+/// `hasNeighborSignal(pos) || hasNeighborSignal(pos.above())` — full
+/// quasi-connectivity, no direction skips — and a rising edge schedules a
+/// 4-tick delay while flipping `triggered` silently (flag 2).
+///
+/// Dispensing: a dropper facing a container moves one item into it
+/// (`HopperBlockEntity.addItem` semantics). With no container in front — and
+/// always, for a dispenser — the item leaves the world as an item entity,
+/// which is Milestone B; the engine decrements the slot and the departure is
+/// exactly what container NBT shows.
+///
+/// # Known simplification
+///
+/// Vanilla picks a **random occupied slot** (`getRandomSlot`); the engine
+/// deterministically takes the first occupied slot. Identical whenever at most
+/// one slot is occupied, which conformance structures keep to.
+pub struct Dropper<P: PowerSource> {
+    /// The output direction.
+    pub facing: Dir,
+    /// Whether this state is the triggered one.
+    pub triggered: bool,
+    /// Untriggered/triggered states.
+    pub states: StatePair,
+    /// True for a dispenser (never inserts into containers).
+    pub dispenser: bool,
+    /// How power and containers are read.
+    pub power: P,
+}
+
+impl<P: PowerSource> Dropper<P> {
+    fn has_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        crate::pos::ALL_DIRS.iter().any(|dir| {
+            self.power
+                .is_powered(ctx.world, pos.offset(*dir), dir.opposite())
+        })
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for Dropper<P> {
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        let powered = self.has_signal(ctx, pos) || self.has_signal(ctx, pos.offset(Dir::Up));
+        if powered && !self.triggered {
+            ctx.schedule(pos, DISPENSER_DELAY, TickPriority::Normal);
+            ctx.set_quiet(pos, self.states.get(true));
+        } else if !powered && self.triggered {
+            ctx.set_quiet(pos, self.states.get(false));
+        }
+    }
+
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        let slots = 9u8;
+        let Some((slot, id, count)) = (0..slots)
+            .find_map(|s| ctx.inventory_slot(pos, s).map(|(id, c)| (s, id, c)))
+        else {
+            return; // empty: vanilla just clicks
+        };
+        if !self.dispenser {
+            let front = pos.offset(self.facing);
+            if let Some(front_slots) = self.power.container_slots_at(ctx.world, front) {
+                if insert_one(ctx, &self.power, None, front, front_slots, &id) {
+                    let remaining = count - 1;
+                    ctx.set_inventory_slot(pos, slot, (remaining > 0).then(|| (id, remaining)));
+                }
+                // Insert refused (target full): the item stays put.
+                return;
+            }
+        }
+        // No container in front: the item is ejected into the world. Item
+        // entities are Milestone B; the container-side effect is the decrement.
+        let remaining = count - 1;
+        ctx.set_inventory_slot(pos, slot, (remaining > 0).then(|| (id, remaining)));
+    }
+
+    fn name(&self) -> &'static str {
+        if self.dispenser {
+            "dispenser"
+        } else {
+            "dropper"
+        }
+    }
+}
+
 /// How many pitches a note block cycles through before wrapping.
 ///
 /// `NoteBlock.NOTE` is `IntegerProperty.create("note", 0, 24)`; `cycle` wraps 24
@@ -706,6 +1017,8 @@ mod tests {
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
@@ -739,6 +1052,8 @@ mod tests {
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
@@ -779,6 +1094,8 @@ mod tests {
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
@@ -814,6 +1131,8 @@ mod tests {
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
@@ -851,6 +1170,8 @@ mod tests {
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         torch.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::Down);
@@ -889,6 +1210,8 @@ mod tests {
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         torch.on_scheduled_tick(&mut ctx, torch_pos);
@@ -939,6 +1262,8 @@ mod tests {
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         comparator.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
@@ -983,6 +1308,8 @@ mod tests {
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
@@ -1022,6 +1349,8 @@ mod tests {
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
@@ -1119,6 +1448,8 @@ mod tests {
             toggles: &mut toggles,
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         torch.on_scheduled_tick(&mut ctx, pos);
@@ -1156,6 +1487,8 @@ mod tests {
             toggles: &mut toggles,
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         torch.on_scheduled_tick(&mut ctx, pos);
@@ -1195,6 +1528,8 @@ mod tests {
             toggles: &mut toggles,
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         torch.on_scheduled_tick(&mut ctx, pos);
@@ -1267,6 +1602,8 @@ mod tests {
             toggles: &mut Vec::new(),
             comparator_out: &mut stored,
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);
@@ -1297,6 +1634,8 @@ mod tests {
             toggles: &mut Vec::new(),
             comparator_out: &mut stored,
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);
@@ -1329,6 +1668,8 @@ mod tests {
             toggles: &mut Vec::new(),
             comparator_out: &mut stored,
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);
@@ -1369,6 +1710,8 @@ mod tests {
             toggles: &mut Vec::new(),
             comparator_out: &mut stored,
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);

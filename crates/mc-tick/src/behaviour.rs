@@ -41,6 +41,40 @@ pub struct BlockChange {
     pub to: StateId,
 }
 
+/// One recorded container-slot change, the inventory analog of [`BlockChange`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InventoryChange {
+    /// The tick it happened on.
+    pub tick: u64,
+    /// The container.
+    pub pos: Pos,
+    /// Which slot.
+    pub slot: u8,
+    /// `(item id, count)` before, `None` for empty.
+    pub from: Option<(String, u8)>,
+    /// `(item id, count)` after.
+    pub to: Option<(String, u8)>,
+}
+
+/// Per-hopper transfer state — vanilla's `HopperBlockEntity` fields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HopperState {
+    /// `cooldownTime`: decremented each block-entity tick; transfers only run
+    /// at zero or below.
+    pub cooldown: i32,
+    /// `tickedGameTime`: the last tick this hopper's block entity ran, signed
+    /// so a hopper that has **never** ticked compares before tick 0. The
+    /// destination-cooldown rule compares these across two hoppers, and the
+    /// distinction decides cooldown 7 versus 8 on the very first tick.
+    pub ticked_at: i64,
+}
+
+impl Default for HopperState {
+    fn default() -> Self {
+        Self { cooldown: 0, ticked_at: -1 }
+    }
+}
+
 /// A block write scheduled to land in a later tick's block-entities phase.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PendingMove {
@@ -101,10 +135,16 @@ pub struct TickCtx<'a> {
     pub comparator_out: &'a mut std::collections::HashMap<Pos, u8>,
     /// Container contents by position — vanilla's inventory block entities.
     ///
-    /// What a comparator reads and a hopper will move. Kept with the simulation
+    /// What a comparator reads and a hopper moves. Kept with the simulation
     /// for the same reason as `comparator_out`: block states cannot express
-    /// "27 slots holding 40 redstone".
+    /// "27 slots holding 40 redstone". Mutate through
+    /// [`TickCtx::set_inventory_slot`], which records the change and updates
+    /// the comparators around the container.
     pub inventories: &'a mut std::collections::HashMap<Pos, crate::inventory::Inventory>,
+    /// Per-hopper cooldown and tick bookkeeping.
+    pub hopper_state: &'a mut std::collections::HashMap<Pos, HopperState>,
+    /// Container-slot changes made this tick, when recording is on.
+    pub inv_log: Option<&'a mut Vec<InventoryChange>>,
     /// Recent redstone-torch toggles, for burnout detection.
     ///
     /// Burnout is the one behaviour that depends on *history* rather than on the
@@ -210,6 +250,48 @@ impl TickCtx<'_> {
             .count()
     }
 
+    /// The `(item id, count)` in a container slot, `None` when empty.
+    pub fn inventory_slot(&self, pos: Pos, slot: u8) -> Option<(String, u8)> {
+        self.inventories.get(&pos).and_then(|inv| {
+            inv.stacks
+                .iter()
+                .find(|stack| stack.slot == slot && stack.count > 0)
+                .map(|stack| (stack.id.clone(), stack.count))
+        })
+    }
+
+    /// Write a container slot, recording the change and updating comparators.
+    ///
+    /// The comparator update mirrors `Level.updateNeighbourForOutputSignal`,
+    /// which a container's `setChanged` reaches: every neighbour of the
+    /// container is notified, and when a neighbour is a conductor, the block
+    /// beyond it too — that is how a comparator reading a container *through* a
+    /// solid block notices the contents change.
+    pub fn set_inventory_slot(&mut self, pos: Pos, slot: u8, to: Option<(String, u8)>) {
+        let from = self.inventory_slot(pos, slot);
+        if from == to {
+            return;
+        }
+        let inventory = self
+            .inventories
+            .entry(pos)
+            .or_insert_with(|| crate::inventory::Inventory::empty(0));
+        inventory.stacks.retain(|stack| stack.slot != slot);
+        if let Some((id, count)) = &to {
+            inventory.stacks.push(crate::inventory::ItemStack {
+                slot,
+                id: id.clone(),
+                count: *count,
+            });
+        }
+        if let Some(log) = self.inv_log.as_deref_mut() {
+            log.push(InventoryChange { tick: self.tick, pos, slot, from, to });
+        }
+        for dir in crate::pos::ALL_DIRS {
+            self.updates.push((pos.offset(dir), dir.opposite()));
+        }
+    }
+
     /// Schedule a block write for `delay` ticks from now, resolved in the
     /// block-entities phase.
     pub fn defer(&mut self, pos: Pos, state: StateId, delay: u64) {
@@ -243,6 +325,18 @@ pub trait BlockBehaviour: Send + Sync {
     /// default; a note block cycles its pitch, which is what makes a *manual*
     /// contraption manual.
     fn on_used(&self, _ctx: &mut TickCtx<'_>, _pos: Pos) {}
+
+    /// This block's entity ticks every game tick in the block-entities phase.
+    ///
+    /// Only hoppers so far. The dispatch order is the ticker registration
+    /// order — vanilla's `tickBlockEntities` walks its list in insertion order,
+    /// which for a placed structure is block order.
+    fn on_block_entity_tick(&self, _ctx: &mut TickCtx<'_>, _pos: Pos) {}
+
+    /// Whether this block registers a ticking block entity.
+    fn ticks_as_block_entity(&self) -> bool {
+        false
+    }
 
     /// This block was just written into the world by a completed piston move.
     ///
@@ -530,6 +624,8 @@ mod tests {
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         source.on_neighbor_changed(&mut ctx, Pos::new(0, 0, 0), Dir::Up);
@@ -556,6 +652,8 @@ mod tests {
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
+            hopper_state: &mut Default::default(),
+            inv_log: None,
             log: None,
         };
         ctx.schedule(Pos::new(1, 1, 1), 2, TickPriority::High);
