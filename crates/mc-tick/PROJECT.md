@@ -137,7 +137,7 @@ adding a file, no recompilation. `load <name>.snbt` runs a real structure.
 
 ## What's simulated today
 
-**203 tests, all green.** Everything below is trace- or bytecode-verified.
+**199 tests, all green** (plus five community doors as standing targets). Everything below is trace- or bytecode-verified.
 
 ### Engine core
 - **Tick phases** — all ten, in verified order, as an explicit walked sequence.
@@ -169,7 +169,7 @@ adding a file, no recompilation. `load <name>.snbt` runs a real structure.
 ### Redstone components
 | Component | Verified facts |
 |---|---|
-| **Dust** | Synchronous settling, 15-block attenuation, locational default |
+| **Dust** | Vanilla's per-wire evaluator: recompute, flag-2 write, seven updateNeighborsAt entries in Java HashSet order — the real ordered cascade, not a fixed point |
 | **Redstone torch** | 2-tick delay, inverts support, NORMAL priority, burnout (8 turn-offs / 60t) |
 | **Repeater** | delay×2 game ticks, 3-way priority (repeater priority via `shouldPrioritize`), locking |
 | **Comparator** | compare/subtract with side inputs, fixed 2t, **priming** (strength-change scheduling), **container analog reads** (direct and through one conductor) |

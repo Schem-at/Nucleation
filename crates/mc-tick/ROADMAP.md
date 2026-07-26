@@ -294,7 +294,45 @@ boxes, signs/heads/rods classified). All five have captured goldens
 (placement settle + lever click), and **all five diverge** — the tests are
 committed `#[ignore]`d as the standing target.
 
-What the diffs establish:
+**Session update — the placement half is solved.** All five doors now
+place **exactly** as vanilla does (zero block diffs each; the vault
+started at 22), and tick 0 matches event-for-event on every one. Getting
+there rebuilt the update model, all bytecode-verified:
+
+- `CollectingNeighborUpdater` semantics: updates are *entries* (one
+  `updateNeighborsAt` = six notifications in `UPDATE_ORDER`) run
+  depth-first, entries queued mid-notification completing first.
+- **Shape updates are a separate callback** (`BlockBehaviour::on_shape_update`).
+  `ObserverBlock` overrides only `updateShape`; that is why placement
+  pulses observers and not pistons. `set` sends neighbours then shapes;
+  a flag-2 write (the dust evaluator's) still sends shapes.
+- `DefaultRedstoneWireEvaluator` transcribed — per-wire recompute, then
+  seven `updateNeighborsAt` entries in Java `HashSet` iteration order.
+  The ideal fixed-point relaxation is gone.
+- **Strength-aware power** (`Level.getSignal`/`getDirectSignalTo`):
+  comparators emit their stored block-entity strength, diodes emit from
+  one face, lit torches strongly power upward, and dust strongly powers
+  everything it powers weakly.
+- A retracted piston is a full collision cube but **not** a redstone
+  conductor.
+- Placement walks three sorted groups — solid, other, block-entities —
+  keyed `(y, x, z)`, not file order.
+- `RepeaterBlock`'s `LOCKED` and `NoteBlock`'s `INSTRUMENT` are derived
+  properties the game rewrites on placement.
+
+Two capture tools made it tractable and should be the first reach next
+time: `--dump-placed` (diff a whole placed world) and
+`--probe`/`--probe-tick` (ask the running game for
+`getSignal`/`getDirectSignalTo`/`isRedstoneConductor` at a position, at
+any tick).
+
+**What remains** is tick-time cascade order: the doors now diverge deep
+into their opening sequences, and the vault's case is traced to two
+opposed pistons racing — vanilla's scheduled-tick order picks one, the
+engine picks the other. The next lead is `LevelTicks`' sub-tick ordering
+against this engine's `(target, priority, sequence)` queue.
+
+The original findings, for reference:
 
 - The divergence starts **inside the placement settle**: vanilla's
   `DefaultRedstoneWireEvaluator` relaxes wire-by-wire, recursively, and its

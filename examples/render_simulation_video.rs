@@ -55,6 +55,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_or(6, |v| v.parse().expect("--frames-per-tick N"));
     let fps: f64 = flag(&args, "--fps").map_or(30.0, |v| v.parse().expect("--fps N"));
     let transparent = args.iter().any(|a| a == "--transparent");
+    // Run vanilla's placement pass first — a community build saved mid-cycle
+    // needs it before it means anything.
+    let settle = args.iter().any(|a| a == "--settle");
     // Every --click occurrence is an actuation; a moving machine's note block
     // moves with it, so successive clicks target successive positions.
     let clicks: Vec<(Pos, u64)> = args
@@ -96,7 +99,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .collect();
 
     // ── 1. Simulate, recording every block change ───────────────────────────
-    let (initial, changes, item_tracks) = simulate(snbt_path, ticks, &clicks, &pulses, &breaks);
+    let (initial, changes, item_tracks) =
+        simulate(snbt_path, ticks, &clicks, &pulses, &breaks, settle);
     println!("simulated {ticks} ticks, {} block changes", changes.len());
 
     println!(
@@ -313,6 +317,7 @@ fn simulate(
     clicks: &[(Pos, u64)],
     pulses: &[(Pos, u64)],
     breaks: &[(Pos, u64)],
+    settle: bool,
 ) -> (
     Vec<(Pos, String)>,
     Vec<(u64, Pos, String, String)>,
@@ -394,6 +399,13 @@ fn simulate(
         }
     }
 
+    if settle {
+        let order = structure.placement_order(
+            mc_tick::vanilla::is_collision_full_cube,
+            mc_tick::vanilla::has_dynamic_shape,
+        );
+        sim.settle_with_order(&order);
+    }
     sim.record();
     for t in 0..ticks {
         for (pos, at) in clicks {
