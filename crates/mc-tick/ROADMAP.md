@@ -284,6 +284,34 @@ the first run, because the engine mirrors vanilla's arithmetic types
 Still open from the original Milestone B slate: **water-stream item motion**
 (fluids, section 7) and player pickup (needs players).
 
+## 7b. The door fixtures — the standing target (NEXT)
+
+Five community doors arrived (`door_3x3_flush`, `door_4x4_sliding`,
+`door_6x6_sliding`, `door_4x4_vault`, `door_tgm_4x4`) — every block they
+contain loads and registers (`check_structure` reports zero gaps after the
+material sweep: slabs, composter analog reads, targets, leaves, shulker
+boxes, signs/heads/rods classified). All five have captured goldens
+(placement settle + lever click), and **all five diverge** — the tests are
+committed `#[ignore]`d as the standing target.
+
+What the diffs establish:
+
+- The divergence starts **inside the placement settle**: vanilla's
+  `DefaultRedstoneWireEvaluator` relaxes wire-by-wire, recursively, and its
+  ordered transients are *latched* by the doors' torches, repeaters and
+  comparators. The engine's ideal fixed-point wire (the documented deviation
+  in `src/wire.rs`) produces the same final dust levels but different
+  component timings — invisible to every small golden, decisive here.
+- Reproducing it means reproducing vanilla's **update dispatch order**
+  (`updateNeighborsAt`'s west/east/down/up/north/south, re-entrant through
+  `setBlock`) and the placement pass's exact semantics — read
+  `StructureTemplate.placeInWorld` and the wire evaluator's bytecode before
+  writing anything.
+- A second discovery: under `--known-shape` the 4x4 sliding door still
+  self-fires a push at tick 0 (`door_4x4_sliding_q.json` in the capture
+  workspace) — community litematics are saved in states that are not at
+  rest, so quiet placement does not sidestep the problem.
+
 ## 7. Milestone C — closing the redstone surface — DONE (awaiting a real door)
 
 The gap between "the engine runs slimestone machines and item logistics" and

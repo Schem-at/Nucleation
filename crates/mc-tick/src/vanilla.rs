@@ -168,6 +168,9 @@ pub struct VanillaRules {
     water_levels: HashMap<u8, StateId>,
     /// Bubble columns: `Some(drag_down)`.
     bubbles: HashMap<StateId, bool>,
+    /// States whose comparator read comes from the block state itself —
+    /// a composter's `level` (0-8).
+    state_analog: HashMap<StateId, u8>,
 }
 
 impl VanillaRules {
@@ -279,6 +282,10 @@ impl PowerSource for VanillaRules {
         inventories: &crate::inventory::InventoryMap,
         pos: Pos,
     ) -> Option<u8> {
+        // State-derived reads first: a composter's level is its signal.
+        if let Some(level) = self.state_analog.get(&world.get(pos)) {
+            return Some(*level);
+        }
         let slots = *self.containers.get(&world.get(pos))?;
         // A container with no recorded contents is an empty container — its
         // analog output is a real 0, not an absence.
@@ -380,6 +387,8 @@ const IMMOVABLE: &[&str] = &[
     "minecraft:barrier",
     "minecraft:moving_piston",
     "minecraft:piston_head",
+    "minecraft:jukebox",
+    "minecraft:white_shulker_box",
 ];
 
 /// Blocks with no behaviour at all, but which are legitimate build material.
@@ -416,6 +425,29 @@ const INERT: &[&str] = &[
     "minecraft:packed_ice",
     "minecraft:blue_ice",
     "minecraft:cobweb",
+    // Door-build material, asserted inert (the census of the first five
+    // community doors).
+    "minecraft:chiseled_quartz_block",
+    "minecraft:quartz_block",
+    "minecraft:white_concrete",
+    "minecraft:cyan_concrete",
+    "minecraft:lime_concrete",
+    "minecraft:cyan_wool",
+    "minecraft:lime_wool",
+    "minecraft:orange_wool",
+    "minecraft:pink_wool",
+    "minecraft:red_wool",
+    "minecraft:oak_wood",
+    "minecraft:oak_leaves",
+    "minecraft:smooth_stone_slab",
+    "minecraft:composter",
+    "minecraft:target",
+    "minecraft:jukebox",
+    "minecraft:white_shulker_box",
+    "minecraft:birch_wall_sign",
+    "minecraft:player_wall_head",
+    "minecraft:lightning_rod",
+    "minecraft:tripwire_hook",
 ];
 
 /// Register vanilla behaviour for every state currently in `registry`.
@@ -469,6 +501,10 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
                 // A bubble column's fluid state is a full water source.
                 rules.waters.insert(*id, crate::fluid::WaterKind::Source);
                 rules.bubbles.insert(*id, descriptor.get("drag") == Some("true"));
+            }
+            "minecraft:composter" => {
+                let level = descriptor.get("level").and_then(|l| l.parse().ok()).unwrap_or(0);
+                rules.state_analog.insert(*id, level);
             }
             _ => {
                 if descriptor.get("waterlogged") == Some("true") {
@@ -844,6 +880,7 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
 pub fn container_slots(name: &str) -> Option<u32> {
     match name {
         "minecraft:barrel" | "minecraft:chest" | "minecraft:trapped_chest" => Some(27),
+        n if n.ends_with("_shulker_box") => Some(27),
         "minecraft:hopper" => Some(5),
         "minecraft:dropper" | "minecraft:dispenser" => Some(9),
         _ => None,
@@ -871,6 +908,8 @@ fn is_conductor(descriptor: &Descriptor) -> bool {
             | "minecraft:observer"
             | "minecraft:slime_block"
             | "minecraft:honey_block"
+            | "minecraft:oak_leaves"
+            | "minecraft:target"
     ) || matches!(descriptor.name.as_str(), "minecraft:slime_block")
 }
 
@@ -891,6 +930,13 @@ fn is_full_cube(descriptor: &Descriptor) -> bool {
         | "minecraft:powered_rail"
         | "minecraft:detector_rail"
         | "minecraft:activator_rail" => false,
+        "minecraft:birch_wall_sign"
+        | "minecraft:player_wall_head"
+        | "minecraft:lightning_rod"
+        | "minecraft:tripwire_hook"
+        | "minecraft:composter" => false,
+        // A slab is a full cube only when doubled.
+        n if n.ends_with("_slab") => descriptor.get("type") == Some("double"),
         "minecraft:redstone_wire"
         | "minecraft:redstone_torch"
         | "minecraft:redstone_wall_torch"
