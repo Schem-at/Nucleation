@@ -1266,3 +1266,17 @@ fn a_slime_extender_drags_its_riders_and_the_floor() {
         &[(5, Actuate::Use(Pos::new(1, 2, 1)))],
     );
 }
+
+#[test]
+fn two_pistons_extend_into_a_gap_each() {
+    // Symmetric double extension: two pistons face each other across two
+    // free blocks, each with its own observer, so both extend and neither
+    // races. Built as a discriminator for placement-walk order and failed at
+    // that (it needs a *single* shared gap to force a race) — kept because it
+    // pins symmetric extension cheaply, and it passes.
+    run_conformance(
+        "observer_order.snbt",
+        "observer_order.json",
+        "nucleation:observer_order",
+    );
+}

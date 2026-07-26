@@ -402,8 +402,30 @@ vanilla exactly; the whole remaining failure is **one piston race**:
   order is `(y, x, z)`); vanilla evidently fires the y=10 one first.
   Neither schedules in the setBlock pass — (4,10,1) faces up into nothing
   and (3,2,1) watches a block placed before it — so both should land in
-  the update pass in y order. Something about observer scheduling is
-  still unmodelled, and that is the next thing to find.
+  the update pass in y order.
+
+  **What the isolated fixture establishes** (`piston_race`, 20 blocks):
+
+  - Both observers *are* triggered, in both engines, with **identical
+    timing** — powered on tick 1, off tick 3. Both notify their piston
+    and both pistons queue an extend. So nothing is missing or mistimed;
+    the entire divergence is which queued event dispatches first.
+  - Reversing this engine's placement walk to descending y makes the
+    fixture match vanilla **exactly**, and leaves all 199 tests green.
+    It is *not* committed, because the source says otherwise and a
+    coincidence that passes one fixture is worse than a known gap:
+    `buildInfoList`'s comparator is
+    `comparingInt(getY).thenComparingInt(getX).thenComparingInt(getZ)`
+    with no `reversed()` and no negation in the lambdas (checked), the
+    setBlock loop appends each placed block to an accumulator, and the
+    update pass iterates that accumulator forward. Ascending, twice over.
+  - A caveat worth chasing: in the fixture's *file*, the high observer
+    happens to be written before the low one, so "descending y" and
+    "file order" are indistinguishable here. A fixture where the two
+    disagree would separate them. The first attempt at one
+    (`observer_order`) failed to discriminate — it left two gaps, so both
+    pistons extended and there was no race — but it passes and is kept as
+    a cheap regression for symmetric double extension.
 
   Historical note, now fixed: at the tick
   the manual engine's piston at (13,1,2) lands, vanilla's resolver
