@@ -579,13 +579,36 @@ impl<P: PowerSource> BlockBehaviour for Comparator<P> {
         ctx.schedule(pos, COMPARATOR_DELAY, priority);
     }
 
+    /// `ComparatorBlock.refreshOutputState`.
+    ///
+    /// The subtle part is what counts as "something happened": vanilla acts
+    /// when the **stored strength** changes (or the mode is `compare`), not
+    /// only when the `powered` flag flips — and it acts by writing the state
+    /// silently (flag 2) and then calling `updateNeighborsInFront` itself.
+    ///
+    /// A comparator placed `powered=true` with a fresh block entity holding 0
+    /// hits exactly that case: it recomputes to its real strength, the flag
+    /// never moves, and only the explicit front update tells the dust. Without
+    /// it a whole branch of the 4x4 vault door stayed dark, its pistons never
+    /// fired, and the opposed pistons on the door's other side won a race they
+    /// lose in the real game.
     fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
         let output = self.output_strength(ctx.world, ctx.comparator_out, ctx.inventories, pos);
+        let stored = ctx.stored_comparator_output(pos);
         ctx.store_comparator_output(pos, output);
+        if stored == output && self.mode != ComparatorMode::Compare {
+            return;
+        }
         let should_be_on = output > 0;
         if should_be_on != self.powered {
-            ctx.set(pos, self.states.get(should_be_on));
+            // setBlock flag 2: the shape pass still runs, neighbours do not.
+            ctx.set_shape_only(pos, self.states.get(should_be_on));
         }
+        // updateNeighborsInFront: the block this comparator outputs into, then
+        // that block's neighbours except back toward us.
+        let target = pos.offset(self.input_side().opposite());
+        ctx.notify(target, self.input_side());
+        ctx.update_neighbors_except(target, self.input_side());
     }
 
     fn redstone_power(&self, world: &World, pos: Pos, dir: Dir) -> u8 {

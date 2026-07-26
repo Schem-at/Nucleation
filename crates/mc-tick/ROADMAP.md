@@ -326,6 +326,35 @@ time: `--dump-placed` (diff a whole placed world) and
 `getSignal`/`getDirectSignalTo`/`isRedstoneConductor` at a position, at
 any tick).
 
+### The vault door, traced to one contested column
+
+Focused session on `door_4x4_vault`. Ticks 0, 2, 5 and 7 now match
+vanilla exactly; the whole remaining failure is **one piston race**:
+
+- The column at x=4 (and its mirror at x=9) has an **up** piston at the
+  bottom, five concrete blocks, an air gap, and a **down** piston at the
+  top. Both become powered on tick 1 by their own observers, both want
+  the gap, and whichever's block event dispatches first moves the column
+  and blocks the other. Vanilla's *down* piston wins; this engine's *up*
+  piston does, which displaces the door frame by one block and is why
+  the lever cascade at tick 10 — the slime extenders — never fires.
+- Fixed on the way: **a comparator must notify when its stored strength
+  changes even if `powered` does not** (`refreshOutputState` acts on
+  `j != i`, writes flag 2, then calls `updateNeighborsInFront`). A
+  comparator placed `powered=true` over a fresh block entity holding 0
+  hits exactly that, and a whole branch of the door stayed dark. Also
+  modelled: `placeInWorld`'s **setBlock loop**, whose shape updates let
+  an observer schedule when a *later* block is placed — that reordered
+  the tick-1 queue correctly for the x=9 side.
+- Still open, and the prime suspect for the race: **refused block events
+  are rescheduled** (`blockEventsToReschedule`, re-added after the drain
+  so they lead the next tick), and `doBlockEvent` drops an event whose
+  position no longer holds the block it was queued for. Implementing the
+  re-add alone regressed things badly (the 6x6 ran away to 151 ticks, a
+  manual-engine golden grew a retraction), so the identity guard has to
+  land with it — our `BlockEvent` carries only `(pos, id, param)` and
+  needs the block. That is the next piece of work.
+
 **What remains** is tick-time cascade order: the doors now diverge deep
 into their opening sequences, and the vault's case is traced to two
 opposed pistons racing — vanilla's scheduled-tick order picks one, the

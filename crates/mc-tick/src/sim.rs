@@ -845,13 +845,51 @@ impl Simulation {
     /// `updateNeighborsAt` passes, which is also how an observer facing a
     /// placed block pulses.
     pub fn settle_with_order(&mut self, order: &[Pos]) {
+        // `placeInWorld` runs **two** loops over that list, and both are
+        // observable.
+        //
+        // Pass 1 — the `setBlock` loop. The write itself carries no neighbour
+        // updates (so no piston fires yet), but `markAndNotifyBlock` still
+        // propagates *shape* updates, and that is when an observer whose
+        // watched block is placed after it schedules its pulse. Only blocks
+        // already down can hear, so the notification is limited to neighbours
+        // earlier in the order.
+        //
+        // Missing this pass inverted the scheduled-tick order for every
+        // observer that watches a later block, which decided piston races:
+        // in the 4x4 vault door two opposed pistons share a column, and
+        // whichever is notified first moves it and blocks the other.
+        let index: std::collections::HashMap<Pos, usize> =
+            order.iter().enumerate().map(|(i, pos)| (*pos, i)).collect();
+        for (i, pos) in order.iter().enumerate() {
+            let items: Vec<(Pos, crate::pos::Dir, crate::behaviour::UpdateKind)> =
+                crate::pos::UPDATE_SHAPE_ORDER
+                    .iter()
+                    .filter(|dir| {
+                        index
+                            .get(&pos.offset(**dir))
+                            .is_some_and(|placed| *placed < i)
+                    })
+                    .map(|dir| {
+                        (
+                            pos.offset(*dir),
+                            dir.opposite(),
+                            crate::behaviour::UpdateKind::Shape,
+                        )
+                    })
+                    .collect();
+            if !items.is_empty() {
+                self.updates.push(crate::behaviour::UpdateEntry::new(items));
+                self.propagate();
+            }
+        }
+
+        // Pass 2 — the update pass: `updateFromNeighbourShapes` then a fully
+        // drained `updateNeighborsAt`, per block.
         for pos in order {
             if self.world.get(*pos) == StateId::AIR {
                 continue;
             }
-            // updateFromNeighbourShapes: the block hears a shape update from
-            // every side (this is what pulses observers), then its neighbours
-            // get updateNeighborsAt.
             self.updates
                 .push(crate::behaviour::UpdateEntry::own_shapes(*pos));
             self.propagate();
@@ -934,6 +972,16 @@ impl Simulation {
                 // this drain. Draining into a Vec is what keeps that boundary
                 // sharp.
                 let due = self.ticks.drain_due(self.tick);
+                if std::env::var("MC_TICK_TRACE_SCHEDULE").is_ok() {
+                    let names: Vec<String> = due
+                        .iter()
+                        .map(|e| {
+                            let d = self.registry.descriptor(self.world.get(e.pos)).unwrap_or("?");
+                            format!("{:?}{}", (e.pos.x, e.pos.y, e.pos.z), &d[10..d.len().min(28)])
+                        })
+                        .collect();
+                    eprintln!("[t{}] block ticks: {}", self.tick, names.join(" | "));
+                }
                 for entry in due {
                     let state = self.world.get(entry.pos);
                     let Some(behaviour) = self.behaviours.get(state) else {
@@ -1229,6 +1277,21 @@ impl Simulation {
 
     /// The block-events phase: drain, handle, repeat until empty.
     fn run_block_events(&mut self) -> Option<StopReason> {
+        // NOTE — a known, deliberate gap. `ServerLevel.runBlockEvents` keeps
+        // the events its handlers refuse (`blockEventsToReschedule`) and
+        // re-adds them once the queue drains, so they lead the next tick's
+        // batch; `doBlockEvent` also drops an event whose position no longer
+        // holds the block it was queued for. This engine drops refused events
+        // instead. Implementing the re-add alone makes things *worse* — the
+        // 6x6 door ran away to 151 ticks and a manual-engine golden grew a
+        // retraction — so the missing guard has to land with it. The block
+        // identity check is the prime suspect: our BlockEvent carries only
+        // (pos, id, param).
+        let mut refused: Vec<BlockEvent> = Vec::new();
+        self.drain_block_events(&mut refused)
+    }
+
+    fn drain_block_events(&mut self, refused: &mut Vec<BlockEvent>) -> Option<StopReason> {
         for _ in 0..MAX_EVENT_CHAIN {
             let batch = self.events.take();
             if batch.is_empty() {
@@ -1261,7 +1324,10 @@ impl Simulation {
                 inv_log: self.inv_log.as_mut(),
                         log: self.log.as_mut(),
                 };
-                behaviour.on_block_event(&mut ctx, event.pos, event.id, event.param);
+                let handled = behaviour.on_block_event(&mut ctx, event.pos, event.id, event.param);
+                if !handled {
+                    refused.push(event);
+                }
                 self.propagate();
             }
         }
