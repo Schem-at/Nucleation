@@ -1124,9 +1124,15 @@ fn flipping_a_lever_lights_a_lamp_through_its_support_block() {
 }
 
 fn run_door(structure_file: &str, golden_file: &str, label: &str, lever: Option<(Pos, u64)>) {
-    let actions: Vec<(u64, Actuate)> = lever
-        .into_iter()
-        .map(|(pos, tick)| (tick, Actuate::Use(pos)))
+    run_door_cycle(structure_file, golden_file, label, &lever.into_iter().collect::<Vec<_>>());
+}
+
+/// A door driven by any number of lever clicks — a full close/open cycle is
+/// two of them.
+fn run_door_cycle(structure_file: &str, golden_file: &str, label: &str, levers: &[(Pos, u64)]) {
+    let actions: Vec<(u64, Actuate)> = levers
+        .iter()
+        .map(|(pos, tick)| (*tick, Actuate::Use(*pos)))
         .collect();
     run_conformance_full(
         structure_file,
@@ -1212,5 +1218,20 @@ fn the_3x3_flush_synced_settles_like_vanilla() {
         "door_3x3_flush.json",
         "nucleation:door_3x3_flush",
         None,
+    );
+}
+
+#[test]
+#[ignore = "the standing target: a full close/open cycle, two lever clicks 70 \
+ticks apart. Placement and the early cascade match; the divergence is tick-time \
+scheduling order. See ROADMAP 'The door fixtures'."]
+fn the_6x6_door_runs_a_full_close_open_cycle() {
+    // The cycle golden: vanilla opens on the tick-10 click (through tick 25)
+    // and closes on the tick-80 one (through tick 95), 2035 events in all.
+    run_door_cycle(
+        "door_6x6_sliding.snbt",
+        "door_6x6_cycle.json",
+        "nucleation:door_6x6_cycle",
+        &[(Pos::new(9, 3, 0), 10), (Pos::new(9, 3, 0), 80)],
     );
 }

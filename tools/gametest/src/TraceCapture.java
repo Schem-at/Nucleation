@@ -272,7 +272,13 @@ public final class TraceCapture {
         // TryEmptyHandInteraction — so the capture exercises the same code path a
         // real click does.
         String useAt = arg(args, "--use", null);
-        int useTick = Integer.parseInt(arg(args, "--use-tick", "0"));
+        // --use-tick accepts a comma list, so one capture can run a full
+        // close/open cycle rather than a single toggle.
+        java.util.List<Integer> useTicks = new java.util.ArrayList<>();
+        for (String piece : arg(args, "--use-tick", "0").split(",")) {
+            useTicks.add(Integer.parseInt(piece.trim()));
+        }
+        int useTick = useTicks.get(0);
         BlockPos usePos = null;
         if (useAt != null) {
             String[] up = useAt.split(",");
@@ -306,7 +312,7 @@ public final class TraceCapture {
         }
 
         for (int tick = 0; tick < maxTicks; tick++) {
-            if (useTarget != null && tick == useTick) {
+            if (useTarget != null && useTicks.contains(tick)) {
                 useBlock(level, useTarget);
             }
             if (pulseTarget != null) {

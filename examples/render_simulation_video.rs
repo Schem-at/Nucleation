@@ -58,6 +58,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Run vanilla's placement pass first — a community build saved mid-cycle
     // needs it before it means anything.
     let settle = args.iter().any(|a| a == "--settle");
+    // Framing. A door is wide and tall but thin, so the rotation-invariant
+    // sphere fit wastes most of the frame on empty air; --tight uses the
+    // silhouette fit instead.
+    let yaw: f32 = flag(&args, "--yaw").map_or(45.0, |v| v.parse().expect("--yaw deg"));
+    let pitch: f32 = flag(&args, "--pitch").map_or(35.264, |v| v.parse().expect("--pitch deg"));
+    let zoom: f32 = flag(&args, "--zoom").map_or(1.0, |v| v.parse().expect("--zoom f"));
+    let tight = args.iter().any(|a| a == "--tight");
     // Every --click occurrence is an actuation; a moving machine's note block
     // moves with it, so successive clicks target successive positions.
     let clicks: Vec<(Pos, u64)> = args
@@ -98,9 +105,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .collect();
 
+    // --place x,y,z@T: put a redstone block down and leave it there.
+    let places: Vec<(Pos, u64)> = args
+        .iter()
+        .enumerate()
+        .filter(|(_, a)| *a == "--place")
+        .filter_map(|(i, _)| args.get(i + 1))
+        .map(|v| {
+            let (xyz, t) = v.split_once('@').expect("--place x,y,z@T");
+            let p: Vec<i32> = xyz.split(',').map(|c| c.parse().expect("coord")).collect();
+            (Pos::new(p[0], p[1], p[2]), t.parse().expect("tick"))
+        })
+        .collect();
+
     // ── 1. Simulate, recording every block change ───────────────────────────
     let (initial, changes, item_tracks) =
-        simulate(snbt_path, ticks, &clicks, &pulses, &breaks, settle);
+        simulate(snbt_path, ticks, &clicks, &pulses, &breaks, &places, settle);
     println!("simulated {ticks} ticks, {} block changes", changes.len());
 
     println!(
@@ -271,7 +291,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut config = RenderConfig::isometric();
     config.width = 1280;
     config.height = 720;
-    config.sphere_fit = true; // bounds cover the whole run, so the camera never drifts
+    config.yaw = yaw;
+    config.pitch = pitch;
+    config.zoom = zoom;
+    // Bounds cover the whole run either way, so the camera never drifts.
+    config.sphere_fit = !tight;
     if transparent {
         config.background = Some([0.0, 0.0, 0.0, 0.0]);
     }
@@ -317,6 +341,7 @@ fn simulate(
     clicks: &[(Pos, u64)],
     pulses: &[(Pos, u64)],
     breaks: &[(Pos, u64)],
+    places: &[(Pos, u64)],
     settle: bool,
 ) -> (
     Vec<(Pos, String)>,
@@ -424,6 +449,11 @@ fn simulate(
         for (pos, at) in breaks {
             if *at == t {
                 sim.place_block(*pos, mc_tick::StateId::AIR);
+            }
+        }
+        for (pos, at) in places {
+            if *at == t {
+                sim.place_block(*pos, redstone_block);
             }
         }
         sim.step();
