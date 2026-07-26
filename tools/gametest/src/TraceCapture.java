@@ -204,6 +204,12 @@ public final class TraceCapture {
         List<String> ticks = new ArrayList<>();
         Map<BlockPos, String> previous = snapshot(level, min, max);
         Map<BlockPos, String[]> previousInv = snapshotContainers(level, min, max);
+        // --entities: also diff item entities per tick. Opt-in because RNG-fed
+        // spawns (dispensers) make trajectories sample-specific; deterministic
+        // captures author their items in the structure's entity list.
+        boolean captureEntities = hasFlag(args, "--entities");
+        Map<Integer, double[]> previousEnt =
+                captureEntities ? snapshotItems(level, min, max) : new HashMap<>();
 
         // --pulse places a power source at a position, holds it for --pulse-ticks,
         // then removes it. Short pulses are how several piston behaviours are
@@ -314,6 +320,39 @@ public final class TraceCapture {
                     }
                 }
             }
+            if (captureEntities) {
+                Map<Integer, double[]> currentEnt = snapshotItems(level, min, max);
+                for (Map.Entry<Integer, double[]> entry : currentEnt.entrySet()) {
+                    double[] was = previousEnt.get(entry.getKey());
+                    double[] now = entry.getValue();
+                    boolean moved = was == null;
+                    if (!moved) {
+                        for (int i = 0; i < 3; i++) {
+                            if (Math.abs(was[i] - now[i]) > 1.0e-9) {
+                                moved = true;
+                            }
+                        }
+                    }
+                    if (moved) {
+                        events.add(String.format(
+                                "        {\"phase\": \"%s\", \"kind\": \"entity_moved\", "
+                                        + "\"id\": %d, \"entity_type\": \"minecraft:item\", "
+                                        + "\"pos\": [%s, %s, %s], \"velocity\": [%s, %s, %s]}",
+                                PHASE_TICK_END, entry.getKey(),
+                                Double.toString(now[0]), Double.toString(now[1]),
+                                Double.toString(now[2]), Double.toString(now[3]),
+                                Double.toString(now[4]), Double.toString(now[5])));
+                    }
+                }
+                for (Integer id : previousEnt.keySet()) {
+                    if (!currentEnt.containsKey(id)) {
+                        events.add(String.format(
+                                "        {\"phase\": \"%s\", \"kind\": \"entity_removed\", \"id\": %d}",
+                                PHASE_TICK_END, id));
+                    }
+                }
+                previousEnt = currentEnt;
+            }
             previous = current;
             previousInv = currentInv;
 
@@ -384,6 +423,29 @@ public final class TraceCapture {
         }
         // GameTestHelper would fall through to ItemStack.useOn here; the hand is
         // empty by construction, so there is nothing to use.
+    }
+
+    /**
+     * Every item entity in the box: id -> [x, y, z, vx, vy, vz].
+     *
+     * <p>Positions relative to ORIGIN, so they compare against the engine's
+     * structure-relative coordinates directly.
+     */
+    private static Map<Integer, double[]> snapshotItems(
+            ServerLevel level, BlockPos min, BlockPos max) {
+        Map<Integer, double[]> items = new java.util.TreeMap<>();
+        net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(
+                min.getX(), min.getY(), min.getZ(),
+                max.getX() + 1, max.getY() + 1, max.getZ() + 1);
+        for (net.minecraft.world.entity.item.ItemEntity item : level.getEntitiesOfClass(
+                net.minecraft.world.entity.item.ItemEntity.class, box)) {
+            net.minecraft.world.phys.Vec3 velocity = item.getDeltaMovement();
+            items.put(item.getId(), new double[] {
+                    item.getX() - ORIGIN.getX(), item.getY() - ORIGIN.getY(),
+                    item.getZ() - ORIGIN.getZ(),
+                    velocity.x, velocity.y, velocity.z});
+        }
+        return items;
     }
 
     /**

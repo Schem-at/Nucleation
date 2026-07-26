@@ -137,6 +137,12 @@ pub enum EventKind {
         to: String,
     },
 
+    /// An entity left the world — despawned, or absorbed by a hopper or merge.
+    EntityRemoved {
+        /// Stable id within the trace.
+        id: u32,
+    },
+
     /// An entity moved.
     ///
     /// The only event compared with tolerance rather than exactly. See the module
@@ -284,7 +290,9 @@ impl Trace {
                     | EventKind::BlockEvent { pos, .. }
                     | EventKind::NeighborUpdate { pos, .. }
                     | EventKind::InventoryChanged { pos, .. } => *pos,
-                    EventKind::EntityMoved { .. } => TracePos::new(0, 0, 0),
+                    EventKind::EntityMoved { .. } | EventKind::EntityRemoved { .. } => {
+                        TracePos::new(0, 0, 0)
+                    }
                 };
                 (pos.1, pos.2, pos.0, format!("{:?}", event.kind))
             });

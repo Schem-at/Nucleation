@@ -1,0 +1,14 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:item_merge",
+  "detail": "normal",
+  "ticks": [
+    {
+      "tick": 39,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_removed", "id": 1}
+      ]
+    }
+  ]
+}

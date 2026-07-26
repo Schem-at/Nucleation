@@ -129,11 +129,49 @@ fn engine_trace(sim: &Simulation, name: &str, ticks: u64) -> Trace {
                 },
             });
         }
+        // Entity movements and removals, exactly as the simulation emitted them
+        // (already position-diffed per tick, mirroring the capture).
+        for (event_tick, event) in sim.recorded_entities() {
+            if *event_tick != tick {
+                continue;
+            }
+            let kind = match event {
+                mc_tick::sim::EntityEvent::Moved { id, entity_type, pos, velocity } => {
+                    EventKind::EntityMoved {
+                        id: *id,
+                        entity_type: entity_type.clone(),
+                        pos: *pos,
+                        velocity: *velocity,
+                    }
+                }
+                mc_tick::sim::EntityEvent::Removed { id } => EventKind::EntityRemoved { id: *id },
+            };
+            events.push(mc_tick_trace::TraceEvent { phase: "tick_end".to_string(), kind });
+        }
         if !events.is_empty() {
             trace.ticks.push(mc_tick_trace::TickRecord { tick, events });
         }
     }
     trace
+}
+
+/// Renumber entity ids by first appearance, so the capture's server-global ids
+/// compare against the engine's zero-based ones. Spawn order is deterministic
+/// on both sides, which is what makes the mapping meaningful.
+fn normalize_entity_ids(trace: &mut Trace) {
+    let mut mapping: HashMap<u32, u32> = HashMap::new();
+    for record in &mut trace.ticks {
+        for event in &mut record.events {
+            match &mut event.kind {
+                EventKind::EntityMoved { id, .. } | EventKind::EntityRemoved { id } => {
+                    let next = mapping.len() as u32;
+                    let mapped = *mapping.entry(*id).or_insert(next);
+                    *id = mapped;
+                }
+                _ => {}
+            }
+        }
+    }
 }
 
 /// How the structure enters the world.
@@ -196,12 +234,37 @@ fn run_conformance_bounded(
     ticking: Option<mc_tick::Bounds>,
     settle: Settle,
 ) {
+    run_conformance_full(
+        structure_file,
+        golden_file,
+        label,
+        extra_states,
+        actions,
+        ticking,
+        settle,
+        1.0e-6,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_conformance_full(
+    structure_file: &str,
+    golden_file: &str,
+    label: &str,
+    extra_states: &[&str],
+    actions: &[(u64, Actuate)],
+    ticking: Option<mc_tick::Bounds>,
+    settle: Settle,
+    tolerance: f64,
+) {
     let structure = structure(structure_file);
     // The goldens are snapshot-derived, so intra-tick order is the capture's scan
     // order rather than the game's causal order. Canonicalising both sides compares
     // *what* changed each tick, which is what such a capture actually knows.
     // An instrumented capture would know the real order and must not be canonicalised.
-    let expected = golden(golden_file).canonicalized();
+    let mut expected = golden(golden_file);
+    normalize_entity_ids(&mut expected);
+    let expected = expected.canonicalized();
 
     let mut sim = Simulation::new(structure.bounds(MARGIN));
     {
@@ -252,6 +315,21 @@ fn run_conformance_bounded(
          a partially-simulated world"
     );
 
+    // Item physics needs to know which states are solid and how slippery.
+    {
+        let (solidity, frictions) = mc_tick::vanilla::physics_tables(sim.registry());
+        sim.set_physics_tables(solidity, frictions);
+    }
+    // Authored item entities spawn in list order, matching placement.
+    for spawned in &structure.item_entities {
+        sim.spawn_item(
+            spawned.item.clone(),
+            spawned.pos,
+            spawned.motion,
+            spawned.pickup_delay,
+        );
+    }
+
     // Ticking block entities register in structure order — vanilla's
     // tickBlockEntities insertion order for a placed structure, which is what
     // decides which of two hoppers moves first.
@@ -298,8 +376,35 @@ fn run_conformance_bounded(
         sim.step();
     }
 
-    let actual = engine_trace(&sim, label, horizon).canonicalized();
-    if let Some(divergence) = expected.diff(&actual) {
+    let mut actual = engine_trace(&sim, label, horizon);
+    // Entity capture is opt-in on the Java side (--entities); a golden without
+    // entity events compares against an engine trace without them. RNG-fed
+    // spawns are exactly the case: the trajectory is sample-specific, and the
+    // conformance claim is the container-visible effects.
+    let golden_has_entities = expected.ticks.iter().any(|t| {
+        t.events.iter().any(|e| {
+            matches!(
+                e.kind,
+                EventKind::EntityMoved { .. } | EventKind::EntityRemoved { .. }
+            )
+        })
+    });
+    if !golden_has_entities {
+        for record in &mut actual.ticks {
+            record.events.retain(|e| {
+                !matches!(
+                    e.kind,
+                    EventKind::EntityMoved { .. } | EventKind::EntityRemoved { .. }
+                )
+            });
+        }
+        actual.ticks.retain(|t| !t.events.is_empty());
+    }
+    normalize_entity_ids(&mut actual);
+    let actual = actual.canonicalized();
+    // Entity positions are floats; everything else still compares exactly. The
+    // engine mirrors vanilla's arithmetic types, so the bar is tight.
+    if let Some(divergence) = expected.diff_with_tolerance(&actual, tolerance) {
         panic!(
             "{label} diverges from vanilla at {divergence}\n\nexpected (vanilla):\n{}\n\nactual (engine):\n{}",
             expected.to_json().unwrap(),
@@ -511,6 +616,61 @@ fn a_comparator_follows_a_container_a_hopper_is_draining() {
         "comparator_drain.json",
         "nucleation:comparator_drain",
     );
+}
+
+#[test]
+fn an_ejected_item_flies_the_mean_trajectory_within_jitter_bounds() {
+    // The RNG policy's conformance shape: vanilla jitters every velocity
+    // component (`triangle(mean, 0.103)` plus a random 0.2..0.3 speed); the
+    // engine spawns at the distribution means. The capture is one sample, so
+    // entity positions compare with a tolerance sized to the jitter bounds over
+    // this short flight — while the inventory decrement and TRIGGERED flips
+    // stay exact.
+    run_conformance_full(
+        "dropper_eject.snbt",
+        "dropper_eject.json",
+        "nucleation:dropper_eject",
+        &["minecraft:redstone_block"],
+        &[
+            (0, Actuate::Place(Pos::new(0, 2, 0), "minecraft:redstone_block")),
+            (2, Actuate::Place(Pos::new(0, 2, 0), "minecraft:air")),
+        ],
+        None,
+        Settle::Placement,
+        0.5,
+    );
+}
+
+#[test]
+fn a_falling_item_follows_vanilla_gravity_and_drag_exactly() {
+    // The strictest physics test the harness can express: an item authored in
+    // the structure (no dispenser RNG anywhere) falls three blocks and lands.
+    // The engine mirrors vanilla's arithmetic types — f32 drag widened to f64 —
+    // so every position matches to the diff's 1e-6 tolerance and the item goes
+    // silent once it rests.
+    run_conformance("item_fall.snbt", "item_fall.json", "nucleation:item_fall");
+}
+
+#[test]
+fn a_hopper_vacuums_a_falling_item() {
+    // The item falls into the suck column (a full block from y+11/16 to y+2
+    // above the hopper) and the whole two-item stack is absorbed at once:
+    // inventory event and entity removal on the same tick.
+    run_conformance(
+        "item_into_hopper.snbt",
+        "item_into_hopper.json",
+        "nucleation:item_into_hopper",
+    );
+}
+
+#[test]
+fn resting_items_merge_on_the_slow_interval() {
+    // Two stacks 0.3 apart merge on the 40-tick interval (tickCount 40 at
+    // tick 39); the larger stack survives. Resting items emit nothing — their
+    // gravity-accumulating velocity is flushed by collisions without the
+    // position ever changing — so the only event in the whole trace is the
+    // removal of the absorbed entity.
+    run_conformance("item_merge.snbt", "item_merge.json", "nucleation:item_merge");
 }
 
 #[test]

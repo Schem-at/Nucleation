@@ -285,3 +285,35 @@ bytecode, pinned by the captures named:
 - A capture-method gotcha that cost one recapture: a support-less comparator is
   destroyed by the placement update pass *before the first snapshot*, so it
   silently never exists. Structures must stand on their own.
+
+## Milestone B session — item entities
+
+From `ItemEntity`, `DefaultDispenseItemBehavior` and the `Hopper` interface
+bytecode, pinned by RNG-free captures (items authored in structure `entities`
+lists — the method discovery that made exact physics conformance possible):
+
+- **The item tick** — gravity 0.04 *before* the move; `move` clips Y then the
+  larger horizontal axis against full cubes, zeroing clipped velocity
+  components and deriving onGround from a downward clip; drag ×0.98f
+  (widened f32 → f64, visible in the captured digits), horizontal also
+  × block friction (0.6, slime 0.8) when grounded; landing bounce
+  `v.y *= -0.5`; the `(tickCount + id) % 4` rest skip. `item_fall.json`
+  conforms at 1e-6.
+- **Emission is by position** — a resting item's velocity keeps accumulating
+  gravity and being flushed by collisions; position never changes, so both
+  capture and engine stay silent. The `% 4` id dependence is invisible for
+  the same reason.
+- **Hopper vacuum** — suck column `Block.column(16, 11, 32)`: the full block
+  from y+11/16 to y+2. Whole stacks absorb at once; success (and the 8gt
+  cooldown) only on full consumption; a full cube above blocks suction.
+- **Merging** — ±0.5 horizontal inflate, interval 2 while crossing block
+  borders / 40 at rest, larger stack survives, over-full merges refuse
+  (`item_merge.json`, absorbed at tick 39 = tickCount 40).
+- **Dispense spawn** — 0.7 out of the face, y − 0.15625 (horizontal facings)
+  or − 0.125 (vertical); velocity `triangle(step × (0.2 + 0.1·U), 0.103)` per
+  horizontal axis and a constant `triangle(0.2, 0.103)` upward — yes, even
+  facing down. The engine uses the means, deterministically; RNG-spawn
+  trajectories conform under jitter-bounds tolerance (`dropper_eject.json`)
+  while container effects stay exact.
+- Entity ids: the capture's server-global ids and the engine's zero-based ids
+  are both renumbered by first appearance before diffing.

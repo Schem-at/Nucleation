@@ -1,0 +1,39 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:item_into_hopper",
+  "detail": "normal",
+  "ticks": [
+    {
+      "tick": 0,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [0.5, 3.4599999999999937, 0.5], "velocity": [0.0, -0.03920000076293945, 0.0]}
+      ]
+    },
+    {
+      "tick": 1,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [0.5, 3.3807999992370554, 0.5], "velocity": [0.0, -0.0776160022583008, 0.0]}
+      ]
+    },
+    {
+      "tick": 2,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [0.5, 3.2631839969787535, 0.5], "velocity": [0.0, -0.115263684456482, 0.0]}
+      ]
+    },
+    {
+      "tick": 3,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:item", "pos": [0.5, 3.1079203125222676, 0.5], "velocity": [0.0, -0.15215841372877212, 0.0]}
+      ]
+    },
+    {
+      "tick": 4,
+      "events": [
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [0, 1, 0], "slot": 0, "from": "", "to": "2x minecraft:redstone"},
+        {"phase": "tick_end", "kind": "entity_removed", "id": 1}
+      ]
+    }
+  ]
+}

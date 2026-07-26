@@ -35,7 +35,7 @@ use crate::state::{StateId, StateRegistry};
 use crate::world::World;
 
 /// A parsed structure, ready to place into a world.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Structure {
     /// Extent along each axis.
     pub size: (i32, i32, i32),
@@ -49,6 +49,25 @@ pub struct Structure {
     /// caller turns these into engine inventories at load time — the parser
     /// does not know how many slots a barrel has.
     pub inventories: Vec<(Pos, Vec<crate::inventory::ItemStack>)>,
+    /// Item entities authored in the structure's `entities` list.
+    ///
+    /// The RNG-free way to put an item into the world: authored positions and
+    /// motion, no dispenser jitter. Only `minecraft:item` is understood; any
+    /// other entity type is a loud parse error rather than a silent hole.
+    pub item_entities: Vec<SpawnedItem>,
+}
+
+/// One authored item entity.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpawnedItem {
+    /// Feet-centre position, structure-relative.
+    pub pos: [f64; 3],
+    /// Initial velocity.
+    pub motion: [f64; 3],
+    /// `(item id, count)`.
+    pub item: (String, u8),
+    /// `PickupDelay`, default 0.
+    pub pickup_delay: u32,
 }
 
 /// Why a structure could not be read.
@@ -289,6 +308,117 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// A floating-point number, tolerating NBT's `d`/`f` suffixes.
+    fn float(&mut self) -> Result<f64, StructureError> {
+        self.skip_ws();
+        let start = self.at;
+        if self.peek() == Some(b'-') {
+            self.at += 1;
+        }
+        while self.at < self.text.len() {
+            let c = self.text[self.at] as char;
+            if c.is_ascii_digit() || c == '.' {
+                self.at += 1;
+            } else {
+                break;
+            }
+        }
+        if start == self.at {
+            return self.err("expected a number");
+        }
+        let digits = String::from_utf8_lossy(&self.text[start..self.at]).into_owned();
+        if self.at < self.text.len() && (self.text[self.at] as char).is_alphabetic() {
+            self.at += 1;
+        }
+        digits
+            .parse()
+            .map_or_else(|_| self.err("number out of range"), Ok)
+    }
+
+    /// `[a, b, c]` of floats.
+    fn float_list(&mut self) -> Result<Vec<f64>, StructureError> {
+        self.eat(b'[')?;
+        let mut out = Vec::new();
+        loop {
+            if self.peek() == Some(b']') {
+                self.at += 1;
+                return Ok(out);
+            }
+            out.push(self.float()?);
+            if self.peek() == Some(b',') {
+                self.at += 1;
+            }
+        }
+    }
+
+    /// One `entities` entry: an authored item entity.
+    fn entity_entry(&mut self) -> Result<SpawnedItem, StructureError> {
+        self.eat(b'{')?;
+        let mut pos: Option<[f64; 3]> = None;
+        let mut motion = [0.0f64; 3];
+        let mut item: Option<(String, u8)> = None;
+        let mut pickup_delay = 0u32;
+        let mut entity_id = String::new();
+        loop {
+            if self.peek() == Some(b'}') {
+                self.at += 1;
+                break;
+            }
+            let key = self.key()?;
+            self.eat(b':')?;
+            match key.as_str() {
+                "pos" => {
+                    let values = self.float_list()?;
+                    if values.len() != 3 {
+                        return self.err("entity pos must have three elements");
+                    }
+                    pos = Some([values[0], values[1], values[2]]);
+                }
+                "nbt" => {
+                    // The entity compound: id, Item, Motion, PickupDelay.
+                    self.eat(b'{')?;
+                    loop {
+                        if self.peek() == Some(b'}') {
+                            self.at += 1;
+                            break;
+                        }
+                        let field = self.key()?;
+                        self.eat(b':')?;
+                        match field.as_str() {
+                            "id" => entity_id = self.string()?,
+                            "Motion" => {
+                                let values = self.float_list()?;
+                                if values.len() == 3 {
+                                    motion = [values[0], values[1], values[2]];
+                                }
+                            }
+                            "PickupDelay" => pickup_delay = self.int()? as u32,
+                            "Item" => {
+                                let stack = self.item_entry()?;
+                                item = Some((stack.id, stack.count));
+                            }
+                            _ => self.skip_value()?,
+                        }
+                        if self.peek() == Some(b',') {
+                            self.at += 1;
+                        }
+                    }
+                }
+                _ => self.skip_value()?,
+            }
+            if self.peek() == Some(b',') {
+                self.at += 1;
+            }
+        }
+        if entity_id != "minecraft:item" {
+            return self.err(format!("unsupported entity type `{entity_id}`"));
+        }
+        match (pos, item) {
+            (Some(pos), Some(item)) => Ok(SpawnedItem { pos, motion, item, pickup_delay }),
+            _ => self.err("item entity needs `pos` and `Item`"),
+        }
+    }
+
     /// A block-entity `nbt` compound: extract the `Items` list, skip the rest.
     fn nbt_items(&mut self) -> Result<Vec<crate::inventory::ItemStack>, StructureError> {
         self.eat(b'{')?;
@@ -411,6 +541,7 @@ impl<'a> Parser<'a> {
         let mut palette = None;
         let mut blocks: Option<Vec<(Pos, usize)>> = None;
         let mut inventories: Vec<(Pos, Vec<crate::inventory::ItemStack>)> = Vec::new();
+        let mut item_entities: Vec<SpawnedItem> = Vec::new();
 
         loop {
             if self.peek() == Some(b'}') {
@@ -441,6 +572,19 @@ impl<'a> Parser<'a> {
                         }
                     }
                     palette = Some(entries);
+                }
+                "entities" => {
+                    self.eat(b'[')?;
+                    loop {
+                        if self.peek() == Some(b']') {
+                            self.at += 1;
+                            break;
+                        }
+                        item_entities.push(self.entity_entry()?);
+                        if self.peek() == Some(b',') {
+                            self.at += 1;
+                        }
+                    }
                 }
                 "blocks" => {
                     self.eat(b'[')?;
@@ -508,6 +652,7 @@ impl<'a> Parser<'a> {
             palette: palette.ok_or(StructureError::Missing("palette"))?,
             blocks: blocks.ok_or(StructureError::Missing("blocks"))?,
             inventories,
+            item_entities,
         })
     }
 }
@@ -555,10 +700,13 @@ mod tests {
             DataVersion: 4903, author: "someone", size: [1,1,1],
             palette: [{Name: "minecraft:stone"}],
             blocks: [{pos: [0,0,0], state: 0, nbt: {Items: [{id: "x", Count: 1b}]}}],
-            entities: [{pos: [0.5, 0.0, 0.5], blockPos: [0,0,0], nbt: {id: "minecraft:item"}}]
+            entities: [{pos: [0.5, 0.0, 0.5], blockPos: [0,0,0], nbt: {id: "minecraft:item", Extra: 1b, Item: {id: "minecraft:stone", count: 2}}}]
         }"#;
         let s = Structure::parse(text).expect("must tolerate extra keys");
         assert_eq!(s.blocks.len(), 1);
+        assert_eq!(s.item_entities.len(), 1);
+        assert_eq!(s.item_entities[0].item, ("minecraft:stone".to_string(), 2));
+        assert_eq!(s.item_entities[0].pos, [0.5, 0.0, 0.5]);
     }
 
     #[test]

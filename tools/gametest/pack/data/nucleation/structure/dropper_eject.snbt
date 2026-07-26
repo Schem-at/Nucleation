@@ -1,0 +1,16 @@
+{
+  DataVersion: 4903,
+  size: [4, 3, 1],
+  palette: [
+    {Name: "minecraft:stone"},
+    {Name: "minecraft:dropper", Properties: {facing: "east", triggered: "false"}}
+  ],
+  blocks: [
+    {pos: [0, 0, 0], state: 0},
+    {pos: [1, 0, 0], state: 0},
+    {pos: [2, 0, 0], state: 0},
+    {pos: [3, 0, 0], state: 0},
+    {pos: [0, 1, 0], state: 1, nbt: {id: "minecraft:dropper", Items: [{Slot: 4b, id: "minecraft:redstone", count: 1}]}}
+  ],
+  entities: []
+}

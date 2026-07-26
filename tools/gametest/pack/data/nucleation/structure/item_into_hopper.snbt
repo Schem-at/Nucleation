@@ -1,0 +1,15 @@
+{
+  DataVersion: 4903,
+  size: [1, 4, 1],
+  palette: [
+    {Name: "minecraft:stone"},
+    {Name: "minecraft:hopper", Properties: {enabled: "true", facing: "down"}}
+  ],
+  blocks: [
+    {pos: [0, 0, 0], state: 0},
+    {pos: [0, 1, 0], state: 1, nbt: {id: "minecraft:hopper"}}
+  ],
+  entities: [
+    {blockPos: [0, 3, 0], pos: [0.5d, 3.5d, 0.5d], nbt: {id: "minecraft:item", Item: {id: "minecraft:redstone", count: 2}, Motion: [0.0d, 0.0d, 0.0d], PickupDelay: 0s, Age: 0s}}
+  ]
+}

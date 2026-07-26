@@ -24,6 +24,45 @@ use crate::world::World;
 /// generous enough that no real build should reach it.
 const MAX_EVENT_CHAIN: usize = 1024;
 
+/// One recorded entity observation.
+#[derive(Debug, Clone, PartialEq)]
+pub enum EntityEvent {
+    /// The entity moved (or first appeared).
+    Moved {
+        /// Trace-stable id.
+        id: u32,
+        /// e.g. `minecraft:item`.
+        entity_type: String,
+        /// Position after the tick.
+        pos: [f64; 3],
+        /// Velocity after the tick.
+        velocity: [f64; 3],
+    },
+    /// The entity left the world.
+    Removed {
+        /// Trace-stable id.
+        id: u32,
+    },
+}
+
+/// The simulation's world as item physics sees it.
+struct SimCollision<'a> {
+    world: &'a World,
+    solidity: &'a [bool],
+    frictions: &'a [f32],
+}
+
+impl crate::entity::CollisionWorld for SimCollision<'_> {
+    fn is_solid(&self, pos: Pos) -> bool {
+        let state = self.world.get(pos);
+        self.solidity.get(state.raw() as usize).copied().unwrap_or(false)
+    }
+    fn friction(&self, pos: Pos) -> f32 {
+        let state = self.world.get(pos);
+        self.frictions.get(state.raw() as usize).copied().unwrap_or(0.6)
+    }
+}
+
 /// Why a run stopped.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StopReason {
@@ -44,7 +83,7 @@ pub enum StopReason {
 ///
 /// Opaque by design — a checkpoint is a value to hand back to
 /// [`Simulation::restore`], not something to inspect or mutate.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Checkpoint {
     tick: u64,
     world: World,
@@ -55,6 +94,7 @@ pub struct Checkpoint {
     comparator_out: std::collections::HashMap<Pos, u8>,
     inventories: std::collections::HashMap<Pos, crate::inventory::Inventory>,
     hopper_state: std::collections::HashMap<Pos, crate::behaviour::HopperState>,
+    item_entities: crate::entity::ItemEntities,
 }
 
 /// A controllable, deterministic simulation of a bounded region.
@@ -87,6 +127,16 @@ pub struct Simulation {
     inventories: std::collections::HashMap<Pos, crate::inventory::Inventory>,
     /// Per-hopper cooldown and tick bookkeeping.
     hopper_state: std::collections::HashMap<Pos, crate::behaviour::HopperState>,
+    /// The world's item entities.
+    item_entities: crate::entity::ItemEntities,
+    /// Full-cube collision, indexed by `StateId`; see [`Simulation::set_physics_tables`].
+    solidity: Vec<bool>,
+    /// Block friction, indexed by `StateId`.
+    frictions: Vec<f32>,
+    /// Entity positions as of the last recorded tick, for event emission.
+    entity_snapshot: std::collections::HashMap<u32, [f64; 3]>,
+    /// Recorded entity events, when recording is enabled.
+    ent_log: Option<Vec<(u64, EntityEvent)>>,
     /// Ticking block entities, in registration order.
     ///
     /// Vanilla's `tickBlockEntities` walks its list in insertion order — for a
@@ -136,6 +186,7 @@ impl Simulation {
             comparator_out: std::collections::HashMap::new(),
             inventories: std::collections::HashMap::new(),
             hopper_state: std::collections::HashMap::new(),
+            item_entities: crate::entity::ItemEntities::default(),
         };
         Self {
             registry: StateRegistry::new(),
@@ -150,6 +201,11 @@ impl Simulation {
             comparator_out: std::collections::HashMap::new(),
             inventories: std::collections::HashMap::new(),
             hopper_state: std::collections::HashMap::new(),
+            item_entities: crate::entity::ItemEntities::default(),
+            solidity: Vec::new(),
+            frictions: Vec::new(),
+            entity_snapshot: std::collections::HashMap::new(),
+            ent_log: None,
             tickers: Vec::new(),
             log: None,
             inv_log: None,
@@ -179,6 +235,41 @@ impl Simulation {
     pub fn record(&mut self) {
         self.log = Some(Vec::new());
         self.inv_log = Some(Vec::new());
+        self.ent_log = Some(Vec::new());
+        self.entity_snapshot.clear();
+        for item in &self.item_entities.items {
+            self.entity_snapshot.insert(item.id, item.pos);
+        }
+    }
+
+    /// The entity events recorded since [`Simulation::record`].
+    pub fn recorded_entities(&self) -> &[(u64, EntityEvent)] {
+        self.ent_log.as_deref().unwrap_or(&[])
+    }
+
+    /// Spawn an item entity, as loading a structure's entity list does.
+    pub fn spawn_item(
+        &mut self,
+        item: (String, u8),
+        pos: [f64; 3],
+        vel: [f64; 3],
+        pickup_delay: u32,
+    ) -> u32 {
+        self.item_entities.spawn(item, pos, vel, pickup_delay)
+    }
+
+    /// The live item entities.
+    pub fn item_entities(&self) -> &[crate::entity::ItemEntityState] {
+        &self.item_entities.items
+    }
+
+    /// Set the collision and friction tables, indexed by `StateId`.
+    ///
+    /// Built by `vanilla::physics_tables` after every state is interned. Item
+    /// physics reads these; without them everything but air is vacuum.
+    pub fn set_physics_tables(&mut self, solidity: Vec<bool>, frictions: Vec<f32>) {
+        self.solidity = solidity;
+        self.frictions = frictions;
     }
 
     /// The container-slot changes recorded since [`Simulation::record`].
@@ -304,6 +395,7 @@ impl Simulation {
                 return stop;
             }
         }
+        self.emit_entity_events();
         self.in_tick = false;
         self.tick += 1;
         // Burnout only looks back a fixed window, so anything older is dead weight.
@@ -341,6 +433,59 @@ impl Simulation {
         }
     }
 
+    /// Record entity movements and removals for this tick, then drop the dead.
+    ///
+    /// Emission is by **position** change, mirroring what a snapshot capture
+    /// can see. A resting item's velocity oscillates as gravity accumulates and
+    /// collisions flush it — invisible here, on both sides, by construction.
+    fn emit_entity_events(&mut self) {
+        if self.ent_log.is_none() {
+            self.item_entities.items.retain(|item| !item.removed);
+            return;
+        }
+        let mut events: Vec<(u64, EntityEvent)> = Vec::new();
+        let mut seen: std::collections::HashSet<u32> = std::collections::HashSet::new();
+        for item in &self.item_entities.items {
+            if item.removed {
+                continue;
+            }
+            seen.insert(item.id);
+            let moved = match self.entity_snapshot.get(&item.id) {
+                None => true,
+                Some(last) => last
+                    .iter()
+                    .zip(&item.pos)
+                    .any(|(a, b)| (a - b).abs() > 1.0e-9),
+            };
+            if moved {
+                events.push((
+                    self.tick,
+                    EntityEvent::Moved {
+                        id: item.id,
+                        entity_type: "minecraft:item".to_string(),
+                        pos: item.pos,
+                        velocity: item.vel,
+                    },
+                ));
+                self.entity_snapshot.insert(item.id, item.pos);
+            }
+        }
+        let vanished: Vec<u32> = self
+            .entity_snapshot
+            .keys()
+            .copied()
+            .filter(|id| !seen.contains(id))
+            .collect();
+        for id in vanished {
+            self.entity_snapshot.remove(&id);
+            events.push((self.tick, EntityEvent::Removed { id }));
+        }
+        if let Some(log) = self.ent_log.as_mut() {
+            log.extend(events);
+        }
+        self.item_entities.items.retain(|item| !item.removed);
+    }
+
     /// Capture the current state.
     pub fn checkpoint(&self) -> Checkpoint {
         Checkpoint {
@@ -353,6 +498,7 @@ impl Simulation {
             comparator_out: self.comparator_out.clone(),
             inventories: self.inventories.clone(),
             hopper_state: self.hopper_state.clone(),
+            item_entities: self.item_entities.clone(),
         }
     }
 
@@ -372,6 +518,12 @@ impl Simulation {
         self.comparator_out = checkpoint.comparator_out.clone();
         self.inventories = checkpoint.inventories.clone();
         self.hopper_state = checkpoint.hopper_state.clone();
+        self.item_entities = checkpoint.item_entities.clone();
+        // Event emission restarts from the restored state.
+        self.entity_snapshot.clear();
+        for item in &self.item_entities.items {
+            self.entity_snapshot.insert(item.id, item.pos);
+        }
     }
 
     /// Set the container contents at `pos`, as loading a structure does.
@@ -428,6 +580,7 @@ impl Simulation {
                 comparator_out: &mut self.comparator_out,
                 inventories: &mut self.inventories,
                 hopper_state: &mut self.hopper_state,
+                item_entities: &mut self.item_entities,
                 inv_log: self.inv_log.as_mut(),
                 log: self.log.as_mut(),
             };
@@ -548,6 +701,7 @@ impl Simulation {
             comparator_out: &mut self.comparator_out,
                 inventories: &mut self.inventories,
                 hopper_state: &mut self.hopper_state,
+                item_entities: &mut self.item_entities,
                 inv_log: self.inv_log.as_mut(),
             log: self.log.as_mut(),
         };
@@ -589,6 +743,7 @@ impl Simulation {
                         comparator_out: &mut self.comparator_out,
                 inventories: &mut self.inventories,
                 hopper_state: &mut self.hopper_state,
+                item_entities: &mut self.item_entities,
                 inv_log: self.inv_log.as_mut(),
                         log: self.log.as_mut(),
                     };
@@ -628,6 +783,7 @@ impl Simulation {
                         comparator_out: &mut self.comparator_out,
                         inventories: &mut self.inventories,
                         hopper_state: &mut self.hopper_state,
+                item_entities: &mut self.item_entities,
                         inv_log: self.inv_log.as_mut(),
                         log: self.log.as_mut(),
                     };
@@ -718,6 +874,7 @@ impl Simulation {
                         comparator_out: &mut self.comparator_out,
                 inventories: &mut self.inventories,
                 hopper_state: &mut self.hopper_state,
+                item_entities: &mut self.item_entities,
                 inv_log: self.inv_log.as_mut(),
                         log: self.log.as_mut(),
                     };
@@ -727,7 +884,38 @@ impl Simulation {
                 None
             }
 
-            Phase::Entities | Phase::PlayerInputs => None,
+            Phase::Entities => {
+                // Item entities tick in spawn order — vanilla's entity list
+                // order. Merging runs at the captured intervals: every 2 ticks
+                // while crossing block boundaries, every 40 at rest.
+                let collision = SimCollision {
+                    world: &self.world,
+                    solidity: &self.solidity,
+                    frictions: &self.frictions,
+                };
+                for index in 0..self.item_entities.items.len() {
+                    if self.item_entities.items[index].removed {
+                        continue;
+                    }
+                    let before = self.item_entities.items[index].pos;
+                    let alive =
+                        crate::entity::tick_item(&mut self.item_entities.items[index], &collision);
+                    if !alive {
+                        continue;
+                    }
+                    let after = self.item_entities.items[index].pos;
+                    let crossed = before[0].floor() != after[0].floor()
+                        || before[1].floor() != after[1].floor()
+                        || before[2].floor() != after[2].floor();
+                    let interval = if crossed { 2 } else { 40 };
+                    if self.item_entities.items[index].tick_count % interval == 0 {
+                        crate::entity::merge_neighbours(&mut self.item_entities, index);
+                    }
+                }
+                None
+            }
+
+            Phase::PlayerInputs => None,
         }
     }
 
@@ -760,6 +948,7 @@ impl Simulation {
                         comparator_out: &mut self.comparator_out,
                 inventories: &mut self.inventories,
                 hopper_state: &mut self.hopper_state,
+                item_entities: &mut self.item_entities,
                 inv_log: self.inv_log.as_mut(),
                         log: self.log.as_mut(),
                 };

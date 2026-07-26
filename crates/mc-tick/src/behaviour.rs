@@ -143,6 +143,8 @@ pub struct TickCtx<'a> {
     pub inventories: &'a mut std::collections::HashMap<Pos, crate::inventory::Inventory>,
     /// Per-hopper cooldown and tick bookkeeping.
     pub hopper_state: &'a mut std::collections::HashMap<Pos, HopperState>,
+    /// The world's item entities — what hoppers vacuum and droppers eject.
+    pub item_entities: &'a mut crate::entity::ItemEntities,
     /// Container-slot changes made this tick, when recording is on.
     pub inv_log: Option<&'a mut Vec<InventoryChange>>,
     /// Recent redstone-torch toggles, for burnout detection.
@@ -625,6 +627,7 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
@@ -653,6 +656,7 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };

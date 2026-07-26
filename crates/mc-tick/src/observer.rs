@@ -187,6 +187,7 @@ mod tests {
             toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
@@ -208,6 +209,7 @@ mod tests {
             toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
@@ -233,6 +235,7 @@ mod tests {
                 toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
                 log: None,
             };
@@ -253,6 +256,7 @@ mod tests {
                 toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
                 log: None,
             };
@@ -278,6 +282,7 @@ mod tests {
             toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
@@ -295,6 +300,7 @@ mod tests {
             toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
@@ -327,6 +333,7 @@ mod tests {
             toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };

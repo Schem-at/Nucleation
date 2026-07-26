@@ -30,6 +30,7 @@
 #![forbid(unsafe_code)]
 
 pub mod behaviour;
+pub mod entity;
 pub mod inventory;
 pub mod components;
 pub mod observer;
@@ -57,6 +58,7 @@ pub use schedule::{BlockEvent, EventQueue, ScheduledTick, TickPriority, TickQueu
 pub use sim::{Checkpoint, Simulation, StopReason};
 pub use state::{StateError, StateId, StateRegistry};
 pub use structure::{Structure, StructureError};
+pub use entity::{ItemEntities, ItemEntityState};
 pub use inventory::{Inventory, ItemStack};
 pub use vanilla::{intern_companions, register_all, Descriptor, VanillaRules};
 pub use world::World;

@@ -247,18 +247,42 @@ Sequenced for the fastest verified loop:
 Still on the board, small and orthogonal: **buttons and pressure plates**
 (pulse lengths differ per material), redstone lamp, target block.
 
-## 6. Milestone B — item entities
+## 6. Milestone B — item entities — DONE (dry land)
 
-Strictly after A. Float positions (the differ's tolerance mode finally earns
-its keep), entity events in the capture (the format already defines them), and
-a **randomness policy**: dispense velocity has RNG jitter, so vanilla captures
-are not bit-reproducible — the engine needs a seeded-deterministic mode for
-product runs plus tolerance-based conformance against captures. Physics:
-gravity, drag, ground rest, merging, despawn, hopper vacuum pickup.
+Item entities live. The decisive method discovery: **structures author item
+entities directly** (`entities` list, `minecraft:item` with `Pos`/`Motion`/
+`Item`), which makes physics captures completely RNG-free — and the physics
+turned out to conform not merely within tolerance but to the diff's 1e-6 on
+the first run, because the engine mirrors vanilla's arithmetic types
+(`f32` drag widened to `f64` exactly where the bytecode widens).
 
-The original plan put fluids before items because water streams move items;
-inverted now — items on dry land (dropper → floor → hopper pickup) are a
-complete, testable milestone, and fluids join when stream alignment matters.
+- **Capture**: `--entities` diffs item entities per tick; `entity_moved` /
+  `entity_removed` in mc-tick-trace; emission is by **position** change on
+  both sides, which is what makes a resting item silent (its velocity
+  oscillates as gravity accumulates and collisions flush it — invisible by
+  construction).
+- **Physics**, all from `ItemEntity.tick` bytecode (`item_fall.json`):
+  gravity 0.04 before the move; drag ×0.98f (horizontal also × block friction
+  when grounded, 0.6 default / 0.8 slime); the −0.5 landing bounce; the
+  `(tickCount + id) % 4` rest skip; despawn at 6000. Collision is Y-then-
+  larger-horizontal axis clipping against full cubes, clipped axes zeroing
+  their velocity.
+- **Hopper vacuum** (`item_into_hopper.json`): the suck column is the full
+  block from y+11/16 to y+2; a whole stack absorbs at once; a full block
+  above the hopper blocks suction; partial absorbs modify both sides but do
+  not take the cooldown (vanilla returns success only on full consumption).
+- **Merging** (`item_merge.json`): ±0.5 horizontal, every 2 ticks while
+  crossing block boundaries and every 40 at rest; the larger stack survives;
+  over-full merges refuse.
+- **RNG policy** (`dropper_eject.json`): vanilla jitters spawn velocity
+  (`triangle(mean, 0.103)`, speed 0.2..0.3); the engine spawns at the
+  distribution means, deterministically. Trajectory conformance for RNG
+  spawns uses a tolerance sized to the jitter bounds over a short flight;
+  container-visible effects stay exact. Deterministic runs never involve RNG
+  at all.
+
+Still open from the original Milestone B slate: **water-stream item motion**
+(fluids, section 7) and player pickup (needs players).
 
 ## 7. Fluids
 

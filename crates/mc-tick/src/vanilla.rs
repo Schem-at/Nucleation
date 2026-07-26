@@ -151,6 +151,8 @@ pub struct VanillaRules {
     containers: HashMap<StateId, u32>,
     /// Hopper states, for the destination-cooldown rule.
     hoppers: Vec<StateId>,
+    /// Full-cube states, for hopper-suction blocking and item collision.
+    full_cubes: Vec<StateId>,
     immovable: Vec<StateId>,
     slime: Vec<StateId>,
     honey: Vec<StateId>,
@@ -195,6 +197,10 @@ impl PowerSource for VanillaRules {
 
     fn hopper_at(&self, world: &World, pos: Pos) -> bool {
         self.hoppers.contains(&world.get(pos))
+    }
+
+    fn is_solid_at(&self, world: &World, pos: Pos) -> bool {
+        self.full_cubes.contains(&world.get(pos))
     }
 
     fn is_powered(&self, world: &World, pos: Pos, toward: Dir) -> bool {
@@ -318,6 +324,9 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
         }
         if IMMOVABLE.contains(&descriptor.name.as_str()) {
             rules.immovable.push(*id);
+        }
+        if is_full_cube(descriptor) {
+            rules.full_cubes.push(*id);
         }
         // A powered diode, torch or observer is itself a source.
         let emits = match descriptor.name.as_str() {
@@ -542,6 +551,55 @@ pub fn container_slots(name: &str) -> Option<u32> {
         "minecraft:dropper" | "minecraft:dispenser" => Some(9),
         _ => None,
     }
+}
+
+/// Whether a block state is a full collision cube.
+///
+/// Drives hopper-suction blocking and item-entity collision. Everything
+/// registered defaults to a full cube except the shapes that plainly are not;
+/// chests and hoppers are close-but-not-full and count as not-full, which
+/// matches `isCollisionShapeFullBlock` for suction. An extended piston base is
+/// not a full cube; a retracted one is.
+fn is_full_cube(descriptor: &Descriptor) -> bool {
+    match descriptor.name.as_str() {
+        "minecraft:air" => false,
+        "minecraft:redstone_wire"
+        | "minecraft:redstone_torch"
+        | "minecraft:redstone_wall_torch"
+        | "minecraft:repeater"
+        | "minecraft:comparator"
+        | "minecraft:lever"
+        | "minecraft:chest"
+        | "minecraft:trapped_chest"
+        | "minecraft:hopper"
+        | "minecraft:piston_head"
+        | "minecraft:moving_piston" => false,
+        "minecraft:piston" | "minecraft:sticky_piston" => !descriptor.flag("extended"),
+        _ => true,
+    }
+}
+
+/// Collision and friction tables for item physics, indexed by `StateId`.
+///
+/// Friction is `Block.getFriction`: 0.6 for almost everything, 0.8 for slime.
+pub fn physics_tables(registry: &StateRegistry) -> (Vec<bool>, Vec<f32>) {
+    let mut solidity = Vec::with_capacity(registry.len());
+    let mut frictions = Vec::with_capacity(registry.len());
+    for index in 0..registry.len() {
+        let descriptor = registry
+            .descriptor(StateId(index as u16))
+            .map(Descriptor::parse);
+        let (solid, friction) = match &descriptor {
+            None => (false, 0.6),
+            Some(d) => (
+                is_full_cube(d),
+                if d.name == "minecraft:slime_block" { 0.8 } else { 0.6 },
+            ),
+        };
+        solidity.push(solid);
+        frictions.push(friction);
+    }
+    (solidity, frictions)
 }
 
 /// The unpowered/powered pair for a descriptor, if both states are interned.

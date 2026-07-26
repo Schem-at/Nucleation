@@ -587,6 +587,7 @@ mod tests {
         comparator_out: Box::leak(Box::new(Default::default())),
         inventories: Box::leak(Box::new(Default::default())),
         hopper_state: Box::leak(Box::new(Default::default())),
+        item_entities: Box::leak(Box::new(Default::default())),
         inv_log: None, log: None }
     }
 
@@ -644,6 +645,7 @@ mod tests {
                 comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
                 log: None,
             };
@@ -744,6 +746,7 @@ mod tests {
                 comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
                 log: None,
             };
@@ -798,6 +801,7 @@ mod tests {
                 comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
                 log: None,
             };
@@ -845,6 +849,7 @@ mod tests {
                 comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
                 log: None,
             };

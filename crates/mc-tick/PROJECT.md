@@ -116,14 +116,16 @@ crates/mc-tick engine  →  emit trace  →  diff against golden  ◄───�
 `tests/conformance.rs` is this loop as a Rust test: load a structure, wire vanilla
 behaviour to it via the registry, settle, actuate (place/break/click at chosen
 ticks), run, and assert the engine's trace matches the captured golden **tick for
-tick**. Seventeen cases pass today — piston QC, slime adhesion, note-block power,
+tick**. Twenty-one cases pass today — piston QC, slime adhesion, note-block power,
 note-block click, the manual engine twice (its 21-tick placement cycle, and a
 55-tick padded run whose second activation is started by a player click), a
 broken flying machine that must break exactly as vanilla breaks it, and a
 quietly placed engine that stays perfectly still until clicked, and a
 comparator reading a barrel's fullness (on and off), hoppers (pull cadence,
 two-hopper race, powered lock), droppers (into a barrel, and into the world),
-and a comparator tracking a barrel as a hopper drains it — all
+a comparator tracking a barrel as a hopper drains it, and item entities —
+an exact three-block fall, a hopper vacuuming a falling stack, resting items
+merging, and a mean-trajectory dropper eject under jitter tolerance — all
 driven entirely by the descriptor→behaviour registry with no hand-wiring.
 
 ### `crates/mc-tick/tests/corpus/` — zero-compile test cases
@@ -135,7 +137,7 @@ adding a file, no recompilation. `load <name>.snbt` runs a real structure.
 
 ## What's simulated today
 
-**169 tests, all green.** Everything below is trace- or bytecode-verified.
+**178 tests, all green.** Everything below is trace- or bytecode-verified.
 
 ### Engine core
 - **Tick phases** — all ten, in verified order, as an explicit walked sequence.
@@ -177,6 +179,7 @@ adding a file, no recompilation. `load <name>.snbt` runs a real structure.
 | **Hopper** | 8gt cooldown, eject-then-suck, one item per move, enabled gate, block-entity tick order with the destination-cooldown rule |
 | **Dropper / dispenser** | full-QC trigger, 4gt delay, silent TRIGGERED flips, container insertion (dropper) |
 | **Containers** | barrel/chest inventories, comparator analog reads, slot-level trace events |
+| **Item entities** | bit-faithful gravity/drag/bounce/rest physics, hopper vacuum, merging, despawn, mean-velocity dispenser ejects |
 
 ### Pistons (the accuracy crux)
 - Extend/retract via block events (phase 7, *same tick* as the trigger), with

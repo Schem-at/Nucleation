@@ -154,6 +154,12 @@ pub trait PowerSource: Send + Sync {
         false
     }
 
+    /// Whether the block at `pos` is a full collision cube — what blocks a
+    /// hopper's suction from above.
+    fn is_solid_at(&self, _world: &World, _pos: Pos) -> bool {
+        false
+    }
+
     /// Whether the block at `pos` is a diode, for repeater-priority purposes.
     fn is_diode(&self, world: &World, pos: Pos) -> bool;
 
@@ -636,11 +642,16 @@ impl<P: PowerSource> Hopper<P> {
     }
 
     /// `suckInItems`: one item from the first occupied slot of the container
-    /// above us. (Item entities above are Milestone B.)
+    /// above us — or, with no container there and no full block capping us,
+    /// vacuum an item entity out of the suck column (the full block above from
+    /// y+11/16 to y+2).
     fn suck(&self, ctx: &mut TickCtx<'_>, pos: Pos) -> bool {
         let source = pos.offset(Dir::Up);
         let Some(source_slots) = self.power.container_slots_at(ctx.world, source) else {
-            return false;
+            if self.power.is_solid_at(ctx.world, source) {
+                return false; // a full block above blocks suction
+            }
+            return self.suck_entities(ctx, pos);
         };
         for slot in 0..source_slots.min(255) as u8 {
             if let Some((id, count)) = ctx.inventory_slot(source, slot) {
@@ -653,6 +664,48 @@ impl<P: PowerSource> Hopper<P> {
                     );
                     return true;
                 }
+            }
+        }
+        false
+    }
+
+    /// `getItemsAtAndAbove` + `addItem(container, itemEntity)`: absorb the
+    /// first intersecting item entity, whole stack when it fits. Vanilla only
+    /// reports success — and takes the cooldown — when the entity was fully
+    /// consumed; a partial absorb modifies both sides and returns false.
+    fn suck_entities(&self, ctx: &mut TickCtx<'_>, pos: Pos) -> bool {
+        let suck_min = [f64::from(pos.x), f64::from(pos.y) + 0.6875, f64::from(pos.z)];
+        let suck_max = [f64::from(pos.x) + 1.0, f64::from(pos.y) + 2.0, f64::from(pos.z) + 1.0];
+        for index in 0..ctx.item_entities.items.len() {
+            let (item_id, count, intersects) = {
+                let entity = &ctx.item_entities.items[index];
+                if entity.removed {
+                    continue;
+                }
+                let (emin, emax) = crate::entity::item_aabb(entity.pos);
+                let intersects = emin[0] < suck_max[0]
+                    && emax[0] > suck_min[0]
+                    && emin[1] < suck_max[1]
+                    && emax[1] > suck_min[1]
+                    && emin[2] < suck_max[2]
+                    && emax[2] > suck_min[2];
+                (entity.item.0.clone(), entity.item.1, intersects)
+            };
+            if !intersects {
+                continue;
+            }
+            let mut absorbed = 0u8;
+            while absorbed < count
+                && insert_one(ctx, &self.power, None, pos, u32::from(HOPPER_SLOTS), &item_id)
+            {
+                absorbed += 1;
+            }
+            if absorbed == count {
+                ctx.item_entities.items[index].removed = true;
+                return true;
+            } else if absorbed > 0 {
+                ctx.item_entities.items[index].item.1 = count - absorbed;
+                return false;
             }
         }
         false
@@ -839,8 +892,28 @@ impl<P: PowerSource> BlockBehaviour for Dropper<P> {
                 return;
             }
         }
-        // No container in front: the item is ejected into the world. Item
-        // entities are Milestone B; the container-side effect is the decrement.
+        // No container in front: the item is ejected into the world as an item
+        // entity. Spawn position and mean velocity are
+        // `DefaultDispenseItemBehavior.spawnItem` with the jitter removed:
+        // 0.7 blocks out of the face (0.125 down for vertical facings,
+        // 0.15625 for horizontal), speed the mean of `0.2 + 0.1 * U(0,1)`,
+        // and a constant upward 0.2 regardless of facing. Vanilla adds
+        // `triangle(_, 0.103)` noise to every component; the engine is
+        // deterministic and conformance for ejected trajectories uses
+        // tolerance rather than exactness.
+        let (dx, dy, dz) = self.facing.delta();
+        let vertical = dy != 0;
+        let x = f64::from(pos.x) + 0.5 + 0.7 * f64::from(dx);
+        let y = f64::from(pos.y) + 0.5 + 0.7 * f64::from(dy)
+            - if vertical { 0.125 } else { 0.15625 };
+        let z = f64::from(pos.z) + 0.5 + 0.7 * f64::from(dz);
+        let speed = 0.25;
+        ctx.item_entities.spawn(
+            (id.clone(), 1),
+            [x, y, z],
+            [f64::from(dx) * speed, 0.2, f64::from(dz) * speed],
+            10,
+        );
         let remaining = count - 1;
         ctx.set_inventory_slot(pos, slot, (remaining > 0).then(|| (id, remaining)));
     }
@@ -1018,6 +1091,7 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
@@ -1053,6 +1127,7 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
@@ -1095,6 +1170,7 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
@@ -1132,6 +1208,7 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
@@ -1171,6 +1248,7 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
@@ -1211,6 +1289,7 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
@@ -1263,6 +1342,7 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
@@ -1309,6 +1389,7 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
@@ -1350,6 +1431,7 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
@@ -1449,6 +1531,7 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
@@ -1488,6 +1571,7 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
@@ -1529,6 +1613,7 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
@@ -1603,6 +1688,7 @@ mod tests {
             comparator_out: &mut stored,
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
@@ -1635,6 +1721,7 @@ mod tests {
             comparator_out: &mut stored,
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
@@ -1669,6 +1756,7 @@ mod tests {
             comparator_out: &mut stored,
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
@@ -1711,6 +1799,7 @@ mod tests {
             comparator_out: &mut stored,
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            item_entities: &mut Default::default(),
             inv_log: None,
             log: None,
         };
