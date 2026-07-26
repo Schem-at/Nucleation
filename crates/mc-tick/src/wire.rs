@@ -122,6 +122,18 @@ impl<R: WireWorld + Clone + 'static> BlockBehaviour for Wire<R> {
         update_power_strength(&self.rules, ctx, pos, self.power_level);
     }
 
+    /// `RedStoneWireBlock.onPlace` runs `updatePowerStrength` too, so dust
+    /// recomputes itself the moment it is written into the world.
+    ///
+    /// That is what corrects the authored power level of a schematic: a build
+    /// saved with dust at 1 is placed, each wire re-evaluates, and the ones
+    /// with nothing feeding them drop to 0 — even under `knownShape`, where no
+    /// update passes run at all. Without this the engine kept the file's
+    /// values and started three cells hot.
+    fn on_placed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        update_power_strength(&self.rules, ctx, pos, self.power_level);
+    }
+
     fn name(&self) -> &'static str {
         "redstone_wire"
     }

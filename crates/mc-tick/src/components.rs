@@ -350,6 +350,17 @@ impl<P: PowerSource> Repeater<P> {
 }
 
 impl<P: PowerSource> BlockBehaviour for Repeater<P> {
+    /// `DiodeBlock.onPlace` runs `updateNeighborsInFront`: a diode written
+    /// into the world tells the block it points at, and that block's other
+    /// neighbours, straight away. Under `knownShape` placement — where no
+    /// update passes run — this is the only way a build's diodes reach each
+    /// other at all.
+    fn on_placed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        let target = pos.offset(self.facing.opposite());
+        ctx.notify(target, self.facing);
+        ctx.update_neighbors_except(target, self.facing);
+    }
+
     /// `RepeaterBlock.updateShape`: a horizontal shape update perpendicular to
     /// `FACING` recomputes `LOCKED`.
     fn on_shape_update(&self, ctx: &mut TickCtx<'_>, pos: Pos, from: Dir) {
@@ -546,6 +557,13 @@ impl<P: PowerSource> Comparator<P> {
 }
 
 impl<P: PowerSource> BlockBehaviour for Comparator<P> {
+    /// `DiodeBlock.onPlace`: see [`Repeater::on_placed`].
+    fn on_placed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        let target = pos.offset(self.input_side().opposite());
+        ctx.notify(target, self.input_side());
+        ctx.update_neighbors_except(target, self.input_side());
+    }
+
     /// `ComparatorBlock.checkTickOnNeighbor` — and the source of comparator priming.
     ///
     /// A comparator differs from a repeater in two ways, both read from the class:

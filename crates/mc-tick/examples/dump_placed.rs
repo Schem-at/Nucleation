@@ -23,7 +23,12 @@ fn main() {
         mc_tick::vanilla::is_collision_full_cube,
         mc_tick::vanilla::has_dynamic_shape,
     );
-    sim.settle_with_order(&order);
+    // `onPlace` and the write's shape propagation run whatever the flags;
+    // `--quiet` then stops, matching a `knownShape` placement.
+    sim.place_on_place(&order);
+    if !std::env::args().any(|a| a == "--quiet") {
+        sim.settle_with_order(&order);
+    }
 
     let mut rows: Vec<(i32, i32, i32, String)> = sim
         .world()
