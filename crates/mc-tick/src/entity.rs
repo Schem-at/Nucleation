@@ -70,6 +70,9 @@ pub struct ItemEntities {
     pub items: Vec<ItemEntityState>,
     /// The next id to assign.
     pub next_id: u32,
+    /// Every id ever spawned with its item, surviving removal — a renderer
+    /// needs to know what a vacuumed item *was*.
+    pub name_log: Vec<(u32, String)>,
 }
 
 impl ItemEntities {
@@ -83,6 +86,7 @@ impl ItemEntities {
     ) -> u32 {
         let id = self.next_id;
         self.next_id += 1;
+        self.name_log.push((id, item.0.clone()));
         self.items.push(ItemEntityState {
             id,
             item,

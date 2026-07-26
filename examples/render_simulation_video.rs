@@ -69,9 +69,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .collect();
 
+    // --pulse x,y,z@T: a redstone block for two ticks, like the capture tool.
+    let pulses: Vec<(Pos, u64)> = args
+        .iter()
+        .enumerate()
+        .filter(|(_, a)| *a == "--pulse")
+        .filter_map(|(i, _)| args.get(i + 1))
+        .map(|v| {
+            let (xyz, t) = v.split_once('@').expect("--pulse x,y,z@T");
+            let p: Vec<i32> = xyz.split(',').map(|c| c.parse().expect("coord")).collect();
+            (Pos::new(p[0], p[1], p[2]), t.parse().expect("tick"))
+        })
+        .collect();
+
     // ── 1. Simulate, recording every block change ───────────────────────────
-    let (initial, changes) = simulate(snbt_path, ticks, &clicks);
+    let (initial, changes, item_tracks) = simulate(snbt_path, ticks, &clicks, &pulses);
     println!("simulated {ticks} ticks, {} block changes", changes.len());
+
+    println!(
+        "item tracks: {} ({} entity events)",
+        item_tracks.len(),
+        item_tracks.iter().map(|t| t.positions.iter().flatten().count()).sum::<usize>()
+    );
 
     // ── 2. Reconstruct the cast ─────────────────────────────────────────────
     let members = build_cast(&initial, &changes, ticks);
@@ -102,6 +121,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     println!("meshes: {} (deduplicated)", meshes.len());
 
+    // Item entities: one mesh per entity (each needs its own pose), the item's
+    // block form scaled to vanilla's item-cube proportions, positioned along
+    // the simulation's per-tick track with sub-tick interpolation.
+    let mut item_mesh_range = Vec::new();
+    for track in &item_tracks {
+        let mut one = UniversalSchematic::new("item".to_string());
+        if one.set_block_from_string(0, 0, 0, &track.item).is_err() {
+            one.set_block_from_string(0, 0, 0, "minecraft:stone").ok();
+        }
+        item_mesh_range.push(meshes.len());
+        let mesh = one.to_mesh(&pack, &mesh_config)?;
+        println!(
+            "item mesh {} ({}): {} opaque verts",
+            meshes.len(),
+            track.item,
+            mesh.opaque.positions.len()
+        );
+        meshes.push(mesh);
+    }
+
     // ── 4. Pose every mesh for every frame ──────────────────────────────────
     let hidden = Pose {
         scale: [0.0; 3],
@@ -131,6 +170,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ];
             }
             poses[mesh_of[index]] = pose;
+        }
+        for (track_index, track) in item_tracks.iter().enumerate() {
+            let t0 = t.floor() as usize;
+            let alpha = t - t.floor();
+            let here = track.positions.get(t0).copied().flatten();
+            let next = track.positions.get(t0 + 1).copied().flatten();
+            let position = match (here, next) {
+                (Some(a), Some(b)) => Some([
+                    a[0] + (b[0] - a[0]) * alpha,
+                    a[1] + (b[1] - a[1]) * alpha,
+                    a[2] + (b[2] - a[2]) * alpha,
+                ]),
+                (Some(a), None) => Some(a),
+                _ => None,
+            };
+            if let Some(p) = position {
+                let mut pose = Pose::IDENTITY;
+                pose.scale = [0.25; 3];
+                // Scale in place about the block's centre, then translate that
+                // centre to the entity position (plus half the scaled height).
+                pose.pivot = [0.5, 0.5, 0.5];
+                pose.translate = [
+                    p[0] as f32 - 0.5,
+                    p[1] as f32 + 0.125 - 0.5,
+                    p[2] as f32 - 0.5,
+                ];
+                poses[item_mesh_range[track_index]] = pose;
+            }
         }
         frames.push(Frame {
             time_ms: f as f32 * (1000.0 / fps as f32),
@@ -181,11 +248,23 @@ fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
 
 /// Quiet placement (no settle), record, click, run. Returns the initial world
 /// and the change log, both as descriptor strings.
+/// One item entity's life for the renderer: its block id and a per-tick
+/// position track (`None` once removed).
+struct ItemTrack {
+    item: String,
+    positions: Vec<Option<[f64; 3]>>,
+}
+
 fn simulate(
     snbt_path: &str,
     ticks: u64,
     clicks: &[(Pos, u64)],
-) -> (Vec<(Pos, String)>, Vec<(u64, Pos, String, String)>) {
+    pulses: &[(Pos, u64)],
+) -> (
+    Vec<(Pos, String)>,
+    Vec<(u64, Pos, String, String)>,
+    Vec<ItemTrack>,
+) {
     let text = std::fs::read_to_string(snbt_path).expect("read structure");
     let structure = Structure::parse(&text).expect("parse structure");
 
@@ -214,6 +293,48 @@ fn simulate(
         })
         .collect();
 
+    {
+        let (solidity, frictions) = mc_tick::vanilla::physics_tables(sim.registry());
+        sim.set_physics_tables(solidity, frictions);
+    }
+    for spawned in &structure.item_entities {
+        sim.spawn_item(
+            spawned.item.clone(),
+            spawned.pos,
+            spawned.motion,
+            spawned.pickup_delay,
+        );
+    }
+    for (pos, stacks) in &structure.inventories {
+        let entry = structure
+            .blocks
+            .iter()
+            .find(|(p, _)| p == pos)
+            .map(|(_, e)| *e)
+            .expect("inventory with no block");
+        let name = structure.palette[entry].split('[').next().unwrap_or_default();
+        let slots = mc_tick::vanilla::container_slots(name).expect("container slot count");
+        sim.set_inventory(*pos, mc_tick::Inventory { slots, stacks: stacks.clone() });
+    }
+    let redstone_block = sim
+        .registry_mut()
+        .intern("minecraft:redstone_block")
+        .expect("intern redstone block");
+    {
+        let mut table = std::mem::take(sim.behaviours_mut());
+        mc_tick::register_all(sim.registry_mut(), &mut table);
+        *sim.behaviours_mut() = table;
+    }
+    for (pos, entry) in &structure.blocks {
+        let state = sim.registry().get(&structure.palette[*entry]);
+        let is_ticker = state
+            .and_then(|s| sim.behaviours().get(s))
+            .is_some_and(|b| b.ticks_as_block_entity());
+        if is_ticker {
+            sim.add_block_entity_ticker(*pos);
+        }
+    }
+
     sim.record();
     for t in 0..ticks {
         for (pos, at) in clicks {
@@ -221,7 +342,61 @@ fn simulate(
                 sim.use_block(*pos);
             }
         }
+        for (pos, at) in pulses {
+            if *at == t {
+                sim.place_block(*pos, redstone_block);
+            }
+            if *at + 2 == t {
+                sim.place_block(*pos, mc_tick::StateId::AIR);
+            }
+        }
         sim.step();
+    }
+
+    // Entity events -> dense per-tick position tracks. Positions persist
+    // between movement events; a removed id's track ends.
+    let mut tracks: Vec<ItemTrack> = Vec::new();
+    let mut index_of: std::collections::HashMap<u32, usize> = std::collections::HashMap::new();
+    let mut cursor: std::collections::HashMap<u32, [f64; 3]> = std::collections::HashMap::new();
+    let mut removed: std::collections::HashMap<u32, u64> = std::collections::HashMap::new();
+    let item_names: std::collections::HashMap<u32, String> =
+        sim.item_name_log().iter().cloned().collect();
+    for (tick, event) in sim.recorded_entities() {
+        match event {
+            mc_tick::sim::EntityEvent::Moved { id, pos, .. } => {
+                if !index_of.contains_key(id) {
+                    index_of.insert(*id, tracks.len());
+                    tracks.push(ItemTrack {
+                        item: item_names
+                            .get(id)
+                            .cloned()
+                            .unwrap_or_else(|| "minecraft:redstone".to_string()),
+                        positions: vec![None; ticks as usize],
+                    });
+                }
+                cursor.insert(*id, *pos);
+                let index = index_of[id];
+                tracks[index].positions[*tick as usize] = Some(*pos);
+            }
+            mc_tick::sim::EntityEvent::Removed { id } => {
+                removed.insert(*id, *tick);
+            }
+        }
+    }
+    // Fill gaps: a live, unmoving item keeps its last position.
+    for (id, index) in &index_of {
+        let end = removed.get(id).copied().unwrap_or(ticks);
+        let mut last: Option<[f64; 3]> = None;
+        for t in 0..ticks as usize {
+            if (t as u64) >= end {
+                tracks[*index].positions[t] = None;
+                continue;
+            }
+            match tracks[*index].positions[t] {
+                Some(p) => last = Some(p),
+                None => tracks[*index].positions[t] = last,
+            }
+        }
     }
 
     let describe = |id| sim.registry().descriptor(id).unwrap_or("?").to_string();
@@ -230,7 +405,7 @@ fn simulate(
         .iter()
         .map(|c| (c.tick, c.pos, describe(c.from), describe(c.to)))
         .collect();
-    (initial, changes)
+    (initial, changes, tracks)
 }
 
 /// Turn initial state + change log into drawable members.

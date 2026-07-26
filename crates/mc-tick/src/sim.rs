@@ -263,6 +263,11 @@ impl Simulation {
         &self.item_entities.items
     }
 
+    /// Every item entity ever spawned: `(id, item id)`, surviving removal.
+    pub fn item_name_log(&self) -> &[(u32, String)] {
+        &self.item_entities.name_log
+    }
+
     /// Set the collision and friction tables, indexed by `StateId`.
     ///
     /// Built by `vanilla::physics_tables` after every state is interned. Item
