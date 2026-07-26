@@ -117,6 +117,7 @@ impl Dir {
         }
     }
 
+    /// The opposite direction.
     pub const fn opposite(self) -> Dir {
         match self {
             Dir::Down => Dir::Up,

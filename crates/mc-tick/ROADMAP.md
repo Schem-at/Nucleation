@@ -384,7 +384,28 @@ vanilla exactly; the whole remaining failure is **one piston race**:
   not fatal) — only an immovable block in the push **line** stops a
   piston. The engine and the test now agree with the game.
 
-  What still blocks the reschedule is narrower than before: at the tick
+  **RESOLVED — the reschedule is live.** `--probe-push` at (13,1,2) on
+  tick 27 answered it: vanilla refuses that push, so it never queues an
+  extend. `PistonBaseBlock.checkIfExtend` runs the resolver *before*
+  `level.blockEvent(...)`; this engine queued on power alone and only
+  resolved at dispatch. Equivalent while refusals are dropped, wrong
+  once they are rescheduled — the phantom event survived and fired two
+  ticks later. Both are now faithful and all goldens stay green.
+
+  **The doors' remaining failure is now a single question.** Probed on
+  the vault door: at tick 0 *both* opposed pistons on the x=4 column have
+  a resolvable push (`resolve=true`, 5 concrete); by tick 1 the up one is
+  refused because the down one's placeholder already occupies the gap. So
+  the winner is decided purely by which piston is notified first, and
+  that traces to two observers, (3,2,1) at y=2 and (4,10,1) at y=10, both
+  scheduled during placement. This engine fires the y=2 one first (walk
+  order is `(y, x, z)`); vanilla evidently fires the y=10 one first.
+  Neither schedules in the setBlock pass — (4,10,1) faces up into nothing
+  and (3,2,1) watches a block placed before it — so both should land in
+  the update pass in y order. Something about observer scheduling is
+  still unmodelled, and that is the next thing to find.
+
+  Historical note, now fixed: at the tick
   the manual engine's piston at (13,1,2) lands, vanilla's resolver
   refuses the push after collecting 7 blocks and ours accepts it with 8
   — the extra being the retracted piston at (10,0,1). Vanilla's
