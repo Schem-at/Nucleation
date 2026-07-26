@@ -396,8 +396,11 @@ flooding replaceable plants. Each becomes a capture when a build needs it.
    `cart_slope`, `cart_curve`, and `cart_loop` (200 ticks around a powered
    circuit through all four corner shapes).
 
-   Still open for stage 2: **dynamic rail powering** (powered-rail chains of
-   8, `findPoweredRailSignal`), detector/activator rails, rail shape
+   Stage 2 so far: **dynamic rail powering** landed (`PoweredRail` — chains
+   of at most 8 already-powered rails, `findPoweredRailSignal` transcribed;
+   goldens `rails_chain` and `cart_launch`), and **levers** joined the
+   component set (strong emission into the support block; golden
+   `lever_lamp`). Still open: detector/activator rails, rail shape
    re-bending (authored shapes must be the natural fixed point — placement
    normalisation re-bends the rest, which the slope rig proved), cart-in-water
    (0.2 max speed, 0.95f slowdown, fifth slope pull), cart–cart collisions,
