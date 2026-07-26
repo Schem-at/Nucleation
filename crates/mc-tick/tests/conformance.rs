@@ -423,7 +423,10 @@ fn run_conformance_full(
     // own writes are pre-baseline and must not be recorded.
     if settle == Settle::Placement {
         // Vanilla's placement pass walks the structure's block list in order.
-        let order: Vec<Pos> = structure.blocks.iter().map(|(pos, _)| *pos).collect();
+        let order = structure.placement_order(
+        mc_tick::vanilla::is_collision_full_cube,
+        mc_tick::vanilla::has_dynamic_shape,
+    );
         sim.settle_with_order(&order);
     }
     sim.record();

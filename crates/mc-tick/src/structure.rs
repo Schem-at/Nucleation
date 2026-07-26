@@ -147,6 +147,43 @@ impl Structure {
         )
     }
 
+    /// The order `StructureTemplate.placeInWorld` walks its blocks.
+    ///
+    /// Vanilla does **not** use the file's block order. `addToLists` splits
+    /// the blocks three ways — full collision cubes without block-entity NBT,
+    /// everything else without NBT, and everything with NBT — sorts each by
+    /// `(y, x, z)` — the comparator's key order, read from its lambdas — and
+    /// concatenates them *solid, other, block-entities*
+    /// (`buildInfoList`). The update pass then walks that list, so a build's
+    /// solid frame settles before a single redstone component is touched.
+    ///
+    /// The order is observable: it decides which transient each repeater and
+    /// torch latches, and running a community door in file order instead
+    /// started clocks the game never starts.
+    pub fn placement_order(
+        &self,
+        is_full_cube: impl Fn(&str) -> bool,
+        has_dynamic_shape: impl Fn(&str) -> bool,
+    ) -> Vec<Pos> {
+        let mut solid: Vec<Pos> = Vec::new();
+        let mut other: Vec<Pos> = Vec::new();
+        let mut entities: Vec<Pos> = Vec::new();
+        for (pos, entry) in &self.blocks {
+            let descriptor = &self.palette[*entry];
+            if self.inventories.iter().any(|(p, _)| p == pos) {
+                entities.push(*pos);
+            } else if !has_dynamic_shape(descriptor) && is_full_cube(descriptor) {
+                solid.push(*pos);
+            } else {
+                other.push(*pos);
+            }
+        }
+        for group in [&mut solid, &mut other, &mut entities] {
+            group.sort_by_key(|p| (p.y, p.x, p.z));
+        }
+        solid.into_iter().chain(other).chain(entities).collect()
+    }
+
     /// Place this structure into `world`, interning states as it goes.
     ///
     /// Writes directly rather than through a tick context: loading is not a

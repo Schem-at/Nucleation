@@ -1035,6 +1035,12 @@ fn is_conductor(descriptor: &Descriptor) -> bool {
             | "minecraft:honey_block"
             | "minecraft:oak_leaves"
             | "minecraft:target"
+            // A piston base is a full *collision* cube when retracted, but
+            // `PistonBaseBlock` declares itself no redstone conductor —
+            // verified with `--probe`, after an observer's strong power leaked
+            // through one into a door's dust line.
+            | "minecraft:piston"
+            | "minecraft:sticky_piston"
     ) || matches!(descriptor.name.as_str(), "minecraft:slime_block")
 }
 
@@ -1163,6 +1169,22 @@ fn lever_attachment(descriptor: &Descriptor) -> Option<Dir> {
         Some("ceiling") => Some(Dir::Up),
         _ => descriptor.facing().map(Dir::opposite),
     }
+}
+
+/// Whether a block descriptor is a full collision cube — `isCollisionShapeFullBlock`
+/// against an empty world, which is what `StructureTemplate.addToLists` uses to
+/// decide a placed block's update-pass group.
+pub fn is_collision_full_cube(descriptor: &str) -> bool {
+    is_full_cube(&Descriptor::parse(descriptor))
+}
+
+/// Whether a block's shape depends on its surroundings (`hasDynamicShape`).
+///
+/// Only the shulker box in this corpus, and it carries a block entity anyway,
+/// so the distinction never changes a group.
+pub fn has_dynamic_shape(descriptor: &str) -> bool {
+    let name = descriptor.split('[').next().unwrap_or(descriptor);
+    name.ends_with("_shulker_box") || name == "minecraft:shulker_box"
 }
 
 /// The instrument a block gives a note block sitting on it.

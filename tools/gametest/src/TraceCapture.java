@@ -88,6 +88,7 @@ public final class TraceCapture {
         Path out = Path.of(arg(args, "--out", "work/trace.json"));
         String dumpPlaced = arg(args, "--dump-placed", null);
         String probeAt = arg(args, "--probe", null);
+        int probeTick = Integer.parseInt(arg(args, "--probe-tick", "-1"));
 
         SharedConstants.tryDetectVersion();
         Bootstrap.bootStrap();
@@ -225,7 +226,7 @@ public final class TraceCapture {
         // Ask the game itself what a position sees: the six weak signals a
         // block reads, plus the strong signal into each neighbour. This is
         // ground truth for "which neighbour is powering this thing".
-        if (probeAt != null) {
+        if (probeAt != null && probeTick < 0) {
             String[] pp = probeAt.split(",");
             BlockPos probe = ORIGIN.offset(Integer.parseInt(pp[0].trim()),
                     Integer.parseInt(pp[1].trim()), Integer.parseInt(pp[2].trim()));
@@ -355,6 +356,21 @@ public final class TraceCapture {
                                 pos.getY() - ORIGIN.getY(), pos.getZ() - ORIGIN.getZ(),
                                 slot, slotWas, slotNow));
                     }
+                }
+            }
+            if (probeAt != null && probeTick == tick) {
+                String[] pp = probeAt.split(",");
+                BlockPos probe = ORIGIN.offset(Integer.parseInt(pp[0].trim()),
+                        Integer.parseInt(pp[1].trim()), Integer.parseInt(pp[2].trim()));
+                System.out.println("PROBE@" + tick + " " + probeAt + " state=" + level.getBlockState(probe));
+                System.out.println("  hasNeighborSignal=" + level.hasNeighborSignal(probe)
+                        + " bestNeighborSignal=" + level.getBestNeighborSignal(probe));
+                for (net.minecraft.core.Direction dir : net.minecraft.core.Direction.values()) {
+                    BlockPos n = probe.relative(dir);
+                    System.out.println("  " + dir + " " + level.getBlockState(n)
+                            + " getSignal=" + level.getSignal(n, dir)
+                            + " directTo=" + level.getDirectSignalTo(n)
+                            + " cond=" + level.getBlockState(n).isRedstoneConductor(level, n));
                 }
             }
             if (captureEntities) {
