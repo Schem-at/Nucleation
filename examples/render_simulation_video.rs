@@ -82,8 +82,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .collect();
 
+    // --break x,y,z@T: replace a block with air, the capture tool's --break.
+    let breaks: Vec<(Pos, u64)> = args
+        .iter()
+        .enumerate()
+        .filter(|(_, a)| *a == "--break")
+        .filter_map(|(i, _)| args.get(i + 1))
+        .map(|v| {
+            let (xyz, t) = v.split_once('@').expect("--break x,y,z@T");
+            let p: Vec<i32> = xyz.split(',').map(|c| c.parse().expect("coord")).collect();
+            (Pos::new(p[0], p[1], p[2]), t.parse().expect("tick"))
+        })
+        .collect();
+
     // ── 1. Simulate, recording every block change ───────────────────────────
-    let (initial, changes, item_tracks) = simulate(snbt_path, ticks, &clicks, &pulses);
+    let (initial, changes, item_tracks) = simulate(snbt_path, ticks, &clicks, &pulses, &breaks);
     println!("simulated {ticks} ticks, {} block changes", changes.len());
 
     println!(
@@ -109,7 +122,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Some(i) => *i,
             None => {
                 let mut one = UniversalSchematic::new("member".to_string());
-                one.set_block_from_string(member.pos.x, member.pos.y, member.pos.z, &member.state)
+                // Fluids have no blockstate model; draw them as tinted glass
+                // boxes, squashed to the fluid's surface height by their pose.
+                let drawn = fluid_proxy(&member.state).unwrap_or(member.state.as_str());
+                one.set_block_from_string(member.pos.x, member.pos.y, member.pos.z, drawn)
                     .map_err(|e| format!("{}: {e}", member.state))?;
                 let mesh = one.to_mesh(&pack, &mesh_config)?;
                 meshes.push(mesh);
@@ -127,7 +143,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut item_mesh_range = Vec::new();
     for track in &item_tracks {
         let mut one = UniversalSchematic::new("item".to_string());
-        if one.set_block_from_string(0, 0, 0, &track.item).is_err() {
+        // Item ids are not block ids; ingots at least have a block to show.
+        let drawn = track.item.replace("_ingot", "_block");
+        if one.set_block_from_string(0, 0, 0, &drawn).is_err() {
             one.set_block_from_string(0, 0, 0, "minecraft:stone").ok();
         }
         item_mesh_range.push(meshes.len());
@@ -159,6 +177,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 continue;
             }
             let mut pose = Pose::IDENTITY;
+            if let Some(height) = fluid_height(&member.state) {
+                pose.scale = [1.0, height, 1.0];
+                pose.pivot = [
+                    member.pos.x as f32 + 0.5,
+                    member.pos.y as f32,
+                    member.pos.z as f32 + 0.5,
+                ];
+            }
             if let Some(motion) = &member.motion {
                 // g4mespeed PAUSE_END: linear across the move window, clamped.
                 let progress = ((t - member.start) / (motion.until - member.start)).clamp(0.0, 1.0);
@@ -260,6 +286,7 @@ fn simulate(
     ticks: u64,
     clicks: &[(Pos, u64)],
     pulses: &[(Pos, u64)],
+    breaks: &[(Pos, u64)],
 ) -> (
     Vec<(Pos, String)>,
     Vec<(u64, Pos, String, String)>,
@@ -349,6 +376,11 @@ fn simulate(
                 sim.place_block(*pos, redstone_block);
             }
             if *at + 2 == t {
+                sim.place_block(*pos, mc_tick::StateId::AIR);
+            }
+        }
+        for (pos, at) in breaks {
+            if *at == t {
                 sim.place_block(*pos, mc_tick::StateId::AIR);
             }
         }
@@ -603,4 +635,35 @@ fn head_state_for(base: &str, facing: mc_tick::Dir) -> String {
         "minecraft:piston_head[facing={},short=false,type={kind}]",
         dir_name(facing)
     )
+}
+
+/// The stand-in block for a fluid state, `None` for ordinary blocks.
+fn fluid_proxy(state: &str) -> Option<&'static str> {
+    if state.starts_with("minecraft:water") {
+        Some("minecraft:blue_stained_glass")
+    } else if state.starts_with("minecraft:bubble_column") {
+        Some("minecraft:light_blue_stained_glass")
+    } else {
+        None
+    }
+}
+
+/// The rendered surface height of a fluid state (vanilla's amount / 9).
+fn fluid_height(state: &str) -> Option<f32> {
+    if state.starts_with("minecraft:bubble_column") {
+        return Some(1.0);
+    }
+    if !state.starts_with("minecraft:water") {
+        return None;
+    }
+    let level: u8 = state
+        .split("level=")
+        .nth(1)
+        .and_then(|rest| rest.trim_end_matches(']').parse().ok())
+        .unwrap_or(0);
+    Some(match level {
+        0 => 8.0 / 9.0,
+        1..=7 => f32::from(8 - level) / 9.0,
+        _ => 1.0,
+    })
 }
