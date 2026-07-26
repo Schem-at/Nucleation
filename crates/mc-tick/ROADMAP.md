@@ -184,39 +184,71 @@ block**, which is a use-block action. The simulation has no notion of this yet.
 Everything needed to *verify* each step already exists — this is capture-then-
 implement, per the discipline, not new infrastructure.
 
-## 5. Remaining redstone components
+## 5. Milestone A — containers and item *transfer* (CURRENT)
 
-Each is small once the scheduler is right; the work is capturing, not coding.
-Roughly in order of how often doors use them:
+Hoppers, droppers, dispensers and inventories, **without** free-flying items:
+deterministic, integer-state, no physics. Two structural problems come first,
+both tooling, because the capture-first discipline goes blind exactly where
+item logic lives without them:
 
-| component | note |
-|---|---|
-| buttons / pressure plates | pulse lengths differ per material |
-| redstone lamp | has an off-delay, unlike most blocks |
-| target block | analogue output |
-| dispenser / dropper | needs container contents |
-| rails, tripwire, daylight sensor | rarely in doors |
+1. **Inventory changes are invisible to the capture.** TraceCapture diffs block
+   states; a hopper pulling an item changes only block-entity NBT. The oracle
+   must snapshot container contents per tick and the trace format needs an
+   inventory-changed event kind.
+2. **Block-entity tick order.** Two adjacent hoppers transfer differently
+   depending on which ticks first — `tickBlockEntities` order is a new ordering
+   domain, same class of problem as the phase order was. Read the iteration
+   order from bytecode, pin it with a discriminating capture (a two-hopper
+   race), then model it. This is where the engine's block-entities phase stops
+   being just deferred piston writes.
 
-## 6. Block entities, properly
+Sequenced for the fastest verified loop:
 
-Moving pistons are modelled as deferred writes. That is correct for *timing* and is
-what the captures show, but it is not a block-entity model. It becomes limiting
-when containers arrive (a dropper's inventory has to live somewhere), so it is
-sequenced with item handling rather than before it.
+- [x] **Comparator reads containers** — done. `Inventory` +
+      `analog_signal` (the exact `getRedstoneSignalFromContainer` formula,
+      `floor(fullness*14) + (any ? 1 : 0)`; max-stack assumed 64, documented),
+      `Structure` parses block-entity `Items`, `VanillaRules` carries container
+      slot counts, and the comparator's `getInputSignal` container path is
+      implemented from bytecode — direct rear override, plus reading *through*
+      one conductor when the rear signal is under 15. `Checkpoint` now carries
+      **all** mutable state (moves, toggles, comparator memory, inventories).
+      Goldens: `comparator_barrel.json` (3 stacks -> signal 2 -> on at t1),
+      `comparator_barrel_off.json` (empty barrel turns a lit comparator off).
+      Known gap, deliberate: `redstone_power` has no inventory view, so a
+      container-fed comparator's *strength* is invisible to that path — nothing
+      consumes it yet (dust is not integrated); revisit with dust.
+- [ ] **Capture upgrade** — per-tick container-NBT snapshots in TraceCapture,
+      `inventory_changed` in mc-tick-trace, engine-side inventory logging.
+- [ ] **Hopper** — 8gt transfer cooldown, pull-from-above / push-to-facing,
+      powered lock, block-entity tick order.
+- [ ] **Dropper / dispenser into containers** — QC-powered like pistons,
+      rising-edge activation, 4gt scheduled tick. Container-to-container only.
 
-## 7. Fluids — prerequisite for entities
+Still on the board, small and orthogonal: **buttons and pressure plates**
+(pulse lengths differ per material), redstone lamp, target block.
 
-Water and lava flow, levels, sources, and the **flow vector field**. Not an aside:
-item alignment in water streams is that field acting on entity motion, so this
-comes before items rather than after.
+## 6. Milestone B — item entities
 
-## 8. Entities
+Strictly after A. Float positions (the differ's tolerance mode finally earns
+its keep), entity events in the capture (the format already defines them), and
+a **randomness policy**: dispense velocity has RNG jitter, so vanilla captures
+are not bit-reproducible — the engine needs a seeded-deterministic mode for
+product runs plus tolerance-based conformance against captures. Physics:
+gravity, drag, ground rest, merging, despawn, hopper vacuum pickup.
 
-In the order originally specified:
+The original plan put fluids before items because water streams move items;
+inverted now — items on dry land (dropper → floor → hopper pickup) are a
+complete, testable milestone, and fluids join when stream alignment matters.
 
-1. **Items** — gravity, drag, water-flow response, merging, despawn
-2. **Minecarts** — rails, momentum, curves, powered rails
-3. **Armor stands** — mostly static, but needed for interaction and collision
+## 7. Fluids
+
+Water and lava flow, levels, sources, and the **flow vector field** — joined
+to item motion once Milestone B lands.
+
+## 8. Remaining entities
+
+1. **Minecarts** — rails, momentum, curves, powered rails
+2. **Armor stands** — mostly static, but needed for interaction and collision
 
 Entity motion is float-based, so the differ's tolerance mode finally earns its
 keep. Traces will need entity events, which the format already defines but the

@@ -50,6 +50,10 @@ pub struct Checkpoint {
     world: World,
     ticks: TickQueue,
     events: EventQueue,
+    moves: Vec<PendingMove>,
+    toggles: Vec<(Pos, u64)>,
+    comparator_out: std::collections::HashMap<Pos, u8>,
+    inventories: std::collections::HashMap<Pos, crate::inventory::Inventory>,
 }
 
 /// A controllable, deterministic simulation of a bounded region.
@@ -78,6 +82,8 @@ pub struct Simulation {
     toggles: Vec<(Pos, u64)>,
     /// Stored comparator output strengths; vanilla's ComparatorBlockEntity.
     comparator_out: std::collections::HashMap<Pos, u8>,
+    /// Container contents by position; vanilla's inventory block entities.
+    inventories: std::collections::HashMap<Pos, crate::inventory::Inventory>,
     /// Recorded block changes, when recording is enabled.
     log: Option<Vec<BlockChange>>,
     /// Whether a tick's phase walk is currently executing.
@@ -114,6 +120,10 @@ impl Simulation {
             world: world.clone(),
             ticks: TickQueue::new(),
             events: EventQueue::new(),
+            moves: Vec::new(),
+            toggles: Vec::new(),
+            comparator_out: std::collections::HashMap::new(),
+            inventories: std::collections::HashMap::new(),
         };
         Self {
             registry: StateRegistry::new(),
@@ -126,6 +136,7 @@ impl Simulation {
             moves: Vec::new(),
             toggles: Vec::new(),
             comparator_out: std::collections::HashMap::new(),
+            inventories: std::collections::HashMap::new(),
             log: None,
             in_tick: false,
             ticking: None,
@@ -306,6 +317,10 @@ impl Simulation {
             world: self.world.clone(),
             ticks: self.ticks.clone(),
             events: self.events.clone(),
+            moves: self.moves.clone(),
+            toggles: self.toggles.clone(),
+            comparator_out: self.comparator_out.clone(),
+            inventories: self.inventories.clone(),
         }
     }
 
@@ -320,6 +335,20 @@ impl Simulation {
         self.world = checkpoint.world.clone();
         self.ticks = checkpoint.ticks.clone();
         self.events = checkpoint.events.clone();
+        self.moves = checkpoint.moves.clone();
+        self.toggles = checkpoint.toggles.clone();
+        self.comparator_out = checkpoint.comparator_out.clone();
+        self.inventories = checkpoint.inventories.clone();
+    }
+
+    /// Set the container contents at `pos`, as loading a structure does.
+    pub fn set_inventory(&mut self, pos: Pos, inventory: crate::inventory::Inventory) {
+        self.inventories.insert(pos, inventory);
+    }
+
+    /// The container contents at `pos`, if any.
+    pub fn inventory(&self, pos: Pos) -> Option<&crate::inventory::Inventory> {
+        self.inventories.get(&pos)
     }
 
     /// Return to the state at construction, or at the last [`Simulation::mark_initial`].
@@ -364,6 +393,7 @@ impl Simulation {
                 moves: &mut self.moves,
                 toggles: &mut self.toggles,
                 comparator_out: &mut self.comparator_out,
+                inventories: &mut self.inventories,
                 log: self.log.as_mut(),
             };
             behaviour.on_neighbor_changed(&mut ctx, pos, from);
@@ -445,6 +475,8 @@ impl Simulation {
             return;
         }
         self.world.set(pos, state);
+        // Breaking a container takes its contents with it.
+        self.inventories.remove(&pos);
         if let Some(log) = self.log.as_mut() {
             log.push(BlockChange { tick: self.tick, pos, from: previous, to: state });
         }
@@ -479,6 +511,7 @@ impl Simulation {
             moves: &mut self.moves,
             toggles: &mut self.toggles,
             comparator_out: &mut self.comparator_out,
+                inventories: &mut self.inventories,
             log: self.log.as_mut(),
         };
         behaviour.on_used(&mut ctx, pos);
@@ -517,6 +550,7 @@ impl Simulation {
                 moves: &mut self.moves,
                         toggles: &mut self.toggles,
                         comparator_out: &mut self.comparator_out,
+                inventories: &mut self.inventories,
                         log: self.log.as_mut(),
                     };
                     behaviour.on_scheduled_tick(&mut ctx, entry.pos);
@@ -612,6 +646,7 @@ impl Simulation {
                         moves: &mut self.moves,
                         toggles: &mut self.toggles,
                         comparator_out: &mut self.comparator_out,
+                inventories: &mut self.inventories,
                         log: self.log.as_mut(),
                     };
                     behaviour.on_placed(&mut ctx, pos);
@@ -651,6 +686,7 @@ impl Simulation {
                 moves: &mut self.moves,
                         toggles: &mut self.toggles,
                         comparator_out: &mut self.comparator_out,
+                inventories: &mut self.inventories,
                         log: self.log.as_mut(),
                 };
                 behaviour.on_block_event(&mut ctx, event.pos, event.id, event.param);
@@ -737,6 +773,36 @@ mod tests {
         s.world_mut().set(Pos::new(3, 3, 3), stone);
         s.reset();
         assert_eq!(s.world().non_air_count(), 0);
+    }
+
+    #[test]
+    fn checkpoints_carry_inventories() {
+        // Container contents are mutable simulation state — a checkpoint that
+        // dropped them would restore a world whose comparators read differently.
+        let mut s = sim();
+        let pos = Pos::new(2, 2, 2);
+        s.set_inventory(pos, crate::inventory::Inventory::empty(27));
+        let saved = s.checkpoint();
+
+        s.set_inventory(
+            pos,
+            crate::inventory::Inventory {
+                slots: 27,
+                stacks: vec![crate::inventory::ItemStack {
+                    slot: 0,
+                    id: "minecraft:redstone".to_string(),
+                    count: 64,
+                }],
+            },
+        );
+        assert_eq!(s.inventory(pos).unwrap().analog_signal(), 1);
+
+        s.restore(&saved);
+        assert_eq!(
+            s.inventory(pos).unwrap().analog_signal(),
+            0,
+            "restore must bring the container contents back"
+        );
     }
 
     #[test]

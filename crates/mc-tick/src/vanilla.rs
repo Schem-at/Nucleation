@@ -146,6 +146,8 @@ pub struct VanillaRules {
     /// Growing this list is capture-driven: slime is on it because the flying
     /// machine's trace proves the signal crossed it. Glass famously is not.
     conductors: Vec<StateId>,
+    /// Container states and their slot counts, for the comparator's analog read.
+    containers: HashMap<StateId, u32>,
     immovable: Vec<StateId>,
     slime: Vec<StateId>,
     honey: Vec<StateId>,
@@ -163,6 +165,27 @@ impl VanillaRules {
 }
 
 impl PowerSource for VanillaRules {
+    fn analog_signal(
+        &self,
+        world: &World,
+        inventories: &crate::inventory::InventoryMap,
+        pos: Pos,
+    ) -> Option<u8> {
+        let slots = *self.containers.get(&world.get(pos))?;
+        // A container with no recorded contents is an empty container — its
+        // analog output is a real 0, not an absence.
+        Some(
+            inventories
+                .get(&pos)
+                .map_or(0, crate::inventory::Inventory::analog_signal)
+                .min(if slots == 0 { 0 } else { 15 }),
+        )
+    }
+
+    fn is_conductor(&self, world: &World, pos: Pos) -> bool {
+        self.conductors.contains(&world.get(pos))
+    }
+
     fn is_powered(&self, world: &World, pos: Pos, toward: Dir) -> bool {
         let state = world.get(pos);
         if self.powered.contains(&state)
@@ -230,6 +253,9 @@ const INERT: &[&str] = &[
     "minecraft:gold_block",
     "minecraft:glass",
     "minecraft:white_stained_glass",
+    "minecraft:barrel",
+    "minecraft:chest",
+    "minecraft:trapped_chest",
     "minecraft:sea_lantern",
     "minecraft:redstone_lamp",
     "minecraft:slime_block",
@@ -264,6 +290,9 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
                 rules.conductors.push(*id);
             }
             "minecraft:honey_block" => rules.honey.push(*id),
+            n if container_slots(n).is_some() => {
+                rules.containers.insert(*id, container_slots(n).unwrap());
+            }
             _ => {}
         }
         if IMMOVABLE.contains(&descriptor.name.as_str()) {
@@ -449,6 +478,22 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
     }
 
     rules
+}
+
+/// How many inventory slots a container block has.
+///
+/// Sizes are the block entities' declared container sizes (`BarrelBlockEntity`
+/// and `ChestBlockEntity` are 27, `HopperBlockEntity` 5, `DispenserBlockEntity`
+/// 9). Hoppers, droppers and dispensers appear here so their inventories load,
+/// even though their behaviours are not implemented yet — they stay
+/// unregistered and loud until they are.
+pub fn container_slots(name: &str) -> Option<u32> {
+    match name {
+        "minecraft:barrel" | "minecraft:chest" | "minecraft:trapped_chest" => Some(27),
+        "minecraft:hopper" => Some(5),
+        "minecraft:dropper" | "minecraft:dispenser" => Some(9),
+        _ => None,
+    }
 }
 
 /// The unpowered/powered pair for a descriptor, if both states are interned.

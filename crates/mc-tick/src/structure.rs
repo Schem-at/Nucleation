@@ -43,6 +43,12 @@ pub struct Structure {
     pub palette: Vec<String>,
     /// Positions with their palette index.
     pub blocks: Vec<(Pos, usize)>,
+    /// Container contents, from block-entity `nbt` `Items` lists.
+    ///
+    /// Only `Items` is understood; other block-entity data is skipped. The
+    /// caller turns these into engine inventories at load time — the parser
+    /// does not know how many slots a barrel has.
+    pub inventories: Vec<(Pos, Vec<crate::inventory::ItemStack>)>,
 }
 
 /// Why a structure could not be read.
@@ -283,6 +289,68 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// A block-entity `nbt` compound: extract the `Items` list, skip the rest.
+    fn nbt_items(&mut self) -> Result<Vec<crate::inventory::ItemStack>, StructureError> {
+        self.eat(b'{')?;
+        let mut items = Vec::new();
+        loop {
+            if self.peek() == Some(b'}') {
+                self.at += 1;
+                return Ok(items);
+            }
+            let key = self.key()?;
+            self.eat(b':')?;
+            if key == "Items" {
+                self.eat(b'[')?;
+                loop {
+                    if self.peek() == Some(b']') {
+                        self.at += 1;
+                        break;
+                    }
+                    items.push(self.item_entry()?);
+                    if self.peek() == Some(b',') {
+                        self.at += 1;
+                    }
+                }
+            } else {
+                self.skip_value()?;
+            }
+            if self.peek() == Some(b',') {
+                self.at += 1;
+            }
+        }
+    }
+
+    /// One `Items` entry: `{Slot: 0b, id: "minecraft:redstone", count: 3}`.
+    fn item_entry(&mut self) -> Result<crate::inventory::ItemStack, StructureError> {
+        self.eat(b'{')?;
+        let mut slot = 0u8;
+        let mut id = String::new();
+        let mut count = 1u8;
+        loop {
+            if self.peek() == Some(b'}') {
+                self.at += 1;
+                break;
+            }
+            let key = self.key()?;
+            self.eat(b':')?;
+            match key.as_str() {
+                "Slot" => slot = self.int()? as u8,
+                "id" => id = self.string()?,
+                // Both spellings: `Count` before the components rework, `count` after.
+                "count" | "Count" => count = self.int()? as u8,
+                _ => self.skip_value()?,
+            }
+            if self.peek() == Some(b',') {
+                self.at += 1;
+            }
+        }
+        if id.is_empty() {
+            return self.err("item entry needs an id");
+        }
+        Ok(crate::inventory::ItemStack { slot, id, count })
+    }
+
     /// One palette entry, rendered as the descriptor the registry interns.
     fn palette_entry(&mut self) -> Result<String, StructureError> {
         self.eat(b'{')?;
@@ -342,6 +410,7 @@ impl<'a> Parser<'a> {
         let mut size = None;
         let mut palette = None;
         let mut blocks: Option<Vec<(Pos, usize)>> = None;
+        let mut inventories: Vec<(Pos, Vec<crate::inventory::ItemStack>)> = Vec::new();
 
         loop {
             if self.peek() == Some(b'}') {
@@ -384,6 +453,7 @@ impl<'a> Parser<'a> {
                         self.eat(b'{')?;
                         let mut pos = None;
                         let mut state = None;
+                        let mut items: Vec<crate::inventory::ItemStack> = Vec::new();
                         loop {
                             if self.peek() == Some(b'}') {
                                 self.at += 1;
@@ -404,6 +474,7 @@ impl<'a> Parser<'a> {
                                     ));
                                 }
                                 "state" => state = Some(self.int()? as usize),
+                                "nbt" => items = self.nbt_items()?,
                                 _ => self.skip_value()?,
                             }
                             if self.peek() == Some(b',') {
@@ -411,7 +482,12 @@ impl<'a> Parser<'a> {
                             }
                         }
                         match (pos, state) {
-                            (Some(p), Some(s)) => entries.push((p, s)),
+                            (Some(p), Some(s)) => {
+                                entries.push((p, s));
+                                if !items.is_empty() {
+                                    inventories.push((p, items));
+                                }
+                            }
                             _ => return self.err("block needs both `pos` and `state`"),
                         }
                         if self.peek() == Some(b',') {
@@ -431,6 +507,7 @@ impl<'a> Parser<'a> {
             size: size.ok_or(StructureError::Missing("size"))?,
             palette: palette.ok_or(StructureError::Missing("palette"))?,
             blocks: blocks.ok_or(StructureError::Missing("blocks"))?,
+            inventories,
         })
     }
 }

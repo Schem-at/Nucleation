@@ -178,6 +178,28 @@ fn run_conformance_bounded(
             .unwrap_or_else(|e| panic!("{label}: interning {descriptor}: {e:?}"));
     }
 
+    // Container contents from the structure's block-entity NBT. Slot counts come
+    // from the block name — the structure format does not carry them.
+    for (pos, stacks) in &structure.inventories {
+        let entry = structure
+            .blocks
+            .iter()
+            .find(|(p, _)| p == pos)
+            .map(|(_, e)| *e)
+            .unwrap_or_else(|| panic!("{label}: inventory at {pos:?} with no block"));
+        let name = structure.palette[entry]
+            .split('[')
+            .next()
+            .unwrap_or_default()
+            .to_string();
+        let slots = mc_tick::vanilla::container_slots(&name)
+            .unwrap_or_else(|| panic!("{label}: {name} has an inventory but no slot count"));
+        sim.set_inventory(
+            *pos,
+            mc_tick::Inventory { slots, stacks: stacks.clone() },
+        );
+    }
+
     // A build only contains the states it was saved with; a block needs its
     // counterparts to be able to change at all.
     mc_tick::intern_companions(sim.registry_mut());
@@ -338,6 +360,30 @@ fn a_quietly_placed_engine_stays_still_until_clicked() {
         &[(10, Actuate::Use(Pos::new(15, 0, 2)))],
         None,
         Settle::Quiet,
+    );
+}
+
+#[test]
+fn a_comparator_reads_a_container_through_its_rear() {
+    // The first container behaviour: a barrel holding three full stacks reads
+    // analog 2 (floor(3/27 * 14) + 1), and the comparator behind it turns on
+    // one tick after placement — the boundary-scheduled 2-game-tick delay.
+    run_conformance(
+        "comparator_barrel.snbt",
+        "comparator_barrel.json",
+        "nucleation:comparator_barrel",
+    );
+}
+
+#[test]
+fn an_empty_container_turns_a_lit_comparator_off() {
+    // The negative control, and the Some(0)-vs-None distinction: an empty
+    // barrel has a real analog signal of 0, so a comparator authored powered
+    // must schedule and turn off.
+    run_conformance(
+        "comparator_barrel_off.snbt",
+        "comparator_barrel_off.json",
+        "nucleation:comparator_barrel_off",
     );
 }
 

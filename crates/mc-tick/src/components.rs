@@ -124,6 +124,25 @@ pub trait PowerSource: Send + Sync {
     /// Whether `pos` currently emits a signal toward `toward`.
     fn is_powered(&self, world: &World, pos: Pos, toward: Dir) -> bool;
 
+    /// The analog (comparator-readable) signal of the block at `pos`, if it has
+    /// one — a container's fullness, principally. `None` means the block has no
+    /// analog output at all, which is different from an empty container's
+    /// `Some(0)`.
+    fn analog_signal(
+        &self,
+        _world: &World,
+        _inventories: &crate::inventory::InventoryMap,
+        _pos: Pos,
+    ) -> Option<u8> {
+        None
+    }
+
+    /// Whether the block at `pos` conducts strong power — also the block a
+    /// comparator can read a container *through*.
+    fn is_conductor(&self, _world: &World, _pos: Pos) -> bool {
+        false
+    }
+
     /// Whether the block at `pos` is a diode, for repeater-priority purposes.
     fn is_diode(&self, world: &World, pos: Pos) -> bool;
 
@@ -426,11 +445,31 @@ impl<P: PowerSource> Comparator<P> {
     /// Rear input comes from [`Comparator::input_side`]; side inputs from the two
     /// horizontal directions perpendicular to it, matching the game's use of the
     /// same perpendicular pair that governs repeater locking.
-    pub fn output_strength(&self, world: &World, pos: Pos) -> u8 {
+    ///
+    /// The container path is `ComparatorBlock.getInputSignal`, from bytecode: a
+    /// block with an analog signal directly behind **overrides** the rear
+    /// redstone reading; failing that, when the rear reading is below 15 and
+    /// the block behind is a conductor, the comparator reads a container one
+    /// block further back *through* it.
+    pub fn output_strength(
+        &self,
+        world: &World,
+        inventories: &crate::inventory::InventoryMap,
+        pos: Pos,
+    ) -> u8 {
         let back = self.input_side();
-        let rear = self
-            .power
-            .signal_strength(world, pos.offset(back), back.opposite());
+        let rear_pos = pos.offset(back);
+        let mut rear = self.power.signal_strength(world, rear_pos, back.opposite());
+        if let Some(analog) = self.power.analog_signal(world, inventories, rear_pos) {
+            rear = analog;
+        } else if rear < 15 && self.power.is_conductor(world, rear_pos) {
+            if let Some(analog) =
+                self.power
+                    .analog_signal(world, inventories, rear_pos.offset(back))
+            {
+                rear = analog;
+            }
+        }
         let side = perpendicular(back)
             .into_iter()
             .map(|dir| {
@@ -461,7 +500,7 @@ impl<P: PowerSource> BlockBehaviour for Comparator<P> {
         if ctx.ticks.has_pending_at(pos, ctx.tick) {
             return;
         }
-        let output = self.output_strength(ctx.world, pos);
+        let output = self.output_strength(ctx.world, ctx.inventories, pos);
         let stored = ctx.stored_comparator_output(pos);
         let should_be_on = output > 0;
 
@@ -478,7 +517,7 @@ impl<P: PowerSource> BlockBehaviour for Comparator<P> {
     }
 
     fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
-        let output = self.output_strength(ctx.world, pos);
+        let output = self.output_strength(ctx.world, ctx.inventories, pos);
         ctx.store_comparator_output(pos, output);
         let should_be_on = output > 0;
         if should_be_on != self.powered {
@@ -489,7 +528,11 @@ impl<P: PowerSource> BlockBehaviour for Comparator<P> {
     fn redstone_power(&self, world: &World, pos: Pos, dir: Dir) -> u8 {
         let output = self.input_side().opposite();
         if dir == output {
-            self.output_strength(world, pos)
+            // No inventory view reaches this trait method, so a container-fed
+            // comparator's *strength* is not visible here — only its powered
+            // block state is. Nothing consumes analog strength through this
+            // path yet (dust is not integrated); revisit when it is.
+            self.output_strength(world, &Default::default(), pos)
         } else {
             0
         }
@@ -662,6 +705,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
             log: None,
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
@@ -694,6 +738,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
             log: None,
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
@@ -733,6 +778,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
             log: None,
         };
         repeater.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
@@ -767,6 +813,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
             log: None,
         };
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
@@ -803,6 +850,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
             log: None,
         };
         torch.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::Down);
@@ -840,6 +888,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
             log: None,
         };
         torch.on_scheduled_tick(&mut ctx, torch_pos);
@@ -889,6 +938,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
             log: None,
         };
         comparator.on_neighbor_changed(&mut ctx, Pos::new(0, 1, 0), Dir::East);
@@ -932,6 +982,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
             log: None,
         };
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
@@ -970,6 +1021,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
             log: None,
         };
         repeater.on_neighbor_changed(&mut ctx, pos, Dir::East);
@@ -1066,6 +1118,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut toggles,
             comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
             log: None,
         };
         torch.on_scheduled_tick(&mut ctx, pos);
@@ -1102,6 +1155,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut toggles,
             comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
             log: None,
         };
         torch.on_scheduled_tick(&mut ctx, pos);
@@ -1140,6 +1194,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut toggles,
             comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
             log: None,
         };
         torch.on_scheduled_tick(&mut ctx, pos);
@@ -1211,6 +1266,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut stored,
+            inventories: &mut Default::default(),
             log: None,
         };
         comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);
@@ -1240,6 +1296,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut stored,
+            inventories: &mut Default::default(),
             log: None,
         };
         comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);
@@ -1271,6 +1328,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut stored,
+            inventories: &mut Default::default(),
             log: None,
         };
         comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);
@@ -1310,6 +1368,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut stored,
+            inventories: &mut Default::default(),
             log: None,
         };
         comparator.on_neighbor_changed(&mut ctx, pos, Dir::East);

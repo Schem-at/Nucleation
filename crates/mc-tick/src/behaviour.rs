@@ -99,6 +99,12 @@ pub struct TickCtx<'a> {
     /// 9". Comparator priming is exactly the consequence: a comparator schedules a
     /// tick when its output *strength* changes even though `powered` does not.
     pub comparator_out: &'a mut std::collections::HashMap<Pos, u8>,
+    /// Container contents by position — vanilla's inventory block entities.
+    ///
+    /// What a comparator reads and a hopper will move. Kept with the simulation
+    /// for the same reason as `comparator_out`: block states cannot express
+    /// "27 slots holding 40 redstone".
+    pub inventories: &'a mut std::collections::HashMap<Pos, crate::inventory::Inventory>,
     /// Recent redstone-torch toggles, for burnout detection.
     ///
     /// Burnout is the one behaviour that depends on *history* rather than on the
@@ -523,6 +529,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
             log: None,
         };
         source.on_neighbor_changed(&mut ctx, Pos::new(0, 0, 0), Dir::Up);
@@ -548,6 +555,7 @@ mod tests {
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
             comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
             log: None,
         };
         ctx.schedule(Pos::new(1, 1, 1), 2, TickPriority::High);

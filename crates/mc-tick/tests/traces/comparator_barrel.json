@@ -1,0 +1,14 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:comparator_barrel",
+  "detail": "normal",
+  "ticks": [
+    {
+      "tick": 1,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 1, 0], "from": "minecraft:comparator[facing=west,mode=compare,powered=false]", "to": "minecraft:comparator[facing=west,mode=compare,powered=true]"}
+      ]
+    }
+  ]
+}

@@ -116,11 +116,12 @@ crates/mc-tick engine  →  emit trace  →  diff against golden  ◄───�
 `tests/conformance.rs` is this loop as a Rust test: load a structure, wire vanilla
 behaviour to it via the registry, settle, actuate (place/break/click at chosen
 ticks), run, and assert the engine's trace matches the captured golden **tick for
-tick**. Nine cases pass today — piston QC, slime adhesion, note-block power,
+tick**. Eleven cases pass today — piston QC, slime adhesion, note-block power,
 note-block click, the manual engine twice (its 21-tick placement cycle, and a
 55-tick padded run whose second activation is started by a player click), a
 broken flying machine that must break exactly as vanilla breaks it, and a
-quietly placed engine that stays perfectly still until clicked — all
+quietly placed engine that stays perfectly still until clicked, and a
+comparator reading a barrel's fullness (on and off) — all
 driven entirely by the descriptor→behaviour registry with no hand-wiring.
 
 ### `crates/mc-tick/tests/corpus/` — zero-compile test cases
@@ -132,7 +133,7 @@ adding a file, no recompilation. `load <name>.snbt` runs a real structure.
 
 ## What's simulated today
 
-**158 tests, all green.** Everything below is trace- or bytecode-verified.
+**162 tests, all green.** Everything below is trace- or bytecode-verified.
 
 ### Engine core
 - **Tick phases** — all ten, in verified order, as an explicit walked sequence.
@@ -167,7 +168,7 @@ adding a file, no recompilation. `load <name>.snbt` runs a real structure.
 | **Dust** | Synchronous settling, 15-block attenuation, locational default |
 | **Redstone torch** | 2-tick delay, inverts support, NORMAL priority, burnout (8 turn-offs / 60t) |
 | **Repeater** | delay×2 game ticks, 3-way priority (repeater priority via `shouldPrioritize`), locking |
-| **Comparator** | compare/subtract with side inputs, fixed 2t, **priming** (strength-change scheduling) |
+| **Comparator** | compare/subtract with side inputs, fixed 2t, **priming** (strength-change scheduling), **container analog reads** (direct and through one conductor) |
 | **Observer** | 2-tick pulse, watches facing side, ignores other sides, **emits from its back face only** (strongly — a conductor like slime re-emits it), pulses once on placement and again when moved, self-clears if it lands mid-pulse, updates the block in front *and its neighbours* on both edges |
 | **Note block** | synchronous `powered` follow, block-event play (air above required), click cycles pitch 0-24 |
 | **Redstone block / lever** | constant / toggled power sources |

@@ -584,7 +584,8 @@ mod tests {
         updates: Box::leak(Box::new(Vec::new())),
         moves: Box::leak(Box::new(Vec::new())),
         toggles: Box::leak(Box::new(Vec::new())),
-        comparator_out: Box::leak(Box::new(Default::default())), log: None }
+        comparator_out: Box::leak(Box::new(Default::default())),
+        inventories: Box::leak(Box::new(Default::default())), log: None }
     }
 
     #[test]
@@ -639,6 +640,7 @@ mod tests {
                 updates: &mut Vec::new(), moves: &mut ctx_moves,
                 toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
                 log: None,
             };
             assert!(p.on_block_event(&mut ctx, pos, TRIGGER_EXTEND, 0));
@@ -736,6 +738,7 @@ mod tests {
             boundary: false,
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
                 log: None,
             };
             assert!(p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0));
@@ -787,6 +790,7 @@ mod tests {
             boundary: false,
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
                 log: None,
             };
             p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0);
@@ -831,6 +835,7 @@ mod tests {
             boundary: false,
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
+            inventories: &mut Default::default(),
                 log: None,
             };
             p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0);
