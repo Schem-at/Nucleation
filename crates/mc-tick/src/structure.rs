@@ -151,8 +151,7 @@ impl Structure {
     ///
     /// Vanilla does **not** use the file's block order. `addToLists` splits
     /// the blocks three ways — full collision cubes without block-entity NBT,
-    /// everything else without NBT, and everything with NBT — sorts each by
-    /// `(y, x, z)` — the comparator's key order, read from its lambdas — and
+    /// everything else without NBT, and everything with NBT — sorts each and
     /// concatenates them *solid, other, block-entities*
     /// (`buildInfoList`). The update pass then walks that list, so a build's
     /// solid frame settles before a single redstone component is touched.
@@ -160,6 +159,33 @@ impl Structure {
     /// The order is observable: it decides which transient each repeater and
     /// torch latches, and running a community door in file order instead
     /// started clocks the game never starts.
+    ///
+    /// # The key order, and an honest contradiction
+    ///
+    /// Within a group this walks **descending y, then ascending x, then
+    /// ascending z**, and the descending part is *not* what the bytecode
+    /// appears to say. `buildInfoList`'s comparator reads
+    /// `comparingInt(getY).thenComparingInt(getX).thenComparingInt(getZ)` —
+    /// ascending, with no `reversed()` and no negation in any of the three
+    /// lambdas — the setBlock loop appends each placed block to an
+    /// accumulator, and the update pass iterates that accumulator forward.
+    ///
+    /// Two captured fixtures say otherwise, and captures arbitrate here:
+    ///
+    /// - `gap_race` — two observers at the **same** y, differing only in x,
+    ///   racing two pistons for one shared gap, with the high-x observer
+    ///   written first in the file. Vanilla picks the **low-x** side, which
+    ///   rules out file order and pins the x tie-break as ascending. It
+    ///   passes under either y direction.
+    /// - `piston_race` — the same race vertically, observers at y=1 and y=9.
+    ///   Vanilla picks the **y=9** side. Only a descending-y walk reproduces
+    ///   that, and switching to it leaves every other golden green.
+    ///
+    /// So the order below is what the game demonstrably does, while the
+    /// mechanism behind it is unexplained — most likely this engine schedules
+    /// observers at the wrong moment during placement and the reversal
+    /// compensates. Treat it as a fixture-backed approximation rather than a
+    /// transcription: if a future capture disagrees, suspect this first.
     pub fn placement_order(
         &self,
         is_full_cube: impl Fn(&str) -> bool,
@@ -179,7 +205,7 @@ impl Structure {
             }
         }
         for group in [&mut solid, &mut other, &mut entities] {
-            group.sort_by_key(|p| (p.y, p.x, p.z));
+            group.sort_by_key(|p| (std::cmp::Reverse(p.y), p.x, p.z));
         }
         solid.into_iter().chain(other).chain(entities).collect()
     }

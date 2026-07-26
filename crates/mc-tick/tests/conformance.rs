@@ -1237,8 +1237,6 @@ fn the_6x6_door_runs_a_full_close_open_cycle() {
 }
 
 #[test]
-#[ignore = "isolated fixture for the door bug: two opposed pistons race for one \
-gap and the engine picks the wrong winner. 20 blocks, so it iterates in a second."]
 fn opposed_pistons_race_for_one_gap() {
     // The vault door's failure, minimised: a piston facing up under five
     // concrete, a one-block gap, a piston facing down above it, and an
@@ -1246,6 +1244,8 @@ fn opposed_pistons_race_for_one_gap() {
     // pistons want the gap. Vanilla's *down* piston wins — it pokes its head
     // into the gap and the column never moves — which means vanilla notifies
     // it first, even though its observer sits at y=9 and the other at y=1.
+    // See `Structure::placement_order` for why the walk descends y, and for
+    // the contradiction that reading leaves unresolved.
     run_conformance("piston_race.snbt", "piston_race.json", "nucleation:piston_race");
 }
 

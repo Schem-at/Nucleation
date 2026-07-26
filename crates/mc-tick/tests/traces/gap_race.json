@@ -1,0 +1,34 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:gap_race",
+  "detail": "normal",
+  "ticks": [
+    {
+      "tick": 1,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [0, 1, 1], "from": "minecraft:piston[extended=false,facing=east]", "to": "minecraft:piston[extended=true,facing=east]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 1, 1], "from": "minecraft:white_concrete", "to": "minecraft:moving_piston[facing=east,type=normal]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 1, 1], "from": "minecraft:air", "to": "minecraft:moving_piston[facing=east,type=normal]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [0, 1, 2], "from": "minecraft:observer[facing=south,powered=false]", "to": "minecraft:observer[facing=south,powered=true]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [4, 1, 2], "from": "minecraft:observer[facing=south,powered=false]", "to": "minecraft:observer[facing=south,powered=true]"}
+      ]
+    },
+    {
+      "tick": 3,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [0, 1, 1], "from": "minecraft:piston[extended=true,facing=east]", "to": "minecraft:moving_piston[facing=east,type=normal]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 1, 1], "from": "minecraft:moving_piston[facing=east,type=normal]", "to": "minecraft:air"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 1, 1], "from": "minecraft:moving_piston[facing=east,type=normal]", "to": "minecraft:white_concrete"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [0, 1, 2], "from": "minecraft:observer[facing=south,powered=true]", "to": "minecraft:observer[facing=south,powered=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [4, 1, 2], "from": "minecraft:observer[facing=south,powered=true]", "to": "minecraft:observer[facing=south,powered=false]"}
+      ]
+    },
+    {
+      "tick": 5,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [0, 1, 1], "from": "minecraft:moving_piston[facing=east,type=normal]", "to": "minecraft:piston[extended=false,facing=east]"}
+      ]
+    }
+  ]
+}
