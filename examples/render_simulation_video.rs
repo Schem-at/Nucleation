@@ -54,14 +54,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let frames_per_tick: u32 = flag(&args, "--frames-per-tick")
         .map_or(6, |v| v.parse().expect("--frames-per-tick N"));
     let fps: f64 = flag(&args, "--fps").map_or(30.0, |v| v.parse().expect("--fps N"));
-    let click: Option<(Pos, u64)> = flag(&args, "--click").map(|v| {
-        let (xyz, t) = v.split_once('@').expect("--click x,y,z@T");
-        let p: Vec<i32> = xyz.split(',').map(|c| c.parse().expect("coord")).collect();
-        (Pos::new(p[0], p[1], p[2]), t.parse().expect("tick"))
-    });
+    let transparent = args.iter().any(|a| a == "--transparent");
+    // Every --click occurrence is an actuation; a moving machine's note block
+    // moves with it, so successive clicks target successive positions.
+    let clicks: Vec<(Pos, u64)> = args
+        .iter()
+        .enumerate()
+        .filter(|(_, a)| *a == "--click")
+        .filter_map(|(i, _)| args.get(i + 1))
+        .map(|v| {
+            let (xyz, t) = v.split_once('@').expect("--click x,y,z@T");
+            let p: Vec<i32> = xyz.split(',').map(|c| c.parse().expect("coord")).collect();
+            (Pos::new(p[0], p[1], p[2]), t.parse().expect("tick"))
+        })
+        .collect();
 
     // ── 1. Simulate, recording every block change ───────────────────────────
-    let (initial, changes) = simulate(snbt_path, ticks, click);
+    let (initial, changes) = simulate(snbt_path, ticks, &clicks);
     println!("simulated {ticks} ticks, {} block changes", changes.len());
 
     // ── 2. Reconstruct the cast ─────────────────────────────────────────────
@@ -140,7 +149,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     config.width = 1280;
     config.height = 720;
     config.sphere_fit = true; // bounds cover the whole run, so the camera never drifts
-    let video = VideoConfig::h264(fps).map_err(|e| e.to_string())?;
+    if transparent {
+        config.background = Some([0.0, 0.0, 0.0, 0.0]);
+    }
+    // The container picks the codec: .webm keeps the alpha channel and still
+    // plays inline in chat clients; .mov is ProRes 4444 for compositing.
+    let video = match out_path.rsplit('.').next() {
+        Some("webm") => VideoConfig::vp9_alpha(fps),
+        Some("mov") => VideoConfig::prores_4444(fps),
+        _ => VideoConfig::h264(fps),
+    }
+    .map_err(|e| e.to_string())?;
     render_animation_to_video(
         &meshes,
         &frames,
@@ -165,7 +184,7 @@ fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
 fn simulate(
     snbt_path: &str,
     ticks: u64,
-    click: Option<(Pos, u64)>,
+    clicks: &[(Pos, u64)],
 ) -> (Vec<(Pos, String)>, Vec<(u64, Pos, String, String)>) {
     let text = std::fs::read_to_string(snbt_path).expect("read structure");
     let structure = Structure::parse(&text).expect("parse structure");
@@ -197,9 +216,9 @@ fn simulate(
 
     sim.record();
     for t in 0..ticks {
-        if let Some((pos, at)) = click {
-            if at == t {
-                sim.use_block(pos);
+        for (pos, at) in clicks {
+            if *at == t {
+                sim.use_block(*pos);
             }
         }
         sim.step();

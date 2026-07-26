@@ -16,6 +16,9 @@ static TEMP_ID: AtomicU64 = AtomicU64::new(0);
 pub enum VideoCodec {
     ProRes4444,
     H264,
+    /// VP9 in WebM with an alpha channel (`yuva420p`) — the transparent format
+    /// browsers and chat clients play inline, unlike ProRes.
+    Vp9Alpha,
 }
 
 #[derive(Debug, Clone)]
@@ -32,6 +35,10 @@ impl VideoConfig {
 
     pub fn h264(fps: f64) -> Result<Self, String> {
         Self::new(fps, VideoCodec::H264)
+    }
+
+    pub fn vp9_alpha(fps: f64) -> Result<Self, String> {
+        Self::new(fps, VideoCodec::Vp9Alpha)
     }
 
     fn new(fps: f64, codec: VideoCodec) -> Result<Self, String> {
@@ -61,6 +68,9 @@ impl VideoConfig {
             }
             VideoCodec::H264 if extension != "mp4" && extension != "mov" => {
                 Err("H.264 output must use a .mp4 or .mov container".to_string())
+            }
+            VideoCodec::Vp9Alpha if extension != "webm" => {
+                Err("VP9 alpha output must use a .webm container".to_string())
             }
             _ => Ok(()),
         }
@@ -108,6 +118,24 @@ impl VideoConfig {
                     "18",
                     "-movflags",
                     "+faststart",
+                ]
+                .into_iter()
+                .map(str::to_string),
+            ),
+            // `-auto-alt-ref 0` is required: libvpx silently drops the alpha
+            // plane when alt-ref frames are enabled.
+            VideoCodec::Vp9Alpha => args.extend(
+                [
+                    "-c:v",
+                    "libvpx-vp9",
+                    "-pix_fmt",
+                    "yuva420p",
+                    "-auto-alt-ref",
+                    "0",
+                    "-crf",
+                    "26",
+                    "-b:v",
+                    "0",
                 ]
                 .into_iter()
                 .map(str::to_string),
