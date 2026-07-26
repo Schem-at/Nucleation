@@ -23,8 +23,8 @@
 
 use crate::behaviour::{BehaviourTable, Inert};
 use crate::components::{
-    Comparator, ComparatorMode, Dropper, Hopper, NoteBlock, PowerSource, Repeater, StatePair,
-    Torch,
+    Button, Comparator, ComparatorMode, Dropper, Hopper, Lamp, NoteBlock, PowerSource,
+    PressurePlate, Repeater, StatePair, Torch,
 };
 use crate::observer::Observer;
 use crate::piston::{Movability, Piston, Sticky};
@@ -153,6 +153,10 @@ pub struct VanillaRules {
     hoppers: Vec<StateId>,
     /// Full-cube states, for hopper-suction blocking and item collision.
     full_cubes: Vec<StateId>,
+    /// Wire states: power level and horizontal connections (true = side or up).
+    wires: HashMap<StateId, (u8, [bool; 4])>,
+    /// `(wire state, power)` -> the same shape at that power.
+    wire_siblings: HashMap<(StateId, u8), StateId>,
     immovable: Vec<StateId>,
     slime: Vec<StateId>,
     honey: Vec<StateId>,
@@ -162,10 +166,82 @@ pub struct VanillaRules {
 impl VanillaRules {
     /// Whether any neighbour of `pos` strongly powers into it.
     fn strongly_powered(&self, world: &World, pos: Pos) -> bool {
+        // Powered dust sitting on top of `pos` strongly powers it.
+        if let Some((power, _)) = self.wires.get(&world.get(pos.offset(Dir::Up))) {
+            if *power > 0 {
+                return true;
+            }
+        }
         crate::pos::ALL_DIRS.iter().any(|dir| {
             let neighbour = world.get(pos.offset(*dir));
             self.strong_into.get(&neighbour) == Some(&dir.opposite())
         })
+    }
+}
+
+impl VanillaRules {
+    /// `is_powered` with `shouldSignal` off — every wire contribution muted,
+    /// including dust strongly powering the conductor it sits on. This is what
+    /// keeps a wire from feeding on its own floor block during evaluation.
+    fn is_powered_no_wire(&self, world: &World, pos: Pos, toward: Dir) -> bool {
+        let state = world.get(pos);
+        if self.powered.contains(&state)
+            && self.emit_only.get(&state).is_none_or(|only| *only == toward)
+        {
+            return true;
+        }
+        if !self.conductors.contains(&state) {
+            return false;
+        }
+        crate::pos::ALL_DIRS.iter().any(|dir| {
+            let neighbour = world.get(pos.offset(*dir));
+            self.strong_into.get(&neighbour) == Some(&dir.opposite())
+        })
+    }
+}
+
+impl crate::wire::WireWorld for VanillaRules {
+    /// `getBlockSignal`: the strongest non-wire signal into the wire —
+    /// components, sources, and strongly powered conductors, with the stored
+    /// comparator strength for exact analog levels.
+    fn block_signal(&self, ctx: &crate::behaviour::TickCtx<'_>, pos: Pos) -> u8 {
+        let mut best = 0u8;
+        for dir in crate::pos::ALL_DIRS {
+            let neighbour = pos.offset(dir);
+            let state = ctx.world.get(neighbour);
+            if self.wires.contains_key(&state) {
+                continue; // shouldSignal is off while evaluating: wires never count
+            }
+            // A comparator's emitted strength is its stored block-entity value.
+            let descriptor = ctx.states.descriptor(state).unwrap_or("");
+            if descriptor.starts_with("minecraft:comparator") && descriptor.contains("powered=true")
+            {
+                let d = Descriptor::parse(descriptor);
+                if d.facing().map(|f| f.opposite()) == Some(dir.opposite()) {
+                    best = best.max(ctx.stored_comparator_output(neighbour));
+                    continue;
+                }
+            }
+            if self.is_powered_no_wire(ctx.world, neighbour, dir.opposite()) {
+                best = best.max(15);
+            }
+        }
+        best
+    }
+
+    fn conductor(&self, world: &World, pos: Pos) -> bool {
+        self.full_cubes.contains(&world.get(pos))
+    }
+
+    fn wire_power(&self, world: &World, pos: Pos) -> Option<u8> {
+        self.wires.get(&world.get(pos)).map(|(power, _)| *power)
+    }
+
+    fn wire_with_power(&self, world: &World, pos: Pos, power: u8) -> Option<StateId> {
+        // The shape survives; only the power property changes. Resolved through
+        // the registry via the sibling map built at registration.
+        let state = world.get(pos);
+        self.wire_siblings.get(&(state, power)).copied()
     }
 }
 
@@ -209,6 +285,27 @@ impl PowerSource for VanillaRules {
             && self.emit_only.get(&state).is_none_or(|only| *only == toward)
         {
             return true;
+        }
+        // Dust: powers the block beneath it and the sides it points into,
+        // never the block above.
+        if let Some((power, connections)) = self.wires.get(&state) {
+            if *power > 0 {
+                match toward {
+                    Dir::Down => return true,
+                    Dir::Up => {}
+                    side => {
+                        let index = match side {
+                            Dir::North => 0,
+                            Dir::South => 1,
+                            Dir::West => 2,
+                            _ => 3,
+                        };
+                        if connections[index] {
+                            return true;
+                        }
+                    }
+                }
+            }
         }
         // A strongly powered conductor re-emits weak power on every face.
         self.conductors.contains(&state) && self.strongly_powered(world, pos)
@@ -281,7 +378,6 @@ const INERT: &[&str] = &[
     "minecraft:chest",
     "minecraft:trapped_chest",
     "minecraft:sea_lantern",
-    "minecraft:redstone_lamp",
     "minecraft:slime_block",
     "minecraft:honey_block",
     "minecraft:piston_head",
@@ -309,9 +405,6 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
             n if CONSTANT_SOURCES.contains(&n) => rules.powered.push(*id),
             "minecraft:slime_block" => {
                 rules.slime.push(*id);
-                // Capture-verified conductor: the flying machine's observer
-                // drives its piston through a slime block.
-                rules.conductors.push(*id);
             }
             "minecraft:honey_block" => rules.honey.push(*id),
             n if container_slots(n).is_some() => {
@@ -328,11 +421,38 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
         if is_full_cube(descriptor) {
             rules.full_cubes.push(*id);
         }
+        if is_conductor(descriptor) {
+            rules.conductors.push(*id);
+        }
+        if descriptor.name == "minecraft:redstone_wire" {
+            let power = descriptor
+                .get("power")
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(0);
+            // Connection order matches Dir: North, South, West, East.
+            let connected = |key: &str| descriptor.get(key).is_some_and(|v| v != "none");
+            rules.wires.insert(
+                *id,
+                (
+                    power,
+                    [
+                        connected("north"),
+                        connected("south"),
+                        connected("west"),
+                        connected("east"),
+                    ],
+                ),
+            );
+        }
         // A powered diode, torch or observer is itself a source.
         let emits = match descriptor.name.as_str() {
             "minecraft:repeater" | "minecraft:comparator" | "minecraft:observer" => {
                 descriptor.flag("powered")
             }
+            "minecraft:stone_button"
+            | "minecraft:oak_button"
+            | "minecraft:stone_pressure_plate"
+            | "minecraft:oak_pressure_plate" => descriptor.flag("powered"),
             "minecraft:redstone_torch" | "minecraft:redstone_wall_torch" => descriptor.flag("lit"),
             "minecraft:lever" => descriptor.flag("powered"),
             _ => false,
@@ -347,6 +467,13 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
                     rules.strong_into.insert(*id, facing.opposite());
                 }
             }
+            // Plates strongly power their floor; floor buttons theirs.
+            if descriptor.name.ends_with("_pressure_plate")
+                || (descriptor.name.ends_with("_button")
+                    && descriptor.get("face") == Some("floor"))
+            {
+                rules.strong_into.insert(*id, Dir::Down);
+            }
         }
         if matches!(
             descriptor.name.as_str(),
@@ -354,6 +481,21 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
         ) {
             if let Some(facing) = descriptor.facing() {
                 rules.diodes.insert(*id, facing);
+            }
+        }
+    }
+
+    // Wire sibling map: every wire state's 16 power variants (same shape).
+    {
+        let wire_ids: Vec<StateId> = rules.wires.keys().copied().collect();
+        for id in wire_ids {
+            let Some(text) = registry.descriptor(id).map(str::to_string) else { continue };
+            let descriptor = Descriptor::parse(&text);
+            for power in 0u8..16 {
+                if let Some(sibling) = registry.get(&descriptor.with("power", &power.to_string()))
+                {
+                    rules.wire_siblings.insert((id, power), sibling);
+                }
             }
         }
     }
@@ -410,6 +552,52 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
                 table.register(
                     *id,
                     Box::new(Observer { facing, powered: descriptor.flag("powered"), states }),
+                );
+            }
+            "minecraft:stone_button" | "minecraft:oak_button" => {
+                let Some(states) = powered_pair(registry, descriptor) else { continue };
+                table.register(
+                    *id,
+                    Box::new(Button {
+                        powered: descriptor.flag("powered"),
+                        states,
+                        // BlockSetType: stone presses for 20 game ticks, wood 30.
+                        duration: if name == "minecraft:stone_button" { 20 } else { 30 },
+                        power: rules.clone(),
+                    }),
+                );
+            }
+            "minecraft:redstone_lamp" => {
+                let Some(states) = lit_pair(registry, descriptor) else { continue };
+                table.register(
+                    *id,
+                    Box::new(Lamp {
+                        lit: descriptor.flag("lit"),
+                        states,
+                        power: rules.clone(),
+                    }),
+                );
+            }
+            "minecraft:stone_pressure_plate" | "minecraft:oak_pressure_plate" => {
+                let Some(states) = powered_pair(registry, descriptor) else { continue };
+                table.register(
+                    *id,
+                    Box::new(PressurePlate {
+                        powered: descriptor.flag("powered"),
+                        states,
+                        senses_items: name == "minecraft:oak_pressure_plate",
+                        power: rules.clone(),
+                    }),
+                );
+            }
+            "minecraft:redstone_wire" => {
+                let power = descriptor
+                    .get("power")
+                    .and_then(|p| p.parse().ok())
+                    .unwrap_or(0);
+                table.register(
+                    *id,
+                    Box::new(crate::wire::Wire { power_level: power, rules: rules.clone() }),
                 );
             }
             "minecraft:note_block" => {
@@ -553,6 +741,30 @@ pub fn container_slots(name: &str) -> Option<u32> {
     }
 }
 
+/// Whether a block state conducts redstone (`isRedstoneConductor`).
+///
+/// Full cubes conduct, with the redstone-transparent exceptions: the glass
+/// family (the glass-diode captures prove it), sources like the redstone
+/// block, and observers. Slime conducting is capture-verified (the flying
+/// machine); stone conducting is capture-verified (dust soft-powering a
+/// piston through its floor block).
+fn is_conductor(descriptor: &Descriptor) -> bool {
+    if !is_full_cube(descriptor) {
+        return false;
+    }
+    !matches!(
+        descriptor.name.as_str(),
+        "minecraft:glass"
+            | "minecraft:white_stained_glass"
+            | "minecraft:sea_lantern"
+            | "minecraft:redstone_block"
+            | "minecraft:redstone_lamp"
+            | "minecraft:observer"
+            | "minecraft:slime_block"
+            | "minecraft:honey_block"
+    ) || matches!(descriptor.name.as_str(), "minecraft:slime_block")
+}
+
 /// Whether a block state is a full collision cube.
 ///
 /// Drives hopper-suction blocking and item-entity collision. Everything
@@ -573,7 +785,11 @@ fn is_full_cube(descriptor: &Descriptor) -> bool {
         | "minecraft:trapped_chest"
         | "minecraft:hopper"
         | "minecraft:piston_head"
-        | "minecraft:moving_piston" => false,
+        | "minecraft:moving_piston"
+        | "minecraft:stone_button"
+        | "minecraft:oak_button"
+        | "minecraft:stone_pressure_plate"
+        | "minecraft:oak_pressure_plate" => false,
         "minecraft:piston" | "minecraft:sticky_piston" => !descriptor.flag("extended"),
         _ => true,
     }
@@ -668,6 +884,18 @@ pub fn intern_companions(registry: &mut StateRegistry) {
                 vec![descriptor.with("powered", "false"), descriptor.with("powered", "true")]
             }
             "minecraft:redstone_torch" | "minecraft:redstone_wall_torch" => {
+                vec![descriptor.with("lit", "false"), descriptor.with("lit", "true")]
+            }
+            "minecraft:redstone_wire" => {
+                (0u8..16).map(|p| descriptor.with("power", &p.to_string())).collect()
+            }
+            "minecraft:stone_button"
+            | "minecraft:oak_button"
+            | "minecraft:stone_pressure_plate"
+            | "minecraft:oak_pressure_plate" => {
+                vec![descriptor.with("powered", "false"), descriptor.with("powered", "true")]
+            }
+            "minecraft:redstone_lamp" => {
                 vec![descriptor.with("lit", "false"), descriptor.with("lit", "true")]
             }
             "minecraft:hopper" => {

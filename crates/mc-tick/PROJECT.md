@@ -116,7 +116,7 @@ crates/mc-tick engine  →  emit trace  →  diff against golden  ◄───�
 `tests/conformance.rs` is this loop as a Rust test: load a structure, wire vanilla
 behaviour to it via the registry, settle, actuate (place/break/click at chosen
 ticks), run, and assert the engine's trace matches the captured golden **tick for
-tick**. Twenty-one cases pass today — piston QC, slime adhesion, note-block power,
+tick**. Twenty-nine cases pass today — piston QC, slime adhesion, note-block power,
 note-block click, the manual engine twice (its 21-tick placement cycle, and a
 55-tick padded run whose second activation is started by a player click), a
 broken flying machine that must break exactly as vanilla breaks it, and a
@@ -137,7 +137,7 @@ adding a file, no recompilation. `load <name>.snbt` runs a real structure.
 
 ## What's simulated today
 
-**178 tests, all green.** Everything below is trace- or bytecode-verified.
+**186 tests, all green.** Everything below is trace- or bytecode-verified.
 
 ### Engine core
 - **Tick phases** — all ten, in verified order, as an explicit walked sequence.
@@ -179,6 +179,8 @@ adding a file, no recompilation. `load <name>.snbt` runs a real structure.
 | **Hopper** | 8gt cooldown, eject-then-suck, one item per move, enabled gate, block-entity tick order with the destination-cooldown rule |
 | **Dropper / dispenser** | full-QC trigger, 4gt delay, silent TRIGGERED flips, container insertion (dropper) |
 | **Containers** | barrel/chest inventories, comparator analog reads, slot-level trace events |
+| **Redstone dust** | vanilla wire evaluator (fixed-point; ideal-order deviation documented), glass diode, soft power, comparator strengths |
+| **Buttons / plates / lamp** | stone 20gt / oak 30gt presses, item-sensing wooden plates, lamp 4gt off-delay |
 | **Item entities** | bit-faithful gravity/drag/bounce/rest physics, hopper vacuum, merging, despawn, mean-velocity dispenser ejects |
 
 ### Pistons (the accuracy crux)

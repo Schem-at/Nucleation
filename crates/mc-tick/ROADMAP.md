@@ -284,7 +284,7 @@ the first run, because the engine mirrors vanilla's arithmetic types
 Still open from the original Milestone B slate: **water-stream item motion**
 (fluids, section 7) and player pickup (needs players).
 
-## 7. Milestone C — closing the redstone surface (NEXT)
+## 7. Milestone C — closing the redstone surface — DONE (awaiting a real door)
 
 The gap between "the engine runs slimestone machines and item logistics" and
 "the engine runs *doors*" is mostly one component: **dust**. Ordered by
@@ -325,8 +325,18 @@ leverage:
       immediate. Small, common in doors as the visible output.
 - [ ] **Target block** — analog output; pairs with the dust strength work.
 
+Everything above is implemented and conformance-pinned (dust line drops,
+comparator strength through wire, soft power extending a piston through the
+dust's floor block, both sides of the glass diode, stone/oak button
+durations 20/30, the lamp's 4-tick off-delay, and an item pressing a wooden
+plate). The wire model is the ideal fixed-point evaluator — the documented
+deviation from vanilla's per-wire cascade, so locational-transient
+contraptions are the known gap. Target block still open (needs projectiles).
+
 **Done when**: a real community piston door (litematic, with dust) runs
 end-to-end and its open/close timing conforms — the product's core claim.
+Send one over Discord (the tooling can receive files now) and it becomes the
+closing golden.
 
 ## 8. Milestone D — fluids
 

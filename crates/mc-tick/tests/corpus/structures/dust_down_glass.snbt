@@ -1,0 +1,21 @@
+{
+  DataVersion: 4903,
+  size: [4, 3, 1],
+  palette: [
+    {Name: "minecraft:stone"},
+    {Name: "minecraft:redstone_block"},
+    {Name: "minecraft:redstone_wire", Properties: {east: "up", north: "none", power: "0", south: "none", west: "side"}},
+    {Name: "minecraft:redstone_wire", Properties: {east: "side", north: "none", power: "15", south: "none", west: "side"}},
+    {Name: "minecraft:glass"}
+  ],
+  blocks: [
+    {pos: [0, 0, 0], state: 0},
+    {pos: [1, 0, 0], state: 0},
+    {pos: [2, 1, 0], state: 4},
+    {pos: [1, 1, 0], state: 2},
+    {pos: [2, 2, 0], state: 3},
+    {pos: [3, 2, 0], state: 1}
+  ],
+  entities: []
+}
+

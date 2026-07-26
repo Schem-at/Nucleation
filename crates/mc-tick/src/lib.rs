@@ -42,6 +42,7 @@ pub mod schedule;
 pub mod sim;
 pub mod state;
 pub mod structure;
+pub mod wire;
 pub mod vanilla;
 pub mod world;
 

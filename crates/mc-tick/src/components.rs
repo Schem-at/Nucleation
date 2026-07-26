@@ -927,6 +927,157 @@ impl<P: PowerSource> BlockBehaviour for Dropper<P> {
     }
 }
 
+/// A button.
+///
+/// `ButtonBlock.press`: power on (loudly), schedule `ticksToStayPressed` —
+/// 20 game ticks for stone, 30 for wood (`BlockSetType`) — and unpower when
+/// the tick fires. Powers everything weakly and its attached block strongly.
+pub struct Button<P: PowerSource> {
+    /// Whether this state is pressed.
+    pub powered: bool,
+    /// Unpressed/pressed states.
+    pub states: StatePair,
+    /// 20 for stone, 30 for wood.
+    pub duration: u64,
+    /// How power is read (unused today; kept for parity with siblings).
+    pub power: P,
+}
+
+impl<P: PowerSource> BlockBehaviour for Button<P> {
+    fn on_used(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if self.powered {
+            return; // pressing a pressed button does nothing
+        }
+        ctx.set(pos, self.states.get(true));
+        ctx.schedule(pos, self.duration, TickPriority::Normal);
+    }
+
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if self.powered {
+            ctx.set(pos, self.states.get(false));
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "button"
+    }
+}
+
+/// Ticks a redstone lamp waits before going dark; turning on is immediate.
+pub const LAMP_OFF_DELAY: u64 = 4;
+
+/// A redstone lamp.
+pub struct Lamp<P: PowerSource> {
+    /// Whether this state is lit.
+    pub lit: bool,
+    /// Unlit/lit states.
+    pub states: StatePair,
+    /// How power is read.
+    pub power: P,
+}
+
+impl<P: PowerSource> Lamp<P> {
+    fn has_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        crate::pos::ALL_DIRS.iter().any(|dir| {
+            self.power
+                .is_powered(ctx.world, pos.offset(*dir), dir.opposite())
+        })
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for Lamp<P> {
+    /// `RedstoneLampBlock.neighborChanged`: light immediately, dim after a
+    /// 4-tick recheck.
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        let signal = self.has_signal(ctx, pos);
+        if signal && !self.lit {
+            ctx.set_quiet(pos, self.states.get(true));
+        } else if !signal && self.lit {
+            ctx.schedule(pos, LAMP_OFF_DELAY, TickPriority::Normal);
+        }
+    }
+
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if self.lit && !self.has_signal(ctx, pos) {
+            ctx.set_quiet(pos, self.states.get(false));
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "redstone_lamp"
+    }
+}
+
+/// Ticks between a pressure plate's presence rechecks.
+pub const PLATE_RECHECK: u64 = 20;
+
+/// A pressure plate. Wooden plates sense every entity — items included, which
+/// is what makes an item-on-plate capture deterministic; stone plates sense
+/// only living entities, so items never trigger them here.
+pub struct PressurePlate<P: PowerSource> {
+    /// Whether this state is pressed.
+    pub powered: bool,
+    /// Unpressed/pressed states.
+    pub states: StatePair,
+    /// Whether items press it (wooden yes, stone no).
+    pub senses_items: bool,
+    /// How power is read (parity).
+    pub power: P,
+}
+
+impl<P: PowerSource> PressurePlate<P> {
+    fn pressed_by_item(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        if !self.senses_items {
+            return false;
+        }
+        // BasePressurePlateBlock.TOUCH_AABB: the plate cell inset by a pixel.
+        let min = [f64::from(pos.x) + 0.0625, f64::from(pos.y), f64::from(pos.z) + 0.0625];
+        let max = [
+            f64::from(pos.x) + 0.9375,
+            f64::from(pos.y) + 0.25,
+            f64::from(pos.z) + 0.9375,
+        ];
+        ctx.item_entities.items.iter().any(|item| {
+            if item.removed {
+                return false;
+            }
+            let (emin, emax) = crate::entity::item_aabb(item.pos);
+            emin[0] < max[0]
+                && emax[0] > min[0]
+                && emin[1] < max[1]
+                && emax[1] > min[1]
+                && emin[2] < max[2]
+                && emax[2] > min[2]
+        })
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for PressurePlate<P> {
+    /// `entityInside`: press and start the recheck cadence.
+    fn on_entity_inside(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if !self.powered && self.pressed_by_item(ctx, pos) {
+            ctx.set(pos, self.states.get(true));
+            ctx.schedule(pos, PLATE_RECHECK, TickPriority::Normal);
+        }
+    }
+
+    /// `tick`: still pressed → check again in 20; empty → release.
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if !self.powered {
+            return;
+        }
+        if self.pressed_by_item(ctx, pos) {
+            ctx.schedule(pos, PLATE_RECHECK, TickPriority::Normal);
+        } else {
+            ctx.set(pos, self.states.get(false));
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "pressure_plate"
+    }
+}
+
 /// How many pitches a note block cycles through before wrapping.
 ///
 /// `NoteBlock.NOTE` is `IntegerProperty.create("note", 0, 24)`; `cycle` wraps 24

@@ -1,0 +1,21 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:dust_line",
+  "detail": "normal",
+  "ticks": [
+    {
+      "tick": 0,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [5, 0, 0], "from": "minecraft:piston[extended=false,facing=up]", "to": "minecraft:piston[extended=true,facing=up]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [5, 1, 0], "from": "minecraft:air", "to": "minecraft:moving_piston[facing=up,type=normal]"}
+      ]
+    },
+    {
+      "tick": 2,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [5, 1, 0], "from": "minecraft:moving_piston[facing=up,type=normal]", "to": "minecraft:piston_head[facing=up,short=false,type=normal]"}
+      ]
+    }
+  ]
+}

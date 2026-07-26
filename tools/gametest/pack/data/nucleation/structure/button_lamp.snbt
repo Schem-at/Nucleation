@@ -1,0 +1,16 @@
+{
+  DataVersion: 4903,
+  size: [2, 2, 1],
+  palette: [
+    {Name: "minecraft:stone"},
+    {Name: "minecraft:stone_button", Properties: {face: "floor", facing: "east", powered: "false"}},
+    {Name: "minecraft:redstone_lamp", Properties: {lit: "false"}}
+  ],
+  blocks: [
+    {pos: [0, 0, 0], state: 0},
+    {pos: [1, 0, 0], state: 0},
+    {pos: [0, 1, 0], state: 1},
+    {pos: [1, 1, 0], state: 2}
+  ],
+  entities: []
+}

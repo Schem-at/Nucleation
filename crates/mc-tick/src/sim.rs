@@ -917,6 +917,51 @@ impl Simulation {
                         crate::entity::merge_neighbours(&mut self.item_entities, index);
                     }
                 }
+                // entityInside: every cell an item overlaps hears about it —
+                // how a wooden pressure plate notices the item on it.
+                let mut cells: Vec<Pos> = Vec::new();
+                for item in &self.item_entities.items {
+                    if item.removed {
+                        continue;
+                    }
+                    let (emin, emax) = crate::entity::item_aabb(item.pos);
+                    for x in (emin[0].floor() as i32)..=(emax[0].floor() as i32) {
+                        for y in (emin[1].floor() as i32)..=(emax[1].floor() as i32) {
+                            for z in (emin[2].floor() as i32)..=(emax[2].floor() as i32) {
+                                let cell = Pos::new(x, y, z);
+                                if !cells.contains(&cell) {
+                                    cells.push(cell);
+                                }
+                            }
+                        }
+                    }
+                }
+                for cell in cells {
+                    let state = self.world.get(cell);
+                    if state == StateId::AIR {
+                        continue;
+                    }
+                    let Some(behaviour) = self.behaviours.get(state) else { continue };
+                    let mut ctx = TickCtx {
+                        world: &mut self.world,
+                        ticks: &mut self.ticks,
+                        events: &mut self.events,
+                        states: &self.registry,
+                        tick: self.tick,
+                        boundary: false,
+                        updates: &mut self.updates,
+                        moves: &mut self.moves,
+                        toggles: &mut self.toggles,
+                        comparator_out: &mut self.comparator_out,
+                        inventories: &mut self.inventories,
+                        hopper_state: &mut self.hopper_state,
+                        item_entities: &mut self.item_entities,
+                        inv_log: self.inv_log.as_mut(),
+                        log: self.log.as_mut(),
+                    };
+                    behaviour.on_entity_inside(&mut ctx, cell);
+                    self.propagate();
+                }
                 None
             }
 

@@ -674,6 +674,98 @@ fn resting_items_merge_on_the_slow_interval() {
 }
 
 #[test]
+fn breaking_a_dust_lines_source_drops_the_whole_line_in_one_tick() {
+    // The wire network settles synchronously; the piston at the end never
+    // fires because its placement-queued extend event fails dispatch
+    // re-validation once the dust is dark — a three-mechanism interaction the
+    // golden captures in a single tick.
+    run_conformance_actuated(
+        "dust_line.snbt",
+        "dust_line.json",
+        "nucleation:dust_line",
+        &[],
+        &[(0, Actuate::Place(Pos::new(0, 1, 0), "minecraft:air"))],
+    );
+}
+
+#[test]
+fn dust_soft_powers_a_piston_through_the_block_it_sits_on() {
+    // Same structure, no break: the dust strongly powers its floor block, the
+    // conductor re-emits, and the piston extends on tick 0.
+    run_conformance("dust_line.snbt", "dust_softpower.json", "nucleation:dust_softpower");
+}
+
+#[test]
+fn a_comparators_analog_strength_reaches_a_dust_line() {
+    // Six full stacks in a barrel read 4; the dust line shows 4, 3, 2 — the
+    // strength-plumbing the container milestone deferred, closed by reading
+    // the comparator's stored block-entity output during wire evaluation.
+    run_conformance(
+        "comparator_dust.snbt",
+        "comparator_dust.json",
+        "nucleation:comparator_dust",
+    );
+}
+
+#[test]
+fn dust_descends_a_stone_step() {
+    run_conformance_actuated(
+        "dust_down_stone.snbt",
+        "dust_down_stone.json",
+        "nucleation:dust_down_stone",
+        &[],
+        &[(0, Actuate::Place(Pos::new(3, 2, 0), "minecraft:air"))],
+    );
+}
+
+#[test]
+fn dust_never_descends_past_glass_the_glass_diode() {
+    // The asymmetry from the wire evaluator's bytecode: climbing reads need a
+    // conductor step, descending reads need a non-conductor — so the lower
+    // wire behind glass stays dark and only the upper wire's drop is captured.
+    run_conformance_actuated(
+        "dust_down_glass.snbt",
+        "dust_down_glass.json",
+        "nucleation:dust_down_glass",
+        &[],
+        &[(0, Actuate::Place(Pos::new(3, 2, 0), "minecraft:air"))],
+    );
+}
+
+#[test]
+fn a_stone_button_presses_for_twenty_ticks_and_the_lamp_follows() {
+    // Click at tick 2: button and lamp on the same tick (lamps light
+    // immediately), button releases at tick 21 (a boundary-scheduled 20), lamp
+    // dims four ticks later.
+    run_conformance_actuated(
+        "button_lamp.snbt",
+        "button_lamp.json",
+        "nucleation:button_lamp",
+        &[],
+        &[(2, Actuate::Use(Pos::new(0, 1, 0)))],
+    );
+}
+
+#[test]
+fn a_wooden_button_presses_for_thirty() {
+    run_conformance_actuated(
+        "button_wood.snbt",
+        "button_wood.json",
+        "nucleation:button_wood",
+        &[],
+        &[(2, Actuate::Use(Pos::new(0, 1, 0)))],
+    );
+}
+
+#[test]
+fn a_falling_item_presses_a_wooden_plate() {
+    // The Milestone B/C junction: an authored item falls nine ticks onto an
+    // oak pressure plate; the plate and its lamp light on the landing tick and
+    // stay lit while the item rests there.
+    run_conformance("plate_item.snbt", "plate_item.json", "nucleation:plate_item");
+}
+
+#[test]
 fn a_note_block_follows_neighbour_power_synchronously() {
     // Captured with `--pulse 1,0,0 --pulse-ticks 2`: the powered flag flips on the
     // same tick the source appears and again on the tick it vanishes — NoteBlock

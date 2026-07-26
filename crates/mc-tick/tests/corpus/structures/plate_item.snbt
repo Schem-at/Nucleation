@@ -1,0 +1,18 @@
+{
+  DataVersion: 4903,
+  size: [2, 4, 1],
+  palette: [
+    {Name: "minecraft:stone"},
+    {Name: "minecraft:oak_pressure_plate", Properties: {powered: "false"}},
+    {Name: "minecraft:redstone_lamp", Properties: {lit: "false"}}
+  ],
+  blocks: [
+    {pos: [0, 0, 0], state: 0},
+    {pos: [1, 0, 0], state: 0},
+    {pos: [0, 1, 0], state: 1},
+    {pos: [1, 1, 0], state: 2}
+  ],
+  entities: [
+    {blockPos: [0, 3, 0], pos: [0.5d, 3.0d, 0.5d], nbt: {id: "minecraft:item", Item: {id: "minecraft:redstone", count: 1}, Motion: [0.0d, 0.0d, 0.0d], PickupDelay: 0s, Age: 0s}}
+  ]
+}

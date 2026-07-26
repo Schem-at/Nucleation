@@ -1,0 +1,27 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:button_lamp",
+  "detail": "normal",
+  "ticks": [
+    {
+      "tick": 2,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [0, 1, 0], "from": "minecraft:stone_button[face=floor,facing=east,powered=false]", "to": "minecraft:stone_button[face=floor,facing=east,powered=true]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 1, 0], "from": "minecraft:redstone_lamp[lit=false]", "to": "minecraft:redstone_lamp[lit=true]"}
+      ]
+    },
+    {
+      "tick": 21,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [0, 1, 0], "from": "minecraft:stone_button[face=floor,facing=east,powered=true]", "to": "minecraft:stone_button[face=floor,facing=east,powered=false]"}
+      ]
+    },
+    {
+      "tick": 25,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 1, 0], "from": "minecraft:redstone_lamp[lit=true]", "to": "minecraft:redstone_lamp[lit=false]"}
+      ]
+    }
+  ]
+}

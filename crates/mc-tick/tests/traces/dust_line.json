@@ -1,0 +1,18 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:dust_line",
+  "detail": "normal",
+  "ticks": [
+    {
+      "tick": 0,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [0, 1, 0], "from": "minecraft:redstone_block", "to": "minecraft:air"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 1, 0], "from": "minecraft:redstone_wire[east=side,north=none,power=15,south=none,west=side]", "to": "minecraft:redstone_wire[east=side,north=none,power=0,south=none,west=side]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 1, 0], "from": "minecraft:redstone_wire[east=side,north=none,power=14,south=none,west=side]", "to": "minecraft:redstone_wire[east=side,north=none,power=0,south=none,west=side]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [3, 1, 0], "from": "minecraft:redstone_wire[east=side,north=none,power=13,south=none,west=side]", "to": "minecraft:redstone_wire[east=side,north=none,power=0,south=none,west=side]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [4, 1, 0], "from": "minecraft:redstone_wire[east=side,north=none,power=12,south=none,west=side]", "to": "minecraft:redstone_wire[east=side,north=none,power=0,south=none,west=side]"}
+      ]
+    }
+  ]
+}

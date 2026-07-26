@@ -340,6 +340,10 @@ pub trait BlockBehaviour: Send + Sync {
         false
     }
 
+    /// An entity is inside this block's cell — vanilla's `entityInside`,
+    /// dispatched after entity movement for every cell an item overlaps.
+    fn on_entity_inside(&self, _ctx: &mut TickCtx<'_>, _pos: Pos) {}
+
     /// This block was just written into the world by a completed piston move.
     ///
     /// Mirrors the `onPlace` a landed block receives from vanilla's `setBlock`.
