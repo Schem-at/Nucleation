@@ -164,6 +164,14 @@ pub trait CollisionWorld {
     fn is_web(&self, _pos: Pos) -> bool {
         false
     }
+    /// The rail at `pos`, if any — what cart physics runs on.
+    fn rail(&self, _pos: Pos) -> Option<crate::minecart::Rail> {
+        None
+    }
+    /// `isRedstoneConductor` — the powered-rail launch check reads it.
+    fn is_conductor(&self, _pos: Pos) -> bool {
+        false
+    }
 }
 
 /// The web's stuck-speed multiplier, `WebBlock.entityInside`'s
@@ -441,6 +449,34 @@ fn move_with_collision(
             entity.vel[2] = 0.0;
         }
     }
+}
+
+/// `Entity.collideBoundingBox` for any box: clip `movement` (Y first, then
+/// the larger horizontal axis) and report which axes hit. Shared by items and
+/// minecarts.
+pub(crate) fn collide_move(
+    world: &dyn CollisionWorld,
+    mut min: [f64; 3],
+    mut max: [f64; 3],
+    movement: [f64; 3],
+) -> ([f64; 3], [bool; 3]) {
+    let mut movement = movement;
+    let mut hit = [false; 3];
+    let clipped = clip_axis(world, min, max, 1, movement[1]);
+    hit[1] = clipped != movement[1];
+    min[1] += clipped;
+    max[1] += clipped;
+    movement[1] = clipped;
+    let x_first = movement[0].abs() > movement[2].abs();
+    let order: [usize; 2] = if x_first { [0, 2] } else { [2, 0] };
+    for &axis in &order {
+        let clipped = clip_axis(world, min, max, axis, movement[axis]);
+        hit[axis] = hit[axis] || clipped != movement[axis];
+        min[axis] += clipped;
+        max[axis] += clipped;
+        movement[axis] = clipped;
+    }
+    (movement, hit)
 }
 
 /// Clip a single-axis movement of the box `(min, max)` against solid blocks.

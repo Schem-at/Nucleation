@@ -370,27 +370,31 @@ fn run_conformance_full(
         sim.set_physics_tables(solidity, frictions, heights, webs);
         let (water_kinds, bubble_kinds) = mc_tick::vanilla::fluid_tables(sim.registry());
         sim.set_fluid_tables(water_kinds, bubble_kinds);
+        let (rails, conductors) = mc_tick::vanilla::rail_tables(sim.registry());
+        sim.set_rail_tables(rails, conductors);
     }
     // Authored item entities spawn in list order, matching placement — and
     // with the server ids the golden recorded, because vanilla's rest-flush
     // cadence is `(tickCount + id) % 4`: the wrong id lifts a settled item on
     // a different tick than the capture shows.
     let raw_ids = golden_entity_ids(&golden(golden_file));
-    for (index, spawned) in structure.item_entities.iter().enumerate() {
-        match raw_ids.get(index) {
-            Some(id) => sim.spawn_item_with_id(
-                *id,
-                spawned.item.clone(),
-                spawned.pos,
-                spawned.motion,
-                spawned.pickup_delay,
-            ),
-            None => sim.spawn_item(
-                spawned.item.clone(),
-                spawned.pos,
-                spawned.motion,
-                spawned.pickup_delay,
-            ),
+    for (index, spawned) in structure.entities.iter().enumerate() {
+        let raw_id = raw_ids.get(index).copied();
+        match spawned {
+            mc_tick::structure::SpawnedEntity::Item(item) => match raw_id {
+                Some(id) => sim.spawn_item_with_id(
+                    id,
+                    item.item.clone(),
+                    item.pos,
+                    item.motion,
+                    item.pickup_delay,
+                ),
+                None => sim.spawn_item(item.item.clone(), item.pos, item.motion, item.pickup_delay),
+            },
+            mc_tick::structure::SpawnedEntity::Minecart(cart) => match raw_id {
+                Some(id) => sim.spawn_minecart_with_id(id, cart.kind.clone(), cart.pos, cart.motion),
+                None => sim.spawn_minecart(cart.kind.clone(), cart.pos, cart.motion),
+            },
         };
     }
 
@@ -996,4 +1000,64 @@ fn an_item_rests_on_soul_sand_at_fourteen_sixteenths() {
         Settle::Quiet,
         1.0e-6,
     );
+}
+
+fn run_cart(structure_file: &str, golden_file: &str, label: &str) {
+    run_conformance_full(
+        structure_file,
+        golden_file,
+        label,
+        &[],
+        &[],
+        None,
+        Settle::Quiet,
+        1.0e-6,
+    );
+}
+
+#[test]
+fn a_coasting_cart_decays_at_ninety_six_percent_and_flies_off_the_end() {
+    // OldMinecartBehavior on a plain line: velocity projected onto the rail
+    // chord, ×0.96 a tick, then comeOffTrack past the last rail — clamp,
+    // ground-halving, landing.
+    run_cart("cart_flat.snbt", "cart_flat.json", "nucleation:cart_flat");
+}
+
+#[test]
+fn powered_rails_accelerate_a_cart_past_the_movement_clamp() {
+    // +0.06 along the motion every tick: the velocity grows well past 0.4
+    // while the per-axis movement clamp holds the cart to 0.4 blocks a tick —
+    // both visible in the golden's diverging velocity and constant stride.
+    run_cart("cart_boost.snbt", "cart_boost.json", "nucleation:cart_boost");
+}
+
+#[test]
+fn unpowered_golden_rails_brake_a_cart_to_a_standstill() {
+    // The braking branch: ×0.5 a tick with vy zeroed, then a dead stop the
+    // tick the horizontal speed dips under 0.03.
+    run_cart("cart_brake.snbt", "cart_brake.json", "nucleation:cart_brake");
+}
+
+#[test]
+fn a_cart_rolls_down_a_slope_and_gains_speed() {
+    // The ascending rail's 0.0078125 downhill pull, the y+1 seat, the corner
+    // fixup as the cart crosses onto the low line, and the 0.05 height
+    // correction feeding slope drop into speed.
+    run_cart("cart_slope.snbt", "cart_slope.json", "nucleation:cart_slope");
+}
+
+#[test]
+fn a_cart_turns_a_corner_without_losing_the_rail() {
+    // The chord projection through a north_west corner: eastbound velocity is
+    // re-aimed north, the exit-crossing redirect included.
+    run_cart("cart_curve.snbt", "cart_curve.json", "nucleation:cart_curve");
+}
+
+#[test]
+fn a_cart_circulates_a_powered_loop_indefinitely() {
+    // The integration pin: a rectangular circuit through all four corner
+    // shapes with boosted straights. Two hundred ticks, several laps, every
+    // projection, redirect, corner fixup and boost landing exactly where
+    // vanilla put them.
+    run_cart("cart_loop.snbt", "cart_loop.json", "nucleation:cart_loop");
 }

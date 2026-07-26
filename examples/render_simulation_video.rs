@@ -143,8 +143,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut item_mesh_range = Vec::new();
     for track in &item_tracks {
         let mut one = UniversalSchematic::new("item".to_string());
-        // Item ids are not block ids; ingots at least have a block to show.
-        let drawn = track.item.replace("_ingot", "_block");
+        // Item ids are not block ids; ingots at least have a block to show,
+        // and a cauldron is the closest block silhouette to a cart.
+        let drawn = if track.item == "minecraft:minecart" {
+            "minecraft:cauldron".to_string()
+        } else {
+            track.item.replace("_ingot", "_block")
+        };
         if one.set_block_from_string(0, 0, 0, &drawn).is_err() {
             one.set_block_from_string(0, 0, 0, "minecraft:stone").ok();
         }
@@ -213,15 +218,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
             if let Some(p) = position {
                 let mut pose = Pose::IDENTITY;
-                pose.scale = [0.25; 3];
+                let cart = track.item == "minecraft:minecart";
+                pose.scale = if cart { [0.9, 0.6, 0.9] } else { [0.25; 3] };
                 // Scale in place about the block's centre, then translate that
                 // centre to the entity position (plus half the scaled height).
                 pose.pivot = [0.5, 0.5, 0.5];
-                pose.translate = [
-                    p[0] as f32 - 0.5,
-                    p[1] as f32 + 0.125 - 0.5,
-                    p[2] as f32 - 0.5,
-                ];
+                pose.translate = if cart {
+                    [p[0] as f32 - 0.5, p[1] as f32 + 0.3 - 0.5, p[2] as f32 - 0.5]
+                } else {
+                    [p[0] as f32 - 0.5, p[1] as f32 + 0.125 - 0.5, p[2] as f32 - 0.5]
+                };
                 poses[item_mesh_range[track_index]] = pose;
             }
         }
@@ -325,14 +331,18 @@ fn simulate(
         sim.set_physics_tables(solidity, frictions, heights, webs);
         let (water_kinds, bubble_kinds) = mc_tick::vanilla::fluid_tables(sim.registry());
         sim.set_fluid_tables(water_kinds, bubble_kinds);
+        let (rails, conductors) = mc_tick::vanilla::rail_tables(sim.registry());
+        sim.set_rail_tables(rails, conductors);
     }
-    for spawned in &structure.item_entities {
-        sim.spawn_item(
-            spawned.item.clone(),
-            spawned.pos,
-            spawned.motion,
-            spawned.pickup_delay,
-        );
+    for spawned in &structure.entities {
+        match spawned {
+            mc_tick::structure::SpawnedEntity::Item(item) => {
+                sim.spawn_item(item.item.clone(), item.pos, item.motion, item.pickup_delay);
+            }
+            mc_tick::structure::SpawnedEntity::Minecart(cart) => {
+                sim.spawn_minecart(cart.kind.clone(), cart.pos, cart.motion);
+            }
+        }
     }
     for (pos, stacks) in &structure.inventories {
         let entry = structure
@@ -393,8 +403,11 @@ fn simulate(
     let mut index_of: std::collections::HashMap<u32, usize> = std::collections::HashMap::new();
     let mut cursor: std::collections::HashMap<u32, [f64; 3]> = std::collections::HashMap::new();
     let mut removed: std::collections::HashMap<u32, u64> = std::collections::HashMap::new();
-    let item_names: std::collections::HashMap<u32, String> =
+    let mut item_names: std::collections::HashMap<u32, String> =
         sim.item_name_log().iter().cloned().collect();
+    for cart in sim.minecarts() {
+        item_names.insert(cart.id, cart.kind.clone());
+    }
     for (tick, event) in sim.recorded_entities() {
         match event {
             mc_tick::sim::EntityEvent::Moved { id, pos, .. } => {

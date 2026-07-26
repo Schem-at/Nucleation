@@ -336,9 +336,10 @@ public final class TraceCapture {
                     if (moved) {
                         events.add(String.format(
                                 "        {\"phase\": \"%s\", \"kind\": \"entity_moved\", "
-                                        + "\"id\": %d, \"entity_type\": \"minecraft:item\", "
+                                        + "\"id\": %d, \"entity_type\": \"%s\", "
                                         + "\"pos\": [%s, %s, %s], \"velocity\": [%s, %s, %s]}",
                                 PHASE_TICK_END, entry.getKey(),
+                                ENTITY_TYPES.getOrDefault(entry.getKey(), "minecraft:item"),
                                 Double.toString(now[0]), Double.toString(now[1]),
                                 Double.toString(now[2]), Double.toString(now[3]),
                                 Double.toString(now[4]), Double.toString(now[5])));
@@ -437,16 +438,27 @@ public final class TraceCapture {
         net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(
                 min.getX(), min.getY(), min.getZ(),
                 max.getX() + 1, max.getY() + 1, max.getZ() + 1);
-        for (net.minecraft.world.entity.item.ItemEntity item : level.getEntitiesOfClass(
-                net.minecraft.world.entity.item.ItemEntity.class, box)) {
-            net.minecraft.world.phys.Vec3 velocity = item.getDeltaMovement();
-            items.put(item.getId(), new double[] {
-                    item.getX() - ORIGIN.getX(), item.getY() - ORIGIN.getY(),
-                    item.getZ() - ORIGIN.getZ(),
+        for (net.minecraft.world.entity.Entity entity : level.getEntitiesOfClass(
+                net.minecraft.world.entity.Entity.class, box)) {
+            boolean tracked = entity instanceof net.minecraft.world.entity.item.ItemEntity
+                    || entity instanceof net.minecraft.world.entity.vehicle.minecart.AbstractMinecart;
+            if (!tracked) {
+                continue;
+            }
+            net.minecraft.world.phys.Vec3 velocity = entity.getDeltaMovement();
+            items.put(entity.getId(), new double[] {
+                    entity.getX() - ORIGIN.getX(), entity.getY() - ORIGIN.getY(),
+                    entity.getZ() - ORIGIN.getZ(),
                     velocity.x, velocity.y, velocity.z});
+            ENTITY_TYPES.put(entity.getId(),
+                    net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE
+                            .getKey(entity.getType()).toString());
         }
         return items;
     }
+
+    /** Entity id -> registry type name, filled by snapshotItems. */
+    private static final Map<Integer, String> ENTITY_TYPES = new HashMap<>();
 
     /**
      * Container contents for every container in the box, one string per slot.

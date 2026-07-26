@@ -49,12 +49,35 @@ pub struct Structure {
     /// caller turns these into engine inventories at load time — the parser
     /// does not know how many slots a barrel has.
     pub inventories: Vec<(Pos, Vec<crate::inventory::ItemStack>)>,
+    /// Every authored entity, in list order — the placement spawn order,
+    /// which is also the server's id-assignment order.
+    pub entities: Vec<SpawnedEntity>,
     /// Item entities authored in the structure's `entities` list.
     ///
     /// The RNG-free way to put an item into the world: authored positions and
     /// motion, no dispenser jitter. Only `minecraft:item` is understood; any
     /// other entity type is a loud parse error rather than a silent hole.
     pub item_entities: Vec<SpawnedItem>,
+}
+
+/// One authored entity, by type.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SpawnedEntity {
+    /// An item entity.
+    Item(SpawnedItem),
+    /// A minecart.
+    Minecart(SpawnedMinecart),
+}
+
+/// An authored minecart.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpawnedMinecart {
+    /// e.g. `minecraft:minecart`.
+    pub kind: String,
+    /// Spawn position.
+    pub pos: [f64; 3],
+    /// Spawn velocity.
+    pub motion: [f64; 3],
 }
 
 /// One authored item entity.
@@ -351,8 +374,8 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// One `entities` entry: an authored item entity.
-    fn entity_entry(&mut self) -> Result<SpawnedItem, StructureError> {
+    /// One `entities` entry: an authored item entity or minecart.
+    fn entity_entry(&mut self) -> Result<SpawnedEntity, StructureError> {
         self.eat(b'{')?;
         let mut pos: Option<[f64; 3]> = None;
         let mut motion = [0.0f64; 3];
@@ -410,12 +433,24 @@ impl<'a> Parser<'a> {
                 self.at += 1;
             }
         }
-        if entity_id != "minecraft:item" {
-            return self.err(format!("unsupported entity type `{entity_id}`"));
-        }
-        match (pos, item) {
-            (Some(pos), Some(item)) => Ok(SpawnedItem { pos, motion, item, pickup_delay }),
-            _ => self.err("item entity needs `pos` and `Item`"),
+        match entity_id.as_str() {
+            "minecraft:item" => match (pos, item) {
+                (Some(pos), Some(item)) => {
+                    Ok(SpawnedEntity::Item(SpawnedItem { pos, motion, item, pickup_delay }))
+                }
+                _ => self.err("item entity needs `pos` and `Item`"),
+            },
+            // Only the plain rideable cart is implemented; the container
+            // variants stay loud until their behaviours exist.
+            "minecraft:minecart" => match pos {
+                Some(pos) => Ok(SpawnedEntity::Minecart(SpawnedMinecart {
+                    kind: entity_id,
+                    pos,
+                    motion,
+                })),
+                None => self.err("minecart entity needs `pos`"),
+            },
+            _ => self.err(format!("unsupported entity type `{entity_id}`")),
         }
     }
 
@@ -541,7 +576,7 @@ impl<'a> Parser<'a> {
         let mut palette = None;
         let mut blocks: Option<Vec<(Pos, usize)>> = None;
         let mut inventories: Vec<(Pos, Vec<crate::inventory::ItemStack>)> = Vec::new();
-        let mut item_entities: Vec<SpawnedItem> = Vec::new();
+        let mut entities: Vec<SpawnedEntity> = Vec::new();
 
         loop {
             if self.peek() == Some(b'}') {
@@ -580,7 +615,7 @@ impl<'a> Parser<'a> {
                             self.at += 1;
                             break;
                         }
-                        item_entities.push(self.entity_entry()?);
+                        entities.push(self.entity_entry()?);
                         if self.peek() == Some(b',') {
                             self.at += 1;
                         }
@@ -652,7 +687,14 @@ impl<'a> Parser<'a> {
             palette: palette.ok_or(StructureError::Missing("palette"))?,
             blocks: blocks.ok_or(StructureError::Missing("blocks"))?,
             inventories,
-            item_entities,
+            item_entities: entities
+                .iter()
+                .filter_map(|e| match e {
+                    SpawnedEntity::Item(item) => Some(item.clone()),
+                    _ => None,
+                })
+                .collect(),
+            entities,
         })
     }
 }

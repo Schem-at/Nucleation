@@ -54,6 +54,8 @@ struct SimCollision<'a> {
     webs: &'a [bool],
     water_kinds: &'a [Option<crate::fluid::WaterKind>],
     bubble_kinds: &'a [Option<bool>],
+    rails: &'a [Option<crate::minecart::Rail>],
+    conductors: &'a [bool],
 }
 
 impl crate::entity::CollisionWorld for SimCollision<'_> {
@@ -83,6 +85,14 @@ impl crate::entity::CollisionWorld for SimCollision<'_> {
     fn is_web(&self, pos: Pos) -> bool {
         let state = self.world.get(pos);
         self.webs.get(state.raw() as usize).copied().unwrap_or(false)
+    }
+    fn rail(&self, pos: Pos) -> Option<crate::minecart::Rail> {
+        let state = self.world.get(pos);
+        self.rails.get(state.raw() as usize).copied().flatten()
+    }
+    fn is_conductor(&self, pos: Pos) -> bool {
+        let state = self.world.get(pos);
+        self.conductors.get(state.raw() as usize).copied().unwrap_or(false)
     }
 }
 
@@ -119,6 +129,7 @@ pub struct Checkpoint {
     inventories: std::collections::HashMap<Pos, crate::inventory::Inventory>,
     hopper_state: std::collections::HashMap<Pos, crate::behaviour::HopperState>,
     item_entities: crate::entity::ItemEntities,
+    minecarts: Vec<crate::minecart::MinecartState>,
 }
 
 /// A controllable, deterministic simulation of a bounded region.
@@ -168,6 +179,12 @@ pub struct Simulation {
     water_kinds: Vec<Option<crate::fluid::WaterKind>>,
     /// Bubble columns per state (`Some(drag_down)`), indexed by `StateId`.
     bubble_kinds: Vec<Option<bool>>,
+    /// Rails per state, indexed by `StateId`; see [`Simulation::set_rail_tables`].
+    rails: Vec<Option<crate::minecart::Rail>>,
+    /// Redstone conductivity per state, for the powered-rail launch check.
+    conductors: Vec<bool>,
+    /// The world's minecarts, in spawn order.
+    minecarts: Vec<crate::minecart::MinecartState>,
     /// Entity positions as of the last recorded tick, for event emission.
     entity_snapshot: std::collections::HashMap<u32, [f64; 3]>,
     /// Recorded entity events, when recording is enabled.
@@ -223,6 +240,7 @@ impl Simulation {
             inventories: std::collections::HashMap::new(),
             hopper_state: std::collections::HashMap::new(),
             item_entities: crate::entity::ItemEntities::default(),
+            minecarts: Vec::new(),
         };
         Self {
             registry: StateRegistry::new(),
@@ -245,6 +263,9 @@ impl Simulation {
             webs: Vec::new(),
             water_kinds: Vec::new(),
             bubble_kinds: Vec::new(),
+            rails: Vec::new(),
+            conductors: Vec::new(),
+            minecarts: Vec::new(),
             entity_snapshot: std::collections::HashMap::new(),
             ent_log: None,
             tickers: Vec::new(),
@@ -280,6 +301,9 @@ impl Simulation {
         self.entity_snapshot.clear();
         for item in &self.item_entities.items {
             self.entity_snapshot.insert(item.id, item.pos);
+        }
+        for cart in &self.minecarts {
+            self.entity_snapshot.insert(cart.id, cart.pos);
         }
     }
 
@@ -351,6 +375,57 @@ impl Simulation {
     ) {
         self.water_kinds = water_kinds;
         self.bubble_kinds = bubble_kinds;
+    }
+
+    /// Set the rail and conductor tables, indexed by `StateId`.
+    ///
+    /// Built by `vanilla::rail_tables`. Cart physics reads these.
+    pub fn set_rail_tables(
+        &mut self,
+        rails: Vec<Option<crate::minecart::Rail>>,
+        conductors: Vec<bool>,
+    ) {
+        self.rails = rails;
+        self.conductors = conductors;
+    }
+
+    /// Spawn a minecart. Ids come from the shared entity counter, so carts
+    /// and items interleave exactly as a placed structure's entity list does.
+    pub fn spawn_minecart(&mut self, kind: String, pos: [f64; 3], vel: [f64; 3]) -> u32 {
+        let id = self.item_entities.next_id;
+        self.item_entities.next_id += 1;
+        self.push_minecart(id, kind, pos, vel);
+        id
+    }
+
+    /// Spawn a minecart with the id a capture recorded for it.
+    pub fn spawn_minecart_with_id(
+        &mut self,
+        id: u32,
+        kind: String,
+        pos: [f64; 3],
+        vel: [f64; 3],
+    ) -> u32 {
+        self.item_entities.next_id = self.item_entities.next_id.max(id + 1);
+        self.push_minecart(id, kind, pos, vel);
+        id
+    }
+
+    fn push_minecart(&mut self, id: u32, kind: String, pos: [f64; 3], vel: [f64; 3]) {
+        self.minecarts.push(crate::minecart::MinecartState {
+            id,
+            kind,
+            pos,
+            vel,
+            on_ground: false,
+            on_rails: false,
+            removed: false,
+        });
+    }
+
+    /// The live minecarts.
+    pub fn minecarts(&self) -> &[crate::minecart::MinecartState] {
+        &self.minecarts
     }
 
     /// The container-slot changes recorded since [`Simulation::record`].
@@ -525,33 +600,36 @@ impl Simulation {
     fn emit_entity_events(&mut self) {
         if self.ent_log.is_none() {
             self.item_entities.items.retain(|item| !item.removed);
+            self.minecarts.retain(|cart| !cart.removed);
             return;
         }
         let mut events: Vec<(u64, EntityEvent)> = Vec::new();
         let mut seen: std::collections::HashSet<u32> = std::collections::HashSet::new();
+        let mut observations: Vec<(u32, String, [f64; 3], [f64; 3])> = Vec::new();
         for item in &self.item_entities.items {
             if item.removed {
                 continue;
             }
-            seen.insert(item.id);
-            let moved = match self.entity_snapshot.get(&item.id) {
+            observations.push((item.id, "minecraft:item".to_string(), item.pos, item.vel));
+        }
+        for cart in &self.minecarts {
+            if cart.removed {
+                continue;
+            }
+            observations.push((cart.id, cart.kind.clone(), cart.pos, cart.vel));
+        }
+        for (id, entity_type, pos, velocity) in observations {
+            seen.insert(id);
+            let moved = match self.entity_snapshot.get(&id) {
                 None => true,
-                Some(last) => last
-                    .iter()
-                    .zip(&item.pos)
-                    .any(|(a, b)| (a - b).abs() > 1.0e-9),
+                Some(last) => last.iter().zip(&pos).any(|(a, b)| (a - b).abs() > 1.0e-9),
             };
             if moved {
                 events.push((
                     self.tick,
-                    EntityEvent::Moved {
-                        id: item.id,
-                        entity_type: "minecraft:item".to_string(),
-                        pos: item.pos,
-                        velocity: item.vel,
-                    },
+                    EntityEvent::Moved { id, entity_type, pos, velocity },
                 ));
-                self.entity_snapshot.insert(item.id, item.pos);
+                self.entity_snapshot.insert(id, pos);
             }
         }
         let vanished: Vec<u32> = self
@@ -568,6 +646,7 @@ impl Simulation {
             log.extend(events);
         }
         self.item_entities.items.retain(|item| !item.removed);
+        self.minecarts.retain(|cart| !cart.removed);
     }
 
     /// Capture the current state.
@@ -584,6 +663,7 @@ impl Simulation {
             inventories: self.inventories.clone(),
             hopper_state: self.hopper_state.clone(),
             item_entities: self.item_entities.clone(),
+            minecarts: self.minecarts.clone(),
         }
     }
 
@@ -605,10 +685,14 @@ impl Simulation {
         self.inventories = checkpoint.inventories.clone();
         self.hopper_state = checkpoint.hopper_state.clone();
         self.item_entities = checkpoint.item_entities.clone();
+        self.minecarts = checkpoint.minecarts.clone();
         // Event emission restarts from the restored state.
         self.entity_snapshot.clear();
         for item in &self.item_entities.items {
             self.entity_snapshot.insert(item.id, item.pos);
+        }
+        for cart in &self.minecarts {
+            self.entity_snapshot.insert(cart.id, cart.pos);
         }
     }
 
@@ -1020,7 +1104,19 @@ impl Simulation {
                     webs: &self.webs,
                     water_kinds: &self.water_kinds,
                     bubble_kinds: &self.bubble_kinds,
+                    rails: &self.rails,
+                    conductors: &self.conductors,
                 };
+                // Carts tick before items here. Vanilla interleaves by entity
+                // list order; nothing implemented couples the two yet, so the
+                // simplification is invisible — documented in case it stops
+                // being.
+                for index in 0..self.minecarts.len() {
+                    if self.minecarts[index].removed {
+                        continue;
+                    }
+                    crate::minecart::tick_minecart(&mut self.minecarts[index], &collision);
+                }
                 for index in 0..self.item_entities.items.len() {
                     if self.item_entities.items[index].removed {
                         continue;

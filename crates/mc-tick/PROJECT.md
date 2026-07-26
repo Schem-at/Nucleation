@@ -137,7 +137,7 @@ adding a file, no recompilation. `load <name>.snbt` runs a real structure.
 
 ## What's simulated today
 
-**193 tests, all green.** Everything below is trace- or bytecode-verified.
+**203 tests, all green.** Everything below is trace- or bytecode-verified.
 
 ### Engine core
 - **Tick phases** — all ten, in verified order, as an explicit walked sequence.
@@ -184,6 +184,8 @@ adding a file, no recompilation. `load <name>.snbt` runs a real structure.
 | **Item entities** | bit-faithful gravity/drag/bounce/rest physics, hopper vacuum, merging, despawn, mean-velocity dispenser ejects |
 | **Water** | separate fluid-tick queue in `Phase::FluidTicks` (5gt), `getNewLiquid`/`spread`/slope-search from bytecode, infinite-water rule, falling water, glass-clean flow vectors |
 | **Item fluid physics** | buoyancy (×0.99f, 5e-4f nudge), the double 0.014 current push per tick, raw-vs-deflated fluid height, flow-carried drift, bubble-column clamps incl. rest-skipped ticks |
+| **Item surfaces** | ice friction family (0.98/0.989), cobweb stuck multiplier, soul sand 14/16 box, the 1e-7 move gate |
+| **Minecarts** | OldMinecartBehavior end to end: chord projection, 0.96 drag, powered boost/launch/brake, slopes (doubled y-delta), corners, comeOffTrack — six goldens incl. a 200-tick powered loop |
 
 ### Pistons (the accuracy crux)
 - Extend/retract via block events (phase 7, *same tick* as the trigger), with

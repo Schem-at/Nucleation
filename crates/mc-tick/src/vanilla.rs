@@ -769,6 +769,12 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
                     }),
                 );
             }
+            "minecraft:rail" | "minecraft:powered_rail" | "minecraft:detector_rail"
+            | "minecraft:activator_rail" => {
+                // Cart physics reads rails through the rail tables; the block
+                // itself is inert until dynamic rail powering gets a capture.
+                table.register(*id, Box::new(Inert::new("rail")));
+            }
             "minecraft:water" => {
                 let level = descriptor.get("level").and_then(|l| l.parse().ok()).unwrap_or(0);
                 table.register(
@@ -846,6 +852,10 @@ fn is_full_cube(descriptor: &Descriptor) -> bool {
         // Soul sand's collision column tops at 14/16: not a full cube, so it
         // neither conducts nor blocks hopper suction (isCollisionShapeFullBlock).
         "minecraft:soul_sand" | "minecraft:cobweb" => false,
+        "minecraft:rail"
+        | "minecraft:powered_rail"
+        | "minecraft:detector_rail"
+        | "minecraft:activator_rail" => false,
         "minecraft:redstone_wire"
         | "minecraft:redstone_torch"
         | "minecraft:redstone_wall_torch"
@@ -938,6 +948,42 @@ pub fn fluid_tables(
         bubble_kinds.push(bubble);
     }
     (water_kinds, bubble_kinds)
+}
+
+/// Rail and conductor tables for cart physics, indexed by `StateId`.
+pub fn rail_tables(
+    registry: &StateRegistry,
+) -> (Vec<Option<crate::minecart::Rail>>, Vec<bool>) {
+    let mut rails = Vec::with_capacity(registry.len());
+    let mut conductors = Vec::with_capacity(registry.len());
+    for index in 0..registry.len() {
+        let descriptor = registry
+            .descriptor(StateId(index as u16))
+            .map(Descriptor::parse);
+        let (rail, conductor) = match &descriptor {
+            None => (None, false),
+            Some(d) => {
+                let rail = match d.name.as_str() {
+                    "minecraft:rail"
+                    | "minecraft:powered_rail"
+                    | "minecraft:detector_rail"
+                    | "minecraft:activator_rail" => d
+                        .get("shape")
+                        .and_then(crate::minecart::RailShape::from_name)
+                        .map(|shape| crate::minecart::Rail {
+                            shape,
+                            powered_rail: d.name == "minecraft:powered_rail",
+                            powered: d.flag("powered"),
+                        }),
+                    _ => None,
+                };
+                (rail, is_conductor(d))
+            }
+        };
+        rails.push(rail);
+        conductors.push(conductor);
+    }
+    (rails, conductors)
 }
 
 /// The unpowered/powered pair for a descriptor, if both states are interned.

@@ -376,26 +376,39 @@ and item physics, but do not yet run their own spread tick),
 `canPassThroughWall` face shapes (approximated by the full-cube table), and
 flooding replaceable plants. Each becomes a capture when a build needs it.
 
-## 9. Milestone E — remaining entities and the surfaces they ride
+## 9. Milestone E — remaining entities and the surfaces they ride (IN PROGRESS)
 
-1. **Minecarts** — rails, momentum, curves, powered rails, and the surface
-   effects that farms tune against:
-   - **soul sand**: a lowered collision box (its top is below a full block)
-     plus a 0.4 speed factor — the classic minecart brake;
-   - **ice / packed ice / blue ice**: friction 0.98 / 0.98 / 0.989 against the
-     0.6 default. The engine's friction table already exists
-     (`vanilla::physics_tables`, currently 0.6/slime 0.8) — read the exact
-     values from `Blocks` static-init bytecode when adding, and note ice
-     affects **items** too, which makes an RNG-free item-slide capture the
-     cheap verification before any minecart exists.
-   - **cobwebs**: `stuckSpeedMultiplier` movement damping — applies to every
-     entity type, items included, so it can also be captured item-first.
-2. **Boats** — the other rideable surface: boat-on-ice item transport and
+1. ~~**Item surfaces**~~ — DONE: ice/packed/frosted 0.98 and blue ice 0.989
+   in the friction table (from `Blocks` static-init), cobwebs via
+   `Entity.stuckSpeedMultiplier` (0.25, 0.05f, 0.25 — armed every touching
+   tick, rest-skipped ones included), soul sand as the first partial-height
+   solid (14/16, so it also stops conducting), and `Entity.move`'s 1e-7
+   movement gate. Goldens: `item_ice`, `item_web`, `item_soulsand`.
+2. ~~**Minecarts, stage 1**~~ — DONE: `OldMinecartBehavior` transcribed
+   (`src/minecart.rs`) — the EXITS table from the static initialiser, chord
+   projection, ×0.96/0.997 rail drag with vy zeroed, ±0.4 movement clamp
+   (velocity itself caps at 2.0), powered +0.06 boost and 0.02 conductor
+   launch, unpowered braking (×0.5, dead stop under 0.03), slope pull
+   0.0078125, corner fixups, the 0.05 height correction, and `getPos`'s
+   doubled y-delta (a slope spans its full block). `comeOffTrack` with the
+   0.95f air drag. Carts spawn from structure entity lists and share the
+   entity id counter. Goldens: `cart_flat`, `cart_boost`, `cart_brake`,
+   `cart_slope`, `cart_curve`, and `cart_loop` (200 ticks around a powered
+   circuit through all four corner shapes).
+
+   Still open for stage 2: **dynamic rail powering** (powered-rail chains of
+   8, `findPoweredRailSignal`), detector/activator rails, rail shape
+   re-bending (authored shapes must be the natural fixed point — placement
+   normalisation re-bends the rest, which the slope rig proved), cart-in-water
+   (0.2 max speed, 0.95f slowdown, fifth slope pull), cart–cart collisions,
+   hopper/chest carts, and riders (the 0.75 ridden factor and 0.997 drag are
+   already stubbed in the transcription).
+3. **Boats** — the other rideable surface: boat-on-ice item transport and
    boat-based mob/item alignment in sorters. Boat physics is `Boat.tick`
    (friction by surface, paddle-free drift for contraption use); Milestone D's
    water surface heights and flow field are the prerequisite, now in place.
-3. **Armor stands** — mostly static, but needed for interaction and collision
-4. **Player pickup** of items (needs a player model; hoppers ignore
+4. **Armor stands** — mostly static, but needed for interaction and collision
+5. **Player pickup** of items (needs a player model; hoppers ignore
    `pickupDelay`, players do not)
 
 The entity capture/tolerance machinery from Milestone B carries over directly.
