@@ -168,7 +168,17 @@ public final class TraceCapture {
             level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
         }
 
-        if (!template.placeInWorld(level, ORIGIN, ORIGIN, new StructurePlaceSettings(),
+        // --known-shape places with StructurePlaceSettings.knownShape, which skips
+        // the final update pass — the vanilla-supported "quiet" placement. Without
+        // the pass, observers receive no placement shape updates and do not pulse.
+        // Note this is not a freeze: per-block onPlace still runs, so e.g. a
+        // quasi-connected piston still notices its power source.
+        StructurePlaceSettings settings = new StructurePlaceSettings();
+        if (hasFlag(args, "--known-shape")) {
+            settings.setKnownShape(true);
+            System.out.println("  placement: known-shape (quiet, no update pass)");
+        }
+        if (!template.placeInWorld(level, ORIGIN, ORIGIN, settings,
                 RandomSource.create(0), 3)) {
             throw new IllegalStateException("failed to place " + structureId);
         }
@@ -404,6 +414,15 @@ public final class TraceCapture {
         } catch (Exception ignored) {
             // Likewise.
         }
+    }
+
+    private static boolean hasFlag(String[] args, String name) {
+        for (String arg : args) {
+            if (arg.equals(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String arg(String[] args, String name, String fallback) {

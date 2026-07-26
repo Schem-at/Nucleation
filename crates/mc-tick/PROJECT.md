@@ -91,7 +91,8 @@ enough, and `GameTestServer` runs in-process for testing.
   block), `--pulse`/`--pulse-ticks` (momentary power), `--pulse-period` (square
   wave, for rate limits like burnout) and `--use`/`--use-tick` (an empty-hand
   right-click, the exact `GameTestHelper.useBlock` sequence with an equivalent
-  mock player). Deletes its multi-hundred-MB world on exit.
+  mock player), plus `--known-shape` for quiet placement (no update pass — the
+  vanilla mechanism behind loading a contraption at rest). Deletes its multi-hundred-MB world on exit.
 - **`capture.sh`** — wraps a capture end to end: compiles the drivers, stages
   the datapack (converting `.snbt`) into a fresh trace universe, and runs
   `TraceCapture` with the given flags. One command per golden.
@@ -115,10 +116,11 @@ crates/mc-tick engine  →  emit trace  →  diff against golden  ◄───�
 `tests/conformance.rs` is this loop as a Rust test: load a structure, wire vanilla
 behaviour to it via the registry, settle, actuate (place/break/click at chosen
 ticks), run, and assert the engine's trace matches the captured golden **tick for
-tick**. Seven cases pass today — piston QC, slime adhesion, note-block power,
+tick**. Nine cases pass today — piston QC, slime adhesion, note-block power,
 note-block click, the manual engine twice (its 21-tick placement cycle, and a
-55-tick padded run whose second activation is started by a player click), and a
-broken flying machine that must break exactly as vanilla breaks it — all
+55-tick padded run whose second activation is started by a player click), a
+broken flying machine that must break exactly as vanilla breaks it, and a
+quietly placed engine that stays perfectly still until clicked — all
 driven entirely by the descriptor→behaviour registry with no hand-wiring.
 
 ### `crates/mc-tick/tests/corpus/` — zero-compile test cases
@@ -130,7 +132,7 @@ adding a file, no recompilation. `load <name>.snbt` runs a real structure.
 
 ## What's simulated today
 
-**155 tests, all green.** Everything below is trace- or bytecode-verified.
+**158 tests, all green.** Everything below is trace- or bytecode-verified.
 
 ### Engine core
 - **Tick phases** — all ten, in verified order, as an explicit walked sequence.

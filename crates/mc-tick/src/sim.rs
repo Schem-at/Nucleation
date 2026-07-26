@@ -400,6 +400,17 @@ impl Simulation {
     /// manual-engine build — all its observers fire on placement, whatever they
     /// face. The duplicate piston events this produces are collapsed by the
     /// event queue's set semantics, as vanilla's are.
+    ///
+    /// # Quiet loading
+    ///
+    /// Vanilla also supports placement **without** the update pass
+    /// (`StructurePlaceSettings.knownShape`), and a capture shows it dispatches
+    /// *nothing* — no observer pulses, and even a quasi-connected piston stays
+    /// put until something else touches it. The engine equivalent is simply not
+    /// calling this method: load, and go. That is the mode a timing product
+    /// wants — instantiate a contraption at rest, then actuate and measure —
+    /// and `manual_engine_quiet_click.json` pins it: a quietly placed engine
+    /// sits completely still until its note block is clicked.
     pub fn settle(&mut self) {
         let occupied: Vec<Pos> = self
             .world

@@ -215,6 +215,13 @@ two from tick 5 on. Reproducing that broken behaviour exactly
   `BlockBehaviour::on_placed`, dispatched when a move lands — after the
   landing's shape updates, whose ordering matters (they must see the carried
   mid-pulse state so they do not start a pulse vanilla never starts).
+- **Quiet placement exists, and dispatches nothing** —
+  `StructurePlaceSettings.knownShape` skips the update pass entirely. Captured
+  (`manual_engine_quiet_click.json`): the machine sits completely still — the
+  QC-powered piston included, so per-block `onPlace` effects do not surface
+  either — until the note block is clicked, and the click then runs exactly one
+  activation from the as-built state. Engine equivalent: load without calling
+  `settle`.
 - **Settle order is placement order** — two racing piston triggers queue their
   block events in the order the placement pass walks the block list, and the
   first event to run moves the other piston's blocks out from under its event.

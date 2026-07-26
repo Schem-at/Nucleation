@@ -100,6 +100,19 @@ fn engine_trace(sim: &Simulation, name: &str, ticks: u64) -> Trace {
     trace
 }
 
+/// How the structure enters the world.
+#[derive(Clone, Copy, PartialEq)]
+enum Settle {
+    /// Ordinary structure placement: every block is notified from every side by
+    /// the placement update pass, so observers pulse and QC pistons fire.
+    Placement,
+    /// `StructurePlaceSettings.knownShape` placement: the update pass is
+    /// skipped and **nothing** is dispatched — captured with the manual engine,
+    /// which sits completely still until clicked. The engine equivalent is
+    /// simply not settling.
+    Quiet,
+}
+
 /// An actuation applied at a tick boundary, mirroring the capture tool's flags.
 ///
 /// The capture applies `--break`/`--pulse`/`--use` *between* server ticks; the
@@ -126,9 +139,18 @@ fn run_conformance_actuated(
     extra_states: &[&str],
     actions: &[(u64, Actuate)],
 ) {
-    run_conformance_bounded(structure_file, golden_file, label, extra_states, actions, None)
+    run_conformance_bounded(
+        structure_file,
+        golden_file,
+        label,
+        extra_states,
+        actions,
+        None,
+        Settle::Placement,
+    )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_conformance_bounded(
     structure_file: &str,
     golden_file: &str,
@@ -136,6 +158,7 @@ fn run_conformance_bounded(
     extra_states: &[&str],
     actions: &[(u64, Actuate)],
     ticking: Option<mc_tick::Bounds>,
+    settle: Settle,
 ) {
     let structure = structure(structure_file);
     // The goldens are snapshot-derived, so intra-tick order is the capture's scan
@@ -179,7 +202,10 @@ fn run_conformance_bounded(
     // Placing a build gives every block a chance to react, exactly as vanilla's
     // onPlace does — which is why a piston notices a quasi-connectivity source that
     // touches it nowhere, and why every observer pulses once at placement.
-    sim.settle();
+    // Quiet (knownShape) placement dispatches nothing, so it settles nothing.
+    if settle == Settle::Placement {
+        sim.settle();
+    }
 
     let horizon = expected.ticks.last().map(|t| t.tick + 1).unwrap_or(0);
     for tick in 0..horizon {
@@ -258,6 +284,7 @@ fn the_manual_engine_runs_its_placement_cycle_tick_for_tick() {
         &[],
         &[],
         Some(mc_tick::Bounds::new(Pos::new(0, -4, 0), Pos::new(15, 7, 15))),
+        Settle::Placement,
     );
 }
 
@@ -292,6 +319,25 @@ fn clicking_the_manual_engine_advances_it_two_more_steps() {
         &[],
         &[(30, Actuate::Use(Pos::new(13, 0, 2)))],
         Some(mc_tick::Bounds::new(Pos::new(0, -4, 0), Pos::new(15, 7, 15))),
+        Settle::Placement,
+    );
+}
+
+#[test]
+fn a_quietly_placed_engine_stays_still_until_clicked() {
+    // The designed behaviour, isolated from placement side effects:
+    // knownShape placement dispatches nothing — the machine sits completely
+    // still, QC-powered piston included, for ten ticks — and the click at the
+    // note block's *as-built* position then runs exactly one activation: two
+    // steps, starting at ticks 10 and 19, nine game ticks apart.
+    run_conformance_bounded(
+        "manual_engine_padded.snbt",
+        "manual_engine_quiet_click.json",
+        "nucleation:manual_engine_padded (quiet)",
+        &[],
+        &[(10, Actuate::Use(Pos::new(15, 0, 2)))],
+        None,
+        Settle::Quiet,
     );
 }
 
