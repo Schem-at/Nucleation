@@ -89,6 +89,7 @@ public final class TraceCapture {
         String dumpPlaced = arg(args, "--dump-placed", null);
         String probeAt = arg(args, "--probe", null);
         int probeTick = Integer.parseInt(arg(args, "--probe-tick", "-1"));
+        String probePush = arg(args, "--probe-push", null);
 
         SharedConstants.tryDetectVersion();
         Bootstrap.bootStrap();
@@ -361,6 +362,28 @@ public final class TraceCapture {
                                 PHASE_TICK_END, pos.getX() - ORIGIN.getX(),
                                 pos.getY() - ORIGIN.getY(), pos.getZ() - ORIGIN.getZ(),
                                 slot, slotWas, slotNow));
+                    }
+                }
+            }
+            if (probePush != null && probeTick == tick) {
+                String[] pp = probePush.split(",");
+                BlockPos probe = ORIGIN.offset(Integer.parseInt(pp[0].trim()),
+                        Integer.parseInt(pp[1].trim()), Integer.parseInt(pp[2].trim()));
+                net.minecraft.world.level.block.state.BlockState ps = level.getBlockState(probe);
+                System.out.println("PUSH@" + tick + " " + probePush + " state=" + ps);
+                if (ps.getBlock() instanceof net.minecraft.world.level.block.piston.PistonBaseBlock) {
+                    net.minecraft.core.Direction facing = ps.getValue(
+                            net.minecraft.world.level.block.piston.PistonHeadBlock.FACING);
+                    net.minecraft.world.level.block.piston.PistonStructureResolver resolver =
+                            new net.minecraft.world.level.block.piston.PistonStructureResolver(
+                                    level, probe, facing, true);
+                    boolean ok = resolver.resolve();
+                    System.out.println("  resolve=" + ok + " toPush=" + resolver.getToPush().size()
+                            + " toDestroy=" + resolver.getToDestroy().size());
+                    for (BlockPos bp : resolver.getToPush()) {
+                        System.out.println("    push " + (bp.getX() - ORIGIN.getX()) + ","
+                                + (bp.getY() - ORIGIN.getY()) + "," + (bp.getZ() - ORIGIN.getZ())
+                                + " " + level.getBlockState(bp));
                     }
                 }
             }

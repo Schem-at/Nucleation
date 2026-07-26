@@ -26,6 +26,16 @@ impl Pos {
         Self { x, y, z }
     }
 
+    /// This position offset `n` blocks in `dir` (`BlockPos.relative(dir, n)`).
+    pub const fn offset_by(self, dir: Dir, n: i32) -> Self {
+        let (dx, dy, dz) = dir.delta();
+        Self {
+            x: self.x + dx * n,
+            y: self.y + dy * n,
+            z: self.z + dz * n,
+        }
+    }
+
     /// This position offset one block in `dir`.
     pub const fn offset(self, dir: Dir) -> Self {
         let (dx, dy, dz) = dir.delta();
@@ -98,6 +108,15 @@ impl Dir {
     }
 
     /// The direction facing the other way.
+    /// Which axis this direction runs along (`Direction.getAxis`).
+    pub const fn axis(self) -> u8 {
+        match self {
+            Dir::West | Dir::East => 0,
+            Dir::Down | Dir::Up => 1,
+            Dir::North | Dir::South => 2,
+        }
+    }
+
     pub const fn opposite(self) -> Dir {
         match self {
             Dir::Down => Dir::Up,

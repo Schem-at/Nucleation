@@ -1277,29 +1277,22 @@ impl Simulation {
 
     /// The block-events phase: drain, handle, repeat until empty.
     fn run_block_events(&mut self) -> Option<StopReason> {
-        // `ServerLevel.runBlockEvents` collects the events its handlers refuse
-        // into `blockEventsToReschedule` and re-adds them once the queue
-        // drains, so they lead the next tick's batch (confirmed from
-        // bytecode). Re-adding them here is one line — commented out below —
-        // and it is **blocked on an upstream bug**, not on doubt about the
-        // rule:
-        //
-        //   The manual engine's piston at (13,1,2) lands on tick 27 and this
-        //   engine queues an extend for it; vanilla never does (probed: both
-        //   agree the piston is quasi-powered there, so the difference is the
-        //   landing notification or the push resolution). Today that event is
-        //   refused on tick 28 and dropped, which hides the divergence. With
-        //   rescheduling it survives to tick 29, fires, and the machine takes
-        //   a stroke the game never takes. Its plan, for the next session:
-        //   8 blocks — piston, glass, 2 slime, observer, redstone block,
-        //   sticky piston, note block.
-        //
-        // Landing that line before the (13,1,2) queue is fixed trades a
-        // documented gap for two red goldens, so the gap stays until then.
+        // `ServerLevel.runBlockEvents`: events whose handler refuses them go
+        // to `blockEventsToReschedule` and are re-added once the queue drains,
+        // so they lead the next tick's batch. A piston whose extend was
+        // refused this tick therefore gets first refusal next tick — which is
+        // how one of two opposed pistons sharing a gap reliably wins.
         let mut refused: Vec<BlockEvent> = Vec::new();
         let outcome = self.drain_block_events(&mut refused);
+        // Still one line from live. The blocker is no longer the mechanism —
+        // it is that this engine's push resolution says *possible* at the tick
+        // the manual engine's piston at (13,1,2) lands, where the game says
+        // impossible (probed: vanilla's resolver stops after 7 blocks; ours
+        // adds an eighth, the retracted piston at (10,0,1)). With refusals
+        // dropped that queue is invisible; with them rescheduled it fires.
+        // Close that gap and delete these two lines.
+        let _ = &refused;
         // for event in refused { self.events.push(event); }
-        let _ = refused;
         outcome
     }
 

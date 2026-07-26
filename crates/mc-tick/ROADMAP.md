@@ -374,6 +374,28 @@ vanilla exactly; the whole remaining failure is **one piston race**:
     survives to tick 29 and fires. **Fix that queue, then uncomment the
     re-add.**
 
+  **Session update.** `PistonStructureResolver` is now transcribed
+  faithfully (backward sticky chains, perpendicular branching, collision
+  reordering, the 12-limit applied at each step) instead of the earlier
+  forward-only approximation. Asking the game with the new
+  `--probe-push` flag also overturned a hand-written unit test: obsidian
+  stuck to a slime block does **not** cancel a push (`addBlockLine`
+  returns *true* for a block it cannot push, so the branch is abandoned,
+  not fatal) — only an immovable block in the push **line** stops a
+  piston. The engine and the test now agree with the game.
+
+  What still blocks the reschedule is narrower than before: at the tick
+  the manual engine's piston at (13,1,2) lands, vanilla's resolver
+  refuses the push after collecting 7 blocks and ours accepts it with 8
+  — the extra being the retracted piston at (10,0,1). Vanilla's
+  `isPushable` tail reads `getDestroySpeed == -1 → false`, then
+  `BLOCK → false`, `DESTROY → allowDestroy`, `PUSH_ONLY → dir == face`,
+  default `→ !hasBlockEntity()`, none of which obviously rejects a
+  retracted piston, so the difference is likely in *which line* is being
+  walked (a branch's forward walk hitting something unpushable, which is
+  fatal, versus a branch origin that is merely skipped). `--probe-push`
+  at that position and tick is the way in.
+
   `cargo run -p mc-tick --example diff_vanilla` is the tool for this:
   per-tick MATCH/DIFFER against any golden, with `--region` to watch one
   mechanism and `--from/--to` to bound the range.

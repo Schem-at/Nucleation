@@ -130,65 +130,164 @@ pub fn resolve_push(
     piston: Pos,
     dir: Dir,
 ) -> PushPlan {
-    let failed = || PushPlan { to_push: Vec::new(), possible: false };
+    let start = piston.offset(dir);
+    let mut to_push: Vec<Pos> = Vec::new();
+    let failed = PushPlan { to_push: Vec::new(), possible: false };
 
-    let mut chosen: Vec<Pos> = Vec::new();
-    // Lines still to explore. A dragged block starts its own line forward, which is
-    // how a slime block pulling a floor block can go on to push whatever that floor
-    // block runs into — observed in the captured trace.
-    let mut frontier: Vec<Pos> = vec![piston.offset(dir)];
-
-    while let Some(start) = frontier.pop() {
-        let mut cursor = start;
-        loop {
-            if cursor == piston {
-                // A piston is not part of its own structure. Slime adjacent to the
-                // piston would otherwise drag it along, and it would push itself
-                // out of existence.
-                break;
-            }
-            if movability.is_empty(world, cursor) {
-                break; // this line has somewhere to go
-            }
-            if !movability.is_movable(world, cursor) {
-                return failed(); // one immovable block cancels everything
-            }
-            if chosen.contains(&cursor) {
-                break; // already accounted for by another line
-            }
-            if chosen.len() >= MAX_PUSH_DEPTH {
-                return failed();
-            }
-            chosen.push(cursor);
-
-            // Adhesion: a sticky block drags its neighbours, and each of those
-            // becomes a line of its own.
-            if let Some(kind) = movability.sticky(world, cursor) {
-                for side in crate::pos::ALL_DIRS {
-                    let neighbour = cursor.offset(side);
-                    if neighbour == piston
-                        || movability.is_empty(world, neighbour)
-                        || chosen.contains(&neighbour)
-                    {
-                        continue;
-                    }
-                    if adheres(Some(kind), movability.sticky(world, neighbour)) {
-                        frontier.push(neighbour);
-                    }
-                }
-            }
-
-            cursor = cursor.offset(dir);
+    // `resolve()`: the start block must be pushable at all, then one line from
+    // it, then a branching pass over every sticky block collected.
+    if !movability.is_empty(world, start) && !movability.is_movable(world, start) {
+        return failed;
+    }
+    if !add_block_line(world, movability, piston, dir, start, dir, &mut to_push) {
+        return failed;
+    }
+    let mut index = 0;
+    while index < to_push.len() {
+        let pos = to_push[index];
+        if movability.sticky(world, pos).is_some()
+            && !add_branching_blocks(world, movability, piston, dir, pos, &mut to_push)
+        {
+            return failed;
         }
+        index += 1;
     }
 
-    // Apply far-end-first *along the push axis*, so every block is written into
-    // space an earlier write has already vacated. With adhesion the set is no
-    // longer a single line, so this ordering has to be computed rather than
-    // assumed.
-    chosen.sort_by_key(|pos| -axis(*pos, dir));
+    // Apply far-end-first along the push axis, so every block is written into
+    // space an earlier write has already vacated.
+    let (dx, dy, dz) = dir.delta();
+    let mut ordered = to_push;
+    ordered.sort_by_key(|pos| -(pos.x * dx + pos.y * dy + pos.z * dz));
+    PushPlan { to_push: ordered, possible: true }
+}
 
-    PushPlan { to_push: chosen, possible: true }
+/// `PistonStructureResolver.addBlockLine`.
+///
+/// Walks **backwards** from `origin` along a sticky chain first — slime drags
+/// what is behind it — then forwards along the push direction, and hands a
+/// collision with an already-collected block to `reorder_at_collision`. A
+/// simplified forward-only version passed every small golden and still let a
+/// flying machine make a push the game refuses, which is what sent us here.
+#[allow(clippy::too_many_arguments)]
+fn add_block_line(
+    world: &World,
+    movability: &dyn Movability,
+    piston: Pos,
+    push_dir: Dir,
+    origin: Pos,
+    _face: Dir,
+    to_push: &mut Vec<Pos>,
+) -> bool {
+    if movability.is_empty(world, origin) {
+        return true;
+    }
+    if !movability.is_movable(world, origin) {
+        return true;
+    }
+    if origin == piston || to_push.contains(&origin) {
+        return true;
+    }
+
+    // The backward sticky chain.
+    let mut chain = 1usize;
+    if chain + to_push.len() > MAX_PUSH_DEPTH {
+        return false;
+    }
+    let mut previous = movability.sticky(world, origin);
+    while previous.is_some() {
+        let back = origin.offset_by(push_dir.opposite(), chain as i32);
+        let back_sticky = movability.sticky(world, back);
+        if movability.is_empty(world, back)
+            || !adheres(previous, back_sticky)
+            || !movability.is_movable(world, back)
+            || back == piston
+        {
+            break;
+        }
+        chain += 1;
+        if chain + to_push.len() > MAX_PUSH_DEPTH {
+            return false;
+        }
+        previous = back_sticky;
+    }
+
+    // Collected from the far end of the chain back to the origin.
+    let mut added = 0usize;
+    for step in (0..chain).rev() {
+        to_push.push(origin.offset_by(push_dir.opposite(), step as i32));
+        added += 1;
+    }
+
+    // Then forwards.
+    let mut step = 1i32;
+    loop {
+        let next = origin.offset_by(push_dir, step);
+        if let Some(collision) = to_push.iter().position(|pos| *pos == next) {
+            reorder_at_collision(to_push, added, collision);
+            for index in 0..=(collision + added).min(to_push.len().saturating_sub(1)) {
+                let pos = to_push[index];
+                if movability.sticky(world, pos).is_some()
+                    && !add_branching_blocks(world, movability, piston, push_dir, pos, to_push)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if movability.is_empty(world, next) {
+            return true;
+        }
+        if !movability.is_movable(world, next) || next == piston {
+            return false;
+        }
+        if to_push.len() >= MAX_PUSH_DEPTH {
+            return false;
+        }
+        to_push.push(next);
+        added += 1;
+        step += 1;
+    }
+}
+
+/// `PistonStructureResolver.reorderListAtCollision`: the collided run is moved
+/// ahead of the line that ran into it.
+fn reorder_at_collision(to_push: &mut Vec<Pos>, added: usize, collision: usize) {
+    let head: Vec<Pos> = to_push[..collision].to_vec();
+    let tail: Vec<Pos> = to_push[to_push.len() - added..].to_vec();
+    let middle: Vec<Pos> = to_push[collision..to_push.len() - added].to_vec();
+    to_push.clear();
+    to_push.extend(head);
+    to_push.extend(tail);
+    to_push.extend(middle);
+}
+
+/// `PistonStructureResolver.addBranchingBlocks`: a sticky block starts a line
+/// in every direction perpendicular to the push.
+fn add_branching_blocks(
+    world: &World,
+    movability: &dyn Movability,
+    piston: Pos,
+    push_dir: Dir,
+    pos: Pos,
+    to_push: &mut Vec<Pos>,
+) -> bool {
+    let sticky = movability.sticky(world, pos);
+    for dir in crate::pos::ALL_DIRS {
+        if dir.axis() == push_dir.axis() {
+            continue;
+        }
+        let neighbour = pos.offset(dir);
+        if !adheres(sticky, movability.sticky(world, neighbour)) {
+            continue;
+        }
+        if movability.is_empty(world, neighbour) {
+            continue;
+        }
+        if !add_block_line(world, movability, piston, push_dir, neighbour, dir, to_push) {
+            return false;
+        }
+    }
+    true
 }
 
 /// Work out what a sticky piston retracting would pull back.
@@ -1025,9 +1124,14 @@ mod tests {
     }
 
     #[test]
-    fn an_immovable_block_dragged_by_slime_cancels_the_whole_push() {
-        // One immovable block anywhere in the resolved structure stops everything —
-        // not just the line it sits in.
+    fn an_immovable_block_beside_slime_is_simply_not_dragged() {
+        // This test used to assert the opposite — that obsidian stuck to the
+        // slime cancels the whole push — which was a guess, and wrong. Asked
+        // directly (`capture.sh --probe-push`, structure `slime_obsidian`),
+        // the game answers `resolve=true`: `addBlockLine` *returns true* for a
+        // block it cannot push, so a branch that runs into obsidian is
+        // abandoned, not fatal. Only an immovable block in the push **line**
+        // stops a piston.
         let mut w = world();
         let pos = Pos::new(0, 1, 0);
         w.set(pos, RETRACTED);
@@ -1036,8 +1140,12 @@ mod tests {
 
         let p = piston(false, false);
         let plan = resolve_push(&w, &p.movability, pos, Dir::East);
-        assert!(!plan.possible, "obsidian on the slime must cancel the push");
-        assert!(plan.to_push.is_empty());
+        assert!(plan.possible, "the branch is abandoned, the push survives");
+        assert!(plan.to_push.contains(&Pos::new(1, 1, 0)), "the slime still moves");
+        assert!(
+            !plan.to_push.contains(&Pos::new(1, 2, 0)),
+            "the obsidian is left behind"
+        );
     }
 
     #[test]
