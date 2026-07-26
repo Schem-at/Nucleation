@@ -88,8 +88,13 @@ enough, and `GameTestServer` runs in-process for testing.
   vanilla's `always_pass`).
 - **`TraceCapture.java`** — drives `ServerLevel.tick()` manually, one tick at a
   time, and records block changes between ticks. Supports `--break` (remove a
-  block), `--pulse`/`--pulse-ticks` (momentary power) and `--pulse-period` (square
-  wave, for rate limits like burnout). Deletes its multi-hundred-MB world on exit.
+  block), `--pulse`/`--pulse-ticks` (momentary power), `--pulse-period` (square
+  wave, for rate limits like burnout) and `--use`/`--use-tick` (an empty-hand
+  right-click, the exact `GameTestHelper.useBlock` sequence with an equivalent
+  mock player). Deletes its multi-hundred-MB world on exit.
+- **`capture.sh`** — wraps a capture end to end: compiles the drivers, stages
+  the datapack (converting `.snbt`) into a fresh trace universe, and runs
+  `TraceCapture` with the given flags. One command per golden.
 - **`Snbt2Nbt.java`** — converts authored `.snbt` structures to the binary `.nbt`
   datapacks require, using the game's *own* NBT parser so the conversion cannot
   disagree with the reader.
@@ -108,9 +113,12 @@ crates/mc-tick engine  →  emit trace  →  diff against golden  ◄───�
 ```
 
 `tests/conformance.rs` is this loop as a Rust test: load a structure, wire vanilla
-behaviour to it via the registry, run, and assert the engine's trace matches the
-captured golden **tick for tick**. Two cases pass today (piston QC, slime adhesion),
-both driven entirely by the descriptor→behaviour registry with no hand-wiring.
+behaviour to it via the registry, settle, actuate (place/break/click at chosen
+ticks), run, and assert the engine's trace matches the captured golden **tick for
+tick**. Six cases pass today — piston QC, slime adhesion, note-block power,
+note-block click, and the manual engine twice (its 21-tick placement cycle, and a
+55-tick padded run whose second activation is started by a player click) — all
+driven entirely by the descriptor→behaviour registry with no hand-wiring.
 
 ### `crates/mc-tick/tests/corpus/` — zero-compile test cases
 
@@ -121,7 +129,7 @@ adding a file, no recompilation. `load <name>.snbt` runs a real structure.
 
 ## What's simulated today
 
-**147 tests, all green.** Everything below is trace- or bytecode-verified.
+**152 tests, all green.** Everything below is trace- or bytecode-verified.
 
 ### Engine core
 - **Tick phases** — all ten, in verified order, as an explicit walked sequence.
@@ -134,7 +142,16 @@ adding a file, no recompilation. `load <name>.snbt` runs a real structure.
   checkpoints. Out-of-bounds reads air (documented divergence; load with padding).
 - **Neighbour propagation** — `set` queues notifications; `settle` replays
   placement (`onPlace`), which is how QC sources are noticed.
-- **Control surface** — step, run, run_until_quiescent, reset, checkpoint, restore.
+- **Control surface** — step, run, run_until_quiescent, reset, checkpoint,
+  restore; `place_block` and `use_block` as boundary actuations, and
+  `set_ticking_bounds` for chunk-edge freezing.
+- **Boundary time** — actions between ticks (placement, breaks, clicks) schedule
+  with "now" = the last completed tick, one tick sooner than in-phase schedules;
+  their own changes are observed by the upcoming tick. Captured three ways
+  (placement observer pulse, boundary repeater, clicked note block).
+- **Player input** — `Simulation::use_block` + `BlockBehaviour::on_used`,
+  executing at the tick boundary exactly where vanilla processes use-block
+  packets (which is why `Phase::PlayerInputs` sits last in the phase list).
 - **Loud unknown-block failure** — an unimplemented block is *named*, never silently
   simulated as inert.
 - **Descriptor→behaviour registry** (`vanilla.rs`) — turns
@@ -148,18 +165,29 @@ adding a file, no recompilation. `load <name>.snbt` runs a real structure.
 | **Redstone torch** | 2-tick delay, inverts support, NORMAL priority, burnout (8 turn-offs / 60t) |
 | **Repeater** | delay×2 game ticks, 3-way priority (repeater priority via `shouldPrioritize`), locking |
 | **Comparator** | compare/subtract with side inputs, fixed 2t, **priming** (strength-change scheduling) |
-| **Observer** | 2-tick pulse, watches facing side, ignores other sides |
+| **Observer** | 2-tick pulse, watches facing side, ignores other sides, **emits from its back face only**, pulses once on placement and again when moved |
+| **Note block** | synchronous `powered` follow, block-event play (air above required), click cycles pitch 0-24 |
 | **Redstone block / lever** | constant / toggled power sources |
 
 ### Pistons (the accuracy crux)
-- Extend/retract via block events (phase 7, *same tick* as the trigger)
+- Extend/retract via block events (phase 7, *same tick* as the trigger), with
+  vanilla's **dispatch-time re-validation** — a queued extend whose power died
+  is dropped; a retract whose power returned silently re-marks extended
 - **12-block push limit** (verified: 12 moves, 13 doesn't)
-- **Moving-block entities** — placeholders now, real states 2 ticks later (phase 9)
-- **Quasi-connectivity** — power read from the block above too
+- **Moving-block entities** — placeholders now, real states 2 ticks later (phase
+  9); move writes are **silent** (no neighbour updates until landing, matching
+  vanilla's flags), and landed blocks re-examine their world (how moved
+  observers re-pulse)
+- **Retraction travels too** — the base is a 2-tick `moving_piston` placeholder;
+  in-flight heads are `finalTick`ed to air; pushed/pulled placeholders are
+  always `type=normal`
+- **Quasi-connectivity** — power read from the block above too, with vanilla's
+  direction skips (facing at the base, Down at the probe)
 - **Slime & honey adhesion** — drags on every face, dragged blocks start their own
   push lines, slime≠honey don't stick, immovable-anywhere cancels the whole push
 - **Sticky pull** with adhesion; **short-pulse block dropping**
-- Piston excluded from its own structure
+- Piston excluded from its own structure; block events deduplicate like
+  vanilla's `ObjectLinkedOpenHashSet`
 
 ---
 
@@ -168,20 +196,19 @@ adding a file, no recompilation. `load <name>.snbt` runs a real structure.
 Ordered roughly by leverage for the door-timing goal. Each item means **capture
 first, then implement** — the coding is small once the trace exists.
 
-### Near-term (unblocks real schematics) — **NEXT AGENT STARTS HERE**
-The concrete target is downloaded: `tools/gametest/samples/manual_engine.litematic`
-(a real 5×3×3 "2-Step 9gt Manual Engine"). **See `ROADMAP.md` §4b for the full
-step-by-step handoff** — it has the exact sequence, the APIs to add, and the
-TraceCapture change needed. In brief:
-- [ ] **Run the manual engine end-to-end.** Pistons/slime/observers are done; the
-      two blockers below are the only gaps. `white_stained_glass` needs adding to
-      `vanilla.rs` `INERT`.
-- [ ] **Note blocks** — flagged historically as mishandled; plays via a block event.
-      Capture a redstone→noteblock trace first.
-- [ ] **Player interaction** — the "manual" click. New `Simulation::use_block`,
-      `BlockBehaviour::on_used`, handled in `Phase::PlayerInputs` (phase 10), plus a
-      `--use` actuation in `TraceCapture.java` (`useWithoutItem`). Capture first.
+### Near-term (unblocks real schematics)
+- [x] **Run the manual engine end-to-end** — done, twice: the 21-tick placement
+      cycle and a 55-tick padded run whose second activation starts from a
+      player click. See `ROADMAP.md` §4b for everything that fell out of it
+      (boundary time, silent moves, travelling retraction, observer emission
+      direction, chunk-edge freezing).
+- [x] **Note blocks** — captured and implemented (synchronous powered follow,
+      block-event play, click cycles pitch).
+- [x] **Player interaction** — `Simulation::use_block` + `on_used`, executing at
+      the tick boundary where vanilla processes packets; `TraceCapture --use`
+      captures the real click.
 - [ ] **Buttons & pressure plates** — pulse lengths differ per material.
+      **NEXT AGENT STARTS HERE** — capture first, as always.
 
 ### Redstone completeness
 - [ ] Redstone lamp (has an off-delay), target block (analogue), dispenser/dropper
@@ -229,4 +256,6 @@ TraceCapture change needed. In brief:
 - `crates/mc-tick/src/redstone_components.md` — the captured/bytecode facts per
   component, with the exact numbers and where each came from
 - `tools/gametest/README.md` — how the oracle works and its hard-won gotchas
-- Branch: `feat/mc-tick` (27 commits ahead of master, pushed)
+- `tools/gametest/capture.sh` — one-command trace capture (stage pack, fresh
+  universe, run TraceCapture)
+- Branch: `feat/mc-tick`

@@ -69,6 +69,16 @@ pub struct TickCtx<'a> {
     pub states: &'a StateRegistry,
     /// The tick currently being executed.
     pub tick: u64,
+    /// Whether this dispatch is happening *between* ticks rather than inside one.
+    ///
+    /// Structure placement, block breaks and player clicks all happen in the
+    /// server loop, outside `ServerLevel.tick` — at a moment when the game time
+    /// still reads the last *completed* tick. A tick scheduled from there fires
+    /// one tick sooner than the same schedule made inside a phase: captured with
+    /// an observer, whose placement-provoked pulse lands on tick 1, not tick 2.
+    /// [`TickCtx::schedule`] folds this in so behaviours never have to know when
+    /// they are being called.
+    pub boundary: bool,
     /// Deferred block writes, applied in the block-entities phase.
     ///
     /// Vanilla's moving pistons work this way: the block event replaces the moved
@@ -105,7 +115,16 @@ pub struct TickCtx<'a> {
 
 impl TickCtx<'_> {
     /// Schedule a block tick at `pos`.
+    ///
+    /// From a boundary dispatch the effective "now" is the last completed tick —
+    /// `self.tick` here is the tick the change will be *observed* in, which is one
+    /// later. See [`TickCtx::boundary`].
     pub fn schedule(&mut self, pos: Pos, delay: u64, priority: TickPriority) {
+        // Folded into the delay rather than the tick so that a boundary schedule
+        // before tick 0 still lands on tick `delay - 1` instead of underflowing.
+        // A boundary delay of 0 stays 0: it would fire in the upcoming tick's
+        // block-ticks phase either way.
+        let delay = if self.boundary { delay.saturating_sub(1) } else { delay };
         self.ticks.schedule(pos, self.tick, delay, priority);
     }
 
@@ -142,6 +161,24 @@ impl TickCtx<'_> {
     /// Set a block without notifying anything, for loading a structure.
     pub fn set_silent(&mut self, pos: Pos, state: StateId) {
         self.world.set(pos, state);
+    }
+
+    /// Set the state at `pos`, recording it, without notifying its neighbours.
+    ///
+    /// Vanilla's piston moves write their placeholders and vacated slots with
+    /// update flags that suppress neighbour block updates (`324`, `82`, `68`) —
+    /// which is why a piston does not react to its own move until the blocks
+    /// land. The write is still real and a snapshot capture sees it, so it is
+    /// logged; only the notifications are withheld.
+    pub fn set_quiet(&mut self, pos: Pos, state: StateId) {
+        let previous = self.world.get(pos);
+        if previous == state {
+            return;
+        }
+        self.world.set(pos, state);
+        if let Some(log) = self.log.as_deref_mut() {
+            log.push(BlockChange { tick: self.tick, pos, from: previous, to: state });
+        }
     }
 
     /// The output strength a comparator at `pos` last emitted.
@@ -193,6 +230,13 @@ pub trait BlockBehaviour: Send + Sync {
     fn on_block_event(&self, _ctx: &mut TickCtx<'_>, _pos: Pos, _id: u8, _param: u8) -> bool {
         false
     }
+
+    /// A player right-clicked this block with an empty hand.
+    ///
+    /// Mirrors vanilla's `useWithoutItem`. Most blocks do nothing, hence the
+    /// default; a note block cycles its pitch, which is what makes a *manual*
+    /// contraption manual.
+    fn on_used(&self, _ctx: &mut TickCtx<'_>, _pos: Pos) {}
 
     /// Redstone power this block emits toward `dir`, 0-15.
     fn redstone_power(&self, _world: &World, _pos: Pos, _dir: Dir) -> u8 {
@@ -466,6 +510,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            boundary: false,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
@@ -490,6 +535,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 10,
+            boundary: false,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),

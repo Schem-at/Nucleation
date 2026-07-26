@@ -118,6 +118,79 @@ reading produces something subtly wrong.
 Nothing on this page is unimplemented, and every rule on it is now backed by
 either a captured trace or the game's own bytecode.
 
+## Manual-engine session — note blocks, clicks, and boundary time
+
+Everything below came out of running the first real community schematic
+(`manual_engine.litematic`) end-to-end, verified against `NoteBlock`,
+`ObserverBlock`, `PistonBaseBlock` and `PistonMovingBlockEntity` bytecode plus
+the captures named in parentheses.
+
+- **Note block** (`note_powered.json`, `note_click.json`) — `neighborChanged`
+  compares `hasNeighborSignal` with `POWERED` and flips it **synchronously**; no
+  scheduled tick anywhere. The note plays via `level.blockEvent(pos, this, 0, 0)`
+  on the rising edge only, and only when the instrument can sound — air above,
+  for the ordinary instruments. `useWithoutItem` cycles `NOTE` (0-24, wrapping),
+  sets the block, then plays. The pitch change is a block-state change, which is
+  what lets an observer see a click.
+- **Observers emit from their back face only** — `ObserverBlock.getSignal`
+  returns power only when the queried direction equals `FACING`. Reading an
+  observer as an omnidirectional source made it power the note block it was
+  watching, which re-triggered it forever. `VanillaRules` now carries per-state
+  emission directions.
+- **Boundary time** (`rep_boundary.json`, `note_click.json`, and every placement
+  pulse) — actions between server ticks (structure placement, `--break`,
+  `--use`) happen while the game time still reads the last *completed* tick, so
+  anything they schedule fires one capture-tick sooner than an in-phase schedule.
+  A repeater scheduled at the placement boundary turns on at trace tick 1; an
+  observer clicked at a boundary pulses one tick after the click. Engine:
+  `TickCtx::boundary`.
+- **Placement updates every block from every side** —
+  `StructureTemplate.placeInWorld` ends with a shape-update pass, which is why
+  **every observer pulses once when a structure is placed**, whatever it faces
+  (`manual_engine_settle.json`, ticks 1/3). `Simulation::settle` now notifies
+  each placed block from all six directions.
+- **Block events deduplicate** — `ServerLevel` keeps pending block events in an
+  `ObjectLinkedOpenHashSet`: queueing an identical `(pos, id, param)` twice is a
+  no-op. Load-bearing once placement sends six notifications per block.
+- **Piston `triggerEvent` re-validates at dispatch** — an extend whose power
+  vanished between queueing (phase 3) and dispatch (phase 7) is dropped; a
+  retract whose power returned just re-marks `EXTENDED` with no updates
+  (flag 2) and is unhandled. This is why a landed piston beside a dying observer
+  pulse never extends (`manual_engine_settle.json`, ticks 2-3).
+- **Move writes are silent** — `moveBlocks` writes placeholders and vacated
+  slots with flags that suppress neighbour block updates (324/82/68/18), and the
+  base's `EXTENDED=true` is written **after** the moves (flag 67, the one loud
+  write). Consequence: a piston does not react to its own move — even when it
+  pushes its own power source away — until the blocks land two ticks later.
+- **Retraction travels like extension** — the *base* becomes
+  `moving_piston` for two ticks: `extended=true -> moving_piston ->
+  extended=false` (`manual_engine_settle.json`, ticks 3-5). An in-flight head is
+  `finalTick`ed first, and a **source** block entity resolves to *air*, not to
+  its head state.
+- **Placeholder types** — `moveBlocks` sets only `FACING` on the placeholders it
+  writes, so pushed *and pulled* blocks always ride `type=normal`; only the head
+  slot's placeholder carries the piston's own type. Captured: a sticky pull
+  wrote `moving_piston[...,type=normal]` over the sticky-typed head placeholder
+  (`manual_engine_settle.json`, tick 6, at `[3,0,1]`).
+- **Landing wakes the landed block** — `PistonMovingBlockEntity.finalTick` runs
+  the landed state through `updateFromNeighbourShapes` (a shape update from all
+  six sides) and then `neighborChanged`s the position itself. This is how an
+  observer that was *moved* pulses two ticks after it lands, which the engine's
+  cycle depends on.
+- **`getNeighborSignal` skips two directions** — the facing direction at the
+  piston's own position, and Down at the position above (the QC probe).
+- **Chunk edges freeze block entities** — a moving piston pushed into a
+  loaded-but-not-ticking chunk stays a placeholder indefinitely, and being
+  immovable it then blocks further pushes. This is what stops the free-flying
+  manual engine after two steps in the settle capture, and it is why
+  `Simulation::set_ticking_bounds` exists.
+
+Known simplification, deliberately accepted: the engine's single notification
+channel does not deliver vanilla's *shape* updates from mid-move placeholder
+writes (vanilla suppresses block updates but still fires shape updates there).
+Nothing captured so far distinguishes the two; an observer watching a slot a
+block moves *into* mid-flight would.
+
 ## What to do next, in order
 
 1. **Capture traces before writing any of it.** A structure per component:

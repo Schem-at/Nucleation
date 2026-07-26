@@ -140,6 +140,7 @@ mod tests {
         let o = observer(false);
         let mut ctx = TickCtx {
             world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
+            boundary: false,
             updates: &mut Vec::new(), moves: &mut Vec::new(),
             toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
             log: None,
@@ -157,6 +158,7 @@ mod tests {
         let o = observer(false);
         let mut ctx = TickCtx {
             world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
+            boundary: false,
             updates: &mut Vec::new(), moves: &mut Vec::new(),
             toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
             log: None,
@@ -178,6 +180,7 @@ mod tests {
         {
             let mut ctx = TickCtx {
                 world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
+            boundary: false,
                 updates: &mut Vec::new(), moves: &mut Vec::new(),
                 toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
                 log: None,
@@ -194,6 +197,7 @@ mod tests {
             let mut ctx = TickCtx {
                 world: &mut w, ticks: &mut t, events: &mut e, states: &s,
                 tick: OBSERVER_PULSE_TICKS,
+            boundary: false,
                 updates: &mut Vec::new(), moves: &mut Vec::new(),
                 toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
                 log: None,
@@ -223,6 +227,7 @@ mod tests {
         let o = observer(true); // mid-pulse
         let mut ctx = TickCtx {
             world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
+            boundary: false,
             updates: &mut Vec::new(), moves: &mut Vec::new(),
             toggles: &mut Vec::new(), comparator_out: &mut Default::default(),
             log: None,

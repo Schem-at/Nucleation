@@ -108,6 +108,7 @@ fn build(repeater_delay: u8) -> Circuit {
                 states: StatePair { off: piston_in, on: piston_out },
                 head,
                 moving,
+                moving_block: moving,
                 power: model.clone(),
                 movability: model.clone(),
             }),
@@ -205,17 +206,18 @@ fn the_piston_moves_in_the_same_tick_its_repeater_fires() {
     }
 
     let tick = extended_on.expect("the piston must extend");
-    // The repeater's delay-1 tick is scheduled for game tick 2 and fires *during*
-    // it; the piston's block event resolves in phase 7 of that same tick. Since
-    // tick_count reports *completed* ticks, it reads 3 immediately afterwards.
-    //
-    // That is the same off-by-one documented on Simulation::tick_count, and it
-    // caught me twice — which is exactly why it is spelled out there.
+    // The lever flip is a *boundary* action — it happens between ticks, where the
+    // game time still reads the last completed tick — so the repeater's 2-game-tick
+    // schedule fires during tick 1, not tick 2. Captured: a repeater scheduled at
+    // the placement boundary turns on at trace tick 1 (`rep_boundary.json`), and an
+    // observer clicked at a boundary pulses one tick after the click, not two.
+    // The piston's block event resolves in phase 7 of that same tick 1. Since
+    // tick_count reports *completed* ticks, it reads 2 immediately afterwards.
     //
     // The load-bearing claim is the relationship, not the number: the piston moves
     // in the repeater's own tick. Were the move modelled as a scheduled tick it
     // would land strictly later.
-    assert_eq!(tick, 3, "extended after tick {tick}");
+    assert_eq!(tick, 2, "extended after tick {tick}");
 }
 
 #[test]

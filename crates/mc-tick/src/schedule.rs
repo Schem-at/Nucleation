@@ -169,8 +169,19 @@ impl EventQueue {
         Self::default()
     }
 
-    /// Append an event.
+    /// Append an event, unless an identical one is already queued.
+    ///
+    /// `ServerLevel` holds pending block events in an `ObjectLinkedOpenHashSet` —
+    /// insertion-ordered, but a *set*: queueing the same `(pos, block, id, param)`
+    /// twice is a no-op. That dedup is load-bearing. Placing a structure gives a
+    /// piston several neighbour updates in a row, each of which queues the same
+    /// extend event; without the set semantics the piston would extend and then
+    /// receive the stale duplicates in its extended state, which vanilla reads as
+    /// a retract request.
     pub fn push(&mut self, event: BlockEvent) {
+        if self.events.contains(&event) {
+            return;
+        }
         self.events.push(event);
     }
 
@@ -269,6 +280,24 @@ mod tests {
         queue.push(BlockEvent { pos: pos(3), id: 0, param: 0 });
         assert_eq!(queue.take().len(), 1);
         assert!(queue.take().is_empty(), "chain terminates on an empty drain");
+    }
+
+    #[test]
+    fn duplicate_events_collapse_like_vanillas_set() {
+        // ServerLevel's block-event container is an ObjectLinkedOpenHashSet:
+        // insertion-ordered but deduplicating. A piston notified from several
+        // sides queues its extend event once, not once per side.
+        let mut queue = EventQueue::new();
+        queue.push(BlockEvent { pos: pos(1), id: 0, param: 2 });
+        queue.push(BlockEvent { pos: pos(1), id: 0, param: 2 });
+        queue.push(BlockEvent { pos: pos(1), id: 1, param: 2 });
+        assert_eq!(queue.len(), 2, "identical events collapse, distinct ones do not");
+
+        // Dedup is against the *currently queued* batch only — once drained, the
+        // same event may be queued again, which chained piston cycles rely on.
+        queue.take();
+        queue.push(BlockEvent { pos: pos(1), id: 0, param: 2 });
+        assert_eq!(queue.len(), 1);
     }
 
     #[test]

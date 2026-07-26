@@ -22,7 +22,9 @@
 //! a matter of adding arms below, each backed by a captured trace.
 
 use crate::behaviour::{BehaviourTable, Inert};
-use crate::components::{Comparator, ComparatorMode, PowerSource, Repeater, StatePair, Torch};
+use crate::components::{
+    Comparator, ComparatorMode, NoteBlock, PowerSource, Repeater, StatePair, Torch,
+};
 use crate::observer::Observer;
 use crate::piston::{Movability, Piston, Sticky};
 use crate::pos::{Dir, Pos};
@@ -124,6 +126,14 @@ impl Descriptor {
 #[derive(Debug, Clone, Default)]
 pub struct VanillaRules {
     powered: Vec<StateId>,
+    /// States that emit in **one** direction only, and which one.
+    ///
+    /// An observer powers only out of its back — `ObserverBlock.getSignal`
+    /// checks the queried direction against `FACING`. Reading it as an
+    /// omnidirectional source made a pulsing observer power the very note block
+    /// it was watching, which re-triggered it forever. States absent from this
+    /// map emit every way, like a redstone block.
+    emit_only: HashMap<StateId, Dir>,
     immovable: Vec<StateId>,
     slime: Vec<StateId>,
     honey: Vec<StateId>,
@@ -131,8 +141,10 @@ pub struct VanillaRules {
 }
 
 impl PowerSource for VanillaRules {
-    fn is_powered(&self, world: &World, pos: Pos, _toward: Dir) -> bool {
-        self.powered.contains(&world.get(pos))
+    fn is_powered(&self, world: &World, pos: Pos, toward: Dir) -> bool {
+        let state = world.get(pos);
+        self.powered.contains(&state)
+            && self.emit_only.get(&state).is_none_or(|only| *only == toward)
     }
     fn is_diode(&self, world: &World, pos: Pos) -> bool {
         self.diodes.contains_key(&world.get(pos))
@@ -190,9 +202,9 @@ const INERT: &[&str] = &[
     "minecraft:iron_block",
     "minecraft:gold_block",
     "minecraft:glass",
+    "minecraft:white_stained_glass",
     "minecraft:sea_lantern",
     "minecraft:redstone_lamp",
-    "minecraft:note_block",
     "minecraft:slime_block",
     "minecraft:honey_block",
     "minecraft:piston_head",
@@ -236,6 +248,12 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
         };
         if emits {
             rules.powered.push(*id);
+            // An observer's pulse leaves through its back face only.
+            if descriptor.name == "minecraft:observer" {
+                if let Some(facing) = descriptor.facing() {
+                    rules.emit_only.insert(*id, facing.opposite());
+                }
+            }
         }
         if matches!(
             descriptor.name.as_str(),
@@ -301,6 +319,28 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
                     Box::new(Observer { facing, powered: descriptor.flag("powered"), states }),
                 );
             }
+            "minecraft:note_block" => {
+                let Some(note) = descriptor.get("note").and_then(|n| n.parse::<u8>().ok())
+                else {
+                    continue;
+                };
+                let Some(states) = powered_pair(registry, descriptor) else { continue };
+                // The click target: same powered flag, next pitch, wrapping at 24.
+                let next = (note + 1) % crate::components::NOTE_VALUES;
+                let Some(cycled) = registry.get(&descriptor.with("note", &next.to_string()))
+                else {
+                    continue;
+                };
+                table.register(
+                    *id,
+                    Box::new(NoteBlock {
+                        powered: descriptor.flag("powered"),
+                        states,
+                        cycled,
+                        power: rules.clone(),
+                    }),
+                );
+            }
             "minecraft:redstone_torch" => {
                 let Some(states) = lit_pair(registry, descriptor) else { continue };
                 table.register(
@@ -346,6 +386,14 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
                         if name == "minecraft:sticky_piston" { "sticky" } else { "normal" }
                     ))
                     .unwrap_or(StateId::AIR);
+                // Pushed and pulled blocks always ride a type=normal placeholder,
+                // whatever the piston's own type; see Piston::moving_block.
+                let moving_block = registry
+                    .get(&format!(
+                        "minecraft:moving_piston[facing={},type=normal]",
+                        face_name(facing)
+                    ))
+                    .unwrap_or(StateId::AIR);
                 table.register(
                     *id,
                     Box::new(Piston {
@@ -355,6 +403,7 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
                         states,
                         head,
                         moving,
+                        moving_block,
                         power: rules.clone(),
                         movability: rules.clone(),
                     }),
@@ -422,6 +471,18 @@ pub fn intern_companions(registry: &mut StateRegistry) {
             "minecraft:redstone_torch" | "minecraft:redstone_wall_torch" => {
                 vec![descriptor.with("lit", "false"), descriptor.with("lit", "true")]
             }
+            "minecraft:note_block" => {
+                // Every pitch, powered and not: a click cycles `note` and wraps at
+                // 24, and a product run may click any number of times, so the
+                // whole cycle is interned rather than one step of it.
+                let mut all = Vec::new();
+                for note in 0..crate::components::NOTE_VALUES {
+                    let at_note = Descriptor::parse(&descriptor.with("note", &note.to_string()));
+                    all.push(at_note.with("powered", "false"));
+                    all.push(at_note.with("powered", "true"));
+                }
+                all
+            }
             "minecraft:piston" | "minecraft:sticky_piston" => {
                 let sticky = descriptor.name == "minecraft:sticky_piston";
                 let kind = if sticky { "sticky" } else { "normal" };
@@ -434,6 +495,9 @@ pub fn intern_companions(registry: &mut StateRegistry) {
                         face_name(facing)
                     ),
                     format!("minecraft:moving_piston[facing={},type={kind}]", face_name(facing)),
+                    // Moved blocks always ride a type=normal placeholder, even
+                    // when a sticky piston does the moving.
+                    format!("minecraft:moving_piston[facing={},type=normal]", face_name(facing)),
                 ]
             }
             _ => Vec::new(),

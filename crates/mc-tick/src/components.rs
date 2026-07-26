@@ -500,6 +500,88 @@ impl<P: PowerSource> BlockBehaviour for Comparator<P> {
     }
 }
 
+/// How many pitches a note block cycles through before wrapping.
+///
+/// `NoteBlock.NOTE` is `IntegerProperty.create("note", 0, 24)`; `cycle` wraps 24
+/// back to 0.
+pub const NOTE_VALUES: u8 = 25;
+
+/// A note block.
+///
+/// Everything here is read from `NoteBlock`'s bytecode and confirmed by capture
+/// (`note_powered.json`, `note_click.json`):
+///
+/// - `neighborChanged` compares `hasNeighborSignal` with the `powered` property
+///   and updates it **synchronously** — no scheduled tick, so the flip lands on
+///   the same tick as the change that caused it.
+/// - The note *plays* via a block event (`level.blockEvent(pos, this, 0, 0)`),
+///   queued only on the rising edge, and only if the instrument can sound —
+///   for the ordinary instruments that means **air above**.
+/// - A right-click (`useWithoutItem`) cycles the `note` property and then plays.
+///   The pitch change is what an adjacent observer sees, which is how a note
+///   block acts as the trigger of a manual contraption.
+pub struct NoteBlock<P: PowerSource> {
+    /// Whether this state is the powered one.
+    pub powered: bool,
+    /// Unpowered/powered states at this pitch.
+    pub states: StatePair,
+    /// The state a click turns this one into: same powered flag, next pitch.
+    pub cycled: StateId,
+    /// How power is read.
+    pub power: P,
+}
+
+impl<P: PowerSource> NoteBlock<P> {
+    /// Vanilla's `Level.hasNeighborSignal`: any of the six neighbours powering us.
+    fn has_neighbor_signal(&self, world: &World, pos: Pos) -> bool {
+        crate::pos::ALL_DIRS
+            .iter()
+            .any(|dir| self.power.is_powered(world, pos.offset(*dir), dir.opposite()))
+    }
+
+    /// Queue the "play a note" block event, if the instrument can sound.
+    ///
+    /// `playNote` refuses when a block sits on top (for instruments that do not
+    /// work above a note block, which is all the ordinary ones). The event has no
+    /// observable effect on the world — it is sound — but it is queued for
+    /// structural fidelity, and [`NoteBlock::on_block_event`] consumes it.
+    fn play(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if ctx.get(pos.offset(Dir::Up)) == StateId::AIR {
+            ctx.queue_event(pos, 0, 0);
+        }
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for NoteBlock<P> {
+    /// `NoteBlock.neighborChanged`: follow the neighbour signal synchronously,
+    /// playing on the rising edge only.
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        let signal = self.has_neighbor_signal(ctx.world, pos);
+        if signal == self.powered {
+            return;
+        }
+        if signal {
+            self.play(ctx, pos);
+        }
+        ctx.set(pos, self.states.get(signal));
+    }
+
+    /// `NoteBlock.useWithoutItem`: cycle the pitch, then play.
+    fn on_used(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        ctx.set(pos, self.cycled);
+        self.play(ctx, pos);
+    }
+
+    /// `NoteBlock.triggerEvent`: the note sounds; nothing in the world changes.
+    fn on_block_event(&self, _ctx: &mut TickCtx<'_>, _pos: Pos, _id: u8, _param: u8) -> bool {
+        true
+    }
+
+    fn name(&self) -> &'static str {
+        "note_block"
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -575,6 +657,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            boundary: false,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
@@ -606,6 +689,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            boundary: false,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
@@ -644,6 +728,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            boundary: false,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
@@ -677,6 +762,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            boundary: false,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
@@ -712,6 +798,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            boundary: false,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
@@ -748,6 +835,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            boundary: false,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
@@ -796,6 +884,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            boundary: false,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
@@ -838,6 +927,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            boundary: false,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
@@ -875,6 +965,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            boundary: false,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
@@ -970,6 +1061,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 10,
+            boundary: false,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut toggles,
@@ -1005,6 +1097,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 10,
+            boundary: false,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut toggles,
@@ -1042,6 +1135,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 500,
+            boundary: false,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut toggles,
@@ -1112,6 +1206,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            boundary: false,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
@@ -1140,6 +1235,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            boundary: false,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
@@ -1170,6 +1266,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            boundary: false,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),
@@ -1208,6 +1305,7 @@ mod tests {
             events: &mut events,
             states: &states,
             tick: 0,
+            boundary: false,
             updates: &mut Vec::new(),
             moves: &mut Vec::new(),
             toggles: &mut Vec::new(),

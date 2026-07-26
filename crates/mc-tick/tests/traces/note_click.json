@@ -1,0 +1,38 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:note_click",
+  "detail": "normal",
+  "ticks": [
+    {
+      "tick": 1,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 0, 0], "from": "minecraft:observer[facing=west,powered=false]", "to": "minecraft:observer[facing=west,powered=true]"}
+      ]
+    },
+    {
+      "tick": 3,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 0, 0], "from": "minecraft:observer[facing=west,powered=true]", "to": "minecraft:observer[facing=west,powered=false]"}
+      ]
+    },
+    {
+      "tick": 6,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [0, 0, 0], "from": "minecraft:note_block[instrument=harp,note=0,powered=false]", "to": "minecraft:note_block[instrument=harp,note=1,powered=false]"}
+      ]
+    },
+    {
+      "tick": 7,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 0, 0], "from": "minecraft:observer[facing=west,powered=false]", "to": "minecraft:observer[facing=west,powered=true]"}
+      ]
+    },
+    {
+      "tick": 9,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 0, 0], "from": "minecraft:observer[facing=west,powered=true]", "to": "minecraft:observer[facing=west,powered=false]"}
+      ]
+    }
+  ]
+}

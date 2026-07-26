@@ -86,7 +86,41 @@ sides are compared through hand-written corpus cases rather than the *same input
 - This is also the natural **UniversalSchematic** touchpoint: conversion at the
   boundary, with the engine keeping its interned `u16` states.
 
-## 4b. Run the manual engine — NEXT UP, for the next agent
+## 4b. ~~Run the manual engine~~ — done
+
+**The manual engine runs end-to-end, twice over.** Two goldens now conform
+tick-for-tick:
+
+- `manual_engine_settle.json` — placement alone runs the machine two full
+  9-game-tick steps (placement pulses every observer, which acts as one
+  trigger); it stops at tick 21 against its own blocks frozen at a chunk edge.
+- `manual_engine_click.json` — the padded variant: placement cycle, quiescence,
+  then a `--use` click on the note block at tick 30 runs a complete second
+  activation through tick 55.
+
+What fell out of making that pass (each verified in bytecode + capture; the
+details live in `src/redstone_components.md` under "Manual-engine session"):
+
+- Note blocks implemented: synchronous `powered`, block-event play, click
+  cycles the pitch. `use_block`/`on_used` is the new player-input path.
+- **Boundary time**: actions between ticks schedule with "now" = the last
+  completed tick, one tick sooner than in-phase schedules (`TickCtx::boundary`).
+  This corrected a latent off-by-one for every boundary actuation.
+- Observers emit from their **back face only** (`VanillaRules` emission
+  directions); placement shape-updates every block from all six sides, so every
+  observer pulses once at placement; moved blocks re-examine their world when
+  they land.
+- Pistons re-validate power at event dispatch; move writes are silent; the
+  retracting *base* is a two-tick `moving_piston`; pushed/pulled placeholders
+  are always `type=normal`; block events deduplicate like vanilla's set.
+- `Simulation::set_ticking_bounds` models chunk-edge freezing, which is what
+  stops a free-flying machine in a capture.
+
+`tools/gametest/capture.sh` now wraps the whole staging-and-capture flow, and
+`TraceCapture` has `--use x,y,z` / `--use-tick N` (the exact
+`GameTestHelper.useBlock` click sequence with an equivalent mock player).
+
+### The original plan, for reference
 
 **The concrete first real-schematic target is downloaded and waiting:**
 `tools/gametest/samples/manual_engine.litematic` — a "2-Step 9gt Manual Engine",

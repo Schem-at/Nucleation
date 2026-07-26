@@ -1,5 +1,7 @@
+import com.mojang.authlib.GameProfile;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestServer;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
@@ -9,11 +11,19 @@ import net.minecraft.server.packs.repository.PackRepository;
 import net.minecraft.server.packs.repository.ServerPacksSource;
 import net.minecraft.util.RandomSource;
 import net.minecraft.util.Util;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.level.storage.LevelStorageSource;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
+
+import java.util.UUID;
 
 import java.lang.reflect.Method;
 import java.nio.file.Files;
@@ -200,6 +210,23 @@ public final class TraceCapture {
         }
         final BlockPos pulseTarget = pulsePos;
 
+        // --use right-clicks a block with an empty hand, on a chosen tick boundary.
+        // This is the "manual" in a manual engine: a note block does nothing until a
+        // player clicks it. The sequence below is GameTestHelper.useBlock verbatim —
+        // useItemOn first, falling through to useWithoutItem on
+        // TryEmptyHandInteraction — so the capture exercises the same code path a
+        // real click does.
+        String useAt = arg(args, "--use", null);
+        int useTick = Integer.parseInt(arg(args, "--use-tick", "0"));
+        BlockPos usePos = null;
+        if (useAt != null) {
+            String[] up = useAt.split(",");
+            usePos = ORIGIN.offset(Integer.parseInt(up[0].trim()),
+                    Integer.parseInt(up[1].trim()), Integer.parseInt(up[2].trim()));
+            System.out.printf("  use: clicking %s before tick %d%n", useAt, useTick);
+        }
+        final BlockPos useTarget = usePos;
+
         String breakAt = arg(args, "--break", null);
         if (breakAt != null) {
             String[] parts = breakAt.split(",");
@@ -224,6 +251,9 @@ public final class TraceCapture {
         }
 
         for (int tick = 0; tick < maxTicks; tick++) {
+            if (useTarget != null && tick == useTick) {
+                useBlock(level, useTarget);
+            }
             if (pulseTarget != null) {
                 if (pulsePeriod > 0) {
                     // Square wave: drives a component hard enough to provoke
@@ -282,6 +312,45 @@ public final class TraceCapture {
         deleteRecursively(Paths.get(universe));
 
         System.exit(0);
+    }
+
+    /**
+     * Right-click `pos` with an empty main hand, exactly as
+     * {@code GameTestHelper.useBlock} does it.
+     *
+     * <p>The player is the same construction as {@code makeMockPlayer}: an anonymous
+     * {@link Player} subclass — the only abstract method is {@code gameMode()}, and
+     * {@code isClientAuthoritative()} is overridden to keep the server authoritative,
+     * matching the framework's mock. The player is never added to the level; the
+     * framework's mock isn't either, and the vanilla use path tolerates that.
+     */
+    private static void useBlock(ServerLevel level, BlockPos pos) {
+        Player player = new Player(level,
+                new GameProfile(UUID.randomUUID(), "trace-mock-player")) {
+            @Override
+            public GameType gameMode() {
+                return GameType.CREATIVE;
+            }
+
+            @Override
+            public boolean isClientAuthoritative() {
+                return false;
+            }
+        };
+        BlockState state = level.getBlockState(pos);
+        InteractionHand hand = InteractionHand.MAIN_HAND;
+        BlockHitResult hit = new BlockHitResult(
+                Vec3.atCenterOf(pos), Direction.NORTH, pos, true);
+        InteractionResult result =
+                state.useItemOn(player.getItemInHand(hand), level, player, hand, hit);
+        if (result.consumesAction()) {
+            return;
+        }
+        if (result instanceof InteractionResult.TryEmptyHandInteraction) {
+            state.useWithoutItem(level, player, hit);
+        }
+        // GameTestHelper would fall through to ItemStack.useOn here; the hand is
+        // empty by construction, so there is nothing to use.
     }
 
     /** Descriptors for every position in the box, so comparison is order-independent. */

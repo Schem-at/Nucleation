@@ -80,6 +80,23 @@ pub struct Simulation {
     comparator_out: std::collections::HashMap<Pos, u8>,
     /// Recorded block changes, when recording is enabled.
     log: Option<Vec<BlockChange>>,
+    /// Whether a tick's phase walk is currently executing.
+    ///
+    /// Dispatches outside of one — settling a freshly placed structure, a block
+    /// broken or clicked from the control surface — are *boundary* actions: they
+    /// happen in the server loop where the game time still reads the last
+    /// completed tick, and anything they schedule fires one tick sooner than an
+    /// in-phase schedule would. See [`TickCtx::boundary`].
+    in_tick: bool,
+    /// Where block entities actually tick, when narrower than the world.
+    ///
+    /// Vanilla freezes block entities outside the block-ticking chunk area: a
+    /// moving piston pushed across that edge stays a `moving_piston` placeholder
+    /// indefinitely — and, being immovable, it then *blocks* further pushes.
+    /// Captured with the manual engine, whose flying machine crosses a chunk
+    /// border after two steps and stops dead against its own frozen blocks.
+    /// `None` means the whole world ticks.
+    ticking: Option<Bounds>,
     tick: u64,
     /// The state to return to on [`Simulation::reset`].
     ///
@@ -110,9 +127,23 @@ impl Simulation {
             toggles: Vec::new(),
             comparator_out: std::collections::HashMap::new(),
             log: None,
+            in_tick: false,
+            ticking: None,
             tick: 0,
             initial,
         }
+    }
+
+    /// Restrict block-entity ticking to `bounds`.
+    ///
+    /// A pending move whose position lies outside never resolves — the
+    /// placeholder freezes in place exactly as a block entity in a
+    /// loaded-but-not-ticking chunk does. Needed to conform against captures,
+    /// whose ticking area ends at a chunk border the capture harness chose.
+    /// Note that frozen pending moves also keep [`Simulation::is_quiescent`]
+    /// false, so bounded runs should use [`Simulation::run`].
+    pub fn set_ticking_bounds(&mut self, bounds: Bounds) {
+        self.ticking = Some(bounds);
     }
 
     /// Start recording block changes, for comparison against a vanilla trace.
@@ -222,13 +253,16 @@ impl Simulation {
 
     /// Run exactly one tick, walking all ten phases in order.
     pub fn step(&mut self) -> StopReason {
+        self.in_tick = true;
         for phase in PHASE_ORDER {
             if let Some(stop) = self.run_phase(phase) {
                 // A phase-level failure ends the tick immediately; continuing
                 // would build further state on top of a known-bad tick.
+                self.in_tick = false;
                 return stop;
             }
         }
+        self.in_tick = false;
         self.tick += 1;
         // Burnout only looks back a fixed window, so anything older is dead weight.
         let horizon = self.tick.saturating_sub(crate::components::TORCH_BURNOUT_WINDOW);
@@ -323,11 +357,14 @@ impl Simulation {
                 events: &mut self.events,
                 states: &self.registry,
                 tick: self.tick,
+                // A cascade running outside a phase walk is a boundary action;
+                // its schedules use last-completed-tick time. See TickCtx::boundary.
+                boundary: !self.in_tick,
                 updates: &mut self.updates,
                 moves: &mut self.moves,
-                        toggles: &mut self.toggles,
-                        comparator_out: &mut self.comparator_out,
-                        log: self.log.as_mut(),
+                toggles: &mut self.toggles,
+                comparator_out: &mut self.comparator_out,
+                log: self.log.as_mut(),
             };
             behaviour.on_neighbor_changed(&mut ctx, pos, from);
         }
@@ -354,6 +391,15 @@ impl Simulation {
     /// Call this after loading a structure and before running. Without it a build
     /// sits inert until something happens to touch it, which is not what the game
     /// does and made an early conformance run produce no events at all.
+    ///
+    /// Each block is notified **from all six directions**, not once nominally.
+    /// `StructureTemplate.placeInWorld` ends with an update pass that hands every
+    /// placed block shape updates from every side, and observers depend on the
+    /// difference: an observer pulses when the side it *faces* reports a change,
+    /// so structure placement pulses every observer once. Captured with the
+    /// manual-engine build — all its observers fire on placement, whatever they
+    /// face. The duplicate piston events this produces are collapsed by the
+    /// event queue's set semantics, as vanilla's are.
     pub fn settle(&mut self) {
         let occupied: Vec<Pos> = self
             .world
@@ -361,10 +407,63 @@ impl Simulation {
             .map(|(pos, _)| pos)
             .collect();
         for pos in occupied {
-            // Each block is told to re-examine itself. The direction is nominal —
-            // nothing here claims a specific neighbour changed.
-            self.updates.push((pos, crate::pos::Dir::Up));
+            for dir in crate::pos::ALL_DIRS {
+                self.updates.push((pos, dir));
+            }
         }
+        self.propagate();
+    }
+
+    /// Write `state` at `pos` from outside the simulation — a placed or broken
+    /// block, the way an actuation reaches a real world.
+    ///
+    /// A boundary action: the write is observed by the upcoming tick (and logged
+    /// against it), while anything it schedules uses last-completed-tick time,
+    /// exactly as a block placed between server ticks behaves. Breaking a block
+    /// is placing air.
+    pub fn place_block(&mut self, pos: Pos, state: StateId) {
+        let previous = self.world.get(pos);
+        if previous == state {
+            return;
+        }
+        self.world.set(pos, state);
+        if let Some(log) = self.log.as_mut() {
+            log.push(BlockChange { tick: self.tick, pos, from: previous, to: state });
+        }
+        self.notify_neighbors(pos);
+    }
+
+    /// Right-click the block at `pos` with an empty hand, as a player would.
+    ///
+    /// This is the `Phase::PlayerInputs` input path. Vanilla processes use-block
+    /// packets in the server loop *between* level ticks — which is why the phase
+    /// list places player inputs last — so the click executes immediately as a
+    /// boundary action rather than being queued into the next phase walk: its
+    /// changes are observed by the upcoming tick, and anything it schedules uses
+    /// last-completed-tick time. Captured with a note block and an observer: the
+    /// note cycles on the click's tick, the observer pulses one tick later.
+    pub fn use_block(&mut self, pos: Pos) {
+        let state = self.world.get(pos);
+        let Some(behaviour) = self.behaviours.get(state) else {
+            if state != StateId::AIR {
+                self.unknown_seen.push(state);
+            }
+            return;
+        };
+        let mut ctx = TickCtx {
+            world: &mut self.world,
+            ticks: &mut self.ticks,
+            events: &mut self.events,
+            states: &self.registry,
+            tick: self.tick,
+            boundary: true,
+            updates: &mut self.updates,
+            moves: &mut self.moves,
+            toggles: &mut self.toggles,
+            comparator_out: &mut self.comparator_out,
+            log: self.log.as_mut(),
+        };
+        behaviour.on_used(&mut ctx, pos);
         self.propagate();
     }
 
@@ -395,6 +494,7 @@ impl Simulation {
                         events: &mut self.events,
                         states: &self.registry,
                         tick: self.tick,
+            boundary: false,
                         updates: &mut self.updates,
                 moves: &mut self.moves,
                         toggles: &mut self.toggles,
@@ -416,10 +516,13 @@ impl Simulation {
                 // event that started them. Captured from vanilla:
                 //   tick 0  stone -> moving_piston
                 //   tick 2  moving_piston -> stone (at its destination)
+                let ticking = self.ticking;
+                let in_ticking =
+                    move |pos: Pos| ticking.as_ref().is_none_or(|bounds| bounds.contains(pos));
                 let mut due: Vec<PendingMove> = self
                     .moves
                     .iter()
-                    .filter(|m| m.resolve_on <= self.tick)
+                    .filter(|m| m.resolve_on <= self.tick && in_ticking(m.pos))
                     .copied()
                     .collect();
                 // Resolve in the world's canonical order rather than the order the
@@ -428,7 +531,10 @@ impl Simulation {
                 // backwards — and an order-sensitive diff treats that as a
                 // divergence, correctly, because update order is observable.
                 due.sort_by_key(|m| (m.resolve_on, m.pos.y, m.pos.z, m.pos.x));
-                self.moves.retain(|m| m.resolve_on > self.tick);
+                // Frozen moves (outside the ticking bounds) stay pending: a
+                // block entity in a non-ticking chunk is suspended, not gone.
+                self.moves
+                    .retain(|m| m.resolve_on > self.tick || !in_ticking(m.pos));
                 for entry in due {
                     let previous = self.world.get(entry.pos);
                     if previous == entry.state {
@@ -445,6 +551,15 @@ impl Simulation {
                             from: previous,
                             to: entry.state,
                         });
+                    }
+                    // `PistonMovingBlockEntity.finalTick` runs the landed state
+                    // through `updateFromNeighbourShapes` — a shape update from
+                    // every side — and then `neighborChanged`s the position
+                    // itself. The landed block re-examines its world, which is
+                    // how an observer that was *moved* pulses two ticks after it
+                    // lands, and how a landed piston notices power waiting for it.
+                    for dir in crate::pos::ALL_DIRS {
+                        self.updates.push((entry.pos, dir));
                     }
                     for dir in crate::pos::ALL_DIRS {
                         self.updates.push((entry.pos.offset(dir), dir.opposite()));
@@ -480,6 +595,7 @@ impl Simulation {
                     events: &mut self.events,
                     states: &self.registry,
                     tick: self.tick,
+            boundary: false,
                     updates: &mut self.updates,
                 moves: &mut self.moves,
                         toggles: &mut self.toggles,

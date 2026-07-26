@@ -18,11 +18,12 @@
 //!
 //! # What is modelled here
 //!
-//! Extension and retraction of a column, the push limit, and the phase in which the
-//! movement happens. What is **not** modelled: the moving-block entity with its
-//! progress (phase 9), slime/honey adhesion pulling perpendicular blocks, and
-//! quasi-connectivity. Each of those needs a captured trace before it is worth
-//! writing — they are where guesses go wrong.
+//! Extension and retraction (both of which travel: placeholders now, real states
+//! two ticks later in phase 9, the retracting *base* included), the push limit,
+//! quasi-connectivity, slime/honey adhesion with pulls, short-pulse dropping,
+//! dispatch-time re-validation of queued events, and vanilla's silent move
+//! writes. Every rule is backed by a captured trace or the class's bytecode; the
+//! details and their captures are in `redstone_components.md`.
 
 use crate::behaviour::{BlockBehaviour, TickCtx};
 use crate::components::{PowerSource, StatePair};
@@ -261,8 +262,18 @@ pub struct Piston<P: PowerSource, M: Movability> {
     pub states: StatePair,
     /// The block placed as the piston head when extended.
     pub head: StateId,
-    /// The `moving_piston` placeholder occupying a block while it travels.
+    /// The `moving_piston` placeholder for the head slot.
+    ///
+    /// Carries the piston's own type: `triggerEvent` builds it with
+    /// `TYPE = sticky ? STICKY : DEFAULT`.
     pub moving: StateId,
+    /// The `moving_piston` placeholder for a pushed or pulled block.
+    ///
+    /// **Always `type=normal`**, even for a sticky piston — `moveBlocks` sets only
+    /// `FACING` on the placeholders it writes, leaving `TYPE` at its default.
+    /// Captured: a sticky piston's pull wrote `moving_piston[...,type=normal]`
+    /// over the sticky-typed head placeholder.
+    pub moving_block: StateId,
     /// How power is read.
     pub power: P,
     /// Which blocks may be pushed.
@@ -281,15 +292,22 @@ impl<P: PowerSource, M: Movability> Piston<P, M> {
     /// and a simulator without it silently disagrees with the game on exactly the
     /// builds people care about.
     fn is_powered(&self, world: &World, pos: Pos) -> bool {
-        self.has_direct_signal(world, pos) || self.has_direct_signal(world, pos.offset(Dir::Up))
+        // `getNeighborSignal` skips the direction the piston pushes at its own
+        // position, and skips Down (back toward the piston) at the position
+        // above. Read from the bytecode.
+        self.has_direct_signal(world, pos, Some(self.facing))
+            || self.has_direct_signal(world, pos.offset(Dir::Up), Some(Dir::Down))
     }
 
-    /// Whether any neighbour of `pos` emits toward it.
-    fn has_direct_signal(&self, world: &World, pos: Pos) -> bool {
-        crate::pos::ALL_DIRS.iter().any(|dir| {
-            self.power
-                .is_powered(world, pos.offset(*dir), dir.opposite())
-        })
+    /// Whether any neighbour of `pos` emits toward it, ignoring `skip`.
+    fn has_direct_signal(&self, world: &World, pos: Pos, skip: Option<Dir>) -> bool {
+        crate::pos::ALL_DIRS
+            .iter()
+            .filter(|dir| Some(**dir) != skip)
+            .any(|dir| {
+                self.power
+                    .is_powered(world, pos.offset(*dir), dir.opposite())
+            })
     }
 }
 
@@ -305,7 +323,17 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
         let trigger = if powered {
             TRIGGER_EXTEND
         } else {
-            TRIGGER_CONTRACT
+            // `checkIfExtend` retracts with TRIGGER_DROP instead of
+            // TRIGGER_CONTRACT when the block beyond the head is still mid-flight
+            // toward it — that is the short-pulse drop: the retraction refuses to
+            // pull a block whose extension it interrupted.
+            let target = pos.offset(self.facing).offset(self.facing);
+            let target_in_flight = ctx.moves.iter().any(|m| m.pos == target);
+            if target_in_flight {
+                TRIGGER_DROP
+            } else {
+                TRIGGER_CONTRACT
+            }
         };
         ctx.queue_event(pos, trigger, self.facing as u8);
     }
@@ -313,6 +341,14 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
     fn on_block_event(&self, ctx: &mut TickCtx<'_>, pos: Pos, id: u8, _param: u8) -> bool {
         match id {
             TRIGGER_EXTEND => {
+                // `triggerEvent` re-reads the signal at dispatch: an extend whose
+                // power vanished between phase 3 (queueing) and phase 7 (here) is
+                // simply dropped. Captured with the manual engine — a landed
+                // piston queues an extend off an observer's pulse, the pulse ends
+                // in the next tick's block-ticks phase, and the extend never runs.
+                if !self.is_powered(ctx.world, pos) {
+                    return false;
+                }
                 let plan = resolve_push(ctx.world, &self.movability, pos, self.facing);
                 if !plan.possible {
                     return false;
@@ -327,8 +363,6 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
 
                 // Vanilla replaces both ends with `moving_piston` placeholders now
                 // and resolves them two ticks later in the block-entities phase.
-                // The write order matches a captured trace: the piston's own state
-                // first, then each moved block from nearest to furthest.
                 let head_slot = pos.offset(self.facing);
                 // A position can be both a source and a destination: in a column,
                 // every block but the last moves into a slot another block just
@@ -339,7 +373,10 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     .map(|(from, _)| from.offset(self.facing))
                     .collect();
 
-                ctx.set(pos, self.states.get(true));
+                // All move writes are *quiet*: `moveBlocks` uses update flags that
+                // suppress neighbour block updates, which is why the piston does
+                // not react to its own move — its power source may be part of the
+                // moved structure — until the blocks land two ticks later.
                 for (from, state) in carried.iter().rev() {
                     let to = from.offset(self.facing);
                     // A vacated source becomes **air**, not a placeholder — captured
@@ -348,37 +385,100 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     // the piston holds a placeholder, because that one resolves into
                     // the head rather than emptying.
                     if *from != head_slot && !destinations.contains(from) {
-                        ctx.set(*from, StateId::AIR);
+                        ctx.set_quiet(*from, StateId::AIR);
                     }
-                    ctx.set(to, self.moving);
+                    ctx.set_quiet(to, self.moving_block);
                     ctx.defer(to, *state, PISTON_MOVE_TICKS);
                 }
                 // The head slot is itself in motion until the move completes.
-                ctx.set(head_slot, self.moving);
+                ctx.set_quiet(head_slot, self.moving);
                 ctx.defer(head_slot, self.head, PISTON_MOVE_TICKS);
+                // The base state is written *after* the moves, with notifications
+                // (vanilla flag 67) — the one loud write of the whole event.
+                ctx.set(pos, self.states.get(true));
                 true
             }
-            TRIGGER_CONTRACT => {
+            TRIGGER_CONTRACT | TRIGGER_DROP => {
+                // Dispatch re-check, mirroring extend: if power returned before
+                // the retract ran, vanilla re-marks the base extended with **no**
+                // updates (flag 2) and treats the event as unhandled.
+                if self.is_powered(ctx.world, pos) {
+                    ctx.set_quiet(pos, self.states.get(true));
+                    return false;
+                }
                 let head = pos.offset(self.facing);
-                if ctx.world.get(head) == self.head {
+                // An in-flight head is `finalTick`ed first: a *source* block
+                // entity resolves to air (not to its head state), loudly — which
+                // is also what frees the slot for a pull to move into.
+                let head_in_flight = ctx.moves.iter().any(|m| m.pos == head);
+                ctx.moves.retain(|m| m.pos != head);
+                if head_in_flight {
                     ctx.set(head, StateId::AIR);
                 }
+
+                // The *base* becomes a moving placeholder for the two ticks the
+                // head takes to travel home — captured: `extended=true ->
+                // moving_piston -> extended=false`. Vanilla writes it silently and
+                // then fires updateNeighborsAt explicitly; ctx.set is exactly
+                // that pair.
+                ctx.set(pos, self.moving);
+                ctx.defer(pos, self.states.get(false), PISTON_MOVE_TICKS);
+
                 if self.sticky {
-                    // A sticky piston pulls, and a pulled slime block drags its own
-                    // neighbours exactly as a pushed one does. Pulling matters as
-                    // much as pushing for doors: it is the return stroke.
                     let back = self.facing.opposite();
-                    let plan =
-                        resolve_pull(ctx.world, &self.movability, head.offset(self.facing), back);
-                    for from in &plan.to_push {
-                        let state = ctx.world.get(*from);
-                        let to = from.offset(back);
-                        ctx.set(to, self.moving);
-                        ctx.set(*from, self.moving);
-                        ctx.defer(to, state, PISTON_MOVE_TICKS);
+                    let target = head.offset(self.facing);
+                    let target_pending = ctx.moves.iter().position(|m| m.pos == target);
+                    let target_state = ctx.world.get(target);
+                    let target_moving =
+                        target_state == self.moving || target_state == self.moving_block;
+                    if let (Some(index), true) = (target_pending, target_moving) {
+                        // The block we would pull is still travelling toward the
+                        // head: it is finalised where it is and *not* pulled — the
+                        // short-pulse drop.
+                        let landed = ctx.moves.remove(index);
+                        ctx.set(target, landed.state);
+                        ctx.set(head, StateId::AIR);
+                    } else if id == TRIGGER_CONTRACT {
+                        // `moveBlocks` begins a retraction by silently clearing a
+                        // real head out of the slot the pulled block moves into.
+                        if ctx.world.get(head) == self.head {
+                            ctx.set_quiet(head, StateId::AIR);
+                        }
+                        // A pulled slime block drags its own neighbours exactly as
+                        // a pushed one does. The return stroke matters as much as
+                        // the push for doors.
+                        let plan = resolve_pull(ctx.world, &self.movability, target, back);
+                        if plan.possible {
+                            let carried: Vec<(Pos, StateId)> = plan
+                                .to_push
+                                .iter()
+                                .map(|from| (*from, ctx.world.get(*from)))
+                                .collect();
+                            let destinations: Vec<Pos> = carried
+                                .iter()
+                                .map(|(from, _)| from.offset(back))
+                                .collect();
+                            for (from, state) in &carried {
+                                let to = from.offset(back);
+                                ctx.set_quiet(to, self.moving_block);
+                                ctx.defer(to, *state, PISTON_MOVE_TICKS);
+                            }
+                            for (from, _) in &carried {
+                                if !destinations.contains(from) {
+                                    ctx.set_quiet(*from, StateId::AIR);
+                                }
+                            }
+                        } else {
+                            ctx.set(head, StateId::AIR);
+                        }
+                    } else {
+                        // TRIGGER_DROP with nothing in flight: retract without
+                        // pulling.
+                        ctx.set(head, StateId::AIR);
                     }
+                } else {
+                    ctx.set(head, StateId::AIR);
                 }
-                ctx.set(pos, self.states.get(false));
                 true
             }
             _ => false,
@@ -463,6 +563,7 @@ mod tests {
             states: StatePair { off: RETRACTED, on: EXTENDED },
             head: HEAD,
             moving: MOVING,
+            moving_block: MOVING,
             power: model.clone(),
             movability: model,
         }
@@ -479,6 +580,7 @@ mod tests {
         states: &'a StateRegistry,
     ) -> TickCtx<'a> {
         TickCtx { world, ticks, events, states, tick: 0,
+            boundary: false,
         updates: Box::leak(Box::new(Vec::new())),
         moves: Box::leak(Box::new(Vec::new())),
         toggles: Box::leak(Box::new(Vec::new())),
@@ -524,12 +626,16 @@ mod tests {
         w.set(pos, RETRACTED);
         w.set(Pos::new(1, 1, 0), STONE);
         w.set(Pos::new(2, 1, 0), STONE);
+        // Power the piston: triggerEvent re-reads the signal at dispatch and
+        // drops an extend whose power has vanished.
+        w.set(pos.offset(Dir::Up), LEVER);
 
         let p = piston(false, false);
         let mut ctx_moves = Vec::new();
         {
             let mut ctx = TickCtx {
                 world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
+            boundary: false,
                 updates: &mut Vec::new(), moves: &mut ctx_moves,
                 toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
@@ -627,6 +733,7 @@ mod tests {
         {
             let mut ctx = TickCtx {
                 world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
+            boundary: false,
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
                 log: None,
@@ -634,15 +741,27 @@ mod tests {
             assert!(p.on_block_event(&mut ctx, pos, TRIGGER_CONTRACT, 0));
         }
 
-        assert_eq!(w.get(pos), RETRACTED);
         // Retraction travels like extension: placeholders now, real states in the
-        // block-entities phase two ticks later.
+        // block-entities phase two ticks later. The *base* is one of them —
+        // captured: extended=true -> moving_piston -> extended=false.
+        assert_eq!(w.get(pos), MOVING, "the base itself is in motion");
+        assert!(
+            pulled.iter().any(|m| m.pos == pos
+                && m.state == RETRACTED
+                && m.resolve_on == PISTON_MOVE_TICKS),
+            "the base must resolve to retracted: {pulled:?}"
+        );
         assert_eq!(w.get(Pos::new(1, 1, 0)), MOVING, "head slot is in motion");
         assert!(
             pulled.iter().any(|m| m.pos == Pos::new(1, 1, 0)
                 && m.state == STONE
                 && m.resolve_on == PISTON_MOVE_TICKS),
             "the stone must be scheduled into the head slot: {pulled:?}"
+        );
+        assert_eq!(
+            w.get(Pos::new(2, 1, 0)),
+            StateId::AIR,
+            "the pulled block's old position empties, as the capture shows"
         );
     }
 
@@ -665,6 +784,7 @@ mod tests {
         {
             let mut ctx = TickCtx {
                 world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
+            boundary: false,
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
                 log: None,
@@ -708,6 +828,7 @@ mod tests {
         {
             let mut ctx = TickCtx {
                 world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
+            boundary: false,
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
                 log: None,
@@ -716,10 +837,11 @@ mod tests {
         }
 
         assert!(
-            pulled.is_empty(),
-            "a block still in motion cannot be grabbed: {pulled:?}"
+            pulled.iter().all(|m| m.pos == pos),
+            "a block still in motion cannot be grabbed — only the base travels: {pulled:?}"
         );
-        assert_eq!(w.get(pos), RETRACTED, "the piston still retracts");
+        assert_eq!(w.get(pos), MOVING, "the piston still retracts, via its placeholder");
+        assert_eq!(w.get(Pos::new(2, 1, 0)), MOVING, "the dropped block is left in flight");
     }
 
     #[test]
@@ -941,12 +1063,14 @@ mod tests {
 
     #[test]
     fn an_unknown_block_event_is_not_claimed() {
+        // TRIGGER_DROP is a real retract variant, so an unknown id has to be an
+        // actually-unused number.
         let mut w = world();
         let mut t = TickQueue::new();
         let mut e = EventQueue::new();
         let s = StateRegistry::new();
         let p = piston(false, false);
         let mut ctx = run(&mut w, &mut t, &mut e, &s);
-        assert!(!p.on_block_event(&mut ctx, Pos::new(0, 1, 0), TRIGGER_DROP, 0));
+        assert!(!p.on_block_event(&mut ctx, Pos::new(0, 1, 0), 9, 0));
     }
 }

@@ -54,20 +54,43 @@ fn golden(name: &str) -> Trace {
 /// The capture observes *between* ticks, so it cannot attribute an event to a
 /// phase and tags everything `tick_end`. The engine could say more, but says the
 /// same thing here — a richer claim on one side would diff as a difference.
+///
+/// For the same reason, same-tick changes at one position are collapsed to their
+/// **net** change. A retraction writes `piston_head -> air -> moving_piston` into
+/// the head slot within one tick; a snapshot diff can only ever see
+/// `piston_head -> moving_piston`, and a no-op round trip not at all.
 fn engine_trace(sim: &Simulation, name: &str, ticks: u64) -> Trace {
     let mut trace = Trace::new("26.2", name, Detail::Normal);
     for tick in 0..ticks {
-        let events: Vec<_> = sim
-            .recorded()
-            .iter()
-            .filter(|c| c.tick == tick)
-            .map(|c| mc_tick_trace::TraceEvent {
-                phase: "tick_end".to_string(),
-                kind: EventKind::BlockChanged {
-                    pos: TracePos::new(c.pos.x, c.pos.y, c.pos.z),
-                    from: sim.registry().descriptor(c.from).unwrap_or("?").to_string(),
-                    to: sim.registry().descriptor(c.to).unwrap_or("?").to_string(),
-                },
+        let mut first_seen: Vec<mc_tick::Pos> = Vec::new();
+        let mut net: std::collections::HashMap<mc_tick::Pos, (mc_tick::StateId, mc_tick::StateId)> =
+            std::collections::HashMap::new();
+        for c in sim.recorded().iter().filter(|c| c.tick == tick) {
+            match net.entry(c.pos) {
+                std::collections::hash_map::Entry::Vacant(slot) => {
+                    slot.insert((c.from, c.to));
+                    first_seen.push(c.pos);
+                }
+                std::collections::hash_map::Entry::Occupied(mut slot) => {
+                    slot.get_mut().1 = c.to;
+                }
+            }
+        }
+        let events: Vec<_> = first_seen
+            .into_iter()
+            .filter_map(|pos| {
+                let (from, to) = net[&pos];
+                if from == to {
+                    return None; // a round trip is invisible between ticks
+                }
+                Some(mc_tick_trace::TraceEvent {
+                    phase: "tick_end".to_string(),
+                    kind: EventKind::BlockChanged {
+                        pos: TracePos::new(pos.x, pos.y, pos.z),
+                        from: sim.registry().descriptor(from).unwrap_or("?").to_string(),
+                        to: sim.registry().descriptor(to).unwrap_or("?").to_string(),
+                    },
+                })
             })
             .collect();
         if !events.is_empty() {
@@ -77,11 +100,43 @@ fn engine_trace(sim: &Simulation, name: &str, ticks: u64) -> Trace {
     trace
 }
 
-/// Load a structure, wire vanilla behaviour to it, settle, and run.
+/// An actuation applied at a tick boundary, mirroring the capture tool's flags.
+///
+/// The capture applies `--break`/`--pulse`/`--use` *between* server ticks; the
+/// tick number here is the tick that will run next — the one whose snapshot diff
+/// records the action, which is how the golden buckets it.
+enum Actuate {
+    /// Write a block state, as `--pulse` placing or removing its source does.
+    /// Breaking a block is placing `minecraft:air`.
+    Place(Pos, &'static str),
+    /// Right-click with an empty hand, as `--use` does.
+    Use(Pos),
+}
+
+/// Load a structure, wire vanilla behaviour to it, settle, actuate, and run.
 ///
 /// No hand-registration: `mc_tick::vanilla` turns descriptors into behaviour, which
-/// is what makes running an arbitrary schematic possible at all.
-fn run_conformance(structure_file: &str, golden_file: &str, label: &str) {
+/// is what makes running an arbitrary schematic possible at all. `extra_states` are
+/// interned before behaviours are bound, so an actuation may introduce a block the
+/// structure itself never mentions (a pulse's redstone block, typically).
+fn run_conformance_actuated(
+    structure_file: &str,
+    golden_file: &str,
+    label: &str,
+    extra_states: &[&str],
+    actions: &[(u64, Actuate)],
+) {
+    run_conformance_bounded(structure_file, golden_file, label, extra_states, actions, None)
+}
+
+fn run_conformance_bounded(
+    structure_file: &str,
+    golden_file: &str,
+    label: &str,
+    extra_states: &[&str],
+    actions: &[(u64, Actuate)],
+    ticking: Option<mc_tick::Bounds>,
+) {
     let structure = structure(structure_file);
     // The goldens are snapshot-derived, so intra-tick order is the capture's scan
     // order rather than the game's causal order. Canonicalising both sides compares
@@ -93,6 +148,11 @@ fn run_conformance(structure_file: &str, golden_file: &str, label: &str) {
     {
         let (registry, world) = sim.registry_and_world_mut();
         structure.place(world, registry, Pos::new(0, 0, 0));
+    }
+    for descriptor in extra_states {
+        sim.registry_mut()
+            .intern(descriptor)
+            .unwrap_or_else(|e| panic!("{label}: interning {descriptor}: {e:?}"));
     }
 
     // A build only contains the states it was saved with; a block needs its
@@ -111,14 +171,35 @@ fn run_conformance(structure_file: &str, golden_file: &str, label: &str) {
          a partially-simulated world"
     );
 
+    if let Some(bounds) = ticking {
+        sim.set_ticking_bounds(bounds);
+    }
+
     sim.record();
     // Placing a build gives every block a chance to react, exactly as vanilla's
     // onPlace does — which is why a piston notices a quasi-connectivity source that
-    // touches it nowhere.
+    // touches it nowhere, and why every observer pulses once at placement.
     sim.settle();
 
     let horizon = expected.ticks.last().map(|t| t.tick + 1).unwrap_or(0);
-    sim.run(horizon);
+    for tick in 0..horizon {
+        for (at, action) in actions {
+            if *at != tick {
+                continue;
+            }
+            match action {
+                Actuate::Place(pos, descriptor) => {
+                    let state = sim
+                        .registry()
+                        .get(descriptor)
+                        .unwrap_or_else(|| panic!("{label}: {descriptor} was not interned"));
+                    sim.place_block(*pos, state);
+                }
+                Actuate::Use(pos) => sim.use_block(*pos),
+            }
+        }
+        sim.step();
+    }
 
     let actual = engine_trace(&sim, label, horizon).canonicalized();
     if let Some(divergence) = expected.diff(&actual) {
@@ -128,6 +209,11 @@ fn run_conformance(structure_file: &str, golden_file: &str, label: &str) {
             actual.to_json().unwrap()
         );
     }
+}
+
+/// The no-actuation case: settle and run.
+fn run_conformance(structure_file: &str, golden_file: &str, label: &str) {
+    run_conformance_actuated(structure_file, golden_file, label, &[], &[]);
 }
 
 #[test]
@@ -148,4 +234,81 @@ fn piston_qc_matches_vanilla_tick_for_tick() {
 #[test]
 fn slime_adhesion_matches_vanilla_tick_for_tick() {
     run_conformance("slime_drag.snbt", "slime_drag.json", "nucleation:slime_drag");
+}
+
+#[test]
+fn the_manual_engine_runs_its_placement_cycle_tick_for_tick() {
+    // The first real community schematic: a 2-step slimestone flying-machine
+    // engine (`tools/gametest/samples/manual_engine.litematic`). Placement pulses
+    // its observers, which acts as one trigger: the machine advances two full
+    // 9-game-tick steps — pistons, slime adhesion, moved observers re-pulsing —
+    // and stops at tick 21. Twenty-one ticks of interlocking behaviour, with no
+    // actuation at all.
+    //
+    // The ticking bounds mirror the capture: its origin sat exactly on a chunk
+    // corner, so blocks the machine pushes to x < 0 land in a chunk that is
+    // loaded but not block-entity-ticking. Their moving_piston placeholders
+    // freeze there — and, being immovable, they are what *stops* the machine
+    // after its second step. Without the bounds the engine happily resolves
+    // them and the machine takes a third step vanilla never took.
+    run_conformance_bounded(
+        "manual_engine.snbt",
+        "manual_engine_settle.json",
+        "nucleation:manual_engine",
+        &[],
+        &[],
+        Some(mc_tick::Bounds::new(Pos::new(0, -4, 0), Pos::new(15, 7, 15))),
+    );
+}
+
+#[test]
+fn clicking_the_manual_engine_advances_it_two_more_steps() {
+    // The same engine, placed with room to fly: padded to the east end of the
+    // capture's chunk so nothing crosses the frozen chunk border. Placement
+    // runs the first two steps (ticks 0-25); the world then goes quiet; a
+    // right-click on the note block — at [13,0,2], where the machine's two
+    // steps left it — cycles its pitch on tick 30, the observers see the
+    // change, and the engine runs a complete second activation through
+    // tick 55. Fifty-five ticks, two full activations, one of them started by
+    // the player-input path.
+    run_conformance_bounded(
+        "manual_engine_padded.snbt",
+        "manual_engine_click.json",
+        "nucleation:manual_engine_padded",
+        &[],
+        &[(30, Actuate::Use(Pos::new(13, 0, 2)))],
+        Some(mc_tick::Bounds::new(Pos::new(0, -4, 0), Pos::new(15, 7, 15))),
+    );
+}
+
+#[test]
+fn a_note_block_follows_neighbour_power_synchronously() {
+    // Captured with `--pulse 1,0,0 --pulse-ticks 2`: the powered flag flips on the
+    // same tick the source appears and again on the tick it vanishes — NoteBlock
+    // has no scheduled delay at all.
+    run_conformance_actuated(
+        "note_powered.snbt",
+        "note_powered.json",
+        "nucleation:note_powered",
+        &["minecraft:redstone_block"],
+        &[
+            (0, Actuate::Place(Pos::new(1, 0, 0), "minecraft:redstone_block")),
+            (2, Actuate::Place(Pos::new(1, 0, 0), "minecraft:air")),
+        ],
+    );
+}
+
+#[test]
+fn clicking_a_note_block_cycles_its_pitch_and_the_observer_sees_it() {
+    // Captured with `--use 0,0,0 --use-tick 6`. Three things in one golden:
+    // the observer's placement pulse (ticks 1 and 3), the click cycling `note`
+    // on its own tick (6), and the observer pulsing one tick after the click
+    // (7 and 9) — boundary scheduling, not the in-phase two-tick offset.
+    run_conformance_actuated(
+        "note_click.snbt",
+        "note_click.json",
+        "nucleation:note_click",
+        &[],
+        &[(6, Actuate::Use(Pos::new(0, 0, 0)))],
+    );
 }
