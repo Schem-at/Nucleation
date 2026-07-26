@@ -60,8 +60,24 @@ fn golden(name: &str) -> Trace {
 /// **net** change. A retraction writes `piston_head -> air -> moving_piston` into
 /// the head slot within one tick; a snapshot diff can only ever see
 /// `piston_head -> moving_piston`, and a no-op round trip not at all.
-fn engine_trace(sim: &Simulation, name: &str, ticks: u64) -> Trace {
+fn engine_trace(sim: &Simulation, name: &str, ticks: u64, size: (i32, i32, i32)) -> Trace {
     let mut trace = Trace::new("26.2", name, Detail::Normal);
+    // The capture's entity observation window: the structure box inflated by
+    // its MARGIN, exactly as TraceCapture builds it (min − 4 to size + 4 + 1).
+    // An item that flies out of it reads as removed and re-appears when it
+    // falls back in — the bubble-column golden does exactly that at its apex.
+    let win_min = [-f64::from(MARGIN); 3];
+    let win_max = [
+        f64::from(size.0 + MARGIN + 1),
+        f64::from(size.1 + MARGIN + 1),
+        f64::from(size.2 + MARGIN + 1),
+    ];
+    let in_window = |pos: &[f64; 3]| {
+        let min = [pos[0] - 0.125, pos[1], pos[2] - 0.125];
+        let max = [pos[0] + 0.125, pos[1] + 0.25, pos[2] + 0.125];
+        (0..3).all(|axis| min[axis] < win_max[axis] && max[axis] > win_min[axis])
+    };
+    let mut visible: HashMap<u32, bool> = HashMap::new();
     for tick in 0..ticks {
         let mut first_seen: Vec<mc_tick::Pos> = Vec::new();
         let mut net: std::collections::HashMap<mc_tick::Pos, (mc_tick::StateId, mc_tick::StateId)> =
@@ -137,14 +153,28 @@ fn engine_trace(sim: &Simulation, name: &str, ticks: u64) -> Trace {
             }
             let kind = match event {
                 mc_tick::sim::EntityEvent::Moved { id, entity_type, pos, velocity } => {
-                    EventKind::EntityMoved {
-                        id: *id,
-                        entity_type: entity_type.clone(),
-                        pos: *pos,
-                        velocity: *velocity,
+                    let now = in_window(pos);
+                    let was = visible.insert(*id, now).unwrap_or(true);
+                    if now {
+                        EventKind::EntityMoved {
+                            id: *id,
+                            entity_type: entity_type.clone(),
+                            pos: *pos,
+                            velocity: *velocity,
+                        }
+                    } else if was {
+                        EventKind::EntityRemoved { id: *id }
+                    } else {
+                        continue; // moving entirely outside the window: unseen
                     }
                 }
-                mc_tick::sim::EntityEvent::Removed { id } => EventKind::EntityRemoved { id: *id },
+                mc_tick::sim::EntityEvent::Removed { id } => {
+                    let was = visible.insert(*id, false).unwrap_or(true);
+                    if !was {
+                        continue; // it already vanished from view
+                    }
+                    EventKind::EntityRemoved { id: *id }
+                }
             };
             events.push(mc_tick_trace::TraceEvent { phase: "tick_end".to_string(), kind });
         }
@@ -153,6 +183,25 @@ fn engine_trace(sim: &Simulation, name: &str, ticks: u64) -> Trace {
         }
     }
     trace
+}
+
+/// The golden's raw entity ids in first-appearance order — the order the
+/// capture's snapshot walks them, which for structure-placed entities is
+/// their spawn order.
+fn golden_entity_ids(trace: &Trace) -> Vec<u32> {
+    let mut ids: Vec<u32> = Vec::new();
+    for record in &trace.ticks {
+        for event in &record.events {
+            if let EventKind::EntityMoved { id, .. } | EventKind::EntityRemoved { id } =
+                &event.kind
+            {
+                if !ids.contains(id) {
+                    ids.push(*id);
+                }
+            }
+        }
+    }
+    ids
 }
 
 /// Renumber entity ids by first appearance, so the capture's server-global ids
@@ -319,15 +368,30 @@ fn run_conformance_full(
     {
         let (solidity, frictions) = mc_tick::vanilla::physics_tables(sim.registry());
         sim.set_physics_tables(solidity, frictions);
+        let (water_kinds, bubble_kinds) = mc_tick::vanilla::fluid_tables(sim.registry());
+        sim.set_fluid_tables(water_kinds, bubble_kinds);
     }
-    // Authored item entities spawn in list order, matching placement.
-    for spawned in &structure.item_entities {
-        sim.spawn_item(
-            spawned.item.clone(),
-            spawned.pos,
-            spawned.motion,
-            spawned.pickup_delay,
-        );
+    // Authored item entities spawn in list order, matching placement — and
+    // with the server ids the golden recorded, because vanilla's rest-flush
+    // cadence is `(tickCount + id) % 4`: the wrong id lifts a settled item on
+    // a different tick than the capture shows.
+    let raw_ids = golden_entity_ids(&golden(golden_file));
+    for (index, spawned) in structure.item_entities.iter().enumerate() {
+        match raw_ids.get(index) {
+            Some(id) => sim.spawn_item_with_id(
+                *id,
+                spawned.item.clone(),
+                spawned.pos,
+                spawned.motion,
+                spawned.pickup_delay,
+            ),
+            None => sim.spawn_item(
+                spawned.item.clone(),
+                spawned.pos,
+                spawned.motion,
+                spawned.pickup_delay,
+            ),
+        };
     }
 
     // Ticking block entities register in structure order — vanilla's
@@ -376,7 +440,7 @@ fn run_conformance_full(
         sim.step();
     }
 
-    let mut actual = engine_trace(&sim, label, horizon);
+    let mut actual = engine_trace(&sim, label, horizon, structure.size);
     // Entity capture is opt-in on the Java side (--entities); a golden without
     // entity events compares against an engine trace without them. RNG-fed
     // spawns are exactly the case: the trajectory is sample-specific, and the
@@ -794,5 +858,89 @@ fn clicking_a_note_block_cycles_its_pitch_and_the_observer_sees_it() {
         "nucleation:note_click",
         &[],
         &[(6, Actuate::Use(Pos::new(0, 0, 0)))],
+    );
+}
+
+#[test]
+fn released_water_spreads_down_a_channel_at_five_gt_a_block() {
+    // Milestone D's opening pin: a walled source behind a broken wall. The
+    // boundary break schedules the source's fluid tick with the −1 fold (first
+    // flow lands on tick 4), then the flow front advances one block every five
+    // game ticks, levels 1 through 5.
+    run_conformance_actuated(
+        "water_spread.snbt",
+        "water_spread.json",
+        "nucleation:water_spread",
+        &[],
+        &[(0, Actuate::Place(Pos::new(2, 1, 1), "minecraft:air"))],
+    );
+}
+
+#[test]
+fn water_flows_only_toward_the_nearest_hole() {
+    // The slope search: a T-junction whose east arm has a floor hole three
+    // blocks out and whose south arm is flat. Vanilla's four-deep hole scan
+    // sends every drop east — the south arm never floods — and the flow ends
+    // by falling into the hole as level=8 falling water on tick 29.
+    run_conformance_actuated(
+        "water_hole.snbt",
+        "water_hole.json",
+        "nucleation:water_hole",
+        &[],
+        &[(0, Actuate::Place(Pos::new(2, 2, 1), "minecraft:air"))],
+    );
+}
+
+#[test]
+fn an_item_floats_up_through_still_water() {
+    // Buoyancy, isolated: an authored item at the bottom of a two-deep walled
+    // column. setUnderwaterMovement's 5e-4 nudge accumulates against the 0.99
+    // horizontal drag until the item bobs at the surface — 120 ticks of pure
+    // fluid physics, no RNG anywhere.
+    run_conformance_full(
+        "item_float.snbt",
+        "item_float_water.json",
+        "nucleation:item_float",
+        &[],
+        &[],
+        None,
+        Settle::Quiet,
+        1.0e-6,
+    );
+}
+
+#[test]
+fn a_stream_carries_an_item_to_the_far_wall() {
+    // The sorting-machine primitive: an authored source-to-level-7 gradient
+    // (quiet placement keeps it frozen, exactly as knownShape does) and an
+    // item dropped upstream. getFlow's height differences push it 0.014 a
+    // tick until it pins against the end wall six blocks later.
+    run_conformance_full(
+        "item_stream.snbt",
+        "item_stream.json",
+        "nucleation:item_stream",
+        &[],
+        &[],
+        None,
+        Settle::Quiet,
+        1.0e-6,
+    );
+}
+
+#[test]
+fn bubble_columns_lift_and_sink_items() {
+    // Both column kinds in one golden: soul sand's upward column launches its
+    // item out of the water (the above-column +0.1/1.8 clamp at the open top),
+    // magma's drag column pulls its item to the floor where it rests. The
+    // per-cell clamps come straight from Entity.handleOnInsideBubbleColumn.
+    run_conformance_full(
+        "bubble.snbt",
+        "bubble.json",
+        "nucleation:bubble",
+        &[],
+        &[],
+        None,
+        Settle::Quiet,
+        1.0e-6,
     );
 }

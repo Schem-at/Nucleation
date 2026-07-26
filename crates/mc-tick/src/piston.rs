@@ -581,6 +581,7 @@ mod tests {
     ) -> TickCtx<'a> {
         TickCtx { world, ticks, events, states, tick: 0,
             boundary: false,
+        fluids: Box::leak(Box::new(TickQueue::new())),
         updates: Box::leak(Box::new(Vec::new())),
         moves: Box::leak(Box::new(Vec::new())),
         toggles: Box::leak(Box::new(Vec::new())),
@@ -638,7 +639,7 @@ mod tests {
         let mut ctx_moves = Vec::new();
         {
             let mut ctx = TickCtx {
-                world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
+                world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 0,
             boundary: false,
                 updates: &mut Vec::new(), moves: &mut ctx_moves,
                 toggles: &mut Vec::new(),
@@ -740,7 +741,7 @@ mod tests {
         let mut pulled = Vec::new();
         {
             let mut ctx = TickCtx {
-                world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
+                world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 0,
             boundary: false,
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
@@ -795,7 +796,7 @@ mod tests {
         let mut pulled = Vec::new();
         {
             let mut ctx = TickCtx {
-                world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
+                world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 0,
             boundary: false,
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),
@@ -843,7 +844,7 @@ mod tests {
         let mut pulled = Vec::new();
         {
             let mut ctx = TickCtx {
-                world: &mut w, ticks: &mut t, events: &mut e, states: &s, tick: 0,
+                world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 0,
             boundary: false,
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
                 comparator_out: &mut Default::default(),

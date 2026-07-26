@@ -97,6 +97,9 @@ pub struct TickCtx<'a> {
     pub world: &'a mut World,
     /// Scheduled block ticks.
     pub ticks: &'a mut TickQueue,
+    /// Scheduled **fluid** ticks — vanilla keeps these in a separate queue
+    /// drained in their own phase, after block ticks.
+    pub fluids: &'a mut TickQueue,
     /// Block events for this tick.
     pub events: &'a mut EventQueue,
     /// State descriptors, for behaviours that need to inspect a block by name.
@@ -174,6 +177,13 @@ impl TickCtx<'_> {
         // block-ticks phase either way.
         let delay = if self.boundary { delay.saturating_sub(1) } else { delay };
         self.ticks.schedule(pos, self.tick, delay, priority);
+    }
+
+    /// Schedule a fluid tick at `pos`, with the same boundary folding as
+    /// [`TickCtx::schedule`].
+    pub fn schedule_fluid(&mut self, pos: Pos, delay: u64) {
+        let delay = if self.boundary { delay.saturating_sub(1) } else { delay };
+        self.fluids.schedule(pos, self.tick, delay, TickPriority::Normal);
     }
 
     /// Queue a block event for this tick's block-events phase.
@@ -312,6 +322,10 @@ pub trait BlockBehaviour: Send + Sync {
 
     /// A scheduled block tick fired at `pos`.
     fn on_scheduled_tick(&self, _ctx: &mut TickCtx<'_>, _pos: Pos) {}
+
+    /// A scheduled fluid tick fired at `pos` — `FluidState.tick`, dispatched
+    /// from the fluid-ticks phase.
+    fn on_fluid_tick(&self, _ctx: &mut TickCtx<'_>, _pos: Pos) {}
 
     /// A block event fired at `pos`. Returns whether it was handled.
     ///
@@ -621,6 +635,7 @@ mod tests {
         let mut ctx = TickCtx {
             world: &mut world,
             ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
             events: &mut events,
             states: &states,
             tick: 0,
@@ -650,6 +665,7 @@ mod tests {
         let mut ctx = TickCtx {
             world: &mut world,
             ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
             events: &mut events,
             states: &states,
             tick: 10,

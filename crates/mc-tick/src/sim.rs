@@ -50,6 +50,8 @@ struct SimCollision<'a> {
     world: &'a World,
     solidity: &'a [bool],
     frictions: &'a [f32],
+    water_kinds: &'a [Option<crate::fluid::WaterKind>],
+    bubble_kinds: &'a [Option<bool>],
 }
 
 impl crate::entity::CollisionWorld for SimCollision<'_> {
@@ -60,6 +62,17 @@ impl crate::entity::CollisionWorld for SimCollision<'_> {
     fn friction(&self, pos: Pos) -> f32 {
         let state = self.world.get(pos);
         self.frictions.get(state.raw() as usize).copied().unwrap_or(0.6)
+    }
+    fn water(&self, pos: Pos) -> Option<crate::fluid::WaterKind> {
+        let state = self.world.get(pos);
+        self.water_kinds.get(state.raw() as usize).copied().flatten()
+    }
+    fn bubble(&self, pos: Pos) -> Option<bool> {
+        let state = self.world.get(pos);
+        self.bubble_kinds.get(state.raw() as usize).copied().flatten()
+    }
+    fn is_air(&self, pos: Pos) -> bool {
+        self.world.get(pos) == StateId::AIR
     }
 }
 
@@ -88,6 +101,7 @@ pub struct Checkpoint {
     tick: u64,
     world: World,
     ticks: TickQueue,
+    fluids: TickQueue,
     events: EventQueue,
     moves: Vec<PendingMove>,
     toggles: Vec<(Pos, u64)>,
@@ -108,6 +122,9 @@ pub struct Simulation {
     registry: StateRegistry,
     world: World,
     ticks: TickQueue,
+    /// Scheduled fluid ticks — vanilla's separate queue, drained in
+    /// `Phase::FluidTicks`.
+    fluids: TickQueue,
     events: EventQueue,
     behaviours: BehaviourTable,
     /// States encountered during a tick with no registered behaviour.
@@ -133,6 +150,10 @@ pub struct Simulation {
     solidity: Vec<bool>,
     /// Block friction, indexed by `StateId`.
     frictions: Vec<f32>,
+    /// Water per state, indexed by `StateId`; see [`Simulation::set_fluid_tables`].
+    water_kinds: Vec<Option<crate::fluid::WaterKind>>,
+    /// Bubble columns per state (`Some(drag_down)`), indexed by `StateId`.
+    bubble_kinds: Vec<Option<bool>>,
     /// Entity positions as of the last recorded tick, for event emission.
     entity_snapshot: std::collections::HashMap<u32, [f64; 3]>,
     /// Recorded entity events, when recording is enabled.
@@ -180,6 +201,7 @@ impl Simulation {
             tick: 0,
             world: world.clone(),
             ticks: TickQueue::new(),
+            fluids: TickQueue::new(),
             events: EventQueue::new(),
             moves: Vec::new(),
             toggles: Vec::new(),
@@ -192,6 +214,7 @@ impl Simulation {
             registry: StateRegistry::new(),
             world,
             ticks: TickQueue::new(),
+            fluids: TickQueue::new(),
             events: EventQueue::new(),
             behaviours: BehaviourTable::new(),
             unknown_seen: Vec::new(),
@@ -204,6 +227,8 @@ impl Simulation {
             item_entities: crate::entity::ItemEntities::default(),
             solidity: Vec::new(),
             frictions: Vec::new(),
+            water_kinds: Vec::new(),
+            bubble_kinds: Vec::new(),
             entity_snapshot: std::collections::HashMap::new(),
             ent_log: None,
             tickers: Vec::new(),
@@ -247,6 +272,19 @@ impl Simulation {
         self.ent_log.as_deref().unwrap_or(&[])
     }
 
+    /// Spawn an item entity with the id a capture recorded for it — the id
+    /// feeds vanilla's rest-flush phase, so conformance runs must match it.
+    pub fn spawn_item_with_id(
+        &mut self,
+        id: u32,
+        item: (String, u8),
+        pos: [f64; 3],
+        vel: [f64; 3],
+        pickup_delay: u32,
+    ) -> u32 {
+        self.item_entities.spawn_with_id(id, item, pos, vel, pickup_delay)
+    }
+
     /// Spawn an item entity, as loading a structure's entity list does.
     pub fn spawn_item(
         &mut self,
@@ -275,6 +313,20 @@ impl Simulation {
     pub fn set_physics_tables(&mut self, solidity: Vec<bool>, frictions: Vec<f32>) {
         self.solidity = solidity;
         self.frictions = frictions;
+    }
+
+    /// Set the fluid tables, indexed by `StateId`.
+    ///
+    /// Built by `vanilla::fluid_tables` after every state is interned. Item
+    /// buoyancy, currents and bubble columns read these; without them water is
+    /// scenery.
+    pub fn set_fluid_tables(
+        &mut self,
+        water_kinds: Vec<Option<crate::fluid::WaterKind>>,
+        bubble_kinds: Vec<Option<bool>>,
+    ) {
+        self.water_kinds = water_kinds;
+        self.bubble_kinds = bubble_kinds;
     }
 
     /// The container-slot changes recorded since [`Simulation::record`].
@@ -386,7 +438,10 @@ impl Simulation {
     /// Quiescence is the natural stopping condition for timing a contraption:
     /// run until the build stops doing anything.
     pub fn is_quiescent(&self) -> bool {
-        self.ticks.is_empty() && self.events.is_empty() && self.moves.is_empty()
+        self.ticks.is_empty()
+            && self.fluids.is_empty()
+            && self.events.is_empty()
+            && self.moves.is_empty()
     }
 
     /// Run exactly one tick, walking all ten phases in order.
@@ -497,6 +552,7 @@ impl Simulation {
             tick: self.tick,
             world: self.world.clone(),
             ticks: self.ticks.clone(),
+            fluids: self.fluids.clone(),
             events: self.events.clone(),
             moves: self.moves.clone(),
             toggles: self.toggles.clone(),
@@ -517,6 +573,7 @@ impl Simulation {
         self.tick = checkpoint.tick;
         self.world = checkpoint.world.clone();
         self.ticks = checkpoint.ticks.clone();
+        self.fluids = checkpoint.fluids.clone();
         self.events = checkpoint.events.clone();
         self.moves = checkpoint.moves.clone();
         self.toggles = checkpoint.toggles.clone();
@@ -573,6 +630,7 @@ impl Simulation {
             let mut ctx = TickCtx {
                 world: &mut self.world,
                 ticks: &mut self.ticks,
+                fluids: &mut self.fluids,
                 events: &mut self.events,
                 states: &self.registry,
                 tick: self.tick,
@@ -696,6 +754,7 @@ impl Simulation {
         let mut ctx = TickCtx {
             world: &mut self.world,
             ticks: &mut self.ticks,
+                fluids: &mut self.fluids,
             events: &mut self.events,
             states: &self.registry,
             tick: self.tick,
@@ -738,6 +797,7 @@ impl Simulation {
                     let mut ctx = TickCtx {
                         world: &mut self.world,
                         ticks: &mut self.ticks,
+                fluids: &mut self.fluids,
                         events: &mut self.events,
                         states: &self.registry,
                         tick: self.tick,
@@ -758,7 +818,40 @@ impl Simulation {
                 None
             }
 
-            Phase::FluidTicks => None,
+            Phase::FluidTicks => {
+                // Identical mechanics to the block-ticks phase, from vanilla's
+                // separate fluid queue — `LevelTicks<Fluid>` drains right after
+                // `LevelTicks<Block>` and water spread happens here.
+                let due = self.fluids.drain_due(self.tick);
+                for entry in due {
+                    let state = self.world.get(entry.pos);
+                    let Some(behaviour) = self.behaviours.get(state) else {
+                        self.unknown_seen.push(state);
+                        continue;
+                    };
+                    let mut ctx = TickCtx {
+                        world: &mut self.world,
+                        ticks: &mut self.ticks,
+                        fluids: &mut self.fluids,
+                        events: &mut self.events,
+                        states: &self.registry,
+                        tick: self.tick,
+                        boundary: false,
+                        updates: &mut self.updates,
+                        moves: &mut self.moves,
+                        toggles: &mut self.toggles,
+                        comparator_out: &mut self.comparator_out,
+                        inventories: &mut self.inventories,
+                        hopper_state: &mut self.hopper_state,
+                        item_entities: &mut self.item_entities,
+                        inv_log: self.inv_log.as_mut(),
+                        log: self.log.as_mut(),
+                    };
+                    behaviour.on_fluid_tick(&mut ctx, entry.pos);
+                    self.propagate();
+                }
+                None
+            }
 
             Phase::BlockEvents => self.run_block_events(),
 
@@ -778,6 +871,7 @@ impl Simulation {
                     let mut ctx = TickCtx {
                         world: &mut self.world,
                         ticks: &mut self.ticks,
+                fluids: &mut self.fluids,
                         events: &mut self.events,
                         states: &self.registry,
                         tick: self.tick,
@@ -869,6 +963,7 @@ impl Simulation {
                     let mut ctx = TickCtx {
                         world: &mut self.world,
                         ticks: &mut self.ticks,
+                fluids: &mut self.fluids,
                         events: &mut self.events,
                         states: &self.registry,
                         tick: self.tick,
@@ -897,6 +992,8 @@ impl Simulation {
                     world: &self.world,
                     solidity: &self.solidity,
                     frictions: &self.frictions,
+                    water_kinds: &self.water_kinds,
+                    bubble_kinds: &self.bubble_kinds,
                 };
                 for index in 0..self.item_entities.items.len() {
                     if self.item_entities.items[index].removed {
@@ -945,6 +1042,7 @@ impl Simulation {
                     let mut ctx = TickCtx {
                         world: &mut self.world,
                         ticks: &mut self.ticks,
+                fluids: &mut self.fluids,
                         events: &mut self.events,
                         states: &self.registry,
                         tick: self.tick,
@@ -988,6 +1086,7 @@ impl Simulation {
                 let mut ctx = TickCtx {
                     world: &mut self.world,
                     ticks: &mut self.ticks,
+                fluids: &mut self.fluids,
                     events: &mut self.events,
                     states: &self.registry,
                     tick: self.tick,

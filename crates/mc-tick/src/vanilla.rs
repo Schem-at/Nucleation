@@ -161,6 +161,13 @@ pub struct VanillaRules {
     slime: Vec<StateId>,
     honey: Vec<StateId>,
     diodes: HashMap<StateId, Dir>,
+    /// Water per state: plain water blocks, waterlogged states and bubble
+    /// columns (`getFluidState`).
+    waters: HashMap<StateId, crate::fluid::WaterKind>,
+    /// The plain `minecraft:water` state for each legacy `level` value.
+    water_levels: HashMap<u8, StateId>,
+    /// Bubble columns: `Some(drag_down)`.
+    bubbles: HashMap<StateId, bool>,
 }
 
 impl VanillaRules {
@@ -242,6 +249,26 @@ impl crate::wire::WireWorld for VanillaRules {
         // the registry via the sibling map built at registration.
         let state = world.get(pos);
         self.wire_siblings.get(&(state, power)).copied()
+    }
+}
+
+impl crate::fluid::FluidWorld for VanillaRules {
+    fn water(&self, world: &World, pos: Pos) -> Option<crate::fluid::WaterKind> {
+        self.waters.get(&world.get(pos)).copied()
+    }
+
+    fn can_flow_into(&self, world: &World, pos: Pos) -> bool {
+        // Air only; vanilla also floods replaceable plants, which this engine
+        // does not model yet.
+        world.get(pos) == StateId::AIR
+    }
+
+    fn is_solid(&self, world: &World, pos: Pos) -> bool {
+        self.full_cubes.contains(&world.get(pos))
+    }
+
+    fn water_state(&self, level: u8) -> Option<StateId> {
+        self.water_levels.get(&level).copied()
     }
 }
 
@@ -383,6 +410,8 @@ const INERT: &[&str] = &[
     "minecraft:piston_head",
     "minecraft:moving_piston",
     "minecraft:redstone_block",
+    "minecraft:soul_sand",
+    "minecraft:magma_block",
 ];
 
 /// Register vanilla behaviour for every state currently in `registry`.
@@ -423,6 +452,25 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
         }
         if is_conductor(descriptor) {
             rules.conductors.push(*id);
+        }
+        match descriptor.name.as_str() {
+            "minecraft:water" => {
+                let level = descriptor.get("level").and_then(|l| l.parse().ok()).unwrap_or(0);
+                rules
+                    .waters
+                    .insert(*id, crate::fluid::WaterKind::from_level(level));
+                rules.water_levels.insert(level, *id);
+            }
+            "minecraft:bubble_column" => {
+                // A bubble column's fluid state is a full water source.
+                rules.waters.insert(*id, crate::fluid::WaterKind::Source);
+                rules.bubbles.insert(*id, descriptor.get("drag") == Some("true"));
+            }
+            _ => {
+                if descriptor.get("waterlogged") == Some("true") {
+                    rules.waters.insert(*id, crate::fluid::WaterKind::Source);
+                }
+            }
         }
         if descriptor.name == "minecraft:redstone_wire" {
             let power = descriptor
@@ -717,6 +765,22 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
                     }),
                 );
             }
+            "minecraft:water" => {
+                let level = descriptor.get("level").and_then(|l| l.parse().ok()).unwrap_or(0);
+                table.register(
+                    *id,
+                    Box::new(crate::fluid::Water {
+                        kind: crate::fluid::WaterKind::from_level(level),
+                        rules: rules.clone(),
+                    }),
+                );
+            }
+            // Bubble columns are inert as *blocks* here; their column-integrity
+            // ticks are not modelled. Their water and their entity effects live
+            // in the rules and the item physics.
+            "minecraft:bubble_column" => {
+                table.register(*id, Box::new(Inert::new("bubble_column")));
+            }
             // Anything else stays unregistered, and will be named in the report.
             _ => {}
         }
@@ -774,7 +838,7 @@ fn is_conductor(descriptor: &Descriptor) -> bool {
 /// not a full cube; a retracted one is.
 fn is_full_cube(descriptor: &Descriptor) -> bool {
     match descriptor.name.as_str() {
-        "minecraft:air" => false,
+        "minecraft:air" | "minecraft:water" | "minecraft:bubble_column" => false,
         "minecraft:redstone_wire"
         | "minecraft:redstone_torch"
         | "minecraft:redstone_wall_torch"
@@ -816,6 +880,40 @@ pub fn physics_tables(registry: &StateRegistry) -> (Vec<bool>, Vec<f32>) {
         frictions.push(friction);
     }
     (solidity, frictions)
+}
+
+/// Fluid tables for item physics, indexed by `StateId`: the water in each
+/// state and whether it is a bubble column (`Some(drag_down)`).
+pub fn fluid_tables(
+    registry: &StateRegistry,
+) -> (Vec<Option<crate::fluid::WaterKind>>, Vec<Option<bool>>) {
+    let mut water_kinds = Vec::with_capacity(registry.len());
+    let mut bubble_kinds = Vec::with_capacity(registry.len());
+    for index in 0..registry.len() {
+        let descriptor = registry
+            .descriptor(StateId(index as u16))
+            .map(Descriptor::parse);
+        let (water, bubble) = match &descriptor {
+            None => (None, None),
+            Some(d) => match d.name.as_str() {
+                "minecraft:water" => {
+                    let level = d.get("level").and_then(|l| l.parse().ok()).unwrap_or(0);
+                    (Some(crate::fluid::WaterKind::from_level(level)), None)
+                }
+                "minecraft:bubble_column" => (
+                    Some(crate::fluid::WaterKind::Source),
+                    Some(d.get("drag") == Some("true")),
+                ),
+                _ if d.get("waterlogged") == Some("true") => {
+                    (Some(crate::fluid::WaterKind::Source), None)
+                }
+                _ => (None, None),
+            },
+        };
+        water_kinds.push(water);
+        bubble_kinds.push(bubble);
+    }
+    (water_kinds, bubble_kinds)
 }
 
 /// The unpowered/powered pair for a descriptor, if both states are interned.
@@ -918,6 +1016,11 @@ pub fn intern_companions(registry: &mut StateRegistry) {
                     all.push(at_note.with("powered", "true"));
                 }
                 all
+            }
+            "minecraft:water" | "minecraft:bubble_column" => {
+                // Every level a flow can take, and air to empty into. Falling
+                // water beyond level 8 never appears from our spread rules.
+                (0u8..=8).map(|l| format!("minecraft:water[level={l}]")).collect()
             }
             "minecraft:piston" | "minecraft:sticky_piston" => {
                 let sticky = descriptor.name == "minecraft:sticky_piston";

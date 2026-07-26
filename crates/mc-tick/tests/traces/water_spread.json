@@ -1,0 +1,44 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:water_spread",
+  "detail": "normal",
+  "ticks": [
+    {
+      "tick": 0,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 1, 1], "from": "minecraft:stone", "to": "minecraft:air"}
+      ]
+    },
+    {
+      "tick": 4,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 1, 1], "from": "minecraft:air", "to": "minecraft:water[level=1]"}
+      ]
+    },
+    {
+      "tick": 9,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [3, 1, 1], "from": "minecraft:air", "to": "minecraft:water[level=2]"}
+      ]
+    },
+    {
+      "tick": 14,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [4, 1, 1], "from": "minecraft:air", "to": "minecraft:water[level=3]"}
+      ]
+    },
+    {
+      "tick": 19,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [5, 1, 1], "from": "minecraft:air", "to": "minecraft:water[level=4]"}
+      ]
+    },
+    {
+      "tick": 24,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [6, 1, 1], "from": "minecraft:air", "to": "minecraft:water[level=5]"}
+      ]
+    }
+  ]
+}

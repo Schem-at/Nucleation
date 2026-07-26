@@ -31,6 +31,7 @@
 
 pub mod behaviour;
 pub mod entity;
+pub mod fluid;
 pub mod inventory;
 pub mod components;
 pub mod observer;

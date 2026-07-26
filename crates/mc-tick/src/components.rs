@@ -1232,6 +1232,7 @@ mod tests {
         let mut ctx = TickCtx {
             world: &mut world,
             ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
             events: &mut events,
             states: &states,
             tick: 0,
@@ -1268,6 +1269,7 @@ mod tests {
         let mut ctx = TickCtx {
             world: &mut world,
             ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
             events: &mut events,
             states: &states,
             tick: 0,
@@ -1311,6 +1313,7 @@ mod tests {
         let mut ctx = TickCtx {
             world: &mut world,
             ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
             events: &mut events,
             states: &states,
             tick: 0,
@@ -1349,6 +1352,7 @@ mod tests {
         let mut ctx = TickCtx {
             world: &mut world,
             ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
             events: &mut events,
             states: &states,
             tick: 0,
@@ -1389,6 +1393,7 @@ mod tests {
         let mut ctx = TickCtx {
             world: &mut world,
             ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
             events: &mut events,
             states: &states,
             tick: 0,
@@ -1430,6 +1435,7 @@ mod tests {
         let mut ctx = TickCtx {
             world: &mut world,
             ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
             events: &mut events,
             states: &states,
             tick: 0,
@@ -1483,6 +1489,7 @@ mod tests {
         let mut ctx = TickCtx {
             world: &mut world,
             ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
             events: &mut events,
             states: &states,
             tick: 0,
@@ -1530,6 +1537,7 @@ mod tests {
         let mut ctx = TickCtx {
             world: &mut world,
             ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
             events: &mut events,
             states: &states,
             tick: 0,
@@ -1572,6 +1580,7 @@ mod tests {
         let mut ctx = TickCtx {
             world: &mut world,
             ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
             events: &mut events,
             states: &states,
             tick: 0,
@@ -1672,6 +1681,7 @@ mod tests {
         let mut ctx = TickCtx {
             world: &mut world,
             ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
             events: &mut events,
             states: &states,
             tick: 10,
@@ -1712,6 +1722,7 @@ mod tests {
         let mut ctx = TickCtx {
             world: &mut world,
             ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
             events: &mut events,
             states: &states,
             tick: 10,
@@ -1754,6 +1765,7 @@ mod tests {
         let mut ctx = TickCtx {
             world: &mut world,
             ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
             events: &mut events,
             states: &states,
             tick: 500,
@@ -1829,6 +1841,7 @@ mod tests {
         let mut ctx = TickCtx {
             world: &mut world,
             ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
             events: &mut events,
             states: &states,
             tick: 0,
@@ -1862,6 +1875,7 @@ mod tests {
         let mut ctx = TickCtx {
             world: &mut world,
             ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
             events: &mut events,
             states: &states,
             tick: 0,
@@ -1897,6 +1911,7 @@ mod tests {
         let mut ctx = TickCtx {
             world: &mut world,
             ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
             events: &mut events,
             states: &states,
             tick: 0,
@@ -1940,6 +1955,7 @@ mod tests {
         let mut ctx = TickCtx {
             world: &mut world,
             ticks: &mut ticks,
+            fluids: &mut TickQueue::new(),
             events: &mut events,
             states: &states,
             tick: 0,

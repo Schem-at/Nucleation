@@ -338,22 +338,43 @@ end-to-end and its open/close timing conforms — the product's core claim.
 Send one over Discord (the tooling can receive files now) and it becomes the
 closing golden.
 
-## 8. Milestone D — fluids
+## 8. Milestone D — fluids — DONE (water)
 
-Water and lava flow, levels, sources, and the **flow vector field**. Closes
-Milestone B's deferred remainder: water-stream item motion is the field acting
-on `ItemEntity` velocity (`setUnderwaterMovement` is already visible in the
-bytecode dumps, waiting). Also the prerequisite for waterlogged-component
-doors.
+Water flow, levels, sources, the flow vector field, item buoyancy and
+currents, and bubble columns. Everything from `FlowingFluid`/`WaterFluid`
+bytecode, pinned by five captures (`water_spread`, `water_hole`,
+`item_float_water`, `item_stream`, `bubble` — all conforming at 1e-6):
 
-- **Waterlogged blocks** — the `waterlogged` property is a per-state flag the
-  descriptor registry already carries for free; the work is fluid-source
-  semantics (a waterlogged block is a source) and how components behave
-  submerged.
-- **Bubble columns** — soul sand (up) and magma (down) under water: a fluid
-  block state whose whole point is the vertical force it applies to entities.
-  Deterministic item-entity captures work here exactly like Milestone B's
-  falls: author an item over the column, no RNG anywhere.
+- **Fluid ticks are their own queue** (`Simulation.fluids`), drained in the
+  previously-empty `Phase::FluidTicks`, 5 gt water delay, boundary folding
+  identical to block ticks. `src/fluid.rs` implements `getNewLiquid`
+  (drop-off 1, falling-8 under any water, the 2-source infinite-water rule),
+  `spread` (down first and stop, side spread gated on 3+ source neighbours or
+  no hole below), and the slope search (`getSlopeFindDistance` = 4) — the
+  `water_hole` golden proves a T-junction sends every drop toward the hole.
+- **Item fluid physics**, bit-faithful: `EntityFluidInteraction` runs **twice
+  per item tick** (baseTick and again near ItemEntity.tick's tail — the
+  stream capture's velocities prove both 0.014 pushes); the fluid height is
+  measured from the *raw* box floor while the skip test uses the 0.001-deflated
+  box (that millimetre decides float-vs-sink in one-deep shallows);
+  `setUnderwaterMovement` is ×0.99f horizontal with the 5e-4f nudge under
+  0.06f. Flow vectors are `getFlow` exactly, f32 height arithmetic included.
+- **Bubble columns**: per-cell clamps from `handleOnInsideBubbleColumn` /
+  `OnAboveBubbleColumn` (±0.03/0.06/0.1 against −0.3/0.7/−0.9/1.8), applied
+  during the move and — crucially — **also on rest-skipped ticks**
+  (`applyEffectsFromBlocksForLastMovements`), which is what keeps a sunk item
+  pinned to the floor of a drag column.
+- **The rest-flush phase is id-dependent** (`(tickCount + id) % 4`): the
+  harness now spawns authored items with the golden's raw server ids, and the
+  capture's entity observation window (structure box + margin) is modelled so
+  an item flying out of view reads as removed/re-appearing, as the capture
+  sees it.
+
+Still open, deliberately: **lava** (different delay/drop-off, mixing),
+**waterlogged spread** (waterlogged states count as sources for neighbours
+and item physics, but do not yet run their own spread tick),
+`canPassThroughWall` face shapes (approximated by the full-cube table), and
+flooding replaceable plants. Each becomes a capture when a build needs it.
 
 ## 9. Milestone E — remaining entities and the surfaces they ride
 
@@ -369,8 +390,12 @@ doors.
      cheap verification before any minecart exists.
    - **cobwebs**: `stuckSpeedMultiplier` movement damping — applies to every
      entity type, items included, so it can also be captured item-first.
-2. **Armor stands** — mostly static, but needed for interaction and collision
-3. **Player pickup** of items (needs a player model; hoppers ignore
+2. **Boats** — the other rideable surface: boat-on-ice item transport and
+   boat-based mob/item alignment in sorters. Boat physics is `Boat.tick`
+   (friction by surface, paddle-free drift for contraption use); Milestone D's
+   water surface heights and flow field are the prerequisite, now in place.
+3. **Armor stands** — mostly static, but needed for interaction and collision
+4. **Player pickup** of items (needs a player model; hoppers ignore
    `pickupDelay`, players do not)
 
 The entity capture/tolerance machinery from Milestone B carries over directly.

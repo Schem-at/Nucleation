@@ -296,6 +296,8 @@ fn simulate(
     {
         let (solidity, frictions) = mc_tick::vanilla::physics_tables(sim.registry());
         sim.set_physics_tables(solidity, frictions);
+        let (water_kinds, bubble_kinds) = mc_tick::vanilla::fluid_tables(sim.registry());
+        sim.set_fluid_tables(water_kinds, bubble_kinds);
     }
     for spawned in &structure.item_entities {
         sim.spawn_item(

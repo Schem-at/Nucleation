@@ -51,6 +51,7 @@ pub struct ItemEntityState {
     pub pos: [f64; 3],
     /// Velocity, blocks per tick.
     pub vel: [f64; 3],
+    /// Whether the last move ended on the ground (`Entity.onGround`).
     pub on_ground: bool,
     /// Ticks since spawn (`Entity.tickCount`), incremented at tick start.
     pub tick_count: u32,
@@ -76,6 +77,22 @@ pub struct ItemEntities {
 }
 
 impl ItemEntities {
+    /// Spawn with an explicit id — the id participates in vanilla's rest-flush
+    /// phase (`(tickCount + id) % 4`), so a conformance run must use the
+    /// server's captured entity ids or its flush ticks land differently.
+    pub fn spawn_with_id(
+        &mut self,
+        id: u32,
+        item: (String, u8),
+        pos: [f64; 3],
+        vel: [f64; 3],
+        pickup_delay: u32,
+    ) -> u32 {
+        self.next_id = self.next_id.max(id + 1);
+        self.push_spawn(id, item, pos, vel, pickup_delay);
+        id
+    }
+
     /// Spawn an item entity, returning its id.
     pub fn spawn(
         &mut self,
@@ -86,6 +103,18 @@ impl ItemEntities {
     ) -> u32 {
         let id = self.next_id;
         self.next_id += 1;
+        self.push_spawn(id, item, pos, vel, pickup_delay);
+        id
+    }
+
+    fn push_spawn(
+        &mut self,
+        id: u32,
+        item: (String, u8),
+        pos: [f64; 3],
+        vel: [f64; 3],
+        pickup_delay: u32,
+    ) {
         self.name_log.push((id, item.0.clone()));
         self.items.push(ItemEntityState {
             id,
@@ -98,7 +127,6 @@ impl ItemEntities {
             pickup_delay,
             removed: false,
         });
-        id
     }
 }
 
@@ -108,6 +136,110 @@ pub trait CollisionWorld {
     fn is_solid(&self, pos: Pos) -> bool;
     /// `Block.getFriction` of the block at `pos` (0.6 for almost everything).
     fn friction(&self, pos: Pos) -> f32;
+    /// The water at `pos`, if any (`getFluidState`) — waterlogged blocks and
+    /// bubble columns included.
+    fn water(&self, _pos: Pos) -> Option<crate::fluid::WaterKind> {
+        None
+    }
+    /// The bubble column at `pos`: `Some(drag_down)` — `true` pulls entities
+    /// down (magma), `false` pushes them up (soul sand).
+    fn bubble(&self, _pos: Pos) -> Option<bool> {
+        None
+    }
+    /// Whether `pos` is literally air — the bubble-column top check
+    /// (`BubbleColumnBlock.entityInside` reads the state *above*).
+    fn is_air(&self, _pos: Pos) -> bool {
+        false
+    }
+}
+
+/// The `EntityFluidInteraction.update` scan for water: the max surface height
+/// above the box floor and the accumulated flow currents, walked over every
+/// cell the interaction box (bounding box deflated 0.001) overlaps in
+/// vanilla's x-outer/z-inner order.
+fn water_interaction(entity: &ItemEntityState, world: &dyn CollisionWorld) -> (f64, [f64; 3]) {
+    let (bmin, bmax) = item_aabb(entity.pos);
+    let min = [bmin[0] + 0.001, bmin[1] + 0.001, bmin[2] + 0.001];
+    let max = [bmax[0] - 0.001, bmax[1] - 0.001, bmax[2] - 0.001];
+    let mut height = 0.0f64;
+    let mut flow_sum = [0.0f64; 3];
+    let water_at = |pos: Pos| world.water(pos);
+    let solid_at = |pos: Pos| world.is_solid(pos);
+    for x in (min[0].floor() as i32)..=((max[0].ceil() as i32) - 1) {
+        for y in (min[1].floor() as i32)..=((max[1].ceil() as i32) - 1) {
+            for z in (min[2].floor() as i32)..=((max[2].ceil() as i32) - 1) {
+                let cell = Pos::new(x, y, z);
+                let Some(kind) = world.water(cell) else { continue };
+                let above = world.water(cell.offset(crate::pos::Dir::Up)).is_some();
+                let surface =
+                    f64::from(y) + f64::from(crate::fluid::surface_height(kind, above));
+                if surface < min[1] {
+                    continue;
+                }
+                // The skip check uses the deflated box; the height itself is
+                // measured from the **raw** bounding-box floor (the bytecode
+                // stores both, and the 0.001 difference decides the float-or-
+                // sink branch in blocks-deep shallows).
+                height = height.max(surface - bmin[1]);
+                let mut flow = crate::fluid::flow_vector(&water_at, &solid_at, cell);
+                if height < 0.4 {
+                    for axis in &mut flow {
+                        *axis *= height;
+                    }
+                }
+                for (sum, axis) in flow_sum.iter_mut().zip(flow) {
+                    *sum += axis;
+                }
+            }
+        }
+    }
+    (height, flow_sum)
+}
+
+/// `Tracker.applyCurrentTo` for a non-player entity: normalize the summed
+/// current and push with `waterPushSpeed` 0.014. Below the 1e-5 length² floor
+/// nothing happens.
+fn apply_water_current(entity: &mut ItemEntityState, flow_sum: [f64; 3]) {
+    let length_sqr =
+        flow_sum[0] * flow_sum[0] + flow_sum[1] * flow_sum[1] + flow_sum[2] * flow_sum[2];
+    if length_sqr < 1.0e-5 {
+        return;
+    }
+    let length = length_sqr.sqrt();
+    if length < 1.0e-4 {
+        return;
+    }
+    for (vel, axis) in entity.vel.iter_mut().zip(flow_sum) {
+        *vel += axis / length * 0.014;
+    }
+}
+
+/// `Entity.onInsideBubbleColumn` / `onAboveBubbleColumn`, dispatched for every
+/// bubble-column cell the item's box overlaps — the clamps come straight from
+/// the bytecode.
+fn apply_bubble_columns(entity: &mut ItemEntityState, world: &dyn CollisionWorld) {
+    let (min, max) = item_aabb(entity.pos);
+    const EPSILON: f64 = 1.0e-7;
+    for x in ((min[0] + EPSILON).floor() as i32)..=((max[0] - EPSILON).floor() as i32) {
+        for y in ((min[1] + EPSILON).floor() as i32)..=((max[1] - EPSILON).floor() as i32) {
+            for z in ((min[2] + EPSILON).floor() as i32)..=((max[2] - EPSILON).floor() as i32) {
+                let cell = Pos::new(x, y, z);
+                let Some(drag_down) = world.bubble(cell) else { continue };
+                let vy = entity.vel[1];
+                entity.vel[1] = if world.is_air(cell.offset(crate::pos::Dir::Up)) {
+                    if drag_down {
+                        (vy - 0.03).max(-0.9)
+                    } else {
+                        (vy + 0.1).min(1.8)
+                    }
+                } else if drag_down {
+                    (vy - 0.03).max(-0.3)
+                } else {
+                    (vy + 0.06).min(0.7)
+                };
+            }
+        }
+    }
 }
 
 /// Advance one item entity by one tick. Returns `true` while it lives.
@@ -117,14 +249,40 @@ pub fn tick_item(entity: &mut ItemEntityState, world: &dyn CollisionWorld) -> bo
         entity.pickup_delay -= 1;
     }
 
-    entity.vel[1] -= ITEM_GRAVITY;
+    // Entity.baseTick → EntityFluidInteraction: fluid heights and current
+    // pushing happen before the gravity/buoyancy decision. ItemEntity.tick
+    // runs the same update **again** after movement and drag (so a second
+    // 0.014 push lands every tick — the stream capture's velocities prove
+    // both, exactly).
+    let (water_height, flow_sum) = water_interaction(entity, world);
+    apply_water_current(entity, flow_sum);
+
+    if water_height > f64::from(0.1f32) {
+        // setUnderwaterMovement: horizontal drag 0.99f, and a nudge of 5e-4f
+        // upward while rising slower than 0.06f — items float, slowly.
+        entity.vel[0] *= f64::from(0.99f32);
+        entity.vel[2] *= f64::from(0.99f32);
+        if entity.vel[1] < f64::from(0.06f32) {
+            entity.vel[1] += f64::from(5.0e-4f32);
+        }
+    } else {
+        entity.vel[1] -= ITEM_GRAVITY;
+    }
 
     let horizontal_sqr = entity.vel[0] * entity.vel[0] + entity.vel[2] * entity.vel[2];
     let resting = entity.on_ground
         && horizontal_sqr <= 1.0e-5
         && (entity.tick_count + entity.id) % 4 != 0;
-    if !resting {
+    if resting {
+        // Even a rest-skipped tick re-applies block effects from the last
+        // movements (`applyEffectsFromBlocksForLastMovements`): a sunk item in
+        // a drag column keeps its velocity pinned downward, which is why the
+        // flush tick never lifts it off the floor.
+        apply_bubble_columns(entity, world);
+    } else {
         move_with_collision(entity, world);
+        // Bubble columns act during the move (`checkInsideBlocks`), before drag.
+        apply_bubble_columns(entity, world);
         let drag = AIR_DRAG;
         let mut ground_drag = drag;
         if entity.on_ground {
@@ -138,6 +296,12 @@ pub fn tick_item(entity: &mut ItemEntityState, world: &dyn CollisionWorld) -> bo
             entity.vel[1] *= -0.5;
         }
     }
+
+    // The second fluid pass, `updateFluidInteraction()` near the tail of
+    // ItemEntity.tick: heights and currents recomputed at the post-move
+    // position, and the current push applied again.
+    let (_, flow_sum) = water_interaction(entity, world);
+    apply_water_current(entity, flow_sum);
 
     entity.age += 1;
     if entity.age >= ITEM_LIFETIME {
