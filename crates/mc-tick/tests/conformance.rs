@@ -1098,3 +1098,20 @@ fn powering_the_rails_launches_a_parked_cart_off_the_wall() {
         1.0e-6,
     );
 }
+
+#[test]
+fn flipping_a_lever_lights_a_lamp_through_its_support_block() {
+    // The lever's strong emission: the flip powers its wall block strongly,
+    // the conductor re-emits, and the lamp on the far side lights on the
+    // click's own tick.
+    run_conformance_full(
+        "lever_lamp.snbt",
+        "lever_lamp.json",
+        "nucleation:lever_lamp",
+        &[],
+        &[(5, Actuate::Use(Pos::new(0, 1, 1)))],
+        None,
+        Settle::Quiet,
+        1.0e-6,
+    );
+}

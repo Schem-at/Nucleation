@@ -526,6 +526,12 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
             {
                 rules.strong_into.insert(*id, Dir::Down);
             }
+            // A lever strongly powers the block it hangs on.
+            if descriptor.name == "minecraft:lever" {
+                if let Some(attached) = lever_attachment(descriptor) {
+                    rules.strong_into.insert(*id, attached);
+                }
+            }
         }
         if matches!(
             descriptor.name.as_str(),
@@ -769,6 +775,18 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
                     }),
                 );
             }
+            "minecraft:lever" => {
+                let Some(attached) = lever_attachment(descriptor) else { continue };
+                let Some(states) = powered_pair(registry, descriptor) else { continue };
+                table.register(
+                    *id,
+                    Box::new(crate::components::Lever {
+                        powered: descriptor.flag("powered"),
+                        states,
+                        attached,
+                    }),
+                );
+            }
             "minecraft:rail" | "minecraft:detector_rail" | "minecraft:activator_rail" => {
                 // Cart physics reads rails through the rail tables; detector
                 // and activator dynamics still await their captures.
@@ -965,6 +983,15 @@ pub fn fluid_tables(
         bubble_kinds.push(bubble);
     }
     (water_kinds, bubble_kinds)
+}
+
+/// The direction from a lever (or similar attachable) to its support block.
+fn lever_attachment(descriptor: &Descriptor) -> Option<Dir> {
+    match descriptor.get("face") {
+        Some("floor") => Some(Dir::Down),
+        Some("ceiling") => Some(Dir::Up),
+        _ => descriptor.facing().map(Dir::opposite),
+    }
 }
 
 /// Rail and conductor tables for cart physics, indexed by `StateId`.

@@ -1984,3 +1984,33 @@ mod tests {
         assert!(TickPriority::High < TickPriority::Normal);
     }
 }
+
+/// A lever — `LeverBlock`.
+///
+/// `useWithoutItem` cycles `powered` (loud write), then additionally updates
+/// the neighbours of the block it is attached to: a powered lever powers
+/// every face weakly and its support block **strongly**, so components on the
+/// far side of that block hear the flip through the extra update wave.
+pub struct Lever {
+    /// Current `powered`.
+    pub powered: bool,
+    /// The unpowered/powered pair.
+    pub states: StatePair,
+    /// The direction from the lever to its support block (floor → down,
+    /// ceiling → up, wall → behind the facing).
+    pub attached: crate::pos::Dir,
+}
+
+impl crate::behaviour::BlockBehaviour for Lever {
+    fn on_used(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        ctx.set(pos, if self.powered { self.states.off } else { self.states.on });
+        let support = pos.offset(self.attached);
+        for dir in crate::pos::ALL_DIRS {
+            ctx.updates.push((support.offset(dir), dir.opposite()));
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "lever"
+    }
+}
