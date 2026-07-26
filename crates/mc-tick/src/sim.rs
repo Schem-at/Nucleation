@@ -830,38 +830,27 @@ impl Simulation {
         self.settle_with_order(&occupied);
     }
 
-    /// [`Simulation::settle`] with an explicit placement order — the structure
-    /// file's block list, which is the order `StructureTemplate.placeInWorld`
-    /// walks.
+    /// Give every placed block its `onPlace`, in placement order.
     ///
-    /// Per block vanilla runs `updateFromNeighbourShapes` and then
-    /// `updateNeighborsAt(pos)`, each cascade fully drained before the next
-    /// block. The shape pass is **not** a neighbour dispatch — it calls
-    /// `updateShape`, which only rewrites the block's own state (fence
-    /// connections, dust shapes) — so this engine, whose shapes come from the
-    /// structure file, has nothing to do for it. Dispatching it as a
-    /// neighbour-change was wrong and fired every piston in a door a tick
-    /// early; a block hears about placement only through its *neighbours'*
-    /// `updateNeighborsAt` passes, which is also how an observer facing a
-    /// placed block pulses.
-    pub fn settle_with_order(&mut self, order: &[Pos]) {
-        // `placeInWorld` runs **two** loops over that list, and both are
-        // observable.
-        //
-        // Pass 1 — the `setBlock` loop. The write itself carries no neighbour
-        // updates (so no piston fires yet), but `markAndNotifyBlock` still
-        // propagates *shape* updates, and that is when an observer whose
-        // watched block is placed after it schedules its pulse. Only blocks
-        // already down can hear, so the notification is limited to neighbours
-        // earlier in the order.
-        //
-        // Missing this pass inverted the scheduled-tick order for every
-        // observer that watches a later block, which decided piston races:
-        // in the 4x4 vault door two opposed pistons share a column, and
-        // whichever is notified first moves it and blocks the other.
+    /// `LevelChunk.setBlockState` calls `onPlace` on the new state, and that
+    /// happens for **every** flag combination a structure placement uses —
+    /// including `knownShape`, which suppresses the neighbour and shape passes
+    /// but not this. So even a "silent" placement wakes a piston that is
+    /// already powered (`PistonBaseBlock.onPlace` → `checkIfExtend`) and lets
+    /// an observer saved mid-pulse clear itself.
+    ///
+    /// Without it a quietly loaded community build never starts: the engine
+    /// sat at zero events while the game did twelve on tick 0.
+    pub fn place_on_place(&mut self, order: &[Pos]) {
         let index: std::collections::HashMap<Pos, usize> =
             order.iter().enumerate().map(|(i, pos)| (*pos, i)).collect();
         for (i, pos) in order.iter().enumerate() {
+            // The write's own shape propagation: `markAndNotifyBlock` skips it
+            // only for `UPDATE_KNOWN_SHAPE`, which a structure placement does
+            // not set on its block writes — so this happens even under
+            // `knownShape`, and it is how an observer gets its pulse scheduled
+            // in a build the game places "silently". Only blocks already down
+            // can hear it.
             let items: Vec<(Pos, crate::pos::Dir, crate::behaviour::UpdateKind)> =
                 crate::pos::UPDATE_SHAPE_ORDER
                     .iter()
@@ -882,8 +871,55 @@ impl Simulation {
                 self.updates.push(crate::behaviour::UpdateEntry::new(items));
                 self.propagate();
             }
-        }
 
+            let state = self.world.get(*pos);
+            if state == StateId::AIR {
+                continue;
+            }
+            let Some(behaviour) = self.behaviours.get(state) else {
+                self.unknown_seen.push(state);
+                continue;
+            };
+            let mut ctx = TickCtx {
+                world: &mut self.world,
+                ticks: &mut self.ticks,
+                fluids: &mut self.fluids,
+                events: &mut self.events,
+                states: &self.registry,
+                tick: self.tick,
+                boundary: true,
+                updates: &mut self.updates,
+                moves: &mut self.moves,
+                toggles: &mut self.toggles,
+                comparator_out: &mut self.comparator_out,
+                inventories: &mut self.inventories,
+                hopper_state: &mut self.hopper_state,
+                item_entities: &mut self.item_entities,
+                inv_log: self.inv_log.as_mut(),
+                log: self.log.as_mut(),
+            };
+            behaviour.on_placed(&mut ctx, *pos);
+            self.propagate();
+        }
+    }
+
+    /// [`Simulation::settle`] with an explicit placement order — the structure
+    /// file's block list, which is the order `StructureTemplate.placeInWorld`
+    /// walks.
+    ///
+    /// Per block vanilla runs `updateFromNeighbourShapes` and then
+    /// `updateNeighborsAt(pos)`, each cascade fully drained before the next
+    /// block. The shape pass is **not** a neighbour dispatch — it calls
+    /// `updateShape`, which only rewrites the block's own state (fence
+    /// connections, dust shapes) — so this engine, whose shapes come from the
+    /// structure file, has nothing to do for it. Dispatching it as a
+    /// neighbour-change was wrong and fired every piston in a door a tick
+    /// early; a block hears about placement only through its *neighbours'*
+    /// `updateNeighborsAt` passes, which is also how an observer facing a
+    /// placed block pulses.
+    pub fn settle_with_order(&mut self, order: &[Pos]) {
+        // Pass 1 (the `setBlock` loop's shape propagation and `onPlace`) is
+        // [`Simulation::place_on_place`], which runs for quiet placement too.
         // Pass 2 — the update pass: `updateFromNeighbourShapes` then a fully
         // drained `updateNeighborsAt`, per block.
         for pos in order {

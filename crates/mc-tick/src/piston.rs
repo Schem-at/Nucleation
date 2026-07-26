@@ -422,6 +422,17 @@ impl<P: PowerSource, M: Movability> Piston<P, M> {
 }
 
 impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
+    /// `PistonBaseBlock.onPlace` runs `checkIfExtend` — a piston that is
+    /// already powered when it is put down queues its extend immediately,
+    /// without waiting for any neighbour to change.
+    ///
+    /// This is what starts a community build that was saved mid-cycle: under
+    /// `knownShape` placement, where the game dispatches no neighbour or shape
+    /// updates at all, the tick-0 activity comes entirely from here.
+    fn on_placed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        self.on_neighbor_changed(ctx, pos, self.facing);
+    }
+
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
         let powered = self.is_powered(ctx.world, ctx.comparator_out, pos);
         if powered == self.extended {

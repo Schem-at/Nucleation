@@ -71,12 +71,16 @@ fn main() {
         }
     }
     let air = sim.registry().get("minecraft:air").unwrap_or(mc_tick::StateId::AIR);
-    if settle {
+    {
         let order = structure.placement_order(
             mc_tick::vanilla::is_collision_full_cube,
             mc_tick::vanilla::has_dynamic_shape,
         );
-        sim.settle_with_order(&order);
+        // onPlace runs whatever the placement flags; the settle pass does not.
+        sim.place_on_place(&order);
+        if settle {
+            sim.settle_with_order(&order);
+        }
     }
     sim.record();
     let horizon = golden.ticks.last().map(|t| t.tick + 1).unwrap_or(0).max(to.min(4096));
