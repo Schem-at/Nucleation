@@ -284,48 +284,93 @@ the first run, because the engine mirrors vanilla's arithmetic types
 Still open from the original Milestone B slate: **water-stream item motion**
 (fluids, section 7) and player pickup (needs players).
 
-## 7. Fluids
+## 7. Milestone C — closing the redstone surface (NEXT)
 
-Water and lava flow, levels, sources, and the **flow vector field** — joined
-to item motion once Milestone B lands.
+The gap between "the engine runs slimestone machines and item logistics" and
+"the engine runs *doors*" is mostly one component: **dust**. Ordered by
+leverage:
 
-## 8. Remaining entities
+- [ ] **Wire dust into the simulation.** `RedstoneNetwork` exists and is
+      trace-verified standalone (synchronous settling, 15-block attenuation),
+      but nothing dispatches it: dust in a structure is still a loud unknown.
+      This is the largest single blocker for real doors, and it forces the
+      strength-plumbing question the comparator work deferred: `redstone_power`
+      has no inventory/aux view, so a container-fed comparator's *strength*
+      cannot reach a dust line today. The likely shape: dust settling runs
+      inside `propagate` (it is notification-driven and synchronous — the
+      captures already prove there is no per-tick crawl), reading sources
+      through an aux-aware strength query; `VanillaRules` grows dust states
+      per power level. Discriminating captures to take first:
+      dust ← comparator at partial strength (the barrel goldens extend
+      naturally), dust → repeater/piston/note-block inputs, dust on top of a
+      conductor (soft power), and a **locational** case where
+      alternate-current's non-locational model would differ — the deviation
+      the sources table has warned about since day one.
+- [ ] **Buttons and pressure plates.** Buttons are pure `use_block` (the input
+      path exists): capture pulse lengths per material — stone and wood
+      differ. Pressure plates now have something to press them: **item
+      entities trigger wooden plates**, so a dropper → plate → piston chain is
+      a fully deterministic capture with the existing tooling.
+- [ ] **Redstone lamp** — the one block with an off-delay (4gt); on is
+      immediate. Small, common in doors as the visible output.
+- [ ] **Target block** — analog output; pairs with the dust strength work.
+
+**Done when**: a real community piston door (litematic, with dust) runs
+end-to-end and its open/close timing conforms — the product's core claim.
+
+## 8. Milestone D — fluids
+
+Water and lava flow, levels, sources, and the **flow vector field**. Closes
+Milestone B's deferred remainder: water-stream item motion is the field acting
+on `ItemEntity` velocity (`setUnderwaterMovement` is already visible in the
+bytecode dumps, waiting). Also the prerequisite for waterlogged-component
+doors.
+
+## 9. Milestone E — remaining entities
 
 1. **Minecarts** — rails, momentum, curves, powered rails
 2. **Armor stands** — mostly static, but needed for interaction and collision
+3. **Player pickup** of items (needs a player model; hoppers ignore
+   `pickupDelay`, players do not)
 
-Entity motion is float-based, so the differ's tolerance mode finally earns its
-keep. Traces will need entity events, which the format already defines but the
-capture tool does not yet emit.
+The entity capture/tolerance machinery from Milestone B carries over directly.
 
-## 9. Throughput
+## 10. Throughput
 
 Only once correctness is pinned by the differ, so optimisation cannot drift.
-The likely first targets are the ones deliberately left simple:
+Benchmarked baseline (`bench_manual_engine`): 0.72 µs/active tick
+(~70,000× real time), 12 ns quiescent — so the pressure is low. The likely
+first targets are the ones deliberately left simple:
 
 - `TickQueue`'s `BTreeMap` → bucketed ring
 - `has_pending_at` is a linear scan
 - `resolve_push` uses `Vec::contains`
+- entity/inventory lookups are linear over small `Vec`s/`HashMap`s
 - parallelism **across** simulations, never within one tick
 
-## 10. Product surface
+## 11. Product surface — parallelisable now
 
-Expose step/run/reset/checkpoint through `src/bridge/` to all six languages, then
-build piston-door timing on top: actuate, run to quiescence, report the tick counts
-and a per-component timeline. The trace machinery already produces the timeline.
+Correctness is pinned well enough that this no longer needs to wait for C:
+
+- Expose load/step/run/actuate (`place_block`, `use_block`)/checkpoint/
+  restore/quiescence through `src/bridge/` to all six languages.
+- Door timing on top: actuate → run to quiescence → tick counts plus a
+  per-component timeline (the trace machinery already produces it).
+- Rendering: `render_simulation_video` should learn to read the **entity
+  log** — falling and ejected items animating alongside the blocks. The
+  smooth-piston cast machinery extends directly (an item is a member with a
+  per-tick position track instead of a lerp).
 
 ---
 
 ## Sequencing
 
 ```
-1 differ ─┬─► 2 observers ──► 5 components ──► 10 product
-          ├─► 3 constants
-          └─► 4 snbt loading ──► 6 block entities ──► 7 fluids ──► 8 entities
-                                                                     │
-                                                        9 throughput ┘
+A containers ──► B items ──► C dust + small components ──► D fluids ──► E entities
+      (done)      (done)          │                                        │
+                                  └─► 11 product surface ◄─────── 10 throughput
 ```
 
-Items 1–4 are each roughly a session. 7 and 8 are the large ones and should not be
-started until the differ makes regressions visible, or they will quietly break the
-redstone that already works.
+Milestones A and B each took a session. C's dust integration is the next
+door-blocking brick; the product surface can proceed in parallel with any of
+it, because every behaviour behind it is already conformance-pinned.
