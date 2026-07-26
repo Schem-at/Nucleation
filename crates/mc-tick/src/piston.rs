@@ -361,6 +361,24 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     return false;
                 }
                 let plan = resolve_push(ctx.world, &self.movability, pos, self.facing);
+                if std::env::var("MC_TICK_TRACE_EVENTS").is_ok() {
+                    let names: Vec<String> = plan
+                        .to_push
+                        .iter()
+                        .map(|p| {
+                            let d = ctx.states.descriptor(ctx.world.get(*p)).unwrap_or("?");
+                            format!("{:?}{}", (p.x, p.y, p.z), d.trim_start_matches("minecraft:"))
+                        })
+                        .collect();
+                    eprintln!(
+                        "[t{}] plan {:?} possible={} n={} [{}]",
+                        ctx.tick,
+                        (pos.x, pos.y, pos.z),
+                        plan.possible,
+                        plan.to_push.len(),
+                        names.join(", ")
+                    );
+                }
                 if !plan.possible {
                     return false;
                 }

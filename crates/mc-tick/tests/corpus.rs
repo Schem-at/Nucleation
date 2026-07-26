@@ -332,7 +332,13 @@ fn run_case(directives: &[Directive]) -> Vec<String> {
             }
 
             Directive::Event { pos, id, param } => {
-                sim.queue_event(mc_tick::BlockEvent { pos: *pos, id: *id, param: *param });
+                let block = sim.world().get(*pos);
+                sim.queue_event(mc_tick::BlockEvent {
+                    pos: *pos,
+                    id: *id,
+                    param: *param,
+                    block,
+                });
             }
 
             Directive::Checkpoint => saved = Some(sim.checkpoint()),

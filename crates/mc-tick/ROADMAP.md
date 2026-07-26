@@ -346,14 +346,37 @@ vanilla exactly; the whole remaining failure is **one piston race**:
   modelled: `placeInWorld`'s **setBlock loop**, whose shape updates let
   an observer schedule when a *later* block is placed — that reordered
   the tick-1 queue correctly for the x=9 side.
+- **Confirmed from source and implemented**: `doBlockEvent` refuses an
+  event whose position no longer holds the **Block** it was queued for
+  (`state.is(event.block())` — properties may differ freely), so
+  `BlockEvent` now carries that block and `StateRegistry` interns block
+  identity alongside state identity.
+- **Found while doing it**: `PistonBaseBlock.getPistonPushReaction`
+  answers `BLOCK` while `EXTENDED`, so an **extended piston base cannot
+  be pushed**. This engine's immovable list keys on block *name*, so a
+  slime structure was happily dragging extended pistons along. Fixed.
 - Still open, and the prime suspect for the race: **refused block events
   are rescheduled** (`blockEventsToReschedule`, re-added after the drain
   so they lead the next tick), and `doBlockEvent` drops an event whose
   position no longer holds the block it was queued for. Implementing the
   re-add alone regressed things badly (the 6x6 ran away to 151 ticks, a
   manual-engine golden grew a retraction), so the identity guard has to
-  land with it — our `BlockEvent` carries only `(pos, id, param)` and
-  needs the block. That is the next piece of work.
+  land with it. The guard is now in place, and the re-add is one
+  commented-out line in `run_block_events` — but it still turns two
+  manual-engine goldens red, and the cause is now localised:
+
+    The engine queues a piston extend at (13,1,2) on tick 27, the tick
+    that piston *lands*; vanilla never queues one. Probes confirm both
+    agree the piston is quasi-powered there and that its push plan is 8
+    blocks, so the difference is either the landing notification or the
+    push resolution — not the power model. Today the stale event is
+    refused on tick 28 and dropped, hiding it; with rescheduling it
+    survives to tick 29 and fires. **Fix that queue, then uncomment the
+    re-add.**
+
+  `cargo run -p mc-tick --example diff_vanilla` is the tool for this:
+  per-tick MATCH/DIFFER against any golden, with `--region` to watch one
+  mechanism and `--from/--to` to bound the range.
 
 **What remains** is tick-time cascade order: the doors now diverge deep
 into their opening sequences, and the vault's case is traced to two

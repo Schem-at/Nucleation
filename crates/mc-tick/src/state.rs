@@ -57,6 +57,15 @@ pub enum StateError {
 pub struct StateRegistry {
     descriptors: Vec<String>,
     lookup: HashMap<String, StateId>,
+    /// Which *block* each state belongs to — the descriptor with its
+    /// properties stripped, interned separately.
+    ///
+    /// Vanilla distinguishes `BlockState` from `Block` constantly, and one
+    /// place it matters is `doBlockEvent`, which refuses an event whose
+    /// position no longer holds the **Block** it was queued for (the state may
+    /// differ freely: a piston that became `extended=true` still passes).
+    block_of: Vec<u16>,
+    block_lookup: HashMap<String, u16>,
 }
 
 impl StateRegistry {
@@ -65,9 +74,13 @@ impl StateRegistry {
         let air = "minecraft:air".to_string();
         let mut lookup = HashMap::new();
         lookup.insert(air.clone(), StateId::AIR);
+        let mut block_lookup = HashMap::new();
+        block_lookup.insert("minecraft:air".to_string(), 0u16);
         Self {
             descriptors: vec![air],
             lookup,
+            block_of: vec![0],
+            block_lookup,
         }
     }
 
@@ -80,7 +93,28 @@ impl StateRegistry {
         let id = StateId(next);
         self.descriptors.push(descriptor.to_string());
         self.lookup.insert(descriptor.to_string(), id);
+        let name = descriptor.split('[').next().unwrap_or(descriptor);
+        let block = match self.block_lookup.get(name) {
+            Some(block) => *block,
+            None => {
+                let block = u16::try_from(self.block_lookup.len())
+                    .map_err(|_| StateError::TooManyStates)?;
+                self.block_lookup.insert(name.to_string(), block);
+                block
+            }
+        };
+        self.block_of.push(block);
         Ok(id)
+    }
+
+    /// The block `state` belongs to, ignoring its properties.
+    pub fn block_of(&self, state: StateId) -> u16 {
+        self.block_of.get(state.raw() as usize).copied().unwrap_or(0)
+    }
+
+    /// Whether two states are the same **block** — `BlockState.is(Block)`.
+    pub fn same_block(&self, a: StateId, b: StateId) -> bool {
+        self.block_of(a) == self.block_of(b)
     }
 
     /// The id for `descriptor` if already interned.

@@ -270,7 +270,17 @@ impl TickCtx<'_> {
 
     /// Queue a block event for this tick's block-events phase.
     pub fn queue_event(&mut self, pos: Pos, id: u8, param: u8) {
-        self.events.push(BlockEvent { pos, id, param });
+        let block = self.world.get(pos);
+        if std::env::var("MC_TICK_TRACE_EVENTS").is_ok() {
+            eprintln!(
+                "[t{}] queue  {:?} id={} on {}",
+                self.tick,
+                (pos.x, pos.y, pos.z),
+                id,
+                self.states.descriptor(block).unwrap_or("?")
+            );
+        }
+        self.events.push(BlockEvent { pos, id, param, block });
     }
 
     /// The state at `pos`.

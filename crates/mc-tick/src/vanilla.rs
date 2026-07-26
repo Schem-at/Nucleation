@@ -559,6 +559,19 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
         if IMMOVABLE.contains(&descriptor.name.as_str()) {
             rules.immovable.push(*id);
         }
+        // `PistonBaseBlock.getPistonPushReaction` answers BLOCK while
+        // EXTENDED: an extended piston base cannot be pushed, though a
+        // retracted one can. The immovable list keys on block *name*, so this
+        // state-dependent case needs saying separately — without it a slime
+        // structure happily dragged an extended piston along, and a flying
+        // machine performed a push the game refuses.
+        if matches!(
+            descriptor.name.as_str(),
+            "minecraft:piston" | "minecraft:sticky_piston"
+        ) && descriptor.flag("extended")
+        {
+            rules.immovable.push(*id);
+        }
         if is_full_cube(descriptor) {
             rules.full_cubes.push(*id);
         }

@@ -74,6 +74,7 @@ pub const UPDATE_SHAPE_ORDER: [Dir; 6] =
 pub const JAVA_DIRECTIONS: [Dir; 6] =
     [Dir::Down, Dir::Up, Dir::North, Dir::South, Dir::West, Dir::East];
 
+/// Every direction, in this crate's own canonical order.
 pub const ALL_DIRS: [Dir; 6] = [
     Dir::Down,
     Dir::Up,

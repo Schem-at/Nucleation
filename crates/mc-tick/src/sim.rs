@@ -1277,18 +1277,30 @@ impl Simulation {
 
     /// The block-events phase: drain, handle, repeat until empty.
     fn run_block_events(&mut self) -> Option<StopReason> {
-        // NOTE — a known, deliberate gap. `ServerLevel.runBlockEvents` keeps
-        // the events its handlers refuse (`blockEventsToReschedule`) and
-        // re-adds them once the queue drains, so they lead the next tick's
-        // batch; `doBlockEvent` also drops an event whose position no longer
-        // holds the block it was queued for. This engine drops refused events
-        // instead. Implementing the re-add alone makes things *worse* — the
-        // 6x6 door ran away to 151 ticks and a manual-engine golden grew a
-        // retraction — so the missing guard has to land with it. The block
-        // identity check is the prime suspect: our BlockEvent carries only
-        // (pos, id, param).
+        // `ServerLevel.runBlockEvents` collects the events its handlers refuse
+        // into `blockEventsToReschedule` and re-adds them once the queue
+        // drains, so they lead the next tick's batch (confirmed from
+        // bytecode). Re-adding them here is one line — commented out below —
+        // and it is **blocked on an upstream bug**, not on doubt about the
+        // rule:
+        //
+        //   The manual engine's piston at (13,1,2) lands on tick 27 and this
+        //   engine queues an extend for it; vanilla never does (probed: both
+        //   agree the piston is quasi-powered there, so the difference is the
+        //   landing notification or the push resolution). Today that event is
+        //   refused on tick 28 and dropped, which hides the divergence. With
+        //   rescheduling it survives to tick 29, fires, and the machine takes
+        //   a stroke the game never takes. Its plan, for the next session:
+        //   8 blocks — piston, glass, 2 slime, observer, redstone block,
+        //   sticky piston, note block.
+        //
+        // Landing that line before the (13,1,2) queue is fixed trades a
+        // documented gap for two red goldens, so the gap stays until then.
         let mut refused: Vec<BlockEvent> = Vec::new();
-        self.drain_block_events(&mut refused)
+        let outcome = self.drain_block_events(&mut refused);
+        // for event in refused { self.events.push(event); }
+        let _ = refused;
+        outcome
     }
 
     fn drain_block_events(&mut self, refused: &mut Vec<BlockEvent>) -> Option<StopReason> {
@@ -1302,6 +1314,25 @@ impl Simulation {
             // piston contraptions depend on it.
             for event in batch {
                 let state = self.world.get(event.pos);
+                // `doBlockEvent`: an event whose position no longer holds the
+                // block it was queued for is refused outright — and refusal
+                // means rescheduled, not dropped. Properties may differ; only
+                // the block has to match.
+                let trace_events = std::env::var("MC_TICK_TRACE_EVENTS").is_ok();
+                if !self.registry.same_block(state, event.block) {
+                    if trace_events {
+                        eprintln!(
+                            "[t{}] refuse(identity) {:?} id={} want={} have={}",
+                            self.tick,
+                            (event.pos.x, event.pos.y, event.pos.z),
+                            event.id,
+                            self.registry.descriptor(event.block).unwrap_or("?"),
+                            self.registry.descriptor(state).unwrap_or("?")
+                        );
+                    }
+                    refused.push(event);
+                    continue;
+                }
                 let Some(behaviour) = self.behaviours.get(state) else {
                     self.unknown_seen.push(state);
                     continue;
@@ -1325,6 +1356,16 @@ impl Simulation {
                         log: self.log.as_mut(),
                 };
                 let handled = behaviour.on_block_event(&mut ctx, event.pos, event.id, event.param);
+                if trace_events {
+                    eprintln!(
+                        "[t{}] {} {:?} id={} on {}",
+                        self.tick,
+                        if handled { "run   " } else { "refuse" },
+                        (event.pos.x, event.pos.y, event.pos.z),
+                        event.id,
+                        self.registry.descriptor(state).unwrap_or("?")
+                    );
+                }
                 if !handled {
                     refused.push(event);
                 }

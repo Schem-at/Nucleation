@@ -71,7 +71,7 @@ impl Observer {
 }
 
 impl BlockBehaviour for Observer {
-    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, from: Dir) {
+    fn on_neighbor_changed(&self, _ctx: &mut TickCtx<'_>, pos: Pos, from: Dir) {
         // `ObserverBlock` has **no** neighborChanged override: an observer is
         // deaf to neighbour updates entirely. Its trigger is the *shape*
         // update — see `on_shape_update`.
