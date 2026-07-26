@@ -1,0 +1,38 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:rails_chain",
+  "detail": "normal",
+  "ticks": [
+    {
+      "tick": 0,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [0, 1, 1], "from": "minecraft:air", "to": "minecraft:redstone_block"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 1, 1], "from": "minecraft:powered_rail[powered=false,shape=east_west,waterlogged=false]", "to": "minecraft:powered_rail[powered=true,shape=east_west,waterlogged=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 1, 1], "from": "minecraft:powered_rail[powered=false,shape=east_west,waterlogged=false]", "to": "minecraft:powered_rail[powered=true,shape=east_west,waterlogged=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [3, 1, 1], "from": "minecraft:powered_rail[powered=false,shape=east_west,waterlogged=false]", "to": "minecraft:powered_rail[powered=true,shape=east_west,waterlogged=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [4, 1, 1], "from": "minecraft:powered_rail[powered=false,shape=east_west,waterlogged=false]", "to": "minecraft:powered_rail[powered=true,shape=east_west,waterlogged=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [5, 1, 1], "from": "minecraft:powered_rail[powered=false,shape=east_west,waterlogged=false]", "to": "minecraft:powered_rail[powered=true,shape=east_west,waterlogged=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [6, 1, 1], "from": "minecraft:powered_rail[powered=false,shape=east_west,waterlogged=false]", "to": "minecraft:powered_rail[powered=true,shape=east_west,waterlogged=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [7, 1, 1], "from": "minecraft:powered_rail[powered=false,shape=east_west,waterlogged=false]", "to": "minecraft:powered_rail[powered=true,shape=east_west,waterlogged=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [8, 1, 1], "from": "minecraft:powered_rail[powered=false,shape=east_west,waterlogged=false]", "to": "minecraft:powered_rail[powered=true,shape=east_west,waterlogged=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [9, 1, 1], "from": "minecraft:powered_rail[powered=false,shape=east_west,waterlogged=false]", "to": "minecraft:powered_rail[powered=true,shape=east_west,waterlogged=false]"}
+      ]
+    },
+    {
+      "tick": 2,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [0, 1, 1], "from": "minecraft:redstone_block", "to": "minecraft:air"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 1, 1], "from": "minecraft:powered_rail[powered=true,shape=east_west,waterlogged=false]", "to": "minecraft:powered_rail[powered=false,shape=east_west,waterlogged=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 1, 1], "from": "minecraft:powered_rail[powered=true,shape=east_west,waterlogged=false]", "to": "minecraft:powered_rail[powered=false,shape=east_west,waterlogged=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [3, 1, 1], "from": "minecraft:powered_rail[powered=true,shape=east_west,waterlogged=false]", "to": "minecraft:powered_rail[powered=false,shape=east_west,waterlogged=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [4, 1, 1], "from": "minecraft:powered_rail[powered=true,shape=east_west,waterlogged=false]", "to": "minecraft:powered_rail[powered=false,shape=east_west,waterlogged=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [5, 1, 1], "from": "minecraft:powered_rail[powered=true,shape=east_west,waterlogged=false]", "to": "minecraft:powered_rail[powered=false,shape=east_west,waterlogged=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [6, 1, 1], "from": "minecraft:powered_rail[powered=true,shape=east_west,waterlogged=false]", "to": "minecraft:powered_rail[powered=false,shape=east_west,waterlogged=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [7, 1, 1], "from": "minecraft:powered_rail[powered=true,shape=east_west,waterlogged=false]", "to": "minecraft:powered_rail[powered=false,shape=east_west,waterlogged=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [8, 1, 1], "from": "minecraft:powered_rail[powered=true,shape=east_west,waterlogged=false]", "to": "minecraft:powered_rail[powered=false,shape=east_west,waterlogged=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [9, 1, 1], "from": "minecraft:powered_rail[powered=true,shape=east_west,waterlogged=false]", "to": "minecraft:powered_rail[powered=false,shape=east_west,waterlogged=false]"}
+      ]
+    }
+  ]
+}

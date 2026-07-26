@@ -467,3 +467,191 @@ mod tests {
         assert_eq!(RailShape::from_name("weird"), None);
     }
 }
+
+use crate::behaviour::{BlockBehaviour, TickCtx};
+use crate::components::{PowerSource, StatePair};
+use crate::pos::Dir;
+
+/// A golden rail's block behaviour: `PoweredRailBlock.updateState`.
+///
+/// The rail is powered when any neighbour signals it directly, or when a
+/// chain of **already-powered** golden rails of compatible shape leads — in
+/// at most 8 steps — to one that is. Chains conduct through powered rails
+/// only, which is why a long line lights up as a cascade of neighbour
+/// updates, one rail per wave, all inside one tick's propagation.
+pub struct PoweredRail<P: PowerSource> {
+    /// This state's shape.
+    pub shape: RailShape,
+    /// This state's `powered` flag.
+    pub powered: bool,
+    /// The unpowered/powered pair.
+    pub states: StatePair,
+    /// The world's power rules.
+    pub power: P,
+}
+
+impl<P: PowerSource> PoweredRail<P> {
+    fn has_neighbor_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        crate::pos::ALL_DIRS
+            .iter()
+            .any(|dir| self.power.is_powered(ctx.world, pos.offset(*dir), dir.opposite()))
+    }
+
+    /// The powered rail at `pos`, from its descriptor.
+    fn rail_at(&self, ctx: &TickCtx<'_>, pos: Pos) -> Option<(RailShape, bool)> {
+        let descriptor = ctx.states.descriptor(ctx.world.get(pos))?;
+        if !descriptor.starts_with("minecraft:powered_rail") {
+            return None;
+        }
+        let shape = descriptor
+            .split("shape=")
+            .nth(1)
+            .and_then(|rest| RailShape::from_name(rest.split([',', ']']).next()?))?;
+        Some((shape, descriptor.contains("powered=true")))
+    }
+
+    /// `findPoweredRailSignal`: walk one rail along the line and recurse.
+    fn find_signal(
+        &self,
+        ctx: &TickCtx<'_>,
+        pos: Pos,
+        shape: RailShape,
+        forward: bool,
+        distance: u32,
+    ) -> bool {
+        if distance >= 8 {
+            return false;
+        }
+        let (mut x, mut y, mut z) = (pos.x, pos.y, pos.z);
+        let mut descend = true;
+        let mut expect = shape;
+        match shape {
+            RailShape::NorthSouth => {
+                if forward {
+                    z += 1;
+                } else {
+                    z -= 1;
+                }
+            }
+            RailShape::EastWest => {
+                if forward {
+                    x -= 1;
+                } else {
+                    x += 1;
+                }
+            }
+            RailShape::AscendingEast => {
+                if forward {
+                    x -= 1;
+                } else {
+                    x += 1;
+                    y += 1;
+                    descend = false;
+                }
+                expect = RailShape::EastWest;
+            }
+            RailShape::AscendingWest => {
+                if forward {
+                    x -= 1;
+                    y += 1;
+                    descend = false;
+                } else {
+                    x += 1;
+                }
+                expect = RailShape::EastWest;
+            }
+            RailShape::AscendingNorth => {
+                if forward {
+                    z += 1;
+                } else {
+                    z -= 1;
+                    y += 1;
+                    descend = false;
+                }
+                expect = RailShape::NorthSouth;
+            }
+            RailShape::AscendingSouth => {
+                if forward {
+                    z += 1;
+                    y += 1;
+                    descend = false;
+                } else {
+                    z -= 1;
+                }
+                expect = RailShape::NorthSouth;
+            }
+            // Golden rails are never curves.
+            _ => {}
+        }
+        let stepped = Pos::new(x, y, z);
+        if self.same_rail_with_power(ctx, stepped, forward, distance, expect) {
+            return true;
+        }
+        descend
+            && self.same_rail_with_power(
+                ctx,
+                Pos::new(x, y - 1, z),
+                forward,
+                distance,
+                expect,
+            )
+    }
+
+    /// `isSameRailWithPower`: shape-compatible, already powered, and fed.
+    fn same_rail_with_power(
+        &self,
+        ctx: &TickCtx<'_>,
+        pos: Pos,
+        forward: bool,
+        distance: u32,
+        expect: RailShape,
+    ) -> bool {
+        let Some((shape, powered)) = self.rail_at(ctx, pos) else {
+            return false;
+        };
+        let incompatible = match expect {
+            RailShape::EastWest => matches!(
+                shape,
+                RailShape::NorthSouth | RailShape::AscendingNorth | RailShape::AscendingSouth
+            ),
+            RailShape::NorthSouth => matches!(
+                shape,
+                RailShape::EastWest | RailShape::AscendingEast | RailShape::AscendingWest
+            ),
+            _ => false,
+        };
+        if incompatible || !powered {
+            return false;
+        }
+        self.has_neighbor_signal(ctx, pos) || self.find_signal(ctx, pos, shape, forward, distance + 1)
+    }
+}
+
+impl<P: PowerSource + 'static> BlockBehaviour for PoweredRail<P> {
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        let target = self.has_neighbor_signal(ctx, pos)
+            || self.find_signal(ctx, pos, self.shape, true, 0)
+            || self.find_signal(ctx, pos, self.shape, false, 0);
+        if target == self.powered {
+            return;
+        }
+        ctx.set(pos, if target { self.states.on } else { self.states.off });
+        // updateState also updates the neighbours of the block below (and
+        // above, on slopes) — how the change reaches components hanging off
+        // the rail's support block.
+        for dir in crate::pos::ALL_DIRS {
+            ctx.updates
+                .push((pos.offset(Dir::Down).offset(dir), dir.opposite()));
+        }
+        if self.shape.is_ascending() {
+            for dir in crate::pos::ALL_DIRS {
+                ctx.updates
+                    .push((pos.offset(Dir::Up).offset(dir), dir.opposite()));
+            }
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "powered_rail"
+    }
+}

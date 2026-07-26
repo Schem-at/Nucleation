@@ -1061,3 +1061,40 @@ fn a_cart_circulates_a_powered_loop_indefinitely() {
     // vanilla put them.
     run_cart("cart_loop.snbt", "cart_loop.json", "nucleation:cart_loop");
 }
+
+#[test]
+fn a_redstone_block_lights_nine_golden_rails_and_no_more() {
+    // findPoweredRailSignal: the direct neighbour plus a chain of at most 8
+    // already-powered rails — nine light up, the tenth stays dark, and the
+    // whole wave lands inside one tick's update cascade. Both edges captured.
+    run_conformance_actuated(
+        "rails_chain.snbt",
+        "rails_chain.json",
+        "nucleation:rails_chain",
+        &["minecraft:redstone_block"],
+        &[
+            (0, Actuate::Place(Pos::new(0, 1, 1), "minecraft:redstone_block")),
+            (2, Actuate::Place(Pos::new(0, 1, 1), "minecraft:air")),
+        ],
+    );
+}
+
+#[test]
+fn powering_the_rails_launches_a_parked_cart_off_the_wall() {
+    // The full circle: a pulse powers the chain, the launch branch reads the
+    // wall as a conductor and hands the resting cart 0.02 east, the boosts
+    // take over, and the cart runs out onto plain rail and off the end.
+    run_conformance_full(
+        "cart_launch.snbt",
+        "cart_launch.json",
+        "nucleation:cart_launch",
+        &["minecraft:redstone_block"],
+        &[
+            (0, Actuate::Place(Pos::new(1, 2, 1), "minecraft:redstone_block")),
+            (40, Actuate::Place(Pos::new(1, 2, 1), "minecraft:air")),
+        ],
+        None,
+        Settle::Quiet,
+        1.0e-6,
+    );
+}

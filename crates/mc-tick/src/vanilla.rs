@@ -769,11 +769,28 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
                     }),
                 );
             }
-            "minecraft:rail" | "minecraft:powered_rail" | "minecraft:detector_rail"
-            | "minecraft:activator_rail" => {
-                // Cart physics reads rails through the rail tables; the block
-                // itself is inert until dynamic rail powering gets a capture.
+            "minecraft:rail" | "minecraft:detector_rail" | "minecraft:activator_rail" => {
+                // Cart physics reads rails through the rail tables; detector
+                // and activator dynamics still await their captures.
                 table.register(*id, Box::new(Inert::new("rail")));
+            }
+            "minecraft:powered_rail" => {
+                let Some(shape) = descriptor
+                    .get("shape")
+                    .and_then(crate::minecart::RailShape::from_name)
+                else {
+                    continue;
+                };
+                let Some(states) = powered_pair(registry, descriptor) else { continue };
+                table.register(
+                    *id,
+                    Box::new(crate::minecart::PoweredRail {
+                        shape,
+                        powered: descriptor.flag("powered"),
+                        states,
+                        power: rules.clone(),
+                    }),
+                );
             }
             "minecraft:water" => {
                 let level = descriptor.get("level").and_then(|l| l.parse().ok()).unwrap_or(0);
@@ -1086,6 +1103,9 @@ pub fn intern_companions(registry: &mut StateRegistry) {
                     all.push(at_note.with("powered", "true"));
                 }
                 all
+            }
+            "minecraft:powered_rail" => {
+                vec![descriptor.with("powered", "false"), descriptor.with("powered", "true")]
             }
             "minecraft:water" | "minecraft:bubble_column" => {
                 // Every level a flow can take, and air to empty into. Falling
