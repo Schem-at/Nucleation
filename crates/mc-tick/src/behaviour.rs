@@ -75,6 +75,89 @@ impl Default for HopperState {
     }
 }
 
+/// Each comparator's last emitted output strength, by position — vanilla's
+/// `ComparatorBlockEntity.outputSignal`.
+///
+/// Emitted power genuinely depends on this: a comparator whose block state
+/// says `powered=true` but whose (freshly placed) block entity still holds 0
+/// emits **nothing**, which is exactly what a community door's placement
+/// looks like before its first comparator tick.
+pub type ComparatorOutputs = std::collections::HashMap<Pos, u8>;
+
+/// Which of vanilla's two update callbacks a queued notification carries.
+///
+/// `Level.setBlock` sends **both**: `updateNeighborsAt` (→ `neighborChanged`,
+/// how a piston notices power) and `updateNeighbourShapes` (→ `updateShape`,
+/// how an **observer** notices a change — `ObserverBlock` overrides only
+/// `updateShape`, and that is exactly why placement pulses observers while
+/// leaving pistons alone).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpdateKind {
+    /// `neighborChanged`.
+    Neighbor,
+    /// `updateShape`.
+    Shape,
+}
+
+/// One collected neighbour-update entry — vanilla's `NeighborUpdates` unit.
+///
+/// An `updateNeighborsAt` call is one entry of up to six notifications run in
+/// `UPDATE_ORDER`; `CollectingNeighborUpdater` runs entries depth-first:
+/// entries queued while a notification dispatches run to completion (in call
+/// order) before the current entry's remaining notifications. The driver's
+/// `propagate` reproduces exactly that.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UpdateEntry {
+    items: Vec<(Pos, Dir, UpdateKind)>,
+    cursor: usize,
+}
+
+impl UpdateEntry {
+    /// An entry dispatching `items` in order.
+    pub fn new(items: Vec<(Pos, Dir, UpdateKind)>) -> Self {
+        Self { items, cursor: 0 }
+    }
+
+    /// One `updateNeighborsAt(pos)`: the six neighbours in `UPDATE_ORDER`.
+    pub fn neighbors_at(pos: Pos) -> Self {
+        Self::new(
+            crate::pos::UPDATE_ORDER
+                .iter()
+                .map(|dir| (pos.offset(*dir), dir.opposite(), UpdateKind::Neighbor))
+                .collect(),
+        )
+    }
+
+    /// One `updateNeighbourShapes(pos)`: the six neighbours in
+    /// `UPDATE_SHAPE_ORDER`, each hearing a shape update from this side.
+    pub fn neighbor_shapes(pos: Pos) -> Self {
+        Self::new(
+            crate::pos::UPDATE_SHAPE_ORDER
+                .iter()
+                .map(|dir| (pos.offset(*dir), dir.opposite(), UpdateKind::Shape))
+                .collect(),
+        )
+    }
+
+    /// `updateFromNeighbourShapes(pos)`: the block at `pos` hears a shape
+    /// update from every side, in `UPDATE_SHAPE_ORDER`.
+    pub fn own_shapes(pos: Pos) -> Self {
+        Self::new(
+            crate::pos::UPDATE_SHAPE_ORDER
+                .iter()
+                .map(|dir| (pos, *dir, UpdateKind::Shape))
+                .collect(),
+        )
+    }
+
+    /// The next notification, if any.
+    pub fn next(&mut self) -> Option<(Pos, Dir, UpdateKind)> {
+        let item = self.items.get(self.cursor).copied();
+        self.cursor += 1;
+        item
+    }
+}
+
 /// A block write scheduled to land in a later tick's block-entities phase.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PendingMove {
@@ -135,7 +218,7 @@ pub struct TickCtx<'a> {
     /// only carries `powered` and `mode` — it cannot express "I am on at strength
     /// 9". Comparator priming is exactly the consequence: a comparator schedules a
     /// tick when its output *strength* changes even though `powered` does not.
-    pub comparator_out: &'a mut std::collections::HashMap<Pos, u8>,
+    pub comparator_out: &'a mut ComparatorOutputs,
     /// Container contents by position — vanilla's inventory block entities.
     ///
     /// What a comparator reads and a hopper moves. Kept with the simulation
@@ -156,12 +239,11 @@ pub struct TickCtx<'a> {
     /// current world, and behaviours are shared and immutable — so the record lives
     /// with the simulation and is reached through here.
     pub toggles: &'a mut Vec<(Pos, u64)>,
-    /// Neighbour notifications raised by [`TickCtx::set`], drained by the driver.
-    ///
-    /// Collected rather than dispatched inline: a behaviour that could re-enter
-    /// other behaviours would make ordering depend on call depth instead of on the
-    /// phase, which is the one thing this engine exists to get right.
-    pub updates: &'a mut Vec<(Pos, Dir)>,
+    /// Neighbour-update entries raised during this dispatch, in call order —
+    /// vanilla's `addedThisLayer`. The driver moves them onto its stack after
+    /// each single notification, which is what makes cascades depth-first in
+    /// call order without any re-entrant dispatch.
+    pub updates: &'a mut Vec<UpdateEntry>,
 }
 
 impl TickCtx<'_> {
@@ -196,11 +278,39 @@ impl TickCtx<'_> {
         self.world.get(pos)
     }
 
+    /// Queue one `updateNeighborsAt(pos)` entry.
+    pub fn update_neighbors_at(&mut self, pos: Pos) {
+        self.updates.push(UpdateEntry::neighbors_at(pos));
+    }
+
+    /// `updateNeighborsAtExceptFromFacing`: the same entry minus one side.
+    pub fn update_neighbors_except(&mut self, pos: Pos, skip: Dir) {
+        self.updates.push(UpdateEntry::new(
+            crate::pos::UPDATE_ORDER
+                .iter()
+                .filter(|dir| **dir != skip)
+                .map(|dir| (pos.offset(*dir), dir.opposite(), UpdateKind::Neighbor))
+                .collect(),
+        ));
+    }
+
+    /// `updateFromNeighbourShapes(pos)`.
+    pub fn update_self_shapes(&mut self, pos: Pos) {
+        self.updates.push(UpdateEntry::own_shapes(pos));
+    }
+
+    /// Queue a single notification (`level.neighborChanged` directly).
+    pub fn notify(&mut self, pos: Pos, from: Dir) {
+        self.updates
+            .push(UpdateEntry::new(vec![(pos, from, UpdateKind::Neighbor)]));
+    }
+
     /// Set the state at `pos` and notify its six neighbours.
     ///
-    /// Notifications are queued, not dispatched here; see [`TickCtx::updates`].
-    /// Nothing is queued if the write changed nothing, which is what stops two
-    /// blocks that keep re-asserting the same state from looping forever.
+    /// Notifications are queued as one `updateNeighborsAt` entry; see
+    /// [`TickCtx::updates`]. Nothing is queued if the write changed nothing,
+    /// which is what stops two blocks that keep re-asserting the same state
+    /// from looping forever.
     pub fn set(&mut self, pos: Pos, state: StateId) {
         let previous = self.world.get(pos);
         if previous == state {
@@ -210,10 +320,10 @@ impl TickCtx<'_> {
         if let Some(log) = self.log.as_deref_mut() {
             log.push(BlockChange { tick: self.tick, pos, from: previous, to: state });
         }
-        for dir in crate::pos::ALL_DIRS {
-            // The neighbour is told which way the change came from, relative to it.
-            self.updates.push((pos.offset(dir), dir.opposite()));
-        }
+        // markAndNotifyBlock, flag 3: neighbour updates first, then the shape
+        // pass that observers listen to.
+        self.updates.push(UpdateEntry::neighbors_at(pos));
+        self.updates.push(UpdateEntry::neighbor_shapes(pos));
     }
 
     /// Set a block without notifying anything, for loading a structure.
@@ -237,6 +347,22 @@ impl TickCtx<'_> {
         if let Some(log) = self.log.as_deref_mut() {
             log.push(BlockChange { tick: self.tick, pos, from: previous, to: state });
         }
+    }
+
+    /// A **flag 2** write: no neighbour updates, but the shape pass still
+    /// runs (`markAndNotifyBlock` only skips it for `UPDATE_KNOWN_SHAPE`).
+    /// This is the dust evaluator's write — and it is how an observer
+    /// watching redstone dust sees a power change at all.
+    pub fn set_shape_only(&mut self, pos: Pos, state: StateId) {
+        let previous = self.world.get(pos);
+        if previous == state {
+            return;
+        }
+        self.world.set(pos, state);
+        if let Some(log) = self.log.as_deref_mut() {
+            log.push(BlockChange { tick: self.tick, pos, from: previous, to: state });
+        }
+        self.updates.push(UpdateEntry::neighbor_shapes(pos));
     }
 
     /// The output strength a comparator at `pos` last emitted.
@@ -299,9 +425,12 @@ impl TickCtx<'_> {
         if let Some(log) = self.inv_log.as_deref_mut() {
             log.push(InventoryChange { tick: self.tick, pos, slot, from, to });
         }
-        for dir in crate::pos::ALL_DIRS {
-            self.updates.push((pos.offset(dir), dir.opposite()));
+        // updateNeighbourForOutputSignal: direct notifications in Java's
+        // Direction.values() order.
+        for dir in crate::pos::JAVA_DIRECTIONS {
+            self.notify(pos.offset(dir), dir.opposite());
         }
+        // (updateNeighbourForOutputSignal: direct neighborChanged calls.)
     }
 
     /// Schedule a block write for `delay` ticks from now, resolved in the
@@ -326,6 +455,15 @@ pub trait BlockBehaviour: Send + Sync {
     /// A scheduled fluid tick fired at `pos` — `FluidState.tick`, dispatched
     /// from the fluid-ticks phase.
     fn on_fluid_tick(&self, _ctx: &mut TickCtx<'_>, _pos: Pos) {}
+
+    /// A **shape** update reached `pos` from `from` — vanilla's `updateShape`.
+    ///
+    /// A different callback from [`BlockBehaviour::on_neighbor_changed`], and
+    /// the distinction is load-bearing: `ObserverBlock` overrides *only* this
+    /// one, which is why a structure placement (whose pass runs
+    /// `updateFromNeighbourShapes` on every block) pulses every observer
+    /// without triggering a single piston.
+    fn on_shape_update(&self, _ctx: &mut TickCtx<'_>, _pos: Pos, _from: Dir) {}
 
     /// A block event fired at `pos`. Returns whether it was handled.
     ///

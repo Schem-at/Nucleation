@@ -86,6 +86,7 @@ public final class TraceCapture {
         String structureId = arg(args, "--structure", "nucleation:torch_inverts");
         int maxTicks = Integer.parseInt(arg(args, "--max-ticks", "40"));
         Path out = Path.of(arg(args, "--out", "work/trace.json"));
+        String dumpPlaced = arg(args, "--dump-placed", null);
 
         SharedConstants.tryDetectVersion();
         Bootstrap.bootStrap();
@@ -203,6 +204,23 @@ public final class TraceCapture {
 
         List<String> ticks = new ArrayList<>();
         Map<BlockPos, String> previous = snapshot(level, min, max);
+        // The world exactly as placement left it: the ground truth for
+        // comparing an engine's settle against the game's.
+        if (dumpPlaced != null) {
+            java.util.List<BlockPos> keys = new java.util.ArrayList<>(previous.keySet());
+            keys.sort(java.util.Comparator
+                    .comparingInt((BlockPos k) -> k.getY())
+                    .thenComparingInt((BlockPos k) -> k.getZ())
+                    .thenComparingInt((BlockPos k) -> k.getX()));
+            StringBuilder placed = new StringBuilder();
+            for (BlockPos key : keys) {
+                placed.append(key.getX() - ORIGIN.getX()).append(' ')
+                      .append(key.getY() - ORIGIN.getY()).append(' ')
+                      .append(key.getZ() - ORIGIN.getZ()).append(' ')
+                      .append(previous.get(key)).append('\n');
+            }
+            java.nio.file.Files.writeString(Path.of(dumpPlaced), placed.toString());
+        }
         Map<BlockPos, String[]> previousInv = snapshotContainers(level, min, max);
         // --entities: also diff item entities per tick. Opt-in because RNG-fed
         // spawns (dispensers) make trajectories sample-specific; deterministic

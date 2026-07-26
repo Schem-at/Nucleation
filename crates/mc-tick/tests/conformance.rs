@@ -415,14 +415,18 @@ fn run_conformance_full(
         sim.set_ticking_bounds(bounds);
     }
 
-    sim.record();
     // Placing a build gives every block a chance to react, exactly as vanilla's
     // onPlace does — which is why a piston notices a quasi-connectivity source that
     // touches it nowhere, and why every observer pulses once at placement.
     // Quiet (knownShape) placement dispatches nothing, so it settles nothing.
+    // The capture's baseline snapshot is taken AFTER placement, so the settle's
+    // own writes are pre-baseline and must not be recorded.
     if settle == Settle::Placement {
-        sim.settle();
+        // Vanilla's placement pass walks the structure's block list in order.
+        let order: Vec<Pos> = structure.blocks.iter().map(|(pos, _)| *pos).collect();
+        sim.settle_with_order(&order);
     }
+    sim.record();
 
     let horizon = expected.ticks.last().map(|t| t.tick + 1).unwrap_or(0);
     for tick in 0..horizon {

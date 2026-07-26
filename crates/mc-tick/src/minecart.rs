@@ -494,7 +494,7 @@ impl<P: PowerSource> PoweredRail<P> {
     fn has_neighbor_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
         crate::pos::ALL_DIRS
             .iter()
-            .any(|dir| self.power.is_powered(ctx.world, pos.offset(*dir), dir.opposite()))
+            .any(|dir| self.power.is_powered(ctx.world, ctx.comparator_out, pos.offset(*dir), dir.opposite()))
     }
 
     /// The powered rail at `pos`, from its descriptor.
@@ -639,15 +639,9 @@ impl<P: PowerSource + 'static> BlockBehaviour for PoweredRail<P> {
         // updateState also updates the neighbours of the block below (and
         // above, on slopes) — how the change reaches components hanging off
         // the rail's support block.
-        for dir in crate::pos::ALL_DIRS {
-            ctx.updates
-                .push((pos.offset(Dir::Down).offset(dir), dir.opposite()));
-        }
+        ctx.update_neighbors_at(pos.offset(Dir::Down));
         if self.shape.is_ascending() {
-            for dir in crate::pos::ALL_DIRS {
-                ctx.updates
-                    .push((pos.offset(Dir::Up).offset(dir), dir.opposite()));
-            }
+            ctx.update_neighbors_at(pos.offset(Dir::Up));
         }
     }
 

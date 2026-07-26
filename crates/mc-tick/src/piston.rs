@@ -291,29 +291,40 @@ impl<P: PowerSource, M: Movability> Piston<P, M> {
     /// QC is not a quirk to be tidied away; a great many door designs depend on it,
     /// and a simulator without it silently disagrees with the game on exactly the
     /// builds people care about.
-    fn is_powered(&self, world: &World, pos: Pos) -> bool {
+    fn is_powered(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+    ) -> bool {
         // `getNeighborSignal` skips the direction the piston pushes at its own
         // position, and skips Down (back toward the piston) at the position
         // above. Read from the bytecode.
-        self.has_direct_signal(world, pos, Some(self.facing))
-            || self.has_direct_signal(world, pos.offset(Dir::Up), Some(Dir::Down))
+        self.has_direct_signal(world, outs, pos, Some(self.facing))
+            || self.has_direct_signal(world, outs, pos.offset(Dir::Up), Some(Dir::Down))
     }
 
     /// Whether any neighbour of `pos` emits toward it, ignoring `skip`.
-    fn has_direct_signal(&self, world: &World, pos: Pos, skip: Option<Dir>) -> bool {
+    fn has_direct_signal(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        skip: Option<Dir>,
+    ) -> bool {
         crate::pos::ALL_DIRS
             .iter()
             .filter(|dir| Some(**dir) != skip)
             .any(|dir| {
                 self.power
-                    .is_powered(world, pos.offset(*dir), dir.opposite())
+                    .is_powered(world, outs, pos.offset(*dir), dir.opposite())
             })
     }
 }
 
 impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
-        let powered = self.is_powered(ctx.world, pos);
+        let powered = self.is_powered(ctx.world, ctx.comparator_out, pos);
         if powered == self.extended {
             return;
         }
@@ -346,7 +357,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // simply dropped. Captured with the manual engine — a landed
                 // piston queues an extend off an observer's pulse, the pulse ends
                 // in the next tick's block-ticks phase, and the extend never runs.
-                if !self.is_powered(ctx.world, pos) {
+                if !self.is_powered(ctx.world, ctx.comparator_out, pos) {
                     return false;
                 }
                 let plan = resolve_push(ctx.world, &self.movability, pos, self.facing);
@@ -402,7 +413,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // Dispatch re-check, mirroring extend: if power returned before
                 // the retract ran, vanilla re-marks the base extended with **no**
                 // updates (flag 2) and treats the event as unhandled.
-                if self.is_powered(ctx.world, pos) {
+                if self.is_powered(ctx.world, ctx.comparator_out, pos) {
                     ctx.set_quiet(pos, self.states.get(true));
                     return false;
                 }
@@ -511,7 +522,13 @@ mod tests {
     }
 
     impl PowerSource for Model {
-        fn is_powered(&self, world: &World, pos: Pos, _toward: Dir) -> bool {
+        fn is_powered(
+            &self,
+            world: &World,
+            _outs: &crate::behaviour::ComparatorOutputs,
+            pos: Pos,
+            _toward: Dir,
+        ) -> bool {
             self.powered.contains(&world.get(pos))
         }
         fn is_diode(&self, _world: &World, _pos: Pos) -> bool {

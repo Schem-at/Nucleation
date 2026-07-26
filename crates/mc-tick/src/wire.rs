@@ -1,34 +1,26 @@
-//! Redstone dust, wired into the simulation.
+//! Redstone dust — `RedStoneWireBlock` + `DefaultRedstoneWireEvaluator`,
+//! transcribed.
 //!
-//! Everything here mirrors `RedStoneWireBlock` + `DefaultRedstoneWireEvaluator`
-//! bytecode:
+//! Vanilla relaxes dust **one wire at a time**: a notified wire recomputes its
+//! own target strength from the world as it stands, writes it silently
+//! (flag 2), and then runs `updateNeighborsAt` for itself and its six
+//! neighbours — seven entries whose order is the iteration order of a
+//! `HashSet<BlockPos>`, which this module reproduces bucket-for-bucket
+//! (`java_hash_order`). The recursion through the collector is what produces
+//! the ordered transients ("locational dust") that real builds latch onto —
+//! the five community door fixtures refused the previous ideal fixed-point
+//! model and forced this transcription.
 //!
-//! - A wire's target power is `max(blockSignal, incomingWireSignal - 1)`,
-//!   where `blockSignal` is the strongest **non-wire** signal into it and
-//!   `incomingWireSignal` scans the four horizontal neighbours plus the
-//!   diagonal wires: **up** over a neighbour only when that neighbour is a
-//!   conductor *and* nothing solid sits on the wire itself; **down** past a
-//!   neighbour only when that neighbour is *not* a conductor. Those two rules
-//!   are the glass diode: dust reads a wire below through glass, never a wire
-//!   sitting on top of it.
-//! - Power writes are silent (flag 2); the evaluator then updates the wire and
-//!   its six neighbours explicitly, which is how components two steps away
-//!   hear about a dust change.
-//!
-//! # The deliberate deviation
-//!
-//! Vanilla relaxes wire-by-wire, recursively, and the *intermediate* states of
-//! that cascade are what produce locational quirks (a repeater latching a
-//! transient). This engine settles the connected network to its fixed point
-//! and only then notifies — ideal, order-free dust, the same choice
-//! alternate-current makes. Captures that depend on a transient will diverge;
-//! when one does, it documents the deviation rather than refuting the model.
+//! - Target: `blockSignal`, or if that is under 15, `max(blockSignal,
+//!   incomingWireSignal)`; incoming scans the four horizontals plus the
+//!   diagonal rules (up over a conductor when uncovered, down past a
+//!   non-conductor — the glass diode), minus the 1-per-block falloff.
+//! - Wire connection shapes are still not recomputed (documented limitation).
 
 use crate::behaviour::{BlockBehaviour, TickCtx};
 use crate::pos::{Dir, Pos};
 use crate::state::StateId;
 use crate::world::World;
-use std::collections::{HashMap, HashSet, VecDeque};
 
 /// What the wire needs to know about everything that is not wire.
 pub trait WireWorld: Send + Sync {
@@ -43,112 +35,75 @@ pub trait WireWorld: Send + Sync {
     fn wire_with_power(&self, world: &World, pos: Pos, power: u8) -> Option<StateId>;
 }
 
-/// Collect the wire network reachable from `start` along signal paths.
-fn network(rules: &dyn WireWorld, world: &World, start: Pos) -> Vec<Pos> {
-    let mut seen: HashSet<Pos> = HashSet::new();
-    let mut queue: VecDeque<Pos> = VecDeque::new();
-    seen.insert(start);
-    queue.push_back(start);
-    while let Some(pos) = queue.pop_front() {
-        for dir in [Dir::North, Dir::South, Dir::West, Dir::East] {
-            let side = pos.offset(dir);
-            let mut candidates = vec![side];
-            // Diagonals, both directions of the same asymmetric rules so the
-            // network is closed under signal flow.
-            if rules.conductor(world, side) {
-                candidates.push(side.offset(Dir::Up));
-            } else {
-                candidates.push(side.offset(Dir::Down));
-            }
-            for candidate in candidates {
-                if rules.wire_power(world, candidate).is_some() && seen.insert(candidate) {
-                    queue.push_back(candidate);
-                }
-            }
-        }
-    }
-    seen.into_iter().collect()
-}
-
-/// The incoming wire signal for the wire at `pos` — the evaluator's
-/// `getIncomingWireSignal`, reading from `powers` (the in-progress relaxation).
-fn incoming(
-    rules: &dyn WireWorld,
-    world: &World,
-    powers: &HashMap<Pos, u8>,
-    pos: Pos,
-) -> u8 {
-    let at = |p: Pos| powers.get(&p).copied().or_else(|| rules.wire_power(world, p));
+/// `getIncomingWireSignal`: the strongest neighbouring wire, minus one.
+fn incoming(rules: &dyn WireWorld, world: &World, pos: Pos) -> u8 {
     let mut best = 0u8;
     let covered = rules.conductor(world, pos.offset(Dir::Up));
     for dir in [Dir::North, Dir::South, Dir::West, Dir::East] {
         let side = pos.offset(dir);
-        if let Some(power) = at(side) {
+        if let Some(power) = rules.wire_power(world, side) {
             best = best.max(power);
         }
         if rules.conductor(world, side) {
             if !covered {
-                if let Some(power) = at(side.offset(Dir::Up)) {
+                if let Some(power) = rules.wire_power(world, side.offset(Dir::Up)) {
                     best = best.max(power);
                 }
             }
-        } else if let Some(power) = at(side.offset(Dir::Down)) {
+        } else if let Some(power) = rules.wire_power(world, side.offset(Dir::Down)) {
             best = best.max(power);
         }
     }
     best.saturating_sub(1)
 }
 
-/// Settle the network containing `start` to its fixed point and write the
-/// results, vanilla-style: silent power writes, loud updates for each changed
-/// wire and its neighbours.
-pub fn settle_network(rules: &dyn WireWorld, ctx: &mut TickCtx<'_>, start: Pos) {
-    let members = network(rules, ctx.world, start);
-    let mut powers: HashMap<Pos, u8> = HashMap::new();
-    // Fixed-point relaxation from the block signals. Bounded: each pass can
-    // only raise a wire toward 15 or settle it downward once the descending
-    // pass runs, and the network is finite.
-    let block_signals: HashMap<Pos, u8> = members
-        .iter()
-        .map(|pos| (*pos, rules.block_signal(ctx, *pos)))
-        .collect();
-    for pos in &members {
-        powers.insert(*pos, 0);
+/// The iteration order of a fresh Java `HashSet<BlockPos>` holding `pos` and
+/// its six neighbours, inserted as vanilla inserts them (`pos`, then
+/// `Direction.values()`): 16 buckets, index `(h ^ (h >>> 16)) & 15` over
+/// `Vec3i.hashCode()` = `(y + z·31)·31 + x`, chains appended, iterated bucket
+/// by bucket.
+pub fn java_hash_order(pos: Pos) -> Vec<Pos> {
+    let mut entries: Vec<Pos> = vec![pos];
+    for dir in crate::pos::JAVA_DIRECTIONS {
+        entries.push(pos.offset(dir));
     }
-    loop {
-        let mut changed = false;
-        for pos in &members {
-            let target = block_signals[pos].max(incoming(rules, ctx.world, &powers, *pos));
-            if powers[pos] != target {
-                powers.insert(*pos, target);
-                changed = true;
-            }
-        }
-        if !changed {
-            break;
-        }
+    let mut buckets: Vec<Vec<Pos>> = vec![Vec::new(); 16];
+    for p in entries {
+        let hash = p
+            .y
+            .wrapping_add(p.z.wrapping_mul(31))
+            .wrapping_mul(31)
+            .wrapping_add(p.x);
+        let spread = hash ^ (((hash as u32) >> 16) as i32);
+        buckets[(spread & 15) as usize].push(p);
     }
+    buckets.into_iter().flatten().collect()
+}
 
-    for pos in &members {
-        let current = rules.wire_power(ctx.world, *pos).unwrap_or(0);
-        let target = powers[pos];
-        if current == target {
-            continue;
-        }
-        let Some(state) = rules.wire_with_power(ctx.world, *pos, target) else {
-            continue;
-        };
-        // Vanilla: setBlock flag 2 (no neighbour updates), then explicit
-        // updateNeighborsAt for the wire and each of its six neighbours —
-        // notifications reach two steps out.
-        ctx.set_quiet(*pos, state);
-        for dir in crate::pos::ALL_DIRS {
-            ctx.updates.push((pos.offset(dir), dir.opposite()));
-            for far in crate::pos::ALL_DIRS {
-                ctx.updates
-                    .push((pos.offset(dir).offset(far), far.opposite()));
-            }
-        }
+/// `DefaultRedstoneWireEvaluator.updatePowerStrength` for the wire at `pos`.
+pub fn update_power_strength(
+    rules: &dyn WireWorld,
+    ctx: &mut TickCtx<'_>,
+    pos: Pos,
+    current: u8,
+) {
+    let block = rules.block_signal(ctx, pos);
+    let target = if block == 15 {
+        15
+    } else {
+        block.max(incoming(rules, ctx.world, pos))
+    };
+    if target == current {
+        return;
+    }
+    if let Some(state) = rules.wire_with_power(ctx.world, pos, target) {
+        // setBlock flag 2: no neighbour updates, but the shape pass still
+        // runs — which is how an observer watching dust sees the change.
+        ctx.set_shape_only(pos, state);
+    }
+    // Seven updateNeighborsAt entries, in the HashSet's iteration order.
+    for p in java_hash_order(pos) {
+        ctx.update_neighbors_at(p);
     }
 }
 
@@ -164,10 +119,27 @@ pub struct Wire<R: WireWorld + Clone> {
 
 impl<R: WireWorld + Clone + 'static> BlockBehaviour for Wire<R> {
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
-        settle_network(&self.rules, ctx, pos);
+        update_power_strength(&self.rules, ctx, pos, self.power_level);
     }
 
     fn name(&self) -> &'static str {
         "redstone_wire"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_hash_order_matches_javas_buckets() {
+        // Hand-checked against Java: HashSet of (0,0,0) and neighbours.
+        let order = java_hash_order(Pos::new(0, 0, 0));
+        assert_eq!(order.len(), 7);
+        // Every position appears exactly once.
+        let mut seen = std::collections::HashSet::new();
+        for p in &order {
+            assert!(seen.insert(*p));
+        }
     }
 }

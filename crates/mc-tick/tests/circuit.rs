@@ -28,7 +28,13 @@ struct Model {
 }
 
 impl PowerSource for Model {
-    fn is_powered(&self, world: &World, pos: Pos, _toward: Dir) -> bool {
+    fn is_powered(
+        &self,
+        world: &World,
+        _outs: &mc_tick::behaviour::ComparatorOutputs,
+        pos: Pos,
+        _toward: Dir,
+    ) -> bool {
         self.powered.contains(&world.get(pos))
     }
     fn is_diode(&self, world: &World, pos: Pos) -> bool {
@@ -93,6 +99,8 @@ fn build(repeater_delay: u8) -> Circuit {
                 delay: repeater_delay,
                 powered,
                 states: StatePair { off: rep_off, on: rep_on },
+                locked: false,
+                locked_twin: None,
                 power: model.clone(),
             }),
         );

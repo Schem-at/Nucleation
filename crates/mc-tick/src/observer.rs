@@ -63,22 +63,24 @@ impl Observer {
     fn update_neighbors_in_front(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
         let front = pos.offset(self.output_side());
         // From the front block's perspective, the observer sits on its `facing`
-        // side.
-        ctx.updates.push((front, self.facing));
-        for dir in crate::pos::ALL_DIRS {
-            if dir == self.facing {
-                continue; // that neighbour is the observer itself
-            }
-            ctx.updates.push((front.offset(dir), dir.opposite()));
-        }
+        // side. Vanilla: one direct neighborChanged, then
+        // updateNeighborsAtExceptFromFacing — two entries, in that order.
+        ctx.notify(front, self.facing);
+        ctx.update_neighbors_except(front, self.facing);
     }
 }
 
 impl BlockBehaviour for Observer {
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, from: Dir) {
-        // Only a change to the watched block matters. An observer is deliberately
-        // deaf to everything else, which is what lets it sit inside a contraption
-        // without reacting to its neighbours' comings and goings.
+        // `ObserverBlock` has **no** neighborChanged override: an observer is
+        // deaf to neighbour updates entirely. Its trigger is the *shape*
+        // update — see `on_shape_update`.
+        let _ = (pos, from);
+    }
+
+    /// `ObserverBlock.updateShape`: a shape update arriving from the watched
+    /// side starts the pulse (`startSignal`), if one is not already running.
+    fn on_shape_update(&self, ctx: &mut TickCtx<'_>, pos: Pos, from: Dir) {
         if from != self.facing || self.powered {
             return;
         }
@@ -191,7 +193,7 @@ mod tests {
             inv_log: None,
             log: None,
         };
-        o.on_neighbor_changed(&mut ctx, pos, Dir::West);
+        o.on_shape_update(&mut ctx, pos, Dir::West);
         assert_eq!(t.len(), 1, "a watched change must schedule");
     }
 
@@ -214,7 +216,7 @@ mod tests {
             log: None,
         };
         for dir in [Dir::East, Dir::North, Dir::South, Dir::Up, Dir::Down] {
-            o.on_neighbor_changed(&mut ctx, pos, dir);
+            o.on_shape_update(&mut ctx, pos, dir);
         }
         assert!(t.is_empty(), "only the watched side counts");
     }
@@ -337,7 +339,7 @@ mod tests {
             inv_log: None,
             log: None,
         };
-        o.on_neighbor_changed(&mut ctx, pos, Dir::West);
+        o.on_shape_update(&mut ctx, pos, Dir::West);
         assert!(t.is_empty(), "a pulse in flight must not be retriggered");
     }
 

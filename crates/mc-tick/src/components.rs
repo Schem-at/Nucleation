@@ -122,7 +122,16 @@ impl StatePair {
 /// of Minecraft's block list.
 pub trait PowerSource: Send + Sync {
     /// Whether `pos` currently emits a signal toward `toward`.
-    fn is_powered(&self, world: &World, pos: Pos, toward: Dir) -> bool;
+    ///
+    /// `outs` carries the comparator block-entity outputs, because a
+    /// comparator's emission is its *stored* strength, not its block state.
+    fn is_powered(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        toward: Dir,
+    ) -> bool;
 
     /// The analog (comparator-readable) signal of the block at `pos`, if it has
     /// one — a container's fullness, principally. `None` means the block has no
@@ -171,8 +180,14 @@ pub trait PowerSource: Send + Sync {
     /// Defaults to the boolean answer widened to full strength, so a power model
     /// that only cares about on/off need not implement it. Comparators are the one
     /// component whose output genuinely depends on the *level*.
-    fn signal_strength(&self, world: &World, pos: Pos, toward: Dir) -> u8 {
-        if self.is_powered(world, pos, toward) {
+    fn signal_strength(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        toward: Dir,
+    ) -> u8 {
+        if self.is_powered(world, outs, pos, toward) {
             15
         } else {
             0
@@ -232,7 +247,7 @@ fn schedule_diode(
     } else {
         facing.opposite()
     };
-    let input = power.is_powered(ctx.world, pos.offset(input_side), input_side.opposite());
+    let input = power.is_powered(ctx.world, ctx.comparator_out, pos.offset(input_side), input_side.opposite());
 
     if input == powered {
         return;
@@ -293,6 +308,15 @@ pub struct Repeater<P: PowerSource> {
     pub powered: bool,
     /// The powered/unpowered states for this facing and delay.
     pub states: StatePair,
+    /// This state with `locked` flipped, when it is interned.
+    ///
+    /// `RepeaterBlock.updateShape` recomputes `LOCKED` on every horizontal
+    /// shape update perpendicular to `FACING`, so the property is *derived*,
+    /// not authored — a community build saved mid-cycle carries whatever
+    /// value it had, and vanilla corrects it the moment it is placed.
+    pub locked_twin: Option<StateId>,
+    /// Whether this state is the locked one.
+    pub locked: bool,
     /// How power is read.
     pub power: P,
 }
@@ -303,11 +327,16 @@ impl<P: PowerSource> Repeater<P> {
     /// `DiodeBlock.isLocked`: a repeater fed from either side by a *powered* diode
     /// ignores its input entirely — `checkTickOnNeighbor` returns early, so a locked
     /// repeater schedules nothing and holds whatever output it had.
-    pub fn locked_at(&self, world: &World, pos: Pos) -> bool {
+    pub fn locked_at(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+    ) -> bool {
         for side in perpendicular(self.facing) {
             let neighbour = pos.offset(side);
             if self.power.is_diode(world, neighbour)
-                && self.power.is_powered(world, neighbour, side.opposite())
+                && self.power.is_powered(world, outs, neighbour, side.opposite())
             {
                 return true;
             }
@@ -321,10 +350,26 @@ impl<P: PowerSource> Repeater<P> {
 }
 
 impl<P: PowerSource> BlockBehaviour for Repeater<P> {
+    /// `RepeaterBlock.updateShape`: a horizontal shape update perpendicular to
+    /// `FACING` recomputes `LOCKED`.
+    fn on_shape_update(&self, ctx: &mut TickCtx<'_>, pos: Pos, from: Dir) {
+        if matches!(from, Dir::Up | Dir::Down)
+            || from == self.facing
+            || from == self.facing.opposite()
+        {
+            return;
+        }
+        let Some(twin) = self.locked_twin else { return };
+        if self.locked_at(ctx.world, ctx.comparator_out, pos) != self.locked {
+            // A shape update writes the state without notifying neighbours.
+            ctx.set_quiet(pos, twin);
+        }
+    }
+
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
         // A locked repeater schedules nothing: the game returns early before
         // checkTickOnNeighbor ever considers the input.
-        if self.locked_at(ctx.world, pos) {
+        if self.locked_at(ctx.world, ctx.comparator_out, pos) {
             return;
         }
         let delay = self.delay_ticks();
@@ -339,7 +384,7 @@ impl<P: PowerSource> BlockBehaviour for Repeater<P> {
         };
         let input =
             self.power
-                .is_powered(ctx.world, pos.offset(input_side), input_side.opposite());
+                .is_powered(ctx.world, ctx.comparator_out, pos.offset(input_side), input_side.opposite());
         if input != self.powered {
             ctx.set(pos, self.states.get(input));
         }
@@ -385,7 +430,7 @@ impl<P: PowerSource> BlockBehaviour for Torch<P> {
         let support = pos.offset(self.attached);
         let powered = self
             .power
-            .is_powered(ctx.world, support, self.attached.opposite());
+            .is_powered(ctx.world, ctx.comparator_out, support, self.attached.opposite());
         // A torch is lit exactly when its support is *not* powered.
         if self.lit == powered && !ctx.ticks.has_pending_at(pos, ctx.tick) {
             ctx.schedule(pos, TORCH_DELAY, TickPriority::Normal);
@@ -396,7 +441,7 @@ impl<P: PowerSource> BlockBehaviour for Torch<P> {
         let support = pos.offset(self.attached);
         let powered = self
             .power
-            .is_powered(ctx.world, support, self.attached.opposite());
+            .is_powered(ctx.world, ctx.comparator_out, support, self.attached.opposite());
         if self.lit != powered {
             return;
         }
@@ -471,12 +516,13 @@ impl<P: PowerSource> Comparator<P> {
     pub fn output_strength(
         &self,
         world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
         inventories: &crate::inventory::InventoryMap,
         pos: Pos,
     ) -> u8 {
         let back = self.input_side();
         let rear_pos = pos.offset(back);
-        let mut rear = self.power.signal_strength(world, rear_pos, back.opposite());
+        let mut rear = self.power.signal_strength(world, outs, rear_pos, back.opposite());
         if let Some(analog) = self.power.analog_signal(world, inventories, rear_pos) {
             rear = analog;
         } else if rear < 15 && self.power.is_conductor(world, rear_pos) {
@@ -491,7 +537,7 @@ impl<P: PowerSource> Comparator<P> {
             .into_iter()
             .map(|dir| {
                 self.power
-                    .signal_strength(world, pos.offset(dir), dir.opposite())
+                    .signal_strength(world, outs, pos.offset(dir), dir.opposite())
             })
             .max()
             .unwrap_or(0);
@@ -517,7 +563,7 @@ impl<P: PowerSource> BlockBehaviour for Comparator<P> {
         if ctx.ticks.has_pending_at(pos, ctx.tick) {
             return;
         }
-        let output = self.output_strength(ctx.world, ctx.inventories, pos);
+        let output = self.output_strength(ctx.world, ctx.comparator_out, ctx.inventories, pos);
         let stored = ctx.stored_comparator_output(pos);
         let should_be_on = output > 0;
 
@@ -534,7 +580,7 @@ impl<P: PowerSource> BlockBehaviour for Comparator<P> {
     }
 
     fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
-        let output = self.output_strength(ctx.world, ctx.inventories, pos);
+        let output = self.output_strength(ctx.world, ctx.comparator_out, ctx.inventories, pos);
         ctx.store_comparator_output(pos, output);
         let should_be_on = output > 0;
         if should_be_on != self.powered {
@@ -549,7 +595,7 @@ impl<P: PowerSource> BlockBehaviour for Comparator<P> {
             // comparator's *strength* is not visible here — only its powered
             // block state is. Nothing consumes analog strength through this
             // path yet (dust is not integrated); revisit when it is.
-            self.output_strength(world, &Default::default(), pos)
+            self.output_strength(world, &Default::default(), &Default::default(), pos)
         } else {
             0
         }
@@ -718,7 +764,7 @@ impl<P: PowerSource> BlockBehaviour for Hopper<P> {
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
         let powered = crate::pos::ALL_DIRS.iter().any(|dir| {
             self.power
-                .is_powered(ctx.world, pos.offset(*dir), dir.opposite())
+                .is_powered(ctx.world, ctx.comparator_out, pos.offset(*dir), dir.opposite())
         });
         let enabled = !powered;
         if enabled != self.enabled {
@@ -858,7 +904,7 @@ impl<P: PowerSource> Dropper<P> {
     fn has_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
         crate::pos::ALL_DIRS.iter().any(|dir| {
             self.power
-                .is_powered(ctx.world, pos.offset(*dir), dir.opposite())
+                .is_powered(ctx.world, ctx.comparator_out, pos.offset(*dir), dir.opposite())
         })
     }
 }
@@ -980,7 +1026,7 @@ impl<P: PowerSource> Lamp<P> {
     fn has_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
         crate::pos::ALL_DIRS.iter().any(|dir| {
             self.power
-                .is_powered(ctx.world, pos.offset(*dir), dir.opposite())
+                .is_powered(ctx.world, ctx.comparator_out, pos.offset(*dir), dir.opposite())
         })
     }
 }
@@ -1111,10 +1157,15 @@ pub struct NoteBlock<P: PowerSource> {
 
 impl<P: PowerSource> NoteBlock<P> {
     /// Vanilla's `Level.hasNeighborSignal`: any of the six neighbours powering us.
-    fn has_neighbor_signal(&self, world: &World, pos: Pos) -> bool {
+    fn has_neighbor_signal(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+    ) -> bool {
         crate::pos::ALL_DIRS
             .iter()
-            .any(|dir| self.power.is_powered(world, pos.offset(*dir), dir.opposite()))
+            .any(|dir| self.power.is_powered(world, outs, pos.offset(*dir), dir.opposite()))
     }
 
     /// Queue the "play a note" block event, if the instrument can sound.
@@ -1134,7 +1185,7 @@ impl<P: PowerSource> BlockBehaviour for NoteBlock<P> {
     /// `NoteBlock.neighborChanged`: follow the neighbour signal synchronously,
     /// playing on the rising edge only.
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
-        let signal = self.has_neighbor_signal(ctx.world, pos);
+        let signal = self.has_neighbor_signal(ctx.world, ctx.comparator_out, pos);
         if signal == self.powered {
             return;
         }
@@ -1175,7 +1226,13 @@ mod tests {
     }
 
     impl PowerSource for Sources {
-        fn is_powered(&self, world: &World, pos: Pos, _toward: Dir) -> bool {
+        fn is_powered(
+            &self,
+            world: &World,
+            _outs: &crate::behaviour::ComparatorOutputs,
+            pos: Pos,
+            _toward: Dir,
+        ) -> bool {
             self.powered.contains(&world.get(pos))
         }
         fn is_diode(&self, world: &World, pos: Pos) -> bool {
@@ -1210,6 +1267,8 @@ mod tests {
                 delay: property,
                 powered: false,
                 states: StatePair { off: StateId(1), on: StateId(2) },
+                locked: false,
+                locked_twin: None,
                 power: Sources { powered: vec![], diodes: vec![] },
             };
             assert_eq!(repeater.delay_ticks(), expected, "delay={property}");
@@ -1227,6 +1286,8 @@ mod tests {
             delay: 1,
             powered: false,
             states: StatePair { off: StateId(1), on: StateId(2) },
+            locked: false,
+            locked_twin: None,
             power: Sources { powered: vec![source], diodes: vec![] },
         };
         let mut ctx = TickCtx {
@@ -1264,6 +1325,8 @@ mod tests {
             delay: 1,
             powered: true,
             states: StatePair { off: StateId(1), on: StateId(2) },
+            locked: false,
+            locked_twin: None,
             power: Sources { powered: vec![], diodes: vec![] },
         };
         let mut ctx = TickCtx {
@@ -1304,6 +1367,8 @@ mod tests {
             delay: 1,
             powered: false,
             states: StatePair { off: StateId(1), on: StateId(2) },
+            locked: false,
+            locked_twin: None,
             power: Sources {
                 powered: vec![source, upstream],
                 // The upstream diode faces east: the same way we look at it.
@@ -1346,6 +1411,8 @@ mod tests {
             delay: 2,
             powered: false,
             states: StatePair { off: StateId(1), on: StateId(2) },
+            locked: false,
+            locked_twin: None,
             power: Sources { powered: vec![source], diodes: vec![] },
         };
         let pos = Pos::new(0, 1, 0);
@@ -1529,6 +1596,8 @@ mod tests {
             delay: 1,
             powered: false,
             states: StatePair { off: StateId(1), on: StateId(2) },
+            locked: false,
+            locked_twin: None,
             power: Sources {
                 powered: vec![source, side_diode],
                 diodes: vec![(side_diode, Dir::South)],
@@ -1572,6 +1641,8 @@ mod tests {
             delay: 1,
             powered: false,
             states: StatePair { off: StateId(1), on: StateId(2) },
+            locked: false,
+            locked_twin: None,
             power: Sources {
                 powered: vec![source], // side diode present but NOT powered
                 diodes: vec![(side_diode, Dir::South)],
@@ -1793,8 +1864,14 @@ mod tests {
     }
 
     impl PowerSource for Levels {
-        fn is_powered(&self, world: &World, pos: Pos, toward: Dir) -> bool {
-            self.signal_strength(world, pos, toward) > 0
+        fn is_powered(
+            &self,
+            world: &World,
+            outs: &crate::behaviour::ComparatorOutputs,
+            pos: Pos,
+            toward: Dir,
+        ) -> bool {
+            self.signal_strength(world, outs, pos, toward) > 0
         }
         fn is_diode(&self, world: &World, pos: Pos) -> bool {
             let s = world.get(pos);
@@ -1804,7 +1881,13 @@ mod tests {
             let s = world.get(pos);
             self.diodes.iter().find(|(d, _)| *d == s).map(|(_, f)| *f)
         }
-        fn signal_strength(&self, _world: &World, pos: Pos, _toward: Dir) -> u8 {
+        fn signal_strength(
+            &self,
+            _world: &World,
+            _outs: &crate::behaviour::ComparatorOutputs,
+            pos: Pos,
+            _toward: Dir,
+        ) -> u8 {
             self.levels
                 .iter()
                 .find(|(p, _)| *p == pos)
@@ -2003,11 +2086,11 @@ pub struct Lever {
 
 impl crate::behaviour::BlockBehaviour for Lever {
     fn on_used(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        // pull: setBlock (entry 1, via set), then updateNeighbours —
+        // updateNeighborsAt(pos) again and at the support block.
         ctx.set(pos, if self.powered { self.states.off } else { self.states.on });
-        let support = pos.offset(self.attached);
-        for dir in crate::pos::ALL_DIRS {
-            ctx.updates.push((support.offset(dir), dir.opposite()));
-        }
+        ctx.update_neighbors_at(pos);
+        ctx.update_neighbors_at(pos.offset(self.attached));
     }
 
     fn name(&self) -> &'static str {

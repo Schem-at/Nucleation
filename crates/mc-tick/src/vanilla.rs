@@ -168,79 +168,151 @@ pub struct VanillaRules {
     water_levels: HashMap<u8, StateId>,
     /// Bubble columns: `Some(drag_down)`.
     bubbles: HashMap<StateId, bool>,
+    /// Comparator states, whose emission is their stored strength.
+    comparators: Vec<StateId>,
     /// States whose comparator read comes from the block state itself —
     /// a composter's `level` (0-8).
     state_analog: HashMap<StateId, u8>,
 }
 
 impl VanillaRules {
-    /// Whether any neighbour of `pos` strongly powers into it.
-    fn strongly_powered(&self, world: &World, pos: Pos) -> bool {
-        // Powered dust sitting on top of `pos` strongly powers it.
-        if let Some((power, _)) = self.wires.get(&world.get(pos.offset(Dir::Up))) {
-            if *power > 0 {
-                return true;
-            }
-        }
-        crate::pos::ALL_DIRS.iter().any(|dir| {
-            let neighbour = world.get(pos.offset(*dir));
-            self.strong_into.get(&neighbour) == Some(&dir.opposite())
-        })
-    }
-}
-
-impl VanillaRules {
-    /// `is_powered` with `shouldSignal` off — every wire contribution muted,
-    /// including dust strongly powering the conductor it sits on. This is what
-    /// keeps a wire from feeding on its own floor block during evaluation.
-    fn is_powered_no_wire(&self, world: &World, pos: Pos, toward: Dir) -> bool {
+    /// What the block at `pos` emits toward `toward` on its own — vanilla's
+    /// `BlockState.getSignal`, plus dust's own emission rules.
+    ///
+    /// `with_wires` is `shouldSignal`: the dust evaluator turns wire
+    /// contributions off while computing a wire's own target, which is what
+    /// stops a wire feeding on the floor block it powers.
+    fn emitted(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        toward: Dir,
+        with_wires: bool,
+    ) -> u8 {
         let state = world.get(pos);
         if self.powered.contains(&state)
             && self.emit_only.get(&state).is_none_or(|only| *only == toward)
         {
-            return true;
+            // A comparator emits its **stored block-entity strength**, not a
+            // flat 15 — and a freshly placed one holds 0 even while its block
+            // state says `powered=true`.
+            return if self.comparators.contains(&state) {
+                outs.get(&pos).copied().unwrap_or(0)
+            } else {
+                15
+            };
         }
-        if !self.conductors.contains(&state) {
-            return false;
+        if !with_wires {
+            return 0;
         }
-        crate::pos::ALL_DIRS.iter().any(|dir| {
-            let neighbour = world.get(pos.offset(*dir));
-            self.strong_into.get(&neighbour) == Some(&dir.opposite())
-        })
+        // Dust powers the block beneath it and the sides it connects to,
+        // never the block above.
+        if let Some((power, connections)) = self.wires.get(&state) {
+            if *power > 0 {
+                match toward {
+                    Dir::Down => return *power,
+                    Dir::Up => {}
+                    side => {
+                        let index = match side {
+                            Dir::North => 0,
+                            Dir::South => 1,
+                            Dir::West => 2,
+                            _ => 3,
+                        };
+                        if connections[index] {
+                            return *power;
+                        }
+                    }
+                }
+            }
+        }
+        0
+    }
+
+    /// `Level.getDirectSignalTo`: the strongest *strong* signal into `pos`.
+    fn direct_signal_to(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        with_wires: bool,
+    ) -> u8 {
+        let mut best = 0u8;
+        // Powered dust sitting on top strongly powers the block below it.
+        if with_wires {
+            if let Some((power, _)) = self.wires.get(&world.get(pos.offset(Dir::Up))) {
+                best = best.max(*power);
+            }
+        }
+        for dir in crate::pos::ALL_DIRS {
+            let neighbour = pos.offset(dir);
+            if self.strong_into.get(&world.get(neighbour)) == Some(&dir.opposite()) {
+                best = best.max(self.emitted(world, outs, neighbour, dir.opposite(), with_wires));
+            }
+        }
+        best
+    }
+
+    /// `signal_strength` with `shouldSignal` off — every wire contribution
+    /// muted, including dust strongly powering the conductor it sits on. This
+    /// is what the dust evaluator's `getBlockSignal` reads.
+    fn signal_no_wire(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        toward: Dir,
+    ) -> u8 {
+        let mut strength = self.emitted(world, outs, pos, toward, false);
+        if self.conductors.contains(&world.get(pos)) {
+            strength = strength.max(self.direct_signal_to(world, outs, pos, false));
+        }
+        strength
+    }
+
+    /// Why `pos` does or does not power `toward` — a diagnostic for tracing a
+    /// dust level back to its source.
+    pub fn explain_power(&self, world: &World, pos: Pos, toward: Dir) -> String {
+        let outs = crate::behaviour::ComparatorOutputs::new();
+        let state = world.get(pos);
+        format!(
+            "emitted={} direct_to={} conductor={} => {}",
+            self.emitted(world, &outs, pos, toward, true),
+            self.direct_signal_to(world, &outs, pos, true),
+            self.conductors.contains(&state),
+            self.signal_strength(world, &outs, pos, toward)
+        )
     }
 }
 
 impl crate::wire::WireWorld for VanillaRules {
-    /// `getBlockSignal`: the strongest non-wire signal into the wire —
-    /// components, sources, and strongly powered conductors, with the stored
-    /// comparator strength for exact analog levels.
+    /// `getBlockSignal`: the strongest non-wire signal into the wire.
+    ///
+    /// Comparator strengths, strongly powered conductors and one-directional
+    /// diodes all fall out of the shared power model — the wire path used to
+    /// special-case comparators and answer a flat 15 for everything else,
+    /// which lit a whole door's dust from a comparator that was emitting 0.
     fn block_signal(&self, ctx: &crate::behaviour::TickCtx<'_>, pos: Pos) -> u8 {
         let mut best = 0u8;
         for dir in crate::pos::ALL_DIRS {
-            let neighbour = pos.offset(dir);
-            let state = ctx.world.get(neighbour);
-            if self.wires.contains_key(&state) {
-                continue; // shouldSignal is off while evaluating: wires never count
-            }
-            // A comparator's emitted strength is its stored block-entity value.
-            let descriptor = ctx.states.descriptor(state).unwrap_or("");
-            if descriptor.starts_with("minecraft:comparator") && descriptor.contains("powered=true")
-            {
-                let d = Descriptor::parse(descriptor);
-                if d.facing().map(|f| f.opposite()) == Some(dir.opposite()) {
-                    best = best.max(ctx.stored_comparator_output(neighbour));
-                    continue;
-                }
-            }
-            if self.is_powered_no_wire(ctx.world, neighbour, dir.opposite()) {
-                best = best.max(15);
+            best = best.max(self.signal_no_wire(
+                ctx.world,
+                ctx.comparator_out,
+                pos.offset(dir),
+                dir.opposite(),
+            ));
+            if best == 15 {
+                break;
             }
         }
         best
     }
 
     fn conductor(&self, world: &World, pos: Pos) -> bool {
-        self.full_cubes.contains(&world.get(pos))
+        // isRedstoneConductor: the diagonal rules run on conductivity, which
+        // is what makes glass a diode — full-cube-ness is not enough.
+        self.conductors.contains(&world.get(pos))
     }
 
     fn wire_power(&self, world: &World, pos: Pos) -> Option<u8> {
@@ -248,8 +320,6 @@ impl crate::wire::WireWorld for VanillaRules {
     }
 
     fn wire_with_power(&self, world: &World, pos: Pos, power: u8) -> Option<StateId> {
-        // The shape survives; only the power property changes. Resolved through
-        // the registry via the sibling map built at registration.
         let state = world.get(pos);
         self.wire_siblings.get(&(state, power)).copied()
     }
@@ -313,36 +383,30 @@ impl PowerSource for VanillaRules {
         self.full_cubes.contains(&world.get(pos))
     }
 
-    fn is_powered(&self, world: &World, pos: Pos, toward: Dir) -> bool {
-        let state = world.get(pos);
-        if self.powered.contains(&state)
-            && self.emit_only.get(&state).is_none_or(|only| *only == toward)
-        {
-            return true;
+    fn is_powered(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        toward: Dir,
+    ) -> bool {
+        self.signal_strength(world, outs, pos, toward) > 0
+    }
+
+    /// `Level.getSignal`: the block's own emission, and — when it conducts —
+    /// the strongest strong signal into it.
+    fn signal_strength(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        toward: Dir,
+    ) -> u8 {
+        let mut strength = self.emitted(world, outs, pos, toward, true);
+        if self.conductors.contains(&world.get(pos)) {
+            strength = strength.max(self.direct_signal_to(world, outs, pos, true));
         }
-        // Dust: powers the block beneath it and the sides it points into,
-        // never the block above.
-        if let Some((power, connections)) = self.wires.get(&state) {
-            if *power > 0 {
-                match toward {
-                    Dir::Down => return true,
-                    Dir::Up => {}
-                    side => {
-                        let index = match side {
-                            Dir::North => 0,
-                            Dir::South => 1,
-                            Dir::West => 2,
-                            _ => 3,
-                        };
-                        if connections[index] {
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-        // A strongly powered conductor re-emits weak power on every face.
-        self.conductors.contains(&state) && self.strongly_powered(world, pos)
+        strength
     }
     fn is_diode(&self, world: &World, pos: Pos) -> bool {
         self.diodes.contains_key(&world.get(pos))
@@ -555,6 +619,25 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
                     rules.strong_into.insert(*id, facing.opposite());
                 }
             }
+            // A diode emits in exactly one direction too. `DiodeBlock.getSignal`
+            // answers only when the querying step equals `FACING`, which puts
+            // the output on the *opposite* side (the input comes from
+            // `pos.relative(FACING)`). Without this a powered repeater or
+            // comparator lit dust on all six sides — invisible in every small
+            // golden, and the reason the community doors' settle came out
+            // fully powered.
+            if matches!(
+                descriptor.name.as_str(),
+                "minecraft:repeater" | "minecraft:comparator"
+            ) {
+                if let Some(facing) = descriptor.facing() {
+                    rules.emit_only.insert(*id, facing.opposite());
+                    rules.strong_into.insert(*id, facing.opposite());
+                }
+                if descriptor.name == "minecraft:comparator" {
+                    rules.comparators.push(*id);
+                }
+            }
             // Plates strongly power their floor; floor buttons theirs.
             if descriptor.name.ends_with("_pressure_plate")
                 || (descriptor.name.ends_with("_button")
@@ -619,6 +702,11 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
                         delay,
                         powered: descriptor.flag("powered"),
                         states,
+                        locked: descriptor.flag("locked"),
+                        locked_twin: registry.get(&descriptor.with(
+                            "locked",
+                            if descriptor.flag("locked") { "false" } else { "true" },
+                        )),
                         power: rules.clone(),
                     }),
                 );
@@ -1137,8 +1225,18 @@ pub fn intern_companions(registry: &mut StateRegistry) {
     for text in existing {
         let descriptor = Descriptor::parse(&text);
         let companions: Vec<String> = match descriptor.name.as_str() {
-            "minecraft:repeater" | "minecraft:comparator" | "minecraft:observer"
-            | "minecraft:lever" => {
+            "minecraft:repeater" => {
+                // Both powered *and* both locked variants: `locked` is derived
+                // by updateShape, so either value may be needed at runtime.
+                let mut all = Vec::new();
+                for locked in ["false", "true"] {
+                    let at = Descriptor::parse(&descriptor.with("locked", locked));
+                    all.push(at.with("powered", "false"));
+                    all.push(at.with("powered", "true"));
+                }
+                all
+            }
+            "minecraft:comparator" | "minecraft:observer" | "minecraft:lever" => {
                 vec![descriptor.with("powered", "false"), descriptor.with("powered", "true")]
             }
             "minecraft:redstone_torch" | "minecraft:redstone_wall_torch" => {
@@ -1335,13 +1433,13 @@ mod tests {
         world.set(Pos::new(0, 0, 0), observer_on);
         world.set(Pos::new(1, 0, 0), slime);
         assert!(
-            rules.is_powered(&world, Pos::new(1, 0, 0), Dir::East),
+            rules.is_powered(&world, &Default::default(), Pos::new(1, 0, 0), Dir::East),
             "the slime re-emits the strong power behind the observer"
         );
 
         world.set(Pos::new(1, 0, 0), glass);
         assert!(
-            !rules.is_powered(&world, Pos::new(1, 0, 0), Dir::East),
+            !rules.is_powered(&world, &Default::default(), Pos::new(1, 0, 0), Dir::East),
             "glass does not conduct"
         );
     }

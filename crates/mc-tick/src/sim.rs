@@ -153,8 +153,10 @@ pub struct Simulation {
     /// Accumulated during dispatch, where the table cannot be mutated, and folded
     /// back in by [`Simulation::unknown_report`].
     unknown_seen: Vec<StateId>,
-    /// Scratch buffer for neighbour notifications; reused every dispatch.
-    updates: Vec<(Pos, crate::pos::Dir)>,
+    /// Entries queued during the current dispatch (`addedThisLayer`).
+    updates: Vec<crate::behaviour::UpdateEntry>,
+    /// The collector's stack of in-flight entries (`CollectingNeighborUpdater`).
+    pending: Vec<crate::behaviour::UpdateEntry>,
     /// Deferred writes awaiting their block-entities phase.
     moves: Vec<PendingMove>,
     /// Torch toggle history for burnout, pruned as it ages out.
@@ -251,6 +253,7 @@ impl Simulation {
             behaviours: BehaviourTable::new(),
             unknown_seen: Vec::new(),
             updates: Vec::new(),
+            pending: Vec::new(),
             moves: Vec::new(),
             toggles: Vec::new(),
             comparator_out: std::collections::HashMap::new(),
@@ -712,20 +715,32 @@ impl Simulation {
         self.restore(&initial);
     }
 
-    /// Deliver queued neighbour notifications until none remain.
+    /// Deliver queued neighbour updates exactly as `CollectingNeighborUpdater`
+    /// does: after every single notification, entries queued during it join
+    /// the stack in call order and run depth-first before the current entry's
+    /// remaining notifications.
     ///
-    /// Bounded: a circuit that keeps re-notifying itself would otherwise hang, and
-    /// a reported limit is far better than a simulation that never returns. The
-    /// `set` guard against no-op writes means real circuits terminate long before
-    /// this.
+    /// Bounded (vanilla's `maxChainedNeighborUpdates` is a million): a circuit
+    /// that keeps re-notifying itself reports rather than hangs.
     fn propagate(&mut self) {
-        const MAX_UPDATE_CASCADE: usize = 8192;
+        const MAX_UPDATE_CASCADE: usize = 1_000_000;
 
         let mut delivered = 0;
-        while let Some((pos, from)) = self.updates.pop() {
+        loop {
+            // addedThisLayer joins the stack reversed, so the first-queued
+            // entry ends on top and runs first.
+            while let Some(entry) = self.updates.pop() {
+                self.pending.push(entry);
+            }
+            let Some(top) = self.pending.last_mut() else { break };
+            let Some((pos, from, kind)) = top.next() else {
+                self.pending.pop();
+                continue;
+            };
             delivered += 1;
             if delivered > MAX_UPDATE_CASCADE {
                 self.updates.clear();
+                self.pending.clear();
                 break;
             }
             let state = self.world.get(pos);
@@ -755,7 +770,14 @@ impl Simulation {
                 inv_log: self.inv_log.as_mut(),
                 log: self.log.as_mut(),
             };
-            behaviour.on_neighbor_changed(&mut ctx, pos, from);
+            match kind {
+                crate::behaviour::UpdateKind::Neighbor => {
+                    behaviour.on_neighbor_changed(&mut ctx, pos, from)
+                }
+                crate::behaviour::UpdateKind::Shape => {
+                    behaviour.on_shape_update(&mut ctx, pos, from)
+                }
+            }
         }
     }
 
@@ -763,9 +785,8 @@ impl Simulation {
     ///
     /// This is how a lever flip or a block break enters the simulation.
     pub fn notify_neighbors(&mut self, pos: Pos) {
-        for dir in crate::pos::ALL_DIRS {
-            self.updates.push((pos.offset(dir), dir.opposite()));
-        }
+        self.updates
+            .push(crate::behaviour::UpdateEntry::neighbors_at(pos));
         self.propagate();
     }
 
@@ -806,19 +827,38 @@ impl Simulation {
             .iter_non_air()
             .map(|(pos, _)| pos)
             .collect();
-        // The updates queue is a stack, so blocks are pushed in *reverse*: the
-        // dispatch order then matches vanilla's placement pass, which walks the
-        // block list in order. The order is observable — two pistons whose
-        // triggers race queue their block events by it, and the first event to
-        // run moves the other piston's blocks out from under its event
-        // (captured: `flying_machine.json`, where the west observer's piston
-        // wins and the east one's event finds only a placeholder).
-        for pos in occupied.into_iter().rev() {
-            for dir in crate::pos::ALL_DIRS {
-                self.updates.push((pos, dir));
+        self.settle_with_order(&occupied);
+    }
+
+    /// [`Simulation::settle`] with an explicit placement order — the structure
+    /// file's block list, which is the order `StructureTemplate.placeInWorld`
+    /// walks.
+    ///
+    /// Per block vanilla runs `updateFromNeighbourShapes` and then
+    /// `updateNeighborsAt(pos)`, each cascade fully drained before the next
+    /// block. The shape pass is **not** a neighbour dispatch — it calls
+    /// `updateShape`, which only rewrites the block's own state (fence
+    /// connections, dust shapes) — so this engine, whose shapes come from the
+    /// structure file, has nothing to do for it. Dispatching it as a
+    /// neighbour-change was wrong and fired every piston in a door a tick
+    /// early; a block hears about placement only through its *neighbours'*
+    /// `updateNeighborsAt` passes, which is also how an observer facing a
+    /// placed block pulses.
+    pub fn settle_with_order(&mut self, order: &[Pos]) {
+        for pos in order {
+            if self.world.get(*pos) == StateId::AIR {
+                continue;
             }
+            // updateFromNeighbourShapes: the block hears a shape update from
+            // every side (this is what pulses observers), then its neighbours
+            // get updateNeighborsAt.
+            self.updates
+                .push(crate::behaviour::UpdateEntry::own_shapes(*pos));
+            self.propagate();
+            self.updates
+                .push(crate::behaviour::UpdateEntry::neighbors_at(*pos));
+            self.propagate();
         }
-        self.propagate();
     }
 
     /// Write `state` at `pos` from outside the simulation — a placed or broken
@@ -1045,12 +1085,10 @@ impl Simulation {
                     // itself. The landed block re-examines its world, which is
                     // how an observer that was *moved* pulses two ticks after it
                     // lands, and how a landed piston notices power waiting for it.
-                    for dir in crate::pos::ALL_DIRS {
-                        self.updates.push((entry.pos, dir));
-                    }
-                    for dir in crate::pos::ALL_DIRS {
-                        self.updates.push((entry.pos.offset(dir), dir.opposite()));
-                    }
+                    self.updates
+                        .push(crate::behaviour::UpdateEntry::own_shapes(entry.pos));
+                    self.updates
+                        .push(crate::behaviour::UpdateEntry::neighbors_at(entry.pos));
                 }
                 self.propagate();
                 // `onPlace` for each landed block, *after* the landing updates
