@@ -1284,15 +1284,9 @@ impl Simulation {
         // how one of two opposed pistons sharing a gap reliably wins.
         let mut refused: Vec<BlockEvent> = Vec::new();
         let outcome = self.drain_block_events(&mut refused);
-        // Still one line from live. The blocker is no longer the mechanism —
-        // it is that this engine's push resolution says *possible* at the tick
-        // the manual engine's piston at (13,1,2) lands, where the game says
-        // impossible (probed: vanilla's resolver stops after 7 blocks; ours
-        // adds an eighth, the retracted piston at (10,0,1)). With refusals
-        // dropped that queue is invisible; with them rescheduled it fires.
-        // Close that gap and delete these two lines.
-        let _ = &refused;
-        // for event in refused { self.events.push(event); }
+        for event in refused {
+            self.events.push(event);
+        }
         outcome
     }
 

@@ -431,6 +431,15 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
         // tick. This is why a piston notified in phase 3 moves in phase 7 of the
         // same tick rather than the next one.
         let trigger = if powered {
+            // `checkIfExtend` resolves the structure **before** queueing:
+            // an extend that could not move anything is never queued at all.
+            // Queueing it and letting dispatch refuse it looks equivalent only
+            // while refused events are dropped — once they are rescheduled the
+            // way the game reschedules them, a phantom event queued here
+            // survives and fires a tick later.
+            if !resolve_push(ctx.world, &self.movability, pos, self.facing).possible {
+                return;
+            }
             TRIGGER_EXTEND
         } else {
             // `checkIfExtend` retracts with TRIGGER_DROP instead of
