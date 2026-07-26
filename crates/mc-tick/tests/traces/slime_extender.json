@@ -1,0 +1,48 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:slime_extender",
+  "detail": "normal",
+  "ticks": [
+    {
+      "tick": 5,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 1, 0], "from": "minecraft:piston[extended=false,facing=east]", "to": "minecraft:air"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [3, 1, 0], "from": "minecraft:white_concrete", "to": "minecraft:moving_piston[facing=east,type=normal]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [4, 1, 0], "from": "minecraft:air", "to": "minecraft:moving_piston[facing=east,type=normal]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 0, 1], "from": "minecraft:stone", "to": "minecraft:air"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [3, 0, 1], "from": "minecraft:stone", "to": "minecraft:moving_piston[facing=east,type=normal]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [4, 0, 1], "from": "minecraft:stone", "to": "minecraft:moving_piston[facing=east,type=normal]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [5, 0, 1], "from": "minecraft:stone", "to": "minecraft:moving_piston[facing=east,type=normal]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [6, 0, 1], "from": "minecraft:stone", "to": "minecraft:moving_piston[facing=east,type=normal]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [7, 0, 1], "from": "minecraft:stone", "to": "minecraft:moving_piston[facing=east,type=normal]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [8, 0, 1], "from": "minecraft:stone", "to": "minecraft:moving_piston[facing=east,type=normal]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [9, 0, 1], "from": "minecraft:air", "to": "minecraft:moving_piston[facing=east,type=normal]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 1, 1], "from": "minecraft:sticky_piston[extended=false,facing=east]", "to": "minecraft:moving_piston[facing=east,type=sticky]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 1, 1], "from": "minecraft:slime_block", "to": "minecraft:air"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [3, 1, 1], "from": "minecraft:air", "to": "minecraft:slime_block"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 2, 1], "from": "minecraft:lever[face=floor,facing=north,powered=false]", "to": "minecraft:air"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 1, 2], "from": "minecraft:piston[extended=false,facing=east]", "to": "minecraft:air"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [3, 1, 2], "from": "minecraft:white_concrete", "to": "minecraft:moving_piston[facing=east,type=normal]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [4, 1, 2], "from": "minecraft:air", "to": "minecraft:moving_piston[facing=east,type=normal]"}
+      ]
+    },
+    {
+      "tick": 7,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [3, 1, 0], "from": "minecraft:moving_piston[facing=east,type=normal]", "to": "minecraft:piston[extended=false,facing=east]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [4, 1, 0], "from": "minecraft:moving_piston[facing=east,type=normal]", "to": "minecraft:white_concrete"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [3, 0, 1], "from": "minecraft:moving_piston[facing=east,type=normal]", "to": "minecraft:stone"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [4, 0, 1], "from": "minecraft:moving_piston[facing=east,type=normal]", "to": "minecraft:stone"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [5, 0, 1], "from": "minecraft:moving_piston[facing=east,type=normal]", "to": "minecraft:stone"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [6, 0, 1], "from": "minecraft:moving_piston[facing=east,type=normal]", "to": "minecraft:stone"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [7, 0, 1], "from": "minecraft:moving_piston[facing=east,type=normal]", "to": "minecraft:stone"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [8, 0, 1], "from": "minecraft:moving_piston[facing=east,type=normal]", "to": "minecraft:stone"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [9, 0, 1], "from": "minecraft:moving_piston[facing=east,type=normal]", "to": "minecraft:stone"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 1, 1], "from": "minecraft:moving_piston[facing=east,type=sticky]", "to": "minecraft:sticky_piston[extended=false,facing=east]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [3, 1, 2], "from": "minecraft:moving_piston[facing=east,type=normal]", "to": "minecraft:piston[extended=false,facing=east]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [4, 1, 2], "from": "minecraft:moving_piston[facing=east,type=normal]", "to": "minecraft:white_concrete"}
+      ]
+    }
+  ]
+}

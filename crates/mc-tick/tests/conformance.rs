@@ -1235,3 +1235,34 @@ fn the_6x6_door_runs_a_full_close_open_cycle() {
         &[(Pos::new(9, 3, 0), 10), (Pos::new(9, 3, 0), 80)],
     );
 }
+
+#[test]
+#[ignore = "isolated fixture for the door bug: two opposed pistons race for one \
+gap and the engine picks the wrong winner. 20 blocks, so it iterates in a second."]
+fn opposed_pistons_race_for_one_gap() {
+    // The vault door's failure, minimised: a piston facing up under five
+    // concrete, a one-block gap, a piston facing down above it, and an
+    // observer for each. Placement pulses both observers on tick 1, so both
+    // pistons want the gap. Vanilla's *down* piston wins — it pokes its head
+    // into the gap and the column never moves — which means vanilla notifies
+    // it first, even though its observer sits at y=9 and the other at y=1.
+    run_conformance("piston_race.snbt", "piston_race.json", "nucleation:piston_race");
+}
+
+#[test]
+#[ignore = "isolated fixture: vanilla's slime drags the floor row and the side \
+pistons; the engine only pushes the slime."]
+fn a_slime_extender_drags_its_riders_and_the_floor() {
+    // A sticky piston, a slime block, a piston riding each side of the slime,
+    // and a lever. Vanilla drags both riders *and* the stone floor beneath the
+    // slime, shoving the whole row; this engine extends and pushes the slime
+    // alone. Same event count, different blocks — the difference is what the
+    // push structure gathers, not whether it fires.
+    run_conformance_actuated(
+        "slime_extender.snbt",
+        "slime_extender.json",
+        "nucleation:slime_extender",
+        &[],
+        &[(5, Actuate::Use(Pos::new(1, 2, 1)))],
+    );
+}

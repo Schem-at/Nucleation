@@ -1,0 +1,32 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:piston_race",
+  "detail": "normal",
+  "ticks": [
+    {
+      "tick": 1,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [0, 1, 1], "from": "minecraft:observer[facing=west,powered=false]", "to": "minecraft:observer[facing=west,powered=true]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 7, 1], "from": "minecraft:air", "to": "minecraft:moving_piston[facing=down,type=normal]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 8, 1], "from": "minecraft:piston[extended=false,facing=down]", "to": "minecraft:piston[extended=true,facing=down]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 9, 1], "from": "minecraft:observer[facing=up,powered=false]", "to": "minecraft:observer[facing=up,powered=true]"}
+      ]
+    },
+    {
+      "tick": 3,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [0, 1, 1], "from": "minecraft:observer[facing=west,powered=true]", "to": "minecraft:observer[facing=west,powered=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 7, 1], "from": "minecraft:moving_piston[facing=down,type=normal]", "to": "minecraft:air"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 8, 1], "from": "minecraft:piston[extended=true,facing=down]", "to": "minecraft:moving_piston[facing=down,type=normal]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 9, 1], "from": "minecraft:observer[facing=up,powered=true]", "to": "minecraft:observer[facing=up,powered=false]"}
+      ]
+    },
+    {
+      "tick": 5,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 8, 1], "from": "minecraft:moving_piston[facing=down,type=normal]", "to": "minecraft:piston[extended=false,facing=down]"}
+      ]
+    }
+  ]
+}
