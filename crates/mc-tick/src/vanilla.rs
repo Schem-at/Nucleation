@@ -170,6 +170,10 @@ pub struct VanillaRules {
     bubbles: HashMap<StateId, bool>,
     /// Comparator states, whose emission is their stored strength.
     comparators: Vec<StateId>,
+    /// States that emit in every direction **except** one — a lit redstone
+    /// torch, which powers everything but the block beneath it
+    /// (`RedstoneTorchBlock.getSignal` returns 0 for a query from below).
+    emit_except: HashMap<StateId, Dir>,
     /// States whose comparator read comes from the block state itself —
     /// a composter's `level` (0-8).
     state_analog: HashMap<StateId, u8>,
@@ -193,6 +197,7 @@ impl VanillaRules {
         let state = world.get(pos);
         if self.powered.contains(&state)
             && self.emit_only.get(&state).is_none_or(|only| *only == toward)
+            && self.emit_except.get(&state).is_none_or(|except| *except != toward)
         {
             // A comparator emits its **stored block-entity strength**, not a
             // flat 15 — and a freshly placed one holds 0 even while its block
@@ -231,6 +236,12 @@ impl VanillaRules {
     }
 
     /// `Level.getDirectSignalTo`: the strongest *strong* signal into `pos`.
+    ///
+    /// Dust is the subtle one. `RedStoneWireBlock.getDirectSignal` delegates
+    /// straight to `getSignal`, so dust strongly powers **everything it powers
+    /// weakly** — the block below it *and* every side it connects into. A
+    /// community door hangs on exactly that: dust running beside a solid block
+    /// makes that block a source for anything touching it.
     fn direct_signal_to(
         &self,
         world: &World,
@@ -239,17 +250,18 @@ impl VanillaRules {
         with_wires: bool,
     ) -> u8 {
         let mut best = 0u8;
-        // Powered dust sitting on top strongly powers the block below it.
-        if with_wires {
-            if let Some((power, _)) = self.wires.get(&world.get(pos.offset(Dir::Up))) {
-                best = best.max(*power);
-            }
-        }
         for dir in crate::pos::ALL_DIRS {
             let neighbour = pos.offset(dir);
-            if self.strong_into.get(&world.get(neighbour)) == Some(&dir.opposite()) {
-                best = best.max(self.emitted(world, outs, neighbour, dir.opposite(), with_wires));
-            }
+            let toward = dir.opposite();
+            let state = world.get(neighbour);
+            let strong = if self.wires.contains_key(&state) {
+                self.emitted(world, outs, neighbour, toward, with_wires)
+            } else if self.strong_into.get(&state) == Some(&toward) {
+                self.emitted(world, outs, neighbour, toward, with_wires)
+            } else {
+                0
+            };
+            best = best.max(strong);
         }
         best
     }
@@ -645,6 +657,17 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
             {
                 rules.strong_into.insert(*id, Dir::Down);
             }
+            // A lit torch powers every face but the one below it, and
+            // strongly powers the block **above** — which is how a torch
+            // under a solid block feeds dust sitting on that block, the
+            // signal path a whole community door was missing.
+            if matches!(
+                descriptor.name.as_str(),
+                "minecraft:redstone_torch" | "minecraft:redstone_wall_torch"
+            ) {
+                rules.emit_except.insert(*id, Dir::Down);
+                rules.strong_into.insert(*id, Dir::Up);
+            }
             // A lever strongly powers the block it hangs on.
             if descriptor.name == "minecraft:lever" {
                 if let Some(attached) = lever_attachment(descriptor) {
@@ -794,12 +817,26 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
                 else {
                     continue;
                 };
+                let instrument_states: Vec<(&'static str, StateId)> = ["harp", "basedrum"]
+                    .into_iter()
+                    .filter_map(|name| {
+                        registry
+                            .get(&descriptor.with("instrument", name))
+                            .map(|state| (name, state))
+                    })
+                    .collect();
+                let instrument = match descriptor.get("instrument") {
+                    Some("basedrum") => "basedrum",
+                    _ => "harp",
+                };
                 table.register(
                     *id,
                     Box::new(NoteBlock {
                         powered: descriptor.flag("powered"),
                         states,
                         cycled,
+                        instrument,
+                        instrument_states,
                         power: rules.clone(),
                     }),
                 );
@@ -1128,6 +1165,33 @@ fn lever_attachment(descriptor: &Descriptor) -> Option<Dir> {
     }
 }
 
+/// The instrument a block gives a note block sitting on it.
+///
+/// Vanilla reads this from each block's `BlockBehaviour.Properties.instrument`,
+/// a per-block data table. The entries here are **derived from placement
+/// captures** (`--dump-placed`): a note block whose instrument vanilla rewrote
+/// at placement told us what the block below it provides. Anything unlisted
+/// answers `harp`, which is vanilla's own default, so a missing entry surfaces
+/// as a loud trace divergence rather than a quiet wrong note.
+///
+/// Only instruments that do **not** work above a note block are modelled, so
+/// the block above never wins — true for everything in the corpus (the
+/// exceptions are mob heads).
+pub fn instrument_below(name: &str) -> &'static str {
+    let name = name.split('[').next().unwrap_or(name);
+    match name {
+        "minecraft:observer" => "basedrum",
+        n if n.ends_with("_concrete") => "basedrum",
+        "minecraft:stone"
+        | "minecraft:smooth_stone"
+        | "minecraft:cobblestone"
+        | "minecraft:obsidian"
+        | "minecraft:quartz_block"
+        | "minecraft:chiseled_quartz_block" => "basedrum",
+        _ => "harp",
+    }
+}
+
 /// Rail and conductor tables for cart physics, indexed by `StateId`.
 pub fn rail_tables(
     registry: &StateRegistry,
@@ -1268,10 +1332,13 @@ pub fn intern_companions(registry: &mut StateRegistry) {
                 // 24, and a product run may click any number of times, so the
                 // whole cycle is interned rather than one step of it.
                 let mut all = Vec::new();
-                for note in 0..crate::components::NOTE_VALUES {
-                    let at_note = Descriptor::parse(&descriptor.with("note", &note.to_string()));
-                    all.push(at_note.with("powered", "false"));
-                    all.push(at_note.with("powered", "true"));
+                for instrument in ["harp", "basedrum"] {
+                    let at_inst = Descriptor::parse(&descriptor.with("instrument", instrument));
+                    for note in 0..crate::components::NOTE_VALUES {
+                        let at_note = Descriptor::parse(&at_inst.with("note", &note.to_string()));
+                        all.push(at_note.with("powered", "false"));
+                        all.push(at_note.with("powered", "true"));
+                    }
                 }
                 all
             }

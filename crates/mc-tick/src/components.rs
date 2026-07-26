@@ -1151,6 +1151,11 @@ pub struct NoteBlock<P: PowerSource> {
     pub states: StatePair,
     /// The state a click turns this one into: same powered flag, next pitch.
     pub cycled: StateId,
+    /// This state's `instrument`.
+    pub instrument: &'static str,
+    /// The same state under each instrument this engine knows, for the
+    /// shape-update recomputation.
+    pub instrument_states: Vec<(&'static str, StateId)>,
     /// How power is read.
     pub power: P,
 }
@@ -1182,6 +1187,32 @@ impl<P: PowerSource> NoteBlock<P> {
 }
 
 impl<P: PowerSource> BlockBehaviour for NoteBlock<P> {
+    /// `NoteBlock.updateShape`: a **vertical** shape update recomputes the
+    /// instrument, which comes from the block above when that instrument
+    /// works above a note block, and otherwise from the block below. Like a
+    /// repeater's `locked`, the property is derived, so a community build
+    /// carries whatever it was saved with until placement corrects it.
+    fn on_shape_update(&self, ctx: &mut TickCtx<'_>, pos: Pos, from: Dir) {
+        if !matches!(from, Dir::Up | Dir::Down) {
+            return;
+        }
+        let below = ctx
+            .states
+            .descriptor(ctx.world.get(pos.offset(Dir::Down)))
+            .unwrap_or("minecraft:air");
+        let wanted = crate::vanilla::instrument_below(below);
+        if wanted == self.instrument {
+            return;
+        }
+        if let Some((_, state)) = self
+            .instrument_states
+            .iter()
+            .find(|(name, _)| *name == wanted)
+        {
+            ctx.set_quiet(pos, *state);
+        }
+    }
+
     /// `NoteBlock.neighborChanged`: follow the neighbour signal synchronously,
     /// playing on the rising edge only.
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
