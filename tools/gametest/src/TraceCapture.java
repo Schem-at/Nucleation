@@ -615,6 +615,42 @@ public final class TraceCapture {
             out.append("\"error\": \"").append(e.getClass().getSimpleName()).append("\"");
         }
         out.append(", \"block_ticks\": ").append(level.getBlockTicks().count());
+
+        // Every *scheduled* block tick, with the tick it fires on and its
+        // priority. Counts alone cannot answer "which component did the game
+        // schedule that we did not", which is the question that actually comes
+        // up: two engines can agree on the world and disagree on what is
+        // pending in it.
+        out.append(", \"scheduled\": [");
+        try {
+            java.lang.reflect.Field cf =
+                    net.minecraft.world.ticks.LevelTicks.class.getDeclaredField("allContainers");
+            cf.setAccessible(true);
+            Object containers = cf.get(level.getBlockTicks());
+            java.lang.reflect.Method values = containers.getClass().getMethod("values");
+            java.lang.reflect.Field qf =
+                    net.minecraft.world.ticks.LevelChunkTicks.class.getDeclaredField("tickQueue");
+            qf.setAccessible(true);
+            boolean first = true;
+            for (Object chunk : (Iterable<Object>) values.invoke(containers)) {
+                for (Object raw : (Iterable<Object>) qf.get(chunk)) {
+                    net.minecraft.world.ticks.ScheduledTick<?> st =
+                            (net.minecraft.world.ticks.ScheduledTick<?>) raw;
+                    if (!first) out.append(", ");
+                    first = false;
+                    out.append(String.format(
+                            "{\"pos\": [%d, %d, %d], \"block\": \"%s\", \"at\": %d, \"priority\": \"%s\"}",
+                            st.pos().getX(), st.pos().getY(), st.pos().getZ(),
+                            net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(
+                                    (net.minecraft.world.level.block.Block) st.type()),
+                            st.triggerTick(), st.priority()));
+                }
+            }
+        } catch (ReflectiveOperationException e) {
+            out.append("]").append(", \"scheduled_error\": \"").append(e.getClass().getSimpleName()).append("\"");
+            return out.append("}").toString();
+        }
+        out.append("]");
         return out.append("}").toString();
     }
 

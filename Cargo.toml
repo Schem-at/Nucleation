@@ -230,6 +230,7 @@ bincode = "1"
 # Dev-only on purpose: examples that *render* mc-tick simulations. The
 # production dependency direction stays one-way (mc-tick never sees nucleation).
 mc-tick = { path = "crates/mc-tick" }
+mc-tick-trace = { path = "crates/mc-tick-trace" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 criterion = "0.5.1"

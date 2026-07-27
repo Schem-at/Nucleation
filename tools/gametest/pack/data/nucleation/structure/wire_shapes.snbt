@@ -1,0 +1,42 @@
+{
+  DataVersion: 4903,
+  size: [5, 3, 9],
+  palette: [
+    {Name: "minecraft:stone"},
+    {Name: "minecraft:redstone_wire", Properties: {east: "none", north: "none", power: "0", south: "none", west: "none"}},
+    {Name: "minecraft:cyan_concrete"},
+    {Name: "minecraft:smooth_stone_slab", Properties: {type: "top", waterlogged: "false"}},
+    {Name: "minecraft:repeater", Properties: {delay: "1", facing: "east", locked: "false", powered: "false"}},
+    {Name: "minecraft:comparator", Properties: {facing: "east", mode: "compare", powered: "false"}},
+    {Name: "minecraft:observer", Properties: {facing: "east", powered: "false"}}
+  ],
+  blocks: [
+    {pos: [0, 0, 0], state: 0}, {pos: [1, 0, 0], state: 0}, {pos: [2, 0, 0], state: 0}, {pos: [3, 0, 0], state: 0}, {pos: [4, 0, 0], state: 0},
+    {pos: [0, 0, 1], state: 0}, {pos: [1, 0, 1], state: 0}, {pos: [2, 0, 1], state: 0}, {pos: [3, 0, 1], state: 0}, {pos: [4, 0, 1], state: 0},
+    {pos: [0, 0, 2], state: 0}, {pos: [1, 0, 2], state: 0}, {pos: [2, 0, 2], state: 0}, {pos: [3, 0, 2], state: 0}, {pos: [4, 0, 2], state: 0},
+    {pos: [0, 0, 3], state: 0}, {pos: [1, 0, 3], state: 0}, {pos: [2, 0, 3], state: 0}, {pos: [3, 0, 3], state: 0}, {pos: [4, 0, 3], state: 0},
+    {pos: [0, 0, 4], state: 0}, {pos: [1, 0, 4], state: 0}, {pos: [2, 0, 4], state: 0}, {pos: [3, 0, 4], state: 0}, {pos: [4, 0, 4], state: 0},
+    {pos: [0, 0, 5], state: 0}, {pos: [1, 0, 5], state: 0}, {pos: [2, 0, 5], state: 0}, {pos: [3, 0, 5], state: 0}, {pos: [4, 0, 5], state: 0},
+    {pos: [0, 0, 6], state: 0}, {pos: [1, 0, 6], state: 0}, {pos: [2, 0, 6], state: 0}, {pos: [3, 0, 6], state: 0}, {pos: [4, 0, 6], state: 0},
+    {pos: [0, 0, 7], state: 0}, {pos: [1, 0, 7], state: 0}, {pos: [2, 0, 7], state: 0}, {pos: [3, 0, 7], state: 0}, {pos: [4, 0, 7], state: 0},
+    {pos: [0, 0, 8], state: 0}, {pos: [1, 0, 8], state: 0}, {pos: [2, 0, 8], state: 0}, {pos: [3, 0, 8], state: 0}, {pos: [4, 0, 8], state: 0},
+
+    {pos: [1, 1, 0], state: 1},
+    {pos: [2, 1, 0], state: 2},
+    {pos: [2, 2, 0], state: 1},
+
+    {pos: [1, 1, 2], state: 1},
+    {pos: [2, 1, 2], state: 3},
+    {pos: [2, 2, 2], state: 1},
+
+    {pos: [1, 1, 4], state: 1},
+
+    {pos: [1, 1, 6], state: 1},
+    {pos: [2, 1, 6], state: 4},
+
+    {pos: [1, 1, 8], state: 1},
+    {pos: [2, 1, 8], state: 5},
+    {pos: [3, 1, 8], state: 6}
+  ],
+  entities: []
+}

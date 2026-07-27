@@ -118,10 +118,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .collect();
 
-    // ── 1. Simulate, recording every block change ───────────────────────────
-    let (initial, changes, item_tracks) =
-        simulate(snbt_path, ticks, &clicks, &pulses, &breaks, &places, settle);
-    println!("simulated {ticks} ticks, {} block changes", changes.len());
+    // ── 1. Simulate, or replay a capture ────────────────────────────────────
+    //
+    // `--trace <capture.json>` renders what *vanilla* did instead of what the
+    // engine does. Same pipeline either way: a capture is already a list of
+    // per-tick block changes, which is exactly what the simulation produces.
+    // Being able to watch the two side by side is the point — a divergence in
+    // a 200-event tick is far easier to recognise than to read.
+    let (initial, changes, item_tracks) = match flag(&args, "--trace") {
+        Some(trace_path) => {
+            let (initial, changes) = replay(snbt_path, trace_path, ticks);
+            println!("replayed {ticks} ticks, {} block changes", changes.len());
+            (initial, changes, Vec::new())
+        }
+        None => {
+            let out = simulate(snbt_path, ticks, &clicks, &pulses, &breaks, &places, settle);
+            println!("simulated {ticks} ticks, {} block changes", out.1.len());
+            out
+        }
+    };
 
     println!(
         "item tracks: {} ({} entity events)",
@@ -333,6 +348,63 @@ fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
 struct ItemTrack {
     item: String,
     positions: Vec<Option<[f64; 3]>>,
+}
+
+/// Rebuild `(initial, changes)` from a captured vanilla trace.
+///
+/// The structure supplies the starting world — a capture records only what
+/// *changed* — and the trace supplies every change after it. Positions the
+/// capture mentions but the structure does not (a block pushed into empty air
+/// beyond the build) come in as air, which `build_cast` already handles.
+fn replay(
+    snbt_path: &str,
+    trace_path: &str,
+    ticks: u64,
+) -> (Vec<(Pos, String)>, Vec<(u64, Pos, String, String)>) {
+    let text = std::fs::read_to_string(snbt_path).expect("read structure");
+    let structure = Structure::parse(&text).expect("parse structure");
+    let initial: Vec<(Pos, String)> = structure
+        .blocks
+        .iter()
+        .map(|(pos, entry)| (*pos, structure.palette[*entry].clone()))
+        .filter(|(_, state)| state != "minecraft:air")
+        .collect();
+
+    let mut initial: std::collections::HashMap<Pos, String> = initial.into_iter().collect();
+
+    let json = std::fs::read_to_string(trace_path).expect("read trace");
+    let trace = mc_tick_trace::Trace::from_json(&json).expect("parse trace");
+    let mut changes: Vec<(u64, Pos, String, String)> = Vec::new();
+    let mut seen: std::collections::HashSet<Pos> = std::collections::HashSet::new();
+    for record in &trace.ticks {
+        if record.tick >= ticks {
+            break;
+        }
+        for event in &record.events {
+            if let mc_tick_trace::EventKind::BlockChanged { pos, from, to } = &event.kind {
+                let at = Pos::new(pos.0, pos.1, pos.2);
+                // The capture's baseline is taken *after* placement, so for a
+                // loud capture the world it starts from is not the file: a
+                // placement settle may already have extended pistons and lit
+                // dust. Each position's first `from` is what the capture says
+                // was there, and it wins over the schematic — otherwise the
+                // cast is built on states that never existed and blocks
+                // animate out of the wrong pose.
+                if !seen.contains(&at) {
+                    seen.insert(at);
+                    if from == "minecraft:air" {
+                        initial.remove(&at);
+                    } else {
+                        initial.insert(at, from.clone());
+                    }
+                }
+                changes.push((record.tick, at, from.clone(), to.clone()));
+            }
+        }
+    }
+    let mut initial: Vec<(Pos, String)> = initial.into_iter().collect();
+    initial.sort_by_key(|(p, _)| (p.y, p.x, p.z));
+    (initial, changes)
 }
 
 fn simulate(

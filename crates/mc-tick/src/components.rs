@@ -455,13 +455,41 @@ pub struct Torch<P: PowerSource> {
 }
 
 impl<P: PowerSource> BlockBehaviour for Torch<P> {
+    /// `RedstoneTorchBlock.onPlace` → `notifyNeighbors`: an `updateNeighborsAt`
+    /// centred on each of the torch's six neighbours.
+    ///
+    /// That reaches two blocks out, the same shape as dust's `onPlace`, and it
+    /// is most of what happens during a `knownShape` placement — where no
+    /// update pass runs at all, so a torch that never announced itself leaves
+    /// every neighbouring torch and piston unscheduled. Which torches are
+    /// pending after placement decides which pistons fire on the first tick.
+    fn on_placed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        for dir in crate::pos::JAVA_DIRECTIONS {
+            ctx.update_neighbors_at(pos.offset(dir));
+        }
+    }
+
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
         let support = pos.offset(self.attached);
         let powered = self
             .power
             .is_powered(ctx.world, ctx.comparator_out, support, self.attached.opposite());
         // A torch is lit exactly when its support is *not* powered.
-        if self.lit == powered && !ctx.ticks.has_pending_at(pos, ctx.tick) {
+        let pending = ctx.ticks.has_pending_at(pos, ctx.tick);
+        // `MC_TICK_TRACE_NOTIFY` covers torches too: whether a torch schedules
+        // depends on the world *at the instant it is notified*, which during a
+        // placement cascade is not the world anyone can see afterwards.
+        if let Some(filter) = std::env::var_os("MC_TICK_TRACE_NOTIFY") {
+            let key = format!("{},{},{}", pos.x, pos.y, pos.z);
+            if filter.to_string_lossy().split(';').any(|want| want.trim() == key) {
+                eprintln!(
+                    "        torch ({key}) lit={} powered={powered} pending={pending} support {:?}",
+                    self.lit,
+                    (support.x, support.y, support.z)
+                );
+            }
+        }
+        if self.lit == powered && !pending {
             ctx.schedule(pos, TORCH_DELAY, TickPriority::Normal);
         }
     }

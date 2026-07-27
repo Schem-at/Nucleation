@@ -3195,6 +3195,7 @@ dependencies = [
  "insign",
  "log",
  "mc-tick",
+ "mc-tick-trace",
  "mchprs_blocks",
  "mchprs_redpiler",
  "mchprs_redstone",
