@@ -175,7 +175,30 @@ pub struct PendingMove {
 /// a behaviour that could dispatch into other behaviours re-entrantly would make
 /// ordering depend on call depth rather than on the phase, which is exactly what
 /// this engine exists to get right.
+/// What a [`TickCtx`] needs to deliver queued updates itself, rather than
+/// handing them back to the driver when the handler returns.
+///
+/// `CollectingNeighborUpdater.addAndRun` runs its queue immediately when
+/// nothing else is running it, and merely queues when a cascade is already in
+/// flight. Handing this out as an `Option` reproduces both halves: the driver
+/// passes it in, [`TickCtx::drain`] takes it for the duration of the drain, and
+/// a nested `drain()` therefore finds `None` and only queues — which is the
+/// count guard, not an approximation of it.
+pub struct Drain<'a> {
+    /// Every registered behaviour, for dispatch.
+    pub behaviours: &'a BehaviourTable,
+    /// The driver's entry stack — vanilla's queue of pending notifications.
+    pub pending: &'a mut Vec<UpdateEntry>,
+    /// States met with no behaviour registered, for the unknown-block report.
+    pub unknown_seen: &'a mut Vec<StateId>,
+}
+
 pub struct TickCtx<'a> {
+    /// The driver's update pump, when this dispatch is allowed to run it.
+    ///
+    /// `None` inside a drain (so nested calls queue instead of recursing) and
+    /// in unit tests that only want to observe what a behaviour queues.
+    pub drain: Option<Drain<'a>>,
     /// Block storage.
     pub world: &'a mut World,
     /// Scheduled block ticks.
@@ -246,7 +269,67 @@ pub struct TickCtx<'a> {
     pub updates: &'a mut Vec<UpdateEntry>,
 }
 
-impl TickCtx<'_> {
+impl<'a> TickCtx<'a> {
+    /// Deliver every queued update now, exactly as [`Simulation::propagate`]
+    /// does — because it *is* that loop, reached from inside a handler.
+    ///
+    /// `moveBlocks` needs this: it notifies the positions its push emptied
+    /// while it is still running, before `triggerEvent` writes the piston base
+    /// as extended. Queueing those and letting the driver drain them afterwards
+    /// shows the notified blocks a piston that has already finished moving.
+    ///
+    /// Re-entrant calls are no-ops that leave the entries queued, which is what
+    /// vanilla's `count` guard does inside `CollectingNeighborUpdater`.
+    pub fn drain(&mut self) {
+        // Vanilla's `maxChainedNeighborUpdates`: a circuit that keeps
+        // re-notifying itself reports rather than hangs.
+        const MAX_UPDATE_CASCADE: usize = 1_000_000;
+        let Some(mut pump) = self.drain.take() else { return };
+        let table = pump.behaviours;
+        let mut delivered = 0usize;
+        loop {
+            // addedThisLayer joins the stack reversed, so the first-queued
+            // entry ends on top and runs first.
+            while let Some(entry) = self.updates.pop() {
+                pump.pending.push(entry);
+            }
+            let Some(top) = pump.pending.last_mut() else { break };
+            let Some((pos, from, kind)) = top.next() else {
+                pump.pending.pop();
+                continue;
+            };
+            delivered += 1;
+            if delivered > MAX_UPDATE_CASCADE {
+                self.updates.clear();
+                pump.pending.clear();
+                break;
+            }
+            let state = self.world.get(pos);
+            if let Some(filter) = std::env::var_os("MC_TICK_TRACE_NOTIFY") {
+                let filter = filter.to_string_lossy().to_string();
+                let key = format!("{},{},{}", pos.x, pos.y, pos.z);
+                if filter.split(';').any(|want| want.trim() == key) {
+                    eprintln!(
+                        "[t{}] notify ({key}) {kind:?} from {from:?}  {}",
+                        self.tick,
+                        self.states.descriptor(state).unwrap_or("minecraft:air")
+                    );
+                }
+            }
+            let Some(behaviour) = table.get(state) else {
+                if state != StateId::AIR {
+                    pump.unknown_seen.push(state);
+                }
+                continue;
+            };
+            match kind {
+                UpdateKind::Neighbor => behaviour.on_neighbor_changed(self, pos, from),
+                UpdateKind::Shape => behaviour.on_shape_update(self, pos, from),
+            }
+        }
+        self.drain = Some(pump);
+    }
+
     /// Schedule a block tick at `pos`.
     ///
     /// From a boundary dispatch the effective "now" is the last completed tick —
@@ -781,6 +864,7 @@ mod tests {
         let mut events = EventQueue::new();
         let states = StateRegistry::new();
         let mut ctx = TickCtx {
+            drain: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -811,6 +895,7 @@ mod tests {
         let mut events = EventQueue::new();
         let states = StateRegistry::new();
         let mut ctx = TickCtx {
+            drain: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),

@@ -549,7 +549,6 @@ const INERT: &[&str] = &[
     "minecraft:sea_lantern",
     "minecraft:slime_block",
     "minecraft:honey_block",
-    "minecraft:piston_head",
     "minecraft:moving_piston",
     "minecraft:redstone_block",
     "minecraft:soul_sand",
@@ -971,6 +970,10 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
                         power: rules.clone(),
                     }),
                 );
+            }
+            "minecraft:piston_head" => {
+                let Some(facing) = descriptor.facing() else { continue };
+                table.register(*id, Box::new(crate::piston::PistonHead { facing }));
             }
             "minecraft:piston" | "minecraft:sticky_piston" => {
                 let Some(facing) = descriptor.facing() else { continue };

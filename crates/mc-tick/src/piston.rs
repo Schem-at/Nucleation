@@ -354,6 +354,29 @@ fn axis(pos: Pos, dir: Dir) -> i32 {
 ///
 /// One instance per distinct block state, so it knows its own facing and extension
 /// without parsing anything at tick time.
+/// A piston head — `PistonHeadBlock`.
+///
+/// It has one job here: `neighborChanged` forwards the update to the base
+/// behind it. A head is the only face many circuits touch, so without the
+/// forward an extended piston never hears that its power has gone and stays
+/// out — which is exactly how a door that hands a redstone block along stalls
+/// after its first move.
+pub struct PistonHead {
+    /// The `facing` property: the head points away from its base.
+    pub facing: Dir,
+}
+
+impl BlockBehaviour for PistonHead {
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        let base = pos.offset(self.facing.opposite());
+        ctx.notify(base, self.facing);
+    }
+
+    fn name(&self) -> &'static str {
+        "piston_head"
+    }
+}
+
 pub struct Piston<P: PowerSource, M: Movability> {
     /// The direction the piston pushes.
     pub facing: Dir,
@@ -559,6 +582,23 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 ctx.set_shape_only(head_slot, self.moving);
                 ctx.defer(head_slot, self.head, PISTON_MOVE_TICKS);
 
+                // `moveBlocks`' tail: `updateNeighborsAt` for every position a
+                // block *left*, walked backwards like the write loop, then the
+                // head slot. This is how a piston hears about its own push —
+                // the block it shoved away may have been powering something,
+                // and no move write carries a neighbour update.
+                //
+                // Drained here rather than left to the driver: vanilla
+                // dispatches these from inside `moveBlocks`, while the base
+                // still reads `extended=false`. Deferring them until after the
+                // base write shows every notified block a piston that has
+                // already finished moving, which is a different world.
+                for (from, _) in carried.iter().rev() {
+                    ctx.update_neighbors_at(*from);
+                }
+                ctx.update_neighbors_at(head_slot);
+                ctx.drain();
+
                 // The base state is written *after* the moves, with notifications
                 // (vanilla flag 67) — the one loud write of the whole event.
                 ctx.set(pos, self.states.get(true));
@@ -751,7 +791,7 @@ mod tests {
         events: &'a mut EventQueue,
         states: &'a StateRegistry,
     ) -> TickCtx<'a> {
-        TickCtx { world, ticks, events, states, tick: 0,
+        TickCtx { drain: None, world, ticks, events, states, tick: 0,
             boundary: false,
         fluids: Box::leak(Box::new(TickQueue::new())),
         updates: Box::leak(Box::new(Vec::new())),
@@ -811,6 +851,7 @@ mod tests {
         let mut ctx_moves = Vec::new();
         {
             let mut ctx = TickCtx {
+                drain: None,
                 world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 0,
             boundary: false,
                 updates: &mut Vec::new(), moves: &mut ctx_moves,
@@ -917,6 +958,7 @@ mod tests {
         let mut pulled = Vec::new();
         {
             let mut ctx = TickCtx {
+                drain: None,
                 world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 0,
             boundary: false,
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
@@ -972,6 +1014,7 @@ mod tests {
         let mut pulled = Vec::new();
         {
             let mut ctx = TickCtx {
+                drain: None,
                 world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 0,
             boundary: false,
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
@@ -1020,6 +1063,7 @@ mod tests {
         let mut pulled = Vec::new();
         {
             let mut ctx = TickCtx {
+                drain: None,
                 world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 0,
             boundary: false,
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),

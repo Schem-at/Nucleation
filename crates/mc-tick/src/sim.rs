@@ -736,76 +736,37 @@ impl Simulation {
     /// Bounded (vanilla's `maxChainedNeighborUpdates` is a million): a circuit
     /// that keeps re-notifying itself reports rather than hangs.
     fn propagate(&mut self) {
-        const MAX_UPDATE_CASCADE: usize = 1_000_000;
+        let mut ctx = self.ctx();
+        ctx.drain();
+    }
 
-        let mut delivered = 0;
-        loop {
-            // addedThisLayer joins the stack reversed, so the first-queued
-            // entry ends on top and runs first.
-            while let Some(entry) = self.updates.pop() {
-                self.pending.push(entry);
-            }
-            let Some(top) = self.pending.last_mut() else { break };
-            let Some((pos, from, kind)) = top.next() else {
-                self.pending.pop();
-                continue;
-            };
-            delivered += 1;
-            if delivered > MAX_UPDATE_CASCADE {
-                self.updates.clear();
-                self.pending.clear();
-                break;
-            }
-            let state = self.world.get(pos);
-            // `MC_TICK_TRACE_NOTIFY=x,y,z[;x,y,z...]` reports every update
-            // delivered to those positions, with what the block was at the time.
-            // Divergences in a big cascade are nearly always "was it told, and
-            // what did it see" — this answers both without a capture.
-            if let Some(filter) = std::env::var_os("MC_TICK_TRACE_NOTIFY") {
-                let filter = filter.to_string_lossy().to_string();
-                let key = format!("{},{},{}", pos.x, pos.y, pos.z);
-                if filter.split(';').any(|want| want.trim() == key) {
-                    eprintln!(
-                        "[t{}] notify ({key}) {kind:?} from {from:?}  {}",
-                        self.tick,
-                        self.registry.descriptor(state).unwrap_or("minecraft:air")
-                    );
-                }
-            }
-            let Some(behaviour) = self.behaviours.get(state) else {
-                if state != StateId::AIR {
-                    self.unknown_seen.push(state);
-                }
-                continue;
-            };
-            let mut ctx = TickCtx {
-                world: &mut self.world,
-                ticks: &mut self.ticks,
-                fluids: &mut self.fluids,
-                events: &mut self.events,
-                states: &self.registry,
-                tick: self.tick,
-                // A cascade running outside a phase walk is a boundary action;
-                // its schedules use last-completed-tick time. See TickCtx::boundary.
-                boundary: !self.in_tick,
-                updates: &mut self.updates,
-                moves: &mut self.moves,
-                toggles: &mut self.toggles,
-                comparator_out: &mut self.comparator_out,
-                inventories: &mut self.inventories,
-                hopper_state: &mut self.hopper_state,
-                item_entities: &mut self.item_entities,
-                inv_log: self.inv_log.as_mut(),
-                log: self.log.as_mut(),
-            };
-            match kind {
-                crate::behaviour::UpdateKind::Neighbor => {
-                    behaviour.on_neighbor_changed(&mut ctx, pos, from)
-                }
-                crate::behaviour::UpdateKind::Shape => {
-                    behaviour.on_shape_update(&mut ctx, pos, from)
-                }
-            }
+    /// A dispatch context over this simulation, with the update pump wired in
+    /// so a behaviour can drain mid-handler.
+    fn ctx(&mut self) -> TickCtx<'_> {
+        TickCtx {
+            drain: Some(crate::behaviour::Drain {
+                behaviours: &self.behaviours,
+                pending: &mut self.pending,
+                unknown_seen: &mut self.unknown_seen,
+            }),
+            world: &mut self.world,
+            ticks: &mut self.ticks,
+            fluids: &mut self.fluids,
+            events: &mut self.events,
+            states: &self.registry,
+            tick: self.tick,
+            // A cascade running outside a phase walk is a boundary action; its
+            // schedules use last-completed-tick time. See TickCtx::boundary.
+            boundary: !self.in_tick,
+            updates: &mut self.updates,
+            moves: &mut self.moves,
+            toggles: &mut self.toggles,
+            comparator_out: &mut self.comparator_out,
+            inventories: &mut self.inventories,
+            hopper_state: &mut self.hopper_state,
+            item_entities: &mut self.item_entities,
+            inv_log: self.inv_log.as_mut(),
+            log: self.log.as_mut(),
         }
     }
 
@@ -920,6 +881,11 @@ impl Simulation {
                 continue;
             };
             let mut ctx = TickCtx {
+                drain: Some(crate::behaviour::Drain {
+                    behaviours: &self.behaviours,
+                    pending: &mut self.pending,
+                    unknown_seen: &mut self.unknown_seen,
+                }),
                 world: &mut self.world,
                 ticks: &mut self.ticks,
                 fluids: &mut self.fluids,
@@ -1131,6 +1097,11 @@ impl Simulation {
             return;
         };
         let mut ctx = TickCtx {
+            drain: Some(crate::behaviour::Drain {
+                behaviours: &self.behaviours,
+                pending: &mut self.pending,
+                unknown_seen: &mut self.unknown_seen,
+            }),
             world: &mut self.world,
             ticks: &mut self.ticks,
                 fluids: &mut self.fluids,
@@ -1187,6 +1158,11 @@ impl Simulation {
                         continue;
                     };
                     let mut ctx = TickCtx {
+                        drain: Some(crate::behaviour::Drain {
+                            behaviours: &self.behaviours,
+                            pending: &mut self.pending,
+                            unknown_seen: &mut self.unknown_seen,
+                        }),
                         world: &mut self.world,
                         ticks: &mut self.ticks,
                 fluids: &mut self.fluids,
@@ -1222,6 +1198,11 @@ impl Simulation {
                         continue;
                     };
                     let mut ctx = TickCtx {
+                        drain: Some(crate::behaviour::Drain {
+                            behaviours: &self.behaviours,
+                            pending: &mut self.pending,
+                            unknown_seen: &mut self.unknown_seen,
+                        }),
                         world: &mut self.world,
                         ticks: &mut self.ticks,
                         fluids: &mut self.fluids,
@@ -1261,6 +1242,11 @@ impl Simulation {
                         continue;
                     };
                     let mut ctx = TickCtx {
+                        drain: Some(crate::behaviour::Drain {
+                            behaviours: &self.behaviours,
+                            pending: &mut self.pending,
+                            unknown_seen: &mut self.unknown_seen,
+                        }),
                         world: &mut self.world,
                         ticks: &mut self.ticks,
                 fluids: &mut self.fluids,
@@ -1376,6 +1362,11 @@ impl Simulation {
                         continue;
                     };
                     let mut ctx = TickCtx {
+                        drain: Some(crate::behaviour::Drain {
+                            behaviours: &self.behaviours,
+                            pending: &mut self.pending,
+                            unknown_seen: &mut self.unknown_seen,
+                        }),
                         world: &mut self.world,
                         ticks: &mut self.ticks,
                 fluids: &mut self.fluids,
@@ -1469,6 +1460,11 @@ impl Simulation {
                     }
                     let Some(behaviour) = self.behaviours.get(state) else { continue };
                     let mut ctx = TickCtx {
+                        drain: Some(crate::behaviour::Drain {
+                            behaviours: &self.behaviours,
+                            pending: &mut self.pending,
+                            unknown_seen: &mut self.unknown_seen,
+                        }),
                         world: &mut self.world,
                         ticks: &mut self.ticks,
                 fluids: &mut self.fluids,
@@ -1550,6 +1546,11 @@ impl Simulation {
                     continue;
                 };
                 let mut ctx = TickCtx {
+                    drain: Some(crate::behaviour::Drain {
+                        behaviours: &self.behaviours,
+                        pending: &mut self.pending,
+                        unknown_seen: &mut self.unknown_seen,
+                    }),
                     world: &mut self.world,
                     ticks: &mut self.ticks,
                 fluids: &mut self.fluids,

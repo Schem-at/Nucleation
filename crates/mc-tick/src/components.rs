@@ -1381,6 +1381,7 @@ mod tests {
             power: Sources { powered: vec![source], diodes: vec![] },
         };
         let mut ctx = TickCtx {
+            drain: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1420,6 +1421,7 @@ mod tests {
             power: Sources { powered: vec![], diodes: vec![] },
         };
         let mut ctx = TickCtx {
+            drain: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1466,6 +1468,7 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            drain: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1507,6 +1510,7 @@ mod tests {
         };
         let pos = Pos::new(0, 1, 0);
         let mut ctx = TickCtx {
+            drain: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1548,6 +1552,7 @@ mod tests {
             power: Sources { powered: vec![source], diodes: vec![] },
         };
         let mut ctx = TickCtx {
+            drain: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1590,6 +1595,7 @@ mod tests {
             power: Sources { powered: vec![source], diodes: vec![] },
         };
         let mut ctx = TickCtx {
+            drain: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1644,6 +1650,7 @@ mod tests {
             power: Sources { powered: vec![source], diodes: vec![] },
         };
         let mut ctx = TickCtx {
+            drain: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1694,6 +1701,7 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            drain: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1739,6 +1747,7 @@ mod tests {
             },
         };
         let mut ctx = TickCtx {
+            drain: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1840,6 +1849,7 @@ mod tests {
         }
 
         let mut ctx = TickCtx {
+            drain: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1881,6 +1891,7 @@ mod tests {
             power: Sources { powered: vec![source], diodes: vec![] },
         };
         let mut ctx = TickCtx {
+            drain: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1924,6 +1935,7 @@ mod tests {
             power: Sources { powered: vec![source], diodes: vec![] },
         };
         let mut ctx = TickCtx {
+            drain: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -2012,6 +2024,7 @@ mod tests {
         stored.insert(pos, 15u8);
 
         let mut ctx = TickCtx {
+            drain: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -2046,6 +2059,7 @@ mod tests {
         stored.insert(pos, 15u8);
 
         let mut ctx = TickCtx {
+            drain: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -2082,6 +2096,7 @@ mod tests {
         let mut stored = std::collections::HashMap::new();
 
         let mut ctx = TickCtx {
+            drain: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -2126,6 +2141,7 @@ mod tests {
         let mut stored = std::collections::HashMap::new();
 
         let mut ctx = TickCtx {
+            drain: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
