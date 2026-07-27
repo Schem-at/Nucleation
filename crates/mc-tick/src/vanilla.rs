@@ -840,7 +840,21 @@ pub fn register_all_at(
         // and a carried block that has begun to move no longer fills that one.
         // Without this a wire beside a piston that starts moving drops the
         // connection entirely instead of lowering it from `up` to `side`.
+        // An *extended* piston base is a 12/16 box pushed to the far side of
+        // its facing, so its top face is a full square only when it faces down —
+        // then the body fills the upper twelve sixteenths and the block's own
+        // top is the box's top. Facing up the box stops at 12/16; facing
+        // sideways the top is 1x0.75. Dust beside a piston that has just
+        // extended downward keeps its connection because of this, dropping from
+        // `up` to `side` rather than to `none`, since the box is still not a
+        // full cube.
+        let extended_base_facing_down = matches!(
+            descriptor.name.as_str(),
+            "minecraft:piston" | "minecraft:sticky_piston"
+        ) && descriptor.flag("extended")
+            && descriptor.facing() == Some(Dir::Down);
         if is_full_cube(descriptor)
+            || extended_base_facing_down
             || descriptor.name == "minecraft:moving_piston"
             || (descriptor.name.ends_with("_slab")
                 && matches!(descriptor.get("type"), Some("top") | Some("double")))

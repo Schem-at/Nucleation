@@ -1274,16 +1274,15 @@ fn the_4x4_vault_door_survives_interrupted_and_repeated_clicks() {
 /// the door is sound and the paste is not what breaks it here — unlike the vault
 /// door, whose latched memory cell a paste destroys.
 ///
-/// Twenty-eight of the thirty ticks that do anything are now identical, block
-/// for block: the whole opening stroke, and all of the close but two ticks. What
-/// is left is two dust connections, mirrored left and right — the wire at
-/// (1,6,2) picks up `north=side` on tick 63 where vanilla has it on 62, so a
-/// shape update reaches it one tick late during the retract. Everything else,
-/// including all 125 block events of the opening tick, matches.
+/// Every tick of the cycle is identical, block for block — open and close, all
+/// 125 block events of the opening tick included.
+///
+/// The last thing standing was a dust connection: an *extended* piston base is a
+/// 12/16 box pushed to the far side of its facing, so its top face is a full
+/// square only when it faces down. The wire beside the edge piston reads that
+/// face to decide whether to climb, and getting it wrong dropped the connection
+/// to `none` where the game lowers it to `side`.
 #[test]
-#[ignore = "28 of 30 active ticks are block-for-block identical, including the \
-whole opening stroke; the dust at (1,6,2) and its mirror pick up north=side one \
-tick late during the close"]
 fn the_6x6_sliding_door_runs_a_cycle_in_the_world_it_was_built_in() {
     run_conformance_full(
         "door_6x6_inworld.snbt",
