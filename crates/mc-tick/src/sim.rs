@@ -1365,7 +1365,6 @@ impl Simulation {
                     if previous == entry.state {
                         continue;
                     }
-                    landed.push(entry.pos);
                     if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
                         eprintln!(
                             "[t{}] land   ({}, {}, {}) -> {}",
@@ -1416,15 +1415,27 @@ impl Simulation {
                     // an already-solid column instead, and a piston above it
                     // extended into a door vanilla leaves shut.
                     self.propagate();
-                }
-                // `onPlace` for each landed block, *after* the landing updates
-                // have run. Ordering matters: vanilla's shape update reaches a
-                // moved observer while it still carries its mid-pulse powered
-                // state (so it does not re-schedule), and only then does
-                // onPlace clear that flag. Dispatching on_placed first would
-                // let the self-update see an unpowered observer and start a
-                // pulse vanilla never starts.
-                for pos in landed {
+                    landed.push(entry.pos);
+                // `onPlace` for each landed block, *after* that block's own
+                // landing updates have run but still inside its own landing.
+                //
+                // Ordering matters twice over. Within one landing it comes
+                // last: vanilla's shape update reaches a moved observer while
+                // it still carries its mid-pulse powered state, so it does not
+                // re-schedule, and only then does onPlace clear the flag.
+                // Dispatching it first would start a pulse vanilla never
+                // starts.
+                //
+                // Across landings it must not be batched to the end. `onPlace`
+                // is where a landed piston runs `checkIfExtend`, and that only
+                // queues a block event if the push actually resolves — so a
+                // piston must see the column above it as vanilla does, still
+                // holding `moving_piston` placeholders that have not landed
+                // yet. Immovable, so the push fails and no event is queued.
+                // Running every onPlace after every landing showed it a solid
+                // column instead, and the 6x6 door fired a piston vanilla
+                // leaves alone.
+                for pos in std::mem::take(&mut landed) {
                     let state = self.world.get(pos);
                     let Some(behaviour) = self.behaviours.get(state) else {
                         if state != StateId::AIR {
@@ -1457,6 +1468,7 @@ impl Simulation {
                     };
                     behaviour.on_placed(&mut ctx, pos);
                     self.propagate();
+                    }
                 }
                 None
             }
