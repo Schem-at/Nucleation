@@ -840,7 +840,7 @@ mod tests {
         events: &'a mut EventQueue,
         states: &'a StateRegistry,
     ) -> TickCtx<'a> {
-        TickCtx { drain: None, world, ticks, events, states, tick: 0,
+        TickCtx { drain: None, behaviours: None, world, ticks, events, states, tick: 0,
             boundary: false,
         fluids: Box::leak(Box::new(TickQueue::new())),
         updates: Box::leak(Box::new(Vec::new())),
@@ -901,6 +901,7 @@ mod tests {
         {
             let mut ctx = TickCtx {
                 drain: None,
+                behaviours: None,
                 world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 0,
             boundary: false,
                 updates: &mut Vec::new(), moves: &mut ctx_moves,
@@ -1008,6 +1009,7 @@ mod tests {
         {
             let mut ctx = TickCtx {
                 drain: None,
+                behaviours: None,
                 world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 0,
             boundary: false,
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
@@ -1064,6 +1066,7 @@ mod tests {
         {
             let mut ctx = TickCtx {
                 drain: None,
+                behaviours: None,
                 world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 0,
             boundary: false,
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),
@@ -1113,6 +1116,7 @@ mod tests {
         {
             let mut ctx = TickCtx {
                 drain: None,
+                behaviours: None,
                 world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 0,
             boundary: false,
                 updates: &mut Vec::new(), moves: &mut pulled, toggles: &mut Vec::new(),

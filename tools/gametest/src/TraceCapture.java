@@ -646,13 +646,13 @@ public final class TraceCapture {
                     if (!first) out.append(", ");
                     first = false;
                     out.append(String.format(
-                            "{\"pos\": [%d, %d, %d], \"block\": \"%s\", \"at\": %d, \"priority\": \"%s\"}",
+                            "{\"pos\": [%d, %d, %d], \"block\": \"%s\", \"at\": %d, \"priority\": \"%s\", \"order\": %d}",
                             st.pos().getX() - ORIGIN.getX(),
                             st.pos().getY() - ORIGIN.getY(),
                             st.pos().getZ() - ORIGIN.getZ(),
                             net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(
                                     (net.minecraft.world.level.block.Block) st.type()),
-                            st.triggerTick(), st.priority()));
+                            st.triggerTick(), st.priority(), st.subTickOrder()));
                 }
             }
         } catch (ReflectiveOperationException e) {

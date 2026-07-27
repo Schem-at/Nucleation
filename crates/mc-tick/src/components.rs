@@ -469,6 +469,19 @@ impl<P: PowerSource> BlockBehaviour for Torch<P> {
         }
     }
 
+    /// `RedstoneTorchBlock.onPlace` carries no `!oldState.is(block)` guard, so
+    /// it runs again every time the torch merely toggles `lit` — and it is the
+    /// *two-step* notify, not the six-neighbour one the write itself does.
+    ///
+    /// That reach is the point. A torch strongly powers the block above it, and
+    /// a piston resting against *that* block is two steps away: it hears
+    /// nothing from the write, and everything from this.
+    fn on_state_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        for dir in crate::pos::JAVA_DIRECTIONS {
+            ctx.update_neighbors_at(pos.offset(dir));
+        }
+    }
+
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
         let support = pos.offset(self.attached);
         let powered = self
@@ -1410,6 +1423,7 @@ mod tests {
         };
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1450,6 +1464,7 @@ mod tests {
         };
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1497,6 +1512,7 @@ mod tests {
         };
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1539,6 +1555,7 @@ mod tests {
         let pos = Pos::new(0, 1, 0);
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1581,6 +1598,7 @@ mod tests {
         };
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1624,6 +1642,7 @@ mod tests {
         };
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1679,6 +1698,7 @@ mod tests {
         };
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1730,6 +1750,7 @@ mod tests {
         };
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1776,6 +1797,7 @@ mod tests {
         };
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1878,6 +1900,7 @@ mod tests {
 
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1920,6 +1943,7 @@ mod tests {
         };
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -1964,6 +1988,7 @@ mod tests {
         };
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -2053,6 +2078,7 @@ mod tests {
 
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -2088,6 +2114,7 @@ mod tests {
 
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -2125,6 +2152,7 @@ mod tests {
 
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -2170,6 +2198,7 @@ mod tests {
 
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),

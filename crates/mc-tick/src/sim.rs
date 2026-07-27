@@ -755,10 +755,10 @@ impl Simulation {
     fn ctx(&mut self) -> TickCtx<'_> {
         TickCtx {
             drain: Some(crate::behaviour::Drain {
-                behaviours: &self.behaviours,
                 pending: &mut self.pending,
                 unknown_seen: &mut self.unknown_seen,
             }),
+            behaviours: Some(&self.behaviours),
             world: &mut self.world,
             ticks: &mut self.ticks,
             fluids: &mut self.fluids,
@@ -892,10 +892,10 @@ impl Simulation {
             };
             let mut ctx = TickCtx {
                 drain: Some(crate::behaviour::Drain {
-                    behaviours: &self.behaviours,
                     pending: &mut self.pending,
                     unknown_seen: &mut self.unknown_seen,
                 }),
+                behaviours: Some(&self.behaviours),
                 world: &mut self.world,
                 ticks: &mut self.ticks,
                 fluids: &mut self.fluids,
@@ -1120,10 +1120,10 @@ impl Simulation {
         };
         let mut ctx = TickCtx {
             drain: Some(crate::behaviour::Drain {
-                behaviours: &self.behaviours,
                 pending: &mut self.pending,
                 unknown_seen: &mut self.unknown_seen,
             }),
+            behaviours: Some(&self.behaviours),
             world: &mut self.world,
             ticks: &mut self.ticks,
                 fluids: &mut self.fluids,
@@ -1181,10 +1181,10 @@ impl Simulation {
                     };
                     let mut ctx = TickCtx {
                         drain: Some(crate::behaviour::Drain {
-                            behaviours: &self.behaviours,
                             pending: &mut self.pending,
                             unknown_seen: &mut self.unknown_seen,
                         }),
+                        behaviours: Some(&self.behaviours),
                         world: &mut self.world,
                         ticks: &mut self.ticks,
                 fluids: &mut self.fluids,
@@ -1221,10 +1221,10 @@ impl Simulation {
                     };
                     let mut ctx = TickCtx {
                         drain: Some(crate::behaviour::Drain {
-                            behaviours: &self.behaviours,
                             pending: &mut self.pending,
                             unknown_seen: &mut self.unknown_seen,
                         }),
+                        behaviours: Some(&self.behaviours),
                         world: &mut self.world,
                         ticks: &mut self.ticks,
                         fluids: &mut self.fluids,
@@ -1265,10 +1265,10 @@ impl Simulation {
                     };
                     let mut ctx = TickCtx {
                         drain: Some(crate::behaviour::Drain {
-                            behaviours: &self.behaviours,
                             pending: &mut self.pending,
                             unknown_seen: &mut self.unknown_seen,
                         }),
+                        behaviours: Some(&self.behaviours),
                         world: &mut self.world,
                         ticks: &mut self.ticks,
                 fluids: &mut self.fluids,
@@ -1385,10 +1385,10 @@ impl Simulation {
                     };
                     let mut ctx = TickCtx {
                         drain: Some(crate::behaviour::Drain {
-                            behaviours: &self.behaviours,
                             pending: &mut self.pending,
                             unknown_seen: &mut self.unknown_seen,
                         }),
+                        behaviours: Some(&self.behaviours),
                         world: &mut self.world,
                         ticks: &mut self.ticks,
                 fluids: &mut self.fluids,
@@ -1483,10 +1483,10 @@ impl Simulation {
                     let Some(behaviour) = self.behaviours.get(state) else { continue };
                     let mut ctx = TickCtx {
                         drain: Some(crate::behaviour::Drain {
-                            behaviours: &self.behaviours,
                             pending: &mut self.pending,
                             unknown_seen: &mut self.unknown_seen,
                         }),
+                        behaviours: Some(&self.behaviours),
                         world: &mut self.world,
                         ticks: &mut self.ticks,
                 fluids: &mut self.fluids,
@@ -1569,10 +1569,10 @@ impl Simulation {
                 };
                 let mut ctx = TickCtx {
                     drain: Some(crate::behaviour::Drain {
-                        behaviours: &self.behaviours,
                         pending: &mut self.pending,
                         unknown_seen: &mut self.unknown_seen,
                     }),
+                    behaviours: Some(&self.behaviours),
                     world: &mut self.world,
                     ticks: &mut self.ticks,
                 fluids: &mut self.fluids,

@@ -184,6 +184,7 @@ mod tests {
         let o = observer(false);
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 0,
             boundary: false,
             updates: &mut Vec::new(), moves: &mut Vec::new(),
@@ -207,6 +208,7 @@ mod tests {
         let o = observer(false);
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 0,
             boundary: false,
             updates: &mut Vec::new(), moves: &mut Vec::new(),
@@ -234,6 +236,7 @@ mod tests {
         {
             let mut ctx = TickCtx {
                 drain: None,
+                behaviours: None,
                 world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 0,
             boundary: false,
                 updates: &mut Vec::new(), moves: &mut Vec::new(),
@@ -255,6 +258,7 @@ mod tests {
         {
             let mut ctx = TickCtx {
                 drain: None,
+                behaviours: None,
                 world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s,
                 tick: OBSERVER_PULSE_TICKS,
             boundary: false,
@@ -283,6 +287,7 @@ mod tests {
         let o = observer(true);
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 5,
             boundary: false,
             updates: &mut Vec::new(), moves: &mut Vec::new(),
@@ -302,6 +307,7 @@ mod tests {
         t.schedule(pos, 5, 2, crate::schedule::TickPriority::Normal);
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 5,
             boundary: false,
             updates: &mut Vec::new(), moves: &mut Vec::new(),
@@ -336,6 +342,7 @@ mod tests {
         let o = observer(true); // mid-pulse
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut w, ticks: &mut t, fluids: &mut TickQueue::new(), events: &mut e, states: &s, tick: 0,
             boundary: false,
             updates: &mut Vec::new(), moves: &mut Vec::new(),

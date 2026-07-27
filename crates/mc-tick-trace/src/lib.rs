@@ -277,6 +277,12 @@ pub struct PendingTick {
     pub at: u64,
     /// Its tick priority, as vanilla names it.
     pub priority: String,
+    /// `subTickOrder`: the tiebreak within a tick and priority, which is
+    /// insertion order. The drain order is (priority, subTickOrder), so this is
+    /// the only way to recover what the game will actually run first — a
+    /// capture reads the queue as a heap, whose iteration order is not it.
+    #[serde(default)]
+    pub order: u64,
 }
 
 /// Where two traces first differ.

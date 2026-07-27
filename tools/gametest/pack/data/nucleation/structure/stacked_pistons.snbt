@@ -1,0 +1,24 @@
+{
+  DataVersion: 4903,
+  size: [3, 5, 4],
+  palette: [
+    {Name: "minecraft:stone"},
+    {Name: "minecraft:sticky_piston", Properties: {extended: "false", facing: "up"}},
+    {Name: "minecraft:quartz_block"},
+    {Name: "minecraft:orange_wool"},
+    {Name: "minecraft:redstone_wall_torch", Properties: {facing: "north", lit: "false"}}
+  ],
+  blocks: [
+    {pos: [0, 0, 0], state: 0}, {pos: [1, 0, 0], state: 0}, {pos: [2, 0, 0], state: 0},
+    {pos: [0, 0, 1], state: 0}, {pos: [1, 0, 1], state: 0}, {pos: [2, 0, 1], state: 0},
+    {pos: [0, 0, 2], state: 0}, {pos: [1, 0, 2], state: 0}, {pos: [2, 0, 2], state: 0},
+    {pos: [0, 0, 3], state: 0}, {pos: [1, 0, 3], state: 0}, {pos: [2, 0, 3], state: 0},
+
+    {pos: [1, 1, 1], state: 1},
+    {pos: [1, 2, 1], state: 1},
+    {pos: [1, 3, 1], state: 2},
+    {pos: [1, 1, 2], state: 4},
+    {pos: [1, 1, 3], state: 3}
+  ],
+  entities: []
+}

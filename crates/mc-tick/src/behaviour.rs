@@ -185,8 +185,6 @@ pub struct PendingMove {
 /// a nested `drain()` therefore finds `None` and only queues — which is the
 /// count guard, not an approximation of it.
 pub struct Drain<'a> {
-    /// Every registered behaviour, for dispatch.
-    pub behaviours: &'a BehaviourTable,
     /// The driver's entry stack — vanilla's queue of pending notifications.
     pub pending: &'a mut Vec<UpdateEntry>,
     /// States met with no behaviour registered, for the unknown-block report.
@@ -199,6 +197,10 @@ pub struct TickCtx<'a> {
     /// `None` inside a drain (so nested calls queue instead of recursing) and
     /// in unit tests that only want to observe what a behaviour queues.
     pub drain: Option<Drain<'a>>,
+    /// Every registered behaviour: for dispatching `onPlace` on a state write,
+    /// and for the update pump. Kept out of [`Drain`] so it stays reachable
+    /// while a drain is in flight.
+    pub behaviours: Option<&'a BehaviourTable>,
     /// Block storage.
     pub world: &'a mut World,
     /// Scheduled block ticks.
@@ -285,7 +287,10 @@ impl<'a> TickCtx<'a> {
         // re-notifying itself reports rather than hangs.
         const MAX_UPDATE_CASCADE: usize = 1_000_000;
         let Some(mut pump) = self.drain.take() else { return };
-        let table = pump.behaviours;
+        let Some(table) = self.behaviours else {
+            self.drain = Some(pump);
+            return;
+        };
         let mut delivered = 0usize;
         loop {
             // addedThisLayer joins the stack reversed, so the first-queued
@@ -412,6 +417,13 @@ impl<'a> TickCtx<'a> {
         self.world.set(pos, state);
         if let Some(log) = self.log.as_deref_mut() {
             log.push(BlockChange { tick: self.tick, pos, from: previous, to: state });
+        }
+        // `LevelChunk.setBlockState` runs `onPlace` before `markAndNotifyBlock`
+        // reaches the neighbours at all.
+        if let Some(table) = self.behaviours {
+            if let Some(behaviour) = table.get(state) {
+                behaviour.on_state_changed(self, pos);
+            }
         }
         // markAndNotifyBlock, flag 3: neighbour updates first, then the shape
         // pass that observers listen to.
@@ -588,6 +600,19 @@ pub trait BlockBehaviour: Send + Sync {
     /// An entity is inside this block's cell — vanilla's `entityInside`,
     /// dispatched after entity movement for every cell an item overlaps.
     fn on_entity_inside(&self, _ctx: &mut TickCtx<'_>, _pos: Pos) {}
+
+    /// Called after this block's *state* changes in place.
+    ///
+    /// `onPlace` runs on every `setBlockState`, not only on a genuine
+    /// placement — which is why `PistonBaseBlock.onPlace` opens with
+    /// `!oldState.is(block)` and `RedstoneTorchBlock.onPlace` does not. The
+    /// guarded ones are modelled by leaving this at its default; the unguarded
+    /// ones implement it, and it fires on every write.
+    ///
+    /// A torch lighting is the case that forced it: `notifyNeighbors` reaches
+    /// two blocks out, and without it the piston standing on the block above a
+    /// torch never hears that the torch came on.
+    fn on_state_changed(&self, _ctx: &mut TickCtx<'_>, _pos: Pos) {}
 
     /// This block was just written into the world by a completed piston move.
     ///
@@ -865,6 +890,7 @@ mod tests {
         let states = StateRegistry::new();
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
@@ -896,6 +922,7 @@ mod tests {
         let states = StateRegistry::new();
         let mut ctx = TickCtx {
             drain: None,
+            behaviours: None,
             world: &mut world,
             ticks: &mut ticks,
             fluids: &mut TickQueue::new(),
