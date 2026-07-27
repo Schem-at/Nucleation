@@ -22,6 +22,9 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use nucleation::formats::schematic::to_schematic;
+use nucleation::world_segment::ids::ContentId;
+use nucleation::world_segment::provenance::{Provenance, StableBuildId};
+use nucleation::{Connectivity, UniversalSchematic};
 use nucleation::world_segment::partition::{PartitionHint, PartitionIndex, PartitionPolicy};
 use nucleation::world_segment::profile::{ProfileParams, WorldProfile};
 use nucleation::world_segment::runner::{MaterializedBuild, RunStats, SegmentJob, WorldSegmenter};
@@ -424,9 +427,9 @@ fn main() {
     let mut schem_written: u64 = 0;
     let mut seen_stable_ids: BTreeSet<String> = BTreeSet::new();
 
-    let mut emit = |mb: MaterializedBuild| {
+    // Writes one final build (schematic + its provenance) to disk.
+    let mut emit_one = |schematic: UniversalSchematic, provenance: Provenance| {
         build_count += 1;
-        let MaterializedBuild { schematic, provenance } = mb;
 
         let line = serde_json::to_string(&provenance).expect("provenance must serialize to JSON");
         writeln!(provenance_file, "{line}").expect("failed to write provenance line");
@@ -451,6 +454,57 @@ fn main() {
                     eprintln!("wol_extract: failed to serialize build {stable_id} to .schem: {e}");
                 }
             }
+        }
+    };
+
+    // Final materialization pass: block-level LOSSLESS connected-component
+    // split. The cell-level `split_disconnected` (SegConfig) is a cheap
+    // pre-split during clustering; this block-level pass REFINES the result on
+    // the fully materialized, substrate-subtracted schematic. A build that is
+    // already a single connected mass (or a single substantial core with only
+    // small fragments — e.g. a redstone build that shatters under flood-fill)
+    // returns exactly ONE piece and is emitted unchanged, so the two splits
+    // never double-count. Only when ≥2 substantial cores (≥ `split_min` blocks
+    // each) survive does this split into separate builds, attaching every
+    // sub-threshold fragment to its nearest core so NO block is dropped.
+    // `--split-min-blocks 0` disables this pass (as it disables the cell-level
+    // one).
+    let split_min = cli.split_min_blocks as usize;
+    let mut emit = |mb: MaterializedBuild| {
+        let MaterializedBuild { schematic, provenance } = mb;
+
+        if split_min == 0 {
+            emit_one(schematic, provenance);
+            return;
+        }
+
+        let pieces = schematic.split_connected_attach(Connectivity::Corner, split_min);
+        if pieces.len() <= 1 {
+            // Clean / single-core build: emit the ORIGINAL untouched so its
+            // stable id, name and bytes are preserved exactly (harmless refine).
+            emit_one(schematic, provenance);
+            return;
+        }
+
+        // Genuine multi-core split: emit each piece as its own build with an
+        // extended, still-valid provenance envelope (a per-piece stable id
+        // deterministically derived from the parent id + index, and the piece's
+        // own bbox / block_count).
+        println!(
+            "wol_extract: block-level attach-split fired: build {} -> {} pieces",
+            provenance.stable_build_id, pieces.len()
+        );
+        for (i, piece) in pieces.into_iter().enumerate() {
+            let mut p = provenance.clone();
+            p.stable_build_id = StableBuildId(ContentId::of(&[
+                b"wol.split.v1",
+                provenance.stable_build_id.0.as_bytes(),
+                &(i as u32).to_le_bytes(),
+            ]));
+            let bb = piece.get_bounding_box();
+            p.world_bbox = (bb.min, bb.max);
+            p.block_count = piece.total_blocks().max(0) as u64;
+            emit_one(piece, p);
         }
     };
 

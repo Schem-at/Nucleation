@@ -140,6 +140,124 @@ impl UniversalSchematic {
             .filter(|piece| piece.total_blocks() as usize >= min_blocks)
             .collect()
     }
+
+    /// **Lossless** connected-component split for extraction pipelines.
+    ///
+    /// Like [`UniversalSchematic::split_connected`], but instead of *dropping*
+    /// sub-threshold fragments (as [`UniversalSchematic::split_connected_min`]
+    /// does) it **attaches every fragment smaller than `min_blocks` to its
+    /// nearest "core"** — a component with at least `min_blocks` blocks. No
+    /// block, block state, or block entity is ever lost: the union of the
+    /// returned pieces equals the input exactly (block-conserving).
+    ///
+    /// Semantics:
+    /// * Components with `>= min_blocks` blocks are **cores**; the rest are
+    ///   **fragments**.
+    /// * If there are **0 or 1 cores**, the whole schematic is returned as a
+    ///   single piece (nothing is split off, nothing is dropped). This is the
+    ///   guard that keeps a redstone build — which shatters into many small
+    ///   substrate-subtracted fragments under a block-level flood-fill — from
+    ///   being torn apart: with no *second* substantial core, it stays whole.
+    /// * With **≥2 cores**, each fragment is assigned to the core with the
+    ///   nearest **bounding-box centroid** (Euclidean distance between centroid
+    ///   points; cheap and stable, ties broken by core order which is
+    ///   largest-first). Each core plus its attached fragments becomes one
+    ///   piece, largest-core-first, `#N`-suffixed like `split_connected`.
+    ///
+    /// `min_blocks == 0` makes every component a core (equivalent to
+    /// [`UniversalSchematic::split_connected`]).
+    pub fn split_connected_attach(
+        &self,
+        conn: Connectivity,
+        min_blocks: usize,
+    ) -> Vec<UniversalSchematic> {
+        let base_name = self
+            .metadata
+            .name
+            .clone()
+            .unwrap_or_else(|| "schematic".to_string());
+
+        let comps = self.connected_components(conn);
+
+        // bbox centroid of a component (float, for nearest-core assignment).
+        let centroid = |c: &Component| -> (f64, f64, f64) {
+            (
+                (c.bounds.min.0 as f64 + c.bounds.max.0 as f64) / 2.0,
+                (c.bounds.min.1 as f64 + c.bounds.max.1 as f64) / 2.0,
+                (c.bounds.min.2 as f64 + c.bounds.max.2 as f64) / 2.0,
+            )
+        };
+
+        // Partition into cores (>= min_blocks) and fragments, preserving the
+        // largest-first order from `connected_components`.
+        let mut core_idx: Vec<usize> = Vec::new();
+        let mut frag_idx: Vec<usize> = Vec::new();
+        for (i, c) in comps.iter().enumerate() {
+            if c.blocks.len() >= min_blocks {
+                core_idx.push(i);
+            } else {
+                frag_idx.push(i);
+            }
+        }
+
+        // Materialize a piece from a set of source positions.
+        let materialize = |positions: &[BlockPosition], name: String| -> UniversalSchematic {
+            let mut piece = UniversalSchematic::new(name.clone());
+            piece.metadata = self.metadata.clone();
+            piece.metadata.name = Some(name);
+            for pos in positions {
+                if let Some(block) = self.get_block(pos.x, pos.y, pos.z) {
+                    piece.set_block(pos.x, pos.y, pos.z, &block.clone());
+                }
+                if let Some(entity) = self.get_block_entity_owned(*pos) {
+                    piece.set_block_entity(*pos, entity);
+                }
+            }
+            piece.default_region = piece.default_region.to_compact();
+            piece
+        };
+
+        // 0 or 1 core: return the whole schematic as one piece (lossless, no
+        // shatter). This is the guard for redstone-style builds.
+        if core_idx.len() <= 1 {
+            let mut all: Vec<BlockPosition> = Vec::new();
+            for c in &comps {
+                all.extend(c.blocks.iter().cloned());
+            }
+            return vec![materialize(&all, format!("{base_name}#1"))];
+        }
+
+        // ≥2 cores: seed each core's bucket with its own blocks, then attach
+        // each fragment to the nearest core by centroid distance.
+        let core_centroids: Vec<(f64, f64, f64)> =
+            core_idx.iter().map(|&i| centroid(&comps[i])).collect();
+
+        let mut buckets: Vec<Vec<BlockPosition>> = core_idx
+            .iter()
+            .map(|&i| comps[i].blocks.clone())
+            .collect();
+
+        for &fi in &frag_idx {
+            let fc = centroid(&comps[fi]);
+            let nearest = core_centroids
+                .iter()
+                .enumerate()
+                .min_by(|(_, a), (_, b)| {
+                    let da = (a.0 - fc.0).powi(2) + (a.1 - fc.1).powi(2) + (a.2 - fc.2).powi(2);
+                    let db = (b.0 - fc.0).powi(2) + (b.1 - fc.1).powi(2) + (b.2 - fc.2).powi(2);
+                    da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
+                })
+                .map(|(i, _)| i)
+                .unwrap_or(0);
+            buckets[nearest].extend(comps[fi].blocks.iter().cloned());
+        }
+
+        buckets
+            .into_iter()
+            .enumerate()
+            .map(|(i, positions)| materialize(&positions, format!("{base_name}#{}", i + 1)))
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -389,6 +507,71 @@ mod tests {
         let filtered = s.split_connected_min(Connectivity::Face, 3);
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].total_blocks(), 5);
+    }
+
+    // ── split_connected_attach (lossless) ───────────────────────────────
+
+    #[test]
+    fn split_connected_attach_two_cores_conserves_blocks_and_attaches_nearest() {
+        let mut s = UniversalSchematic::new("attach".into());
+        // Core A: 5 blocks near origin.
+        for x in 0..5 {
+            place(&mut s, x, 0, 0);
+        }
+        // Core B: 5 blocks far away.
+        for x in 0..5 {
+            place(&mut s, 100 + x, 0, 0);
+        }
+        // Tiny 1-block fragment, disconnected from both, closest to core B.
+        place(&mut s, 110, 0, 10);
+
+        let pieces = s.split_connected_attach(Connectivity::Corner, 3);
+        assert_eq!(pieces.len(), 2, "two substantial cores -> two pieces");
+
+        // Block conservation: nothing dropped or duplicated.
+        let total: i64 = pieces.iter().map(|p| p.total_blocks() as i64).sum();
+        assert_eq!(total, s.total_blocks() as i64, "no block lost");
+
+        // Fragment attached to the nearer core (B), not A.
+        let piece_b = pieces
+            .iter()
+            .find(|p| p.get_block(100, 0, 0).is_some())
+            .expect("piece with core B");
+        assert!(
+            piece_b.get_block(110, 0, 10).is_some(),
+            "fragment attached to nearest core B"
+        );
+        let piece_a = pieces
+            .iter()
+            .find(|p| p.get_block(0, 0, 0).is_some())
+            .expect("piece with core A");
+        assert!(
+            piece_a.get_block(110, 0, 10).is_none(),
+            "fragment did not go to core A"
+        );
+    }
+
+    #[test]
+    fn split_connected_attach_single_core_stays_whole_and_lossless() {
+        // A redstone-style build shatters into one dominant mass plus many
+        // small fragments; with only one core the guard keeps it whole and
+        // loses nothing.
+        let mut s = UniversalSchematic::new("redstone".into());
+        for x in 0..8 {
+            place(&mut s, x, 0, 0); // one core (size 8)
+        }
+        // scattered sub-threshold fragments
+        place(&mut s, 50, 0, 0);
+        place(&mut s, 60, 5, 0);
+        place(&mut s, 70, 0, 9);
+
+        let pieces = s.split_connected_attach(Connectivity::Corner, 4);
+        assert_eq!(pieces.len(), 1, "one core -> single whole piece");
+        assert_eq!(
+            pieces[0].total_blocks(),
+            s.total_blocks(),
+            "no fragment dropped"
+        );
     }
 
     #[test]
