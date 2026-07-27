@@ -87,6 +87,7 @@ public final class TraceCapture {
         int maxTicks = Integer.parseInt(arg(args, "--max-ticks", "40"));
         Path out = Path.of(arg(args, "--out", "work/trace.json"));
         String dumpPlaced = arg(args, "--dump-placed", null);
+        String watchAt = arg(args, "--watch", null);
         String probeAt = arg(args, "--probe", null);
         int probeTick = Integer.parseInt(arg(args, "--probe-tick", "-1"));
         String probePush = arg(args, "--probe-push", null);
@@ -376,6 +377,12 @@ public final class TraceCapture {
         }
 
         installBlockEventLog(level);
+        if (watchAt != null) {
+            String[] wp = watchAt.split(",");
+            WATCH = ORIGIN.offset(Integer.parseInt(wp[0].trim()),
+                    Integer.parseInt(wp[1].trim()), Integer.parseInt(wp[2].trim()));
+            System.out.printf("  watching %s%n", watchAt);
+        }
         installNotifyLog(level);
         for (int tick = 0; tick < maxTicks; tick++) {
             EVENT_LOG.clear();
@@ -754,16 +761,44 @@ public final class TraceCapture {
         }
     }
 
+    /// `--watch x,y,z` — sample a position at every notification and report it
+    /// whenever it changes.
+    ///
+    /// Mid-tick state is otherwise unobservable: a snapshot capture only sees
+    /// the end of a tick, and a probe runs between ticks. But the updater holds
+    /// the level and is called throughout the cascade, so sampling from inside
+    /// it gives a view of the world *as the tick runs* — which is where every
+    /// remaining divergence has been hiding.
+    private static BlockPos WATCH = null;
+    private static String watchLast = null;
+
     private static final class LoggingUpdater
             extends net.minecraft.world.level.redstone.CollectingNeighborUpdater {
+        private final net.minecraft.world.level.Level level;
+
         LoggingUpdater(net.minecraft.world.level.Level level, int max) {
             super(level, max);
+            this.level = level;
+        }
+
+        private void sample() {
+            if (WATCH == null) {
+                return;
+            }
+            String now = String.format("%s powered=%s best=%d",
+                    level.getBlockState(WATCH), level.hasNeighborSignal(WATCH),
+                    level.getBestNeighborSignal(WATCH));
+            if (!now.equals(watchLast)) {
+                watchLast = now;
+                System.out.printf("  WATCH@%d %s%n", NOTIFY_LOG.size(), now);
+            }
         }
 
         @Override
         public void shapeUpdate(Direction dir, BlockState state, BlockPos pos, BlockPos neighborPos,
                 int flags, int recursion) {
             note("shape", pos);
+            sample();
             super.shapeUpdate(dir, state, pos, neighborPos, flags, recursion);
         }
 
@@ -771,6 +806,7 @@ public final class TraceCapture {
         public void neighborChanged(BlockPos pos, net.minecraft.world.level.block.Block block,
                 net.minecraft.world.level.redstone.Orientation orientation) {
             note("neighbor", pos);
+            sample();
             super.neighborChanged(pos, block, orientation);
         }
 
@@ -779,6 +815,7 @@ public final class TraceCapture {
                 net.minecraft.world.level.block.Block block,
                 net.minecraft.world.level.redstone.Orientation orientation, boolean movedByPiston) {
             note("neighbor", pos);
+            sample();
             super.neighborChanged(state, pos, block, orientation, movedByPiston);
         }
 
@@ -787,6 +824,7 @@ public final class TraceCapture {
                 net.minecraft.world.level.block.Block block, Direction skip,
                 net.minecraft.world.level.redstone.Orientation orientation) {
             note("neighbors_at", pos);
+            sample();
             super.updateNeighborsAtExceptFromFacing(pos, block, skip, orientation);
         }
     }
