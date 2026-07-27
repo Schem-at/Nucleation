@@ -84,6 +84,12 @@ pub trait Movability: Send + Sync {
     /// One immovable block anywhere in a resolved structure cancels the whole push.
     fn is_movable(&self, world: &World, pos: Pos) -> bool;
 
+    /// Whether a push *breaks* the block at `pos` instead of moving it —
+    /// `PushReaction.DESTROY`, which is dust, torches, rails and plants.
+    fn destroys(&self, _world: &World, _pos: Pos) -> bool {
+        false
+    }
+
     /// Whether the block at `pos` is air, i.e. free space for a push to end in.
     fn is_empty(&self, world: &World, pos: Pos) -> bool {
         world.get(pos) == StateId::AIR
@@ -115,6 +121,13 @@ pub struct PushPlan {
     /// Far-end-first is what makes applying the plan a simple loop: each block is
     /// written into space the previous write has already vacated.
     pub to_push: Vec<Pos>,
+    /// Positions the push destroys rather than moves, in collection order.
+    ///
+    /// `PistonStructureResolver.toDestroy`. They are broken, not carried, and
+    /// `moveBlocks` notifies each of them before it notifies the vacated
+    /// sources — dust breaking beside a piston is a power change like any
+    /// other, and something has to hear it.
+    pub to_destroy: Vec<Pos>,
     /// Whether the push is possible at all.
     pub possible: bool,
 }
@@ -132,21 +145,27 @@ pub fn resolve_push(
 ) -> PushPlan {
     let start = piston.offset(dir);
     let mut to_push: Vec<Pos> = Vec::new();
-    let failed = PushPlan { to_push: Vec::new(), possible: false };
+    let mut to_destroy: Vec<Pos> = Vec::new();
+    let failed = PushPlan { to_push: Vec::new(), to_destroy: Vec::new(), possible: false };
 
     // `resolve()`: the start block must be pushable at all, then one line from
     // it, then a branching pass over every sticky block collected.
     if !movability.is_empty(world, start) && !movability.is_movable(world, start) {
+        // `resolve()`: a start block that breaks is collected and the push
+        // still goes ahead — with nothing to carry.
+        if movability.destroys(world, start) {
+            return PushPlan { to_push, to_destroy: vec![start], possible: true };
+        }
         return failed;
     }
-    if !add_block_line(world, movability, piston, dir, start, dir, &mut to_push) {
+    if !add_block_line(world, movability, piston, dir, start, dir, &mut to_push, &mut to_destroy) {
         return failed;
     }
     let mut index = 0;
     while index < to_push.len() {
         let pos = to_push[index];
         if movability.sticky(world, pos).is_some()
-            && !add_branching_blocks(world, movability, piston, dir, pos, &mut to_push)
+            && !add_branching_blocks(world, movability, piston, dir, pos, &mut to_push, &mut to_destroy)
         {
             return failed;
         }
@@ -162,7 +181,7 @@ pub fn resolve_push(
     // a branch pulled sideways by slime has no meaningful position on that axis,
     // and the order is observable anyway, because the moving block entities land
     // in creation order and each landing notifies its neighbours.
-    PushPlan { to_push, possible: true }
+    PushPlan { to_push, to_destroy, possible: true }
 }
 
 /// `PistonStructureResolver.addBlockLine`.
@@ -181,11 +200,15 @@ fn add_block_line(
     origin: Pos,
     _face: Dir,
     to_push: &mut Vec<Pos>,
+    to_destroy: &mut Vec<Pos>,
 ) -> bool {
     if movability.is_empty(world, origin) {
         return true;
     }
     if !movability.is_movable(world, origin) {
+        if movability.destroys(world, origin) && !to_destroy.contains(&origin) {
+            to_destroy.push(origin);
+        }
         return true;
     }
     if origin == piston || to_push.contains(&origin) {
@@ -231,7 +254,7 @@ fn add_block_line(
             for index in 0..=(collision + added).min(to_push.len().saturating_sub(1)) {
                 let pos = to_push[index];
                 if movability.sticky(world, pos).is_some()
-                    && !add_branching_blocks(world, movability, piston, push_dir, pos, to_push)
+                    && !add_branching_blocks(world, movability, piston, push_dir, pos, to_push, to_destroy)
                 {
                     return false;
                 }
@@ -274,6 +297,7 @@ fn add_branching_blocks(
     push_dir: Dir,
     pos: Pos,
     to_push: &mut Vec<Pos>,
+    to_destroy: &mut Vec<Pos>,
 ) -> bool {
     let sticky = movability.sticky(world, pos);
     for dir in crate::pos::ALL_DIRS {
@@ -287,7 +311,7 @@ fn add_branching_blocks(
         if movability.is_empty(world, neighbour) {
             continue;
         }
-        if !add_block_line(world, movability, piston, push_dir, neighbour, dir, to_push) {
+        if !add_block_line(world, movability, piston, push_dir, neighbour, dir, to_push, to_destroy) {
             return false;
         }
     }
@@ -307,7 +331,7 @@ pub fn resolve_pull(
     dir: Dir,
 ) -> PushPlan {
     if movability.is_empty(world, start) || !movability.is_movable(world, start) {
-        return PushPlan { to_push: Vec::new(), possible: false };
+        return PushPlan { to_push: Vec::new(), to_destroy: Vec::new(), possible: false };
     }
 
     let mut chosen: Vec<Pos> = Vec::new();
@@ -341,7 +365,7 @@ pub fn resolve_pull(
     // is already clear.
     chosen.sort_by_key(|pos| -axis(*pos, dir));
 
-    PushPlan { possible: !chosen.is_empty(), to_push: chosen }
+    PushPlan { possible: !chosen.is_empty(), to_push: chosen, to_destroy: Vec::new() }
 }
 
 /// A position's coordinate along `dir`, increasing in the direction of travel.
@@ -565,6 +589,12 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // appearing beside an observer gives it a shape update and it
                 // pulses two ticks later, on the tick the block is still in
                 // flight rather than the tick it lands.
+                // A push breaks these outright — `setBlock(pos, AIR, 276)`,
+                // which carries UPDATE_KNOWN_SHAPE and so says nothing on its
+                // own. The notification comes from the tail pass below.
+                for pos in plan.to_destroy.clone() {
+                    ctx.set_quiet(pos, StateId::AIR);
+                }
                 for (from, state) in carried.iter().rev() {
                     let to = from.offset(self.facing);
                     // A vacated source becomes **air**, not a placeholder — captured
@@ -593,6 +623,11 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // still reads `extended=false`. Deferring them until after the
                 // base write shows every notified block a piston that has
                 // already finished moving, which is a different world.
+                // Destroyed blocks go first, exactly as `moveBlocks` walks
+                // them: the toDestroy loop runs before the vacated-source loop.
+                for pos in plan.to_destroy.iter().rev() {
+                    ctx.update_neighbors_at(*pos);
+                }
                 for (from, _) in carried.iter().rev() {
                     ctx.update_neighbors_at(*from);
                 }

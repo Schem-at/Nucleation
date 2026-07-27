@@ -163,6 +163,8 @@ pub struct VanillaRules {
     signal_sources: Vec<StateId>,
     /// Blocks dust can climb: `canSurviveOn`, i.e. a sturdy upward face.
     sturdy_up: Vec<StateId>,
+    /// `PushReaction.DESTROY`: broken by a push rather than carried.
+    destroyed_by_push: Vec<StateId>,
     /// Repeater states, which dust faces only along their axis.
     repeaters: Vec<StateId>,
     /// Observer states and the direction they look, which is the only face
@@ -486,6 +488,10 @@ impl PowerSource for VanillaRules {
 }
 
 impl Movability for VanillaRules {
+    fn destroys(&self, world: &World, pos: Pos) -> bool {
+        self.destroyed_by_push.contains(&world.get(pos))
+    }
+
     fn is_movable(&self, world: &World, pos: Pos) -> bool {
         let state = world.get(pos);
         state != StateId::AIR && !self.immovable.contains(&state)
@@ -709,6 +715,28 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
         }
         if descriptor.name == "minecraft:repeater" {
             rules.repeaters.push(*id);
+        }
+        // `PushReaction.DESTROY`. Dust and torches are the ones that matter for
+        // redstone: a piston pushing into them breaks them, and the break is a
+        // power change the circuit has to hear about.
+        if matches!(
+            descriptor.name.as_str(),
+            "minecraft:redstone_wire"
+                | "minecraft:redstone_torch"
+                | "minecraft:redstone_wall_torch"
+                | "minecraft:lever"
+                | "minecraft:stone_button"
+                | "minecraft:oak_button"
+                | "minecraft:stone_pressure_plate"
+                | "minecraft:oak_pressure_plate"
+                | "minecraft:rail"
+                | "minecraft:powered_rail"
+                | "minecraft:detector_rail"
+                | "minecraft:activator_rail"
+                | "minecraft:torch"
+                | "minecraft:wall_torch"
+        ) {
+            rules.destroyed_by_push.push(*id);
         }
         if descriptor.name == "minecraft:observer" {
             if let Some(facing) = descriptor.facing() {
