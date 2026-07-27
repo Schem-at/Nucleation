@@ -1219,6 +1219,22 @@ fn the_4x4_vault_door_runs_a_full_cycle_in_the_world_it_was_built_in() {
     );
 }
 
+/// The 4x4 sliding door, a full close/open cycle.
+///
+/// Slime and honey both, so its panels travel in dragged trains rather than
+/// being pushed directly — the mechanism the vault door's opening stroke turned
+/// on. Exact for all twenty-two recorded ticks once the wire hash was given the
+/// world origin the capture recorded.
+#[test]
+fn the_4x4_sliding_door_runs_a_full_close_open_cycle() {
+    run_door_cycle(
+        "door_4x4_sliding.snbt",
+        "door_4x4_sliding_cycle.json",
+        "nucleation:door_4x4_sliding",
+        &[(Pos::new(7, 3, 0), 10), (Pos::new(7, 3, 0), 60)],
+    );
+}
+
 /// The same door under stress: six clicks, two of them mid-stroke.
 ///
 /// A close interrupted five ticks in, resumed fifteen ticks later, then a pair

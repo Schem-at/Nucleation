@@ -58,6 +58,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Run vanilla's placement pass first — a community build saved mid-cycle
     // needs it before it means anything.
     let settle = args.iter().any(|a| a == "--settle");
+    let in_world = args.iter().any(|a| a == "--in-world");
+    // Where the build sits in the game's coordinates; `updatePowerStrength`
+    // iterates a HashSet whose order follows from absolute position.
+    let hash_origin = flag(&args, "--origin")
+        .map(|v| {
+            let c: Vec<i32> = v.split(',').map(|p| p.parse().expect("--origin x,y,z")).collect();
+            Pos::new(c[0], c[1], c[2])
+        })
+        .unwrap_or_default();
     // Framing. A door is wide and tall but thin, so the rotation-invariant
     // sphere fit wastes most of the frame on empty air; --tight uses the
     // silhouette fit instead.
@@ -132,7 +141,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             (initial, changes, Vec::new())
         }
         None => {
-            let out = simulate(snbt_path, ticks, &clicks, &pulses, &breaks, &places, settle);
+            let out = simulate(snbt_path, ticks, &clicks, &pulses, &breaks, &places, settle, in_world, hash_origin);
             println!("simulated {ticks} ticks, {} block changes", out.1.len());
             out
         }
@@ -415,6 +424,8 @@ fn simulate(
     breaks: &[(Pos, u64)],
     places: &[(Pos, u64)],
     settle: bool,
+    in_world: bool,
+    hash_origin: Pos,
 ) -> (
     Vec<(Pos, String)>,
     Vec<(u64, Pos, String, String)>,
@@ -431,7 +442,7 @@ fn simulate(
     mc_tick::intern_companions(sim.registry_mut());
     {
         let mut table = std::mem::take(sim.behaviours_mut());
-        mc_tick::register_all(sim.registry_mut(), &mut table);
+        mc_tick::register_all_at(sim.registry_mut(), &mut table, hash_origin);
         *sim.behaviours_mut() = table;
     }
     if let Some(report) = sim.unknown_report() {
@@ -483,7 +494,7 @@ fn simulate(
         .expect("intern redstone block");
     {
         let mut table = std::mem::take(sim.behaviours_mut());
-        mc_tick::register_all(sim.registry_mut(), &mut table);
+        mc_tick::register_all_at(sim.registry_mut(), &mut table, hash_origin);
         *sim.behaviours_mut() = table;
     }
     for (pos, entry) in &structure.blocks {
@@ -496,12 +507,18 @@ fn simulate(
         }
     }
 
-    if settle {
-        let order = structure.placement_order(
-            mc_tick::vanilla::is_collision_full_cube,
-            mc_tick::vanilla::has_dynamic_shape,
-        );
-        sim.settle_with_order(&order);
+    // `onPlace` runs on every write whatever the flags, so a placed build gets
+    // it even for a quiet placement; `--in-world` is for a recording taken where
+    // the build already stood, which is placed by nothing at all.
+    let order = structure.placement_order(
+        mc_tick::vanilla::is_collision_full_cube,
+        mc_tick::vanilla::has_dynamic_shape,
+    );
+    if !in_world {
+        sim.place_on_place(&order);
+        if settle {
+            sim.settle_with_order(&order);
+        }
     }
     sim.record();
     for t in 0..ticks {
