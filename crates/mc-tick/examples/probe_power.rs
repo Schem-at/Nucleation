@@ -21,6 +21,8 @@ fn main() {
     let path = args.first().expect("structure").clone();
     let target = coords(args.get(1).expect("x,y,z"));
     let quiet = args.iter().any(|a| a == "--quiet");
+    // A build recorded where it stood is placed by nothing at all.
+    let in_world = args.iter().any(|a| a == "--in-world");
     // Ordering follows absolute position, so a probe without the build's origin
     // answers for a copy of it sitting at zero.
     let hash_origin = args
@@ -74,9 +76,11 @@ fn main() {
         mc_tick::vanilla::is_collision_full_cube,
         mc_tick::vanilla::has_dynamic_shape,
     );
-    sim.place_on_place(&order);
-    if !quiet {
-        sim.settle_with_order(&order);
+    if !in_world {
+        sim.place_on_place(&order);
+        if !quiet {
+            sim.settle_with_order(&order);
+        }
     }
     for tick in 0..at {
         for (pos, when) in &uses {
