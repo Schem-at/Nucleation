@@ -1,0 +1,41 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:dust_cascade",
+  "detail": "normal",
+  "game_time_at_start": 5,
+  "queues": [
+    {"tick": 0, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}},
+    {"tick": 1, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}},
+    {"tick": 2, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}},
+    {"tick": 3, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}},
+    {"tick": 4, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}},
+    {"tick": 5, "before": {"events": [{"pos": [5, 1, 1], "block": "minecraft:sticky_piston", "id": 0, "param": 3}, {"pos": [3, 1, 1], "block": "minecraft:sticky_piston", "id": 0, "param": 3}, {"pos": [2, 1, 1], "block": "minecraft:sticky_piston", "id": 0, "param": 3}, {"pos": [1, 1, 1], "block": "minecraft:sticky_piston", "id": 0, "param": 3}, {"pos": [4, 1, 1], "block": "minecraft:sticky_piston", "id": 0, "param": 3}, {"pos": [6, 1, 1], "block": "minecraft:sticky_piston", "id": 0, "param": 3}], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}},
+    {"tick": 6, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}},
+    {"tick": 7, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}},
+    {"tick": 8, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}},
+    {"tick": 9, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}},
+    {"tick": 10, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}},
+    {"tick": 11, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}}
+  ],
+  "ticks": [
+    {
+      "tick": 5,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [5, 1, 1], "from": "minecraft:sticky_piston[extended=false,facing=south]", "to": "minecraft:moving_piston[facing=south,type=sticky]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [6, 1, 1], "from": "minecraft:sticky_piston[extended=false,facing=south]", "to": "minecraft:sticky_piston[extended=true,facing=south]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [5, 2, 1], "from": "minecraft:redstone_wire[east=side,north=none,power=0,south=none,west=side]", "to": "minecraft:air"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [6, 2, 1], "from": "minecraft:redstone_wire[east=side,north=none,power=0,south=none,west=side]", "to": "minecraft:air"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [7, 2, 1], "from": "minecraft:lever[face=floor,facing=west,powered=false]", "to": "minecraft:lever[face=floor,facing=west,powered=true]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [6, 1, 2], "from": "minecraft:air", "to": "minecraft:moving_piston[facing=south,type=sticky]"}
+      ]
+    },
+    {
+      "tick": 7,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [5, 1, 1], "from": "minecraft:moving_piston[facing=south,type=sticky]", "to": "minecraft:sticky_piston[extended=false,facing=south]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [6, 1, 2], "from": "minecraft:moving_piston[facing=south,type=sticky]", "to": "minecraft:piston_head[facing=south,short=false,type=sticky]"}
+      ]
+    }
+  ]
+}
