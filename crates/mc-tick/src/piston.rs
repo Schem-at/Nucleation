@@ -689,6 +689,25 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                         (pos.x, pos.y, pos.z),
                         self.facing
                     );
+                    // The local layout at this instant, so the shape of the
+                    // dust can be read rather than inferred.
+                    for z in (pos.z - 1)..=(pos.z + 1) {
+                        eprintln!("    --- z={z}");
+                        for y in ((pos.y - 2)..=(pos.y + 2)).rev() {
+                            let row: Vec<String> = ((pos.x - 2)..=(pos.x + 2))
+                                .map(|x| {
+                                    let d = ctx
+                                        .states
+                                        .descriptor(ctx.world.get(Pos::new(x, y, z)))
+                                        .unwrap_or("?")
+                                        .trim_start_matches("minecraft:");
+                                    let mark = if (x, y, z) == (pos.x, pos.y, pos.z) { "*" } else { " " };
+                                    format!("{mark}{:<38}", &d[..d.len().min(38)])
+                                })
+                                .collect();
+                            eprintln!("    y{y:<3}{}", row.join(""));
+                        }
+                    }
                     for (label, base, skip) in
                         [("direct", pos, Some(self.facing)), ("qc", pos.offset(Dir::Up), Some(Dir::Down))]
                     {
