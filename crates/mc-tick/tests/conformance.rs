@@ -234,6 +234,12 @@ enum Settle {
     /// which sits completely still until clicked. The engine equivalent is
     /// simply not settling.
     Quiet,
+    /// Not placed at all. The capture ticked a build where it already stood in
+    /// a saved world, so the states are loaded as they were left and nothing —
+    /// not even `onPlace` — runs over them. Anything else re-derives a
+    /// repeater's `locked` and a wire's connections from scratch, which is
+    /// exactly what pasting a built machine gets wrong.
+    InWorld,
 }
 
 /// An actuation applied at a tick boundary, mirroring the capture tool's flags.
@@ -435,7 +441,9 @@ fn run_conformance_full(
     // `onPlace` runs on every write whatever the flags, so it happens for a
     // knownShape placement too — a piston already powered when it is placed
     // resolves and queues its block event with no update pass in sight.
-    sim.place_on_place(&order);
+    if settle != Settle::InWorld {
+        sim.place_on_place(&order);
+    }
     if settle == Settle::Placement {
         sim.settle_with_order(&order);
     }
@@ -1170,6 +1178,62 @@ fn the_3x3_flush_synced_settles_like_vanilla() {
         "door_3x3_flush_quiet.json",
         "nucleation:door_3x3_flush",
         None,
+    );
+}
+
+/// The 4x4 vault door, recorded in the world it was built in.
+///
+/// The one door that had never been compared against a reference worth
+/// trusting. Every earlier capture pasted it into an empty world first, and
+/// `placeInWorld` re-derives repeater `locked` and wire connections and loads
+/// block-entity NBT after the block write — so the memory cell that holds the
+/// door came up unlatched and the machine could not run. Ticked where it
+/// stands, it seals completely, four strokes running.
+///
+/// Three lever clicks: close, open, close. The second close is event-for-event
+/// identical to the first, which is the real test — a door that opens and does
+/// not return to the state it started in is a door that works once.
+#[test]
+fn the_4x4_vault_door_runs_a_full_cycle_in_the_world_it_was_built_in() {
+    run_conformance_full(
+        "door_4x4_vault_inworld.snbt",
+        "door_4x4_vault_inworld.json",
+        "nucleation:door_4x4_vault",
+        &[],
+        &[
+            (10, Actuate::Use(Pos::new(7, 5, 1))),
+            (40, Actuate::Use(Pos::new(7, 5, 1))),
+            (70, Actuate::Use(Pos::new(7, 5, 1))),
+        ],
+        None,
+        Settle::InWorld,
+        1.0e-6,
+    );
+}
+
+/// A dust corner losing the block beside it, which is the vault door's opening
+/// stroke reduced to twenty-four blocks.
+///
+/// A sticky piston pulls a redstone block out from beside a dust corner. The
+/// slot it vacates is cleared with flag 82 — `UPDATE_KNOWN_SHAPE`, silent — and
+/// `moveBlocks` then runs `updateNeighbourShapes` over it by hand, which is the
+/// only thing that tells the dust to re-examine its connections. It drops the
+/// west connection and the symmetry rule runs it north-south instead.
+///
+/// It also pins the registry: the state the dust turns into appears nowhere in
+/// the schematic, and a rewrite naming a state that does not exist is dropped
+/// in silence.
+#[test]
+fn a_piston_pulling_a_block_from_beside_a_dust_corner_reshapes_it() {
+    run_conformance_full(
+        "wire_corner_pull.snbt",
+        "wire_corner_pull.json",
+        "nucleation:wire_corner_pull",
+        &[],
+        &[(10, Actuate::Use(Pos::new(0, 2, 1)))],
+        None,
+        Settle::Placement,
+        1.0e-6,
     );
 }
 

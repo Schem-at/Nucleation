@@ -324,54 +324,62 @@ fn add_branching_blocks(
 /// the piston. Unlike a push there is no column ahead to shove — only the pulled
 /// block and whatever adheres to it — so a blocked destination simply means that
 /// piece stays put rather than cancelling the retraction.
-pub fn resolve_pull(
-    world: &World,
-    movability: &dyn Movability,
-    start: Pos,
-    dir: Dir,
-) -> PushPlan {
+pub fn resolve_pull(world: &World, movability: &dyn Movability, piston: Pos, facing: Dir) -> PushPlan {
+    // `PistonStructureResolver` has no separate retract path. Constructed with
+    // `extending = false` it sets `pushDirection = dir.getOpposite()` and
+    // `startPos = pos.relative(dir, 2)`, and `resolve()` is then the same
+    // method: one block line from the start, then a branching pass over every
+    // sticky block it collected.
+    //
+    // A breadth-first walk over sticky neighbours stood in for this and is not
+    // the same shape. It grows one block at a time where the game grows a whole
+    // *line* — so a slime block dragged sideways brought only its immediate
+    // neighbour along, not the row that neighbour is stuck to — and it filters
+    // on the destination being free, which rejects a block whose destination is
+    // occupied by another block moving out of the way in the same stroke. The
+    // vault door opens on exactly that: a pulled slime block sticks to a second
+    // slime block a row below, and *that* one carries a piston and a panel.
+    let push_dir = facing.opposite();
+    let start = piston.offset(facing).offset(facing);
+    let failed = PushPlan { to_push: Vec::new(), to_destroy: Vec::new(), possible: false };
+
     if movability.is_empty(world, start) || !movability.is_movable(world, start) {
-        return PushPlan { to_push: Vec::new(), to_destroy: Vec::new(), possible: false };
+        return failed;
+    }
+    let mut to_push: Vec<Pos> = Vec::new();
+    let mut to_destroy: Vec<Pos> = Vec::new();
+    if !add_block_line(
+        world,
+        movability,
+        piston,
+        push_dir,
+        start,
+        push_dir,
+        &mut to_push,
+        &mut to_destroy,
+    ) {
+        return failed;
+    }
+    let mut index = 0;
+    while index < to_push.len() {
+        let pos = to_push[index];
+        if movability.sticky(world, pos).is_some()
+            && !add_branching_blocks(
+                world,
+                movability,
+                piston,
+                push_dir,
+                pos,
+                &mut to_push,
+                &mut to_destroy,
+            )
+        {
+            return failed;
+        }
+        index += 1;
     }
 
-    let mut chosen: Vec<Pos> = Vec::new();
-    let mut frontier: Vec<Pos> = vec![start];
-
-    while let Some(pos) = frontier.pop() {
-        if chosen.contains(&pos) || chosen.len() >= MAX_PUSH_DEPTH {
-            continue;
-        }
-        if movability.is_empty(world, pos) || !movability.is_movable(world, pos) {
-            continue;
-        }
-        // Only pull into space that is actually free.
-        let destination = pos.offset(dir);
-        if !movability.is_empty(world, destination) && !chosen.contains(&destination) {
-            continue;
-        }
-        chosen.push(pos);
-
-        if let Some(kind) = movability.sticky(world, pos) {
-            for side in crate::pos::ALL_DIRS {
-                let neighbour = pos.offset(side);
-                if adheres(Some(kind), movability.sticky(world, neighbour)) {
-                    frontier.push(neighbour);
-                }
-            }
-        }
-    }
-
-    // Nearest-first along the pull direction, so each block moves into space that
-    // is already clear.
-    chosen.sort_by_key(|pos| -axis(*pos, dir));
-
-    PushPlan { possible: !chosen.is_empty(), to_push: chosen, to_destroy: Vec::new() }
-}
-
-/// A position's coordinate along `dir`, increasing in the direction of travel.
-fn axis(pos: Pos, dir: Dir) -> i32 {
-    let (dx, dy, dz) = dir.delta();
-    pos.x * dx + pos.y * dy + pos.z * dz
+    PushPlan { possible: true, to_push, to_destroy }
 }
 
 /// A piston.
@@ -713,7 +721,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                         // A pulled slime block drags its own neighbours exactly as
                         // a pushed one does. The return stroke matters as much as
                         // the push for doors.
-                        let plan = resolve_pull(ctx.world, &self.movability, target, back);
+                        let plan = resolve_pull(ctx.world, &self.movability, pos, self.facing);
                         if plan.possible {
                             let carried: Vec<(Pos, StateId)> = plan
                                 .to_push

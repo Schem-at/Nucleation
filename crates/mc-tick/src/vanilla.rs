@@ -598,6 +598,9 @@ const INERT: &[&str] = &[
     "minecraft:white_concrete",
     "minecraft:cyan_concrete",
     "minecraft:lime_concrete",
+    // The floor the vault door stands on, which only an in-world recording
+    // includes — a pasted build brings the machine and none of its setting.
+    "minecraft:gray_concrete",
     "minecraft:cyan_wool",
     "minecraft:lime_wool",
     "minecraft:orange_wool",
