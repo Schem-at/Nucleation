@@ -21,6 +21,17 @@ fn main() {
     let path = args.first().expect("structure").clone();
     let target = coords(args.get(1).expect("x,y,z"));
     let quiet = args.iter().any(|a| a == "--quiet");
+    // Ordering follows absolute position, so a probe without the build's origin
+    // answers for a copy of it sitting at zero.
+    let hash_origin = args
+        .iter()
+        .position(|a| a == "--origin")
+        .and_then(|i| args.get(i + 1))
+        .map(|v| {
+            let c: Vec<i32> = v.split(',').map(|p| p.parse().expect("--origin x,y,z")).collect();
+            Pos::new(c[0], c[1], c[2])
+        })
+        .unwrap_or_default();
     let at: u64 = args
         .iter()
         .position(|a| a == "--at")
@@ -49,7 +60,7 @@ fn main() {
     mc_tick::intern_companions(sim.registry_mut());
     let rules = {
         let mut table = std::mem::take(sim.behaviours_mut());
-        let rules = mc_tick::register_all(sim.registry_mut(), &mut table);
+        let rules = mc_tick::register_all_at(sim.registry_mut(), &mut table, hash_origin);
         *sim.behaviours_mut() = table;
         rules
     };
