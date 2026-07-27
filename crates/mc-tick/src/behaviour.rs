@@ -112,6 +112,18 @@ pub struct UpdateEntry {
     cursor: usize,
 }
 
+
+/// `MC_TICK_TRACE_UPDATES=1` — every neighbour update the engine asks for.
+///
+/// Logged where the update is *requested*, which is where the game logs its
+/// own, so the two sequences line up call for call. Granularity is the call,
+/// not the notification: one `neighbors_at` covers six neighbours.
+pub(crate) fn trace_update(kind: &str, pos: Pos) {
+    if std::env::var_os("MC_TICK_TRACE_UPDATES").is_some() {
+        eprintln!("[upd] {kind} {} {} {}", pos.x, pos.y, pos.z);
+    }
+}
+
 impl UpdateEntry {
     /// An entry dispatching `items` in order.
     pub fn new(items: Vec<(Pos, Dir, UpdateKind)>) -> Self {
@@ -120,6 +132,7 @@ impl UpdateEntry {
 
     /// One `updateNeighborsAt(pos)`: the six neighbours in `UPDATE_ORDER`.
     pub fn neighbors_at(pos: Pos) -> Self {
+        trace_update("neighbors_at", pos);
         Self::new(
             crate::pos::UPDATE_ORDER
                 .iter()
@@ -131,6 +144,9 @@ impl UpdateEntry {
     /// One `updateNeighbourShapes(pos)`: the six neighbours in
     /// `UPDATE_SHAPE_ORDER`, each hearing a shape update from this side.
     pub fn neighbor_shapes(pos: Pos) -> Self {
+        for dir in crate::pos::UPDATE_SHAPE_ORDER {
+            trace_update("shape", pos.offset(dir));
+        }
         Self::new(
             crate::pos::UPDATE_SHAPE_ORDER
                 .iter()
@@ -142,6 +158,9 @@ impl UpdateEntry {
     /// `updateFromNeighbourShapes(pos)`: the block at `pos` hears a shape
     /// update from every side, in `UPDATE_SHAPE_ORDER`.
     pub fn own_shapes(pos: Pos) -> Self {
+        for _ in crate::pos::UPDATE_SHAPE_ORDER {
+            trace_update("shape", pos);
+        }
         Self::new(
             crate::pos::UPDATE_SHAPE_ORDER
                 .iter()
@@ -409,6 +428,7 @@ impl<'a> TickCtx<'a> {
 
     /// Queue a single notification (`level.neighborChanged` directly).
     pub fn notify(&mut self, pos: Pos, from: Dir) {
+        trace_update("neighbor", pos);
         self.updates
             .push(UpdateEntry::new(vec![(pos, from, UpdateKind::Neighbor)]));
     }
@@ -437,7 +457,19 @@ impl<'a> TickCtx<'a> {
         }
         // markAndNotifyBlock, flag 3: neighbour updates first, then the shape
         // pass that observers listen to.
+        //
+        // The neighbour updates are *dispatched* before the shape pass is even
+        // requested. `blockUpdated` goes through `addAndRun`, which runs on the
+        // spot whenever the updater's stack is empty, and only when it returns
+        // does `markAndNotifyBlock` reach `updateNeighbourShapes`. Queueing both
+        // and draining once puts every shape update ahead of anything the
+        // neighbour updates set off — including a piston head forwarding to its
+        // base, which is how this first showed up.
+        //
+        // Nested calls are unaffected: `drain` is a no-op while a drain is
+        // already running, which is exactly what `addAndRun` does.
         self.updates.push(UpdateEntry::neighbors_at(pos));
+        self.drain();
         self.updates.push(UpdateEntry::neighbor_shapes(pos));
     }
 

@@ -1467,8 +1467,21 @@ impl Simulation {
                     // extend before it wakes the piston underneath it.
                     self.updates
                         .push(crate::behaviour::UpdateEntry::neighbors_at(entry.pos));
+                    self.propagate();
                     self.updates
                         .push(crate::behaviour::UpdateEntry::neighbor_shapes(entry.pos));
+                    self.propagate();
+                    // `finalTick` ends with `level.neighborChanged(pos, block,
+                    // null)` — the landed block hearing a neighbour update at
+                    // its *own* position, after everything else. Vanilla passes
+                    // no orientation; nothing that reacts to this reads the
+                    // direction, so Down stands in for the absent one.
+                    self.updates.push(crate::behaviour::UpdateEntry::new(vec![(
+                        entry.pos,
+                        crate::pos::Dir::Down,
+                        crate::behaviour::UpdateKind::Neighbor,
+                    )]));
+                    crate::behaviour::trace_update("neighbor", entry.pos);
                     self.propagate();
                 }
                 None

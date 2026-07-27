@@ -654,15 +654,26 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 for (from, _) in carried.iter().rev() {
                     if *from != head_slot && !destinations.contains(from) {
                         ctx.update_neighbour_shapes(*from);
+                        ctx.drain();
                     }
                 }
                 // Destroyed blocks go first, exactly as `moveBlocks` walks
                 // them: the toDestroy loop runs before the vacated-source loop.
+                //
+                // Each call is dispatched before the next is made. `moveBlocks`
+                // calls `Level.updateNeighborsAt` one position at a time, and
+                // every one of those finds the updater's stack empty and runs
+                // on the spot — so a piston head that forwards to its base does
+                // so *between* two of these calls, not after all of them.
+                // Batching them and draining once reorders the whole cascade
+                // from that point on.
                 for pos in plan.to_destroy.iter().rev() {
                     ctx.update_neighbors_at(*pos);
+                    ctx.drain();
                 }
                 for (from, _) in carried.iter().rev() {
                     ctx.update_neighbors_at(*from);
+                    ctx.drain();
                 }
                 ctx.update_neighbors_at(head_slot);
                 ctx.drain();
@@ -772,6 +783,12 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     let landed = ctx.moves.remove(index);
                     ctx.set(head, landed.state);
                     ctx.drain();
+                    // `finalTick` ends with `neighborChanged` at its own
+                    // position, whether it runs from the block-entity phase or
+                    // from here inside `triggerEvent`. Same call, same place in
+                    // the sequence — after the write's own notifications.
+                    ctx.notify(head, Dir::Down);
+                    ctx.drain();
                 }
                 ctx.set(pos, self.moving);
                 ctx.defer(pos, self.states.get(false), PISTON_MOVE_TICKS);
@@ -844,8 +861,8 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                             // told, the piston above it never learns its pulse ended.
                             for (from, _) in carried.iter().rev() {
                                 ctx.update_neighbors_at(*from);
+                                ctx.drain();
                             }
-                            ctx.drain();
                         } else {
                             ctx.set(head, StateId::AIR);
                         }

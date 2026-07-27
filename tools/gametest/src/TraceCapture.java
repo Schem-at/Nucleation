@@ -376,8 +376,10 @@ public final class TraceCapture {
         }
 
         installBlockEventLog(level);
+        installNotifyLog(level);
         for (int tick = 0; tick < maxTicks; tick++) {
             EVENT_LOG.clear();
+            NOTIFY_LOG.clear();
             if (useTarget != null && useTicks.contains(tick)) {
                 useBlock(level, useTarget);
             }
@@ -409,8 +411,9 @@ public final class TraceCapture {
             // game *planned* to do this tick, and what it left for the next one.
             // That is enough to place an event in a phase without inventing one.
             queues.add(String.format(
-                    "    {\"tick\": %d, \"before\": %s, \"after\": %s, \"log\": [%s]}",
-                    tick, queuedBefore, queueDump(level), String.join(", ", EVENT_LOG)));
+                    "    {\"tick\": %d, \"before\": %s, \"after\": %s, \"log\": [%s], \"notify\": [%s]}",
+                    tick, queuedBefore, queueDump(level), String.join(", ", EVENT_LOG),
+                    String.join(", ", NOTIFY_LOG)));
             for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
                 String was = previous.get(pos);
                 String now = current.get(pos);
@@ -713,6 +716,89 @@ public final class TraceCapture {
             f.set(level, logging);
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("could not instrument blockEvents", e);
+        }
+    }
+
+    /// Every neighbour update the game *asks for*, in order.
+    ///
+    /// The block-event log says which events ran and says nothing about the
+    /// notifications between them — and those decide the order events get
+    /// queued in, so a divergence hunt with only events keeps landing on
+    /// symptoms. `CollectingNeighborUpdater` is a public non-final class whose
+    /// entry points are all overridable, so a subclass that logs and calls
+    /// super records the sequence without altering it. The field holding it on
+    /// `Level` is final but not static, which reflection can still write.
+    ///
+    /// Its own `setDebugListener` looks like the intended hook and never fires
+    /// here; overriding the entry points does.
+    ///
+    /// Granularity is the *call*, not the individual notification:
+    /// `updateNeighborsAtExceptFromFacing` is one line covering six
+    /// neighbours, which is exactly how the engine models an update entry.
+    private static final List<String> NOTIFY_LOG = new ArrayList<>();
+
+    /// Beyond this a tick's notifications stop being worth the file size.
+    private static final int NOTIFY_LIMIT = 40000;
+
+    private static void note(String kind, BlockPos pos) {
+        if (NOTIFY_LOG.size() < NOTIFY_LIMIT) {
+            NOTIFY_LOG.add(String.format("{\"kind\": \"%s\", \"pos\": [%d, %d, %d]}",
+                    kind, pos.getX() - ORIGIN.getX(), pos.getY() - ORIGIN.getY(),
+                    pos.getZ() - ORIGIN.getZ()));
+        }
+    }
+
+    private static final class LoggingUpdater
+            extends net.minecraft.world.level.redstone.CollectingNeighborUpdater {
+        LoggingUpdater(net.minecraft.world.level.Level level, int max) {
+            super(level, max);
+        }
+
+        @Override
+        public void shapeUpdate(Direction dir, BlockState state, BlockPos pos, BlockPos neighborPos,
+                int flags, int recursion) {
+            note("shape", pos);
+            super.shapeUpdate(dir, state, pos, neighborPos, flags, recursion);
+        }
+
+        @Override
+        public void neighborChanged(BlockPos pos, net.minecraft.world.level.block.Block block,
+                net.minecraft.world.level.redstone.Orientation orientation) {
+            note("neighbor", pos);
+            super.neighborChanged(pos, block, orientation);
+        }
+
+        @Override
+        public void neighborChanged(BlockState state, BlockPos pos,
+                net.minecraft.world.level.block.Block block,
+                net.minecraft.world.level.redstone.Orientation orientation, boolean movedByPiston) {
+            note("neighbor", pos);
+            super.neighborChanged(state, pos, block, orientation, movedByPiston);
+        }
+
+        @Override
+        public void updateNeighborsAtExceptFromFacing(BlockPos pos,
+                net.minecraft.world.level.block.Block block, Direction skip,
+                net.minecraft.world.level.redstone.Orientation orientation) {
+            note("neighbors_at", pos);
+            super.updateNeighborsAtExceptFromFacing(pos, block, skip, orientation);
+        }
+    }
+
+    private static void installNotifyLog(ServerLevel level) {
+        try {
+            java.lang.reflect.Field f =
+                    net.minecraft.world.level.Level.class.getDeclaredField("neighborUpdater");
+            f.setAccessible(true);
+            java.lang.reflect.Field maxField =
+                    net.minecraft.world.level.redstone.CollectingNeighborUpdater.class
+                            .getDeclaredField("maxChainedNeighborUpdates");
+            maxField.setAccessible(true);
+            int max = maxField.getInt(f.get(level));
+            f.set(level, new LoggingUpdater(level, max));
+            System.out.printf("  notify hook: installed (maxChained=%d)%n", max);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("could not instrument neighborUpdater", e);
         }
     }
 
