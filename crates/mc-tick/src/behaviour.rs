@@ -413,6 +413,21 @@ impl<'a> TickCtx<'a> {
         self.world.get(pos)
     }
 
+
+    /// `markAndNotifyBlock`'s indirect passes: the old state's, then — after the
+    /// six-neighbour shape pass — the new state's. Both, because a connection
+    /// that has just gone away still has to tell what it was reaching.
+    fn indirect_shapes(&mut self, pos: Pos, state: StateId) {
+        let Some(table) = self.behaviours else { return };
+        let Some(behaviour) = table.get(state) else { return };
+        let targets = behaviour.indirect_shape_targets(self.world, pos);
+        for (target, from) in targets {
+            trace_update("shape", target);
+            self.updates
+                .push(UpdateEntry::new(vec![(target, from, UpdateKind::Shape)]));
+        }
+    }
+
     /// Queue one `updateNeighborsAt(pos)` entry.
     pub fn update_neighbors_at(&mut self, pos: Pos) {
         self.updates.push(UpdateEntry::neighbors_at(pos));
@@ -489,7 +504,9 @@ impl<'a> TickCtx<'a> {
         // already running, which is exactly what `addAndRun` does.
         self.updates.push(UpdateEntry::neighbors_at(pos));
         self.drain();
+        self.indirect_shapes(pos, previous);
         self.updates.push(UpdateEntry::neighbor_shapes(pos));
+        self.indirect_shapes(pos, state);
     }
 
     /// Set a block without notifying anything, for loading a structure.
@@ -530,7 +547,9 @@ impl<'a> TickCtx<'a> {
         if let Some(log) = self.log.as_deref_mut() {
             log.push(BlockChange { tick: self.tick, pos, from: previous, to: state });
         }
+        self.indirect_shapes(pos, previous);
         self.updates.push(UpdateEntry::neighbor_shapes(pos));
+        self.indirect_shapes(pos, state);
     }
 
     /// The output strength a comparator at `pos` last emitted.
@@ -614,6 +633,20 @@ impl<'a> TickCtx<'a> {
 
 /// How one kind of block behaves.
 pub trait BlockBehaviour: Send + Sync {
+    /// `updateIndirectNeighbourShapes`: the *diagonal* partners a write must
+    /// also shape-update, on top of its six neighbours.
+    ///
+    /// Only dust overrides this in the game, and it is what makes a staircase
+    /// of wire propagate: a wire connected to a block it climbs tells the wire
+    /// above and below that block. Without it a diagonal dust line is deaf to
+    /// its own neighbours.
+    ///
+    /// `markAndNotifyBlock` runs it for the *old* state and the new one, so a
+    /// connection that has just gone away still notifies what it was reaching.
+    fn indirect_shape_targets(&self, _world: &World, _pos: Pos) -> Vec<(Pos, Dir)> {
+        Vec::new()
+    }
+
     /// A neighbour of `pos` changed, in direction `from` relative to `pos`.
     fn on_neighbor_changed(&self, _ctx: &mut TickCtx<'_>, _pos: Pos, _from: Dir) {}
 

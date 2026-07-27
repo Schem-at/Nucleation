@@ -785,9 +785,24 @@ public final class TraceCapture {
             if (WATCH == null) {
                 return;
             }
-            String now = String.format("%s powered=%s best=%d",
+            // Evaluated the way PistonBaseBlock.getNeighborSignal does, because
+            // hasNeighborSignal excludes quasi-connectivity and a piston's power
+            // usually *is* quasi-connectivity.
+            StringBuilder src = new StringBuilder();
+            for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+                int sig = level.getSignal(WATCH.relative(d), d);
+                if (sig > 0) src.append(String.format(" %s=%d", d, sig));
+            }
+            BlockPos above = WATCH.above();
+            for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+                if (d == net.minecraft.core.Direction.DOWN) continue;
+                int sig = level.getSignal(above.relative(d), d);
+                if (sig > 0) src.append(String.format(" qc:%s=%d", d, sig));
+            }
+            String now = String.format("%s powered=%s best=%d  sources:%s",
                     level.getBlockState(WATCH), level.hasNeighborSignal(WATCH),
-                    level.getBestNeighborSignal(WATCH));
+                    level.getBestNeighborSignal(WATCH),
+                    src.length() == 0 ? " none" : src.toString());
             if (!now.equals(watchLast)) {
                 watchLast = now;
                 System.out.printf("  WATCH@%d %s%n", NOTIFY_LOG.size(), now);

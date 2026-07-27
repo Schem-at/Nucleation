@@ -508,6 +508,29 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
     }
 
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        if std::env::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
+            f.to_string_lossy().split(';').any(|t| {
+                let c: Vec<i32> = t.split(',').filter_map(|v| v.trim().parse().ok()).collect();
+                c.len() == 3 && c[0] == pos.x && c[1] == pos.y && c[2] == pos.z
+            })
+        }) {
+            let above = pos.offset(Dir::Up);
+            let qc: Vec<String> = crate::pos::ALL_DIRS
+                .iter()
+                .filter(|d| **d != Dir::Down)
+                .filter(|d| {
+                    self.power.is_powered(ctx.world, ctx.comparator_out, above.offset(**d), d.opposite())
+                })
+                .map(|d| format!("qc:{d:?}"))
+                .collect();
+            eprintln!(
+                "[pwr] {:?} extended={} powered={} {}",
+                (pos.x, pos.y, pos.z),
+                self.extended,
+                self.is_powered(ctx.world, ctx.comparator_out, pos),
+                qc.join(" ")
+            );
+        }
         let powered = self.is_powered(ctx.world, ctx.comparator_out, pos);
         if powered == self.extended {
             return;
