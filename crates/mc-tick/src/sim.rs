@@ -757,6 +757,21 @@ impl Simulation {
                 break;
             }
             let state = self.world.get(pos);
+            // `MC_TICK_TRACE_NOTIFY=x,y,z[;x,y,z...]` reports every update
+            // delivered to those positions, with what the block was at the time.
+            // Divergences in a big cascade are nearly always "was it told, and
+            // what did it see" — this answers both without a capture.
+            if let Some(filter) = std::env::var_os("MC_TICK_TRACE_NOTIFY") {
+                let filter = filter.to_string_lossy().to_string();
+                let key = format!("{},{},{}", pos.x, pos.y, pos.z);
+                if filter.split(';').any(|want| want.trim() == key) {
+                    eprintln!(
+                        "[t{}] notify ({key}) {kind:?} from {from:?}  {}",
+                        self.tick,
+                        self.registry.descriptor(state).unwrap_or("minecraft:air")
+                    );
+                }
+            }
             let Some(behaviour) = self.behaviours.get(state) else {
                 if state != StateId::AIR {
                     self.unknown_seen.push(state);
