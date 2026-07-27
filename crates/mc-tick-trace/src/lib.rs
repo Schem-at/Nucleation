@@ -40,7 +40,7 @@ pub const FORMAT_VERSION: u32 = 1;
 /// Serialised as a three-element array, so a trace stays readable and compact:
 /// `[1, 2, 3]` rather than an object per coordinate, of which a trace holds
 /// thousands.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct TracePos(pub i32, pub i32, pub i32);
 
 impl TracePos {
@@ -210,6 +210,73 @@ pub struct Trace {
     pub detail: Detail,
     /// Per-tick records, ascending.
     pub ticks: Vec<TickRecord>,
+    /// The engine's own queues either side of each tick, when the capture
+    /// recorded them.
+    ///
+    /// A snapshot diff says what *changed*; this says what was *pending*. Two
+    /// engines can agree on every block in the world and disagree entirely on
+    /// what is scheduled in it — which is the state a door diverges from one
+    /// tick later. Empty for captures taken before the recorder had it.
+    #[serde(default)]
+    pub queues: Vec<QueueRecord>,
+    /// The game time of tick 0, for turning a scheduled tick's absolute
+    /// trigger time into a tick number. `None` in older captures.
+    #[serde(default)]
+    pub game_time_at_start: Option<u64>,
+}
+
+/// What the level had pending around one tick.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct QueueRecord {
+    /// Which tick this brackets.
+    pub tick: u64,
+    /// Pending work before the tick ran.
+    pub before: Pending,
+    /// Pending work after it ran.
+    pub after: Pending,
+}
+
+/// The level's pending work at one instant.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Pending {
+    /// Block events, in queue order — which is run order.
+    #[serde(default)]
+    pub events: Vec<PendingEvent>,
+    /// Scheduled block ticks.
+    #[serde(default)]
+    pub scheduled: Vec<PendingTick>,
+    /// How many block ticks the level holds.
+    #[serde(default)]
+    pub block_ticks: u64,
+    /// How many block events were deferred to the next tick.
+    #[serde(default)]
+    pub rescheduled: u64,
+}
+
+/// One queued block event.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct PendingEvent {
+    /// Where.
+    pub pos: TracePos,
+    /// The block the event names; a mismatch at dispatch refuses it.
+    pub block: String,
+    /// `paramA` — the piston trigger id.
+    pub id: i32,
+    /// `paramB`.
+    pub param: i32,
+}
+
+/// One scheduled block tick.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct PendingTick {
+    /// Where.
+    pub pos: TracePos,
+    /// Which block scheduled it.
+    pub block: String,
+    /// Absolute game time it fires on.
+    pub at: u64,
+    /// Its tick priority, as vanilla names it.
+    pub priority: String,
 }
 
 /// Where two traces first differ.
@@ -244,6 +311,8 @@ impl Trace {
             structure: structure.into(),
             detail,
             ticks: Vec::new(),
+            queues: Vec::new(),
+            game_time_at_start: None,
         }
     }
 

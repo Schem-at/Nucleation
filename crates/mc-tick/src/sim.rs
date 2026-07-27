@@ -495,6 +495,16 @@ impl Simulation {
     /// tick 4 has finished this reads **5**. So after running a contraption to
     /// quiescence, this is one greater than the last tick on which anything
     /// happened — not the tick the last event occurred on.
+    /// The block ticks this simulation has pending, as `(fires on, position)`.
+    pub fn pending_ticks(&self) -> Vec<(u64, Pos)> {
+        self.ticks.pending()
+    }
+
+    /// The block events queued for the next block-events phase, in order.
+    pub fn pending_events(&self) -> Vec<(Pos, u8)> {
+        self.events.peek().iter().map(|e| (e.pos, e.id)).collect()
+    }
+
     pub fn tick_count(&self) -> u64 {
         self.tick
     }

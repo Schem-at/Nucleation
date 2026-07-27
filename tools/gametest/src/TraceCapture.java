@@ -207,6 +207,10 @@ public final class TraceCapture {
 
         List<String> ticks = new ArrayList<>();
         List<String> queues = new ArrayList<>();
+        // The tick numbering in this file is relative; a scheduled tick's
+        // trigger time is absolute. Recording the offset lets a reader turn one
+        // into the other without guessing.
+        long startGameTime = level.getGameTime();
         Map<BlockPos, String> previous = snapshot(level, min, max);
         // The world exactly as placement left it: the ground truth for
         // comparing an engine's settle against the game's.
@@ -459,6 +463,7 @@ public final class TraceCapture {
                 + "  \"mc_version\": \"" + SharedConstants.getCurrentVersion().name() + "\",\n"
                 + "  \"structure\": \"" + structureId + "\",\n"
                 + "  \"detail\": \"normal\",\n"
+                + "  \"game_time_at_start\": " + startGameTime + ",\n"
                 + "  \"queues\": [\n" + String.join(",\n", queues) + "\n  ],\n"
                 + "  \"ticks\": [\n" + String.join(",\n", ticks) + "\n  ]\n}\n";
 
@@ -603,7 +608,9 @@ public final class TraceCapture {
                 if (!first) out.append(", ");
                 first = false;
                 out.append(String.format("{\"pos\": [%d, %d, %d], \"block\": \"%s\", \"id\": %d, \"param\": %d}",
-                        e.pos().getX(), e.pos().getY(), e.pos().getZ(),
+                        e.pos().getX() - ORIGIN.getX(),
+                        e.pos().getY() - ORIGIN.getY(),
+                        e.pos().getZ() - ORIGIN.getZ(),
                         net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(e.block()), e.paramA(), e.paramB()));
             }
             out.append("]");
@@ -640,7 +647,9 @@ public final class TraceCapture {
                     first = false;
                     out.append(String.format(
                             "{\"pos\": [%d, %d, %d], \"block\": \"%s\", \"at\": %d, \"priority\": \"%s\"}",
-                            st.pos().getX(), st.pos().getY(), st.pos().getZ(),
+                            st.pos().getX() - ORIGIN.getX(),
+                            st.pos().getY() - ORIGIN.getY(),
+                            st.pos().getZ() - ORIGIN.getZ(),
                             net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(
                                     (net.minecraft.world.level.block.Block) st.type()),
                             st.triggerTick(), st.priority()));

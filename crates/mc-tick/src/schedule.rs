@@ -132,6 +132,18 @@ impl TickQueue {
     /// The earliest tick anything is scheduled for.
     ///
     /// Used to decide whether a world has gone quiescent.
+    /// Every pending tick as `(tick it fires on, position)`, ascending.
+    ///
+    /// For comparing against a capture's scheduled list: agreeing on the world
+    /// while disagreeing on what is pending in it is the normal shape of a
+    /// divergence, and it is invisible to a snapshot diff.
+    pub fn pending(&self) -> Vec<(u64, Pos)> {
+        self.buckets
+            .iter()
+            .flat_map(|(at, list)| list.iter().map(move |t| (*at, t.pos)))
+            .collect()
+    }
+
     pub fn next_due(&self) -> Option<u64> {
         self.buckets
             .iter()
@@ -196,6 +208,11 @@ impl EventQueue {
     ///
     /// Callers loop on this: handling a batch may enqueue the next batch, and
     /// the phase is over only when a drain comes back empty.
+    /// The queued events without draining them.
+    pub fn peek(&self) -> &[BlockEvent] {
+        &self.events
+    }
+
     pub fn take(&mut self) -> Vec<BlockEvent> {
         std::mem::take(&mut self.events)
     }
