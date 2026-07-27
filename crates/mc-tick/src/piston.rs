@@ -674,10 +674,16 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
             }
             TRIGGER_CONTRACT | TRIGGER_DROP => {
                 // Dispatch re-check, mirroring extend: if power returned before
-                // the retract ran, vanilla re-marks the base extended with **no**
-                // updates (flag 2) and treats the event as unhandled.
+                // the retract ran, vanilla re-marks the base extended and treats
+                // the event as unhandled.
+                //
+                // The write is flag **2**, which is not silence. It withholds
+                // the neighbour updates and still runs the shape pass over the
+                // six neighbours, because `UPDATE_KNOWN_SHAPE` is clear — so an
+                // observer beside a piston sees a refused retract even though no
+                // block around it is told about one.
                 if self.is_powered(ctx.world, ctx.comparator_out, pos) {
-                    ctx.set_quiet(pos, self.states.get(true));
+                    ctx.set_shape_only(pos, self.states.get(true));
                     return false;
                 }
                 let head = pos.offset(self.facing);
@@ -695,6 +701,24 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // moving_piston -> extended=false`. Vanilla writes it silently and
                 // then fires updateNeighborsAt explicitly; ctx.set is exactly
                 // that pair.
+                // `triggerEvent` begins a retraction by finalising an
+                // in-flight *head*: a piston that extended less than two ticks
+                // ago still has a moving block entity in the head slot, and the
+                // very first thing the retract branch does is `finalTick` it —
+                // before the base is written and long before the block two
+                // ahead is looked at.
+                //
+                // The order is observable. Landing the head writes it loudly,
+                // and that notification reaches the block under the head while
+                // the block two ahead is *still in flight*. Finalising that one
+                // first instead — as this did — puts a solid block in the
+                // quasi-connectivity ring a tick early, and a piston below
+                // reads power vanilla never gives it.
+                if let Some(index) = ctx.moves.iter().position(|m| m.pos == head) {
+                    let landed = ctx.moves.remove(index);
+                    ctx.set(head, landed.state);
+                    ctx.drain();
+                }
                 ctx.set(pos, self.moving);
                 ctx.defer(pos, self.states.get(false), PISTON_MOVE_TICKS);
 
