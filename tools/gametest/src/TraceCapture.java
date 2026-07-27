@@ -206,6 +206,7 @@ public final class TraceCapture {
                 level.isPositionTickingWithEntitiesLoaded(centre.pack()));
 
         List<String> ticks = new ArrayList<>();
+        List<String> queues = new ArrayList<>();
         Map<BlockPos, String> previous = snapshot(level, min, max);
         // The world exactly as placement left it: the ground truth for
         // comparing an engine's settle against the game's.
@@ -328,6 +329,7 @@ public final class TraceCapture {
                     level.setBlock(pulseTarget, Blocks.AIR.defaultBlockState(), 3);
                 }
             }
+            String queuedBefore = queueDump(level);
             tickServer.invoke(server, (BooleanSupplier) () -> true);
             waitUntilNextTick.invoke(server);
             if (tick < 3) {
@@ -338,6 +340,13 @@ public final class TraceCapture {
             Map<BlockPos, String> current = snapshot(level, min, max);
             Map<BlockPos, String[]> currentInv = snapshotContainers(level, min, max);
             List<String> events = new ArrayList<>();
+            // The engine's own queues, before and after the tick ran. A snapshot
+            // diff cannot see inside a tick, but the queues bracket it: what the
+            // game *planned* to do this tick, and what it left for the next one.
+            // That is enough to place an event in a phase without inventing one.
+            queues.add(String.format(
+                    "    {\"tick\": %d, \"before\": %s, \"after\": %s}",
+                    tick, queuedBefore, queueDump(level)));
             for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
                 String was = previous.get(pos);
                 String now = current.get(pos);
@@ -450,6 +459,7 @@ public final class TraceCapture {
                 + "  \"mc_version\": \"" + SharedConstants.getCurrentVersion().name() + "\",\n"
                 + "  \"structure\": \"" + structureId + "\",\n"
                 + "  \"detail\": \"normal\",\n"
+                + "  \"queues\": [\n" + String.join(",\n", queues) + "\n  ],\n"
                 + "  \"ticks\": [\n" + String.join(",\n", ticks) + "\n  ]\n}\n";
 
         Path parent = out.getParent();
@@ -570,6 +580,44 @@ public final class TraceCapture {
     }
 
     /** Descriptors for every position in the box, so comparison is order-independent. */
+    /**
+     * The level's pending work, read straight off its queues by reflection:
+     * block events (in queue order, which is run order), the events refused last
+     * tick and rescheduled, and the scheduled block ticks due next.
+     *
+     * Captured once per tick either side of the tick itself, this answers the
+     * ordering questions a between-ticks snapshot cannot — whether a piston ever
+     * had an event queued at all, and in what order two diodes will fire.
+     */
+    @SuppressWarnings("unchecked")
+    private static String queueDump(ServerLevel level) {
+        StringBuilder out = new StringBuilder("{");
+        try {
+            java.lang.reflect.Field f = ServerLevel.class.getDeclaredField("blockEvents");
+            f.setAccessible(true);
+            out.append("\"events\": [");
+            boolean first = true;
+            for (Object raw : (Iterable<Object>) f.get(level)) {
+                net.minecraft.world.level.BlockEventData e =
+                        (net.minecraft.world.level.BlockEventData) raw;
+                if (!first) out.append(", ");
+                first = false;
+                out.append(String.format("{\"pos\": [%d, %d, %d], \"block\": \"%s\", \"id\": %d, \"param\": %d}",
+                        e.pos().getX(), e.pos().getY(), e.pos().getZ(),
+                        net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(e.block()), e.paramA(), e.paramB()));
+            }
+            out.append("]");
+
+            java.lang.reflect.Field r = ServerLevel.class.getDeclaredField("blockEventsToReschedule");
+            r.setAccessible(true);
+            out.append(", \"rescheduled\": ").append(((java.util.List<?>) r.get(level)).size());
+        } catch (ReflectiveOperationException e) {
+            out.append("\"error\": \"").append(e.getClass().getSimpleName()).append("\"");
+        }
+        out.append(", \"block_ticks\": ").append(level.getBlockTicks().count());
+        return out.append("}").toString();
+    }
+
     private static Map<BlockPos, String> snapshot(ServerLevel level, BlockPos min, BlockPos max) {
         Map<BlockPos, String> blocks = new HashMap<>();
         for (BlockPos pos : BlockPos.betweenClosed(min, max)) {

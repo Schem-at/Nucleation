@@ -153,12 +153,16 @@ pub fn resolve_push(
         index += 1;
     }
 
-    // Apply far-end-first along the push axis, so every block is written into
-    // space an earlier write has already vacated.
-    let (dx, dy, dz) = dir.delta();
-    let mut ordered = to_push;
-    ordered.sort_by_key(|pos| -(pos.x * dx + pos.y * dy + pos.z * dz));
-    PushPlan { to_push: ordered, possible: true }
+    // No sort. `PistonStructureResolver` hands `moveBlocks` its list as built —
+    // nearest the piston first, with slime branches interleaved by
+    // `reorderListAtCollision` — and `moveBlocks` walks it *backwards*, so every
+    // block is written into space an earlier write has already vacated.
+    //
+    // Sorting it by distance along the push axis looks equivalent and is not:
+    // a branch pulled sideways by slime has no meaningful position on that axis,
+    // and the order is observable anyway, because the moving block entities land
+    // in creation order and each landing notifies its neighbours.
+    PushPlan { to_push, possible: true }
 }
 
 /// `PistonStructureResolver.addBlockLine`.
@@ -521,10 +525,17 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     .map(|(from, _)| from.offset(self.facing))
                     .collect();
 
-                // All move writes are *quiet*: `moveBlocks` uses update flags that
-                // suppress neighbour block updates, which is why the piston does
-                // not react to its own move — its power source may be part of the
-                // moved structure — until the blocks land two ticks later.
+                // No move write notifies neighbours — that is why the piston does
+                // not react to its own move, whose structure may contain its own
+                // power source, until the blocks land two ticks later.
+                //
+                // The two kinds of write differ in *shape* though, and it shows.
+                // Vacating a source is flag 18 or 82, both carrying
+                // `UPDATE_KNOWN_SHAPE`: fully silent. Writing a `moving_piston`
+                // placeholder is flag 324, which does not — so the placeholder
+                // appearing beside an observer gives it a shape update and it
+                // pulses two ticks later, on the tick the block is still in
+                // flight rather than the tick it lands.
                 for (from, state) in carried.iter().rev() {
                     let to = from.offset(self.facing);
                     // A vacated source becomes **air**, not a placeholder — captured
@@ -535,11 +546,11 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     if *from != head_slot && !destinations.contains(from) {
                         ctx.set_quiet(*from, StateId::AIR);
                     }
-                    ctx.set_quiet(to, self.moving_block);
+                    ctx.set_shape_only(to, self.moving_block);
                     ctx.defer(to, *state, PISTON_MOVE_TICKS);
                 }
                 // The head slot is itself in motion until the move completes.
-                ctx.set_quiet(head_slot, self.moving);
+                ctx.set_shape_only(head_slot, self.moving);
                 ctx.defer(head_slot, self.head, PISTON_MOVE_TICKS);
                 // The base state is written *after* the moves, with notifications
                 // (vanilla flag 67) — the one loud write of the whole event.
@@ -864,9 +875,13 @@ mod tests {
     }
 
     #[test]
-    fn the_push_plan_is_ordered_far_end_first() {
-        // So applying it is a simple loop: each block moves into space the previous
-        // write already vacated.
+    fn the_push_plan_is_ordered_nearest_first() {
+        // `PistonStructureResolver` builds outward from the piston, and
+        // `moveBlocks` then walks the list backwards — so applying it is still a
+        // simple loop where each block moves into space the previous write
+        // vacated, but the list itself is in vanilla's order. The distinction is
+        // observable: moving block entities land in creation order, and each
+        // landing notifies its neighbours.
         let mut w = world();
         w.set(Pos::new(0, 1, 0), RETRACTED);
         for x in 1..=3 {
@@ -876,7 +891,7 @@ mod tests {
         let plan = resolve_push(&w, &p.movability, Pos::new(0, 1, 0), Dir::East);
         assert_eq!(
             plan.to_push,
-            vec![Pos::new(3, 1, 0), Pos::new(2, 1, 0), Pos::new(1, 1, 0)]
+            vec![Pos::new(1, 1, 0), Pos::new(2, 1, 0), Pos::new(3, 1, 0)]
         );
     }
 
@@ -1183,10 +1198,11 @@ mod tests {
     }
 
     #[test]
-    fn the_push_order_is_far_end_first_along_the_push_axis() {
-        // With adhesion the moved set is no longer a single line, so the ordering
-        // has to be computed. Every block must still be written into space an
-        // earlier write vacated.
+    fn a_slime_branch_keeps_its_place_in_the_resolver_list() {
+        // With adhesion the moved set is no longer a single line, and a branch
+        // pulled sideways has no meaningful position along the push axis. The
+        // list keeps the resolver's own order — the line first, then what the
+        // slime brought with it — which is what vanilla hands to `moveBlocks`.
         let mut w = world();
         let pos = Pos::new(0, 1, 0);
         w.set(pos, RETRACTED);
@@ -1197,10 +1213,10 @@ mod tests {
         let p = piston(false, false);
         let plan = resolve_push(&w, &p.movability, pos, Dir::East);
 
-        let xs: Vec<i32> = plan.to_push.iter().map(|p| p.x).collect();
-        assert!(
-            xs.windows(2).all(|w| w[0] >= w[1]),
-            "must be ordered by descending x for an eastward push: {xs:?}"
+        assert_eq!(
+            plan.to_push,
+            vec![Pos::new(1, 1, 0), Pos::new(2, 1, 0), Pos::new(1, 2, 0)],
+            "the pushed line first, then the block the slime carries"
         );
     }
 

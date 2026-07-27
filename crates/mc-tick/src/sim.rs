@@ -1139,6 +1139,9 @@ impl Simulation {
 
     /// Run one phase. `Some(stop)` aborts the tick.
     fn run_phase(&mut self, phase: Phase) -> Option<StopReason> {
+        if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
+            eprintln!("[t{}] --- phase {}", self.tick, phase.name());
+        }
         match phase {
             // Not simulated. Named and walked so the order stays structurally
             // right and filling one in never re-plumbs its neighbours.
@@ -1276,12 +1279,20 @@ impl Simulation {
                     .filter(|m| m.resolve_on <= self.tick && in_ticking(m.pos))
                     .copied()
                     .collect();
-                // Resolve in the world's canonical order rather than the order the
-                // moves happened to be queued. The captured trace lands the head
-                // slot before the block beyond it, which insertion order gets
-                // backwards — and an order-sensitive diff treats that as a
-                // divergence, correctly, because update order is observable.
-                due.sort_by_key(|m| (m.resolve_on, m.pos.y, m.pos.z, m.pos.x));
+                // Insertion order, which is what `tickBlockEntities` walks: the
+                // moving block entities tick in the order they were added to the
+                // level, and `moveBlocks` creates them farthest-from-the-piston
+                // first, head slot last.
+                //
+                // The order is observable, because each landing notifies its
+                // neighbours. A column landing top-down tells the block above it
+                // while everything below is still a `moving_piston` placeholder —
+                // immovable — so a piston up there resolves *false* and queues
+                // nothing. Landing bottom-up instead hands that piston a fully
+                // solid column and it extends into a door vanilla leaves shut.
+                //
+                // A stable sort on the due tick alone preserves that order.
+                due.sort_by_key(|m| m.resolve_on);
                 // Frozen moves (outside the ticking bounds) stay pending: a
                 // block entity in a non-ticking chunk is suspended, not gone.
                 self.moves
@@ -1293,6 +1304,16 @@ impl Simulation {
                         continue;
                     }
                     landed.push(entry.pos);
+                    if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
+                        eprintln!(
+                            "[t{}] land   ({}, {}, {}) -> {}",
+                            self.tick,
+                            entry.pos.x,
+                            entry.pos.y,
+                            entry.pos.z,
+                            self.registry.descriptor(entry.state).unwrap_or_default()
+                        );
+                    }
                     self.world.set(entry.pos, entry.state);
                     // Record here too. These writes bypass TickCtx, and leaving
                     // them out of the log made a trace end two ticks early —
@@ -1315,8 +1336,15 @@ impl Simulation {
                         .push(crate::behaviour::UpdateEntry::own_shapes(entry.pos));
                     self.updates
                         .push(crate::behaviour::UpdateEntry::neighbors_at(entry.pos));
+                    // Drained per landing, not once at the end. Each moving
+                    // block entity's tick completes — write, shape updates,
+                    // neighbour updates — before the next one starts, so a
+                    // neighbour woken by the first landing sees the rest of the
+                    // column still in flight. Draining once at the end showed it
+                    // an already-solid column instead, and a piston above it
+                    // extended into a door vanilla leaves shut.
+                    self.propagate();
                 }
-                self.propagate();
                 // `onPlace` for each landed block, *after* the landing updates
                 // have run. Ordering matters: vanilla's shape update reaches a
                 // moved observer while it still carries its mid-pulse powered
@@ -1455,17 +1483,22 @@ impl Simulation {
 
     /// The block-events phase: drain, handle, repeat until empty.
     fn run_block_events(&mut self) -> Option<StopReason> {
-        // `ServerLevel.runBlockEvents`: events whose handler refuses them go
-        // to `blockEventsToReschedule` and are re-added once the queue drains,
-        // so they lead the next tick's batch. A piston whose extend was
-        // refused this tick therefore gets first refusal next tick — which is
-        // how one of two opposed pistons sharing a gap reliably wins.
+        // `ServerLevel.runBlockEvents` reschedules only what it never *tried*:
+        //
+        //     if (shouldTickBlocksAt(pos)) { doBlockEvent(data); }
+        //     else { blockEventsToReschedule.add(data); }
+        //
+        // An event whose handler returns false — a piston that has lost its
+        // power, or whose position no longer holds the block the event names —
+        // is simply dropped. Re-queueing those instead gave a piston a second
+        // attempt a tick later, and a retracting piston re-extended into a door
+        // that vanilla leaves shut.
+        //
+        // Everything this engine simulates is inside a ticking region, so
+        // nothing is rescheduled at all; the distinction is recorded here for
+        // when ticking bounds start suspending block events too.
         let mut refused: Vec<BlockEvent> = Vec::new();
-        let outcome = self.drain_block_events(&mut refused);
-        for event in refused {
-            self.events.push(event);
-        }
-        outcome
+        self.drain_block_events(&mut refused)
     }
 
     fn drain_block_events(&mut self, refused: &mut Vec<BlockEvent>) -> Option<StopReason> {
@@ -1480,9 +1513,8 @@ impl Simulation {
             for event in batch {
                 let state = self.world.get(event.pos);
                 // `doBlockEvent`: an event whose position no longer holds the
-                // block it was queued for is refused outright — and refusal
-                // means rescheduled, not dropped. Properties may differ; only
-                // the block has to match.
+                // block it was queued for is refused and dropped. Properties may
+                // differ; only the block has to match.
                 let trace_events = std::env::var("MC_TICK_TRACE_EVENTS").is_ok();
                 if !self.registry.same_block(state, event.block) {
                     if trace_events {
