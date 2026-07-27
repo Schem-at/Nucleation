@@ -1268,6 +1268,42 @@ fn the_4x4_vault_door_survives_interrupted_and_repeated_clicks() {
     );
 }
 
+/// The 6x6 sliding door, recorded in the world Harrison built it in.
+///
+/// He pasted the litematic into a creative world and it ran without a tweak, so
+/// the door is sound and the paste is not what breaks it here — unlike the vault
+/// door, whose latched memory cell a paste destroys. Recording it in place tests
+/// the door itself rather than `placeInWorld`, and it still diverges, so the two
+/// problems really are separate.
+///
+/// Ignored, and the shape of the failure is the useful part: the engine queues a
+/// strict *subset* of vanilla's block events — sixty-one of a hundred and
+/// twenty-five on the opening tick, with nothing queued that vanilla does not.
+/// Everything it does is right; it does too little. The missing events are the
+/// two outer edge mechanisms, mirrored left and right, starting at the sticky
+/// piston at (1,6,1) that sits facing down onto a redstone block.
+///
+/// Every block in the build is modelled, so it is not a coverage gap.
+#[test]
+#[ignore = "the engine queues 61 of vanilla's 125 block events on the opening \
+tick, a strict subset — the door's two outer edge mechanisms never fire. Not a \
+coverage gap; every block is modelled."]
+fn the_6x6_sliding_door_runs_a_cycle_in_the_world_it_was_built_in() {
+    run_conformance_full(
+        "door_6x6_inworld.snbt",
+        "door_6x6_inworld.json",
+        "nucleation:door_6x6_sliding",
+        &[],
+        &[
+            (10, Actuate::Use(Pos::new(10, 4, 1))),
+            (60, Actuate::Use(Pos::new(10, 4, 1))),
+        ],
+        None,
+        Settle::InWorld,
+        1.0e-6,
+    );
+}
+
 /// A dust corner losing the block beside it, which is the vault door's opening
 /// stroke reduced to twenty-four blocks.
 ///
