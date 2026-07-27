@@ -1231,11 +1231,19 @@ pub fn container_slots(name: &str) -> Option<u32> {
 
 /// Whether a block state conducts redstone (`isRedstoneConductor`).
 ///
-/// Full cubes conduct, with the redstone-transparent exceptions: the glass
-/// family (the glass-diode captures prove it), sources like the redstone
-/// block, and observers. Slime conducting is capture-verified (the flying
-/// machine); stone conducting is capture-verified (dust soft-powering a
-/// piston through its floor block).
+/// `BlockBehaviour.Properties` defaults the predicate to
+/// `state.blocksMotion() && state.isCollisionShapeFullBlock(...)` — so a solid
+/// block conducts unless its registration overrides it. The exclusions below
+/// are exactly the blocks whose registration calls `isRedstoneConductor`,
+/// read off `Blocks`' static initialiser in the 26.2 server jar. Slime and
+/// honey call `noOcclusion` and no more: occlusion is a lighting concern, and
+/// slime's collision box is a full cube, so slime conducts (which the flying
+/// machine capture independently shows) while honey's inset box does not.
+///
+/// Two blocks used to be listed here on the assumption that emitting a signal
+/// implies not conducting one. It does not — `TARGET` and `REDSTONE_LAMP`
+/// register with no override at all, and the vault door turns a torch off by
+/// strongly powering the target block the torch stands on.
 fn is_conductor(descriptor: &Descriptor) -> bool {
     if !is_full_cube(descriptor) {
         return false;
@@ -1246,19 +1254,19 @@ fn is_conductor(descriptor: &Descriptor) -> bool {
             | "minecraft:white_stained_glass"
             | "minecraft:sea_lantern"
             | "minecraft:redstone_block"
-            | "minecraft:redstone_lamp"
             | "minecraft:observer"
-            | "minecraft:slime_block"
+            // Honey's collision shape is inset, so it fails the default
+            // predicate rather than overriding it.
             | "minecraft:honey_block"
+            // `leavesProperties` and `pistonProperties` both call
+            // `isRedstoneConductor`. A piston base is a full *collision* cube
+            // when retracted, but declares itself no conductor — which is why
+            // an observer's strong power once leaked through one into a door's
+            // dust line.
             | "minecraft:oak_leaves"
-            | "minecraft:target"
-            // A piston base is a full *collision* cube when retracted, but
-            // `PistonBaseBlock` declares itself no redstone conductor —
-            // verified with `--probe`, after an observer's strong power leaked
-            // through one into a door's dust line.
             | "minecraft:piston"
             | "minecraft:sticky_piston"
-    ) || matches!(descriptor.name.as_str(), "minecraft:slime_block")
+    )
 }
 
 /// Whether a block state is a full collision cube.

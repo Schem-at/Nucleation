@@ -172,28 +172,47 @@ public final class TraceCapture {
         // ignores its input, because a torch changes only on a scheduled tick.
         // Dust hid this: it settles synchronously on neighbour updates and works
         // either way. PLAYER_SIMULATION is the ticket that grants ticking.
-        var centre = new net.minecraft.world.level.ChunkPos(ORIGIN.getX() >> 4, ORIGIN.getZ() >> 4);
-        level.getChunkSource().addTicketWithRadius(
-                net.minecraft.server.level.TicketType.PLAYER_SIMULATION, centre, 3);
-        level.getChunkSource().addTicketWithRadius(
-                net.minecraft.server.level.TicketType.FORCED, centre, 3);
-        for (int cx = min.getX() >> 4; cx <= max.getX() >> 4; cx++) {
-            for (int cz = min.getZ() >> 4; cz <= max.getZ() >> 4; cz++) {
+        // Ticket *every* chunk the region touches, not just the one under ORIGIN.
+        // A ticket's radius degrades outward: the chunk at the edge of the radius
+        // is loaded but not ticking. A build that straddles a chunk border — and
+        // at seventeen blocks wide this one does — then has half of itself in a
+        // chunk whose scheduled ticks are never collected.
+        var chunks = new java.util.ArrayList<net.minecraft.world.level.ChunkPos>();
+        for (int cx = (min.getX() >> 4) - 1; cx <= (max.getX() >> 4) + 1; cx++) {
+            for (int cz = (min.getZ() >> 4) - 1; cz <= (max.getZ() >> 4) + 1; cz++) {
+                var chunk = new net.minecraft.world.level.ChunkPos(cx, cz);
+                chunks.add(chunk);
+                level.getChunkSource().addTicketWithRadius(
+                        net.minecraft.server.level.TicketType.PLAYER_SIMULATION, chunk, 2);
+                level.getChunkSource().addTicketWithRadius(
+                        net.minecraft.server.level.TicketType.FORCED, chunk, 2);
                 level.setChunkForced(cx, cz, true);
             }
         }
         // Entity loading is asynchronous, and LevelTicks will not run a chunk's
-        // scheduled ticks until its entities are loaded. Wait for it rather than
-        // guessing a tick count — a region that is loaded but not entity-ticking
-        // looks exactly like redstone that ignores its input.
+        // scheduled ticks until its entities are loaded — `ServerLevel` passes
+        // `isPositionTickingWithEntitiesLoaded` as the collector's predicate, so
+        // ticks in a not-yet-ready chunk sit in the queue, overdue, until it is.
+        // Wait for every chunk rather than guessing a tick count: waiting on only
+        // the centre one let a neighbouring chunk finish loading twenty-two ticks
+        // into a recording and dump its whole backlog in one tick, which reads as
+        // a door that deliberately sequences its two halves.
         int warmup = 0;
-        while (!level.isPositionTickingWithEntitiesLoaded(centre.pack()) && warmup < 600) {
+        while (warmup < 600 && !chunks.stream()
+                .allMatch(c -> level.isPositionTickingWithEntitiesLoaded(c.pack()))) {
             tickServer.invoke(server, (BooleanSupplier) () -> true);
             waitUntilNextTick.invoke(server);
             warmup++;
         }
-        System.out.printf("  warmup ticks until entity-ticking: %d (ready=%s)%n",
-                warmup, level.isPositionTickingWithEntitiesLoaded(centre.pack()));
+        long ready = chunks.stream()
+                .filter(c -> level.isPositionTickingWithEntitiesLoaded(c.pack())).count();
+        System.out.printf("  warmup ticks until entity-ticking: %d (%d/%d chunks ready)%n",
+                warmup, ready, chunks.size());
+        if (ready < chunks.size()) {
+            throw new IllegalStateException(
+                    "only " + ready + " of " + chunks.size() + " chunks are entity-ticking; "
+                            + "the recording would stall and then catch up mid-run");
+        }
 
         if (inWorld == null) {
             for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
@@ -222,17 +241,19 @@ public final class TraceCapture {
         // source) and the ticks that follow are the circuit's response.
         // Decisive diagnostic: a region that is loaded but not in block-ticking
         // range looks exactly like a circuit that ignores its input.
-        System.out.printf("  block-ticking here: %s%n",
-                level.shouldTickBlocksAt(centre.pack()));
+        System.out.printf("  block-ticking chunks: %d/%d%n",
+                chunks.stream().filter(c -> level.shouldTickBlocksAt(c.pack())).count(),
+                chunks.size());
         System.out.printf("  pending block ticks: %d%n", level.getBlockTicks().count());
         System.out.printf("  runs normally: %s%n",
                 level.tickRateManager().runsNormally());
         // LevelTicks gates on this, not on block-ticking range: a chunk can be
         // block-tickable yet have no active tick container if its entities are
         // not loaded, and then scheduled ticks sit pending forever.
-        System.out.printf("  entities loaded / pos ticking: %s / %s%n",
-                level.areEntitiesLoaded(centre.pack()),
-                level.isPositionTickingWithEntitiesLoaded(centre.pack()));
+        System.out.printf("  entity-ticking chunks: %d/%d%n",
+                chunks.stream()
+                        .filter(c -> level.isPositionTickingWithEntitiesLoaded(c.pack())).count(),
+                chunks.size());
 
         List<String> ticks = new ArrayList<>();
         List<String> queues = new ArrayList<>();

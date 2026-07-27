@@ -261,7 +261,7 @@ fn schedule_diode(
 
     // The game refuses to double-schedule a position that already has a tick
     // pending. Skipping this check silently doubles every delay.
-    if ctx.ticks.has_pending_at(pos, ctx.tick) {
+    if ctx.ticks.will_tick_this_tick(pos) {
         return;
     }
 
@@ -512,7 +512,7 @@ impl<P: PowerSource> BlockBehaviour for Torch<P> {
             .power
             .is_powered(ctx.world, ctx.comparator_out, support, self.attached.opposite());
         // A torch is lit exactly when its support is *not* powered.
-        let pending = ctx.ticks.has_pending_at(pos, ctx.tick);
+        let pending = ctx.ticks.will_tick_this_tick(pos);
         // `MC_TICK_TRACE_NOTIFY` covers torches too: whether a torch schedules
         // depends on the world *at the instant it is notified*, which during a
         // placement cascade is not the world anyone can see afterwards.
@@ -661,7 +661,7 @@ impl<P: PowerSource> BlockBehaviour for Comparator<P> {
     ///    never uses the `VERY_HIGH`/`EXTREMELY_HIGH` that a repeater reaches for,
     ///    so a primed comparator resolves *after* every repeater in the same tick.
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
-        if ctx.ticks.has_pending_at(pos, ctx.tick) {
+        if ctx.ticks.will_tick_this_tick(pos) {
             return;
         }
         let output = self.output_strength(ctx.world, ctx.comparator_out, ctx.inventories, pos);
@@ -2276,8 +2276,20 @@ pub struct Leaves<P: PowerSource> {
 }
 
 impl<P: PowerSource> crate::behaviour::BlockBehaviour for Leaves<P> {
-    fn on_shape_update(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
-        if !ctx.ticks.has_pending_at(pos, ctx.tick) {
+    /// `LeavesBlock.updateShape`: book a re-check unless the changed neighbour
+    /// already accounts for this leaf's distance.
+    ///
+    /// The condition is the game's, verbatim — `distance != 1 || DISTANCE !=
+    /// distance` where `distance` is the *changed neighbour's* distance plus
+    /// one. It declines to schedule in exactly one case: a leaf already at
+    /// distance 1 hearing from a log. There is deliberately no queue guard;
+    /// `LevelChunkTicks` deduplicates pending bookings on its own, and adding
+    /// `willTickThisTick` on top of that drops the booking a leaf makes while
+    /// its own tick is running — which is precisely when a piston has just set
+    /// a log down beside it.
+    fn on_shape_update(&self, ctx: &mut TickCtx<'_>, pos: Pos, from: Dir) {
+        let distance = self.rules.leaf_distance(ctx.world, pos.offset(from)).saturating_add(1);
+        if distance != 1 || self.distance != distance {
             ctx.schedule(pos, 1, TickPriority::Normal);
         }
     }

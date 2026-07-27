@@ -1396,8 +1396,18 @@ impl Simulation {
                     // lands, and how a landed piston notices power waiting for it.
                     self.updates
                         .push(crate::behaviour::UpdateEntry::own_shapes(entry.pos));
+                    // The write itself is `setBlock(pos, state, 3)`, and flag 3
+                    // leaves `UPDATE_KNOWN_SHAPE` clear: `markAndNotifyBlock`
+                    // runs the neighbour updates *and then* the shape pass over
+                    // the same six neighbours. Only the first was modelled here,
+                    // so a block landing beside a wire never made that wire
+                    // recompute its connections — a target block arriving next
+                    // to a dust line left the dust unattached to it, and the
+                    // vault door's whole second stage hung off that connection.
                     self.updates
                         .push(crate::behaviour::UpdateEntry::neighbors_at(entry.pos));
+                    self.updates
+                        .push(crate::behaviour::UpdateEntry::neighbor_shapes(entry.pos));
                     // Drained per landing, not once at the end. Each moving
                     // block entity's tick completes — write, shape updates,
                     // neighbour updates — before the next one starts, so a
@@ -1701,7 +1711,7 @@ mod tests {
         s.restore(&saved);
         assert_eq!(s.tick_count(), saved_tick);
         assert_eq!(s.world().get(Pos::new(1, 1, 1)), stone);
-        assert!(s.ticks.has_pending_at(Pos::new(2, 2, 2), 0));
+        assert!(s.ticks.is_pending(Pos::new(2, 2, 2)));
     }
 
     #[test]

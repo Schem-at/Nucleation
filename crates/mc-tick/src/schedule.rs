@@ -79,10 +79,20 @@ impl TickQueue {
 
     /// Schedule a tick at `pos` to fire `delay` ticks after `now`.
     ///
+    /// A position can hold **one** pending tick, as in `LevelChunkTicks`, whose
+    /// `ticksPerPosition` set is keyed on position and block type with no tick
+    /// component: `schedule` drops a second booking outright. The set is keyed
+    /// that way, not merely deduplicated on insert, which is why *collecting* a
+    /// tick frees the position again — `poll` removes the entry before the tick
+    /// runs, so a block notified during its own tick can book the next one.
+    ///
     /// A `delay` of 0 fires on the current tick's own block-tick phase if that
     /// phase has not run yet; the game permits this and some contraptions rely
     /// on it, so it is not rejected here.
     pub fn schedule(&mut self, pos: Pos, now: u64, delay: u64, priority: TickPriority) {
+        if self.is_pending(pos) {
+            return;
+        }
         let entry = ScheduledTick {
             pos,
             target: now.saturating_add(delay),
@@ -93,21 +103,29 @@ impl TickQueue {
         self.buckets.entry(entry.target).or_default().push(entry);
     }
 
-    /// Whether a tick is already scheduled at `pos` on or after `now`.
-    ///
-    /// The game refuses to double-schedule the same position, and blocks query
-    /// this before scheduling. Getting it wrong produces doubled delays that
-    /// look like an off-by-one in the block's logic.
-    pub fn has_pending_at(&self, pos: Pos, now: u64) -> bool {
-        self.running.iter().any(|entry| *entry == pos)
-            || self
-                .buckets
-                .range(now..)
-                .any(|(_, entries)| entries.iter().any(|entry| entry.pos == pos))
+    /// Whether `pos` holds an uncollected tick — `LevelChunkTicks`' own
+    /// deduplication, which [`Self::schedule`] applies for the caller.
+    pub fn is_pending(&self, pos: Pos) -> bool {
+        self.buckets
+            .values()
+            .any(|entries| entries.iter().any(|entry| entry.pos == pos))
     }
 
-    /// Take everything due, keeping it visible to [`Self::has_pending_at`]
-    /// until it has actually run.
+    /// `LevelTicks.willTickThisTick`: collected for this tick and not yet run.
+    ///
+    /// A different question from [`Self::is_pending`], and the two must not be
+    /// merged. Diodes, torches and observers consult *this* one explicitly
+    /// before booking a tick; leaves consult neither and let the queue's own
+    /// deduplication decide. Answering `pending` here instead loses the
+    /// reschedule a block makes during its own tick — a leaf whose tick already
+    /// ran this tick then never re-checks its distance, and the observer
+    /// watching it never fires.
+    pub fn will_tick_this_tick(&self, pos: Pos) -> bool {
+        self.running.iter().any(|entry| *entry == pos)
+    }
+
+    /// Take everything due, keeping it visible to
+    /// [`Self::will_tick_this_tick`] until it has actually run.
     ///
     /// `LevelTicks` collects the due ticks into `toRunThisTick` and polls them
     /// one at a time, so a tick still waiting its turn answers
@@ -154,9 +172,6 @@ impl TickQueue {
         self.buckets.values().map(Vec::len).sum()
     }
 
-    /// The earliest tick anything is scheduled for.
-    ///
-    /// Used to decide whether a world has gone quiescent.
     /// Every pending tick as `(tick it fires on, position)`, ascending.
     ///
     /// For comparing against a capture's scheduled list: agreeing on the world
@@ -169,6 +184,9 @@ impl TickQueue {
             .collect()
     }
 
+    /// The earliest tick anything is scheduled for.
+    ///
+    /// Used to decide whether a world has gone quiescent.
     pub fn next_due(&self) -> Option<u64> {
         self.buckets
             .iter()
@@ -301,10 +319,41 @@ mod tests {
     fn pending_lookup_sees_future_ticks_only() {
         let mut queue = TickQueue::new();
         queue.schedule(pos(1), 10, 5, TickPriority::Normal);
-        assert!(queue.has_pending_at(pos(1), 10));
-        assert!(!queue.has_pending_at(pos(2), 10));
+        assert!(queue.is_pending(pos(1)));
+        assert!(!queue.is_pending(pos(2)));
         queue.drain_due(15);
-        assert!(!queue.has_pending_at(pos(1), 15));
+        assert!(!queue.is_pending(pos(1)));
+    }
+
+    /// One pending tick per position, as `LevelChunkTicks.ticksPerPosition`
+    /// enforces — a second booking is dropped, not queued behind the first.
+    #[test]
+    fn a_position_holds_one_pending_tick() {
+        let mut queue = TickQueue::new();
+        queue.schedule(pos(1), 10, 5, TickPriority::Normal);
+        queue.schedule(pos(1), 10, 1, TickPriority::Normal);
+        assert_eq!(queue.len(), 1);
+        assert_eq!(queue.pending(), vec![(15, pos(1))]);
+    }
+
+    /// Collecting frees the position again: `poll` drops the entry from the
+    /// dedupe set before the tick body runs, so a block can book its next tick
+    /// from inside its own. Leaves depend on this — a log set down beside one
+    /// during its own tick has to be re-checked on the next.
+    #[test]
+    fn collecting_frees_the_position_but_still_ticks_this_tick() {
+        let mut queue = TickQueue::new();
+        queue.schedule(pos(1), 10, 1, TickPriority::Normal);
+        let due = queue.collect_due(11);
+        assert_eq!(due.len(), 1);
+        assert!(queue.will_tick_this_tick(pos(1)));
+        assert!(!queue.is_pending(pos(1)));
+
+        queue.schedule(pos(1), 11, 1, TickPriority::Normal);
+        assert_eq!(queue.pending(), vec![(12, pos(1))]);
+
+        queue.finished(pos(1));
+        assert!(!queue.will_tick_this_tick(pos(1)));
     }
 
     #[test]

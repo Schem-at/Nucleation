@@ -80,11 +80,16 @@ impl BlockBehaviour for Observer {
 
     /// `ObserverBlock.updateShape`: a shape update arriving from the watched
     /// side starts the pulse (`startSignal`), if one is not already running.
+    ///
+    /// `startSignal` guards on `hasScheduledTick` — is a tick *pending* — and
+    /// not on `willTickThisTick`, which is what diodes and torches use. The
+    /// distinction only shows once a position can be both mid-tick and
+    /// unbooked, which is the state collection leaves it in.
     fn on_shape_update(&self, ctx: &mut TickCtx<'_>, pos: Pos, from: Dir) {
         if from != self.facing || self.powered {
             return;
         }
-        if ctx.ticks.has_pending_at(pos, ctx.tick) {
+        if ctx.ticks.is_pending(pos) {
             return;
         }
         ctx.schedule(pos, OBSERVER_PULSE_TICKS, TickPriority::Normal);
@@ -108,7 +113,8 @@ impl BlockBehaviour for Observer {
     }
 
     /// `ObserverBlock.onPlace`: a powered observer written into the world with
-    /// no pending tick clears its own powered flag, silently.
+    /// no tick *pending* — `hasScheduledTick` again — clears its own powered
+    /// flag, silently.
     ///
     /// This is how a moved mid-pulse observer lands unpowered: its turn-off
     /// tick is stranded at the position it was pushed out of, so without this
@@ -116,7 +122,7 @@ impl BlockBehaviour for Observer {
     /// observer is pushed while pulsing and lands `powered=false`
     /// (`flying_machine.json`, tick 3).
     fn on_placed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
-        if !self.powered || ctx.ticks.has_pending_at(pos, ctx.tick) {
+        if !self.powered || ctx.ticks.is_pending(pos) {
             return;
         }
         // Vanilla writes with flag 18 — visible, but no neighbour updates —

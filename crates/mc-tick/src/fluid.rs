@@ -187,12 +187,10 @@ fn spread_to(rules: &dyn FluidWorld, ctx: &mut TickCtx<'_>, pos: Pos, kind: Wate
     schedule_fluid(ctx, pos);
 }
 
-/// Schedule a water tick unless one is already pending — vanilla's fluid queue
-/// dedupes per position.
+/// Schedule a water tick. The queue dedupes per position on its own, exactly as
+/// the game's fluid ticks do.
 pub fn schedule_fluid(ctx: &mut TickCtx<'_>, pos: Pos) {
-    if !ctx.fluids.has_pending_at(pos, ctx.tick) {
-        ctx.schedule_fluid(pos, WATER_TICK_DELAY);
-    }
+    ctx.schedule_fluid(pos, WATER_TICK_DELAY);
 }
 
 /// `getSlopeDistance`: nearest hole within [`SLOPE_FIND_DISTANCE`], walking
