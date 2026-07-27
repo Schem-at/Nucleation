@@ -606,10 +606,22 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                         ctx.set_quiet(*from, StateId::AIR);
                     }
                     ctx.set_shape_only(to, self.moving_block);
+                    // Each placeholder's shape updates run before the next one
+                    // is written. `moveBlocks` is not itself dispatching a
+                    // neighbour update, so `CollectingNeighborUpdater.addAndRun`
+                    // finds an empty stack and runs each write's shape pass on
+                    // the spot. Batching them to the end of the loop instead
+                    // shows a block its own slot already overwritten: an
+                    // observer being pushed hears the placeholder land in front
+                    // of it and books a tick *before* the head placeholder
+                    // takes its square, and that booking then strands at a
+                    // position the observer no longer occupies.
+                    ctx.drain();
                     ctx.defer(to, *state, PISTON_MOVE_TICKS);
                 }
                 // The head slot is itself in motion until the move completes.
                 ctx.set_shape_only(head_slot, self.moving);
+                ctx.drain();
                 ctx.defer(head_slot, self.head, PISTON_MOVE_TICKS);
 
                 // `moveBlocks`' tail: `updateNeighborsAt` for every position a

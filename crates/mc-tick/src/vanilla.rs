@@ -1556,6 +1556,15 @@ pub fn intern_companions(registry: &mut StateRegistry) {
             "minecraft:redstone_wire" => {
                 (0u8..16).map(|p| descriptor.with("power", &p.to_string())).collect()
             }
+            // Every distance a leaf can take. `register_all` interns these too,
+            // for the family it writes into — but it does so while iterating a
+            // snapshot of the registry, so a distance the schematic never held
+            // would exist as a state with no behaviour attached. A leaf pulled
+            // to distance 1 by a log then went inert: it could no longer book
+            // its own re-check, and the observer watching it never fired again.
+            n if n.ends_with("_leaves") => {
+                (1u8..=7).map(|d| descriptor.with("distance", &d.to_string())).collect()
+            }
             "minecraft:stone_button"
             | "minecraft:oak_button"
             | "minecraft:stone_pressure_plate"
