@@ -576,7 +576,6 @@ const INERT: &[&str] = &[
     "minecraft:pink_wool",
     "minecraft:red_wool",
     "minecraft:oak_wood",
-    "minecraft:oak_leaves",
     "minecraft:smooth_stone_slab",
     "minecraft:composter",
     "minecraft:target",
@@ -998,6 +997,9 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
                         power: rules.clone(),
                     }),
                 );
+            }
+            n if n.ends_with("_leaves") => {
+                table.register(*id, Box::new(crate::components::Leaves));
             }
             "minecraft:piston_head" => {
                 let Some(facing) = descriptor.facing() else { continue };

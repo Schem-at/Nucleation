@@ -2202,6 +2202,33 @@ mod tests {
     }
 }
 
+/// Leaves — `LeavesBlock`, for their *scheduling* only.
+///
+/// A shape update makes leaves book a tick to re-check their `distance`, and
+/// that schedule is observable in the game's pending queue even when nothing
+/// comes of it. Every leaf block in this corpus is `persistent=true` with no
+/// logs nearby, so the tick recomputes the same distance and writes nothing —
+/// which is why the tick itself is a no-op here.
+///
+/// Decay is not modelled: non-persistent leaves cut off from wood would
+/// disappear in vanilla and will not here. No fixture depends on it, and a
+/// half-implemented decay would be worse than a named gap.
+pub struct Leaves;
+
+impl crate::behaviour::BlockBehaviour for Leaves {
+    fn on_shape_update(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        if !ctx.ticks.has_pending_at(pos, ctx.tick) {
+            ctx.schedule(pos, 1, TickPriority::Normal);
+        }
+    }
+
+    fn on_scheduled_tick(&self, _ctx: &mut TickCtx<'_>, _pos: Pos) {}
+
+    fn name(&self) -> &'static str {
+        "leaves"
+    }
+}
+
 /// A lever — `LeverBlock`.
 ///
 /// `useWithoutItem` cycles `powered` (loud write), then additionally updates

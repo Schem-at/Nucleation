@@ -915,6 +915,18 @@ impl Simulation {
             };
             behaviour.on_placed(&mut ctx, *pos);
             self.propagate();
+
+            // `markAndNotifyBlock` after the write: flag 1 is set (the harness
+            // places with flags 3), so every block notifies its neighbours as
+            // it lands. `knownShape` gates the *update pass* that follows the
+            // placement loop, not this — which is why a "silent" placement
+            // still schedules torches and wakes pistons.
+            //
+            // The order within a write is `onPlace`, then this: a block reacts
+            // to its own arrival before the neighbourhood hears about it.
+            self.updates
+                .push(crate::behaviour::UpdateEntry::neighbors_at(*pos));
+            self.propagate();
         }
 
         // `placeInWorld` ends each block's turn with `BlockEntity.setChanged()`
