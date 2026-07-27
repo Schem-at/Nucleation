@@ -159,7 +159,10 @@ pub fn resolve_push(
         return failed;
     }
     if !add_block_line(world, movability, piston, dir, start, dir, &mut to_push, &mut to_destroy) {
-        return failed;
+        // The partial list, not an empty one: a refusal that reports nothing
+        // collected cannot be told apart from a refusal at the first block, and
+        // those have completely different causes.
+        return PushPlan { to_push, to_destroy, possible: false };
     }
     let mut index = 0;
     while index < to_push.len() {
@@ -167,7 +170,7 @@ pub fn resolve_push(
         if movability.sticky(world, pos).is_some()
             && !add_branching_blocks(world, movability, piston, dir, pos, &mut to_push, &mut to_destroy)
         {
-            return failed;
+            return PushPlan { to_push, to_destroy, possible: false };
         }
         index += 1;
     }
@@ -205,10 +208,11 @@ fn add_block_line(
     if movability.is_empty(world, origin) {
         return true;
     }
-    if !movability.is_movable(world, origin) {
-        if movability.destroys(world, origin) && !to_destroy.contains(&origin) {
-            to_destroy.push(origin);
-        }
+    // `isPushable(..., allowDestroy = false, ...)`, which is what `addBlockLine`
+    // passes at its head: a block that *breaks* when pushed is not collected
+    // here at all — not carried, not destroyed, just skipped. Only the forward
+    // walk destroys, and it passes `true`.
+    if !movability.is_movable(world, origin) || movability.destroys(world, origin) {
         return true;
     }
     if origin == piston || to_push.contains(&origin) {
@@ -227,6 +231,8 @@ fn add_block_line(
         if movability.is_empty(world, back)
             || !adheres(previous, back_sticky)
             || !movability.is_movable(world, back)
+            // allowDestroy is false here too: a breakable block ends the chain.
+            || movability.destroys(world, back)
             || back == piston
         {
             break;
@@ -267,6 +273,10 @@ fn add_block_line(
         if !movability.is_movable(world, next) || next == piston {
             return false;
         }
+        // The forward walk passes `allowDestroy = true`, so a breakable block
+        // here *is* collected — into `toDestroy` — and it ends the line. The
+        // order matters: this is checked *before* the twelve-block limit, so a
+        // line that ends in dust is never the thing that overflows it.
         if to_push.len() >= MAX_PUSH_DEPTH {
             return false;
         }
@@ -545,7 +555,45 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
             // while refused events are dropped — once they are rescheduled the
             // way the game reschedules them, a phantom event queued here
             // survives and fires a tick later.
-            if !resolve_push(ctx.world, &self.movability, pos, self.facing).possible {
+            let plan = resolve_push(ctx.world, &self.movability, pos, self.facing);
+            if !plan.possible {
+                // A piston that is powered, unextended, and still silent is
+                // always a refused resolve — and which block refused it is the
+                // only thing worth knowing.
+                if std::env::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
+                    f.to_string_lossy().split(';').any(|t| {
+                        let c: Vec<i32> =
+                            t.split(',').filter_map(|v| v.trim().parse().ok()).collect();
+                        c.len() == 3 && c[0] == pos.x && c[1] == pos.y && c[2] == pos.z
+                    })
+                }) {
+                    let line: Vec<String> = plan
+                        .to_push
+                        .iter()
+                        .map(|p| {
+                            format!(
+                                "({}, {}, {}){} destroys={} movable={}",
+                                p.x,
+                                p.y,
+                                p.z,
+                                ctx.states.descriptor(ctx.world.get(*p)).unwrap_or("?"),
+                                self.movability.destroys(ctx.world, *p),
+                                self.movability.is_movable(ctx.world, *p)
+                            )
+                        })
+                        .collect();
+                    let blocker = plan.to_push.last().map(|p| p.offset(self.facing));
+                    eprintln!(
+                        "[pwr] {:?} resolve REFUSED n={} blocker={:?} line=[{}]",
+                        (pos.x, pos.y, pos.z),
+                        plan.to_push.len(),
+                        blocker.map(|b| (
+                            (b.x, b.y, b.z),
+                            ctx.states.descriptor(ctx.world.get(b)).unwrap_or("?")
+                        )),
+                        line.join(", ")
+                    );
+                }
                 return;
             }
             TRIGGER_EXTEND
@@ -1139,8 +1187,12 @@ mod tests {
 
         let p = piston(false, false);
         let plan = resolve_push(&w, &p.movability, Pos::new(0, 1, 0), Dir::East);
-        assert!(!plan.possible);
-        assert!(plan.to_push.is_empty(), "nothing moves, not even the movable part");
+        // Refused, so nothing moves — not even the stone that could have. The
+        // list a refused plan carries is diagnostic only: every caller gates on
+        // `possible`, and it is worth far more to be able to see *how far* a
+        // refused resolve got than to have it come back empty.
+        assert!(!plan.possible, "nothing moves, not even the movable part");
+        assert_eq!(plan.to_push, vec![Pos::new(1, 1, 0)], "collected up to the obsidian");
     }
 
     #[test]

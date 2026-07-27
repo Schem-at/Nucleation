@@ -814,6 +814,13 @@ pub fn register_all_at(
                 | "minecraft:activator_rail"
                 | "minecraft:torch"
                 | "minecraft:wall_torch"
+                // `DiodeBlock` is `PushReaction.DESTROY`: a repeater or
+                // comparator in a piston's way breaks, it does not ride along.
+                // Carrying them inflates the push line — a honey slab reaching
+                // down to a repeater collected two extra blocks, and a line of
+                // thirteen is refused where vanilla's eleven goes through.
+                | "minecraft:repeater"
+                | "minecraft:comparator"
         ) {
             rules.destroyed_by_push.push(*id);
         }
