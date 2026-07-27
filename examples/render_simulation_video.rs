@@ -477,6 +477,17 @@ fn simulate(
             }
         }
     }
+    // The same block-entity setup the conformance harness does. Without it a
+    // comparator has no stored `OutputSignal`, so a door whose memory cell is
+    // held by one comes up unlatched and never closes — which is the very
+    // failure that made pasted captures useless, reproduced here in the
+    // renderer while the engine itself was exact.
+    for pos in &structure.block_entities {
+        sim.mark_block_entity(*pos);
+    }
+    for (pos, strength) in &structure.comparator_outputs {
+        sim.set_comparator_output(*pos, *strength);
+    }
     for (pos, stacks) in &structure.inventories {
         let entry = structure
             .blocks

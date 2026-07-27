@@ -31,10 +31,19 @@ fn main() {
         let (registry, world) = sim.registry_and_world_mut();
         structure.place(world, registry, Pos::new(0, 0, 0));
     }
+    let hash_origin = args
+        .iter()
+        .position(|a| a == "--origin")
+        .and_then(|i| args.get(i + 1))
+        .map(|v| {
+            let c: Vec<i32> = v.split(',').map(|p| p.parse().unwrap()).collect();
+            Pos::new(c[0], c[1], c[2])
+        })
+        .unwrap_or_default();
     mc_tick::intern_companions(sim.registry_mut());
     {
         let mut table = std::mem::take(sim.behaviours_mut());
-        mc_tick::register_all(sim.registry_mut(), &mut table);
+        mc_tick::register_all_at(sim.registry_mut(), &mut table, hash_origin);
         *sim.behaviours_mut() = table;
     }
     for pos in &structure.block_entities {
