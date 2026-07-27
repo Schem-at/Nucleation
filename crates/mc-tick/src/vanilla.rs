@@ -1528,6 +1528,9 @@ fn face_name(dir: Dir) -> &'static str {
 /// has no reason to mention `extended=true`, and a build never mentions
 /// `moving_piston` at all. Without their counterparts a block cannot change state,
 /// so a simulation would silently freeze.
+/// The values a wire's four side properties take — `RedstoneSide`.
+const WIRE_SIDE_VALUES: [&str; 3] = ["none", "side", "up"];
+
 pub fn intern_companions(registry: &mut StateRegistry) {
     let existing: Vec<String> = (0..registry.len())
         .filter_map(|i| registry.descriptor(StateId(i as u16)).map(str::to_string))
@@ -1553,8 +1556,34 @@ pub fn intern_companions(registry: &mut StateRegistry) {
             "minecraft:redstone_torch" | "minecraft:redstone_wall_torch" => {
                 vec![descriptor.with("lit", "false"), descriptor.with("lit", "true")]
             }
+            // Every state a wire can take: sixteen powers across all eighty-one
+            // combinations of the four sides. Interning only the powers was
+            // enough for as long as a wire's *connections* never changed, and
+            // they do — `getConnectionState` reshapes a wire whenever a
+            // neighbour appears or leaves. A shape the schematic never happened
+            // to contain simply did not exist, and the rewrite was dropped: the
+            // wire kept a connection to a block a piston had pulled away, which
+            // then suppressed the symmetry rule that would have run it straight.
+            // Silent, because a missing state is indistinguishable from no
+            // change at the call site.
             "minecraft:redstone_wire" => {
-                (0u8..16).map(|p| descriptor.with("power", &p.to_string())).collect()
+                let mut all = Vec::new();
+                for power in 0u8..16 {
+                    let at = Descriptor::parse(&descriptor.with("power", &power.to_string()));
+                    for north in WIRE_SIDE_VALUES {
+                        let at = Descriptor::parse(&at.with("north", north));
+                        for south in WIRE_SIDE_VALUES {
+                            let at = Descriptor::parse(&at.with("south", south));
+                            for east in WIRE_SIDE_VALUES {
+                                let at = Descriptor::parse(&at.with("east", east));
+                                for west in WIRE_SIDE_VALUES {
+                                    all.push(at.with("west", west));
+                                }
+                            }
+                        }
+                    }
+                }
+                all
             }
             // Every distance a leaf can take. `register_all` interns these too,
             // for the family it writes into — but it does so while iterating a

@@ -381,6 +381,16 @@ impl<'a> TickCtx<'a> {
         self.updates.push(UpdateEntry::neighbors_at(pos));
     }
 
+    /// Queue one `updateNeighbourShapes(pos)` entry.
+    ///
+    /// Normally a consequence of a write's flags, but `moveBlocks` calls it
+    /// directly: the slots a push vacates are cleared with flag 82, which
+    /// carries `UPDATE_KNOWN_SHAPE` and so says nothing, and the shape pass is
+    /// then run over them by hand.
+    pub fn update_neighbour_shapes(&mut self, pos: Pos) {
+        self.updates.push(UpdateEntry::neighbor_shapes(pos));
+    }
+
     /// `updateNeighborsAtExceptFromFacing`: the same entry minus one side.
     pub fn update_neighbors_except(&mut self, pos: Pos, skip: Dir) {
         self.updates.push(UpdateEntry::new(

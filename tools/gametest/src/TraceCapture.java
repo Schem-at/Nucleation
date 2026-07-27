@@ -177,11 +177,19 @@ public final class TraceCapture {
         // is loaded but not ticking. A build that straddles a chunk border — and
         // at seventeen blocks wide this one does — then has half of itself in a
         // chunk whose scheduled ticks are never collected.
+        // `chunks` is what must tick — the ones the recording actually covers.
+        // The ring around them is ticketed too, so the recorded chunks sit
+        // inside the ticket radius rather than on its edge, but a margin chunk
+        // that never reaches entity-ticking is not a problem worth failing on.
         var chunks = new java.util.ArrayList<net.minecraft.world.level.ChunkPos>();
         for (int cx = (min.getX() >> 4) - 1; cx <= (max.getX() >> 4) + 1; cx++) {
             for (int cz = (min.getZ() >> 4) - 1; cz <= (max.getZ() >> 4) + 1; cz++) {
                 var chunk = new net.minecraft.world.level.ChunkPos(cx, cz);
-                chunks.add(chunk);
+                boolean covered = cx >= (min.getX() >> 4) && cx <= (max.getX() >> 4)
+                        && cz >= (min.getZ() >> 4) && cz <= (max.getZ() >> 4);
+                if (covered) {
+                    chunks.add(chunk);
+                }
                 level.getChunkSource().addTicketWithRadius(
                         net.minecraft.server.level.TicketType.PLAYER_SIMULATION, chunk, 2);
                 level.getChunkSource().addTicketWithRadius(

@@ -635,6 +635,19 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // still reads `extended=false`. Deferring them until after the
                 // base write shows every notified block a piston that has
                 // already finished moving, which is a different world.
+                // Before any of that, the shape pass over the vacated slots.
+                // They were cleared with flag 82 — `UPDATE_KNOWN_SHAPE` set, so
+                // the write itself is silent — and `moveBlocks` then calls
+                // `updateNeighbourShapes` on each of them explicitly, flag 2.
+                // Without it a wire beside a slot a piston empties keeps a
+                // connection to a block that is no longer there: it still hears
+                // the neighbour update and drops its power, so the fault reads
+                // as a stale connection property rather than a missing update.
+                for (from, _) in carried.iter().rev() {
+                    if *from != head_slot && !destinations.contains(from) {
+                        ctx.update_neighbour_shapes(*from);
+                    }
+                }
                 // Destroyed blocks go first, exactly as `moveBlocks` walks
                 // them: the toDestroy loop runs before the vacated-source loop.
                 for pos in plan.to_destroy.iter().rev() {
@@ -713,12 +726,24 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                                 .collect();
                             for (from, state) in &carried {
                                 let to = from.offset(back);
-                                ctx.set_quiet(to, self.moving_block);
+                                // Flag 324, the same as a push: the placeholder
+                                // write propagates shape, and does so before the
+                                // next one is written.
+                                ctx.set_shape_only(to, self.moving_block);
+                                ctx.drain();
                                 ctx.defer(to, *state, PISTON_MOVE_TICKS);
                             }
                             for (from, _) in &carried {
                                 if !destinations.contains(from) {
                                     ctx.set_quiet(*from, StateId::AIR);
+                                }
+                            }
+                            // Flag 82 is silent, so `moveBlocks` runs the shape
+                            // pass over the vacated slots by hand, before any of
+                            // the neighbour updates below.
+                            for (from, _) in carried.iter().rev() {
+                                if !destinations.contains(from) {
+                                    ctx.update_neighbour_shapes(*from);
                                 }
                             }
                             // `moveBlocks`' tail again — a pull vacates
