@@ -808,10 +808,6 @@ pub fn register_all_at(
                 | "minecraft:oak_button"
                 | "minecraft:stone_pressure_plate"
                 | "minecraft:oak_pressure_plate"
-                | "minecraft:rail"
-                | "minecraft:powered_rail"
-                | "minecraft:detector_rail"
-                | "minecraft:activator_rail"
                 | "minecraft:torch"
                 | "minecraft:wall_torch"
                 // `DiodeBlock` is `PushReaction.DESTROY`: a repeater or

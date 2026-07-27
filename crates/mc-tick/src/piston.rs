@@ -273,10 +273,33 @@ fn add_block_line(
         if !movability.is_movable(world, next) || next == piston {
             return false;
         }
+        // `MC_TICK_TRACE_REACH=1` — every breakable block a push line walks into.
+        //
+        // This walk passes `allowDestroy = true`, so whatever it reaches is a
+        // block the engine is about to break. Cross-check each one against a
+        // capture: if the game never breaks it, either the line is longer than
+        // the game's or the block is not breakable at all. It was the second —
+        // rails were listed as `DESTROY` and the game plainly pushes them.
+        if std::env::var_os("MC_TICK_TRACE_REACH").is_some() && movability.destroys(world, next) {
+            eprintln!(
+                "[reach] piston={:?} dir={:?} line_origin={:?} reached={:?} collected={:?}",
+                (piston.x, piston.y, piston.z),
+                push_dir,
+                (origin.x, origin.y, origin.z),
+                (next.x, next.y, next.z),
+                to_push.iter().map(|p| (p.x, p.y, p.z)).collect::<Vec<_>>()
+            );
+        }
         // The forward walk passes `allowDestroy = true`, so a breakable block
         // here *is* collected — into `toDestroy` — and it ends the line. The
         // order matters: this is checked *before* the twelve-block limit, so a
         // line that ends in dust is never the thing that overflows it.
+        if movability.destroys(world, next) {
+            if !to_destroy.contains(&next) {
+                to_destroy.push(next);
+            }
+            return true;
+        }
         if to_push.len() >= MAX_PUSH_DEPTH {
             return false;
         }
