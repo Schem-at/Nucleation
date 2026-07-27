@@ -102,6 +102,16 @@ fn main() {
 
     let mut divergences = 0usize;
     for tick in 0..horizon {
+        // Actuations first: the capture clicks *before* it dumps the queues, so
+        // the recorded pending state already contains whatever the click
+        // cascaded. Comparing before applying it here would hold the engine to
+        // a world it has not been told about yet.
+        for (pos, at) in &uses {
+            if *at == tick {
+                sim.use_block(*pos);
+            }
+        }
+
         // Compare what is *pending* before the tick runs. This is the earliest
         // point a divergence can be seen, and often several ticks before it
         // shows up as a block change.
@@ -155,11 +165,6 @@ fn main() {
             }
         }
 
-        for (pos, at) in &uses {
-            if *at == tick {
-                sim.use_block(*pos);
-            }
-        }
         sim.step();
 
         // Then compare what changed during it.
