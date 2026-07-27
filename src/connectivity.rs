@@ -72,6 +72,74 @@ impl UniversalSchematic {
         comps.sort_by(|a, b| b.blocks.len().cmp(&a.blocks.len()));
         comps
     }
+
+    /// Split this schematic into one standalone [`UniversalSchematic`] per
+    /// physically-connected component (see [`UniversalSchematic::connected_components`]
+    /// for the `conn` ↔ `//that` mapping), largest-first.
+    ///
+    /// Each returned piece contains *exactly* that component's non-air
+    /// blocks — full block state (properties) and any attached block entity
+    /// (chest contents, sign text, etc.) travel with their coordinate into
+    /// the correct piece. Original world coordinates are preserved (pieces
+    /// are **not** re-origined), so the split is information-preserving and
+    /// reversible: overlaying every returned piece back onto an empty
+    /// schematic reproduces the input exactly. Each piece's `metadata.name`
+    /// is the original name with a `#N` suffix (1-based, in output order);
+    /// the rest of the top-level metadata is carried over unchanged.
+    ///
+    /// A fully-connected input returns a single-element `Vec` containing a
+    /// block-identical clone (modulo the `#1` name suffix).
+    pub fn split_connected(&self, conn: Connectivity) -> Vec<UniversalSchematic> {
+        let base_name = self
+            .metadata
+            .name
+            .clone()
+            .unwrap_or_else(|| "schematic".to_string());
+
+        self.connected_components(conn)
+            .into_iter()
+            .enumerate()
+            .map(|(i, comp)| {
+                let mut piece = UniversalSchematic::new(format!("{base_name}#{}", i + 1));
+                piece.metadata = self.metadata.clone();
+                piece.metadata.name = Some(format!("{base_name}#{}", i + 1));
+
+                for pos in &comp.blocks {
+                    if let Some(block) = self.get_block(pos.x, pos.y, pos.z) {
+                        piece.set_block(pos.x, pos.y, pos.z, &block.clone());
+                    }
+                    if let Some(entity) = self.get_block_entity_owned(*pos) {
+                        piece.set_block_entity(*pos, entity);
+                    }
+                }
+
+                // set_block's incremental `expand_to_fit` pads the storage
+                // region well beyond the placed blocks (a perf tradeoff for
+                // incremental writes). Compact down to the tight content
+                // bounds so the piece is a well-formed standalone schematic:
+                // a correct (non-padded) bounding box, and `get_block` no
+                // longer reports phantom air outside the component.
+                piece.default_region = piece.default_region.to_compact();
+
+                piece
+            })
+            .collect()
+    }
+
+    /// Like [`UniversalSchematic::split_connected`], but drops components
+    /// with fewer than `min_blocks` blocks. Tiny fragments are simply
+    /// discarded, not merged into a neighbouring piece — if you need
+    /// attach-to-nearest behaviour, build it on top of this.
+    pub fn split_connected_min(
+        &self,
+        conn: Connectivity,
+        min_blocks: usize,
+    ) -> Vec<UniversalSchematic> {
+        self.split_connected(conn)
+            .into_iter()
+            .filter(|piece| piece.total_blocks() as usize >= min_blocks)
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -184,5 +252,170 @@ mod tests {
         assert_eq!(comps[0].blocks.len(), 2);
         assert_eq!(comps[0].bounds.min, (-5, -5, -5));
         assert_eq!(comps[0].bounds.max, (-4, -5, -5));
+    }
+
+    // ── split_connected ─────────────────────────────────────────────────
+
+    use crate::block_position::BlockPosition;
+    use std::collections::HashMap;
+
+    #[test]
+    fn split_connected_two_blobs_routes_blocks_and_block_entity_to_correct_piece() {
+        let mut s = UniversalSchematic::new("base".into());
+        // Blob A: two stone blocks far from blob B.
+        place(&mut s, 0, 0, 0);
+        place(&mut s, 1, 0, 0);
+        // Blob B: a chest (with NBT) plus a neighbouring stone block.
+        let mut nbt = HashMap::new();
+        nbt.insert("CustomName".to_string(), "\"Loot\"".to_string());
+        s.set_block_with_nbt(50, 0, 0, "minecraft:chest", nbt).unwrap();
+        place(&mut s, 51, 0, 0);
+
+        let pieces = s.split_connected(Connectivity::Face);
+        assert_eq!(pieces.len(), 2);
+
+        // Largest-first: both components are size 2, so order is by
+        // discovery (iter_bounds scan order) — identify by content instead.
+        let piece_a = pieces
+            .iter()
+            .find(|p| p.get_block(0, 0, 0).is_some())
+            .expect("piece containing blob A");
+        let piece_b = pieces
+            .iter()
+            .find(|p| p.get_block(50, 0, 0).is_some())
+            .expect("piece containing blob B");
+
+        // Piece A has exactly blob A's blocks, no block entity.
+        assert_eq!(piece_a.total_blocks(), 2);
+        assert_eq!(
+            piece_a.get_block(1, 0, 0).map(|b| b.get_name()),
+            Some("minecraft:stone")
+        );
+        assert!(piece_a.get_block(50, 0, 0).is_none());
+        assert!(piece_a
+            .get_block_entity_owned(BlockPosition::new(50, 0, 0))
+            .is_none());
+
+        // Piece B has exactly blob B's blocks, and the chest's NBT travelled
+        // with it.
+        assert_eq!(piece_b.total_blocks(), 2);
+        assert_eq!(
+            piece_b.get_block(51, 0, 0).map(|b| b.get_name()),
+            Some("minecraft:stone")
+        );
+        assert!(piece_b.get_block(0, 0, 0).is_none());
+        let chest_entity = piece_b
+            .get_block_entity_owned(BlockPosition::new(50, 0, 0))
+            .expect("chest block entity should travel with its block");
+        assert_eq!(chest_entity.id, "minecraft:chest");
+        assert!(piece_b
+            .get_block_entity_owned(BlockPosition::new(0, 0, 0))
+            .is_none());
+    }
+
+    #[test]
+    fn split_connected_honors_connectivity_choice() {
+        // Pure corner diagonal touch: split at Face, merged at Corner.
+        let mut s = UniversalSchematic::new("diag".into());
+        place(&mut s, 0, 0, 0);
+        place(&mut s, 1, 1, 1);
+
+        assert_eq!(s.split_connected(Connectivity::Face).len(), 2);
+        assert_eq!(s.split_connected(Connectivity::Corner).len(), 1);
+    }
+
+    #[test]
+    fn split_connected_block_conservation_round_trip() {
+        // Mixed schematic: a blockstate with properties in one component,
+        // a plain block in a disconnected component, negative coordinates.
+        let mut s = UniversalSchematic::new("mixed".into());
+        s.set_block_from_string(-3, -3, -3, "minecraft:oak_stairs[facing=north,half=top]")
+            .unwrap();
+        place(&mut s, -3, -3, -2); // face-connects to the stairs block
+        place(&mut s, 10, 10, 10); // disconnected singleton
+
+        // Collect the original multiset of (pos, block-string).
+        let mut original: Vec<((i32, i32, i32), String)> = Vec::new();
+        for x in -4..=11 {
+            for y in -4..=11 {
+                for z in -4..=11 {
+                    if let Some(b) = s.get_block(x, y, z) {
+                        if b.get_name() != "minecraft:air" {
+                            original.push(((x, y, z), b.to_string()));
+                        }
+                    }
+                }
+            }
+        }
+        original.sort();
+
+        let pieces = s.split_connected(Connectivity::Face);
+        assert_eq!(pieces.len(), 2);
+
+        let mut recombined: Vec<((i32, i32, i32), String)> = Vec::new();
+        for piece in &pieces {
+            let bounds = piece.get_bounding_box();
+            for x in bounds.min.0..=bounds.max.0 {
+                for y in bounds.min.1..=bounds.max.1 {
+                    for z in bounds.min.2..=bounds.max.2 {
+                        if let Some(b) = piece.get_block(x, y, z) {
+                            if b.get_name() != "minecraft:air" {
+                                recombined.push(((x, y, z), b.to_string()));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        recombined.sort();
+
+        assert_eq!(original, recombined, "no block lost, duplicated, or mutated");
+    }
+
+    #[test]
+    fn split_connected_min_drops_tiny_fragments() {
+        let mut s = UniversalSchematic::new("frag".into());
+        // Main mass: 5 blocks.
+        for x in 0..5 {
+            place(&mut s, x, 0, 0);
+        }
+        // Tiny disconnected fragment: 2 blocks.
+        place(&mut s, 100, 0, 0);
+        place(&mut s, 101, 0, 0);
+
+        let all = s.split_connected(Connectivity::Face);
+        assert_eq!(all.len(), 2);
+
+        let filtered = s.split_connected_min(Connectivity::Face, 3);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].total_blocks(), 5);
+    }
+
+    #[test]
+    fn split_connected_single_component_returns_one_block_identical_piece() {
+        let mut s = UniversalSchematic::new("solo".into());
+        for x in 0..3 {
+            for y in 0..3 {
+                place(&mut s, x, y, 0);
+            }
+        }
+        let pieces = s.split_connected(Connectivity::Face);
+        assert_eq!(pieces.len(), 1);
+        assert_eq!(pieces[0].total_blocks(), s.total_blocks());
+        // `s.get_bounding_box()` is the padded storage bbox (perf tradeoff of
+        // incremental `set_block`); the split piece is compacted, so compare
+        // against the tight content bounds instead.
+        assert_eq!(
+            pieces[0].get_bounding_box(),
+            s.default_region.get_tight_bounds().unwrap()
+        );
+        for x in 0..3 {
+            for y in 0..3 {
+                assert_eq!(
+                    pieces[0].get_block(x, y, 0).map(|b| b.to_string()),
+                    s.get_block(x, y, 0).map(|b| b.to_string())
+                );
+            }
+        }
     }
 }
