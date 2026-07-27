@@ -223,6 +223,15 @@ pub struct Trace {
     /// trigger time into a tick number. `None` in older captures.
     #[serde(default)]
     pub game_time_at_start: Option<u64>,
+    /// Where the recording's `(0, 0, 0)` sat in the game's coordinates.
+    ///
+    /// `BlockPos.hashCode` runs on world positions, and the `HashSet<BlockPos>`
+    /// in `updatePowerStrength` iterates in an order that follows from it — so
+    /// a build recorded away from the origin hands its neighbour updates out in
+    /// an order a zero-based replay cannot reproduce without knowing where it
+    /// stood. `None` in captures taken before the recorder wrote it.
+    #[serde(default)]
+    pub origin: Option<[i32; 3]>,
 }
 
 /// What the level had pending around one tick.
@@ -319,6 +328,7 @@ impl Trace {
             ticks: Vec::new(),
             queues: Vec::new(),
             game_time_at_start: None,
+            origin: None,
         }
     }
 

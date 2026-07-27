@@ -10,7 +10,7 @@
 //! [`crate::world::World`].
 
 /// A block position in world coordinates.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Pos {
     /// East/west.
     pub x: i32,

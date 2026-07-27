@@ -126,6 +126,10 @@ impl Descriptor {
 /// power and which can be shoved.
 #[derive(Debug, Clone, Default)]
 pub struct VanillaRules {
+    /// Where this world's `(0, 0, 0)` sits in the game's coordinates — see
+    /// [`crate::wire::WireWorld::hash_origin`]. Zero unless a capture says
+    /// otherwise.
+    hash_origin: Pos,
     powered: Vec<StateId>,
     /// States that emit in **one** direction only, and which one.
     ///
@@ -334,6 +338,10 @@ impl VanillaRules {
 }
 
 impl crate::wire::WireWorld for VanillaRules {
+    fn hash_origin(&self) -> Pos {
+        self.hash_origin
+    }
+
     /// `getBlockSignal`: the strongest non-wire signal into the wire.
     ///
     /// Comparator strengths, strongly powered conductors and one-directional
@@ -624,6 +632,21 @@ const INERT: &[&str] = &[
 /// Any state whose block is not recognised is left unregistered on purpose; see the
 /// module docs.
 pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) -> VanillaRules {
+    register_all_at(registry, table, Pos::new(0, 0, 0))
+}
+
+/// As [`register_all`], for a build that sits at `origin` in the game's own
+/// coordinates.
+///
+/// The only thing this changes is the iteration order of the `HashSet<BlockPos>`
+/// in `updatePowerStrength`, which is a function of absolute position — so a
+/// trace recorded where a build stands can only be reproduced by hashing the
+/// positions it was recorded at.
+pub fn register_all_at(
+    registry: &mut StateRegistry,
+    table: &mut BehaviourTable,
+    origin: Pos,
+) -> VanillaRules {
     // Two passes. The first classifies every state, because a piston's behaviour
     // needs to know which blocks are sticky and which emit power — facts about
     // *other* states that may not have been seen yet when it is reached.
@@ -632,7 +655,7 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
         .filter_map(|id| registry.descriptor(id).map(|d| (id, Descriptor::parse(d))))
         .collect();
 
-    let mut rules = VanillaRules::default();
+    let mut rules = VanillaRules { hash_origin: origin, ..VanillaRules::default() };
     for (id, descriptor) in &descriptors {
         match descriptor.name.as_str() {
             n if CONSTANT_SOURCES.contains(&n) => rules.powered.push(*id),

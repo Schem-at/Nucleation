@@ -63,5 +63,5 @@ pub use state::{StateError, StateId, StateRegistry};
 pub use structure::{Structure, StructureError};
 pub use entity::{ItemEntities, ItemEntityState};
 pub use inventory::{Inventory, ItemStack};
-pub use vanilla::{intern_companions, register_all, Descriptor, VanillaRules};
+pub use vanilla::{intern_companions, register_all, register_all_at, Descriptor, VanillaRules};
 pub use world::World;

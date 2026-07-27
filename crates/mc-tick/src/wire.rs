@@ -26,6 +26,16 @@ use crate::world::World;
 
 /// What the wire needs to know about everything that is not wire.
 pub trait WireWorld: Send + Sync {
+    /// Where this world's `(0, 0, 0)` sits in the game's coordinates.
+    ///
+    /// Only `updatePowerStrength`'s `HashSet<BlockPos>` needs it, and only
+    /// because that set's iteration order is a function of absolute position.
+    /// Zero for a fixture placed at the origin; the recorded origin for a build
+    /// captured where it stands.
+    fn hash_origin(&self) -> Pos {
+        Pos::new(0, 0, 0)
+    }
+
     /// The strongest non-wire signal into the wire at `pos` (vanilla's
     /// `getBlockSignal` with `shouldSignal` off, so wires never count).
     fn block_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> u8;
@@ -175,18 +185,28 @@ fn incoming(rules: &dyn WireWorld, world: &World, pos: Pos) -> u8 {
 /// `Direction.values()`): 16 buckets, index `(h ^ (h >>> 16)) & 15` over
 /// `Vec3i.hashCode()` = `(y + z·31)·31 + x`, chains appended, iterated bucket
 /// by bucket.
-pub fn java_hash_order(pos: Pos) -> Vec<Pos> {
+pub fn java_hash_order(pos: Pos, origin: Pos) -> Vec<Pos> {
     let mut entries: Vec<Pos> = vec![pos];
     for dir in crate::pos::JAVA_DIRECTIONS {
         entries.push(pos.offset(dir));
     }
     let mut buckets: Vec<Vec<Pos>> = vec![Vec::new(); 16];
     for p in entries {
-        let hash = p
-            .y
-            .wrapping_add(p.z.wrapping_mul(31))
+        // `BlockPos.hashCode` runs on the position the game holds, which is a
+        // *world* position. This engine's world is zero-based, so the two agree
+        // only when the build happens to sit at the origin. They differ by a
+        // constant offset, and a constant offset does not preserve the bucket:
+        // a dust cell at local y=2 and world y=102 hands `updateNeighborsAt`
+        // its seven positions in genuinely different orders.
+        let (x, y, z) = (
+            p.x.wrapping_add(origin.x),
+            p.y.wrapping_add(origin.y),
+            p.z.wrapping_add(origin.z),
+        );
+        let hash = y
+            .wrapping_add(z.wrapping_mul(31))
             .wrapping_mul(31)
-            .wrapping_add(p.x);
+            .wrapping_add(x);
         let spread = hash ^ (((hash as u32) >> 16) as i32);
         buckets[(spread & 15) as usize].push(p);
     }
@@ -215,7 +235,7 @@ pub fn update_power_strength(
         ctx.set_shape_only(pos, state);
     }
     // Seven updateNeighborsAt entries, in the HashSet's iteration order.
-    for p in java_hash_order(pos) {
+    for p in java_hash_order(pos, rules.hash_origin()) {
         ctx.update_neighbors_at(p);
     }
 }
@@ -336,7 +356,7 @@ mod tests {
     #[test]
     fn the_hash_order_matches_javas_buckets() {
         // Hand-checked against Java: HashSet of (0,0,0) and neighbours.
-        let order = java_hash_order(Pos::new(0, 0, 0));
+        let order = java_hash_order(Pos::new(0, 0, 0), Pos::new(0, 0, 0));
         assert_eq!(order.len(), 7);
         // Every position appears exactly once.
         let mut seen = std::collections::HashSet::new();
@@ -372,9 +392,46 @@ mod hash_order_ground_truth {
         ];
         for (pos, want) in cases {
             let got: Vec<(i32, i32, i32)> =
-                java_hash_order(*pos).iter().map(|p| (p.x, p.y, p.z)).collect();
+                java_hash_order(*pos, Pos::new(0, 0, 0)).iter().map(|p| (p.x, p.y, p.z)).collect();
             let want: Vec<(i32, i32, i32)> = want.to_vec();
             assert_eq!(got, want, "hash order for {pos:?}");
         }
+    }
+}
+
+#[cfg(test)]
+mod hash_origin_matters {
+    use super::*;
+    use crate::pos::Pos;
+
+    /// The same block, hashed where it stands and hashed at the origin, hands
+    /// `updateNeighborsAt` its seven positions in different orders.
+    ///
+    /// Both sides are real Java run against the 26.2 jar. The dust cascade's
+    /// cell at local (5,2,1) sits at world y=102 in the capture, and that one
+    /// difference is the whole reason its six pistons fire 5,3,2,1,4,6 rather
+    /// than sweeping 5,4,3,2,1,6 — and, a hundred blocks away in a saved world,
+    /// the reason the vault door's tick-80 piston race went the other way.
+    #[test]
+    fn the_world_origin_changes_the_hash_order() {
+        let cell = Pos::new(5, 2, 1);
+        let at_origin: Vec<(i32, i32, i32)> = java_hash_order(cell, Pos::new(0, 0, 0))
+            .iter()
+            .map(|p| (p.x, p.y, p.z))
+            .collect();
+        let in_world: Vec<(i32, i32, i32)> = java_hash_order(cell, Pos::new(0, 100, 0))
+            .iter()
+            .map(|p| (p.x, p.y, p.z))
+            .collect();
+
+        assert_eq!(
+            at_origin,
+            vec![(5, 3, 1), (5, 2, 0), (4, 2, 1), (5, 2, 1), (5, 1, 1), (5, 2, 2), (6, 2, 1)],
+        );
+        assert_eq!(
+            in_world,
+            vec![(5, 2, 1), (5, 1, 1), (5, 2, 2), (6, 2, 1), (5, 3, 1), (5, 2, 0), (4, 2, 1)],
+        );
+        assert_ne!(at_origin, in_world, "the offset must not be a no-op");
     }
 }

@@ -522,6 +522,13 @@ public final class TraceCapture {
                 + "  \"format_version\": 1,\n"
                 + "  \"mc_version\": \"" + SharedConstants.getCurrentVersion().name() + "\",\n"
                 + "  \"structure\": \"" + structureId + "\",\n"
+                // Where local (0,0,0) sits in the game's coordinates. Only the
+                // HashSet in updatePowerStrength cares, and it cares absolutely:
+                // BlockPos.hashCode runs on the world position, so a build
+                // recorded away from the origin hands updateNeighborsAt its
+                // seven positions in an order a zero-based replay cannot guess.
+                + "  \"origin\": [" + ORIGIN.getX() + ", " + ORIGIN.getY() + ", "
+                + ORIGIN.getZ() + "],\n"
                 + "  \"detail\": \"normal\",\n"
                 + "  \"game_time_at_start\": " + startGameTime + ",\n"
                 + "  \"queues\": [\n" + String.join(",\n", queues) + "\n  ],\n"

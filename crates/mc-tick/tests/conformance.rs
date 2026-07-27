@@ -319,6 +319,14 @@ fn run_conformance_full(
     // An instrumented capture would know the real order and must not be canonicalised.
     let mut expected = golden(golden_file);
     normalize_entity_ids(&mut expected);
+    // Where the capture's (0,0,0) sat in the game's coordinates. Needed because
+    // `updatePowerStrength` iterates a `HashSet<BlockPos>` whose order follows
+    // from absolute position — a build recorded away from the origin hands out
+    // its neighbour updates in an order a zero-based replay cannot guess.
+    let hash_origin = expected
+        .origin
+        .map(|o| mc_tick::Pos::new(o[0], o[1], o[2]))
+        .unwrap_or_default();
     let expected = expected.canonicalized();
 
     let mut sim = Simulation::new(structure.bounds(MARGIN));
@@ -365,7 +373,7 @@ fn run_conformance_full(
     mc_tick::intern_companions(sim.registry_mut());
     {
         let mut table = std::mem::take(sim.behaviours_mut());
-        mc_tick::register_all(sim.registry_mut(), &mut table);
+        mc_tick::register_all_at(sim.registry_mut(), &mut table, hash_origin);
         *sim.behaviours_mut() = table;
     }
 
@@ -1219,16 +1227,11 @@ fn the_4x4_vault_door_runs_a_full_cycle_in_the_world_it_was_built_in() {
 /// including a 151-event tick, so interrupting a stroke and re-triggering it
 /// are both right.
 ///
-/// Ignored on the last four. Every block state agrees through tick 61; what
-/// differs is the order two pistons queue their block events in during the
-/// lever cascade, and by tick 80 that decides which of two racing pistons
-/// wins. The capture's `log` records vanilla's own queueing order for exactly
-/// this — the first divergence is the eleventh block event of tick 45, where
-/// vanilla queues (1,10,4) and the engine queues (2,2,4).
+/// It matched the last four ticks only once the wire hash was given the world
+/// origin: they turn on a piston race at tick 80, and which piston wins follows
+/// from the order two of them queued their block events in thirty-five ticks
+/// earlier.
 #[test]
-#[ignore = "block states match through tick 61; the lever cascade's traversal \
-order diverges at the eleventh queued block event of tick 45, and the piston \
-race it decides shows up as a block difference at tick 80"]
 fn the_4x4_vault_door_survives_interrupted_and_repeated_clicks() {
     run_conformance_full(
         "door_4x4_vault_inworld.snbt",

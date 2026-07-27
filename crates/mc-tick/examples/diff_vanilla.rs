@@ -48,6 +48,14 @@ fn main() {
     let to: u64 = flag(&args, "--to").map_or(u64::MAX, |v| v.parse().expect("--to N"));
 
     // ── run the engine the way the conformance harness does ────────────────
+    // The world position this build was recorded at. Only the `HashSet<BlockPos>`
+    // in `updatePowerStrength` needs it, and only because that set iterates in an
+    // order derived from absolute position — so a build recorded away from the
+    // origin cannot be replayed zero-based without it.
+    let hash_origin = golden
+        .origin
+        .map(|o| mc_tick::Pos::new(o[0], o[1], o[2]))
+        .unwrap_or_default();
     let mut sim = Simulation::new(structure.bounds(4));
     {
         let (registry, world) = sim.registry_and_world_mut();
@@ -56,7 +64,7 @@ fn main() {
     mc_tick::intern_companions(sim.registry_mut());
     {
         let mut table = std::mem::take(sim.behaviours_mut());
-        mc_tick::register_all(sim.registry_mut(), &mut table);
+        mc_tick::register_all_at(sim.registry_mut(), &mut table, hash_origin);
         *sim.behaviours_mut() = table;
     }
     if let Some(report) = sim.unknown_report() {
