@@ -228,8 +228,25 @@ impl VanillaRules {
         }
         // Dust powers the block beneath it and the sides it connects to,
         // never the block above.
-        if let Some((power, connections)) = self.wires.get(&state) {
+        //
+        // The connections are **recomputed here**, not read from the state.
+        // `RedStoneWireBlock.getSignal` calls `getConnectionState(level, state,
+        // pos)` on every query, so what a wire powers follows the world as it
+        // is now — not the shape the schematic was saved with. It matters
+        // during placement: a wire saved climbing a block only powers that
+        // block once the dust it climbs toward exists, and until then the
+        // block is dark. A torch beside it reads that darkness and books the
+        // tick that vanilla books.
+        if let Some((power, _)) = self.wires.get(&state) {
             if *power > 0 {
+                let connections = {
+                    let stored = self
+                        .wires
+                        .get(&state)
+                        .map(|(_, c)| *c)
+                        .unwrap_or([crate::wire::WireSide::None; 4]);
+                    crate::wire::connection_state(self, world, pos, stored)
+                };
                 match toward {
                     Dir::Down => return *power,
                     Dir::Up => {}
