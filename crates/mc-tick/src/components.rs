@@ -121,6 +121,12 @@ impl StatePair {
 /// power model — the same reasoning that keeps [`crate::state::StateRegistry`] free
 /// of Minecraft's block list.
 pub trait PowerSource: Send + Sync {
+    /// `LeavesBlock.getDistanceAt`: 0 for a log, a leaf's own `distance`, and
+    /// 7 for everything else — the "too far to matter" value.
+    fn leaf_distance(&self, _world: &World, _pos: Pos) -> u8 {
+        7
+    }
+
     /// Whether `pos` currently emits a signal toward `toward`.
     ///
     /// `outs` carries the comparator block-entity outputs, because a
@@ -2260,16 +2266,44 @@ mod tests {
 /// Decay is not modelled: non-persistent leaves cut off from wood would
 /// disappear in vanilla and will not here. No fixture depends on it, and a
 /// half-implemented decay would be worse than a named gap.
-pub struct Leaves;
+pub struct Leaves<P: PowerSource> {
+    /// This state's `distance`.
+    pub distance: u8,
+    /// The same leaf at each distance 1..=7, for the rewrite.
+    pub family: [Option<StateId>; 8],
+    /// How to read a neighbour's distance.
+    pub rules: P,
+}
 
-impl crate::behaviour::BlockBehaviour for Leaves {
+impl<P: PowerSource> crate::behaviour::BlockBehaviour for Leaves<P> {
     fn on_shape_update(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
         if !ctx.ticks.has_pending_at(pos, ctx.tick) {
             ctx.schedule(pos, 1, TickPriority::Normal);
         }
     }
 
-    fn on_scheduled_tick(&self, _ctx: &mut TickCtx<'_>, _pos: Pos) {}
+    /// `LeavesBlock.tick` → `updateDistance`: one more than the nearest
+    /// neighbour's, capped at 7, written **loudly** (flag 3).
+    ///
+    /// It matters more than foliage bookkeeping suggests. A door that carries
+    /// logs past a leaf block changes that leaf's `distance`, and the write
+    /// notifies its neighbours like any other — which is what drives the
+    /// observers watching it. Leaving the tick a no-op cost the 4x4 vault two
+    /// whole steps of its opening sequence.
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        let mut nearest = 7u8;
+        for dir in crate::pos::JAVA_DIRECTIONS {
+            nearest = nearest.min(self.rules.leaf_distance(ctx.world, pos.offset(dir)).saturating_add(1));
+            if nearest == 1 {
+                break;
+            }
+        }
+        if nearest != self.distance {
+            if let Some(state) = self.family.get(nearest as usize).copied().flatten() {
+                ctx.set(pos, state);
+            }
+        }
+    }
 
     fn name(&self) -> &'static str {
         "leaves"

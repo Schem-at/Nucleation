@@ -165,6 +165,9 @@ pub struct VanillaRules {
     sturdy_up: Vec<StateId>,
     /// `PushReaction.DESTROY`: broken by a push rather than carried.
     destroyed_by_push: Vec<StateId>,
+    /// A leaf state's `distance`, and the log states that count as distance 0.
+    leaf_distance: HashMap<StateId, u8>,
+    logs: Vec<StateId>,
     /// Repeater states, which dust faces only along their axis.
     repeaters: Vec<StateId>,
     /// Observer states and the direction they look, which is the only face
@@ -459,6 +462,14 @@ impl PowerSource for VanillaRules {
         self.conductors.contains(&world.get(pos))
     }
 
+    fn leaf_distance(&self, world: &World, pos: Pos) -> u8 {
+        let state = world.get(pos);
+        if self.logs.contains(&state) {
+            return 0;
+        }
+        self.leaf_distance.get(&state).copied().unwrap_or(7)
+    }
+
     fn container_slots_at(&self, world: &World, pos: Pos) -> Option<u32> {
         self.containers.get(&world.get(pos)).copied()
     }
@@ -731,6 +742,22 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
         }
         if descriptor.name == "minecraft:repeater" {
             rules.repeaters.push(*id);
+        }
+        if descriptor.name.ends_with("_leaves") {
+            let distance = descriptor
+                .get("distance")
+                .and_then(|d| d.parse().ok())
+                .unwrap_or(7);
+            rules.leaf_distance.insert(*id, distance);
+        }
+        // `BlockTags.LOGS` members answer 0, which is what pulls a nearby
+        // leaf's distance down to 1.
+        if descriptor.name.ends_with("_log")
+            || descriptor.name.ends_with("_wood")
+            || descriptor.name.ends_with("_stem")
+            || descriptor.name.ends_with("_hyphae")
+        {
+            rules.logs.push(*id);
         }
         // `PushReaction.DESTROY`. Dust and torches are the ones that matter for
         // redstone: a piston pushing into them breaks them, and the break is a
@@ -1032,7 +1059,27 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
                 );
             }
             n if n.ends_with("_leaves") => {
-                table.register(*id, Box::new(crate::components::Leaves));
+                let distance = descriptor
+                    .get("distance")
+                    .and_then(|d| d.parse().ok())
+                    .unwrap_or(7u8);
+                let mut family = [None; 8];
+                // Interned, not looked up: a schematic holds only the
+                // distances it was saved with, and the tick needs the whole
+                // family to write into.
+                for want in 1u8..=7 {
+                    family[want as usize] = registry
+                        .intern(&descriptor.with("distance", &want.to_string()))
+                        .ok();
+                }
+                table.register(
+                    *id,
+                    Box::new(crate::components::Leaves {
+                        distance,
+                        family,
+                        rules: rules.clone(),
+                    }),
+                );
             }
             "minecraft:piston_head" => {
                 let Some(facing) = descriptor.facing() else { continue };
