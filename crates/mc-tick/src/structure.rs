@@ -49,6 +49,11 @@ pub struct Structure {
     /// caller turns these into engine inventories at load time — the parser
     /// does not know how many slots a barrel has.
     pub inventories: Vec<(Pos, Vec<crate::inventory::ItemStack>)>,
+    /// Comparator block-entity output strengths, from `nbt` `OutputSignal`.
+    ///
+    /// What a comparator *emits* until it next re-evaluates. A door saved with
+    /// its comparators mid-cycle starts from these, not from zero.
+    pub comparator_outputs: Vec<(Pos, u8)>,
     /// Positions that carried an `nbt` compound — i.e. that have a block
     /// entity. `placeInWorld` ends each of these with `BlockEntity.setChanged`,
     /// which pokes neighbouring comparators, so the list is load-bearing even
@@ -199,7 +204,11 @@ impl Structure {
         let mut entities: Vec<Pos> = Vec::new();
         for (pos, entry) in &self.blocks {
             let descriptor = &self.palette[*entry];
-            if self.inventories.iter().any(|(p, _)| p == pos) {
+            //  splits on `info.nbt != null` — *any* block entity,
+            // not just one holding items. A comparator carrying its saved
+            // OutputSignal belongs in this group too, and putting it in the
+            // "other" group instead places it earlier than the game does.
+            if self.block_entities.contains(pos) {
                 entities.push(*pos);
             } else if !has_dynamic_shape(descriptor) && is_full_cube(descriptor) {
                 solid.push(*pos);
@@ -520,18 +529,30 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// A block-entity `nbt` compound: extract the `Items` list, skip the rest.
-    fn nbt_items(&mut self) -> Result<Vec<crate::inventory::ItemStack>, StructureError> {
+    /// A block-entity `nbt` compound: the `Items` list and the comparator's
+    /// `OutputSignal`, skipping the rest.
+    ///
+    /// `OutputSignal` is not decoration. A comparator emits its *stored*
+    /// block-entity strength rather than anything its block state carries, so a
+    /// build saved mid-cycle starts with whatever each comparator last emitted.
+    /// Dropping it made every comparator in a loaded door start at zero, which
+    /// is true of a freshly placed one and false of a saved one.
+    fn nbt_items(
+        &mut self,
+    ) -> Result<(Vec<crate::inventory::ItemStack>, Option<u8>), StructureError> {
         self.eat(b'{')?;
         let mut items = Vec::new();
+        let mut output_signal = None;
         loop {
             if self.peek() == Some(b'}') {
                 self.at += 1;
-                return Ok(items);
+                return Ok((items, output_signal));
             }
             let key = self.key()?;
             self.eat(b':')?;
-            if key == "Items" {
+            if key == "OutputSignal" {
+                output_signal = Some(self.int()? as u8);
+            } else if key == "Items" {
                 self.eat(b'[')?;
                 loop {
                     if self.peek() == Some(b']') {
@@ -643,6 +664,7 @@ impl<'a> Parser<'a> {
         let mut blocks: Option<Vec<(Pos, usize)>> = None;
         let mut inventories: Vec<(Pos, Vec<crate::inventory::ItemStack>)> = Vec::new();
         let mut block_entities: Vec<Pos> = Vec::new();
+        let mut comparator_outputs: Vec<(Pos, u8)> = Vec::new();
         let mut entities: Vec<SpawnedEntity> = Vec::new();
 
         loop {
@@ -700,6 +722,7 @@ impl<'a> Parser<'a> {
                         let mut pos = None;
                         let mut state = None;
                         let mut items: Vec<crate::inventory::ItemStack> = Vec::new();
+                        let mut output_signal: Option<u8> = None;
                         let mut has_nbt = false;
                         loop {
                             if self.peek() == Some(b'}') {
@@ -722,7 +745,9 @@ impl<'a> Parser<'a> {
                                 }
                                 "state" => state = Some(self.int()? as usize),
                                 "nbt" => {
-                                    items = self.nbt_items()?;
+                                    let parsed = self.nbt_items()?;
+                                    items = parsed.0;
+                                    output_signal = parsed.1;
                                     has_nbt = true;
                                 }
                                 _ => self.skip_value()?,
@@ -739,6 +764,9 @@ impl<'a> Parser<'a> {
                                 }
                                 if has_nbt {
                                     block_entities.push(p);
+                                }
+                                if let Some(signal) = output_signal {
+                                    comparator_outputs.push((p, signal));
                                 }
                             }
                             _ => return self.err("block needs both `pos` and `state`"),
@@ -761,6 +789,7 @@ impl<'a> Parser<'a> {
             palette: palette.ok_or(StructureError::Missing("palette"))?,
             blocks: blocks.ok_or(StructureError::Missing("blocks"))?,
             inventories,
+            comparator_outputs,
             block_entities,
             item_entities: entities
                 .iter()

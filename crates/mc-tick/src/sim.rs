@@ -10,6 +10,12 @@
 
 use crate::behaviour::{BehaviourTable, BlockChange, PendingMove, TickCtx};
 use crate::phase::{Phase, PHASE_ORDER};
+
+/// Whether a state descriptor names a comparator.
+fn is_comparator(descriptor: &str) -> bool {
+    descriptor.starts_with("minecraft:comparator")
+}
+
 use crate::pos::{Bounds, Pos};
 use crate::schedule::{BlockEvent, EventQueue, TickPriority, TickQueue};
 use crate::state::{StateId, StateRegistry};
@@ -713,6 +719,16 @@ impl Simulation {
     }
 
     /// Set the container contents at `pos`, as loading a structure does.
+    /// Seed a comparator's stored output strength, as a saved build carries it.
+    ///
+    /// `ComparatorBlockEntity.outputSignal` is what the comparator emits until
+    /// it re-evaluates, and a schematic saved mid-cycle carries it. Without
+    /// this every loaded comparator starts at zero — true of a freshly placed
+    /// one, false of a saved one.
+    pub fn set_comparator_output(&mut self, pos: Pos, strength: u8) {
+        self.comparator_out.insert(pos, strength);
+    }
+
     /// Record that `pos` holds a block entity. `placeInWorld` calls
     /// `BlockEntity.setChanged` on each of these, so the placement pass has to
     /// know about them even when we model nothing of their contents.
@@ -947,32 +963,52 @@ impl Simulation {
         }
     }
 
-    /// `Level.updateNeighbourForOutputSignal`: notify each neighbour, and the
-    /// block beyond any neighbour that conducts — how a comparator reading a
-    /// container *through* a solid block hears about it.
+    /// `Level.updateNeighbourForOutputSignal`: the *comparator* notification a
+    /// changed container sends.
+    ///
+    /// Narrower than its name suggests, and the narrowness is the point: only
+    /// the four **horizontal** neighbours, and only if the block there is a
+    /// comparator — or, past a block that conducts, the comparator one step
+    /// beyond it. Everything else adjacent hears nothing at all.
+    ///
+    /// Reading it as "notify all six neighbours" put four comparators on the
+    /// schedule that vanilla leaves alone, the moment the door fixtures
+    /// regained their block entities.
     fn update_neighbour_for_output_signal(&mut self, pos: Pos) {
-        for dir in crate::pos::JAVA_DIRECTIONS {
-            let neighbour = pos.offset(dir);
-            self.updates.push(crate::behaviour::UpdateEntry::new(vec![(
-                neighbour,
-                dir.opposite(),
-                crate::behaviour::UpdateKind::Neighbor,
-            )]));
-            if self
-                .conductors
-                .get(self.world.get(neighbour).raw() as usize)
-                .copied()
-                .unwrap_or(false)
-            {
-                let beyond = neighbour.offset(dir);
+        const HORIZONTAL: [crate::pos::Dir; 4] = [
+            crate::pos::Dir::North,
+            crate::pos::Dir::South,
+            crate::pos::Dir::West,
+            crate::pos::Dir::East,
+        ];
+        for dir in HORIZONTAL {
+            let side = pos.offset(dir);
+            let state = self.world.get(side);
+            if self.registry.descriptor(state).is_some_and(is_comparator) {
                 self.updates.push(crate::behaviour::UpdateEntry::new(vec![(
-                    beyond,
+                    side,
                     dir.opposite(),
                     crate::behaviour::UpdateKind::Neighbor,
                 )]));
+            } else if self
+                .conductors
+                .get(state.raw() as usize)
+                .copied()
+                .unwrap_or(false)
+            {
+                let beyond = side.offset(dir);
+                let state = self.world.get(beyond);
+                if self.registry.descriptor(state).is_some_and(is_comparator) {
+                    self.updates.push(crate::behaviour::UpdateEntry::new(vec![(
+                        beyond,
+                        dir.opposite(),
+                        crate::behaviour::UpdateKind::Neighbor,
+                    )]));
+                }
             }
         }
     }
+
 
     /// [`Simulation::settle`] with an explicit placement order — the structure
     /// file's block list, which is the order `StructureTemplate.placeInWorld`

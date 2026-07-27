@@ -56,6 +56,9 @@ fn main() {
     for pos in &structure.block_entities {
         sim.mark_block_entity(*pos);
     }
+    for (pos, strength) in &structure.comparator_outputs {
+        sim.set_comparator_output(*pos, *strength);
+    }
     let order = structure.placement_order(
         mc_tick::vanilla::is_collision_full_cube,
         mc_tick::vanilla::has_dynamic_shape,

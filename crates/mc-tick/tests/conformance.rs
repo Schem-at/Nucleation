@@ -331,6 +331,9 @@ fn run_conformance_full(
     for pos in &structure.block_entities {
         sim.mark_block_entity(*pos);
     }
+    for (pos, strength) in &structure.comparator_outputs {
+        sim.set_comparator_output(*pos, *strength);
+    }
     for (pos, stacks) in &structure.inventories {
         let entry = structure
             .blocks
