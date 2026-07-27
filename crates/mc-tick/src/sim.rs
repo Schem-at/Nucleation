@@ -1160,7 +1160,7 @@ impl Simulation {
                 // ticks, and those belong to a later tick rather than extending
                 // this drain. Draining into a Vec is what keeps that boundary
                 // sharp.
-                let due = self.ticks.drain_due(self.tick);
+                let due = self.ticks.collect_due(self.tick);
                 if std::env::var("MC_TICK_TRACE_SCHEDULE").is_ok() {
                     let names: Vec<String> = due
                         .iter()
@@ -1204,6 +1204,9 @@ impl Simulation {
                     };
                     behaviour.on_scheduled_tick(&mut ctx, entry.pos);
                     self.propagate();
+                    // Off the "will tick this tick" set only once it has run,
+                    // so the ticks still queued behind it stay visible.
+                    self.ticks.finished(entry.pos);
                 }
                 None
             }

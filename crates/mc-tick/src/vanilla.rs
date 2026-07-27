@@ -812,7 +812,23 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
                 descriptor.name.as_str(),
                 "minecraft:redstone_torch" | "minecraft:redstone_wall_torch"
             ) {
-                rules.emit_except.insert(*id, Dir::Down);
+                // A torch powers everything around it *except the block it is
+                // attached to* — `RedstoneTorchBlock.getSignal` excludes `UP`
+                // for a standing torch, and `RedstoneWallTorchBlock`'s excludes
+                // `FACING`, which is the wall behind it. Reading both as "not
+                // downward" gave a wall torch the wrong exclusion twice over:
+                // it powered its own support, and refused to power the block
+                // below it.
+                //
+                // Powering its own support is self-defeating in the exact
+                // sense — the torch then reads its support as lit and books a
+                // tick to turn itself off, one vanilla never books.
+                let support = if descriptor.name == "minecraft:redstone_wall_torch" {
+                    descriptor.facing().map(Dir::opposite).unwrap_or(Dir::Down)
+                } else {
+                    Dir::Down
+                };
+                rules.emit_except.insert(*id, support);
                 rules.strong_into.insert(*id, Dir::Up);
             }
             // A lever strongly powers the block it hangs on.

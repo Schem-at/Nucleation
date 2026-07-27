@@ -67,6 +67,8 @@ pub struct ScheduledTick {
 pub struct TickQueue {
     buckets: BTreeMap<u64, Vec<ScheduledTick>>,
     next_sequence: u64,
+    /// Collected for this tick and not yet run — vanilla's `toRunThisTickSet`.
+    running: Vec<Pos>,
 }
 
 impl TickQueue {
@@ -97,9 +99,32 @@ impl TickQueue {
     /// this before scheduling. Getting it wrong produces doubled delays that
     /// look like an off-by-one in the block's logic.
     pub fn has_pending_at(&self, pos: Pos, now: u64) -> bool {
-        self.buckets
-            .range(now..)
-            .any(|(_, entries)| entries.iter().any(|entry| entry.pos == pos))
+        self.running.iter().any(|entry| *entry == pos)
+            || self
+                .buckets
+                .range(now..)
+                .any(|(_, entries)| entries.iter().any(|entry| entry.pos == pos))
+    }
+
+    /// Take everything due, keeping it visible to [`Self::has_pending_at`]
+    /// until it has actually run.
+    ///
+    /// `LevelTicks` collects the due ticks into `toRunThisTick` and polls them
+    /// one at a time, so a tick still waiting its turn answers
+    /// `willTickThisTick` with *true*. Draining into a list and forgetting
+    /// about it answers false instead, and a torch notified while an earlier
+    /// tick runs books a second tick vanilla never books.
+    pub fn collect_due(&mut self, tick: u64) -> Vec<ScheduledTick> {
+        let due = self.drain_due(tick);
+        self.running = due.iter().map(|entry| entry.pos).collect();
+        due
+    }
+
+    /// One collected tick has now run, so it stops counting as pending.
+    pub fn finished(&mut self, pos: Pos) {
+        if let Some(index) = self.running.iter().position(|entry| *entry == pos) {
+            self.running.swap_remove(index);
+        }
     }
 
     /// Remove and return everything due on or before `tick`, in firing order.
