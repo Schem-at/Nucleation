@@ -375,7 +375,9 @@ public final class TraceCapture {
             }
         }
 
+        installBlockEventLog(level);
         for (int tick = 0; tick < maxTicks; tick++) {
+            EVENT_LOG.clear();
             if (useTarget != null && useTicks.contains(tick)) {
                 useBlock(level, useTarget);
             }
@@ -407,8 +409,8 @@ public final class TraceCapture {
             // game *planned* to do this tick, and what it left for the next one.
             // That is enough to place an event in a phase without inventing one.
             queues.add(String.format(
-                    "    {\"tick\": %d, \"before\": %s, \"after\": %s}",
-                    tick, queuedBefore, queueDump(level)));
+                    "    {\"tick\": %d, \"before\": %s, \"after\": %s, \"log\": [%s]}",
+                    tick, queuedBefore, queueDump(level), String.join(", ", EVENT_LOG)));
             for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
                 String was = previous.get(pos);
                 String now = current.get(pos);
@@ -653,6 +655,60 @@ public final class TraceCapture {
      * had an event queued at all, and in what order two diodes will fire.
      */
     @SuppressWarnings("unchecked")
+    /// Every `blockEvent` call and every `runBlockEvents` poll, in order.
+    ///
+    /// The before/after queue dumps bracket a tick but cannot see inside it, and
+    /// the order block events are *queued* in during a tick is what decides which
+    /// of two racing pistons wins. It is otherwise unobservable: the queue is
+    /// filled and drained entirely within one `tickServer` call, and freezing the
+    /// chunk to stop the drain also stops the scheduled ticks that do the filling.
+    ///
+    /// `ServerLevel.blockEvents` is a plain `ObjectLinkedOpenHashSet` on the
+    /// classpath and `blockEvent()` does nothing but `add` to it, so a subclass
+    /// that logs and delegates records the true order without changing any of it.
+    /// Reflection can write it because the field is final but not static.
+    private static final List<String> EVENT_LOG = new ArrayList<>();
+
+    private static final class LoggingBlockEvents
+            extends it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet<
+                    net.minecraft.world.level.BlockEventData> {
+        @Override
+        public boolean add(net.minecraft.world.level.BlockEventData e) {
+            boolean fresh = super.add(e);
+            // A repeat add is dropped by the set and keeps its original place,
+            // which is exactly the detail that decides these races — so record
+            // whether it took.
+            EVENT_LOG.add(String.format(
+                    "{\"kind\": \"%s\", \"pos\": [%d, %d, %d], \"id\": %d, \"param\": %d}",
+                    fresh ? "queue" : "requeue",
+                    e.pos().getX(), e.pos().getY(), e.pos().getZ(), e.paramA(), e.paramB()));
+            return fresh;
+        }
+
+        @Override
+        public net.minecraft.world.level.BlockEventData removeFirst() {
+            net.minecraft.world.level.BlockEventData e = super.removeFirst();
+            EVENT_LOG.add(String.format(
+                    "{\"kind\": \"run\", \"pos\": [%d, %d, %d], \"id\": %d, \"param\": %d}",
+                    e.pos().getX(), e.pos().getY(), e.pos().getZ(), e.paramA(), e.paramB()));
+            return e;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void installBlockEventLog(ServerLevel level) {
+        try {
+            java.lang.reflect.Field f = ServerLevel.class.getDeclaredField("blockEvents");
+            f.setAccessible(true);
+            LoggingBlockEvents logging = new LoggingBlockEvents();
+            logging.addAll((java.util.Collection<net.minecraft.world.level.BlockEventData>) f.get(level));
+            EVENT_LOG.clear();
+            f.set(level, logging);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("could not instrument blockEvents", e);
+        }
+    }
+
     private static String queueDump(ServerLevel level) {
         StringBuilder out = new StringBuilder("{");
         try {

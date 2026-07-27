@@ -1211,6 +1211,44 @@ fn the_4x4_vault_door_runs_a_full_cycle_in_the_world_it_was_built_in() {
     );
 }
 
+/// The same door under stress: six clicks, two of them mid-stroke.
+///
+/// A close interrupted five ticks in, resumed fifteen ticks later, then a pair
+/// two ticks apart — the patterns a player produces and a fixed close/open
+/// cycle never exercises. Thirty-six of the forty recorded ticks match,
+/// including a 151-event tick, so interrupting a stroke and re-triggering it
+/// are both right.
+///
+/// Ignored on the last four. Every block state agrees through tick 61; what
+/// differs is the order two pistons queue their block events in during the
+/// lever cascade, and by tick 80 that decides which of two racing pistons
+/// wins. The capture's `log` records vanilla's own queueing order for exactly
+/// this — the first divergence is the eleventh block event of tick 45, where
+/// vanilla queues (1,10,4) and the engine queues (2,2,4).
+#[test]
+#[ignore = "block states match through tick 61; the lever cascade's traversal \
+order diverges at the eleventh queued block event of tick 45, and the piston \
+race it decides shows up as a block difference at tick 80"]
+fn the_4x4_vault_door_survives_interrupted_and_repeated_clicks() {
+    run_conformance_full(
+        "door_4x4_vault_inworld.snbt",
+        "door_4x4_vault_stress.json",
+        "nucleation:door_4x4_vault",
+        &[],
+        &[
+            (10, Actuate::Use(Pos::new(7, 5, 1))),
+            (15, Actuate::Use(Pos::new(7, 5, 1))),
+            (30, Actuate::Use(Pos::new(7, 5, 1))),
+            (45, Actuate::Use(Pos::new(7, 5, 1))),
+            (47, Actuate::Use(Pos::new(7, 5, 1))),
+            (80, Actuate::Use(Pos::new(7, 5, 1))),
+        ],
+        None,
+        Settle::InWorld,
+        1.0e-6,
+    );
+}
+
 /// A dust corner losing the block beside it, which is the vault door's opening
 /// stroke reduced to twenty-four blocks.
 ///

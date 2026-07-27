@@ -346,3 +346,35 @@ mod tests {
     }
 }
 
+
+#[cfg(test)]
+mod hash_order_ground_truth {
+    use super::*;
+    use crate::pos::Pos;
+
+    /// Printed by real Java against the 26.2 jar:
+    /// `HashSet<BlockPos>` seeded with a position and its six neighbours,
+    /// iterated. This is the set `updatePowerStrength` walks to decide which
+    /// positions hear a wire's power change, and its order is observable.
+    #[test]
+    fn the_hash_order_matches_real_java() {
+        let cases: &[(Pos, &[(i32, i32, i32)])] = &[
+            (Pos::new(2, 2, 3), &[(2,3,3),(2,2,2),(1,2,3),(2,2,3),(2,1,3),(2,2,4),(3,2,3)]),
+            (Pos::new(1, 10, 4), &[(1,11,4),(1,10,3),(0,10,4),(1,10,4),(1,9,4),(1,10,5),(2,10,4)]),
+            (Pos::new(2, 2, 2), &[(2,3,2),(2,2,1),(1,2,2),(2,2,2),(2,1,2),(2,2,3),(3,2,2)]),
+            (Pos::new(3, 2, 2), &[(3,3,2),(3,2,1),(2,2,2),(3,2,2),(3,1,2),(3,2,3),(4,2,2)]),
+            (Pos::new(4, 7, 2), &[(4,6,2),(4,7,3),(5,7,2),(4,8,2),(4,7,1),(3,7,2),(4,7,2)]),
+            (Pos::new(11, 7, 4), &[(11,8,4),(11,7,3),(10,7,4),(11,7,4),(11,6,4),(11,7,5),(12,7,4)]),
+            (Pos::new(2, 5, 3), &[(2,5,3),(2,4,3),(2,5,4),(3,5,3),(2,6,3),(2,5,2),(1,5,3)]),
+            (Pos::new(13, 5, 3), &[(13,6,3),(13,5,2),(12,5,3),(13,5,3),(13,4,3),(13,5,4),(14,5,3)]),
+            (Pos::new(0, 0, 0), &[(0,0,0),(0,0,-1),(-1,0,0),(0,0,1),(1,0,0),(0,-1,0),(0,1,0)]),
+            (Pos::new(7, 5, 1), &[(7,6,1),(7,5,0),(6,5,1),(7,5,1),(7,4,1),(7,5,2),(8,5,1)]),
+        ];
+        for (pos, want) in cases {
+            let got: Vec<(i32, i32, i32)> =
+                java_hash_order(*pos).iter().map(|p| (p.x, p.y, p.z)).collect();
+            let want: Vec<(i32, i32, i32)> = want.to_vec();
+            assert_eq!(got, want, "hash order for {pos:?}");
+        }
+    }
+}
