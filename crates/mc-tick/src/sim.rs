@@ -1652,15 +1652,28 @@ impl Simulation {
                 inv_log: self.inv_log.as_mut(),
                         log: self.log.as_mut(),
                 };
-                let handled = behaviour.on_block_event(&mut ctx, event.pos, event.id, event.param);
+                // Logged *before* dispatch, because the game logs its own at
+                // `removeFirst` — before `doBlockEvent` runs. Logging after
+                // instead puts every notification the event causes ahead of the
+                // line announcing it, and the two traces stop being comparable
+                // exactly where a divergence hunt needs them to be. That cost an
+                // hour of chasing a divergence that was only in the logging.
                 if trace_events {
                     eprintln!(
-                        "[t{}] {} {:?} id={} on {}",
+                        "[t{}] run    {:?} id={} on {}",
                         self.tick,
-                        if handled { "run   " } else { "refuse" },
                         (event.pos.x, event.pos.y, event.pos.z),
                         event.id,
                         self.registry.descriptor(state).unwrap_or("?")
+                    );
+                }
+                let handled = behaviour.on_block_event(&mut ctx, event.pos, event.id, event.param);
+                if trace_events && !handled {
+                    eprintln!(
+                        "[t{}] refuse {:?} id={}",
+                        self.tick,
+                        (event.pos.x, event.pos.y, event.pos.z),
+                        event.id
                     );
                 }
                 if !handled {
