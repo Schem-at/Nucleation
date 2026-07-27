@@ -1260,6 +1260,34 @@ fn opposed_pistons_race_for_one_gap() {
 }
 
 #[test]
+fn a_zero_tick_generator_teleports_its_redstone_block() {
+    // A 0-tick generator, reduced from the 4x4 vault door's corner: dust
+    // strongly powers a concrete block, the concrete powers the sticky piston
+    // on top of it, and that piston pushes a redstone block one south. The
+    // redstone block was quasi-powering a second sticky piston below, which
+    // now retracts and pulls the concrete out from under the first — ending its
+    // pulse before the push completes.
+    //
+    // Vanilla's answer is the 0-tick: the redstone block *teleports* one block
+    // in the same tick, with no `moving_piston` stage, because the retract
+    // finds an extending moving block two ahead and `finalTick`s it in place.
+    //
+    // Every step of that chain is a separate vanilla behaviour, and the last
+    // one to arrive was the notification pass over the positions a *pull*
+    // vacates — without it the upper piston never hears its pulse end and the
+    // block completes an ordinary two-tick move instead.
+    run_conformance_bounded(
+        "piston_handoff.snbt",
+        "piston_handoff.json",
+        "nucleation:piston_handoff",
+        &[],
+        &[(3, Actuate::Use(Pos::new(3, 1, 1)))],
+        None,
+        Settle::Quiet,
+    );
+}
+
+#[test]
 fn the_first_placed_of_two_powered_pistons_takes_the_shared_gap() {
     // The placement-order discriminator. Two opposed pistons, each already
     // powered by its own redstone block, one gap between them: both resolve in

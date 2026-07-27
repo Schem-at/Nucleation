@@ -709,6 +709,20 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                                     ctx.set_quiet(*from, StateId::AIR);
                                 }
                             }
+                            // `moveBlocks`' tail again — a pull vacates
+                            // positions exactly as a push does, and the game
+                            // notifies them the same way. Only the head-slot
+                            // notification is skipped, which vanilla guards
+                            // with `if (extending)`.
+                            //
+                            // This is the step that makes a 0-tick generator
+                            // tick: the block pulled out from under a piston
+                            // was powering it, and until those neighbours are
+                            // told, the piston above it never learns its pulse ended.
+                            for (from, _) in carried.iter().rev() {
+                                ctx.update_neighbors_at(*from);
+                            }
+                            ctx.drain();
                         } else {
                             ctx.set(head, StateId::AIR);
                         }
