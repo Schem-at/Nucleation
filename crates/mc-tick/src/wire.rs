@@ -100,23 +100,65 @@ pub fn connecting_side(
     can_connect_up: bool,
 ) -> WireSide {
     let side = pos.offset(dir);
-    if can_connect_up
+    let climbs = can_connect_up
         && rules.sturdy_up(world, side)
-        && rules.should_connect_to(world, side.offset(Dir::Up), None)
-    {
-        return if rules.full_block(world, side) { WireSide::Up } else { WireSide::Side };
+        && rules.should_connect_to(world, side.offset(Dir::Up), None);
+    if climbs {
+        let out = if rules.full_block(world, side) { WireSide::Up } else { WireSide::Side };
+        trace_side(rules, world, pos, dir, out, can_connect_up, true);
+        return out;
     }
     // Otherwise the wire faces the block only if that block takes a signal, or
     // if there is dust below it to step down onto — and a conductor blocks the
     // step down, which is what makes glass a diode.
-    if !rules.should_connect_to(world, side, Some(dir))
+    let out = if !rules.should_connect_to(world, side, Some(dir))
         && (rules.conductor(world, side)
             || !rules.should_connect_to(world, side.offset(Dir::Down), None))
     {
         WireSide::None
     } else {
         WireSide::Side
+    };
+    trace_side(rules, world, pos, dir, out, can_connect_up, false);
+    out
+}
+
+/// `MC_TICK_TRACE_SIDE=x,y,z[;...]` — why a wire faced the way it did.
+///
+/// Connection shape is decided by a five-term expression over the neighbour,
+/// the block above it and the block below it, and a wrong answer looks
+/// identical to a missing update from the outside. Printing the terms is the
+/// difference between reading the divergence and guessing at it.
+fn trace_side(
+    rules: &dyn WireWorld,
+    world: &World,
+    pos: Pos,
+    dir: Dir,
+    out: WireSide,
+    can_connect_up: bool,
+    climbed: bool,
+) {
+    let Some(filter) = std::env::var_os("MC_TICK_TRACE_SIDE") else { return };
+    let wanted = filter.to_string_lossy().split(';').any(|t| {
+        let c: Vec<i32> = t.split(',').filter_map(|v| v.trim().parse().ok()).collect();
+        c.len() == 3 && c[0] == pos.x && c[1] == pos.y && c[2] == pos.z
+    });
+    if !wanted {
+        return;
     }
+    let side = pos.offset(dir);
+    eprintln!(
+        "[side] {:?} {dir:?} -> {out:?} via {}  canUp={can_connect_up} sturdyUp={} aboveConnects={} \
+full={} sideConnects={} cond={} belowConnects={}",
+        (pos.x, pos.y, pos.z),
+        if climbed { "climb" } else { "flat" },
+        rules.sturdy_up(world, side),
+        rules.should_connect_to(world, side.offset(Dir::Up), None),
+        rules.full_block(world, side),
+        rules.should_connect_to(world, side, Some(dir)),
+        rules.conductor(world, side),
+        rules.should_connect_to(world, side.offset(Dir::Down), None),
+    );
 }
 
 /// `getConnectionState`: recompute every unconnected face, then apply the

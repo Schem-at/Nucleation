@@ -763,6 +763,16 @@ pub fn register_all_at(
                 | "minecraft:daylight_detector"
                 | "minecraft:trapped_chest"
                 | "minecraft:target"
+                // Emitters that never emit in these builds and still matter,
+                // because `shouldConnectTo` asks the block whether it is a
+                // source and not whether it is emitting. Missing the hook cost
+                // the 6x6 door its first divergence: dust that should have
+                // faced north found nothing there, and the symmetry rule then
+                // ran it east-west instead of north-south. The set is the
+                // game's own answer for every block in the corpus.
+                | "minecraft:tripwire_hook"
+                | "minecraft:lightning_rod"
+                | "minecraft:jukebox"
         ) {
             rules.signal_sources.push(*id);
         }
@@ -814,7 +824,17 @@ pub fn register_all_at(
         }
         // `canSurviveOn`: dust sits on, and climbs, anything with a sturdy top
         // face — full cubes, plus the top halves of slabs and stairs.
+        //
+        // A `moving_piston` counts. `MovingPistonBlock.getShape` asks the block
+        // entity, which answers with the shape of the block it is carrying, so
+        // dust rests on a block in motion as it did on the block itself. It is
+        // deliberately not a full cube: `getConnectingSide` gates on the top
+        // face and then picks UP or SIDE by the face pointing back at the wire,
+        // and a carried block that has begun to move no longer fills that one.
+        // Without this a wire beside a piston that starts moving drops the
+        // connection entirely instead of lowering it from `up` to `side`.
         if is_full_cube(descriptor)
+            || descriptor.name == "minecraft:moving_piston"
             || (descriptor.name.ends_with("_slab")
                 && matches!(descriptor.get("type"), Some("top") | Some("double")))
             || (descriptor.name.ends_with("_stairs") && descriptor.get("half") == Some("top"))
