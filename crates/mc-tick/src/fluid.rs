@@ -47,7 +47,8 @@ pub const WATER_DROP_OFF: u8 = 1;
 /// `WaterFluid.getSlopeFindDistance`.
 pub const SLOPE_FIND_DISTANCE: u8 = 4;
 
-const HORIZONTALS: [Dir; 4] = [Dir::North, Dir::South, Dir::West, Dir::East];
+// `Direction.Plane.HORIZONTAL` order — clockwise, not `values()` order.
+const HORIZONTALS: [Dir; 4] = [Dir::North, Dir::East, Dir::South, Dir::West];
 
 /// One cell's worth of water, `FluidState` distilled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

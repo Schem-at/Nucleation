@@ -480,6 +480,14 @@ use crate::pos::Dir;
 /// only, which is why a long line lights up as a cascade of neighbour
 /// updates, one rail per wave, all inside one tick's propagation.
 pub struct PoweredRail<P: PowerSource> {
+    /// Which rail block this is — `minecraft:powered_rail` or
+    /// `minecraft:activator_rail`.
+    ///
+    /// `isSameRailWithPower` tests `state.is(this)`, so a chain conducts only
+    /// between rails of the *same* block: an activator rail beside a golden one
+    /// does not extend it. Activator rails run this exact update — there is no
+    /// separate class, only a second registration of `PoweredRailBlock`.
+    pub block: &'static str,
     /// This state's shape.
     pub shape: RailShape,
     /// This state's `powered` flag.
@@ -500,7 +508,7 @@ impl<P: PowerSource> PoweredRail<P> {
     /// The powered rail at `pos`, from its descriptor.
     fn rail_at(&self, ctx: &TickCtx<'_>, pos: Pos) -> Option<(RailShape, bool)> {
         let descriptor = ctx.states.descriptor(ctx.world.get(pos))?;
-        if !descriptor.starts_with("minecraft:powered_rail") {
+        if !descriptor.starts_with(self.block) {
             return None;
         }
         let shape = descriptor
@@ -646,6 +654,6 @@ impl<P: PowerSource + 'static> BlockBehaviour for PoweredRail<P> {
     }
 
     fn name(&self) -> &'static str {
-        "powered_rail"
+        self.block
     }
 }

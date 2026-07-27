@@ -1129,17 +1129,19 @@ pub fn register_all_at(
             }
             "minecraft:piston_head" => {
                 let Some(facing) = descriptor.facing() else { continue };
-                // `canSurvive`: a piston or sticky piston, extended, facing the
-                // same way. Looked up rather than assumed, so a head whose base
-                // is absent from the build simply never forwards.
+                // `canSurvive` is `isFittingBase(base) || (base is MOVING_PISTON
+                // with the same FACING)`. The second half is the whole point: a
+                // base mid-retract *is* a moving_piston, and that is exactly
+                // when the head still has to forward to it. Allowing only the
+                // extended piston made the head go silent for the one dispatch
+                // that decides whether the retract is heard.
                 let bases: Vec<StateId> = descriptors
                     .iter()
-                    .filter(|(_, d)| {
-                        matches!(
-                            d.name.as_str(),
-                            "minecraft:piston" | "minecraft:sticky_piston"
-                        ) && d.flag("extended")
-                            && d.facing() == Some(facing)
+                    .filter(|(_, d)| d.facing() == Some(facing))
+                    .filter(|(_, d)| match d.name.as_str() {
+                        "minecraft:piston" | "minecraft:sticky_piston" => d.flag("extended"),
+                        "minecraft:moving_piston" => true,
+                        _ => false,
                     })
                     .map(|(id, _)| *id)
                     .collect();
@@ -1225,12 +1227,12 @@ pub fn register_all_at(
                     }),
                 );
             }
-            "minecraft:rail" | "minecraft:detector_rail" | "minecraft:activator_rail" => {
+            "minecraft:rail" | "minecraft:detector_rail" => {
                 // Cart physics reads rails through the rail tables; detector
-                // and activator dynamics still await their captures.
+                // dynamics still await their captures.
                 table.register(*id, Box::new(Inert::new("rail")));
             }
-            "minecraft:powered_rail" => {
+            "minecraft:powered_rail" | "minecraft:activator_rail" => {
                 let Some(shape) = descriptor
                     .get("shape")
                     .and_then(crate::minecart::RailShape::from_name)
@@ -1241,6 +1243,11 @@ pub fn register_all_at(
                 table.register(
                     *id,
                     Box::new(crate::minecart::PoweredRail {
+                        block: if descriptor.name == "minecraft:activator_rail" {
+                            "minecraft:activator_rail"
+                        } else {
+                            "minecraft:powered_rail"
+                        },
                         shape,
                         powered: descriptor.flag("powered"),
                         states,
@@ -1687,7 +1694,7 @@ pub fn intern_companions(registry: &mut StateRegistry) {
                 }
                 all
             }
-            "minecraft:powered_rail" => {
+            "minecraft:powered_rail" | "minecraft:activator_rail" => {
                 vec![descriptor.with("powered", "false"), descriptor.with("powered", "true")]
             }
             "minecraft:water" | "minecraft:bubble_column" => {

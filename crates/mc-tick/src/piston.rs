@@ -668,7 +668,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // The head slot is itself in motion until the move completes.
                 ctx.set_shape_only(head_slot, self.moving);
                 ctx.drain();
-                ctx.defer(head_slot, self.head, PISTON_MOVE_TICKS);
+                ctx.defer_source(head_slot, self.head, PISTON_MOVE_TICKS);
 
                 // `moveBlocks`' tail: `updateNeighborsAt` for every position a
                 // block *left*, walked backwards like the write loop, then the
@@ -831,7 +831,15 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 }
                 if let Some(index) = ctx.moves.iter().position(|m| m.pos == head) {
                     let landed = ctx.moves.remove(index);
-                    ctx.set(head, landed.state);
+                    // `finalTick` lands `isSourcePiston ? AIR : movedState`, and
+                    // the head slot of an extension still in progress is a
+                    // source piston. It empties; it does not deliver its head.
+                    let state = if landed.source_piston {
+                        StateId::AIR
+                    } else {
+                        landed.state
+                    };
+                    ctx.set(head, state);
                     ctx.drain();
                     // `finalTick` ends with `neighborChanged` at its own
                     // position, whether it runs from the block-entity phase or
@@ -841,7 +849,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     ctx.drain();
                 }
                 ctx.set(pos, self.moving);
-                ctx.defer(pos, self.states.get(false), PISTON_MOVE_TICKS);
+                ctx.defer_source(pos, self.states.get(false), PISTON_MOVE_TICKS);
 
                 if self.sticky {
                     let back = self.facing.opposite();

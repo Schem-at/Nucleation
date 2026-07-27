@@ -551,12 +551,29 @@ public final class TraceCapture {
         Files.writeString(out, json);
         System.out.printf("captured %d tick(s) with changes -> %s%n", ticks.size(), out);
 
+        // `--keep-world` is only worth anything if the chunks reach disk, and
+        // halt(false) does not write them.
+        if (hasFlag(args, "--keep-world")) {
+            server.saveEverything(true, true, true);
+        }
+
         server.halt(false);
 
         // Delete the world. Each run creates a full Minecraft save — all three
         // dimensions with region files — and a session that captures a dozen
         // traces will fill a disk. Regenerating it costs a few seconds.
-        deleteRecursively(Paths.get(universe));
+        //
+        // `--keep-world` holds onto it, which is how an in-world reference is
+        // built without a save to borrow: paste a structure, tick it until it
+        // goes quiet, keep the world, then record *that* world in place. A
+        // machine settled by its own placement cascade is not the same machine
+        // as one stamped down and ticked immediately, and only the first can be
+        // actuated the way a player would actuate it.
+        if (!hasFlag(args, "--keep-world")) {
+            deleteRecursively(Paths.get(universe));
+        } else {
+            System.out.printf("  world kept at %s%n", universe);
+        }
 
         System.exit(0);
     }
@@ -754,10 +771,24 @@ public final class TraceCapture {
     private static final int NOTIFY_LIMIT = 40000;
 
     private static void note(String kind, BlockPos pos) {
+        note(kind, pos, null);
+    }
+
+    /// The block *at dispatch time*, not at the end of the tick.
+    ///
+    /// Which block sits at a position when a notification reaches it decides
+    /// whether the notification does anything at all — a piston head forwards to
+    /// its base, the moving_piston placeholder that replaces it does not. That
+    /// distinction is invisible in a snapshot, and guessing it wrong sends you
+    /// looking for a missing update that was never supposed to happen.
+    private static void note(String kind, BlockPos pos, net.minecraft.world.level.Level level) {
         if (NOTIFY_LOG.size() < NOTIFY_LIMIT) {
-            NOTIFY_LOG.add(String.format("{\"kind\": \"%s\", \"pos\": [%d, %d, %d]}",
+            String at = level == null ? "" : String.format(", \"at\": \"%s\"",
+                    net.minecraft.core.registries.BuiltInRegistries.BLOCK
+                            .getKey(level.getBlockState(pos).getBlock()));
+            NOTIFY_LOG.add(String.format("{\"kind\": \"%s\", \"pos\": [%d, %d, %d]%s}",
                     kind, pos.getX() - ORIGIN.getX(), pos.getY() - ORIGIN.getY(),
-                    pos.getZ() - ORIGIN.getZ()));
+                    pos.getZ() - ORIGIN.getZ(), at));
         }
     }
 
@@ -812,7 +843,7 @@ public final class TraceCapture {
         @Override
         public void shapeUpdate(Direction dir, BlockState state, BlockPos pos, BlockPos neighborPos,
                 int flags, int recursion) {
-            note("shape", pos);
+            note("shape", pos, level);
             sample();
             super.shapeUpdate(dir, state, pos, neighborPos, flags, recursion);
         }
@@ -820,7 +851,7 @@ public final class TraceCapture {
         @Override
         public void neighborChanged(BlockPos pos, net.minecraft.world.level.block.Block block,
                 net.minecraft.world.level.redstone.Orientation orientation) {
-            note("neighbor", pos);
+            note("neighbor", pos, level);
             sample();
             super.neighborChanged(pos, block, orientation);
         }
@@ -829,7 +860,7 @@ public final class TraceCapture {
         public void neighborChanged(BlockState state, BlockPos pos,
                 net.minecraft.world.level.block.Block block,
                 net.minecraft.world.level.redstone.Orientation orientation, boolean movedByPiston) {
-            note("neighbor", pos);
+            note("neighbor", pos, level);
             sample();
             super.neighborChanged(state, pos, block, orientation, movedByPiston);
         }
@@ -838,7 +869,7 @@ public final class TraceCapture {
         public void updateNeighborsAtExceptFromFacing(BlockPos pos,
                 net.minecraft.world.level.block.Block block, Direction skip,
                 net.minecraft.world.level.redstone.Orientation orientation) {
-            note("neighbors_at", pos);
+            note("neighbors_at", pos, level);
             sample();
             super.updateNeighborsAtExceptFromFacing(pos, block, skip, orientation);
         }

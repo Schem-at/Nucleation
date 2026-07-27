@@ -204,6 +204,18 @@ pub struct PendingMove {
     pub state: StateId,
     /// The tick whose block-entities phase applies it.
     pub resolve_on: u64,
+    /// `isSourcePiston`: the placeholder a piston writes over its *own* square —
+    /// the head slot it is extending into, or its base while it retracts —
+    /// rather than one carrying a block it pushes.
+    ///
+    /// It decides what an early `finalTick` lands. A move that runs to
+    /// completion lands the moved state either way, but `finalTick` lands
+    /// **air** for a source piston, and a retract that interrupts an extension
+    /// goes through `finalTick`. Landing the head there instead leaves a piston
+    /// head in a slot vanilla emptied, and that head then forwards every
+    /// neighbour update it receives on to its base — updates vanilla never
+    /// delivers.
+    pub source_piston: bool,
 }
 
 /// What a behaviour is given when it runs.
@@ -623,10 +635,20 @@ impl<'a> TickCtx<'a> {
     /// Schedule a block write for `delay` ticks from now, resolved in the
     /// block-entities phase.
     pub fn defer(&mut self, pos: Pos, state: StateId, delay: u64) {
+        self.push_move(pos, state, delay, false);
+    }
+
+    /// `defer`, for the placeholder a piston writes over its own square.
+    pub fn defer_source(&mut self, pos: Pos, state: StateId, delay: u64) {
+        self.push_move(pos, state, delay, true);
+    }
+
+    fn push_move(&mut self, pos: Pos, state: StateId, delay: u64, source_piston: bool) {
         self.moves.push(PendingMove {
             pos,
             state,
             resolve_on: self.tick + delay,
+            source_piston,
         });
     }
 }

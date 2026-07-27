@@ -291,7 +291,8 @@ pub fn update_neighbours_of_neighbouring_wires(
     ctx: &mut TickCtx<'_>,
     pos: Pos,
 ) {
-    const HORIZONTAL: [Dir; 4] = [Dir::North, Dir::South, Dir::West, Dir::East];
+    // `Direction.Plane.HORIZONTAL` order — clockwise, not `values()` order.
+    const HORIZONTAL: [Dir; 4] = [Dir::North, Dir::East, Dir::South, Dir::West];
     for dir in HORIZONTAL {
         check_corner_change_at(rules, ctx, pos.offset(dir));
     }
@@ -331,7 +332,11 @@ impl<R: WireWorld + Clone + 'static> BlockBehaviour for Wire<R> {
     /// that does. The 6x6 door's outer edges are built from exactly this shape
     /// and stayed dead without it.
     fn indirect_shape_targets(&self, world: &World, pos: Pos) -> Vec<(Pos, Dir)> {
-        const HORIZONTAL: [Dir; 4] = [Dir::North, Dir::South, Dir::West, Dir::East];
+        // `Direction.Plane.HORIZONTAL` is declared clockwise — NORTH, EAST,
+        // SOUTH, WEST — not in `Direction.values()` order, which puts WEST
+        // before EAST. A loop written against the wrong one emits the same set
+        // of updates in a different sequence, and redstone is order-sensitive.
+        const HORIZONTAL: [Dir; 4] = [Dir::North, Dir::East, Dir::South, Dir::West];
         let Some((_, sides)) = self.rules.wire_shape(world, pos) else { return Vec::new() };
         let mut out = Vec::new();
         for dir in HORIZONTAL {
