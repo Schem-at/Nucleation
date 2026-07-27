@@ -1280,8 +1280,10 @@ fn a_piston_pulling_a_block_from_beside_a_dust_corner_reshapes_it() {
 
 #[test]
 #[ignore = "the standing target: a full close/open cycle, two lever clicks 70 \
-ticks apart. Placement and the early cascade match; the divergence is tick-time \
-scheduling order. See ROADMAP 'The door fixtures'."]
+ticks apart. Re-captured with its world origin, which moved it much closer — \
+the old reference disagreed from tick 0 by dozens of events. It now diverges at \
+tick 1 on two wire states, during the placement cascade rather than the door. \
+See ROADMAP 'The door fixtures'."]
 fn the_6x6_door_runs_a_full_close_open_cycle() {
     // The cycle golden: vanilla opens on the tick-10 click (through tick 25)
     // and closes on the tick-80 one (through tick 95), 2035 events in all.
