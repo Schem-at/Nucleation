@@ -1129,7 +1129,21 @@ pub fn register_all_at(
             }
             "minecraft:piston_head" => {
                 let Some(facing) = descriptor.facing() else { continue };
-                table.register(*id, Box::new(crate::piston::PistonHead { facing }));
+                // `canSurvive`: a piston or sticky piston, extended, facing the
+                // same way. Looked up rather than assumed, so a head whose base
+                // is absent from the build simply never forwards.
+                let bases: Vec<StateId> = descriptors
+                    .iter()
+                    .filter(|(_, d)| {
+                        matches!(
+                            d.name.as_str(),
+                            "minecraft:piston" | "minecraft:sticky_piston"
+                        ) && d.flag("extended")
+                            && d.facing() == Some(facing)
+                    })
+                    .map(|(id, _)| *id)
+                    .collect();
+                table.register(*id, Box::new(crate::piston::PistonHead { bases, facing }));
             }
             "minecraft:piston" | "minecraft:sticky_piston" => {
                 let Some(facing) = descriptor.facing() else { continue };

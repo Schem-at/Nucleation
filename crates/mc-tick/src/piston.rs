@@ -394,13 +394,28 @@ pub fn resolve_pull(world: &World, movability: &dyn Movability, piston: Pos, fac
 /// out — which is exactly how a door that hands a redstone block along stalls
 /// after its first move.
 pub struct PistonHead {
+    /// The base states this head can survive on: a piston or sticky piston,
+    /// extended, facing the same way.
+    pub bases: Vec<StateId>,
     /// The `facing` property: the head points away from its base.
     pub facing: Dir,
 }
 
 impl BlockBehaviour for PistonHead {
+    /// `PistonHeadBlock.neighborChanged` forwards to the base — but only while
+    /// the head can survive, and `canSurvive` is: the block behind me is a
+    /// piston or sticky piston, extended, facing the same way. Nothing about
+    /// TYPE, which is why a sticky head sitting on a plain base still forwards.
+    ///
+    /// The guard bites the moment the base stops being an extended piston,
+    /// which is exactly when the base is mid-retract and has become a
+    /// `moving_piston`. Forwarding unconditionally sends the base a
+    /// notification vanilla never sends it.
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
         let base = pos.offset(self.facing.opposite());
+        if !self.bases.contains(&ctx.world.get(base)) {
+            return;
+        }
         ctx.notify(base, self.facing);
     }
 
@@ -752,14 +767,16 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     return false;
                 }
                 let head = pos.offset(self.facing);
-                // An in-flight head is `finalTick`ed first: a *source* block
-                // entity resolves to air (not to its head state), loudly — which
-                // is also what frees the slot for a pull to move into.
-                let head_in_flight = ctx.moves.iter().any(|m| m.pos == head);
-                ctx.moves.retain(|m| m.pos != head);
-                if head_in_flight {
-                    ctx.set(head, StateId::AIR);
-                }
+                // An in-flight head is `finalTick`ed first, and `finalTick`
+                // lands the block it is *carrying* — the piston head — not air.
+                // The slot is emptied later, by the `removeBlock` at the end of
+                // the retract branch, which is a second write.
+                //
+                // Writing air here instead collapsed the two into one and lost
+                // both the head state and the `neighborChanged` that finalTick
+                // ends with. A snapshot capture cannot tell the difference,
+                // because both orders leave air at the end of the tick; the
+                // notification log can, and does.
 
                 // The *base* becomes a moving placeholder for the two ticks the
                 // head takes to travel home — captured: `extended=true ->
@@ -779,6 +796,16 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // first instead — as this did — puts a solid block in the
                 // quasi-connectivity ring a tick early, and a piston below
                 // reads power vanilla never gives it.
+                if std::env::var_os("MC_TICK_TRACE_RETRACT").is_some() {
+                    eprintln!(
+                        "[t{}] [retract] {:?} id={id} head={:?} head_state={} pending_at_head={}",
+                        ctx.tick,
+                        (pos.x, pos.y, pos.z),
+                        (head.x, head.y, head.z),
+                        ctx.states.descriptor(ctx.world.get(head)).unwrap_or("?"),
+                        ctx.moves.iter().any(|m| m.pos == head)
+                    );
+                }
                 if let Some(index) = ctx.moves.iter().position(|m| m.pos == head) {
                     let landed = ctx.moves.remove(index);
                     ctx.set(head, landed.state);

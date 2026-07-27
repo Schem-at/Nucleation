@@ -124,6 +124,24 @@ pub(crate) fn trace_update(kind: &str, pos: Pos) {
     }
 }
 
+
+/// `MC_TICK_TRACE_WRITE=x,y,z[;...]` — every write landing on a position.
+///
+/// A divergence that is a *write* rather than an event is invisible in both the
+/// event log and the notification log, and that is where these have been
+/// hiding. This says who touched a block and with which flags.
+pub(crate) fn trace_write(kind: &str, pos: Pos, states: &StateRegistry, to: StateId) {
+    let Some(filter) = std::env::var_os("MC_TICK_TRACE_WRITE") else { return };
+    let wanted = filter.to_string_lossy().split(';').any(|t| {
+        let c: Vec<i32> = t.split(',').filter_map(|v| v.trim().parse().ok()).collect();
+        c.len() == 3 && c[0] == pos.x && c[1] == pos.y && c[2] == pos.z
+    });
+    if wanted {
+        eprintln!("[write] {kind:<14} {} {} {} -> {}", pos.x, pos.y, pos.z,
+            states.descriptor(to).unwrap_or("?"));
+    }
+}
+
 impl UpdateEntry {
     /// An entry dispatching `items` in order.
     pub fn new(items: Vec<(Pos, Dir, UpdateKind)>) -> Self {
@@ -440,6 +458,7 @@ impl<'a> TickCtx<'a> {
     /// which is what stops two blocks that keep re-asserting the same state
     /// from looping forever.
     pub fn set(&mut self, pos: Pos, state: StateId) {
+        trace_write("set(flag3)", pos, self.states, state);
         let previous = self.world.get(pos);
         if previous == state {
             return;
@@ -486,6 +505,7 @@ impl<'a> TickCtx<'a> {
     /// land. The write is still real and a snapshot capture sees it, so it is
     /// logged; only the notifications are withheld.
     pub fn set_quiet(&mut self, pos: Pos, state: StateId) {
+        trace_write("set_quiet", pos, self.states, state);
         let previous = self.world.get(pos);
         if previous == state {
             return;
@@ -501,6 +521,7 @@ impl<'a> TickCtx<'a> {
     /// This is the dust evaluator's write — and it is how an observer
     /// watching redstone dust sees a power change at all.
     pub fn set_shape_only(&mut self, pos: Pos, state: StateId) {
+        trace_write("set_shape_only", pos, self.states, state);
         let previous = self.world.get(pos);
         if previous == state {
             return;

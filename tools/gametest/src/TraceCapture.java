@@ -688,19 +688,25 @@ public final class TraceCapture {
             // A repeat add is dropped by the set and keeps its original place,
             // which is exactly the detail that decides these races — so record
             // whether it took.
-            EVENT_LOG.add(String.format(
+            String line = String.format(
                     "{\"kind\": \"%s\", \"pos\": [%d, %d, %d], \"id\": %d, \"param\": %d}",
                     fresh ? "queue" : "requeue",
-                    e.pos().getX(), e.pos().getY(), e.pos().getZ(), e.paramA(), e.paramB()));
+                    e.pos().getX() - ORIGIN.getX(), e.pos().getY() - ORIGIN.getY(),
+                    e.pos().getZ() - ORIGIN.getZ(), e.paramA(), e.paramB());
+            EVENT_LOG.add(line);
+            if (NOTIFY_LOG.size() < NOTIFY_LIMIT) NOTIFY_LOG.add(line);
             return fresh;
         }
 
         @Override
         public net.minecraft.world.level.BlockEventData removeFirst() {
             net.minecraft.world.level.BlockEventData e = super.removeFirst();
-            EVENT_LOG.add(String.format(
+            String line = String.format(
                     "{\"kind\": \"run\", \"pos\": [%d, %d, %d], \"id\": %d, \"param\": %d}",
-                    e.pos().getX(), e.pos().getY(), e.pos().getZ(), e.paramA(), e.paramB()));
+                    e.pos().getX() - ORIGIN.getX(), e.pos().getY() - ORIGIN.getY(),
+                    e.pos().getZ() - ORIGIN.getZ(), e.paramA(), e.paramB());
+            EVENT_LOG.add(line);
+            if (NOTIFY_LOG.size() < NOTIFY_LIMIT) NOTIFY_LOG.add(line);
             return e;
         }
     }
