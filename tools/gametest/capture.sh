@@ -41,8 +41,19 @@ while IFS= read -r snbt; do
     rm -f "$STAGE/$rel"
 done < <(find pack -name '*.snbt')
 
+# WORLD=<path to a save> records that world in place rather than pasting into a
+# fresh one. Every paste disturbs a machine — placeInWorld recomputes repeater
+# LOCKED and wire shapes, and loads block-entity NBT after the block write — so
+# a door built and latched in a world cannot be reproduced by stamping it down.
+# Copying the save in and ticking it is the only way the reference is the door
+# that was actually built.
 rm -rf "$UNIVERSE"
 mkdir -p "$UNIVERSE/gametestworld/datapacks"
+if [[ -n "${WORLD:-}" ]]; then
+    echo "  world: recording $WORLD in place"
+    rsync -a --exclude session.lock "$WORLD/" "$UNIVERSE/gametestworld/"
+    mkdir -p "$UNIVERSE/gametestworld/datapacks"
+fi
 cp -R "$STAGE" "$UNIVERSE/gametestworld/datapacks/nucleation_tests"
 
 java -cp "$WORK/classes:$CP" TraceCapture --universe "$UNIVERSE" "$@" \

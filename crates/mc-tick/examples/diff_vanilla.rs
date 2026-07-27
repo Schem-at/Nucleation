@@ -83,7 +83,16 @@ fn main() {
             mc_tick::vanilla::has_dynamic_shape,
         );
         // onPlace runs whatever the placement flags; the settle pass does not.
+        // `--in-world` ticks the world exactly as loaded, with no placement pass.
+    //
+    // A placement recomputes what a running machine has already settled:
+    // repeater LOCKED, wire connection shapes, and the live power a wire is
+    // carrying. Reproducing a door that was *built* rather than stamped means
+    // not re-deriving any of it — the states in the file are the truth.
+    let in_world = args.iter().any(|a| a == "--in-world");
+    if !in_world {
         sim.place_on_place(&order);
+    }
         if settle {
             sim.settle_with_order(&order);
         }

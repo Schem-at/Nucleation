@@ -121,23 +121,50 @@ public final class TraceCapture {
 
         ServerLevel level = server.overworld();
 
+        // `--in-world x0,y0,z0,x1,y1,z1` records a build *where it already
+        // stands*, with no clearing and no placement.
+        //
+        // Every paste disturbs a machine: placeInWorld recomputes LOCKED on
+        // repeaters, recomputes wire connection shapes, and loads block-entity
+        // NBT only after the block write. A door that was built in place and
+        // left latched cannot be reproduced by stamping its blocks down, no
+        // matter how faithful the block data is — which is why a captured door
+        // can stall in a way the real one never does. In this mode the game
+        // simply keeps ticking the world it loaded.
+        String inWorld = arg(args, "--in-world", null);
+        BlockPos worldMin = null, worldMax = null;
+        if (inWorld != null) {
+            String[] b = inWorld.split(",");
+            worldMin = new BlockPos(Integer.parseInt(b[0].trim()),
+                    Integer.parseInt(b[1].trim()), Integer.parseInt(b[2].trim()));
+            worldMax = new BlockPos(Integer.parseInt(b[3].trim()),
+                    Integer.parseInt(b[4].trim()), Integer.parseInt(b[5].trim()));
+        }
+
         // Anchor to spawn: those chunks are held at a ticking level by the
         // server, whereas a far-off forced chunk loads but never activates its
         // tick containers.
         BlockPos spawn = level.getRespawnData().pos();
-        ORIGIN = new BlockPos(spawn.getX(), 100, spawn.getZ());
+        ORIGIN = inWorld != null ? worldMin : new BlockPos(spawn.getX(), 100, spawn.getZ());
         System.out.printf("  origin: %s%n", ORIGIN);
 
-        StructureTemplate template = server.getStructureManager()
-                .get(Identifier.parse(structureId))
-                .orElseThrow(() -> new IllegalStateException(
-                        "no such structure: " + structureId
-                                + " (is the datapack in <universe>/gametestworld/datapacks?)"));
+        StructureTemplate template = inWorld != null
+                ? server.getStructureManager().get(Identifier.parse(structureId)).orElse(null)
+                : server.getStructureManager()
+                        .get(Identifier.parse(structureId))
+                        .orElseThrow(() -> new IllegalStateException(
+                                "no such structure: " + structureId
+                                        + " (is the datapack in <universe>/gametestworld/datapacks?)"));
 
-        net.minecraft.core.Vec3i size = template.getSize();
-        BlockPos min = ORIGIN.offset(-MARGIN, -MARGIN, -MARGIN);
-        BlockPos max = ORIGIN.offset(size.getX() + MARGIN, size.getY() + MARGIN,
-                size.getZ() + MARGIN);
+        net.minecraft.core.Vec3i size = template != null
+                ? template.getSize()
+                : new net.minecraft.core.Vec3i(0, 0, 0);
+        BlockPos min = inWorld != null
+                ? worldMin
+                : ORIGIN.offset(-MARGIN, -MARGIN, -MARGIN);
+        BlockPos max = inWorld != null
+                ? worldMax
+                : ORIGIN.offset(size.getX() + MARGIN, size.getY() + MARGIN, size.getZ() + MARGIN);
 
         // The region must *simulate*, not merely be loaded. setChunkForced alone
         // keeps chunks in memory but does not raise them to a ticking level, so
@@ -168,8 +195,10 @@ public final class TraceCapture {
         System.out.printf("  warmup ticks until entity-ticking: %d (ready=%s)%n",
                 warmup, level.isPositionTickingWithEntitiesLoaded(centre.pack()));
 
-        for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
-            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
+        if (inWorld == null) {
+            for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
+                level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
+            }
         }
 
         // --known-shape places with StructurePlaceSettings.knownShape, which skips
@@ -182,7 +211,7 @@ public final class TraceCapture {
             settings.setKnownShape(true);
             System.out.println("  placement: known-shape (quiet, no update pass)");
         }
-        if (!template.placeInWorld(level, ORIGIN, ORIGIN, settings,
+        if (inWorld == null && !template.placeInWorld(level, ORIGIN, ORIGIN, settings,
                 RandomSource.create(0), 3)) {
             throw new IllegalStateException("failed to place " + structureId);
         }
