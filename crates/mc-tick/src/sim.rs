@@ -165,6 +165,8 @@ pub struct Simulation {
     comparator_out: std::collections::HashMap<Pos, u8>,
     /// Container contents by position; vanilla's inventory block entities.
     inventories: std::collections::HashMap<Pos, crate::inventory::Inventory>,
+    /// Every position holding a block entity, contents modelled or not.
+    block_entities: std::collections::HashSet<Pos>,
     /// Per-hopper cooldown and tick bookkeeping.
     hopper_state: std::collections::HashMap<Pos, crate::behaviour::HopperState>,
     /// The world's item entities.
@@ -245,6 +247,7 @@ impl Simulation {
             minecarts: Vec::new(),
         };
         Self {
+            block_entities: std::collections::HashSet::new(),
             registry: StateRegistry::new(),
             world,
             ticks: TickQueue::new(),
@@ -700,7 +703,17 @@ impl Simulation {
     }
 
     /// Set the container contents at `pos`, as loading a structure does.
+    /// Record that `pos` holds a block entity. `placeInWorld` calls
+    /// `BlockEntity.setChanged` on each of these, so the placement pass has to
+    /// know about them even when we model nothing of their contents.
+    pub fn mark_block_entity(&mut self, pos: Pos) {
+        self.block_entities.insert(pos);
+    }
+
+    /// Give the container at `pos` its contents, and record it as a block
+    /// entity.
     pub fn set_inventory(&mut self, pos: Pos, inventory: crate::inventory::Inventory) {
+        self.block_entities.insert(pos);
         self.inventories.insert(pos, inventory);
     }
 
@@ -841,10 +854,21 @@ impl Simulation {
     ///
     /// Without it a quietly loaded community build never starts: the engine
     /// sat at zero events while the game did twelve on tick 0.
+    /// The walk is *incremental*: the structure's blocks are lifted back out of
+    /// the world and written one at a time, so a block's `onPlace` sees only
+    /// what vanilla had written by that point. It matters more than it sounds —
+    /// a comparator's `updateNeighborsInFront` fires into the repeater beside
+    /// it, and whether that repeater exists yet decides whether it books a tick
+    /// during placement or waits to be woken later.
     pub fn place_on_place(&mut self, order: &[Pos]) {
         let index: std::collections::HashMap<Pos, usize> =
             order.iter().enumerate().map(|(i, pos)| (*pos, i)).collect();
+        let placed: Vec<StateId> = order.iter().map(|pos| self.world.get(*pos)).collect();
+        for pos in order {
+            self.world.set(*pos, StateId::AIR);
+        }
         for (i, pos) in order.iter().enumerate() {
+            self.world.set(*pos, placed[i]);
             // The write's own shape propagation: `markAndNotifyBlock` skips it
             // only for `UPDATE_KNOWN_SHAPE`, which a structure placement does
             // not set on its block writes — so this happens even under
@@ -901,6 +925,50 @@ impl Simulation {
             behaviour.on_placed(&mut ctx, *pos);
             self.propagate();
         }
+
+        // `placeInWorld` ends each block's turn with `BlockEntity.setChanged()`
+        // for anything carrying NBT — and that runs even under `knownShape`,
+        // where nothing else does. `setChanged` calls
+        // `Level.updateNeighbourForOutputSignal`, so every placed container
+        // pokes the comparators around it. Without it a comparator saved
+        // `powered=true` over a barrel is never told to re-read, sits lit, and
+        // locks the repeater beside it — which was the whole of the tick-1 gap.
+        let containers: Vec<Pos> = order
+            .iter()
+            .copied()
+            .filter(|pos| self.block_entities.contains(pos))
+            .collect();
+        for pos in containers {
+            self.update_neighbour_for_output_signal(pos);
+            self.propagate();
+        }
+    }
+
+    /// `Level.updateNeighbourForOutputSignal`: notify each neighbour, and the
+    /// block beyond any neighbour that conducts — how a comparator reading a
+    /// container *through* a solid block hears about it.
+    fn update_neighbour_for_output_signal(&mut self, pos: Pos) {
+        for dir in crate::pos::JAVA_DIRECTIONS {
+            let neighbour = pos.offset(dir);
+            self.updates.push(crate::behaviour::UpdateEntry::new(vec![(
+                neighbour,
+                dir.opposite(),
+                crate::behaviour::UpdateKind::Neighbor,
+            )]));
+            if self
+                .conductors
+                .get(self.world.get(neighbour).raw() as usize)
+                .copied()
+                .unwrap_or(false)
+            {
+                let beyond = neighbour.offset(dir);
+                self.updates.push(crate::behaviour::UpdateEntry::new(vec![(
+                    beyond,
+                    dir.opposite(),
+                    crate::behaviour::UpdateKind::Neighbor,
+                )]));
+            }
+        }
     }
 
     /// [`Simulation::settle`] with an explicit placement order — the structure
@@ -920,7 +988,8 @@ impl Simulation {
     pub fn settle_with_order(&mut self, order: &[Pos]) {
         // Pass 1 (the `setBlock` loop's shape propagation and `onPlace`) is
         // [`Simulation::place_on_place`], which runs for quiet placement too.
-        // Pass 2 — the update pass: `updateFromNeighbourShapes` then a fully
+        self.update_shape_at_edge(order);
+        // Pass 3 — the update pass: `updateFromNeighbourShapes` then a fully
         // drained `updateNeighborsAt`, per block.
         for pos in order {
             if self.world.get(*pos) == StateId::AIR {
@@ -933,6 +1002,79 @@ impl Simulation {
                 .push(crate::behaviour::UpdateEntry::neighbors_at(*pos));
             self.propagate();
         }
+    }
+
+    /// Pass 2 of `placeInWorld`: `StructureTemplate.updateShapeAtEdge`.
+    ///
+    /// Before the per-block update pass, the game walks the *surface* of what it
+    /// just placed and shape-updates each boundary pair — the placed block and
+    /// the world block outside it, both ways. `DiscreteVoxelShape.forAllFaces`
+    /// drives it, and its order has nothing to do with placement order: three
+    /// sweeps, one per axis (`AxisCycle` NONE, FORWARD, BACKWARD), each scanning
+    /// along that axis and emitting a face wherever filled meets empty —
+    /// negative-facing on entering a run, positive-facing on leaving it.
+    ///
+    /// That is the order two observers on opposite faces of a build pulse in,
+    /// so it decides races that placement order has no say in.
+    fn update_shape_at_edge(&mut self, order: &[Pos]) {
+        let filled: std::collections::HashSet<Pos> = order.iter().copied().collect();
+        let (Some(min), Some(max)) = (
+            order.iter().copied().reduce(|a, b| Pos::new(a.x.min(b.x), a.y.min(b.y), a.z.min(b.z))),
+            order.iter().copied().reduce(|a, b| Pos::new(a.x.max(b.x), a.y.max(b.y), a.z.max(b.z))),
+        ) else {
+            return;
+        };
+
+        // (outer axis, middle axis, scan axis) per sweep, with the face pair the
+        // scan axis emits.
+        let sweeps: [(usize, usize, usize, crate::pos::Dir, crate::pos::Dir); 3] = [
+            (0, 1, 2, crate::pos::Dir::North, crate::pos::Dir::South),
+            (2, 0, 1, crate::pos::Dir::Down, crate::pos::Dir::Up),
+            (1, 2, 0, crate::pos::Dir::West, crate::pos::Dir::East),
+        ];
+        let lo = [min.x, min.y, min.z];
+        let hi = [max.x, max.y, max.z];
+        for (outer, middle, scan, negative, positive) in sweeps {
+            for l in lo[outer]..=hi[outer] {
+                for m in lo[middle]..=hi[middle] {
+                    let mut inside = false;
+                    for s in lo[scan]..=hi[scan] + 1 {
+                        let at = |v: i32| {
+                            let mut c = [0i32; 3];
+                            c[outer] = l;
+                            c[middle] = m;
+                            c[scan] = v;
+                            Pos::new(c[0], c[1], c[2])
+                        };
+                        let full = s <= hi[scan] && filled.contains(&at(s));
+                        if !inside && full {
+                            self.shape_update_pair(at(s), negative);
+                        }
+                        if inside && !full {
+                            self.shape_update_pair(at(s - 1), positive);
+                        }
+                        inside = full;
+                    }
+                }
+            }
+        }
+    }
+
+    /// One face of the edge walk: the placed block hears from the world block
+    /// across the face, then that block hears back.
+    fn shape_update_pair(&mut self, pos: Pos, dir: crate::pos::Dir) {
+        self.updates.push(crate::behaviour::UpdateEntry::new(vec![(
+            pos,
+            dir,
+            crate::behaviour::UpdateKind::Shape,
+        )]));
+        self.propagate();
+        self.updates.push(crate::behaviour::UpdateEntry::new(vec![(
+            pos.offset(dir),
+            dir.opposite(),
+            crate::behaviour::UpdateKind::Shape,
+        )]));
+        self.propagate();
     }
 
     /// Write `state` at `pos` from outside the simulation — a placed or broken

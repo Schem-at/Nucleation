@@ -28,6 +28,9 @@ fn main() {
         mc_tick::register_all(sim.registry_mut(), &mut table);
         *sim.behaviours_mut() = table;
     }
+    for pos in &structure.block_entities {
+        sim.mark_block_entity(*pos);
+    }
     for (pos, stacks) in &structure.inventories {
         let entry = structure.blocks.iter().find(|(p, _)| p == pos).map(|(_, e)| *e).unwrap();
         let name = structure.palette[entry].split('[').next().unwrap_or_default();

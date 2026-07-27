@@ -62,6 +62,9 @@ fn main() {
     if let Some(report) = sim.unknown_report() {
         eprintln!("warning: {report}");
     }
+    for pos in &structure.block_entities {
+        sim.mark_block_entity(*pos);
+    }
     for (pos, stacks) in &structure.inventories {
         let entry = structure.blocks.iter().find(|(p, _)| p == pos).map(|(_, e)| *e);
         let Some(entry) = entry else { continue };

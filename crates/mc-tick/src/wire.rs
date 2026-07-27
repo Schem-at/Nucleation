@@ -107,6 +107,33 @@ pub fn update_power_strength(
     }
 }
 
+/// `RedStoneWireBlock.updateNeighborsOfNeighboringWires`: every horizontal
+/// neighbour that is itself dust gets an update pass, and so does the dust one
+/// step up or down from that neighbour — up when the neighbour conducts, down
+/// when it does not, which is exactly how dust follows a staircase.
+pub fn update_neighbours_of_neighbouring_wires(
+    rules: &dyn WireWorld,
+    ctx: &mut TickCtx<'_>,
+    pos: Pos,
+) {
+    const HORIZONTAL: [Dir; 4] = [Dir::North, Dir::South, Dir::West, Dir::East];
+    for dir in HORIZONTAL {
+        check_corner_change_at(rules, ctx, pos.offset(dir));
+    }
+    for dir in HORIZONTAL {
+        let side = pos.offset(dir);
+        let step = if rules.conductor(ctx.world, side) { Dir::Up } else { Dir::Down };
+        check_corner_change_at(rules, ctx, side.offset(step));
+    }
+}
+
+/// `checkCornerChangeAt`: an update pass, but only if that position is dust.
+fn check_corner_change_at(rules: &dyn WireWorld, ctx: &mut TickCtx<'_>, pos: Pos) {
+    if rules.wire_power(ctx.world, pos).is_some() {
+        ctx.update_neighbors_at(pos);
+    }
+}
+
 /// Redstone dust. One instance per wire state; the connection shape comes from
 /// the structure and is not recomputed (documented limitation — a piston
 /// rearranging blocks beside dust would change shapes in vanilla).
@@ -130,8 +157,18 @@ impl<R: WireWorld + Clone + 'static> BlockBehaviour for Wire<R> {
     /// with nothing feeding them drop to 0 — even under `knownShape`, where no
     /// update passes run at all. Without this the engine kept the file's
     /// values and started three cells hot.
+    /// The rest of `onPlace` matters just as much, and is *unconditional*:
+    /// whatever the recomputed power, dust always pokes the neighbours of the
+    /// blocks above and below it, plus any neighbouring wires. That reaches two
+    /// blocks out — a wire sitting on a barrel notifies the comparator on the
+    /// barrel's far side — and it is the only thing that wakes diodes during a
+    /// `knownShape` placement, where no update pass runs.
     fn on_placed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
         update_power_strength(&self.rules, ctx, pos, self.power_level);
+        for dir in [Dir::Down, Dir::Up] {
+            ctx.update_neighbors_at(pos.offset(dir));
+        }
+        update_neighbours_of_neighbouring_wires(&self.rules, ctx, pos);
     }
 
     fn name(&self) -> &'static str {

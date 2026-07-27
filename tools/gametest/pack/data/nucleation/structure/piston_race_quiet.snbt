@@ -1,0 +1,29 @@
+{
+  DataVersion: 4903,
+  size: [3, 8, 3],
+  palette: [
+    {Name: "minecraft:stone"},
+    {Name: "minecraft:white_concrete"},
+    {Name: "minecraft:redstone_block"},
+    {Name: "minecraft:piston", Properties: {extended: "false", facing: "up"}},
+    {Name: "minecraft:piston", Properties: {extended: "false", facing: "down"}}
+  ],
+  blocks: [
+    {pos: [0, 0, 0], state: 0},
+    {pos: [1, 0, 0], state: 0},
+    {pos: [2, 0, 0], state: 0},
+    {pos: [0, 0, 1], state: 0},
+    {pos: [1, 0, 1], state: 0},
+    {pos: [2, 0, 1], state: 0},
+    {pos: [0, 0, 2], state: 0},
+    {pos: [1, 0, 2], state: 0},
+    {pos: [2, 0, 2], state: 0},
+    {pos: [0, 1, 1], state: 2},
+    {pos: [1, 1, 1], state: 3},
+    {pos: [1, 2, 1], state: 1},
+    {pos: [1, 4, 1], state: 1},
+    {pos: [0, 5, 1], state: 2},
+    {pos: [1, 5, 1], state: 4}
+  ],
+  entities: []
+}

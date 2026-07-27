@@ -328,6 +328,9 @@ fn run_conformance_full(
 
     // Container contents from the structure's block-entity NBT. Slot counts come
     // from the block name — the structure format does not carry them.
+    for pos in &structure.block_entities {
+        sim.mark_block_entity(*pos);
+    }
     for (pos, stacks) in &structure.inventories {
         let entry = structure
             .blocks
@@ -421,12 +424,16 @@ fn run_conformance_full(
     // Quiet (knownShape) placement dispatches nothing, so it settles nothing.
     // The capture's baseline snapshot is taken AFTER placement, so the settle's
     // own writes are pre-baseline and must not be recorded.
-    if settle == Settle::Placement {
-        // Vanilla's placement pass walks the structure's block list in order.
-        let order = structure.placement_order(
+    // Vanilla's placement pass walks the structure's block list in order.
+    let order = structure.placement_order(
         mc_tick::vanilla::is_collision_full_cube,
         mc_tick::vanilla::has_dynamic_shape,
     );
+    // `onPlace` runs on every write whatever the flags, so it happens for a
+    // knownShape placement too — a piston already powered when it is placed
+    // resolves and queues its block event with no update pass in sight.
+    sim.place_on_place(&order);
+    if settle == Settle::Placement {
         sim.settle_with_order(&order);
     }
     sim.record();
@@ -1240,13 +1247,37 @@ fn the_6x6_door_runs_a_full_close_open_cycle() {
 fn opposed_pistons_race_for_one_gap() {
     // The vault door's failure, minimised: a piston facing up under five
     // concrete, a one-block gap, a piston facing down above it, and an
-    // observer for each. Placement pulses both observers on tick 1, so both
-    // pistons want the gap. Vanilla's *down* piston wins — it pokes its head
-    // into the gap and the column never moves — which means vanilla notifies
-    // it first, even though its observer sits at y=9 and the other at y=1.
-    // See `Structure::placement_order` for why the walk descends y, and for
-    // the contradiction that reading leaves unresolved.
+    // observer for each. A loud placement pulses both observers, so both
+    // pistons want the gap, and vanilla's *down* piston wins — even though its
+    // observer sits at y=9 and the other at y=1.
+    //
+    // Placement order has no say in it: the observers are pulsed by
+    // `updateShapeAtEdge`, which walks the surface of the placed shape by axis
+    // (`Simulation::update_shape_at_edge`), not by the placement list. The
+    // companion `piston_race_quiet` fixture isolates the other half — pistons
+    // already powered when placed, where placement order *is* the tiebreak.
     run_conformance("piston_race.snbt", "piston_race.json", "nucleation:piston_race");
+}
+
+#[test]
+fn the_first_placed_of_two_powered_pistons_takes_the_shared_gap() {
+    // The placement-order discriminator. Two opposed pistons, each already
+    // powered by its own redstone block, one gap between them: both resolve in
+    // `onPlace`, so whichever is placed first queues its block event first and
+    // takes the gap. Nothing else can break the tie — knownShape placement runs
+    // no update pass at all.
+    //
+    // Vanilla's *bottom* piston (y=1) wins, which is the direct evidence that
+    // the placement walk ascends y, matching `buildInfoList`'s comparators.
+    run_conformance_bounded(
+        "piston_race_quiet.snbt",
+        "piston_race_quiet.json",
+        "nucleation:piston_race_quiet",
+        &[],
+        &[],
+        None,
+        Settle::Quiet,
+    );
 }
 
 #[test]

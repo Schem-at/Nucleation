@@ -49,6 +49,11 @@ pub struct Structure {
     /// caller turns these into engine inventories at load time — the parser
     /// does not know how many slots a barrel has.
     pub inventories: Vec<(Pos, Vec<crate::inventory::ItemStack>)>,
+    /// Positions that carried an `nbt` compound — i.e. that have a block
+    /// entity. `placeInWorld` ends each of these with `BlockEntity.setChanged`,
+    /// which pokes neighbouring comparators, so the list is load-bearing even
+    /// when the compound holds nothing we model (an empty barrel still counts).
+    pub block_entities: Vec<Pos>,
     /// Every authored entity, in list order — the placement spawn order,
     /// which is also the server's id-assignment order.
     pub entities: Vec<SpawnedEntity>,
@@ -160,32 +165,30 @@ impl Structure {
     /// torch latches, and running a community door in file order instead
     /// started clocks the game never starts.
     ///
-    /// # The key order, and an honest contradiction
+    /// # The key order
     ///
-    /// Within a group this walks **descending y, then ascending x, then
-    /// ascending z**, and the descending part is *not* what the bytecode
-    /// appears to say. `buildInfoList`'s comparator reads
-    /// `comparingInt(getY).thenComparingInt(getX).thenComparingInt(getZ)` —
-    /// ascending, with no `reversed()` and no negation in any of the three
-    /// lambdas — the setBlock loop appends each placed block to an
-    /// accumulator, and the update pass iterates that accumulator forward.
+    /// Within a group this walks **ascending y, then x, then z**, exactly as
+    /// `buildInfoList`'s comparator reads:
+    /// `comparingInt(getY).thenComparingInt(getX).thenComparingInt(getZ)`, with
+    /// no `reversed()` and no negation in any of the three lambdas. The setBlock
+    /// loop appends each placed block to an accumulator and the update pass
+    /// iterates that accumulator forward.
+    /// An earlier version of this engine descended y to satisfy the `piston_race`
+    /// capture; that was an artifact of two bugs since fixed — placement wrote
+    /// the whole structure before running any `onPlace` (so notifications saw
+    /// blocks the game had not written yet), and the loud path skipped
+    /// `updateShapeAtEdge`, which is what actually pulses observers during a
+    /// placement. With both corrected, ascending order reproduces every capture.
     ///
-    /// Two captured fixtures say otherwise, and captures arbitrate here:
+    /// Two fixtures hold the order down:
     ///
-    /// - `gap_race` — two observers at the **same** y, differing only in x,
-    ///   racing two pistons for one shared gap, with the high-x observer
+    /// - `piston_race_quiet` — two opposed pistons, each already powered when
+    ///   placed, one gap between them. `knownShape` runs no update pass, so the
+    ///   only tiebreak is which `onPlace` queued its block event first. Vanilla
+    ///   picks the **bottom** piston: the walk ascends y.
+    /// - `gap_race` — the same race horizontally, with the high-x observer
     ///   written first in the file. Vanilla picks the **low-x** side, which
-    ///   rules out file order and pins the x tie-break as ascending. It
-    ///   passes under either y direction.
-    /// - `piston_race` — the same race vertically, observers at y=1 and y=9.
-    ///   Vanilla picks the **y=9** side. Only a descending-y walk reproduces
-    ///   that, and switching to it leaves every other golden green.
-    ///
-    /// So the order below is what the game demonstrably does, while the
-    /// mechanism behind it is unexplained — most likely this engine schedules
-    /// observers at the wrong moment during placement and the reversal
-    /// compensates. Treat it as a fixture-backed approximation rather than a
-    /// transcription: if a future capture disagrees, suspect this first.
+    ///   rules out file order and pins the x tie-break as ascending.
     pub fn placement_order(
         &self,
         is_full_cube: impl Fn(&str) -> bool,
@@ -205,7 +208,7 @@ impl Structure {
             }
         }
         for group in [&mut solid, &mut other, &mut entities] {
-            group.sort_by_key(|p| (std::cmp::Reverse(p.y), p.x, p.z));
+            group.sort_by_key(|p| (p.y, p.x, p.z));
         }
         solid.into_iter().chain(other).chain(entities).collect()
     }
@@ -639,6 +642,7 @@ impl<'a> Parser<'a> {
         let mut palette = None;
         let mut blocks: Option<Vec<(Pos, usize)>> = None;
         let mut inventories: Vec<(Pos, Vec<crate::inventory::ItemStack>)> = Vec::new();
+        let mut block_entities: Vec<Pos> = Vec::new();
         let mut entities: Vec<SpawnedEntity> = Vec::new();
 
         loop {
@@ -696,6 +700,7 @@ impl<'a> Parser<'a> {
                         let mut pos = None;
                         let mut state = None;
                         let mut items: Vec<crate::inventory::ItemStack> = Vec::new();
+                        let mut has_nbt = false;
                         loop {
                             if self.peek() == Some(b'}') {
                                 self.at += 1;
@@ -716,7 +721,10 @@ impl<'a> Parser<'a> {
                                     ));
                                 }
                                 "state" => state = Some(self.int()? as usize),
-                                "nbt" => items = self.nbt_items()?,
+                                "nbt" => {
+                                    items = self.nbt_items()?;
+                                    has_nbt = true;
+                                }
                                 _ => self.skip_value()?,
                             }
                             if self.peek() == Some(b',') {
@@ -728,6 +736,9 @@ impl<'a> Parser<'a> {
                                 entries.push((p, s));
                                 if !items.is_empty() {
                                     inventories.push((p, items));
+                                }
+                                if has_nbt {
+                                    block_entities.push(p);
                                 }
                             }
                             _ => return self.err("block needs both `pos` and `state`"),
@@ -750,6 +761,7 @@ impl<'a> Parser<'a> {
             palette: palette.ok_or(StructureError::Missing("palette"))?,
             blocks: blocks.ok_or(StructureError::Missing("blocks"))?,
             inventories,
+            block_entities,
             item_entities: entities
                 .iter()
                 .filter_map(|e| match e {

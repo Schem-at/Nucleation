@@ -387,17 +387,35 @@ impl<P: PowerSource> BlockBehaviour for Repeater<P> {
         schedule_diode(ctx, &self.power, pos, self.facing, self.powered, delay);
     }
 
+    /// `DiodeBlock.tick`, whose whole body sits under `if (!isLocked(...))`.
+    ///
+    /// A repeater that is locked when its tick lands does nothing *and does
+    /// not reschedule* — it keeps its output until something unlocks it and
+    /// notifies it afresh. That is why a build placed with a lit comparator
+    /// beside a repeater holds its output for one more cycle: the tick fires
+    /// into a locked repeater and is simply dropped.
     fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if self.locked_at(ctx.world, ctx.comparator_out, pos) {
+            return;
+        }
         let input_side = if INPUT_IS_FACING_SIDE {
             self.facing
         } else {
             self.facing.opposite()
         };
-        let input =
+        let should_turn_on =
             self.power
                 .is_powered(ctx.world, ctx.comparator_out, pos.offset(input_side), input_side.opposite());
-        if input != self.powered {
-            ctx.set(pos, self.states.get(input));
+        if self.powered && !should_turn_on {
+            ctx.set(pos, self.states.get(false));
+        } else if !self.powered {
+            // Turning on always happens; if the input has already gone away the
+            // repeater books its own turn-off, which is what stretches a pulse
+            // shorter than the delay out to the full delay.
+            ctx.set(pos, self.states.get(true));
+            if !should_turn_on {
+                ctx.schedule(pos, self.delay_ticks(), crate::schedule::TickPriority::VeryHigh);
+            }
         }
     }
 
