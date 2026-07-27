@@ -101,7 +101,22 @@ impl BlockBehaviour for Observer {
             ctx.set(pos, self.states.get(false));
         } else {
             // Start of the pulse, and schedule its end.
+            //
+            // `ObserverBlock.tick` writes *before* it schedules, and the write
+            // dispatches its shape updates on the spot — a block tick is not
+            // running inside a neighbour update, so the updater's stack is
+            // empty and `addAndRun` runs immediately. Any observer watching
+            // this one therefore books its tick *before* this one books its
+            // own turn-off, and holds the earlier sub-tick order for it.
+            //
+            // Two observers watching each other are a clock, and the clock only
+            // keeps running if the watcher ticks first: it has to be unpowered
+            // again by the time the one below it turns off, or the shape update
+            // that would restart it arrives while it is still lit and
+            // `updateShape` drops it. Scheduling before draining reversed the
+            // pair and the 6x6 door's observer clocks stopped after one cycle.
             ctx.set(pos, self.states.get(true));
+            ctx.drain();
             ctx.schedule(pos, OBSERVER_PULSE_TICKS, TickPriority::Normal);
         }
         // `ObserverBlock.tick` ends with `updateNeighborsInFront` on both edges:
