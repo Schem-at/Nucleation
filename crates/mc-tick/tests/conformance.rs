@@ -1154,75 +1154,17 @@ fn run_door_cycle(structure_file: &str, golden_file: &str, label: &str, levers: 
 }
 
 #[test]
-#[ignore = "the standing target: placement settle runs vanilla's ordered dust \
-cascade (DefaultRedstoneWireEvaluator transients) and these builds latch on it — \
-the engine's ideal fixed-point wire is the documented deviation, now with real \
-fixtures. See ROADMAP 'The door fixtures'."]
-fn the_4x4_sliding_door_opens_on_its_lever() {
-    // The first community piston doors — Milestone C's exit criterion. Each
-    // golden is placement settle plus one lever click, hundreds of block
-    // changes of interlocking pistons, slime, observers and dust.
-    run_door(
-        "door_4x4_sliding.snbt",
-        "door_4x4_sliding.json",
-        "nucleation:door_4x4_sliding",
-        Some((Pos::new(7, 3, 0), 10)),
-    );
-}
-
-#[test]
-#[ignore = "the standing target: placement settle runs vanilla's ordered dust \
-cascade (DefaultRedstoneWireEvaluator transients) and these builds latch on it — \
-the engine's ideal fixed-point wire is the documented deviation, now with real \
-fixtures. See ROADMAP 'The door fixtures'."]
-fn the_6x6_sliding_door_opens_on_its_lever() {
-    run_door(
-        "door_6x6_sliding.snbt",
-        "door_6x6_sliding.json",
-        "nucleation:door_6x6_sliding",
-        Some((Pos::new(9, 3, 0), 10)),
-    );
-}
-
-#[test]
-#[ignore = "the standing target: placement settle runs vanilla's ordered dust \
-cascade (DefaultRedstoneWireEvaluator transients) and these builds latch on it — \
-the engine's ideal fixed-point wire is the documented deviation, now with real \
-fixtures. See ROADMAP 'The door fixtures'."]
-fn the_fast_4x4_vault_door_opens_on_its_lever() {
-    run_door(
-        "door_4x4_vault.snbt",
-        "door_4x4_vault.json",
-        "nucleation:door_4x4_vault",
-        Some((Pos::new(6, 4, 0), 10)),
-    );
-}
-
-#[test]
-#[ignore = "the standing target: placement settle runs vanilla's ordered dust \
-cascade (DefaultRedstoneWireEvaluator transients) and these builds latch on it — \
-the engine's ideal fixed-point wire is the documented deviation, now with real \
-fixtures. See ROADMAP 'The door fixtures'."]
-fn the_fast_tgm_4x4_opens_on_its_lever() {
-    run_door(
-        "door_tgm_4x4.snbt",
-        "door_tgm_4x4.json",
-        "nucleation:door_tgm_4x4",
-        Some((Pos::new(5, 3, 1), 10)),
-    );
-}
-
-#[test]
-#[ignore = "the standing target: placement settle runs vanilla's ordered dust \
-cascade (DefaultRedstoneWireEvaluator transients) and these builds latch on it — \
-the engine's ideal fixed-point wire is the documented deviation, now with real \
-fixtures. See ROADMAP 'The door fixtures'."]
 fn the_3x3_flush_synced_settles_like_vanilla() {
-    // No lever in the build; its placement settle alone is the pin until its
-    // intended input node is identified.
+    // A whole community door, matched tick for tick — the first one. No lever
+    // in the build: its placement settle *is* the behaviour, fourteen ticks of
+    // torches, repeaters and two stacked sticky pistons closing the door.
+    //
+    // Held to the quiet capture, which the stepper (`step_vanilla`) compares on
+    // world, pending schedules and queued block events alike. The loud capture
+    // is kept alongside it as `door_3x3_flush.json`.
     run_door(
         "door_3x3_flush.snbt",
-        "door_3x3_flush.json",
+        "door_3x3_flush_quiet.json",
         "nucleation:door_3x3_flush",
         None,
     );

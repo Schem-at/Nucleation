@@ -343,6 +343,14 @@ impl<P: PowerSource> Repeater<P> {
         }
         false
     }
+    /// `DiodeBlock.updateNeighborsInFront`: the block this diode outputs into,
+    /// then that block's neighbours except back toward the diode.
+    fn update_neighbours_in_front(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        let target = pos.offset(self.facing.opposite());
+        ctx.notify(target, self.facing);
+        ctx.update_neighbors_except(target, self.facing);
+    }
+
     /// Delay in game ticks.
     pub fn delay_ticks(&self) -> u64 {
         u64::from(self.delay) * REPEATER_TICKS_PER_DELAY
@@ -406,13 +414,23 @@ impl<P: PowerSource> BlockBehaviour for Repeater<P> {
         let should_turn_on =
             self.power
                 .is_powered(ctx.world, ctx.comparator_out, pos.offset(input_side), input_side.opposite());
+        // `DiodeBlock.tick` writes with flag **2** — no neighbour updates — and
+        // the notification comes from `onPlace`, which runs on every write and
+        // carries no block-changed guard: `updateNeighborsInFront`, reaching
+        // the block this diode outputs into *and that block's neighbours*.
+        //
+        // Writing with flag 3 instead notifies only the diode's own six, which
+        // stops one block short: a repeater feeding a solid block never tells
+        // the dust on the far side of it, and that dust stays dark.
         if self.powered && !should_turn_on {
-            ctx.set(pos, self.states.get(false));
+            ctx.set_shape_only(pos, self.states.get(false));
+            self.update_neighbours_in_front(ctx, pos);
         } else if !self.powered {
             // Turning on always happens; if the input has already gone away the
             // repeater books its own turn-off, which is what stretches a pulse
             // shorter than the delay out to the full delay.
-            ctx.set(pos, self.states.get(true));
+            ctx.set_shape_only(pos, self.states.get(true));
+            self.update_neighbours_in_front(ctx, pos);
             if !should_turn_on {
                 ctx.schedule(pos, self.delay_ticks(), crate::schedule::TickPriority::VeryHigh);
             }
