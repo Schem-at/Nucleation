@@ -525,9 +525,15 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     .map(|(from, _)| from.offset(self.facing))
                     .collect();
 
-                // No move write notifies neighbours — that is why the piston does
-                // not react to its own move, whose structure may contain its own
-                // power source, until the blocks land two ticks later.
+                // No move *write* notifies neighbours. `moveBlocks` ends with
+                // an explicit notification pass instead — `updateNeighborsAt`
+                // for every position a block left, then the head slot — which
+                // this engine does not run yet. Adding it here is not enough:
+                // vanilla dispatches those updates *inside* `moveBlocks`, before
+                // `triggerEvent` writes the base as extended, and queueing them
+                // from here shows the notified blocks a piston that has already
+                // finished moving. Doing it faithfully needs a mid-handler
+                // drain; queued from here it reddens the manual-engine goldens.
                 //
                 // The two kinds of write differ in *shape* though, and it shows.
                 // Vacating a source is flag 18 or 82, both carrying
@@ -552,6 +558,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // The head slot is itself in motion until the move completes.
                 ctx.set_shape_only(head_slot, self.moving);
                 ctx.defer(head_slot, self.head, PISTON_MOVE_TICKS);
+
                 // The base state is written *after* the moves, with notifications
                 // (vanilla flag 67) — the one loud write of the whole event.
                 ctx.set(pos, self.states.get(true));

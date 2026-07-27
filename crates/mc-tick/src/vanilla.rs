@@ -154,7 +154,20 @@ pub struct VanillaRules {
     /// Full-cube states, for hopper-suction blocking and item collision.
     full_cubes: Vec<StateId>,
     /// Wire states: power level and horizontal connections (true = side or up).
-    wires: HashMap<StateId, (u8, [bool; 4])>,
+    wires: HashMap<StateId, (u8, [crate::wire::WireSide; 4])>,
+    /// `(power, connections)` -> the wire state with that shape, for the
+    /// connection recompute in `RedStoneWireBlock.updateShape`.
+    wire_shapes: HashMap<(u8, [crate::wire::WireSide; 4]), StateId>,
+    /// `isSignalSource`: whether the block *can* emit, powered or not — which
+    /// is what decides whether dust turns to face it.
+    signal_sources: Vec<StateId>,
+    /// Blocks dust can climb: `canSurviveOn`, i.e. a sturdy upward face.
+    sturdy_up: Vec<StateId>,
+    /// Repeater states, which dust faces only along their axis.
+    repeaters: Vec<StateId>,
+    /// Observer states and the direction they look, which is the only face
+    /// dust turns toward.
+    observer_facing: HashMap<StateId, Dir>,
     /// `(wire state, power)` -> the same shape at that power.
     wire_siblings: HashMap<(StateId, u8), StateId>,
     immovable: Vec<StateId>,
@@ -225,7 +238,7 @@ impl VanillaRules {
                             Dir::West => 2,
                             _ => 3,
                         };
-                        if connections[index] {
+                        if connections[index] != crate::wire::WireSide::None {
                             return *power;
                         }
                     }
@@ -334,6 +347,50 @@ impl crate::wire::WireWorld for VanillaRules {
     fn wire_with_power(&self, world: &World, pos: Pos, power: u8) -> Option<StateId> {
         let state = world.get(pos);
         self.wire_siblings.get(&(state, power)).copied()
+    }
+
+    fn wire_shape(&self, world: &World, pos: Pos) -> Option<(u8, [crate::wire::WireSide; 4])> {
+        self.wires.get(&world.get(pos)).copied()
+    }
+
+    fn wire_with_shape(
+        &self,
+        power: u8,
+        sides: [crate::wire::WireSide; 4],
+    ) -> Option<StateId> {
+        self.wire_shapes.get(&(power, sides)).copied()
+    }
+
+    fn should_connect_to(&self, world: &World, pos: Pos, from: Option<Dir>) -> bool {
+        let state = world.get(pos);
+        if self.wires.contains_key(&state) {
+            return true;
+        }
+        // A repeater takes a signal on its input face and gives one on its
+        // output face, so dust faces it along its axis and not across it. An
+        // observer only counts on the face it looks along. A comparator has no
+        // special case in `shouldConnectTo` — it connects like any other
+        // source, which is why dust wraps around its sides.
+        if self.repeaters.contains(&state) {
+            let facing = self.diodes.get(&state);
+            return from.is_some_and(|dir| {
+                facing.is_some_and(|f| dir == *f || dir == f.opposite())
+            });
+        }
+        if let Some(facing) = self.observer_facing.get(&state) {
+            return from == Some(*facing);
+        }
+        // Everything else that can emit connects, but only when asked about a
+        // real direction: the diagonal checks pass `None` and want dust only.
+        self.signal_sources.contains(&state) && from.is_some()
+    }
+
+    fn sturdy_up(&self, world: &World, pos: Pos) -> bool {
+        self.sturdy_up.contains(&world.get(pos))
+    }
+
+    fn full_block(&self, world: &World, pos: Pos) -> bool {
+        self.full_cubes.contains(&world.get(pos))
     }
 }
 
@@ -607,19 +664,14 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(0);
             // Connection order matches Dir: North, South, West, East.
-            let connected = |key: &str| descriptor.get(key).is_some_and(|v| v != "none");
-            rules.wires.insert(
-                *id,
-                (
-                    power,
-                    [
-                        connected("north"),
-                        connected("south"),
-                        connected("west"),
-                        connected("east"),
-                    ],
-                ),
-            );
+            let side = |key: &str| match descriptor.get(key) {
+                Some("up") => crate::wire::WireSide::Up,
+                Some("side") => crate::wire::WireSide::Side,
+                _ => crate::wire::WireSide::None,
+            };
+            let sides = [side("north"), side("south"), side("west"), side("east")];
+            rules.wires.insert(*id, (power, sides));
+            rules.wire_shapes.insert((power, sides), *id);
         }
         // A powered diode, torch or observer is itself a source.
         let emits = match descriptor.name.as_str() {
@@ -634,6 +686,45 @@ pub fn register_all(registry: &mut StateRegistry, table: &mut BehaviourTable) ->
             "minecraft:lever" => descriptor.flag("powered"),
             _ => false,
         };
+        // `isSignalSource` is a property of the *block*, not of this state:
+        // an unlit torch and an unpowered lever are still signal sources, and
+        // dust connects to them either way.
+        if matches!(
+            descriptor.name.as_str(),
+            "minecraft:repeater"
+                | "minecraft:comparator"
+                | "minecraft:observer"
+                | "minecraft:redstone_torch"
+                | "minecraft:redstone_wall_torch"
+                | "minecraft:lever"
+                | "minecraft:redstone_block"
+                | "minecraft:stone_button"
+                | "minecraft:oak_button"
+                | "minecraft:stone_pressure_plate"
+                | "minecraft:oak_pressure_plate"
+                | "minecraft:daylight_detector"
+                | "minecraft:trapped_chest"
+                | "minecraft:target"
+        ) {
+            rules.signal_sources.push(*id);
+        }
+        if descriptor.name == "minecraft:repeater" {
+            rules.repeaters.push(*id);
+        }
+        if descriptor.name == "minecraft:observer" {
+            if let Some(facing) = descriptor.facing() {
+                rules.observer_facing.insert(*id, facing);
+            }
+        }
+        // `canSurviveOn`: dust sits on, and climbs, anything with a sturdy top
+        // face — full cubes, plus the top halves of slabs and stairs.
+        if is_full_cube(descriptor)
+            || (descriptor.name.ends_with("_slab")
+                && matches!(descriptor.get("type"), Some("top") | Some("double")))
+            || (descriptor.name.ends_with("_stairs") && descriptor.get("half") == Some("top"))
+        {
+            rules.sturdy_up.push(*id);
+        }
         if emits {
             rules.powered.push(*id);
             // An observer's pulse leaves through its back face only — and it
@@ -1493,6 +1584,119 @@ mod tests {
         );
         assert!(!rules.slime.is_empty(), "slime must be classified sticky");
         assert!(!rules.honey.is_empty(), "honey must be classified sticky");
+    }
+
+    #[test]
+    fn dust_re_faces_itself_when_a_neighbour_leaves() {
+        // `RedStoneWireBlock.updateShape`. Dust beside a solid block faces it
+        // (a block that takes a signal is worth connecting to); take the block
+        // away and the connection has to go with it — otherwise the wire keeps
+        // powering a hole, which is what kept this engine's dust frozen in the
+        // shape its schematic was saved in.
+        use crate::wire::{WireSide, WireWorld};
+        let mut registry = StateRegistry::new();
+        for descriptor in [
+            "minecraft:air",
+            "minecraft:redstone_wire[east=side,north=none,power=0,south=none,west=none]",
+            "minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]",
+            "minecraft:redstone_wire[east=side,north=side,power=0,south=side,west=side]",
+            "minecraft:lever[face=floor,facing=west,powered=false]",
+            "minecraft:cyan_concrete",
+        ] {
+            registry.intern(descriptor).unwrap();
+        }
+        intern_companions(&mut registry);
+        let mut table = BehaviourTable::new();
+        let rules = register_all(&mut registry, &mut table);
+
+        let mut world = World::new(crate::pos::Bounds::new(
+            Pos::new(-1, -1, -1),
+            Pos::new(2, 2, 2),
+        ));
+        let dust = Pos::new(0, 0, 0);
+        let east = Pos::new(1, 0, 0);
+        world.set(
+            dust,
+            registry
+                .get("minecraft:redstone_wire[east=side,north=none,power=0,south=none,west=none]")
+                .unwrap(),
+        );
+        world.set(east, registry.get("minecraft:lever[face=floor,facing=west,powered=false]").unwrap());
+
+        // A lever is a signal source, so the wire faces it.
+        let sides = crate::wire::connection_state(&rules, &world, dust, [WireSide::None; 4]);
+        assert_eq!(sides[3], WireSide::Side, "east faces the lever");
+        // With only one connection, the opposite face is forced to `side` too —
+        // the symmetry rule that renders a lone neighbour as a line.
+        assert_eq!(sides[2], WireSide::Side, "west is filled in by symmetry");
+        assert_eq!(sides[0], WireSide::None);
+
+        // Take the lever away and the wire has nothing to face — so the
+        // symmetry rule fills in all four and it renders as a cross, which is
+        // what isolated dust looks like in vanilla. A dot only survives if the
+        // wire was already a dot.
+        world.set(east, StateId::AIR);
+        let sides = crate::wire::connection_state(&rules, &world, dust, sides);
+        assert_eq!(sides, [WireSide::Side; 4], "isolated dust is a cross");
+        let dot = crate::wire::connection_state(&rules, &world, dust, [WireSide::None; 4]);
+        assert_eq!(dot, [WireSide::None; 4], "a dot with no neighbours stays a dot");
+        assert!(
+            rules.wire_with_shape(0, sides).is_some(),
+            "the recomputed shape must resolve back to a real state"
+        );
+    }
+
+    #[test]
+    fn dust_climbs_a_full_block_and_only_leans_on_a_slab() {
+        // `getConnectingSide`: the wire connects *up* a block it can walk onto
+        // when dust sits above it, but renders that connection as `up` only
+        // when the block is a full cube. A top slab carries the signal just the
+        // same and stays `side`, which is why a slab staircase looks flat.
+        use crate::wire::{WireSide, WireWorld};
+        let mut registry = StateRegistry::new();
+        for descriptor in [
+            "minecraft:air",
+            "minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]",
+            "minecraft:cyan_concrete",
+            "minecraft:smooth_stone_slab[type=top,waterlogged=false]",
+        ] {
+            registry.intern(descriptor).unwrap();
+        }
+        intern_companions(&mut registry);
+        let mut table = BehaviourTable::new();
+        let rules = register_all(&mut registry, &mut table);
+
+        let mut world = World::new(crate::pos::Bounds::new(
+            Pos::new(-1, -1, -1),
+            Pos::new(3, 3, 3),
+        ));
+        let wire = registry
+            .get("minecraft:redstone_wire[east=none,north=none,power=0,south=none,west=none]")
+            .unwrap();
+        let dust = Pos::new(0, 0, 0);
+        world.set(dust, wire);
+        // A full cube to the east with dust on top of it.
+        world.set(Pos::new(1, 0, 0), registry.get("minecraft:cyan_concrete").unwrap());
+        world.set(Pos::new(1, 1, 0), wire);
+        assert_eq!(
+            crate::wire::connecting_side(&rules, &world, dust, Dir::East, true),
+            WireSide::Up
+        );
+        // The same climb over a top slab is a `side` connection.
+        world.set(
+            Pos::new(1, 0, 0),
+            registry.get("minecraft:smooth_stone_slab[type=top,waterlogged=false]").unwrap(),
+        );
+        assert_eq!(
+            crate::wire::connecting_side(&rules, &world, dust, Dir::East, true),
+            WireSide::Side
+        );
+        // Cover the wire and it cannot climb at all.
+        assert_eq!(
+            crate::wire::connecting_side(&rules, &world, dust, Dir::East, false),
+            WireSide::None,
+            "a covered wire ignores what is above its neighbour"
+        );
     }
 
     #[test]
