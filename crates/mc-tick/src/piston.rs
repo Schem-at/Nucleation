@@ -673,6 +673,41 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 true
             }
             TRIGGER_CONTRACT | TRIGGER_DROP => {
+                // `MC_TICK_TRACE_POWER=x,y,z` — the whole of `getNeighborSignal`
+                // at the instant a retract is dispatched, which is the instant
+                // vanilla decides whether to refuse it. Both halves separately,
+                // because "powered" and "quasi-powered" fail in different ways.
+                if std::env::var_os("MC_TICK_TRACE_POWER").is_some_and(|f| {
+                    f.to_string_lossy().split(';').any(|t| {
+                        let c: Vec<i32> = t.split(',').filter_map(|v| v.trim().parse().ok()).collect();
+                        c.len() == 3 && c[0] == pos.x && c[1] == pos.y && c[2] == pos.z
+                    })
+                }) {
+                    eprintln!(
+                        "[t{}] power at {:?} facing={:?} id={id}",
+                        ctx.tick,
+                        (pos.x, pos.y, pos.z),
+                        self.facing
+                    );
+                    for (label, base, skip) in
+                        [("direct", pos, Some(self.facing)), ("qc", pos.offset(Dir::Up), Some(Dir::Down))]
+                    {
+                        for dir in crate::pos::ALL_DIRS {
+                            if Some(dir) == skip {
+                                continue;
+                            }
+                            let at = base.offset(dir);
+                            let emits =
+                                self.power.is_powered(ctx.world, ctx.comparator_out, at, dir.opposite());
+                            eprintln!(
+                                "    {label:<7}{dir:?} {:?} {} => {}",
+                                (at.x, at.y, at.z),
+                                ctx.states.descriptor(ctx.world.get(at)).unwrap_or("?"),
+                                if emits { "POWERS" } else { "-" }
+                            );
+                        }
+                    }
+                }
                 // Dispatch re-check, mirroring extend: if power returned before
                 // the retract ran, vanilla re-marks the base extended and treats
                 // the event as unhandled.
