@@ -1395,25 +1395,13 @@ impl Simulation {
                     // lands, and how a landed piston notices power waiting for it.
                     self.updates
                         .push(crate::behaviour::UpdateEntry::own_shapes(entry.pos));
-                    // The write itself is `setBlock(pos, state, 3)`, and flag 3
-                    // leaves `UPDATE_KNOWN_SHAPE` clear: `markAndNotifyBlock`
-                    // runs the neighbour updates *and then* the shape pass over
-                    // the same six neighbours. Only the first was modelled here,
-                    // so a block landing beside a wire never made that wire
-                    // recompute its connections — a target block arriving next
-                    // to a dust line left the dust unattached to it, and the
-                    // vault door's whole second stage hung off that connection.
-                    self.updates
-                        .push(crate::behaviour::UpdateEntry::neighbors_at(entry.pos));
-                    self.updates
-                        .push(crate::behaviour::UpdateEntry::neighbor_shapes(entry.pos));
                     // Drained per landing, not once at the end. Each moving
-                    // block entity's tick completes — write, shape updates,
-                    // neighbour updates — before the next one starts, so a
-                    // neighbour woken by the first landing sees the rest of the
-                    // column still in flight. Draining once at the end showed it
-                    // an already-solid column instead, and a piston above it
-                    // extended into a door vanilla leaves shut.
+                    // block entity's tick completes — shapes, onPlace, neighbour
+                    // updates — before the next one starts, so a neighbour woken
+                    // by the first landing sees the rest of the column still in
+                    // flight. Draining once at the end showed it an already-solid
+                    // column instead, and a piston above it extended into a door
+                    // vanilla leaves shut.
                     self.propagate();
                     landed.push(entry.pos);
                 // `onPlace` for each landed block, *after* that block's own
@@ -1469,6 +1457,19 @@ impl Simulation {
                     behaviour.on_placed(&mut ctx, pos);
                     self.propagate();
                     }
+                    // Only now `markAndNotifyBlock`. The write is
+                    // `setBlock(pos, state, 3)`, and flag 3 leaves
+                    // `UPDATE_KNOWN_SHAPE` clear, so the neighbour updates run
+                    // and then the shape pass over the same six neighbours.
+                    // Both come *after* onPlace, because onPlace happens inside
+                    // `LevelChunk.setBlockState` and `markAndNotifyBlock` after
+                    // it returns — which is how a landed piston queues its own
+                    // extend before it wakes the piston underneath it.
+                    self.updates
+                        .push(crate::behaviour::UpdateEntry::neighbors_at(entry.pos));
+                    self.updates
+                        .push(crate::behaviour::UpdateEntry::neighbor_shapes(entry.pos));
+                    self.propagate();
                 }
                 None
             }
