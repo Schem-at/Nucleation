@@ -27,6 +27,8 @@ internal interface TickSimulationLib: Library {
     fun TickSimulation_updates_count(handle: Pointer): FFIUint32
     fun TickSimulation_updates_json(handle: Pointer, write: Pointer): Unit
     fun TickSimulation_updates_json_between(handle: Pointer, fromTick: FFIUint32, toTick: FFIUint32, write: Pointer): Unit
+    fun TickSimulation_updates_heat_json(handle: Pointer, fromTick: FFIUint32, toTick: FFIUint32, write: Pointer): Unit
+    fun TickSimulation_updates_wave_json(handle: Pointer, tick: FFIUint32, write: Pointer): Unit
     fun TickSimulation_changes_json(handle: Pointer, write: Pointer): Unit
     fun TickSimulation_item_entities_json(handle: Pointer, write: Pointer): Unit
     fun TickSimulation_events_summary_json(handle: Pointer, write: Pointer): Unit
@@ -351,6 +353,35 @@ class TickSimulation internal constructor (
     fun updatesJsonBetween(fromTick: UInt, toTick: UInt): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.TickSimulation_updates_json_between(handle, FFIUint32(fromTick), FFIUint32(toTick), write);
+
+        val returnString = DW.writeToString(write)
+        return returnString
+    }
+
+    /** Per-tick, per-cell update counts for ticks in `[from_tick, to_tick)`.
+    *
+    *The resolution playback should run at: `{phases, ticks:[{tick, total,
+    *cells:[{p:[x,y,z], n, nb, sh, ph:[…]}]}]}`, where `nb`/`sh` split
+    *neighbour from shape and `ph` indexes the `phases` legend. Collapses
+    *a tick's tens of thousands of updates into a few hundred cells.
+    */
+    fun updatesHeatJson(fromTick: UInt, toTick: UInt): String {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.TickSimulation_updates_heat_json(handle, FFIUint32(fromTick), FFIUint32(toTick), write);
+
+        val returnString = DW.writeToString(write)
+        return returnString
+    }
+
+    /** One tick's updates in delivery order, as parallel arrays.
+    *
+    *For stepping *within* a tick: `seq` is the array index, `pos` is flat
+    *x,y,z triples, `kind`/`phase`/`from` are integer codes with legends
+    *in the payload, and `state` indexes a deduplicated `states` table.
+    */
+    fun updatesWaveJson(tick: UInt): String {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.TickSimulation_updates_wave_json(handle, FFIUint32(tick), write);
 
         val returnString = DW.writeToString(write)
         return returnString

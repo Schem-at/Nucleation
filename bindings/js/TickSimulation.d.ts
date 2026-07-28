@@ -158,6 +158,25 @@ export class TickSimulation {
      */
     updatesJsonBetween(fromTick: number, toTick: number): string;
 
+    /**
+     * Per-tick, per-cell update counts for ticks in `[from_tick, to_tick)`.
+     *
+     * The resolution playback should run at: `{phases, ticks:[{tick, total,
+     * cells:[{p:[x,y,z], n, nb, sh, ph:[…]}]}]}`, where `nb`/`sh` split
+     * neighbour from shape and `ph` indexes the `phases` legend. Collapses
+     * a tick's tens of thousands of updates into a few hundred cells.
+     */
+    updatesHeatJson(fromTick: number, toTick: number): string;
+
+    /**
+     * One tick's updates in delivery order, as parallel arrays.
+     *
+     * For stepping *within* a tick: `seq` is the array index, `pos` is flat
+     * x,y,z triples, `kind`/`phase`/`from` are integer codes with legends
+     * in the payload, and `state` indexes a deduplicated `states` table.
+     */
+    updatesWaveJson(tick: number): string;
+
     changesJson(): string;
 
     /**

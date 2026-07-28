@@ -220,6 +220,18 @@ final class TickSimulation {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function updatesHeatJson( $from_tick,  $to_tick) {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->TickSimulation_updates_heat_json($this->ptr, $from_tick, $to_tick, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function updatesWaveJson( $tick) {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->TickSimulation_updates_wave_json($this->ptr, $tick, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function changesJson() {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         Lib::ffi()->TickSimulation_changes_json($this->ptr, $write);

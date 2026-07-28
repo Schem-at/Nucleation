@@ -108,6 +108,91 @@ if (moved) {
   );
 }
 
+// --- heat agrees with raw ---------------------------------------------------
+const lastTick = updates[updates.length - 1].tick;
+const heat = JSON.parse(sim.updatesHeatJson(firstTick, lastTick + 1));
+expect(
+  Array.isArray(heat.phases) && heat.phases[0] === "boundary",
+  "heat carries a phase legend",
+);
+
+const rawPerCell = new Map(); // "tick|x,y,z" -> {n, nb, sh, ph}
+for (const u of updates) {
+  const key = `${u.tick}|${u.pos.join(",")}`;
+  let e = rawPerCell.get(key);
+  if (!e) rawPerCell.set(key, (e = { n: 0, nb: 0, sh: 0, ph: new Map() }));
+  e.n++;
+  if (u.kind === "neighbor") e.nb++;
+  else e.sh++;
+  e.ph.set(u.phase, (e.ph.get(u.phase) ?? 0) + 1);
+}
+
+let heatCells = 0;
+let countsMatch = true;
+let splitsMatch = true;
+let phasesMatch = true;
+let totalsMatch = true;
+for (const t of heat.ticks) {
+  let tickSum = 0;
+  for (const c of t.cells) {
+    heatCells++;
+    tickSum += c.n;
+    const raw = rawPerCell.get(`${t.tick}|${c.p.join(",")}`);
+    if (!raw) {
+      countsMatch = false;
+      continue;
+    }
+    if (raw.n !== c.n) countsMatch = false;
+    if (raw.nb !== c.nb || raw.sh !== c.sh || c.nb + c.sh !== c.n) splitsMatch = false;
+    for (const [phaseName, n] of raw.ph) {
+      if (c.ph[heat.phases.indexOf(phaseName)] !== n) phasesMatch = false;
+    }
+  }
+  if (tickSum !== t.total) totalsMatch = false;
+}
+expect(heatCells === rawPerCell.size, `heat has one row per (tick, cell) — ${heatCells}`);
+expect(countsMatch, "heat cell counts match the raw log");
+expect(splitsMatch, "heat neighbour/shape split matches and sums to the total");
+expect(phasesMatch, "heat phase breakdown matches the raw log");
+expect(totalsMatch, "each heat tick's total is the sum of its cells");
+
+// --- wave expands back to raw ----------------------------------------------
+const busiest = heat.ticks.reduce((a, b) => (b.total > a.total ? b : a));
+const wave = JSON.parse(sim.updatesWaveJson(busiest.tick));
+const rawTick = updates.filter((u) => u.tick === busiest.tick);
+expect(wave.n === rawTick.length, `wave holds the whole tick (${wave.n})`);
+expect(
+  wave.pos.length === wave.n * 3 &&
+    wave.kind.length === wave.n &&
+    wave.phase.length === wave.n &&
+    wave.from.length === wave.n &&
+    wave.state.length === wave.n,
+  "wave arrays are parallel and correctly sized",
+);
+
+// seq is the array index, so index i must be raw delivery i of that tick.
+let waveMatches = true;
+for (let i = 0; i < wave.n; i++) {
+  const raw = rawTick[i];
+  if (
+    wave.pos[i * 3] !== raw.pos[0] ||
+    wave.pos[i * 3 + 1] !== raw.pos[1] ||
+    wave.pos[i * 3 + 2] !== raw.pos[2] ||
+    wave.kinds[wave.kind[i]] !== raw.kind ||
+    wave.phases[wave.phase[i]] !== raw.phase ||
+    wave.dirs[wave.from[i]] !== raw.from ||
+    wave.states[wave.state[i]] !== raw.state
+  ) {
+    waveMatches = false;
+    break;
+  }
+}
+expect(waveMatches, "wave expands cell-for-cell back to the raw log");
+expect(
+  wave.states.length < wave.n / 10,
+  `wave dedupes states hard (${wave.states.length} distinct across ${wave.n})`,
+);
+
 // --- turning it back off ----------------------------------------------------
 sim.recordUpdates(false);
 expect(sim.updatesCount() === 0, "recordUpdates(false) drops the log");

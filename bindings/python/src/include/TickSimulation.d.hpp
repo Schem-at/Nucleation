@@ -186,6 +186,29 @@ public:
   template<typename W>
   inline void updates_json_between_write(uint32_t from_tick, uint32_t to_tick, W& writeable_output) const;
 
+  /**
+   * Per-tick, per-cell update counts for ticks in `[from_tick, to_tick)`.
+   *
+   * The resolution playback should run at: `{phases, ticks:[{tick, total,
+   * cells:[{p:[x,y,z], n, nb, sh, ph:[…]}]}]}`, where `nb`/`sh` split
+   * neighbour from shape and `ph` indexes the `phases` legend. Collapses
+   * a tick's tens of thousands of updates into a few hundred cells.
+   */
+  inline std::string updates_heat_json(uint32_t from_tick, uint32_t to_tick) const;
+  template<typename W>
+  inline void updates_heat_json_write(uint32_t from_tick, uint32_t to_tick, W& writeable_output) const;
+
+  /**
+   * One tick's updates in delivery order, as parallel arrays.
+   *
+   * For stepping *within* a tick: `seq` is the array index, `pos` is flat
+   * x,y,z triples, `kind`/`phase`/`from` are integer codes with legends
+   * in the payload, and `state` indexes a deduplicated `states` table.
+   */
+  inline std::string updates_wave_json(uint32_t tick) const;
+  template<typename W>
+  inline void updates_wave_json_write(uint32_t tick, W& writeable_output) const;
+
   inline std::string changes_json() const;
   template<typename W>
   inline void changes_json_write(W& writeable_output) const;

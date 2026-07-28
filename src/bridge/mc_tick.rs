@@ -131,6 +131,153 @@ fn updates_json_range(sim: &mc_tick::Simulation, from: u64, to: u64) -> String {
     json
 }
 
+/// The phase legend shared by the compact update views: index 0 is a boundary
+/// dispatch (outside the phase walk), then [`mc_tick::PHASE_ORDER`].
+fn phase_legend() -> Vec<&'static str> {
+    let mut names = vec!["boundary"];
+    names.extend(mc_tick::PHASE_ORDER.iter().map(|p| p.name()));
+    names
+}
+
+/// A record's index into [`phase_legend`].
+fn phase_code(update: &mc_tick::UpdateRecord) -> usize {
+    match update.phase {
+        None => 0,
+        Some(phase) => {
+            mc_tick::PHASE_ORDER.iter().position(|p| *p == phase).map_or(0, |i| i + 1)
+        }
+    }
+}
+
+/// A direction's index into [`mc_tick::ALL_DIRS`].
+fn dir_code(dir: mc_tick::Dir) -> usize {
+    mc_tick::ALL_DIRS.iter().position(|d| *d == dir).unwrap_or(0)
+}
+
+/// Per-tick, per-cell update counts — the resolution playback runs at.
+///
+/// The raw log is unusable for a UI: one tick of a 6x6 door is ~20k updates and
+/// megabytes of JSON, and twenty thousand individual flares are not legible
+/// anyway. Collapsing to "which cells lit up this tick, and how hot" turns that
+/// into a few hundred rows while keeping the two breakdowns worth colouring by.
+fn updates_heat_range(sim: &mc_tick::Simulation, from: u64, to: u64) -> String {
+    use std::collections::BTreeMap;
+    use std::fmt::Write as _;
+
+    let phases = phase_legend();
+    // BTreeMap so ticks and cells come out in a stable, sorted order.
+    let mut per_tick: BTreeMap<u64, BTreeMap<(i32, i32, i32), (u32, u32, u32, Vec<u32>)>> =
+        BTreeMap::new();
+    for update in sim.recorded_updates() {
+        if update.tick < from || update.tick >= to {
+            continue;
+        }
+        let cells = per_tick.entry(update.tick).or_default();
+        let cell = cells
+            .entry((update.pos.x, update.pos.y, update.pos.z))
+            .or_insert_with(|| (0, 0, 0, vec![0; phases.len()]));
+        cell.0 += 1;
+        match update.kind {
+            mc_tick::UpdateKind::Neighbor => cell.1 += 1,
+            mc_tick::UpdateKind::Shape => cell.2 += 1,
+        }
+        cell.3[phase_code(update)] += 1;
+    }
+
+    let mut json = String::from("{\"phases\":[");
+    for (i, name) in phases.iter().enumerate() {
+        let _ = write!(json, "{}\"{name}\"", if i > 0 { "," } else { "" });
+    }
+    json.push_str("],\"ticks\":[");
+    for (i, (tick, cells)) in per_tick.iter().enumerate() {
+        if i > 0 {
+            json.push(',');
+        }
+        let total: u32 = cells.values().map(|c| c.0).sum();
+        let _ = write!(json, "{{\"tick\":{tick},\"total\":{total},\"cells\":[");
+        for (j, ((x, y, z), (n, nb, sh, ph))) in cells.iter().enumerate() {
+            if j > 0 {
+                json.push(',');
+            }
+            let _ = write!(
+                json,
+                "{{\"p\":[{x},{y},{z}],\"n\":{n},\"nb\":{nb},\"sh\":{sh},\"ph\":["
+            );
+            for (k, count) in ph.iter().enumerate() {
+                let _ = write!(json, "{}{count}", if k > 0 { "," } else { "" });
+            }
+            json.push_str("]}");
+        }
+        json.push_str("]}");
+    }
+    json.push_str("]}");
+    json
+}
+
+/// One tick's updates in delivery order, as parallel arrays.
+///
+/// The wavefront resolution: everything the raw log has for a single tick, but
+/// without repeating a field name per record. `seq` is the array index; every
+/// small enum is an integer code with its legend in the payload; and the
+/// dispatch-time state is an index into a deduplicated table, which is where
+/// most of the saving comes from — a tick touches thousands of cells but only
+/// tens of distinct states.
+fn updates_wave(sim: &mc_tick::Simulation, tick: u64) -> String {
+    use std::collections::HashMap;
+    use std::fmt::Write as _;
+
+    let mut pos = String::new();
+    let mut kinds = String::new();
+    let mut phases_arr = String::new();
+    let mut froms = String::new();
+    let mut states_arr = String::new();
+    let mut table: Vec<&str> = Vec::new();
+    let mut seen: HashMap<mc_tick::StateId, usize> = HashMap::new();
+    let mut n = 0usize;
+
+    for update in sim.recorded_updates() {
+        if update.tick != tick {
+            continue;
+        }
+        let sep = if n > 0 { "," } else { "" };
+        let _ = write!(pos, "{sep}{},{},{}", update.pos.x, update.pos.y, update.pos.z);
+        let _ = write!(
+            kinds,
+            "{sep}{}",
+            match update.kind {
+                mc_tick::UpdateKind::Neighbor => 0,
+                mc_tick::UpdateKind::Shape => 1,
+            }
+        );
+        let _ = write!(phases_arr, "{sep}{}", phase_code(update));
+        let _ = write!(froms, "{sep}{}", dir_code(update.from));
+        let index = *seen.entry(update.state).or_insert_with(|| {
+            table.push(sim.registry().descriptor(update.state).unwrap_or("minecraft:air"));
+            table.len() - 1
+        });
+        let _ = write!(states_arr, "{sep}{index}");
+        n += 1;
+    }
+
+    let mut json = String::new();
+    let _ = write!(json, "{{\"tick\":{tick},\"n\":{n},\"pos\":[{pos}],\"kind\":[{kinds}],");
+    let _ = write!(json, "\"phase\":[{phases_arr}],\"from\":[{froms}],\"state\":[{states_arr}],");
+    json.push_str("\"states\":[");
+    for (i, descriptor) in table.iter().enumerate() {
+        let _ = write!(json, "{}\"{descriptor}\"", if i > 0 { "," } else { "" });
+    }
+    json.push_str("],\"phases\":[");
+    for (i, name) in phase_legend().iter().enumerate() {
+        let _ = write!(json, "{}\"{name}\"", if i > 0 { "," } else { "" });
+    }
+    json.push_str("],\"dirs\":[");
+    for (i, dir) in mc_tick::ALL_DIRS.iter().enumerate() {
+        let _ = write!(json, "{}\"{dir:?}\"", if i > 0 { "," } else { "" });
+    }
+    json.push_str("],\"kinds\":[\"neighbor\",\"shape\"]}");
+    json
+}
+
 /// The settle recipe, mirroring the engine's conformance harness.
 fn wire_simulation(
     structure: &mc_tick::Structure,
@@ -873,6 +1020,34 @@ pub mod ffi {
                 "{}",
                 super::updates_json_range(&self.sim, u64::from(from_tick), u64::from(to_tick))
             );
+        }
+
+        /// Per-tick, per-cell update counts for ticks in `[from_tick, to_tick)`.
+        ///
+        /// The resolution playback should run at: `{phases, ticks:[{tick, total,
+        /// cells:[{p:[x,y,z], n, nb, sh, ph:[…]}]}]}`, where `nb`/`sh` split
+        /// neighbour from shape and `ph` indexes the `phases` legend. Collapses
+        /// a tick's tens of thousands of updates into a few hundred cells.
+        pub fn updates_heat_json(
+            &self,
+            from_tick: u32,
+            to_tick: u32,
+            out: &mut DiplomatWrite,
+        ) {
+            let _ = write!(
+                out,
+                "{}",
+                super::updates_heat_range(&self.sim, u64::from(from_tick), u64::from(to_tick))
+            );
+        }
+
+        /// One tick's updates in delivery order, as parallel arrays.
+        ///
+        /// For stepping *within* a tick: `seq` is the array index, `pos` is flat
+        /// x,y,z triples, `kind`/`phase`/`from` are integer codes with legends
+        /// in the payload, and `state` indexes a deduplicated `states` table.
+        pub fn updates_wave_json(&self, tick: u32, out: &mut DiplomatWrite) {
+            let _ = write!(out, "{}", super::updates_wave(&self.sim, u64::from(tick)));
         }
 
         pub fn changes_json(&self, out: &mut DiplomatWrite) {

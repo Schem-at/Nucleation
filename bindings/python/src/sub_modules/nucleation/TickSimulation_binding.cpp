@@ -39,8 +39,10 @@ void add_TickSimulation_binding(nb::module_ mod) {
         .def("step", &nucleation::TickSimulation::step)
         .def("tick_count", &nucleation::TickSimulation::tick_count)
         .def("updates_count", &nucleation::TickSimulation::updates_count)
+        .def("updates_heat_json", &nucleation::TickSimulation::updates_heat_json, "from_tick"_a, "to_tick"_a)
         .def("updates_json", &nucleation::TickSimulation::updates_json)
         .def("updates_json_between", &nucleation::TickSimulation::updates_json_between, "from_tick"_a, "to_tick"_a)
+        .def("updates_wave_json", &nucleation::TickSimulation::updates_wave_json, "tick"_a)
         .def("use_block", &nucleation::TickSimulation::use_block, "x"_a, "y"_a, "z"_a)
         .def("world_snapshot_json", &nucleation::TickSimulation::world_snapshot_json);
 }

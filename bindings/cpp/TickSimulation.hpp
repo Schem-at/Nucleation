@@ -67,6 +67,10 @@ namespace capi {
 
     void TickSimulation_updates_json_between(const diplomat::capi::TickSimulation* self, uint32_t from_tick, uint32_t to_tick, diplomat::capi::DiplomatWrite* write);
 
+    void TickSimulation_updates_heat_json(const diplomat::capi::TickSimulation* self, uint32_t from_tick, uint32_t to_tick, diplomat::capi::DiplomatWrite* write);
+
+    void TickSimulation_updates_wave_json(const diplomat::capi::TickSimulation* self, uint32_t tick, diplomat::capi::DiplomatWrite* write);
+
     void TickSimulation_changes_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
 
     void TickSimulation_item_entities_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
@@ -298,6 +302,40 @@ inline void TickSimulation::updates_json_between_write(uint32_t from_tick, uint3
     diplomat::capi::TickSimulation_updates_json_between(this->AsFFI(),
         from_tick,
         to_tick,
+        &write);
+}
+
+inline std::string TickSimulation::updates_heat_json(uint32_t from_tick, uint32_t to_tick) const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::TickSimulation_updates_heat_json(this->AsFFI(),
+        from_tick,
+        to_tick,
+        &write);
+    return output;
+}
+template<typename W>
+inline void TickSimulation::updates_heat_json_write(uint32_t from_tick, uint32_t to_tick, W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::TickSimulation_updates_heat_json(this->AsFFI(),
+        from_tick,
+        to_tick,
+        &write);
+}
+
+inline std::string TickSimulation::updates_wave_json(uint32_t tick) const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::TickSimulation_updates_wave_json(this->AsFFI(),
+        tick,
+        &write);
+    return output;
+}
+template<typename W>
+inline void TickSimulation::updates_wave_json_write(uint32_t tick, W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::TickSimulation_updates_wave_json(this->AsFFI(),
+        tick,
         &write);
 }
 

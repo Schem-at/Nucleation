@@ -551,6 +551,8 @@ void TickSimulation_record_updates(TickSimulation* self, bool on);
 uint32_t TickSimulation_updates_count(TickSimulation* self);
 void TickSimulation_updates_json(TickSimulation* self, DiplomatWrite* write);
 void TickSimulation_updates_json_between(TickSimulation* self, uint32_t from_tick, uint32_t to_tick, DiplomatWrite* write);
+void TickSimulation_updates_heat_json(TickSimulation* self, uint32_t from_tick, uint32_t to_tick, DiplomatWrite* write);
+void TickSimulation_updates_wave_json(TickSimulation* self, uint32_t tick, DiplomatWrite* write);
 void TickSimulation_changes_json(TickSimulation* self, DiplomatWrite* write);
 void TickSimulation_item_entities_json(TickSimulation* self, DiplomatWrite* write);
 void TickSimulation_events_summary_json(TickSimulation* self, DiplomatWrite* write);

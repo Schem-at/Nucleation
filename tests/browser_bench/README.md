@@ -5,16 +5,23 @@ Verified in headless Chromium (main thread + module Web Worker), 2026-07-28.
 ## Build the package
 
 ```sh
-# best-performing artifact (+6% evals/sec, -0.5 MB):
-RUSTFLAGS='-C codegen-units=1' NUCLEATION_WASM_FEATURES=bridge,mc-tick \
+# What the apps actually need — mc-tick AND meshing:
+RUSTFLAGS='-C codegen-units=1' NUCLEATION_WASM_FEATURES=bridge,mc-tick,meshing \
     tools/package-npm.sh dist/npm-mctick
 ```
 
-`tools/package-npm.sh` now takes `NUCLEATION_WASM_FEATURES` (default is the
-published set `bridge,simulation,meshing`; add `mc-tick` for TickSimulation)
-and emits an isomorphic `diplomat.config.mjs` (`new URL("./nucleation.wasm",
+**Do not drop `meshing` from that list.** Both wasm apps render with
+nucleation's real mesher (`Schematic.create` + `MeshResult.create` →
+GLB → three.js); a package built `bridge,mc-tick` alone still loads, still
+simulates, and then fails only where a model is meshed — a silent break of
+door-cert's replay. The simulation-only artifact is ~11.0 MB and the one with
+meshing ~12.5 MB, so the size is also the tell.
+
+`tools/package-npm.sh` takes `NUCLEATION_WASM_FEATURES` (default is the
+published set `bridge,simulation,meshing`; `mc-tick` adds TickSimulation) and
+emits an isomorphic `diplomat.config.mjs` (`new URL("./nucleation.wasm",
 import.meta.url)`) that works in Node, the browser main thread, and workers.
-The `.wasm` is ~11 MB — serve it with `Content-Type: application/wasm` so
+Serve the `.wasm` with `Content-Type: application/wasm` so
 `instantiateStreaming` works (Vite does this out of the box for public/ files).
 
 ## Vite frontends
