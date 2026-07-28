@@ -16,6 +16,7 @@
 // left as holes.
 import type {
   Aperture,
+  ApertureGeometry,
   Classification,
   PatternCell,
   ReplayBlock,
@@ -33,7 +34,11 @@ const MAX_SPAN = 32;
 export function aperture(
   closed: ReplayBlock[],
   open: ReplayBlock[],
-): { aperture: Aperture; classification: Classification | null } | null {
+): {
+  aperture: Aperture;
+  classification: Classification | null;
+  geometry: ApertureGeometry | null;
+} | null {
   // A snapshot may omit air cells entirely, so absence means air and the
   // union of both key sets is the only safe domain to compare over.
   const closedMap = new Map(closed.map((b) => [posKey(b.pos), b]));
@@ -428,6 +433,27 @@ export function aperture(
   const sillRow = vertical ? loR : hiR;
   const sillIds = collect((a, b) => b === sillRow && a >= loC && a <= hiC, vacant, layers);
 
+  // 9. The cells the timing is taken over, in world coordinates. `passage` is
+  //    what "walkable" means — air at every layer of the wall once open — and
+  //    `closedCells` is the subset of it the door blocks actually fill when
+  //    shut. Timing the second set rather than the first is the only way a
+  //    sissy bar or a checkerboard ever reads as closed, because most of its
+  //    doorway is air in both states.
+  let geometry: ApertureGeometry | null = null;
+  if (passage) {
+    const passageCells: Vec3[] = [];
+    const closedCells: Vec3[] = [];
+    for (const key of passage.set) {
+      const [a, b] = parse(key);
+      for (let layer = lo; layer <= hi; layer++) {
+        const p = at(a, b, layer);
+        passageCells.push(p);
+        if (solidIn(filled, p)) closedCells.push(p);
+      }
+    }
+    geometry = { passage: passageCells, closed: closedCells, restIsClosed: shut };
+  }
+
   const classification =
     cellList.length > 0 && m >= 1 && n >= 1 && m <= MAX_SPAN && n <= MAX_SPAN
       ? classify({
@@ -442,5 +468,5 @@ export function aperture(
         })
       : null;
 
-  return { aperture: doorway, classification };
+  return { aperture: doorway, classification, geometry };
 }

@@ -9,6 +9,7 @@ import type {
   Material,
   ReplayBlock,
   ReplayChange,
+  ResetTime,
   TickEvents,
   Vec3,
   WorkerJob,
@@ -17,11 +18,19 @@ import type {
 import { aperture } from "../lib/aperture";
 
 const SEED = 12345n;
+/** How far the reset search walks before giving up and saying so. */
+const RESET_CAP = 200;
+/** Ticks allowed for a trial to go quiet again. */
+const SETTLE_BUDGET = 400;
+/** Wall-clock guard on the reset search, so a pathological door reports
+ *  "not found within N tried" instead of hanging the worker. */
+const RESET_BUDGET_MS = 25_000;
 
 const post = (m: WorkerMessage) => (self as unknown as Worker).postMessage(m);
 const progress = (step: string) => post({ type: "progress", step });
 
 const baseName = (state: string) => state.split("[", 1)[0];
+const isAir = (state: string) => baseName(state).endsWith("air");
 const posKey = (p: Vec3) => `${p[0]},${p[1]},${p[2]}`;
 
 /** Cells that differ between two snapshot keys — the size of a stroke. */
@@ -41,23 +50,53 @@ function snapshotKey(blocks: ReplayBlock[]): string {
     .join("\n");
 }
 
-/** First and last tick carrying a block change in [from, to), ignoring the
- * lever cell itself — clicking it is the stimulus, not a response. */
-function windowSpan(
+/** A question asked of the running world after every tick of a stroke. */
+type Probe = { key: string; test: () => boolean };
+
+/** Replay a slice of the recorded change log forward over a running world and
+ *  report the elapsed tick at which each probe first holds.
+ *
+ *  Replayed rather than re-simulated: the log already carries every write the
+ *  engine made, so walking it costs nothing and reads the doorway at exactly
+ *  the tick it cleared instead of at the tick the machine stopped fidgeting.
+ *
+ *  Elapsed counting: `useBlock` is a boundary action — it fires between level
+ *  ticks, so the writes it causes directly (the lever, and whatever redstone
+ *  propagation reaches on the spot) happen with no tick having run and count
+ *  as 0. Everything after is `tick - clickTick + 1`, which is the number of
+ *  game ticks that had to run. That is also what the activity chart calls
+ *  "quiet at t=N · N ticks", so the two now agree by construction. */
+function replayStroke(
+  world: Map<string, string>,
   changes: ReplayChange[],
   from: number,
   to: number,
+  boundary: number,
+  clickTick: number,
   leverKey: string,
-): { first: number | null; last: number | null } {
-  let first: number | null = null;
-  let last: number | null = null;
-  for (const c of changes) {
-    if (c.tick < from || c.tick >= to) continue;
-    if (posKey(c.pos) === leverKey) continue;
-    if (first === null || c.tick < first) first = c.tick;
-    if (last === null || c.tick > last) last = c.tick;
+  probes: Probe[],
+): { hits: Map<string, number>; latency: number | null } {
+  const hits = new Map<string, number>();
+  const check = (elapsed: number) => {
+    for (const p of probes) if (!hits.has(p.key) && p.test()) hits.set(p.key, elapsed);
+  };
+  const elapsedOf = (i: number) => (i < boundary ? 0 : changes[i].tick - clickTick + 1);
+  let latency: number | null = null;
+  check(0);
+  let i = from;
+  while (i < to) {
+    const e = elapsedOf(i);
+    while (i < to && elapsedOf(i) === e) {
+      const c = changes[i];
+      const key = posKey(c.pos);
+      if (isAir(c.to)) world.delete(key);
+      else world.set(key, c.to);
+      if (latency === null && key !== leverKey) latency = e;
+      i++;
+    }
+    check(e);
   }
-  return { first, last };
+  return { hits, latency };
 }
 
 /** Parts census, taken from the door at rest. */
@@ -156,21 +195,48 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
 
   const leverKey = posKey(lever.pos);
   type Cycle = {
+    /** Checkpoint of the world the cycle starts from — the base every reset
+     *  trial is restored to. */
+    cp: number;
     tOpen: number;
     tClose: number;
+    /** Change-log lengths: at each click, immediately after it (so the
+     *  boundary writes can be told from the first tick's), and at the end. */
+    iOpen: number;
+    iOpenPost: number;
+    iClose: number;
+    iClosePost: number;
+    iEnd: number;
     openBlocks: ReplayBlock[];
     endBlocks: ReplayBlock[];
   };
   const runCycle = (): Cycle => {
+    const cp: number = sim.checkpoint();
     const tOpen: number = sim.tickCount();
+    const iOpen: number = sim.changesCount();
     sim.useBlock(lx, ly, lz);
+    const iOpenPost: number = sim.changesCount();
     sim.runUntilQuiescent(300);
     const openBlocks: ReplayBlock[] = JSON.parse(sim.worldSnapshotJson());
     const tClose: number = sim.tickCount();
+    const iClose: number = sim.changesCount();
     sim.useBlock(lx, ly, lz);
+    const iClosePost: number = sim.changesCount();
     sim.runUntilQuiescent(300);
     const endBlocks: ReplayBlock[] = JSON.parse(sim.worldSnapshotJson());
-    return { tOpen, tClose, openBlocks, endBlocks };
+    const iEnd: number = sim.changesCount();
+    return {
+      cp,
+      tOpen,
+      tClose,
+      iOpen,
+      iOpenPost,
+      iClose,
+      iClosePost,
+      iEnd,
+      openBlocks,
+      endBlocks,
+    };
   };
 
   // -- measuring ----------------------------------------------------------
@@ -178,11 +244,6 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
   let restBlocks: ReplayBlock[] = JSON.parse(sim.worldSnapshotJson());
   let restKey = snapshotKey(restBlocks);
   const savedRest = restBlocks;
-  let tRebase: number = sim.tickCount();
-  // The change log is cumulative and already holds the placement writes, so
-  // the measured cycle is everything appended from here on — a count, not a
-  // tick filter, because settling can complete without advancing the clock.
-  let logBase: number = (JSON.parse(sim.changesJson()) as ReplayChange[]).length;
   let cycle = runCycle();
   // A door saved off its own cycle has to be run onto it before anything
   // measured means much, and one lap is not always enough: a 4x4 vault saved
@@ -195,10 +256,14 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
     primingCycles++;
     restBlocks = cycle.endBlocks;
     restKey = snapshotKey(restBlocks);
-    tRebase = sim.tickCount();
-    logBase = (JSON.parse(sim.changesJson()) as ReplayChange[]).length;
     cycle = runCycle();
   }
+  // The change log is cumulative and already holds the placement writes, so
+  // the measured cycle is everything appended from the last cycle's first
+  // click on — a count, not a tick filter, because settling can complete
+  // without advancing the clock.
+  const tRebase = cycle.tOpen;
+  const logBase = cycle.iOpen;
   const neededPriming = primingCycles > 0;
   // How far the saved state sits from the cycle the machine actually runs.
   // Reported, never hidden: a schematic that does not reproduce its own
@@ -212,14 +277,8 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
   ).slice(logBase);
   const endTick: number = sim.tickCount();
 
-  const openSpan = windowSpan(allChanges, cycle.tOpen, cycle.tClose, leverKey);
-  if (openSpan.last === null) throw new Error("lever click caused no block changes");
-  const openTicks = openSpan.last - cycle.tOpen;
-  const openLatency = openSpan.first! - cycle.tOpen;
-
-  const closeSpan = windowSpan(allChanges, cycle.tClose, Infinity, leverKey);
-  const closeTicks = closeSpan.last !== null ? closeSpan.last - cycle.tClose : 0;
-  const closeLatency = closeSpan.first !== null ? closeSpan.first - cycle.tClose : 0;
+  if (allChanges.every((c) => posKey(c.pos) === leverKey))
+    throw new Error("lever click caused no block changes");
 
   const verdict = snapshotKey(cycle.endBlocks) === restKey ? "CERTIFIED" : "DID NOT RESET";
 
@@ -233,8 +292,210 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
   progress("classifying");
   const analysis = aperture(restBlocks, cycle.openBlocks);
   const doorway = analysis?.aperture ?? null;
+  const geo = analysis?.geometry ?? null;
   const parts = census(restBlocks);
-  const cycleTicks = openTicks + closeTicks;
+
+  // -- doorway timing -----------------------------------------------------
+  // The old open/close numbers were the last tick carrying ANY change, which
+  // is when the machine goes quiet, not when the door opened. A door whose
+  // panels clear in 8 ticks and whose tape shuffles for another 12 reported
+  // 20. Now that the passage is known cell by cell, both are measured off it:
+  //   open  — the first tick at which every passage cell is air.
+  //   close — the first tick at which every cell the pattern fills when shut
+  //           is solid again. Not "the passage is full": a sissy bar or a
+  //           checkerboard never fills its own doorway and never would.
+  // Settle is kept, under its own name, because the gap between the two is a
+  // real property of a door.
+  const world = new Map<string, string>();
+  for (const b of restBlocks) world.set(posKey(b.pos), b.state);
+  const solid = (k: string) => {
+    const s = world.get(k);
+    return s !== undefined && !isAir(s);
+  };
+  const passageKeys = geo ? geo.passage.map(posKey) : [];
+  const patternKeys = geo ? geo.closed.map(posKey) : [];
+  const probes = (): Probe[] =>
+    geo
+      ? [
+          { key: "clear", test: () => passageKeys.every((k) => !solid(k)) },
+          { key: "shut", test: () => patternKeys.every((k) => solid(k)) },
+        ]
+      : [];
+
+  const rel = (i: number) => i - logBase;
+  const strokeA = replayStroke(
+    world,
+    allChanges,
+    0,
+    rel(cycle.iClose),
+    rel(cycle.iOpenPost),
+    cycle.tOpen,
+    leverKey,
+    probes(),
+  );
+  const strokeB = replayStroke(
+    world,
+    allChanges,
+    rel(cycle.iClose),
+    rel(cycle.iEnd),
+    rel(cycle.iClosePost),
+    cycle.tClose,
+    leverKey,
+    probes(),
+  );
+
+  // A file saved with the door already standing open measures its own closing
+  // first, so the two strokes swap. `aperture()` knows which snapshot holds
+  // the door blocks; take the answer from there rather than assuming.
+  const restIsClosed = geo?.restIsClosed ?? true;
+  const openStroke = restIsClosed ? strokeA : strokeB;
+  const closeStroke = restIsClosed ? strokeB : strokeA;
+  const openTicks = openStroke.hits.get("clear") ?? null;
+  const closeTicks = closeStroke.hits.get("shut") ?? null;
+  const openLatency = openStroke.latency;
+  const closeLatency = closeStroke.latency;
+
+  // Settle, read off the same per-tick series the activity chart draws, so
+  // the "quiet at t=N" marker and this number cannot drift apart.
+  const summary: TickEvents[] = JSON.parse(sim.eventsSummaryJson());
+  const settleOf = (from: number, to: number): number | null => {
+    let last = -1;
+    for (const r of summary) {
+      if (r.tick < from || r.tick >= to) continue;
+      // The engine omits series it does not report, so every term is
+      // defaulted — the chart does the same, and one NaN here would silently
+      // erase the whole stat.
+      if ((r.piston ?? 0) + (r.redstone ?? 0) + (r.items ?? 0) > 0) last = r.tick;
+    }
+    return last < 0 ? null : last + 1 - from;
+  };
+  const settleA = settleOf(cycle.tOpen, cycle.tClose);
+  const settleB = settleOf(cycle.tClose, Infinity);
+  const openSettle = restIsClosed ? settleA : settleB;
+  const closeSettle = restIsClosed ? settleB : settleA;
+
+  const timingNotes: string[] = [];
+  if (!geo)
+    timingNotes.push(
+      "no walkable passage was extracted, so the doorway could not be timed",
+    );
+  else {
+    if (openTicks === null)
+      timingNotes.push("the passage never fully cleared on the opening stroke");
+    if (closeTicks === null)
+      timingNotes.push("the pattern never fully re-filled on the closing stroke");
+  }
+  const timingNote = timingNotes.length ? timingNotes.join("; ") : null;
+
+  // -- reset time ---------------------------------------------------------
+  // Purplers' algorithm: there is no closed form, so it is measured. From the
+  // state the cycle starts in, click the lever, wait X ticks, click it back,
+  // let the machine settle, and ask whether the world is exactly where it
+  // started. The smallest X that works is the reset time.
+  //
+  // One extra condition, which the bare algorithm needs: the door must
+  // actually have completed the stroke somewhere in the trial. Without it
+  // X = 0 passes for every door on earth — two clicks in the same instant
+  // cancel, nothing runs, and the world trivially matches. With it, a reset
+  // shorter than the stroke means the machine took the re-trigger MID-stroke
+  // and finished anyway, which is exactly the rare property section 2b is
+  // after.
+  progress("reset");
+  const cellSolid = (p: Vec3) => !isAir(sim.getBlock(p[0], p[1], p[2]));
+  const searchReset = (
+    cp: number,
+    base: string,
+    reached: () => boolean,
+  ): { ticks: number | null; searched: number } => {
+    const deadline = Date.now() + RESET_BUDGET_MS;
+    let searched = 0;
+    for (let x = 0; x <= RESET_CAP; x++) {
+      searched = x;
+      sim.restore(cp);
+      let done = false;
+      const watch = () => {
+        if (!done && reached()) done = true;
+      };
+      sim.useBlock(lx, ly, lz);
+      watch();
+      for (let i = 0; i < x; i++) {
+        sim.step();
+        watch();
+      }
+      sim.useBlock(lx, ly, lz);
+      watch();
+      for (let i = 0; i < SETTLE_BUDGET && !sim.isQuiescent(); i++) {
+        sim.step();
+        watch();
+      }
+      // The snapshot is the expensive half of a trial, so it is only taken
+      // once the cheap condition has already passed.
+      if (done && sim.worldSnapshotJson() === base) return { ticks: x, searched: x };
+      if (Date.now() > deadline) break;
+    }
+    return { ticks: null, searched };
+  };
+
+  let resetRest: ResetTime | null = null;
+  let resetOther: ResetTime | null = null;
+  const resetSkip =
+    !geo
+      ? "not measured — there is no passage to check the stroke against"
+      : verdict !== "CERTIFIED"
+        ? "not measured — the door does not return to its own resting state"
+        : null;
+  if (!resetSkip && geo) {
+    const clearNow = () => geo.passage.every((p) => !cellSolid(p));
+    const shutNow = () => geo.closed.every((p) => cellSolid(p));
+    // From the resting state the first click runs one stroke; from the state
+    // it settles into, the other. Which is which follows `restIsClosed`.
+    sim.restore(cycle.cp);
+    const restSnap: string = sim.worldSnapshotJson();
+    const a = searchReset(cycle.cp, restSnap, restIsClosed ? clearNow : shutNow);
+
+    sim.restore(cycle.cp);
+    sim.useBlock(lx, ly, lz);
+    sim.runUntilQuiescent(SETTLE_BUDGET);
+    const cpOther: number = sim.checkpoint();
+    const otherSnap: string = sim.worldSnapshotJson();
+    const b = searchReset(cpOther, otherSnap, restIsClosed ? shutNow : clearNow);
+
+    const wrap = (
+      r: { ticks: number | null; searched: number },
+      stroke: number | null,
+    ): ResetTime => ({
+      ticks: r.ticks,
+      searched: r.searched,
+      stroke_ticks: stroke,
+      negative: r.ticks !== null && stroke !== null && r.ticks < stroke,
+      note:
+        r.ticks === null
+          ? `no delay up to ${r.searched} ticks brought the door back to this state`
+          : null,
+    });
+    resetRest = wrap(a, restIsClosed ? openTicks : closeTicks);
+    resetOther = wrap(b, restIsClosed ? closeTicks : openTicks);
+  }
+  const blankReset = (): ResetTime => ({
+    ticks: null,
+    searched: 0,
+    stroke_ticks: null,
+    negative: false,
+    note: resetSkip,
+  });
+  const resetOpen = restIsClosed ? resetRest : resetOther;
+  const resetClose = restIsClosed ? resetOther : resetRest;
+
+  // The true safe re-trigger period is the pair of reset times, not the pair
+  // of stroke times: a door can open in 8 ticks and still refuse the lever
+  // for 40. Fall back to the doorway cycle only when the resets are unknown.
+  const doorwayCycle =
+    openTicks !== null && closeTicks !== null ? openTicks + closeTicks : null;
+  const resetCycle =
+    resetOpen?.ticks != null && resetClose?.ticks != null
+      ? resetOpen.ticks + resetClose.ticks
+      : null;
+  const cycleTicks = resetCycle ?? doorwayCycle ?? (openSettle ?? 0) + (closeSettle ?? 0);
   const cyclesPerMinute = cycleTicks > 0 ? 1200 / cycleTicks : 0;
 
 
@@ -245,12 +506,22 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
   const changes: ReplayChange[] = allChanges
     .filter((c) => c.tick >= tRebase)
     .map((c) => ({ ...c, tick: c.tick - tRebase }));
+  // Labelled by effect, not by lever position: a file saved with its door
+  // standing open has its first click CLOSE the thing, and calling that
+  // "opens" would make every annotation on the replay a lie.
   const flips: LeverFlip[] = [
-    { tick: cycle.tOpen - tRebase, label: "lever on", measured: true },
-    { tick: cycle.tClose - tRebase, label: "lever off", measured: true },
+    {
+      tick: cycle.tOpen - tRebase,
+      label: restIsClosed ? "lever thrown — opens" : "lever thrown — closes",
+      measured: true,
+    },
+    {
+      tick: cycle.tClose - tRebase,
+      label: restIsClosed ? "lever back — closes" : "lever back — opens",
+      measured: true,
+    },
   ];
 
-  const summary: TickEvents[] = JSON.parse(sim.eventsSummaryJson());
   const byTick = new Map(
     summary.filter((r) => r.tick >= tRebase).map((r) => [r.tick - tRebase, r]),
   );
@@ -322,8 +593,13 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
       lever: [lx, ly, lz] as Vec3,
       open_ticks: openTicks,
       close_ticks: closeTicks,
+      open_settle_ticks: openSettle,
+      close_settle_ticks: closeSettle,
+      timing_note: timingNote,
       open_latency: openLatency,
       close_latency: closeLatency,
+      reset_open: resetOpen ?? blankReset(),
+      reset_close: resetClose ?? blankReset(),
       materials,
       events_per_tick: eventsPerTick,
       heatmap: { w, h, values },
@@ -343,6 +619,7 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
       needed_priming: neededPriming,
       priming_cycles: primingCycles,
       saved_state_drift: savedStateDrift,
+      rest_is_closed: restIsClosed,
     },
     replay: { blocks: restBlocks, changes, simTicks, flips },
   };

@@ -27,6 +27,23 @@ export type Aperture = {
   note?: string | null;
 };
 
+/** The cells the doorway timing is measured over, in world coordinates.
+ *  `aperture()` already knows both of these exactly; timing them is the whole
+ *  point of extracting them. */
+export type ApertureGeometry = {
+  /** Every cell of the walkable passage, across the wall's full depth. The
+   *  door is OPEN when all of these are air. */
+  passage: Vec3[];
+  /** The passage cells that hold a door block in the closed reference state —
+   *  the pattern, not the passage. The door is SHUT when all of these are
+   *  solid again; a sissy bar or a checkerboard never fills the rest. */
+  closed: Vec3[];
+  /** True when the first snapshot handed to `aperture()` is the closed one,
+   *  i.e. the first lever click opens the door. A file saved open measures
+   *  its own closing first, and the strokes swap. */
+  restIsClosed: boolean;
+};
+
 /** One door block, in the standard's matrix coordinates: row counted down
  *  from the top of the pattern, column left to right, layer front to back. */
 export type PatternCell = { r: number; c: number; k: number; id: string };
@@ -91,15 +108,48 @@ export type Census = {
   honey_block: number;
 };
 
+/** Purplers' reset measurement: the shortest delay after a lever click that
+ *  still lets the input be used again without breaking the machine. There is
+ *  no closed form — every value here comes from a trial. */
+export type ResetTime = {
+  /** Shortest delay that worked, in ticks. Null when nothing under `searched`
+   *  did — reported as such rather than guessed at. */
+  ticks: number | null;
+  /** How far the search actually went, so a null is honest about its reach. */
+  searched: number;
+  /** The stroke this reset re-triggers into, for the comparison below. */
+  stroke_ticks: number | null;
+  /** True when the reset lands before the stroke it interrupts has finished:
+   *  the input can be used again mid-stroke. Rare. */
+  negative: boolean;
+  /** Set when the measurement was skipped or qualified. */
+  note: string | null;
+};
+
 export type Certificate = {
   name: string;
   dims: [number, number, number];
   lever: [number, number, number];
-  open_ticks: number;
-  close_ticks: number;
+  /** Ticks from the click until every passage cell is clear — the doorway is
+   *  walkable. Null when the passage never fully cleared. */
+  open_ticks: number | null;
+  /** Ticks from the click until every cell of the closed pattern is solid
+   *  again. Null when the doorway never fully re-filled. */
+  close_ticks: number | null;
+  /** Ticks from the click until the whole machine goes quiet. Always >= the
+   *  doorway time above: the tape can still be shuffling long after you can
+   *  walk through. This is the number the certificate used to call "opens in". */
+  open_settle_ticks: number | null;
+  close_settle_ticks: number | null;
+  /** Set when a doorway time is missing, saying why. */
+  timing_note: string | null;
   /** Ticks from the lever click to the first block that moves. */
-  open_latency: number;
-  close_latency: number;
+  open_latency: number | null;
+  close_latency: number | null;
+  /** Shortest wait after the opening click before the lever may be thrown
+   *  back, and the same after the closing click. */
+  reset_open: ResetTime | null;
+  reset_close: ResetTime | null;
   materials: Material[];
   events_per_tick: TickEvents[];
   heatmap: { w: number; h: number; values: number[][] };
@@ -133,6 +183,9 @@ export type Certificate = {
   priming_cycles: number;
   /** Cells between the saved state and the cycle it settles into. */
   saved_state_drift: number;
+  /** False when the file was saved with its doorway already standing open —
+   *  the first lever click then closes it, and the two strokes swap. */
+  rest_is_closed: boolean;
 };
 
 export type Vec3 = [number, number, number];

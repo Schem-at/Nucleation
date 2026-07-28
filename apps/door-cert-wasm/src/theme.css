@@ -301,6 +301,9 @@ button { font: inherit; color: inherit; }
   justify-content: space-between;
   flex-wrap: wrap;
 }
+/* The prose column shrinks rather than shoving the seal onto its own line —
+ * a fourth fact in the dims row must not cost the stamp its place. */
+.hero-main { flex: 1 1 440px; min-width: 0; }
 .hero h1 {
   font-weight: 800;
   font-size: clamp(32px, 5vw, 50px);
@@ -899,6 +902,10 @@ button { font: inherit; color: inherit; }
 
 /* seal variant for a failed verdict */
 .seal.seal-fail text { fill: var(--muted); }
+
+/* A note worth stopping on — a negative reset, not a caveat. */
+.hero-note.note-flag { border-left-color: var(--accent); }
+.hero-note.note-flag .badge { margin-right: 6px; vertical-align: 1px; }
 
 /* Priming clause: a fact about how the file was saved, not a fault. */
 .hero-note {

@@ -5,7 +5,10 @@
 import type { ReactNode } from "react";
 import type { Verdict } from "../lib/types";
 
-export function Seal({ openTicks, verdict }: { openTicks: number; verdict: Verdict }) {
+/** `openTicks` is the doorway time — the tick the passage becomes walkable,
+ *  not the tick the machine goes quiet. Null when the passage never cleared,
+ *  which the seal says outright rather than quoting the settle time instead. */
+export function Seal({ openTicks, verdict }: { openTicks: number | null; verdict: Verdict }) {
   const size = 190;
   const c = size / 2;
   const ok = verdict === "CERTIFIED";
@@ -21,7 +24,8 @@ export function Seal({ openTicks, verdict }: { openTicks: number; verdict: Verdi
       <rect key={i} x={x} y={y} width={px} height={px} fill={ok ? "var(--accent)" : "var(--alarm)"} />,
     );
   }
-  const seconds = (openTicks / 20).toFixed(2);
+  const timed = openTicks !== null;
+  const seconds = timed ? (openTicks / 20).toFixed(2) : null;
   const rText = 62;
   const ring = ok ? "var(--accent)" : "var(--alarm)";
   const ink = ok ? "var(--accent-ink)" : "var(--alarm-ink)";
@@ -33,9 +37,11 @@ export function Seal({ openTicks, verdict }: { openTicks: number; verdict: Verdi
       viewBox={`0 0 ${size} ${size}`}
       role="img"
       aria-label={
-        ok
-          ? `Certified: opens in ${openTicks} ticks (${seconds} seconds)`
-          : `Not certified: door did not reset after its cycle`
+        !ok
+          ? `Not certified: door did not reset after its cycle`
+          : timed
+            ? `Certified: the doorway is walkable ${openTicks} ticks after the lever (${seconds} seconds)`
+            : `Certified: the passage never fully cleared, so no opening time was measured`
       }
     >
       {teeth}
@@ -55,13 +61,20 @@ export function Seal({ openTicks, verdict }: { openTicks: number; verdict: Verdi
         </textPath>
       </text>
       <text x={c} y={c - 22} textAnchor="middle" fontSize="9" letterSpacing="1.5" fill={ink}>
-        OPENS IN
+        WALKABLE IN
       </text>
-      <text x={c} y={c + 16} textAnchor="middle" fontSize="42" fontWeight="700" fill={ink}>
-        {openTicks}
+      <text
+        x={c}
+        y={c + 16}
+        textAnchor="middle"
+        fontSize={timed ? 42 : 26}
+        fontWeight="700"
+        fill={ink}
+      >
+        {timed ? openTicks : "n/a"}
       </text>
       <text x={c} y={c + 30} textAnchor="middle" fontSize="8" letterSpacing="0.8" fill={ink}>
-        TICKS · {seconds} S
+        {timed ? `TICKS · ${seconds} S` : "PASSAGE NEVER CLEARED"}
       </text>
     </svg>
   );
