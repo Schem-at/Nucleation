@@ -1,3 +1,5 @@
+import type { XrayData } from "./xray";
+
 export type TickEvents = {
   tick: number;
   piston: number;
@@ -206,7 +208,11 @@ export type CertRecord = { certificate: Certificate; replay: Replay };
 
 /** Worker → page protocol. */
 export type WorkerProgress = { type: "progress"; step: string };
-export type WorkerDone = { type: "done"; record: CertRecord };
+/** `xray` travels beside the record rather than inside it: it is ~1.5 MB of
+ *  transferable typed arrays, which neither `JSON.stringify` nor a
+ *  localStorage quota survives. The certificate persists; the x-ray is a
+ *  this-session artefact and says so when it is missing. */
+export type WorkerDone = { type: "done"; record: CertRecord; xray: XrayData | null };
 export type WorkerError = { type: "error"; error: string };
 export type WorkerMessage = WorkerProgress | WorkerDone | WorkerError;
 

@@ -123,7 +123,7 @@ different kind of problem and probably out of scope; a mob used as a redstone
 component is usually stationary — a pressure-plate weight or a comparator-read
 container — which may be tractable without real AI).
 
-## 6. X-ray / propagation view
+## 6. X-ray / propagation view — BUILT
 
 **Nano: "an X-ray view for both redstone updates and just events, so you can see
 things propagate through the door, even on the subtick — for example see the
@@ -149,6 +149,23 @@ Design sketch:
 
 This is the most differentiated feature on the list. Everything else measures a
 door; this one *explains* it.
+
+**Shipped** as a mode on the existing replay (`src/components/MeshReplay.tsx`,
+`src/lib/xray.ts`, recorded in `certify.worker.ts`), verified by
+`scripts/verify-xray.mjs`. Notes worth keeping:
+
+- The engine's `updatesHeatJson` / `updatesWaveJson` are the drawable views;
+  the raw `updatesJson` (15.8 MB per 6x6 cycle) is never fetched. A whole
+  cycle is 0.88 MB of heat + 1.85 MB of waves, packed to ~1.5 MB of typed
+  arrays and transferred, not copied.
+- `record_updates(false)` **drops** the log. Read the JSON before switching
+  the recorder off.
+- Four tick phases fire in a door, and four categorical hues cannot pass the
+  all-pairs colour-vision gate — so the fourth (`boundary`, the out-of-tick
+  lever action) is drawn as a hueless wireframe cage instead of a fifth
+  colour. See the note in `lib/xray.ts`.
+- Flares are opaque depth-tested marks, not glow: additive clips a five-deep
+  build to white and max-blending invents hues at overlaps.
 
 ---
 

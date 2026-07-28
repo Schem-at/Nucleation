@@ -16,6 +16,7 @@ import type {
   WorkerMessage,
 } from "../lib/types";
 import { aperture } from "../lib/aperture";
+import { decodeXray, xrayTransferables, type XrayData } from "../lib/xray";
 
 const SEED = 12345n;
 /** How far the reset search walks before giving up and saying so. */
@@ -26,7 +27,8 @@ const SETTLE_BUDGET = 400;
  *  "not found within N tried" instead of hanging the worker. */
 const RESET_BUDGET_MS = 25_000;
 
-const post = (m: WorkerMessage) => (self as unknown as Worker).postMessage(m);
+const post = (m: WorkerMessage, transfer?: Transferable[]) =>
+  (self as unknown as Worker).postMessage(m, transfer ?? []);
 const progress = (step: string) => post({ type: "progress", step });
 
 const baseName = (state: string) => state.split("[", 1)[0];
@@ -140,7 +142,7 @@ function census(blocks: ReplayBlock[]): Census {
   return c;
 }
 
-async function certify(job: WorkerJob): Promise<CertRecord> {
+async function certify(job: WorkerJob): Promise<{ record: CertRecord; xray: XrayData | null }> {
   // Dynamic import inside the handler: a failing top-level import in a
   // module worker fires neither onmessage nor onerror — this form reports.
   progress("engine");
@@ -586,7 +588,46 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
     .map(([id, count]) => ({ id, count }))
     .sort((a, b) => b.count - a.count || (a.id < b.id ? -1 : 1));
 
-  return {
+  // -- x-ray: the update stream ------------------------------------------
+  // Recording is off for everything above (it costs nothing when off, but a
+  // reset search runs the cycle a hundred times and would record all of it).
+  // So the measured cycle is replayed once more from its own checkpoint —
+  // same seed, same starting state, same trace — with the recorder on.
+  //
+  // The two DRAWABLE views are pulled here and the 15.8 MB raw log never is:
+  // the heat view (~900 KB/cycle) drives playback and the wave view (~310 KB
+  // for the busiest tick) drives sub-tick stepping. Every tick's wave is
+  // precomputed rather than fetched on demand — the whole cycle's waves cost
+  // ~30 ms and ~1.3 MB packed, which is cheaper than keeping a wasm world
+  // alive for the life of the page.
+  progress("x-ray");
+  let xray: XrayData | null = null;
+  try {
+    sim.restore(cycle.cp);
+    const xBase: number = sim.tickCount();
+    sim.recordUpdates(true);
+    sim.useBlock(lx, ly, lz);
+    sim.runUntilQuiescent(300);
+    sim.useBlock(lx, ly, lz);
+    sim.runUntilQuiescent(300);
+    // Read BEFORE switching the recorder off: `record_updates(false)` drops
+    // the log outright (`upd_log = None`), so disabling first returns an
+    // empty trace rather than the one just recorded.
+    xray = decodeXray(
+      sim.updatesHeatJson(xBase, xBase + simTicks),
+      (t: number) => sim.updatesWaveJson(t),
+      xBase,
+      simTicks,
+    );
+    sim.recordUpdates(false);
+  } catch (e) {
+    // A door whose trace does not fit is still a certified door; the replay
+    // simply offers no x-ray.
+    console.warn("[xray] update recording failed", e);
+    xray = null;
+  }
+
+  const record: CertRecord = {
     certificate: {
       name: job.name,
       dims: [w, h, l] as Vec3,
@@ -623,12 +664,13 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
     },
     replay: { blocks: restBlocks, changes, simTicks, flips },
   };
+  return { record, xray };
 }
 
 self.onmessage = async ({ data }: MessageEvent<WorkerJob>) => {
   try {
-    const record = await certify(data);
-    post({ type: "done", record });
+    const { record, xray } = await certify(data);
+    post({ type: "done", record, xray }, xray ? xrayTransferables(xray) : []);
   } catch (e) {
     post({ type: "error", error: e instanceof Error ? e.message : String(e) });
   }

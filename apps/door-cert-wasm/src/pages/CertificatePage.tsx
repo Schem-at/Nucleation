@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
-import { loadRecord } from "../lib/store";
+import { loadRecord, loadXray } from "../lib/store";
 import { Seal } from "../components/Seal";
 import { StatTile } from "../components/StatTile";
 import { ActivityChart } from "../components/ActivityChart";
@@ -78,6 +78,7 @@ function censusRows(c: Census): { term: string; detail: string }[] {
 export function CertificatePage() {
   const { id = "" } = useParams();
   const rec = useMemo(() => loadRecord(id), [id]);
+  const xray = useMemo(() => loadXray(id), [id]);
 
   const certUrl = useMemo(() => {
     if (!rec) return "";
@@ -240,7 +241,7 @@ export function CertificatePage() {
 
       <div className="sheet-section">
         <p className="eyebrow">Exhibit A — the measured cycle</p>
-        <MeshReplay replay={rec.replay} lever={cert.lever} />
+        <MeshReplay replay={rec.replay} lever={cert.lever} xray={xray} />
         <p className="exhibit-caption">
           Drawn from the recorded block changes. The two lime marks on the scrubber are the
           lever clicks; it starts on the one that{" "}

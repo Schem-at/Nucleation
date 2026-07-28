@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { newId, saveRecord } from "../lib/store";
+import { newId, saveRecord, saveXray } from "../lib/store";
 import type { WorkerJob, WorkerMessage } from "../lib/types";
 
 const ACCEPT = [".litematic", ".schem", ".schematic", ".snbt"];
@@ -11,6 +11,7 @@ const STEPS = [
   { key: "measuring", label: "Measuring open / close" },
   { key: "classifying", label: "Classifying the pattern" },
   { key: "reset", label: "Measuring reset time" },
+  { key: "x-ray", label: "Recording the update stream" },
 ];
 
 export function UploadPage() {
@@ -46,6 +47,7 @@ export function UploadPage() {
         } else if (data.type === "done") {
           const id = newId();
           saveRecord(id, data.record);
+          if (data.xray) saveXray(id, data.xray);
           worker.terminate();
           navigate(`/door/${id}`);
         } else {

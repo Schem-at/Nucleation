@@ -1,4 +1,5 @@
 import type { CertRecord } from "./types";
+import type { XrayData } from "./xray";
 
 // Certificates live in memory first (this session's runs) and are mirrored
 // into localStorage so a certificate URL survives a reload. No network.
@@ -37,6 +38,20 @@ export function loadRecord(id: string): CertRecord | null {
     /* corrupted entry — treat as missing */
   }
   return null;
+}
+
+// The x-ray payload is ~1.5 MB of typed arrays — it does not survive
+// JSON.stringify and would not fit the localStorage quota if it did. It stays
+// in memory for the session that recorded it; a certificate opened from a cold
+// reload keeps every number and offers no x-ray until the door is re-run.
+const xrays = new Map<string, XrayData>();
+
+export function saveXray(id: string, data: XrayData): void {
+  xrays.set(id, data);
+}
+
+export function loadXray(id: string): XrayData | null {
+  return xrays.get(id) ?? null;
 }
 
 export function newId(): string {
