@@ -27,8 +27,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { buildCast, headClipHalfSpace, type CastMember } from "../lib/cast";
+import { doorwayFacts, doorwayStyles, doorwaySummary } from "../lib/doorway";
 import { instanceFor, addDefaultLights, fitCamera, meshStats } from "../lib/mesher";
-import type { Replay, Vec3 } from "../lib/types";
+import type { ApertureGeometry, Replay, Vec3 } from "../lib/types";
 import {
   channelStyles,
   hexCss,
@@ -60,8 +61,138 @@ const GHOST_LIVE = 0.13;
 /** …and how far its colour is pulled down. Opacity alone is not enough: a
  * five-deep build stacks twenty translucent layers, and twenty layers of a
  * pale block accumulate into a bright haze that beats the flares in front of
- * it. A ghost has to be DARK as well as thin. */
-const GHOST_TINT = 0.34;
+ * it. A ghost has to be DARK as well as thin.
+ *
+ * Taken from 0.34 to 0.20 after the ghost was judged too heavy. The two
+ * failure modes the first pass documented were re-checked at the new value on
+ * the busiest tick of both test doors: the flares still out-brighten the ghost
+ * everywhere (0.20 of a mid-grey block behind a stack of layers stays below
+ * the dimmest legal flare step, which is 0.3 of its palette hue), and the
+ * flare colours are untouched, so the legend still reads true. It stops at
+ * 0.20 rather than going lower because the piston tape and the frame are the
+ * only cues to where you are in the build once the models go translucent —
+ * under about 0.15 the silhouette breaks up and the flares float in the
+ * dark with nothing to place them against. */
+const GHOST_TINT = 0.2;
+
+/* ------------------------------------------------------------- doorway --- */
+
+/** How far a door-block pane is inset inside its passage cell. The gap is
+ * doing two jobs, both about the nesting: it keeps the violet shell visible
+ * around the pattern, and it keeps the panes from fusing into one magenta
+ * mass, so a doorway whose pattern only fills SOME of its passage (a 4 × 4
+ * vault door fills 32 of 48 cells) reads as blocks-in-a-hole rather than as a
+ * filled block. */
+const PANE = 0.7;
+/** Pane opacity, plain replay and x-ray. Lower under the x-ray so the flares
+ * keep the stage — the overlay is an annotation, not a fourth channel. */
+const PANE_ALPHA = 0.62;
+const PANE_ALPHA_XRAY = 0.42;
+
+/** A 45° hatch, drawn once into a canvas and repeated over the door-block
+ * panes. This is the overlay's escape from the flare palette: `lib/doorway.ts`
+ * records that no fourth hue clears the all-pairs gate beside the x-ray's
+ * three, so the door blocks are separated by TEXTURE instead — a striped pane
+ * is not a flare at any hue, and the stripes let the flares behind it through
+ * rather than masking them. */
+function hatchTexture(): THREE.Texture {
+  const s = 64;
+  const c = document.createElement("canvas");
+  c.width = s;
+  c.height = s;
+  const g = c.getContext("2d")!;
+  g.clearRect(0, 0, s, s);
+  g.strokeStyle = "#ffffff";
+  g.lineWidth = 8;
+  for (let i = -s; i < s * 2; i += 21) {
+    g.beginPath();
+    g.moveTo(i, 0);
+    g.lineTo(i + s, s);
+    g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = THREE.RepeatWrapping;
+  t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
+/** The passage as a wireframe SHELL: the grid on the faces where the passage
+ * meets solid wall, and nothing inside.
+ *
+ * Wireframing every cell was built first and rejected on sight — a 6 × 6 × 3
+ * passage is 108 boxes, and 108 boxes of interior lattice is a solid violet
+ * brick, the opposite of "here is the hole". Culling every face that has
+ * another passage cell behind it leaves exactly the surface you would walk
+ * through: the opening's grid at each end, and the four strips that show how
+ * thick the wall is. Same cells, same counts, legible shape.
+ *
+ * Shared edges are emitted once. Static — built once, never touched by the
+ * frame loop. */
+function passageEdges(cells: Vec3[]): THREE.BufferGeometry {
+  const key = (x: number, y: number, z: number) => `${x},${y},${z}`;
+  const set = new Set(cells.map((p) => key(p[0], p[1], p[2])));
+  // The four corners of each face, as ± half-offsets from the cell centre.
+  const FACES: { d: Vec3; quad: Vec3[] }[] = [];
+  for (let axis = 0; axis < 3; axis++)
+    for (const s of [-1, 1]) {
+      const d: Vec3 = [0, 0, 0];
+      d[axis] = s;
+      const [u, v] = [0, 1, 2].filter((a) => a !== axis);
+      const quad: Vec3[] = [
+        [-1, -1],
+        [1, -1],
+        [1, 1],
+        [-1, 1],
+      ].map(([a, b]) => {
+        const c: Vec3 = [0, 0, 0];
+        c[axis] = s;
+        c[u] = a;
+        c[v] = b;
+        return c;
+      });
+      FACES.push({ d, quad });
+    }
+
+  const pts: number[] = [];
+  const seen = new Set<string>();
+  for (const p of cells)
+    for (const f of FACES) {
+      if (set.has(key(p[0] + f.d[0], p[1] + f.d[1], p[2] + f.d[2]))) continue;
+      for (let i = 0; i < 4; i++) {
+        const a = f.quad[i];
+        const b = f.quad[(i + 1) % 4];
+        const ax = p[0] + 0.5 + a[0] / 2;
+        const ay = p[1] + 0.5 + a[1] / 2;
+        const az = p[2] + 0.5 + a[2] / 2;
+        const bx = p[0] + 0.5 + b[0] / 2;
+        const by = p[1] + 0.5 + b[1] / 2;
+        const bz = p[2] + 0.5 + b[2] / 2;
+        // Two coplanar faces of neighbouring cells share this edge; order the
+        // endpoints so both spellings collapse to one line.
+        const k =
+          ax < bx || (ax === bx && (ay < by || (ay === by && az <= bz)))
+            ? `${ax},${ay},${az}|${bx},${by},${bz}`
+            : `${bx},${by},${bz}|${ax},${ay},${az}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        pts.push(ax, ay, az, bx, by, bz);
+      }
+    }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(Float32Array.from(pts), 3));
+  return geo;
+}
+
+/** True when the page is on its dark plate. The overlay's violet steps down
+ * for the white page and up for the two dark surfaces (dark theme, and the
+ * x-ray darkroom, which is dark in both themes). */
+function pageIsDark(): boolean {
+  if (typeof document === "undefined") return false;
+  const t = document.documentElement.dataset.theme;
+  if (t === "dark") return true;
+  if (t === "light") return false;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
 
 /** A hollow box drawn as twelve thin bars. This is a MARK, not a hue — it is
  * how the `boundary` phase stays distinguishable without a fourth colour (see
@@ -146,11 +277,13 @@ function WebglReplay({
   replay,
   lever,
   xray,
+  geometry,
   onFail,
 }: {
   replay: Replay;
   lever: Vec3;
   xray: XrayData | null;
+  geometry: ApertureGeometry | null;
   onFail: (err: string) => void;
 }) {
   const { simTicks } = replay;
@@ -189,6 +322,35 @@ function WebglReplay({
   const subSpeedRef = useRef(1);
   const cursorRef = useRef(0);
   const applyRef = useRef<((on: boolean) => void) | null>(null);
+
+  // Doorway overlay. Independent of the x-ray in both directions: it is the
+  // derived geometry, not the update stream, and it is arguably most useful on
+  // the plain replay where you can watch the door blocks leave the passage
+  // they are drawn in.
+  const facts = useMemo(() => (geometry ? doorwayFacts(geometry) : null), [geometry]);
+  const [doorwayOn, setDoorwayOn] = useState(false);
+  const [dark, setDark] = useState(pageIsDark);
+  const doorwayRef = useRef<((on: boolean) => void) | null>(null);
+  const paintRef = useRef<((dark: boolean, xrayOn: boolean) => void) | null>(null);
+  const focusRef = useRef<(() => void) | null>(null);
+
+  // The overlay's violet has a light step and a dark step, so the stage has to
+  // know which plate it is on. `data-theme` covers the app's own toggle; the
+  // media query covers a viewer who never touched it.
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const sync = () => setDark(pageIsDark());
+    mq.addEventListener("change", sync);
+    const obs = new MutationObserver(sync);
+    obs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    return () => {
+      mq.removeEventListener("change", sync);
+      obs.disconnect();
+    };
+  }, []);
 
   const cast = useMemo(() => {
     const c = buildCast(
@@ -291,6 +453,103 @@ function WebglReplay({
     );
     leverBox.position.set(lever[0] + 0.5, lever[1] + 0.5, lever[2] + 0.5);
     scene.add(leverBox);
+
+    /* -------------------------------------------------------- doorway --- */
+
+    // The derived doorway, drawn from the very cells the timing was taken
+    // over. Two marks, nested: the passage as a wireframe LATTICE on the cell
+    // boundaries (the hole), and the closed pattern as HATCHED panes inset
+    // inside it (the blocks that fill the hole). Because the panes are inset,
+    // the violet edge survives all the way around each filled cell and the
+    // subset relationship is visible rather than covered up.
+    //
+    // Both are static: built once, posed once, and never touched again by the
+    // frame loop. Two extra draw calls, no per-frame work.
+    let doorway: THREE.Group | null = null;
+    let hatch: THREE.Texture | null = null;
+    let edgeGeo: THREE.BufferGeometry | null = null;
+    let paneGeo: THREE.BufferGeometry | null = null;
+    const edgeMat = new THREE.LineBasicMaterial({
+      transparent: true,
+      opacity: 0.92,
+      // Drawn THROUGH the build on purpose. The doorway is a derivation, not
+      // a block: burying it inside an opaque wall would answer "what did the
+      // classifier find?" only on the ticks the door happens to be open.
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    const paneMat = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: PANE_ALPHA,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+    });
+    if (geometry && facts) {
+      doorway = new THREE.Group();
+      doorway.visible = false;
+      // Under the flares (renderOrder 4) so an update landing in the doorway
+      // still reads as an update. The hatch is what makes that survivable:
+      // half the pane is holes, so a flare behind it is never fully masked.
+      doorway.renderOrder = 3;
+
+      edgeGeo = passageEdges(geometry.passage);
+      const edges = new THREE.LineSegments(edgeGeo, edgeMat);
+      edges.frustumCulled = false;
+      edges.renderOrder = 3;
+      doorway.add(edges);
+
+      if (geometry.closed.length > 0) {
+        hatch = hatchTexture();
+        paneMat.map = hatch;
+        paneGeo = new THREE.BoxGeometry(PANE, PANE, PANE);
+        const panes = new THREE.InstancedMesh(paneGeo, paneMat, geometry.closed.length);
+        panes.frustumCulled = false;
+        panes.renderOrder = 3;
+        const o = new THREE.Object3D();
+        geometry.closed.forEach((p, i) => {
+          o.position.set(p[0] + 0.5, p[1] + 0.5, p[2] + 0.5);
+          o.updateMatrix();
+          panes.setMatrixAt(i, o.matrix);
+        });
+        panes.instanceMatrix.needsUpdate = true;
+        doorway.add(panes);
+      }
+      scene.add(doorway);
+    }
+
+    /** Repaint for the current plate. Called on theme change and on every
+     * x-ray toggle, because the x-ray's darkroom is dark in both themes. */
+    const paintDoorway = (isDark: boolean, xrayNow: boolean) => {
+      const [passage, closed] = doorwayStyles(isDark || xrayNow);
+      edgeMat.color.setHex(passage.hex);
+      paneMat.color.setHex(closed.hex);
+      paneMat.opacity = xrayNow ? PANE_ALPHA_XRAY : PANE_ALPHA;
+    };
+    paintDoorway(pageIsDark(), false);
+    paintRef.current = paintDoorway;
+
+    doorwayRef.current = (on: boolean) => {
+      if (doorway) doorway.visible = on;
+    };
+
+    // Verification aid (scripts/verify-doorway.mjs): frame the doorway so a
+    // screenshot can show the hole itself rather than the whole machine.
+    focusRef.current = () => {
+      if (!facts) return;
+      const c = new THREE.Vector3(
+        (facts.min[0] + facts.max[0]) / 2 + 0.5,
+        (facts.min[1] + facts.max[1]) / 2 + 0.5,
+        (facts.min[2] + facts.max[2]) / 2 + 0.5,
+      );
+      const r = Math.max(facts.w, facts.h, facts.depth);
+      controls.target.copy(c);
+      camera.position.set(c.x + r * 1.5, c.y + r * 0.85, c.z + r * 1.9);
+      camera.lookAt(c);
+      controls.update();
+    };
 
     // One group per cast member; real models attach as meshing resolves.
     const groups: THREE.Group[] = cast.map((m) => {
@@ -623,6 +882,12 @@ function WebglReplay({
     // emitted them, plus a way to measure a clean window of frame times.
     const w = window as unknown as Record<string, unknown>;
     w.__replayFrameReset = () => stats.reset();
+    // Verification aid (scripts/verify-doorway.mjs): the counts the legend is
+    // drawn from, so a test can prove the picture and the certificate's
+    // aperture line came off the same cells.
+    w.__doorway = facts
+      ? { ...facts, focus: () => focusRef.current?.() }
+      : null;
     w.__xray = X
       ? {
           heatBytes: X.bytes.heat,
@@ -692,9 +957,17 @@ function WebglReplay({
     return () => {
       disposed = true;
       applyRef.current = null;
+      doorwayRef.current = null;
+      paintRef.current = null;
+      focusRef.current = null;
       ro.disconnect();
       cancelAnimationFrame(raf);
       controls.dispose();
+      edgeGeo?.dispose();
+      paneGeo?.dispose();
+      hatch?.dispose();
+      edgeMat.dispose();
+      paneMat.dispose();
       flareGeo.dispose();
       cageGeo.dispose();
       (flares.material as THREE.Material).dispose();
@@ -704,7 +977,7 @@ function WebglReplay({
       renderer.forceContextLoss();
       mount.removeChild(renderer.domElement);
     };
-  }, [cast, lever, simTicks, onFail, glNonce, xray]);
+  }, [cast, lever, simTicks, onFail, glNonce, xray, geometry, facts]);
 
   // Mode changes are applied to the LIVE scene rather than rebuilding it, so
   // the x-ray toggle keeps the camera, the tick and the play state.
@@ -712,6 +985,14 @@ function WebglReplay({
     xrayOnRef.current = xrayOn;
     applyRef.current?.(xrayOn);
   }, [xrayOn, glNonce, cast, xray]);
+  // The overlay is a visibility flip on a pre-built group, so it survives the
+  // x-ray toggle in either order and costs nothing to leave on.
+  useEffect(() => {
+    doorwayRef.current?.(doorwayOn);
+  }, [doorwayOn, glNonce, geometry, facts]);
+  useEffect(() => {
+    paintRef.current?.(dark, xrayOn);
+  }, [dark, xrayOn, glNonce, geometry, facts]);
   useEffect(() => {
     channelRef.current = channel;
   }, [channel]);
@@ -751,6 +1032,7 @@ function WebglReplay({
   };
 
   const legend = xray ? channelStyles(xray, channel) : [];
+  const [passageStyle, closedStyle] = doorwayStyles(dark || xrayOn);
 
   return (
     <div>
@@ -846,6 +1128,22 @@ function WebglReplay({
         </div>
         <button
           type="button"
+          className={"door-toggle" + (doorwayOn ? " on" : "")}
+          aria-pressed={doorwayOn}
+          disabled={!facts}
+          data-testid="doorway-toggle"
+          title={
+            facts
+              ? "Outline the doorway the classifier derived"
+              : "No walkable passage was extracted from this door"
+          }
+          onClick={() => setDoorwayOn((v) => !v)}
+        >
+          <i className="door-dot" aria-hidden />
+          Doorway
+        </button>
+        <button
+          type="button"
           className={"xray-toggle" + (xrayOn ? " on" : "")}
           aria-pressed={xrayOn}
           disabled={!xray}
@@ -869,6 +1167,50 @@ function WebglReplay({
           X-ray
         </button>
       </div>
+
+      {doorwayOn && facts && (
+        <div
+          className={"door-panel" + (xrayOn ? " xr" : "")}
+          data-testid="doorway-panel"
+        >
+          <span className="xray-label">doorway</span>
+          <ul className="door-legend" data-testid="doorway-legend">
+            <li>
+              <i
+                className="door-swatch edges"
+                style={{ borderColor: hexCss(passageStyle.hex) }}
+                aria-hidden
+              />
+              {passageStyle.label}
+              <b>{fmt(facts.passageCells)}</b>
+            </li>
+            <li>
+              <i
+                className="door-swatch hatch"
+                style={{
+                  // Same 45° hatch as the panes, at swatch scale.
+                  backgroundImage:
+                    `repeating-linear-gradient(45deg, ${hexCss(closedStyle.hex)} 0 2px,` +
+                    ` transparent 2px 4px)`,
+                  borderColor: hexCss(closedStyle.hex),
+                }}
+                aria-hidden
+              />
+              {closedStyle.label}
+              <b>{fmt(facts.closedCells)}</b>
+            </li>
+          </ul>
+          <span className="door-summary" data-testid="doorway-summary">
+            {doorwaySummary(facts)}
+          </span>
+          {!facts.rectangular && (
+            <span className="door-warn" data-testid="doorway-ragged">
+              the passage does not fill its own {facts.w} × {facts.h} × {facts.depth}
+              {" "}box — it is not a clean rectangular opening
+            </span>
+          )}
+        </div>
+      )}
 
       {xrayOn && xray && (
         <div className="xray-panel" data-testid="xray-panel">
@@ -1070,12 +1412,22 @@ export function MeshReplay({
   replay,
   lever,
   xray = null,
+  geometry = null,
 }: {
   replay: Replay;
   lever: Vec3;
   xray?: XrayData | null;
+  geometry?: ApertureGeometry | null;
 }) {
   const [glFail, setGlFail] = useState<string | null>(null);
   if (glFail !== null) return <VoxelReplay replay={replay} lever={lever} />;
-  return <WebglReplay replay={replay} lever={lever} xray={xray} onFail={setGlFail} />;
+  return (
+    <WebglReplay
+      replay={replay}
+      lever={lever}
+      xray={xray}
+      geometry={geometry}
+      onFail={setGlFail}
+    />
+  );
 }

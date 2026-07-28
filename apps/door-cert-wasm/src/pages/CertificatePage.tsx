@@ -241,7 +241,12 @@ export function CertificatePage() {
 
       <div className="sheet-section">
         <p className="eyebrow">Exhibit A — the measured cycle</p>
-        <MeshReplay replay={rec.replay} lever={cert.lever} xray={xray} />
+        <MeshReplay
+          replay={rec.replay}
+          lever={cert.lever}
+          xray={xray}
+          geometry={cert.aperture_geometry ?? null}
+        />
         <p className="exhibit-caption">
           Drawn from the recorded block changes. The two lime marks on the scrubber are the
           lever clicks; it starts on the one that{" "}

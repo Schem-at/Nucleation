@@ -649,6 +649,7 @@ async function certify(job: WorkerJob): Promise<{ record: CertRecord; xray: Xray
       verdict,
       moved_cells: movedCells,
       aperture: doorway,
+      aperture_geometry: geo,
       classification: analysis?.classification ?? null,
       peak_changes: peakChanges,
       peak_tick: peakTick,

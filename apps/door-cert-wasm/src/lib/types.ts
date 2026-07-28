@@ -163,6 +163,12 @@ export type Certificate = {
   moved_cells: number;
   /** The doorway the machine actually opens. Null if nothing opened. */
   aperture: Aperture | null;
+  /** The doorway's cells, in world coordinates — the exact set `open_ticks`
+   *  and `close_ticks` were measured over. It rides on the certificate so the
+   *  replay can DRAW what the classifier derived; picture and numbers come
+   *  from one source and cannot drift apart. ~3 KB for a 6 × 6 door.
+   *  Null when no walkable passage was found, same as `aperture`. */
+  aperture_geometry: ApertureGeometry | null;
   /** The doorway read against the community pattern standard. */
   classification: Classification | null;
   /** Busiest tick of the cycle: how many cells changed, and when. */

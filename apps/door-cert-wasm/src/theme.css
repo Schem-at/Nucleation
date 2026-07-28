@@ -903,6 +903,115 @@ button { font: inherit; color: inherit; }
   border-color: var(--xr-line);
 }
 .replay-stage.xray + .replay-controls { border-radius: 0; }
+/* A panel below the controls takes over the sheet's bottom edge. */
+.replay-controls:has(+ .door-panel) { border-radius: 0; }
+.door-panel:has(+ .xray-panel) { border-radius: 0; }
+
+/* ---------------------------------------------------------- doorway --- */
+
+/* The overlay's own colours, as CSS roles. The violet has a light step and a
+ * dark step (see lib/doorway.ts for the validation run); the magenta clears
+ * 3:1 on the white page, the dark page and the x-ray plate alike, so it holds
+ * one value everywhere. */
+:root {
+  --door-passage: #4a3aa7;
+  --door-closed: #d55181;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --door-passage: #9085e9; }
+}
+:root[data-theme="dark"] { --door-passage: #9085e9; }
+
+.door-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface);
+  color: var(--ink-2);
+  padding: 5px 11px 5px 9px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.door-toggle:hover:not(:disabled) { background: var(--surface-2); }
+.door-toggle:disabled { opacity: 0.45; cursor: not-allowed; }
+/* The dot is the passage mark in miniature: a hollow outline, matching the
+ * wireframe it turns on, rather than a filled dot like the x-ray's. */
+.door-toggle .door-dot {
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--baseline);
+  background: transparent;
+}
+.door-toggle.on {
+  border-color: var(--door-passage);
+  color: var(--ink);
+}
+.door-toggle.on .door-dot { border-color: var(--door-passage); }
+.door-toggle + .xray-toggle { margin-left: 0; }
+
+.door-panel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--r) var(--r);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  padding: 8px 14px;
+}
+/* Under the x-ray the panel joins the darkroom, and the x-ray's own panel
+ * takes the rounded bottom edge below it. */
+.door-panel.xr {
+  background: var(--xr-surface);
+  border-color: var(--xr-line);
+  color: var(--xr-ink);
+  border-radius: 0;
+}
+.door-panel.xr .xray-label { color: var(--xr-ink-2); }
+.door-panel.xr .door-summary { color: var(--xr-ink-2); }
+
+.door-legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.door-legend li { display: inline-flex; align-items: center; gap: 6px; }
+/* The count is the point of the legend, so it is set as data, not as a
+ * parenthetical. */
+.door-legend b {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.door-swatch {
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid transparent;
+  flex: none;
+}
+.door-swatch.edges { background: transparent; }
+.door-swatch.hatch { background-color: transparent; }
+.door-summary {
+  margin-left: auto;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.door-warn {
+  flex-basis: 100%;
+  color: var(--alarm);
+  font-size: 11px;
+}
 
 .xray-toggle {
   display: inline-flex;
@@ -1062,6 +1171,8 @@ button { font: inherit; color: inherit; }
 @media (max-width: 640px) {
   .xray-toggle { margin-left: 0; }
   .xray-legend { width: 100%; }
+  .door-toggle { margin-left: 0; }
+  .door-summary { margin-left: 0; flex-basis: 100%; }
 }
 
 .block-legend {
