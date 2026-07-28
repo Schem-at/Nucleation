@@ -334,6 +334,19 @@ fn run_conformance_full(
         let (registry, world) = sim.registry_and_world_mut();
         structure.place(world, registry, Pos::new(0, 0, 0));
     }
+    // A dispenser can *place* a shulker box it holds as an item; behaviours
+    // bind only to interned states, so intern every facing up front — the
+    // same pre-intern the dynamic-case harness and the bridge perform.
+    for (_, stacks) in &structure.inventories {
+        for stack in stacks {
+            let base = stack.id.split('[').next().unwrap_or(&stack.id);
+            if base.ends_with("_shulker_box") || base == "minecraft:shulker_box" {
+                for facing in ["up", "down", "north", "south", "west", "east"] {
+                    let _ = sim.registry_mut().intern(&format!("{base}[facing={facing}]"));
+                }
+            }
+        }
+    }
     for descriptor in extra_states {
         sim.registry_mut()
             .intern(descriptor)
@@ -1436,5 +1449,84 @@ fn two_pistons_extend_into_a_gap_each() {
         "observer_order.snbt",
         "observer_order.json",
         "nucleation:observer_order",
+    );
+}
+
+#[test]
+fn a_trapdoor_toggles_open_and_shut_like_vanilla() {
+    // Oak (facing=north, bottom) and iron (facing=south, top) beside one
+    // redstone block: open+powered flip together on the power edge, both ways.
+    // Captured with the --at schedule that mirrors the dynamic case exactly.
+    run_conformance_actuated(
+        "trapdoor_rig.snbt",
+        "trapdoor_toggle.json",
+        "nucleation:trapdoor_toggle",
+        &["minecraft:redstone_block"],
+        &[
+            (2, Actuate::Place(Pos::new(1, 0, 0), "minecraft:redstone_block")),
+            (8, Actuate::Place(Pos::new(1, 0, 0), "minecraft:air")),
+        ],
+    );
+}
+
+#[test]
+fn a_piston_pushes_a_trapdoor_intact() {
+    // Trapdoors are movable (no getPistonPushReaction override): the push
+    // carries the trapdoor with its properties, and the retract leaves it.
+    run_conformance_actuated(
+        "trapdoor_rig.snbt",
+        "trapdoor_push.json",
+        "nucleation:trapdoor_push",
+        &["minecraft:redstone_block"],
+        &[
+            (2, Actuate::Place(Pos::new(0, 1, 2), "minecraft:redstone_block")),
+            (8, Actuate::Place(Pos::new(0, 1, 2), "minecraft:air")),
+        ],
+    );
+}
+
+#[test]
+fn the_flying_machine_flies_as_vanilla_does() {
+    // Engine B, quiet placement, redstone-block kick at t2 removed at t4 —
+    // then 70 ticks of unassisted flight, block for block against the game.
+    run_conformance_bounded(
+        "flying_machine_east.snbt",
+        "flying_kick.json",
+        "nucleation:flying_machine_east",
+        &["minecraft:redstone_block"],
+        &[
+            (2, Actuate::Place(Pos::new(2, 1, 1), "minecraft:redstone_block")),
+            (4, Actuate::Place(Pos::new(2, 1, 1), "minecraft:air")),
+        ],
+        None,
+        Settle::Quiet,
+    );
+}
+
+#[test]
+fn the_shulker_pipeline_runs_as_vanilla_does() {
+    // The full two-phase machine: dispense-place, hopper-drain, double dropper
+    // eject, lock, piston break, vacuum, ship. Item trajectories are RNG-fed
+    // in the game and mean-fed here, so this compares the block and container
+    // record; where a vacuum lands a tick apart the divergence is the sample,
+    // not the machine — see the doc note beside the golden if that surfaces.
+    run_conformance_actuated(
+        "shulker_pipeline.snbt",
+        "shulker_full.json",
+        "nucleation:shulker_pipeline",
+        &["minecraft:redstone_block"],
+        &[
+            (5, Actuate::Place(Pos::new(-1, 2, 1), "minecraft:redstone_block")),
+            (30, Actuate::Place(Pos::new(2, 0, 1), "minecraft:redstone_block")),
+            (34, Actuate::Place(Pos::new(2, 0, 1), "minecraft:air")),
+            (38, Actuate::Place(Pos::new(2, 0, 1), "minecraft:redstone_block")),
+            (42, Actuate::Place(Pos::new(2, 0, 1), "minecraft:air")),
+            (46, Actuate::Place(Pos::new(1, 1, 2), "minecraft:redstone_block")),
+            (50, Actuate::Place(Pos::new(1, 4, 1), "minecraft:redstone_block")),
+            (54, Actuate::Place(Pos::new(1, 4, 1), "minecraft:air")),
+            (60, Actuate::Place(Pos::new(1, 1, 2), "minecraft:air")),
+            (82, Actuate::Place(Pos::new(2, 0, 1), "minecraft:redstone_block")),
+            (86, Actuate::Place(Pos::new(2, 0, 1), "minecraft:air")),
+        ],
     );
 }

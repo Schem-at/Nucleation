@@ -1,0 +1,262 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:shulker_pipeline",
+  "origin": [0, 100, 0],
+  "detail": "normal",
+  "game_time_at_start": 18,
+  "queues": [
+    {"tick": 0, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 1, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 2, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 3, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 4, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 5, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [0, 2, 1], "block": "minecraft:dispenser", "at": 27, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [0, 2, 1], "block": "minecraft:dispenser", "at": 27, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": [{"kind": "neighbors_at", "pos": [-1, 2, 1], "at": "minecraft:redstone_block"}, {"kind": "shape", "pos": [-1, 2, 1], "at": "minecraft:redstone_block"}, {"kind": "shape", "pos": [1, 2, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [0, 2, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [0, 2, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [0, 1, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [0, 3, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [-2, 2, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [0, 2, 1], "at": "minecraft:dispenser"}, {"kind": "shape", "pos": [-1, 2, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [-1, 2, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [-1, 1, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [-1, 3, 1], "at": "minecraft:air"}]},
+    {"tick": 6, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [0, 2, 1], "block": "minecraft:dispenser", "at": 27, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [0, 2, 1], "block": "minecraft:dispenser", "at": 27, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 7, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [0, 2, 1], "block": "minecraft:dispenser", "at": 27, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [0, 2, 1], "block": "minecraft:dispenser", "at": 27, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 8, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [0, 2, 1], "block": "minecraft:dispenser", "at": 27, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": [{"kind": "neighbors_at", "pos": [1, 2, 1], "at": "minecraft:white_shulker_box"}, {"kind": "shape", "pos": [0, 2, 1], "at": "minecraft:dispenser"}, {"kind": "shape", "pos": [2, 2, 1], "at": "minecraft:glass"}, {"kind": "shape", "pos": [1, 2, 0], "at": "minecraft:glass"}, {"kind": "shape", "pos": [1, 2, 2], "at": "minecraft:glass"}, {"kind": "shape", "pos": [1, 1, 1], "at": "minecraft:hopper"}, {"kind": "shape", "pos": [1, 3, 1], "at": "minecraft:piston"}]},
+    {"tick": 9, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 10, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 11, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 12, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 13, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 14, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 15, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 16, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 17, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 18, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 19, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 20, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 21, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 22, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 23, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 24, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 25, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 26, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 27, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 28, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 29, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 30, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 52, "priority": "NORMAL", "order": 1}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 52, "priority": "NORMAL", "order": 1}]}, "log": [], "notify": [{"kind": "neighbors_at", "pos": [2, 0, 1], "at": "minecraft:redstone_block"}, {"kind": "shape", "pos": [1, 1, 1], "at": "minecraft:hopper"}, {"kind": "shape", "pos": [3, 1, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 0, 1], "at": "minecraft:redstone_block"}, {"kind": "shape", "pos": [2, 2, 1], "at": "minecraft:glass"}, {"kind": "shape", "pos": [1, 0, 1], "at": "minecraft:smooth_stone"}, {"kind": "shape", "pos": [3, 0, 1], "at": "minecraft:smooth_stone"}, {"kind": "shape", "pos": [2, 0, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 0, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, -1, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 1], "at": "minecraft:dropper"}]},
+    {"tick": 31, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 52, "priority": "NORMAL", "order": 1}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 52, "priority": "NORMAL", "order": 1}]}, "log": [], "notify": []},
+    {"tick": 32, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 52, "priority": "NORMAL", "order": 1}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 52, "priority": "NORMAL", "order": 1}]}, "log": [], "notify": []},
+    {"tick": 33, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 52, "priority": "NORMAL", "order": 1}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 34, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": [{"kind": "neighbors_at", "pos": [2, 0, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 1, 1], "at": "minecraft:hopper"}, {"kind": "shape", "pos": [3, 1, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 0, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 2, 1], "at": "minecraft:glass"}, {"kind": "shape", "pos": [1, 0, 1], "at": "minecraft:smooth_stone"}, {"kind": "shape", "pos": [3, 0, 1], "at": "minecraft:smooth_stone"}, {"kind": "shape", "pos": [2, 0, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 0, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, -1, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 1], "at": "minecraft:dropper"}]},
+    {"tick": 35, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 36, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 37, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 38, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 60, "priority": "NORMAL", "order": 2}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 60, "priority": "NORMAL", "order": 2}]}, "log": [], "notify": [{"kind": "neighbors_at", "pos": [2, 0, 1], "at": "minecraft:redstone_block"}, {"kind": "shape", "pos": [1, 1, 1], "at": "minecraft:hopper"}, {"kind": "shape", "pos": [3, 1, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 0, 1], "at": "minecraft:redstone_block"}, {"kind": "shape", "pos": [2, 2, 1], "at": "minecraft:glass"}, {"kind": "shape", "pos": [1, 0, 1], "at": "minecraft:smooth_stone"}, {"kind": "shape", "pos": [3, 0, 1], "at": "minecraft:smooth_stone"}, {"kind": "shape", "pos": [2, 0, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 0, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, -1, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 1], "at": "minecraft:dropper"}]},
+    {"tick": 39, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 60, "priority": "NORMAL", "order": 2}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 60, "priority": "NORMAL", "order": 2}]}, "log": [], "notify": []},
+    {"tick": 40, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 60, "priority": "NORMAL", "order": 2}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 60, "priority": "NORMAL", "order": 2}]}, "log": [], "notify": []},
+    {"tick": 41, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 60, "priority": "NORMAL", "order": 2}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 42, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": [{"kind": "neighbors_at", "pos": [2, 0, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 1, 1], "at": "minecraft:hopper"}, {"kind": "shape", "pos": [3, 1, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 0, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 2, 1], "at": "minecraft:glass"}, {"kind": "shape", "pos": [1, 0, 1], "at": "minecraft:smooth_stone"}, {"kind": "shape", "pos": [3, 0, 1], "at": "minecraft:smooth_stone"}, {"kind": "shape", "pos": [2, 0, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 0, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, -1, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 1], "at": "minecraft:dropper"}]},
+    {"tick": 43, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 44, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 45, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 46, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": [{"kind": "neighbors_at", "pos": [1, 1, 2], "at": "minecraft:redstone_block"}, {"kind": "shape", "pos": [0, 1, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 1], "at": "minecraft:dropper"}, {"kind": "shape", "pos": [1, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 1, 2], "at": "minecraft:redstone_block"}, {"kind": "shape", "pos": [1, 0, 1], "at": "minecraft:smooth_stone"}, {"kind": "shape", "pos": [1, 2, 1], "at": "minecraft:white_shulker_box"}, {"kind": "shape", "pos": [0, 1, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 1, 1], "at": "minecraft:hopper"}, {"kind": "shape", "pos": [1, 1, 3], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 0, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 2, 2], "at": "minecraft:glass"}]},
+    {"tick": 47, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 48, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 49, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 50, "before": {"events": [{"pos": [1, 3, 1], "block": "minecraft:piston", "id": 0, "param": 0}], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [{"kind": "queue", "pos": [1, 3, 1], "id": 0, "param": 0}, {"kind": "run", "pos": [1, 3, 1], "id": 0, "param": 0}], "notify": [{"kind": "neighbors_at", "pos": [1, 4, 1], "at": "minecraft:redstone_block"}, {"kind": "queue", "pos": [1, 3, 1], "id": 0, "param": 0}, {"kind": "shape", "pos": [0, 4, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 4, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 4, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 4, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 3, 1], "at": "minecraft:piston"}, {"kind": "shape", "pos": [1, 5, 1], "at": "minecraft:air"}, {"kind": "run", "pos": [1, 3, 1], "id": 0, "param": 0}, {"kind": "shape", "pos": [0, 2, 1], "at": "minecraft:dispenser"}, {"kind": "shape", "pos": [2, 2, 1], "at": "minecraft:glass"}, {"kind": "shape", "pos": [1, 2, 0], "at": "minecraft:glass"}, {"kind": "shape", "pos": [1, 2, 2], "at": "minecraft:glass"}, {"kind": "shape", "pos": [1, 1, 1], "at": "minecraft:hopper"}, {"kind": "shape", "pos": [1, 3, 1], "at": "minecraft:piston"}, {"kind": "neighbors_at", "pos": [1, 2, 1], "at": "minecraft:moving_piston"}, {"kind": "neighbors_at", "pos": [1, 2, 1], "at": "minecraft:moving_piston"}, {"kind": "neighbors_at", "pos": [1, 3, 1], "at": "minecraft:piston"}, {"kind": "shape", "pos": [0, 3, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 3, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 3, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 3, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 2, 1], "at": "minecraft:moving_piston"}, {"kind": "shape", "pos": [1, 4, 1], "at": "minecraft:redstone_block"}]},
+    {"tick": 51, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 52, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": [{"kind": "neighbors_at", "pos": [1, 2, 1], "at": "minecraft:piston_head"}, {"kind": "shape", "pos": [0, 2, 1], "at": "minecraft:dispenser"}, {"kind": "shape", "pos": [2, 2, 1], "at": "minecraft:glass"}, {"kind": "shape", "pos": [1, 2, 0], "at": "minecraft:glass"}, {"kind": "shape", "pos": [1, 2, 2], "at": "minecraft:glass"}, {"kind": "shape", "pos": [1, 1, 1], "at": "minecraft:hopper"}, {"kind": "shape", "pos": [1, 3, 1], "at": "minecraft:piston"}, {"kind": "neighbor", "pos": [1, 2, 1], "at": "minecraft:piston_head"}, {"kind": "neighbor", "pos": [1, 3, 1], "at": "minecraft:piston"}]},
+    {"tick": 53, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 54, "before": {"events": [{"pos": [1, 3, 1], "block": "minecraft:piston", "id": 1, "param": 0}], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [{"kind": "queue", "pos": [1, 3, 1], "id": 1, "param": 0}, {"kind": "run", "pos": [1, 3, 1], "id": 1, "param": 0}], "notify": [{"kind": "neighbors_at", "pos": [1, 4, 1], "at": "minecraft:air"}, {"kind": "queue", "pos": [1, 3, 1], "id": 1, "param": 0}, {"kind": "shape", "pos": [0, 4, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 4, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 4, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 4, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 3, 1], "at": "minecraft:piston"}, {"kind": "shape", "pos": [1, 5, 1], "at": "minecraft:air"}, {"kind": "run", "pos": [1, 3, 1], "id": 1, "param": 0}, {"kind": "neighbors_at", "pos": [1, 3, 1], "at": "minecraft:moving_piston"}, {"kind": "neighbor", "pos": [1, 3, 1], "at": "minecraft:moving_piston"}, {"kind": "shape", "pos": [0, 3, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 3, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 3, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 3, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 2, 1], "at": "minecraft:piston_head"}, {"kind": "shape", "pos": [1, 4, 1], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [1, 2, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [0, 2, 1], "at": "minecraft:dispenser"}, {"kind": "shape", "pos": [2, 2, 1], "at": "minecraft:glass"}, {"kind": "shape", "pos": [1, 2, 0], "at": "minecraft:glass"}, {"kind": "shape", "pos": [1, 2, 2], "at": "minecraft:glass"}, {"kind": "shape", "pos": [1, 1, 1], "at": "minecraft:hopper"}, {"kind": "shape", "pos": [1, 3, 1], "at": "minecraft:moving_piston"}]},
+    {"tick": 55, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 56, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": [{"kind": "neighbors_at", "pos": [1, 3, 1], "at": "minecraft:piston"}, {"kind": "shape", "pos": [0, 3, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 3, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 3, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 3, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 2, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 4, 1], "at": "minecraft:air"}, {"kind": "neighbor", "pos": [1, 3, 1], "at": "minecraft:piston"}]},
+    {"tick": 57, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 58, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 59, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 60, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": [{"kind": "neighbors_at", "pos": [1, 1, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [0, 1, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 1], "at": "minecraft:dropper"}, {"kind": "shape", "pos": [1, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 1, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 0, 1], "at": "minecraft:smooth_stone"}, {"kind": "shape", "pos": [1, 2, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [0, 1, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 1, 1], "at": "minecraft:hopper"}, {"kind": "shape", "pos": [1, 1, 3], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 0, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 2, 2], "at": "minecraft:glass"}]},
+    {"tick": 61, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 62, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 63, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 64, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 65, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 66, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 67, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 68, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 69, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 70, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 71, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 72, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 73, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 74, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 75, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 76, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 77, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 78, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 79, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 80, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 81, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 82, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 104, "priority": "NORMAL", "order": 3}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 104, "priority": "NORMAL", "order": 3}]}, "log": [], "notify": [{"kind": "neighbors_at", "pos": [2, 0, 1], "at": "minecraft:redstone_block"}, {"kind": "shape", "pos": [1, 1, 1], "at": "minecraft:hopper"}, {"kind": "shape", "pos": [3, 1, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 0, 1], "at": "minecraft:redstone_block"}, {"kind": "shape", "pos": [2, 2, 1], "at": "minecraft:glass"}, {"kind": "shape", "pos": [1, 0, 1], "at": "minecraft:smooth_stone"}, {"kind": "shape", "pos": [3, 0, 1], "at": "minecraft:smooth_stone"}, {"kind": "shape", "pos": [2, 0, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 0, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, -1, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 1], "at": "minecraft:dropper"}]},
+    {"tick": 83, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 104, "priority": "NORMAL", "order": 3}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 104, "priority": "NORMAL", "order": 3}]}, "log": [], "notify": []},
+    {"tick": 84, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 104, "priority": "NORMAL", "order": 3}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 104, "priority": "NORMAL", "order": 3}]}, "log": [], "notify": []},
+    {"tick": 85, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [2, 1, 1], "block": "minecraft:dropper", "at": 104, "priority": "NORMAL", "order": 3}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 86, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": [{"kind": "neighbors_at", "pos": [2, 0, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 1, 1], "at": "minecraft:hopper"}, {"kind": "shape", "pos": [3, 1, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 0, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 2, 1], "at": "minecraft:glass"}, {"kind": "shape", "pos": [1, 0, 1], "at": "minecraft:smooth_stone"}, {"kind": "shape", "pos": [3, 0, 1], "at": "minecraft:smooth_stone"}, {"kind": "shape", "pos": [2, 0, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 0, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, -1, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 1], "at": "minecraft:dropper"}]},
+    {"tick": 87, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 88, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 89, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 90, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 91, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 92, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 93, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 94, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 95, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 96, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 97, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 98, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 99, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 100, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 101, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 102, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 103, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 104, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 105, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 106, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 107, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 108, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 109, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []}
+  ],
+  "ticks": [
+    {
+      "tick": 5,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [-1, 2, 1], "from": "minecraft:air", "to": "minecraft:redstone_block"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [0, 2, 1], "from": "minecraft:dispenser[facing=east,triggered=false]", "to": "minecraft:dispenser[facing=east,triggered=true]"}
+      ]
+    },
+    {
+      "tick": 8,
+      "events": [
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [1, 1, 1], "slot": 0, "from": "", "to": "1x minecraft:diamond"},
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [0, 2, 1], "slot": 0, "from": "1x minecraft:white_shulker_box", "to": ""},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 2, 1], "from": "minecraft:air", "to": "minecraft:white_shulker_box[facing=up]"},
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [1, 2, 1], "slot": 0, "from": "", "to": "1x minecraft:diamond"}
+      ]
+    },
+    {
+      "tick": 16,
+      "events": [
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [2, 1, 1], "slot": 0, "from": "", "to": "1x minecraft:diamond"},
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [1, 2, 1], "slot": 0, "from": "1x minecraft:diamond", "to": ""}
+      ]
+    },
+    {
+      "tick": 24,
+      "events": [
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [1, 1, 1], "slot": 0, "from": "1x minecraft:diamond", "to": ""},
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [2, 1, 1], "slot": 0, "from": "1x minecraft:diamond", "to": "2x minecraft:diamond"}
+      ]
+    },
+    {
+      "tick": 30,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 0, 1], "from": "minecraft:smooth_stone", "to": "minecraft:redstone_block"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 1, 1], "from": "minecraft:dropper[facing=east,triggered=false]", "to": "minecraft:dropper[facing=east,triggered=true]"}
+      ]
+    },
+    {
+      "tick": 33,
+      "events": [
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [2, 1, 1], "slot": 0, "from": "2x minecraft:diamond", "to": "1x minecraft:diamond"}
+      ]
+    },
+    {
+      "tick": 34,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 0, 1], "from": "minecraft:redstone_block", "to": "minecraft:air"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 1, 1], "from": "minecraft:dropper[facing=east,triggered=true]", "to": "minecraft:dropper[facing=east,triggered=false]"}
+      ]
+    },
+    {
+      "tick": 38,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 0, 1], "from": "minecraft:air", "to": "minecraft:redstone_block"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 1, 1], "from": "minecraft:dropper[facing=east,triggered=false]", "to": "minecraft:dropper[facing=east,triggered=true]"}
+      ]
+    },
+    {
+      "tick": 41,
+      "events": [
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [2, 1, 1], "slot": 0, "from": "1x minecraft:diamond", "to": ""}
+      ]
+    },
+    {
+      "tick": 42,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 0, 1], "from": "minecraft:redstone_block", "to": "minecraft:air"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 1, 1], "from": "minecraft:dropper[facing=east,triggered=true]", "to": "minecraft:dropper[facing=east,triggered=false]"}
+      ]
+    },
+    {
+      "tick": 46,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 1, 1], "from": "minecraft:hopper[enabled=true,facing=east]", "to": "minecraft:hopper[enabled=false,facing=east]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 1, 2], "from": "minecraft:air", "to": "minecraft:redstone_block"}
+      ]
+    },
+    {
+      "tick": 50,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 2, 1], "from": "minecraft:white_shulker_box[facing=up]", "to": "minecraft:moving_piston[facing=down,type=normal]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 3, 1], "from": "minecraft:piston[extended=false,facing=down]", "to": "minecraft:piston[extended=true,facing=down]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 4, 1], "from": "minecraft:air", "to": "minecraft:redstone_block"}
+      ]
+    },
+    {
+      "tick": 52,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 2, 1], "from": "minecraft:moving_piston[facing=down,type=normal]", "to": "minecraft:piston_head[facing=down,short=false,type=normal]"}
+      ]
+    },
+    {
+      "tick": 54,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 2, 1], "from": "minecraft:piston_head[facing=down,short=false,type=normal]", "to": "minecraft:air"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 3, 1], "from": "minecraft:piston[extended=true,facing=down]", "to": "minecraft:moving_piston[facing=down,type=normal]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 4, 1], "from": "minecraft:redstone_block", "to": "minecraft:air"}
+      ]
+    },
+    {
+      "tick": 56,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 3, 1], "from": "minecraft:moving_piston[facing=down,type=normal]", "to": "minecraft:piston[extended=false,facing=down]"}
+      ]
+    },
+    {
+      "tick": 60,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 1, 1], "from": "minecraft:hopper[enabled=false,facing=east]", "to": "minecraft:hopper[enabled=true,facing=east]"},
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [1, 1, 1], "slot": 0, "from": "", "to": "1x minecraft:white_shulker_box"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 1, 2], "from": "minecraft:redstone_block", "to": "minecraft:air"}
+      ]
+    },
+    {
+      "tick": 68,
+      "events": [
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [1, 1, 1], "slot": 0, "from": "1x minecraft:white_shulker_box", "to": ""},
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [2, 1, 1], "slot": 0, "from": "", "to": "1x minecraft:white_shulker_box"}
+      ]
+    },
+    {
+      "tick": 82,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 0, 1], "from": "minecraft:air", "to": "minecraft:redstone_block"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 1, 1], "from": "minecraft:dropper[facing=east,triggered=false]", "to": "minecraft:dropper[facing=east,triggered=true]"}
+      ]
+    },
+    {
+      "tick": 85,
+      "events": [
+        {"phase": "tick_end", "kind": "inventory_changed", "pos": [2, 1, 1], "slot": 0, "from": "1x minecraft:white_shulker_box", "to": ""}
+      ]
+    },
+    {
+      "tick": 86,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 0, 1], "from": "minecraft:redstone_block", "to": "minecraft:air"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 1, 1], "from": "minecraft:dropper[facing=east,triggered=true]", "to": "minecraft:dropper[facing=east,triggered=false]"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:trapdoor_rig",
+  "origin": [0, 100, 0],
+  "detail": "normal",
+  "game_time_at_start": 18,
+  "queues": [
+    {"tick": 0, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 1, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 2, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": [{"kind": "neighbors_at", "pos": [1, 0, 0], "at": "minecraft:redstone_block"}, {"kind": "shape", "pos": [1, 0, 0], "at": "minecraft:redstone_block"}, {"kind": "shape", "pos": [3, 0, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 0, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 0, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, -1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [0, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 1, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 0, 0], "at": "minecraft:redstone_block"}, {"kind": "shape", "pos": [1, 2, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [0, 0, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 0, 0], "at": "minecraft:oak_trapdoor"}, {"kind": "shape", "pos": [1, 0, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 0, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, -1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 1, 0], "at": "minecraft:iron_trapdoor"}]},
+    {"tick": 3, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 4, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 5, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 6, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 7, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 8, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": [{"kind": "neighbors_at", "pos": [1, 0, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 0, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [3, 0, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 0, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 0, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, -1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [0, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 1, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 0, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 2, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [0, 0, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [2, 0, 0], "at": "minecraft:oak_trapdoor"}, {"kind": "shape", "pos": [1, 0, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 0, 1], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, -1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [1, 1, 0], "at": "minecraft:iron_trapdoor"}]},
+    {"tick": 9, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 10, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 11, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 12, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 13, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []}
+  ],
+  "ticks": [
+    {
+      "tick": 2,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 0, 0], "from": "minecraft:air", "to": "minecraft:redstone_block"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 0, 0], "from": "minecraft:oak_trapdoor[facing=north,half=bottom,open=false,powered=false,waterlogged=false]", "to": "minecraft:oak_trapdoor[facing=north,half=bottom,open=true,powered=true,waterlogged=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 1, 0], "from": "minecraft:iron_trapdoor[facing=south,half=top,open=false,powered=false,waterlogged=false]", "to": "minecraft:iron_trapdoor[facing=south,half=top,open=true,powered=true,waterlogged=false]"}
+      ]
+    },
+    {
+      "tick": 8,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 0, 0], "from": "minecraft:redstone_block", "to": "minecraft:air"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [2, 0, 0], "from": "minecraft:oak_trapdoor[facing=north,half=bottom,open=true,powered=true,waterlogged=false]", "to": "minecraft:oak_trapdoor[facing=north,half=bottom,open=false,powered=false,waterlogged=false]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [1, 1, 0], "from": "minecraft:iron_trapdoor[facing=south,half=top,open=true,powered=true,waterlogged=false]", "to": "minecraft:iron_trapdoor[facing=south,half=top,open=false,powered=false,waterlogged=false]"}
+      ]
+    }
+  ]
+}

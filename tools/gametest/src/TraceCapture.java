@@ -364,6 +364,31 @@ public final class TraceCapture {
             System.out.printf("  actuated: broke %s%n", breakAt);
         }
 
+        // --at T:x,y,z:BLOCK — repeatable scheduled writes (setBlock flag 3),
+        // applied before tick T runs, exactly when the engine's Actuate::Place
+        // fires. --pulse can only drive one position; a multi-stage machine
+        // (the shulker pipeline: trigger, twice-pulsed dropper, hopper lock,
+        // piston blink) needs a schedule. BLOCK is redstone_block or air —
+        // the two actuators every capture uses.
+        java.util.List<Object[]> writeSchedule = new java.util.ArrayList<>();
+        for (int i = 0; i + 1 < args.length; i++) {
+            if (!args[i].equals("--at")) continue;
+            String[] parts = args[i + 1].split(":");
+            String[] xyz = parts[1].split(",");
+            BlockPos target = ORIGIN.offset(
+                    Integer.parseInt(xyz[0].trim()),
+                    Integer.parseInt(xyz[1].trim()),
+                    Integer.parseInt(xyz[2].trim()));
+            var state = switch (parts[2].trim()) {
+                case "redstone_block" -> Blocks.REDSTONE_BLOCK.defaultBlockState();
+                case "air" -> Blocks.AIR.defaultBlockState();
+                default -> throw new IllegalArgumentException(
+                        "--at only writes redstone_block or air, got " + parts[2]);
+            };
+            writeSchedule.add(new Object[]{Integer.parseInt(parts[0].trim()), target, state});
+            System.out.printf("  at t%s: %s -> %s%n", parts[0], parts[1], parts[2]);
+        }
+
         // The state immediately after placement, before any tick. Printed because
         // "no changes" is ambiguous: it means either nothing happened, or everything
         // settled during placement. Only the initial state distinguishes them.
@@ -389,6 +414,12 @@ public final class TraceCapture {
             NOTIFY_LOG.clear();
             if (useTarget != null && useTicks.contains(tick)) {
                 useBlock(level, useTarget);
+            }
+            for (Object[] write : writeSchedule) {
+                if ((Integer) write[0] == tick) {
+                    level.setBlock((BlockPos) write[1],
+                            (net.minecraft.world.level.block.state.BlockState) write[2], 3);
+                }
             }
             if (pulseTarget != null) {
                 if (pulsePeriod > 0) {

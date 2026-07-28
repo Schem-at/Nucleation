@@ -1,0 +1,20 @@
+{
+  DataVersion: 4903,
+  size: [30, 1, 2],
+  palette: [
+    {Name: "minecraft:observer", Properties: {facing: "west", powered: "false"}},
+    {Name: "minecraft:slime_block"},
+    {Name: "minecraft:sticky_piston", Properties: {extended: "false", facing: "east"}},
+    {Name: "minecraft:sticky_piston", Properties: {extended: "false", facing: "west"}},
+    {Name: "minecraft:observer", Properties: {facing: "east", powered: "false"}}
+  ],
+  blocks: [
+    {pos: [1, 0, 0], state: 0},
+    {pos: [2, 0, 0], state: 1},
+    {pos: [3, 0, 0], state: 3},
+    {pos: [2, 0, 1], state: 2},
+    {pos: [3, 0, 1], state: 1},
+    {pos: [4, 0, 1], state: 4}
+  ],
+  entities: []
+}

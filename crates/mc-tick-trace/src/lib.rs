@@ -367,6 +367,42 @@ impl Trace {
     /// then by the event's own debug rendering to break remaining ties.
     pub fn canonicalize(&mut self) {
         for record in &mut self.ticks {
+            // Net intra-tick inventory chains per (pos, slot): a snapshot-derived
+            // golden can only see a slot's net change across the tick, while an
+            // engine trace records each step — a dispenser creating a shulker's
+            // inventory and a hopper sucking from it in the same tick is
+            // ("" -> 2x, 2x -> 1x) in the engine and ("" -> 1x) in the capture.
+            // Both sides are canonicalized, so netting keeps them comparable.
+            let mut first_of: std::collections::HashMap<(i32, i32, i32, u32), usize> =
+                std::collections::HashMap::new();
+            let mut merged: Vec<(usize, String)> = Vec::new();
+            let mut dropped: Vec<usize> = Vec::new();
+            for (index, event) in record.events.iter().enumerate() {
+                if let EventKind::InventoryChanged { pos, slot, to, .. } = &event.kind {
+                    let key = (pos.0, pos.1, pos.2, *slot);
+                    match first_of.get(&key) {
+                        None => {
+                            first_of.insert(key, index);
+                        }
+                        Some(first) => {
+                            merged.push((*first, to.clone()));
+                            dropped.push(index);
+                        }
+                    }
+                }
+            }
+            for (first, latest) in merged {
+                if let EventKind::InventoryChanged { to, .. } = &mut record.events[first].kind {
+                    *to = latest;
+                }
+            }
+            for index in dropped.into_iter().rev() {
+                record.events.remove(index);
+            }
+            record.events.retain(|event| {
+                !matches!(&event.kind,
+                    EventKind::InventoryChanged { from, to, .. } if from == to)
+            });
             record.events.sort_by_key(|event| {
                 let pos = match &event.kind {
                     EventKind::BlockChanged { pos, .. }

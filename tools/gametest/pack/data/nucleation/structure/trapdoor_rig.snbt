@@ -1,0 +1,16 @@
+{
+  DataVersion: 4903,
+  size: [4, 2, 3],
+  palette: [
+    {Name: "minecraft:oak_trapdoor", Properties: {facing: "north", half: "bottom", open: "false", powered: "false", waterlogged: "false"}},
+    {Name: "minecraft:piston", Properties: {extended: "false", facing: "east"}},
+    {Name: "minecraft:iron_trapdoor", Properties: {facing: "south", half: "top", open: "false", powered: "false", waterlogged: "false"}}
+  ],
+  blocks: [
+    {pos: [2, 0, 0], state: 0},
+    {pos: [1, 1, 0], state: 2},
+    {pos: [0, 0, 2], state: 1},
+    {pos: [1, 0, 2], state: 0}
+  ],
+  entities: []
+}

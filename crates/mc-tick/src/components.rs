@@ -1111,14 +1111,24 @@ impl<P: PowerSource> BlockBehaviour for Dropper<P> {
                         (remaining > 0).then(|| (id.clone(), remaining)),
                     );
                     // The placed box keeps the item's slots. Registered before
-                    // the write so the update cascade reads a full container.
+                    // the write so the update cascade reads a full container —
+                    // and each stack lands through the *logged* slot setter, so
+                    // the trace records the container coming into existence the
+                    // way a vanilla snapshot diff sees it (net across the tick).
                     ctx.inventories.insert(
                         front,
-                        crate::inventory::Inventory {
-                            slots: 27,
-                            stacks: carried.unwrap_or_default(),
-                        },
+                        crate::inventory::Inventory { slots: 27, stacks: Vec::new() },
                     );
+                    for stack in carried.unwrap_or_default() {
+                        ctx.set_inventory_slot(
+                            front,
+                            stack.slot,
+                            Some((stack.id.clone(), stack.count)),
+                        );
+                        if let Some(contents) = stack.contents {
+                            ctx.set_slot_contents(front, stack.slot, Some(contents));
+                        }
+                    }
                     ctx.set(front, state);
                 }
                 // State never interned: nothing can be placed; the item stays,
