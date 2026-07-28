@@ -1,0 +1,53 @@
+<!doctype html>
+<title>TickSimulation browser bench</title>
+<pre id="log"></pre>
+<script type="module">
+  // Reference for the frontends: import the assembled package, evaluate a
+  // flying machine on the main thread AND in a module Web Worker.
+  const log = (m) => {
+    document.getElementById("log").textContent += m + "\n";
+    console.log(m);
+  };
+  window.__results = {};
+
+  const { TickSimulation, TickSettleMode } = await import(
+    "/dist/npm-mctick/index.mjs"
+  );
+  const snbt = await (
+    await fetch("/crates/mc-tick/tests/corpus/structures/flying_machine_east.snbt")
+  ).text();
+
+  const RB = "minecraft:redstone_block";
+  function evalOnce() {
+    const sim = TickSimulation.fromSnbt(snbt, TickSettleMode.Quiet, 0, 0, 0, "");
+    for (let t = 0; t < 80; t++) {
+      if (t === 2) sim.placeBlock(2, 1, 1, RB);
+      if (t === 4) sim.placeBlock(2, 1, 1, "minecraft:air");
+      sim.step();
+    }
+    return sim.nonAirMinX() - 1;
+  }
+
+  for (let i = 0; i < 10; i++) evalOnce(); // warmup
+  const N = 150;
+  const t0 = performance.now();
+  let displacement = 0;
+  for (let i = 0; i < N; i++) displacement = evalOnce();
+  const main = (1000 * N) / (performance.now() - t0);
+  window.__results.main = { evalsPerSec: main, displacement };
+  log(`main thread: ${main.toFixed(0)} evals/sec, displacement +${displacement}`);
+
+  const worker = new Worker("/tests/browser_bench/worker.mjs", { type: "module" });
+  worker.postMessage({ snbt, evals: N });
+  worker.onmessage = (e) => {
+    window.__results.worker = e.data;
+    log(e.data.error ? "worker ERROR: " + e.data.error
+        : `worker: ${e.data.evalsPerSec.toFixed(0)} evals/sec, displacement +${e.data.displacement}`);
+    window.__done = true;
+  };
+  worker.onerror = (e) => {
+    window.__results.worker = { error: String(e.message) };
+    log("worker ERROR: " + e.message);
+    window.__done = true;
+  };
+</script>

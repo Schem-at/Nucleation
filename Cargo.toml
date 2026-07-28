@@ -53,7 +53,14 @@ bridge-full = [
     "scripting-js",
     "voxelize",
     "world-segment",
+    "mc-tick",
 ]
+
+# The vanilla-accurate headless tick engine (crates/mc-tick), bridged as
+# TickSimulation. Optional so plain library builds stay unchanged; the crate
+# also stays a dev-dependency for examples/tests, which is fine — the two
+# declarations are independent.
+mc-tick = ["dep:mc-tick"]
 
 # Storage backends (the `store` module). `mem` is always available; the rest
 # are feature-gated so you only pull the deps you enable. Networked backends
@@ -128,6 +135,9 @@ getrandom = { version = "0.2", features = ["custom"] }
 diplomat = { version = "0.15.0", optional = true }
 diplomat-runtime = { version = "0.15.1", optional = true }
 base64 = { version = "0.22", optional = true }
+# The headless tick engine, bridged behind the `mc-tick` feature. Dependency
+# direction stays one-way: mc-tick never sees nucleation.
+mc-tick = { path = "crates/mc-tick", version = "0.1.0", optional = true }
 
 # Scripting engine dependencies
 mlua = { version = "0.10", features = ["luajit", "vendored"], optional = true }

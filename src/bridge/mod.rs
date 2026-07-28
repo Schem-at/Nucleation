@@ -21,6 +21,8 @@ pub mod field;
 pub mod geo;
 #[cfg(feature = "meshing")]
 pub mod meshing;
+#[cfg(feature = "mc-tick")]
+pub mod mc_tick;
 pub mod nbt;
 #[cfg(feature = "rendering")]
 pub mod rendering;

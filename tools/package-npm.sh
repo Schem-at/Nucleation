@@ -9,7 +9,8 @@ OUT="${1:-dist/npm}"
 # simulation+meshing ride along (schemati's flow runs redstone sim in the
 # browser); rendering (wgpu needs wasm-bindgen glue) and scripting (luajit
 # can't target wasm) stay out of the wasm build.
-cargo build --release --target wasm32-unknown-unknown --lib --features bridge,simulation,meshing
+FEATURES="${NUCLEATION_WASM_FEATURES:-bridge,simulation,meshing}"
+cargo build --release --target wasm32-unknown-unknown --lib --features "$FEATURES"
 
 rm -rf "$OUT"
 mkdir -p "$OUT"
@@ -21,11 +22,10 @@ cp bindings/npm/README.md "$OUT/"
 # Package-local wasm path (the committed bindings/diplomat.config.mjs points at
 # target/ for the in-repo smoke tests instead).
 cat > "$OUT/diplomat.config.mjs" <<'EOF'
-import { fileURLToPath } from "node:url";
-import path from "node:path";
-
+// Isomorphic: fs.readFileSync accepts file:// URLs in Node; the browser
+// branch fetches the same URL relative to the module.
 export default {
-  wasm_path: path.join(path.dirname(fileURLToPath(import.meta.url)), "nucleation.wasm"),
+  wasm_path: new URL("./nucleation.wasm", import.meta.url),
 };
 EOF
 

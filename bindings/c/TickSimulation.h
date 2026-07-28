@@ -1,0 +1,77 @@
+#ifndef TickSimulation_H
+#define TickSimulation_H
+
+#include <stdio.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+#include "diplomat_runtime.h"
+
+#include "NucleationError.d.h"
+#include "Schematic.d.h"
+#include "TickSettleMode.d.h"
+
+#include "TickSimulation.d.h"
+
+
+
+
+
+
+typedef struct TickSimulation_from_snbt_result {union {TickSimulation* ok; NucleationError err;}; bool is_ok;} TickSimulation_from_snbt_result;
+TickSimulation_from_snbt_result TickSimulation_from_snbt(DiplomatStringView snbt, TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z, DiplomatStringView extra_states);
+
+typedef struct TickSimulation_from_schematic_result {union {TickSimulation* ok; NucleationError err;}; bool is_ok;} TickSimulation_from_schematic_result;
+TickSimulation_from_schematic_result TickSimulation_from_schematic(const Schematic* schematic, TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z, DiplomatStringView extra_states);
+
+void TickSimulation_set_rng_seed(TickSimulation* self, int64_t seed);
+
+void TickSimulation_step(TickSimulation* self);
+
+void TickSimulation_run(TickSimulation* self, uint32_t ticks);
+
+bool TickSimulation_run_until_quiescent(TickSimulation* self, uint32_t budget);
+
+uint32_t TickSimulation_tick_count(const TickSimulation* self);
+
+bool TickSimulation_is_quiescent(const TickSimulation* self);
+
+void TickSimulation_use_block(TickSimulation* self, int32_t x, int32_t y, int32_t z);
+
+typedef struct TickSimulation_place_block_result {union { NucleationError err;}; bool is_ok;} TickSimulation_place_block_result;
+TickSimulation_place_block_result TickSimulation_place_block(TickSimulation* self, int32_t x, int32_t y, int32_t z, DiplomatStringView state);
+
+void TickSimulation_get_block(const TickSimulation* self, int32_t x, int32_t y, int32_t z, DiplomatWrite* write);
+
+uint32_t TickSimulation_checkpoint(TickSimulation* self);
+
+typedef struct TickSimulation_restore_result {union { NucleationError err;}; bool is_ok;} TickSimulation_restore_result;
+TickSimulation_restore_result TickSimulation_restore(TickSimulation* self, uint32_t id);
+
+void TickSimulation_gametest_snbt(const Schematic* schematic, DiplomatWrite* write);
+
+void TickSimulation_changes_json(const TickSimulation* self, DiplomatWrite* write);
+
+void TickSimulation_item_entities_json(const TickSimulation* self, DiplomatWrite* write);
+
+void TickSimulation_events_summary_json(const TickSimulation* self, DiplomatWrite* write);
+
+uint32_t TickSimulation_non_air_count(const TickSimulation* self);
+
+double TickSimulation_non_air_center_x(const TickSimulation* self);
+
+int32_t TickSimulation_non_air_min_x(const TickSimulation* self);
+
+int32_t TickSimulation_non_air_max_x(const TickSimulation* self);
+
+uint32_t TickSimulation_changes_count(const TickSimulation* self);
+
+void TickSimulation_world_snapshot_json(const TickSimulation* self, DiplomatWrite* write);
+
+void TickSimulation_destroy(TickSimulation* self);
+
+
+
+
+
+#endif // TickSimulation_H

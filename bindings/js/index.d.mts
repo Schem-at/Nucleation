@@ -58,6 +58,8 @@ export { Field3 } from "./Field3.mjs"
 
 export { Geo } from "./Geo.mjs"
 
+export { TickSimulation } from "./TickSimulation.mjs"
+
 export { ChunkMeshResult } from "./ChunkMeshResult.mjs"
 
 export { ItemModelConfig } from "./ItemModelConfig.mjs"
@@ -155,6 +157,8 @@ export { WorldSink } from "./WorldSink.mjs"
 export { WorldStream } from "./WorldStream.mjs"
 
 export { InterpolationSpace } from "./InterpolationSpace.mjs"
+
+export { TickSettleMode } from "./TickSettleMode.mjs"
 
 export { MeshPhase } from "./MeshPhase.mjs"
 

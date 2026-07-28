@@ -1,0 +1,293 @@
+#ifndef TickSimulation_HPP
+#define TickSimulation_HPP
+
+#include "TickSimulation.d.hpp"
+
+#include <stdio.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+#include <memory>
+#include <functional>
+#include <optional>
+#include <cstdlib>
+#include "NucleationError.hpp"
+#include "Schematic.hpp"
+#include "TickSettleMode.hpp"
+#include "diplomat_runtime.hpp"
+
+
+namespace diplomat {
+namespace capi {
+    extern "C" {
+
+    typedef struct TickSimulation_from_snbt_result {union {diplomat::capi::TickSimulation* ok; diplomat::capi::NucleationError err;}; bool is_ok;} TickSimulation_from_snbt_result;
+    TickSimulation_from_snbt_result TickSimulation_from_snbt(diplomat::capi::DiplomatStringView snbt, diplomat::capi::TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z, diplomat::capi::DiplomatStringView extra_states);
+
+    typedef struct TickSimulation_from_schematic_result {union {diplomat::capi::TickSimulation* ok; diplomat::capi::NucleationError err;}; bool is_ok;} TickSimulation_from_schematic_result;
+    TickSimulation_from_schematic_result TickSimulation_from_schematic(const diplomat::capi::Schematic* schematic, diplomat::capi::TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z, diplomat::capi::DiplomatStringView extra_states);
+
+    void TickSimulation_set_rng_seed(diplomat::capi::TickSimulation* self, int64_t seed);
+
+    void TickSimulation_step(diplomat::capi::TickSimulation* self);
+
+    void TickSimulation_run(diplomat::capi::TickSimulation* self, uint32_t ticks);
+
+    bool TickSimulation_run_until_quiescent(diplomat::capi::TickSimulation* self, uint32_t budget);
+
+    uint32_t TickSimulation_tick_count(const diplomat::capi::TickSimulation* self);
+
+    bool TickSimulation_is_quiescent(const diplomat::capi::TickSimulation* self);
+
+    void TickSimulation_use_block(diplomat::capi::TickSimulation* self, int32_t x, int32_t y, int32_t z);
+
+    typedef struct TickSimulation_place_block_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} TickSimulation_place_block_result;
+    TickSimulation_place_block_result TickSimulation_place_block(diplomat::capi::TickSimulation* self, int32_t x, int32_t y, int32_t z, diplomat::capi::DiplomatStringView state);
+
+    void TickSimulation_get_block(const diplomat::capi::TickSimulation* self, int32_t x, int32_t y, int32_t z, diplomat::capi::DiplomatWrite* write);
+
+    uint32_t TickSimulation_checkpoint(diplomat::capi::TickSimulation* self);
+
+    typedef struct TickSimulation_restore_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} TickSimulation_restore_result;
+    TickSimulation_restore_result TickSimulation_restore(diplomat::capi::TickSimulation* self, uint32_t id);
+
+    void TickSimulation_gametest_snbt(const diplomat::capi::Schematic* schematic, diplomat::capi::DiplomatWrite* write);
+
+    void TickSimulation_changes_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
+
+    void TickSimulation_item_entities_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
+
+    void TickSimulation_events_summary_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
+
+    uint32_t TickSimulation_non_air_count(const diplomat::capi::TickSimulation* self);
+
+    double TickSimulation_non_air_center_x(const diplomat::capi::TickSimulation* self);
+
+    int32_t TickSimulation_non_air_min_x(const diplomat::capi::TickSimulation* self);
+
+    int32_t TickSimulation_non_air_max_x(const diplomat::capi::TickSimulation* self);
+
+    uint32_t TickSimulation_changes_count(const diplomat::capi::TickSimulation* self);
+
+    void TickSimulation_world_snapshot_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
+
+    void TickSimulation_destroy(TickSimulation* self);
+
+    } // extern "C"
+} // namespace capi
+} // namespace
+
+inline diplomat::result<std::unique_ptr<TickSimulation>, NucleationError> TickSimulation::from_snbt(std::string_view snbt, TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z, std::string_view extra_states) {
+    auto result = diplomat::capi::TickSimulation_from_snbt({snbt.data(), snbt.size()},
+        settle.AsFFI(),
+        origin_x,
+        origin_y,
+        origin_z,
+        {extra_states.data(), extra_states.size()});
+    return result.is_ok ? diplomat::result<std::unique_ptr<TickSimulation>, NucleationError>(diplomat::Ok<std::unique_ptr<TickSimulation>>(std::unique_ptr<TickSimulation>(TickSimulation::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<TickSimulation>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<TickSimulation>, NucleationError> TickSimulation::from_schematic(const Schematic& schematic, TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z, std::string_view extra_states) {
+    auto result = diplomat::capi::TickSimulation_from_schematic(schematic.AsFFI(),
+        settle.AsFFI(),
+        origin_x,
+        origin_y,
+        origin_z,
+        {extra_states.data(), extra_states.size()});
+    return result.is_ok ? diplomat::result<std::unique_ptr<TickSimulation>, NucleationError>(diplomat::Ok<std::unique_ptr<TickSimulation>>(std::unique_ptr<TickSimulation>(TickSimulation::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<TickSimulation>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline void TickSimulation::set_rng_seed(int64_t seed) {
+    diplomat::capi::TickSimulation_set_rng_seed(this->AsFFI(),
+        seed);
+}
+
+inline void TickSimulation::step() {
+    diplomat::capi::TickSimulation_step(this->AsFFI());
+}
+
+inline void TickSimulation::run(uint32_t ticks) {
+    diplomat::capi::TickSimulation_run(this->AsFFI(),
+        ticks);
+}
+
+inline bool TickSimulation::run_until_quiescent(uint32_t budget) {
+    auto result = diplomat::capi::TickSimulation_run_until_quiescent(this->AsFFI(),
+        budget);
+    return result;
+}
+
+inline uint32_t TickSimulation::tick_count() const {
+    auto result = diplomat::capi::TickSimulation_tick_count(this->AsFFI());
+    return result;
+}
+
+inline bool TickSimulation::is_quiescent() const {
+    auto result = diplomat::capi::TickSimulation_is_quiescent(this->AsFFI());
+    return result;
+}
+
+inline void TickSimulation::use_block(int32_t x, int32_t y, int32_t z) {
+    diplomat::capi::TickSimulation_use_block(this->AsFFI(),
+        x,
+        y,
+        z);
+}
+
+inline diplomat::result<std::monostate, NucleationError> TickSimulation::place_block(int32_t x, int32_t y, int32_t z, std::string_view state) {
+    auto result = diplomat::capi::TickSimulation_place_block(this->AsFFI(),
+        x,
+        y,
+        z,
+        {state.data(), state.size()});
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline std::string TickSimulation::get_block(int32_t x, int32_t y, int32_t z) const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::TickSimulation_get_block(this->AsFFI(),
+        x,
+        y,
+        z,
+        &write);
+    return output;
+}
+template<typename W>
+inline void TickSimulation::get_block_write(int32_t x, int32_t y, int32_t z, W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::TickSimulation_get_block(this->AsFFI(),
+        x,
+        y,
+        z,
+        &write);
+}
+
+inline uint32_t TickSimulation::checkpoint() {
+    auto result = diplomat::capi::TickSimulation_checkpoint(this->AsFFI());
+    return result;
+}
+
+inline diplomat::result<std::monostate, NucleationError> TickSimulation::restore(uint32_t id) {
+    auto result = diplomat::capi::TickSimulation_restore(this->AsFFI(),
+        id);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline std::string TickSimulation::gametest_snbt(const Schematic& schematic) {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::TickSimulation_gametest_snbt(schematic.AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void TickSimulation::gametest_snbt_write(const Schematic& schematic, W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::TickSimulation_gametest_snbt(schematic.AsFFI(),
+        &write);
+}
+
+inline std::string TickSimulation::changes_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::TickSimulation_changes_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void TickSimulation::changes_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::TickSimulation_changes_json(this->AsFFI(),
+        &write);
+}
+
+inline std::string TickSimulation::item_entities_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::TickSimulation_item_entities_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void TickSimulation::item_entities_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::TickSimulation_item_entities_json(this->AsFFI(),
+        &write);
+}
+
+inline std::string TickSimulation::events_summary_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::TickSimulation_events_summary_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void TickSimulation::events_summary_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::TickSimulation_events_summary_json(this->AsFFI(),
+        &write);
+}
+
+inline uint32_t TickSimulation::non_air_count() const {
+    auto result = diplomat::capi::TickSimulation_non_air_count(this->AsFFI());
+    return result;
+}
+
+inline double TickSimulation::non_air_center_x() const {
+    auto result = diplomat::capi::TickSimulation_non_air_center_x(this->AsFFI());
+    return result;
+}
+
+inline int32_t TickSimulation::non_air_min_x() const {
+    auto result = diplomat::capi::TickSimulation_non_air_min_x(this->AsFFI());
+    return result;
+}
+
+inline int32_t TickSimulation::non_air_max_x() const {
+    auto result = diplomat::capi::TickSimulation_non_air_max_x(this->AsFFI());
+    return result;
+}
+
+inline uint32_t TickSimulation::changes_count() const {
+    auto result = diplomat::capi::TickSimulation_changes_count(this->AsFFI());
+    return result;
+}
+
+inline std::string TickSimulation::world_snapshot_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::TickSimulation_world_snapshot_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void TickSimulation::world_snapshot_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::TickSimulation_world_snapshot_json(this->AsFFI(),
+        &write);
+}
+
+inline const diplomat::capi::TickSimulation* TickSimulation::AsFFI() const {
+    return reinterpret_cast<const diplomat::capi::TickSimulation*>(this);
+}
+
+inline diplomat::capi::TickSimulation* TickSimulation::AsFFI() {
+    return reinterpret_cast<diplomat::capi::TickSimulation*>(this);
+}
+
+inline const TickSimulation* TickSimulation::FromFFI(const diplomat::capi::TickSimulation* ptr) {
+    return reinterpret_cast<const TickSimulation*>(ptr);
+}
+
+inline TickSimulation* TickSimulation::FromFFI(diplomat::capi::TickSimulation* ptr) {
+    return reinterpret_cast<TickSimulation*>(ptr);
+}
+
+inline void TickSimulation::operator delete(void* ptr) {
+    diplomat::capi::TickSimulation_destroy(reinterpret_cast<diplomat::capi::TickSimulation*>(ptr));
+}
+
+
+#endif // TickSimulation_HPP

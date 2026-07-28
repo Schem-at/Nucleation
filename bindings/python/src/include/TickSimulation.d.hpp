@@ -1,0 +1,198 @@
+#ifndef NUCLEATION_TickSimulation_D_HPP
+#define NUCLEATION_TickSimulation_D_HPP
+
+#include <stdio.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+#include <memory>
+#include <functional>
+#include <optional>
+#include <cstdlib>
+#include "diplomat_runtime.hpp"
+namespace nucleation {
+namespace capi { struct Schematic; }
+class Schematic;
+namespace capi { struct TickSimulation; }
+class TickSimulation;
+class NucleationError;
+class TickSettleMode;
+} // namespace nucleation
+
+
+
+namespace nucleation {
+namespace capi {
+    struct TickSimulation;
+} // namespace capi
+} // namespace
+
+namespace nucleation {
+/**
+ * A headless, vanilla-accurate tick simulation of one structure.
+ */
+class TickSimulation {
+public:
+
+  /**
+   * Load from Java structure SNBT text.
+   *
+   * `extra_states`: semicolon-separated block-state descriptors that
+   * later `place_block` calls may write (behaviours bind at
+   * construction). `minecraft:redstone_block` is always available.
+   * `origin_*`: where the build's (0,0,0) sits in world coordinates —
+   * wire update order hashes absolute positions.
+   */
+  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::TickSimulation>, nucleation::NucleationError> from_snbt(std::string_view snbt, nucleation::TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z, std::string_view extra_states);
+
+  /**
+   * Load from a schematic (any format nucleation can read), rendered
+   * to gametest-flavor structure SNBT for mc-tick's parser.
+   */
+  inline static nucleation::diplomat::result<std::unique_ptr<nucleation::TickSimulation>, nucleation::NucleationError> from_schematic(const nucleation::Schematic& schematic, nucleation::TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z, std::string_view extra_states);
+
+  /**
+   * Seed the vanilla random source (`java.util.Random`'s LCG,
+   * bit-for-bit). Unseeded, jittering behaviours use each
+   * distribution's mean — fully deterministic, no noise.
+   */
+  inline void set_rng_seed(int64_t seed);
+
+  /**
+   * Advance one game tick.
+   */
+  inline void step();
+
+  /**
+   * Advance `ticks` game ticks.
+   */
+  inline void run(uint32_t ticks);
+
+  /**
+   * Run until nothing is scheduled or `budget` ticks pass. Returns
+   * whether the world went quiet.
+   */
+  inline bool run_until_quiescent(uint32_t budget);
+
+  /**
+   * Game ticks elapsed since settle.
+   */
+  inline uint32_t tick_count() const;
+
+  /**
+   * Whether nothing is scheduled or queued.
+   */
+  inline bool is_quiescent() const;
+
+  /**
+   * Right-click a block with an empty hand (lever, button, note block).
+   */
+  inline void use_block(int32_t x, int32_t y, int32_t z);
+
+  /**
+   * Write a block state (`minecraft:air` breaks). The state must be in
+   * the structure, in `extra_states`, or `minecraft:redstone_block`.
+   */
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> place_block(int32_t x, int32_t y, int32_t z, std::string_view state);
+
+  /**
+   * The block state descriptor at a position (`minecraft:air` for empty).
+   */
+  inline std::string get_block(int32_t x, int32_t y, int32_t z) const;
+  template<typename W>
+  inline void get_block_write(int32_t x, int32_t y, int32_t z, W& writeable_output) const;
+
+  /**
+   * Snapshot the entire simulation; returns a checkpoint id.
+   */
+  inline uint32_t checkpoint();
+
+  /**
+   * Restore a checkpoint taken earlier on this simulation.
+   */
+  inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> restore(uint32_t id);
+
+  /**
+   * Every recorded block change since settle, as JSON:
+   * `[{"tick":N,"pos":[x,y,z],"from":"...","to":"..."}]`.
+   * Render a schematic as gametest-flavor structure SNBT — the text
+   * `from_snbt` and the corpus/render tooling consume. Lets hosts hand
+   * a converted `.litematic`/`.schem` to the video renderer.
+   */
+  inline static std::string gametest_snbt(const nucleation::Schematic& schematic);
+  template<typename W>
+  inline static void gametest_snbt_write(const nucleation::Schematic& schematic, W& writeable_output);
+
+  inline std::string changes_json() const;
+  template<typename W>
+  inline void changes_json_write(W& writeable_output) const;
+
+  /**
+   * Live item entities and minecarts, as JSON:
+   * `{"items":[{"id":N,"item":"...","count":N,"pos":[..],"vel":[..],
+   * "on_ground":bool,"contents":[{"id":"...","count":N}]}],
+   * "minecarts":[{"id":N,"kind":"...","pos":[..],"vel":[..]}]}`.
+   */
+  inline std::string item_entities_json() const;
+  template<typename W>
+  inline void item_entities_json_write(W& writeable_output) const;
+
+  /**
+   * Per-tick aggregates over the recorded changes, as JSON:
+   * `[{"tick":N,"changes":N,"piston":N,"redstone":N}]` — `piston`
+   * counts changes touching piston blocks (base, head, moving), and
+   * `redstone` changes touching wire/torch/repeater/comparator/
+   * observer/lamp/lever/button/pressure-plate states.
+   */
+  inline std::string events_summary_json() const;
+  template<typename W>
+  inline void events_summary_json_write(W& writeable_output) const;
+
+  /**
+   * Every non-air block, as JSON:
+   * `[{"pos":[x,y,z],"state":"..."}]`.
+   * How many non-air blocks stand in the world right now.
+   */
+  inline uint32_t non_air_count() const;
+
+  /**
+   * Center of mass (x) of every non-air block — the GA's displacement
+   * metric without a JSON round-trip. NaN when the world is empty.
+   */
+  inline double non_air_center_x() const;
+
+  /**
+   * Smallest x holding a non-air block; `i32::MAX` when empty.
+   */
+  inline int32_t non_air_min_x() const;
+
+  /**
+   * Largest x holding a non-air block; `i32::MIN` when empty.
+   */
+  inline int32_t non_air_max_x() const;
+
+  /**
+   * How many block changes recording has captured so far.
+   */
+  inline uint32_t changes_count() const;
+
+  inline std::string world_snapshot_json() const;
+  template<typename W>
+  inline void world_snapshot_json_write(W& writeable_output) const;
+
+    inline const nucleation::capi::TickSimulation* AsFFI() const;
+    inline nucleation::capi::TickSimulation* AsFFI();
+    inline static const nucleation::TickSimulation* FromFFI(const nucleation::capi::TickSimulation* ptr);
+    inline static nucleation::TickSimulation* FromFFI(nucleation::capi::TickSimulation* ptr);
+    inline static void operator delete(void* ptr);
+private:
+    TickSimulation() = delete;
+    TickSimulation(const nucleation::TickSimulation&) = delete;
+    TickSimulation(nucleation::TickSimulation&&) noexcept = delete;
+    TickSimulation operator=(const nucleation::TickSimulation&) = delete;
+    TickSimulation operator=(nucleation::TickSimulation&&) noexcept = delete;
+    static void operator delete[](void*, size_t) = delete;
+};
+
+} // namespace
+#endif // NUCLEATION_TickSimulation_D_HPP
