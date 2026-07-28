@@ -163,42 +163,67 @@ select {
 
 .layout {
   display: grid;
-  grid-template-columns: 264px 1fr;
+  grid-template-columns: 1fr;
   gap: 20px;
   align-items: start;
 }
 
-@media (max-width: 980px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* The rail is a self-scrolling column: it can never exceed the viewport
-   vertically (internal scroll instead) and never overflows horizontally. */
+/* Config lives in a flyout drawer: a fixed width the content actually fits,
+   instead of a grid column it silently overflowed (the old 264px rail was
+   clipping ~380px of controls). The dashboard keeps the full viewport. */
 .side-col {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 80;
+  width: min(460px, 94vw);
   display: grid;
   gap: 14px;
   align-content: start;
-  position: sticky;
-  top: 12px;
-  /* Sized for the rail's NATURAL position below the header, not just the
-     stuck position — 100vh-24 overflowed the fold by the header's height
-     at page top, clipping the rail's bottom edge ("cut off"). */
-  max-height: calc(100dvh - 100px);
+  padding: 16px;
+  background: var(--page);
+  border-right: 1px solid var(--hairline);
+  box-shadow: 12px 0 40px rgb(0 0 0 / 0.25);
   overflow-y: auto;
   overflow-x: hidden;
-  min-width: 0;
   scrollbar-width: thin;
-  padding-right: 2px;
+  transform: translateX(-103%);
+  transition: transform 200ms ease;
 }
 
-@media (max-width: 980px) {
+.side-col.open {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
   .side-col {
-    position: static;
-    max-height: none;
-    overflow: visible;
+    transition: none;
   }
+}
+
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: rgb(0 0 0 / 0.42);
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* Header stays interactive above the backdrop (its right-side controls sit
+   past the drawer's width); drawer overlays everything on the left. */
+.topbar {
+  position: relative;
+  z-index: 70;
 }
 
 .main-col {

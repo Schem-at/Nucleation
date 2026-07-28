@@ -81,6 +81,24 @@ export default function App() {
   const replayer = () => (replayRef.current ??= new ReplayClient());
 
   const [status, setStatus] = useState<RunStatus>("idle");
+  // Config drawer: open on arrival (configuring is the first task), closed
+  // automatically when a run launches, reopenable any time — live controls
+  // inside keep working mid-run.
+  const [configOpen, setConfigOpen] = useState(true);
+  const prevStatusRef = useRef<RunStatus>("idle");
+  useEffect(() => {
+    if (prevStatusRef.current === "idle" && status === "running") {
+      setConfigOpen(false);
+    }
+    prevStatusRef.current = status;
+  }, [status]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setConfigOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const [config, setConfig] = useState<RunConfig | null>(null);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -640,17 +658,35 @@ export default function App() {
           </button>
         </nav>
         <div className="spacer" />
+        <button
+          className="icon-btn"
+          onClick={() => setConfigOpen((o) => !o)}
+          aria-expanded={configOpen}
+          data-testid="config-drawer-toggle"
+        >
+          ⚙ config
+        </button>
         <button className="icon-btn" onClick={toggle} aria-label="Toggle color theme">
           light / dark
         </button>
       </header>
 
       <div className="layout">
-        <aside className="side-col">
+        {configOpen && (
+          <button
+            className="drawer-backdrop"
+            aria-label="Close run config"
+            onClick={() => setConfigOpen(false)}
+          />
+        )}
+        <aside className={configOpen ? "side-col open" : "side-col"}>
+          <div className="drawer-head">
+            <h2 className="eyebrow">Run config</h2>
+            <button className="icon-btn" onClick={() => setConfigOpen(false)}>
+              close ✕
+            </button>
+          </div>
           <section className="panel">
-            <div className="panel-head">
-              <h2 className="eyebrow">Run config</h2>
-            </div>
             <RunConfigForm
               running={running}
               paused={isPaused}
