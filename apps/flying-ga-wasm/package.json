@@ -1,0 +1,25 @@
+{
+  "name": "flying-ga-wasm",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "sync-engine": "rm -rf public/engine && mkdir -p public/engine && cp -R ../../dist/npm-mctick/. public/engine/",
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "gifenc": "^1.0.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "playwright": "^1.62.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

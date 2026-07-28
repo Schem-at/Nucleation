@@ -1,0 +1,4 @@
+node_modules/
+dist/
+# Generated: `npm run sync-engine` copies ../../dist/npm-mctick here.
+public/engine/

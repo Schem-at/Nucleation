@@ -1,0 +1,928 @@
+{
+ "name": "door_6x6",
+ "dims": [
+  22,
+  13,
+  7
+ ],
+ "lever": [
+  10,
+  4,
+  1
+ ],
+ "open_ticks": 14,
+ "close_ticks": 16,
+ "materials": [
+  {
+   "id": "minecraft:white_concrete",
+   "count": 54
+  },
+  {
+   "id": "minecraft:redstone_wire",
+   "count": 41
+  },
+  {
+   "id": "minecraft:smooth_stone",
+   "count": 38
+  },
+  {
+   "id": "minecraft:sticky_piston",
+   "count": 24
+  },
+  {
+   "id": "minecraft:redstone_torch",
+   "count": 17
+  },
+  {
+   "id": "minecraft:repeater",
+   "count": 14
+  },
+  {
+   "id": "minecraft:observer",
+   "count": 12
+  },
+  {
+   "id": "minecraft:slime_block",
+   "count": 8
+  },
+  {
+   "id": "minecraft:redstone_block",
+   "count": 6
+  },
+  {
+   "id": "minecraft:comparator",
+   "count": 4
+  },
+  {
+   "id": "minecraft:noteblock",
+   "count": 2
+  },
+  {
+   "id": "minecraft:lever",
+   "count": 1
+  }
+ ],
+ "events_per_tick": [
+  {
+   "tick": 0,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 1,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 2,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 3,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 4,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 5,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 6,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 7,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 8,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 9,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 10,
+   "piston": 0,
+   "redstone": 7,
+   "changes": 4
+  },
+  {
+   "tick": 11,
+   "piston": 0,
+   "redstone": 5,
+   "changes": 3
+  },
+  {
+   "tick": 12,
+   "piston": 0,
+   "redstone": 4,
+   "changes": 2
+  },
+  {
+   "tick": 13,
+   "piston": 1,
+   "redstone": 3,
+   "changes": 4
+  },
+  {
+   "tick": 14,
+   "piston": 3,
+   "redstone": 2,
+   "changes": 7
+  },
+  {
+   "tick": 15,
+   "piston": 4,
+   "redstone": 2,
+   "changes": 9
+  },
+  {
+   "tick": 16,
+   "piston": 4,
+   "redstone": 2,
+   "changes": 9
+  },
+  {
+   "tick": 17,
+   "piston": 4,
+   "redstone": 2,
+   "changes": 9
+  },
+  {
+   "tick": 18,
+   "piston": 4,
+   "redstone": 1,
+   "changes": 9
+  },
+  {
+   "tick": 19,
+   "piston": 6,
+   "redstone": 0,
+   "changes": 12
+  },
+  {
+   "tick": 20,
+   "piston": 6,
+   "redstone": 1,
+   "changes": 13
+  },
+  {
+   "tick": 21,
+   "piston": 4,
+   "redstone": 0,
+   "changes": 8
+  },
+  {
+   "tick": 22,
+   "piston": 4,
+   "redstone": 1,
+   "changes": 9
+  },
+  {
+   "tick": 23,
+   "piston": 3,
+   "redstone": 0,
+   "changes": 6
+  },
+  {
+   "tick": 24,
+   "piston": 3,
+   "redstone": 1,
+   "changes": 7
+  },
+  {
+   "tick": 25,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 26,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 27,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 28,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 29,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 30,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 31,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 32,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 33,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 34,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 35,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 36,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 37,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 38,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 39,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 40,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 41,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 42,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 43,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 44,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 45,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 46,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 47,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 48,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 49,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 50,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 51,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 52,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 53,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 54,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 55,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 56,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 57,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 58,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 59,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 60,
+   "piston": 0,
+   "redstone": 7,
+   "changes": 4
+  },
+  {
+   "tick": 61,
+   "piston": 0,
+   "redstone": 6,
+   "changes": 4
+  },
+  {
+   "tick": 62,
+   "piston": 0,
+   "redstone": 5,
+   "changes": 3
+  },
+  {
+   "tick": 63,
+   "piston": 1,
+   "redstone": 3,
+   "changes": 4
+  },
+  {
+   "tick": 64,
+   "piston": 2,
+   "redstone": 3,
+   "changes": 6
+  },
+  {
+   "tick": 65,
+   "piston": 3,
+   "redstone": 3,
+   "changes": 8
+  },
+  {
+   "tick": 66,
+   "piston": 3,
+   "redstone": 2,
+   "changes": 7
+  },
+  {
+   "tick": 67,
+   "piston": 5,
+   "redstone": 1,
+   "changes": 11
+  },
+  {
+   "tick": 68,
+   "piston": 4,
+   "redstone": 2,
+   "changes": 9
+  },
+  {
+   "tick": 69,
+   "piston": 6,
+   "redstone": 1,
+   "changes": 13
+  },
+  {
+   "tick": 70,
+   "piston": 4,
+   "redstone": 1,
+   "changes": 9
+  },
+  {
+   "tick": 71,
+   "piston": 4,
+   "redstone": 1,
+   "changes": 9
+  },
+  {
+   "tick": 72,
+   "piston": 4,
+   "redstone": 1,
+   "changes": 9
+  },
+  {
+   "tick": 73,
+   "piston": 4,
+   "redstone": 1,
+   "changes": 9
+  },
+  {
+   "tick": 74,
+   "piston": 3,
+   "redstone": 0,
+   "changes": 6
+  },
+  {
+   "tick": 75,
+   "piston": 4,
+   "redstone": 0,
+   "changes": 8
+  },
+  {
+   "tick": 76,
+   "piston": 1,
+   "redstone": 0,
+   "changes": 2
+  },
+  {
+   "tick": 77,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 78,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 79,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 80,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 81,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 82,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 83,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 84,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 85,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 86,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 87,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 88,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  },
+  {
+   "tick": 89,
+   "piston": 0,
+   "redstone": 0,
+   "changes": 0
+  }
+ ],
+ "heatmap": {
+  "w": 22,
+  "h": 13,
+  "values": [
+   [
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    2,
+    2,
+    3,
+    3,
+    0,
+    0,
+    0,
+    3,
+    3,
+    0,
+    2,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    0,
+    3,
+    0,
+    0,
+    3,
+    0,
+    3,
+    0,
+    3,
+    0,
+    2,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    0,
+    0,
+    4,
+    2,
+    3,
+    4,
+    3,
+    2,
+    2,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    4,
+    5,
+    11,
+    12,
+    12,
+    12,
+    11,
+    12,
+    8,
+    7,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    5,
+    7,
+    11,
+    10,
+    12,
+    10,
+    10,
+    9,
+    5,
+    4,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    7,
+    6,
+    13,
+    13,
+    10,
+    11,
+    11,
+    9,
+    8,
+    5,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    6,
+    4,
+    9,
+    9,
+    9,
+    13,
+    12,
+    12,
+    5,
+    5,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    5,
+    4,
+    13,
+    10,
+    14,
+    9,
+    9,
+    11,
+    8,
+    5,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    7,
+    5,
+    11,
+    12,
+    11,
+    12,
+    12,
+    10,
+    5,
+    7,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0
+   ]
+  ]
+ },
+ "animation_url": "/api/doors/abc123/animation.mp4",
+ "sim_ticks": 90,
+ "seed": 12345
+}

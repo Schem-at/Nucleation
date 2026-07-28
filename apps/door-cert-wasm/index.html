@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Door Certification Bureau — In-Browser</title>
+    <script>
+      // Theme bootstrap: URL ?theme= wins (used by screenshot tooling),
+      // then saved preference; otherwise the OS setting applies via CSS.
+      (function () {
+        var q = new URLSearchParams(location.search).get("theme");
+        var t = q || localStorage.getItem("door-cert-theme");
+        if (t === "dark" || t === "light") document.documentElement.dataset.theme = t;
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
