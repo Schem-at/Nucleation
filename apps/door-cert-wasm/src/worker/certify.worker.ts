@@ -21,6 +21,16 @@ const progress = (step: string) => post({ type: "progress", step });
 
 const baseName = (state: string) => state.split("[", 1)[0];
 
+/** Cells that differ between two snapshot keys — the size of a stroke. */
+function symmetricDiff(a: string, b: string): number {
+  const sa = new Set(a.split("\n"));
+  const sb = new Set(b.split("\n"));
+  let n = 0;
+  for (const k of sa) if (!sb.has(k)) n++;
+  for (const k of sb) if (!sa.has(k)) n++;
+  return n;
+}
+
 function snapshotKey(blocks: ReplayBlock[]): string {
   return blocks
     .map((b) => `${b.pos[0]},${b.pos[1]},${b.pos[2]}|${b.state}`)
@@ -50,6 +60,8 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
   progress("parsing");
   const bytes = new Uint8Array(job.buffer);
   let sim: any;
+  /** Builds a second sim under vanilla's paste semantics, for the survival probe. */
+  let pasteProbe: () => any;
   let w: number, h: number, l: number;
   if (job.ext === ".snbt") {
     // Vanilla gametest-style structure SNBT ("blocks:" flavor) is parsed
@@ -59,12 +71,21 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
     const m = snbt.match(/size:\s*\[([^\]]+)\]/);
     if (!m) throw new Error("structure SNBT has no size field");
     [w, h, l] = m[1].split(",").map((v) => parseInt(v.replace(/[^-\d]/g, ""), 10));
-    sim = TickSimulation.fromSnbt(snbt, TickSettleMode.Placement, 0, 0, 0, "");
+    // AS BUILT, not as pasted. Vanilla's placement pass re-derives repeater
+    // `locked` and wire connections and loads block-entity NBT after the
+    // block writes, so a door's memory cell can come up unlatched and the
+    // machine runs crippled — measuring that would certify a broken variant
+    // of the user's door. Paste behaviour is probed separately below.
+    sim = TickSimulation.fromSnbt(snbt, TickSettleMode.InWorld, 0, 0, 0, "");
+    pasteProbe = () =>
+      TickSimulation.fromSnbt(snbt, TickSettleMode.Placement, 0, 0, 0, "");
   } else {
     const schem = Schematic.fromData(Array.from(bytes));
     const dims = schem.dimensions();
     [w, h, l] = [dims.x, dims.y, dims.z];
-    sim = TickSimulation.fromSchematic(schem, TickSettleMode.Placement, 0, 0, 0, "");
+    sim = TickSimulation.fromSchematic(schem, TickSettleMode.InWorld, 0, 0, 0, "");
+    pasteProbe = () =>
+      TickSimulation.fromSchematic(schem, TickSettleMode.Placement, 0, 0, 0, "");
   }
   sim.setRngSeed(SEED);
 
@@ -102,6 +123,8 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
   if (lastOpen === null) throw new Error("lever click caused no block changes");
   const openTicks = lastOpen - tOpenClick;
 
+  const snapshotOpen = snapshotKey(JSON.parse(sim.worldSnapshotJson()));
+
   const tCloseClick: number = sim.tickCount();
   flip("lever off", true);
   sim.runUntilQuiescent(300);
@@ -111,6 +134,31 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
 
   const snapshotFinal = snapshotKey(JSON.parse(sim.worldSnapshotJson()));
   const verdict = snapshotFinal === snapshotA ? "CERTIFIED" : "DID NOT RESET";
+
+  // How much of the build actually travels on a stroke — a door that merely
+  // returns to its reference state has proven nothing (a dead machine does
+  // that too). This is the number that separates a working door from a
+  // crippled one.
+  const movedCells = symmetricDiff(snapshotA, snapshotOpen);
+
+  // Paste survival: the same door taken through vanilla's placement pass.
+  // If its stroke is materially weaker than the as-built one, the design
+  // needs priming after being pasted — worth telling the owner.
+  progress("paste check");
+  let pasteMovedCells = movedCells;
+  try {
+    const probe = pasteProbe();
+    probe.setRngSeed(SEED);
+    probe.runUntilQuiescent(200);
+    const p0 = snapshotKey(JSON.parse(probe.worldSnapshotJson()));
+    probe.useBlock(lx, ly, lz);
+    probe.runUntilQuiescent(300);
+    const p1 = snapshotKey(JSON.parse(probe.worldSnapshotJson()));
+    pasteMovedCells = symmetricDiff(p0, p1);
+  } catch {
+    pasteMovedCells = 0;
+  }
+  const pasteSafe = pasteMovedCells >= movedCells * 0.9;
 
   const simTicks: number = sim.tickCount();
   const summary: TickEvents[] = JSON.parse(sim.eventsSummaryJson());
@@ -155,6 +203,9 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
       sim_ticks: simTicks,
       seed: Number(SEED),
       verdict,
+      moved_cells: movedCells,
+      paste_safe: pasteSafe,
+      paste_moved_cells: pasteMovedCells,
     },
     replay: { blocks: initialSnapshot, changes, simTicks, flips },
   };

@@ -68,6 +68,15 @@ export function CertificatePage() {
                 closes in <b>{cert.close_ticks} ticks</b> · {secs(cert.close_ticks)} s
               </span>
             </div>
+            {!cert.paste_safe && (
+              <p className="hero-caveat">
+                <b>Needs priming after pasting.</b> Measured as built. Placed by a
+                paste, this door's stroke drops from {cert.moved_cells} to{" "}
+                {cert.paste_moved_cells} cells — vanilla re-derives redstone state on
+                placement and its memory cell comes up unlatched. Cycle the lever once
+                after placing it.
+              </p>
+            )}
           </div>
           <Seal openTicks={cert.open_ticks} verdict={cert.verdict} />
         </div>
@@ -88,7 +97,11 @@ export function CertificatePage() {
         <div className="tiles">
           <StatTile label="Open time" value={cert.open_ticks} unit=" ticks" sub={`${secs(cert.open_ticks)} s at 20 tps`} />
           <StatTile label="Close time" value={cert.close_ticks} unit=" ticks" sub={`${secs(cert.close_ticks)} s at 20 tps`} />
-          <StatTile label="Moving blocks" value={movingBlocks} sub="columns with block changes" />
+          <StatTile
+            label="Stroke mass"
+            value={cert.moved_cells}
+            sub={`cells travel per stroke · ${movingBlocks} columns active`}
+          />
           <StatTile label="Sim length" value={cert.sim_ticks} unit=" ticks" sub={`peak ${peak} events in one tick`} />
         </div>
       </div>

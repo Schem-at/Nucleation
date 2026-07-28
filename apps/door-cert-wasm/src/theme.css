@@ -570,3 +570,14 @@ button { font: inherit; color: inherit; }
 
 /* footer download link */
 .sheet-foot a { color: inherit; }
+
+/* Paste-survival caveat: a real finding about the design, not an error. */
+.hero-caveat {
+  margin: 10px 0 0;
+  padding: 8px 11px;
+  border-left: 3px solid var(--seal, #b23a2e);
+  background: color-mix(in srgb, var(--seal, #b23a2e) 7%, transparent);
+  font-size: 12.5px;
+  line-height: 1.5;
+  max-width: 62ch;
+}

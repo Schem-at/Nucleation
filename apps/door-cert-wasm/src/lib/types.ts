@@ -21,6 +21,12 @@ export type Certificate = {
   sim_ticks: number;
   seed: number;
   verdict: Verdict;
+  /** Cells that travel on one stroke — the door's working mass. */
+  moved_cells: number;
+  /** Whether the door still works when pasted (vanilla's placement pass
+   *  re-derives redstone state and can leave a memory cell unlatched). */
+  paste_safe: boolean;
+  paste_moved_cells: number;
 };
 
 export type Vec3 = [number, number, number];
