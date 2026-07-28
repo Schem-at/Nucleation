@@ -11,7 +11,11 @@ import PopulationInspector from "./components/PopulationInspector";
 import RunConfigForm from "./components/RunConfigForm";
 import RunHistory from "./components/RunHistory";
 import LineageView from "./components/LineageView";
-import { GaRunner, type LiveConfigPatch } from "./ga/runner";
+import {
+  GaRunner,
+  type GenerationUpdate,
+  type LiveConfigPatch,
+} from "./ga/runner";
 import type { BBox } from "./ga/genome";
 import { clearHof, considerForHof, loadHof, type Hof, type HofEntry } from "./hof";
 import {
@@ -57,6 +61,10 @@ function useTheme() {
 
 const SAVE_EVERY_MS = 4000;
 const EVENTS_CAP = 120;
+/** UI reflection cadence during a run. Rendering every generation put the
+ *  chart/inspector reconcile on the same thread the runner schedules from
+ *  and measurably throttled evolution; ~3 Hz is visually indistinguishable. */
+const UI_FLUSH_MS = 300;
 
 interface StagedSim {
   bbox: BBox;
@@ -225,8 +233,36 @@ export default function App() {
         setEvents((es) => [...es, e].slice(-EVENTS_CAP));
       };
 
+      // Generation results land in `rec` immediately (exact, push-based);
+      // React only sees them on a throttled flush so the main thread stays
+      // free for the runner between generations.
+      let latestUpdate: GenerationUpdate | null = null;
+      let flushTimer: number | null = null;
+      const flushUi = () => {
+        if (flushTimer != null) {
+          window.clearTimeout(flushTimer);
+          flushTimer = null;
+        }
+        const v = latestUpdate;
+        if (!v) return;
+        setGen(v.gen);
+        setEps(v.evalsPerSec);
+        setHistory(rec.history.slice());
+        setLeaderboard(v.leaderboard);
+        setArchive(v.archive);
+        setCloud(v.cloud);
+        setRetired(v.retired);
+        setSpeciesInfo(rec.species!.info);
+        setSpeciesPoints(rec.species!.points.slice());
+        setRates(rec.rates!.slice());
+        setPopulation(v.population);
+        setEvents((rec.events ?? []).slice());
+        setBests(rec.bests.slice());
+      };
+
       runner().start(cfg, {
         onPause: (g) => {
+          flushUi();
           setStatus("paused");
           pushEvent({
             gen: g,
@@ -247,33 +283,23 @@ export default function App() {
         },
         onGeneration: (u) => {
           setStatus((s) => (s === "paused" ? s : "running"));
+          // Exact record keeping, all push-based: the previous per-generation
+          // array spreads went quadratic over long runs (gen 2000 copied
+          // multi-thousand-element arrays every generation).
           rec.generation = u.gen;
           rec.history.push(u.point);
           rec.leaderboard = u.leaderboard;
           rec.archive = u.archive;
-          setGen(u.gen);
-          setEps(u.evalsPerSec);
-          setHistory((h) => [...h, u.point]);
-          setLeaderboard(u.leaderboard);
-          setArchive(u.archive);
-          setCloud(u.cloud);
-          setRetired(u.retired);
           rec.retired = u.retired;
-          const sp: SpeciesPoint = { gen: u.gen, counts: u.species.counts };
-          rec.species = {
-            info: u.species.info,
-            points: [...(rec.species?.points ?? []), sp],
-          };
-          setSpeciesInfo(u.species.info);
-          setSpeciesPoints((ps) => [...ps, sp]);
-          const rp: RatePoint = { gen: u.gen, rate: u.mutationRate };
-          rec.rates = [...(rec.rates ?? []), rp];
-          setRates((rs) => [...rs, rp]);
-          setPopulation(u.population);
+          // Both are initialised in the record literal above; the record type
+          // keeps them optional for old stored runs.
+          rec.species!.info = u.species.info;
+          rec.species!.points.push({ gen: u.gen, counts: u.species.counts });
+          rec.rates!.push({ gen: u.gen, rate: u.mutationRate });
           if (u.events.length > 0) {
             rec.events = [...(rec.events ?? []), ...u.events].slice(-EVENTS_CAP);
-            setEvents((es) => [...es, ...u.events].slice(-EVENTS_CAP));
           }
+          latestUpdate = u;
           // Challenge the Hall of Fame with everything notable this gen —
           // including the run's newest slowpoke, which may sit far below
           // the leaderboard when the run is chasing speed.
@@ -292,19 +318,24 @@ export default function App() {
           }
           if (u.newBest) {
             rec.bests.push(u.newBest);
-            setBests((bs) => [...bs, u.newBest!]);
             requestReplay(u.newBest, cfg);
             persist(true);
+            flushUi(); // a new champion is worth an immediate frame
           } else {
+            if (flushTimer == null) {
+              flushTimer = window.setTimeout(flushUi, UI_FLUSH_MS);
+            }
             persist();
           }
         },
         onDone: () => {
+          flushUi();
           rec.stoppedAt = Date.now();
           setStatus("done");
           persist(true);
         },
         onError: (message) => {
+          flushUi();
           setError(message);
           rec.stoppedAt = Date.now();
           setStatus("done");
