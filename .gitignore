@@ -99,3 +99,4 @@ apps/shared-pack/
 dist/npm-mctick/
 apps/*/preview-*.log
 apps/*/verify-*-out.json
+apps/preview.pid
