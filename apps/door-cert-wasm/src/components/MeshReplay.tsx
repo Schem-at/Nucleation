@@ -27,7 +27,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { buildCast, headClipHalfSpace, type CastMember } from "../lib/cast";
-import { doorwayFacts, doorwayStyles, doorwaySummary } from "../lib/doorway";
+import {
+  CARRIER_ALPHA,
+  CARRIER_ALPHA_XRAY,
+  doorwayFacts,
+  doorwayStyles,
+  doorwaySummary,
+} from "../lib/doorway";
 import { instanceFor, addDefaultLights, fitCamera, meshStats } from "../lib/mesher";
 import type { ApertureGeometry, Replay, Vec3 } from "../lib/types";
 import {
@@ -84,6 +90,11 @@ const GHOST_TINT = 0.2;
  * vault door fills 32 of 48 cells) reads as blocks-in-a-hole rather than as a
  * filled block. */
 const PANE = 0.7;
+/** …and how big a CARRIER's core is: a small solid marker rather than a
+ * panel, so "the panel" and "the slime pushing it" separate by silhouette
+ * without spending a hue on the difference. See the three-channel note in
+ * `lib/doorway.ts`. */
+const CORE = 0.4;
 /** Pane opacity, plain replay and x-ray. Lower under the x-ray so the flares
  * keep the stage — the overlay is an annotation, not a fourth channel. */
 const PANE_ALPHA = 0.62;
@@ -431,18 +442,30 @@ function WebglReplay({
     controls.dampingFactor = 0.1;
     controls.update();
 
-    // Ground grid at the base level, native-style.
-    const span = Math.ceil(
+    // Ground grid at the base level, native-style. Its lines have to fall on
+    // the block boundaries, which are the integers: a grid square is a cell
+    // footprint, and a reader uses it to count blocks off the floor.
+    //
+    // A GridHelper puts its lines at `-size/2 + i`, so where they land depends
+    // on the PARITY of the size as much as on the centre. An even size gives
+    // integer offsets and so needs an integer centre; an odd size gives
+    // half-integer offsets and needs a half-integer one. The old centre was
+    // `(box.min + box.max) / 2`, and box.max is a max corner PLUS ONE, so that
+    // landed on a half-integer for half of all builds — the grid was aligned by
+    // coincidence. Forcing the size even and the centre to a whole block makes
+    // it aligned by construction, at any build size.
+    let span = Math.ceil(
       Math.max(box.max.x - box.min.x, box.max.z - box.min.z) + 4,
     );
+    if (span % 2 !== 0) span += 1;
     const grid = new THREE.GridHelper(span, span, 0x888888, 0x888888);
     const gridMat = grid.material as THREE.Material;
     gridMat.transparent = true;
     gridMat.opacity = 0.18;
     grid.position.set(
-      (box.min.x + box.max.x) / 2,
+      Math.round((box.min.x + box.max.x) / 2),
       box.min.y + 0.001,
-      (box.min.z + box.max.z) / 2,
+      Math.round((box.min.z + box.max.z) / 2),
     );
     scene.add(grid);
 
@@ -469,6 +492,7 @@ function WebglReplay({
     let hatch: THREE.Texture | null = null;
     let edgeGeo: THREE.BufferGeometry | null = null;
     let paneGeo: THREE.BufferGeometry | null = null;
+    let coreGeo: THREE.BufferGeometry | null = null;
     const edgeMat = new THREE.LineBasicMaterial({
       transparent: true,
       opacity: 0.92,
@@ -487,6 +511,30 @@ function WebglReplay({
       side: THREE.DoubleSide,
       toneMapped: false,
     });
+    // Carriers: same hue, no hatch, small and dim. A door block that faces
+    // nobody should recede behind the ones that do.
+    const coreMat = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: CARRIER_ALPHA,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    const instances = (cells: Vec3[], geo: THREE.BufferGeometry, mat: THREE.Material) => {
+      const mesh = new THREE.InstancedMesh(geo, mat, cells.length);
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 3;
+      const o = new THREE.Object3D();
+      cells.forEach((p, i) => {
+        // Cell CENTRE — the same corner→centre convention the meshed blocks
+        // are placed with, so a pane lands exactly on the block it marks.
+        o.position.set(p[0] + 0.5, p[1] + 0.5, p[2] + 0.5);
+        o.updateMatrix();
+        mesh.setMatrixAt(i, o.matrix);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+      return mesh;
+    };
     if (geometry && facts) {
       doorway = new THREE.Group();
       doorway.visible = false;
@@ -501,21 +549,23 @@ function WebglReplay({
       edges.renderOrder = 3;
       doorway.add(edges);
 
-      if (geometry.closed.length > 0) {
+      if (geometry.visible.length > 0) {
         hatch = hatchTexture();
         paneMat.map = hatch;
         paneGeo = new THREE.BoxGeometry(PANE, PANE, PANE);
-        const panes = new THREE.InstancedMesh(paneGeo, paneMat, geometry.closed.length);
-        panes.frustumCulled = false;
-        panes.renderOrder = 3;
-        const o = new THREE.Object3D();
-        geometry.closed.forEach((p, i) => {
-          o.position.set(p[0] + 0.5, p[1] + 0.5, p[2] + 0.5);
-          o.updateMatrix();
-          panes.setMatrixAt(i, o.matrix);
-        });
-        panes.instanceMatrix.needsUpdate = true;
-        doorway.add(panes);
+        doorway.add(instances(geometry.visible, paneGeo, paneMat));
+      }
+      if (geometry.carriers.length > 0) {
+        coreGeo = new THREE.BoxGeometry(CORE, CORE, CORE);
+        const cores = instances(geometry.carriers, coreGeo, coreMat);
+        // A carrier is BEHIND the pattern block that hides it — that is the
+        // definition — so with everything depth-tested off and sorted back to
+        // front, the pane in front would always paint over it and the third
+        // mark would be invisible on exactly the doors it exists for. Drawn
+        // after the panes and still under the flares, so the pointing-out
+        // works without the overlay outranking an update.
+        cores.renderOrder = 3.5;
+        doorway.add(cores);
       }
       scene.add(doorway);
     }
@@ -523,10 +573,12 @@ function WebglReplay({
     /** Repaint for the current plate. Called on theme change and on every
      * x-ray toggle, because the x-ray's darkroom is dark in both themes. */
     const paintDoorway = (isDark: boolean, xrayNow: boolean) => {
-      const [passage, closed] = doorwayStyles(isDark || xrayNow);
+      const [passage, pattern, carrier] = doorwayStyles(isDark || xrayNow);
       edgeMat.color.setHex(passage.hex);
-      paneMat.color.setHex(closed.hex);
+      paneMat.color.setHex(pattern.hex);
+      coreMat.color.setHex(carrier.hex);
       paneMat.opacity = xrayNow ? PANE_ALPHA_XRAY : PANE_ALPHA;
+      coreMat.opacity = xrayNow ? CARRIER_ALPHA_XRAY : CARRIER_ALPHA;
     };
     paintDoorway(pageIsDark(), false);
     paintRef.current = paintDoorway;
@@ -552,9 +604,24 @@ function WebglReplay({
     };
 
     // One group per cast member; real models attach as meshing resolves.
+    //
+    // CELL_MID is the half-block that reconciles two conventions. A schematic
+    // block at (x, y, z) occupies the unit cube from that CORNER — that is what
+    // every other mark on this stage assumes (the passage shell, the door-block
+    // panes, the flares, the lever box, the world bounds above). But the mesher
+    // returns each block's GLB centred on its own origin, spanning -0.5..+0.5,
+    // so a group parked at the raw corner draws the block half a cell low, left
+    // and back of the cell it belongs to, and every overlay reads as offset by
+    // (0.5, 0.5, 0.5). Placing the group at the cell CENTRE puts the meshed
+    // block back in [x, x+1] where the rest of the scene expects it.
+    //
+    // The piston-arm clip planes in `headClipHalfSpace` are world-space and
+    // already written in corner terms (`headBase + 0.75`), so they come right
+    // with this too rather than needing their own shift.
+    const CELL_MID = 0.5;
     const groups: THREE.Group[] = cast.map((m) => {
       const g = new THREE.Group();
-      g.position.set(m.x, m.y, m.z);
+      g.position.set(m.x + CELL_MID, m.y + CELL_MID, m.z + CELL_MID);
       g.visible = false;
       scene.add(g);
       return g;
@@ -888,6 +955,98 @@ function WebglReplay({
     w.__doorway = facts
       ? { ...facts, focus: () => focusRef.current?.() }
       : null;
+    // Verification aid (scripts/verify-align.mjs): the numeric half-block
+    // check. For a named world cell, report where the MESHED block actually
+    // sits and where the overlay drew its passage box, both as world-space
+    // centres. The two must agree to within a rounding error; a 0.5 gap on
+    // any axis is the bug this hook exists to catch.
+    w.__align = (cell?: Vec3) => {
+      const target = cell ?? (geometry?.passage?.[0] as Vec3 | undefined);
+      if (!target) return null;
+      // A member with `motion` is parked at its FROM cell for most of the
+      // stroke, so its group is not over `target` at an arbitrary tick and its
+      // box says nothing about the convention. Report it and let the caller
+      // skip it rather than silently measuring the wrong block.
+      const i = cast.findIndex(
+        (m) => m.x === target[0] && m.y === target[1] && m.z === target[2],
+      );
+      const member = i >= 0 ? cast[i] : null;
+      const bb = new THREE.Box3();
+      let groupPos: number[] | null = null;
+      if (i >= 0) {
+        groups[i].updateMatrixWorld(true);
+        groupPos = groups[i].position.toArray();
+        if (groups[i].children.length) bb.setFromObject(groups[i]);
+      }
+      // Where the OVERLAY drew this cell. Read off the drawn instances rather
+      // than recomputed, so the check is against what is actually on screen.
+      // The passage shell culls every face with another passage cell behind
+      // it, so an interior cell has no edge geometry at all — the pane/core
+      // instance is the mark that is always there.
+      let overlayCentre: number[] | null = null;
+      const mid = new THREE.Vector3();
+      const mat4 = new THREE.Matrix4();
+      doorway?.traverse((o: THREE.Object3D) => {
+        const im = o as THREE.InstancedMesh;
+        if (!im.isInstancedMesh || overlayCentre) return;
+        for (let k = 0; k < im.count; k++) {
+          im.getMatrixAt(k, mat4);
+          mid.setFromMatrixPosition(mat4);
+          if (
+            Math.abs(mid.x - (target[0] + 0.5)) < 0.01 &&
+            Math.abs(mid.y - (target[1] + 0.5)) < 0.01 &&
+            Math.abs(mid.z - (target[2] + 0.5)) < 0.01
+          ) {
+            overlayCentre = mid.toArray();
+            return;
+          }
+        }
+      });
+      const gridLines: number[] = [];
+      {
+        const gp = (grid.geometry as THREE.BufferGeometry).getAttribute("position");
+        const seen2 = new Set<number>();
+        for (let v = 0; v < gp.count; v++) seen2.add(+(gp.getX(v) + grid.position.x).toFixed(4));
+        gridLines.push(...[...seen2].sort((a, b) => a - b));
+      }
+      return {
+        cell: target,
+        state: member?.state ?? null,
+        /** True while this block is being carried by a piston: its group is
+         *  somewhere between two cells and its box is not a convention test. */
+        moving: !!member?.motion,
+        /** Where the group itself sits — must be the cell CENTRE. */
+        groupPos,
+        // Where the mesher put the block: its own world bounding box.
+        meshMin: i >= 0 && !bb.isEmpty() ? bb.min.toArray() : null,
+        meshMax: i >= 0 && !bb.isEmpty() ? bb.max.toArray() : null,
+        // Centre of the mark the overlay drew on the same cell.
+        overlayCentre,
+        // Distinct x-coordinates of the floor grid's lines, in world space.
+        gridX: gridLines,
+      };
+    };
+    // …and a sample of blocks that never move, whose meshes therefore pin the
+    // corner convention exactly rather than being caught mid-stroke.
+    w.__alignStatic = (want = 6) => {
+      const out: unknown[] = [];
+      const bb = new THREE.Box3();
+      for (let i = 0; i < cast.length && out.length < want; i++) {
+        const m = cast[i];
+        if (m.motion || !groups[i].children.length) continue;
+        groups[i].updateMatrixWorld(true);
+        bb.makeEmpty();
+        bb.setFromObject(groups[i]);
+        if (bb.isEmpty()) continue;
+        out.push({
+          cell: [m.x, m.y, m.z],
+          state: m.state,
+          meshMin: bb.min.toArray(),
+          meshMax: bb.max.toArray(),
+        });
+      }
+      return out;
+    };
     w.__xray = X
       ? {
           heatBytes: X.bytes.heat,
@@ -930,10 +1089,12 @@ function WebglReplay({
           const progress =
             span2 > 0 ? Math.min(1, Math.max(0, (t - m.start) / span2)) : 1;
           const remaining = 1 - progress;
+          // Same corner→centre shift as the initial pose above; the lerp is
+          // between two cell corners, so the half-block rides on the result.
           g.position.set(
-            m.x + (m.motion.fx - m.x) * remaining,
-            m.y + (m.motion.fy - m.y) * remaining,
-            m.z + (m.motion.fz - m.z) * remaining,
+            m.x + (m.motion.fx - m.x) * remaining + CELL_MID,
+            m.y + (m.motion.fy - m.y) * remaining + CELL_MID,
+            m.z + (m.motion.fz - m.z) * remaining + CELL_MID,
           );
         }
       }
@@ -965,9 +1126,11 @@ function WebglReplay({
       controls.dispose();
       edgeGeo?.dispose();
       paneGeo?.dispose();
+      coreGeo?.dispose();
       hatch?.dispose();
       edgeMat.dispose();
       paneMat.dispose();
+      coreMat.dispose();
       flareGeo.dispose();
       cageGeo.dispose();
       (flares.material as THREE.Material).dispose();
@@ -1032,7 +1195,7 @@ function WebglReplay({
   };
 
   const legend = xray ? channelStyles(xray, channel) : [];
-  const [passageStyle, closedStyle] = doorwayStyles(dark || xrayOn);
+  const [passageStyle, patternStyle, carrierStyle] = doorwayStyles(dark || xrayOn);
 
   return (
     <div>
@@ -1190,15 +1353,26 @@ function WebglReplay({
                 style={{
                   // Same 45° hatch as the panes, at swatch scale.
                   backgroundImage:
-                    `repeating-linear-gradient(45deg, ${hexCss(closedStyle.hex)} 0 2px,` +
+                    `repeating-linear-gradient(45deg, ${hexCss(patternStyle.hex)} 0 2px,` +
                     ` transparent 2px 4px)`,
-                  borderColor: hexCss(closedStyle.hex),
+                  borderColor: hexCss(patternStyle.hex),
                 }}
                 aria-hidden
               />
-              {closedStyle.label}
-              <b>{fmt(facts.closedCells)}</b>
+              {patternStyle.label}
+              <b>{fmt(facts.visibleCells)}</b>
             </li>
+            {facts.carrierCells > 0 && (
+              <li>
+                <i
+                  className="door-swatch core"
+                  style={{ ["--core" as string]: hexCss(carrierStyle.hex) }}
+                  aria-hidden
+                />
+                {carrierStyle.label}
+                <b>{fmt(facts.carrierCells)}</b>
+              </li>
+            )}
           </ul>
           <span className="door-summary" data-testid="doorway-summary">
             {doorwaySummary(facts)}

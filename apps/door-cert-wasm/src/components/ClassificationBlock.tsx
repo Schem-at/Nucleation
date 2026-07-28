@@ -1,34 +1,64 @@
 // The door read against MYuen222, "Door Pattern Definitions v1.1" — the
-// competitive community's formal spec. The name reads like a spec line and
-// the pattern matrix sits beside it, drawn in the door's own orientation so
-// you can hold the two against each other.
-import type { Classification } from "../lib/types";
+// competitive community's formal spec.
+//
+// The headline is the PATTERN. That is the door's name, the thing a builder
+// would call it, and the only line here that answers "what is this?" Flush,
+// Deluxe and Trapdoor are frame properties (Definitions 2.6–2.8) — they say
+// where the door sits in its wall, not what it looks like — so they sit with
+// orientation and pattern size in the attribute row below. An earlier version
+// spent the headline on "4 × 4 Flush Door", which read as the door's name and
+// was not one.
+//
+// Beside it, the surfaces: one matrix per face, drawn in the door's own
+// orientation, so the reader can hold the classifier's claim against the
+// picture. A vault gets two, and its two funnels are the whole argument for
+// the name.
+import type { Classification, SurfaceReading } from "../lib/types";
 
-/** Layer colours run one lime ramp, front layer lightest. Six steps is more
- *  than any real door needs; deeper cells clamp to the last. */
-const RAMP = ["var(--cell-0)", "var(--cell-1)", "var(--cell-2)", "var(--cell-3)", "var(--cell-4)", "var(--cell-5)"];
+/** Layer colours run one lime ramp, front layer lightest — depth is a
+ *  magnitude, so it gets a sequential scale rather than a categorical one.
+ *  Six steps is more than any real door needs; deeper cells clamp to the last. */
+const RAMP = [
+  "var(--cell-0)",
+  "var(--cell-1)",
+  "var(--cell-2)",
+  "var(--cell-3)",
+  "var(--cell-4)",
+  "var(--cell-5)",
+];
 
-function MatrixFigure({ cls }: { cls: Classification }) {
-  const { matrix, depth, m, n, layers } = cls;
-  // Colour only carries depth when depth actually varies; a pattern extruded
-  // straight through the wall is one flat shape.
+type Fig = {
+  matrix: number[][];
+  depth: number[][];
+  m: number;
+  n: number;
+  label: string;
+  caption: React.ReactNode;
+  testid?: string;
+};
+
+/** One pattern matrix. Depth is never carried by colour alone: where it
+ *  varies, each filled cell also prints its own depth digit, which is the same
+ *  number the ASCII matrix reports. */
+function Matrix({ matrix, depth, m, n, label, caption, testid }: Fig) {
   const steps = new Set(depth.flat().filter((k) => k >= 0));
   const varies = steps.size > 1;
-  // The grid should read at a glance without dominating the block.
-  const cell = Math.max(9, Math.min(20, Math.round(150 / Math.max(m, n))));
+  const cell = Math.max(11, Math.min(22, Math.round(150 / Math.max(m, n))));
   const gap = 2;
   const w = m * (cell + gap) - gap;
   const h = n * (cell + gap) - gap;
   const rounded = Math.max(1, Math.round(cell / 6));
+  const fontSize = Math.round(cell * 0.52);
 
   return (
-    <figure className="matrix-fig">
+    <figure className="matrix-fig" data-testid={testid}>
+      <figcaption className="matrix-label">{label}</figcaption>
       <svg
         width={w}
         height={h}
         viewBox={`0 0 ${w} ${h}`}
         role="img"
-        aria-label={`Pattern matrix, ${m} columns by ${n} rows. ${matrix
+        aria-label={`${label}. ${m} columns by ${n} rows. ${matrix
           .map((row, r) => `Row ${r + 1}: ${row.join(" ")}`)
           .join(". ")}`}
       >
@@ -50,39 +80,48 @@ function MatrixFigure({ cls }: { cls: Classification }) {
                   strokeWidth="1"
                 />
               );
-            const k = varies ? Math.max(0, Math.min(RAMP.length - 1, depth[r][c])) : 2;
+            const k = Math.max(0, Math.min(RAMP.length - 1, depth[r][c]));
             return (
-              <rect
-                key={`${r}-${c}`}
-                x={x}
-                y={y}
-                width={cell}
-                height={cell}
-                rx={rounded}
-                fill={RAMP[k]}
-              />
+              <g key={`${r}-${c}`}>
+                <rect
+                  x={x}
+                  y={y}
+                  width={cell}
+                  height={cell}
+                  rx={rounded}
+                  fill={varies ? RAMP[k] : RAMP[2]}
+                />
+                {varies && (
+                  <text
+                    x={x + cell / 2}
+                    y={y + cell / 2}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fontSize={fontSize}
+                    fontWeight="700"
+                    fill={k >= 3 ? "var(--cell-0)" : "var(--cell-5)"}
+                  >
+                    {k}
+                  </text>
+                )}
+              </g>
             );
           }),
         )}
       </svg>
-      <figcaption className="matrix-cap">
-        {m} × {n} pattern matrix — filled where a door block sits when closed.
-        {varies ? (
-          <>
-            {" "}
-            Layers front
-            <span className="matrix-ramp" aria-hidden>
-              {RAMP.slice(0, Math.min(steps.size, RAMP.length)).map((c, i) => (
-                <i key={i} style={{ background: c }} />
-              ))}
-            </span>
-            back.
-          </>
-        ) : layers > 1 ? (
-          <> One flat shape, extruded {layers} blocks deep.</>
-        ) : null}
-      </figcaption>
+      <figcaption className="matrix-cap">{caption}</figcaption>
     </figure>
+  );
+}
+
+/** How a surface reads, in one line. */
+function surfaceVerdict(s: SurfaceReading) {
+  if (!s.pattern) return <span className="unknown">no matching pattern</span>;
+  return (
+    <>
+      <b>{s.pattern}</b> <sup>{s.patternRef}</sup>
+      {s.transform ? `, ${s.transform}` : ""}
+    </>
   );
 }
 
@@ -90,13 +129,22 @@ export function ClassificationBlock({ cls }: { cls: Classification }) {
   const rows: { term: string; detail: string }[] = [
     { term: "Orientation", detail: cls.orientation },
     { term: "Pattern size", detail: `${cls.m} × ${cls.n}` },
-    { term: "Pattern depth", detail: `${cls.layers} ${cls.layers === 1 ? "layer" : "layers"}` },
+    {
+      term: "Pattern depth",
+      detail: `${cls.layers} ${cls.layers === 1 ? "layer" : "layers"}`,
+    },
   ];
-  if (cls.qualifiers.length || cls.frameNote)
-    rows.push({
-      term: "Frame",
-      detail: cls.qualifiers.length ? cls.qualifiers.join(" · ") : cls.frameNote!,
-    });
+  // Frame properties, named as such. `qualifiers` holds the standard's own
+  // terms when one applies; `frameNote` is the plain-language reading for the
+  // cases the standard has no word for.
+  const frame = [...cls.qualifiers, ...(cls.frameNote ? [cls.frameNote] : [])];
+  if (frame.length) rows.push({ term: "Frame", detail: frame.join(" · ") });
+
+  const surfaces = cls.surfaces ?? [];
+  const twoSided = surfaces.length > 1;
+  // The volume reading is only worth printing when it disagrees with the
+  // surfaces — that disagreement IS the carriers.
+  const volumeDiffers = cls.volumePattern !== cls.pattern;
 
   return (
     <div className="classify" data-testid="classification">
@@ -117,12 +165,31 @@ export function ClassificationBlock({ cls }: { cls: Classification }) {
         <h2 className="classify-name" data-testid="classify-name">
           {cls.unclassified ? (
             <>
-              {cls.name} — <span className="unknown">unclassified pattern</span>
+              {cls.m} × {cls.n} <span className="unknown">unclassified pattern</span>{" "}
+              {cls.orientation}
             </>
           ) : (
             cls.name
           )}
         </h2>
+
+        {cls.dual && (
+          <p className="classify-lede" data-testid="classify-dual">
+            Two-sided: each face reads as a <b>{cls.dual.pattern.toLowerCase()}</b>{" "}
+            <sup>{cls.dual.patternRef}</sup>, so the door is that pattern in a dual
+            arrangement <sup>Def 2.24</sup>
+            {cls.dual.name === "Vault" ? (
+              <>
+                {" "}
+                — which the standard names a <b>Vault</b> <sup>{cls.dual.ref}</sup>.
+              </>
+            ) : (
+              "."
+            )}
+            {!cls.dual.symmetric &&
+              " The two faces match, but the blocks between them do not mirror."}
+          </p>
+        )}
 
         <dl className="classify-defs">
           {rows.map((r) => (
@@ -145,14 +212,25 @@ export function ClassificationBlock({ cls }: { cls: Classification }) {
 
         {cls.unclassified ? (
           <p className="classify-note">
-            The door blocks do not form any pattern in the standard, under any rotation or
-            mirror. The matrix is printed as measured rather than rounded to a near match.
+            {twoSided ? "Neither visible surface forms" : "The visible surface does not form"}{" "}
+            any pattern in the standard, under any rotation, mirror or front/back reversal. The
+            matrices are printed as measured rather than rounded to a near match.
           </p>
-        ) : cls.transform ? (
+        ) : cls.transform && !cls.dual ? (
           <p className="classify-note">
             Matched {cls.transform} — the same pattern, authored in a different orientation.
           </p>
         ) : null}
+
+        {volumeDiffers && (
+          <p className="classify-note" data-testid="classify-carriers">
+            Read as a solid volume instead — counting every block in the doorway, carriers and
+            all — the door matches{" "}
+            {cls.volumePattern ? <b>{cls.volumePattern}</b> : <span className="unknown">nothing</span>}
+            . The pattern is what the door <i>shows</i>: the blocks behind the surface push it,
+            they are not part of it.
+          </p>
+        )}
 
         <p className="classify-cite">
           Patterns per MYuen222, <i>Door Pattern Definitions v1.1</i>. Section numbers refer to
@@ -160,7 +238,42 @@ export function ClassificationBlock({ cls }: { cls: Classification }) {
         </p>
       </div>
 
-      <MatrixFigure cls={cls} />
+      <div className="matrix-set" data-testid="surface-matrices">
+        {surfaces.map((s) => (
+          <Matrix
+            key={s.side}
+            testid={`surface-${s.side}`}
+            matrix={s.matrix}
+            depth={s.depth}
+            m={s.m}
+            n={s.n}
+            label={twoSided ? `${s.side} face` : "Visible surface"}
+            caption={
+              <>
+                {surfaceVerdict(s)}
+                {s.layers > 1 ? (
+                  <>
+                    {" "}
+                    · digits are depth below this face, {s.layers} deep
+                  </>
+                ) : (
+                  " · one flat face"
+                )}
+              </>
+            }
+          />
+        ))}
+        {surfaces.length === 0 && (
+          <Matrix
+            matrix={cls.matrix}
+            depth={cls.depth}
+            m={cls.m}
+            n={cls.n}
+            label="Pattern matrix"
+            caption={`${cls.m} × ${cls.n}, filled where a door block sits when closed.`}
+          />
+        )}
+      </div>
     </div>
   );
 }

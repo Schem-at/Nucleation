@@ -20,7 +20,12 @@
 // symmetry group anyway, so nothing depends on which one a door was authored
 // in.
 
-import type { Classification, PatternCell, PatternSurroundings } from "./types";
+import type {
+  Classification,
+  PatternCell,
+  PatternSurroundings,
+  SurfaceReading,
+} from "./types";
 
 /** A door pattern as the standard's integrated DBPM (Definition 6.2), with
  *  the layer set kept per cell rather than collapsed — several patterns put
@@ -495,6 +500,160 @@ function compositions(
 }
 
 /* ------------------------------------------------------------------ */
+/* Matching                                                            */
+/* ------------------------------------------------------------------ */
+
+export type Match = {
+  pattern: string;
+  patternRef: string;
+  transform: string | null;
+  /** The Section 5.1 variant that matched, when it was not the plain form. */
+  variant: Tag | null;
+};
+
+/** Test a measured grid against every reference definition, over the full
+ *  symmetry group and the two Section 5.1 variants. Null when nothing is
+ *  set-equal — never a nearest guess. */
+export function matchGrid(measured: Grid): Match | null {
+  for (const view of orientations(measured)) {
+    const target = canon(view.grid);
+    for (const def of REFS) {
+      const base = def.build(view.grid.m, view.grid.n);
+      if (!base) continue;
+      const variants: { g: Grid; tag: Tag | null }[] = [
+        { g: base, tag: null },
+        { g: iris(base), tag: { label: "Iris", ref: "§5.1.1" } },
+        { g: onion(base), tag: { label: "Onion", ref: "§5.1.2" } },
+      ];
+      for (const v of variants) {
+        if (isEmpty(v.g)) continue;
+        if (canon(v.g) !== target) continue;
+        return {
+          pattern: def.name,
+          patternRef: def.ref,
+          transform: view.label || null,
+          variant: v.tag,
+        };
+      }
+    }
+  }
+  return null;
+}
+
+/* ------------------------------------------------------------------ */
+/* Visible surfaces                                                    */
+/* ------------------------------------------------------------------ */
+
+/** A depth matrix as ASCII: the depth digit where a block is visible, `.`
+ *  where the column is empty all the way through. Reading a door out loud is
+ *  how a reader checks the classifier, so the matrices are first-class output
+ *  rather than a debug dump. */
+export function asciiDepth(depth: number[][]): string {
+  return depth
+    .map((row) => row.map((k) => (k < 0 ? "." : k > 9 ? "+" : String(k))).join(" "))
+    .join("\n");
+}
+
+/** Read one visible surface as a pattern in its own right.
+ *
+ * `cells` are already the first-solid hits cast in from one face, with `k`
+ * counted from THAT face, so the surface is a complete pattern by itself and
+ * every definition in Section 3/4 applies to it unchanged. */
+export function readSurface(
+  side: SurfaceReading["side"],
+  cells: PatternCell[],
+  m: number,
+  n: number,
+): SurfaceReading {
+  const grid = emptyGrid(m, n);
+  for (const cell of cells) put(grid, cell.r, cell.c, cell.k);
+  for (const row of grid.cells) for (const ls of row) ls.sort((a, b) => a - b);
+
+  const matrix = grid.cells.map((row) => row.map((ls) => (ls.length ? 1 : 0)));
+  const depth = grid.cells.map((row) => row.map((ls) => (ls.length ? ls[0] : -1)));
+  const hit = cells.length > 0 ? matchGrid(grid) : null;
+
+  return {
+    side,
+    m,
+    n,
+    layers: layerCount(grid),
+    cells: cells.length,
+    pattern: hit?.pattern ?? null,
+    patternRef: hit?.patternRef ?? null,
+    transform: hit?.transform ?? null,
+    variant: hit?.variant ?? null,
+    matrix,
+    depth,
+    ascii: asciiDepth(depth),
+  };
+}
+
+/** Patterns the standard gives a proper name to in their dual arrangement.
+ *  §7.5 works the 5 × 5 vault as "a 5x5 Dual Funnel Door" — the vault IS the
+ *  dual funnel, and that is the only such name the standard supplies. */
+const DUAL_NAMES: Record<string, { name: string; ref: string }> = {
+  Funnel: { name: "Vault", ref: "§7.5" },
+};
+
+export type DualReading = {
+  /** The pattern both visible surfaces read as. */
+  pattern: string;
+  patternRef: string;
+  /** "Vault" where the standard names the dual arrangement, else
+   *  "Dual <pattern>". */
+  name: string;
+  /** The section the NAME comes from — §7.5 for the vault, else Def 2.24,
+   *  which is what defines a dual arrangement in the first place. */
+  ref: string;
+  /** True when the whole door volume is symmetric about its centre depth
+   *  plane, which is what Definition 2.24 actually requires. False means the
+   *  two faces match but the machinery between them does not mirror, and the
+   *  reading says so instead of claiming the name outright. */
+  symmetric: boolean;
+};
+
+/** Definition 2.24 (Dual): the pattern is S + S′ where S′ is S reflected in a
+ *  plane through the centre blocks whose normal points front-to-back.
+ *
+ *  Tested on the visible surfaces first — two faces showing the same pattern is
+ *  the claim a reader can check by walking round the door — and then on the
+ *  full door volume, which is the letter of the definition. */
+export function readDual(
+  front: SurfaceReading,
+  back: SurfaceReading,
+  volume: Grid,
+): DualReading | null {
+  if (!front.pattern || front.pattern !== back.pattern) return null;
+  // A FLAT face is never a dual. Reflecting a flat pattern about its own plane
+  // returns the same set, so S + S′ = S and Definition 2.24 adds nothing: a
+  // plain slab three blocks thick is a regular door, not a "dual regular" one.
+  // That is the same rule `classify` already applies to the volume — a pattern
+  // extruded uniformly through the wall is still that pattern. Only a
+  // depth-varying face has a reflection worth naming.
+  if (front.layers < 2) return null;
+  // The two faces are read from opposite directions, so a dual door's back
+  // surface is its front surface mirrored — a member of the symmetry group
+  // either way. Requiring the same DEPTHS as well as the same silhouette is
+  // what stops "both sides happen to be funnels" from passing as a dual.
+  const fg = emptyGrid(front.m, front.n);
+  front.depth.forEach((row, r) => row.forEach((k, c) => k >= 0 && put(fg, r, c, k)));
+  const bg = emptyGrid(back.m, back.n);
+  back.depth.forEach((row, r) => row.forEach((k, c) => k >= 0 && put(bg, r, c, k)));
+  const bt = canon(bg);
+  if (!orientations(fg).some((v) => canon(v.grid) === bt)) return null;
+
+  const named = DUAL_NAMES[front.pattern];
+  return {
+    pattern: front.pattern,
+    patternRef: front.patternRef!,
+    name: named?.name ?? `Dual ${front.pattern.toLowerCase()}`,
+    ref: named?.ref ?? "Def 2.24",
+    symmetric: canon(volume) === canon(flipDepth(volume)),
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* The classifier                                                      */
 /* ------------------------------------------------------------------ */
 
@@ -511,10 +670,15 @@ export type ClassifyInput = {
   /** Plain-language reading of where the door sits in the frame. */
   frameNote: string | null;
   around: PatternSurroundings;
+  /** What the door shows from each face — the pattern proper. See the header
+   *  of `aperture.ts` for why the visible surface, not the filled volume, is
+   *  the thing the standard's definitions are about. */
+  surfaces: SurfaceReading[];
 };
 
 export function classify(input: ClassifyInput): Classification {
-  const { cells, m, n, layers, orientation, qualifiers, frameNote, around } = input;
+  const { cells, m, n, layers, orientation, qualifiers, frameNote, around, surfaces } =
+    input;
 
   const measured = emptyGrid(m, n);
   for (const cell of cells) put(measured, cell.r, cell.c, cell.k);
@@ -535,34 +699,48 @@ export function classify(input: ClassifyInput): Classification {
     row.map((ls) => (ls.length ? Math.min(...ls) : -1)),
   );
 
-  let pattern: string | null = null;
-  let patternRef: string | null = null;
-  let transform: string | null = null;
   const composition = compositions(cells, m, n, around);
 
-  outer: for (const view of orientations(measured)) {
-    const target = canon(view.grid);
-    for (const def of REFS) {
-      const base = def.build(view.grid.m, view.grid.n);
-      if (!base) continue;
-      const variants: { g: Grid; tag: Tag | null }[] = [
-        { g: base, tag: null },
-        { g: iris(base), tag: { label: "Iris", ref: "§5.1.1" } },
-        { g: onion(base), tag: { label: "Onion", ref: "§5.1.2" } },
-      ];
-      for (const v of variants) {
-        if (isEmpty(v.g)) continue;
-        if (canon(v.g) !== target) continue;
-        pattern = def.name;
-        patternRef = def.ref;
-        transform = view.label || null;
-        if (v.tag && !composition.some((t) => t.label === v.tag!.label)) composition.unshift(v.tag);
-        break outer;
-      }
-    }
+  // The FILLED VOLUME reading, kept for reference. It is what this classifier
+  // used to report as the door's pattern, and it is wrong to do so on any door
+  // with carriers inside its own doorway — a vault's slime blocks sit in the
+  // passage but face nobody. It stays because when a door has no carriers the
+  // two readings agree, and a disagreement is itself worth seeing.
+  const volumeHit = matchGrid(measured);
+
+  // The SURFACE reading, which is the door's pattern. A one-sided door has one
+  // surface and its front face is the answer; a two-sided door has two, and if
+  // they agree it is that pattern DUAL (Definition 2.24).
+  const front = surfaces.find((s) => s.side === "front") ?? null;
+  const back = surfaces.find((s) => s.side === "back") ?? null;
+  const dual = front && back ? readDual(front, back, measured) : null;
+
+  let pattern: string | null;
+  let patternRef: string | null;
+  let transform: string | null = null;
+  if (dual) {
+    pattern = dual.name;
+    patternRef = dual.ref;
+  } else if (front?.pattern) {
+    pattern = front.pattern;
+    patternRef = front.patternRef;
+    transform = front.transform;
+    if (front.variant && !composition.some((t) => t.label === front.variant!.label))
+      composition.unshift(front.variant);
+  } else {
+    // No surface matched. Fall back to the volume reading rather than throwing
+    // the answer away — but only when it found something the surfaces did not.
+    pattern = volumeHit?.pattern ?? null;
+    patternRef = volumeHit?.patternRef ?? null;
+    transform = volumeHit?.transform ?? null;
+    if (volumeHit?.variant && !composition.some((t) => t.label === volumeHit.variant!.label))
+      composition.unshift(volumeHit.variant);
   }
 
-  const words = [`${m} × ${n}`, ...qualifiers];
+  // The formal name, pattern FIRST. `qualifiers` are frame properties (Flush,
+  // Deluxe, Trapdoor) and follow the pattern rather than standing in for it —
+  // "4 × 4 Vault Door, flush" rather than "4 × 4 Flush Door".
+  const words = [`${m} × ${n}`];
   if (pattern) words.push(pattern);
   words.push(orientation);
 
@@ -577,6 +755,9 @@ export function classify(input: ClassifyInput): Classification {
     pattern,
     patternRef,
     transform,
+    dual,
+    surfaces,
+    volumePattern: volumeHit?.pattern ?? null,
     composition,
     matrix,
     depth,

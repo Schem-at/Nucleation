@@ -36,10 +36,17 @@ export type ApertureGeometry = {
   /** Every cell of the walkable passage, across the wall's full depth. The
    *  door is OPEN when all of these are air. */
   passage: Vec3[];
-  /** The passage cells that hold a door block in the closed reference state —
-   *  the pattern, not the passage. The door is SHUT when all of these are
-   *  solid again; a sissy bar or a checkerboard never fills the rest. */
+  /** The passage cells that hold a door block in the closed reference state.
+   *  The door is SHUT when all of these are solid again; a sissy bar or a
+   *  checkerboard never fills the rest. */
   closed: Vec3[];
+  /** The subset of `closed` you can actually SEE — the first solid cell cast
+   *  in from either face. This is the pattern. */
+  visible: Vec3[];
+  /** The rest: cells that are solid when shut but hidden behind another block
+   *  from both faces. The slime blocks pushing a vault's centre panel are
+   *  here, not in the pattern — they are carriers. */
+  carriers: Vec3[];
   /** True when the first snapshot handed to `aperture()` is the closed one,
    *  i.e. the first lever click opens the door. A file saved open measures
    *  its own closing first, and the strokes swap. */
@@ -49,6 +56,36 @@ export type ApertureGeometry = {
 /** One door block, in the standard's matrix coordinates: row counted down
  *  from the top of the pattern, column left to right, layer front to back. */
 export type PatternCell = { r: number; c: number; k: number; id: string };
+
+/** What one face of the door SHOWS.
+ *
+ *  Cast inward from a face and stop at the first solid cell: that cell is the
+ *  pattern at that (row, column), and everything behind it is machinery. See
+ *  the header of `aperture.ts` for why this — not the filled volume — is what
+ *  the standard's pattern definitions are about. */
+export type SurfaceReading = {
+  /** Which face this was cast from. `front` is the shallower layer of the
+   *  wall along the door's own depth axis; `back` the deeper one. */
+  side: "front" | "back";
+  m: number;
+  n: number;
+  /** Distinct depths the visible surface reaches — 1 for a flat face. */
+  layers: number;
+  /** How many cells of the m × n cross-section show a block at all. */
+  cells: number;
+  /** Matched pattern, or null when this face matches no definition. */
+  pattern: string | null;
+  patternRef: string | null;
+  transform: string | null;
+  /** Section 5.1 variant (Iris / Onion) when one matched. */
+  variant: { label: string; ref: string } | null;
+  /** 1 where the face shows a block. */
+  matrix: number[][];
+  /** Depth of that block below this face; -1 where the column is empty. */
+  depth: number[][];
+  /** The depth matrix as text, for reading the door out loud. */
+  ascii: string;
+};
 
 /** What sits around the doorway — needed for the Section 5 compositions. */
 export type PatternSurroundings = {
@@ -79,12 +116,29 @@ export type Classification = {
   /** True when every door block spans the same run of layers: a flat pattern
    *  extruded through the wall rather than a depth-varying one. */
   extruded: boolean;
-  /** Matched pattern name, or null when nothing matched exactly. */
+  /** The door's pattern, read off what its faces SHOW. Null when nothing
+   *  matched exactly. For a two-sided door this is the dual name — "Vault" for
+   *  the dual funnel of §7.5. */
   pattern: string | null;
   /** Section of the standard the pattern is defined in. */
   patternRef: string | null;
   /** Which member of the symmetry group matched, when not the identity. */
   transform: string | null;
+  /** One reading per visible face: one for a one-sided door, two for a door
+   *  you can see the pattern from either way. */
+  surfaces: SurfaceReading[];
+  /** Set when both faces show the same pattern (Definition 2.24). */
+  dual: {
+    pattern: string;
+    patternRef: string;
+    name: string;
+    ref: string;
+    symmetric: boolean;
+  } | null;
+  /** What the FILLED VOLUME matches, carriers and all. Reported beside the
+   *  surface reading rather than as the answer: on a door with carriers inside
+   *  its own passage the two differ, and the difference is the point. */
+  volumePattern: string | null;
   /** Section 5 block compositions found. */
   composition: { label: string; ref: string }[];
   /** Binary pattern matrix: 1 where a door block sits when closed. */

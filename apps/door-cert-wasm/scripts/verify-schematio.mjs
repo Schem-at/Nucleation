@@ -100,8 +100,6 @@ for (const door of DOORS) {
     classificationRenders: dom.hasClassification,
     matrixGridRenders: dom.matrixCells > 0,
     noPasteCaveat: !dom.hasPasteCaveat && !dom.pasteCaveatText,
-    pasteFieldsStillInJson:
-      typeof cert.paste_safe === "boolean" && typeof cert.paste_moved_cells === "number",
     stackedChartHasBothSeries: dom.pistonBars > 0 && dom.redstoneBars > 0,
     itemsSeriesPresent: dom.legend.some((l) => l.startsWith("Item events")),
     tooltipBreakdown: !!tooltip && /Total/.test(tooltip),

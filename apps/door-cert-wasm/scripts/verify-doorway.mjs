@@ -125,12 +125,23 @@ for (const door of DOORS) {
     await page.locator('[data-testid="doorway-summary"]').textContent()
   )?.trim();
 
-  ok(`${P} legend names both marks`, legend.length === 2, legend);
+  // Two marks on a door with no carriers, three on one that has them: the
+  // pattern blocks and the carriers behind them are named separately.
+  const wantMarks = facts.carrierCells > 0 ? 3 : 2;
+  ok(`${P} legend names all ${wantMarks} marks`, legend.length === wantMarks, legend);
   ok(
     `${P} legend counts are the drawn cells (${legend.join(" | ")})`,
     legend[0]?.includes(facts.passageCells.toLocaleString("en-US")) &&
-      legend[1]?.includes(facts.closedCells.toLocaleString("en-US")),
+      legend[1]?.includes(facts.visibleCells.toLocaleString("en-US")) &&
+      (wantMarks === 2 ||
+        legend[2]?.includes(facts.carrierCells.toLocaleString("en-US"))),
     { legend, facts },
+  );
+  ok(
+    `${P} pattern + carriers account for every door block ` +
+      `(${facts.visibleCells} + ${facts.carrierCells} = ${facts.closedCells})`,
+    facts.visibleCells + facts.carrierCells === facts.closedCells,
+    facts,
   );
   ok(
     `${P} drawn cells are the certificate's own geometry`,
@@ -164,13 +175,129 @@ for (const door of DOORS) {
     facts.rectangular,
     facts,
   );
+  const N = (v) => v.toLocaleString("en-US");
   ok(
     `${P} summary line reads "${summary}"`,
     summary === `${facts.w} × ${facts.h} opening · ` +
-      `${facts.passageCells.toLocaleString("en-US")} passage cells · ` +
-      `${facts.closedCells.toLocaleString("en-US")} door blocks · ` +
-      `${facts.depth} deep`,
+      `${N(facts.passageCells)} passage cells · ` +
+      (facts.carrierCells > 0
+        ? `${N(facts.visibleCells)} pattern + ${N(facts.carrierCells)} carrier blocks`
+        : `${N(facts.closedCells)} door blocks`) +
+      ` · ${facts.depth} deep`,
     summary,
+  );
+
+  /* -- the half-block check: overlay vs meshed block ---------------------- */
+  //
+  // The bug this catches is a rendering one, so it is measured rather than
+  // eyeballed: take a cell that holds a door block, and compare where the
+  // MESHER put that block with where the overlay drew the same cell. A block
+  // occupies the unit cube from its own corner, so both boxes must be
+  // [p, p+1] on every axis, and their centres must coincide.
+  const { align, statics } = await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith("door-cert-wasm:"));
+    const geo = JSON.parse(localStorage[k]).certificate.aperture_geometry;
+    return {
+      align: geo.closed.map((p) => window.__align(p)).filter(Boolean),
+      statics: window.__alignStatic(40),
+    };
+  });
+  const near = (v, want) => Math.abs(v - want) < 0.02;
+
+  ok(`${P} probed ${align.length} door cells`, align.length > 0, align.length);
+  // The group's own position is the convention, and it holds for every cell
+  // whether the block is parked or being carried.
+  ok(
+    `${P} every group sits at its cell CENTRE — the mesher's GLB is ` +
+      `origin-centred, so this is what puts the block in [p, p+1]`,
+    align.every(
+      (a) => a.moving || (a.groupPos && a.groupPos.every((v, i) => near(v, a.cell[i] + 0.5))),
+    ),
+    align.find((a) => !a.moving && !a.groupPos?.every((v, i) => near(v, a.cell[i] + 0.5))),
+  );
+  ok(
+    `${P} the overlay marks every door cell at that same centre`,
+    align.every(
+      (a) => a.overlayCentre && a.overlayCentre.every((v, i) => near(v, a.cell[i] + 0.5)),
+    ),
+    align.find((a) => !a.overlayCentre?.every((v, i) => near(v, a.cell[i] + 0.5))) ?? align[0],
+  );
+
+  // Blocks that never move pin the box exactly: a vanilla model lives inside
+  // its own cell, and a full cube fills it.
+  const inCell = (a) =>
+    a.meshMin.every((v, i) => v >= a.cell[i] - 0.02) &&
+    a.meshMax.every((v, i) => v <= a.cell[i] + 1.02);
+  ok(`${P} found ${statics.length} static blocks to measure`, statics.length > 0);
+  ok(
+    `${P} every static block's mesh stays inside its own cell [p, p+1]`,
+    statics.length > 0 && statics.every(inCell),
+    statics.find((a) => !inCell(a)),
+  );
+  const full = statics.find(
+    (a) =>
+      a.meshMin.every((v, i) => near(v, a.cell[i])) &&
+      a.meshMax.every((v, i) => near(v, a.cell[i] + 1)),
+  );
+  ok(
+    full
+      ? `${P} full cube ${full.state} at (${full.cell}) meshes to exactly ` +
+          `[${full.meshMin.map((v) => v.toFixed(3))}] → ` +
+          `[${full.meshMax.map((v) => v.toFixed(3))}]`
+      : `${P} a full-cube block meshes to exactly [p, p+1]`,
+    !!full,
+    statics.slice(0, 3),
+  );
+  // The headline number: the meshed block and the overlay mark on the SAME
+  // cell must share a centre. A 0.5 gap on any axis is the bug.
+  const paired = full && align.find((a) => a.overlayCentre);
+  ok(
+    `${P} block centre and overlay centre coincide — no half-block offset`,
+    !!full &&
+      [0, 1, 2].every((i) => near((full.meshMin[i] + full.meshMax[i]) / 2, full.cell[i] + 0.5)) &&
+      !!paired &&
+      paired.overlayCentre.every((v, i) => near(v, paired.cell[i] + 0.5)),
+    {
+      block: full && {
+        cell: full.cell,
+        centre: full.meshMin?.map((v, i) => (v + full.meshMax[i]) / 2),
+      },
+      overlay: paired && { cell: paired.cell, centre: paired.overlayCentre },
+    },
+  );
+  ok(
+    `${P} floor grid lines land on block boundaries`,
+    align[0]?.gridX?.length > 1 &&
+      align[0].gridX.every((x) => Math.abs(x - Math.round(x)) < 1e-6),
+    align[0]?.gridX?.slice(0, 6),
+  );
+
+  /* -- the pattern is the visible surface --------------------------------- */
+  const cls = cert.classification;
+  ok(`${P} classification reads both faces`, (cls?.surfaces?.length ?? 0) >= 1, {
+    surfaces: cls?.surfaces?.map((s) => `${s.side}: ${s.pattern ?? "none"}`),
+  });
+  ok(
+    `${P} pattern is "${cls?.pattern ?? "unclassified"}" ${cls?.patternRef ?? ""}`,
+    true,
+    {
+      name: cls?.name,
+      dual: cls?.dual,
+      volumePattern: cls?.volumePattern,
+      surfaces: cls?.surfaces?.map((s) => ({
+        side: s.side,
+        pattern: s.pattern,
+        ref: s.patternRef,
+        transform: s.transform,
+        ascii: s.ascii,
+      })),
+    },
+  );
+  // Flush is a FRAME property (Defs 2.6-2.8), never the door's name.
+  ok(
+    `${P} the headline names the pattern, not the frame ("${cls?.name}")`,
+    !/Flush|Deluxe|Trapdoor/.test(cls?.name ?? ""),
+    cls?.name,
   );
 
   /* -- independence: x-ray on UNDER a live overlay ------------------------ */
@@ -224,20 +351,52 @@ for (const door of DOORS) {
     }, theme);
     await page.waitForTimeout(400);
     await page.screenshot({
-      path: join(SHOTS, `certificate-${door.id}-${theme}-doorway.png`),
+      path: join(SHOTS, `certificate-${door.id}-${theme}-doorway-visible.png`),
       fullPage: true,
     });
   }
 
   /* -- close-up of the hole itself ---------------------------------------- */
+  // Two shots, both framed on the doorway: the overlay showing pattern panes
+  // against carrier cores, and the same view with the overlay off so the
+  // meshed blocks can be checked against the grid they now line up with.
   await page.evaluate((t) => {
     document.documentElement.dataset.theme = t;
   }, "dark");
+  // Park on the frame where the door is SHUT. That is the only frame where the
+  // pattern blocks are in the doorway at all, so it is the only one where
+  // "pane on block" and "pattern vs carrier" are visible things to check.
+  //
+  // Tick 0 is NOT always it: a file saved with its doorway standing open
+  // measures its own closing first, and this 4 × 4 vault is one of those.
+  const shutTick = cert.rest_is_closed ? 0 : (cert.close_ticks ?? 0) + 2;
+  await page.locator(".replay-track input[type='range']").fill(String(shutTick));
   await page.evaluate(() => window.__doorway.focus());
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(800);
   await stage.screenshot({
-    path: join(SHOTS, `${door.id}-doorway-closeup.png`),
+    path: join(SHOTS, `${door.id}-doorway-closeup-visible.png`),
   });
+  await toggle.click();
+  await page.waitForTimeout(400);
+  await stage.screenshot({
+    path: join(SHOTS, `${door.id}-alignment-closeup-visible.png`),
+  });
+  await toggle.click();
+  await page.waitForTimeout(300);
+
+  /* -- the classification block, as it now reads -------------------------- */
+  const classifyEl = page.locator('[data-testid="classification"]');
+  if (await classifyEl.count()) {
+    await classifyEl.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(200);
+    await classifyEl.screenshot({
+      path: join(SHOTS, `${door.id}-classification-visible.png`),
+    });
+  }
+  const headline = (
+    await page.locator('[data-testid="classify-name"]').textContent()
+  )?.trim();
+  ok(`${P} classification headline reads "${headline}"`, !!headline, headline);
 
   ok(`${P} no console errors`, consoleErrors.length === 0, consoleErrors.slice(0, 4));
 
@@ -246,6 +405,26 @@ for (const door of DOORS) {
     facts,
     legend,
     summary,
+    headline,
+    align: align.slice(0, 6),
+    classification: cls && {
+      name: cls.name,
+      pattern: cls.pattern,
+      patternRef: cls.patternRef,
+      qualifiers: cls.qualifiers,
+      frameNote: cls.frameNote,
+      dual: cls.dual,
+      volumePattern: cls.volumePattern,
+      surfaces: cls.surfaces?.map((s) => ({
+        side: s.side,
+        pattern: s.pattern,
+        patternRef: s.patternRef,
+        transform: s.transform,
+        cells: s.cells,
+        layers: s.layers,
+        ascii: s.ascii,
+      })),
+    },
     framesPlain,
     framesOverlay,
     framesBoth,

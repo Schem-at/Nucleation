@@ -54,8 +54,9 @@ export type DoorwayStyle = {
   hex: number;
   label: string;
   /** `edges` — a thin wireframe box on the cell boundary.
-   *  `hatch` — a 45°-hatched translucent pane, inset inside that box. */
-  mark: "edges" | "hatch";
+   *  `hatch` — a 45°-hatched translucent pane, inset inside that box.
+   *  `core`  — a small plain cube at the centre of the cell. */
+  mark: "edges" | "hatch" | "core";
 };
 
 /** The walkable hole. Violet steps for the light page and for the two dark
@@ -65,14 +66,45 @@ const PASSAGE_DARK = 0x9085e9;
 /** The blocks that fill it. One step, valid on all three surfaces. */
 const CLOSED_BOTH = 0xd55181;
 
-export function doorwayStyles(dark: boolean): [DoorwayStyle, DoorwayStyle] {
+/** ------------------------------------------------------- three channels --
+ *
+ * The overlay now separates the door blocks you can SEE from the ones hidden
+ * behind them — the pattern from the carriers. A vault's centre panel is the
+ * pattern; the slime blocks directly behind it, which push it, are not, and
+ * being able to point at each is the whole reason the surface is extracted.
+ *
+ * That third channel takes no new hue, and could not: the note at the top of
+ * this file records that no fourth colour clears the all-pairs gate beside the
+ * x-ray's three, and that the doorway escapes by MARK instead. So the carriers
+ * stay on the same magenta as the pattern — they ARE door blocks, and a
+ * different hue would deny it — and separate by mark and by size:
+ *
+ *   pattern  hatched pane, 0.70 of the cell, translucent — an airy panel
+ *   carrier  plain cube,   0.40 of the cell, denser      — a small solid core
+ *
+ * The separation is SIZE and DENSITY rather than brightness. A first pass made
+ * the carrier a dim ghost of the pane and it disappeared: a carrier sits
+ * directly behind the block that hides it — that is the definition — so it is
+ * always seen through a pane, and dimming it further left the third mark
+ * invisible on exactly the doors it exists for. A small dense core reads
+ * against a large airy panel at any depth, and stays obviously secondary
+ * because it covers a third of the area. The legend names both with their
+ * counts, so identity is never carried by appearance alone. */
+const CARRIER_ALPHA = 0.86;
+const CARRIER_ALPHA_XRAY = 0.6;
+export { CARRIER_ALPHA, CARRIER_ALPHA_XRAY };
+
+export function doorwayStyles(
+  dark: boolean,
+): [DoorwayStyle, DoorwayStyle, DoorwayStyle] {
   return [
     {
       hex: dark ? PASSAGE_DARK : PASSAGE_LIGHT,
       label: "walkable passage",
       mark: "edges",
     },
-    { hex: CLOSED_BOTH, label: "door blocks (shut)", mark: "hatch" },
+    { hex: CLOSED_BOTH, label: "pattern blocks (visible)", mark: "hatch" },
+    { hex: CLOSED_BOTH, label: "carriers (hidden behind)", mark: "core" },
   ];
 }
 
@@ -84,6 +116,11 @@ export type DoorwayFacts = {
   passageCells: number;
   /** Cells of that passage holding a door block when shut. */
   closedCells: number;
+  /** …of which these are the ones a viewer can see from either face — the
+   *  pattern. */
+  visibleCells: number;
+  /** …and these are hidden behind them: carriers, not pattern. */
+  carrierCells: number;
   /** The opening's own two spans, and the wall thickness it cuts through. */
   w: number;
   h: number;
@@ -143,6 +180,8 @@ export function doorwayFacts(geo: ApertureGeometry): DoorwayFacts | null {
   return {
     passageCells: geo.passage.length,
     closedCells: geo.closed.length,
+    visibleCells: geo.visible.length,
+    carrierCells: geo.carriers.length,
     w,
     h,
     depth,
@@ -154,11 +193,17 @@ export function doorwayFacts(geo: ApertureGeometry): DoorwayFacts | null {
 }
 
 /** The legend's one-line summary. Reads as the doorway rather than as a stat
- * row: the shape first, then what fills it, then how thick the wall is. */
+ * row: the shape first, then what fills it, then how thick the wall is. The
+ * door-block count is split only when there is something to split — a door
+ * with no carriers should not have to say "0 carriers". */
 export function doorwaySummary(f: DoorwayFacts): string {
   const n = (v: number) => v.toLocaleString("en-US");
+  const blocks =
+    f.carrierCells > 0
+      ? `${n(f.visibleCells)} pattern + ${n(f.carrierCells)} carrier blocks`
+      : `${n(f.closedCells)} door blocks`;
   return (
     `${f.w} × ${f.h} opening · ${n(f.passageCells)} passage cells · ` +
-    `${n(f.closedCells)} door blocks · ${f.depth} deep`
+    `${blocks} · ${f.depth} deep`
   );
 }

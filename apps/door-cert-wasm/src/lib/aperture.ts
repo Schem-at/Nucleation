@@ -14,15 +14,38 @@
 // The pattern is then read back off the CLOSED world over that footprint, so
 // door blocks that never appear on the seed layer are recovered rather than
 // left as holes.
+//
+// ------------------------------------------------------------- pattern --
+//
+// The pattern is what you can SEE from the hallway, not everything solid
+// inside the passage.
+//
+// Reading it as "every passage cell holding a block when shut" gets the answer
+// wrong on any door with carriers in its own doorway. A vault pushes its
+// centre panel forward with slime blocks; those slime blocks sit in passage
+// cells, so the volume reading counts them — but they are directly behind the
+// panel they push and nobody standing in the hallway ever sees one. Counting
+// them both misdescribes the door and makes it unclassifiable, because no
+// definition in the standard has a shape for "panel plus its pusher".
+//
+// So the surface is cast: for each (row, column) of the cross-section, walk in
+// from the face and take the FIRST solid cell. That cell, and its depth below
+// the face, is the pattern there. Everything behind it is machinery.
+//
+// A door can be two-sided, and §7.5 works the vault as exactly that — "a 5x5
+// Vault Door, which is a 5x5 Dual Funnel Door" — so both faces are cast and
+// both kept. A door whose two visible surfaces are each a funnel is a vault,
+// and saying so is the whole reason the surface is extracted separately.
 import type {
   Aperture,
   ApertureGeometry,
   Classification,
   PatternCell,
   ReplayBlock,
+  SurfaceReading,
   Vec3,
 } from "./types";
-import { classify } from "./classify";
+import { classify, readSurface } from "./classify";
 
 const baseName = (state: string) => state.split("[", 1)[0];
 const isAir = (state: string) => baseName(state).endsWith("air");
@@ -322,6 +345,36 @@ export function aperture(
   const m = spanC;
   const n = spanR;
 
+  // 5b. The visible surface, cast in from each face. `k` is counted from the
+  //     face it was cast from, so each surface is a complete pattern in its
+  //     own right and every Section 3/4 definition applies to it unchanged.
+  const castSurface = (fromFront: boolean) => {
+    const cells: PatternCell[] = [];
+    const hits: Vec3[] = [];
+    for (let col = loC; col <= hiC; col++)
+      for (let row = loR; row <= hiR; row++)
+        for (let d = 0; d < depth; d++) {
+          const layer = fromFront ? lo + d : hi - d;
+          const p = at(col, row, layer);
+          const block = filled.get(posKey(p));
+          if (!block || isAir(block.state)) continue;
+          cells.push({ r: rowOf(row), c: col - loC, k: d, id: baseName(block.state) });
+          hits.push(p);
+          break;
+        }
+    return { cells, hits };
+  };
+  const frontCast = castSurface(true);
+  // A one-block-thick door has one face worth reading: the back cast would
+  // return the same cells at the same depths and "dual" would be vacuous.
+  const backCast = depth > 1 ? castSurface(false) : null;
+  const surfaces: SurfaceReading[] = [readSurface("front", frontCast.cells, m, n)];
+  if (backCast) surfaces.push(readSurface("back", backCast.cells, m, n));
+
+  const visibleSet = new Set(
+    [...frontCast.hits, ...(backCast?.hits ?? [])].map(posKey),
+  );
+
   // 6. Orientation (Definition 2.4). A wall is a Door; a hatch is a skydoor,
   //    and which kind depends on where the machinery lives — the front side
   //    is the one you can see the pattern from.
@@ -443,15 +496,28 @@ export function aperture(
   if (passage) {
     const passageCells: Vec3[] = [];
     const closedCells: Vec3[] = [];
+    // …and the split the overlay draws: the blocks a viewer can SEE, and the
+    // ones hidden behind them. Both are still door blocks and both are still
+    // timed; only one of them is the pattern.
+    const visibleCells: Vec3[] = [];
+    const carrierCells: Vec3[] = [];
     for (const key of passage.set) {
       const [a, b] = parse(key);
       for (let layer = lo; layer <= hi; layer++) {
         const p = at(a, b, layer);
         passageCells.push(p);
-        if (solidIn(filled, p)) closedCells.push(p);
+        if (!solidIn(filled, p)) continue;
+        closedCells.push(p);
+        (visibleSet.has(posKey(p)) ? visibleCells : carrierCells).push(p);
       }
     }
-    geometry = { passage: passageCells, closed: closedCells, restIsClosed: shut };
+    geometry = {
+      passage: passageCells,
+      closed: closedCells,
+      visible: visibleCells,
+      carriers: carrierCells,
+      restIsClosed: shut,
+    };
   }
 
   const classification =
@@ -465,6 +531,7 @@ export function aperture(
           qualifiers,
           frameNote,
           around: { frameIds, outerIds, sillIds },
+          surfaces,
         })
       : null;
 
