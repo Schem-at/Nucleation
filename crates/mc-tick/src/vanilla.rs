@@ -563,7 +563,8 @@ const IMMOVABLE: &[&str] = &[
     "minecraft:moving_piston",
     "minecraft:piston_head",
     "minecraft:jukebox",
-    "minecraft:white_shulker_box",
+    // Shulker boxes of every colour are also immovable; they match by name
+    // pattern in `register_all_at` rather than sixteen entries here.
 ];
 
 /// Blocks with no behaviour at all, but which are legitimate build material.
@@ -619,7 +620,8 @@ const INERT: &[&str] = &[
     "minecraft:composter",
     "minecraft:target",
     "minecraft:jukebox",
-    "minecraft:white_shulker_box",
+    // Shulker boxes (all sixteen colours plus undyed) are inert too; they
+    // match by name pattern in the second registration pass.
     "minecraft:birch_wall_sign",
     "minecraft:player_wall_head",
     "minecraft:lightning_rod",
@@ -671,7 +673,7 @@ pub fn register_all_at(
             }
             _ => {}
         }
-        if IMMOVABLE.contains(&descriptor.name.as_str()) {
+        if IMMOVABLE.contains(&descriptor.name.as_str()) || is_shulker_box(&descriptor.name) {
             rules.immovable.push(*id);
         }
         // `PistonBaseBlock.getPistonPushReaction` answers BLOCK while
@@ -821,8 +823,7 @@ pub fn register_all_at(
             // Shulker boxes register `PushReaction.DESTROY` in their block
             // properties (`Blocks` bytecode) — a piston breaks one, and the
             // break drops the box as an item that keeps its slots.
-            || descriptor.name.ends_with("_shulker_box")
-            || descriptor.name == "minecraft:shulker_box"
+            || is_shulker_box(&descriptor.name)
         {
             rules.destroyed_by_push.push(*id);
         }
@@ -964,7 +965,7 @@ pub fn register_all_at(
     for (id, descriptor) in &descriptors {
         let name = descriptor.name.as_str();
 
-        if INERT.contains(&name) {
+        if INERT.contains(&name) || is_shulker_box(name) {
             table.register(*id, Box::new(Inert::new("vanilla")));
             continue;
         }
@@ -1323,7 +1324,7 @@ pub fn register_all_at(
 pub fn container_slots(name: &str) -> Option<u32> {
     match name {
         "minecraft:barrel" | "minecraft:chest" | "minecraft:trapped_chest" => Some(27),
-        n if n.ends_with("_shulker_box") => Some(27),
+        n if is_shulker_box(n) => Some(27),
         "minecraft:hopper" => Some(5),
         "minecraft:dropper" | "minecraft:dispenser" => Some(9),
         _ => None,
@@ -1513,6 +1514,12 @@ pub fn is_collision_full_cube(descriptor: &str) -> bool {
 /// so the distinction never changes a group.
 pub fn has_dynamic_shape(descriptor: &str) -> bool {
     let name = descriptor.split('[').next().unwrap_or(descriptor);
+    is_shulker_box(name)
+}
+
+/// Whether a block is a shulker box — any of the sixteen dye colours or the
+/// undyed `minecraft:shulker_box`.
+fn is_shulker_box(name: &str) -> bool {
     name.ends_with("_shulker_box") || name == "minecraft:shulker_box"
 }
 

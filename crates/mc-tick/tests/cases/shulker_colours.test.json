@@ -1,0 +1,27 @@
+{
+  "name": "shulker colours: lime and undyed boxes register as build material; a dispensed red box broken by the piston drops a red item",
+  "structure": "../corpus/structures/shulker_colours.snbt",
+  "settle": "placement",
+  "seed": 12345,
+  "actions": [
+    { "tick": 5,  "place": [-1, 2, 1], "state": "minecraft:redstone_block" },
+    { "tick": 20, "place": [1, 4, 1],  "state": "minecraft:redstone_block" },
+    { "tick": 24, "place": [1, 4, 1],  "state": "minecraft:air" }
+  ],
+  "checks": [
+    { "tick": 0, "expect": "blocks", "blocks": {
+        "3,1,1": "minecraft:lime_shulker_box[facing=up]",
+        "4,1,1": "minecraft:shulker_box[facing=up]" } },
+    { "tick": 12, "expect": "blocks", "blocks": { "1,2,1": "minecraft:red_shulker_box" } },
+    { "tick": 22, "expect": "entities", "entities": [
+        { "item": "minecraft:red_shulker_box", "region": [[1, 1, 1], [1, 2, 1]], "count": 1 } ] },
+    { "tick": 40, "expect": "blocks", "blocks": {
+        "1,2,1": "minecraft:air",
+        "1,3,1": "minecraft:piston[extended=false]",
+        "3,1,1": "minecraft:lime_shulker_box[facing=up]",
+        "4,1,1": "minecraft:shulker_box[facing=up]" } },
+    { "tick": 40, "expect": "entities", "entities": [
+        { "item": "minecraft:red_shulker_box", "region": [[1, 1, 1], [1, 2, 1]], "count": 1 }
+    ] }
+  ]
+}
