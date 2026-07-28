@@ -27,6 +27,12 @@ namespace capi {
     typedef struct TickSimulation_from_schematic_result {union {diplomat::capi::TickSimulation* ok; diplomat::capi::NucleationError err;}; bool is_ok;} TickSimulation_from_schematic_result;
     TickSimulation_from_schematic_result TickSimulation_from_schematic(const diplomat::capi::Schematic* schematic, diplomat::capi::TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z, diplomat::capi::DiplomatStringView extra_states);
 
+    typedef struct TickSimulation_from_blocks_result {union {diplomat::capi::TickSimulation* ok; diplomat::capi::NucleationError err;}; bool is_ok;} TickSimulation_from_blocks_result;
+    TickSimulation_from_blocks_result TickSimulation_from_blocks(int32_t bx, int32_t by, int32_t bz, int32_t travel, int32_t x_off, diplomat::capi::DiplomatStringView palette, diplomat::capi::DiplomatU16View cells, uint16_t air_index, diplomat::capi::TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z);
+
+    typedef struct TickSimulation_eval_flight_batch_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} TickSimulation_eval_flight_batch_result;
+    TickSimulation_eval_flight_batch_result TickSimulation_eval_flight_batch(int32_t bx, int32_t by, int32_t bz, int32_t travel, int32_t x_off, diplomat::capi::DiplomatStringView palette, diplomat::capi::DiplomatU16View cells, uint16_t air_index, diplomat::capi::DiplomatI32View kicks, uint32_t eval_ticks, int64_t seed, int32_t must_move_by_tick, bool need_period, bool early_exit, diplomat::capi::DiplomatWrite* write);
+
     void TickSimulation_set_rng_seed(diplomat::capi::TickSimulation* self, int64_t seed);
 
     void TickSimulation_step(diplomat::capi::TickSimulation* self);
@@ -95,6 +101,63 @@ inline diplomat::result<std::unique_ptr<TickSimulation>, NucleationError> TickSi
         origin_z,
         {extra_states.data(), extra_states.size()});
     return result.is_ok ? diplomat::result<std::unique_ptr<TickSimulation>, NucleationError>(diplomat::Ok<std::unique_ptr<TickSimulation>>(std::unique_ptr<TickSimulation>(TickSimulation::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<TickSimulation>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::unique_ptr<TickSimulation>, NucleationError> TickSimulation::from_blocks(int32_t bx, int32_t by, int32_t bz, int32_t travel, int32_t x_off, std::string_view palette, diplomat::span<const uint16_t> cells, uint16_t air_index, TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z) {
+    auto result = diplomat::capi::TickSimulation_from_blocks(bx,
+        by,
+        bz,
+        travel,
+        x_off,
+        {palette.data(), palette.size()},
+        {cells.data(), cells.size()},
+        air_index,
+        settle.AsFFI(),
+        origin_x,
+        origin_y,
+        origin_z);
+    return result.is_ok ? diplomat::result<std::unique_ptr<TickSimulation>, NucleationError>(diplomat::Ok<std::unique_ptr<TickSimulation>>(std::unique_ptr<TickSimulation>(TickSimulation::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<TickSimulation>, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, NucleationError> TickSimulation::eval_flight_batch(int32_t bx, int32_t by, int32_t bz, int32_t travel, int32_t x_off, std::string_view palette, diplomat::span<const uint16_t> cells, uint16_t air_index, diplomat::span<const int32_t> kicks, uint32_t eval_ticks, int64_t seed, int32_t must_move_by_tick, bool need_period, bool early_exit) {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::TickSimulation_eval_flight_batch(bx,
+        by,
+        bz,
+        travel,
+        x_off,
+        {palette.data(), palette.size()},
+        {cells.data(), cells.size()},
+        air_index,
+        {kicks.data(), kicks.size()},
+        eval_ticks,
+        seed,
+        must_move_by_tick,
+        need_period,
+        early_exit,
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> TickSimulation::eval_flight_batch_write(int32_t bx, int32_t by, int32_t bz, int32_t travel, int32_t x_off, std::string_view palette, diplomat::span<const uint16_t> cells, uint16_t air_index, diplomat::span<const int32_t> kicks, uint32_t eval_ticks, int64_t seed, int32_t must_move_by_tick, bool need_period, bool early_exit, W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::TickSimulation_eval_flight_batch(bx,
+        by,
+        bz,
+        travel,
+        x_off,
+        {palette.data(), palette.size()},
+        {cells.data(), cells.size()},
+        air_index,
+        {kicks.data(), kicks.size()},
+        eval_ticks,
+        seed,
+        must_move_by_tick,
+        need_period,
+        early_exit,
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
 inline void TickSimulation::set_rng_seed(int64_t seed) {

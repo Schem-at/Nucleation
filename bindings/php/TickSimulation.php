@@ -60,6 +60,73 @@ final class TickSimulation {
         return new TickSimulation($result->ok, true);
     }
 
+    public static function fromBlocks( $bx,  $by,  $bz,  $travel,  $x_off, string $palette, array $cells,  $air_index, int $settle,  $origin_x,  $origin_y,  $origin_z) {
+        $__n5 = strlen($palette);
+        $__view5 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n5 > 0) {
+            $__buf5 = Lib::ffi()->new("uint8_t[" . $__n5 . "]", false);
+            \FFI::memcpy($__buf5, $palette, $__n5);
+            $__view5->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf5[0]));
+        } else {
+            $__view5->data = null;
+        }
+        $__view5->len = $__n5;
+        $__n6 = count($cells);
+        $__view6 = Lib::ffi()->new('DiplomatU16View');
+        if ($__n6 > 0) {
+            $__arr6 = Lib::ffi()->new("uint16_t[" . $__n6 . "]", false);
+            foreach ($cells as $__i6 => $__v6) { $__arr6[$__i6] = $__v6; }
+            $__view6->data = \FFI::addr($__arr6[0]);
+        } else {
+            $__view6->data = null;
+        }
+        $__view6->len = $__n6;
+        $result = Lib::ffi()->TickSimulation_from_blocks($bx, $by, $bz, $travel, $x_off, $__view5, $__view6, $air_index, $settle, $origin_x, $origin_y, $origin_z);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return new TickSimulation($result->ok, true);
+    }
+
+    public static function evalFlightBatch( $bx,  $by,  $bz,  $travel,  $x_off, string $palette, array $cells,  $air_index, array $kicks,  $eval_ticks,  $seed,  $must_move_by_tick,  $need_period,  $early_exit) {
+        $__n5 = strlen($palette);
+        $__view5 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n5 > 0) {
+            $__buf5 = Lib::ffi()->new("uint8_t[" . $__n5 . "]", false);
+            \FFI::memcpy($__buf5, $palette, $__n5);
+            $__view5->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf5[0]));
+        } else {
+            $__view5->data = null;
+        }
+        $__view5->len = $__n5;
+        $__n6 = count($cells);
+        $__view6 = Lib::ffi()->new('DiplomatU16View');
+        if ($__n6 > 0) {
+            $__arr6 = Lib::ffi()->new("uint16_t[" . $__n6 . "]", false);
+            foreach ($cells as $__i6 => $__v6) { $__arr6[$__i6] = $__v6; }
+            $__view6->data = \FFI::addr($__arr6[0]);
+        } else {
+            $__view6->data = null;
+        }
+        $__view6->len = $__n6;
+        $__n8 = count($kicks);
+        $__view8 = Lib::ffi()->new('DiplomatI32View');
+        if ($__n8 > 0) {
+            $__arr8 = Lib::ffi()->new("int32_t[" . $__n8 . "]", false);
+            foreach ($kicks as $__i8 => $__v8) { $__arr8[$__i8] = $__v8; }
+            $__view8->data = \FFI::addr($__arr8[0]);
+        } else {
+            $__view8->data = null;
+        }
+        $__view8->len = $__n8;
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->TickSimulation_eval_flight_batch($bx, $by, $bz, $travel, $x_off, $__view5, $__view6, $air_index, $__view8, $eval_ticks, $seed, $must_move_by_tick, $need_period, $early_exit, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function setRngSeed( $seed) {
         Lib::ffi()->TickSimulation_set_rng_seed($this->ptr, $seed);
     }

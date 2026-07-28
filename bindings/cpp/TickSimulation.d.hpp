@@ -49,6 +49,32 @@ public:
   inline static diplomat::result<std::unique_ptr<TickSimulation>, NucleationError> from_schematic(const Schematic& schematic, TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z, std::string_view extra_states);
 
   /**
+   * GA fast path: construct from a flat genome-cell array — no SNBT
+   * text built or parsed. Corridor layout matches the flying-ga app:
+   * machine at `x_off`, world size `[bx + travel, by + 2, bz + 2]`,
+   * cells flattened `((y * bz) + z) * bx + x`, `air_index` = empty
+   * cell. `palette` is the run's alphabet, semicolon-separated; every
+   * entry is pre-interned so behaviours bind exactly as the SNBT
+   * path's EXTRA_STATES did.
+   */
+  inline static diplomat::result<std::unique_ptr<TickSimulation>, NucleationError> from_blocks(int32_t bx, int32_t by, int32_t bz, int32_t travel, int32_t x_off, std::string_view palette, diplomat::span<const uint16_t> cells, uint16_t air_index, TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z);
+
+  /**
+   * Evaluate a whole batch of kicked flights inside the engine — one
+   * wasm call per generation chunk instead of a dozen boundary calls
+   * per machine. `cells` holds N genomes concatenated (each
+   * `bx*by*bz` entries), `kicks` N structure-space `[x,y,z]` triples.
+   * The flight protocol, probe schedule and gait detection mirror the
+   * app's evalCore exactly; `early_exit` stops provably-frozen
+   * machines at tick 40 without changing any reported value. Writes
+   * JSON rows `[n0, startCom, startMinX, startMaxX, comAtMoveCheck |
+   * null, comAtMid, period, n1, endCom, endMinX, endMaxX]`.
+   */
+  inline static diplomat::result<std::string, NucleationError> eval_flight_batch(int32_t bx, int32_t by, int32_t bz, int32_t travel, int32_t x_off, std::string_view palette, diplomat::span<const uint16_t> cells, uint16_t air_index, diplomat::span<const int32_t> kicks, uint32_t eval_ticks, int64_t seed, int32_t must_move_by_tick, bool need_period, bool early_exit);
+  template<typename W>
+  inline static diplomat::result<std::monostate, NucleationError> eval_flight_batch_write(int32_t bx, int32_t by, int32_t bz, int32_t travel, int32_t x_off, std::string_view palette, diplomat::span<const uint16_t> cells, uint16_t air_index, diplomat::span<const int32_t> kicks, uint32_t eval_ticks, int64_t seed, int32_t must_move_by_tick, bool need_period, bool early_exit, W& writeable_output);
+
+  /**
    * Seed the vanilla random source (`java.util.Random`'s LCG,
    * bit-for-bit). Unseeded, jittering behaviours use each
    * distribution's mean — fully deterministic, no noise.

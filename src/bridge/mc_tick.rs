@@ -200,6 +200,263 @@ fn is_named(descriptor: &str, needle: &str) -> bool {
         .contains(needle)
 }
 
+/// One pass over the world: (non-air count, center-of-mass x, min x, max x).
+fn non_air_stats(sim: &mc_tick::Simulation) -> (u32, f64, i32, i32) {
+    let mut n = 0u32;
+    let mut sum = 0.0;
+    let mut min = i32::MAX;
+    let mut max = i32::MIN;
+    for (pos, _) in sim.world().iter_non_air() {
+        n += 1;
+        sum += f64::from(pos.x);
+        if pos.x < min {
+            min = pos.x;
+        }
+        if pos.x > max {
+            max = pos.x;
+        }
+    }
+    (n, if n == 0 { f64::NAN } else { sum / f64::from(n) }, min, max)
+}
+
+/// Build a Structure directly from a flat genome-cell array — the GA fast
+/// path, no SNBT text. Layout mirrors the flying-ga corridor: machine at
+/// `x_off`, world size `[bx + travel, by + 2, bz + 2]`, cells flattened as
+/// `((y * bz) + z) * bx + x`, `air` the palette index meaning empty. The
+/// full palette rides along (indices are alphabet indices verbatim), so
+/// behaviours bind to every alphabet state exactly as the SNBT path did via
+/// its EXTRA_STATES list.
+fn structure_from_blocks(
+    bx: i32,
+    by: i32,
+    bz: i32,
+    travel: i32,
+    x_off: i32,
+    palette: &[String],
+    cells: &[u16],
+    air: u16,
+) -> Result<mc_tick::Structure, String> {
+    let volume = (bx.max(0) as usize) * (by.max(0) as usize) * (bz.max(0) as usize);
+    if cells.len() != volume {
+        return Err(format!("cells len {} != bbox volume {volume}", cells.len()));
+    }
+    let mut blocks = Vec::new();
+    let mut i = 0usize;
+    for _y in 0..by {
+        for _z in 0..bz {
+            for _x in 0..bx {
+                let s = cells[i];
+                let (x, y, z) = (_x, _y, _z);
+                i += 1;
+                if s == air {
+                    continue;
+                }
+                if s as usize >= palette.len() {
+                    return Err(format!("palette index {s} out of range"));
+                }
+                blocks.push((mc_tick::Pos::new(x + x_off, y, z), s as usize));
+            }
+        }
+    }
+    Ok(mc_tick::Structure {
+        size: (bx + travel, by + 2, bz + 2),
+        palette: palette.to_vec(),
+        blocks,
+        inventories: Vec::new(),
+        comparator_outputs: Vec::new(),
+        block_entities: Vec::new(),
+        entities: Vec::new(),
+        item_entities: Vec::new(),
+    })
+}
+
+/// The modal gait period from min-x rise gaps — bit-identical port of the
+/// app's `modalGap` (mode, ties to the smaller gap, modal share >= 0.6).
+fn modal_gap(gaps: &[u32]) -> u32 {
+    if gaps.len() < 3 {
+        return 0;
+    }
+    let mut order: Vec<u32> = Vec::new();
+    let mut counts: Vec<u32> = Vec::new();
+    for &g in gaps {
+        match order.iter().position(|&o| o == g) {
+            Some(i) => counts[i] += 1,
+            None => {
+                order.push(g);
+                counts.push(1);
+            }
+        }
+    }
+    let mut best = 0u32;
+    let mut best_gap: Option<u32> = None;
+    for (i, &g) in order.iter().enumerate() {
+        let n = counts[i];
+        if n > best || (n == best && best_gap.is_some_and(|b| g < b)) {
+            best = n;
+            best_gap = Some(g);
+        }
+    }
+    match best_gap {
+        Some(g) if (best as f64) / (gaps.len() as f64) >= 0.6 => g,
+        _ => 0,
+    }
+}
+
+/// One kicked flight, mirroring the app's `evalCore.fly` exactly: quiet
+/// settle at construction, redstone-block kick at tick 2 removed at tick 4,
+/// the same probe schedule (must-move deadline, mid-window centre of mass),
+/// optional in-eval gait detection over the last 120 ticks, and an optional
+/// early exit for machines that are provably frozen — quiescent and unmoved
+/// at tick 40, where every later scalar equals the tick-40 scalar, so the
+/// shortcut changes wall time and nothing else.
+///
+/// Row layout: `[n0, startCom, startMinX, startMaxX, comAtMoveCheck(NaN =
+/// no deadline), comAtMid, period, n1, endCom, endMinX, endMaxX]`.
+#[allow(clippy::too_many_arguments)]
+fn fly_metrics(
+    structure: &mc_tick::Structure,
+    extras: &[&str],
+    kick: (i32, i32, i32),
+    eval_ticks: u32,
+    seed: i64,
+    must_move_by_tick: i32,
+    need_period: bool,
+    early_exit: bool,
+) -> Result<[f64; 11], String> {
+    let mut sim = wire_simulation(
+        structure,
+        mc_tick::Pos::new(0, 0, 0),
+        ffi::TickSettleMode::Quiet,
+        extras,
+    )?;
+    fly_on(&mut sim, kick, eval_ticks, seed, must_move_by_tick, need_period, early_exit)
+}
+
+/// The flight itself, on an already-wired sim (fresh, quiet-settled).
+#[allow(clippy::too_many_arguments)]
+fn fly_on(
+    sim: &mut mc_tick::Simulation,
+    kick: (i32, i32, i32),
+    eval_ticks: u32,
+    seed: i64,
+    must_move_by_tick: i32,
+    need_period: bool,
+    early_exit: bool,
+) -> Result<[f64; 11], String> {
+    const PERIOD_WINDOW: u32 = 120;
+    const EARLY_TICK: u32 = 40;
+    sim.set_rng_seed(seed);
+
+    let (n0, start_com, start_min, start_max) = non_air_stats(sim);
+    let mut row = [f64::NAN; 11];
+    row[0] = f64::from(n0);
+    row[1] = start_com;
+    row[2] = f64::from(start_min);
+    row[3] = f64::from(start_max);
+    if n0 == 0 {
+        return Ok(row); // the caller short-circuits on n0 before reading on
+    }
+
+    let redstone = sim
+        .registry()
+        .get("minecraft:redstone_block")
+        .ok_or("redstone_block not interned")?;
+    let kick_pos = mc_tick::Pos::new(kick.0, kick.1, kick.2);
+    sim.run(2);
+    sim.place_block(kick_pos, redstone);
+    sim.run(2);
+    sim.place_block(kick_pos, mc_tick::StateId::AIR);
+    let mut elapsed: u32 = 4;
+
+    let mid_tick = eval_ticks.min((eval_ticks / 2).max(elapsed));
+    let move_check: Option<u32> = if must_move_by_tick >= 0 {
+        Some((must_move_by_tick as u32).max(elapsed).min(eval_ticks))
+    } else {
+        None
+    };
+    let mut probes: Vec<u32> = Vec::new();
+    if let Some(mc) = move_check {
+        probes.push(mc);
+    }
+    probes.push(mid_tick);
+    if early_exit && eval_ticks > EARLY_TICK {
+        probes.push(EARLY_TICK.max(elapsed));
+    }
+    probes.sort_unstable();
+    probes.dedup();
+
+    let mut com_mid = start_com;
+    let mut com_move = f64::NAN;
+    let mut frozen = false;
+    for &t in &probes {
+        if t > elapsed {
+            sim.run(u64::from(t - elapsed));
+            elapsed = t;
+        }
+        let (_, com, _, _) = non_air_stats(&sim);
+        if Some(t) == move_check {
+            com_move = com;
+        }
+        if t == mid_tick {
+            com_mid = com;
+        }
+        if early_exit
+            && t == EARLY_TICK
+            && sim.is_quiescent()
+            && (com - start_com).abs() < 0.25
+        {
+            frozen = true;
+            if mid_tick > t {
+                com_mid = com;
+            }
+            if let Some(mc) = move_check {
+                if mc > t && com_move.is_nan() {
+                    com_move = com;
+                }
+            }
+            break;
+        }
+    }
+
+    let mut period = 0u32;
+    if need_period && !frozen {
+        let win_start = elapsed.max(eval_ticks.saturating_sub(PERIOD_WINDOW));
+        if win_start > elapsed {
+            sim.run(u64::from(win_start - elapsed));
+            elapsed = win_start;
+        }
+        let mut gaps: Vec<u32> = Vec::new();
+        let (_, _, mut prev_min, _) = non_air_stats(&sim);
+        let mut last_rise: i64 = -1;
+        while elapsed < eval_ticks {
+            sim.run(1);
+            elapsed += 1;
+            let (_, _, mx, _) = non_air_stats(&sim);
+            if mx > prev_min {
+                if last_rise >= 0 {
+                    gaps.push(elapsed - last_rise as u32);
+                }
+                last_rise = i64::from(elapsed);
+            }
+            prev_min = mx;
+        }
+        period = modal_gap(&gaps);
+    }
+    if !frozen && eval_ticks > elapsed {
+        sim.run(u64::from(eval_ticks - elapsed));
+    }
+
+    let (n1, end_com, end_min, end_max) = non_air_stats(&sim);
+    row[4] = com_move;
+    row[5] = com_mid;
+    row[6] = f64::from(period);
+    row[7] = f64::from(n1);
+    row[8] = end_com;
+    row[9] = f64::from(end_min);
+    row[10] = f64::from(end_max);
+    Ok(row)
+}
+
 #[diplomat::bridge]
 pub mod ffi {
     use super::super::schematic::ffi::Schematic;
@@ -284,6 +541,163 @@ pub mod ffi {
             )
             .map_err(|_| NucleationError::Simulation)?;
             Ok(Box::new(TickSimulation { sim, checkpoints: Vec::new() }))
+        }
+
+        /// GA fast path: construct from a flat genome-cell array — no SNBT
+        /// text built or parsed. Corridor layout matches the flying-ga app:
+        /// machine at `x_off`, world size `[bx + travel, by + 2, bz + 2]`,
+        /// cells flattened `((y * bz) + z) * bx + x`, `air_index` = empty
+        /// cell. `palette` is the run's alphabet, semicolon-separated; every
+        /// entry is pre-interned so behaviours bind exactly as the SNBT
+        /// path's EXTRA_STATES did.
+        #[allow(clippy::too_many_arguments)]
+        pub fn from_blocks(
+            bx: i32,
+            by: i32,
+            bz: i32,
+            travel: i32,
+            x_off: i32,
+            palette: &DiplomatStr,
+            cells: &[u16],
+            air_index: u16,
+            settle: TickSettleMode,
+            origin_x: i32,
+            origin_y: i32,
+            origin_z: i32,
+        ) -> Result<Box<TickSimulation>, NucleationError> {
+            let palette =
+                std::str::from_utf8(palette).map_err(|_| NucleationError::InvalidArgument)?;
+            let pal: Vec<String> = palette
+                .split(';')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .collect();
+            let structure =
+                super::structure_from_blocks(bx, by, bz, travel, x_off, &pal, cells, air_index)
+                    .map_err(|_| NucleationError::InvalidArgument)?;
+            let extras: Vec<&str> = pal.iter().map(String::as_str).collect();
+            let sim = super::wire_simulation(
+                &structure,
+                mc_tick::Pos::new(origin_x, origin_y, origin_z),
+                settle,
+                &extras,
+            )
+            .map_err(|_| NucleationError::Simulation)?;
+            Ok(Box::new(TickSimulation { sim, checkpoints: Vec::new() }))
+        }
+
+        /// Evaluate a whole batch of kicked flights inside the engine — one
+        /// wasm call per generation chunk instead of a dozen boundary calls
+        /// per machine. `cells` holds N genomes concatenated (each
+        /// `bx*by*bz` entries), `kicks` N structure-space `[x,y,z]` triples.
+        /// The flight protocol, probe schedule and gait detection mirror the
+        /// app's evalCore exactly; `early_exit` stops provably-frozen
+        /// machines at tick 40 without changing any reported value. Writes
+        /// JSON rows `[n0, startCom, startMinX, startMaxX, comAtMoveCheck |
+        /// null, comAtMid, period, n1, endCom, endMinX, endMaxX]`.
+        #[allow(clippy::too_many_arguments)]
+        pub fn eval_flight_batch(
+            bx: i32,
+            by: i32,
+            bz: i32,
+            travel: i32,
+            x_off: i32,
+            palette: &DiplomatStr,
+            cells: &[u16],
+            air_index: u16,
+            kicks: &[i32],
+            eval_ticks: u32,
+            seed: i64,
+            must_move_by_tick: i32,
+            need_period: bool,
+            early_exit: bool,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let palette =
+                std::str::from_utf8(palette).map_err(|_| NucleationError::InvalidArgument)?;
+            let pal: Vec<String> = palette
+                .split(';')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .collect();
+            let extras: Vec<&str> = pal.iter().map(String::as_str).collect();
+            let volume = (bx.max(0) as usize) * (by.max(0) as usize) * (bz.max(0) as usize);
+            if volume == 0
+                || cells.len() % volume != 0
+                || kicks.len() != (cells.len() / volume) * 3
+            {
+                return Err(NucleationError::InvalidArgument);
+            }
+            let n_genomes = cells.len() / volume;
+            // Wire ONE empty-corridor sim (registry, behaviours, physics
+            // tables — the expensive part), checkpoint it pristine, and per
+            // genome restore + place. Construction cost is paid once per
+            // batch instead of once per machine.
+            let empty = vec![air_index; volume];
+            let empty_structure = super::structure_from_blocks(
+                bx, by, bz, travel, x_off, &pal, &empty, air_index,
+            )
+            .map_err(|_| NucleationError::InvalidArgument)?;
+            let mut sim = super::wire_simulation(
+                &empty_structure,
+                mc_tick::Pos::new(0, 0, 0),
+                TickSettleMode::Quiet,
+                &extras,
+            )
+            .map_err(|_| NucleationError::Simulation)?;
+            let pristine = sim.checkpoint();
+            let mut json = String::from("[");
+            for g in 0..n_genomes {
+                let slice = &cells[g * volume..(g + 1) * volume];
+                let structure = super::structure_from_blocks(
+                    bx, by, bz, travel, x_off, &pal, slice, air_index,
+                )
+                .map_err(|_| NucleationError::InvalidArgument)?;
+                sim.restore(&pristine);
+                {
+                    let (registry, world) = sim.registry_and_world_mut();
+                    structure.place(world, registry, mc_tick::Pos::new(0, 0, 0));
+                }
+                // Quiet settle for the placed genome, exactly as
+                // wire_simulation would have done for a fresh sim.
+                let order = structure.placement_order(
+                    mc_tick::vanilla::is_collision_full_cube,
+                    mc_tick::vanilla::has_dynamic_shape,
+                );
+                sim.place_on_place(&order);
+                sim.record();
+                let kick = (kicks[g * 3], kicks[g * 3 + 1], kicks[g * 3 + 2]);
+                let row = super::fly_on(
+                    &mut sim,
+                    kick,
+                    eval_ticks,
+                    seed,
+                    must_move_by_tick,
+                    need_period,
+                    early_exit,
+                )
+                .map_err(|_| NucleationError::Simulation)?;
+                if g > 0 {
+                    json.push(',');
+                }
+                json.push('[');
+                for (i, v) in row.iter().enumerate() {
+                    if i > 0 {
+                        json.push(',');
+                    }
+                    if v.is_nan() {
+                        json.push_str("null");
+                    } else {
+                        let _ = write!(json, "{v:?}");
+                    }
+                }
+                json.push(']');
+            }
+            json.push(']');
+            let _ = write!(out, "{json}");
+            Ok(())
         }
 
         /// Seed the vanilla random source (`java.util.Random`'s LCG,

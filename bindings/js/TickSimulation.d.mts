@@ -34,6 +34,30 @@ export class TickSimulation {
     static fromSchematic(schematic: Schematic, settle: TickSettleMode, originX: number, originY: number, originZ: number, extraStates: string): TickSimulation;
 
     /**
+     * GA fast path: construct from a flat genome-cell array — no SNBT
+     * text built or parsed. Corridor layout matches the flying-ga app:
+     * machine at `x_off`, world size `[bx + travel, by + 2, bz + 2]`,
+     * cells flattened `((y * bz) + z) * bx + x`, `air_index` = empty
+     * cell. `palette` is the run's alphabet, semicolon-separated; every
+     * entry is pre-interned so behaviours bind exactly as the SNBT
+     * path's EXTRA_STATES did.
+     */
+    static fromBlocks(bx: number, by: number, bz: number, travel: number, xOff: number, palette: string, cells: Array<number>, airIndex: number, settle: TickSettleMode, originX: number, originY: number, originZ: number): TickSimulation;
+
+    /**
+     * Evaluate a whole batch of kicked flights inside the engine — one
+     * wasm call per generation chunk instead of a dozen boundary calls
+     * per machine. `cells` holds N genomes concatenated (each
+     * `bx*by*bz` entries), `kicks` N structure-space `[x,y,z]` triples.
+     * The flight protocol, probe schedule and gait detection mirror the
+     * app's evalCore exactly; `early_exit` stops provably-frozen
+     * machines at tick 40 without changing any reported value. Writes
+     * JSON rows `[n0, startCom, startMinX, startMaxX, comAtMoveCheck |
+     * null, comAtMid, period, n1, endCom, endMinX, endMaxX]`.
+     */
+    static evalFlightBatch(bx: number, by: number, bz: number, travel: number, xOff: number, palette: string, cells: Array<number>, airIndex: number, kicks: Array<number>, evalTicks: number, seed: bigint, mustMoveByTick: number, needPeriod: boolean, earlyExit: boolean): string;
+
+    /**
      * Seed the vanilla random source (`java.util.Random`'s LCG,
      * bit-for-bit). Unseeded, jittering behaviours use each
      * distribution's mean — fully deterministic, no noise.

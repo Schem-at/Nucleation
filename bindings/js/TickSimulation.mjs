@@ -106,6 +106,82 @@ export class TickSimulation {
     }
 
     /**
+     * GA fast path: construct from a flat genome-cell array — no SNBT
+     * text built or parsed. Corridor layout matches the flying-ga app:
+     * machine at `x_off`, world size `[bx + travel, by + 2, bz + 2]`,
+     * cells flattened `((y * bz) + z) * bx + x`, `air_index` = empty
+     * cell. `palette` is the run's alphabet, semicolon-separated; every
+     * entry is pre-interned so behaviours bind exactly as the SNBT
+     * path's EXTRA_STATES did.
+     */
+    static fromBlocks(bx, by, bz, travel, xOff, palette, cells, airIndex, settle, originX, originY, originZ) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const paletteSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, palette)));
+        const cellsSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.slice(wasm, cells, "u16")));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.TickSimulation_from_blocks(diplomatReceive.buffer, bx, by, bz, travel, xOff, paletteSlice.ptr, cellsSlice.ptr, airIndex, settle.ffiValue, originX, originY, originZ);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return new TickSimulation(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
+    /**
+     * Evaluate a whole batch of kicked flights inside the engine — one
+     * wasm call per generation chunk instead of a dozen boundary calls
+     * per machine. `cells` holds N genomes concatenated (each
+     * `bx*by*bz` entries), `kicks` N structure-space `[x,y,z]` triples.
+     * The flight protocol, probe schedule and gait detection mirror the
+     * app's evalCore exactly; `early_exit` stops provably-frozen
+     * machines at tick 40 without changing any reported value. Writes
+     * JSON rows `[n0, startCom, startMinX, startMaxX, comAtMoveCheck |
+     * null, comAtMid, period, n1, endCom, endMinX, endMaxX]`.
+     */
+    static evalFlightBatch(bx, by, bz, travel, xOff, palette, cells, airIndex, kicks, evalTicks, seed, mustMoveByTick, needPeriod, earlyExit) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const paletteSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, palette)));
+        const cellsSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.slice(wasm, cells, "u16")));
+        const kicksSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.slice(wasm, kicks, "i32")));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.TickSimulation_eval_flight_batch(diplomatReceive.buffer, bx, by, bz, travel, xOff, paletteSlice.ptr, cellsSlice.ptr, airIndex, kicksSlice.ptr, evalTicks, seed, mustMoveByTick, needPeriod, earlyExit, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
+    /**
      * Seed the vanilla random source (`java.util.Random`'s LCG,
      * bit-for-bit). Unseeded, jittering behaviours use each
      * distribution's mean — fully deterministic, no noise.

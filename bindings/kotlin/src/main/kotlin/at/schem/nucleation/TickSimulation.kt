@@ -9,6 +9,8 @@ internal interface TickSimulationLib: Library {
     fun TickSimulation_destroy(handle: Pointer)
     fun TickSimulation_from_snbt(snbt: Slice, settle: Int, originX: Int, originY: Int, originZ: Int, extraStates: Slice): ResultPointerInt
     fun TickSimulation_from_schematic(schematic: Pointer, settle: Int, originX: Int, originY: Int, originZ: Int, extraStates: Slice): ResultPointerInt
+    fun TickSimulation_from_blocks(bx: Int, by: Int, bz: Int, travel: Int, xOff: Int, palette: Slice, cells: Slice, airIndex: FFIUint16, settle: Int, originX: Int, originY: Int, originZ: Int): ResultPointerInt
+    fun TickSimulation_eval_flight_batch(bx: Int, by: Int, bz: Int, travel: Int, xOff: Int, palette: Slice, cells: Slice, airIndex: FFIUint16, kicks: Slice, evalTicks: FFIUint32, seed: Long, mustMoveByTick: Int, needPeriod: Boolean, earlyExit: Boolean, write: Pointer): ResultUnitInt
     fun TickSimulation_set_rng_seed(handle: Pointer, seed: Long): Unit
     fun TickSimulation_step(handle: Pointer): Unit
     fun TickSimulation_run(handle: Pointer, ticks: FFIUint32): Unit
@@ -110,6 +112,69 @@ class TickSimulation internal constructor (
                 }
             } finally {
                 extraStatesSliceMemory.close()
+            }
+        }
+        @JvmStatic
+
+        /** GA fast path: construct from a flat genome-cell array — no SNBT
+        *text built or parsed. Corridor layout matches the flying-ga app:
+        *machine at `x_off`, world size `[bx + travel, by + 2, bz + 2]`,
+        *cells flattened `((y * bz) + z) * bx + x`, `air_index` = empty
+        *cell. `palette` is the run's alphabet, semicolon-separated; every
+        *entry is pre-interned so behaviours bind exactly as the SNBT
+        *path's EXTRA_STATES did.
+        */
+        fun fromBlocks(bx: Int, by: Int, bz: Int, travel: Int, xOff: Int, palette: String, cells: UShortArray, airIndex: UShort, settle: TickSettleMode, originX: Int, originY: Int, originZ: Int): Result<TickSimulation> {
+            val paletteSliceMemory = PrimitiveArrayTools.borrowUtf8(palette)
+            val cellsSliceMemory = PrimitiveArrayTools.borrow(cells)
+
+            val returnVal = lib.TickSimulation_from_blocks(bx, by, bz, travel, xOff, paletteSliceMemory.slice, cellsSliceMemory.slice, FFIUint16(airIndex), settle.toNative(), originX, originY, originZ);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+                    val selfEdges: List<Any> = listOf()
+                    val handle = nativeOkVal
+                    val returnOpaque = TickSimulation(handle, selfEdges, true)
+                    return returnOpaque.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                paletteSliceMemory.close()
+                cellsSliceMemory.close()
+            }
+        }
+        @JvmStatic
+
+        /** Evaluate a whole batch of kicked flights inside the engine — one
+        *wasm call per generation chunk instead of a dozen boundary calls
+        *per machine. `cells` holds N genomes concatenated (each
+        *`bx*by*bz` entries), `kicks` N structure-space `[x,y,z]` triples.
+        *The flight protocol, probe schedule and gait detection mirror the
+        *app's evalCore exactly; `early_exit` stops provably-frozen
+        *machines at tick 40 without changing any reported value. Writes
+        *JSON rows `[n0, startCom, startMinX, startMaxX, comAtMoveCheck |
+        *null, comAtMid, period, n1, endCom, endMinX, endMaxX]`.
+        */
+        fun evalFlightBatch(bx: Int, by: Int, bz: Int, travel: Int, xOff: Int, palette: String, cells: UShortArray, airIndex: UShort, kicks: IntArray, evalTicks: UInt, seed: Long, mustMoveByTick: Int, needPeriod: Boolean, earlyExit: Boolean): Result<String> {
+            val paletteSliceMemory = PrimitiveArrayTools.borrowUtf8(palette)
+            val cellsSliceMemory = PrimitiveArrayTools.borrow(cells)
+            val kicksSliceMemory = PrimitiveArrayTools.borrow(kicks)
+            val write = DW.lib.diplomat_buffer_write_create(0)
+            val returnVal = lib.TickSimulation_eval_flight_batch(bx, by, bz, travel, xOff, paletteSliceMemory.slice, cellsSliceMemory.slice, FFIUint16(airIndex), kicksSliceMemory.slice, FFIUint32(evalTicks), seed, mustMoveByTick, needPeriod, earlyExit, write);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+
+                    val returnString = DW.writeToString(write)
+                    return returnString.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                paletteSliceMemory.close()
+                cellsSliceMemory.close()
+                kicksSliceMemory.close()
             }
         }
         @JvmStatic

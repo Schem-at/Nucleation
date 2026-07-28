@@ -529,6 +529,10 @@ typedef struct TickSimulation_from_snbt_result { union { TickSimulation* ok; Nuc
 TickSimulation_from_snbt_result TickSimulation_from_snbt(DiplomatStringView snbt, TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z, DiplomatStringView extra_states);
 typedef struct TickSimulation_from_schematic_result { union { TickSimulation* ok; NucleationError err; }; bool is_ok; } TickSimulation_from_schematic_result;
 TickSimulation_from_schematic_result TickSimulation_from_schematic(Schematic* schematic, TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z, DiplomatStringView extra_states);
+typedef struct TickSimulation_from_blocks_result { union { TickSimulation* ok; NucleationError err; }; bool is_ok; } TickSimulation_from_blocks_result;
+TickSimulation_from_blocks_result TickSimulation_from_blocks(int32_t bx, int32_t by, int32_t bz, int32_t travel, int32_t x_off, DiplomatStringView palette, DiplomatU16View cells, uint16_t air_index, TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z);
+typedef struct TickSimulation_eval_flight_batch_result { union { NucleationError err; }; bool is_ok; } TickSimulation_eval_flight_batch_result;
+TickSimulation_eval_flight_batch_result TickSimulation_eval_flight_batch(int32_t bx, int32_t by, int32_t bz, int32_t travel, int32_t x_off, DiplomatStringView palette, DiplomatU16View cells, uint16_t air_index, DiplomatI32View kicks, uint32_t eval_ticks, int64_t seed, int32_t must_move_by_tick, bool need_period, bool early_exit, DiplomatWrite* write);
 void TickSimulation_set_rng_seed(TickSimulation* self, int64_t seed);
 void TickSimulation_step(TickSimulation* self);
 void TickSimulation_run(TickSimulation* self, uint32_t ticks);
