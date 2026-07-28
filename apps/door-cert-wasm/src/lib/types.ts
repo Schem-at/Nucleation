@@ -22,6 +22,9 @@ export type Aperture = {
   h: number;
   /** Depth of the opening along the remaining axis. */
   depth: number;
+  /** Set when the measurement needed a caveat — several separate openings, or
+   *  no walkable passage at all. Null when the doorway read cleanly. */
+  note?: string | null;
 };
 
 /** One door block, in the standard's matrix coordinates: row counted down

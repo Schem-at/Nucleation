@@ -108,6 +108,7 @@ export function CertificatePage() {
                 aperture
                 <span>
                   {ap.cells} cells clear{ap.depth > 1 ? ` · ${ap.depth} deep` : ""}
+                  {ap.note ? ` · ${ap.note}` : ""}
                 </span>
               </p>
             ) : (
