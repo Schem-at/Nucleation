@@ -106,10 +106,6 @@ export type Certificate = {
   verdict: Verdict;
   /** Cells that travel on one stroke — the door's working mass. */
   moved_cells: number;
-  /** Whether the door still works when pasted (vanilla's placement pass
-   *  re-derives redstone state and can leave a memory cell unlatched). */
-  paste_safe: boolean;
-  paste_moved_cells: number;
   /** The doorway the machine actually opens. Null if nothing opened. */
   aperture: Aperture | null;
   /** The doorway read against the community pattern standard. */

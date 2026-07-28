@@ -446,8 +446,6 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
   progress("parsing");
   const bytes = new Uint8Array(job.buffer);
   let sim: any;
-  /** Builds a second sim under vanilla's paste semantics, for the survival probe. */
-  let pasteProbe: () => any;
   let w: number, h: number, l: number;
   if (job.ext === ".snbt") {
     // Vanilla gametest-style structure SNBT ("blocks:" flavor) is parsed
@@ -457,21 +455,18 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
     const m = snbt.match(/size:\s*\[([^\]]+)\]/);
     if (!m) throw new Error("structure SNBT has no size field");
     [w, h, l] = m[1].split(",").map((v) => parseInt(v.replace(/[^-\d]/g, ""), 10));
-    // AS BUILT, not as pasted. Vanilla's placement pass re-derives repeater
-    // `locked` and wire connections and loads block-entity NBT after the
-    // block writes, so a door's memory cell can come up unlatched and the
-    // machine runs crippled — measuring that would certify a broken variant
-    // of the user's door. Paste behaviour is probed separately below.
+    // A schematic IS a world state: both test doors tick to quiescence in
+    // zero ticks exactly as authored. So the file is simulated as it stands.
+    // Vanilla's placement pass is a separate thing — it re-derives `locked`
+    // and wire connections and loads block-entity NBT after the block writes,
+    // which destroys derived state the author saved (a vault's repeater locks
+    // go `locked=true` -> `false`). That models pasting, not the schematic.
     sim = TickSimulation.fromSnbt(snbt, TickSettleMode.InWorld, 0, 0, 0, "");
-    pasteProbe = () =>
-      TickSimulation.fromSnbt(snbt, TickSettleMode.Placement, 0, 0, 0, "");
   } else {
     const schem = Schematic.fromData(Array.from(bytes));
     const dims = schem.dimensions();
     [w, h, l] = [dims.x, dims.y, dims.z];
     sim = TickSimulation.fromSchematic(schem, TickSettleMode.InWorld, 0, 0, 0, "");
-    pasteProbe = () =>
-      TickSimulation.fromSchematic(schem, TickSettleMode.Placement, 0, 0, 0, "");
   }
   sim.setRngSeed(SEED);
 
@@ -573,24 +568,6 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
   const cycleTicks = openTicks + closeTicks;
   const cyclesPerMinute = cycleTicks > 0 ? 1200 / cycleTicks : 0;
 
-  // Paste survival: the same door taken through vanilla's placement pass.
-  // If its stroke is materially weaker than the as-built one, the design
-  // needs priming after being pasted — worth telling the owner.
-  progress("paste check");
-  let pasteMovedCells = movedCells;
-  try {
-    const probe = pasteProbe();
-    probe.setRngSeed(SEED);
-    probe.runUntilQuiescent(200);
-    const p0 = snapshotKey(JSON.parse(probe.worldSnapshotJson()));
-    probe.useBlock(lx, ly, lz);
-    probe.runUntilQuiescent(300);
-    const p1 = snapshotKey(JSON.parse(probe.worldSnapshotJson()));
-    pasteMovedCells = symmetricDiff(p0, p1);
-  } catch {
-    pasteMovedCells = 0;
-  }
-  const pasteSafe = pasteMovedCells >= movedCells * 0.9;
 
   // Everything below describes the MEASURED cycle only: the change log,
   // the activity trace and the replay are all rebased so tick 0 is the
@@ -685,8 +662,6 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
       seed: Number(SEED),
       verdict,
       moved_cells: movedCells,
-      paste_safe: pasteSafe,
-      paste_moved_cells: pasteMovedCells,
       aperture: doorway,
       classification: analysis?.classification ?? null,
       peak_changes: peakChanges,
