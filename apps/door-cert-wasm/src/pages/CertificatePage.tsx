@@ -6,7 +6,7 @@ import { StatTile } from "../components/StatTile";
 import { ActivityChart } from "../components/ActivityChart";
 import { Heatmap } from "../components/Heatmap";
 import { MaterialsTable } from "../components/MaterialsTable";
-import { VoxelReplay } from "../components/VoxelReplay";
+import { MeshReplay } from "../components/MeshReplay";
 
 const secs = (ticks: number) => (ticks / 20).toFixed(2);
 
@@ -75,7 +75,7 @@ export function CertificatePage() {
 
       <div className="sheet-section">
         <p className="eyebrow">Exhibit A — cycle replay</p>
-        <VoxelReplay replay={rec.replay} lever={cert.lever} />
+        <MeshReplay replay={rec.replay} lever={cert.lever} />
         <p className="exhibit-caption">
           Conditioning cycle, then the measured open and close — replayed from the recorded
           block changes, drawn live in this tab. Red marks on the scrubber are the measured

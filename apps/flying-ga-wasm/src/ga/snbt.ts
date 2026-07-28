@@ -11,6 +11,14 @@ import { genomeBlocks, type BBox, type Genome } from "./genome";
 /** Machine sits at x-offset 1 in the corridor. */
 export const X_OFF = 1;
 
+/** Corridor travel room for a given sim window. The historical 26-block
+ * corridor saturates fast machines (engine B covers 60 blocks in 600 ticks
+ * and reads 1.0 blk/s instead of 2.0), so scale with the window: room for
+ * 2.5 blk/s (1 block / 8 ticks) plus margin. */
+export function travelRoom(ticks: number): number {
+  return Math.max(26, Math.ceil(ticks / 8) + 6);
+}
+
 function palEntry(state: string): string {
   if (!state.includes("[")) return `{Name: "${state}"}`;
   const [name, propsRaw] = state.slice(0, -1).split("[", 2);
@@ -25,10 +33,10 @@ function palEntry(state: string): string {
 }
 
 /** Structure SNBT shaped like flying_machine_east.snbt: machine at x-offset 1,
- * corridor of air sized bbox + [26, 2, 2] for travel room. */
-export function genomeToSnbt(genome: Genome, bbox: BBox): string {
+ * corridor of air sized bbox + [travel, 2, 2] for travel room. */
+export function genomeToSnbt(genome: Genome, bbox: BBox, travel = 26): string {
   const [bx, by, bz] = bbox;
-  const size = [bx + 26, by + 2, bz + 2];
+  const size = [bx + travel, by + 2, bz + 2];
   const palette: string[] = [];
   const palOf = new Map<number, number>();
   const blocks: string[] = [];
@@ -52,14 +60,17 @@ export function genomeToSnbt(genome: Genome, bbox: BBox): string {
   );
 }
 
-/** Structure-space cell to drop the redstone block into: beside the first
+/** Structure-space cells to drop the redstone block into: beside the first
  * east-facing sticky piston, else beside any sticky piston, else any piston
  * (normal pistons joined the alphabet — a push responds to a kick just as
- * well). Must be air. */
-export function kickPos(
+ * well). Must be air. Returns up to `max` distinct positions in preference
+ * order — position 0 is the reference kick, the rest feed the robustness
+ * objective. */
+export function kickPositions(
   genome: Genome,
   bbox: BBox,
-): [number, number, number] | null {
+  max = 1,
+): Array<[number, number, number]> {
   const cells = genomeBlocks(genome, bbox);
   const occupied = new Set(cells.map((c) => `${c.x + X_OFF},${c.y},${c.z}`));
   const pistons =
@@ -68,6 +79,8 @@ export function kickPos(
       : cells.filter((c) => STICKY_PISTON_IDXS.has(c.s)).length > 0
         ? cells.filter((c) => STICKY_PISTON_IDXS.has(c.s))
         : cells.filter((c) => PISTON_IDXS.has(c.s));
+  const out: Array<[number, number, number]> = [];
+  const seen = new Set<string>();
   for (const { x, y, z } of pistons) {
     const sx = x + X_OFF;
     // Above first (the reference kick), then sideways in z, then behind.
@@ -78,13 +91,21 @@ export function kickPos(
       [sx - 1, y, z],
     ];
     for (const cand of cands) {
-      if (
-        cand[1] >= 0 &&
-        cand[2] >= 0 &&
-        !occupied.has(`${cand[0]},${cand[1]},${cand[2]}`)
-      )
-        return cand;
+      const key = `${cand[0]},${cand[1]},${cand[2]}`;
+      if (cand[1] >= 0 && cand[2] >= 0 && !occupied.has(key) && !seen.has(key)) {
+        seen.add(key);
+        out.push(cand);
+        if (out.length >= max) return out;
+      }
     }
   }
-  return null;
+  return out;
+}
+
+/** The reference kick position (first candidate), or null. */
+export function kickPos(
+  genome: Genome,
+  bbox: BBox,
+): [number, number, number] | null {
+  return kickPositions(genome, bbox, 1)[0] ?? null;
 }

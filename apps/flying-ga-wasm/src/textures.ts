@@ -287,6 +287,26 @@ interface TexEntry {
 
 const cache = new Map<string, TexEntry>();
 
+/** Translucent block art (honey's transparent rim, slime's see-through body)
+ * otherwise falls through to whatever sits behind the face — the flat
+ * fallback fill. Composite those textures over a solid backing in their own
+ * material colour, plus a soft diagonal gloss so they read as glassy. */
+const GLASSY_BACKING: Record<string, string> = {
+  slime_block: "#4ca03c",
+  honey_block_top: "#c07a15",
+  honey_block_side: "#c07a15",
+  honey_block_bottom: "#c07a15",
+};
+
+function applyGloss(g: CanvasRenderingContext2D, s: number): void {
+  const grad = g.createLinearGradient(0, 0, s, s);
+  grad.addColorStop(0, "rgba(255,255,255,0.30)");
+  grad.addColorStop(0.4, "rgba(255,255,255,0.06)");
+  grad.addColorStop(1, "rgba(0,0,0,0.12)");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, s, s);
+}
+
 function load(rt: ResolvedTexture, rot: 0 | 1 | 2 | 3 = 0): TexEntry {
   const key = `${rt.name}|${rt.tint ?? ""}|r${rot}`;
   let e = cache.get(key);
@@ -306,7 +326,13 @@ function load(rt: ResolvedTexture, rot: 0 | 1 | 2 | 3 = 0): TexEntry {
     const g = c.getContext("2d");
     if (!g) return;
     g.imageSmoothingEnabled = false;
+    const backing = GLASSY_BACKING[rt.name];
+    if (backing) {
+      g.fillStyle = backing;
+      g.fillRect(0, 0, s, s);
+    }
     g.drawImage(img, 0, 0, s, s, 0, 0, s, s);
+    if (backing) applyGloss(g, s);
     if (rt.tint) {
       g.globalCompositeOperation = "multiply";
       g.fillStyle = rt.tint;

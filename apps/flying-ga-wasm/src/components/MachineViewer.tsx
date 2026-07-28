@@ -1,25 +1,46 @@
 /** Static machine inspector for the leaderboard selection (the animated
  * champion lives in FlightLoop). */
 
-import { useEffect, useMemo, useReducer } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import { colorOf } from "../iso";
 import { blockKind } from "../ga/alphabet";
+import { speedOf } from "../metrics";
 import { ensureTextureIndex, onTexturesChanged, textureURL } from "../textures";
 import type { LeaderboardEntry } from "../types";
+import GLBlocks from "./GLBlocks";
 import IsoThumb from "./IsoThumb";
 
 interface Props {
   machine: LeaderboardEntry | null;
   evalTicks: number | null;
+  /** True while the viewer auto-follows the leaderboard leader. */
+  following?: boolean;
+  /** User grabbed the orbit controls — parent should stop auto-follow. */
+  onInteract?: () => void;
+  /** Chip click: re-enable follow-the-leader (camera re-fits). */
+  onResumeFollow?: () => void;
 }
 
-export default function MachineViewer({ machine, evalTicks }: Props) {
+export default function MachineViewer({
+  machine,
+  evalTicks,
+  following = true,
+  onInteract,
+  onResumeFollow,
+}: Props) {
   // Legend swatches pick up real textures as they decode.
   const [, bump] = useReducer((n: number) => n + 1, 0);
+  const [glFail, setGlFail] = useState(false);
+  const [fitNonce, setFitNonce] = useState(0);
   useEffect(() => {
     ensureTextureIndex();
     return onTexturesChanged(bump);
   }, []);
+  const onFail = useCallback(() => setGlFail(true), []);
+  const resume = useCallback(() => {
+    setFitNonce((n) => n + 1);
+    onResumeFollow?.();
+  }, [onResumeFollow]);
 
   const meta = useMemo(() => {
     if (!machine || machine.blocks.length === 0) return null;
@@ -42,11 +63,16 @@ export default function MachineViewer({ machine, evalTicks }: Props) {
   return (
     <div className="viewer">
       <div className="viewer-stats">
-        <div className="big">
-          {machine.fitness.toFixed(1)}
-          <span className="unit">
-            blocks flown{evalTicks ? ` / ${evalTicks} ticks` : ""}
-          </span>
+        <div className="big" data-testid="viewer-speed">
+          {(machine.speed ?? (evalTicks ? speedOf(machine.fitness, evalTicks) : 0)).toFixed(2)}
+          <span className="unit">blk/s @ 20 tps</span>
+        </div>
+        <div className="kv">
+          distance
+          <b>
+            {machine.fitness.toFixed(1)} blk
+            {evalTicks ? ` / ${evalTicks}t` : ""}
+          </b>
         </div>
         <div className="kv">
           blocks<b>{machine.blocks.length}</b>
@@ -54,17 +80,50 @@ export default function MachineViewer({ machine, evalTicks }: Props) {
         <div className="kv">
           size<b>{meta.dims.join("×")}</b>
         </div>
+        {machine.metrics && machine.metrics.cargo > 0 && (
+          <div className="kv">
+            cargo<b>{machine.metrics.cargo}</b>
+          </div>
+        )}
+        {machine.metrics && machine.metrics.robustness >= 0 && (
+          <div className="kv">
+            kick tol.<b>{Math.round(machine.metrics.robustness * 100)}%</b>
+          </div>
+        )}
         <div className="kv">
           found gen<b>{machine.gen}</b>
         </div>
       </div>
 
       <div className="viewer-stage">
-        <IsoThumb
-          blocks={machine.blocks}
-          width={340}
-          label={`Voxel structure of ${machine.name ?? machine.id}: ${machine.blocks.length} blocks`}
-        />
+        {glFail ? (
+          <IsoThumb
+            blocks={machine.blocks}
+            width={340}
+            label={`Voxel structure of ${machine.name ?? machine.id}: ${machine.blocks.length} blocks`}
+          />
+        ) : (
+          <GLBlocks
+            blocks={machine.blocks}
+            height={260}
+            label={`Voxel structure of ${machine.name ?? machine.id}: ${machine.blocks.length} blocks`}
+            onFail={onFail}
+            onUserInteract={onInteract}
+            fitNonce={fitNonce}
+            debugId="viewer"
+          />
+        )}
+        {!following && (
+          <button
+            type="button"
+            className="follow-chip"
+            onClick={resume}
+            data-testid="viewer-follow-chip"
+            title="Camera and selection are yours — click to re-follow the leaderboard leader and re-frame"
+          >
+            following leader ⏸ — resume
+          </button>
+        )}
       </div>
 
       <div className="block-legend">

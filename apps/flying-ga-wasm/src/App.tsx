@@ -1,21 +1,42 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import EventsFeed from "./components/EventsFeed";
 import FitnessChart from "./components/FitnessChart";
 import Filmstrip from "./components/Filmstrip";
 import FlightLoop from "./components/FlightLoop";
+import HallOfFame from "./components/HallOfFame";
 import Leaderboard from "./components/Leaderboard";
 import MachineViewer from "./components/MachineViewer";
+import ParetoChart from "./components/ParetoChart";
+import PopulationInspector from "./components/PopulationInspector";
 import RunConfigForm from "./components/RunConfigForm";
 import RunHistory from "./components/RunHistory";
-import { GaRunner } from "./ga/runner";
+import LineageView from "./components/LineageView";
+import { GaRunner, type LiveConfigPatch } from "./ga/runner";
+import type { BBox } from "./ga/genome";
+import { clearHof, considerForHof, loadHof, type Hof, type HofEntry } from "./hof";
+import {
+  dirOf,
+  speedOf,
+  withConfigDefaults,
+  OBJECTIVES,
+  type EvalMetrics,
+  type ObjectiveChoice,
+} from "./metrics";
 import { ReplayClient } from "./replay/replayClient";
 import { deleteRun, listRuns, loadRun, saveRun, type RunSummary } from "./storage";
 import type {
   BestRecord,
+  EvolutionEvent,
   HistoryPoint,
   LeaderboardEntry,
+  PopulationMember,
+  RatePoint,
+  RetiredEntry,
   RunConfig,
   RunRecord,
   RunStatus,
+  SpeciesInfo,
+  SpeciesPoint,
 } from "./types";
 
 function useTheme() {
@@ -35,6 +56,13 @@ function useTheme() {
 }
 
 const SAVE_EVERY_MS = 4000;
+const EVENTS_CAP = 120;
+
+interface StagedSim {
+  bbox: BBox;
+  evalTicks: number;
+  seed: number;
+}
 
 export default function App() {
   const { toggle } = useTheme();
@@ -49,6 +77,17 @@ export default function App() {
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [bests, setBests] = useState<BestRecord[]>([]);
+  const [archive, setArchive] = useState<LeaderboardEntry[]>([]);
+  const [cloud, setCloud] = useState<EvalMetrics[]>([]);
+  const [events, setEvents] = useState<EvolutionEvent[]>([]);
+  const [retired, setRetired] = useState<RetiredEntry[]>([]);
+  const [speciesInfo, setSpeciesInfo] = useState<SpeciesInfo[]>([]);
+  const [speciesPoints, setSpeciesPoints] = useState<SpeciesPoint[]>([]);
+  const [rates, setRates] = useState<RatePoint[]>([]);
+  const [population, setPopulation] = useState<PopulationMember[]>([]);
+  /** A population-inspector pick shown in the machine viewer (takes
+   * precedence over the leaderboard/archive selection). */
+  const [inspected, setInspected] = useState<LeaderboardEntry | null>(null);
   const [gen, setGen] = useState(0);
   const [eps, setEps] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +96,19 @@ export default function App() {
   const [replayLoading, setReplayLoading] = useState(false);
   const [runsIndex, setRunsIndex] = useState<RunSummary[]>(() => listRuns());
   const [browsing, setBrowsing] = useState<RunRecord | null>(null);
-  const userPicked = useRef(false);
+  const [viewTab, setViewTab] = useState<
+    "lab" | "hof" | "lineage" | "population"
+  >("lab");
+  const [hof, setHof] = useState<Hof>(() => loadHof());
+  /** Machine-viewer follows the leaderboard leader until the user picks a
+   * machine or grabs the orbit controls. */
+  const [followLeader, setFollowLeader] = useState(true);
+  /** A machine pinned onto the flight stage from the Pareto front or the
+   * Hall of Fame, overriding the champion / filmstrip pick. */
+  const [staged, setStaged] = useState<BestRecord | null>(null);
+  const [stagedSim, setStagedSim] = useState<StagedSim | null>(null);
+  const hofRef = useRef(hof);
+  hofRef.current = hof;
 
   // Authoritative run accumulator (callbacks mutate this, then mirror to state).
   const recRef = useRef<RunRecord | null>(null);
@@ -110,6 +161,21 @@ export default function App() {
     [],
   );
 
+  /** Replay for a pinned (Pareto / Hall of Fame) machine. */
+  const requestStagedReplay = useCallback(
+    (rec: BestRecord, sim: StagedSim) => {
+      setReplayLoading(true);
+      replayer()
+        .replay(rec.genome, sim.bbox, sim.evalTicks, sim.seed)
+        .then((loop) => {
+          setStaged((p) => (p && p.gen === rec.gen ? { ...p, loop } : p));
+        })
+        .catch(() => undefined)
+        .finally(() => setReplayLoading(false));
+    },
+    [],
+  );
+
   const start = useCallback(
     (cfg: RunConfig) => {
       setError(null);
@@ -118,11 +184,23 @@ export default function App() {
       setHistory([]);
       setLeaderboard([]);
       setBests([]);
+      setArchive([]);
+      setCloud([]);
+      setEvents([]);
+      setRetired([]);
+      setSpeciesInfo([]);
+      setSpeciesPoints([]);
+      setRates([]);
+      setPopulation([]);
+      setInspected(null);
       setGen(0);
       setEps(0);
       setFilmGen(null);
       setSelectedLbId(null);
-      userPicked.current = false;
+      setStaged(null);
+      setStagedSim(null);
+      setViewTab("lab");
+      setFollowLeader(true);
       setStatus("starting");
 
       const rec: RunRecord = {
@@ -132,20 +210,86 @@ export default function App() {
         history: [],
         leaderboard: [],
         bests: [],
+        archive: [],
+        events: [],
+        retired: [],
+        species: { info: [], points: [] },
+        rates: [],
         generation: 0,
       };
       recRef.current = rec;
 
+      /** Append an app-side event (pause/resume) to feed + record. */
+      const pushEvent = (e: EvolutionEvent) => {
+        rec.events = [...(rec.events ?? []), e].slice(-EVENTS_CAP);
+        setEvents((es) => [...es, e].slice(-EVENTS_CAP));
+      };
+
       runner().start(cfg, {
-        onGeneration: (u) => {
+        onPause: (g) => {
+          setStatus("paused");
+          pushEvent({
+            gen: g,
+            kind: "pause",
+            at: Date.now(),
+            text: `paused @ gen ${g} — state held, live controls stay active`,
+          });
+          persist(true);
+        },
+        onResume: (g) => {
           setStatus("running");
+          pushEvent({
+            gen: g,
+            kind: "pause",
+            at: Date.now(),
+            text: `resumed @ gen ${g}`,
+          });
+        },
+        onGeneration: (u) => {
+          setStatus((s) => (s === "paused" ? s : "running"));
           rec.generation = u.gen;
           rec.history.push(u.point);
           rec.leaderboard = u.leaderboard;
+          rec.archive = u.archive;
           setGen(u.gen);
           setEps(u.evalsPerSec);
           setHistory((h) => [...h, u.point]);
           setLeaderboard(u.leaderboard);
+          setArchive(u.archive);
+          setCloud(u.cloud);
+          setRetired(u.retired);
+          rec.retired = u.retired;
+          const sp: SpeciesPoint = { gen: u.gen, counts: u.species.counts };
+          rec.species = {
+            info: u.species.info,
+            points: [...(rec.species?.points ?? []), sp],
+          };
+          setSpeciesInfo(u.species.info);
+          setSpeciesPoints((ps) => [...ps, sp]);
+          const rp: RatePoint = { gen: u.gen, rate: u.mutationRate };
+          rec.rates = [...(rec.rates ?? []), rp];
+          setRates((rs) => [...rs, rp]);
+          setPopulation(u.population);
+          if (u.events.length > 0) {
+            rec.events = [...(rec.events ?? []), ...u.events].slice(-EVENTS_CAP);
+            setEvents((es) => [...es, ...u.events].slice(-EVENTS_CAP));
+          }
+          // Challenge the Hall of Fame with everything notable this gen —
+          // including the run's newest slowpoke, which may sit far below
+          // the leaderboard when the run is chasing speed.
+          const cands = [
+            ...u.leaderboard,
+            ...u.archive,
+            ...(u.slowpoke ? [u.slowpoke] : []),
+          ];
+          if (cands.length > 0) {
+            const res = considerForHof(hofRef.current, cands, rec.id, {
+              bbox: cfg.bbox,
+              evalTicks: cfg.eval_ticks,
+              seed: cfg.seed,
+            });
+            if (res.changed) setHof(res.hof);
+          }
           if (u.newBest) {
             rec.bests.push(u.newBest);
             setBests((bs) => [...bs, u.newBest!]);
@@ -175,6 +319,42 @@ export default function App() {
     runner().stop();
   }, []);
 
+  const pause = useCallback(() => {
+    runner().pause();
+  }, []);
+
+  const resume = useCallback(() => {
+    runner().resume();
+  }, []);
+
+  /** Mid-run regime change: applied by the runner at the next generation
+   * boundary; the config mirror updates so charts/labels follow. */
+  const reconfigure = useCallback((patch: LiveConfigPatch) => {
+    runner().reconfigure(patch);
+    setConfig((c) =>
+      c
+        ? {
+            ...c,
+            objectives: patch.objectives,
+            constraints: patch.constraints,
+            targetPeriod: patch.targetPeriod,
+            mutation_rate: patch.mutationRate,
+            mutationSchedule: patch.mutationSchedule,
+          }
+        : c,
+    );
+    const rec = recRef.current;
+    if (rec)
+      rec.config = {
+        ...rec.config,
+        objectives: patch.objectives,
+        constraints: patch.constraints,
+        targetPeriod: patch.targetPeriod,
+        mutation_rate: patch.mutationRate,
+        mutationSchedule: patch.mutationSchedule,
+      };
+  }, []);
+
   useEffect(
     () => () => {
       runnerRef.current?.dispose();
@@ -190,7 +370,11 @@ export default function App() {
       setBrowsing(rec);
       setFilmGen(null);
       setSelectedLbId(null);
-      userPicked.current = false;
+      setStaged(null);
+      setStagedSim(null);
+      setInspected(null);
+      setViewTab("lab");
+      setFollowLeader(true);
     }
   }, []);
 
@@ -207,6 +391,14 @@ export default function App() {
         history: browsing.history,
         leaderboard: browsing.leaderboard,
         bests: browsing.bests,
+        archive: browsing.archive ?? [],
+        cloud: [] as EvalMetrics[],
+        events: browsing.events ?? [],
+        retired: browsing.retired ?? [],
+        speciesInfo: browsing.species?.info ?? [],
+        speciesPoints: browsing.species?.points ?? [],
+        rates: browsing.rates ?? [],
+        population: [] as PopulationMember[],
         gen: browsing.generation,
         config: browsing.config,
         eps: null as number | null,
@@ -216,25 +408,66 @@ export default function App() {
       history,
       leaderboard,
       bests,
+      archive,
+      cloud,
+      events,
+      retired,
+      speciesInfo,
+      speciesPoints,
+      rates,
+      population,
       gen,
       config,
       eps,
       status,
     };
-  }, [browsing, history, leaderboard, bests, gen, config, eps, status]);
+  }, [browsing, history, leaderboard, bests, archive, cloud, events, retired, speciesInfo, speciesPoints, rates, population, gen, config, eps, status]);
 
-  // Follow the leader until the user picks a machine manually.
+  const viewCfg = useMemo(
+    () => (view.config ? withConfigDefaults(view.config) : null),
+    [view.config],
+  );
+
+  // Follow the leader until the user picks a machine manually or grabs the
+  // viewer's orbit controls (either disengages follow; the chip re-enables).
   useEffect(() => {
     const lb = view.leaderboard;
     if (lb.length === 0) return;
-    if (!userPicked.current) setSelectedLbId(lb[0].id);
-    else if (!lb.some((m) => m.id === selectedLbId)) setSelectedLbId(lb[0].id);
-  }, [view.leaderboard, selectedLbId]);
+    if (followLeader) setSelectedLbId(lb[0].id);
+    else if (
+      !lb.some((m) => m.id === selectedLbId) &&
+      !view.archive.some((m) => m.id === selectedLbId)
+    )
+      setSelectedLbId(lb[0].id);
+  }, [view.leaderboard, view.archive, selectedLbId, followLeader]);
 
   const selectedMachine =
-    view.leaderboard.find((m) => m.id === selectedLbId) ?? null;
+    inspected ??
+    view.leaderboard.find((m) => m.id === selectedLbId) ??
+    view.archive.find((m) => m.id === selectedLbId) ??
+    null;
+
+  /** Population-inspector click-through: stage the member in the viewer. */
+  const inspectMember = useCallback(
+    (m: PopulationMember) => {
+      setInspected({
+        id: m.id,
+        name: `gen ${view.gen} · #${m.id.split("-")[1] ?? "?"}`,
+        fitness: m.fitness,
+        gen: view.gen,
+        genome: m.genome,
+        blocks: m.blocks,
+        speed: m.speed,
+        metrics: m.metrics,
+      });
+      setFollowLeader(false);
+      setViewTab("lab");
+    },
+    [view.gen],
+  );
 
   const stageRecord: BestRecord | null = useMemo(() => {
+    if (staged) return staged;
     const bs = view.bests;
     if (bs.length === 0) return null;
     if (filmGen !== null) {
@@ -242,28 +475,91 @@ export default function App() {
       if (hit) return hit;
     }
     return bs[bs.length - 1];
-  }, [view.bests, filmGen]);
+  }, [staged, view.bests, filmGen]);
 
   const isChampionOnStage =
+    staged === null &&
     stageRecord !== null &&
     view.bests.length > 0 &&
     stageRecord.gen === view.bests[view.bests.length - 1].gen;
 
-  // Lazily re-simulate a filmstrip pick that has no stored loop.
+  // Lazily re-simulate a stage pick that has no stored loop.
   useEffect(() => {
     if (!stageRecord || stageRecord.loop || replayLoading) return;
+    if (staged && stageRecord === staged) {
+      const sim =
+        stagedSim ??
+        (viewCfg
+          ? { bbox: viewCfg.bbox, evalTicks: viewCfg.eval_ticks, seed: viewCfg.seed }
+          : null);
+      if (sim) requestStagedReplay(staged, sim);
+      return;
+    }
     const cfg = view.config;
     if (!cfg) return;
     // Live champions get their replay queued on discovery; this covers
     // filmstrip picks and archived runs.
     requestReplay(stageRecord, cfg);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stageRecord?.gen, stageRecord?.loop, view.config]);
+  }, [stageRecord?.gen, stageRecord?.loop, view.config, staged, stagedSim]);
 
-  const running = status === "running" || status === "starting";
+  /** Click on a Pareto front point: inspect + fly that machine. */
+  const pickParetoPoint = useCallback(
+    (id: string) => {
+      const entry = view.archive.find((e) => e.id === id);
+      if (!entry) return;
+      setFollowLeader(false);
+      setInspected(null);
+      setSelectedLbId(id);
+      setFilmGen(null);
+      setStaged({
+        gen: entry.gen,
+        fitness: entry.fitness,
+        genome: entry.genome,
+        blocks: entry.blocks,
+      });
+      setStagedSim(
+        viewCfg
+          ? { bbox: viewCfg.bbox, evalTicks: viewCfg.eval_ticks, seed: viewCfg.seed }
+          : null,
+      );
+    },
+    [view.archive, viewCfg],
+  );
+
+  /** Click a Hall of Fame plinth: fly the inductee on the lab stage. */
+  const stageHofEntry = useCallback((e: HofEntry) => {
+    setViewTab("lab");
+    setFilmGen(null);
+    setStaged({
+      gen: e.gen,
+      fitness: e.metrics.fit,
+      genome: e.genome,
+      blocks: e.blocks,
+    });
+    setStagedSim({ bbox: e.bbox, evalTicks: e.evalTicks, seed: e.seed });
+  }, []);
+
+  const clearHall = useCallback(() => {
+    clearHof();
+    setHof({});
+  }, []);
+
+  const running =
+    status === "running" || status === "starting" || status === "paused";
+  const isPaused = status === "paused";
   const lastBest =
     view.history.length > 0 ? view.history[view.history.length - 1].best : null;
-  const target = view.config?.generations ?? null;
+  const bestOverall =
+    view.history.length > 0
+      ? Math.max(...view.history.map((h) => h.best))
+      : null;
+  const target = viewCfg?.generations ?? null;
+  const evalTicks = viewCfg?.eval_ticks ?? null;
+  const stageTicks = staged && stagedSim ? stagedSim.evalTicks : evalTicks;
+
+  const paretoSel: ObjectiveChoice[] = viewCfg?.objectives ?? [];
+  const paretoMode = viewCfg?.mode === "pareto";
 
   return (
     <div className="shell">
@@ -279,6 +575,39 @@ export default function App() {
             flying-machine evolution · engine + GA entirely in your browser
           </div>
         </div>
+        <nav className="tabs" aria-label="Views">
+          <button
+            className={viewTab === "lab" ? "on" : ""}
+            aria-current={viewTab === "lab" ? "page" : undefined}
+            onClick={() => setViewTab("lab")}
+          >
+            Lab
+          </button>
+          <button
+            className={viewTab === "population" ? "on" : ""}
+            aria-current={viewTab === "population" ? "page" : undefined}
+            onClick={() => setViewTab("population")}
+            data-testid="tab-population"
+          >
+            Population
+          </button>
+          <button
+            className={viewTab === "lineage" ? "on" : ""}
+            aria-current={viewTab === "lineage" ? "page" : undefined}
+            onClick={() => setViewTab("lineage")}
+            data-testid="tab-lineage"
+          >
+            Lineage
+          </button>
+          <button
+            className={viewTab === "hof" ? "on" : ""}
+            aria-current={viewTab === "hof" ? "page" : undefined}
+            onClick={() => setViewTab("hof")}
+            data-testid="tab-hof"
+          >
+            Hall of Fame
+          </button>
+        </nav>
         <div className="spacer" />
         <button className="icon-btn" onClick={toggle} aria-label="Toggle color theme">
           light / dark
@@ -291,7 +620,24 @@ export default function App() {
             <div className="panel-head">
               <h2 className="eyebrow">Run config</h2>
             </div>
-            <RunConfigForm running={running} onStart={start} onStop={stop} error={error} />
+            <RunConfigForm
+              running={running}
+              paused={isPaused}
+              onStart={start}
+              onStop={stop}
+              onPause={pause}
+              onResume={resume}
+              onReconfigure={reconfigure}
+              rates={rates}
+              error={error}
+            />
+          </section>
+
+          <section className="panel">
+            <div className="panel-head">
+              <h2 className="eyebrow">Evolution events</h2>
+            </div>
+            <EventsFeed events={view.events} />
           </section>
 
           <section className="panel">
@@ -308,6 +654,52 @@ export default function App() {
           </section>
         </aside>
 
+        {viewTab === "hof" ? (
+          <main className="main-col">
+            <section className="panel">
+              <div className="panel-head">
+                <h2 className="eyebrow">Hall of Fame</h2>
+                <span className="note">the finest and strangest fliers, across every run</span>
+              </div>
+              <HallOfFame hof={hof} onClear={clearHall} onStage={stageHofEntry} />
+            </section>
+          </main>
+        ) : viewTab === "population" ? (
+          <main className="main-col">
+            <section className="panel" data-testid="population-panel">
+              <div className="panel-head">
+                <h2 className="eyebrow">Population</h2>
+                <span className="note">
+                  the entire current generation — every genome, valid or culled
+                </span>
+              </div>
+              <PopulationInspector
+                members={view.population}
+                species={view.speciesInfo}
+                gen={view.gen}
+                paused={isPaused}
+                onPick={inspectMember}
+              />
+            </section>
+          </main>
+        ) : viewTab === "lineage" ? (
+          <main className="main-col">
+            <section className="panel" data-testid="lineage-panel">
+              <div className="panel-head">
+                <h2 className="eyebrow">Lineage</h2>
+                <span className="note">
+                  species share per generation — births ▲ and extinctions ✕ of
+                  structural families
+                </span>
+              </div>
+              <LineageView
+                info={view.speciesInfo}
+                points={view.speciesPoints}
+                currentGen={view.gen}
+              />
+            </section>
+          </main>
+        ) : (
         <main className="main-col">
           {browsing && (
             <div className="browse-banner">
@@ -330,11 +722,18 @@ export default function App() {
               </div>
             </div>
             <div className="stat">
-              <div className="k">Best fitness</div>
-              <div className="v" data-testid="stat-best">
-                {lastBest !== null
-                  ? Math.max(...view.history.map((h) => h.best)).toFixed(1)
+              <div className="k">Best speed</div>
+              <div className="v" data-testid="stat-speed">
+                {bestOverall !== null && evalTicks
+                  ? speedOf(bestOverall, evalTicks).toFixed(2)
                   : "—"}
+                <span className="unit">blk/s</span>
+              </div>
+            </div>
+            <div className="stat">
+              <div className="k">Best distance</div>
+              <div className="v" data-testid="stat-best">
+                {lastBest !== null ? bestOverall!.toFixed(1) : "—"}
                 <span className="unit">blocks</span>
               </div>
             </div>
@@ -371,8 +770,69 @@ export default function App() {
                 </span>
               </div>
             </div>
-            <FitnessChart history={view.history} targetGenerations={target} />
+            <FitnessChart
+              history={view.history}
+              targetGenerations={target}
+              evalTicks={evalTicks}
+            />
           </section>
+
+          {paretoMode && (
+            <section className="panel" data-testid="pareto-panel">
+              <div className="panel-head">
+                <h2 className="eyebrow">
+                  Pareto front
+                  {paretoSel.length >= 2 &&
+                    ` — ${OBJECTIVES[paretoSel[0].key].label} vs ${OBJECTIVES[paretoSel[1].key].label}`}
+                </h2>
+                <span className="note">
+                  {view.archive.length} non-dominated machine
+                  {view.archive.length === 1 ? "" : "s"} archived across all
+                  generations
+                </span>
+              </div>
+              {paretoSel.length === 2 ? (
+                <ParetoChart
+                  archive={view.archive}
+                  cloud={view.cloud}
+                  choices={[paretoSel[0], paretoSel[1]]}
+                  selectedId={selectedLbId}
+                  onPick={pickParetoPoint}
+                />
+              ) : (
+                <div className="chart-empty">
+                  Select exactly 2 objectives to plot the front — the archive is
+                  still collecting non-dominated machines on{" "}
+                  {paretoSel
+                    .map(
+                      (c) =>
+                        `${dirOf(c) === "min" ? "min " : ""}${OBJECTIVES[c.key].label}`,
+                    )
+                    .join(" + ")}.
+                </div>
+              )}
+              {view.retired.length > 0 && (
+                <div className="retired-shelf" data-testid="retired-shelf">
+                  <div className="retired-head">
+                    Retired — pushed off the front by a mid-run rule change
+                  </div>
+                  <ul>
+                    {view.retired.map((r, i) => (
+                      <li key={`${r.entry.id}-${i}`} data-testid="retired-entry">
+                        <b>{r.entry.name ?? r.entry.id}</b>
+                        <span className="retired-meta">
+                          {(r.entry.speed ?? 0).toFixed(2)} blk/s ·{" "}
+                          {r.entry.blocks.length} blocks
+                        </span>
+                        <span className="retired-reason">{r.reason}</span>
+                        <span className="retired-gen">@ gen {r.atGen}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </section>
+          )}
 
           <section className="panel" data-testid="flight-stage">
             <div className="panel-head">
@@ -385,6 +845,18 @@ export default function App() {
               best={stageRecord}
               isChampion={isChampionOnStage}
               loading={replayLoading && stageRecord !== null && !stageRecord.loop}
+              evalTicks={stageTicks}
+              onInteract={() => {
+                // Grabbing the stage pins the current machine: a new
+                // champion no longer swaps it out from under the drag.
+                if (staged === null && filmGen === null && stageRecord)
+                  setFilmGen(stageRecord.gen);
+              }}
+              onResumeFollow={() => {
+                setStaged(null);
+                setStagedSim(null);
+                setFilmGen(null);
+              }}
             />
             <div className="panel-head film-head">
               <h2 className="eyebrow">Champions</h2>
@@ -393,7 +865,11 @@ export default function App() {
             <Filmstrip
               bests={view.bests}
               selectedGen={filmGen}
-              onSelect={setFilmGen}
+              onSelect={(g) => {
+                setStaged(null);
+                setStagedSim(null);
+                setFilmGen(g);
+              }}
             />
           </section>
 
@@ -401,13 +877,17 @@ export default function App() {
             <section className="panel">
               <div className="panel-head">
                 <h2 className="eyebrow">Leaderboard</h2>
-                <span className="note">top machines by distance flown</span>
+                <span className="note">
+                  {paretoMode ? "top machines by speed" : "top machines by score"}
+                </span>
               </div>
               <Leaderboard
                 entries={view.leaderboard}
                 selectedId={selectedLbId}
+                evalTicks={evalTicks}
                 onSelect={(id) => {
-                  userPicked.current = true;
+                  setFollowLeader(false);
+                  setInspected(null);
                   setSelectedLbId(id);
                 }}
               />
@@ -422,11 +902,20 @@ export default function App() {
               </div>
               <MachineViewer
                 machine={selectedMachine}
-                evalTicks={view.config?.eval_ticks ?? null}
+                evalTicks={evalTicks}
+                following={followLeader}
+                onInteract={() => setFollowLeader(false)}
+                onResumeFollow={() => {
+                  setFollowLeader(true);
+                  setInspected(null);
+                  if (view.leaderboard.length > 0)
+                    setSelectedLbId(view.leaderboard[0].id);
+                }}
               />
             </section>
           </div>
         </main>
+        )}
       </div>
     </div>
   );

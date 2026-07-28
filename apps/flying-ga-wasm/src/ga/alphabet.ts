@@ -80,6 +80,22 @@ const kindIdxs = (kind: AlphabetEntry["kind"]): Set<number> => {
   return s;
 };
 
+/** Kind of each live genome state index (parallel to ALPHABET). */
+export const KIND_OF_INDEX: AlphabetEntry["kind"][] = ALPHABET_ENTRIES.filter(
+  (e) => e.enabled,
+).map((e) => e.kind);
+
+/** Every kind the GA can place (excluding air) — constraint chip options. */
+export const PLACEABLE_KINDS = [
+  ...new Set(KIND_OF_INDEX.filter((k) => k !== "air")),
+];
+
+/** Kinds that are pure inert mass — the cargo objective counts these. */
+export const INERT_KINDS = new Set<AlphabetEntry["kind"]>([
+  "note_block",
+  "white_concrete",
+]);
+
 /** Sticky pistons only — the preferred kick targets (they hold the engine). */
 export const STICKY_PISTON_IDXS = kindIdxs("sticky_piston");
 /** Every piston (sticky + normal) — any of them responds to a kick. */

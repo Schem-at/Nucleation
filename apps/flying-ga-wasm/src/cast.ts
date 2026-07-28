@@ -99,6 +99,11 @@ export interface CastMember {
   end: number;
   /** Where it travels from during `start..until`, if it is in flight. */
   motion?: { fx: number; fy: number; fz: number; until: number };
+  /** For piston_head members: the BASE cell this head belongs to. Lets the
+   * pose compute the live extension (0 = seated, 1 = fully out) so the arm
+   * can be clamped to span base front face → plate inner face instead of
+   * poking fixed-length out the back of the base. */
+  headBase?: Vec3;
 }
 
 const k3 = (p: Vec3) => `${p[0]},${p[1]},${p[2]}`;
@@ -186,6 +191,17 @@ export function buildCast(
       if (landed !== undefined && isExtendedFalseOf(previous, landed)) {
         // A retracting base: the piston does not travel — its head slides
         // back into it while the base shows its extended shell.
+        //
+        // Seat the head HALF A TICK EARLY (`until: end - 0.5`): extension is
+        // pause-at-end by construction (the flight member outlives its move
+        // window, so the clamp holds the seated pose), but this member DIES
+        // at `end` — with `until: end` the head still floats a sub-tick step
+        // proud of its seat on the last drawn frame, and the swap to the
+        // closed extended=false cube pops. Seating early gives retraction
+        // the same pause-at-end: seated head + extended shell compose the
+        // exact closed-cube geometry before the swap, so the swap is
+        // invisible.
+        const seatAt = Math.max(start + (end - start) / 2, end - 0.5);
         members.push({ x: pos[0], y: pos[1], z: pos[2], state: previous!, start, end });
         members.push({
           x: pos[0],
@@ -194,7 +210,8 @@ export function buildCast(
           state: headStateFor(landed, facing),
           start,
           end,
-          motion: { fx: pos[0] + fv[0], fy: pos[1] + fv[1], fz: pos[2] + fv[2], until: end },
+          motion: { fx: pos[0] + fv[0], fy: pos[1] + fv[1], fz: pos[2] + fv[2], until: seatAt },
+          headBase: pos,
         });
       } else if (
         landed !== undefined &&
@@ -217,6 +234,10 @@ export function buildCast(
           start,
           end: list[i + 1].end,
           motion: { fx: from[0], fy: from[1], fz: from[2], until: end },
+          // An emerging head extends out of the source cell it came from.
+          ...(parseState(landed).name === "piston_head"
+            ? { headBase: from }
+            : null),
         });
         // The landed segment itself is dropped below: the flight covers it.
       } else {
@@ -230,6 +251,7 @@ export function buildCast(
           start,
           end,
           motion: { fx: pos[0] - fv[0], fy: pos[1] - fv[1], fz: pos[2] - fv[2], until: end },
+          headBase: [pos[0] - fv[0], pos[1] - fv[1], pos[2] - fv[2]],
         });
       }
     }
@@ -266,6 +288,21 @@ export interface DrawItem {
   oy: number;
   oz: number;
   state: string;
+  /** piston_head only: live extension 0 (seated) .. 1 (fully out), from the
+   * member's `headBase`. Undefined means fully extended (static heads). */
+  ext?: number;
+}
+
+/** Live extension of a piston_head member at world offset (ox,oy,oz):
+ * signed distance of the head cell from its base cell along the facing. */
+export function headExtension(m: CastMember, ox: number, oy: number, oz: number): number {
+  if (!m.headBase) return 1;
+  const fv = DIR_VEC[facingOf(m.state)];
+  const e =
+    (m.x + ox - m.headBase[0]) * fv[0] +
+    (m.y + oy - m.headBase[1]) * fv[1] +
+    (m.z + oz - m.headBase[2]) * fv[2];
+  return Math.min(1, Math.max(0, e));
 }
 
 /** Visible members at fractional tick `t`, with interpolated offsets.
@@ -286,7 +323,9 @@ export function castAt(members: CastMember[], t: number): DrawItem[] {
       oy = (m.motion.fy - m.y) * remaining;
       oz = (m.motion.fz - m.z) * remaining;
     }
-    out.push({ id, x: m.x, y: m.y, z: m.z, ox, oy, oz, state: m.state });
+    const item: DrawItem = { id, x: m.x, y: m.y, z: m.z, ox, oy, oz, state: m.state };
+    if (m.headBase) item.ext = headExtension(m, ox, oy, oz);
+    out.push(item);
   }
   return out;
 }
@@ -341,6 +380,10 @@ const boxMemo = new Map<string, IsoBox[]>();
  *   vacated by the departed plate; `piston_inner` lands on the open face).
  * - `piston_head`: a 4/16 plate flush with the facing face plus a thin arm
  *   reaching 4/16 into the base cell (flat-colour approximation).
+ * - `*_trapdoor`: a 3/16 plate — closed: horizontal at the cell floor
+ *   (`half=bottom`) or ceiling (`half=top`); open: vertical against the
+ *   hinge face (the face opposite `facing`, matching the vanilla
+ *   `trapdoor_open` model).
  * - Everything else: the unit cube. */
 export function boxesFor(state: string): IsoBox[] {
   const memo = boxMemo.get(state);
@@ -352,12 +395,71 @@ export function boxesFor(state: string): IsoBox[] {
     boxes = [{ ...boxAlong(facing, 0, 0.75), tex: state }];
   } else if (name === "piston_head") {
     boxes = [
+      // Fully-extended arm: base front face (head-local -0.25) → plate
+      // inner face. Posed heads mid-move clamp this via `boxesForItem`.
       { ...boxAlong(facing, -0.25, 0.75, 0.375, 0.625), tex: null }, // arm
       { ...boxAlong(facing, 0.75, 1), tex: state }, // plate
     ];
+  } else if (name.endsWith("trapdoor")) {
+    const t = 3 / 16;
+    if (props.open === "true") {
+      // boxAlong measures from the BACK face; the open plate hangs on the
+      // hinge (back) face, opposite `facing`.
+      boxes = [{ ...boxAlong(facing, 0, t), tex: state }];
+    } else if (props.half === "top") {
+      boxes = [{ x0: 0, y0: 1 - t, z0: 0, x1: 1, y1: 1, z1: 1, tex: state }];
+    } else {
+      boxes = [{ x0: 0, y0: 0, z0: 0, x1: 1, y1: t, z1: 1, tex: state }];
+    }
   } else {
     boxes = UNIT_BOX(state);
   }
   boxMemo.set(state, boxes);
+  return boxes;
+}
+
+/** GL-renderer counterpart of the arm clamp: meshed vanilla piston_head
+ * models carry a fixed-length arm poking 4/16 out the back of the cell, so
+ * a head near its seat pushes the arm through the base and out its rear.
+ * This returns the world-space half-space to KEEP (n·p ≥ min): everything
+ * in front of the base's front face. The plane is static per member (the
+ * base cell never moves), so renderers can clip once at instancing time. */
+export function headClipHalfSpace(
+  m: CastMember,
+): { nx: number; ny: number; nz: number; min: number } | null {
+  if (!m.headBase) return null;
+  const fv = DIR_VEC[facingOf(m.state)];
+  const axis = fv[0] !== 0 ? 0 : fv[1] !== 0 ? 1 : 2;
+  const min =
+    fv[axis] > 0 ? m.headBase[axis] + 0.75 : -(m.headBase[axis] + 0.25);
+  return { nx: fv[0], ny: fv[1], nz: fv[2], min };
+}
+
+const posedMemo = new Map<string, IsoBox[]>();
+
+/** Pose-aware boxes for a draw item. Identical to `boxesFor` except for a
+ * piston_head mid-move: its arm is clamped to span exactly from the base's
+ * front face (head-local `0.75 - ext`) to the plate's inner face, so the
+ * arm's length shrinks to 0 as the head seats instead of the fixed-length
+ * arm passing through the base and out its back. */
+export function boxesForItem(item: Pick<DrawItem, "state" | "ext">): IsoBox[] {
+  const ext = item.ext;
+  if (ext === undefined || ext >= 1) return boxesFor(item.state);
+  const { name, props } = parseState(item.state);
+  if (name !== "piston_head") return boxesFor(item.state);
+  const facing = (props.facing ?? "north") as Dir;
+  // Quantize so the memo stays small across an animation's frames.
+  const q = Math.round(Math.max(0, ext) * 64) / 64;
+  const key = `${item.state}|${q}`;
+  const memo = posedMemo.get(key);
+  if (memo) return memo;
+  const boxes: IsoBox[] =
+    q <= 0
+      ? [{ ...boxAlong(facing, 0.75, 1), tex: item.state }] // seated: plate only
+      : [
+          { ...boxAlong(facing, 0.75 - q, 0.75, 0.375, 0.625), tex: null }, // arm
+          { ...boxAlong(facing, 0.75, 1), tex: item.state }, // plate
+        ];
+  posedMemo.set(key, boxes);
   return boxes;
 }

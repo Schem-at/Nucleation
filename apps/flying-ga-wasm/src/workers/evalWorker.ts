@@ -1,8 +1,10 @@
 /// <reference lib="webworker" />
 /** Evaluation worker: instantiates the ~11 MB wasm engine once, then
- * evaluates genome batches for the rest of its life. */
+ * evaluates genome batches for the rest of its life. Returns the full
+ * metrics vector per genome — the runner decides what "fitness" means. */
 
 import type { BBox, Genome } from "../ga/genome";
+import type { Constraints, EvalMetrics } from "../metrics";
 import { loadEngine, type EngineModule } from "./engine";
 import { evaluate } from "./evalCore";
 
@@ -19,12 +21,16 @@ export type EvalWorkerIn =
       bbox: BBox;
       evalTicks: number;
       seed: number;
+      constraints: Constraints;
+      needRobustness: boolean;
+      needPeriod: boolean;
+      targetPeriod: number | null;
     };
 
 export type EvalWorkerOut =
   | { type: "ready" }
   | { type: "error"; message: string }
-  | { type: "results"; results: Array<{ i: number; fit: number }> };
+  | { type: "results"; results: Array<{ i: number; m: EvalMetrics }> };
 
 let engine: EngineModule | null = null;
 
@@ -37,10 +43,29 @@ self.onmessage = async ({ data }: MessageEvent<EvalWorkerIn>) => {
     }
     if (data.type === "eval") {
       if (!engine) engine = await loadEngine();
-      const { jobs, bbox, evalTicks, seed } = data;
+      const {
+        jobs,
+        bbox,
+        evalTicks,
+        seed,
+        constraints,
+        needRobustness,
+        needPeriod,
+        targetPeriod,
+      } = data;
       const results = jobs.map((j) => ({
         i: j.i,
-        fit: evaluate(engine!, j.genome, bbox, evalTicks, seed),
+        m: evaluate(
+          engine!,
+          j.genome,
+          bbox,
+          evalTicks,
+          seed,
+          constraints,
+          needRobustness,
+          needPeriod,
+          targetPeriod,
+        ),
       }));
       (self as unknown as Worker).postMessage({
         type: "results",

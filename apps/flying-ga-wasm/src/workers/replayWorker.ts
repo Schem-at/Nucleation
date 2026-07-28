@@ -5,7 +5,7 @@
 
 import { EXTRA_STATES } from "../ga/alphabet";
 import type { BBox, Genome } from "../ga/genome";
-import { genomeToSnbt, kickPos } from "../ga/snbt";
+import { genomeToSnbt, kickPos, travelRoom } from "../ga/snbt";
 import { loadEngine } from "./engine";
 
 export interface ReplayRequest {
@@ -53,7 +53,7 @@ self.onmessage = async ({ data }: MessageEvent<ReplayRequest | { type: "init" }>
     const { token, genome, bbox, evalTicks, seed, maxTicks } = data;
     const kick = kickPos(genome, bbox);
     const sim = eng.TickSimulation.fromSnbt(
-      genomeToSnbt(genome, bbox),
+      genomeToSnbt(genome, bbox, travelRoom(Math.min(evalTicks, maxTicks))),
       eng.TickSettleMode.Quiet,
       0,
       0,

@@ -20,6 +20,13 @@ export interface ResolvedTexture {
   name: string;
   /** Multiply tint (e.g. redstone dust). Baked into the cached canvas. */
   tint?: string;
+  /** Inner-core texture drawn beneath `name`, inset 1/16 per side — the
+   * vanilla honey/slime model: an opaque core inside a translucent shell.
+   * Baked into the cached canvas. */
+  core?: string;
+  /** Flat colour painted under the core/shell stack so the translucent
+   * shell reads as the block's material, not whatever sits behind it. */
+  backing?: string;
 }
 
 const INDEX_URL = "/pack/textures/index.json";
@@ -113,8 +120,22 @@ function candidates(name: string, face: Face): ResolvedTexture[] {
       else push(`${name}_front`, "furnace_side");
       break;
     case "honey_block":
+      // Vanilla model: translucent shell (honey_block_bottom on ALL outer
+      // faces) over an opaque inner core (top/side art, inset 1/16). The
+      // amber backing keeps it reading as honey, not the ground behind.
+      out.push({
+        name: "honey_block_bottom",
+        core: face === "top" ? "honey_block_top" : "honey_block_side",
+        backing: "rgba(234,160,49,0.9)",
+      });
       if (face === "top") push("honey_block_top");
       else push("honey_block_side");
+      break;
+    case "slime_block":
+      // Same two-element model as honey: shell + inner core, both from the
+      // one slime_block texture; the double pass restores in-game density.
+      out.push({ name: "slime_block", core: "slime_block", backing: "rgba(111,190,85,0.85)" });
+      push("slime_block");
       break;
     case "quartz_block":
       if (face === "top") push("quartz_block_top");
@@ -164,7 +185,7 @@ export function textureFor(blockState: string, face: Face): ResolvedTexture | nu
   const name = blockState.replace(/^minecraft:/, "").replace(/\[.*$/, "");
   let hit: ResolvedTexture | null = null;
   for (const cand of candidates(name, face)) {
-    if (has(cand.name)) {
+    if (has(cand.name) && (cand.core === undefined || has(cand.core))) {
       hit = cand;
       break;
     }
@@ -288,15 +309,31 @@ interface TexEntry {
 const cache = new Map<string, TexEntry>();
 
 function load(rt: ResolvedTexture, rot: 0 | 1 | 2 | 3 = 0): TexEntry {
-  const key = `${rt.name}|${rt.tint ?? ""}|r${rot}`;
+  const key = `${rt.name}|${rt.tint ?? ""}|${rt.core ?? ""}|${rt.backing ?? ""}|r${rot}`;
   let e = cache.get(key);
   if (e) return e;
   e = { canvas: null, url: null };
   cache.set(key, e);
 
+  // Optional inner-core layer (honey/slime): loaded alongside the shell,
+  // composed once both have decoded.
+  let coreImg: HTMLImageElement | null = null;
+  let coreReady = rt.core === undefined;
+  if (rt.core !== undefined) {
+    coreImg = new Image();
+    coreImg.decoding = "async";
+    coreImg.onload = () => {
+      coreReady = true;
+      compose();
+    };
+    coreImg.src = texUrl(rt.core);
+  }
+
   const img = new Image();
   img.decoding = "async";
-  img.onload = () => {
+  let shellReady = false;
+  const compose = () => {
+    if (!shellReady || !coreReady) return;
     // Animated textures are vertical strips (height > width): crop to the
     // top square frame.
     const s = img.naturalWidth;
@@ -306,6 +343,16 @@ function load(rt: ResolvedTexture, rot: 0 | 1 | 2 | 3 = 0): TexEntry {
     const g = c.getContext("2d");
     if (!g) return;
     g.imageSmoothingEnabled = false;
+    if (rt.backing) {
+      g.fillStyle = rt.backing;
+      g.fillRect(0, 0, s, s);
+    }
+    if (coreImg) {
+      // The core element is inset 1/16th of a block on every side.
+      const inset = s / 16;
+      const cs = coreImg.naturalWidth;
+      g.drawImage(coreImg, 0, 0, cs, cs, inset, inset, s - 2 * inset, s - 2 * inset);
+    }
     g.drawImage(img, 0, 0, s, s, 0, 0, s, s);
     if (rt.tint) {
       g.globalCompositeOperation = "multiply";
@@ -334,6 +381,10 @@ function load(rt: ResolvedTexture, rot: 0 | 1 | 2 | 3 = 0): TexEntry {
     e!.canvas = c;
     e!.url = c.toDataURL();
     notify();
+  };
+  img.onload = () => {
+    shellReady = true;
+    compose();
   };
   img.src = texUrl(rt.name);
   return e;

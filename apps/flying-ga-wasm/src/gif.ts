@@ -28,13 +28,15 @@ export function exportLoopGif(
   const gif = GIFEncoder();
   for (let k = 0; k < nFrames; k++) {
     const phase = k / nFrames;
-    const tick = Math.floor(phase * period);
+    const tick = Math.min(Math.floor(phase * period), loop.frames.length - 1);
+    const frame = loop.frames[tick];
+    if (!frame) continue;
     const shift = loop.anchorX + phase * loop.dx;
     drawScene(
       ctx,
       W,
       H,
-      loop.frames[tick].blocks,
+      frame.blocks ?? [],
       shift,
       pal,
       22,

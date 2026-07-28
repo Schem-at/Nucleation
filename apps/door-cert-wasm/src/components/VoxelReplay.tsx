@@ -8,7 +8,7 @@
 // render as plate + arm. A scrubber (fractional ticks) with the measured lever
 // flips stamped in seal red.
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { boxesFor, buildCast, castAt } from "../lib/cast";
+import { boxesForItem, buildCast, castAt } from "../lib/cast";
 import {
   ensureTextureIndex,
   onTexturesChanged,
@@ -270,7 +270,7 @@ export function VoxelReplay({ replay, lever }: { replay: Replay; lever: Vec3 }) 
               it.ox === 0 && it.oy === 0 && it.oz === 0;
             return (
               <g key={it.id}>
-                {boxesFor(it.state).map((bx, j) => {
+                {boxesForItem(it).map((bx, j) => {
                   const x0 = wx + bx.x0;
                   const x1 = wx + bx.x1;
                   const y0 = wy + bx.y0;

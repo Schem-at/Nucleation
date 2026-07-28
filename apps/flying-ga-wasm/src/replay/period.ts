@@ -68,7 +68,9 @@ export function rebuildFrames(
   return frames;
 }
 
-function modalGap(gaps: number[]): number | null {
+/** Modal gap between successive min-x rises: needs ≥3 gaps with ≥60 %
+ * agreement. Shared with the in-eval target-period detector (evalCore). */
+export function modalGap(gaps: number[]): number | null {
   if (gaps.length < 3) return null;
   const counts = new Map<number, number>();
   for (const g of gaps) counts.set(g, (counts.get(g) ?? 0) + 1);

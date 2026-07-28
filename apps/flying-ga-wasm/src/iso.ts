@@ -3,7 +3,7 @@
  * server edition's MachineViewer. */
 
 import { blockKind } from "./ga/alphabet";
-import { boxesFor, castAt, type CastMember, type DrawItem } from "./cast";
+import { boxesForItem, castAt, type CastMember, type DrawItem } from "./cast";
 import { ensureTextureIndex, faceCanvas, FACE_OVERLAY } from "./textures";
 import type { Block } from "./types";
 
@@ -170,7 +170,7 @@ export function drawScene(
     const wy = item.y + item.oy;
     const wz = item.z + item.oz;
     const c = colorOf(item.state).base;
-    for (const bx of boxesFor(item.state)) {
+    for (const bx of boxesForItem(item)) {
       const x0 = wx + bx.x0;
       const x1 = wx + bx.x1;
       const y0 = wy + bx.y0;

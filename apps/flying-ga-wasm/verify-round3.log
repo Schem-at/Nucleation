@@ -1,0 +1,104 @@
+== phase A: camera + seeding default ==
+PASS A.seeding-default — built UI default seed = "minimal"
+PASS A.camera-registered — viewer camera exposed for introspection
+PASS A.drag-moved-camera — drag actually orbited the camera
+PASS A.follow-chip — 'following leader ⏸' chip appeared after the grab
+PASS A.camera-stable-across-polls — gen 107→122, max matrix drift 1.4627632438646287e-11 (a poll-driven re-fit would move elements by ~1e0)
+== phase B: gated Pareto speed+cargo + retired shelf ==
+PASS B.gate-chip — implied must-keep-flying lock chip visible with cargo selected
+  B t+5s gen=52 front=2
+  B t+10s gen=81 front=2
+  B t+15s gen=102 front=1
+  B t+20s gen=119 front=2
+  B t+26s gen=134 front=2
+  B t+31s gen=147 front=2
+  B t+36s gen=158 front=1
+  B t+41s gen=169 front=1
+  B t+46s gen=178 front=1
+  B t+52s gen=188 front=1
+  B t+57s gen=197 front=1
+  B t+62s gen=206 front=1
+PASS B.no-parked-cargo — 2 front members, slowest 2.00 blk/s (gate: ≥0.5)
+  front: [{"id":"engine-b","speed":2,"cargo":0,"blocks":6},{"id":"m85023129","speed":1.9958333333333333,"cargo":1,"blocks":8}]
+PASS B.retired-shelf — 1 archive entries retired (not vanished) after banning slime mid-run
+== phase C: mid-run speed-max → speed-min + weights + lineage ==
+  flipped speed direction at gen 87, top speed was 0.03
+PASS C.config-event — events feed logged the regime change
+PASS C.leaderboard-flipped — top blk/s 0.03 → 0.02 after min-speed re-rank
+PASS C.run-continues — still evolving (gen 129), 0 page errors
+PASS C.weights-change-ranking — board order changed after size w=8 (m44112009 → m50091850 on top)
+PASS C.lineage-extinction — 6 birth marks, 6 extinction marks on the Muller chart
+== phase D: target-period run (target 10) ==
+  D t+5s gen=51
+  D t+10s gen=96
+  D t+15s gen=133
+  D t+20s gen=163
+  D t+25s gen=189
+  D t+30s gen=213
+  D t+35s gen=235
+  D t+40s gen=257
+  D t+45s gen=280
+  D t+50s gen=304
+PASS D.champion-period-10 — top machine "engine-b" detected period = 10 ticks (err 0)
+{
+  "results": {
+    "A.seeding-default": {
+      "pass": true,
+      "detail": "built UI default seed = \"minimal\""
+    },
+    "A.camera-registered": {
+      "pass": true,
+      "detail": "viewer camera exposed for introspection"
+    },
+    "A.drag-moved-camera": {
+      "pass": true,
+      "detail": "drag actually orbited the camera"
+    },
+    "A.follow-chip": {
+      "pass": true,
+      "detail": "'following leader ⏸' chip appeared after the grab"
+    },
+    "A.camera-stable-across-polls": {
+      "pass": true,
+      "detail": "gen 107→122, max matrix drift 1.4627632438646287e-11 (a poll-driven re-fit would move elements by ~1e0)"
+    },
+    "B.gate-chip": {
+      "pass": true,
+      "detail": "implied must-keep-flying lock chip visible with cargo selected"
+    },
+    "B.no-parked-cargo": {
+      "pass": true,
+      "detail": "2 front members, slowest 2.00 blk/s (gate: ≥0.5)"
+    },
+    "B.retired-shelf": {
+      "pass": true,
+      "detail": "1 archive entries retired (not vanished) after banning slime mid-run"
+    },
+    "C.config-event": {
+      "pass": true,
+      "detail": "events feed logged the regime change"
+    },
+    "C.leaderboard-flipped": {
+      "pass": true,
+      "detail": "top blk/s 0.03 → 0.02 after min-speed re-rank"
+    },
+    "C.run-continues": {
+      "pass": true,
+      "detail": "still evolving (gen 129), 0 page errors"
+    },
+    "C.weights-change-ranking": {
+      "pass": true,
+      "detail": "board order changed after size w=8 (m44112009 → m50091850 on top)"
+    },
+    "C.lineage-extinction": {
+      "pass": true,
+      "detail": "6 birth marks, 6 extinction marks on the Muller chart"
+    },
+    "D.champion-period-10": {
+      "pass": true,
+      "detail": "top machine \"engine-b\" detected period = 10 ticks (err 0)"
+    }
+  },
+  "pageErrors": []
+}
+VERIFY OK — all round-3 checks passed
