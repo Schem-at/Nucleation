@@ -97,3 +97,5 @@ apps/*/public/pack/
 apps/shared-pack/
 # Assembled browser wasm package (rebuild via tools/package-npm.sh)
 dist/npm-mctick/
+apps/*/preview-*.log
+apps/*/verify-*-out.json
