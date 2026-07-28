@@ -232,6 +232,16 @@ export class GaRunner {
     this.pool = workers;
   }
 
+  /** Genome-fingerprint → metrics memo. Converged populations re-submit
+   * identical genomes generation after generation (elites verbatim, clones
+   * from crossover); their evaluations are deterministic given the eval
+   * policy, so a lookup replaces a full flight. Cleared whenever anything
+   * that affects evaluation changes. */
+  private memo = new Map<string, EvalMetrics>();
+  private memoSig = "";
+  private memoHits = 0;
+  private memoLookups = 0;
+
   /** Evaluate a whole population across the pool; small batches keep the
    * workers load-balanced when eval cost varies per genome. */
   private evaluateAll(
@@ -244,15 +254,52 @@ export class GaRunner {
       live.objectives.some((o) => o.key === "period") ||
       (live.constraints.periodBand && live.targetPeriod !== null);
     const constraints = effectiveConstraints(live.constraints, live.objectives);
+
+    const sig = JSON.stringify([
+      cfg.bbox,
+      cfg.eval_ticks,
+      cfg.seed,
+      constraints,
+      needRobustness,
+      needPeriod,
+      live.targetPeriod,
+    ]);
+    if (sig !== this.memoSig) {
+      this.memo.clear();
+      this.memoSig = sig;
+    }
+    if (this.memo.size > 50_000) this.memo.clear();
+
     const out = new Array<EvalMetrics | null>(pop.length).fill(null);
+    const keys = pop.map(genomeKey);
+    const fresh: number[] = [];
+    for (let i = 0; i < pop.length; i++) {
+      this.memoLookups++;
+      const hit = this.memo.get(keys[i]);
+      if (hit) {
+        this.memoHits++;
+        out[i] = hit;
+      } else {
+        fresh.push(i);
+      }
+    }
+    if (this.memoLookups % 25_000 < pop.length)
+      console.debug(
+        `[memo] ${this.memoHits}/${this.memoLookups} hits (${((100 * this.memoHits) / Math.max(1, this.memoLookups)).toFixed(1)}%)`,
+      );
+    if (fresh.length === 0)
+      return Promise.resolve(
+        out.map((m) => m ?? zeroMetrics("missing result")),
+      );
+
     const batchSize = Math.max(
       1,
-      Math.min(8, Math.ceil(pop.length / (this.pool.length * 3))),
+      Math.min(16, Math.ceil(fresh.length / (this.pool.length * 2))),
     );
     const queue: EvalJob[][] = [];
-    for (let i = 0; i < pop.length; i += batchSize)
+    for (let i = 0; i < fresh.length; i += batchSize)
       queue.push(
-        pop.slice(i, i + batchSize).map((genome, j) => ({ i: i + j, genome })),
+        fresh.slice(i, i + batchSize).map((k) => ({ i: k, genome: pop[k] })),
       );
 
     return new Promise((resolve, reject) => {
@@ -270,7 +317,10 @@ export class GaRunner {
           pending--;
           p.busy = false;
           if (data.type === "results") {
-            for (const r of data.results) out[r.i] = r.m;
+            for (const r of data.results) {
+              out[r.i] = r.m;
+              this.memo.set(keys[r.i], r.m);
+            }
             pump(p);
           } else if (data.type === "error") {
             reject(new Error(data.message));

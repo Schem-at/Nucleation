@@ -6,7 +6,7 @@
 import type { BBox, Genome } from "../ga/genome";
 import type { Constraints, EvalMetrics } from "../metrics";
 import { loadEngine, type EngineModule } from "./engine";
-import { evaluate } from "./evalCore";
+import { evaluate, evaluateBatch } from "./evalCore";
 
 export interface EvalJob {
   i: number;
@@ -53,20 +53,33 @@ self.onmessage = async ({ data }: MessageEvent<EvalWorkerIn>) => {
         needPeriod,
         targetPeriod,
       } = data;
-      const results = jobs.map((j) => ({
-        i: j.i,
-        m: evaluate(
-          engine!,
-          j.genome,
-          bbox,
-          evalTicks,
-          seed,
-          constraints,
-          needRobustness,
-          needPeriod,
-          targetPeriod,
-        ),
-      }));
+      // Fast path: one engine call for the whole chunk. Robustness needs
+      // per-genome alternate kicks, so it keeps the single-genome path.
+      const results = needRobustness
+        ? jobs.map((j) => ({
+            i: j.i,
+            m: evaluate(
+              engine!,
+              j.genome,
+              bbox,
+              evalTicks,
+              seed,
+              constraints,
+              true,
+              needPeriod,
+              targetPeriod,
+            ),
+          }))
+        : evaluateBatch(
+            engine!,
+            jobs.map((j) => j.genome),
+            bbox,
+            evalTicks,
+            seed,
+            constraints,
+            needPeriod,
+            targetPeriod,
+          ).map((m, k) => ({ i: jobs[k].i, m }));
       (self as unknown as Worker).postMessage({
         type: "results",
         results,

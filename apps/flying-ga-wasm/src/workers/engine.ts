@@ -31,6 +31,39 @@ export interface EngineModule {
       oz: number,
       extraStates: string,
     ): TickSimulationT;
+    /** GA fast path: flat palette-index cells, no SNBT built or parsed. */
+    fromBlocks(
+      bx: number,
+      by: number,
+      bz: number,
+      travel: number,
+      xOff: number,
+      palette: string,
+      cells: number[],
+      airIndex: number,
+      settle: unknown,
+      ox: number,
+      oy: number,
+      oz: number,
+    ): TickSimulationT;
+    /** One call per generation chunk: kicked flights for N genomes, JSON
+     * rows of raw scalars (see evalCore.FlightRow). */
+    evalFlightBatch(
+      bx: number,
+      by: number,
+      bz: number,
+      travel: number,
+      xOff: number,
+      palette: string,
+      cells: number[],
+      airIndex: number,
+      kicks: number[],
+      evalTicks: number,
+      seed: bigint,
+      mustMoveByTick: number,
+      needPeriod: boolean,
+      earlyExit: boolean,
+    ): string;
   };
   TickSettleMode: { Quiet: unknown };
 }
