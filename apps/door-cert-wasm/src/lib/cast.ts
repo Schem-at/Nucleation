@@ -216,6 +216,21 @@ export function buildCast(
       } else if (
         landed !== undefined &&
         !isAirState(landed) &&
+        !landed.startsWith("minecraft:moving_piston") &&
+        previous !== undefined &&
+        parseState(previous).name === parseState(landed).name
+      ) {
+        // An in-place state swap of the SAME block family passing through a
+        // moving_piston phase — the signature of a piston BASE extending
+        // (extended=false → moving_piston → extended=true). The block does
+        // not travel; inferring motion here (via the vacancy lookup or the
+        // behind-the-facing fallback) made the base visibly slide ~half a
+        // block backward during the stroke. Draw the landed state in place
+        // for the placeholder phase; the landed segment then takes over.
+        members.push({ x: pos[0], y: pos[1], z: pos[2], state: landed, start, end });
+      } else if (
+        landed !== undefined &&
+        !isAirState(landed) &&
         !landed.startsWith("minecraft:moving_piston")
       ) {
         // A block in flight toward this position. Its source is the adjacent

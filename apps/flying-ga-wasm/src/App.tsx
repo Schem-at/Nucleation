@@ -336,6 +336,10 @@ export default function App() {
           }
           if (u.newBest) {
             rec.bests.push(u.newBest);
+            // Test introspection (verify scripts): live champion list —
+            // survives the localStorage quota fallback dropping the run.
+            (window as unknown as { __fgaBests?: unknown }).__fgaBests =
+              rec.bests;
             requestReplay(u.newBest, cfg);
             persist(true);
             flushUi(); // a new champion is worth an immediate frame
@@ -619,10 +623,8 @@ export default function App() {
           <path d="M16 18v11L3 21.5v-11z" fill="#3e8c33" />
         </svg>
         <div>
-          <h1>Flight Lab · WASM</h1>
-          <div className="sub">
-            flying-machine evolution · engine + GA entirely in your browser
-          </div>
+          <h1>Flight Evolution</h1>
+        
         </div>
         <nav className="tabs" aria-label="Views">
           <button

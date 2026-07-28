@@ -513,10 +513,22 @@ export class GaRunner {
                     ) * 100,
                   ) / 100;
           }
+          const effC = effectiveConstraints(live.constraints, live.objectives);
+          // The leaderboard must obey the new constraints too: machines that
+          // are invalid under the new regime (e.g. over a tightened block
+          // cap) drop off at this boundary instead of squatting on scores
+          // earned under the old rules.
+          for (const [k, e] of [...board]) {
+            if (e.metrics && storedViolation(e, effC, live.targetPeriod))
+              board.delete(k);
+          }
+          // A regime change re-opens the champion race: the next generation
+          // crowns the best machine under the NEW objective vector, instead
+          // of the stage forever showing the old regime's record holder.
+          if (objChanged || conDiffs.length > 0) bestEver = -Infinity;
           // Archive: entries invalid under the new constraints move to the
           // retired shelf (they don't vanish); the survivors are re-pruned
           // under the new dominance.
-          const effC = effectiveConstraints(live.constraints, live.objectives);
           for (const [k, e] of [...archive]) {
             const reason = e.metrics
               ? storedViolation(e, effC, live.targetPeriod)
@@ -679,14 +691,22 @@ export class GaRunner {
           }
         }
 
-        // New champion? (Physical displacement champion drives the stage.)
+        // New champion? The champion follows the ACTIVE regime: scalar mode
+        // crowns the best weighted-objective score, so selecting size or
+        // efficiency visibly changes who flies on the stage (ranking by raw
+        // displacement made those objectives invisible — the old bloated
+        // record holder could never be dethroned by a smaller flier).
+        // Pareto mode keeps the physical displacement champion; its real
+        // product is the front, not one machine.
+        const champScores = pareto ? fits : scalars;
         let newBest: BestRecord | null = null;
-        if (best > bestEver + 1e-9) {
-          bestEver = best;
-          const gi = fits.indexOf(best);
+        const champTop = Math.max(...champScores);
+        if (champTop > 0 && champTop > bestEver + 1e-9) {
+          bestEver = champTop;
+          const gi = champScores.indexOf(champTop);
           newBest = {
             gen,
-            fitness: Math.round(best * 100) / 100,
+            fitness: Math.round(metrics[gi].fit * 100) / 100,
             genome: pop[gi],
             blocks: genomeBlocks(pop[gi], cfg.bbox).map((c) => ({
               x: c.x,
@@ -699,7 +719,7 @@ export class GaRunner {
             gen,
             kind: "champion",
             at: Date.now(),
-            text: `new champion — ${metrics[gi].speed.toFixed(2)} blk/s (${best.toFixed(1)} blocks), ${metrics[gi].blocks} block build`,
+            text: `new champion — ${metrics[gi].speed.toFixed(2)} blk/s (${metrics[gi].fit.toFixed(1)} blocks), ${metrics[gi].blocks} block build`,
           });
         }
 
