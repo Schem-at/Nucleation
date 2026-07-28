@@ -797,13 +797,17 @@ impl<P: PowerSource> Hopper<P> {
         }
         for slot in 0..HOPPER_SLOTS {
             if let Some((id, count)) = ctx.inventory_slot(pos, slot) {
-                if insert_one(ctx, &self.power, Some(pos), target, target_slots, &id) {
+                if let Some(target_slot) =
+                    insert_one(ctx, &self.power, Some(pos), target, target_slots, &id)
+                {
+                    let carried = ctx.take_slot_contents(pos, slot);
                     let remaining = count - 1;
                     ctx.set_inventory_slot(
                         pos,
                         slot,
                         (remaining > 0).then(|| (id, remaining)),
                     );
+                    ctx.set_slot_contents(target, target_slot, carried);
                     return true;
                 }
             }
@@ -825,13 +829,17 @@ impl<P: PowerSource> Hopper<P> {
         };
         for slot in 0..source_slots.min(255) as u8 {
             if let Some((id, count)) = ctx.inventory_slot(source, slot) {
-                if insert_one(ctx, &self.power, None, pos, u32::from(HOPPER_SLOTS), &id) {
+                if let Some(target_slot) =
+                    insert_one(ctx, &self.power, None, pos, u32::from(HOPPER_SLOTS), &id)
+                {
+                    let carried = ctx.take_slot_contents(source, slot);
                     let remaining = count - 1;
                     ctx.set_inventory_slot(
                         source,
                         slot,
                         (remaining > 0).then(|| (id, remaining)),
                     );
+                    ctx.set_slot_contents(pos, target_slot, carried);
                     return true;
                 }
             }
@@ -865,13 +873,26 @@ impl<P: PowerSource> Hopper<P> {
                 continue;
             }
             let mut absorbed = 0u8;
-            while absorbed < count
-                && insert_one(ctx, &self.power, None, pos, u32::from(HOPPER_SLOTS), &item_id)
-            {
+            let mut landed_slot = None;
+            while absorbed < count {
+                let Some(slot) =
+                    insert_one(ctx, &self.power, None, pos, u32::from(HOPPER_SLOTS), &item_id)
+                else {
+                    break;
+                };
+                landed_slot = Some(slot);
                 absorbed += 1;
             }
             if absorbed == count {
+                let entity_id = ctx.item_entities.items[index].id;
                 ctx.item_entities.items[index].removed = true;
+                // A contents-carrying item (a dropped shulker box) lands its
+                // slots in the hopper stack it was absorbed into.
+                if let Some(carried) = ctx.item_entities.contents.remove(&entity_id) {
+                    if let Some(slot) = landed_slot {
+                        ctx.set_slot_contents(pos, slot, Some(carried));
+                    }
+                }
                 return true;
             } else if absorbed > 0 {
                 ctx.item_entities.items[index].item.1 = count - absorbed;
@@ -956,7 +977,7 @@ fn insert_one<P: PowerSource>(
     target: Pos,
     target_slots: u32,
     id: &str,
-) -> bool {
+) -> Option<u8> {
     let target_was_empty = ctx
         .inventories
         .get(&target)
@@ -981,16 +1002,16 @@ fn insert_one<P: PowerSource>(
                     ctx.hopper_state.entry(target).or_default().cooldown =
                         HOPPER_COOLDOWN - i32::from(already_ticked);
                 }
-                return true;
+                return Some(slot);
             }
             Some((existing, count)) if existing == id && count < MERGE_LIMIT => {
                 ctx.set_inventory_slot(target, slot, Some((existing, count + 1)));
-                return true;
+                return Some(slot);
             }
             Some(_) => continue,
         }
     }
-    false
+    None
 }
 
 /// A dropper or dispenser.
@@ -1046,44 +1067,112 @@ impl<P: PowerSource> BlockBehaviour for Dropper<P> {
 
     fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
         let slots = 9u8;
-        let Some((slot, id, count)) = (0..slots)
-            .find_map(|s| ctx.inventory_slot(pos, s).map(|(id, c)| (s, id, c)))
-        else {
+        // `DispenserBlockEntity.getRandomSlot`: reservoir-sample the occupied
+        // slots — one `nextInt(n)` per candidate, n counting up from 1. With
+        // no seeded rng the engine keeps its deterministic first-occupied
+        // choice, which the conformance goldens were recorded against (their
+        // dispensers hold one stack, where the two rules agree).
+        let chosen = if ctx.item_entities.rng.is_some() {
+            let occupied: Vec<u8> =
+                (0..slots).filter(|s| ctx.inventory_slot(pos, *s).is_some()).collect();
+            let rng = ctx.item_entities.rng.as_mut().expect("checked above");
+            let mut chosen = None;
+            for (i, s) in occupied.iter().enumerate() {
+                if rng.next_int(i as i32 + 1) == 0 {
+                    chosen = Some(*s);
+                }
+            }
+            chosen
+        } else {
+            (0..slots).find(|s| ctx.inventory_slot(pos, *s).is_some())
+        };
+        let Some(slot) = chosen else {
             return; // empty: vanilla just clicks
         };
+        let Some((id, count)) = ctx.inventory_slot(pos, slot) else {
+            return;
+        };
+        // `ShulkerBoxDispenseBehavior`: a dispenser holding a shulker box
+        // *places* it as a block in front. Facing comes from
+        // `DirectionalPlaceContext`: the dispense direction when the block
+        // below the target is empty, straight up otherwise.
+        if self.dispenser && crate::vanilla::has_dynamic_shape(&id) {
+            let front = pos.offset(self.facing);
+            if ctx.world.get(front) == StateId::AIR {
+                let below_empty = ctx.world.get(front.offset(Dir::Down)) == StateId::AIR;
+                let facing = if below_empty { self.facing } else { Dir::Up };
+                let descriptor = format!("{}[facing={}]", id, dir_name(facing));
+                if let Some(state) = ctx.states.get(&descriptor) {
+                    let carried = ctx.take_slot_contents(pos, slot);
+                    let remaining = count - 1;
+                    ctx.set_inventory_slot(
+                        pos,
+                        slot,
+                        (remaining > 0).then(|| (id.clone(), remaining)),
+                    );
+                    // The placed box keeps the item's slots. Registered before
+                    // the write so the update cascade reads a full container.
+                    ctx.inventories.insert(
+                        front,
+                        crate::inventory::Inventory {
+                            slots: 27,
+                            stacks: carried.unwrap_or_default(),
+                        },
+                    );
+                    ctx.set(front, state);
+                }
+                // State never interned: nothing can be placed; the item stays,
+                // exactly as a failed OptionalDispenseItemBehavior keeps it.
+                return;
+            }
+            // Front obstructed: the placement fails and the item stays put.
+            return;
+        }
         if !self.dispenser {
             let front = pos.offset(self.facing);
             if let Some(front_slots) = self.power.container_slots_at(ctx.world, front) {
-                if insert_one(ctx, &self.power, None, front, front_slots, &id) {
+                if let Some(target_slot) =
+                    insert_one(ctx, &self.power, None, front, front_slots, &id)
+                {
+                    let carried = ctx.take_slot_contents(pos, slot);
                     let remaining = count - 1;
-                    ctx.set_inventory_slot(pos, slot, (remaining > 0).then(|| (id, remaining)));
+                    ctx.set_inventory_slot(pos, slot, (remaining > 0).then(|| (id.clone(), remaining)));
+                    ctx.set_slot_contents(front, target_slot, carried);
                 }
                 // Insert refused (target full): the item stays put.
                 return;
             }
         }
         // No container in front: the item is ejected into the world as an item
-        // entity. Spawn position and mean velocity are
-        // `DefaultDispenseItemBehavior.spawnItem` with the jitter removed:
-        // 0.7 blocks out of the face (0.125 down for vertical facings,
-        // 0.15625 for horizontal), speed the mean of `0.2 + 0.1 * U(0,1)`,
-        // and a constant upward 0.2 regardless of facing. Vanilla adds
-        // `triangle(_, 0.103)` noise to every component; the engine is
-        // deterministic and conformance for ejected trajectories uses
-        // tolerance rather than exactness.
+        // entity — `DefaultDispenseItemBehavior.spawnItem`, speed multiplier 6.
+        // Position: 0.7 blocks out of the face (0.125 down for vertical
+        // facings, 0.15625 for horizontal). Velocity: speed `0.2 + 0.1 *
+        // nextDouble()` along the facing, a constant upward 0.2 mean, and
+        // `triangle(_, 0.0172275 * 6)` noise on every component. Without a
+        // seeded rng the engine uses the distribution means (speed 0.25, no
+        // noise) — what the conformance goldens' tolerance compares against.
         let (dx, dy, dz) = self.facing.delta();
         let vertical = dy != 0;
         let x = f64::from(pos.x) + 0.5 + 0.7 * f64::from(dx);
         let y = f64::from(pos.y) + 0.5 + 0.7 * f64::from(dy)
             - if vertical { 0.125 } else { 0.15625 };
         let z = f64::from(pos.z) + 0.5 + 0.7 * f64::from(dz);
-        let speed = 0.25;
-        ctx.item_entities.spawn(
-            (id.clone(), 1),
-            [x, y, z],
-            [f64::from(dx) * speed, 0.2, f64::from(dz) * speed],
-            10,
-        );
+        let vel = if let Some(rng) = ctx.item_entities.rng.as_mut() {
+            let speed = rng.next_double() * 0.1 + 0.2;
+            let dev = 0.0172275 * 6.0;
+            [
+                rng.triangle(f64::from(dx) * speed, dev),
+                rng.triangle(0.2, dev),
+                rng.triangle(f64::from(dz) * speed, dev),
+            ]
+        } else {
+            [f64::from(dx) * 0.25, 0.2, f64::from(dz) * 0.25]
+        };
+        let carried = ctx.take_slot_contents(pos, slot);
+        let entity = ctx.item_entities.spawn((id.clone(), 1), [x, y, z], vel, 10);
+        if let Some(carried) = carried {
+            ctx.item_entities.contents.insert(entity, carried);
+        }
         let remaining = count - 1;
         ctx.set_inventory_slot(pos, slot, (remaining > 0).then(|| (id, remaining)));
     }
@@ -1094,6 +1183,18 @@ impl<P: PowerSource> BlockBehaviour for Dropper<P> {
         } else {
             "dropper"
         }
+    }
+}
+
+/// A `facing=` property value.
+fn dir_name(dir: Dir) -> &'static str {
+    match dir {
+        Dir::Down => "down",
+        Dir::Up => "up",
+        Dir::North => "north",
+        Dir::South => "south",
+        Dir::West => "west",
+        Dir::East => "east",
     }
 }
 
@@ -1175,6 +1276,45 @@ impl<P: PowerSource> BlockBehaviour for Lamp<P> {
 
     fn name(&self) -> &'static str {
         "redstone_lamp"
+    }
+}
+
+/// A trapdoor — any wood variant or iron.
+///
+/// `TrapDoorBlock.neighborChanged`, from bytecode: `hasNeighborSignal` (plain —
+/// no quasi-connectivity), and when the signal differs from `powered`, one
+/// flag-2 write lands `open = powered = signal`. The bytecode's inner
+/// `open != signal` check only gates the sound: whenever `powered` flips, the
+/// final state always has both properties equal to the signal. A hand-opened
+/// unpowered trapdoor is therefore left alone until power actually changes.
+pub struct Trapdoor<P: PowerSource> {
+    /// Whether this state is powered.
+    pub powered: bool,
+    /// Both-false / both-true states for `(open, powered)`.
+    pub states: StatePair,
+    /// How power is read.
+    pub power: P,
+}
+
+impl<P: PowerSource> Trapdoor<P> {
+    fn has_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        crate::pos::ALL_DIRS.iter().any(|dir| {
+            self.power
+                .is_powered(ctx.world, ctx.comparator_out, pos.offset(*dir), dir.opposite())
+        })
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for Trapdoor<P> {
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        let signal = self.has_signal(ctx, pos);
+        if signal != self.powered {
+            ctx.set_quiet(pos, self.states.get(signal));
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "trapdoor"
     }
 }
 

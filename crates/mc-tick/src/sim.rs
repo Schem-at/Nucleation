@@ -354,6 +354,12 @@ impl Simulation {
     }
 
     /// Every item entity ever spawned: `(id, item id)`, surviving removal.
+    /// Container contents carried by an item entity — a dropped shulker box's
+    /// slots. Empty for ordinary items.
+    pub fn item_contents(&self, id: u32) -> Option<&[crate::inventory::ItemStack]> {
+        self.item_entities.contents.get(&id).map(Vec::as_slice)
+    }
+
     pub fn item_name_log(&self) -> &[(u32, String)] {
         &self.item_entities.name_log
     }
@@ -403,6 +409,18 @@ impl Simulation {
 
     /// Spawn a minecart. Ids come from the shared entity counter, so carts
     /// and items interleave exactly as a placed structure's entity list does.
+    /// Seed the vanilla random source (`LegacyRandomSource`'s LCG).
+    ///
+    /// Behaviours that jitter — dispense trajectories, dispenser slot choice,
+    /// destroy drops — draw from it in a fixed order, so a seeded run is
+    /// exactly reproducible. Without a seed the engine uses each
+    /// distribution's mean, which is what the conformance goldens compare
+    /// against. Matching a live server draw-for-draw is out of scope: a real
+    /// `ServerLevel.random` is shared with the whole world.
+    pub fn set_rng_seed(&mut self, seed: i64) {
+        self.item_entities.rng = Some(crate::rng::JavaRandom::new(seed));
+    }
+
     pub fn spawn_minecart(&mut self, kind: String, pos: [f64; 3], vel: [f64; 3]) -> u32 {
         let id = self.item_entities.next_id;
         self.item_entities.next_id += 1;
@@ -1794,6 +1812,7 @@ mod tests {
                     slot: 0,
                     id: "minecraft:redstone".to_string(),
                     count: 64,
+                    contents: None,
                 }],
             },
         );

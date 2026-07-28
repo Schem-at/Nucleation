@@ -579,6 +579,7 @@ impl<'a> Parser<'a> {
         let mut slot = 0u8;
         let mut id = String::new();
         let mut count = 1u8;
+        let mut contents: Option<Vec<crate::inventory::ItemStack>> = None;
         loop {
             if self.peek() == Some(b'}') {
                 self.at += 1;
@@ -591,6 +592,7 @@ impl<'a> Parser<'a> {
                 "id" => id = self.string()?,
                 // Both spellings: `Count` before the components rework, `count` after.
                 "count" | "Count" => count = self.int()? as u8,
+                "components" => contents = self.item_components()?,
                 _ => self.skip_value()?,
             }
             if self.peek() == Some(b',') {
@@ -600,7 +602,97 @@ impl<'a> Parser<'a> {
         if id.is_empty() {
             return self.err("item entry needs an id");
         }
-        Ok(crate::inventory::ItemStack { slot, id, count })
+        Ok(crate::inventory::ItemStack { slot, id, count, contents })
+    }
+
+    /// An item's `components` compound. Only `minecraft:container` — a
+    /// shulker box's slots — is understood; every other component is skipped.
+    fn item_components(
+        &mut self,
+    ) -> Result<Option<Vec<crate::inventory::ItemStack>>, StructureError> {
+        self.eat(b'{')?;
+        let mut contents: Option<Vec<crate::inventory::ItemStack>> = None;
+        loop {
+            self.skip_ws();
+            if self.peek() == Some(b'}') {
+                self.at += 1;
+                break;
+            }
+            let key = self.key()?;
+            self.eat(b':')?;
+            if key == "minecraft:container" {
+                contents = Some(self.container_component()?);
+            } else {
+                self.skip_value()?;
+            }
+            if self.peek() == Some(b',') {
+                self.at += 1;
+            }
+        }
+        Ok(contents)
+    }
+
+    /// `minecraft:container`: `[{slot: 0, item: {id: "...", count: 2}}, ...]`.
+    fn container_component(
+        &mut self,
+    ) -> Result<Vec<crate::inventory::ItemStack>, StructureError> {
+        self.eat(b'[')?;
+        let mut stacks = Vec::new();
+        loop {
+            self.skip_ws();
+            if self.peek() == Some(b']') {
+                self.at += 1;
+                break;
+            }
+            self.eat(b'{')?;
+            let mut slot = 0u8;
+            let mut id = String::new();
+            let mut count = 1u8;
+            loop {
+                self.skip_ws();
+                if self.peek() == Some(b'}') {
+                    self.at += 1;
+                    break;
+                }
+                let key = self.key()?;
+                self.eat(b':')?;
+                match key.as_str() {
+                    "slot" | "Slot" => slot = self.int()? as u8,
+                    "item" => {
+                        self.eat(b'{')?;
+                        loop {
+                            self.skip_ws();
+                            if self.peek() == Some(b'}') {
+                                self.at += 1;
+                                break;
+                            }
+                            let inner = self.key()?;
+                            self.eat(b':')?;
+                            match inner.as_str() {
+                                "id" => id = self.string()?,
+                                "count" | "Count" => count = self.int()? as u8,
+                                _ => self.skip_value()?,
+                            }
+                            if self.peek() == Some(b',') {
+                                self.at += 1;
+                            }
+                        }
+                    }
+                    _ => self.skip_value()?,
+                }
+                if self.peek() == Some(b',') {
+                    self.at += 1;
+                }
+            }
+            if id.is_empty() {
+                return self.err("container component entry needs an item id");
+            }
+            stacks.push(crate::inventory::ItemStack { slot, id, count, contents: None });
+            if self.peek() == Some(b',') {
+                self.at += 1;
+            }
+        }
+        Ok(stacks)
     }
 
     /// One palette entry, rendered as the descriptor the registry interns.

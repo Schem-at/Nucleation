@@ -77,6 +77,16 @@ pub struct ItemEntities {
     /// Every id ever spawned with its item, surviving removal — a renderer
     /// needs to know what a vacuumed item *was*.
     pub name_log: Vec<(u32, String)>,
+    /// Container contents carried *by an item* — a dropped shulker box keeps
+    /// its slots. Keyed by entity id; moves with the item through hoppers.
+    pub contents: std::collections::HashMap<u32, Vec<crate::inventory::ItemStack>>,
+    /// The seeded random source, when the simulation opted in
+    /// ([`crate::sim::Simulation::set_rng_seed`]). Lives here rather than on
+    /// `TickCtx` because every consumer today — dispense jitter, dispenser
+    /// slot choice, destroy drops — is an item-spawning path that already
+    /// holds this handle. `None` keeps every behaviour on its deterministic
+    /// mean, which is what the conformance goldens were recorded against.
+    pub rng: Option<crate::rng::JavaRandom>,
 }
 
 impl ItemEntities {
@@ -558,6 +568,12 @@ pub fn merge_neighbours(entities: &mut ItemEntities, index: usize) {
     if !is_mergable(&entities.items[index]) {
         return;
     }
+    // An item carrying container contents (a dropped shulker box) never merges:
+    // vanilla's `areMergable` fails on the component mismatch, and shulker
+    // boxes stack to 1 anyway.
+    if entities.contents.contains_key(&entities.items[index].id) {
+        return;
+    }
     let (pos, item_id) = {
         let e = &entities.items[index];
         (e.pos, e.item.0.clone())
@@ -569,6 +585,9 @@ pub fn merge_neighbours(entities: &mut ItemEntities, index: usize) {
         }
         let other = &entities.items[other_index];
         if !is_mergable(other) || other.item.0 != item_id {
+            continue;
+        }
+        if entities.contents.contains_key(&other.id) {
             continue;
         }
         let (omin, omax) = item_aabb(other.pos);

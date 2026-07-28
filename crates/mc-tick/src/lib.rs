@@ -40,6 +40,7 @@ pub mod phase;
 pub mod piston;
 pub mod pos;
 pub mod redstone;
+pub mod rng;
 pub mod schedule;
 pub mod sim;
 pub mod state;

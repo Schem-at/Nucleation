@@ -597,6 +597,37 @@ impl<'a> TickCtx<'a> {
         })
     }
 
+    /// Detach and return the container contents carried by the stack in a
+    /// slot — a shulker box's slots travelling with the item.
+    pub fn take_slot_contents(
+        &mut self,
+        pos: Pos,
+        slot: u8,
+    ) -> Option<Vec<crate::inventory::ItemStack>> {
+        self.inventories.get_mut(&pos).and_then(|inv| {
+            inv.stacks
+                .iter_mut()
+                .find(|stack| stack.slot == slot)
+                .and_then(|stack| stack.contents.take())
+        })
+    }
+
+    /// Attach container contents to the stack in a slot. No-op when empty —
+    /// contents only ever ride on a real item.
+    pub fn set_slot_contents(
+        &mut self,
+        pos: Pos,
+        slot: u8,
+        contents: Option<Vec<crate::inventory::ItemStack>>,
+    ) {
+        let Some(contents) = contents else { return };
+        if let Some(inv) = self.inventories.get_mut(&pos) {
+            if let Some(stack) = inv.stacks.iter_mut().find(|stack| stack.slot == slot) {
+                stack.contents = Some(contents);
+            }
+        }
+    }
+
     /// Write a container slot, recording the change and updating comparators.
     ///
     /// The comparator update mirrors `Level.updateNeighbourForOutputSignal`,
@@ -619,6 +650,7 @@ impl<'a> TickCtx<'a> {
                 slot,
                 id: id.clone(),
                 count: *count,
+                contents: None,
             });
         }
         if let Some(log) = self.inv_log.as_deref_mut() {

@@ -33,6 +33,10 @@ pub struct ItemStack {
     pub id: String,
     /// How many.
     pub count: u8,
+    /// Container contents carried *by the item* — a shulker box in a
+    /// dispenser keeps its slots (vanilla's `minecraft:container` component).
+    /// `None` for ordinary items.
+    pub contents: Option<Vec<ItemStack>>,
 }
 
 /// A container's contents.
@@ -86,6 +90,7 @@ mod tests {
                 .map(|(slot, count)| ItemStack {
                     slot,
                     id: "minecraft:redstone".to_string(),
+                    contents: None,
                     count,
                 })
                 .collect(),

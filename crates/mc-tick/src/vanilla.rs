@@ -23,7 +23,7 @@
 
 use crate::behaviour::{BehaviourTable, Inert};
 use crate::components::{
-    Button, Comparator, ComparatorMode, Dropper, Hopper, Lamp, NoteBlock, PowerSource,
+    Button, Comparator, ComparatorMode, Dropper, Hopper, Lamp, NoteBlock, PowerSource, Trapdoor,
     PressurePlate, Repeater, StatePair, Torch,
 };
 use crate::observer::Observer;
@@ -817,7 +817,13 @@ pub fn register_all_at(
                 // thirteen is refused where vanilla's eleven goes through.
                 | "minecraft:repeater"
                 | "minecraft:comparator"
-        ) {
+        )
+            // Shulker boxes register `PushReaction.DESTROY` in their block
+            // properties (`Blocks` bytecode) — a piston breaks one, and the
+            // break drops the box as an item that keeps its slots.
+            || descriptor.name.ends_with("_shulker_box")
+            || descriptor.name == "minecraft:shulker_box"
+        {
             rules.destroyed_by_push.push(*id);
         }
         if descriptor.name == "minecraft:observer" {
@@ -1031,6 +1037,17 @@ pub fn register_all_at(
                     *id,
                     Box::new(Lamp {
                         lit: descriptor.flag("lit"),
+                        states,
+                        power: rules.clone(),
+                    }),
+                );
+            }
+            n if n.ends_with("_trapdoor") => {
+                let Some(states) = trapdoor_pair(registry, descriptor) else { continue };
+                table.register(
+                    *id,
+                    Box::new(Trapdoor {
+                        powered: descriptor.flag("powered"),
                         states,
                         power: rules.clone(),
                     }),
@@ -1377,6 +1394,9 @@ fn is_full_cube(descriptor: &Descriptor) -> bool {
         | "minecraft:composter" => false,
         // A slab is a full cube only when doubled.
         n if n.ends_with("_slab") => descriptor.get("type") == Some("double"),
+        // A trapdoor is a 3/16 plate whatever its pose: never a full cube, so
+        // it neither conducts nor blocks hopper suction.
+        n if n.ends_with("_trapdoor") => false,
         "minecraft:redstone_wire"
         | "minecraft:redstone_torch"
         | "minecraft:redstone_wall_torch"
@@ -1581,6 +1601,16 @@ fn enabled_pair(registry: &StateRegistry, descriptor: &Descriptor) -> Option<Sta
     })
 }
 
+/// A trapdoor's power response sets `open` and `powered` together (see
+/// [`Trapdoor`]): off is both-false, on is both-true.
+fn trapdoor_pair(registry: &StateRegistry, descriptor: &Descriptor) -> Option<StatePair> {
+    let both = |value: &str| {
+        let opened = Descriptor::parse(&descriptor.with("open", value));
+        registry.get(&opened.with("powered", value))
+    };
+    Some(StatePair { off: both("false")?, on: both("true")? })
+}
+
 fn triggered_pair(registry: &StateRegistry, descriptor: &Descriptor) -> Option<StatePair> {
     Some(StatePair {
         off: registry.get(&descriptor.with("triggered", "false"))?,
@@ -1686,6 +1716,18 @@ pub fn intern_companions(registry: &mut StateRegistry) {
             }
             "minecraft:redstone_lamp" => {
                 vec![descriptor.with("lit", "false"), descriptor.with("lit", "true")]
+            }
+            // A trapdoor's power write flips `open` and `powered` together,
+            // but a structure may hold any of the four combinations.
+            n if n.ends_with("_trapdoor") => {
+                let mut variants = Vec::new();
+                for open in ["false", "true"] {
+                    let opened = Descriptor::parse(&descriptor.with("open", open));
+                    for powered in ["false", "true"] {
+                        variants.push(opened.with("powered", powered));
+                    }
+                }
+                variants
             }
             "minecraft:hopper" => {
                 vec![descriptor.with("enabled", "false"), descriptor.with("enabled", "true")]

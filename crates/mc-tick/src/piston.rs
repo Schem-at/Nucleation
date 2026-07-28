@@ -710,6 +710,58 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 // which carries UPDATE_KNOWN_SHAPE and so says nothing on its
                 // own. The notification comes from the tail pass below.
                 for pos in plan.to_destroy.clone() {
+                    // A destroyed shulker box drops itself with its slots
+                    // intact — `dropResources` through the box's loot table,
+                    // whose container component survives the break. Spawn
+                    // position and velocity are `Block.popResource` plus the
+                    // four-arg `ItemEntity` constructor: centre ±0.25 uniform
+                    // per axis (y also down half an item height), velocity
+                    // `(U*0.2-0.1, 0.2, U*0.2-0.1)`, pickup delay 10. With no
+                    // seeded rng, the distribution means. Other DESTROY blocks
+                    // (dust, torches) intentionally drop nothing yet — the
+                    // conformance goldens predate loot.
+                    let destroyed = ctx.world.get(pos);
+                    let is_shulker = ctx
+                        .states
+                        .descriptor(destroyed)
+                        .is_some_and(crate::vanilla::has_dynamic_shape);
+                    if is_shulker {
+                        let name = ctx
+                            .states
+                            .descriptor(destroyed)
+                            .map(|d| d.split('[').next().unwrap_or(d).to_string())
+                            .expect("checked above");
+                        let carried: Vec<crate::inventory::ItemStack> = ctx
+                            .inventories
+                            .remove(&pos)
+                            .map(|inv| inv.stacks)
+                            .unwrap_or_default();
+                        let (offset, vel) = if let Some(rng) = ctx.item_entities.rng.as_mut() {
+                            (
+                                [
+                                    rng.next_double_between(-0.25, 0.25),
+                                    rng.next_double_between(-0.25, 0.25) - 0.125,
+                                    rng.next_double_between(-0.25, 0.25),
+                                ],
+                                [
+                                    rng.next_double() * 0.2 - 0.1,
+                                    0.2,
+                                    rng.next_double() * 0.2 - 0.1,
+                                ],
+                            )
+                        } else {
+                            ([0.0, -0.125, 0.0], [0.0, 0.2, 0.0])
+                        };
+                        let spawn = [
+                            f64::from(pos.x) + 0.5 + offset[0],
+                            f64::from(pos.y) + 0.5 + offset[1],
+                            f64::from(pos.z) + 0.5 + offset[2],
+                        ];
+                        let entity = ctx.item_entities.spawn((name, 1), spawn, vel, 10);
+                        if !carried.is_empty() {
+                            ctx.item_entities.contents.insert(entity, carried);
+                        }
+                    }
                     ctx.set_quiet(pos, StateId::AIR);
                 }
                 for (from, state) in carried.iter().rev() {
