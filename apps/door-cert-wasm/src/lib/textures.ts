@@ -33,6 +33,9 @@ const INDEX_URL = "/pack/textures/index.json";
 const texUrl = (name: string) => `/pack/textures/${name}.png`;
 
 const REDSTONE_TINT = "#c22f21";
+/** Leaves ship greyscale and are tinted per biome at render time; plains
+ *  foliage is the sane default for a schematic with no world around it. */
+const FOLIAGE_TINT = "#79c05a";
 
 /* ---------------------------------------------------------------- index -- */
 
@@ -155,6 +158,10 @@ function candidates(name: string, face: Face): ResolvedTexture[] {
   }
 
   if (name.endsWith("_trapdoor")) push(name, "oak_trapdoor");
+  if (name.endsWith("_leaves")) out.push({ name, tint: FOLIAGE_TINT });
+  // "wood" is the six-sided log: it has no art of its own and wears the log's
+  // bark on every face (stripped variants included).
+  if (name.endsWith("_wood")) push(`${name.slice(0, -5)}_log`);
 
   // Generic resolution: face-specific first, then the plain name, then any
   // other face-ish suffix so e.g. furnace/side-only art still lands.

@@ -307,7 +307,7 @@ function WebglReplay({
           {playing ? "❚❚" : "▶"}
         </button>
         <span className="replay-readout">
-          t=<b ref={readoutRef}>000</b>/{simTicks}
+          tick <b ref={readoutRef}>000</b>/{simTicks}
         </span>
         <div className="replay-track">
           <input
@@ -335,52 +335,32 @@ function WebglReplay({
             ))}
           </div>
         </div>
-        <select
-          className="replay-speed"
-          value={speed}
-          aria-label="Replay speed"
-          onChange={(e) => {
-            const s = Number(e.target.value);
-            speedRef.current = s;
-            setSpeed(s);
-          }}
-        >
+        <span className="replay-rate">playback ×1 = in-game speed</span>
+        <div className="replay-speeds" role="group" aria-label="Playback speed">
           {SPEEDS.map((s) => (
-            <option key={s} value={s}>
+            <button
+              key={s}
+              type="button"
+              className={"replay-speed" + (s === speed ? " on" : "")}
+              aria-pressed={s === speed}
+              onClick={() => {
+                speedRef.current = s;
+                setSpeed(s);
+              }}
+            >
               {s}×
-            </option>
+            </button>
           ))}
-        </select>
+        </div>
       </div>
     </div>
   );
 }
 
-/** Primary WebGL replay with the classic isometric painter as a fallback
- * toggle (and automatic fallback when WebGL is unavailable). */
+/** The WebGL mesh replay. The isometric painter is kept only as an automatic
+ * fallback for browsers without a usable WebGL context. */
 export function MeshReplay({ replay, lever }: { replay: Replay; lever: Vec3 }) {
-  const [mode, setMode] = useState<"webgl" | "iso">("webgl");
   const [glFail, setGlFail] = useState<string | null>(null);
-  const iso = mode === "iso" || glFail !== null;
-
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
-        <button
-          className="replay-btn"
-          style={{ fontSize: 12, width: "auto", padding: "2px 10px" }}
-          onClick={() => setMode(iso ? "webgl" : "iso")}
-          disabled={glFail !== null}
-          data-testid="replay-mode-toggle"
-        >
-          {iso ? "▲ WebGL view" : "▤ classic iso view"}
-        </button>
-      </div>
-      {iso ? (
-        <VoxelReplay replay={replay} lever={lever} />
-      ) : (
-        <WebglReplay replay={replay} lever={lever} onFail={setGlFail} />
-      )}
-    </div>
-  );
+  if (glFail !== null) return <VoxelReplay replay={replay} lever={lever} />;
+  return <WebglReplay replay={replay} lever={lever} onFail={setGlFail} />;
 }

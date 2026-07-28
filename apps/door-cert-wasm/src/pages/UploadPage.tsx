@@ -131,15 +131,12 @@ export function UploadPage() {
               {error}
             </div>
           )}
-          <p className="bench-note">
-            simulated at 20 tps · deterministic seed · nucleation wasm, entirely in this tab
-          </p>
         </>
       )}
 
       {job && (
         <div className="steps" aria-live="polite">
-          <div className="steps-head">Certifying {job.file} · in-browser</div>
+          <div className="steps-head">Certifying {job.file}</div>
           {STEPS.map((s, i) => {
             const state = i < activeIdx ? "done" : i === activeIdx ? "active" : "todo";
             return (

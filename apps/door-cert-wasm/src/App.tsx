@@ -35,7 +35,6 @@ export default function App() {
             Door Certification <b>Bureau</b>
           </Link>
           <div className="topbar-side">
-            <span className="topbar-note">in-browser · wasm engine · 20 tps</span>
             <ThemeToggle />
           </div>
         </header>
