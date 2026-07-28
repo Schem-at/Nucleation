@@ -513,24 +513,35 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
   progress("measuring");
   let restBlocks: ReplayBlock[] = JSON.parse(sim.worldSnapshotJson());
   let restKey = snapshotKey(restBlocks);
+  const savedRest = restBlocks;
   let tRebase: number = sim.tickCount();
   // The change log is cumulative and already holds the placement writes, so
   // the measured cycle is everything appended from here on — a count, not a
   // tick filter, because settling can complete without advancing the clock.
   let logBase: number = (JSON.parse(sim.changesJson()) as ReplayChange[]).length;
   let cycle = runCycle();
-  let neededPriming = false;
-
-  if (snapshotKey(cycle.endBlocks) !== restKey) {
-    // Not at steady state when it was saved — that first cycle becomes the
-    // conditioning pass, and the door is measured from where it settled.
-    neededPriming = true;
+  // A door saved off its own cycle has to be run onto it before anything
+  // measured means much, and one lap is not always enough: a 4x4 vault saved
+  // with eight panels parked elsewhere lands 24 cells out after one cycle and
+  // only becomes periodic on the second. Keep cycling to a fixed point, with
+  // a cap — a machine that never repeats itself has genuinely not reset.
+  const MAX_PRIMING = 4;
+  let primingCycles = 0;
+  while (snapshotKey(cycle.endBlocks) !== restKey && primingCycles < MAX_PRIMING) {
+    primingCycles++;
     restBlocks = cycle.endBlocks;
     restKey = snapshotKey(restBlocks);
     tRebase = sim.tickCount();
     logBase = (JSON.parse(sim.changesJson()) as ReplayChange[]).length;
     cycle = runCycle();
   }
+  const neededPriming = primingCycles > 0;
+  // How far the saved state sits from the cycle the machine actually runs.
+  // Reported, never hidden: a schematic that does not reproduce its own
+  // resting state is a fact about the download, not a detail to smooth over.
+  const savedStateDrift = neededPriming
+    ? symmetricDiff(snapshotKey(savedRest), restKey)
+    : 0;
 
   const allChanges: ReplayChange[] = (
     JSON.parse(sim.changesJson()) as ReplayChange[]
@@ -686,6 +697,8 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
       cycles_per_minute: cyclesPerMinute,
       volume: w * h * l,
       needed_priming: neededPriming,
+      priming_cycles: primingCycles,
+      saved_state_drift: savedStateDrift,
     },
     replay: { blocks: restBlocks, changes, simTicks, flips },
   };

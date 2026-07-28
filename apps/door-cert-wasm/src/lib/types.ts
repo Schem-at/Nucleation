@@ -130,6 +130,10 @@ export type Certificate = {
   /** True when the door was saved mid-cycle and had to be run to its
    *  steady state before the measured cycle could start. */
   needed_priming: boolean;
+  /** Cycles needed before the machine repeated itself. */
+  priming_cycles: number;
+  /** Cells between the saved state and the cycle it settles into. */
+  saved_state_drift: number;
 };
 
 export type Vec3 = [number, number, number];
