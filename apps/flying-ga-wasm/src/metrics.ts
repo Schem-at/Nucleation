@@ -311,7 +311,156 @@ export const DEFAULT_OBJECTIVES: ObjectiveChoice[] = [
   { key: "speed", weight: 1, dir: "max" },
 ];
 
-export type OptimizeMode = "scalar" | "pareto";
+export type OptimizeMode = "scalar" | "pareto" | "map-elites";
+
+/* ------------------------------------------------ behaviour space (QD) --
+ * MAP-Elites needs a BEHAVIOUR characterization, which is a different job
+ * from an objective: it says where a machine sits in design space, not how
+ * good it is. Each dimension is a natural-unit readout with a fixed range
+ * so bins stay comparable across a run (and across runs). */
+
+export type BehaviourKey = "speed" | "size" | "period" | "compactness";
+
+export interface BehaviourDef {
+  key: BehaviourKey;
+  label: string;
+  unit: string;
+  hint: string;
+  value(m: EvalMetrics): number;
+  /** Inclusive lower / exclusive upper edge of the binned span. */
+  range(maxBlocks: number): [number, number];
+  fmt(v: number): string;
+}
+
+export const BEHAVIOURS: Record<BehaviourKey, BehaviourDef> = {
+  speed: {
+    key: "speed",
+    label: "speed",
+    unit: "blk/s",
+    hint: "center-of-mass velocity — bin 0 is the grounded column",
+    value: (m) => m.speed,
+    range: () => [0, 3],
+    fmt: f2,
+  },
+  size: {
+    key: "size",
+    label: "size",
+    unit: "blocks",
+    hint: "non-air block count",
+    value: (m) => m.blocks,
+    range: (maxBlocks) => [0, Math.max(2, maxBlocks) + 1],
+    fmt: f0,
+  },
+  period: {
+    key: "period",
+    label: "gait period",
+    unit: "ticks",
+    hint: "detected flight period — measured only when a run asks for it",
+    value: (m) => m.period ?? 0,
+    range: () => [0, 40],
+    fmt: f0,
+  },
+  compactness: {
+    key: "compactness",
+    label: "compactness",
+    unit: "fill ratio",
+    hint: "blocks / bounding volume",
+    value: (m) => (m.volume > 0 ? m.blocks / m.volume : 0),
+    range: () => [0, 1],
+    fmt: f2,
+  },
+};
+
+export const BEHAVIOUR_ORDER: BehaviourKey[] = [
+  "speed",
+  "size",
+  "period",
+  "compactness",
+];
+
+/** How an archive cell ranks its incumbent against a challenger. Kept
+ * separate from the behaviour space: quality is the "elite" test, the
+ * behaviour dims only decide which cells compete. */
+export type QualityKey = "displacement" | "speed" | "efficiency";
+
+export interface QualityDef {
+  key: QualityKey;
+  label: string;
+  unit: string;
+  value(m: EvalMetrics): number;
+  fmt(v: number): string;
+}
+
+export const QUALITIES: Record<QualityKey, QualityDef> = {
+  displacement: {
+    key: "displacement",
+    label: "displacement",
+    unit: "blocks",
+    value: (m) => Math.max(0, m.fit),
+    fmt: (v) => v.toFixed(1),
+  },
+  speed: {
+    key: "speed",
+    label: "speed",
+    unit: "blk/s",
+    value: (m) => Math.max(0, m.speed),
+    fmt: f2,
+  },
+  efficiency: {
+    key: "efficiency",
+    label: "efficiency",
+    unit: "blk/s per block",
+    value: (m) => (m.blocks > 0 ? Math.max(0, m.speed / m.blocks) : 0),
+    fmt: (v) => v.toFixed(3),
+  },
+};
+
+export const QUALITY_ORDER: QualityKey[] = [
+  "displacement",
+  "speed",
+  "efficiency",
+];
+
+/** The archive geometry + elite test for a MAP-Elites run. */
+export interface MapElitesSpec {
+  x: BehaviourKey;
+  y: BehaviourKey;
+  binsX: number;
+  binsY: number;
+  quality: QualityKey;
+}
+
+export const DEFAULT_MAP_ELITES: MapElitesSpec = {
+  x: "speed",
+  y: "size",
+  binsX: 20,
+  binsY: 12,
+  quality: "displacement",
+};
+
+export const MAP_ELITES_BIN_MIN = 4;
+export const MAP_ELITES_BIN_MAX = 40;
+
+export function normalizeSpec(s: Partial<MapElitesSpec> | undefined | null): MapElitesSpec {
+  const clampBins = (v: number | undefined, d: number) =>
+    Number.isFinite(v)
+      ? Math.max(MAP_ELITES_BIN_MIN, Math.min(MAP_ELITES_BIN_MAX, Math.round(v as number)))
+      : d;
+  const x = s?.x && BEHAVIOURS[s.x] ? s.x : DEFAULT_MAP_ELITES.x;
+  let y = s?.y && BEHAVIOURS[s.y] ? s.y : DEFAULT_MAP_ELITES.y;
+  // Two axes of the same readout would collapse the grid to a diagonal.
+  if (y === x) y = BEHAVIOUR_ORDER.find((k) => k !== x)!;
+  return {
+    x,
+    y,
+    binsX: clampBins(s?.binsX, DEFAULT_MAP_ELITES.binsX),
+    binsY: clampBins(s?.binsY, DEFAULT_MAP_ELITES.binsY),
+    quality:
+      s?.quality && QUALITIES[s.quality]
+        ? s.quality
+        : DEFAULT_MAP_ELITES.quality,
+  };
+}
 
 /* ------------------------------------------------------- scalar fitness */
 

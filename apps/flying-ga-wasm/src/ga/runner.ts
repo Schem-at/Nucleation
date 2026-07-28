@@ -28,15 +28,20 @@ import {
   effectiveConstraints,
   impliedGateBy,
   naturalDir,
+  normalizeSpec,
   nsgaSelectionFitness,
   paretoFrontIdx,
   scalarFitness,
   zeroMetrics,
+  BEHAVIOURS,
   OBJECTIVES,
+  QUALITIES,
   type Constraints,
   type EvalMetrics,
+  type MapElitesSpec,
   type ObjectiveChoice,
 } from "../metrics";
+import { MapElitesArchive, type GridSnapshot } from "./mapelites";
 import { ALPHABET } from "./alphabet";
 import {
   crossover,
@@ -52,6 +57,9 @@ import { Rng } from "./rng";
 import { SpeciesTracker } from "./species";
 
 const ELITISM = 2;
+/** map-elites: share of offspring bred by crossing two archive cells; the
+ * rest are single-parent mutations. */
+const MAP_ELITES_CROSSOVER_RATE = 0.5;
 const TOURNAMENT_K = 3;
 const LEADERBOARD_SIZE = 10;
 const EVENTS_PER_GEN_CAP = 6;
@@ -107,8 +115,11 @@ export interface GenerationUpdate {
   evalsPerSec: number;
   leaderboard: LeaderboardEntry[];
   newBest: BestRecord | null;
-  /** Non-dominated archive (pareto mode; empty in scalar mode). */
+  /** Non-dominated front (pareto) or archive elites (map-elites); empty in
+   * scalar mode. */
   archive: LeaderboardEntry[];
+  /** The illuminated behaviour grid (map-elites only, else null). */
+  grid: GridSnapshot | null;
   /** This generation's valid, flying machines — the scatter cloud. */
   cloud: EvalMetrics[];
   /** New slowest sustained flier of the run (null when unbeaten). */
@@ -137,6 +148,9 @@ export interface LiveConfigPatch {
   mutationRate: number;
   /** Active schedule; a mid-run change re-anchors it at the current gen. */
   mutationSchedule: MutationSchedule;
+  /** map-elites geometry. A mid-run change RE-BINS the archive's machines
+   * into the new grid — discoveries survive a dimension or bin change. */
+  mapElites?: MapElitesSpec;
 }
 
 export interface RunnerCallbacks {
@@ -362,6 +376,7 @@ export class GaRunner {
         targetPeriod: cfg.targetPeriod ?? null,
         mutationRate: cfg.mutation_rate,
         mutationSchedule: cfg.mutationSchedule ?? { kind: "constant" },
+        mapElites: normalizeSpec(cfg.mapElites),
       };
       // Mutation-rate schedule state (see the constants block up top).
       const sched = {
@@ -430,6 +445,19 @@ export class GaRunner {
       pop = pop.slice(0, cfg.population);
 
       const pareto = cfg.mode === "pareto";
+      const mapElites = cfg.mode === "map-elites";
+      // The behaviour archive IS the population in map-elites mode: parents
+      // come from it, not from a ranked generation.
+      let gridMaxBlocks = live.constraints.maxBlocks;
+      const grid = new MapElitesArchive(
+        live.mapElites ?? normalizeSpec(null),
+        gridMaxBlocks,
+      );
+      // Lineage for archive parents: an elite may be many generations old,
+      // so its species tag can't be read off the current population.
+      const eliteSpecies = new Map<string, number>();
+      const specLabel = (s: MapElitesSpec) =>
+        `${BEHAVIOURS[s.x].label}×${BEHAVIOURS[s.y].label} ${s.binsX}×${s.binsY} on ${QUALITIES[s.quality].label}`;
       const tracker = new SpeciesTracker();
       let parentSpecies: Array<number | null> = pop.map(() => null);
       const retired: RetiredEntry[] = [];
@@ -484,7 +512,9 @@ export class GaRunner {
             gen,
             kind: "run",
             at: Date.now(),
-            text: `run started — ${cfg.mode} mode on ${labelOf()}, ${seeding} seed, pop ${cfg.population}`,
+            text: mapElites
+              ? `run started — map-elites on ${specLabel(grid.spec)}, ${seeding} seed, ${cfg.population} evals/gen`
+              : `run started — ${cfg.mode} mode on ${labelOf()}, ${seeding} seed, pop ${cfg.population}`,
           });
         }
 
@@ -549,6 +579,27 @@ export class GaRunner {
               text: `mutation schedule set @ gen ${gen}: ${describeSchedule(sched.schedule)} from ${sched.anchorRate.toFixed(3)}`,
             });
           }
+          // Behaviour grid: a dimension / bin-count / quality change REBUILDS
+          // the grid from the machines the archive is already holding. The
+          // run's discoveries are re-binned, never thrown away.
+          if (mapElites) {
+            const next = normalizeSpec(patch.mapElites ?? grid.spec);
+            // The size axis is scaled by the block cap, so moving the cap is
+            // also a grid geometry change.
+            const capMoved = live.constraints.maxBlocks !== gridMaxBlocks;
+            if (capMoved || JSON.stringify(next) !== JSON.stringify(grid.spec)) {
+              gridMaxBlocks = live.constraints.maxBlocks;
+              const before = grid.size;
+              const { kept, merged } = grid.rebin(next, live.constraints.maxBlocks);
+              live.mapElites = next;
+              events.push({
+                gen,
+                kind: "config",
+                at: Date.now(),
+                text: `behaviour grid rebuilt @ gen ${gen}: ${specLabel(next)} — ${before} machines re-binned into ${kept} cells${merged > 0 ? ` (${merged} merged)` : ""}`,
+              });
+            }
+          }
           // Re-rank the leaderboard under the new regime (scalar scores are
           // recomputable from stored metrics; pareto ranks by speed).
           if (!pareto) {
@@ -576,6 +627,24 @@ export class GaRunner {
           // crowns the best machine under the NEW objective vector, instead
           // of the stage forever showing the old regime's record holder.
           if (objChanged || conDiffs.length > 0) bestEver = -Infinity;
+          // Behaviour grid: elites the new constraints reject vacate their
+          // cell onto the retired shelf; the cell re-opens for a fresh
+          // machine that does qualify.
+          if (mapElites) {
+            const gone = grid.evict((e) =>
+              storedViolation(e, effC, live.targetPeriod),
+            );
+            for (const g of gone) {
+              retired.push({ entry: g.entry, reason: g.reason, atGen: gen });
+              if (events.length < EVENTS_PER_GEN_CAP)
+                events.push({
+                  gen,
+                  kind: "retired",
+                  at: Date.now(),
+                  text: `cell vacated — ${g.entry.name ?? g.entry.id}: ${g.reason}`,
+                });
+            }
+          }
           // Archive: entries invalid under the new constraints move to the
           // retired shelf (they don't vanish); the survivors are re-pruned
           // under the new dominance.
@@ -649,7 +718,11 @@ export class GaRunner {
         // Leaderboard: best score seen per distinct genome.
         pop.forEach((g, i) => {
           const m = metrics[i];
-          const rankScore = pareto ? m.speed : scalars[i];
+          const rankScore = pareto
+            ? m.speed
+            : mapElites
+              ? grid.qualityOf(m)
+              : scalars[i];
           if (m.violation || m.fit <= 0) return;
           const key = genomeKey(g);
           const prev = board.get(key);
@@ -715,6 +788,36 @@ export class GaRunner {
           });
         }
 
+        // MAP-Elites: every evaluated machine is offered to its behaviour
+        // cell. Illuminating a NEW cell counts as much as improving an old
+        // one — that is what keeps stepping stones in the breeding pool.
+        let newCells = 0;
+        let improvedCells = 0;
+        if (mapElites) {
+          for (let i = 0; i < pop.length; i++) {
+            const m = metrics[i];
+            if (m.violation || !grid.wouldAccept(m)) continue;
+            const q = grid.qualityOf(m);
+            const r = grid.place(mkEntry(pop[i], m, gen, q), m);
+            if (r === "new") newCells++;
+            else if (r === "improved") improvedCells++;
+            if (r) {
+              const sid = tracker.ids[i];
+              if (sid != null) {
+                if (eliteSpecies.size > 20_000) eliteSpecies.clear();
+                eliteSpecies.set(genomeKey(pop[i]), sid);
+              }
+            }
+          }
+          if (newCells > 0 && events.length < EVENTS_PER_GEN_CAP)
+            events.push({
+              gen,
+              kind: "elite",
+              at: Date.now(),
+              text: `${newCells} new cell${newCells === 1 ? "" : "s"} illuminated — archive ${grid.size}/${grid.total} (${((100 * grid.size) / grid.total).toFixed(1)} %)`,
+            });
+        }
+
         // New slowpoke? Slowest sustained flier of the run — the machine
         // that still propels itself in the back half of the window at the
         // lowest blk/s. Feeds the Slowpoke plinth even when the run's
@@ -748,7 +851,13 @@ export class GaRunner {
         // record holder could never be dethroned by a smaller flier).
         // Pareto mode keeps the physical displacement champion; its real
         // product is the front, not one machine.
-        const champScores = pareto ? fits : scalars;
+        // MAP-Elites has no single objective, so the stage champion follows
+        // the archive's quality measure — the same number the grid is lit by.
+        const champScores = mapElites
+          ? metrics.map((m) => (m.violation ? 0 : grid.qualityOf(m)))
+          : pareto
+            ? fits
+            : scalars;
         let newBest: BestRecord | null = null;
         const champTop = Math.max(...champScores);
         if (champTop > 0 && champTop > bestEver + 1e-9) {
@@ -776,7 +885,9 @@ export class GaRunner {
         // Mutation-rate schedule step. "Success" for the adaptive 1/5th
         // rule: this generation set a new run champion or grew the archive.
         {
-          const grewArchive = events.some((e) => e.kind === "pareto");
+          const grewArchive = mapElites
+            ? newCells > 0 || improvedCells > 0
+            : events.some((e) => e.kind === "pareto");
           sched.successes.push(newBest !== null || grewArchive);
           if (sched.successes.length > ADAPT_WINDOW) sched.successes.shift();
           if (
@@ -814,21 +925,32 @@ export class GaRunner {
           };
         });
 
+        const gridSnap = mapElites ? grid.snapshot() : null;
+
         cb.onGeneration({
           gen,
           point: {
             gen,
             best: Math.round(best * 100) / 100,
             mean: Math.round(mean * 100) / 100,
+            ...(gridSnap
+              ? {
+                  fill: Math.round(gridSnap.fillRate * 1e4) / 1e4,
+                  qd: gridSnap.qdScore,
+                }
+              : {}),
           },
           evalsPerSec: Math.round(emaEps),
           leaderboard: top,
           newBest,
           mutationRate: Math.round(mutRate * 1e4) / 1e4,
           population,
-          archive: pareto
-            ? [...archive.values()].sort((a, b) => (b.speed ?? 0) - (a.speed ?? 0))
-            : [],
+          grid: gridSnap,
+          archive: mapElites
+            ? grid.elites()
+            : pareto
+              ? [...archive.values()].sort((a, b) => (b.speed ?? 0) - (a.speed ?? 0))
+              : [],
           cloud: metrics.filter((m) => !m.violation && m.fit > 0.5),
           slowpoke,
           events,
@@ -839,28 +961,57 @@ export class GaRunner {
         // Next generation: elitism + tournament/uniform-crossover/mutation.
         // Parent-A's species tags each child for lineage tracking.
         const cap = live.constraints.maxBlocks;
-        const order = selFits
-          .map((_, i) => i)
-          .sort((a, b) => selFits[b] - selFits[a]);
         const nxt: Genome[] = [];
         const nextParents: Array<number | null> = [];
-        for (const i of order.slice(0, ELITISM)) {
-          nxt.push(pop[i]);
-          nextParents.push(tracker.ids[i] ?? null);
-        }
-        while (nxt.length < cfg.population) {
-          const ia = tourneyIdx(selFits, rng, TOURNAMENT_K);
-          const ib = tourneyIdx(selFits, rng, TOURNAMENT_K);
-          nxt.push(
-            mutate(
-              crossover(pop[ia], pop[ib], rng, cap),
-              mutRate,
-              rng,
-              cfg.bbox,
-              cap,
-            ),
-          );
-          nextParents.push(tracker.ids[ia] ?? null);
+        if (mapElites) {
+          // Parents drawn UNIFORMLY from filled cells — no rank, no
+          // tournament. The archive already did the selecting by refusing
+          // to let two machines share a behaviour cell, so a lone occupant
+          // of a weird cell breeds exactly as often as the fastest flier.
+          // No elitism either: the cells are the elites.
+          while (nxt.length < cfg.population) {
+            const a = grid.sample(rng);
+            const b = grid.sample(rng);
+            if (!a || !b) {
+              nxt.push(randomGenome(cfg.bbox, rng, cap));
+              nextParents.push(null);
+              continue;
+            }
+            // Half the batch is single-parent mutation, half is crossover.
+            // A behaviour archive routinely pairs a 1-block cell with a
+            // 14-block one, and splicing those two is destructive — the
+            // mutation-only half is what carries a lineage forward intact.
+            const child =
+              rng.next() < MAP_ELITES_CROSSOVER_RATE
+                ? crossover(a.entry.genome, b.entry.genome, rng, cap)
+                : a.entry.genome;
+            nxt.push(mutate(child, mutRate, rng, cfg.bbox, cap));
+            nextParents.push(
+              eliteSpecies.get(genomeKey(a.entry.genome)) ?? null,
+            );
+          }
+        } else {
+          const order = selFits
+            .map((_, i) => i)
+            .sort((a, b) => selFits[b] - selFits[a]);
+          for (const i of order.slice(0, ELITISM)) {
+            nxt.push(pop[i]);
+            nextParents.push(tracker.ids[i] ?? null);
+          }
+          while (nxt.length < cfg.population) {
+            const ia = tourneyIdx(selFits, rng, TOURNAMENT_K);
+            const ib = tourneyIdx(selFits, rng, TOURNAMENT_K);
+            nxt.push(
+              mutate(
+                crossover(pop[ia], pop[ib], rng, cap),
+                mutRate,
+                rng,
+                cfg.bbox,
+                cap,
+              ),
+            );
+            nextParents.push(tracker.ids[ia] ?? null);
+          }
         }
         pop = nxt;
         parentSpecies = nextParents;

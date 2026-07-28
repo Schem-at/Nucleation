@@ -11,6 +11,7 @@ const KIND_TAG: Record<EvolutionEvent["kind"], string> = {
   run: "run",
   champion: "champ",
   pareto: "front",
+  elite: "cell",
   slowpoke: "slow",
   config: "cfg",
   retired: "shelf",

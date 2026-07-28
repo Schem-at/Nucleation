@@ -4,6 +4,12 @@
 
 import type { BestRecord, HistoryPoint, RunRecord } from "./types";
 
+/** Elites kept when persisting a map-elites run. A 40×40 grid can hold
+ * 1600 machines; storing every block list blows the localStorage quota, so
+ * the archive is truncated to its highest-quality cells (the list arrives
+ * sorted) and the grid drops the cells whose machine went with them. */
+const ARCHIVE_PERSIST_CAP = 600;
+
 const INDEX_KEY = "fgaw:runs";
 const runKey = (id: string) => `fgaw:run:${id}`;
 
@@ -49,13 +55,19 @@ export function decimateHistory(h: HistoryPoint[], cap = 2000): HistoryPoint[] {
   for (let i = 0; i < h.length; i += stride) {
     // Bucket: keep max best + avg mean, stamped at the bucket's last gen.
     const bucket = h.slice(i, i + stride);
+    // QD measures are cumulative archive state, so the bucket's LAST value
+    // is the correct representative (a max would be identical for a
+    // monotone series but would lie after a mid-run grid rebuild).
+    const tail = bucket[bucket.length - 1];
     out.push({
-      gen: bucket[bucket.length - 1].gen,
+      gen: tail.gen,
       best: Math.max(...bucket.map((p) => p.best)),
       mean:
         Math.round(
           (bucket.reduce((a, p) => a + p.mean, 0) / bucket.length) * 100,
         ) / 100,
+      ...(tail.qd !== undefined ? { qd: tail.qd } : {}),
+      ...(tail.fill !== undefined ? { fill: tail.fill } : {}),
     });
   }
   if (out[out.length - 1].gen !== h[h.length - 1].gen)
@@ -80,6 +92,15 @@ export function saveRun(rec: RunRecord): void {
     history: decimateHistory(rec.history),
     bests: slimBests(rec.bests),
   };
+  if (rec.grid && (rec.archive?.length ?? 0) > ARCHIVE_PERSIST_CAP) {
+    const keep = rec.archive!.slice(0, ARCHIVE_PERSIST_CAP);
+    const ids = new Set(keep.map((e) => e.id));
+    slim.archive = keep;
+    slim.grid = {
+      ...rec.grid,
+      cells: rec.grid.cells.filter((c) => ids.has(c.id)),
+    };
+  }
   if (!safeSet(runKey(rec.id), slim)) {
     // Quota: drop oldest runs, retry once.
     const runs = listRuns().sort((a, b) => a.startedAt - b.startedAt);

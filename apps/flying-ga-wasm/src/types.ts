@@ -1,8 +1,10 @@
 import type { CastMember } from "./cast";
 import type { BBox, Genome } from "./ga/genome";
+import type { GridSnapshot } from "./ga/mapelites";
 import type {
   Constraints,
   EvalMetrics,
+  MapElitesSpec,
   ObjectiveChoice,
   OptimizeMode,
 } from "./metrics";
@@ -54,6 +56,8 @@ export interface RunConfig {
   /** Mutation-rate schedule; absent on records stored by older versions
    * (those ran a constant rate). */
   mutationSchedule?: MutationSchedule;
+  /** Behaviour-grid geometry + elite test; used only in map-elites mode. */
+  mapElites?: MapElitesSpec;
 }
 
 export interface Block {
@@ -85,6 +89,10 @@ export interface HistoryPoint {
   best: number;
   /** Mean displacement fitness (blocks) this generation. */
   mean: number;
+  /** map-elites only: archive fill rate (0..1) after this generation. */
+  fill?: number;
+  /** map-elites only: QD-score (sum of cell qualities) after this gen. */
+  qd?: number;
 }
 
 /** One line in the live evolution events feed. */
@@ -94,6 +102,7 @@ export interface EvolutionEvent {
     | "run"
     | "champion"
     | "pareto"
+    | "elite"
     | "slowpoke"
     | "config"
     | "retired"
@@ -206,8 +215,12 @@ export interface RunRecord {
   leaderboard: LeaderboardEntry[];
   bests: BestRecord[];
   generation: number;
-  /** Pareto archive: non-dominated machines across all generations. */
+  /** Pareto front (pareto mode) or archive elites (map-elites mode):
+   * the machines the archive is holding, across all generations. */
   archive?: LeaderboardEntry[];
+  /** map-elites only: the illuminated grid — cell coordinates, qualities
+   * and the id of the elite in each. Machines live in `archive`. */
+  grid?: GridSnapshot;
   /** Evolution events feed (newest last, capped). */
   events?: EvolutionEvent[];
   /** Archive entries shelved by mid-run reconfigurations. */

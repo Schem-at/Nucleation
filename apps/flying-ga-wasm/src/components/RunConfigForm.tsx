@@ -10,13 +10,24 @@ import { PLACEABLE_KINDS } from "../ga/alphabet";
 import {
   impliedGateBy,
   naturalDir,
+  normalizeSpec,
+  BEHAVIOURS,
+  BEHAVIOUR_ORDER,
+  DEFAULT_MAP_ELITES,
+  MAP_ELITES_BIN_MAX,
+  MAP_ELITES_BIN_MIN,
   OBJECTIVES,
   OBJECTIVE_ORDER,
+  QUALITIES,
+  QUALITY_ORDER,
+  type BehaviourKey,
   type Constraints,
+  type MapElitesSpec,
   type ObjectiveChoice,
   type ObjectiveDir,
   type ObjectiveKey,
   type OptimizeMode,
+  type QualityKey,
 } from "../metrics";
 import type { LiveConfigPatch } from "../ga/runner";
 import type {
@@ -115,6 +126,11 @@ export default function RunConfigForm({
   const [workers, setWorkers] = useState(4);
 
   const [mode, setMode] = useState<OptimizeMode>("scalar");
+  const [beX, setBeX] = useState<BehaviourKey>(DEFAULT_MAP_ELITES.x);
+  const [beY, setBeY] = useState<BehaviourKey>(DEFAULT_MAP_ELITES.y);
+  const [binsX, setBinsX] = useState(DEFAULT_MAP_ELITES.binsX);
+  const [binsY, setBinsY] = useState(DEFAULT_MAP_ELITES.binsY);
+  const [quality, setQuality] = useState<QualityKey>(DEFAULT_MAP_ELITES.quality);
   const [seeding, setSeeding] = useState<SeedMode>("minimal");
   const [objs, setObjs] = useState<ObjState>(initialObjectives);
   const [maxBlocks, setMaxBlocks] = useState(14);
@@ -212,6 +228,9 @@ export default function RunConfigForm({
     };
   };
 
+  const buildSpec = (): MapElitesSpec =>
+    normalizeSpec({ x: beX, y: beY, binsX, binsY, quality });
+
   const buildSchedule = (): MutationSchedule => {
     if (schedKind === "linear")
       return { kind: "linear", spanGens: posInt(spanGens, 120) };
@@ -245,6 +264,7 @@ export default function RunConfigForm({
       objectives: buildObjectives(),
       constraints: buildConstraints(),
       targetPeriod: targetPeriodVal(),
+      mapElites: buildSpec(),
     });
   };
 
@@ -257,6 +277,7 @@ export default function RunConfigForm({
     targetPeriod: targetPeriodVal(),
     mutationRate,
     mutationSchedule: buildSchedule(),
+    mapElites: buildSpec(),
   });
   const sentRef = useRef<string | null>(null);
   useEffect(() => {
@@ -297,13 +318,19 @@ export default function RunConfigForm({
   const reads: Record<GroupId, string> = {
     run: `pop ${population} · ${generations.trim() === "" ? "∞" : generations} gens · ${workers}w`,
     genome: `${bx}·${by}·${bz} · ${seeding}`,
-    objectives: `${
-      checkedKeys.length > 0
-        ? checkedKeys
-            .map((k) => `${OBJECTIVES[k].label}${objs[k].dir === "max" ? "↑" : "↓"}`)
-            .join(" + ")
-        : "speed↑"
-    } · ${mode}`,
+    objectives:
+      mode === "map-elites"
+        ? `map-elites · ${BEHAVIOURS[beX].label}×${BEHAVIOURS[beY].label} ${binsX}×${binsY}`
+        : `${
+            checkedKeys.length > 0
+              ? checkedKeys
+                  .map(
+                    (k) =>
+                      `${OBJECTIVES[k].label}${objs[k].dir === "max" ? "↑" : "↓"}`,
+                  )
+                  .join(" + ")
+              : "speed↑"
+          } · ${mode}`,
     constraints: `${minBlocks}–${maxBlocks} blk${extraConstraints > 0 ? ` · ${extraConstraints} more` : ""}`,
     schedules: `${schedKind} · ${nowRate.toFixed(3)}`,
     advanced: `seed ${seed} · ${evalTicks}t`,
@@ -455,7 +482,106 @@ export default function RunConfigForm({
               >
                 Pareto
               </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={mode === "map-elites"}
+                className={mode === "map-elites" ? "on" : ""}
+                onClick={() => setMode("map-elites")}
+                disabled={running}
+                data-testid="mode-map-elites"
+              >
+                MAP-Elites
+              </button>
             </div>
+            {mode === "map-elites" && (
+              <div className="me-config" data-testid="me-config">
+                <p className="hint">
+                  Every machine is filed by BEHAVIOUR, one per cell, and parents
+                  are drawn evenly from the filled cells. Slow and strange
+                  designs keep breeding instead of being out-competed — that is
+                  what turns them into stepping stones toward fliers.
+                </p>
+                <div className="row2">
+                  <div className="field">
+                    <label htmlFor="cfg-be-x">Grid across</label>
+                    <select
+                      id="cfg-be-x"
+                      value={beX}
+                      onChange={(e) => setBeX(e.target.value as BehaviourKey)}
+                      data-testid="cfg-be-x"
+                    >
+                      {BEHAVIOUR_ORDER.filter((k) => k !== beY).map((k) => (
+                        <option key={k} value={k}>
+                          {BEHAVIOURS[k].label} ({BEHAVIOURS[k].unit})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="cfg-be-y">Grid up</label>
+                    <select
+                      id="cfg-be-y"
+                      value={beY}
+                      onChange={(e) => setBeY(e.target.value as BehaviourKey)}
+                      data-testid="cfg-be-y"
+                    >
+                      {BEHAVIOUR_ORDER.filter((k) => k !== beX).map((k) => (
+                        <option key={k} value={k}>
+                          {BEHAVIOURS[k].label} ({BEHAVIOURS[k].unit})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="row2">
+                  <div className="field">
+                    <label htmlFor="cfg-bins-x">Bins across ({binsX})</label>
+                    <input
+                      id="cfg-bins-x"
+                      data-testid="cfg-bins-x"
+                      type="range"
+                      min={MAP_ELITES_BIN_MIN}
+                      max={MAP_ELITES_BIN_MAX}
+                      value={binsX}
+                      onChange={num(setBinsX)}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="cfg-bins-y">Bins up ({binsY})</label>
+                    <input
+                      id="cfg-bins-y"
+                      data-testid="cfg-bins-y"
+                      type="range"
+                      min={MAP_ELITES_BIN_MIN}
+                      max={MAP_ELITES_BIN_MAX}
+                      value={binsY}
+                      onChange={num(setBinsY)}
+                    />
+                  </div>
+                </div>
+                <div className="field">
+                  <label htmlFor="cfg-quality">Cell keeps its best by</label>
+                  <select
+                    id="cfg-quality"
+                    value={quality}
+                    onChange={(e) => setQuality(e.target.value as QualityKey)}
+                    data-testid="cfg-quality"
+                  >
+                    {QUALITY_ORDER.map((k) => (
+                      <option key={k} value={k}>
+                        {QUALITIES[k].label} ({QUALITIES[k].unit})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="hint">
+                  {binsX * binsY} cells. Changing dimensions or bins mid-run
+                  re-bins the machines the archive already holds — nothing is
+                  discarded.
+                </p>
+              </div>
+            )}
             {OBJECTIVE_ORDER.map((k) => {
               const def = OBJECTIVES[k];
               const inverted = objs[k].dir !== naturalDir(k);
@@ -533,11 +659,13 @@ export default function RunConfigForm({
               </button>
             )}
             <p className="hint">
-              {mode === "pareto"
-                ? checkedKeys.length === 2
-                  ? "Pareto: front of trade-offs, archived across generations."
-                  : "Pick exactly 2 objectives to plot the front (archive still works)."
-                : "Weighted sum of the checked objectives (fliers only)."}
+              {mode === "map-elites"
+                ? "MAP-Elites ignores the weights for selection — the checked objectives still rank the leaderboard and set the implied flight gates."
+                : mode === "pareto"
+                  ? checkedKeys.length === 2
+                    ? "Pareto: front of trade-offs, archived across generations."
+                    : "Pick exactly 2 objectives to plot the front (archive still works)."
+                  : "Weighted sum of the checked objectives (fliers only)."}
             </p>
             {objs.robustness.on && (
               <p className="hint">robustness re-flies each machine — slower evals.</p>

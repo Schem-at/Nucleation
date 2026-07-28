@@ -6,8 +6,10 @@ import FlightLoop from "./components/FlightLoop";
 import HallOfFame from "./components/HallOfFame";
 import Leaderboard from "./components/Leaderboard";
 import MachineViewer from "./components/MachineViewer";
+import MapElitesGrid from "./components/MapElitesGrid";
 import ParetoChart from "./components/ParetoChart";
 import PopulationInspector from "./components/PopulationInspector";
+import QdChart from "./components/QdChart";
 import RunConfigForm from "./components/RunConfigForm";
 import RunHistory from "./components/RunHistory";
 import LineageView from "./components/LineageView";
@@ -17,12 +19,16 @@ import {
   type LiveConfigPatch,
 } from "./ga/runner";
 import type { BBox } from "./ga/genome";
+import type { GridCell, GridSnapshot } from "./ga/mapelites";
 import { clearHof, considerForHof, loadHof, type Hof, type HofEntry } from "./hof";
 import {
   dirOf,
+  normalizeSpec,
   speedOf,
   withConfigDefaults,
+  BEHAVIOURS,
   OBJECTIVES,
+  QUALITIES,
   type EvalMetrics,
   type ObjectiveChoice,
 } from "./metrics";
@@ -61,6 +67,9 @@ function useTheme() {
 
 const SAVE_EVERY_MS = 4000;
 const EVENTS_CAP = 120;
+/** Archive entries offered to the Hall of Fame each generation (best
+ * first). Bounded because a map-elites grid can hold 1600 elites. */
+const HOF_CANDIDATE_CAP = 64;
 /** UI reflection cadence during a run. Rendering every generation put the
  *  chart/inspector reconcile on the same thread the runner schedules from
  *  and measurably throttled evolution; ~3 Hz is visually indistinguishable. */
@@ -104,6 +113,7 @@ export default function App() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [bests, setBests] = useState<BestRecord[]>([]);
   const [archive, setArchive] = useState<LeaderboardEntry[]>([]);
+  const [grid, setGrid] = useState<GridSnapshot | null>(null);
   const [cloud, setCloud] = useState<EvalMetrics[]>([]);
   const [events, setEvents] = useState<EvolutionEvent[]>([]);
   const [retired, setRetired] = useState<RetiredEntry[]>([]);
@@ -211,6 +221,7 @@ export default function App() {
       setLeaderboard([]);
       setBests([]);
       setArchive([]);
+      setGrid(null);
       setCloud([]);
       setEvents([]);
       setRetired([]);
@@ -237,6 +248,7 @@ export default function App() {
         leaderboard: [],
         bests: [],
         archive: [],
+        grid: undefined,
         events: [],
         retired: [],
         species: { info: [], points: [] },
@@ -244,6 +256,12 @@ export default function App() {
         generation: 0,
       };
       recRef.current = rec;
+
+      // Test introspection (verify scripts): the exact QD trajectory, pushed
+      // every generation. Cheap — three numbers, no array copies.
+      const qdTrace: Array<{ gen: number; qd: number; fill: number; filled: number }> =
+        [];
+      (window as unknown as { __fgaQd?: unknown }).__fgaQd = qdTrace;
 
       /** Append an app-side event (pause/resume) to feed + record. */
       const pushEvent = (e: EvolutionEvent) => {
@@ -268,6 +286,7 @@ export default function App() {
         setHistory(rec.history.slice());
         setLeaderboard(v.leaderboard);
         setArchive(v.archive);
+        setGrid(v.grid);
         setCloud(v.cloud);
         setRetired(v.retired);
         setSpeciesInfo(rec.species!.info);
@@ -308,6 +327,14 @@ export default function App() {
           rec.history.push(u.point);
           rec.leaderboard = u.leaderboard;
           rec.archive = u.archive;
+          rec.grid = u.grid ?? undefined;
+          if (u.grid)
+            qdTrace.push({
+              gen: u.gen,
+              qd: u.grid.qdScore,
+              fill: u.grid.fillRate,
+              filled: u.grid.filled,
+            });
           rec.retired = u.retired;
           // Both are initialised in the record literal above; the record type
           // keeps them optional for old stored runs.
@@ -321,9 +348,12 @@ export default function App() {
           // Challenge the Hall of Fame with everything notable this gen —
           // including the run's newest slowpoke, which may sit far below
           // the leaderboard when the run is chasing speed.
+          // A map-elites archive can hold well over a thousand elites; the
+          // list arrives best-quality-first, so the head is the only part
+          // that could plausibly win a Hall of Fame plinth.
           const cands = [
             ...u.leaderboard,
-            ...u.archive,
+            ...u.archive.slice(0, HOF_CANDIDATE_CAP),
             ...(u.slowpoke ? [u.slowpoke] : []),
           ];
           if (cands.length > 0) {
@@ -393,6 +423,7 @@ export default function App() {
             targetPeriod: patch.targetPeriod,
             mutation_rate: patch.mutationRate,
             mutationSchedule: patch.mutationSchedule,
+            mapElites: patch.mapElites ?? c.mapElites,
           }
         : c,
     );
@@ -405,6 +436,7 @@ export default function App() {
         targetPeriod: patch.targetPeriod,
         mutation_rate: patch.mutationRate,
         mutationSchedule: patch.mutationSchedule,
+        mapElites: patch.mapElites ?? rec.config.mapElites,
       };
   }, []);
 
@@ -445,6 +477,7 @@ export default function App() {
         leaderboard: browsing.leaderboard,
         bests: browsing.bests,
         archive: browsing.archive ?? [],
+        grid: browsing.grid ?? null,
         cloud: [] as EvalMetrics[],
         events: browsing.events ?? [],
         retired: browsing.retired ?? [],
@@ -462,6 +495,7 @@ export default function App() {
       leaderboard,
       bests,
       archive,
+      grid,
       cloud,
       events,
       retired,
@@ -474,7 +508,7 @@ export default function App() {
       eps,
       status,
     };
-  }, [browsing, history, leaderboard, bests, archive, cloud, events, retired, speciesInfo, speciesPoints, rates, population, gen, config, eps, status]);
+  }, [browsing, history, leaderboard, bests, archive, grid, cloud, events, retired, speciesInfo, speciesPoints, rates, population, gen, config, eps, status]);
 
   const viewCfg = useMemo(
     () => (view.config ? withConfigDefaults(view.config) : null),
@@ -580,6 +614,30 @@ export default function App() {
     [view.archive, viewCfg],
   );
 
+  /** Click a lit archive cell: fly that cell's elite on the lab stage. */
+  const pickGridCell = useCallback(
+    (cell: GridCell) => {
+      const entry = view.archive.find((e) => e.id === cell.id);
+      if (!entry) return;
+      setFollowLeader(false);
+      setInspected(null);
+      setSelectedLbId(entry.id);
+      setFilmGen(null);
+      setStaged({
+        gen: entry.gen,
+        fitness: entry.fitness,
+        genome: entry.genome,
+        blocks: entry.blocks,
+      });
+      setStagedSim(
+        viewCfg
+          ? { bbox: viewCfg.bbox, evalTicks: viewCfg.eval_ticks, seed: viewCfg.seed }
+          : null,
+      );
+    },
+    [view.archive, viewCfg],
+  );
+
   /** Click a Hall of Fame plinth: fly the inductee on the lab stage. */
   const stageHofEntry = useCallback((e: HofEntry) => {
     setViewTab("lab");
@@ -613,6 +671,9 @@ export default function App() {
 
   const paretoSel: ObjectiveChoice[] = viewCfg?.objectives ?? [];
   const paretoMode = viewCfg?.mode === "pareto";
+  const qdMode = viewCfg?.mode === "map-elites";
+  const qdSpec = normalizeSpec(viewCfg?.mapElites);
+  const qdGrid = view.grid;
 
   return (
     <div className="shell">
@@ -806,6 +867,28 @@ export default function App() {
                 <span className="unit">blocks</span>
               </div>
             </div>
+            {qdMode && (
+              <>
+                <div className="stat">
+                  <div className="k">Cells lit</div>
+                  <div className="v" data-testid="stat-fill">
+                    {qdGrid ? `${(qdGrid.fillRate * 100).toFixed(1)}` : "—"}
+                    <span className="unit">
+                      % of {qdGrid ? qdGrid.total : qdSpec.binsX * qdSpec.binsY}
+                    </span>
+                  </div>
+                </div>
+                <div className="stat">
+                  <div className="k">QD-score</div>
+                  <div className="v" data-testid="stat-qd">
+                    {qdGrid ? qdGrid.qdScore.toFixed(1) : "—"}
+                    <span className="unit">
+                      Σ {QUALITIES[qdSpec.quality].label}
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
             <div className="stat">
               <div className="k">Throughput</div>
               <div className="v" data-testid="stat-eps">
@@ -845,6 +928,60 @@ export default function App() {
               evalTicks={evalTicks}
             />
           </section>
+
+          {qdMode && (
+            <section className="panel" data-testid="mapelites-panel">
+              <div className="panel-head">
+                <h2 className="eyebrow">
+                  Illuminated archive — {BEHAVIOURS[qdSpec.x].label} ×{" "}
+                  {BEHAVIOURS[qdSpec.y].label}
+                </h2>
+                <span className="note">
+                  {qdGrid
+                    ? `${qdGrid.filled} of ${qdGrid.total} behaviour cells hold a machine — one elite each, kept by ${QUALITIES[qdSpec.quality].label}`
+                    : "one machine per behaviour cell — the archive lights up as new designs appear"}
+                </span>
+              </div>
+              {qdGrid ? (
+                <MapElitesGrid
+                  grid={qdGrid}
+                  selectedId={selectedLbId}
+                  onPick={pickGridCell}
+                />
+              ) : (
+                <div className="chart-empty">
+                  The archive opens on the first generation.
+                </div>
+              )}
+              <div className="panel-head film-head">
+                <h2 className="eyebrow">Quality-diversity over generations</h2>
+                <span className="note">
+                  coverage and total archive quality — both should only climb
+                </span>
+              </div>
+              <QdChart history={view.history} quality={qdSpec.quality} />
+              {view.retired.length > 0 && (
+                <div className="retired-shelf" data-testid="retired-shelf">
+                  <div className="retired-head">
+                    Vacated — cells emptied by a mid-run rule change
+                  </div>
+                  <ul>
+                    {view.retired.map((r, i) => (
+                      <li key={`${r.entry.id}-${i}`} data-testid="retired-entry">
+                        <b>{r.entry.name ?? r.entry.id}</b>
+                        <span className="retired-meta">
+                          {(r.entry.speed ?? 0).toFixed(2)} blk/s ·{" "}
+                          {r.entry.blocks.length} blocks
+                        </span>
+                        <span className="retired-reason">{r.reason}</span>
+                        <span className="retired-gen">@ gen {r.atGen}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </section>
+          )}
 
           {paretoMode && (
             <section className="panel" data-testid="pareto-panel">
@@ -947,7 +1084,11 @@ export default function App() {
               <div className="panel-head">
                 <h2 className="eyebrow">Leaderboard</h2>
                 <span className="note">
-                  {paretoMode ? "top machines by speed" : "top machines by score"}
+                  {paretoMode
+                    ? "top machines by speed"
+                    : qdMode
+                      ? `top machines by ${QUALITIES[qdSpec.quality].label}`
+                      : "top machines by score"}
                 </span>
               </div>
               <Leaderboard
@@ -966,7 +1107,9 @@ export default function App() {
               <div className="panel-head">
                 <h2 className="eyebrow">Machine viewer</h2>
                 {selectedMachine && (
-                  <span className="note">{selectedMachine.name ?? selectedMachine.id}</span>
+                  <span className="note" data-testid="viewer-machine">
+                    {selectedMachine.name ?? selectedMachine.id}
+                  </span>
                 )}
               </div>
               <MachineViewer

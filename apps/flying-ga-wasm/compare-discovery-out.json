@@ -1,0 +1,115 @@
+{
+  "targetSpeed": 1.5,
+  "windowMs": 60000,
+  "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "mapElitesHits": 2,
+  "scalarHits": 3,
+  "results": [
+    {
+      "mode": "map-elites",
+      "seed": 1,
+      "best": 1.87,
+      "hitAt": 9,
+      "gen": 344,
+      "extra": {
+        "filled": 46,
+        "qd": 1475.216,
+        "fill": 0.19166666666666668
+      }
+    },
+    {
+      "mode": "map-elites",
+      "seed": 2,
+      "best": 0.05,
+      "hitAt": null,
+      "gen": 1001,
+      "extra": {
+        "filled": 12,
+        "qd": 13.026,
+        "fill": 0.05
+      }
+    },
+    {
+      "mode": "map-elites",
+      "seed": 3,
+      "best": 2,
+      "hitAt": 41,
+      "gen": 536,
+      "extra": {
+        "filled": 51,
+        "qd": 1758.462,
+        "fill": 0.2125
+      }
+    },
+    {
+      "mode": "map-elites",
+      "seed": 4,
+      "best": 0.03,
+      "hitAt": null,
+      "gen": 891,
+      "extra": {
+        "filled": 12,
+        "qd": 8.977,
+        "fill": 0.05
+      }
+    },
+    {
+      "mode": "map-elites",
+      "seed": 5,
+      "best": 0.06,
+      "hitAt": null,
+      "gen": 1054,
+      "extra": {
+        "filled": 12,
+        "qd": 14.394,
+        "fill": 0.05
+      }
+    },
+    {
+      "mode": "scalar",
+      "seed": 1,
+      "best": 0.04,
+      "hitAt": null,
+      "gen": 175,
+      "extra": null
+    },
+    {
+      "mode": "scalar",
+      "seed": 2,
+      "best": 2,
+      "hitAt": 9,
+      "gen": 176,
+      "extra": null
+    },
+    {
+      "mode": "scalar",
+      "seed": 3,
+      "best": 0.06,
+      "hitAt": null,
+      "gen": 178,
+      "extra": null
+    },
+    {
+      "mode": "scalar",
+      "seed": 4,
+      "best": 1.87,
+      "hitAt": 9,
+      "gen": 180,
+      "extra": null
+    },
+    {
+      "mode": "scalar",
+      "seed": 5,
+      "best": 1.87,
+      "hitAt": 23,
+      "gen": 161,
+      "extra": null
+    }
+  ]
+}

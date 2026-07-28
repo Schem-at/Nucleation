@@ -1911,3 +1911,101 @@ select {
   border-color: var(--cat-7);
   color: var(--ink);
 }
+
+/* ---------------------------------------- MAP-Elites illuminated archive */
+
+/* Sequential ramp on cell quality: ONE hue (blue), steps 100→700, low→high.
+   The blue-ramp steps are the same family as --series-best, so the archive
+   reads as part of this app's chart system rather than a new one. Light-end
+   contrast is deliberately below the ordinal 2:1 floor — for a continuous
+   heatmap "near zero" is allowed to recede toward the surface, and empty
+   cells are separated from it by HUE (neutral) plus a hairline, not by
+   lightness alone. Validated: monotone L, adjacent ΔL >= 0.06, single hue. */
+:root {
+  --me-1: #cde2fb;
+  --me-2: #9ec5f4;
+  --me-3: #6da7ec;
+  --me-4: #3987e5;
+  --me-5: #256abf;
+  --me-6: #184f95;
+  --me-7: #0d366b;
+  --me-empty: #e8e7e1;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    --me-1: #0d366b;
+    --me-2: #184f95;
+    --me-3: #256abf;
+    --me-4: #3987e5;
+    --me-5: #6da7ec;
+    --me-6: #9ec5f4;
+    --me-7: #cde2fb;
+    --me-empty: #232322;
+  }
+}
+:root[data-theme="dark"] {
+  --me-1: #0d366b;
+  --me-2: #184f95;
+  --me-3: #256abf;
+  --me-4: #3987e5;
+  --me-5: #6da7ec;
+  --me-6: #9ec5f4;
+  --me-7: #cde2fb;
+  --me-empty: #232322;
+}
+
+.me-wrap {
+  overflow-x: auto;
+}
+.me-grid {
+  min-width: 520px;
+}
+.me-grid rect[role="button"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.me-tip {
+  pointer-events: none;
+}
+
+.me-legend {
+  align-items: center;
+  flex-wrap: wrap;
+}
+.me-legend .ramp {
+  display: inline-flex;
+  margin-right: 6px;
+  border-radius: 2px;
+  overflow: hidden;
+  vertical-align: middle;
+}
+.me-legend .ramp i {
+  display: block;
+  width: 13px;
+  height: 10px;
+}
+.me-legend .swatch.empty {
+  background: var(--me-empty);
+  border: 1px solid var(--hairline);
+}
+
+/* Behaviour-space controls in the config rail. */
+.me-config {
+  margin: 8px 0 4px;
+  padding: 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--surface-2);
+}
+.me-config .field {
+  margin-bottom: 6px;
+}
+.me-config .hint:first-child {
+  margin-top: 0;
+}
+
+.ev-tag-elite {
+  background: color-mix(in srgb, var(--me-4) 16%, transparent);
+  border-color: var(--me-4);
+  color: var(--ink);
+}
