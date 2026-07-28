@@ -1152,7 +1152,47 @@ impl Simulation {
         if let Some(log) = self.log.as_mut() {
             log.push(BlockChange { tick: self.tick, pos, from: previous, to: state });
         }
-        self.notify_neighbors(pos);
+        // `LevelChunk.setBlockState` runs `onPlace` before `markAndNotifyBlock`
+        // reaches the neighbours — same as `TickCtx::set`, at the boundary.
+        if let Some(behaviour) = self.behaviours.get(state) {
+            // Field-disjoint borrows, exactly as `use_block` builds its ctx —
+            // `self.ctx()` would reborrow `behaviours` mutably.
+            let mut ctx = TickCtx {
+                drain: Some(crate::behaviour::Drain {
+                    pending: &mut self.pending,
+                    unknown_seen: &mut self.unknown_seen,
+                }),
+                behaviours: Some(&self.behaviours),
+                world: &mut self.world,
+                ticks: &mut self.ticks,
+                fluids: &mut self.fluids,
+                events: &mut self.events,
+                states: &self.registry,
+                tick: self.tick,
+                boundary: true,
+                updates: &mut self.updates,
+                moves: &mut self.moves,
+                toggles: &mut self.toggles,
+                comparator_out: &mut self.comparator_out,
+                inventories: &mut self.inventories,
+                hopper_state: &mut self.hopper_state,
+                item_entities: &mut self.item_entities,
+                inv_log: self.inv_log.as_mut(),
+                log: self.log.as_mut(),
+            };
+            behaviour.on_state_changed(&mut ctx, pos);
+        }
+        // markAndNotifyBlock, flag 3: the neighbour updates AND the shape pass
+        // observers listen to. Sending only the neighbour half left every
+        // observer blind to placed and removed blocks — the repro is
+        // `a_placed_block_pulses_the_watching_observer`, and vanilla's own
+        // record of the same write (`--at` uses setBlock flag 3) shows the
+        // pulse. Queue both, drain once: the documented flag-3 order.
+        self.updates
+            .push(crate::behaviour::UpdateEntry::neighbors_at(pos));
+        self.updates
+            .push(crate::behaviour::UpdateEntry::neighbor_shapes(pos));
+        self.propagate();
     }
 
     /// Right-click the block at `pos` with an empty hand, as a player would.

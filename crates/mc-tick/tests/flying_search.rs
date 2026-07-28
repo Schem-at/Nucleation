@@ -431,7 +431,6 @@ fn search_single_row_len6() {
 /// until it lands, kick machines by powering a piston with a redstone block
 /// (neighbour updates work) — the first stroke's landing pulse takes over.
 #[test]
-#[ignore = "place_block delivers no shape updates — see doc comment"]
 fn a_placed_block_pulses_the_watching_observer() {
     // Observer at x1 facing west (watches x0), lamp at x2 (its output side).
     let snbt = "{DataVersion: 4903, size: [6, 1, 1], palette: [\
