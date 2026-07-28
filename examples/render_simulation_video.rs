@@ -141,7 +141,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             (initial, changes, Vec::new())
         }
         None => {
-            let out = simulate(snbt_path, ticks, &clicks, &pulses, &breaks, &places, settle, in_world, hash_origin);
+            let seed: Option<i64> = flag(&args, "--seed").map(|v| v.parse().expect("--seed N"));
+            let out = simulate(snbt_path, ticks, &clicks, &pulses, &breaks, &places, settle, in_world, hash_origin, seed);
             println!("simulated {ticks} ticks, {} block changes", out.1.len());
             out
         }
@@ -172,7 +173,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut one = UniversalSchematic::new("member".to_string());
                 // Fluids have no blockstate model; draw them as tinted glass
                 // boxes, squashed to the fluid's surface height by their pose.
-                let drawn = fluid_proxy(&member.state).unwrap_or(member.state.as_str());
+                let shulker = shulker_proxy(&member.state);
+                let drawn = fluid_proxy(&member.state)
+                    .or(shulker.as_deref())
+                    .unwrap_or(member.state.as_str());
                 one.set_block_from_string(member.pos.x, member.pos.y, member.pos.z, drawn)
                     .map_err(|e| format!("{}: {e}", member.state))?;
                 let mesh = one.to_mesh(&pack, &mesh_config)?;
@@ -203,8 +207,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         } else {
-            // Item ids are not block ids; ingots at least have a block to show.
-            let drawn = track.item.replace("_ingot", "_block");
+            // Item ids are not block ids; ingots, gems and shulkers at least
+            // have a block form to show.
+            let drawn = shulker_proxy(&track.item).unwrap_or_else(|| match track.item.as_str() {
+                "minecraft:diamond" | "minecraft:emerald" | "minecraft:lapis_lazuli"
+                | "minecraft:coal" | "minecraft:redstone" => format!("{}_block", track.item),
+                other => other.replace("_ingot", "_block"),
+            });
             if one.set_block_from_string(0, 0, 0, &drawn).is_err() {
                 one.set_block_from_string(0, 0, 0, "minecraft:stone").ok();
             }
@@ -426,6 +435,7 @@ fn simulate(
     settle: bool,
     in_world: bool,
     hash_origin: Pos,
+    seed: Option<i64>,
 ) -> (
     Vec<(Pos, String)>,
     Vec<(u64, Pos, String, String)>,
@@ -435,9 +445,24 @@ fn simulate(
     let structure = Structure::parse(&text).expect("parse structure");
 
     let mut sim = Simulation::new(structure.bounds(4));
+    if let Some(seed) = seed {
+        sim.set_rng_seed(seed);
+    }
     {
         let (registry, world) = sim.registry_and_world_mut();
         structure.place(world, registry, Pos::new(0, 0, 0));
+    }
+    // A dispenser can *place* a shulker box it holds as an item; behaviours
+    // bind only to interned states, so intern every facing up front.
+    for (_, stacks) in &structure.inventories {
+        for stack in stacks {
+            let base = stack.id.split('[').next().unwrap_or(&stack.id);
+            if base.ends_with("_shulker_box") || base == "minecraft:shulker_box" {
+                for facing in ["up", "down", "north", "south", "west", "east"] {
+                    let _ = sim.registry_mut().intern(&format!("{base}[facing={facing}]"));
+                }
+            }
+        }
     }
     mc_tick::intern_companions(sim.registry_mut());
     {
@@ -753,6 +778,19 @@ fn build_cast(
 
 fn adjacent(a: Pos, b: Pos) -> bool {
     (a.x - b.x).abs() + (a.y - b.y).abs() + (a.z - b.z).abs() == 1
+}
+
+/// Shulker boxes have no blockstate model — vanilla draws them with a
+/// block-entity renderer the mesher does not run — so show them as their
+/// colour's wool (plain `shulker_box` as purpur) to stay visible.
+fn shulker_proxy(state: &str) -> Option<String> {
+    let base = state.split('[').next().unwrap_or(state);
+    let name = base.strip_prefix("minecraft:")?;
+    if name == "shulker_box" {
+        return Some("minecraft:purpur_block".to_string());
+    }
+    let color = name.strip_suffix("_shulker_box")?;
+    Some(format!("minecraft:{color}_wool"))
 }
 
 fn facing_of(descriptor: &str) -> mc_tick::Dir {
