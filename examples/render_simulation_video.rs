@@ -173,10 +173,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut one = UniversalSchematic::new("member".to_string());
                 // Fluids have no blockstate model; draw them as tinted glass
                 // boxes, squashed to the fluid's surface height by their pose.
-                let shulker = shulker_proxy(&member.state);
-                let drawn = fluid_proxy(&member.state)
-                    .or(shulker.as_deref())
-                    .unwrap_or(member.state.as_str());
+                // Shulker boxes pass through unchanged: the mesher runs the
+                // real block-entity model (base + lid, entity/shulker/*.png).
+                let drawn = fluid_proxy(&member.state).unwrap_or(member.state.as_str());
                 one.set_block_from_string(member.pos.x, member.pos.y, member.pos.z, drawn)
                     .map_err(|e| format!("{}: {e}", member.state))?;
                 let mesh = one.to_mesh(&pack, &mesh_config)?;
@@ -196,24 +195,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for track in &item_tracks {
         let mut one = UniversalSchematic::new("item".to_string());
         if track.item == "minecraft:minecart" {
-            // A cart-shaped mini-structure: a 3×3 iron floor with a one-high
-            // rim, scaled down to the cart's 0.98 × 0.7 box by its pose.
-            for x in 0..3 {
-                for z in 0..3 {
-                    one.set_block_from_string(x, 0, z, "minecraft:polished_deepslate").ok();
-                    if x != 1 || z != 1 {
-                        one.set_block_from_string(x, 1, z, "minecraft:polished_deepslate").ok();
+            // The real cart: meshed through the mesher's entity path — the
+            // vanilla MinecartModel hull, UV'd from entity/minecart.png in
+            // the client jar — oriented along its direction of travel.
+            let pts: Vec<[f64; 3]> = track.positions.iter().flatten().copied().collect();
+            let yaw: f32 = match (pts.first(), pts.last()) {
+                (Some(a), Some(b)) => {
+                    let (dx, dz) = (b[0] - a[0], b[2] - a[2]);
+                    if dx.abs() >= dz.abs() {
+                        if dx >= 0.0 { -90.0 } else { 90.0 }
+                    } else if dz >= 0.0 {
+                        0.0
+                    } else {
+                        180.0
                     }
                 }
-            }
+                _ => 0.0,
+            };
+            let mut cart =
+                nucleation::Entity::new("minecraft:minecart".to_string(), (0.5, 0.0, 0.5));
+            cart.nbt.insert(
+                "Rotation".to_string(),
+                nucleation::NbtValue::List(vec![
+                    nucleation::NbtValue::Float(yaw),
+                    nucleation::NbtValue::Float(0.0),
+                ]),
+            );
+            one.add_entity(cart);
         } else {
-            // Item ids are not block ids; ingots, gems and shulkers at least
-            // have a block form to show.
-            let drawn = shulker_proxy(&track.item).unwrap_or_else(|| match track.item.as_str() {
+            // Shulker boxes pass through as blocks: the mesher's block-entity
+            // path draws the real base + lid from entity/shulker/*.png. Other
+            // item ids are not block ids; ingots and gems have a block form.
+            let drawn = match track.item.as_str() {
                 "minecraft:diamond" | "minecraft:emerald" | "minecraft:lapis_lazuli"
                 | "minecraft:coal" | "minecraft:redstone" => format!("{}_block", track.item),
                 other => other.replace("_ingot", "_block"),
-            });
+            };
             if one.set_block_from_string(0, 0, 0, &drawn).is_err() {
                 one.set_block_from_string(0, 0, 0, "minecraft:stone").ok();
             }
@@ -284,20 +301,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(p) = position {
                 let mut pose = Pose::IDENTITY;
                 let cart = track.item == "minecraft:minecart";
-                // The cart mesh is 3×2×3, squeezed to the real 0.98 × 0.7 box.
-                pose.scale = if cart {
-                    [0.98 / 3.0, 0.7 / 2.0, 0.98 / 3.0]
-                } else {
-                    [0.25; 3]
-                };
-                // Scale in place about the block's centre, then translate that
-                // centre to the entity position (plus half the scaled height).
                 if cart {
-                    // Scale about the mesh's bottom centre, then put that
-                    // point at the entity position.
-                    pose.pivot = [1.5, 0.0, 1.5];
-                    pose.translate = [p[0] as f32 - 1.5, p[1] as f32, p[2] as f32 - 1.5];
+                    // The cart is meshed as the real entity model inside one
+                    // block (vanilla hull, 0.375 rail lift baked in): put the
+                    // block's bottom centre at the entity position, unscaled.
+                    pose.pivot = [0.5, 0.0, 0.5];
+                    pose.translate = [p[0] as f32 - 0.5, p[1] as f32, p[2] as f32 - 0.5];
                 } else {
+                    // Dropped items draw at vanilla's quarter block scale,
+                    // scaled in place about the block's centre, then moved so
+                    // that centre sits just above the entity position.
+                    pose.scale = [0.25; 3];
                     pose.pivot = [0.5, 0.5, 0.5];
                     pose.translate = [
                         p[0] as f32 - 0.5,
@@ -778,19 +792,6 @@ fn build_cast(
 
 fn adjacent(a: Pos, b: Pos) -> bool {
     (a.x - b.x).abs() + (a.y - b.y).abs() + (a.z - b.z).abs() == 1
-}
-
-/// Shulker boxes have no blockstate model — vanilla draws them with a
-/// block-entity renderer the mesher does not run — so show them as their
-/// colour's wool (plain `shulker_box` as purpur) to stay visible.
-fn shulker_proxy(state: &str) -> Option<String> {
-    let base = state.split('[').next().unwrap_or(state);
-    let name = base.strip_prefix("minecraft:")?;
-    if name == "shulker_box" {
-        return Some("minecraft:purpur_block".to_string());
-    }
-    let color = name.strip_suffix("_shulker_box")?;
-    Some(format!("minecraft:{color}_wool"))
 }
 
 fn facing_of(descriptor: &str) -> mc_tick::Dir {

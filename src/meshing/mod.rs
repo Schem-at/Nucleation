@@ -110,6 +110,15 @@ impl ResourcePackSource {
                 pack.add_texture("minecraft", "entity/armorstand/wood", texture);
             }
         }
+        // schematic-mesher's minecart model reads `entity/minecart`, but the
+        // client jar moved the texture to `entity/minecart/minecart.png` in
+        // 1.21.x. Alias it so carts get their hull texture instead of the
+        // missing-texture tile.
+        if pack.get_texture("entity/minecart").is_none() {
+            if let Some(texture) = pack.get_texture("entity/minecart/minecart").cloned() {
+                pack.add_texture("minecraft", "entity/minecart", texture);
+            }
+        }
         Self { pack }
     }
 
