@@ -1,0 +1,27 @@
+{
+  "name": "6x6 sliding door: lever seals the doorway, lever reopens it, world resets",
+  "structure": "../corpus/structures/door_6x6_inworld.snbt",
+  "origin": [15, -64, 0],
+  "settle": "in-world",
+  "actions": [
+    { "tick": 10, "use": [10, 4, 1] },
+    { "tick": 60, "use": [10, 4, 1] }
+  ],
+  "checks": [
+    { "tick": 60, "expect": "changed" },
+    { "tick": 60, "expect": "blocks", "blocks": {
+        "8,4,2": "minecraft:white_concrete",
+        "13,4,2": "minecraft:white_concrete",
+        "8,9,2": "minecraft:white_concrete",
+        "13,9,2": "minecraft:white_concrete",
+        "10,6,3": "minecraft:honey_block",
+        "11,6,3": "minecraft:slime_block",
+        "3,4,1": "minecraft:redstone_wire[power=14]"
+    } },
+    { "tick": 95, "expect": "initial" },
+    { "tick": 95, "expect": "air", "region": [[8, 4, 2], [13, 9, 4]] },
+    { "tick": 95, "expect": "blocks", "blocks": {
+        "3,4,1": "minecraft:redstone_wire[power=0]"
+    } }
+  ]
+}

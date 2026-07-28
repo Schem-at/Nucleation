@@ -1,0 +1,28 @@
+{
+  "name": "trapdoors: power opens wood and iron together, a piston pushes one and it survives the trip",
+  "structure": "../corpus/structures/trapdoor_rig.snbt",
+  "settle": "placement",
+  "actions": [
+    { "tick": 2, "place": [1, 0, 0], "state": "minecraft:redstone_block" },
+    { "tick": 2, "place": [0, 1, 2], "state": "minecraft:redstone_block" },
+    { "tick": 8, "place": [1, 0, 0], "state": "minecraft:air" },
+    { "tick": 8, "place": [0, 1, 2], "state": "minecraft:air" }
+  ],
+  "checks": [
+    { "tick": 1, "expect": "blocks", "blocks": {
+        "2,0,0": "minecraft:oak_trapdoor[open=false,powered=false]",
+        "1,1,0": "minecraft:iron_trapdoor[open=false,powered=false]"
+    } },
+    { "tick": 5, "expect": "blocks", "blocks": {
+        "2,0,0": "minecraft:oak_trapdoor[open=true,powered=true]",
+        "1,1,0": "minecraft:iron_trapdoor[open=true,powered=true]"
+    } },
+    { "tick": 14, "expect": "blocks", "blocks": {
+        "2,0,0": "minecraft:oak_trapdoor[open=false,powered=false,facing=north,half=bottom]",
+        "1,1,0": "minecraft:iron_trapdoor[open=false,powered=false,facing=south,half=top]",
+        "2,0,2": "minecraft:oak_trapdoor[open=false,powered=false]",
+        "1,0,2": "minecraft:air",
+        "0,0,2": "minecraft:piston[extended=false]"
+    } }
+  ]
+}

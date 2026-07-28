@@ -1,0 +1,13 @@
+{
+  "name": "two dropped redstone stacks merge into exactly one item entity",
+  "structure": "../corpus/structures/item_merge.snbt",
+  "settle": "placement",
+  "checks": [
+    { "tick": 10, "expect": "entities", "entities": [
+        { "item": "minecraft:redstone", "region": [[0, 0, 0], [0, 2, 0]], "count": 2 }
+    ] },
+    { "tick": 45, "expect": "entities", "entities": [
+        { "item": "minecraft:redstone", "region": [[0, 0, 0], [0, 2, 0]], "count": 1 }
+    ] }
+  ]
+}

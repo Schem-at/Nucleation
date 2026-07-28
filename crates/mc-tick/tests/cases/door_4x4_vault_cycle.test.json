@@ -1,0 +1,34 @@
+{
+  "name": "4x4 vault door: close seals it, open clears it, second close lands the same world as the first",
+  "structure": "../corpus/structures/door_4x4_vault_inworld.snbt",
+  "origin": [36, -64, 0],
+  "settle": "in-world",
+  "actions": [
+    { "tick": 10, "use": [7, 5, 1] },
+    { "tick": 40, "use": [7, 5, 1] },
+    { "tick": 70, "use": [7, 5, 1] }
+  ],
+  "checks": [
+    { "tick": 40, "expect": "changed" },
+    { "tick": 40, "expect": "blocks", "blocks": {
+        "6,5,2": "minecraft:white_concrete",
+        "9,5,2": "minecraft:white_concrete",
+        "6,8,2": "minecraft:white_concrete",
+        "9,8,4": "minecraft:white_concrete",
+        "6,6,3": "minecraft:slime_block",
+        "9,7,3": "minecraft:slime_block",
+        "7,6,3": "minecraft:white_concrete",
+        "3,4,2": "minecraft:oak_wood[axis=y]"
+    } },
+    { "tick": 70, "expect": "initial" },
+    { "tick": 70, "expect": "blocks", "blocks": {
+        "6,6,3": "minecraft:air",
+        "7,6,3": "minecraft:air",
+        "9,7,3": "minecraft:air",
+        "6,5,2": "minecraft:air",
+        "9,8,4": "minecraft:air"
+    } },
+    { "tick": 105, "expect": "changed" },
+    { "tick": 105, "expect": "same-as", "as_tick": 40 }
+  ]
+}

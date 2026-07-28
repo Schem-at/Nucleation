@@ -1,0 +1,28 @@
+{
+  "name": "flying machine: wiki two-way engine B, kicked once, flies east forever at a block per 10 ticks",
+  "structure": "../corpus/structures/flying_machine_east.snbt",
+  "settle": "quiet",
+  "actions": [
+    { "tick": 2, "place": [2, 1, 1], "state": "minecraft:redstone_block" },
+    { "tick": 4, "place": [2, 1, 1], "state": "minecraft:air" }
+  ],
+  "checks": [
+    { "tick": 61, "expect": "air", "region": [[0, 0, 0], [6, 0, 1]] },
+    { "tick": 61, "expect": "blocks", "blocks": {
+        "7,0,0": "minecraft:observer[facing=west,powered=false]",
+        "8,0,0": "minecraft:slime_block",
+        "8,0,1": "minecraft:sticky_piston[extended=false,facing=east]",
+        "9,0,0": "minecraft:sticky_piston[extended=false,facing=west]",
+        "9,0,1": "minecraft:slime_block",
+        "10,0,1": "minecraft:observer[facing=east,powered=false]"
+    } },
+    { "tick": 71, "expect": "blocks", "blocks": {
+        "8,0,0": "minecraft:observer[facing=west,powered=false]",
+        "9,0,0": "minecraft:slime_block",
+        "9,0,1": "minecraft:sticky_piston[extended=false,facing=east]",
+        "10,0,0": "minecraft:sticky_piston[extended=false,facing=west]",
+        "10,0,1": "minecraft:slime_block",
+        "11,0,1": "minecraft:observer[facing=east,powered=false]"
+    } }
+  ]
+}
