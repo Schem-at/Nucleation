@@ -9,6 +9,8 @@ const STEPS = [
   { key: "parsing", label: "Parsing schematic" },
   { key: "simulating", label: "Simulating redstone" },
   { key: "measuring", label: "Measuring open / close" },
+  { key: "classifying", label: "Classifying the pattern" },
+  { key: "paste check", label: "Checking paste survival" },
 ];
 
 export function UploadPage() {
@@ -68,13 +70,14 @@ export function UploadPage() {
   return (
     <div className="upload-wrap">
       <div className="upload-hero">
-        <p className="eyebrow">Piston door performance certification</p>
+        <p className="eyebrow">Piston door validator</p>
         <h1>
-          Your door, <em>measured</em>.
+          Your door, <em>measured and named</em>.
         </h1>
         <p>
           Drop in a piston door with its lever. Your browser simulates it tick by tick — no
-          upload, no server — times the full cycle, and issues a certificate on the spot.
+          upload, no server — times the full cycle, and reads the pattern against the
+          community standard.
         </p>
       </div>
 

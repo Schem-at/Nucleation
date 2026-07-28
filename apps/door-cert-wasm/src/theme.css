@@ -1,24 +1,59 @@
 /* ------------------------------------------------------------------ */
-/* Door Certification Bureau — tokens                                  */
-/* Voice: the machine's monospace carries measured values; a quiet     */
-/* system sans carries prose. One red is reserved for the seal.        */
+/* door.schemat.io — tokens                                            */
+/*                                                                     */
+/* A subdomain of schemat.io, so it wears their language: Figtree for  */
+/* prose, neutral surfaces that start dark, hairline borders, rounded- */
+/* md corners, and lime used only where the page makes a claim — the   */
+/* verdict, the primary action, the active state. Measured values stay */
+/* monospace: this is still an instrument printout.                    */
 /* ------------------------------------------------------------------ */
+
+@font-face {
+  font-family: "Figtree";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("/fonts/figtree-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Figtree";
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("/fonts/figtree-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
 
 :root {
   color-scheme: light;
-  --plane: #f1f3f2;
-  --surface: #fcfcfb;
-  --surface-2: #f5f5f2;
-  --ink: #131514;
-  --ink-2: #52514e;
-  --muted: #898781;
-  --grid: #e1e0d9;
-  --baseline: #c3c2b7;
-  --border: rgba(11, 11, 11, 0.12);
-  --seal: #b23327;
-  --seal-ink: #b23327;
+  --plane: #fafafa;
+  --surface: #ffffff;
+  --surface-2: #f5f5f5;
+  --ink: #171717;
+  --ink-2: #525252;
+  --muted: #737373;
+  --grid: #e5e5e5;
+  --baseline: #d4d4d4;
+  --border: rgba(23, 23, 23, 0.1);
+  /* lime is the affirmative: verdict, primary action, active state */
+  --accent: #65a30d;
+  --accent-strong: #4d7c0f;
+  --accent-ink: #3f6212;
+  --accent-soft: rgba(101, 163, 13, 0.12);
+  --accent-glow: rgba(101, 163, 13, 0.2);
+  --accent-on: #ffffff;
+  /* a failed verdict is not lime, and is never the same red as a series */
+  --alarm: #b91c1c;
+  --alarm-ink: #991b1b;
+  /* series: categorical slots 1-3, validated against this surface */
   --series-piston: #2a78d6;
   --series-redstone: #eb6834;
+  --series-items: #1baf7a;
   /* sequential blue, low -> high magnitude */
   --heat-0: transparent;
   --heat-1: #cde2fb;
@@ -28,31 +63,49 @@
   --heat-5: #256abf;
   --heat-6: #184f95;
   --heat-7: #0d366b;
+  /* pattern matrix: one lime ramp, front layer lightest */
+  --cell-0: #bef264;
+  --cell-1: #a3e635;
+  --cell-2: #84cc16;
+  --cell-3: #65a30d;
+  --cell-4: #4d7c0f;
+  --cell-5: #3f6212;
   /* inventory slot: a beveled well, tuned to the sheet rather than the game */
-  --slot: #dededa;
-  --slot-shade: rgba(0, 0, 0, 0.20);
+  --slot: #e7e5e4;
+  --slot-shade: rgba(0, 0, 0, 0.2);
   --slot-light: rgba(255, 255, 255, 0.9);
-  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* the verdict colour, wherever the page stamps one */
+  --seal: var(--accent);
+  --seal-ink: var(--accent-ink);
+  --font-sans: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --r: 6px;
 }
 
+/* Dark is the default reading mode; light is a full second theme, not a flip. */
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
     color-scheme: dark;
-    --plane: #0e0f0f;
-    --surface: #1a1a19;
-    --surface-2: #222221;
-    --ink: #f4f4f0;
-    --ink-2: #c3c2b7;
-    --muted: #898781;
-    --grid: #2c2c2a;
-    --baseline: #383835;
-    --border: rgba(255, 255, 255, 0.12);
-    --seal: #d24a3c;
-    --seal-ink: #e0604f;
+    --plane: #171717;
+    --surface: #262626;
+    --surface-2: #303030;
+    --ink: #fafafa;
+    --ink-2: #d4d4d4;
+    --muted: #a3a3a3;
+    --grid: #3a3a3a;
+    --baseline: #525252;
+    --border: rgba(255, 255, 255, 0.1);
+    --accent: #84cc16;
+    --accent-strong: #a3e635;
+    --accent-ink: #a3e635;
+    --accent-soft: rgba(132, 204, 22, 0.14);
+    --accent-glow: rgba(132, 204, 22, 0.2);
+    --accent-on: #1a2e05;
+    --alarm: #ef4444;
+    --alarm-ink: #f87171;
     --series-piston: #3987e5;
     --series-redstone: #d95926;
-    /* on the dark surface, near-zero recedes dark and high burns bright */
+    --series-items: #199e70;
     --heat-1: #0d366b;
     --heat-2: #184f95;
     --heat-3: #256abf;
@@ -60,26 +113,39 @@
     --heat-5: #6da7ec;
     --heat-6: #9ec5f4;
     --heat-7: #cde2fb;
-    --slot: #2c2c29;
+    --cell-0: #ecfccb;
+    --cell-1: #d9f99d;
+    --cell-2: #bef264;
+    --cell-3: #a3e635;
+    --cell-4: #84cc16;
+    --cell-5: #65a30d;
+    --slot: #3a3a3a;
     --slot-shade: rgba(0, 0, 0, 0.55);
-    --slot-light: rgba(255, 255, 255, 0.10);
+    --slot-light: rgba(255, 255, 255, 0.1);
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --plane: #0e0f0f;
-  --surface: #1a1a19;
-  --surface-2: #222221;
-  --ink: #f4f4f0;
-  --ink-2: #c3c2b7;
-  --muted: #898781;
-  --grid: #2c2c2a;
-  --baseline: #383835;
-  --border: rgba(255, 255, 255, 0.12);
-  --seal: #d24a3c;
-  --seal-ink: #e0604f;
+  --plane: #171717;
+  --surface: #262626;
+  --surface-2: #303030;
+  --ink: #fafafa;
+  --ink-2: #d4d4d4;
+  --muted: #a3a3a3;
+  --grid: #3a3a3a;
+  --baseline: #525252;
+  --border: rgba(255, 255, 255, 0.1);
+  --accent: #84cc16;
+  --accent-strong: #a3e635;
+  --accent-ink: #a3e635;
+  --accent-soft: rgba(132, 204, 22, 0.14);
+  --accent-glow: rgba(132, 204, 22, 0.2);
+  --accent-on: #1a2e05;
+  --alarm: #ef4444;
+  --alarm-ink: #f87171;
   --series-piston: #3987e5;
   --series-redstone: #d95926;
+  --series-items: #199e70;
   --heat-1: #0d366b;
   --heat-2: #184f95;
   --heat-3: #256abf;
@@ -87,13 +153,22 @@
   --heat-5: #6da7ec;
   --heat-6: #9ec5f4;
   --heat-7: #cde2fb;
-  --slot: #2c2c29;
+  --cell-0: #ecfccb;
+  --cell-1: #d9f99d;
+  --cell-2: #bef264;
+  --cell-3: #a3e635;
+  --cell-4: #84cc16;
+  --cell-5: #65a30d;
+  --slot: #3a3a3a;
   --slot-shade: rgba(0, 0, 0, 0.55);
-  --slot-light: rgba(255, 255, 255, 0.10);
+  --slot-light: rgba(255, 255, 255, 0.1);
+  /* the verdict colour, wherever the page stamps one */
+  --seal: var(--accent);
+  --seal-ink: var(--accent-ink);
 }
 
 /* ------------------------------------------------------------------ */
-/* Base                                                             */
+/* Base                                                                */
 /* ------------------------------------------------------------------ */
 
 * { box-sizing: border-box; }
@@ -108,18 +183,47 @@ body {
 }
 a { color: inherit; }
 button { font: inherit; color: inherit; }
-:focus-visible { outline: 2px solid var(--series-piston); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .mono { font-family: var(--font-mono); }
 
 /* Eyebrow: the document's clause labels */
 .eyebrow {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.14em;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
   margin: 0 0 10px;
+}
+
+/* schemat.io's badge: tiny, black, wide-tracked, with a soft coloured lift */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: var(--r);
+  padding: 3px 7px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1.4;
+  background: var(--accent);
+  color: var(--accent-on);
+  box-shadow: 0 2px 10px var(--accent-glow);
+}
+.badge-quiet {
+  background: var(--surface-2);
+  color: var(--ink-2);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+.badge-alarm {
+  background: var(--alarm);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(185, 28, 28, 0.25);
 }
 
 /* ------------------------------------------------------------------ */
@@ -130,37 +234,43 @@ button { font: inherit; color: inherit; }
 
 .topbar {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   padding: 10px 2px 18px;
 }
 .topbar-brand {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   text-decoration: none;
 }
-.topbar-brand b { color: var(--seal-ink); font-weight: 700; }
+.topbar-brand b { font-weight: 800; }
+.topbar-brand .sep { color: var(--muted); font-weight: 400; }
+.topbar-brand .sub { color: var(--ink-2); font-weight: 500; }
 .topbar-side { display: flex; align-items: center; gap: 14px; }
 .theme-toggle {
   border: 1px solid var(--border);
   background: var(--surface);
-  border-radius: 999px;
-  padding: 4px 12px;
-  font-family: var(--font-mono);
-  font-size: 11px;
+  border-radius: var(--r);
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
   cursor: pointer;
 }
-.theme-toggle:hover { background: var(--surface-2); }
+.theme-toggle:hover { background: var(--surface-2); color: var(--ink); }
 
 /* The certificate sheet */
 .sheet {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border-radius: var(--r);
   overflow: hidden;
 }
 .sheet-band {
@@ -168,15 +278,15 @@ button { font: inherit; color: inherit; }
   flex-wrap: wrap;
   gap: 6px 24px;
   justify-content: space-between;
-  padding: 12px 32px;
+  padding: 11px 32px;
   border-bottom: 1px solid var(--grid);
   background: var(--surface-2);
   font-family: var(--font-mono);
   font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--ink-2);
 }
+.sheet-band b { color: var(--ink); font-weight: 600; }
 .sheet-body { padding: 36px 32px 40px; }
 .sheet-section { padding: 28px 32px; border-top: 1px solid var(--grid); }
 
@@ -192,16 +302,15 @@ button { font: inherit; color: inherit; }
   flex-wrap: wrap;
 }
 .hero h1 {
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: clamp(34px, 5vw, 54px);
-  letter-spacing: -0.02em;
-  line-height: 1.05;
-  margin: 0 0 10px;
+  font-weight: 800;
+  font-size: clamp(32px, 5vw, 50px);
+  letter-spacing: -0.035em;
+  line-height: 1.03;
+  margin: 0 0 12px;
 }
 /* Spec plate: the aperture is what the door IS, so it sits directly under
  * the name on its own heavy rule — the one number you read from across the
- * room. Seal red stays reserved for the seal and its caveats. */
+ * room. */
 .hero-aperture {
   display: flex;
   align-items: baseline;
@@ -209,10 +318,10 @@ button { font: inherit; color: inherit; }
   gap: 4px 12px;
   margin: 2px 0 16px;
   padding: 4px 0 4px 14px;
-  border-left: 3px solid var(--ink);
+  border-left: 3px solid var(--accent);
   font-family: var(--font-mono);
-  font-size: 12.5px;
-  letter-spacing: 0.12em;
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -227,7 +336,7 @@ button { font: inherit; color: inherit; }
 .hero-aperture span {
   flex-basis: 100%;
   font-size: 11.5px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: none;
 }
 
@@ -238,7 +347,7 @@ button { font: inherit; color: inherit; }
   gap: 8px 22px;
   margin-top: 18px;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--ink-2);
 }
 .hero-dims span b { color: var(--ink); font-weight: 600; }
@@ -248,12 +357,88 @@ button { font: inherit; color: inherit; }
 .seal text { font-family: var(--font-mono); }
 
 /* ------------------------------------------------------------------ */
+/* Classification — the door read against the community standard       */
+/* ------------------------------------------------------------------ */
+
+.classify {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 28px 36px;
+  align-items: start;
+}
+@media (max-width: 720px) { .classify { grid-template-columns: 1fr; } }
+
+.classify-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 10px;
+}
+.classify-name {
+  font-size: clamp(20px, 2.6vw, 27px);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  margin: 0;
+}
+.classify-name .unknown { color: var(--muted); font-weight: 700; }
+.classify-defs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 12px 0 0;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.classify-defs div { display: flex; gap: 7px; align-items: baseline; }
+.classify-defs dt {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-family: var(--font-sans);
+}
+.classify-defs dd { margin: 0; color: var(--ink); }
+
+.classify-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 0; }
+.classify-chips .badge sup { font-size: 8px; opacity: 0.75; letter-spacing: 0; }
+
+.classify-note {
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  max-width: 58ch;
+}
+.classify-cite {
+  margin: 16px 0 0;
+  font-size: 10.5px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.matrix-fig { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.matrix-fig svg { display: block; }
+.matrix-cap {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  letter-spacing: 0.03em;
+  max-width: 34ch;
+}
+.matrix-ramp { display: inline-flex; gap: 2px; vertical-align: -1px; margin: 0 5px; }
+.matrix-ramp i { width: 9px; height: 9px; border-radius: 2px; display: block; }
+
+/* ------------------------------------------------------------------ */
 /* Video exhibit                                                       */
 /* ------------------------------------------------------------------ */
 
 .exhibit-frame {
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--r);
   background: #000;
   overflow: hidden;
 }
@@ -269,8 +454,6 @@ button { font: inherit; color: inherit; }
 /* Stat tiles                                                          */
 /* ------------------------------------------------------------------ */
 
-/* Six measurements read as two rows of three; auto-fit would strand the
- * sixth on a line of its own. */
 .tiles {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -280,14 +463,14 @@ button { font: inherit; color: inherit; }
 @media (max-width: 560px) { .tiles { grid-template-columns: 1fr; } }
 .tile {
   border: 1px solid var(--grid);
-  border-radius: 4px;
+  border-radius: var(--r);
   padding: 16px 18px 14px;
   background: var(--surface);
 }
 .tile-label {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.1em;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--muted);
   margin: 0 0 8px;
@@ -296,12 +479,12 @@ button { font: inherit; color: inherit; }
   font-family: var(--font-mono);
   font-size: 30px;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   line-height: 1;
   margin: 0;
 }
 .tile-value small { font-size: 14px; font-weight: 500; color: var(--ink-2); margin-left: 2px; }
-.tile-sub { font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); margin: 6px 0 0; }
+.tile-sub { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-2); margin: 6px 0 0; }
 
 /* ------------------------------------------------------------------ */
 /* Charts (shared)                                                     */
@@ -309,7 +492,8 @@ button { font: inherit; color: inherit; }
 
 .chart-block h3 {
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   margin: 0 0 2px;
 }
 .chart-note { color: var(--ink-2); font-size: 13px; margin: 0 0 14px; }
@@ -320,29 +504,54 @@ button { font: inherit; color: inherit; }
   flex-wrap: wrap;
   gap: 6px 18px;
   align-items: center;
-  margin: 0 0 10px;
+  margin: 0 0 12px;
   font-size: 12.5px;
   color: var(--ink-2);
 }
+.legend .item { display: inline-flex; align-items: baseline; gap: 7px; }
+.legend .item b {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.legend .item.zero { color: var(--muted); }
 .legend-swatch {
   display: inline-block;
   width: 10px;
   height: 10px;
   border-radius: 2px;
-  margin-right: 6px;
   vertical-align: -1px;
 }
 .axis-label { font-family: var(--font-mono); font-size: 10px; fill: var(--muted); }
-.panel-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; fill: var(--ink-2); }
-.annot-label { font-family: var(--font-mono); font-size: 10px; fill: var(--muted); }
+.panel-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  fill: var(--ink-2);
+}
+/* Annotations sit over the data, so they carry a surface-coloured halo
+ * rather than a box — legible on a bar or on the grid, in either theme. */
+.annot-label,
+.callout-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  fill: var(--muted);
+  stroke: var(--surface);
+  stroke-width: 3px;
+  paint-order: stroke;
+  stroke-linejoin: round;
+}
+.callout-label { font-size: 10.5px; fill: var(--ink-2); }
 
 .tooltip {
   position: absolute;
   pointer-events: none;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+  border-radius: var(--r);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
   padding: 8px 10px;
   font-family: var(--font-mono);
   font-size: 12px;
@@ -350,9 +559,14 @@ button { font: inherit; color: inherit; }
   z-index: 10;
   white-space: nowrap;
 }
-.tooltip-title { color: var(--muted); font-size: 11px; margin-bottom: 2px; }
+.tooltip-title { color: var(--muted); font-size: 11px; margin-bottom: 3px; }
 .tooltip-row { display: flex; align-items: center; gap: 8px; }
-.tooltip-row .legend-swatch { margin-right: 0; }
+.tooltip-row.total {
+  border-top: 1px solid var(--grid);
+  margin-top: 3px;
+  padding-top: 3px;
+  color: var(--ink);
+}
 .tooltip-row b { margin-left: auto; padding-left: 14px; font-variant-numeric: tabular-nums; }
 
 /* Heatmap */
@@ -396,7 +610,7 @@ button { font: inherit; color: inherit; }
   display: grid;
   place-items: center;
   background: var(--slot);
-  border-radius: 2px;
+  border-radius: 3px;
   box-shadow:
     inset 2px 2px 0 var(--slot-shade),
     inset -2px -2px 0 var(--slot-light);
@@ -415,8 +629,6 @@ button { font: inherit; color: inherit; }
   );
   opacity: 0.55;
 }
-/* Classic count stamp: white with a hard offset shadow, so it stays legible
- * on any texture in either theme. */
 .stack-count {
   position: absolute;
   right: 3px;
@@ -470,50 +682,57 @@ button { font: inherit; color: inherit; }
 .upload-wrap { max-width: 720px; margin: 0 auto; }
 .upload-hero { text-align: center; padding: 48px 0 8px; }
 .upload-hero h1 {
-  font-family: var(--font-mono);
-  font-size: clamp(28px, 4.4vw, 44px);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+  font-size: clamp(30px, 4.6vw, 46px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
   margin: 0 0 14px;
 }
-.upload-hero h1 em { font-style: normal; color: var(--seal-ink); }
+.upload-hero h1 em { font-style: normal; color: var(--accent-ink); }
 .upload-hero p { color: var(--ink-2); margin: 0 auto; max-width: 46ch; }
 
 .dropzone {
   margin-top: 36px;
   border: 1.5px dashed var(--baseline);
-  border-radius: 6px;
+  border-radius: var(--r);
   background: var(--surface);
   padding: 56px 32px;
   text-align: center;
   cursor: pointer;
   transition: border-color 120ms ease, background 120ms ease;
 }
-.dropzone:hover, .dropzone.drag { border-color: var(--series-piston); background: var(--surface-2); }
+.dropzone:hover, .dropzone.drag {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
 .dropzone-glyph { margin-bottom: 18px; }
-.dropzone-title { font-weight: 600; margin: 0 0 6px; }
+.dropzone-title { font-weight: 700; margin: 0 0 6px; }
 .dropzone-formats { font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin: 0; }
 .dropzone input { display: none; }
 
 .upload-error {
   margin-top: 16px;
-  border: 1px solid var(--seal);
-  border-radius: 4px;
+  border: 1px solid var(--alarm);
+  border-radius: var(--r);
   padding: 12px 16px;
   font-size: 13.5px;
-  color: var(--seal-ink);
+  color: var(--alarm-ink);
   background: var(--surface);
 }
 
 /* Processing checklist */
-.steps { margin-top: 36px; border: 1px solid var(--grid); border-radius: 6px; background: var(--surface); }
+.steps {
+  margin-top: 36px;
+  border: 1px solid var(--grid);
+  border-radius: var(--r);
+  background: var(--surface);
+}
 .steps-head {
   padding: 14px 20px;
   border-bottom: 1px solid var(--grid);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.08em;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-2);
 }
@@ -533,9 +752,9 @@ button { font: inherit; color: inherit; }
   flex: 0 0 auto;
 }
 .step.active { color: var(--ink); }
-.step.active .dot { border-color: var(--series-piston); background: var(--series-piston); animation: pulse 1.1s ease-in-out infinite; }
+.step.active .dot { border-color: var(--accent); background: var(--accent); animation: pulse 1.1s ease-in-out infinite; }
 .step.done { color: var(--ink-2); }
-.step.done .dot { border-color: var(--series-piston); background: var(--series-piston); animation: none; }
+.step.done .dot { border-color: var(--accent); background: var(--accent); animation: none; }
 .step.todo { color: var(--muted); }
 .step .step-ms { margin-left: auto; font-size: 11px; color: var(--muted); }
 @keyframes pulse { 50% { opacity: 0.35; } }
@@ -559,13 +778,15 @@ button { font: inherit; color: inherit; }
   font-size: 11px;
   color: var(--muted);
 }
+.sheet-foot a { color: var(--accent-ink); text-decoration: none; }
+.sheet-foot a:hover { text-decoration: underline; }
 
 .loading, .error-page { text-align: center; padding: 80px 20px; color: var(--ink-2); font-family: var(--font-mono); }
 
 @media print {
   .topbar, .theme-toggle { display: none; }
   body { background: #fff; }
-  .sheet { border: none; box-shadow: none; }
+  .sheet { border: none; }
 }
 
 /* ------------------------------------------------------------------ */
@@ -574,7 +795,7 @@ button { font: inherit; color: inherit; }
 
 .replay-stage {
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--r) var(--r) 0 0;
   background:
     linear-gradient(var(--grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid) 1px, transparent 1px),
@@ -592,7 +813,7 @@ button { font: inherit; color: inherit; }
   padding: 10px 14px;
   border: 1px solid var(--border);
   border-top: none;
-  border-radius: 0 0 4px 4px;
+  border-radius: 0 0 var(--r) var(--r);
   background: var(--surface);
   font-family: var(--font-mono);
   font-size: 12px;
@@ -600,7 +821,7 @@ button { font: inherit; color: inherit; }
 .replay-btn {
   border: 1px solid var(--border);
   background: var(--surface);
-  border-radius: 4px;
+  border-radius: var(--r);
   width: 34px;
   height: 26px;
   cursor: pointer;
@@ -616,7 +837,7 @@ button { font: inherit; color: inherit; }
 .replay-track input[type="range"] {
   width: 100%;
   margin: 0;
-  accent-color: var(--series-piston);
+  accent-color: var(--accent);
 }
 .replay-marks { position: absolute; left: 0; right: 0; bottom: 0; height: 12px; pointer-events: none; }
 .replay-mark {
@@ -627,14 +848,14 @@ button { font: inherit; color: inherit; }
   background: var(--baseline);
   transform: translateX(-1px);
 }
-.replay-mark.measured { background: var(--seal); }
+.replay-mark.measured { background: var(--accent); }
 
 /* Speeds are a visible row, not a menu: ×2 and ×4 are the useful ones for
  * reading a whole stroke and should never be a click away. */
 .replay-speeds {
   display: inline-flex;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--r);
   overflow: hidden;
 }
 .replay-speed {
@@ -651,7 +872,7 @@ button { font: inherit; color: inherit; }
 }
 .replay-speed:first-child { border-left: none; }
 .replay-speed:hover { background: var(--surface-2); }
-.replay-speed.on { background: var(--series-piston); color: #fff; }
+.replay-speed.on { background: var(--accent); color: var(--accent-on); font-weight: 700; }
 
 /* The honest label for the control: the sim is not slow, the playback is
  * pinned to Minecraft's clock. */
@@ -670,17 +891,14 @@ button { font: inherit; color: inherit; }
 .block-legend .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 
 /* iso floor grid inside the replay svg */
-:root { --grid-iso: rgba(11, 11, 11, 0.14); }
-:root[data-theme="dark"] { --grid-iso: rgba(255, 255, 255, 0.14); }
+:root { --grid-iso: rgba(23, 23, 23, 0.12); }
+:root[data-theme="dark"] { --grid-iso: rgba(255, 255, 255, 0.12); }
 @media (prefers-color-scheme: dark) {
-  :root:where(:not([data-theme="light"])) { --grid-iso: rgba(255, 255, 255, 0.14); }
+  :root:where(:not([data-theme="light"])) { --grid-iso: rgba(255, 255, 255, 0.12); }
 }
 
 /* seal variant for a failed verdict */
 .seal.seal-fail text { fill: var(--muted); }
-
-/* footer download link */
-.sheet-foot a { color: inherit; }
 
 /* Priming clause: a fact about how the file was saved, not a fault. */
 .hero-note {
@@ -688,17 +906,7 @@ button { font: inherit; color: inherit; }
   padding: 8px 11px;
   border-left: 3px solid var(--baseline);
   background: var(--surface-2);
-  font-size: 12.5px;
-  line-height: 1.5;
-  max-width: 62ch;
-}
-
-/* Paste-survival caveat: a real finding about the design, not an error. */
-.hero-caveat {
-  margin: 10px 0 0;
-  padding: 8px 11px;
-  border-left: 3px solid var(--seal, #b23a2e);
-  background: color-mix(in srgb, var(--seal, #b23a2e) 7%, transparent);
+  border-radius: 0 var(--r) var(--r) 0;
   font-size: 12.5px;
   line-height: 1.5;
   max-width: 62ch;

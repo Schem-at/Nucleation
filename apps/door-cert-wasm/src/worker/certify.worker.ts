@@ -6,8 +6,10 @@ import type {
   Aperture,
   Census,
   CertRecord,
+  Classification,
   LeverFlip,
   Material,
+  PatternCell,
   ReplayBlock,
   ReplayChange,
   TickEvents,
@@ -15,6 +17,7 @@ import type {
   WorkerJob,
   WorkerMessage,
 } from "../lib/types";
+import { classify } from "../lib/classify";
 
 const SEED = 12345n;
 
@@ -70,7 +73,10 @@ function windowSpan(
  * flat, contiguous sheet in that set: take the axis-aligned plane holding the
  * most vacated cells, then the largest connected patch within it. Depth is
  * how many parallel planes repeat that same patch — the wall's thickness. */
-function aperture(closed: ReplayBlock[], open: ReplayBlock[]): Aperture | null {
+function aperture(
+  closed: ReplayBlock[],
+  open: ReplayBlock[],
+): { aperture: Aperture; classification: Classification | null } | null {
   // A snapshot may omit air cells entirely, so absence means air and the
   // union of both key sets is the only safe domain to compare over.
   const closedMap = new Map(closed.map((b) => [posKey(b.pos), b]));
@@ -86,8 +92,17 @@ function aperture(closed: ReplayBlock[], open: ReplayBlock[]): Aperture | null {
     if (cSolid && !oSolid) forward.push(pos);
     else if (!cSolid && oSolid) backward.push(pos);
   }
-  const cells = forward.length >= backward.length ? forward : backward;
+  const shut = forward.length >= backward.length;
+  const cells = shut ? forward : backward;
   if (cells.length === 0) return null;
+  // Whichever snapshot holds the door blocks is the closed one; the other is
+  // the door standing open. A file saved open measures its own closing.
+  const filled = shut ? closedMap : openMap;
+  const vacant = shut ? openMap : closedMap;
+  const solidIn = (m: Map<string, ReplayBlock>, p: Vec3) => {
+    const b = m.get(posKey(p));
+    return b !== undefined && !isAir(b.state);
+  };
 
   // 1. The plane holding the most vacated cells.
   let best = { axis: 0, coord: 0, n: 0 };
@@ -96,8 +111,20 @@ function aperture(closed: ReplayBlock[], open: ReplayBlock[]): Aperture | null {
     for (const p of cells) byCoord.set(p[axis], (byCoord.get(p[axis]) ?? 0) + 1);
     for (const [coord, n] of byCoord) if (n > best.n) best = { axis, coord, n };
   }
-  const [u, v] = [0, 1, 2].filter((i) => i !== best.axis) as [number, number];
-  const flat = (p: Vec3) => `${p[u]},${p[v]}`;
+  // Matrix axes, in the standard's terms: a wall reads rows down the y-axis,
+  // a floor hatch reads rows along z. Which of the two the door is decides
+  // the orientation (Definition 2.4).
+  const vertical = best.axis !== 1;
+  const rowAxis = vertical ? 1 : 2;
+  const colAxis = best.axis === 0 ? 2 : 0;
+  const flat = (p: Vec3) => `${p[colAxis]},${p[rowAxis]}`;
+  const at = (col: number, row: number, layer: number): Vec3 => {
+    const p: Vec3 = [0, 0, 0];
+    p[colAxis] = col;
+    p[rowAxis] = row;
+    p[best.axis] = layer;
+    return p;
+  };
 
   // 2. The largest 4-connected patch inside that plane.
   const plane = new Set(cells.filter((p) => p[best.axis] === best.coord).map(flat));
@@ -123,14 +150,6 @@ function aperture(closed: ReplayBlock[], open: ReplayBlock[]): Aperture | null {
     if (comp.length > patch.length) patch = comp;
   }
   const patchSet = new Set(patch);
-  let loU = Infinity, hiU = -Infinity, loV = Infinity, hiV = -Infinity;
-  for (const key of patch) {
-    const [a, b] = key.split(",").map(Number);
-    if (a < loU) loU = a;
-    if (a > hiU) hiU = a;
-    if (b < loV) loV = b;
-    if (b > hiV) hiV = b;
-  }
 
   // 3. Depth: parallel planes that repeat most of the same patch.
   const byPlane = new Map<number, Set<string>>();
@@ -146,17 +165,230 @@ function aperture(closed: ReplayBlock[], open: ReplayBlock[]): Aperture | null {
     for (const key of patchSet) if (s.has(key)) hit++;
     return hit >= patch.length * 0.5;
   };
-  let depth = 1;
-  for (let c = best.coord - 1; repeats(c); c--) depth++;
-  for (let c = best.coord + 1; repeats(c); c++) depth++;
+  let lo = best.coord;
+  let hi = best.coord;
+  while (repeats(lo - 1)) lo--;
+  while (repeats(hi + 1)) hi++;
+  const depth = hi - lo + 1;
 
-  const eU = hiU - loU + 1;
-  const eV = hiV - loV + 1;
+  // 4. The pattern footprint: every door cell in those layers, projected flat.
+  //    Diagonal neighbours count, or a checkerboard would fall apart into
+  //    single cells.
+  const foot = new Set<string>();
+  for (const p of cells) if (p[best.axis] >= lo && p[best.axis] <= hi) foot.add(flat(p));
+  const reach = new Set(patch);
+  const stack = [...patch];
+  while (stack.length) {
+    const [a, b] = stack.pop()!.split(",").map(Number);
+    for (let da = -1; da <= 1; da++)
+      for (let db = -1; db <= 1; db++) {
+        const nk = `${a + da},${b + db}`;
+        if (foot.has(nk) && !reach.has(nk)) {
+          reach.add(nk);
+          stack.push(nk);
+        }
+      }
+  }
+  let loC = Infinity, hiC = -Infinity, loR = Infinity, hiR = -Infinity;
+  for (const key of reach) {
+    const [a, b] = key.split(",").map(Number);
+    if (a < loC) loC = a;
+    if (a > hiC) hiC = a;
+    if (b < loR) loR = b;
+    if (b > hiR) hiR = b;
+  }
+
+  // 5. The pattern size is the hole in the wall, not the blocks filling it —
+  //    a sissy bar leaves whole rows empty. Flood the non-static cells of the
+  //    doorway plane out from the door blocks; if the fill escapes a margin
+  //    around them it has leaked past the frame, so fall back to the blocks.
+  const PAD = 3;
+  const winC0 = loC - PAD, winC1 = hiC + PAD, winR0 = loR - PAD, winR1 = hiR + PAD;
+  const isStatic = (col: number, row: number) => {
+    const p = at(col, row, best.coord);
+    return solidIn(filled, p) && solidIn(vacant, p);
+  };
+  const hole = new Set(reach);
+  const holeQ = [...reach];
+  let leaked = false;
+  while (holeQ.length && !leaked) {
+    const [a, b] = holeQ.pop()!.split(",").map(Number);
+    for (const [da, db] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const na = a + da, nb = b + db;
+      if (na < winC0 || na > winC1 || nb < winR0 || nb > winR1) {
+        leaked = true;
+        break;
+      }
+      const nk = `${na},${nb}`;
+      if (hole.has(nk) || isStatic(na, nb)) continue;
+      hole.add(nk);
+      holeQ.push(nk);
+    }
+  }
+  if (!leaked) {
+    for (const key of hole) {
+      const [a, b] = key.split(",").map(Number);
+      if (a < loC) loC = a;
+      if (a > hiC) hiC = a;
+      if (b < loR) loR = b;
+      if (b > hiR) hiR = b;
+    }
+  }
+
+  const spanC = hiC - loC + 1;
+  const spanR = hiR - loR + 1;
   // y is height whenever it lies in the plane; a floor hatch has no height,
   // so its two horizontal spans are reported widest-first.
-  const h = u === 1 ? eU : v === 1 ? eV : Math.min(eU, eV);
-  const w = u === 1 ? eV : v === 1 ? eU : Math.max(eU, eV);
-  return { cells: patch.length, w, h, depth };
+  const h = vertical ? spanR : Math.min(spanC, spanR);
+  const w = vertical ? spanC : Math.max(spanC, spanR);
+  const doorway: Aperture = { cells: patch.length, w, h, depth };
+
+  // 6. Read the pattern off the door blocks. Rows run down the matrix, so a
+  //    wall's rows count down from its top y.
+  const rowOf = (row: number) => (vertical ? hiR - row : row - loR);
+  const cellList: PatternCell[] = [];
+  let clean = true;
+  for (const p of cells) {
+    const layer = p[best.axis];
+    if (layer < lo || layer > hi) continue;
+    const col = p[colAxis], row = p[rowAxis];
+    if (col < loC || col > hiC || row < loR || row > hiR) continue;
+    const block = filled.get(posKey(p));
+    if (!block) {
+      clean = false;
+      continue;
+    }
+    cellList.push({ r: rowOf(row), c: col - loC, k: layer - lo, id: baseName(block.state) });
+  }
+  const m = spanC;
+  const n = spanR;
+
+  // 7. Orientation (Definition 2.4). A wall is a Door; a hatch is a skydoor,
+  //    and which kind depends on where the machinery lives — the front side
+  //    is the one you can see the pattern from.
+  let orientation: Classification["orientation"] = "Door";
+  if (!vertical) {
+    let below = 0;
+    let above = 0;
+    for (const b of filled.values()) {
+      if (isAir(b.state)) continue;
+      if (b.pos[1] < best.coord) below++;
+      else if (b.pos[1] > best.coord) above++;
+    }
+    orientation = below >= above ? "Skydoor" : "Ceiling Skydoor";
+  }
+
+  // 8. Flush / Deluxe / Trapdoor (Definitions 2.6-2.8): where the outermost
+  //    door layer sits relative to the frame surface.
+  //
+  //    The frame surface is a layer whose ring around the doorway is a
+  //    complete, static rectangle — a wall face. Behind it the same ring is
+  //    part solid and part machinery, so a loose threshold would read the
+  //    mechanism as more wall and push the frame back through the build.
+  const ring: [number, number][] = [];
+  for (let a = loC - 1; a <= hiC + 1; a++) {
+    ring.push([a, loR - 1]);
+    ring.push([a, hiR + 1]);
+  }
+  for (let b = loR; b <= hiR; b++) {
+    ring.push([loC - 1, b]);
+    ring.push([hiC + 1, b]);
+  }
+  const faces: number[] = [];
+  for (let layer = lo - 6; layer <= hi + 6; layer++) {
+    let n2 = 0;
+    for (const [a, b] of ring) {
+      const p = at(a, b, layer);
+      if (solidIn(filled, p) && solidIn(vacant, p)) n2++;
+    }
+    if (n2 >= ring.length * 0.85) faces.push(layer);
+  }
+  // How far the door stands from the nearest frame face, and on which side of
+  // it. A face is an exposed wall surface; the machinery is always behind the
+  // wall, so if the space past a face holds most of the build the door is
+  // standing outside that face — deluxe. If it is empty, the door is sunk
+  // into the wall instead.
+  let totalSolid = 0;
+  for (const b of filled.values()) if (!isAir(b.state)) totalSolid++;
+  const massBeyond = (face: number, below: boolean) => {
+    let n2 = 0;
+    for (const b of filled.values()) {
+      if (isAir(b.state)) continue;
+      const c = b.pos[best.axis];
+      if (below ? c < face : c > face) n2++;
+    }
+    return n2;
+  };
+  const qualifiers: string[] = [];
+  let frameNote: string | null = null;
+  let nearest: { gap: number; proud: boolean } | null = null;
+  for (const face of faces) {
+    if (face >= lo && face <= hi) {
+      nearest = { gap: 0, proud: false };
+      break;
+    }
+    const below = face < lo;
+    const gap = below ? lo - face : face - hi;
+    const proud = massBeyond(face, below) >= totalSolid * 0.2;
+    if (nearest === null || gap < nearest.gap) nearest = { gap, proud };
+  }
+  if (nearest) {
+    const { gap, proud } = nearest;
+    if (gap === 0) {
+      qualifiers.push("Flush");
+      frameNote = "outermost layer level with the frame face";
+    } else if (proud) {
+      if (gap === 1 && vertical) qualifiers.push("Deluxe");
+      frameNote = `outermost layer ${gap} block${gap === 1 ? "" : "s"} proud of the frame face`;
+    } else {
+      frameNote = `outermost layer ${gap} block${gap === 1 ? "" : "s"} inside the frame face`;
+    }
+    // A skydoor within one block of the surface either way is a trapdoor.
+    if (!vertical && gap <= 1) qualifiers.push("Trapdoor");
+  }
+
+  // 9. What surrounds the pattern, for the Section 5 compositions.
+  const collect = (
+    pick: (col: number, row: number) => boolean,
+    src: Map<string, ReplayBlock>,
+    layers: number[],
+  ) => {
+    const out: string[] = [];
+    for (let a = loC - 2; a <= hiC + 2; a++)
+      for (let b = loR - 2; b <= hiR + 2; b++) {
+        if (!pick(a, b)) continue;
+        for (const layer of layers) {
+          const blk = src.get(posKey(at(a, b, layer)));
+          if (blk && !isAir(blk.state)) out.push(baseName(blk.state));
+        }
+      }
+    return out;
+  };
+  const layers: number[] = [];
+  for (let c = lo; c <= hi; c++) layers.push(c);
+  const inBox = (a: number, b: number) => a >= loC && a <= hiC && b >= loR && b <= hiR;
+  const inPad = (a: number, b: number, d: number) =>
+    a >= loC - d && a <= hiC + d && b >= loR - d && b <= hiR + d;
+  const frameIds = collect((a, b) => !inBox(a, b) && inPad(a, b, 1), filled, layers);
+  const outerIds = collect((a, b) => !inPad(a, b, 1) && inPad(a, b, 2), filled, layers);
+  const sillRow = vertical ? loR : hiR;
+  const sillIds = collect((a, b) => b === sillRow && a >= loC && a <= hiC, vacant, layers);
+
+  const classification =
+    clean && cellList.length > 0 && m >= 1 && n >= 1 && m <= 32 && n <= 32
+      ? classify({
+          cells: cellList,
+          m,
+          n,
+          layers: depth,
+          orientation,
+          qualifiers,
+          frameNote,
+          around: { frameIds, outerIds, sillIds },
+        })
+      : null;
+
+  return { aperture: doorway, classification };
 }
 
 /** Parts census, taken from the door at rest. */
@@ -323,7 +555,9 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
   const movedCells = symmetricDiff(restKey, snapshotKey(cycle.openBlocks));
 
   // The doorway itself, and how much of the build it costs to get it.
-  const doorway = aperture(restBlocks, cycle.openBlocks);
+  progress("classifying");
+  const analysis = aperture(restBlocks, cycle.openBlocks);
+  const doorway = analysis?.aperture ?? null;
   const parts = census(restBlocks);
   const cycleTicks = openTicks + closeTicks;
   const cyclesPerMinute = cycleTicks > 0 ? 1200 / cycleTicks : 0;
@@ -367,6 +601,9 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
     tick: t,
     piston: byTick.get(t)?.piston ?? 0,
     redstone: byTick.get(t)?.redstone ?? 0,
+    // The engine does not report item movement yet; the series is carried so
+    // the trace does not have to change shape when it does.
+    items: byTick.get(t)?.items ?? 0,
     changes: byTick.get(t)?.changes ?? 0,
   }));
 
@@ -440,6 +677,7 @@ async function certify(job: WorkerJob): Promise<CertRecord> {
       paste_safe: pasteSafe,
       paste_moved_cells: pasteMovedCells,
       aperture: doorway,
+      classification: analysis?.classification ?? null,
       peak_changes: peakChanges,
       peak_tick: peakTick,
       peak_signal: peakSignal.n,

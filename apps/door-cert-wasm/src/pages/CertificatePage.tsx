@@ -4,6 +4,7 @@ import { loadRecord } from "../lib/store";
 import { Seal } from "../components/Seal";
 import { StatTile } from "../components/StatTile";
 import { ActivityChart } from "../components/ActivityChart";
+import { ClassificationBlock } from "../components/ClassificationBlock";
 import { Heatmap } from "../components/Heatmap";
 import { MaterialsGrid, stackMath } from "../components/MaterialsGrid";
 import { MeshReplay } from "../components/MeshReplay";
@@ -80,16 +81,24 @@ export function CertificatePage() {
   return (
     <div className="sheet">
       <div className="sheet-band">
-        <span>Certificate no. {id}</span>
-        <span>Seed {cert.seed}</span>
-        <span>Verdict {cert.verdict}</span>
-        <span>Issued {new Date().toISOString().slice(0, 10)}</span>
+        <span>
+          report <b>{id}</b>
+        </span>
+        <span>
+          seed <b>{cert.seed}</b>
+        </span>
+        <span>
+          verdict <b>{cert.verdict}</b>
+        </span>
+        <span>
+          run <b>{new Date().toISOString().slice(0, 10)}</b>
+        </span>
       </div>
 
       <div className="sheet-body">
         <div className="hero">
           <div>
-            <p className="eyebrow">Piston door performance certificate</p>
+            <p className="eyebrow">Piston door validation report</p>
             <h1>{cert.name}</h1>
             {ap ? (
               <p className="hero-aperture" data-testid="aperture">
@@ -132,24 +141,22 @@ export function CertificatePage() {
                 was run to its steady state first; timings are measured from there.
               </p>
             )}
-            {!cert.paste_safe && (
-              <p className="hero-caveat">
-                <b>Needs priming after pasting.</b> Measured as built. Placed by a paste,
-                this door's stroke drops from {cert.moved_cells} to {cert.paste_moved_cells}{" "}
-                cells — vanilla re-derives redstone state on placement and its memory cell
-                comes up unlatched. Cycle the lever once after placing it.
-              </p>
-            )}
           </div>
           <Seal openTicks={cert.open_ticks} verdict={cert.verdict} />
         </div>
       </div>
 
+      {cert.classification && (
+        <div className="sheet-section">
+          <ClassificationBlock cls={cert.classification} />
+        </div>
+      )}
+
       <div className="sheet-section">
         <p className="eyebrow">Exhibit A — the measured cycle</p>
         <MeshReplay replay={rec.replay} lever={cert.lever} />
         <p className="exhibit-caption">
-          Drawn from the recorded block changes. The two red marks on the scrubber are the
+          Drawn from the recorded block changes. The two lime marks on the scrubber are the
           lever clicks: it starts on the one that opens the door.
         </p>
       </div>
@@ -203,7 +210,9 @@ export function CertificatePage() {
         <p className="eyebrow">Activity trace</p>
         <h3>Events per tick of the cycle</h3>
         <p className="chart-note">
-          One burst per lever click: redstone settles first, then pistons walk the door.
+          Stacked, so the height is everything happening on that tick. One burst per lever
+          click; the marker under the axis is where the stroke actually finishes, and shaded
+          columns are ticks with nothing at all.
         </p>
         <ActivityChart events={cert.events_per_tick} flips={rec.replay.flips} />
       </div>
@@ -251,7 +260,7 @@ export function CertificatePage() {
       </div>
 
       <div className="sheet-foot">
-        <span>Door Certification Bureau</span>
+        <span>schemat.io · door validator — simulated in this browser</span>
         <span>
           seed {cert.seed} ·{" "}
           <a href={certUrl} download={`${cert.name}.certificate.json`}>

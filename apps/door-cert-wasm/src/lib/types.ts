@@ -2,6 +2,9 @@ export type TickEvents = {
   tick: number;
   piston: number;
   redstone: number;
+  /** Item-movement events. The engine does not report these yet, so this is
+   *  zero everywhere; the stacked trace already carries the series. */
+  items: number;
   changes: number;
 };
 
@@ -19,6 +22,54 @@ export type Aperture = {
   h: number;
   /** Depth of the opening along the remaining axis. */
   depth: number;
+};
+
+/** One door block, in the standard's matrix coordinates: row counted down
+ *  from the top of the pattern, column left to right, layer front to back. */
+export type PatternCell = { r: number; c: number; k: number; id: string };
+
+/** What sits around the doorway — needed for the Section 5 compositions. */
+export type PatternSurroundings = {
+  /** Blocks in the ring immediately around the pattern, door layers, closed. */
+  frameIds: string[];
+  /** The ring outside that one. */
+  outerIds: string[];
+  /** What the doorway stands on once it is open. */
+  sillIds: string[];
+};
+
+/** The door read against MYuen222, "Door Pattern Definitions v1.1". */
+export type Classification = {
+  /** The formal name, e.g. "6 × 6 Flush Regular Door". */
+  name: string;
+  /** Pattern length and height (Def 2.9). */
+  m: number;
+  n: number;
+  /** Pattern depth: parallel planes the door blocks occupy. */
+  layers: number;
+  /** Def 2.4. */
+  orientation: "Door" | "Skydoor" | "Ceiling Skydoor";
+  /** Flush / Deluxe / Trapdoor (Defs 2.6-2.8), when one of them applies. */
+  qualifiers: string[];
+  /** Where the outermost door layer sits relative to the frame face, in
+   *  plain language — the standard has no term for every case. */
+  frameNote: string | null;
+  /** True when every door block spans the same run of layers: a flat pattern
+   *  extruded through the wall rather than a depth-varying one. */
+  extruded: boolean;
+  /** Matched pattern name, or null when nothing matched exactly. */
+  pattern: string | null;
+  /** Section of the standard the pattern is defined in. */
+  patternRef: string | null;
+  /** Which member of the symmetry group matched, when not the identity. */
+  transform: string | null;
+  /** Section 5 block compositions found. */
+  composition: { label: string; ref: string }[];
+  /** Binary pattern matrix: 1 where a door block sits when closed. */
+  matrix: number[][];
+  /** Layer index per cell; -1 where empty. */
+  depth: number[][];
+  unclassified: boolean;
 };
 
 /** Counts of the parts that make the door move. */
@@ -61,6 +112,8 @@ export type Certificate = {
   paste_moved_cells: number;
   /** The doorway the machine actually opens. Null if nothing opened. */
   aperture: Aperture | null;
+  /** The doorway read against the community pattern standard. */
+  classification: Classification | null;
   /** Busiest tick of the cycle: how many cells changed, and when. */
   peak_changes: number;
   peak_tick: number;

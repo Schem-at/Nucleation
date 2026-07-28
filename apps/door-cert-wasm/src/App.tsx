@@ -32,7 +32,9 @@ export default function App() {
       <div className="shell">
         <header className="topbar">
           <Link to="/" className="topbar-brand">
-            Door Certification <b>Bureau</b>
+            <b>schemat.io</b>
+            <span className="sep">·</span>
+            <span className="sub">door validator</span>
           </Link>
           <div className="topbar-side">
             <ThemeToggle />
