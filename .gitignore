@@ -78,3 +78,22 @@ bindings/kotlin/.kotlin/
 # Vanilla oracle scratch: server jar, extracted libraries, test worlds.
 /tools/gametest/work/
 /tools/gametest/logs/
+
+# Web-app build/runtime artifacts (apps/ ships sources only)
+apps/*/node_modules/
+apps/*/*/node_modules/
+apps/*/dist/
+apps/*/*/dist/
+apps/*/backend/.venv/
+apps/*/backend/jobs/
+apps/*/backend/*.log
+apps/*/backend/*.pid
+apps/*/preview.log
+apps/*/preview.pid
+apps/*/screenshots/
+apps/*/*/screenshots/
+apps/*/public/engine/
+apps/*/public/pack/
+apps/shared-pack/
+# Assembled browser wasm package (rebuild via tools/package-npm.sh)
+dist/npm-mctick/
