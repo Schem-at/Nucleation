@@ -49,7 +49,7 @@ pub mod wire;
 pub mod vanilla;
 pub mod world;
 
-pub use behaviour::{BehaviourTable, BlockBehaviour, Inert, TickCtx};
+pub use behaviour::{BehaviourTable, BlockBehaviour, Inert, TickCtx, UpdateKind, UpdateRecord};
 pub use components::{Comparator, PowerSource, Repeater, StatePair, Torch,
     COMPARATOR_DELAY, REPEATER_TICKS_PER_DELAY, TORCH_DELAY};
 pub use observer::{Observer, OBSERVER_PULSE_TICKS};

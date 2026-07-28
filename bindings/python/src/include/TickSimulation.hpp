@@ -59,6 +59,14 @@ namespace capi {
 
     void TickSimulation_gametest_snbt(const nucleation::capi::Schematic* schematic, nucleation::diplomat::capi::DiplomatWrite* write);
 
+    void TickSimulation_record_updates(nucleation::capi::TickSimulation* self, bool on);
+
+    uint32_t TickSimulation_updates_count(const nucleation::capi::TickSimulation* self);
+
+    void TickSimulation_updates_json(const nucleation::capi::TickSimulation* self, nucleation::diplomat::capi::DiplomatWrite* write);
+
+    void TickSimulation_updates_json_between(const nucleation::capi::TickSimulation* self, uint32_t from_tick, uint32_t to_tick, nucleation::diplomat::capi::DiplomatWrite* write);
+
     void TickSimulation_changes_json(const nucleation::capi::TickSimulation* self, nucleation::diplomat::capi::DiplomatWrite* write);
 
     void TickSimulation_item_entities_json(const nucleation::capi::TickSimulation* self, nucleation::diplomat::capi::DiplomatWrite* write);
@@ -248,6 +256,48 @@ template<typename W>
 inline void nucleation::TickSimulation::gametest_snbt_write(const nucleation::Schematic& schematic, W& writeable) {
     nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
     nucleation::capi::TickSimulation_gametest_snbt(schematic.AsFFI(),
+        &write);
+}
+
+inline void nucleation::TickSimulation::record_updates(bool on) {
+    nucleation::capi::TickSimulation_record_updates(this->AsFFI(),
+        on);
+}
+
+inline uint32_t nucleation::TickSimulation::updates_count() const {
+    auto result = nucleation::capi::TickSimulation_updates_count(this->AsFFI());
+    return result;
+}
+
+inline std::string nucleation::TickSimulation::updates_json() const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    nucleation::capi::TickSimulation_updates_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void nucleation::TickSimulation::updates_json_write(W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    nucleation::capi::TickSimulation_updates_json(this->AsFFI(),
+        &write);
+}
+
+inline std::string nucleation::TickSimulation::updates_json_between(uint32_t from_tick, uint32_t to_tick) const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    nucleation::capi::TickSimulation_updates_json_between(this->AsFFI(),
+        from_tick,
+        to_tick,
+        &write);
+    return output;
+}
+template<typename W>
+inline void nucleation::TickSimulation::updates_json_between_write(uint32_t from_tick, uint32_t to_tick, W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    nucleation::capi::TickSimulation_updates_json_between(this->AsFFI(),
+        from_tick,
+        to_tick,
         &write);
 }
 

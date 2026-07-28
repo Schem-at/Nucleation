@@ -31,12 +31,16 @@ void add_TickSimulation_binding(nb::module_ mod) {
         .def("non_air_max_x", &nucleation::TickSimulation::non_air_max_x)
         .def("non_air_min_x", &nucleation::TickSimulation::non_air_min_x)
         .def("place_block", &nucleation::TickSimulation::place_block, "x"_a, "y"_a, "z"_a, "state"_a)
+        .def("record_updates", &nucleation::TickSimulation::record_updates, "on"_a)
         .def("restore", &nucleation::TickSimulation::restore, "id"_a)
         .def("run", &nucleation::TickSimulation::run, "ticks"_a)
         .def("run_until_quiescent", &nucleation::TickSimulation::run_until_quiescent, "budget"_a)
         .def("set_rng_seed", &nucleation::TickSimulation::set_rng_seed, "seed"_a)
         .def("step", &nucleation::TickSimulation::step)
         .def("tick_count", &nucleation::TickSimulation::tick_count)
+        .def("updates_count", &nucleation::TickSimulation::updates_count)
+        .def("updates_json", &nucleation::TickSimulation::updates_json)
+        .def("updates_json_between", &nucleation::TickSimulation::updates_json_between, "from_tick"_a, "to_tick"_a)
         .def("use_block", &nucleation::TickSimulation::use_block, "x"_a, "y"_a, "z"_a)
         .def("world_snapshot_json", &nucleation::TickSimulation::world_snapshot_json);
 }

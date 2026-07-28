@@ -59,6 +59,14 @@ namespace capi {
 
     void TickSimulation_gametest_snbt(const diplomat::capi::Schematic* schematic, diplomat::capi::DiplomatWrite* write);
 
+    void TickSimulation_record_updates(diplomat::capi::TickSimulation* self, bool on);
+
+    uint32_t TickSimulation_updates_count(const diplomat::capi::TickSimulation* self);
+
+    void TickSimulation_updates_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
+
+    void TickSimulation_updates_json_between(const diplomat::capi::TickSimulation* self, uint32_t from_tick, uint32_t to_tick, diplomat::capi::DiplomatWrite* write);
+
     void TickSimulation_changes_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
 
     void TickSimulation_item_entities_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
@@ -248,6 +256,48 @@ template<typename W>
 inline void TickSimulation::gametest_snbt_write(const Schematic& schematic, W& writeable) {
     diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
     diplomat::capi::TickSimulation_gametest_snbt(schematic.AsFFI(),
+        &write);
+}
+
+inline void TickSimulation::record_updates(bool on) {
+    diplomat::capi::TickSimulation_record_updates(this->AsFFI(),
+        on);
+}
+
+inline uint32_t TickSimulation::updates_count() const {
+    auto result = diplomat::capi::TickSimulation_updates_count(this->AsFFI());
+    return result;
+}
+
+inline std::string TickSimulation::updates_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::TickSimulation_updates_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void TickSimulation::updates_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::TickSimulation_updates_json(this->AsFFI(),
+        &write);
+}
+
+inline std::string TickSimulation::updates_json_between(uint32_t from_tick, uint32_t to_tick) const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::TickSimulation_updates_json_between(this->AsFFI(),
+        from_tick,
+        to_tick,
+        &write);
+    return output;
+}
+template<typename W>
+inline void TickSimulation::updates_json_between_write(uint32_t from_tick, uint32_t to_tick, W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::TickSimulation_updates_json_between(this->AsFFI(),
+        from_tick,
+        to_tick,
         &write);
 }
 

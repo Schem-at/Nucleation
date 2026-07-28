@@ -23,6 +23,10 @@ internal interface TickSimulationLib: Library {
     fun TickSimulation_checkpoint(handle: Pointer): FFIUint32
     fun TickSimulation_restore(handle: Pointer, id: FFIUint32): ResultUnitInt
     fun TickSimulation_gametest_snbt(schematic: Pointer, write: Pointer): Unit
+    fun TickSimulation_record_updates(handle: Pointer, on: Boolean): Unit
+    fun TickSimulation_updates_count(handle: Pointer): FFIUint32
+    fun TickSimulation_updates_json(handle: Pointer, write: Pointer): Unit
+    fun TickSimulation_updates_json_between(handle: Pointer, fromTick: FFIUint32, toTick: FFIUint32, write: Pointer): Unit
     fun TickSimulation_changes_json(handle: Pointer, write: Pointer): Unit
     fun TickSimulation_item_entities_json(handle: Pointer, write: Pointer): Unit
     fun TickSimulation_events_summary_json(handle: Pointer, write: Pointer): Unit
@@ -301,6 +305,55 @@ class TickSimulation internal constructor (
         } else {
             return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
         }
+    }
+
+    /** Start (or stop) recording every delivered redstone update.
+    *
+    *Off by default and much larger than the block-change log — a door's
+    *cycle runs several updates per change — so a propagation view asks
+    *for it explicitly and pages with
+    *[TickSimulation::updates_json_between].
+    */
+    fun recordUpdates(on: Boolean): Unit {
+
+        val returnVal = lib.TickSimulation_record_updates(handle, on);
+
+    }
+
+    /** How many updates have been recorded — page before pulling them.
+    */
+    fun updatesCount(): UInt {
+
+        val returnVal = lib.TickSimulation_updates_count(handle);
+        return (returnVal.toUInt())
+    }
+
+    /** Every recorded update, in delivery order.
+    *
+    *`seq` counts from 0 within each tick: that is the sub-tick axis, and
+    *`(tick, seq)` is the order the engine actually delivered them in.
+    *`state` is the block as it stood **at dispatch time**, which is what
+    *makes intra-tick order legible — a snapshot cannot show it.
+    */
+    fun updatesJson(): String {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.TickSimulation_updates_json(handle, write);
+
+        val returnString = DW.writeToString(write)
+        return returnString
+    }
+
+    /** The recorded updates for ticks in `[from_tick, to_tick)`.
+    *
+    *The whole log for a 6x6 door's cycle is megabytes; a scrubber only
+    *ever shows one tick, so it should ask for one tick.
+    */
+    fun updatesJsonBetween(fromTick: UInt, toTick: UInt): String {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.TickSimulation_updates_json_between(handle, FFIUint32(fromTick), FFIUint32(toTick), write);
+
+        val returnString = DW.writeToString(write)
+        return returnString
     }
 
     fun changesJson(): String {

@@ -89,6 +89,48 @@ fn to_gametest_snbt(schematic: &crate::UniversalSchematic) -> String {
     )
 }
 
+/// Serialise recorded updates for ticks in `[from, to)`.
+///
+/// Shared by the whole-log and per-tick-range accessors so both emit exactly
+/// one schema. `state` is the block at dispatch time, not at the tick boundary.
+fn updates_json_range(sim: &mc_tick::Simulation, from: u64, to: u64) -> String {
+    use std::fmt::Write as _;
+    let mut json = String::from("[");
+    let mut first = true;
+    for update in sim.recorded_updates() {
+        if update.tick < from || update.tick >= to {
+            continue;
+        }
+        if !first {
+            json.push(',');
+        }
+        first = false;
+        let state = sim.registry().descriptor(update.state).unwrap_or("minecraft:air");
+        let kind = match update.kind {
+            mc_tick::UpdateKind::Neighbor => "neighbor",
+            mc_tick::UpdateKind::Shape => "shape",
+        };
+        // No phase means a boundary dispatch: placement, a click, a break —
+        // the server loop rather than a phase of the tick.
+        let phase = update.phase.map_or("boundary", |p| p.name());
+        let _ = write!(
+            json,
+            "{{\"tick\":{},\"seq\":{},\"pos\":[{},{},{}],\"from\":\"{:?}\",\"kind\":\"{}\",\"phase\":\"{}\",\"state\":\"{}\"}}",
+            update.tick,
+            update.seq,
+            update.pos.x,
+            update.pos.y,
+            update.pos.z,
+            update.from,
+            kind,
+            phase,
+            state
+        );
+    }
+    json.push(']');
+    json
+}
+
 /// The settle recipe, mirroring the engine's conformance harness.
 fn wire_simulation(
     structure: &mc_tick::Structure,
@@ -789,6 +831,48 @@ pub mod ffi {
         /// a converted `.litematic`/`.schem` to the video renderer.
         pub fn gametest_snbt(schematic: &Schematic, out: &mut DiplomatWrite) {
             let _ = write!(out, "{}", super::to_gametest_snbt(&schematic.0));
+        }
+
+        /// Start (or stop) recording every delivered redstone update.
+        ///
+        /// Off by default and much larger than the block-change log — a door's
+        /// cycle runs several updates per change — so a propagation view asks
+        /// for it explicitly and pages with
+        /// [`TickSimulation::updates_json_between`].
+        pub fn record_updates(&mut self, on: bool) {
+            self.sim.record_updates(on);
+        }
+
+        /// How many updates have been recorded — page before pulling them.
+        pub fn updates_count(&self) -> u32 {
+            self.sim.recorded_updates().len() as u32
+        }
+
+        /// Every recorded update, in delivery order.
+        ///
+        /// `seq` counts from 0 within each tick: that is the sub-tick axis, and
+        /// `(tick, seq)` is the order the engine actually delivered them in.
+        /// `state` is the block as it stood **at dispatch time**, which is what
+        /// makes intra-tick order legible — a snapshot cannot show it.
+        pub fn updates_json(&self, out: &mut DiplomatWrite) {
+            let _ = write!(out, "{}", super::updates_json_range(&self.sim, 0, u64::MAX));
+        }
+
+        /// The recorded updates for ticks in `[from_tick, to_tick)`.
+        ///
+        /// The whole log for a 6x6 door's cycle is megabytes; a scrubber only
+        /// ever shows one tick, so it should ask for one tick.
+        pub fn updates_json_between(
+            &self,
+            from_tick: u32,
+            to_tick: u32,
+            out: &mut DiplomatWrite,
+        ) {
+            let _ = write!(
+                out,
+                "{}",
+                super::updates_json_range(&self.sim, u64::from(from_tick), u64::from(to_tick))
+            );
         }
 
         pub fn changes_json(&self, out: &mut DiplomatWrite) {

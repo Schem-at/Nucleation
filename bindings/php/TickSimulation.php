@@ -199,6 +199,27 @@ final class TickSimulation {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function recordUpdates( $on) {
+        Lib::ffi()->TickSimulation_record_updates($this->ptr, $on);
+    }
+
+    public function updatesCount() {
+        $ret = Lib::ffi()->TickSimulation_updates_count($this->ptr);
+        return $ret;
+    }
+
+    public function updatesJson() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->TickSimulation_updates_json($this->ptr, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function updatesJsonBetween( $from_tick,  $to_tick) {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->TickSimulation_updates_json_between($this->ptr, $from_tick, $to_tick, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function changesJson() {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         Lib::ffi()->TickSimulation_changes_json($this->ptr, $write);

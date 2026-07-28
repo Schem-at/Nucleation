@@ -149,6 +149,43 @@ public:
   template<typename W>
   inline static void gametest_snbt_write(const nucleation::Schematic& schematic, W& writeable_output);
 
+  /**
+   * Start (or stop) recording every delivered redstone update.
+   *
+   * Off by default and much larger than the block-change log — a door's
+   * cycle runs several updates per change — so a propagation view asks
+   * for it explicitly and pages with
+   * {@link TickSimulation::updates_json_between}.
+   */
+  inline void record_updates(bool on);
+
+  /**
+   * How many updates have been recorded — page before pulling them.
+   */
+  inline uint32_t updates_count() const;
+
+  /**
+   * Every recorded update, in delivery order.
+   *
+   * `seq` counts from 0 within each tick: that is the sub-tick axis, and
+   * `(tick, seq)` is the order the engine actually delivered them in.
+   * `state` is the block as it stood **at dispatch time**, which is what
+   * makes intra-tick order legible — a snapshot cannot show it.
+   */
+  inline std::string updates_json() const;
+  template<typename W>
+  inline void updates_json_write(W& writeable_output) const;
+
+  /**
+   * The recorded updates for ticks in `[from_tick, to_tick)`.
+   *
+   * The whole log for a 6x6 door's cycle is megabytes; a scrubber only
+   * ever shows one tick, so it should ask for one tick.
+   */
+  inline std::string updates_json_between(uint32_t from_tick, uint32_t to_tick) const;
+  template<typename W>
+  inline void updates_json_between_write(uint32_t from_tick, uint32_t to_tick, W& writeable_output) const;
+
   inline std::string changes_json() const;
   template<typename W>
   inline void changes_json_write(W& writeable_output) const;

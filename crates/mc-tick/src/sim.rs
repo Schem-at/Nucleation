@@ -209,6 +209,13 @@ pub struct Simulation {
     log: Option<Vec<BlockChange>>,
     /// Recorded container-slot changes, when recording is enabled.
     inv_log: Option<Vec<crate::behaviour::InventoryChange>>,
+    /// Recorded update deliveries, when update recording is enabled.
+    ///
+    /// Separate from [`Simulation::record`] because it is far larger — several
+    /// updates per block change — and only a propagation view wants it.
+    upd_log: Option<Vec<crate::behaviour::UpdateRecord>>,
+    /// The phase currently executing, `None` between ticks.
+    phase: Option<Phase>,
     /// Whether a tick's phase walk is currently executing.
     ///
     /// Dispatches outside of one — settling a freshly placed structure, a block
@@ -283,6 +290,8 @@ impl Simulation {
             tickers: Vec::new(),
             log: None,
             inv_log: None,
+            upd_log: None,
+            phase: None,
             in_tick: false,
             ticking: None,
             tick: 0,
@@ -478,6 +487,21 @@ impl Simulation {
         self.log.as_deref().unwrap_or(&[])
     }
 
+    /// Start (or stop) recording every delivered update.
+    ///
+    /// Off by default and deliberately separate from [`Simulation::record`]:
+    /// a door's cycle produces several updates per block change, and only a
+    /// propagation view wants them. Turning it off drops the log.
+    pub fn record_updates(&mut self, on: bool) {
+        self.upd_log = if on { Some(Vec::new()) } else { None };
+    }
+
+    /// The updates recorded since [`Simulation::record_updates`], in delivery
+    /// order — which is `(tick, seq)` order.
+    pub fn recorded_updates(&self) -> &[crate::behaviour::UpdateRecord] {
+        self.upd_log.as_deref().unwrap_or(&[])
+    }
+
     /// The behaviour table.
     pub fn behaviours(&self) -> &BehaviourTable {
         &self.behaviours
@@ -591,11 +615,13 @@ impl Simulation {
                 // A phase-level failure ends the tick immediately; continuing
                 // would build further state on top of a known-bad tick.
                 self.in_tick = false;
+                self.phase = None;
                 return stop;
             }
         }
         self.emit_entity_events();
         self.in_tick = false;
+        self.phase = None;
         self.tick += 1;
         // Burnout only looks back a fixed window, so anything older is dead weight.
         let horizon = self.tick.saturating_sub(crate::components::TORCH_BURNOUT_WINDOW);
@@ -791,6 +817,8 @@ impl Simulation {
             drain: Some(crate::behaviour::Drain {
                 pending: &mut self.pending,
                 unknown_seen: &mut self.unknown_seen,
+                upd_log: self.upd_log.as_mut(),
+                phase: self.phase,
             }),
             behaviours: Some(&self.behaviours),
             world: &mut self.world,
@@ -928,6 +956,8 @@ impl Simulation {
                 drain: Some(crate::behaviour::Drain {
                     pending: &mut self.pending,
                     unknown_seen: &mut self.unknown_seen,
+                    upd_log: self.upd_log.as_mut(),
+                    phase: self.phase,
                 }),
                 behaviours: Some(&self.behaviours),
                 world: &mut self.world,
@@ -1161,6 +1191,8 @@ impl Simulation {
                 drain: Some(crate::behaviour::Drain {
                     pending: &mut self.pending,
                     unknown_seen: &mut self.unknown_seen,
+                    upd_log: self.upd_log.as_mut(),
+                    phase: self.phase,
                 }),
                 behaviours: Some(&self.behaviours),
                 world: &mut self.world,
@@ -1216,6 +1248,8 @@ impl Simulation {
             drain: Some(crate::behaviour::Drain {
                 pending: &mut self.pending,
                 unknown_seen: &mut self.unknown_seen,
+                upd_log: self.upd_log.as_mut(),
+                phase: self.phase,
             }),
             behaviours: Some(&self.behaviours),
             world: &mut self.world,
@@ -1241,6 +1275,7 @@ impl Simulation {
 
     /// Run one phase. `Some(stop)` aborts the tick.
     fn run_phase(&mut self, phase: Phase) -> Option<StopReason> {
+        self.phase = Some(phase);
         if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
             eprintln!("[t{}] --- phase {}", self.tick, phase.name());
         }
@@ -1277,6 +1312,8 @@ impl Simulation {
                         drain: Some(crate::behaviour::Drain {
                             pending: &mut self.pending,
                             unknown_seen: &mut self.unknown_seen,
+                            upd_log: self.upd_log.as_mut(),
+                            phase: self.phase,
                         }),
                         behaviours: Some(&self.behaviours),
                         world: &mut self.world,
@@ -1320,6 +1357,8 @@ impl Simulation {
                         drain: Some(crate::behaviour::Drain {
                             pending: &mut self.pending,
                             unknown_seen: &mut self.unknown_seen,
+                            upd_log: self.upd_log.as_mut(),
+                            phase: self.phase,
                         }),
                         behaviours: Some(&self.behaviours),
                         world: &mut self.world,
@@ -1364,6 +1403,8 @@ impl Simulation {
                         drain: Some(crate::behaviour::Drain {
                             pending: &mut self.pending,
                             unknown_seen: &mut self.unknown_seen,
+                            upd_log: self.upd_log.as_mut(),
+                            phase: self.phase,
                         }),
                         behaviours: Some(&self.behaviours),
                         world: &mut self.world,
@@ -1493,6 +1534,8 @@ impl Simulation {
                         drain: Some(crate::behaviour::Drain {
                             pending: &mut self.pending,
                             unknown_seen: &mut self.unknown_seen,
+                            upd_log: self.upd_log.as_mut(),
+                            phase: self.phase,
                         }),
                         behaviours: Some(&self.behaviours),
                         world: &mut self.world,
@@ -1618,6 +1661,8 @@ impl Simulation {
                         drain: Some(crate::behaviour::Drain {
                             pending: &mut self.pending,
                             unknown_seen: &mut self.unknown_seen,
+                            upd_log: self.upd_log.as_mut(),
+                            phase: self.phase,
                         }),
                         behaviours: Some(&self.behaviours),
                         world: &mut self.world,
@@ -1704,6 +1749,8 @@ impl Simulation {
                     drain: Some(crate::behaviour::Drain {
                         pending: &mut self.pending,
                         unknown_seen: &mut self.unknown_seen,
+                        upd_log: self.upd_log.as_mut(),
+                        phase: self.phase,
                     }),
                     behaviours: Some(&self.behaviours),
                     world: &mut self.world,

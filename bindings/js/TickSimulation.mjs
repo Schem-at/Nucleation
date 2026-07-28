@@ -390,6 +390,84 @@ export class TickSimulation {
         }
     }
 
+    /**
+     * Start (or stop) recording every delivered redstone update.
+     *
+     * Off by default and much larger than the block-change log — a door's
+     * cycle runs several updates per change — so a propagation view asks
+     * for it explicitly and pages with
+     * {@link TickSimulation::updates_json_between}.
+     */
+    recordUpdates(on) {
+    wasm.TickSimulation_record_updates(this.ffiValue, on);
+
+        try {}
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
+     * How many updates have been recorded — page before pulling them.
+     */
+    updatesCount() {
+
+        const result = wasm.TickSimulation_updates_count(this.ffiValue);
+
+        try {
+            return result;
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
+     * Every recorded update, in delivery order.
+     *
+     * `seq` counts from 0 within each tick: that is the sub-tick axis, and
+     * `(tick, seq)` is the order the engine actually delivered them in.
+     * `state` is the block as it stood **at dispatch time**, which is what
+     * makes intra-tick order legible — a snapshot cannot show it.
+     */
+    updatesJson() {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.TickSimulation_updates_json(this.ffiValue, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            write.free();
+        }
+    }
+
+    /**
+     * The recorded updates for ticks in `[from_tick, to_tick)`.
+     *
+     * The whole log for a 6x6 door's cycle is megabytes; a scrubber only
+     * ever shows one tick, so it should ask for one tick.
+     */
+    updatesJsonBetween(fromTick, toTick) {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.TickSimulation_updates_json_between(this.ffiValue, fromTick, toTick, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            write.free();
+        }
+    }
+
     changesJson() {
         const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
 

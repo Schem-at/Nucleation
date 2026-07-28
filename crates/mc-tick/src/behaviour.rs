@@ -238,6 +238,39 @@ pub struct Drain<'a> {
     pub pending: &'a mut Vec<UpdateEntry>,
     /// States met with no behaviour registered, for the unknown-block report.
     pub unknown_seen: &'a mut Vec<StateId>,
+    /// Every delivered notification, when update recording is on.
+    ///
+    /// Lives here rather than on [`TickCtx`] because a drain is the only place
+    /// updates are ever *delivered* — everywhere else they are merely queued.
+    /// `None` when recording is off, which is the default: the tick loop should
+    /// not pay for observability nobody asked for.
+    pub upd_log: Option<&'a mut Vec<UpdateRecord>>,
+    /// The phase currently executing, or `None` for a boundary dispatch.
+    pub phase: Option<crate::phase::Phase>,
+}
+
+/// One delivered update — the raw material of a propagation view.
+///
+/// Recorded at the moment of *delivery* rather than of request, which is why it
+/// can carry `state`: the block as it stood when the notification reached it.
+/// Which block sits at a position mid-tick is what decides whether an update
+/// does anything, and it is invisible in a per-tick snapshot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UpdateRecord {
+    /// The tick this was delivered in.
+    pub tick: u64,
+    /// Position within the tick, counting from 0 — the scrubber's sub-tick axis.
+    pub seq: u32,
+    /// The block being notified.
+    pub pos: Pos,
+    /// The side the notification arrived from.
+    pub from: Dir,
+    /// `neighborChanged` or `updateShape`.
+    pub kind: UpdateKind,
+    /// The phase it landed in; `None` outside a phase walk.
+    pub phase: Option<crate::phase::Phase>,
+    /// The state at `pos` at dispatch time.
+    pub state: StateId,
 }
 
 pub struct TickCtx<'a> {
@@ -359,6 +392,26 @@ impl<'a> TickCtx<'a> {
                 break;
             }
             let state = self.world.get(pos);
+            // Recorded before the behaviour lookup, so a notification landing on
+            // air or on an unregistered block still shows up: the question a
+            // propagation view answers is "what did the update reach", not
+            // "what reacted to it".
+            if let Some(log) = pump.upd_log.as_deref_mut() {
+                let tick = self.tick;
+                let seq = match log.last() {
+                    Some(last) if last.tick == tick => last.seq + 1,
+                    _ => 0,
+                };
+                log.push(UpdateRecord {
+                    tick,
+                    seq,
+                    pos,
+                    from,
+                    kind,
+                    phase: pump.phase,
+                    state,
+                });
+            }
             if let Some(filter) = std::env::var_os("MC_TICK_TRACE_NOTIFY") {
                 let filter = filter.to_string_lossy().to_string();
                 let key = format!("{},{},{}", pos.x, pos.y, pos.z);
