@@ -878,6 +878,38 @@ fn a_stone_button_presses_for_twenty_ticks_and_the_lamp_follows() {
 }
 
 #[test]
+fn a_wall_button_strongly_powers_the_block_it_hangs_on() {
+    // A button is a strong-power source through its *attachment* face, exactly
+    // like a lever — `ButtonBlock.getDirectSignal` answers 15 for
+    // `getConnectedDirection(state)`, which is UP for `face=floor`, DOWN for
+    // `face=ceiling` and `facing` for `face=wall`. Captured across all six
+    // orientations in `button_strong.snbt`: each pressed button lights exactly
+    // one lamp, the one beyond its support block, and a glass support relays
+    // nothing (it is not a redstone conductor). The engine used to fill
+    // `strong_into` for buttons only when `face=floor`, so a wall button
+    // powered nothing through its wall and the lamp here never lit.
+    run_conformance_actuated(
+        "button_wall.snbt",
+        "button_wall.json",
+        "nucleation:button_wall",
+        &[],
+        &[(5, Actuate::Use(Pos::new(0, 1, 1)))],
+    );
+}
+
+#[test]
+fn a_ceiling_button_strongly_powers_the_block_above_it() {
+    // The other half of the same rule: `face=ceiling` attaches upward.
+    run_conformance_actuated(
+        "button_ceiling.snbt",
+        "button_ceiling.json",
+        "nucleation:button_ceiling",
+        &[],
+        &[(5, Actuate::Use(Pos::new(0, 1, 1)))],
+    );
+}
+
+#[test]
 fn a_wooden_button_presses_for_thirty() {
     run_conformance_actuated(
         "button_wood.snbt",

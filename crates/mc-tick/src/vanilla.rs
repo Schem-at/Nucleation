@@ -935,17 +935,32 @@ pub fn register_all_at(
                     rules.comparators.push(*id);
                 }
             }
-            // Plates strongly power their floor; floor buttons theirs. A
-            // detector rail does the same: `DetectorRailBlock.getDirectSignal`
-            // answers 15 only for `Direction.UP`, i.e. only to the block
-            // beneath it. Captured in `detector_strong.json`, where dust that
-            // touches the block under the rail — and nothing else — reads 15.
+            // Plates strongly power their floor. A detector rail does the same:
+            // `DetectorRailBlock.getDirectSignal` answers 15 only for
+            // `Direction.UP`, i.e. only to the block beneath it. Captured in
+            // `detector_strong.json`, where dust that touches the block under
+            // the rail — and nothing else — reads 15. Neither block carries a
+            // `face`, so Down is their only attachment.
             if descriptor.name.ends_with("_pressure_plate")
                 || descriptor.name == "minecraft:detector_rail"
-                || (descriptor.name.ends_with("_button")
-                    && descriptor.get("face") == Some("floor"))
             {
                 rules.strong_into.insert(*id, Dir::Down);
+            }
+            // A button strongly powers whatever it hangs on, in every one of
+            // its orientations — `ButtonBlock.getDirectSignal` answers 15 for
+            // `getConnectedDirection(state)`, the same `FaceAttachedHorizontal
+            // DirectionalBlock` helper the lever uses. Captured across all six
+            // in `button_strong.snbt`: a pressed button lights exactly one
+            // lamp, the one beyond its support, and a glass support (not a
+            // redstone conductor) relays nothing.
+            //
+            // This used to read `face == "floor"` only, so a wall or ceiling
+            // button was not a strong source at all and no conductor ever
+            // relayed it — `button_wall.json` / `button_ceiling.json`.
+            if descriptor.name.ends_with("_button") {
+                if let Some(attached) = lever_attachment(descriptor) {
+                    rules.strong_into.insert(*id, attached);
+                }
             }
             // A weighted plate emits its `power`, not 15.
             if let Some(power) = weighted_plate_power(descriptor) {
@@ -1738,7 +1753,11 @@ fn is_stone_button(name: &str) -> bool {
     )
 }
 
-/// The direction from a lever (or similar attachable) to its support block.
+/// The direction from a lever or button to its support block —
+/// `FaceAttachedHorizontalDirectionalBlock.getConnectedDirection` inverted.
+/// Both blocks strongly power exactly this neighbour, captured for the lever in
+/// `lever_lamp.json` and for the button in all six orientations by
+/// `button_strong.snbt` (`button_wall.json`, `button_ceiling.json`).
 fn lever_attachment(descriptor: &Descriptor) -> Option<Dir> {
     match descriptor.get("face") {
         Some("floor") => Some(Dir::Down),
