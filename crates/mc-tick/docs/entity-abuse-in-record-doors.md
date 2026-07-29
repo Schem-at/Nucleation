@@ -241,21 +241,80 @@ with a block change. That is a hard target for any run of ours, and the engine
 now meets the first half of it: with `Rotation` plumbed through, no cart in the
 row moves and none falls out of the world. It does **not** meet the second half.
 
-## The open problem: the door actuates itself on load
+## Settled: the door does not actuate itself — the diagnostic asked for a paste
 
-Ticking the save through the schematic path with nothing triggered, the engine
-changes **68 blocks** over the first ten ticks — a bank of observers flipping
-`powered=false → true` at tick 1, then the cascade that follows — before going
-quiescent. Vanilla, ticking the same save in place, changes nothing at all.
+This section used to read "the open problem: the door actuates itself on load",
+and reported that the engine changed **68 blocks** over the first ten ticks —
+a bank of observers flipping `powered=false → true` at tick 1 and the cascade
+after it — where vanilla's `--in-world` capture of the same save changes
+nothing. It concluded that `TickSettleMode` "is meant to absorb exactly that and
+does not absorb this."
 
-The difference is almost certainly **paste versus load**. `--in-world` ticks a
-world the server read off disk, where every observer's `powered` and every
-pending block tick came out of the save with it. Our path renders the schematic
-to structure SNBT and *places* it, and a placed observer arms — which is correct
-vanilla behaviour for placement and wrong for this comparison. `TickSettleMode`
-is meant to absorb exactly that and does not absorb this.
+**That conclusion was wrong, and it was wrong in the way this project keeps
+getting caught by: the instrument was lying.** `examples/door55_sim.rs`
+constructed its simulation with `TickSettleMode::Quiet`, not `InWorld`. The 68
+changes were real engine behaviour, faithfully reported — they were simply the
+behaviour of a mode that *places* the build, measured while we were asking a
+question about *loading* it.
 
-Until it does, **every door result from the schematic path is downstream of an
-unmodelled load**, and the ten `piston_retract_contacts` the run reports are
-ten entities standing in a retracting sweep the engine also does not model. Two
-independent reasons not to believe a door that looks like it works.
+Run through the same path with the mode the comparison actually calls for, the
+door is exactly where vanilla leaves it:
+
+| mode | block changes, nothing triggered | entities moved | `piston_retract_contacts` |
+|---|---|---|---|
+| `Quiet` | 68 by tick 10 | 1 (a furnace cart, tick 6) | 11 |
+| `InWorld` | **0 over 400 ticks** | **none** | **0** |
+
+Zero changes, zero entity motion, quiescent, and it stays that way for as long
+as it is run. That matches `door55_in_world.entities.log` on both halves of the
+target this document sets — the top row holds its positions *and* not a block
+changes — and it removes the second of the two reasons given here not to believe
+a door: the ten `piston_retract_contacts` were ten entities standing in a
+retraction that only happened because the build had been pasted.
+
+### Why placement arms every observer
+
+`Simulation::place_on_place` — which `Quiet` and `Placement` both run, and
+`InWorld` does not — blanks the region to air and re-writes every block one at a
+time, handing each landing block's already-placed neighbours a shape update.
+This is a faithful model of `StructureTemplate.placeInWorld`. It is also, for a
+build cut out of a running world, a complete fiction: **every** observer in the
+build watches the block it faces *appear*, and an observer that sees its facing
+neighbour change pulses. Nine of them do here, at tick 1, and the pistons follow.
+
+The first divergent cell is `(72, 1, 20)`,
+`observer[facing=east,powered=false] → powered=true`, at tick 1. It is not a
+boundary artefact — the cut face has nothing to do with it, and neither does any
+re-derived `locked` flag, rail shape or wire connection. The perturbation is
+global because the re-write is global.
+
+`InWorld` writes the blocks and stops. That is all it was ever supposed to do,
+and it does it.
+
+### What this cost, and where it may still be costing
+
+Pinned by `the_record_door_is_at_rest_under_in_world_and_disturbed_under_quiet`
+in `src/bridge/mc_tick.rs`, which asserts both halves — the door at rest under
+`InWorld`, *and* that `Quiet` still disturbs it, so the first assertion cannot
+pass by accident.
+
+The ordinary corpus was checked too, and the same measurement is now built into
+`examples/door_batch_load.rs` (`SETTLE=in-world|quiet|placement`), which reports
+per door whether it holds still when nobody touches it. The three certified
+reference doors are **at rest under `InWorld`** and badly disturbed under
+anything else:
+
+| door | `InWorld` | `Quiet` | `Placement` |
+|---|---|---|---|
+| `4x4 sliding door` | at rest | 73 changes | 78 changes |
+| `6x6 sliding door` | at rest | 836 changes | 896 changes |
+| `fast 4x4 vault door (barrels filled)` | at rest | 50 changes | 121 changes |
+
+So a door measured under a placement mode is measured against a machine that has
+already moved several hundred blocks before the clock starts. The browser
+certificate path (`apps/door-cert-wasm`) already uses `InWorld` and is clean.
+**`apps/door-cert/backend/main.py` uses `Placement`, and `apps/flying-ga` uses
+`Quiet`** — the latter is arguably right, since a GA genome genuinely is pasted,
+but the former is not, and every verdict it has produced is downstream of the
+disturbance in the table above. That is an `apps/` change and is left to whoever
+owns it.

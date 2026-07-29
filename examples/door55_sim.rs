@@ -81,7 +81,27 @@ fn main() {
         }
     };
 
-    let mut sim = match TickSimulation::from_schematic(&schem, TickSettleMode::Quiet, 0, 0, 0, b"")
+    // The mode is the whole experiment, so it is an argument rather than a
+    // constant. `InWorld` is the default because this sample **is** a world:
+    // it was cut out of a save that was already running, so nothing about it
+    // was placed and nothing about it should settle. Ticking it under `Quiet`
+    // — which this diagnostic did until now — re-writes every block through
+    // `place_on_place`, and a build whose every neighbour just appeared is a
+    // build whose every observer sees an edge. That, and not the door, was
+    // the source of the 68 "spontaneous" block changes.
+    let mode = std::env::args().nth(3).unwrap_or_else(|| "in-world".to_string());
+    let settle = match mode.as_str() {
+        "in-world" => TickSettleMode::InWorld,
+        "quiet" => TickSettleMode::Quiet,
+        "placement" => TickSettleMode::Placement,
+        other => {
+            eprintln!("unknown settle mode {other:?} (in-world | quiet | placement)");
+            std::process::exit(1);
+        }
+    };
+    println!("settle mode: {mode}");
+
+    let mut sim = match TickSimulation::from_schematic(&schem, settle, 0, 0, 0, b"")
     {
         Ok(s) => s,
         Err(_) => {
@@ -98,7 +118,21 @@ fn main() {
     let non_finite = start.values().filter(|(_, _, v)| v.iter().any(|c| !c.is_finite())).count();
     println!("entities in the simulator: {} ({non_finite} with a non-finite velocity)", start.len());
     for (id, (kind, pos, vel)) in &start {
-        println!("  id={id:<3} {kind:<28} pos={pos:?} vel={vel:?}");
+        // What holds it up, if anything. `floor` because an entity's feet are
+        // its `y`, so the cell it stands *on* is the one below that.
+        let cell = |dy: f64| {
+            let (x, y, z) = (
+                pos[0].floor() as i32,
+                (pos[1] + dy).floor() as i32,
+                pos[2].floor() as i32,
+            );
+            read_out(|w| sim.get_block(x, y, z, w))
+        };
+        println!(
+            "  id={id:<3} {kind:<28} pos={pos:?} vel={vel:?} in={} below={}",
+            cell(0.0),
+            cell(-0.5)
+        );
     }
 
     // Nothing is triggered: this is the warmup the door has to survive before
@@ -106,8 +140,17 @@ fn main() {
     let mut first_move: BTreeMap<u32, u32> = BTreeMap::new();
     let mut lost_nan: BTreeMap<u32, u32> = BTreeMap::new();
     let mut previous = start.clone();
+    let mut changes_before = sim.changes_count();
     for tick in 1..=ticks {
         sim.step();
+        // A door nobody touched should not be changing blocks. Reporting the
+        // tick each change lands on is the difference between "the entities
+        // came apart" and "the door actuated itself and then they came apart".
+        let changes_now = sim.changes_count();
+        if changes_now != changes_before {
+            println!("  tick {tick}: {} block change(s)", changes_now - changes_before);
+            changes_before = changes_now;
+        }
         let now = entities(&read_out(|w| sim.item_entities_json(w)));
         for (id, (_, pos, vel)) in &now {
             if let Some((_, was_pos, was_vel)) = previous.get(id) {
@@ -141,6 +184,14 @@ fn main() {
             let (kind, pos, vel) = &previous[id];
             println!("    tick {tick:<4} id={id:<3} {kind:<28} now pos={pos:?} vel={vel:?}");
         }
+    }
+    // Vanilla, ticking this same save in place, changes **no** blocks at all
+    // (`tools/gametest/captures/door55_in_world.entities.log`). Any change here
+    // is the engine actuating a door nobody touched, so name them rather than
+    // count them.
+    if std::env::var("DUMP_CHANGES").is_ok() {
+        let changes = read_out(|w| sim.changes_json(w));
+        println!("  changes: {}", &changes[..changes.len().min(4000)]);
     }
     if !lost_nan.is_empty() {
         println!("  entities that lost their non-finite velocity:");

@@ -2090,6 +2090,69 @@ mod tests {
         }
     }
 
+    /// Load the record 3x3 door sample and wire it under `settle`.
+    ///
+    /// This goes through the product path — world zip, schematic, gametest
+    /// SNBT, `wire_simulation` — because the question is about that path and a
+    /// test that reached past it would answer a different one.
+    fn wire_record_door(settle: super::ffi::TickSettleMode) -> mc_tick::Simulation {
+        let path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/samples/55_3x3.zip");
+        let bytes = std::fs::read(&path).expect("the record-door sample must be present");
+        let schematic = crate::formats::world::from_world_zip(&bytes).expect("the sample loads");
+        let snbt = to_gametest_snbt(&schematic);
+        let structure = mc_tick::Structure::parse(&snbt).expect("the sample parses");
+        super::wire_simulation(
+            &structure,
+            mc_tick::Pos::new(0, 0, 0),
+            settle,
+            &[],
+            schematic.metadata.source_data_version,
+        )
+        .expect("the engine must accept the record door")
+    }
+
+    /// A build cut out of a running world must load into that world's state.
+    ///
+    /// `--in-world` capture of this same save records **zero** block changes:
+    /// the door is at rest in the game, so it must be at rest in us. The mode
+    /// that means "the build *is* the world" is `InWorld`, and this pins that
+    /// it genuinely places nothing and settles nothing.
+    ///
+    /// The `Quiet` half is the negative control, and it is not decoration —
+    /// it is the entire reason this test is trustworthy. `Quiet` runs
+    /// [`Simulation::place_on_place`], which blanks the region to air and
+    /// re-writes every block one at a time, handing each landing block's
+    /// already-placed neighbours a shape update. Every observer in the build
+    /// therefore watches its facing neighbour *appear*, and pulses. That is
+    /// correct for a paste and catastrophic for a load, and it is what made
+    /// this door look like it actuated itself: the diagnostic was asking for
+    /// `Quiet`. If the two modes ever stop differing here, one of them has
+    /// silently become the other and this assertion says so.
+    #[test]
+    fn the_record_door_is_at_rest_under_in_world_and_disturbed_under_quiet() {
+        let mut at_rest = wire_record_door(super::ffi::TickSettleMode::InWorld);
+        at_rest.run(200);
+        assert_eq!(
+            at_rest.recorded().len(),
+            0,
+            "nobody touched this door: vanilla changes no block ticking the same save in \
+             place, so neither may we. First few: {:?}",
+            at_rest.recorded().iter().take(4).collect::<Vec<_>>()
+        );
+        assert!(at_rest.is_quiescent(), "a build at rest has nothing pending");
+
+        // The control. Placement *should* perturb this build, and if it does
+        // not then the assertion above is passing for the wrong reason.
+        let mut placed = wire_record_door(super::ffi::TickSettleMode::Quiet);
+        placed.run(200);
+        assert!(
+            !placed.recorded().is_empty(),
+            "placing this build must disturb it — an observer whose neighbour just \
+             appeared pulses. If this is empty, `InWorld` proves nothing."
+        );
+    }
+
     /// Wire a one-rail structure carrying `entities`, as the app would.
     fn wire_with_entities(entities: &str) -> Result<mc_tick::Simulation, String> {
         let snbt = format!(

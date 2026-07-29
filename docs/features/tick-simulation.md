@@ -90,6 +90,24 @@ you are measuring, and picking wrong produces a confidently wrong answer.
 If a build ticks to quiescence in zero ticks under `InWorld`, it was genuinely at
 rest as saved, and that is the mode you want.
 
+**`Quiet` is not "the gentle one".** Both `Quiet` and `Placement` run the
+placement pass, which blanks the region and re-writes every block one at a time
+so that each landing block's already-placed neighbours get a shape update. Every
+observer in the build therefore watches the block it faces *appear*, and pulses.
+On real doors that is not a rounding error — the certified reference set changes
+50 to 896 blocks before anyone touches it:
+
+| door | `InWorld` | `Quiet` | `Placement` |
+|---|---|---|---|
+| 4x4 sliding | at rest | 73 changes | 78 changes |
+| 6x6 sliding | at rest | 836 changes | 896 changes |
+| fast 4x4 vault | at rest | 50 changes | 121 changes |
+
+If you are timing a saved build, use `InWorld` and check `changes_count() == 0`
+before you start the clock. A door that is already moving when you actuate it
+gives an open time that is confidently wrong rather than obviously wrong.
+`examples/door_batch_load.rs` does exactly this check over a list of files.
+
 ### `extra_states`, and why your redstone block does nothing
 
 Behaviours bind to *interned* block states when the simulation is constructed. A
