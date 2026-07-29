@@ -26,6 +26,8 @@ void add_TickSimulation_binding(nb::module_ mod) {
         .def("get_block", &nucleation::TickSimulation::get_block, "x"_a, "y"_a, "z"_a)
         .def("is_quiescent", &nucleation::TickSimulation::is_quiescent)
         .def("item_entities_json", &nucleation::TickSimulation::item_entities_json)
+        .def_static("last_error_detail", &nucleation::TickSimulation::last_error_detail)
+        .def_static("max_volume", &nucleation::TickSimulation::max_volume)
         .def("non_air_center_x", &nucleation::TickSimulation::non_air_center_x)
         .def("non_air_count", &nucleation::TickSimulation::non_air_count)
         .def("non_air_max_x", &nucleation::TickSimulation::non_air_max_x)

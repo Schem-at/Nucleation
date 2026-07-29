@@ -21,6 +21,10 @@ namespace nucleation {
 namespace capi {
     extern "C" {
 
+    void TickSimulation_last_error_detail(nucleation::diplomat::capi::DiplomatWrite* write);
+
+    uint32_t TickSimulation_max_volume(void);
+
     typedef struct TickSimulation_from_snbt_result {union {nucleation::capi::TickSimulation* ok; nucleation::capi::NucleationError err;}; bool is_ok;} TickSimulation_from_snbt_result;
     TickSimulation_from_snbt_result TickSimulation_from_snbt(nucleation::diplomat::capi::DiplomatStringView snbt, nucleation::capi::TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z, nucleation::diplomat::capi::DiplomatStringView extra_states);
 
@@ -94,6 +98,23 @@ namespace capi {
     } // extern "C"
 } // namespace capi
 } // namespace
+
+inline std::string nucleation::TickSimulation::last_error_detail() {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    nucleation::capi::TickSimulation_last_error_detail(&write);
+    return output;
+}
+template<typename W>
+inline void nucleation::TickSimulation::last_error_detail_write(W& writeable) {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    nucleation::capi::TickSimulation_last_error_detail(&write);
+}
+
+inline uint32_t nucleation::TickSimulation::max_volume() {
+    auto result = nucleation::capi::TickSimulation_max_volume();
+    return result;
+}
 
 inline nucleation::diplomat::result<std::unique_ptr<nucleation::TickSimulation>, nucleation::NucleationError> nucleation::TickSimulation::from_snbt(std::string_view snbt, nucleation::TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z, std::string_view extra_states) {
     auto result = nucleation::capi::TickSimulation_from_snbt({snbt.data(), snbt.size()},

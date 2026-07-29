@@ -14,6 +14,17 @@ final class TickSimulation {
         $this->borrowedFrom = $borrowedFrom;
     }
 
+    public static function lastErrorDetail() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->TickSimulation_last_error_detail($write);
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public static function maxVolume() {
+        $ret = Lib::ffi()->TickSimulation_max_volume();
+        return $ret;
+    }
+
     public static function fromSnbt(string $snbt, int $settle,  $origin_x,  $origin_y,  $origin_z, string $extra_states) {
         $__n0 = strlen($snbt);
         $__view0 = Lib::ffi()->new('DiplomatStringView');

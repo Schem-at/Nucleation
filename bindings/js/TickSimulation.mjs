@@ -42,6 +42,49 @@ export class TickSimulation {
 
 
     /**
+     * Why the last constructor on this thread failed, in words.
+     *
+     * The enum cannot carry a message, and "Simulation" is useless to
+     * someone holding a door that will not load: the engine already knows
+     * it is `minecraft:waxed_copper_bulb` at (4,2,1) and says so here.
+     * Empty when the last construction succeeded.
+     */
+    static lastErrorDetail() {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.TickSimulation_last_error_detail(write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            write.free();
+        }
+    }
+
+    /**
+     * Largest build this will attempt, in cells.
+     *
+     * A 500x379x442 "door" is a saved world, and loading one exhausts the
+     * wasm heap — after which every later call on that instance traps,
+     * not just the one that overflowed. Refused up front instead.
+     */
+    static maxVolume() {
+
+        const result = wasm.TickSimulation_max_volume();
+
+        try {
+            return result;
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
      * Load from Java structure SNBT text.
      *
      * `extra_states`: semicolon-separated block-state descriptors that

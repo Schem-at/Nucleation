@@ -17,6 +17,25 @@ export class TickSimulation {
 
 
     /**
+     * Why the last constructor on this thread failed, in words.
+     *
+     * The enum cannot carry a message, and "Simulation" is useless to
+     * someone holding a door that will not load: the engine already knows
+     * it is `minecraft:waxed_copper_bulb` at (4,2,1) and says so here.
+     * Empty when the last construction succeeded.
+     */
+    static lastErrorDetail(): string;
+
+    /**
+     * Largest build this will attempt, in cells.
+     *
+     * A 500x379x442 "door" is a saved world, and loading one exhausts the
+     * wasm heap — after which every later call on that instance traps,
+     * not just the one that overflowed. Refused up front instead.
+     */
+    static maxVolume(): number;
+
+    /**
      * Load from Java structure SNBT text.
      *
      * `extra_states`: semicolon-separated block-state descriptors that

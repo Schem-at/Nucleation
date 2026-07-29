@@ -278,6 +278,43 @@ fn updates_wave(sim: &mc_tick::Simulation, tick: u64) -> String {
     json
 }
 
+/// Largest build the simulator will accept, in cells.
+///
+/// `IRIS_B.schem` is 499x379x442 — 83.5 million cells, a saved world rather
+/// than a door. Loading one exhausts the wasm heap, and a Rust OOM in wasm is
+/// an `unreachable` trap that poisons the whole instance: every later call on
+/// it traps too, so one oversized upload takes down every door after it. Eight
+/// million cells is roughly a 200-cube, far past any real door and well inside
+/// what the heap survives.
+const MAX_VOLUME: usize = 8_000_000;
+
+thread_local! {
+    /// Why the last constructor failed. Set on every failure path, cleared on
+    /// success, read back through `TickSimulation::last_error_detail`.
+    static LAST_ERROR: std::cell::RefCell<String> = const { std::cell::RefCell::new(String::new()) };
+}
+
+fn set_last_error(detail: impl Into<String>) {
+    LAST_ERROR.with(|e| *e.borrow_mut() = detail.into());
+}
+
+fn clear_last_error() {
+    LAST_ERROR.with(|e| e.borrow_mut().clear());
+}
+
+/// Refuse a build too large to load before allocating for it.
+fn check_volume(size: (i32, i32, i32)) -> Result<(), String> {
+    let volume = (size.0 as i64) * (size.1 as i64) * (size.2 as i64);
+    if volume > MAX_VOLUME as i64 {
+        return Err(format!(
+            "build is {} x {} x {} = {volume} cells, over the {MAX_VOLUME}-cell limit — \
+             this looks like a saved world rather than a contraption",
+            size.0, size.1, size.2
+        ));
+    }
+    Ok(())
+}
+
 /// The settle recipe, mirroring the engine's conformance harness.
 fn wire_simulation(
     structure: &mc_tick::Structure,
@@ -672,6 +709,27 @@ pub mod ffi {
     }
 
     impl TickSimulation {
+        /// Why the last constructor on this thread failed, in words.
+        ///
+        /// The enum cannot carry a message, and "Simulation" is useless to
+        /// someone holding a door that will not load: the engine already knows
+        /// it is `minecraft:waxed_copper_bulb` at (4,2,1) and says so here.
+        /// Empty when the last construction succeeded.
+        pub fn last_error_detail(out: &mut DiplomatWrite) {
+            super::LAST_ERROR.with(|e| {
+                let _ = write!(out, "{}", e.borrow());
+            });
+        }
+
+        /// Largest build this will attempt, in cells.
+        ///
+        /// A 500x379x442 "door" is a saved world, and loading one exhausts the
+        /// wasm heap — after which every later call on that instance traps,
+        /// not just the one that overflowed. Refused up front instead.
+        pub fn max_volume() -> u32 {
+            super::MAX_VOLUME as u32
+        }
+
         /// Load from Java structure SNBT text.
         ///
         /// `extra_states`: semicolon-separated block-state descriptors that
@@ -691,8 +749,15 @@ pub mod ffi {
                 std::str::from_utf8(snbt).map_err(|_| NucleationError::InvalidArgument)?;
             let extra =
                 std::str::from_utf8(extra_states).map_err(|_| NucleationError::InvalidArgument)?;
-            let structure =
-                mc_tick::Structure::parse(snbt).map_err(|_| NucleationError::Parse)?;
+            super::clear_last_error();
+            let structure = mc_tick::Structure::parse(snbt).map_err(|e| {
+                super::set_last_error(format!("structure SNBT did not parse: {e:?}"));
+                NucleationError::Parse
+            })?;
+            super::check_volume(structure.size).map_err(|e| {
+                super::set_last_error(e);
+                NucleationError::InvalidArgument
+            })?;
             let extras: Vec<&str> =
                 extra.split(';').map(str::trim).filter(|s| !s.is_empty()).collect();
             let sim = super::wire_simulation(
@@ -701,7 +766,10 @@ pub mod ffi {
                 settle,
                 &extras,
             )
-            .map_err(|_| NucleationError::Simulation)?;
+            .map_err(|e| {
+                super::set_last_error(e);
+                NucleationError::Simulation
+            })?;
             Ok(Box::new(TickSimulation { sim, checkpoints: Vec::new() }))
         }
 
@@ -715,11 +783,33 @@ pub mod ffi {
             origin_z: i32,
             extra_states: &DiplomatStr,
         ) -> Result<Box<TickSimulation>, NucleationError> {
-            let snbt = super::to_gametest_snbt(&schematic.0);
+            super::clear_last_error();
             let extra =
                 std::str::from_utf8(extra_states).map_err(|_| NucleationError::InvalidArgument)?;
-            let structure =
-                mc_tick::Structure::parse(&snbt).map_err(|_| NucleationError::Parse)?;
+            // Before rendering anything: the SNBT for a world-sized build is
+            // what exhausts the heap, and the trap it raises poisons the
+            // instance for every door after it.
+            let bb = schematic.0.get_bounding_box();
+            super::check_volume((
+                bb.max.0 - bb.min.0 + 1,
+                bb.max.1 - bb.min.1 + 1,
+                bb.max.2 - bb.min.2 + 1,
+            ))
+            .map_err(|e| {
+                super::set_last_error(e);
+                NucleationError::InvalidArgument
+            })?;
+            let snbt = super::to_gametest_snbt(&schematic.0);
+            let structure = mc_tick::Structure::parse(&snbt).map_err(|e| {
+                // The schematic loaded; it is our own rendering of it that the
+                // engine rejected. Saying "Parse" here blames the user's file
+                // for our bug, so this reports as an engine failure.
+                super::set_last_error(format!(
+                    "converted structure did not parse: {e:?} — this is an engine fault, \
+                     not a problem with the uploaded file"
+                ));
+                NucleationError::Simulation
+            })?;
             let extras: Vec<&str> =
                 extra.split(';').map(str::trim).filter(|s| !s.is_empty()).collect();
             let sim = super::wire_simulation(
@@ -728,7 +818,10 @@ pub mod ffi {
                 settle,
                 &extras,
             )
-            .map_err(|_| NucleationError::Simulation)?;
+            .map_err(|e| {
+                super::set_last_error(e);
+                NucleationError::Simulation
+            })?;
             Ok(Box::new(TickSimulation { sim, checkpoints: Vec::new() }))
         }
 

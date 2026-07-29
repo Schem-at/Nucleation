@@ -7,6 +7,8 @@ import com.sun.jna.Structure
 
 internal interface TickSimulationLib: Library {
     fun TickSimulation_destroy(handle: Pointer)
+    fun TickSimulation_last_error_detail(write: Pointer): Unit
+    fun TickSimulation_max_volume(): FFIUint32
     fun TickSimulation_from_snbt(snbt: Slice, settle: Int, originX: Int, originY: Int, originZ: Int, extraStates: Slice): ResultPointerInt
     fun TickSimulation_from_schematic(schematic: Pointer, settle: Int, originX: Int, originY: Int, originZ: Int, extraStates: Slice): ResultPointerInt
     fun TickSimulation_from_blocks(bx: Int, by: Int, bz: Int, travel: Int, xOff: Int, palette: Slice, cells: Slice, airIndex: FFIUint16, settle: Int, originX: Int, originY: Int, originZ: Int): ResultPointerInt
@@ -67,6 +69,35 @@ class TickSimulation internal constructor (
     companion object {
         internal val libClass: Class<TickSimulationLib> = TickSimulationLib::class.java
         internal val lib: TickSimulationLib = Native.load("nucleation", libClass)
+        @JvmStatic
+
+        /** Why the last constructor on this thread failed, in words.
+        *
+        *The enum cannot carry a message, and "Simulation" is useless to
+        *someone holding a door that will not load: the engine already knows
+        *it is `minecraft:waxed_copper_bulb` at (4,2,1) and says so here.
+        *Empty when the last construction succeeded.
+        */
+        fun lastErrorDetail(): String {
+            val write = DW.lib.diplomat_buffer_write_create(0)
+            val returnVal = lib.TickSimulation_last_error_detail(write);
+
+            val returnString = DW.writeToString(write)
+            return returnString
+        }
+        @JvmStatic
+
+        /** Largest build this will attempt, in cells.
+        *
+        *A 500x379x442 "door" is a saved world, and loading one exhausts the
+        *wasm heap — after which every later call on that instance traps,
+        *not just the one that overflowed. Refused up front instead.
+        */
+        fun maxVolume(): UInt {
+
+            val returnVal = lib.TickSimulation_max_volume();
+            return (returnVal.toUInt())
+        }
         @JvmStatic
 
         /** Load from Java structure SNBT text.

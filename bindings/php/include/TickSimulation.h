@@ -18,6 +18,10 @@
 
 
 
+void TickSimulation_last_error_detail(DiplomatWrite* write);
+
+uint32_t TickSimulation_max_volume(void);
+
 typedef struct TickSimulation_from_snbt_result {union {TickSimulation* ok; NucleationError err;}; bool is_ok;} TickSimulation_from_snbt_result;
 TickSimulation_from_snbt_result TickSimulation_from_snbt(DiplomatStringView snbt, TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z, DiplomatStringView extra_states);
 

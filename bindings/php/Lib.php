@@ -525,6 +525,8 @@ Geo_extrude_footprints_result Geo_extrude_footprints(DiplomatStringView building
 typedef struct Geo_heightmap_terrain_result { union { Schematic* ok; NucleationError err; }; bool is_ok; } Geo_heightmap_terrain_result;
 Geo_heightmap_terrain_result Geo_heightmap_terrain(DiplomatStringView heights_json, int32_t width, DiplomatStringView surface_blocks_json, DiplomatStringView subsurface_block, int32_t surface_depth, DiplomatStringView name);
 void Geo_destroy(Geo* self);
+void TickSimulation_last_error_detail(DiplomatWrite* write);
+uint32_t TickSimulation_max_volume();
 typedef struct TickSimulation_from_snbt_result { union { TickSimulation* ok; NucleationError err; }; bool is_ok; } TickSimulation_from_snbt_result;
 TickSimulation_from_snbt_result TickSimulation_from_snbt(DiplomatStringView snbt, TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z, DiplomatStringView extra_states);
 typedef struct TickSimulation_from_schematic_result { union { TickSimulation* ok; NucleationError err; }; bool is_ok; } TickSimulation_from_schematic_result;

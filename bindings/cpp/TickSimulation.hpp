@@ -21,6 +21,10 @@ namespace diplomat {
 namespace capi {
     extern "C" {
 
+    void TickSimulation_last_error_detail(diplomat::capi::DiplomatWrite* write);
+
+    uint32_t TickSimulation_max_volume(void);
+
     typedef struct TickSimulation_from_snbt_result {union {diplomat::capi::TickSimulation* ok; diplomat::capi::NucleationError err;}; bool is_ok;} TickSimulation_from_snbt_result;
     TickSimulation_from_snbt_result TickSimulation_from_snbt(diplomat::capi::DiplomatStringView snbt, diplomat::capi::TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z, diplomat::capi::DiplomatStringView extra_states);
 
@@ -94,6 +98,23 @@ namespace capi {
     } // extern "C"
 } // namespace capi
 } // namespace
+
+inline std::string TickSimulation::last_error_detail() {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::TickSimulation_last_error_detail(&write);
+    return output;
+}
+template<typename W>
+inline void TickSimulation::last_error_detail_write(W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::TickSimulation_last_error_detail(&write);
+}
+
+inline uint32_t TickSimulation::max_volume() {
+    auto result = diplomat::capi::TickSimulation_max_volume();
+    return result;
+}
 
 inline diplomat::result<std::unique_ptr<TickSimulation>, NucleationError> TickSimulation::from_snbt(std::string_view snbt, TickSettleMode settle, int32_t origin_x, int32_t origin_y, int32_t origin_z, std::string_view extra_states) {
     auto result = diplomat::capi::TickSimulation_from_snbt({snbt.data(), snbt.size()},
