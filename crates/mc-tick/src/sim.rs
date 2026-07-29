@@ -136,6 +136,7 @@ pub struct Checkpoint {
     hopper_state: std::collections::HashMap<Pos, crate::behaviour::HopperState>,
     item_entities: crate::entity::ItemEntities,
     minecarts: Vec<crate::minecart::MinecartState>,
+    frozen: Vec<(u32, String, [f64; 3])>,
 }
 
 /// A controllable, deterministic simulation of a bounded region.
@@ -195,6 +196,10 @@ pub struct Simulation {
     conductors: Vec<bool>,
     /// The world's minecarts, in spawn order.
     minecarts: Vec<crate::minecart::MinecartState>,
+    /// Entities that are a hitbox and nothing else — the record doors' frozen
+    /// fireballs. `(id, kind, position)`; see
+    /// [`Simulation::spawn_frozen_entity`].
+    frozen: Vec<(u32, String, [f64; 3])>,
     /// Entity positions as of the last recorded tick, for event emission.
     entity_snapshot: std::collections::HashMap<u32, [f64; 3]>,
     /// Recorded entity events, when recording is enabled.
@@ -261,6 +266,7 @@ impl Simulation {
             hopper_state: std::collections::HashMap::new(),
             item_entities: crate::entity::ItemEntities::default(),
             minecarts: Vec::new(),
+            frozen: Vec::new(),
         };
         Self {
             block_entities: std::collections::HashSet::new(),
@@ -288,6 +294,7 @@ impl Simulation {
             rails: Vec::new(),
             conductors: Vec::new(),
             minecarts: Vec::new(),
+            frozen: Vec::new(),
             entity_snapshot: std::collections::HashMap::new(),
             ent_log: None,
             tickers: Vec::new(),
@@ -467,6 +474,33 @@ impl Simulation {
         self.refresh_bodies();
     }
 
+    /// Spawn an entity that is **only** a hitbox: it holds its position and
+    /// takes part in every presence question, and has no physics of its own.
+    ///
+    /// This is what the record doors' frozen fireballs are. Caught mid-flight
+    /// by a piston-and-cobweb trick, they have zero motion and no gravity, so
+    /// vanilla's own physics leaves them exactly where they are — and a piston
+    /// arm shoves them onto a pressure plate. Modelling them as a box that does
+    /// not move is not a simplification here; it is what the game does with
+    /// them.
+    ///
+    /// Refuses an unrecognised entity **by name** rather than inventing a
+    /// hitbox for it. A wrong box silently produces a wrong door.
+    pub fn spawn_frozen_entity(&mut self, kind: String, pos: [f64; 3]) -> Result<u32, String> {
+        if crate::entity::entity_dimensions(&kind).is_none() {
+            return Err(format!(
+                "unknown entity {kind}: no hitbox is known for it, and guessing one \
+                 would silently change the simulation. Measure it with \
+                 tools/gametest/src/EntityDims.java and add it to entity_dimensions()."
+            ));
+        }
+        let id = self.item_entities.next_id;
+        self.item_entities.next_id += 1;
+        self.frozen.push((id, kind, pos));
+        self.refresh_bodies();
+        Ok(id)
+    }
+
     /// Rebuild the entity-box view block behaviours read
     /// ([`crate::entity::EntityBody`]).
     ///
@@ -488,6 +522,18 @@ impl Simulation {
                 min,
                 max,
                 is_minecart: true,
+            });
+        }
+        for (id, kind, pos) in &self.frozen {
+            // Refused at spawn if the kind had no dimensions, so this cannot
+            // fall back to a guessed box.
+            let Some((min, max)) = crate::entity::body_aabb(kind, *pos) else { continue };
+            bodies.push(crate::entity::EntityBody {
+                id: *id,
+                kind: kind.clone(),
+                min,
+                max,
+                is_minecart: false,
             });
         }
     }
@@ -789,6 +835,7 @@ impl Simulation {
             hopper_state: self.hopper_state.clone(),
             item_entities: self.item_entities.clone(),
             minecarts: self.minecarts.clone(),
+            frozen: self.frozen.clone(),
         }
     }
 
@@ -811,6 +858,7 @@ impl Simulation {
         self.hopper_state = checkpoint.hopper_state.clone();
         self.item_entities = checkpoint.item_entities.clone();
         self.minecarts = checkpoint.minecarts.clone();
+        self.frozen = checkpoint.frozen.clone();
         // Event emission restarts from the restored state.
         self.entity_snapshot.clear();
         for item in &self.item_entities.items {

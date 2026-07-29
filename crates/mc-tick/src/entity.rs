@@ -95,6 +95,132 @@ pub struct EntityBody {
     pub is_minecart: bool,
 }
 
+/// An entity type's hitbox, as `EntityType.sized(width, height)` registered it.
+///
+/// Read out of the game's own registry (`tools/gametest/src/EntityDims.java`
+/// prints `EntityType.getDimensions()` after `Bootstrap.bootStrap`), so these
+/// cannot disagree with the game the way a remembered number can.
+///
+/// These are mechanism, not trivia. The record 3x3 door uses a **dragon**
+/// fireball where a small one will not do, and the registry says why: a dragon
+/// fireball is exactly one block tall, so resting at the bottom of a cell it
+/// spans the whole cell — reaching a pressure plate at the floor *and* the
+/// piston above. A small fireball is 5/16 and reaches neither.
+///
+/// Verified against the oracle in `fireball_reach.json`, which walks both
+/// fireballs across a weighted plate's touch box and finds the edge exactly
+/// where these widths put it: the dragon registers at 0.90 from centre and not
+/// at 0.95, the small one at 0.55 and not at 0.65.
+pub fn entity_dimensions(kind: &str) -> Option<(f64, f64)> {
+    Some(match kind {
+        // Every minecart variant shares one hitbox — furnace, chest, hopper and
+        // TNT carts included. A furnace minecart is dimensionally an ordinary
+        // cart.
+        "minecraft:minecart"
+        | "minecraft:furnace_minecart"
+        | "minecraft:chest_minecart"
+        | "minecraft:hopper_minecart"
+        | "minecraft:tnt_minecart" => (0.98, 0.7),
+        "minecraft:dragon_fireball" | "minecraft:fireball" => (1.0, 1.0),
+        "minecraft:small_fireball" => (0.3125, 0.3125),
+        "minecraft:villager" => (0.6, 1.95),
+        "minecraft:item" => (0.25, 0.25),
+        // Anything else is *not* guessed. An unknown entity gets no box, and
+        // the simulation refuses it by name rather than quietly giving it a
+        // default hitbox — a wrong box in this corpus is a wrong door.
+        _ => return None,
+    })
+}
+
+/// The world-space box of an entity of `kind` standing at `pos`.
+///
+/// Vanilla centres an entity horizontally on its position and hangs the box
+/// upward from its feet (`EntityDimensions.makeBoundingBox`). Confirmed by
+/// `fireball_reach.json`: the fireballs there sit with their feet exactly at
+/// plate level and register, and their horizontal edges land where a centred
+/// box puts them.
+pub fn body_aabb(kind: &str, pos: [f64; 3]) -> Option<([f64; 3], [f64; 3])> {
+    let (width, height) = entity_dimensions(kind)?;
+    let half = width / 2.0;
+    Some((
+        [pos[0] - half, pos[1], pos[2] - half],
+        [pos[0] + half, pos[1] + height, pos[2] + half],
+    ))
+}
+
+#[cfg(test)]
+mod hitbox_tests {
+    use super::*;
+
+    /// `BasePressurePlateBlock.TOUCH_AABB` at a cell, duplicated here so the
+    /// geometry check does not depend on the block layer.
+    fn touch(x: f64, y: f64, z: f64) -> ([f64; 3], [f64; 3]) {
+        ([x + 0.0625, y, z + 0.0625], [x + 0.9375, y + 0.25, z + 0.9375])
+    }
+
+    fn presses(kind: &str, plate: [f64; 3], pos: [f64; 3]) -> bool {
+        let (min, max) = body_aabb(kind, pos).expect("known entity");
+        let body = EntityBody { id: 0, kind: kind.into(), min, max, is_minecart: false };
+        let (tmin, tmax) = touch(plate[0], plate[1], plate[2]);
+        body.intersects(tmin, tmax)
+    }
+
+    /// The six probes of `fireball_reach.json`, replayed against the engine's
+    /// own boxes. Vanilla answered 1, 1, 0, 1, 1, 0 — the dragon fireball
+    /// reaching 0.90 from a plate's centre but not 0.95, the small one 0.55 but
+    /// not 0.65. Those pairs straddle the exact half-widths the registry gives
+    /// (0.5 and 0.15625), so the test fails if either width is off by more than
+    /// a couple of hundredths.
+    #[test]
+    fn fireball_boxes_reproduce_the_captured_plate_probes() {
+        let plate = |x: f64| [x, 1.0, 1.0];
+        let at = |x: f64| [x, 1.0, 1.5];
+        assert!(presses("minecraft:dragon_fireball", plate(1.0), at(1.5)));
+        assert!(presses("minecraft:dragon_fireball", plate(4.0), at(5.4)));
+        assert!(!presses("minecraft:dragon_fireball", plate(7.0), at(8.45)));
+        assert!(presses("minecraft:small_fireball", plate(10.0), at(10.5)));
+        assert!(presses("minecraft:small_fireball", plate(13.0), at(14.05)));
+        assert!(!presses("minecraft:small_fireball", plate(16.0), at(17.15)));
+    }
+
+    /// The reason the door uses a *dragon* fireball: it is exactly one block
+    /// tall, so resting on a cell's floor it spans that whole cell — a plate at
+    /// the bottom and the piston above. A small fireball spans 5/16 of it.
+    #[test]
+    fn a_dragon_fireball_spans_a_whole_block_and_a_small_one_does_not() {
+        let (min, max) = body_aabb("minecraft:dragon_fireball", [0.5, 3.0, 0.5]).unwrap();
+        assert_eq!(max[1] - min[1], 1.0);
+        let (smin, smax) = body_aabb("minecraft:small_fireball", [0.5, 3.0, 0.5]).unwrap();
+        assert!(smax[1] - smin[1] < 0.32);
+    }
+
+    /// Every cart variant is one hitbox, and it is exactly the 0.98 spacing the
+    /// door's furnace-cart chain sits at.
+    #[test]
+    fn every_minecart_variant_shares_the_plain_cart_box() {
+        for kind in [
+            "minecraft:minecart",
+            "minecraft:furnace_minecart",
+            "minecraft:chest_minecart",
+            "minecraft:hopper_minecart",
+            "minecraft:tnt_minecart",
+        ] {
+            assert_eq!(entity_dimensions(kind), Some((0.98, 0.7)), "{kind}");
+        }
+        // The engine's cart box must agree with the generic table.
+        let (min, max) = body_aabb("minecraft:minecart", [0.5, 1.0, 0.5]).unwrap();
+        let (cmin, cmax) = crate::minecart::cart_aabb([0.5, 1.0, 0.5]);
+        assert_eq!((min, max), (cmin, cmax));
+    }
+
+    /// An entity nobody has measured gets no box at all.
+    #[test]
+    fn an_unmeasured_entity_has_no_hitbox_rather_than_a_guessed_one() {
+        assert_eq!(entity_dimensions("minecraft:creeper"), None);
+        assert_eq!(body_aabb("minecraft:creeper", [0.0; 3]), None);
+    }
+}
+
 impl EntityBody {
     /// Whether this body overlaps a box, by vanilla's strict `AABB.intersects`
     /// (touching faces do not count).

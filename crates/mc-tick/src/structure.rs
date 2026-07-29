@@ -65,18 +65,49 @@ pub struct Structure {
     /// Item entities authored in the structure's `entities` list.
     ///
     /// The RNG-free way to put an item into the world: authored positions and
-    /// motion, no dispenser jitter. Only `minecraft:item` is understood; any
-    /// other entity type is a loud parse error rather than a silent hole.
+    /// motion, no dispenser jitter. This is the `minecraft:item` subset of
+    /// [`Self::entities`]; the other types are reachable there.
     pub item_entities: Vec<SpawnedItem>,
 }
 
 /// One authored entity, by type.
+///
+/// Parsing a type and being able to *simulate* it are deliberately different
+/// questions. Everything here can be read out of a structure file faithfully;
+/// whether the engine has a behaviour for it is decided at construction, by
+/// whoever turns a `Structure` into a `Simulation`. Keeping the two apart means
+/// adding a variant never quietly weakens anything — a type with no behaviour
+/// still refuses, it just refuses one step later and with a better message.
+///
+/// Each unsimulatable type gets its own variant rather than hiding behind a
+/// `kind` string, so the gate is a `match` the compiler checks. A hand-kept
+/// list of "kinds we support" would silently drift out of date; a missing match
+/// arm will not compile.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SpawnedEntity {
     /// An item entity.
     Item(SpawnedItem),
-    /// A minecart.
+    /// A plain rideable minecart.
     Minecart(SpawnedMinecart),
+    /// A furnace minecart — a cart that can drive itself.
+    FurnaceMinecart(SpawnedFurnaceMinecart),
+    /// A fireball, of either size.
+    Fireball(SpawnedFireball),
+    /// A villager.
+    Villager(SpawnedVillager),
+}
+
+impl SpawnedEntity {
+    /// The entity id this was parsed from, for messages.
+    pub fn kind(&self) -> &str {
+        match self {
+            Self::Item(_) => "minecraft:item",
+            Self::Minecart(cart) => &cart.kind,
+            Self::FurnaceMinecart(_) => "minecraft:furnace_minecart",
+            Self::Fireball(ball) => &ball.kind,
+            Self::Villager(_) => "minecraft:villager",
+        }
+    }
 }
 
 /// An authored minecart.
@@ -84,6 +115,65 @@ pub enum SpawnedEntity {
 pub struct SpawnedMinecart {
     /// e.g. `minecraft:minecart`.
     pub kind: String,
+    /// Spawn position.
+    pub pos: [f64; 3],
+    /// Spawn velocity.
+    pub motion: [f64; 3],
+}
+
+/// An authored furnace minecart.
+///
+/// Its own variant rather than a `kind` on [`SpawnedMinecart`] because the
+/// engine models the plain cart and this one does strictly more: it carries
+/// fuel and a push vector and can drive itself along a rail. Sharing a variant
+/// would make "can the engine simulate this?" a string comparison instead of a
+/// match arm.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpawnedFurnaceMinecart {
+    /// Spawn position.
+    pub pos: [f64; 3],
+    /// Spawn velocity.
+    pub motion: [f64; 3],
+    /// `Fuel` — ticks of self-propulsion left.
+    ///
+    /// Measured zero on all fifteen furnace carts in the record 3x3 door, which
+    /// makes those pure mass and hitbox rather than engines. Carried anyway: a
+    /// fuelled cart drives itself, and silently dropping that would mis-simulate
+    /// a different build in exactly the way this whole seam exists to prevent.
+    pub fuel: u32,
+    /// `PushX`/`PushZ` — the drive direction. Also zero throughout that door.
+    pub push: [f64; 2],
+}
+
+/// An authored fireball, either size.
+///
+/// The record doors freeze these mid-flight with piston-and-cobweb timing and
+/// use them as one-block-tall pressure-plate triggers, so the *size* is
+/// mechanism: a small fireball barely clips a plate, while a dragon fireball is
+/// a full block tall and can reach a plate and the piston above it at once.
+/// Which is why the kind is kept rather than collapsed to "a fireball".
+///
+/// Hitbox dimensions deliberately do **not** live here. They are a property of
+/// the entity type, like a container's slot count, and belong to the engine's
+/// tables — a structure file carries no such field, and accepting one would let
+/// a hand-edited file claim a small fireball is a block tall.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpawnedFireball {
+    /// `minecraft:small_fireball` or `minecraft:dragon_fireball`.
+    pub kind: String,
+    /// Spawn position.
+    pub pos: [f64; 3],
+    /// Spawn velocity.
+    pub motion: [f64; 3],
+}
+
+/// An authored villager.
+///
+/// Present in the record doors purely as a hitbox — one acts as a wall stopping
+/// a cart, the other as a floor it lands on. No AI, no trading, no pathfinding
+/// is wanted from it, only its box and its solidity to entity collision.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpawnedVillager {
     /// Spawn position.
     pub pos: [f64; 3],
     /// Spawn velocity.
@@ -551,6 +641,8 @@ impl<'a> Parser<'a> {
         let mut motion = [0.0f64; 3];
         let mut item: Option<(String, u8)> = None;
         let mut pickup_delay = 0u32;
+        let mut fuel = 0u32;
+        let mut push = [0.0f64; 2];
         let mut entity_id = String::new();
         loop {
             if self.peek() == Some(b'}') {
@@ -586,6 +678,12 @@ impl<'a> Parser<'a> {
                                 }
                             }
                             "PickupDelay" => pickup_delay = self.int()? as u32,
+                            // A furnace cart's self-drive. Zero on every cart
+                            // in the record door, but a fuelled one propels
+                            // itself, so it is read rather than assumed.
+                            "Fuel" => fuel = self.int()? as u32,
+                            "PushX" => push[0] = self.float()?,
+                            "PushZ" => push[1] = self.float()?,
                             "Item" => {
                                 let stack = self.item_entry()?;
                                 item = Some((stack.id, stack.count));
@@ -610,8 +708,6 @@ impl<'a> Parser<'a> {
                 }
                 _ => self.err("item entity needs `pos` and `Item`"),
             },
-            // Only the plain rideable cart is implemented; the container
-            // variants stay loud until their behaviours exist.
             "minecraft:minecart" => match pos {
                 Some(pos) => Ok(SpawnedEntity::Minecart(SpawnedMinecart {
                     kind: entity_id,
@@ -620,9 +716,32 @@ impl<'a> Parser<'a> {
                 })),
                 None => self.err("minecart entity needs `pos`"),
             },
-            // Everything else is refused by name. Dropping it instead would
-            // let a build whose mechanism depends on the entity load clean and
-            // simulate as though it were not there — a confident wrong answer.
+            "minecraft:furnace_minecart" => match pos {
+                Some(pos) => Ok(SpawnedEntity::FurnaceMinecart(SpawnedFurnaceMinecart {
+                    pos,
+                    motion,
+                    fuel,
+                    push,
+                })),
+                None => self.err("furnace minecart entity needs `pos`"),
+            },
+            "minecraft:small_fireball" | "minecraft:dragon_fireball" => match pos {
+                Some(pos) => Ok(SpawnedEntity::Fireball(SpawnedFireball {
+                    kind: entity_id,
+                    pos,
+                    motion,
+                })),
+                None => self.err("fireball entity needs `pos`"),
+            },
+            "minecraft:villager" => match pos {
+                Some(pos) => Ok(SpawnedEntity::Villager(SpawnedVillager { pos, motion })),
+                None => self.err("villager entity needs `pos`"),
+            },
+            // A type this reader cannot even *represent*. Distinct from one it
+            // can represent but the engine cannot yet simulate — that second
+            // refusal belongs at construction, where the behaviour tables are.
+            // Dropping either would let a build whose mechanism depends on the
+            // entity load clean and run as though it were not there.
             other => Err(StructureError::UnsupportedEntity {
                 // An entry with no `id` at all still has to say something
                 // useful; `unsupported entity type ``` names nothing.
@@ -1204,27 +1323,83 @@ mod tests {
         }
     }
 
-    /// An entity with no behaviour refuses by name, in its own error variant.
+    /// The record door's entity cast parses, whether or not it can be run.
     ///
-    /// The variant matters as much as the message: the bridge tells the user
-    /// "your build has a furnace minecart" only if it can distinguish this
-    /// from "our converter emitted garbage", and those read identically once
-    /// both collapse into `Malformed`.
+    /// Reading and simulating are separate questions now: everything here is
+    /// carried faithfully out of the file, and the engine decides at
+    /// construction what it can actually tick. `Fuel` and `PushX`/`PushZ` are
+    /// read rather than assumed — they are zero on all fifteen furnace carts in
+    /// `55_3x3`, which is what makes those pure mass and hitbox, but a fuelled
+    /// cart drives itself and a build using one must not be quietly flattened.
     #[test]
-    fn an_unmodelled_entity_type_is_refused_by_name() {
+    fn the_record_doors_entity_cast_parses() {
         const TEXT: &str = r#"{
             size: [1, 1, 1],
             palette: [{Name: "minecraft:rail"}],
             blocks: [{pos: [0, 0, 0], state: 0}],
-            entities: [{pos: [0.5d, 0.0d, 0.5d], nbt: {id: "minecraft:furnace_minecart"}}]
+            entities: [
+                {pos: [0.5d, 0.0d, 0.5d], nbt: {id: "minecraft:furnace_minecart", Fuel: 3s, PushX: 0.5d, PushZ: -1.0d}},
+                {pos: [1.5d, 0.0d, 0.5d], nbt: {id: "minecraft:furnace_minecart"}},
+                {pos: [2.5d, 0.0d, 0.5d], nbt: {id: "minecraft:small_fireball"}},
+                {pos: [3.5d, 0.0d, 0.5d], nbt: {id: "minecraft:dragon_fireball"}},
+                {pos: [4.5d, 0.0d, 0.5d], nbt: {id: "minecraft:villager"}}
+            ]
+        }"#;
+        let s = Structure::parse(TEXT).unwrap();
+        assert_eq!(s.entities.len(), 5);
+        match &s.entities[0] {
+            SpawnedEntity::FurnaceMinecart(cart) => {
+                assert_eq!(cart.fuel, 3);
+                assert_eq!(cart.push, [0.5, -1.0]);
+            }
+            other => panic!("expected a furnace minecart, got {other:?}"),
+        }
+        match &s.entities[1] {
+            // Absent `Fuel`/`Push*` mean a cart with no drive, not a parse error.
+            SpawnedEntity::FurnaceMinecart(cart) => {
+                assert_eq!(cart.fuel, 0);
+                assert_eq!(cart.push, [0.0, 0.0]);
+            }
+            other => panic!("expected a furnace minecart, got {other:?}"),
+        }
+        // Both fireball sizes keep their kind: the hitboxes differ, and that
+        // difference is why the doors use one rather than the other.
+        assert_eq!(s.entities[2].kind(), "minecraft:small_fireball");
+        assert_eq!(s.entities[3].kind(), "minecraft:dragon_fireball");
+        assert!(matches!(s.entities[2], SpawnedEntity::Fireball(_)));
+        assert!(matches!(s.entities[3], SpawnedEntity::Fireball(_)));
+        assert!(matches!(s.entities[4], SpawnedEntity::Villager(_)));
+        // None of them are items, so none reach the item-entity view.
+        assert!(s.item_entities.is_empty());
+    }
+
+    /// A type with no representation at all is refused by name, in its own
+    /// error variant.
+    ///
+    /// Note what this is *not*: it is not "the engine has no behaviour for
+    /// this" — that question is asked at construction, and a furnace minecart
+    /// parses fine here. This is a type the reader cannot carry at all, so
+    /// there is nothing to hand on.
+    ///
+    /// The variant matters as much as the message: the bridge tells the user
+    /// "your build has a creeper in it" only if it can distinguish this from
+    /// "our converter emitted garbage", and those read identically once both
+    /// collapse into `Malformed`.
+    #[test]
+    fn an_unrepresentable_entity_type_is_refused_by_name() {
+        const TEXT: &str = r#"{
+            size: [1, 1, 1],
+            palette: [{Name: "minecraft:rail"}],
+            blocks: [{pos: [0, 0, 0], state: 0}],
+            entities: [{pos: [0.5d, 0.0d, 0.5d], nbt: {id: "minecraft:creeper"}}]
         }"#;
         let err = Structure::parse(TEXT).unwrap_err();
         match &err {
             StructureError::UnsupportedEntity { entity_type, .. } => {
-                assert_eq!(entity_type, "minecraft:furnace_minecart");
+                assert_eq!(entity_type, "minecraft:creeper");
             }
             other => panic!("expected UnsupportedEntity, got {other:?}"),
         }
-        assert!(err.to_string().contains("minecraft:furnace_minecart"), "{err}");
+        assert!(err.to_string().contains("minecraft:creeper"), "{err}");
     }
 }

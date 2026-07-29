@@ -614,6 +614,32 @@ fn check_volume(size: (i32, i32, i32)) -> Result<(), String> {
     Ok(())
 }
 
+/// Why a build cannot be simulated, named by entity type and counted.
+///
+/// Deliberately shaped like `unknown_report`'s message for blocks, and for the
+/// same reason: "Simulation" tells someone holding a door that will not load
+/// nothing they can act on, whereas a type name does. The counts matter too —
+/// the record 3x3 door holds fifteen furnace minecarts, and naming the type
+/// once understates how much of the machine would be missing.
+fn entity_gap_report(kinds: &[&str]) -> String {
+    use std::collections::BTreeMap;
+
+    let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
+    for kind in kinds {
+        *counts.entry(*kind).or_default() += 1;
+    }
+    // Sorted by name, so the same build always produces the same sentence.
+    let named: Vec<String> = counts.iter().map(|(kind, n)| format!("{n} x {kind}")).collect();
+    format!(
+        "{} entit{} in this build have no behaviour yet: {}. These are load bearing in \
+         the builds that use them — simulating without them would drop part of the \
+         machine and give a confident wrong answer, so the build is refused instead.",
+        kinds.len(),
+        if kinds.len() == 1 { "y" } else { "ies" },
+        named.join(", ")
+    )
+}
+
 /// The settle recipe, mirroring the engine's conformance harness.
 fn wire_simulation(
     structure: &mc_tick::Structure,
@@ -684,6 +710,20 @@ fn wire_simulation(
         let (rails, conductors) = mc_tick::vanilla::rail_tables(sim.registry());
         sim.set_rail_tables(rails, conductors);
     }
+    // Entities the parser can read but the engine cannot yet run.
+    //
+    // This is the entity half of the `unknown_report` gate above: a build is
+    // refused whole rather than simulated with pieces missing. It lives here,
+    // at construction, rather than in the parser, because "can this be read"
+    // and "is there a behaviour for it" are different questions — the parser
+    // answering both meant the behaviours agent could not even load a villager
+    // to develop against.
+    //
+    // The match is deliberately exhaustive with no catch-all: a new
+    // `SpawnedEntity` variant will fail to compile here until someone decides
+    // whether it can be simulated. That is the whole point of the split — the
+    // gate cannot silently fall out of date.
+    let mut unsupported: Vec<&str> = Vec::new();
     for spawned in &structure.entities {
         match spawned {
             mc_tick::structure::SpawnedEntity::Item(item) => {
@@ -692,7 +732,17 @@ fn wire_simulation(
             mc_tick::structure::SpawnedEntity::Minecart(cart) => {
                 sim.spawn_minecart(cart.kind.clone(), cart.pos, cart.motion);
             }
+            // No behaviour yet for any of these. When one lands, swap its arm
+            // for the spawn call — nothing else here needs to change.
+            other @ (mc_tick::structure::SpawnedEntity::FurnaceMinecart(_)
+            | mc_tick::structure::SpawnedEntity::Fireball(_)
+            | mc_tick::structure::SpawnedEntity::Villager(_)) => {
+                unsupported.push(other.kind());
+            }
         }
+    }
+    if !unsupported.is_empty() {
+        return Err(entity_gap_report(&unsupported));
     }
     for (pos, entry) in &structure.blocks {
         let state = sim.registry().get(&structure.palette[*entry]);
@@ -1932,29 +1982,120 @@ mod tests {
         }
     }
 
-    /// An entity the engine cannot model refuses by name rather than vanishing.
+    /// Wire a one-rail structure carrying `entities`, as the app would.
+    fn wire_with_entities(entities: &str) -> Result<mc_tick::Simulation, String> {
+        let snbt = format!(
+            "{{DataVersion: 4903, size: [1, 1, 1], \
+              palette: [{{Name: \"minecraft:rail\"}}], \
+              blocks: [{{pos: [0, 0, 0], state: 0}}], entities: [{entities}]}}"
+        );
+        let structure = mc_tick::Structure::parse(&snbt)
+            .unwrap_or_else(|e| panic!("the parser must accept this: {e}\n{snbt}"));
+        super::wire_simulation(
+            &structure,
+            mc_tick::Pos::new(0, 0, 0),
+            super::ffi::TickSettleMode::InWorld,
+            &[],
+        )
+    }
+
+    /// The refusal moved from the parser to the simulator, and still names the
+    /// type.
+    ///
+    /// The split is the point: the parser reads every entity faithfully, and
+    /// construction is where "is there a behaviour for this" gets asked. That
+    /// lets a behaviour be developed against a real structure while keeping a
+    /// build that depends on an unmodelled entity from ever loading.
     #[test]
-    fn an_unsupported_entity_is_refused_and_named() {
+    fn entities_without_behaviour_are_refused_at_construction_not_at_parse() {
+        for (entity, expected) in [
+            (
+                r#"{pos: [0.5d, 0.0d, 0.5d], nbt: {id: "minecraft:furnace_minecart"}}"#,
+                "minecraft:furnace_minecart",
+            ),
+            (
+                r#"{pos: [0.5d, 0.0d, 0.5d], nbt: {id: "minecraft:dragon_fireball"}}"#,
+                "minecraft:dragon_fireball",
+            ),
+            (
+                r#"{pos: [0.5d, 0.0d, 0.5d], nbt: {id: "minecraft:small_fireball"}}"#,
+                "minecraft:small_fireball",
+            ),
+            (
+                r#"{pos: [0.5d, 0.0d, 0.5d], nbt: {id: "minecraft:villager"}}"#,
+                "minecraft:villager",
+            ),
+        ] {
+            // `wire_with_entities` already asserts the parse succeeds, which is
+            // half the claim: the refusal is no longer the parser's.
+            let error = wire_with_entities(entity)
+                .err()
+                .unwrap_or_else(|| panic!("{expected} must not load without a behaviour"));
+            assert!(error.contains(expected), "refusal does not name the type: {error}");
+        }
+    }
+
+    /// Negative control: the gate refuses the unmodelled, not everything.
+    ///
+    /// Without this, a gate that rejected every build in existence would pass
+    /// the test above and look correct.
+    #[test]
+    fn entities_that_do_have_behaviour_still_load() {
+        let sim = wire_with_entities(
+            r#"{pos: [0.5d, 0.0625d, 0.5d], nbt: {id: "minecraft:minecart", Motion: [0.0d, 0.0d, 0.0d]}},
+               {pos: [0.5d, 1.0d, 0.5d], nbt: {id: "minecraft:item", Item: {id: "minecraft:redstone", count: 1b}}}"#,
+        )
+        .expect("a plain cart and an item are both simulated today");
+        assert_eq!(sim.minecarts().len(), 1, "the cart should be live");
+        assert_eq!(sim.item_entities().len(), 1, "the item should be live");
+    }
+
+    /// The message names every missing type with its count, not just the first.
+    ///
+    /// `55_3x3.zip` contains fifteen furnace minecarts, two dragon fireballs
+    /// and one small fireball; a refusal naming only one of the three would
+    /// send someone chasing a single entity when eighteen are missing.
+    #[test]
+    fn the_refusal_counts_every_missing_type() {
+        let report = super::entity_gap_report(&[
+            "minecraft:furnace_minecart",
+            "minecraft:dragon_fireball",
+            "minecraft:furnace_minecart",
+        ]);
+        assert!(report.contains("3 entities"), "{report}");
+        assert!(report.contains("2 x minecraft:furnace_minecart"), "{report}");
+        assert!(report.contains("1 x minecraft:dragon_fireball"), "{report}");
+        // Singular reads correctly too.
+        let one = super::entity_gap_report(&["minecraft:villager"]);
+        assert!(one.contains("1 entity in this build"), "{one}");
+    }
+
+    /// A type the reader cannot even represent is still refused by name.
+    ///
+    /// This is the *other* refusal — not "no behaviour yet" but "no idea what
+    /// this is". A creeper has no `SpawnedEntity` variant, so it cannot be
+    /// carried at all, and saying so beats inventing a shape for it.
+    #[test]
+    fn an_unrepresentable_entity_is_refused_and_named() {
         use crate::entity::Entity;
 
-        let mut schem = UniversalSchematic::new("furnace".into());
+        let mut schem = UniversalSchematic::new("creeper".into());
         schem.set_block(0, 0, 0, &BlockState::new("minecraft:rail"));
-        assert!(schem
-            .add_entity(Entity::new("minecraft:furnace_minecart".into(), (0.5, 0.0, 0.5))));
+        assert!(schem.add_entity(Entity::new("minecraft:creeper".into(), (0.5, 0.0, 0.5))));
 
         let snbt = to_gametest_snbt(&schem);
-        let err = mc_tick::Structure::parse(&snbt).expect_err("should refuse the furnace cart");
+        let err = mc_tick::Structure::parse(&snbt).expect_err("should refuse the creeper");
         assert!(
             matches!(
                 &err,
                 mc_tick::structure::StructureError::UnsupportedEntity { entity_type, .. }
-                    if entity_type == "minecraft:furnace_minecart"
+                    if entity_type == "minecraft:creeper"
             ),
             "wrong error: {err}"
         );
         // And the sentence the app shows blames the build, not the converter.
         let detail = super::structure_parse_detail(&err, true);
-        assert!(detail.contains("minecraft:furnace_minecart"), "{detail}");
+        assert!(detail.contains("minecraft:creeper"), "{detail}");
         assert!(!detail.contains("engine fault"), "{detail}");
     }
 }

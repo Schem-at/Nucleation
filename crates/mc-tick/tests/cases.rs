@@ -290,6 +290,13 @@ fn build_sim(
             mc_tick::structure::SpawnedEntity::Minecart(cart) => {
                 sim.spawn_minecart(cart.kind.clone(), cart.pos, cart.motion);
             }
+            // A case that authors one of these would otherwise run with the
+            // entity missing and quietly "pass". Loud beats silent in a test
+            // harness; swap for a spawn call when the behaviour lands.
+            other => panic!(
+                "no spawn path yet for {} — add one when its behaviour exists",
+                other.kind()
+            ),
         }
     }
     for (pos, entry) in &structure.blocks {

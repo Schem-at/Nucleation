@@ -428,6 +428,13 @@ fn run_conformance_full(
                 Some(id) => sim.spawn_minecart_with_id(id, cart.kind.clone(), cart.pos, cart.motion),
                 None => sim.spawn_minecart(cart.kind.clone(), cart.pos, cart.motion),
             },
+            // A golden that contains one of these would otherwise be compared
+            // against a run with the entity missing, which is worse than no
+            // comparison; swap for a spawn call when the behaviour lands.
+            other => panic!(
+                "no spawn path yet for {} — add one when its behaviour exists",
+                other.kind()
+            ),
         };
     }
 

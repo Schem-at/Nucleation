@@ -263,6 +263,7 @@ public final class TraceCapture {
                 chunks.stream()
                         .filter(c -> level.isPositionTickingWithEntitiesLoaded(c.pack())).count(),
                 chunks.size());
+        reportEntities(level, min, max);
 
         List<String> ticks = new ArrayList<>();
         List<String> queues = new ArrayList<>();
@@ -662,9 +663,18 @@ public final class TraceCapture {
                 max.getX() + 1, max.getY() + 1, max.getZ() + 1);
         for (net.minecraft.world.entity.Entity entity : level.getEntitiesOfClass(
                 net.minecraft.world.entity.Entity.class, box)) {
-            boolean tracked = entity instanceof net.minecraft.world.entity.item.ItemEntity
-                    || entity instanceof net.minecraft.world.entity.vehicle.minecart.AbstractMinecart;
-            if (!tracked) {
+            // Track *every* entity but the player.
+            //
+            // This filter used to name ItemEntity and AbstractMinecart, which
+            // made the instrument silently lie: a capture containing fireballs
+            // or villagers reported them as absent, and "no entity moved" was
+            // indistinguishable from "no entity was ever looked at". The record
+            // piston doors are built out of exactly those untracked types, so
+            // the blind spot sat precisely over the thing being measured.
+            //
+            // Widening is safe for the existing goldens: none of them contains
+            // an entity outside the old pair, so none of their events change.
+            if (entity instanceof Player) {
                 continue;
             }
             net.minecraft.world.phys.Vec3 velocity = entity.getDeltaMovement();
@@ -681,6 +691,51 @@ public final class TraceCapture {
 
     /** Entity id -> registry type name, filled by snapshotItems. */
     private static final Map<Integer, String> ENTITY_TYPES = new HashMap<>();
+
+    /**
+     * Every entity in the box at capture start, counted by registry type.
+     *
+     * <p>Decisive diagnostic for a capture that records nothing. A door whose
+     * mechanism is entities producing zero events over forty ticks means either
+     * the entities are correctly frozen or they never loaded at all, and those
+     * two are indistinguishable in the trace itself. This separates them before
+     * the first tick is taken.
+     *
+     * <p>Counts <em>every</em> entity, deliberately not the
+     * ItemEntity/AbstractMinecart subset that {@link #snapshotItems} diffs:
+     * fireballs and villagers are filtered out there, and they are precisely
+     * the ones whose absence would otherwise go unnoticed.
+     *
+     * <p>Non-finite velocities are called out separately because that is what
+     * "correctly frozen" looks like. The record doors glue themselves together
+     * with <em>nan carts</em> — carts whose velocity was overflowed to ±Infinity
+     * and then collided into NaN, which kills their physics. A cart that loaded
+     * but lost its NaN is a live cart, and it will move; seeing the count here
+     * distinguishes that from a cart that is properly inert.
+     */
+    private static void reportEntities(ServerLevel level, BlockPos min, BlockPos max) {
+        net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(
+                min.getX(), min.getY(), min.getZ(),
+                max.getX() + 1, max.getY() + 1, max.getZ() + 1);
+        List<net.minecraft.world.entity.Entity> found = level.getEntitiesOfClass(
+                net.minecraft.world.entity.Entity.class, box);
+        Map<String, Integer> byType = new java.util.TreeMap<>();
+        int nonFinite = 0;
+        for (net.minecraft.world.entity.Entity entity : found) {
+            byType.merge(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE
+                    .getKey(entity.getType()).toString(), 1, Integer::sum);
+            Vec3 velocity = entity.getDeltaMovement();
+            if (!Double.isFinite(velocity.x) || !Double.isFinite(velocity.y)
+                    || !Double.isFinite(velocity.z)) {
+                nonFinite++;
+            }
+        }
+        System.out.printf("  entities loaded: %d%n", found.size());
+        for (Map.Entry<String, Integer> entry : byType.entrySet()) {
+            System.out.printf("    %d x %s%n", entry.getValue(), entry.getKey());
+        }
+        System.out.printf("  entities with non-finite velocity (nan carts): %d%n", nonFinite);
+    }
 
     /**
      * Container contents for every container in the box, one string per slot.
