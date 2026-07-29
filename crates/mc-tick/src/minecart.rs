@@ -152,6 +152,15 @@ pub struct MinecartState {
     pub on_rails: bool,
     /// Set when discarded.
     pub removed: bool,
+    /// `yRot`, degrees, as the *polar angle in the XZ plane* — the sense
+    /// `AbstractMinecart` writes and reads it, `atan2(dz, dx)`, so 0 points
+    /// +X and 90 points +Z.
+    ///
+    /// Carried because cart-cart pushing gates on it: a pair only shoves each
+    /// other when the line between them is within ~37° of the facing. An
+    /// entity with no `Rotation` tag starts at 0, which is what a structure
+    /// spawn gives — the structure reader does not carry rotation yet.
+    pub yaw: f64,
 }
 
 /// `getCurrentBlockPosOrRailBelow`: the cart's block, or the block below when
@@ -247,7 +256,13 @@ fn move_cart(cart: &mut MinecartState, world: &dyn CollisionWorld, movement: [f6
 }
 
 /// One cart tick — `OldMinecartBehavior.tick`, server side, riderless.
+///
+/// This is the movement half only. Vanilla's `AbstractMinecart.tick` then
+/// shoves whatever shares its space; that half is [`push_neighbours`], which
+/// the caller runs straight after this for the same cart, because it needs the
+/// other carts and this function only has one.
 pub fn tick_minecart(cart: &mut MinecartState, world: &dyn CollisionWorld) {
+    let before = [cart.pos[0], cart.pos[2]];
     cart.vel[1] -= CART_GRAVITY;
     let rail_pos = rail_block_pos(cart, world);
     match world.rail(rail_pos) {
@@ -260,6 +275,44 @@ pub fn tick_minecart(cart: &mut MinecartState, world: &dyn CollisionWorld) {
             come_off_track(cart, world);
         }
     }
+    // `yRot = atan2(zo - z, xo - x)`, but only once the tick's travel clears
+    // 0.001 squared — a cart creeping slower than 0.0316 a tick keeps the
+    // heading it already had, which is the whole reason a parked cart can hold
+    // a stale yaw and refuse to be pushed.
+    //
+    // Vanilla then folds in a `flipped` flag that adds 180°. It is dropped
+    // here: the only consumer of yaw in this engine is the push gate, which
+    // takes `abs` of the dot product, and negating the facing cannot change
+    // that. If a second consumer appears, `flipped` has to come with it.
+    let dx = cart.pos[0] - before[0];
+    let dz = cart.pos[2] - before[1];
+    if dx * dx + dz * dz > 0.001 {
+        cart.yaw = dz.atan2(dx).to_degrees();
+    }
+}
+
+/// `Mth.SIN`: 65536 **float** samples of one turn, the table `Mth.sin`/`Mth.cos`
+/// read instead of calling `Math.sin`. Vanilla's push gate goes through it, and
+/// it is only accurate to about 1e-4, so reproducing the structure rather than
+/// calling `f64::sin` is what keeps the threshold comparison honest.
+fn sin_table() -> &'static [f32; 65536] {
+    use std::sync::OnceLock;
+    static TABLE: OnceLock<Box<[f32; 65536]>> = OnceLock::new();
+    TABLE.get_or_init(|| {
+        let mut table = Box::new([0.0f32; 65536]);
+        for (index, slot) in table.iter_mut().enumerate() {
+            *slot = (index as f64 * std::f64::consts::TAU / 65536.0).sin() as f32;
+        }
+        table
+    })
+}
+
+fn mth_sin(radians: f32) -> f32 {
+    sin_table()[((radians * 10430.378_f32) as i32 as usize) & 0xFFFF]
+}
+
+fn mth_cos(radians: f32) -> f32 {
+    sin_table()[((radians * 10430.378_f32 + 16384.0) as i32 as usize) & 0xFFFF]
 }
 
 /// `comeOffTrack`: clamp, halve when grounded, move, air-drag when airborne.
@@ -439,6 +492,180 @@ fn horizontal(vel: [f64; 3]) -> f64 {
     (vel[0] * vel[0] + vel[2] * vel[2]).sqrt()
 }
 
+/// The push search inflates the hitbox by this on X and Z (`inflate(0.2, 0, 0.2)`),
+/// so two carts shove each other out to 0.98 + 0.2 = 1.18 apart.
+pub const PUSH_INFLATE: f64 = 0.2;
+
+/// The push impulse, and the single most important constant here: vanilla
+/// writes `0.05F`, a **float** literal, widened to double. That is
+/// `0.05000000074505806`, not `0.05` — and the difference is not cosmetic.
+/// With plain `0.05` the `cart_collide` golden reproduces to about 1e-8 and
+/// drifts; with the float literal it reproduces **bit for bit** across all 80
+/// ticks, which is how the constant was identified in the first place.
+const PUSH_SCALE: f64 = 0.05_f32 as f64;
+
+/// Two carts only shove each other when the line between them is within this
+/// much of one cart's facing, as `|dot| >= 0.8` — about 37°.
+const PUSH_ALIGNMENT: f64 = 0.8;
+
+/// Whether `a`'s push search box reaches `b` — `getBoundingBox().inflate(0.2, 0, 0.2)`
+/// against `b`'s box, vanilla's strict `AABB.intersects`.
+fn push_boxes_overlap(a: &MinecartState, b: &MinecartState) -> bool {
+    let (amin, amax) = cart_aabb(a.pos);
+    let (bmin, bmax) = cart_aabb(b.pos);
+    let inflate = [PUSH_INFLATE, 0.0, PUSH_INFLATE];
+    (0..3).all(|axis| amin[axis] - inflate[axis] < bmax[axis] && amax[axis] + inflate[axis] > bmin[axis])
+}
+
+/// `AbstractMinecart.push(Entity)` for a cart pushing a cart.
+///
+/// # The law
+///
+/// ```text
+/// n     = normalize(other.pos - this.pos)   in XZ, then scaled by min(1/dist, 1)
+/// n    *= 0.05F
+/// gate  = |dot(normalize(other.pos - this.pos), (cos yaw, 0, sin yaw))| >= 0.8
+/// mid   = (this.vel + other.vel) / 2
+/// this.vel  = this.vel  * 0.2 + (mid - n)
+/// other.vel = other.vel * 0.2 + (mid + n)
+/// ```
+///
+/// **This does not conserve momentum, it amplifies it**, and that is not a bug
+/// in the transcription — it is the documented mechanism the record doors abuse.
+/// Each cart keeps a fifth of its own velocity *and* is handed the full average
+/// of the pair, so the sum comes out larger than it went in: the `cart_collide`
+/// golden shows 0.1100 becoming 0.1460 (+33%) on one collision and 0.0984
+/// becoming 0.1103 (+12%) on another. Iterate that on a slope and the velocity
+/// saturates to ±Infinity; collide a +Infinity cart with a -Infinity one and
+/// the `mid` term computes `(+Inf + -Inf)/2` = NaN. That is where nan carts
+/// come from, and why nothing here may clamp, guard or sanitise a velocity.
+///
+/// # Reading it against Java
+///
+/// Every comparison is written so NaN falls the way Java drops it:
+/// `if (sq >= 1.0E-4)` skips a NaN separation, `if (scale > 1.0)` leaves a NaN
+/// scale alone, and `if (dot < 0.8) return` does **not** return on NaN, so a
+/// NaN-positioned cart still pushes. Do not "simplify" any of these into
+/// `f64::min`/`max` or `clamp`, which discard NaN where Java propagates it.
+fn push(this: &mut MinecartState, other: &mut MinecartState) {
+    let raw_x = other.pos[0] - this.pos[0];
+    let raw_z = other.pos[2] - this.pos[2];
+    let sq = raw_x * raw_x + raw_z * raw_z;
+    // Java: `if (d2 >= 1.0E-4)`. NaN fails it, so a NaN separation pushes nothing.
+    if !(sq >= 1.0e-4) {
+        return;
+    }
+    let dist = sq.sqrt();
+    let mut d0 = raw_x / dist;
+    let mut d1 = raw_z / dist;
+    let mut scale = 1.0 / dist;
+    // Java: `if (d3 > 1.0) d3 = 1.0`. NaN fails it and stays NaN — deliberately
+    // not `scale.min(1.0)`, which would launder it.
+    if scale > 1.0 {
+        scale = 1.0;
+    }
+    d0 *= scale;
+    d1 *= scale;
+    d0 *= PUSH_SCALE;
+    d1 *= PUSH_SCALE;
+
+    // The alignment gate. `cart_yaw` pins this: two carts at rest 0.98 apart
+    // along +Z, one lane holding yaw 0 and one holding yaw 90, and only the
+    // yaw-90 lane ever moves. The yaw-0 lane sits there for all 80 ticks.
+    let length = (raw_x * raw_x + raw_z * raw_z).sqrt();
+    let (ux, uz) = (raw_x / length, raw_z / length);
+    let radians = (this.yaw as f32) * (std::f32::consts::PI / 180.0);
+    let (fx, fz) = (f64::from(mth_cos(radians)), f64::from(mth_sin(radians)));
+    let facing = (fx * fx + fz * fz).sqrt();
+    let dot = (ux * (fx / facing) + uz * (fz / facing)).abs();
+    // Java: `if (d6 < 0.8F) return`. NaN fails it, so the push goes ahead —
+    // matching, not correcting, the game.
+    if dot < PUSH_ALIGNMENT {
+        return;
+    }
+
+    let (tx, tz) = (this.vel[0], this.vel[2]);
+    let (ox, oz) = (other.vel[0], other.vel[2]);
+    let mid_x = (ox + tx) / 2.0;
+    let mid_z = (oz + tz) / 2.0;
+    this.vel[0] = tx * 0.2 + (mid_x - d0);
+    this.vel[2] = tz * 0.2 + (mid_z - d1);
+    other.vel[0] = ox * 0.2 + (mid_x + d0);
+    other.vel[2] = oz * 0.2 + (mid_z + d1);
+}
+
+/// The push half of `AbstractMinecart.tick` for the cart at `index`: every other
+/// cart its inflated box reaches gets `entity.push(this)` — note the direction,
+/// the *found* entity is the receiver `this` and the ticking cart is the
+/// argument. For two ordinary carts the law is symmetric in the pair, so the
+/// direction is invisible; it would stop being with a furnace cart, which is
+/// not implemented.
+///
+/// Runs immediately after [`tick_minecart`] for the same cart, and reads the
+/// cart's **post-move** position. The `cart_collide` golden settles that order
+/// on its own: the first tick's numbers only come out right if the pusher has
+/// already moved when it pushes.
+///
+/// # What is verified, and what is not
+///
+/// Returns how many carts were pushed. **One is proven; two or more is not**,
+/// and the caller is expected to treat anything above one as a run that has
+/// left the captured envelope.
+///
+/// A cart with exactly one neighbour reproduces vanilla *bit for bit* — same
+/// doubles, not "within 1e-6" — across four independent captures:
+/// `cart_collide` (a pair on rail, 80 ticks, plus a third cart rammed into
+/// them), `cart_offrail` (a pair with no track), `cart_group`'s pair lane, and
+/// both lanes of `cart_yaw`.
+///
+/// A cart with **two** neighbours does not. `cart_group` puts a pair, a triple
+/// and a quad of touching carts on one line and lets them shove themselves
+/// apart; vanilla moves only the far cart of each group on the first tick, by
+/// 1, 1.25, 1.3375 and (in `cart_chain`, five carts) 1.368125 times the 0.05
+/// impulse — a clean geometric series in 0.35 that this pairwise law does not
+/// produce under *any* ordering. Every permutation of tick order, neighbour
+/// order, push-before-move versus push-after-move, frozen versus live
+/// positions, and once-per-pair versus twice was searched: the pair matches
+/// exactly, the triple and quad match nothing. So vanilla does something
+/// structurally different once a cart has neighbours on both sides, and this
+/// engine does not know what. The middle carts of a chain are quietly wrong
+/// here, and the divergence starts on the very first tick.
+///
+/// That matters directly: the record 3x3 door is built out of exactly such
+/// chains. See `cart_group.json` and `cart_chain.json`, which are kept in the
+/// tree as the evidence, and the ignored `cart_group` conformance test.
+#[must_use]
+pub fn push_neighbours(carts: &mut [MinecartState], index: usize) -> usize {
+    if carts[index].removed {
+        return 0;
+    }
+    let mut pushed = 0;
+    for other in 0..carts.len() {
+        if other == index || carts[other].removed {
+            continue;
+        }
+        if !push_boxes_overlap(&carts[index], &carts[other]) {
+            continue;
+        }
+        pushed += 1;
+        let (this, arg) = pair_mut(carts, other, index);
+        push(this, arg);
+    }
+    pushed
+}
+
+/// Two distinct elements of a slice, mutably.
+fn pair_mut<T>(slice: &mut [T], a: usize, b: usize) -> (&mut T, &mut T) {
+    assert_ne!(a, b);
+    if a < b {
+        let (left, right) = slice.split_at_mut(b);
+        (&mut left[a], &mut right[0])
+    } else {
+        let (left, right) = slice.split_at_mut(a);
+        (&mut right[0], &mut left[b])
+    }
+}
+
 /// `Math.min` with **Java's** semantics: NaN propagates.
 ///
 /// Rust's `f64::min` implements IEEE-754 `minNum`, which *discards* NaN and
@@ -520,6 +747,7 @@ mod tests {
             on_ground: false,
             on_rails: true,
             removed: false,
+            yaw: 0.0,
         };
         // The first tick seats the cart on the rail chord — vanilla writes that
         // position unconditionally, whatever the velocity — so stability is
@@ -555,6 +783,7 @@ mod tests {
             on_ground: false,
             on_rails: true,
             removed: false,
+            yaw: 0.0,
         };
         tick_minecart(&mut cart, &RailOnly);
         assert!(cart.pos[0] > 0.5, "a finite cart moves along the rail");
@@ -572,6 +801,147 @@ mod tests {
         assert_eq!(jmin(2.0, 1.0), 1.0);
         // Infinity clamps like an ordinary large number, as Java does.
         assert_eq!(jmin(f64::INFINITY, 2.0), 2.0);
+    }
+
+    fn parked(id: u32, x: f64, z: f64, yaw: f64) -> MinecartState {
+        MinecartState {
+            id,
+            kind: "minecraft:minecart".into(),
+            pos: [x, 1.0625, z],
+            vel: [0.0; 3],
+            on_ground: false,
+            on_rails: true,
+            removed: false,
+            yaw,
+        }
+    }
+
+    /// One push phase over `carts`, cart 0 doing the pushing.
+    fn shove(carts: &mut [MinecartState]) -> usize {
+        push_neighbours(carts, 0)
+    }
+
+    /// Two carts touching at 0.98 shove themselves apart, symmetrically, by the
+    /// `0.05F` impulse — and it really is the float literal, not 0.05.
+    ///
+    /// This is the first tick of the `cart_collide` golden, where the pair sits
+    /// at 8.5 and 9.48 with no input and comes apart anyway.
+    #[test]
+    fn a_touching_pair_pushes_itself_apart_by_the_float_impulse() {
+        let mut carts = vec![parked(0, 8.5, 1.5, 0.0), parked(1, 9.48, 1.5, 0.0)];
+        assert_eq!(shove(&mut carts), 1);
+        // Vanilla's `0.05F` widened, exactly: 0.05000000074505806.
+        assert_eq!(carts[0].vel[0], -(0.05_f32 as f64));
+        assert_eq!(carts[1].vel[0], 0.05_f32 as f64);
+        // and it is *not* the double 0.05 — the difference is what makes the
+        // golden reproduce bit for bit instead of drifting at 1e-8.
+        assert_ne!(carts[1].vel[0], 0.05_f64);
+    }
+
+    /// The collision adds momentum instead of conserving it.
+    ///
+    /// Each cart keeps a fifth of its own velocity *and* is handed the pair's
+    /// full average, so the sum comes out bigger than it went in — and by an
+    /// exact factor. Summing the pair, the ±impulse cancels and the averages
+    /// add back to the whole, leaving `sum' = 0.2 x sum + sum = 1.2 x sum`,
+    /// whatever the velocities and however far apart the carts are.
+    ///
+    /// A full tick applies this twice, once in each cart's push phase, with the
+    /// 0.96 rail drag in between — which is the +33% the `cart_collide` golden
+    /// shows when the rammer lands, 0.1100 becoming 0.1460.
+    ///
+    /// Compounding 1.2 a tick is the road to ±Infinity, and from there to the
+    /// NaN carts the record doors are glued with, so this must not be "fixed"
+    /// into a conserving collision.
+    #[test]
+    fn colliding_carts_amplify_momentum_by_exactly_a_fifth() {
+        let mut carts = vec![parked(0, 8.5, 1.5, 0.0), parked(1, 9.48, 1.5, 0.0)];
+        carts[0].vel[0] = 0.13812576058731485; // the golden's t18 rammer
+        carts[1].vel[0] = -0.02808734124118818; // and the cart it caught
+        let before = carts[0].vel[0] + carts[1].vel[0];
+        assert_eq!(shove(&mut carts), 1);
+        let after = carts[0].vel[0] + carts[1].vel[0];
+        assert!(
+            (after - before * 1.2).abs() < 1.0e-15,
+            "one push must multiply total momentum by 1.2: {before} -> {after}"
+        );
+
+        // It is a property of the law, not of these two numbers: at rest the
+        // pair still gains, from nothing, in opposite directions.
+        let mut rest = vec![parked(0, 8.5, 1.5, 0.0), parked(1, 9.48, 1.5, 0.0)];
+        assert_eq!(shove(&mut rest), 1);
+        assert!(rest[0].vel[0] < 0.0 && rest[1].vel[0] > 0.0);
+    }
+
+    /// A cart pushes only along its facing: the alignment gate.
+    ///
+    /// `cart_yaw` is two identical north-south lanes, each holding a pair
+    /// parked 0.98 apart along +Z. The lane whose carts carry yaw 90 shoves
+    /// itself apart exactly like the east-west pairs do; the lane carrying
+    /// yaw 0 sits there, untouched, for all 80 ticks of the capture. The gate
+    /// is `|dot(direction, facing)| >= 0.8`, and a +Z separation against an
+    /// +X facing scores 0.
+    #[test]
+    fn carts_only_push_along_their_facing() {
+        // Facing +Z, separated along +Z: aligned, so they shove.
+        let mut aligned = vec![parked(0, 2.5, 7.5, 90.0), parked(1, 2.5, 8.48, 90.0)];
+        assert_eq!(shove(&mut aligned), 1);
+        assert_eq!(aligned[0].vel[2], -(0.05_f32 as f64));
+        assert_eq!(aligned[1].vel[2], 0.05_f32 as f64);
+
+        // Facing +X, separated along +Z: crosswise, so nothing happens at all.
+        let mut crosswise = vec![parked(0, 2.5, 7.5, 0.0), parked(1, 2.5, 8.48, 0.0)];
+        // The box search still finds it — the gate is inside the push, not the
+        // search, which is why the count is 1 and the velocities are still 0.
+        assert_eq!(shove(&mut crosswise), 1);
+        assert_eq!(crosswise[0].vel, [0.0; 3], "yaw 0 must not push along Z");
+        assert_eq!(crosswise[1].vel, [0.0; 3], "yaw 0 must not push along Z");
+    }
+
+    /// Carts further apart than hitbox + 0.2 never touch.
+    #[test]
+    fn the_push_search_reaches_exactly_one_hitbox_plus_two_tenths() {
+        let mut near = vec![parked(0, 0.5, 0.5, 0.0), parked(1, 0.5 + 1.17, 0.5, 0.0)];
+        assert_eq!(shove(&mut near), 1);
+        assert!(near[1].vel[0] > 0.0);
+
+        let mut far = vec![parked(0, 0.5, 0.5, 0.0), parked(1, 0.5 + 1.19, 0.5, 0.0)];
+        assert_eq!(shove(&mut far), 0);
+        assert_eq!(far[1].vel, [0.0; 3]);
+    }
+
+    /// A NaN cart's velocity survives being collided with.
+    ///
+    /// The record doors use NaN carts as glue, and a NaN that gets laundered
+    /// into a real number sets the whole contraption walking. Every comparison
+    /// in the push is written the way Java drops it, and none of the arithmetic
+    /// clamps — so a NaN velocity comes out the other side still NaN, and
+    /// spreads to whatever it was collided with, which is the contagion the
+    /// builders rely on.
+    ///
+    /// NOT asserted: that vanilla agrees. This pins the engine's own IEEE-754
+    /// behaviour so a later `min`/`clamp`/`is_finite` "tidy-up" trips a test;
+    /// whether the game propagates NaN across a cart-cart collision needs a
+    /// capture driven from a world save, because SNBT cannot express NaN.
+    #[test]
+    fn a_nan_velocity_survives_a_collision_and_spreads() {
+        let mut carts = vec![parked(0, 8.5, 1.5, 0.0), parked(1, 9.48, 1.5, 0.0)];
+        carts[0].vel[0] = f64::NAN;
+        assert_eq!(shove(&mut carts), 1);
+        assert!(carts[0].vel[0].is_nan(), "the nan cart must stay nan");
+        assert!(
+            carts[1].vel[0].is_nan(),
+            "and must infect the cart it hit — this is the zombie minecart"
+        );
+    }
+
+    /// A NaN *position* pushes nothing: `sq >= 1e-4` is false for NaN in Java
+    /// too, so the whole push is skipped rather than producing NaN velocities.
+    #[test]
+    fn a_nan_position_skips_the_push_the_way_java_does() {
+        let mut carts = vec![parked(0, f64::NAN, 1.5, 0.0), parked(1, 9.48, 1.5, 0.0)];
+        assert_eq!(shove(&mut carts), 0, "a nan box intersects nothing");
+        assert_eq!(carts[1].vel, [0.0; 3]);
     }
 
     #[test]

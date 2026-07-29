@@ -196,6 +196,15 @@ pub struct Simulation {
     conductors: Vec<bool>,
     /// The world's minecarts, in spawn order.
     minecarts: Vec<crate::minecart::MinecartState>,
+    /// How many cart-push phases this run found **more than one** neighbour.
+    ///
+    /// Nonzero means the run leaned on the part of cart-cart collision that is
+    /// not pinned by any capture: one neighbour reproduces vanilla bit for bit,
+    /// two does not, and no ordering of the pairwise law reproduces a chain of
+    /// touching carts (see `minecart::push_neighbours`). Kept as a count rather
+    /// than a panic because the record doors are *made* of such chains — the
+    /// simulation still runs, it just must not be believed about them.
+    cart_chain_ticks: u64,
     /// Entities that are a hitbox and nothing else — the record doors' frozen
     /// fireballs. `(id, kind, position)`; see
     /// [`Simulation::spawn_frozen_entity`].
@@ -294,6 +303,7 @@ impl Simulation {
             rails: Vec::new(),
             conductors: Vec::new(),
             minecarts: Vec::new(),
+            cart_chain_ticks: 0,
             frozen: Vec::new(),
             entity_snapshot: std::collections::HashMap::new(),
             ent_log: None,
@@ -470,6 +480,11 @@ impl Simulation {
             on_ground: false,
             on_rails: false,
             removed: false,
+            // Vanilla's default for an entity spawned without a `Rotation`
+            // tag. The structure reader does not carry rotation, so a build
+            // that means to park a cart on a stale heading cannot say so yet —
+            // see `push_neighbours`, which gates on this.
+            yaw: 0.0,
         });
         self.refresh_bodies();
     }
@@ -536,6 +551,13 @@ impl Simulation {
                 is_minecart: false,
             });
         }
+    }
+
+    /// Whether this run ever pushed a cart that had two or more neighbours —
+    /// the regime `minecart::push_neighbours` documents as unverified. A
+    /// conformance claim about a run with this set is not worth making.
+    pub fn cart_chain_unverified(&self) -> bool {
+        self.cart_chain_ticks > 0
     }
 
     /// The live minecarts.
@@ -1719,6 +1741,17 @@ impl Simulation {
                         continue;
                     }
                     crate::minecart::tick_minecart(&mut self.minecarts[index], &collision);
+                    // The push half of the same cart's tick, in the same pass:
+                    // a cart shoves its neighbours the moment it has finished
+                    // moving, before the next cart ticks. That interleaving is
+                    // observable — in `cart_collide` the pushed cart travels on
+                    // its own tick, later the same tick it did the pushing.
+                    let pushed = crate::minecart::push_neighbours(&mut self.minecarts, index);
+                    // One neighbour is bit-exact against vanilla; two is not,
+                    // and no ordering of the pairwise law reproduces a chain.
+                    // Rather than let that be invisible, remember it — see
+                    // `cart_chain_unverified`.
+                    self.cart_chain_ticks += u64::from(pushed > 1);
                 }
                 for index in 0..self.item_entities.items.len() {
                     if self.item_entities.items[index].removed {

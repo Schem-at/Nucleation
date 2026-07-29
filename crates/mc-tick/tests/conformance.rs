@@ -1146,6 +1146,62 @@ fn a_cart_circulates_a_powered_loop_indefinitely() {
 }
 
 #[test]
+fn two_touching_carts_shove_themselves_apart_and_a_third_amplifies_the_pair() {
+    // Entity-to-entity collision, and the constant that makes it exact.
+    //
+    // Two carts parked at 0.98 — the cart hitbox width, and the spacing the
+    // record 3x3 door's chains sit at — push themselves apart with no input at
+    // all: by t17 the golden has them at -0.029 and +0.028. That self-sustaining
+    // shove is what holds the door's carts in place.
+    //
+    // The collision **amplifies** momentum rather than conserving it, because
+    // each cart keeps 0.2 of its own velocity *and* takes the pair's full
+    // average: the rammer arrives and 0.1100 becomes 0.1460 (+33%), later
+    // 0.0984 becomes 0.1103 (+12%). Run that up a slope and you get ±Infinity,
+    // collide those and you get the NaN carts the door is glued with.
+    //
+    // The bar here is not the 1e-6 tolerance — this reproduces vanilla to the
+    // last bit, all 80 ticks, and it only does so because the impulse is
+    // vanilla's `0.05F` widened to double (0.05000000074505806). Plain `0.05`
+    // drifts to about 1e-8, which is how the float literal was found.
+    run_cart("cart_collide.snbt", "cart_collide.json", "nucleation:cart_collide");
+}
+
+#[test]
+fn carts_with_no_rail_under_them_still_shove_each_other() {
+    // The door's glue carts sit inside blocks, not on track, so the push has to
+    // survive `comeOffTrack`. It does, and the interaction with the grounded
+    // halving is visible: the first tick the pair is still airborne so the
+    // pushed cart takes the full 0.05, and from the second the x0.5 bites.
+    run_cart("cart_offrail.snbt", "cart_offrail.json", "nucleation:cart_offrail");
+}
+
+#[test]
+#[ignore = "three touching carts are not reproduced by any ordering of the \
+            pairwise law; kept as the evidence, see minecart::push_neighbours"]
+fn a_chain_of_touching_carts_is_not_reproduced_yet() {
+    // Deliberately failing, and kept.
+    //
+    // `cart_group` is one rail line holding a pair, a triple and a quad of
+    // carts all touching at 0.98. The pair is bit-exact. The triple and the
+    // quad are not: vanilla moves only the far cart of each group on the first
+    // tick, by 1, 1.25 and 1.3375 times the 0.05 impulse — a geometric series
+    // in 0.35 — and the engine moves several of them instead.
+    //
+    // This is not an ordering bug that a bit of shuffling fixes. Every
+    // permutation of tick order, neighbour order, push-before-move versus
+    // push-after-move, live versus tick-start positions, and once- versus
+    // twice-per-pair was searched against this golden: the two-cart case comes
+    // out exact under the obvious one and the three-cart case comes out exact
+    // under none of them. Vanilla is doing something else once a cart has a
+    // neighbour on each side, and guessing at it would put a plausible,
+    // unverified number underneath the door.
+    //
+    // Un-ignore this when the capture that explains it exists.
+    run_cart("cart_group.snbt", "cart_group.json", "nucleation:cart_group");
+}
+
+#[test]
 fn a_redstone_block_lights_nine_golden_rails_and_no_more() {
     // findPoweredRailSignal: the direct neighbour plus a chain of at most 8
     // already-powered rails — nine light up, the tenth stays dark, and the
