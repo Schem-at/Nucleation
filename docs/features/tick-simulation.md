@@ -266,8 +266,8 @@ answer:
   container reads are correct only for 64-stackable items.
 - **Some components.** Anything not implemented refuses to load and names itself,
   rather than being silently treated as air or stone.
-- **Piston push reaction for doors** is currently ordinary-material and marked as
-  unverified in the code; it wants a capture.
+- **Item drops.** A capture pins block-level outcomes; the items a destroyed
+  block produces are not pinned unless the capture was taken with entities.
 
 ## Gotchas worth knowing before you hit them
 

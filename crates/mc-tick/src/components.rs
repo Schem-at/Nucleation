@@ -1407,10 +1407,17 @@ impl<P: PowerSource> BlockBehaviour for CopperBulb<P> {
 /// half changing state does not alter either half's neighbour signal, so the
 /// `powered != self.powered` test below already makes such an update a no-op.
 ///
-/// **Unverified:** a door's piston push reaction is not modelled here, so a
-/// door in the path of a piston moves as ordinary material. If doors are in
-/// fact `PushReaction.DESTROY` that is a divergence, but guessing either way
-/// is a silent one — it wants a gametest capture, not a judgement call.
+/// A door is `PushReaction.DESTROY`, captured (`door_push.json`, five lanes at
+/// once): a piston reaching either half **breaks** it rather than carrying it,
+/// and the untouched half breaks too, because a half cannot survive without its
+/// partner. Oak and iron behave identically, a sticky piston therefore has
+/// nothing left to pull back, and a slime array moving both halves together
+/// destroys them just the same. The push-reaction half of that lives in
+/// [`crate::vanilla`]'s `destroyed_by_push`; the partner rule is
+/// [`Door::on_shape_update`] below.
+///
+/// Note that `_trapdoor` does not end with `_door`, so trapdoors are untouched
+/// by either rule — they are movable, which `trapdoor_push.json` pins.
 pub struct Door<P: PowerSource> {
     /// Whether this state is powered.
     pub powered: bool,
@@ -1420,6 +1427,10 @@ pub struct Door<P: PowerSource> {
     pub states: StatePair,
     /// How power is read.
     pub power: P,
+    /// Every state that counts as this door's other half — the same door block
+    /// in the opposite `half`. Precomputed so the check is a lookup rather than
+    /// descriptor-string parsing on a hot path.
+    pub partner: std::sync::Arc<[StateId]>,
 }
 
 impl<P: PowerSource> Door<P> {
@@ -1436,6 +1447,21 @@ impl<P: PowerSource> BlockBehaviour for Door<P> {
         let signal = self.signal_at(ctx, pos) || self.signal_at(ctx, pos.offset(self.other_half));
         if signal != self.powered {
             ctx.set_quiet(pos, self.states.get(signal));
+        }
+    }
+
+    /// `DoorBlock.updateShape`: an update arriving from where the other half
+    /// should be, finding anything that is not the other half, returns AIR.
+    ///
+    /// This is what makes a piston destroy a *whole* door when it only reaches
+    /// one half — the surviving half hears its partner vanish and goes too.
+    fn on_shape_update(&self, ctx: &mut TickCtx<'_>, pos: Pos, from: Dir) {
+        if from != self.other_half {
+            return;
+        }
+        let neighbour = ctx.world.get(pos.offset(self.other_half));
+        if !self.partner.contains(&neighbour) {
+            ctx.set(pos, StateId::AIR);
         }
     }
 

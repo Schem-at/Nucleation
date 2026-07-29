@@ -1486,6 +1486,45 @@ fn a_piston_pushes_a_trapdoor_intact() {
 }
 
 #[test]
+fn a_piston_destroys_a_door_and_takes_the_other_half_with_it() {
+    // Five lanes, one capture, and the same answer in every one: a door is
+    // `PushReaction.DESTROY`. Whichever half the piston reaches is broken
+    // rather than carried, and the untouched half breaks with it because a
+    // door half cannot survive its partner's absence.
+    //
+    //   z=0   normal piston at the LOWER half of an oak door
+    //   z=3   normal piston at the UPPER half of an oak door
+    //   z=6   normal piston at the lower half of an IRON door
+    //   z=9   sticky piston: the push destroys, so the retract pulls nothing
+    //   z=12  a slime array carrying a companion block, both halves at once
+    //
+    // Every destination cell is floored, so "the door is gone" cannot be
+    // confused with "the door landed somewhere it could not stand". Iron and
+    // oak behave identically, which is why one lane of each suffices.
+    //
+    // This overturned the engine: doors were modelled as ordinary pushable
+    // material, and carried the door forward in all five lanes.
+    run_conformance_actuated(
+        "door_push.snbt",
+        "door_push.json",
+        "nucleation:door_push",
+        &["minecraft:redstone_block"],
+        &[
+            (2, Actuate::Place(Pos::new(0, 1, 0), "minecraft:redstone_block")),
+            (2, Actuate::Place(Pos::new(0, 2, 3), "minecraft:redstone_block")),
+            (2, Actuate::Place(Pos::new(0, 1, 6), "minecraft:redstone_block")),
+            (2, Actuate::Place(Pos::new(0, 1, 9), "minecraft:redstone_block")),
+            (2, Actuate::Place(Pos::new(0, 1, 12), "minecraft:redstone_block")),
+            (8, Actuate::Place(Pos::new(0, 1, 0), "minecraft:air")),
+            (8, Actuate::Place(Pos::new(0, 2, 3), "minecraft:air")),
+            (8, Actuate::Place(Pos::new(0, 1, 6), "minecraft:air")),
+            (8, Actuate::Place(Pos::new(0, 1, 9), "minecraft:air")),
+            (8, Actuate::Place(Pos::new(0, 1, 12), "minecraft:air")),
+        ],
+    );
+}
+
+#[test]
 fn the_flying_machine_flies_as_vanilla_does() {
     // Engine B, quiet placement, redstone-block kick at t2 removed at t4 —
     // then 70 ticks of unassisted flight, block for block against the game.

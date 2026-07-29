@@ -206,6 +206,15 @@ adding a file, no recompilation. `load <name>.snbt` runs a real structure.
 - **Sticky pull** with adhesion; **short-pulse block dropping**
 - Piston excluded from its own structure; block events deduplicate like
   vanilla's `ObjectLinkedOpenHashSet`
+- **Doors are `PushReaction.DESTROY`** (captured, `door_push.json`) — a piston
+  reaching *either* half breaks it rather than carrying it, and the untouched
+  half then breaks for want of a partner (`DoorBlock.updateShape`). Oak and iron
+  are identical, a sticky piston is left with nothing to pull back, and a slime
+  array moving both halves at once destroys them just the same. The engine
+  previously treated doors as ordinary pushable material; the capture overturned
+  it. **Trapdoors are the opposite and are separately pinned** — no push-reaction
+  override, so they ride a piston intact (`trapdoor_push.json`); note that
+  `_trapdoor` does not end in `_door`, which is what keeps the two rules apart.
 
 ---
 

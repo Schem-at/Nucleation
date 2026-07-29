@@ -832,6 +832,15 @@ pub fn register_all_at(
                 | "minecraft:repeater"
                 | "minecraft:comparator"
         )
+            // Doors are `PushReaction.DESTROY` — captured, not assumed. A
+            // piston reaching either half breaks it, and the other half then
+            // breaks for want of a partner (`Door::on_shape_update`). Oak and
+            // iron alike, and a slime array carrying both halves at once fares
+            // no better. `door_push.json` pins all five arrangements.
+            //
+            // `_trapdoor` does not end with `_door`, so trapdoors keep riding
+            // pistons intact as `trapdoor_push.json` requires.
+            || descriptor.name.ends_with("_door")
             // Shulker boxes register `PushReaction.DESTROY` in their block
             // properties (`Blocks` bytecode) — a piston breaks one, and the
             // break drops the box as an item that keeps its slots.
@@ -1075,11 +1084,19 @@ pub fn register_all_at(
                 let Some(states) = trapdoor_pair(registry, descriptor) else { continue };
                 // `half` says which way the other half lies. Anything else is
                 // not a door state we can reason about, so leave it unregistered.
-                let other_half = match descriptor.get("half") {
-                    Some("lower") => Dir::Up,
-                    Some("upper") => Dir::Down,
+                let (other_half, partner_half) = match descriptor.get("half") {
+                    Some("lower") => (Dir::Up, "upper"),
+                    Some("upper") => (Dir::Down, "lower"),
                     _ => continue,
                 };
+                // Every state of *this* door block in the opposite half. Keyed
+                // on the block name, so an oak door stacked on an iron one is
+                // two broken halves rather than one tall door.
+                let partner: std::sync::Arc<[StateId]> = descriptors
+                    .iter()
+                    .filter(|(_, d)| d.name == descriptor.name && d.get("half") == Some(partner_half))
+                    .map(|(sid, _)| *sid)
+                    .collect();
                 table.register(
                     *id,
                     Box::new(Door {
@@ -1087,6 +1104,7 @@ pub fn register_all_at(
                         other_half,
                         states,
                         power: rules.clone(),
+                        partner,
                     }),
                 );
             }
