@@ -1,0 +1,772 @@
+Note: src/TraceCapture.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+[23:40:18] [main/INFO]: Loaded 1585 recipes
+[23:40:18] [main/INFO]: Loaded 1688 advancements
+[23:40:19] [main/INFO]: Selecting global world spawn...
+[23:40:19] [main/INFO]: Loading 0 persistent chunks...
+[23:40:19] [main/INFO]: Time elapsed: 375 ms
+[23:40:19] [main/INFO]: Started game test server
+  origin: BlockPos{x=0, y=100, z=0}
+[23:40:19] [main/INFO]: 2 tests are now running at position -14767788, -59, 14353984!
+[23:40:19] [main/INFO]: Running test environment 'minecraft:default' batch 0 (1 tests)...
+[23:40:20] [main/INFO]: [  ]
+  warmup ticks until entity-ticking: 38 (9/9 chunks ready)
+  spawn: id=3 minecraft:furnace_minecart at (1.5, 1.0625, 1.5) vel=(0.3, 0.0, 0.0)
+         bbox=[1.0099999904632568..1.9900000095367432, 1.0625..1.762499988079071, 1.0099999904632568..1.9900000095367432] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=4 minecraft:furnace_minecart at (1.5, 1.0625, 4.5) vel=(0.3, 0.0, 0.0)
+         bbox=[1.0099999904632568..1.9900000095367432, 1.0625..1.762499988079071, 4.009999990463257..4.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=5 minecraft:fireball at (6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0) flags=[nogravity]
+         bbox=[6.0..7.0, 1.0..2.0, 4.0..5.0] size=1.0x1.0x1.0
+  spawn: id=6 minecraft:furnace_minecart at (1.5, 1.0625, 7.5) vel=(0.3, 0.0, 0.0)
+         bbox=[1.0099999904632568..1.9900000095367432, 1.0625..1.762499988079071, 7.009999990463257..7.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=7 minecraft:fireball at (2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0) flags=[nogravity]
+         bbox=[2.0..3.0, 1.0..2.0, 10.0..11.0] size=1.0x1.0x1.0
+  spawn: id=8 minecraft:furnace_minecart at (2.5, 3.0, 10.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.009999990463257..2.990000009536743, 3.0..3.699999988079071, 10.009999990463257..10.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=9 minecraft:furnace_minecart at (2.5, 3.0, 13.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.009999990463257..2.990000009536743, 3.0..3.699999988079071, 13.009999990463257..13.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=10 minecraft:furnace_minecart at (2.5, 3.0, 16.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.009999990463257..2.990000009536743, 3.0..3.699999988079071, 16.009999990463257..16.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  block-ticking chunks: 9/9
+  pending block ticks: 0
+  runs normally: true
+  entity-ticking chunks: 9/9
+  entities loaded: 10
+    2 x minecraft:fireball
+    6 x minecraft:furnace_minecart
+    2 x minecraft:item
+  entities with non-finite velocity (nan carts): 0
+  initial [0,0,0] minecraft:stone
+  initial [1,0,0] minecraft:stone
+  initial [2,0,0] minecraft:stone
+  initial [3,0,0] minecraft:stone
+  initial [4,0,0] minecraft:stone
+  initial [5,0,0] minecraft:stone
+  initial [6,0,0] minecraft:stone
+  initial [7,0,0] minecraft:stone
+  initial [8,0,0] minecraft:stone
+  initial [9,0,0] minecraft:stone
+  initial [10,0,0] minecraft:stone
+  initial [11,0,0] minecraft:stone
+  initial [0,0,1] minecraft:stone
+  initial [1,0,1] minecraft:stone
+  initial [2,0,1] minecraft:stone
+  initial [3,0,1] minecraft:stone
+  initial [4,0,1] minecraft:stone
+  initial [5,0,1] minecraft:stone
+  initial [6,0,1] minecraft:stone
+  initial [7,0,1] minecraft:stone
+  initial [8,0,1] minecraft:stone
+  initial [9,0,1] minecraft:stone
+  initial [10,0,1] minecraft:stone
+  initial [11,0,1] minecraft:stone
+  initial [0,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [1,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [2,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [3,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [4,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [5,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [6,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [7,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [8,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [9,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [10,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [11,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [0,0,2] minecraft:stone
+  initial [1,0,2] minecraft:stone
+  initial [2,0,2] minecraft:stone
+  initial [3,0,2] minecraft:stone
+  initial [4,0,2] minecraft:stone
+  initial [5,0,2] minecraft:stone
+  initial [6,0,2] minecraft:stone
+  initial [7,0,2] minecraft:stone
+  initial [8,0,2] minecraft:stone
+  initial [9,0,2] minecraft:stone
+  initial [10,0,2] minecraft:stone
+  initial [11,0,2] minecraft:stone
+  initial [0,0,3] minecraft:stone
+  initial [1,0,3] minecraft:stone
+  initial [2,0,3] minecraft:stone
+  initial [3,0,3] minecraft:stone
+  initial [4,0,3] minecraft:stone
+  initial [5,0,3] minecraft:stone
+  initial [6,0,3] minecraft:stone
+  initial [7,0,3] minecraft:stone
+  initial [8,0,3] minecraft:stone
+  initial [9,0,3] minecraft:stone
+  initial [10,0,3] minecraft:stone
+  initial [11,0,3] minecraft:stone
+  initial [0,0,4] minecraft:stone
+  initial [1,0,4] minecraft:stone
+  initial [2,0,4] minecraft:stone
+  initial [3,0,4] minecraft:stone
+  initial [4,0,4] minecraft:stone
+  initial [5,0,4] minecraft:stone
+  initial [6,0,4] minecraft:stone
+  initial [7,0,4] minecraft:stone
+  initial [8,0,4] minecraft:stone
+  initial [9,0,4] minecraft:stone
+  initial [10,0,4] minecraft:stone
+  initial [11,0,4] minecraft:stone
+  initial [0,1,4] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [1,1,4] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [2,1,4] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [3,1,4] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [4,1,4] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [5,1,4] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [6,1,4] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [7,1,4] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [8,1,4] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [9,1,4] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [10,1,4] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [11,1,4] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [0,0,5] minecraft:stone
+  initial [1,0,5] minecraft:stone
+  initial [2,0,5] minecraft:stone
+  initial [3,0,5] minecraft:stone
+  initial [4,0,5] minecraft:stone
+  initial [5,0,5] minecraft:stone
+  initial [6,0,5] minecraft:stone
+  initial [7,0,5] minecraft:stone
+  initial [8,0,5] minecraft:stone
+  initial [9,0,5] minecraft:stone
+  initial [10,0,5] minecraft:stone
+  initial [11,0,5] minecraft:stone
+  initial [0,0,6] minecraft:stone
+  initial [1,0,6] minecraft:stone
+  initial [2,0,6] minecraft:stone
+  initial [3,0,6] minecraft:stone
+  initial [4,0,6] minecraft:stone
+  initial [5,0,6] minecraft:stone
+  initial [6,0,6] minecraft:stone
+  initial [7,0,6] minecraft:stone
+  initial [8,0,6] minecraft:stone
+  initial [9,0,6] minecraft:stone
+  initial [10,0,6] minecraft:stone
+  initial [11,0,6] minecraft:stone
+  initial [0,0,7] minecraft:stone
+  initial [1,0,7] minecraft:stone
+  initial [2,0,7] minecraft:stone
+  initial [3,0,7] minecraft:stone
+  initial [4,0,7] minecraft:stone
+  initial [5,0,7] minecraft:stone
+  initial [6,0,7] minecraft:stone
+  initial [7,0,7] minecraft:stone
+  initial [8,0,7] minecraft:stone
+  initial [9,0,7] minecraft:stone
+  initial [10,0,7] minecraft:stone
+  initial [11,0,7] minecraft:stone
+  initial [0,1,7] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [1,1,7] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [2,1,7] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [3,1,7] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [4,1,7] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [5,1,7] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [6,1,7] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [7,1,7] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [8,1,7] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [9,1,7] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [10,1,7] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [11,1,7] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [0,0,8] minecraft:stone
+  initial [1,0,8] minecraft:stone
+  initial [2,0,8] minecraft:stone
+  initial [3,0,8] minecraft:stone
+  initial [4,0,8] minecraft:stone
+  initial [5,0,8] minecraft:stone
+  initial [6,0,8] minecraft:stone
+  initial [7,0,8] minecraft:stone
+  initial [8,0,8] minecraft:stone
+  initial [9,0,8] minecraft:stone
+  initial [10,0,8] minecraft:stone
+  initial [11,0,8] minecraft:stone
+  initial [0,0,9] minecraft:stone
+  initial [1,0,9] minecraft:stone
+  initial [2,0,9] minecraft:stone
+  initial [3,0,9] minecraft:stone
+  initial [4,0,9] minecraft:stone
+  initial [5,0,9] minecraft:stone
+  initial [6,0,9] minecraft:stone
+  initial [7,0,9] minecraft:stone
+  initial [8,0,9] minecraft:stone
+  initial [9,0,9] minecraft:stone
+  initial [10,0,9] minecraft:stone
+  initial [11,0,9] minecraft:stone
+  initial [0,0,10] minecraft:stone
+  initial [1,0,10] minecraft:stone
+  initial [2,0,10] minecraft:stone
+  initial [3,0,10] minecraft:stone
+  initial [4,0,10] minecraft:stone
+  initial [5,0,10] minecraft:stone
+  initial [6,0,10] minecraft:stone
+  initial [7,0,10] minecraft:stone
+  initial [8,0,10] minecraft:stone
+  initial [9,0,10] minecraft:stone
+  initial [10,0,10] minecraft:stone
+  initial [11,0,10] minecraft:stone
+  initial [0,0,11] minecraft:stone
+  initial [1,0,11] minecraft:stone
+  initial [2,0,11] minecraft:stone
+  initial [3,0,11] minecraft:stone
+  initial [4,0,11] minecraft:stone
+  initial [5,0,11] minecraft:stone
+  initial [6,0,11] minecraft:stone
+  initial [7,0,11] minecraft:stone
+  initial [8,0,11] minecraft:stone
+  initial [9,0,11] minecraft:stone
+  initial [10,0,11] minecraft:stone
+  initial [11,0,11] minecraft:stone
+  initial [0,0,12] minecraft:stone
+  initial [1,0,12] minecraft:stone
+  initial [2,0,12] minecraft:stone
+  initial [3,0,12] minecraft:stone
+  initial [4,0,12] minecraft:stone
+  initial [5,0,12] minecraft:stone
+  initial [6,0,12] minecraft:stone
+  initial [7,0,12] minecraft:stone
+  initial [8,0,12] minecraft:stone
+  initial [9,0,12] minecraft:stone
+  initial [10,0,12] minecraft:stone
+  initial [11,0,12] minecraft:stone
+  initial [0,0,13] minecraft:stone
+  initial [1,0,13] minecraft:stone
+  initial [2,0,13] minecraft:stone
+  initial [3,0,13] minecraft:stone
+  initial [4,0,13] minecraft:stone
+  initial [5,0,13] minecraft:stone
+  initial [6,0,13] minecraft:stone
+  initial [7,0,13] minecraft:stone
+  initial [8,0,13] minecraft:stone
+  initial [9,0,13] minecraft:stone
+  initial [10,0,13] minecraft:stone
+  initial [11,0,13] minecraft:stone
+  initial [0,0,14] minecraft:stone
+  initial [1,0,14] minecraft:stone
+  initial [2,0,14] minecraft:stone
+  initial [3,0,14] minecraft:stone
+  initial [4,0,14] minecraft:stone
+  initial [5,0,14] minecraft:stone
+  initial [6,0,14] minecraft:stone
+  initial [7,0,14] minecraft:stone
+  initial [8,0,14] minecraft:stone
+  initial [9,0,14] minecraft:stone
+  initial [10,0,14] minecraft:stone
+  initial [11,0,14] minecraft:stone
+  initial [0,0,15] minecraft:stone
+  initial [1,0,15] minecraft:stone
+  initial [2,0,15] minecraft:stone
+  initial [3,0,15] minecraft:stone
+  initial [4,0,15] minecraft:stone
+  initial [5,0,15] minecraft:stone
+  initial [6,0,15] minecraft:stone
+  initial [7,0,15] minecraft:stone
+  initial [8,0,15] minecraft:stone
+  initial [9,0,15] minecraft:stone
+  initial [10,0,15] minecraft:stone
+  initial [11,0,15] minecraft:stone
+  initial [0,0,16] minecraft:stone
+  initial [1,0,16] minecraft:stone
+  initial [2,0,16] minecraft:stone
+  initial [3,0,16] minecraft:stone
+  initial [4,0,16] minecraft:stone
+  initial [5,0,16] minecraft:stone
+  initial [6,0,16] minecraft:stone
+  initial [7,0,16] minecraft:stone
+  initial [8,0,16] minecraft:stone
+  initial [9,0,16] minecraft:stone
+  initial [10,0,16] minecraft:stone
+  initial [11,0,16] minecraft:stone
+  initial [0,0,17] minecraft:stone
+  initial [1,0,17] minecraft:stone
+  initial [2,0,17] minecraft:stone
+  initial [3,0,17] minecraft:stone
+  initial [4,0,17] minecraft:stone
+  initial [5,0,17] minecraft:stone
+  initial [6,0,17] minecraft:stone
+  initial [7,0,17] minecraft:stone
+  initial [8,0,17] minecraft:stone
+  initial [9,0,17] minecraft:stone
+  initial [10,0,17] minecraft:stone
+  initial [11,0,17] minecraft:stone
+  initial [0,0,18] minecraft:stone
+  initial [1,0,18] minecraft:stone
+  initial [2,0,18] minecraft:stone
+  initial [3,0,18] minecraft:stone
+  initial [4,0,18] minecraft:stone
+  initial [5,0,18] minecraft:stone
+  initial [6,0,18] minecraft:stone
+  initial [7,0,18] minecraft:stone
+  initial [8,0,18] minecraft:stone
+  initial [9,0,18] minecraft:stone
+  initial [10,0,18] minecraft:stone
+  initial [11,0,18] minecraft:stone
+  initial [0,0,19] minecraft:stone
+  initial [1,0,19] minecraft:stone
+  initial [2,0,19] minecraft:stone
+  initial [3,0,19] minecraft:stone
+  initial [4,0,19] minecraft:stone
+  initial [5,0,19] minecraft:stone
+  initial [6,0,19] minecraft:stone
+  initial [7,0,19] minecraft:stone
+  initial [8,0,19] minecraft:stone
+  initial [9,0,19] minecraft:stone
+  initial [10,0,19] minecraft:stone
+  initial [11,0,19] minecraft:stone
+ENT t-1 entities=10 non-finite=0
+  E t-1 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=3 minecraft:furnace_minecart pos=(1.5, 1.0625, 1.5) vel=(0.3, 0.0, 0.0)
+  E t-1 id=4 minecraft:furnace_minecart pos=(1.5, 1.0625, 4.5) vel=(0.3, 0.0, 0.0)
+  E t-1 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=6 minecraft:furnace_minecart pos=(1.5, 1.0625, 7.5) vel=(0.3, 0.0, 0.0)
+  E t-1 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=8 minecraft:furnace_minecart pos=(2.5, 3.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=9 minecraft:furnace_minecart pos=(2.5, 3.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=10 minecraft:furnace_minecart pos=(2.5, 3.0, 16.5) vel=(0.0, 0.0, 0.0)
+  notify hook: installed (maxChained=1000000)
+    t0 gameTime=39 pending=0
+ENT t0 entities=10 non-finite=0
+  E t0 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=3 minecraft:furnace_minecart pos=(1.7, 1.0625, 1.5) vel=(0.28224, -0.0, 0.0)
+  E t0 id=4 minecraft:furnace_minecart pos=(1.7, 1.0625, 4.5) vel=(0.28224, -0.0, 0.0)
+  E t0 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=6 minecraft:furnace_minecart pos=(1.7, 1.0625, 7.5) vel=(0.28224, -0.0, 0.0)
+  E t0 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=8 minecraft:furnace_minecart pos=(2.5, 2.9599999999999937, 10.5) vel=(0.0, -0.037999999523162846, 0.0)
+  E t0 id=9 minecraft:furnace_minecart pos=(2.5, 2.9599999999999937, 13.5) vel=(0.0, -0.037999999523162846, 0.0)
+  E t0 id=10 minecraft:furnace_minecart pos=(2.5, 2.9599999999999937, 16.5) vel=(0.0, -0.037999999523162846, 0.0)
+[23:40:20] [main/INFO]: [  ]
+    t1 gameTime=40 pending=0
+ENT t1 entities=10 non-finite=0
+  E t1 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.04, 0.0)
+  E t1 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=3 minecraft:furnace_minecart pos=(1.9, 1.0625, 1.5) vel=(0.265531392, -0.0, 0.0)
+  E t1 id=4 minecraft:furnace_minecart pos=(1.9, 1.0625, 4.5) vel=(0.265531392, -0.0, 0.0)
+  E t1 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=6 minecraft:furnace_minecart pos=(1.9, 1.0625, 7.5) vel=(0.265531392, -0.0, 0.0)
+  E t1 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=8 minecraft:furnace_minecart pos=(2.5, 2.882000000476836, 10.5) vel=(0.0, -0.07409999861717226, 0.0)
+  E t1 id=9 minecraft:furnace_minecart pos=(2.5, 2.882000000476836, 13.5) vel=(0.0, -0.07409999861717226, 0.0)
+  E t1 id=10 minecraft:furnace_minecart pos=(2.5, 2.882000000476836, 16.5) vel=(0.0, -0.07409999861717226, 0.0)
+    t2 gameTime=41 pending=0
+ENT t2 entities=10 non-finite=0
+  E t2 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.04, 0.0)
+  E t2 id=3 minecraft:furnace_minecart pos=(2.1, 1.0625, 1.5) vel=(0.24981193359359993, -0.0, 0.0)
+  E t2 id=4 minecraft:furnace_minecart pos=(2.1, 1.0625, 4.5) vel=(0.24981193359359993, -0.0, 0.0)
+  E t2 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=6 minecraft:furnace_minecart pos=(2.1, 1.0625, 7.5) vel=(0.24981193359359993, -0.0, 0.0)
+  E t2 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=8 minecraft:furnace_minecart pos=(2.5, 2.7679000018596582, 10.5) vel=(0.0, -0.10839499732613568, 0.0)
+  E t2 id=9 minecraft:furnace_minecart pos=(2.5, 2.7679000018596582, 13.5) vel=(0.0, -0.10839499732613568, 0.0)
+  E t2 id=10 minecraft:furnace_minecart pos=(2.5, 2.7679000018596582, 16.5) vel=(0.0, -0.10839499732613568, 0.0)
+ENT t3 entities=10 non-finite=0
+  E t3 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.04, 0.0)
+  E t3 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.08, 0.0)
+  E t3 id=3 minecraft:furnace_minecart pos=(2.3000000000000003, 1.0625, 1.5) vel=(0.2350230671248588, -0.0, 0.0)
+  E t3 id=4 minecraft:furnace_minecart pos=(2.3000000000000003, 1.0625, 4.5) vel=(0.2350230671248588, -0.0, 0.0)
+  E t3 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=6 minecraft:furnace_minecart pos=(2.3000000000000003, 1.0625, 7.5) vel=(0.2350230671248588, -0.0, 0.0)
+  E t3 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=8 minecraft:furnace_minecart pos=(2.5, 2.619505004533522, 10.5) vel=(0.0, -0.14097524569082268, 0.0)
+  E t3 id=9 minecraft:furnace_minecart pos=(2.5, 2.619505004533522, 13.5) vel=(0.0, -0.14097524569082268, 0.0)
+  E t3 id=10 minecraft:furnace_minecart pos=(2.5, 2.619505004533522, 16.5) vel=(0.0, -0.14097524569082268, 0.0)
+ENT t4 entities=10 non-finite=0
+  E t4 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.08, 0.0)
+  E t4 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.12, 0.0)
+  E t4 id=3 minecraft:furnace_minecart pos=(2.5000000000000004, 1.0625, 1.5) vel=(0.22110970155106713, -0.0, 0.0)
+  E t4 id=4 minecraft:furnace_minecart pos=(2.5000000000000004, 1.0625, 4.5) vel=(0.22110970155106713, -0.0, 0.0)
+  E t4 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=6 minecraft:furnace_minecart pos=(2.5000000000000004, 1.0625, 7.5) vel=(0.22110970155106713, -0.0, 0.0)
+  E t4 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=8 minecraft:furnace_minecart pos=(2.5, 2.438529758842705, 10.5) vel=(0.0, -0.1719264812488885, 0.0)
+  E t4 id=9 minecraft:furnace_minecart pos=(2.5, 2.438529758842705, 13.5) vel=(0.0, -0.1719264812488885, 0.0)
+  E t4 id=10 minecraft:furnace_minecart pos=(2.5, 2.438529758842705, 16.5) vel=(0.0, -0.1719264812488885, 0.0)
+ENT t5 entities=10 non-finite=0
+  E t5 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.12, 0.0)
+  E t5 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=3 minecraft:furnace_minecart pos=(2.7000000000000006, 1.0625, 1.5) vel=(0.20802000721924394, -0.0, 0.0)
+  E t5 id=4 minecraft:furnace_minecart pos=(2.7000000000000006, 1.0625, 4.5) vel=(0.20802000721924394, -0.0, 0.0)
+  E t5 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=6 minecraft:furnace_minecart pos=(2.7000000000000006, 1.0625, 7.5) vel=(0.20802000721924394, -0.0, 0.0)
+  E t5 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=8 minecraft:furnace_minecart pos=(2.5, 2.22660327759381, 10.5) vel=(0.0, -0.20133015466008355, 0.0)
+  E t5 id=9 minecraft:furnace_minecart pos=(2.5, 2.22660327759381, 13.5) vel=(0.0, -0.20133015466008355, 0.0)
+  E t5 id=10 minecraft:furnace_minecart pos=(2.5, 2.22660327759381, 16.5) vel=(0.0, -0.20133015466008355, 0.0)
+ENT t6 entities=10 non-finite=0
+  E t6 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.04, 0.0)
+  E t6 id=3 minecraft:furnace_minecart pos=(2.900000000000001, 1.0625, 1.5) vel=(0.1957052227918647, -0.0, 0.0)
+  E t6 id=4 minecraft:furnace_minecart pos=(2.900000000000001, 1.0625, 4.5) vel=(0.1957052227918647, -0.0, 0.0)
+  E t6 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=6 minecraft:furnace_minecart pos=(2.900000000000001, 1.0625, 7.5) vel=(0.1957052227918647, -0.0, 0.0)
+  E t6 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=8 minecraft:furnace_minecart pos=(2.5, 1.9852731229337195, 10.5) vel=(0.0, -0.22926364405019975, 0.0)
+  E t6 id=9 minecraft:furnace_minecart pos=(2.5, 1.9852731229337195, 13.5) vel=(0.0, -0.22926364405019975, 0.0)
+  E t6 id=10 minecraft:furnace_minecart pos=(2.5, 1.9852731229337195, 16.5) vel=(0.0, -0.22926364405019975, 0.0)
+ENT t7 entities=10 non-finite=0
+  E t7 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.04, 0.0)
+  E t7 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.08, 0.0)
+  E t7 id=3 minecraft:furnace_minecart pos=(3.0957052227918656, 1.0625, 1.5) vel=(0.18411947360258632, -0.0, 0.0)
+  E t7 id=4 minecraft:furnace_minecart pos=(3.0957052227918656, 1.0625, 4.5) vel=(0.18411947360258632, -0.0, 0.0)
+  E t7 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=6 minecraft:furnace_minecart pos=(3.0957052227918656, 1.0625, 7.5) vel=(0.18411947360258632, -0.0, 0.0)
+  E t7 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=8 minecraft:furnace_minecart pos=(2.5, 1.716009478883521, 10.5) vel=(0.0, -0.255800458637817, 0.0)
+  E t7 id=9 minecraft:furnace_minecart pos=(2.5, 1.716009478883521, 13.5) vel=(0.0, -0.255800458637817, 0.0)
+  E t7 id=10 minecraft:furnace_minecart pos=(2.5, 1.716009478883521, 16.5) vel=(0.0, -0.255800458637817, 0.0)
+ENT t8 entities=10 non-finite=0
+  E t8 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.08, 0.0)
+  E t8 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.12, 0.0)
+  E t8 id=3 minecraft:furnace_minecart pos=(3.279824696394452, 1.0625, 1.5) vel=(0.1732196007653132, -0.0, 0.0)
+  E t8 id=4 minecraft:furnace_minecart pos=(3.279824696394452, 1.0625, 4.5) vel=(0.1732196007653132, -0.0, 0.0)
+  E t8 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=6 minecraft:furnace_minecart pos=(3.279824696394452, 1.0625, 7.5) vel=(0.1732196007653132, -0.0, 0.0)
+  E t8 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=8 minecraft:furnace_minecart pos=(2.5, 1.4202090202457072, 10.5) vel=(0.0, -0.28101043217970983, 0.0)
+  E t8 id=9 minecraft:furnace_minecart pos=(2.5, 1.4202090202457072, 13.5) vel=(0.0, -0.28101043217970983, 0.0)
+  E t8 id=10 minecraft:furnace_minecart pos=(2.5, 1.4202090202457072, 16.5) vel=(0.0, -0.28101043217970983, 0.0)
+ENT t9 entities=10 non-finite=0
+  E t9 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.12, 0.0)
+  E t9 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=3 minecraft:furnace_minecart pos=(3.453044297159765, 1.0625, 1.5) vel=(0.16296500040000667, -0.0, 0.0)
+  E t9 id=4 minecraft:furnace_minecart pos=(3.453044297159765, 1.0625, 4.5) vel=(0.16296500040000667, -0.0, 0.0)
+  E t9 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=6 minecraft:furnace_minecart pos=(3.453044297159765, 1.0625, 7.5) vel=(0.16296500040000667, -0.0, 0.0)
+  E t9 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=8 minecraft:furnace_minecart pos=(2.5, 1.0991985880660025, 10.5) vel=(0.0, -0.30495990674398177, 0.0)
+  E t9 id=9 minecraft:furnace_minecart pos=(2.5, 1.0991985880660025, 13.5) vel=(0.0, -0.30495990674398177, 0.0)
+  E t9 id=10 minecraft:furnace_minecart pos=(2.5, 1.0991985880660025, 16.5) vel=(0.0, -0.30495990674398177, 0.0)
+ENT t10 entities=10 non-finite=0
+  E t10 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.04, 0.0)
+  E t10 id=3 minecraft:furnace_minecart pos=(3.6160092975597715, 1.0625, 1.5) vel=(0.15331747237632626, -0.0, 0.0)
+  E t10 id=4 minecraft:furnace_minecart pos=(3.6160092975597715, 1.0625, 4.5) vel=(0.15331747237632626, -0.0, 0.0)
+  E t10 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=6 minecraft:furnace_minecart pos=(3.6160092975597715, 1.0625, 7.5) vel=(0.15331747237632626, -0.0, 0.0)
+  E t10 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t11 entities=10 non-finite=0
+  E t11 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.04, 0.0)
+  E t11 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.08, 0.0)
+  E t11 id=3 minecraft:furnace_minecart pos=(3.769326769936098, 1.0625, 1.5) vel=(0.14424107801164773, -0.0, 0.0)
+  E t11 id=4 minecraft:furnace_minecart pos=(3.769326769936098, 1.0625, 4.5) vel=(0.14424107801164773, -0.0, 0.0)
+  E t11 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=6 minecraft:furnace_minecart pos=(3.769326769936098, 1.0625, 7.5) vel=(0.14424107801164773, -0.0, 0.0)
+  E t11 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t12 entities=10 non-finite=0
+  E t12 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.08, 0.0)
+  E t12 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.12, 0.0)
+  E t12 id=3 minecraft:furnace_minecart pos=(3.913567847947746, 1.0625, 1.5) vel=(0.13570200619335818, -0.0, 0.0)
+  E t12 id=4 minecraft:furnace_minecart pos=(3.913567847947746, 1.0625, 4.5) vel=(0.13570200619335818, -0.0, 0.0)
+  E t12 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=6 minecraft:furnace_minecart pos=(3.913567847947746, 1.0625, 7.5) vel=(0.13570200619335818, -0.0, 0.0)
+  E t12 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t13 entities=10 non-finite=0
+  E t13 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.12, 0.0)
+  E t13 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=3 minecraft:furnace_minecart pos=(4.049269854141104, 1.0625, 1.5) vel=(0.12766844742671135, -0.0, 0.0)
+  E t13 id=4 minecraft:furnace_minecart pos=(4.049269854141104, 1.0625, 4.5) vel=(0.12766844742671135, -0.0, 0.0)
+  E t13 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=6 minecraft:furnace_minecart pos=(4.049269854141104, 1.0625, 7.5) vel=(0.12766844742671135, -0.0, 0.0)
+  E t13 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t14 entities=10 non-finite=0
+  E t14 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.04, 0.0)
+  E t14 id=3 minecraft:furnace_minecart pos=(4.176938301567816, 1.0625, 1.5) vel=(0.12011047533905003, -0.0, 0.0)
+  E t14 id=4 minecraft:furnace_minecart pos=(4.176938301567816, 1.0625, 4.5) vel=(0.12011047533905003, -0.0, 0.0)
+  E t14 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=6 minecraft:furnace_minecart pos=(4.176938301567816, 1.0625, 7.5) vel=(0.12011047533905003, -0.0, 0.0)
+  E t14 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t15 entities=10 non-finite=0
+  E t15 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.04, 0.0)
+  E t15 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.08, 0.0)
+  E t15 id=3 minecraft:furnace_minecart pos=(4.297048776906866, 1.0625, 1.5) vel=(0.11299993519897826, -0.0, 0.0)
+  E t15 id=4 minecraft:furnace_minecart pos=(4.297048776906866, 1.0625, 4.5) vel=(0.11299993519897826, -0.0, 0.0)
+  E t15 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=6 minecraft:furnace_minecart pos=(4.297048776906866, 1.0625, 7.5) vel=(0.11299993519897826, -0.0, 0.0)
+  E t15 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t16 entities=10 non-finite=0
+  E t16 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.08, 0.0)
+  E t16 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.12, 0.0)
+  E t16 id=3 minecraft:furnace_minecart pos=(4.410048712105844, 1.0625, 1.5) vel=(0.10631033903519874, -0.0, 0.0)
+  E t16 id=4 minecraft:furnace_minecart pos=(4.410048712105844, 1.0625, 4.5) vel=(0.10631033903519874, -0.0, 0.0)
+  E t16 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t16 id=6 minecraft:furnace_minecart pos=(4.410048712105844, 1.0625, 7.5) vel=(0.10631033903519874, -0.0, 0.0)
+  E t16 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t16 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t16 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t16 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t17 entities=10 non-finite=0
+  E t17 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.12, 0.0)
+  E t17 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t17 id=3 minecraft:furnace_minecart pos=(4.516359051141043, 1.0625, 1.5) vel=(0.10001676696431497, -0.0, 0.0)
+  E t17 id=4 minecraft:furnace_minecart pos=(4.516359051141043, 1.0625, 4.5) vel=(0.10001676696431497, -0.0, 0.0)
+  E t17 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t17 id=6 minecraft:furnace_minecart pos=(4.516359051141043, 1.0625, 7.5) vel=(0.10001676696431497, -0.0, 0.0)
+  E t17 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t17 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t17 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t17 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t18 entities=10 non-finite=0
+  E t18 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t18 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.04, 0.0)
+  E t18 id=3 minecraft:furnace_minecart pos=(4.616375818105358, 1.0625, 1.5) vel=(0.09409577436002751, -0.0, 0.0)
+  E t18 id=4 minecraft:furnace_minecart pos=(4.616375818105358, 1.0625, 4.5) vel=(0.09409577436002751, -0.0, 0.0)
+  E t18 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t18 id=6 minecraft:furnace_minecart pos=(4.616375818105358, 1.0625, 7.5) vel=(0.09409577436002751, -0.0, 0.0)
+  E t18 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t18 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t18 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t18 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t19 entities=10 non-finite=0
+  E t19 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.04, 0.0)
+  E t19 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.08, 0.0)
+  E t19 id=3 minecraft:furnace_minecart pos=(4.710471592465386, 1.0625, 1.5) vel=(0.08852530451791388, -0.0, 0.0)
+  E t19 id=4 minecraft:furnace_minecart pos=(4.710471592465386, 1.0625, 4.5) vel=(0.08852530451791388, -0.0, 0.0)
+  E t19 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t19 id=6 minecraft:furnace_minecart pos=(4.710471592465386, 1.0625, 7.5) vel=(0.08852530451791388, -0.0, 0.0)
+  E t19 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t19 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t19 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t19 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t20 entities=10 non-finite=0
+  E t20 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.08, 0.0)
+  E t20 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.12, 0.0)
+  E t20 id=3 minecraft:furnace_minecart pos=(4.7989968969833, 1.0625, 1.5) vel=(0.08328460649045337, -0.0, 0.0)
+  E t20 id=4 minecraft:furnace_minecart pos=(4.7989968969833, 1.0625, 4.5) vel=(0.08328460649045337, -0.0, 0.0)
+  E t20 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t20 id=6 minecraft:furnace_minecart pos=(4.7989968969833, 1.0625, 7.5) vel=(0.08328460649045337, -0.0, 0.0)
+  E t20 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t20 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t20 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t20 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+[23:40:20] [main/INFO]: [  ]
+ENT t21 entities=10 non-finite=0
+  E t21 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.12, 0.0)
+  E t21 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t21 id=3 minecraft:furnace_minecart pos=(4.882281503473753, 1.0625, 1.5) vel=(0.07835415778621853, -0.0, 0.0)
+  E t21 id=4 minecraft:furnace_minecart pos=(4.882281503473753, 1.0625, 4.5) vel=(0.07835415778621853, -0.0, 0.0)
+  E t21 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t21 id=6 minecraft:furnace_minecart pos=(4.882281503473753, 1.0625, 7.5) vel=(0.07835415778621853, -0.0, 0.0)
+  E t21 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t21 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t21 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t21 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t22 entities=10 non-finite=0
+  E t22 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t22 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.04, 0.0)
+  E t22 id=3 minecraft:furnace_minecart pos=(4.960635661259972, 1.0625, 1.5) vel=(0.07371559164527439, -0.0, 0.0)
+  E t22 id=4 minecraft:furnace_minecart pos=(4.960635661259972, 1.0625, 4.5) vel=(0.07371559164527439, -0.0, 0.0)
+  E t22 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t22 id=6 minecraft:furnace_minecart pos=(4.960635661259972, 1.0625, 7.5) vel=(0.07371559164527439, -0.0, 0.0)
+  E t22 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t22 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t22 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t22 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t23 entities=10 non-finite=0
+  E t23 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.04, 0.0)
+  E t23 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.08, 0.0)
+  E t23 id=3 minecraft:furnace_minecart pos=(5.034351252905246, 1.0625, 1.5) vel=(0.06935162861987414, -0.0, 0.0)
+  E t23 id=4 minecraft:furnace_minecart pos=(5.034351252905246, 1.0625, 4.5) vel=(0.06935162861987414, -0.0, 0.0)
+  E t23 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t23 id=6 minecraft:furnace_minecart pos=(5.034351252905246, 1.0625, 7.5) vel=(0.06935162861987414, -0.0, 0.0)
+  E t23 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t23 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t23 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t23 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t24 entities=10 non-finite=0
+  E t24 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.08, 0.0)
+  E t24 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.12, 0.0)
+  E t24 id=3 minecraft:furnace_minecart pos=(5.103702881525121, 1.0625, 1.5) vel=(0.06524601220557757, -0.0, 0.0)
+  E t24 id=4 minecraft:furnace_minecart pos=(5.103702881525121, 1.0625, 4.5) vel=(0.06524601220557757, -0.0, 0.0)
+  E t24 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t24 id=6 minecraft:furnace_minecart pos=(5.103702881525121, 1.0625, 7.5) vel=(0.06524601220557757, -0.0, 0.0)
+  E t24 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t24 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t24 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t24 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t25 entities=10 non-finite=0
+  E t25 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.12, 0.0)
+  E t25 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t25 id=3 minecraft:furnace_minecart pos=(5.168948893730699, 1.0625, 1.5) vel=(0.06138344828300738, -0.0, 0.0)
+  E t25 id=4 minecraft:furnace_minecart pos=(5.168948893730699, 1.0625, 4.5) vel=(0.06138344828300738, -0.0, 0.0)
+  E t25 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t25 id=6 minecraft:furnace_minecart pos=(5.168948893730699, 1.0625, 7.5) vel=(0.06138344828300738, -0.0, 0.0)
+  E t25 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t25 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t25 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t25 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t26 entities=10 non-finite=0
+  E t26 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t26 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.04, 0.0)
+  E t26 id=3 minecraft:furnace_minecart pos=(5.230332342013706, 1.0625, 1.5) vel=(0.05774954814465334, -0.0, 0.0)
+  E t26 id=4 minecraft:furnace_minecart pos=(5.230332342013706, 1.0625, 4.5) vel=(0.05774954814465334, -0.0, 0.0)
+  E t26 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t26 id=6 minecraft:furnace_minecart pos=(5.230332342013706, 1.0625, 7.5) vel=(0.05774954814465334, -0.0, 0.0)
+  E t26 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t26 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t26 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t26 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t27 entities=10 non-finite=0
+  E t27 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.04, 0.0)
+  E t27 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.08, 0.0)
+  E t27 id=3 minecraft:furnace_minecart pos=(5.2880818901583595, 1.0625, 1.5) vel=(0.05433077489448986, -0.0, 0.0)
+  E t27 id=4 minecraft:furnace_minecart pos=(5.2880818901583595, 1.0625, 4.5) vel=(0.05433077489448986, -0.0, 0.0)
+  E t27 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t27 id=6 minecraft:furnace_minecart pos=(5.2880818901583595, 1.0625, 7.5) vel=(0.05433077489448986, -0.0, 0.0)
+  E t27 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t27 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t27 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t27 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t28 entities=10 non-finite=0
+  E t28 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.08, 0.0)
+  E t28 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.12, 0.0)
+  E t28 id=3 minecraft:furnace_minecart pos=(5.34241266505285, 1.0625, 1.5) vel=(0.05111439302073606, -0.0, 0.0)
+  E t28 id=4 minecraft:furnace_minecart pos=(5.34241266505285, 1.0625, 4.5) vel=(0.05111439302073606, -0.0, 0.0)
+  E t28 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t28 id=6 minecraft:furnace_minecart pos=(5.34241266505285, 1.0625, 7.5) vel=(0.05111439302073606, -0.0, 0.0)
+  E t28 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t28 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t28 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t28 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t29 entities=10 non-finite=0
+  E t29 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.12, 0.0)
+  E t29 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t29 id=3 minecraft:furnace_minecart pos=(5.393527058073586, 1.0625, 1.5) vel=(0.04808842095390848, -0.0, 0.0)
+  E t29 id=4 minecraft:furnace_minecart pos=(5.393527058073586, 1.0625, 4.5) vel=(0.04808842095390848, -0.0, 0.0)
+  E t29 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t29 id=6 minecraft:furnace_minecart pos=(5.393527058073586, 1.0625, 7.5) vel=(0.04808842095390848, -0.0, 0.0)
+  E t29 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t29 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t29 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t29 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t30 entities=10 non-finite=0
+  E t30 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t30 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.04, 0.0)
+  E t30 id=3 minecraft:furnace_minecart pos=(5.441615479027494, 1.0625, 1.5) vel=(0.0452415864334371, -0.0, 0.0)
+  E t30 id=4 minecraft:furnace_minecart pos=(5.441615479027494, 1.0625, 4.5) vel=(0.0452415864334371, -0.0, 0.0)
+  E t30 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t30 id=6 minecraft:furnace_minecart pos=(5.441615479027494, 1.0625, 7.5) vel=(0.0452415864334371, -0.0, 0.0)
+  E t30 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t30 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t30 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t30 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t31 entities=10 non-finite=0
+  E t31 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.04, 0.0)
+  E t31 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.08, 0.0)
+  E t31 id=3 minecraft:furnace_minecart pos=(5.4868570654609305, 1.0625, 1.5) vel=(0.04256328451657762, -0.0, 0.0)
+  E t31 id=4 minecraft:furnace_minecart pos=(5.4868570654609305, 1.0625, 4.5) vel=(0.04256328451657762, -0.0, 0.0)
+  E t31 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t31 id=6 minecraft:furnace_minecart pos=(5.4868570654609305, 1.0625, 7.5) vel=(0.04256328451657762, -0.0, 0.0)
+  E t31 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t31 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t31 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t31 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t32 entities=10 non-finite=0
+  E t32 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.08, 0.0)
+  E t32 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.12, 0.0)
+  E t32 id=3 minecraft:furnace_minecart pos=(5.529420349977508, 1.0625, 1.5) vel=(0.04004353807319622, -0.0, 0.0)
+  E t32 id=4 minecraft:furnace_minecart pos=(5.529420349977508, 1.0625, 4.5) vel=(0.04004353807319622, -0.0, 0.0)
+  E t32 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t32 id=6 minecraft:furnace_minecart pos=(5.529420349977508, 1.0625, 7.5) vel=(0.04004353807319622, -0.0, 0.0)
+  E t32 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t32 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t32 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t32 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t33 entities=10 non-finite=0
+  E t33 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.12, 0.0)
+  E t33 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t33 id=3 minecraft:furnace_minecart pos=(5.569463888050705, 1.0625, 1.5) vel=(0.03767296061926301, -0.0, 0.0)
+  E t33 id=4 minecraft:furnace_minecart pos=(5.569463888050705, 1.0625, 4.5) vel=(0.03767296061926301, -0.0, 0.0)
+  E t33 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t33 id=6 minecraft:furnace_minecart pos=(5.569463888050705, 1.0625, 7.5) vel=(0.03767296061926301, -0.0, 0.0)
+  E t33 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t33 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t33 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t33 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t34 entities=10 non-finite=0
+  E t34 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t34 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.04, 0.0)
+  E t34 id=3 minecraft:furnace_minecart pos=(5.607136848669968, 1.0625, 1.5) vel=(0.035442721350602634, -0.0, 0.0)
+  E t34 id=4 minecraft:furnace_minecart pos=(5.607136848669968, 1.0625, 4.5) vel=(0.035442721350602634, -0.0, 0.0)
+  E t34 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t34 id=6 minecraft:furnace_minecart pos=(5.607136848669968, 1.0625, 7.5) vel=(0.035442721350602634, -0.0, 0.0)
+  E t34 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t34 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t34 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t34 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t35 entities=10 non-finite=0
+  E t35 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.04, 0.0)
+  E t35 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.08, 0.0)
+  E t35 id=3 minecraft:furnace_minecart pos=(5.642579570020571, 1.0625, 1.5) vel=(0.03334451224664696, -0.0, 0.0)
+  E t35 id=4 minecraft:furnace_minecart pos=(5.642579570020571, 1.0625, 4.5) vel=(0.03334451224664696, -0.0, 0.0)
+  E t35 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t35 id=6 minecraft:furnace_minecart pos=(5.642579570020571, 1.0625, 7.5) vel=(0.03334451224664696, -0.0, 0.0)
+  E t35 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t35 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t35 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t35 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t36 entities=10 non-finite=0
+  E t36 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.08, 0.0)
+  E t36 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.12, 0.0)
+  E t36 id=3 minecraft:furnace_minecart pos=(5.675924082267218, 1.0625, 1.5) vel=(0.03137051712164546, -0.0, 0.0)
+  E t36 id=4 minecraft:furnace_minecart pos=(5.675924082267218, 1.0625, 4.5) vel=(0.03137051712164546, -0.0, 0.0)
+  E t36 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t36 id=6 minecraft:furnace_minecart pos=(5.675924082267218, 1.0625, 7.5) vel=(0.03137051712164546, -0.0, 0.0)
+  E t36 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t36 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t36 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t36 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t37 entities=10 non-finite=0
+  E t37 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.12, 0.0)
+  E t37 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t37 id=3 minecraft:furnace_minecart pos=(5.707294599388864, 1.0625, 1.5) vel=(0.029513382508044046, -0.0, 0.0)
+  E t37 id=4 minecraft:furnace_minecart pos=(5.707294599388864, 1.0625, 4.5) vel=(0.029513382508044046, -0.0, 0.0)
+  E t37 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t37 id=6 minecraft:furnace_minecart pos=(5.707294599388864, 1.0625, 7.5) vel=(0.029513382508044046, -0.0, 0.0)
+  E t37 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t37 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t37 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t37 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t38 entities=10 non-finite=0
+  E t38 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t38 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.04, 0.0)
+  E t38 id=3 minecraft:furnace_minecart pos=(5.736807981896908, 1.0625, 1.5) vel=(0.027766190263567837, -0.0, 0.0)
+  E t38 id=4 minecraft:furnace_minecart pos=(5.736807981896908, 1.0625, 4.5) vel=(0.027766190263567837, -0.0, 0.0)
+  E t38 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t38 id=6 minecraft:furnace_minecart pos=(5.736807981896908, 1.0625, 7.5) vel=(0.027766190263567837, -0.0, 0.0)
+  E t38 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t38 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t38 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t38 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+ENT t39 entities=10 non-finite=0
+  E t39 id=1 minecraft:item pos=(6.5, 1.0, 1.5) vel=(0.0, -0.04, 0.0)
+  E t39 id=2 minecraft:item pos=(2.5, 1.0, 13.5) vel=(0.0, -0.08, 0.0)
+  E t39 id=3 minecraft:furnace_minecart pos=(5.764574172160477, 1.0625, 1.5) vel=(0.02612243179996462, -0.0, 0.0)
+  E t39 id=4 minecraft:furnace_minecart pos=(5.764574172160477, 1.0625, 4.5) vel=(0.02612243179996462, -0.0, 0.0)
+  E t39 id=5 minecraft:fireball pos=(6.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0)
+  E t39 id=6 minecraft:furnace_minecart pos=(5.764574172160477, 1.0625, 7.5) vel=(0.02612243179996462, -0.0, 0.0)
+  E t39 id=7 minecraft:fireball pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t39 id=8 minecraft:furnace_minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t39 id=9 minecraft:furnace_minecart pos=(2.5, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t39 id=10 minecraft:furnace_minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0)
+captured 0 tick(s) with changes -> work/cart_body4.json

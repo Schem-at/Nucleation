@@ -1,0 +1,8 @@
+{
+  "type": "minecraft:block_based",
+  "environment": "nucleation:default",
+  "structure": "nucleation:torch_inverts",
+  "max_ticks": 40,
+  "setup_ticks": 0,
+  "required": true
+}

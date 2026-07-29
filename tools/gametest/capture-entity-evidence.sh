@@ -449,4 +449,165 @@ tools/gametest/capture.sh --structure nucleation:piston_pull_inside --max-ticks 
   --at 6:2,4,1:air --at 6:2,4,3:air --at 6:2,4,5:air --at 6:2,4,9:air \
   --out work/piston_pull_inside.json | tee "$CAP/piston_pull_inside.entities.log"
 
+# ---------------------------------------------------------------------------
+# 10. What a cart stands on, and what it walks through.
+#
+# `blaze_ride_ai` had already shown a cart resting on a blaze and falling
+# through a fireball, and the obvious conclusion — "a LivingEntity is solid, a
+# projectile is not" — is **wrong**, which is why these four rigs exist. Ten
+# bodies, each met twice: dropped on from above, and driven into sideways.
+#
+#   cart_body   drop lanes and the two probes the drop lanes cannot answer.
+#
+#               Resting height is the body's exact float top: blaze
+#               2.799999952316284, villager 2.950000047683716, zombie
+#               2.950000047683716, boat 1.5625, cart 1.699999988079071.
+#               Armor stand, small fireball and dragon fireball reproduce the
+#               empty control's fall to 1.0 on tick 10, digit for digit. So an
+#               **armor stand is a LivingEntity a cart falls through** and a
+#               **boat is not living and holds one up**: "living" is refuted at
+#               both of its edges, and what fits all ten is vanilla's vehicle
+#               predicate, canBeCollidedWith() || isPushable().
+#
+#               z=37.5 and z=40.5 are the onGround probe — the same cart with
+#               vx = 0.1, one over a blaze and one over stone. Off-rail,
+#               comeOffTrack halves the horizontal velocity when grounded and
+#               multiplies by 0.95f when airborne, and the blaze lane takes the
+#               *grounded* branch the tick it lands: 0.09025 -> 0.045125 ->
+#               0.0225625. Resting on a mob is being on the ground.
+#
+#               z=43.5 is the negative control for the support being positional:
+#               the same blaze, the cart 1.5 blocks to the side, and it falls.
+#
+#               The rail lanes here measure something else entirely and are the
+#               reason cart_body2 exists: a **plain** cart rolling at a free
+#               blaze does not stop, it *picks the blaze up* — AbstractMinecart
+#               mounts a pushable LivingEntity it finds inside inflate(0.2,0,0.2)
+#               — and then coasts on at the ridden 0.997 instead of the empty
+#               0.96. A small fireball in the same lane is bit-identical to the
+#               empty control at every tick.
+tools/gametest/capture.sh --structure nucleation:cart_body --max-ticks 40 --entity-log \
+  --spawn 'minecraft:minecart@1.5,1.0625,1.5:0.3,0,0' \
+  --spawn 'minecraft:blaze@6.5,1.0,1.5:0,0,0:noai' \
+  --spawn 'minecraft:minecart@1.5,1.0625,4.5:0.3,0,0' \
+  --spawn 'minecraft:villager@6.5,1.0,4.5:0,0,0:noai' \
+  --spawn 'minecraft:minecart@1.5,1.0625,7.5:0.3,0,0' \
+  --spawn 'minecraft:small_fireball@6.5,1.0,7.5:0,0,0:nogravity' \
+  --spawn 'minecraft:minecart@1.5,1.0625,10.5:0.3,0,0' \
+  --spawn 'minecraft:armor_stand@2.5,1.0,13.5:0,0,0:noai' \
+  --spawn 'minecraft:minecart@2.5,3.0,13.5:0,0,0' \
+  --spawn 'minecraft:oak_boat@2.5,1.0,16.5:0,0,0' \
+  --spawn 'minecraft:minecart@2.5,3.0,16.5:0,0,0' \
+  --spawn 'minecraft:zombie@2.5,1.0,19.5:0,0,0:noai' \
+  --spawn 'minecraft:minecart@2.5,3.0,19.5:0,0,0' \
+  --spawn 'minecraft:minecart@2.5,1.0,22.5:0,0,0' \
+  --spawn 'minecraft:minecart@2.5,3.0,22.5:0,0,0' \
+  --spawn 'minecraft:minecart@2.5,1.0,25.5:0,0,NaN' \
+  --spawn 'minecraft:blaze@2.5,3.0,25.5:0,0,0:noai' \
+  --spawn 'minecraft:blaze@2.5,1.0,28.5:0,0,0:noai' \
+  --spawn 'minecraft:minecart@2.5,3.0,28.5:0,0,NaN' \
+  --spawn 'minecraft:blaze@2.5,1.0,31.5:0,0,0' \
+  --spawn 'minecraft:minecart@2.5,3.0,31.5:0,0,0' \
+  --spawn 'minecraft:minecart@2.5,3.0,34.5:0,0,0' \
+  --spawn 'minecraft:blaze@2.5,1.0,37.5:0,0,0:noai' \
+  --spawn 'minecraft:minecart@2.5,3.0,37.5:0.1,0,0' \
+  --spawn 'minecraft:minecart@2.5,3.0,40.5:0.1,0,0' \
+  --spawn 'minecraft:blaze@2.5,1.0,43.5:0,0,0:noai' \
+  --spawn 'minecraft:minecart@4.0,3.0,43.5:0,0,0' \
+  --out work/cart_body.json | tee "$CAP/cart_body.entities.log"
+
+# NB two lanes of that rig are **void and must not be read as answers**: the
+# noai blazes at z=25.5 and z=28.5 were meant to ask whether a mob rests on a
+# NaN cart, and a `noai` mob turns out not to fall at all — it holds y = 3.0 for
+# forty ticks. cart_body2 asks the same question with AI on.
+#
+#   cart_body2  the sideways half, with **furnace** carts, because a plain one
+#               mounts the mob instead of hitting it. Every lane stops with its
+#               east face on the body's west face, exactly: blaze and villager
+#               at x = 5.709999978542328 (face 6.199999988079071), boat at
+#               5.322499990463257 (face 5.8125, so width 1.375). Armor stand,
+#               dragon fireball and the empty control all reach the same
+#               5.764574172160477.
+#
+#               Its drop lanes answer the two the first rig could not:
+#               a blaze **with AI** dropped from y=3 onto a NaN cart, an
+#               ordinary cart and a furnace cart lands on the *floor* at 1.0 on
+#               tick 19 in all three lanes, the same tick as the empty control.
+#               A mob's own movement collides with no cart — the solidity is
+#               one-way. And a furnace cart dropped on a **seated** blaze rests
+#               at 2.987499952316284, the vehicle's y plus the 0.1875 seat plus
+#               1.8f, so a passenger's box holds a cart up like any other.
+tools/gametest/capture.sh --structure nucleation:cart_body2 --max-ticks 40 --entity-log \
+  --spawn 'minecraft:furnace_minecart@1.5,1.0625,1.5:0.3,0,0' \
+  --spawn 'minecraft:blaze@6.5,1.0,1.5:0,0,0:noai' \
+  --spawn 'minecraft:furnace_minecart@1.5,1.0625,4.5:0.3,0,0' \
+  --spawn 'minecraft:villager@6.5,1.0,4.5:0,0,0:noai' \
+  --spawn 'minecraft:furnace_minecart@1.5,1.0625,7.5:0.3,0,0' \
+  --spawn 'minecraft:oak_boat@6.5,1.0,7.5:0,0,0' \
+  --spawn 'minecraft:furnace_minecart@1.5,1.0625,10.5:0.3,0,0' \
+  --spawn 'minecraft:armor_stand@6.5,1.0,10.5:0,0,0:noai' \
+  --spawn 'minecraft:furnace_minecart@1.5,1.0625,13.5:0.3,0,0' \
+  --spawn 'minecraft:dragon_fireball@6.5,1.0,13.5:0,0,0:nogravity' \
+  --spawn 'minecraft:furnace_minecart@1.5,1.0625,16.5:0.3,0,0' \
+  --spawn 'minecraft:minecart@2.5,1.0,22.5:0,0,NaN' \
+  --spawn 'minecraft:blaze@2.5,3.0,22.5:0,0,0' \
+  --spawn 'minecraft:minecart@2.5,1.0,25.5:0,0,0' \
+  --spawn 'minecraft:blaze@2.5,3.0,25.5:0,0,0' \
+  --spawn 'minecraft:blaze@2.5,3.0,28.5:0,0,0' \
+  --spawn 'minecraft:furnace_minecart@2.5,1.0,31.5:0,0,0' \
+  --spawn 'minecraft:blaze@2.5,3.0,31.5:0,0,0' \
+  --spawn 'minecraft:dragon_fireball@2.5,1.0,34.5:0,0,0:nogravity' \
+  --spawn 'minecraft:furnace_minecart@2.5,3.0,34.5:0,0,0' \
+  --spawn 'minecraft:oak_boat@2.5,1.0,37.5:0,0,0' \
+  --spawn 'minecraft:furnace_minecart@2.5,3.0,37.5:0,0,0' \
+  --spawn 'minecraft:minecart@2.5,1.0,40.5:0,0,NaN' \
+  --spawn 'minecraft:blaze@2.5,1.0,40.5:0,0,0:ride' \
+  --spawn 'minecraft:furnace_minecart@2.5,4.0,40.5:0,0,0' \
+  --out work/cart_body2.json | tee "$CAP/cart_body2.entities.log"
+
+#   cart_body3  does the body feel anything back? A furnace cart presses against
+#               a blaze **with AI** for twenty ticks and the blaze holds
+#               (2.5, 1.0, 1.5) to the last digit; a cart resting on an AI blaze
+#               reproduces the noai lane's x bit for bit. Nothing is pushed and
+#               nothing takes the weight. The villager and zombie lanes are
+#               **not** evidence either way — both wander off under their own AI,
+#               changing z as well as x, which is pathing and not a shove.
+#
+#               Its `minecraft:item` lane is void: `--spawn` builds an ItemEntity
+#               with an empty stack and the game discards it before tick 0. The
+#               item answer comes from cart_body4, which authors it in the
+#               structure file instead.
+tools/gametest/capture.sh --structure nucleation:cart_body2 --max-ticks 40 --entity-log \
+  --spawn 'minecraft:furnace_minecart@1.5,1.0625,1.5:0.3,0,0' \
+  --spawn 'minecraft:blaze@6.5,1.0,1.5:0,0,0' \
+  --spawn 'minecraft:furnace_minecart@1.5,1.0625,4.5:0.3,0,0' \
+  --spawn 'minecraft:villager@6.5,1.0,4.5:0,0,0' \
+  --spawn 'minecraft:furnace_minecart@1.5,1.0625,7.5:0.3,0,0' \
+  --spawn 'minecraft:zombie@6.5,1.0,7.5:0,0,0' \
+  --spawn 'minecraft:furnace_minecart@1.5,1.0625,10.5:0.3,0,0' \
+  --spawn 'minecraft:furnace_minecart@1.5,1.0625,13.5:0.3,0,0' \
+  --spawn 'minecraft:item@6.5,1.0,13.5:0,0,0' \
+  --spawn 'minecraft:blaze@2.5,1.0,22.5:0,0,0' \
+  --spawn 'minecraft:furnace_minecart@2.5,3.0,22.5:0.1,0,0' \
+  --spawn 'minecraft:villager@2.5,1.0,25.5:0,0,0:noai' \
+  --spawn 'minecraft:furnace_minecart@2.5,3.0,25.5:0.1,0,0' \
+  --out work/cart_body3.json | tee "$CAP/cart_body3.entities.log"
+
+#   cart_body4  the two kinds `--spawn` cannot ask about: a **ghast** fireball
+#               (`minecraft:fireball`, which shares the dragon fireball's 1x1
+#               box and had never been measured on its own) and a real **item
+#               entity**, authored into the structure with a stack so the game
+#               keeps it. Both are transparent in both axes — the two rail lanes
+#               and the two drop lanes all reproduce their controls exactly.
+tools/gametest/capture.sh --structure nucleation:cart_body4 --max-ticks 40 --entity-log \
+  --spawn 'minecraft:furnace_minecart@1.5,1.0625,1.5:0.3,0,0' \
+  --spawn 'minecraft:furnace_minecart@1.5,1.0625,4.5:0.3,0,0' \
+  --spawn 'minecraft:fireball@6.5,1.0,4.5:0,0,0:nogravity' \
+  --spawn 'minecraft:furnace_minecart@1.5,1.0625,7.5:0.3,0,0' \
+  --spawn 'minecraft:fireball@2.5,1.0,10.5:0,0,0:nogravity' \
+  --spawn 'minecraft:furnace_minecart@2.5,3.0,10.5:0,0,0' \
+  --spawn 'minecraft:furnace_minecart@2.5,3.0,13.5:0,0,0' \
+  --spawn 'minecraft:furnace_minecart@2.5,3.0,16.5:0,0,0' \
+  --out work/cart_body4.json | tee "$CAP/cart_body4.entities.log"
+
 echo "captures written to $CAP and $TRACES"

@@ -128,7 +128,14 @@ pub fn entity_dimensions(kind: &str) -> Option<(f64, f64)> {
         | "minecraft:tnt_minecart" => (0.98_f32 as f64, 0.7_f32 as f64),
         "minecraft:dragon_fireball" | "minecraft:fireball" => (1.0, 1.0),
         "minecraft:small_fireball" => (0.3125, 0.3125),
-        "minecraft:villager" => (0.6, 1.95),
+        // `EntityType.VILLAGER` is `sized(0.6F, 1.95F)`, and both literals are
+        // **floats**: 0.6000000238418579 by 1.9500000476837158. Written as
+        // decimals until a cart could stand on one, at which point the eighth
+        // decimal became observable and wrong — `blaze_ride_ai` rests a cart on
+        // a villager at exactly `2.950000047683716`, which is 1.0 + 1.95f and
+        // not 1.0 + 1.95. The width is float for the same reason the cart's is
+        // (see above) even though no capture separates 0.6 from 0.6f yet.
+        "minecraft:villager" => (0.6_f32 as f64, 1.95_f32 as f64),
         // The record 3x3 door's two riders. Registry says `sized(0.6F, 1.8F)`,
         // and `blaze_reach.entities.log` walks a blaze across a weighted plate's
         // touch box at twelve offsets and agrees at all twelve: clear at 1.76
@@ -169,6 +176,77 @@ pub fn body_aabb(kind: &str, pos: [f64; 3]) -> Option<([f64; 3], [f64; 3])> {
         [pos[0] - half, pos[1], pos[2] - half],
         [pos[0] + half, pos[1] + height, pos[2] + half],
     ))
+}
+
+/// Whether a body of `kind` stops a **minecart** that moves into it.
+///
+/// `None` for a kind with no measured hitbox — unreachable from a loaded world,
+/// because [`entity_dimensions`] refuses those at spawn.
+///
+/// This is not "living entities are solid". Ten lanes across four captures say
+/// the split runs somewhere else entirely:
+///
+/// | body under / in front of the cart | cart | capture |
+/// |---|---|---|
+/// | `blaze` | **stopped** | `cart_body`, `cart_body2`, `cart_body3` |
+/// | `villager` | **stopped** | `cart_body`, `cart_body2` |
+/// | `zombie` | **stopped** | `cart_body` |
+/// | `oak_boat` | **stopped** | `cart_body2` |
+/// | `minecart` | **stopped** | `cart_body`, and five older goldens |
+/// | `armor_stand` | passes through | `cart_body`, `cart_body2` |
+/// | `small_fireball` | passes through | `blaze_ride_ai`, `cart_body` |
+/// | `dragon_fireball` | passes through | `blaze_ride_ai`, `cart_body2` |
+/// | `fireball` (ghast) | passes through | `cart_body4` |
+/// | `item` | passes through | `cart_body4` |
+///
+/// An **armor stand is a `LivingEntity` and is transparent**; a **boat is not
+/// living and is solid**. So "living" is refuted as the rule by both of its
+/// edges at once. What fits all ten is vanilla's vehicle predicate — a cart's
+/// collision set is `canBeCollidedWith() || isPushable()`, and an armor stand
+/// answers false to both (`ArmorStand.isPushable` is overridden to `false`).
+/// The table below is the measurement, not that reading; the reading is only
+/// why the measurement is not two coincidences.
+///
+/// Two asymmetries are measured and are **not** in this function, because it
+/// only answers "what stops a cart":
+///
+/// * A living body's *own* movement is not stopped by any of this. A blaze
+///   dropped from y = 3 onto a minecart, a NaN minecart and a furnace minecart
+///   lands on the floor at y = 1.0 on tick 19 in all three lanes — the same
+///   tick as the empty control (`cart_body2`). Carts are transparent to a
+///   falling mob. Nothing in this engine moves a mob, so there is nothing to
+///   implement, but a future mob-physics pass must not reuse this table.
+/// * A **rideable** cart that comes within `inflate(0.2, 0, 0.2)` of a free
+///   living entity *mounts* it rather than being stopped by it: in `cart_body`
+///   a plain cart rolling east picks the blaze up at t18, from 0.2 away, and
+///   carries on with the ridden `0.997` slowdown instead of the empty `0.96`.
+///   That is not modelled. It cannot fire on the record door — its rolling
+///   stock is furnace carts, which are not rideable, and both of its blazes are
+///   already passengers, which vanilla's gate excludes.
+pub fn blocks_a_cart(kind: &str) -> Option<bool> {
+    // Deliberately mirrors `entity_dimensions`' arms one for one, so a kind
+    // cannot gain a hitbox without someone deciding what it does to a cart.
+    Some(match kind {
+        // Cart on cart: `cart_body` drops one onto another and it rests at
+        // 1.699999988079071 — the lower cart's exact float top. The five
+        // cart-cart goldens are the horizontal half of the same fact.
+        "minecraft:minecart"
+        | "minecraft:furnace_minecart"
+        | "minecraft:chest_minecart"
+        | "minecraft:hopper_minecart"
+        | "minecraft:tnt_minecart" => true,
+        // Every projectile measured is transparent, in both axes.
+        "minecraft:dragon_fireball" | "minecraft:fireball" | "minecraft:small_fireball" => false,
+        // `cart_body2`: a furnace cart rolling east stops with its east face at
+        // 6.199999988079071, which is the blaze's and the villager's west face
+        // to the last bit. `cart_body`/`blaze_ride_ai`: a cart dropped on them
+        // rests at 2.799999952316284 and 2.950000047683716, their exact tops.
+        "minecraft:villager" | "minecraft:blaze" => true,
+        // `cart_body4`: an authored item on the rail, and a cart dropped on
+        // one, both reproduce the empty control to the last digit.
+        "minecraft:item" => false,
+        _ => return None,
+    })
 }
 
 /// Where a passenger sits relative to its vehicle's position, measured.
@@ -356,6 +434,41 @@ mod hitbox_tests {
     fn an_unmeasured_entity_has_no_hitbox_rather_than_a_guessed_one() {
         assert_eq!(entity_dimensions("minecraft:creeper"), None);
         assert_eq!(body_aabb("minecraft:creeper", [0.0; 3]), None);
+    }
+
+    /// The collidability table, and its refusals.
+    ///
+    /// The two halves are asserted together on purpose: a table that answered
+    /// `true` for everything would pass the first loop and fail the second, and
+    /// one that answered `false` for everything the other way round. The
+    /// numbers behind each row are in [`blocks_a_cart`]'s own documentation.
+    #[test]
+    fn only_the_measured_bodies_stop_a_cart() {
+        for kind in [
+            "minecraft:minecart",
+            "minecraft:furnace_minecart",
+            "minecraft:chest_minecart",
+            "minecraft:hopper_minecart",
+            "minecraft:tnt_minecart",
+            "minecraft:villager",
+            "minecraft:blaze",
+        ] {
+            assert_eq!(blocks_a_cart(kind), Some(true), "{kind} was measured solid");
+        }
+        for kind in [
+            "minecraft:small_fireball",
+            "minecraft:dragon_fireball",
+            "minecraft:fireball",
+            "minecraft:item",
+        ] {
+            assert_eq!(blocks_a_cart(kind), Some(false), "{kind} was measured transparent");
+        }
+        // Every kind with a hitbox has an answer here, and no kind without one
+        // does — so a new entity cannot arrive with a box and no decision.
+        for kind in ["minecraft:creeper", "minecraft:armor_stand", "minecraft:oak_boat"] {
+            assert_eq!(blocks_a_cart(kind), None, "{kind} has no box in this engine");
+            assert_eq!(entity_dimensions(kind), None);
+        }
     }
 }
 

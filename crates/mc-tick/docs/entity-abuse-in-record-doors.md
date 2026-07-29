@@ -192,7 +192,12 @@ refuted it** — the builders' account was wrong, and this page was wrong with i
       variant 0.98 x 0.7, dragon fireball 1.0 x 1.0, small fireball 0.3125,
       villager adult 0.6 x 1.95 and baby 0.49 x 0.98, **blaze 0.6 x 1.8**,
       item 0.25. An unmeasured entity gets **no** box and the simulation refuses
-      it by name. The blaze is `blaze_reach.entities.log`: nine floor plates
+      it by name. **The registry's literals are `float`**, and the eighth decimal
+      is observable: the villager's height was written as the decimal `1.95`
+      until a cart could stand on one, at which point `blaze_ride_ai` read
+      `2.950000047683716` where the engine gave `2.95`. It is `1.95F` —
+      1.9500000476837158 — like the cart's `0.98F` and the blaze's `1.8F` before
+      it. The blaze is `blaze_reach.entities.log`: nine floor plates
       straddling the width edges — clear at 1.76 and 11.24, touching at 5.77 and
       15.23, which bounds the half-width in (0.2925, 0.3025) — plus the four
       baby-villager offsets, where a 0.49-wide body reads clear and a blaze
@@ -230,10 +235,11 @@ refuted it** — the builders' account was wrong, and this page was wrong with i
       box with no velocity, where vanilla reports −0.0784. It is inert — nothing
       reads it and it never moves the rider — but it is a difference, and a
       future behaviour that reads passenger velocity would find zero here.
-- [~] Entities resting on other entities' hitboxes. **Half of this line was
-      wrong, and the oracle says which half.** `blaze_ride_ai.entities.log` drops
-      a minecart from y = 3.0 onto four different bodies at y = 1.0, with a fifth
-      lane over bare floor as the control:
+- [x] Entities resting on other entities' hitboxes. **This line has now been
+      wrong twice, and both times the oracle said which half.**
+      `blaze_ride_ai.entities.log` drops a minecart from y = 3.0 onto four
+      different bodies at y = 1.0, with a fifth lane over bare floor as the
+      control:
 
       | body under it | cart settles at | reading |
       |---|---|---|
@@ -243,16 +249,73 @@ refuted it** — the builders' account was wrong, and this page was wrong with i
       | dragon fireball | 1.0 | falls straight through |
       | nothing (control) | 1.0 | falls |
 
-      So a **living** body *is* a hard obstacle to a cart and a **projectile** is
-      not, which is `Entity.canBeCollidedWith` — true for a living entity, false
-      for a fireball. The engine implements neither: `tick_minecart_among` still
-      builds its obstacle list from the other carts only, so a cart that vanilla
-      would park on a villager or a blaze falls through it here. That is now a
-      **known, measured gap** rather than an open question, and it is not
-      silently counted the way `piston_retract_contacts` is. The record 3x3 door
-      does not appear to need it — it is at rest for 400 ticks without it, and
-      its one cart over air is held by a block ledge (see the next entry) — but
-      any build that stacks a cart on a mob is mis-simulated today.
+      This page then read that as `Entity.canBeCollidedWith` — "true for a living
+      entity, false for a fireball". **`cart_body` refutes it at both edges.**
+      Six more bodies, met twice each (dropped on from above and driven into
+      sideways), and two of them fall the wrong side of "living":
+
+      | body | cart | rest height / stop face |
+      |---|---|---|
+      | zombie | **solid** | 2.950000047683716 |
+      | oak boat | **solid** | 1.5625 (0.5625 tall, 1.375 wide) |
+      | minecart | **solid** | 1.699999988079071 |
+      | **armor stand** | transparent | reproduces the control exactly |
+      | ghast fireball | transparent | ditto |
+      | item entity | transparent | ditto |
+
+      An **armor stand is a `LivingEntity` and a cart falls straight through
+      it**; a **boat is not living and holds one up**. What fits all ten is
+      vanilla's *vehicle* predicate — a cart's collision set is
+      `canBeCollidedWith() || isPushable()`, and an armor stand answers false to
+      both. `entity::blocks_a_cart` is that table, kind by kind, refusing any
+      kind it has not seen, and `sim::cart_obstacle_bodies` feeds the qualifying
+      boxes into the **same** obstacle list the other carts go through.
+
+      Four more things the same captures settle:
+
+      - **It is a full box, not a ledge.** `cart_body2` drives a cart east into
+        a blaze and it stops with its east face at `6.199999988079071` — the
+        blaze's west face to the last bit. A support-only model drives through.
+      - **`onGround` is set by it.** `cart_body`'s z=37.5 and z=40.5 lanes are
+        the same cart with vx = 0.1, one over a blaze and one over stone; the
+        blaze lane takes `comeOffTrack`'s *grounded* ×0.5 branch the tick it
+        lands rather than the airborne ×0.95f, exactly as the stone lane does.
+      - **The body feels nothing back.** A cart pressed against an AI-enabled
+        blaze for twenty ticks (`cart_body3`) leaves it at (2.5, 1.0, 1.5) to
+        the last digit, and a cart sitting on its head does not press it down.
+      - **The solidity is one-way.** A blaze dropped from y = 3 onto a NaN cart,
+        an ordinary cart and a furnace cart lands on the *floor* at 1.0 on tick
+        19 in all three lanes — the same tick as the empty control. A mob's own
+        movement collides with no cart. Nothing in this engine moves a mob, so
+        there is nothing to implement, but a future mob-physics pass must not
+        reuse the table above.
+
+      A **passenger's** box counts too: `cart_body2` drops a furnace cart onto a
+      blaze seated on a NaN cart and it rests at `2.987499952316284`, the
+      vehicle's y plus the 0.1875 seat plus 1.8f.
+
+      Pinned by `tests/cart_body.rs` (six cases). Five of the six fail with the
+      body list emptied, which is how they were checked.
+
+      **Two things these captures measured and the engine does not model.**
+      Neither can fire on the record door, and both are named here so that stays
+      a fact rather than an assumption:
+
+      - **A rideable cart mounts a mob rather than hitting it.** In `cart_body` a
+        plain minecart rolling east picks a blaze up at t18 — from 0.2 away, the
+        `inflate(0.2, 0, 0.2)` push search, not the collision box — and carries
+        on with the ridden 0.997 slowdown instead of the empty 0.96. The door's
+        rolling stock is furnace carts, which are not rideable, and both of its
+        blazes are already passengers, which vanilla's gate excludes.
+      - **A furnace cart is slower than a plain one, two ways.** Its velocity
+        decays by **0.9408 = 0.96 × 0.98** a tick, not 0.96, and its stride is
+        capped at **0.2** a block rather than 0.4 — both visible for nineteen
+        ticks in `cart_body2`'s control lane, where the displacement is a flat
+        0.2 while the velocity falls past it. `minecart.rs` applies 0.96 and 0.4
+        to every variant. All fifteen of the door's furnace carts are motionless
+        (`cart_furnace_yaw`, and `door55_in_world` records them holding position),
+        so nothing depends on it today; a build that rolls one would be
+        mis-timed.
 - [x] A cart with **no block under its own column** is held up by a block under
       any column its box overlaps. This is what actually holds the record door's
       end cart: it stands in an `observer` over air, with 0.245 of its 0.98
@@ -360,6 +423,35 @@ target this document sets — the top row holds its positions *and* not a block
 changes — and it removes the second of the two reasons given here not to believe
 a door: the ten `piston_retract_contacts` were ten entities standing in a
 retraction that only happened because the build had been pasted.
+
+### What happens when somebody does touch it
+
+`examples/door55_sim.rs` takes `--press T` now (and `--button x,y,z`; the button
+is otherwise searched for, because the extraction's origin is not the save's).
+Pressed on tick 5 under `InWorld`, the door **starts and then stalls**, and it
+does so identically with and without the body-collision work above:
+
+```text
+  block changes: 23, over ticks 5-10 and 34-40
+  quiescent: true          entities in a retracting piston's sweep: 6
+  no entity moved
+```
+
+Everything that happens is the first stage and only the first stage. The oak
+button powers the note block beside it, the observer at `(72, 2, 20)` pulses,
+and the down-facing sticky pair at `(71, 2, 20)`/`(71, 1, 20)` runs one
+extend-and-retract of the double piston extender at `(71, 0, 20)`. Thirty game
+ticks later the button releases, the observer pulses again on the falling edge,
+and the same pair runs the same cycle backwards. Nothing downstream of it moves,
+no entity moves, and the world is quiescent again by tick 41.
+
+The six `piston_retract_contacts` are the reason to expect exactly this: they
+are entities standing in a *down*-facing piston's own square as its head
+retracts into it, which is the one piston case this page records as **measured
+but not determined** (see the `piston_pull_inside` entry above). The door's
+pistons face down, and the stage that would follow this one is behind that gap.
+So a door that starts, does its first extender, and stops is the predicted
+outcome of the retraction blocker, not of anything to do with entity hitboxes.
 
 ### Why placement arms every observer
 

@@ -135,13 +135,75 @@ fn main() {
         );
     }
 
-    // Nothing is triggered: this is the warmup the door has to survive before
-    // anyone touches it. Anything that moves here moved on its own.
+    // `--press T` clicks the door's button on tick T (repeatable). Without it
+    // nothing is triggered, which is the warmup the door has to survive before
+    // anyone touches it — anything that moves *then* moved on its own.
+    //
+    // The button is searched for rather than computed: the extraction's origin
+    // and the save's differ, so a hard-coded coordinate is a coordinate for a
+    // different world. `--button x,y,z` overrides when a build has more than
+    // one and the first is the wrong one.
+    let args: Vec<String> = std::env::args().collect();
+    let presses: Vec<u32> = args
+        .iter()
+        .enumerate()
+        .filter(|(_, a)| *a == "--press")
+        .filter_map(|(i, _)| args.get(i + 1))
+        .filter_map(|v| v.parse().ok())
+        .collect();
+    let button = if presses.is_empty() {
+        None
+    } else {
+        let explicit = args
+            .iter()
+            .position(|a| a == "--button")
+            .and_then(|i| args.get(i + 1))
+            .map(|v| {
+                let c: Vec<i32> = v.split(',').map(|p| p.parse().expect("--button x,y,z")).collect();
+                (c[0], c[1], c[2])
+            });
+        let found = explicit.or_else(|| {
+            let json = read_out(|w| sim.changes_json(w));
+            let _ = json;
+            let (min, max) = ((0, 0, 0), (200, 60, 200));
+            let mut hit = None;
+            'search: for x in min.0..=max.0 {
+                for y in min.1..=max.1 {
+                    for z in min.2..=max.2 {
+                        if read_out(|w| sim.get_block(x, y, z, w)).contains("_button") {
+                            hit = Some((x, y, z));
+                            break 'search;
+                        }
+                    }
+                }
+            }
+            hit
+        });
+        match found {
+            Some(b) => {
+                println!(
+                    "button at {b:?} = {}, pressing on tick(s) {presses:?}",
+                    read_out(|w| sim.get_block(b.0, b.1, b.2, w))
+                );
+                Some(b)
+            }
+            None => {
+                eprintln!("no button found in this world; pass --button x,y,z");
+                std::process::exit(3);
+            }
+        }
+    };
+
     let mut first_move: BTreeMap<u32, u32> = BTreeMap::new();
     let mut lost_nan: BTreeMap<u32, u32> = BTreeMap::new();
     let mut previous = start.clone();
     let mut changes_before = sim.changes_count();
     for tick in 1..=ticks {
+        if presses.contains(&tick) {
+            let (x, y, z) = button.expect("checked above");
+            println!("  tick {tick}: pressing the button");
+            sim.use_block(x, y, z);
+        }
         sim.step();
         // A door nobody touched should not be changing blocks. Reporting the
         // tick each change lands on is the difference between "the entities

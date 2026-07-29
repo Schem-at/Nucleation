@@ -351,7 +351,8 @@ pub fn tick_minecart_blocked(
     }
 }
 
-/// Tick the cart at `index`, stopped by the boxes of every other live cart.
+/// Tick the cart at `index`, stopped by every other live cart **and** by
+/// `bodies` — the boxes of the non-cart entities that stop a cart.
 ///
 /// Carts block each other's movement. That single fact is what turns the
 /// two-body push into the behaviour of a *chain*: shove a cart into a
@@ -359,16 +360,35 @@ pub fn tick_minecart_blocked(
 /// on that axis is zeroed — so it goes on to push its own neighbours from a
 /// standstill rather than from the velocity it was handed. Every chain golden
 /// falls out of it, and none of them falls out without it.
+///
+/// `bodies` is the caller's business because this module owns only carts;
+/// [`crate::sim::Simulation`] builds it from the frozen entities and the seated
+/// riders, filtered by [`crate::entity::blocks_a_cart`]. Pass an empty slice for
+/// a world that has none, which is what every pre-existing cart golden is.
+///
+/// The bodies go in through the *same* obstacle list as the carts, so a body is
+/// a full AABB and not a floor: `cart_body2` measures a furnace cart rolling
+/// east into a blaze and it stops with its east face at the blaze's west face,
+/// where a support-only model would have driven straight through. And the boxes
+/// are one list rather than two because vanilla's `Entity.collide` takes one
+/// list: whichever is nearer wins, per axis, with no ordering between them.
+///
+/// A cart's own passenger may be in `bodies` and is harmless: its box overlaps
+/// the cart's on every axis, and [`crate::entity::collide_move_among`] only
+/// clips a box the mover is *outside* of. Pinned by
+/// `a_cart_is_not_stopped_by_the_rider_sitting_on_it`.
 pub fn tick_minecart_among(
     carts: &mut [MinecartState],
     index: usize,
     world: &dyn CollisionWorld,
+    bodies: &[([f64; 3], [f64; 3])],
 ) {
     let obstacles: Vec<([f64; 3], [f64; 3])> = carts
         .iter()
         .enumerate()
         .filter(|(other, cart)| *other != index && !cart.removed)
         .map(|(_, cart)| cart_aabb(cart.pos))
+        .chain(bodies.iter().copied())
         .collect();
     tick_minecart_blocked(&mut carts[index], world, &obstacles);
 }

@@ -1,0 +1,11 @@
+{
+  DataVersion: 4903,
+  size: [2, 1, 1],
+  palette: [
+    {Name: "minecraft:note_block", Properties: {instrument: "harp", note: "0", powered: "false"}}
+  ],
+  blocks: [
+    {pos: [0, 0, 0], state: 0}
+  ],
+  entities: []
+}

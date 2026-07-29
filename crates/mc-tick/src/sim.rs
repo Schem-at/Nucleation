@@ -996,6 +996,56 @@ impl Simulation {
         clipped
     }
 
+    /// The boxes of the non-cart entities a moving minecart is stopped by.
+    ///
+    /// Carts are **not** here — [`crate::minecart::tick_minecart_among`] adds
+    /// those itself, and it has to, because it must leave out the cart doing the
+    /// moving.
+    ///
+    /// This is the record doors' "the minecart rests on the villager's head":
+    /// a mob's hitbox used as scaffolding to hold a cart at an exact height. It
+    /// is a full box, not a ledge — a cart is stopped sideways by a blaze
+    /// exactly as it is stopped from below (`cart_body2`). Which kinds qualify
+    /// is [`crate::entity::blocks_a_cart`], which is a measured table and not a
+    /// class test; the fireballs are in `frozen` too and are transparent.
+    ///
+    /// A rider's position is re-derived from its vehicle here rather than
+    /// stored, for the same reason [`Simulation::refresh_bodies`] does it: a
+    /// passenger has no position of its own. `cart_body2` drops a furnace cart
+    /// onto a blaze seated on a NaN cart and it rests at 2.987499952316284 —
+    /// the vehicle's y, plus the 0.1875 seat, plus the blaze's 1.8 — so a
+    /// rider's box holds a cart up just as a standing body does.
+    fn cart_obstacle_bodies(&self) -> Vec<([f64; 3], [f64; 3])> {
+        let mut out = Vec::new();
+        for (_, kind, pos) in &self.frozen {
+            if crate::entity::blocks_a_cart(kind) != Some(true) {
+                continue;
+            }
+            // `None` is unreachable: spawn refuses a kind with no dimensions.
+            if let Some(aabb) = crate::entity::body_aabb(kind, *pos) {
+                out.push(aabb);
+            }
+        }
+        for (_, kind, vehicle_id, seat) in &self.riders {
+            if crate::entity::blocks_a_cart(kind) != Some(true) {
+                continue;
+            }
+            let Some(vehicle) = self.minecarts.iter().find(|c| c.id == *vehicle_id && !c.removed)
+            else {
+                continue;
+            };
+            let pos = [
+                vehicle.pos[0] + seat[0],
+                vehicle.pos[1] + seat[1],
+                vehicle.pos[2] + seat[2],
+            ];
+            if let Some(aabb) = crate::entity::body_aabb(kind, pos) {
+                out.push(aabb);
+            }
+        }
+        out
+    }
+
     /// Rebuild the entity-box view block behaviours read
     /// ([`crate::entity::EntityBody`]).
     ///
@@ -2286,7 +2336,17 @@ impl Simulation {
                     if self.minecarts[index].removed {
                         continue;
                     }
-                    crate::minecart::tick_minecart_among(&mut self.minecarts, index, &collision);
+                    // Rebuilt per cart rather than once per tick, because a
+                    // rider's box is derived from its vehicle and a vehicle
+                    // that ticked earlier in this very loop has already moved.
+                    // Vanilla reads live positions; so does this.
+                    let bodies = self.cart_obstacle_bodies();
+                    crate::minecart::tick_minecart_among(
+                        &mut self.minecarts,
+                        index,
+                        &collision,
+                        &bodies,
+                    );
                     // The push half of the same cart's tick, in the same pass:
                     // a cart shoves its neighbours the moment it has finished
                     // moving, before the next cart ticks. That interleaving is
