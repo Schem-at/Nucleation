@@ -214,6 +214,9 @@ pub struct Simulation {
     /// Separate from [`Simulation::record`] because it is far larger — several
     /// updates per block change — and only a propagation view wants it.
     upd_log: Option<Vec<crate::behaviour::UpdateRecord>>,
+    /// The log kept after recording was switched off, so that stopping the
+    /// recorder does not destroy what it recorded. `None` while recording.
+    upd_saved: Option<Vec<crate::behaviour::UpdateRecord>>,
     /// The phase currently executing, `None` between ticks.
     phase: Option<Phase>,
     /// Whether a tick's phase walk is currently executing.
@@ -291,6 +294,7 @@ impl Simulation {
             log: None,
             inv_log: None,
             upd_log: None,
+            upd_saved: None,
             phase: None,
             in_tick: false,
             ticking: None,
@@ -491,15 +495,44 @@ impl Simulation {
     ///
     /// Off by default and deliberately separate from [`Simulation::record`]:
     /// a door's cycle produces several updates per block change, and only a
-    /// propagation view wants them. Turning it off drops the log.
+    /// propagation view wants them.
+    ///
+    /// Turning it *off* stops recording but keeps what was recorded — a
+    /// caller that records a cycle, switches the recorder off to run an
+    /// unwatched settle, and only then reads the log gets the cycle rather
+    /// than nothing. Turning it back *on* starts a fresh log; use
+    /// [`Simulation::clear_updates`] to drop one without changing the
+    /// recording state.
     pub fn record_updates(&mut self, on: bool) {
-        self.upd_log = if on { Some(Vec::new()) } else { None };
+        if on {
+            self.upd_saved = None;
+            self.upd_log = Some(Vec::new());
+        } else {
+            // Retained, not dropped: `recorded_updates` reads through to it.
+            self.upd_saved = self.upd_log.take();
+        }
+    }
+
+    /// Discard the recorded updates, leaving recording as it was.
+    ///
+    /// The log is the largest thing a simulation holds — a 6x6 door cycle is
+    /// tens of megabytes — so a long-lived instance that records many cycles
+    /// needs a way to free one without stopping.
+    pub fn clear_updates(&mut self) {
+        if let Some(log) = self.upd_log.as_mut() {
+            log.clear();
+        }
+        self.upd_saved = None;
     }
 
     /// The updates recorded since [`Simulation::record_updates`], in delivery
-    /// order — which is `(tick, seq)` order.
+    /// order — which is `(tick, seq)` order. Survives the recorder being
+    /// switched off; emptied by [`Simulation::clear_updates`].
     pub fn recorded_updates(&self) -> &[crate::behaviour::UpdateRecord] {
-        self.upd_log.as_deref().unwrap_or(&[])
+        self.upd_log
+            .as_deref()
+            .or(self.upd_saved.as_deref())
+            .unwrap_or(&[])
     }
 
     /// The behaviour table.
@@ -1836,6 +1869,47 @@ mod tests {
         ran.run(17);
         assert_eq!(stepped.tick_count(), ran.tick_count());
         assert_eq!(stepped.world(), ran.world());
+    }
+
+    /// Switching the recorder off must not destroy what it recorded.
+    ///
+    /// The propagation view records a cycle, then runs an unwatched settle
+    /// with the recorder off before reading the log — under the old
+    /// behaviour that read back empty, silently.
+    #[test]
+    fn stopping_the_update_recorder_keeps_the_log() {
+        let mut s = sim();
+        s.record_updates(true);
+        let stone = s.registry_mut().intern("minecraft:stone").unwrap();
+        s.place_block(Pos::new(1, 1, 1), stone);
+        s.run(2);
+        let recorded = s.recorded_updates().len();
+        assert!(recorded > 0, "nothing was recorded, so the test proves nothing");
+
+        s.record_updates(false);
+        assert_eq!(s.recorded_updates().len(), recorded, "the log was dropped");
+
+        // ...and the recorder really is off: further placements add nothing.
+        s.place_block(Pos::new(2, 1, 1), stone);
+        s.run(2);
+        assert_eq!(s.recorded_updates().len(), recorded);
+
+        s.clear_updates();
+        assert!(s.recorded_updates().is_empty());
+    }
+
+    #[test]
+    fn restarting_the_recorder_starts_a_fresh_log() {
+        let mut s = sim();
+        s.record_updates(true);
+        let stone = s.registry_mut().intern("minecraft:stone").unwrap();
+        s.place_block(Pos::new(1, 1, 1), stone);
+        s.run(2);
+        assert!(!s.recorded_updates().is_empty());
+
+        s.record_updates(false);
+        s.record_updates(true);
+        assert!(s.recorded_updates().is_empty(), "a stale log survived a restart");
     }
 
     #[test]

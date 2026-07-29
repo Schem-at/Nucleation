@@ -78,10 +78,13 @@ drivers on a one-lever door. Rarity orders the queue and nothing else; every
 candidate is still tried. A second control counts as a second input only if it
 opens the SAME passage.
 
-Still open: the engine delivers no power from a floor `stone_button` or
-`stone_pressure_plate` under `TickSettleMode.InWorld` — the button's own
-20-tick press/release is simulated correctly, but the door never moves. So no
-button or plate door can certify yet; the detector is ready for one.
+**Unblocked.** The engine used to deliver no power from a button or plate:
+`ButtonBlock.updateNeighbours` makes *two* `updateNeighborsAt` calls — one at
+the button, one at the support block it is attached to — and only the first was
+implemented, so a button strongly powered its support and nothing on the far
+side of that block ever heard about it. Fixed in `components.rs`, pinned by
+`tests/cases/button_support.test.json`. Registration is now by family, so every
+material of button and plate works rather than only stone and oak.
 
 Original notes below. Real builds use:
 
@@ -238,8 +241,10 @@ door; this one *explains* it.
   the raw `updatesJson` (15.8 MB per 6x6 cycle) is never fetched. A whole
   cycle is 0.88 MB of heat + 1.85 MB of waves, packed to ~1.5 MB of typed
   arrays and transferred, not copied.
-- `record_updates(false)` **drops** the log. Read the JSON before switching
-  the recorder off.
+- `recordUpdates(false)` used to **drop** the log; it now stops recording and
+  keeps it, and `clearUpdates()` frees one without stopping. A page that
+  certifies several builds on one instance should call `clearUpdates()`
+  between them — a 6x6 cycle is tens of megabytes.
 - Four tick phases fire in a door, and four categorical hues cannot pass the
   all-pairs colour-vision gate — so the fourth (`boundary`, the out-of-tick
   lever action) is drawn as a hueless wireframe cage instead of a fifth

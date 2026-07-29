@@ -60,7 +60,11 @@ TickSimulation_restore_result TickSimulation_restore(TickSimulation* self, uint3
 
 void TickSimulation_gametest_snbt(const Schematic* schematic, DiplomatWrite* write);
 
+void TickSimulation_block_entity_audit_json(const Schematic* schematic, DiplomatWrite* write);
+
 void TickSimulation_record_updates(TickSimulation* self, bool on);
+
+void TickSimulation_clear_updates(TickSimulation* self);
 
 uint32_t TickSimulation_updates_count(const TickSimulation* self);
 

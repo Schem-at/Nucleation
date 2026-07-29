@@ -194,8 +194,23 @@ expect(
 );
 
 // --- turning it back off ----------------------------------------------------
+// Stopping the recorder must not destroy what it recorded: the propagation
+// view records a cycle, runs an unwatched settle with the recorder off, and
+// only then reads the log. This test used to assert the opposite — it pinned
+// the footgun rather than the contract.
+const recorded = sim.updatesCount();
 sim.recordUpdates(false);
-expect(sim.updatesCount() === 0, "recordUpdates(false) drops the log");
+expect(sim.updatesCount() === recorded, "recordUpdates(false) keeps the log");
+
+sim.run(20);
+expect(sim.updatesCount() === recorded, "...and really has stopped recording");
+
+sim.clearUpdates();
+expect(sim.updatesCount() === 0, "clearUpdates() frees the log");
+
+// Restarting starts fresh rather than appending to a stale log.
+sim.recordUpdates(true);
+expect(sim.updatesCount() === 0, "recordUpdates(true) starts a fresh log");
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

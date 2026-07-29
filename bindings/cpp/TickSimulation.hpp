@@ -63,7 +63,11 @@ namespace capi {
 
     void TickSimulation_gametest_snbt(const diplomat::capi::Schematic* schematic, diplomat::capi::DiplomatWrite* write);
 
+    void TickSimulation_block_entity_audit_json(const diplomat::capi::Schematic* schematic, diplomat::capi::DiplomatWrite* write);
+
     void TickSimulation_record_updates(diplomat::capi::TickSimulation* self, bool on);
+
+    void TickSimulation_clear_updates(diplomat::capi::TickSimulation* self);
 
     uint32_t TickSimulation_updates_count(const diplomat::capi::TickSimulation* self);
 
@@ -284,9 +288,27 @@ inline void TickSimulation::gametest_snbt_write(const Schematic& schematic, W& w
         &write);
 }
 
+inline std::string TickSimulation::block_entity_audit_json(const Schematic& schematic) {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::TickSimulation_block_entity_audit_json(schematic.AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void TickSimulation::block_entity_audit_json_write(const Schematic& schematic, W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::TickSimulation_block_entity_audit_json(schematic.AsFFI(),
+        &write);
+}
+
 inline void TickSimulation::record_updates(bool on) {
     diplomat::capi::TickSimulation_record_updates(this->AsFFI(),
         on);
+}
+
+inline void TickSimulation::clear_updates() {
+    diplomat::capi::TickSimulation_clear_updates(this->AsFFI());
 }
 
 inline uint32_t TickSimulation::updates_count() const {

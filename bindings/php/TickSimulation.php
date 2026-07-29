@@ -210,8 +210,18 @@ final class TickSimulation {
         return Lib::readAndFreeWrite($write);
     }
 
+    public static function blockEntityAuditJson( $schematic) {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->TickSimulation_block_entity_audit_json($schematic->ptr, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function recordUpdates( $on) {
         Lib::ffi()->TickSimulation_record_updates($this->ptr, $on);
+    }
+
+    public function clearUpdates() {
+        Lib::ffi()->TickSimulation_clear_updates($this->ptr);
     }
 
     public function updatesCount() {

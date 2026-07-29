@@ -14,9 +14,11 @@ void add_TickSimulation_binding(nb::module_ mod) {
 
     nb::class_<nucleation::TickSimulation> opaque(mod, "TickSimulation", nb::type_slots(nucleation_TickSimulation_slots));
     opaque
+        .def_static("block_entity_audit_json", &nucleation::TickSimulation::block_entity_audit_json, "schematic"_a)
         .def("changes_count", &nucleation::TickSimulation::changes_count)
         .def("changes_json", &nucleation::TickSimulation::changes_json)
         .def("checkpoint", &nucleation::TickSimulation::checkpoint)
+        .def("clear_updates", &nucleation::TickSimulation::clear_updates)
         .def_static("eval_flight_batch", &nucleation::TickSimulation::eval_flight_batch, "bx"_a, "by"_a, "bz"_a, "travel"_a, "x_off"_a, "palette"_a, "cells"_a, "air_index"_a, "kicks"_a, "eval_ticks"_a, "seed"_a, "must_move_by_tick"_a, "need_period"_a, "early_exit"_a)
         .def("events_summary_json", &nucleation::TickSimulation::events_summary_json)
         .def_static("from_blocks", std::move(maybe_op_unwrap(&nucleation::TickSimulation::from_blocks)), "bx"_a, "by"_a, "bz"_a, "travel"_a, "x_off"_a, "palette"_a, "cells"_a, "air_index"_a, "settle"_a, "origin_x"_a, "origin_y"_a, "origin_z"_a)

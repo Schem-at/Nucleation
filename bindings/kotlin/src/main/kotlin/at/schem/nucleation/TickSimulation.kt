@@ -25,7 +25,9 @@ internal interface TickSimulationLib: Library {
     fun TickSimulation_checkpoint(handle: Pointer): FFIUint32
     fun TickSimulation_restore(handle: Pointer, id: FFIUint32): ResultUnitInt
     fun TickSimulation_gametest_snbt(schematic: Pointer, write: Pointer): Unit
+    fun TickSimulation_block_entity_audit_json(schematic: Pointer, write: Pointer): Unit
     fun TickSimulation_record_updates(handle: Pointer, on: Boolean): Unit
+    fun TickSimulation_clear_updates(handle: Pointer): Unit
     fun TickSimulation_updates_count(handle: Pointer): FFIUint32
     fun TickSimulation_updates_json(handle: Pointer, write: Pointer): Unit
     fun TickSimulation_updates_json_between(handle: Pointer, fromTick: FFIUint32, toTick: FFIUint32, write: Pointer): Unit
@@ -216,15 +218,39 @@ class TickSimulation internal constructor (
         }
         @JvmStatic
 
-        /** Every recorded block change since settle, as JSON:
-        *`[{"tick":N,"pos":[x,y,z],"from":"...","to":"..."}]`.
-        *Render a schematic as gametest-flavor structure SNBT — the text
+        /** Render a schematic as gametest-flavor structure SNBT — the text
         *`from_snbt` and the corpus/render tooling consume. Lets hosts hand
         *a converted `.litematic`/`.schem` to the video renderer.
         */
         fun gametestSnbt(schematic: Schematic): String {
             val write = DW.lib.diplomat_buffer_write_create(0)
             val returnVal = lib.TickSimulation_gametest_snbt(schematic.handle, write);
+
+            val returnString = DW.writeToString(write)
+            return returnString
+        }
+        @JvmStatic
+
+        /** Report blocks whose behaviour is defined by block-entity data the
+        *file does not carry.
+        *
+        *Some exporters write the blocks and drop the block entities. The
+        *build then loads clean and simulates *wrongly but plausibly*: a
+        *comparator with no `OutputSignal` reads 0, a barrel holding the
+        *item that latched a repeater reads empty, and the door quietly
+        *fails to reset. Two files with identical block arrays get
+        *different verdicts and nothing says why. `0.45_4x4_funnel.schem`
+        *is exactly this — 4 comparators, 2 furnaces, `BlockEntities` of
+        *length 0, while its `.litematic` twin carries all 9.
+        *
+        *This does not refuse the build; it names the doubt so a host can.
+        *JSON: `{"present":N,"missing_total":N,"missing":[{"name":..,
+        *"count":N}],"summary":"..."}` — `summary` is empty when nothing
+        *is missing, and otherwise a sentence fit to show as-is.
+        */
+        fun blockEntityAuditJson(schematic: Schematic): String {
+            val write = DW.lib.diplomat_buffer_write_create(0)
+            val returnVal = lib.TickSimulation_block_entity_audit_json(schematic.handle, write);
 
             val returnString = DW.writeToString(write)
             return returnString
@@ -346,10 +372,25 @@ class TickSimulation internal constructor (
     *cycle runs several updates per change — so a propagation view asks
     *for it explicitly and pages with
     *[TickSimulation::updates_json_between].
+    *
+    *Switching it off keeps what was recorded; use
+    *[TickSimulation::clear_updates] to free it.
     */
     fun recordUpdates(on: Boolean): Unit {
 
         val returnVal = lib.TickSimulation_record_updates(handle, on);
+
+    }
+
+    /** Drop the recorded updates without changing whether recording is on.
+    *
+    *A cycle of a 6x6 door is tens of megabytes of log, so a page that
+    *certifies several builds on one instance needs to release one
+    *before recording the next.
+    */
+    fun clearUpdates(): Unit {
+
+        val returnVal = lib.TickSimulation_clear_updates(handle);
 
     }
 

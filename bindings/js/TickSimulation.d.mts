@@ -136,13 +136,31 @@ export class TickSimulation {
     restore(id: number): void;
 
     /**
-     * Every recorded block change since settle, as JSON:
-     * `[{"tick":N,"pos":[x,y,z],"from":"...","to":"..."}]`.
      * Render a schematic as gametest-flavor structure SNBT — the text
      * `from_snbt` and the corpus/render tooling consume. Lets hosts hand
      * a converted `.litematic`/`.schem` to the video renderer.
      */
     static gametestSnbt(schematic: Schematic): string;
+
+    /**
+     * Report blocks whose behaviour is defined by block-entity data the
+     * file does not carry.
+     *
+     * Some exporters write the blocks and drop the block entities. The
+     * build then loads clean and simulates *wrongly but plausibly*: a
+     * comparator with no `OutputSignal` reads 0, a barrel holding the
+     * item that latched a repeater reads empty, and the door quietly
+     * fails to reset. Two files with identical block arrays get
+     * different verdicts and nothing says why. `0.45_4x4_funnel.schem`
+     * is exactly this — 4 comparators, 2 furnaces, `BlockEntities` of
+     * length 0, while its `.litematic` twin carries all 9.
+     *
+     * This does not refuse the build; it names the doubt so a host can.
+     * JSON: `{"present":N,"missing_total":N,"missing":[{"name":..,
+     * "count":N}],"summary":"..."}` — `summary` is empty when nothing
+     * is missing, and otherwise a sentence fit to show as-is.
+     */
+    static blockEntityAuditJson(schematic: Schematic): string;
 
     /**
      * Start (or stop) recording every delivered redstone update.
@@ -151,8 +169,20 @@ export class TickSimulation {
      * cycle runs several updates per change — so a propagation view asks
      * for it explicitly and pages with
      * {@link TickSimulation::updates_json_between}.
+     *
+     * Switching it off keeps what was recorded; use
+     * {@link TickSimulation::clear_updates} to free it.
      */
     recordUpdates(on: boolean): void;
+
+    /**
+     * Drop the recorded updates without changing whether recording is on.
+     *
+     * A cycle of a 6x6 door is tens of megabytes of log, so a page that
+     * certifies several builds on one instance needs to release one
+     * before recording the next.
+     */
+    clearUpdates(): void;
 
     /**
      * How many updates have been recorded — page before pulling them.

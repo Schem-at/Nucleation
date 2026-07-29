@@ -16,6 +16,121 @@
 //!   shulker box held as an item are always pre-interned.
 //! - Structured data crosses as JSON strings (PORTING.md rule 9).
 
+/// The first data version whose block ids are flattened (1.13).
+const FLATTENING_DATA_VERSION: i32 = 1519;
+
+/// Run a pre-flattening build through the dataconverter before the engine
+/// ever sees it.
+///
+/// mc-tick's registry is modern-only, so a 1.12 schematic reaches it holding
+/// ids that no longer exist. The failure is not a clean "unknown block"
+/// either: `minecraft:slime` is the 1.12 id for the *slime block*, and modern
+/// `minecraft:slime` does not exist — so a bore whose whole point is sticky
+/// movement loads with 59 inert cells and simulates as a machine that cannot
+/// fly. Likewise `stone_slab` (now `smooth_stone_slab`), `leaves`, and
+/// `fence_gate`. Converting forward is lossless, so this is unconditional
+/// for anything older than the flattening.
+///
+/// Returns `None` when the build is already modern — callers then use their
+/// borrow and clone nothing.
+fn modernized(schematic: &crate::UniversalSchematic) -> Option<crate::UniversalSchematic> {
+    let from = schematic.metadata.source_data_version.or(schematic.metadata.mc_version)?;
+    if from >= FLATTENING_DATA_VERSION {
+        return None;
+    }
+    let mut converted = schematic.clone();
+    converted.convert_to_data_version(crate::dataconverter::CANONICAL_DATA_VERSION);
+    Some(converted)
+}
+
+/// Whether a block's simulated behaviour depends on block-entity data.
+///
+/// Only the ones whose *absence changes the run*: a comparator without
+/// `OutputSignal` reads 0, a container without `Items` is empty and so reads
+/// 0 through a comparator and has nothing to transfer. Signs, banners and
+/// heads carry block entities too, and losing them changes nothing that
+/// ticks — listing them would bury the two that matter.
+fn needs_block_entity(name: &str) -> bool {
+    let short = name.strip_prefix("minecraft:").unwrap_or(name);
+    matches!(
+        short,
+        "comparator"
+            | "chest"
+            | "trapped_chest"
+            | "barrel"
+            | "hopper"
+            | "dropper"
+            | "dispenser"
+            | "furnace"
+            | "blast_furnace"
+            | "smoker"
+            | "brewing_stand"
+            | "crafter"
+            | "chiseled_bookshelf"
+            | "jukebox"
+            | "lectern"
+            | "decorated_pot"
+    ) || short.ends_with("shulker_box")
+}
+
+/// See [`ffi::TickSimulation::block_entity_audit_json`].
+fn block_entity_audit(schematic: &crate::UniversalSchematic) -> String {
+    use std::collections::{HashMap, HashSet};
+    use std::fmt::Write as _;
+
+    let have: HashSet<(i32, i32, i32)> =
+        schematic.get_block_entities_as_list().into_iter().map(|be| be.position).collect();
+
+    let mut missing: HashMap<String, u32> = HashMap::new();
+    for (pos, state) in schematic.iter_blocks() {
+        if !needs_block_entity(&state.name) {
+            continue;
+        }
+        if !have.contains(&(pos.x, pos.y, pos.z)) {
+            *missing.entry(state.name.to_string()).or_default() += 1;
+        }
+    }
+
+    let mut rows: Vec<(String, u32)> = missing.into_iter().collect();
+    // Descending count, then name — a stable order so two runs of the same
+    // file produce byte-identical JSON.
+    rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    let total: u32 = rows.iter().map(|(_, n)| *n).sum();
+
+    let mut json = String::from("{\"present\":");
+    let _ = write!(json, "{}", have.len());
+    let _ = write!(json, ",\"missing_total\":{total},\"missing\":[");
+    for (i, (name, count)) in rows.iter().enumerate() {
+        if i > 0 {
+            json.push(',');
+        }
+        let _ = write!(json, "{{\"name\":\"{name}\",\"count\":{count}}}");
+    }
+    json.push_str("],\"summary\":\"");
+    if total > 0 {
+        let named: Vec<String> = rows
+            .iter()
+            .take(3)
+            .map(|(name, count)| {
+                let short = name.strip_prefix("minecraft:").unwrap_or(name);
+                let plural = if *count == 1 { "" } else { "s" };
+                format!("{count} {short}{plural}")
+            })
+            .collect();
+        let more = if rows.len() > 3 { ", and others" } else { "" };
+        let _ = write!(
+            json,
+            "This schematic contains {}{} with no block-entity data. \
+             Comparator outputs and container contents are simulated as empty, \
+             so results may not reflect the original build.",
+            named.join(", "),
+            more
+        );
+    }
+    json.push_str("\"}");
+    json
+}
+
 /// Render a schematic as vanilla gametest structure SNBT — the flavor
 /// `mc_tick::Structure::parse` reads (`palette` + indexed `blocks` +
 /// bracketless `Properties`, block-entity `nbt` inline). The
@@ -23,7 +138,12 @@
 /// (inline `state:"id{k:v}"` strings), which mc-tick rejects — so this
 /// builds the gametest flavor directly and keeps mc-tick's proven parser
 /// as the single reader.
+///
+/// Pre-flattening builds are converted first; see [`modernized`].
 fn to_gametest_snbt(schematic: &crate::UniversalSchematic) -> String {
+    if let Some(modern) = modernized(schematic) {
+        return to_gametest_snbt(&modern);
+    }
     use std::collections::HashMap;
     use std::fmt::Write as _;
 
@@ -1064,13 +1184,31 @@ pub mod ffi {
             Ok(())
         }
 
-        /// Every recorded block change since settle, as JSON:
-        /// `[{"tick":N,"pos":[x,y,z],"from":"...","to":"..."}]`.
         /// Render a schematic as gametest-flavor structure SNBT — the text
         /// `from_snbt` and the corpus/render tooling consume. Lets hosts hand
         /// a converted `.litematic`/`.schem` to the video renderer.
         pub fn gametest_snbt(schematic: &Schematic, out: &mut DiplomatWrite) {
             let _ = write!(out, "{}", super::to_gametest_snbt(&schematic.0));
+        }
+
+        /// Report blocks whose behaviour is defined by block-entity data the
+        /// file does not carry.
+        ///
+        /// Some exporters write the blocks and drop the block entities. The
+        /// build then loads clean and simulates *wrongly but plausibly*: a
+        /// comparator with no `OutputSignal` reads 0, a barrel holding the
+        /// item that latched a repeater reads empty, and the door quietly
+        /// fails to reset. Two files with identical block arrays get
+        /// different verdicts and nothing says why. `0.45_4x4_funnel.schem`
+        /// is exactly this — 4 comparators, 2 furnaces, `BlockEntities` of
+        /// length 0, while its `.litematic` twin carries all 9.
+        ///
+        /// This does not refuse the build; it names the doubt so a host can.
+        /// JSON: `{"present":N,"missing_total":N,"missing":[{"name":..,
+        /// "count":N}],"summary":"..."}` — `summary` is empty when nothing
+        /// is missing, and otherwise a sentence fit to show as-is.
+        pub fn block_entity_audit_json(schematic: &Schematic, out: &mut DiplomatWrite) {
+            let _ = write!(out, "{}", super::block_entity_audit(&schematic.0));
         }
 
         /// Start (or stop) recording every delivered redstone update.
@@ -1079,8 +1217,20 @@ pub mod ffi {
         /// cycle runs several updates per change — so a propagation view asks
         /// for it explicitly and pages with
         /// [`TickSimulation::updates_json_between`].
+        ///
+        /// Switching it off keeps what was recorded; use
+        /// [`TickSimulation::clear_updates`] to free it.
         pub fn record_updates(&mut self, on: bool) {
             self.sim.record_updates(on);
+        }
+
+        /// Drop the recorded updates without changing whether recording is on.
+        ///
+        /// A cycle of a 6x6 door is tens of megabytes of log, so a page that
+        /// certifies several builds on one instance needs to release one
+        /// before recording the next.
+        pub fn clear_updates(&mut self) {
+            self.sim.clear_updates();
         }
 
         /// How many updates have been recorded — page before pulling them.
@@ -1341,5 +1491,83 @@ pub mod ffi {
             json.push(']');
             let _ = write!(out, "{json}");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{block_entity_audit, needs_block_entity, to_gametest_snbt};
+    use crate::{BlockState, UniversalSchematic};
+
+    /// A 1.12 build must reach the engine flattened.
+    ///
+    /// The trap this pins is `minecraft:slime`: in 1.12 that is the *slime
+    /// block*, and no modern block has the id — so an unconverted bore loads
+    /// with every sticky cell inert and simulates as a machine that cannot
+    /// fly, without erroring anywhere.
+    #[test]
+    fn pre_flattening_ids_are_converted_before_the_engine_sees_them() {
+        let mut schem = UniversalSchematic::new("legacy".into());
+        schem.metadata.source_data_version = Some(1343); // 1.12.2
+        schem.set_block(0, 0, 0, &BlockState::new("minecraft:slime"));
+        // 1.12 stored the sub-type as a property; the flattening rules key on
+        // it, so a realistic file carries `variant` and a bare id does not
+        // convert. Real .litematic/.schem imports always have it.
+        schem.set_block(
+            1,
+            0,
+            0,
+            &BlockState::new("minecraft:stonebrick").with_property("variant", "stonebrick"),
+        );
+
+        let snbt = to_gametest_snbt(&schem);
+        assert!(snbt.contains("minecraft:slime_block"), "slime block not flattened: {snbt}");
+        assert!(snbt.contains("minecraft:stone_bricks"), "stone brick not flattened: {snbt}");
+        assert!(
+            !snbt.contains("\"minecraft:slime\""),
+            "the 1.12 id survived into the engine's input: {snbt}"
+        );
+    }
+
+
+    #[test]
+    fn modern_builds_are_passed_through_untouched() {
+        let mut schem = UniversalSchematic::new("modern".into());
+        schem.metadata.source_data_version = Some(3955);
+        schem.set_block(0, 0, 0, &BlockState::new("minecraft:slime_block"));
+        assert!(to_gametest_snbt(&schem).contains("minecraft:slime_block"));
+    }
+
+    #[test]
+    fn audit_names_blocks_whose_block_entity_is_missing() {
+        let mut schem = UniversalSchematic::new("stripped".into());
+        schem.set_block(0, 0, 0, &BlockState::new("minecraft:comparator"));
+        schem.set_block(1, 0, 0, &BlockState::new("minecraft:comparator"));
+        schem.set_block(2, 0, 0, &BlockState::new("minecraft:furnace"));
+        // Carries no block-entity state that ticks; must not be reported.
+        schem.set_block(3, 0, 0, &BlockState::new("minecraft:stone"));
+
+        let json = block_entity_audit(&schem);
+        assert!(json.contains("\"missing_total\":3"), "{json}");
+        assert!(json.contains("\"name\":\"minecraft:comparator\",\"count\":2"), "{json}");
+        assert!(json.contains("\"name\":\"minecraft:furnace\",\"count\":1"), "{json}");
+        assert!(!json.contains("stone"), "a block with no ticking NBT was reported: {json}");
+        assert!(json.contains("2 comparators"), "summary not written: {json}");
+    }
+
+    #[test]
+    fn audit_is_silent_when_nothing_is_missing() {
+        let mut schem = UniversalSchematic::new("plain".into());
+        schem.set_block(0, 0, 0, &BlockState::new("minecraft:stone"));
+        let json = block_entity_audit(&schem);
+        assert!(json.contains("\"missing_total\":0"), "{json}");
+        assert!(json.contains("\"summary\":\"\""), "{json}");
+    }
+
+    #[test]
+    fn every_colour_of_shulker_box_counts_as_a_container() {
+        assert!(needs_block_entity("minecraft:shulker_box"));
+        assert!(needs_block_entity("minecraft:lime_shulker_box"));
+        assert!(!needs_block_entity("minecraft:oak_sign"));
     }
 }
