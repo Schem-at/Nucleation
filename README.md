@@ -48,6 +48,7 @@ Every capability, with its own deep-dive doc:
 - [World segmentation](docs/features/world-segmentation.md) — a whole world into individual builds with provenance, deterministically
 - [Block entities, entities, NBT](docs/features/block-entities-nbt.md) — SNBT round-trips
 - [Redstone simulation](docs/features/redstone-simulation.md) — MCHPRS redpiler, typed circuit executors
+- [Tick simulation](docs/features/tick-simulation.md) — vanilla-accurate tick loop, verified against captures from the game
 - [Meshing and rendering](docs/features/meshing-and-rendering.md) — GLB/glTF/USDZ and the headless renderer
 - [Animating a build](docs/features/animation.md) — assembly, layer printing, reveals along a curve
 - [Analysis](docs/features/analysis.md) — diff, fingerprint, auto-stack
