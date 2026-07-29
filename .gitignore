@@ -102,3 +102,6 @@ dist/npm-mctick/
 apps/*/preview-*.log
 apps/*/verify-*-out.json
 apps/preview.pid
+
+# Per-agent gametest scratch dirs (jars, .class files, staged worlds)
+/tools/gametest/work-*/

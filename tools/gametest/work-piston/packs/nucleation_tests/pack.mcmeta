@@ -1,8 +1,0 @@
-{
-  "pack": {
-    "description": "nucleation tick-engine conformance tests",
-    "pack_format": 107,
-    "min_format": 107,
-    "max_format": 107
-  }
-}
