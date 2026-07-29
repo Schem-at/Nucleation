@@ -5,6 +5,7 @@
 import type {
   ApertureConflict,
   ApertureReading,
+  BlockEntityAudit,
   Census,
   CertRecord,
   InputControl,
@@ -668,6 +669,9 @@ async function certify(job: WorkerJob): Promise<{ record: CertRecord; xray: Xray
   let sim: any;
   let makeSim: () => any;
   let w: number, h: number, l: number;
+  // Taken at parse time, off the parsed schematic, BEFORE anything is
+  // simulated — it is a fact about the download, not about the run.
+  let blockEntityAudit: BlockEntityAudit | null = null;
   if (job.ext === ".snbt") {
     // Vanilla gametest-style structure SNBT ("blocks:" flavor) is parsed
     // by mc-tick itself; Schematic.fromData only knows the nucleation
@@ -687,6 +691,20 @@ async function certify(job: WorkerJob): Promise<{ record: CertRecord; xray: Xray
     sim = makeSim();
   } else {
     const schem = Schematic.fromData(Array.from(bytes));
+    // Which block entities the file carries, against which its blocks imply.
+    // Some export tools drop them: every block survives, so the build loads
+    // clean and measures clean, but a comparator with no stored OutputSignal
+    // reads 0 and the door can fail to reset for a reason that is nowhere in
+    // the blocks. Read it here so the sheet can say so out loud.
+    try {
+      blockEntityAudit = JSON.parse(
+        TickSimulation.blockEntityAuditJson(schem),
+      ) as BlockEntityAudit;
+    } catch {
+      // An audit we cannot read is not a reason to refuse the file; the run
+      // simply proceeds without one and the sheet claims nothing about it.
+      blockEntityAudit = null;
+    }
     const dims = schem.dimensions();
     [w, h, l] = [dims.x, dims.y, dims.z];
     // Parsing is cheap and answers the only question that matters here; it is
@@ -867,6 +885,27 @@ async function certify(job: WorkerJob): Promise<{ record: CertRecord; xray: Xray
       };
       verdict = "INCONCLUSIVE";
     }
+  }
+
+  // -- was this even the whole file? --------------------------------------
+  //
+  // A file missing block-entity data cannot be certified, whatever it did on
+  // the bench. The blocks are all present, so nothing upstream notices: the
+  // door loads, opens, and either resets or does not — but it did so against
+  // comparators reading 0 and containers holding nothing, which is not the
+  // machine the builder saved. CERTIFIED would be a claim about a door that
+  // does not exist, and DID NOT RESET would blame the build for its export.
+  //
+  // Only STATE-BEARING block entities count, and that decision is the engine's
+  // (`needs_block_entity`): comparators, containers, and the rest whose absence
+  // changes what ticks. Signs, banners, heads and empty decorative pots are
+  // block entities too and are never counted — a build with fifty signs and no
+  // sign NBT simulates identically, and making it uncertifiable would be a
+  // false positive that teaches people to ignore the warning. The cost of that
+  // choice is the honest edge case: a barrel nobody reads with a comparator
+  // still counts, because the audit cannot see who is reading it.
+  if (blockEntityAudit && blockEntityAudit.missing_total > 0) {
+    verdict = "INCONCLUSIVE";
   }
 
   // -- doorway timing -----------------------------------------------------
@@ -1251,6 +1290,7 @@ async function certify(job: WorkerJob): Promise<{ record: CertRecord; xray: Xray
       priming_cycles: primingCycles,
       saved_state_drift: savedStateDrift,
       aperture_conflict: apertureConflict,
+      block_entity_audit: blockEntityAudit,
       rest_is_closed: restIsClosed,
       engineering: eng,
     },

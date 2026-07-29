@@ -66,6 +66,13 @@ open, the door accepts a re-trigger mid-stroke — a genuinely impressive proper
 and worth a badge. We already know the vault survives interrupted strokes
 (conformance covers it), so the machinery is there.
 
+**Found one in the corpus, batch v3.** `4x4 sliding door.litematic`: opening
+stroke 4 ticks, opening reset **1** — the lever is usable three ticks before the
+door has finished opening. That is the first time the detector has fired on a
+real build rather than a constructed test, and it confirms Purplers' "rare, but
+some do". Closing reset on the same door is 6, so the asymmetry is real and the
+two directions genuinely need measuring separately, as §2 assumed.
+
 ## 3. Input detection beyond levers — BUILT
 
 `detectInputs()` in `src/worker/certify.worker.ts`. Candidates are levers,
@@ -185,9 +192,21 @@ doors).
 ## 4c. Still open
 
 - No cycling door in the corpus, so the tape branch of the cycle-less badge has
-  never fired. Find one.
+  never fired. Find one. **Batch v3 fired it — and it does not count.**
+  `Fastest_3x3_Hipster` read `cycleless: false, tape: {pistons: 1, fires: 47,
+  period: 7}`, but the whole reading of that door is wrong: a 3 × 3 wall door
+  came back as a 5-cell "2 × 4 Ceiling Skydoor" that never resets and ran past
+  tick 314. A tape detected while the door is thrashing is not evidence the
+  detector works. It stays untested until it fires on a door we have read
+  correctly.
 - `per_second` ("held on a loop") is derived from the reset cycle, so it
   inherits any doubt about the reset search.
+- Cost per doorway cell now has a corpus behind it and looks like a usable
+  ranking: 0.45 funnel 428, 4 × 4 sliding 643, 2 × 2 flush 663, 4 × 4 vault 695,
+  6 × 6 sliding 1,104. The 6 × 6 costs nearly three times per cell what the
+  4 × 4 does, so sliding doors do not scale linearly — which is exactly the sort
+  of claim the metric exists to support, and the sort that wants a second
+  measurement before anyone quotes it.
 - The first-movement trace would become a real critical path the moment the
   engine records update **parentage** (which update scheduled which). That is an
   engine change, not an app one.

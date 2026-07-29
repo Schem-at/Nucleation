@@ -13,11 +13,42 @@ export type TickEvents = {
 export type Material = { id: string; count: number };
 
 /** `INCONCLUSIVE` is not a failure of the door — it is a refusal by the tool.
- *  It is issued when the machine ran fine but the run cannot say WHICH door it
- *  measured: the state the file was saved in and the state the machine settles
- *  into disagree about where the doorway is. Better a loud refusal than a
- *  confident wrong number. */
+ *  Two things earn it, and both are about what the run can HONESTLY claim:
+ *
+ *  - The run cannot say WHICH door it measured: the state the file was saved in
+ *    and the state the machine settles into disagree about where the doorway is
+ *    (`aperture_conflict`).
+ *  - The run cannot say it measured the door the builder BUILT, because the
+ *    file arrived with block-entity data missing (`block_entity_audit`). The
+ *    blocks are all there, so everything reads clean, but the simulation ran
+ *    against zeroed comparators and empty containers.
+ *
+ *  Better a loud refusal than a confident wrong number. A refusal still shows
+ *  every measurement taken — it just declines to stamp them. */
 export type Verdict = "CERTIFIED" | "DID NOT RESET" | "INCONCLUSIVE";
+
+/** What the file actually carries, against what its blocks imply it should.
+ *
+ *  Produced by `TickSimulation.blockEntityAuditJson`. The engine counts only
+ *  the block entities whose ABSENCE changes the run: a comparator with no
+ *  stored `OutputSignal` reads 0, a container with no `Items` is empty and so
+ *  reads 0 through a comparator and has nothing to transfer. Signs, banners and
+ *  heads are block entities too and are deliberately NOT counted — losing them
+ *  changes nothing that ticks, and a build decorated with fifty signs must stay
+ *  certifiable. That filter is what makes `missing_total > 0` safe to treat as
+ *  disqualifying on its own. */
+export type BlockEntityAudit = {
+  /** How many block entities the file carries, of every kind. */
+  present: number;
+  /** How many state-bearing block entities its blocks imply and it lacks. */
+  missing_total: number;
+  /** The absent ones by block id, densest first. */
+  missing: { name: string; count: number }[];
+  /** Empty when nothing is missing; otherwise a sentence fit to show as-is.
+   *  The sheet writes its own copy from `missing`, but this rides along so a
+   *  record can still explain itself without the page. */
+  summary: string;
+};
 
 /** The doorway itself: cells that are solid at rest and air once open. */
 export type Aperture = {
@@ -424,6 +455,12 @@ export type Certificate = {
    *  INCONCLUSIVE and `classification` is withheld: the run knows it measured
    *  A door and cannot prove it measured THIS one. */
   aperture_conflict: ApertureConflict | null;
+  /** What the file carries versus what its blocks imply. Set whenever the file
+   *  was read as a schematic; null for structure SNBT, which is handed straight
+   *  to the simulator and never becomes a `Schematic` to audit. While
+   *  `missing_total > 0` the verdict is INCONCLUSIVE — the run measured a door,
+   *  but not necessarily the one in the file. */
+  block_entity_audit: BlockEntityAudit | null;
   /** False when the file was saved with its doorway already standing open —
    *  the first lever click then closes it, and the two strokes swap. */
   rest_is_closed: boolean;

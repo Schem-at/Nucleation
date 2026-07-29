@@ -8,7 +8,14 @@ import { ClassificationBlock } from "../components/ClassificationBlock";
 import { Heatmap } from "../components/Heatmap";
 import { MaterialsGrid, stackMath } from "../components/MaterialsGrid";
 import { MeshReplay } from "../components/MeshReplay";
-import type { Badges, Census, Engineering, ResetTime, Symmetry } from "../lib/types";
+import type {
+  Badges,
+  BlockEntityAudit,
+  Census,
+  Engineering,
+  ResetTime,
+  Symmetry,
+} from "../lib/types";
 
 /** Minecraft runs at 20 ticks a second, so ticks convert to in-game seconds.
  *  The simulation itself finishes in a fraction of that. */
@@ -20,6 +27,17 @@ const plural = (n: number, one: string, many = one + "s") =>
   `${fmt(n)} ${n === 1 ? one : many}`;
 /** Block ids read as words on the sheet; the namespace is noise here. */
 const blockWord = (id: string) => id.replace(/^minecraft:/, "").replace(/_/g, " ");
+
+/** "4 comparators and 4 furnaces" — the absent block entities named and
+ *  counted, densest first, in the order the engine reported them. Naming them
+ *  is the whole point of the audit: "9 block entities missing" tells a builder
+ *  nothing they can act on, "4 comparators" tells them exactly which part of
+ *  their door this run got wrong. */
+const missingList = (missing: BlockEntityAudit["missing"]) => {
+  const parts = missing.map((m) => plural(m.count, blockWord(m.name)));
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+};
 
 /** Redstone can move on the very tick the lever is thrown, and that reads
  *  better as a word than as a zero. */
@@ -395,6 +413,16 @@ export function CertificatePage() {
   const stacks = Math.ceil(totalBlocks / 64);
   const ap = cert.aperture;
   const conflict = cert.aperture_conflict ?? null;
+  /** Null on structure SNBT, which never becomes a Schematic, and on records
+   *  certified before the audit existed. */
+  const audit = cert.block_entity_audit ?? null;
+  const missingBE = audit && audit.missing_total > 0 ? audit : null;
+  /** Any reason the run took a reading it will not stand behind. The aperture
+   *  dispute is one. A file missing block-entity data is the other, and it
+   *  taints the same numbers just as thoroughly: they time a machine whose
+   *  comparators all read 0. Both keep every figure on the sheet — deleting a
+   *  measurement is its own kind of dishonesty — and mark it where it is read. */
+  const disputed = !!conflict || !!missingBE;
   /** What actually drives this door. Older records have no `input`, and a lever
    *  is what they all were. */
   const control = cert.input?.kind ?? "lever";
@@ -498,7 +526,7 @@ export function CertificatePage() {
                 {/* On a disputed door the hero carries no timings at all. The
                     numbers exist and are printed below, marked; up here, beside
                     the door's name, they would be read as the door's time. */}
-                {conflict ? (
+                {disputed ? (
                   <>
                     doorway cycle <b>not certified</b>
                   </>
@@ -512,12 +540,42 @@ export function CertificatePage() {
                   </>
                 )}
               </span>
-              {!conflict && settleCycle !== null && (
+              {!disputed && settleCycle !== null && (
                 <span>
                   settles after <b>{settleCycle} ticks</b>
                 </span>
               )}
             </div>
+            {/* First of the hero notes, and ahead of the aperture dispute on
+                purpose: when both fire, this one is the CAUSE. A door whose
+                comparators all read 0 is exactly the kind of door that settles
+                into a different cycle than the one it was saved in, and a
+                reader who meets "two doors, one file" first will go hunting
+                through their build for a fault that is in the export. */}
+            {missingBE && (
+              <p className="hero-note note-alarm" data-testid="blockentity-audit">
+                <span className="badge badge-alarm">incomplete file</span>{" "}
+                <b>This file is missing block-entity data.</b> Every block is present and
+                correct — which is why nothing else here complains — but{" "}
+                {missingList(missingBE.missing)} arrived with no block entity attached
+                {missingBE.present === 0
+                  ? ", and the file carries none at all"
+                  : `, out of ${plural(
+                      missingBE.present,
+                      "block entity",
+                      "block entities",
+                    )} it does carry`}
+                . That is where a comparator keeps its output signal and a container keeps
+                its contents, so this run simulated them as a comparator reading <b>0</b>{" "}
+                and a box holding nothing. A door that resets on those numbers may not
+                reset in game, and one that fails on them may run perfectly — the
+                measurement is not wrong, it is of a different machine, so no verdict is
+                stamped. Nothing here says your build is broken: several export tools drop
+                block entities on conversion and pass every block through regardless.
+                Re-export from the original save, or upload the file in the format it was
+                built in, and this run can be certified.
+              </p>
+            )}
             {conflict && (
               <p className="hero-note note-alarm" data-testid="conflict">
                 <span className="badge badge-alarm">no classification</span>{" "}
@@ -606,8 +664,26 @@ export function CertificatePage() {
 
       <div className="sheet-section">
         <p className="eyebrow">
-          {conflict ? "Measurements — of the settled cycle only" : "Measurements"}
+          {conflict
+            ? "Measurements — of the settled cycle only"
+            : missingBE
+              ? "Measurements — of an incomplete file"
+              : "Measurements"}
         </p>
+        {!conflict && missingBE && (
+          /* Same reasoning as the conflict caveat below, different cause: the
+             numbers are real, and they are of the wrong machine. Said again
+             here because the tiles are what gets screenshotted, and a figure
+             lifted off this sheet travels without the hero note. */
+          <p className="tiles-refusal" data-testid="measurements-caveat">
+            <b>Not certified, and the file is why.</b> Every figure below is a true
+            measurement of what this file contains — but the file is missing{" "}
+            {missingList(missingBE.missing)} worth of block-entity data, so the run timed a
+            door whose comparators read 0 and whose containers are empty. Quote none of
+            these as this build's numbers until the file is re-exported with its block
+            entities intact.
+          </p>
+        )}
         {conflict && (
           /* The tiles are the most liftable numbers on the page. On a disputed
              door every one of them times a cycle the run cannot attribute to
@@ -628,14 +704,14 @@ export function CertificatePage() {
             value={cert.open_ticks ?? "—"}
             unit={cert.open_ticks !== null ? " ticks" : undefined}
             sub={strokeSub(cert.open_ticks, cert.open_settle_ticks, cert.open_latency)}
-            disputed={!!conflict}
+            disputed={disputed}
           />
           <StatTile
             label="Closes in"
             value={cert.close_ticks ?? "—"}
             unit={cert.close_ticks !== null ? " ticks" : undefined}
             sub={strokeSub(cert.close_ticks, cert.close_settle_ticks, cert.close_latency)}
-            disputed={!!conflict}
+            disputed={disputed}
           />
           <StatTile
             label="Settles at"
@@ -648,21 +724,21 @@ export function CertificatePage() {
                     cert.close_settle_ticks ?? "—"
                   } closing · when the last block stops`
             }
-            disputed={!!conflict}
+            disputed={disputed}
           />
           <StatTile
             label="Reset after opening"
             value={ro?.ticks ?? "—"}
             unit={ro?.ticks != null ? " ticks" : undefined}
             sub={resetSub(ro, "open")}
-            disputed={!!conflict}
+            disputed={disputed}
           />
           <StatTile
             label="Reset after closing"
             value={rc?.ticks ?? "—"}
             unit={rc?.ticks != null ? " ticks" : undefined}
             sub={resetSub(rc, "close")}
-            disputed={!!conflict}
+            disputed={disputed}
           />
           <StatTile
             label="Cycle rate"
@@ -675,14 +751,14 @@ export function CertificatePage() {
                   ? `doorway cycle of ${cycleTicks} ticks — reset not measured`
                   : `from settle: ${settleCycle ?? "—"} ticks`
             }
-            disputed={!!conflict}
+            disputed={disputed}
           />
           <StatTile
             label="Stroke mass"
             value={cert.moved_cells}
             unit=" cells"
             sub={`travel per stroke · ${movingBlocks} columns active`}
-            disputed={!!conflict}
+            disputed={disputed}
           />
           <StatTile
             label="Aperture cost"
@@ -692,7 +768,7 @@ export function CertificatePage() {
                 ? `${ap.cells}-cell doorway in a ${cert.volume}-cell build`
                 : "no doorway measured"
             }
-            disputed={!!conflict}
+            disputed={disputed}
           />
         </div>
       </div>
