@@ -1,0 +1,466 @@
+Note: src/TraceCapture.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+[23:59:13] [main/INFO]: Loaded 1585 recipes
+[23:59:13] [main/INFO]: Loaded 1688 advancements
+[23:59:13] [main/INFO]: Selecting global world spawn...
+[23:59:13] [main/INFO]: Loading 0 persistent chunks...
+[23:59:13] [main/INFO]: Time elapsed: 201 ms
+[23:59:13] [main/INFO]: Started game test server
+  origin: BlockPos{x=0, y=100, z=0}
+[23:59:13] [main/INFO]: 2 tests are now running at position -5962564, -59, 5303251!
+[23:59:13] [main/INFO]: Running test environment 'nucleation:default' batch 0 (1 tests)...
+[23:59:13] [main/INFO]: [  ]
+  warmup ticks until entity-ticking: 22 (6/6 chunks ready)
+  spawn: id=1 minecraft:minecart at (2.7, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.209999990463257..3.1900000095367433, 1.0..1.699999988079071, 1.0099999904632568..1.9900000095367432] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=2 minecraft:minecart at (2.75, 1.0, 3.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.259999990463257..3.240000009536743, 1.0..1.699999988079071, 3.009999990463257..3.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=3 minecraft:minecart at (2.8, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.3099999904632567..3.290000009536743, 1.0..1.699999988079071, 5.009999990463257..5.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=4 minecraft:minecart at (2.85, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.359999990463257..3.3400000095367433, 1.0..1.699999988079071, 7.009999990463257..7.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=5 minecraft:minecart at (2.9, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.4099999904632567..3.390000009536743, 1.0..1.699999988079071, 9.009999990463257..9.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=6 minecraft:minecart at (2.95, 1.0, 11.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.459999990463257..3.4400000095367433, 1.0..1.699999988079071, 11.009999990463257..11.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=7 minecraft:minecart at (3.0, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.509999990463257..3.490000009536743, 1.0..1.699999988079071, 13.009999990463257..13.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=8 minecraft:minecart at (3.05, 1.0, 15.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.5599999904632567..3.540000009536743, 1.0..1.699999988079071, 15.009999990463257..15.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=9 minecraft:minecart at (3.1, 1.0, 17.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.609999990463257..3.5900000095367433, 1.0..1.699999988079071, 17.009999990463257..17.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=10 minecraft:minecart at (3.2, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.709999990463257..3.6900000095367433, 1.0..1.699999988079071, 19.009999990463257..19.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=11 minecraft:minecart at (3.25, 1.0, 21.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.759999990463257..3.740000009536743, 1.0..1.699999988079071, 21.009999990463257..21.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=12 minecraft:minecart at (3.3, 1.0, 23.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.8099999904632567..3.790000009536743, 1.0..1.699999988079071, 23.009999990463257..23.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  block-ticking chunks: 6/6
+  pending block ticks: 0
+  runs normally: true
+  entity-ticking chunks: 6/6
+  entities loaded: 12
+    12 x minecraft:minecart
+  entities with non-finite velocity (nan carts): 0
+  at t6: 1,1,1 -> air
+  at t6: 1,1,3 -> air
+  at t6: 1,1,5 -> air
+  at t6: 1,1,7 -> air
+  at t6: 1,1,9 -> air
+  at t6: 1,1,11 -> air
+  at t6: 1,1,13 -> air
+  at t6: 1,1,15 -> air
+  at t6: 1,1,17 -> air
+  at t6: 1,1,19 -> air
+  at t6: 1,1,21 -> air
+  at t6: 1,1,23 -> air
+  initial [0,0,0] minecraft:stone
+  initial [1,0,0] minecraft:stone
+  initial [2,0,0] minecraft:stone
+  initial [3,0,0] minecraft:stone
+  initial [4,0,0] minecraft:stone
+  initial [5,0,0] minecraft:stone
+  initial [6,0,0] minecraft:stone
+  initial [7,0,0] minecraft:stone
+  initial [0,0,1] minecraft:stone
+  initial [1,0,1] minecraft:stone
+  initial [2,0,1] minecraft:stone
+  initial [3,0,1] minecraft:stone
+  initial [4,0,1] minecraft:stone
+  initial [5,0,1] minecraft:stone
+  initial [6,0,1] minecraft:stone
+  initial [7,0,1] minecraft:stone
+  initial [1,1,1] minecraft:redstone_block
+  initial [2,1,1] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,1,1] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [0,0,2] minecraft:stone
+  initial [1,0,2] minecraft:stone
+  initial [2,0,2] minecraft:stone
+  initial [3,0,2] minecraft:stone
+  initial [4,0,2] minecraft:stone
+  initial [5,0,2] minecraft:stone
+  initial [6,0,2] minecraft:stone
+  initial [7,0,2] minecraft:stone
+  initial [0,0,3] minecraft:stone
+  initial [1,0,3] minecraft:stone
+  initial [2,0,3] minecraft:stone
+  initial [3,0,3] minecraft:stone
+  initial [4,0,3] minecraft:stone
+  initial [5,0,3] minecraft:stone
+  initial [6,0,3] minecraft:stone
+  initial [7,0,3] minecraft:stone
+  initial [1,1,3] minecraft:redstone_block
+  initial [2,1,3] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,1,3] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [0,0,4] minecraft:stone
+  initial [1,0,4] minecraft:stone
+  initial [2,0,4] minecraft:stone
+  initial [3,0,4] minecraft:stone
+  initial [4,0,4] minecraft:stone
+  initial [5,0,4] minecraft:stone
+  initial [6,0,4] minecraft:stone
+  initial [7,0,4] minecraft:stone
+  initial [0,0,5] minecraft:stone
+  initial [1,0,5] minecraft:stone
+  initial [2,0,5] minecraft:stone
+  initial [3,0,5] minecraft:stone
+  initial [4,0,5] minecraft:stone
+  initial [5,0,5] minecraft:stone
+  initial [6,0,5] minecraft:stone
+  initial [7,0,5] minecraft:stone
+  initial [1,1,5] minecraft:redstone_block
+  initial [2,1,5] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,1,5] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [0,0,6] minecraft:stone
+  initial [1,0,6] minecraft:stone
+  initial [2,0,6] minecraft:stone
+  initial [3,0,6] minecraft:stone
+  initial [4,0,6] minecraft:stone
+  initial [5,0,6] minecraft:stone
+  initial [6,0,6] minecraft:stone
+  initial [7,0,6] minecraft:stone
+  initial [0,0,7] minecraft:stone
+  initial [1,0,7] minecraft:stone
+  initial [2,0,7] minecraft:stone
+  initial [3,0,7] minecraft:stone
+  initial [4,0,7] minecraft:stone
+  initial [5,0,7] minecraft:stone
+  initial [6,0,7] minecraft:stone
+  initial [7,0,7] minecraft:stone
+  initial [1,1,7] minecraft:redstone_block
+  initial [2,1,7] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,1,7] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [0,0,8] minecraft:stone
+  initial [1,0,8] minecraft:stone
+  initial [2,0,8] minecraft:stone
+  initial [3,0,8] minecraft:stone
+  initial [4,0,8] minecraft:stone
+  initial [5,0,8] minecraft:stone
+  initial [6,0,8] minecraft:stone
+  initial [7,0,8] minecraft:stone
+  initial [0,0,9] minecraft:stone
+  initial [1,0,9] minecraft:stone
+  initial [2,0,9] minecraft:stone
+  initial [3,0,9] minecraft:stone
+  initial [4,0,9] minecraft:stone
+  initial [5,0,9] minecraft:stone
+  initial [6,0,9] minecraft:stone
+  initial [7,0,9] minecraft:stone
+  initial [1,1,9] minecraft:redstone_block
+  initial [2,1,9] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,1,9] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [0,0,10] minecraft:stone
+  initial [1,0,10] minecraft:stone
+  initial [2,0,10] minecraft:stone
+  initial [3,0,10] minecraft:stone
+  initial [4,0,10] minecraft:stone
+  initial [5,0,10] minecraft:stone
+  initial [6,0,10] minecraft:stone
+  initial [7,0,10] minecraft:stone
+  initial [0,0,11] minecraft:stone
+  initial [1,0,11] minecraft:stone
+  initial [2,0,11] minecraft:stone
+  initial [3,0,11] minecraft:stone
+  initial [4,0,11] minecraft:stone
+  initial [5,0,11] minecraft:stone
+  initial [6,0,11] minecraft:stone
+  initial [7,0,11] minecraft:stone
+  initial [1,1,11] minecraft:redstone_block
+  initial [2,1,11] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,1,11] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [0,0,12] minecraft:stone
+  initial [1,0,12] minecraft:stone
+  initial [2,0,12] minecraft:stone
+  initial [3,0,12] minecraft:stone
+  initial [4,0,12] minecraft:stone
+  initial [5,0,12] minecraft:stone
+  initial [6,0,12] minecraft:stone
+  initial [7,0,12] minecraft:stone
+  initial [0,0,13] minecraft:stone
+  initial [1,0,13] minecraft:stone
+  initial [2,0,13] minecraft:stone
+  initial [3,0,13] minecraft:stone
+  initial [4,0,13] minecraft:stone
+  initial [5,0,13] minecraft:stone
+  initial [6,0,13] minecraft:stone
+  initial [7,0,13] minecraft:stone
+  initial [1,1,13] minecraft:redstone_block
+  initial [2,1,13] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,1,13] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [0,0,14] minecraft:stone
+  initial [1,0,14] minecraft:stone
+  initial [2,0,14] minecraft:stone
+  initial [3,0,14] minecraft:stone
+  initial [4,0,14] minecraft:stone
+  initial [5,0,14] minecraft:stone
+  initial [6,0,14] minecraft:stone
+  initial [7,0,14] minecraft:stone
+  initial [0,0,15] minecraft:stone
+  initial [1,0,15] minecraft:stone
+  initial [2,0,15] minecraft:stone
+  initial [3,0,15] minecraft:stone
+  initial [4,0,15] minecraft:stone
+  initial [5,0,15] minecraft:stone
+  initial [6,0,15] minecraft:stone
+  initial [7,0,15] minecraft:stone
+  initial [1,1,15] minecraft:redstone_block
+  initial [2,1,15] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,1,15] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [0,0,16] minecraft:stone
+  initial [1,0,16] minecraft:stone
+  initial [2,0,16] minecraft:stone
+  initial [3,0,16] minecraft:stone
+  initial [4,0,16] minecraft:stone
+  initial [5,0,16] minecraft:stone
+  initial [6,0,16] minecraft:stone
+  initial [7,0,16] minecraft:stone
+  initial [0,0,17] minecraft:stone
+  initial [1,0,17] minecraft:stone
+  initial [2,0,17] minecraft:stone
+  initial [3,0,17] minecraft:stone
+  initial [4,0,17] minecraft:stone
+  initial [5,0,17] minecraft:stone
+  initial [6,0,17] minecraft:stone
+  initial [7,0,17] minecraft:stone
+  initial [1,1,17] minecraft:redstone_block
+  initial [2,1,17] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,1,17] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [0,0,18] minecraft:stone
+  initial [1,0,18] minecraft:stone
+  initial [2,0,18] minecraft:stone
+  initial [3,0,18] minecraft:stone
+  initial [4,0,18] minecraft:stone
+  initial [5,0,18] minecraft:stone
+  initial [6,0,18] minecraft:stone
+  initial [7,0,18] minecraft:stone
+  initial [0,0,19] minecraft:stone
+  initial [1,0,19] minecraft:stone
+  initial [2,0,19] minecraft:stone
+  initial [3,0,19] minecraft:stone
+  initial [4,0,19] minecraft:stone
+  initial [5,0,19] minecraft:stone
+  initial [6,0,19] minecraft:stone
+  initial [7,0,19] minecraft:stone
+  initial [1,1,19] minecraft:redstone_block
+  initial [2,1,19] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,1,19] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [0,0,20] minecraft:stone
+  initial [1,0,20] minecraft:stone
+  initial [2,0,20] minecraft:stone
+  initial [3,0,20] minecraft:stone
+  initial [4,0,20] minecraft:stone
+  initial [5,0,20] minecraft:stone
+  initial [6,0,20] minecraft:stone
+  initial [7,0,20] minecraft:stone
+  initial [0,0,21] minecraft:stone
+  initial [1,0,21] minecraft:stone
+  initial [2,0,21] minecraft:stone
+  initial [3,0,21] minecraft:stone
+  initial [4,0,21] minecraft:stone
+  initial [5,0,21] minecraft:stone
+  initial [6,0,21] minecraft:stone
+  initial [7,0,21] minecraft:stone
+  initial [1,1,21] minecraft:redstone_block
+  initial [2,1,21] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,1,21] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [0,0,22] minecraft:stone
+  initial [1,0,22] minecraft:stone
+  initial [2,0,22] minecraft:stone
+  initial [3,0,22] minecraft:stone
+  initial [4,0,22] minecraft:stone
+  initial [5,0,22] minecraft:stone
+  initial [6,0,22] minecraft:stone
+  initial [7,0,22] minecraft:stone
+  initial [0,0,23] minecraft:stone
+  initial [1,0,23] minecraft:stone
+  initial [2,0,23] minecraft:stone
+  initial [3,0,23] minecraft:stone
+  initial [4,0,23] minecraft:stone
+  initial [5,0,23] minecraft:stone
+  initial [6,0,23] minecraft:stone
+  initial [7,0,23] minecraft:stone
+  initial [1,1,23] minecraft:redstone_block
+  initial [2,1,23] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,1,23] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [0,0,24] minecraft:stone
+  initial [1,0,24] minecraft:stone
+  initial [2,0,24] minecraft:stone
+  initial [3,0,24] minecraft:stone
+  initial [4,0,24] minecraft:stone
+  initial [5,0,24] minecraft:stone
+  initial [6,0,24] minecraft:stone
+  initial [7,0,24] minecraft:stone
+ENT t-1 entities=12 non-finite=0
+  E t-1 id=1 minecraft:minecart pos=(2.7, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=2 minecraft:minecart pos=(2.75, 1.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=3 minecraft:minecart pos=(2.8, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=4 minecraft:minecart pos=(2.85, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=5 minecraft:minecart pos=(2.9, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=6 minecraft:minecart pos=(2.95, 1.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=7 minecraft:minecart pos=(3.0, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=8 minecraft:minecart pos=(3.05, 1.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=9 minecraft:minecart pos=(3.1, 1.0, 17.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=10 minecraft:minecart pos=(3.2, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=11 minecraft:minecart pos=(3.25, 1.0, 21.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=12 minecraft:minecart pos=(3.3, 1.0, 23.5) vel=(0.0, 0.0, 0.0)
+  notify hook: installed (maxChained=1000000)
+    t0 gameTime=23 pending=0
+ENT t0 entities=12 non-finite=0
+  E t0 id=1 minecraft:minecart pos=(2.7, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=2 minecraft:minecart pos=(2.75, 1.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=3 minecraft:minecart pos=(2.8, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=4 minecraft:minecart pos=(2.85, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=5 minecraft:minecart pos=(2.9, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=6 minecraft:minecart pos=(2.95, 1.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=7 minecraft:minecart pos=(3.0, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=8 minecraft:minecart pos=(3.05, 1.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=9 minecraft:minecart pos=(3.1, 1.0, 17.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=10 minecraft:minecart pos=(3.2, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=11 minecraft:minecart pos=(3.25, 1.0, 21.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=12 minecraft:minecart pos=(3.3, 1.0, 23.5) vel=(0.0, 0.0, 0.0)
+    t1 gameTime=24 pending=0
+ENT t1 entities=12 non-finite=0
+  E t1 id=1 minecraft:minecart pos=(2.7, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=2 minecraft:minecart pos=(2.75, 1.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=3 minecraft:minecart pos=(2.8, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=4 minecraft:minecart pos=(2.85, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=5 minecraft:minecart pos=(2.9, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=6 minecraft:minecart pos=(2.95, 1.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=7 minecraft:minecart pos=(3.0, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=8 minecraft:minecart pos=(3.05, 1.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=9 minecraft:minecart pos=(3.1, 1.0, 17.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=10 minecraft:minecart pos=(3.2, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=11 minecraft:minecart pos=(3.25, 1.0, 21.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=12 minecraft:minecart pos=(3.3, 1.0, 23.5) vel=(0.0, 0.0, 0.0)
+    t2 gameTime=25 pending=0
+ENT t2 entities=12 non-finite=0
+  E t2 id=1 minecraft:minecart pos=(2.7, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=2 minecraft:minecart pos=(2.75, 1.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=3 minecraft:minecart pos=(2.8, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=4 minecraft:minecart pos=(2.85, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=5 minecraft:minecart pos=(2.9, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=6 minecraft:minecart pos=(2.95, 1.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=7 minecraft:minecart pos=(3.0, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=8 minecraft:minecart pos=(3.05, 1.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=9 minecraft:minecart pos=(3.1, 1.0, 17.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=10 minecraft:minecart pos=(3.2, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=11 minecraft:minecart pos=(3.25, 1.0, 21.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=12 minecraft:minecart pos=(3.3, 1.0, 23.5) vel=(0.0, 0.0, 0.0)
+ENT t3 entities=12 non-finite=0
+  E t3 id=1 minecraft:minecart pos=(2.7, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=2 minecraft:minecart pos=(2.75, 1.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=3 minecraft:minecart pos=(2.8, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=4 minecraft:minecart pos=(2.85, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=5 minecraft:minecart pos=(2.9, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=6 minecraft:minecart pos=(2.95, 1.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=7 minecraft:minecart pos=(3.0, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=8 minecraft:minecart pos=(3.05, 1.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=9 minecraft:minecart pos=(3.1, 1.0, 17.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=10 minecraft:minecart pos=(3.2, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=11 minecraft:minecart pos=(3.25, 1.0, 21.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=12 minecraft:minecart pos=(3.3, 1.0, 23.5) vel=(0.0, 0.0, 0.0)
+ENT t4 entities=12 non-finite=0
+  E t4 id=1 minecraft:minecart pos=(2.7, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=2 minecraft:minecart pos=(2.75, 1.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=3 minecraft:minecart pos=(2.8, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=4 minecraft:minecart pos=(2.85, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=5 minecraft:minecart pos=(2.9, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=6 minecraft:minecart pos=(2.95, 1.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=7 minecraft:minecart pos=(3.0, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=8 minecraft:minecart pos=(3.05, 1.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=9 minecraft:minecart pos=(3.1, 1.0, 17.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=10 minecraft:minecart pos=(3.2, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=11 minecraft:minecart pos=(3.25, 1.0, 21.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=12 minecraft:minecart pos=(3.3, 1.0, 23.5) vel=(0.0, 0.0, 0.0)
+ENT t5 entities=12 non-finite=0
+  E t5 id=1 minecraft:minecart pos=(2.7, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=2 minecraft:minecart pos=(2.75, 1.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=3 minecraft:minecart pos=(2.8, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=4 minecraft:minecart pos=(2.85, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=5 minecraft:minecart pos=(2.9, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=6 minecraft:minecart pos=(2.95, 1.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=7 minecraft:minecart pos=(3.0, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=8 minecraft:minecart pos=(3.05, 1.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=9 minecraft:minecart pos=(3.1, 1.0, 17.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=10 minecraft:minecart pos=(3.2, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=11 minecraft:minecart pos=(3.25, 1.0, 21.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=12 minecraft:minecart pos=(3.3, 1.0, 23.5) vel=(0.0, 0.0, 0.0)
+ENT t6 entities=12 non-finite=0
+  E t6 id=1 minecraft:minecart pos=(2.1900000000000004, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=2 minecraft:minecart pos=(3.250000009536743, 1.0, 3.5) vel=(-0.0, 0.0, 0.0)
+  E t6 id=3 minecraft:minecart pos=(3.250000009536743, 1.0, 5.5) vel=(-0.0, 0.0, 0.0)
+  E t6 id=4 minecraft:minecart pos=(3.250000009536743, 1.0, 7.5) vel=(-0.0, 0.0, 0.0)
+  E t6 id=5 minecraft:minecart pos=(3.250000009536743, 1.0, 9.5) vel=(-0.0, 0.0, 0.0)
+  E t6 id=6 minecraft:minecart pos=(3.250000009536743, 1.0, 11.5) vel=(-0.0, 0.0, 0.0)
+  E t6 id=7 minecraft:minecart pos=(3.500000009536743, 1.0, 13.5) vel=(-0.0, 0.0, 0.0)
+  E t6 id=8 minecraft:minecart pos=(3.500000009536743, 1.0, 15.5) vel=(-0.0, 0.0, 0.0)
+  E t6 id=9 minecraft:minecart pos=(3.500000009536743, 1.0, 17.5) vel=(-0.0, 0.0, 0.0)
+  E t6 id=10 minecraft:minecart pos=(3.500000009536743, 1.0, 19.5) vel=(-0.0, 0.0, 0.0)
+  E t6 id=11 minecraft:minecart pos=(3.510000009536743, 1.0, 21.5) vel=(-0.0, 0.0, 0.0)
+  E t6 id=12 minecraft:minecart pos=(3.510000009536743, 1.0, 23.5) vel=(-0.0, 0.0, 0.0)
+ENT t7 entities=12 non-finite=0
+  E t7 id=1 minecraft:minecart pos=(1.6800000000000004, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=2 minecraft:minecart pos=(3.510000009536743, 1.0, 3.5) vel=(-0.0, 0.0, 0.0)
+  E t7 id=3 minecraft:minecart pos=(3.510000009536743, 1.0, 5.5) vel=(-0.0, 0.0, 0.0)
+  E t7 id=4 minecraft:minecart pos=(3.510000009536743, 1.0, 7.5) vel=(-0.0, 0.0, 0.0)
+  E t7 id=5 minecraft:minecart pos=(3.510000009536743, 1.0, 9.5) vel=(-0.0, 0.0, 0.0)
+  E t7 id=6 minecraft:minecart pos=(3.510000009536743, 1.0, 11.5) vel=(-0.0, 0.0, 0.0)
+  E t7 id=7 minecraft:minecart pos=(3.510000009536743, 1.0, 13.5) vel=(-0.0, 0.0, 0.0)
+  E t7 id=8 minecraft:minecart pos=(3.510000009536743, 1.0, 15.5) vel=(-0.0, 0.0, 0.0)
+  E t7 id=9 minecraft:minecart pos=(3.510000009536743, 1.0, 17.5) vel=(-0.0, 0.0, 0.0)
+  E t7 id=10 minecraft:minecart pos=(3.510000009536743, 1.0, 19.5) vel=(-0.0, 0.0, 0.0)
+  E t7 id=11 minecraft:minecart pos=(3.510000009536743, 1.0, 21.5) vel=(-0.0, 0.0, 0.0)
+  E t7 id=12 minecraft:minecart pos=(3.510000009536743, 1.0, 23.5) vel=(-0.0, 0.0, 0.0)
+ENT t8 entities=12 non-finite=0
+  E t8 id=1 minecraft:minecart pos=(1.6800000000000004, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=2 minecraft:minecart pos=(3.510000009536743, 1.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=3 minecraft:minecart pos=(3.510000009536743, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=4 minecraft:minecart pos=(3.510000009536743, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=5 minecraft:minecart pos=(3.510000009536743, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=6 minecraft:minecart pos=(3.510000009536743, 1.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=7 minecraft:minecart pos=(3.510000009536743, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=8 minecraft:minecart pos=(3.510000009536743, 1.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=9 minecraft:minecart pos=(3.510000009536743, 1.0, 17.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=10 minecraft:minecart pos=(3.510000009536743, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=11 minecraft:minecart pos=(3.510000009536743, 1.0, 21.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=12 minecraft:minecart pos=(3.510000009536743, 1.0, 23.5) vel=(0.0, 0.0, 0.0)
+ENT t9 entities=12 non-finite=0
+  E t9 id=1 minecraft:minecart pos=(1.6800000000000004, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=2 minecraft:minecart pos=(3.510000009536743, 1.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=3 minecraft:minecart pos=(3.510000009536743, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=4 minecraft:minecart pos=(3.510000009536743, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=5 minecraft:minecart pos=(3.510000009536743, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=6 minecraft:minecart pos=(3.510000009536743, 1.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=7 minecraft:minecart pos=(3.510000009536743, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=8 minecraft:minecart pos=(3.510000009536743, 1.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=9 minecraft:minecart pos=(3.510000009536743, 1.0, 17.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=10 minecraft:minecart pos=(3.510000009536743, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=11 minecraft:minecart pos=(3.510000009536743, 1.0, 21.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=12 minecraft:minecart pos=(3.510000009536743, 1.0, 23.5) vel=(0.0, 0.0, 0.0)
+ENT t10 entities=12 non-finite=0
+  E t10 id=1 minecraft:minecart pos=(1.6800000000000004, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=2 minecraft:minecart pos=(3.510000009536743, 1.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=3 minecraft:minecart pos=(3.510000009536743, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=4 minecraft:minecart pos=(3.510000009536743, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=5 minecraft:minecart pos=(3.510000009536743, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=6 minecraft:minecart pos=(3.510000009536743, 1.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=7 minecraft:minecart pos=(3.510000009536743, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=8 minecraft:minecart pos=(3.510000009536743, 1.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=9 minecraft:minecart pos=(3.510000009536743, 1.0, 17.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=10 minecraft:minecart pos=(3.510000009536743, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=11 minecraft:minecart pos=(3.510000009536743, 1.0, 21.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=12 minecraft:minecart pos=(3.510000009536743, 1.0, 23.5) vel=(0.0, 0.0, 0.0)
+ENT t11 entities=12 non-finite=0
+  E t11 id=1 minecraft:minecart pos=(1.6800000000000004, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=2 minecraft:minecart pos=(3.510000009536743, 1.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=3 minecraft:minecart pos=(3.510000009536743, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=4 minecraft:minecart pos=(3.510000009536743, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=5 minecraft:minecart pos=(3.510000009536743, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=6 minecraft:minecart pos=(3.510000009536743, 1.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=7 minecraft:minecart pos=(3.510000009536743, 1.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=8 minecraft:minecart pos=(3.510000009536743, 1.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=9 minecraft:minecart pos=(3.510000009536743, 1.0, 17.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=10 minecraft:minecart pos=(3.510000009536743, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=11 minecraft:minecart pos=(3.510000009536743, 1.0, 21.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=12 minecraft:minecart pos=(3.510000009536743, 1.0, 23.5) vel=(0.0, 0.0, 0.0)
+captured 2 tick(s) with changes -> work-piston/sq_cart.json

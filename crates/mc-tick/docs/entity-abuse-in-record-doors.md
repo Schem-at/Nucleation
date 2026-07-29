@@ -172,21 +172,65 @@ refuted it** — the builders' account was wrong, and this page was wrong with i
         direction, at most `PISTON_STEP + PISTON_OVERSHOOT` per step. Fitted
         bit-exactly to fifteen lanes across four captures, sticky and
         non-sticky, at two heights, both sides of the block.
-      - **Measured but NOT determined:** an entity standing in the piston's
-        *own* square as the head retracts into it — which is what the record
-        door does, its pistons facing down. `piston_pull_inside` captures it
-        vertically and the law is exact within that capture (8 of 8): first step
-        pushes the entity out of the middle half of the piston's square to
-        `3.24`/`3.76`, second step out of the whole square to `2.98`/`4.01`,
-        nearer side each time. **It is not implemented, because
-        `piston_pull_law`'s first lane is the same situation on the x axis and
-        vanilla does not move that entity at all**, where this rule demands
-        `0.41625`. No single law gives both answers, so the engine reports the
-        case instead of guessing: `Simulation::piston_retract_contacts` still
-        names them (**6** on the 3x3 door, down from 7), and a build that
-        depends on the unmodelled path cannot look like one that does not. The
-        experiment that would settle it is the horizontal rig with the entity
-        floating clear of the floor, to tell the axis apart from the support.
+      - **An entity in the piston's own square is ejected by the arm.** This is
+        what the record door's downward-facing pistons do, and it was the last
+        of the three left open, because `piston_pull_inside` moved a vertical
+        entity where `piston_pull_law` lane 1 left a horizontal one alone.
+        **Neither the axis nor the floor was the difference, and both captures
+        were right.** Lane 1's fireball sits at y = 1.0, so its box tops out at
+        1.3125 — *below the piston's arm*, which starts at 1.375. Lift the same
+        fireball by 0.34375, change nothing else, and vanilla throws it
+        `0.41625`, which is exactly what the vertical law demanded.
+        `piston_pull_float` is that capture: lane 1 unchanged and still
+        motionless, lane 2 the same fireball lifted and moving, and a minecart,
+        a furnace cart and a **NaN furnace cart** all moving from the floor
+        because at 0.7 tall they reach the arm without being lifted.
+        `crate::piston::inside_eject_displacement` is the law:
+        - the gate across the piston is the **arm's own 4/16 column**, strictly
+          — `piston_square_yband` walks a box across both edges in thousandths
+          and the answer flips exactly at 6/16 and 10/16, twelve lanes;
+        - along the piston, the entity is driven to the outermost of three
+          lines it can reach in one `PISTON_MAX_STEP`: trailing face `1.01` of
+          the way through the square, or `0.76`, or leading face back to `0.24`;
+          failing all three it retreats a whole step. The second step's lines
+          are `1.02` — the same `blockMin + 0.02` the head-only law lands on —
+          and `-0.01`;
+        - the hand-over is at *exactly* `0.51`: `piston_square_threshold` shows
+          a target costing 0.51 taken and one costing 0.5101 refused, at both
+          of them.
+        Fitted bit-exactly to fifty-five lanes across `piston_pull_inside`,
+        `piston_pull_float`, `piston_pull_xsweep`, `piston_square_cart` and
+        `piston_square_threshold`, on both axes and both sides of the block,
+        for a small fireball, a dragon fireball, a minecart, a furnace cart and
+        a NaN furnace cart. **One lane in fifty-five disagrees**, `x = 2.65635`
+        in the threshold rig, where vanilla moves `0.51` and the law says
+        `0.5099`; every neighbour on both sides agrees, so it is a seam 1e-4 of
+        a block wide, and it is asserted as a disagreement rather than hidden.
+        Nothing produces `PistonPush::Unmodelled` any more, so
+        `Simulation::piston_retract_contacts` is empty by construction. On the
+        3x3 door it reads **0** — but it read 0 before this change too, in every
+        run reachable from `examples/door55_sim`: under `InWorld` the door does
+        not retract a piston at all, and under `Quiet` the contacts had already
+        been consumed. What the new law does change on that door is that a
+        **third** furnace cart moves — id 20, sitting in a
+        `sticky_piston[extended=false,facing=down]` square, which is precisely
+        this geometry. The "six remaining contacts" this section used to quote
+        are not reproducible from the example as it stands, and that is itself
+        unverified.
+      - **The rig was lying, and it was not the game's fault.**
+        `piston_pull_law` is not uniform: lanes z = 15, 17, 19 and 21 carry a
+        stone block at `(4,1,z)` for the sticky head to **pull** and the other
+        eight have nothing. The pulled block's sweep lands on top of everything
+        else, so the identical fireball finishes at 3.02 in a pull-free lane and
+        3.00 in a pulling one — which read as run-to-run non-determinism for an
+        hour. `piston_pull_uniform` is the proof (twelve lanes, one start
+        position, the answer changes at exactly z = 15), and
+        `piston_pull_square` is the same rig rebuilt with twelve pull-free
+        lanes. Every constant above comes from `piston_pull_square`.
+        **A retraction that both pulls a block and closes over an entity in its
+        own square is still not modelled as a combination**: the engine applies
+        the two laws independently and vanilla does not, by 0.02 in the lanes
+        measured.
 - [x] Per-entity hitbox dimensions. Read out of the game's own registry and
       cross-checked against plate-edge probes: minecart and every container
       variant 0.98 x 0.7, dragon fireball 1.0 x 1.0, small fireball 0.3125,

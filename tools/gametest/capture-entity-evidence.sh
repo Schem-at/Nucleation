@@ -610,4 +610,151 @@ tools/gametest/capture.sh --structure nucleation:cart_body4 --max-ticks 40 --ent
   --spawn 'minecraft:furnace_minecart@2.5,3.0,16.5:0,0,0' \
   --out work/cart_body4.json | tee "$CAP/cart_body4.entities.log"
 
+# Every lane of every rig below cuts its own power at t6.
+LANES_AIR="--at 6:1,1,1:air --at 6:1,1,3:air --at 6:1,1,5:air --at 6:1,1,7:air
+  --at 6:1,1,9:air --at 6:1,1,11:air --at 6:1,1,13:air --at 6:1,1,15:air
+  --at 6:1,1,17:air --at 6:1,1,19:air --at 6:1,1,21:air --at 6:1,1,23:air"
+
+# ---------------------------------------------------------------------------
+# The third geometry, settled: an entity inside the piston's OWN square.
+#
+# Section 9 said the vertical rig and `piston_pull_law` lane 1 could not both be
+# right. They can. **Neither the axis nor the floor was the variable.**
+#
+# piston_pull_float is `piston_pull_law` again with the entities LIFTED. Lane 1
+# is the contradicting lane exactly as it was, on the floor at y=1.0, and it
+# still does not move. Lane 2 is the same fireball raised by 0.34375 and nothing
+# else, and vanilla throws it 0.41625 — the number the vertical law demanded all
+# along. Lanes 9-11 are a minecart, a furnace cart and a NaN furnace cart, which
+# reach the same band from the floor because they are 0.7 tall; all three move.
+#
+# What lane 1 was measuring is the piston ARM: a 4/16 column through the middle
+# of the block, which a box must overlap in BOTH cross-axes to be touched. The
+# floor fireball tops out at 1.3125 and the arm starts at 1.375.
+tools/gametest/capture.sh --structure nucleation:piston_pull_law --max-ticks 16 --entity-log \
+  --spawn 'minecraft:small_fireball@2.5,1.0,1.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.5,1.34375,3.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.64375,1.34375,5.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.94375,1.34375,7.5:0,0,0' \
+  --spawn 'minecraft:dragon_fireball@2.9,1.0,9.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.24375,1.34375,11.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.5,1.34375,13.7:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.5,1.7,15.5:0,0,0' \
+  --spawn 'minecraft:minecart@2.5,1.0,17.5:0,0,0' \
+  --spawn 'minecraft:furnace_minecart@2.5,1.0,19.5:0,0,0' \
+  --spawn 'minecraft:furnace_minecart@2.5,1.0,21.5:0,0,NaN' \
+  --spawn 'minecraft:small_fireball@2.5,1.34375,23.5:0,0,0' \
+  $LANES_AIR --out work/piston_pull_float.json \
+  | tee "$CAP/piston_pull_float.entities.log"
+
+# `piston_pull_law` IS NOT A UNIFORM RIG, and reading it as one costs a day.
+# Lanes z = 15, 17, 19 and 21 carry a stone block at (4,1,z) for the sticky head
+# to PULL; the other eight have nothing. The pulled block's sweep lands on top
+# of everything else, so the identical fireball finishes at 3.02 in a pull-free
+# lane and at 3.00 in a pulling one, and two captures of "the same" lane read as
+# non-determinism. `piston_pull_uniform` is the proof: twelve lanes, one x, and
+# the answer changes at exactly z = 15.
+tools/gametest/capture.sh --structure nucleation:piston_pull_law --max-ticks 12 --entity-log \
+  --spawn 'minecraft:small_fireball@2.45,1.34375,1.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.45,1.34375,3.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.45,1.34375,5.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.45,1.34375,7.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.45,1.34375,9.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.45,1.34375,11.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.45,1.34375,13.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.45,1.34375,15.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.45,1.34375,17.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.45,1.34375,19.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.45,1.34375,21.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.45,1.34375,23.5:0,0,0' \
+  $LANES_AIR --out work/piston_pull_uniform.json \
+  | tee "$CAP/piston_pull_uniform.entities.log"
+
+# `piston_pull_square` is that rig with twelve pull-free sticky lanes and
+# nothing else. Every constant in `piston::inside_eject_displacement` comes
+# from the four captures below.
+#
+# The law: the entity is driven to the outermost of three lines it can reach in
+# one 0.51 step — trailing face 1.01 of the way through the square, or 0.76, or
+# leading face back to 0.24 — and if it can reach none it retreats a whole step.
+# On the second step the lines are 1.02 and -0.01. Watch lane 7 (x=2.70) jump to
+# the outer line where lane 6 (x=2.65) stops at the inner one: that is the
+# hand-over, measured to a ten-thousandth by the threshold capture below.
+tools/gametest/capture.sh --structure nucleation:piston_pull_square --max-ticks 16 --entity-log \
+  --spawn 'minecraft:small_fireball@2.40,1.34375,1.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.45,1.34375,3.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.50,1.34375,5.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.55,1.34375,7.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.60,1.34375,9.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.65,1.34375,11.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.70,1.34375,13.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.75,1.34375,15.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.80,1.34375,17.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.85,1.34375,19.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.90,1.34375,21.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.95,1.34375,23.5:0,0,0' \
+  $LANES_AIR --out work/piston_pull_xsweep.json \
+  | tee "$CAP/piston_pull_xsweep.entities.log"
+
+# The same sweep with the record door's own hitbox — a minecart, 0.98 x 0.7 —
+# which needs no lifting, being tall enough to reach the arm from the floor.
+# The last two lanes clear the middle half and are handled by
+# `head_eject_displacement` instead: that is the seam between the two laws.
+tools/gametest/capture.sh --structure nucleation:piston_pull_square --max-ticks 12 --entity-log \
+  --spawn 'minecraft:minecart@2.70,1.0,1.5:0,0,0' \
+  --spawn 'minecraft:minecart@2.75,1.0,3.5:0,0,0' \
+  --spawn 'minecraft:minecart@2.80,1.0,5.5:0,0,0' \
+  --spawn 'minecraft:minecart@2.85,1.0,7.5:0,0,0' \
+  --spawn 'minecraft:minecart@2.90,1.0,9.5:0,0,0' \
+  --spawn 'minecraft:minecart@2.95,1.0,11.5:0,0,0' \
+  --spawn 'minecraft:minecart@3.00,1.0,13.5:0,0,0' \
+  --spawn 'minecraft:minecart@3.05,1.0,15.5:0,0,0' \
+  --spawn 'minecraft:minecart@3.10,1.0,17.5:0,0,0' \
+  --spawn 'minecraft:minecart@3.20,1.0,19.5:0,0,0' \
+  --spawn 'minecraft:minecart@3.25,1.0,21.5:0,0,0' \
+  --spawn 'minecraft:minecart@3.30,1.0,23.5:0,0,0' \
+  $LANES_AIR --out work/piston_square_cart.json \
+  | tee "$CAP/piston_square_cart.entities.log"
+
+# The gate across the piston, to a thousandth. The arm's column is [6/16, 10/16]
+# and the intersection is strict: a box whose top is exactly 1.375, or whose
+# bottom is exactly 1.625, is NOT moved, and one 0.0025 inside is thrown the
+# full 0.41625. Twelve lanes, both edges, and the answer flips exactly there.
+tools/gametest/capture.sh --structure nucleation:piston_pull_square --max-ticks 12 --entity-log \
+  --spawn 'minecraft:small_fireball@2.5,1.05,1.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.5,1.06,3.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.5,1.0625,5.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.5,1.065,7.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.5,1.08,9.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.5,1.20,11.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.5,1.34375,13.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.5,1.60,15.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.5,1.62,17.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.5,1.625,19.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.5,1.63,21.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.5,1.70,23.5:0,0,0' \
+  $LANES_AIR --out work/piston_square_yband.json \
+  | tee "$CAP/piston_square_yband.entities.log"
+
+# Where one target gives way to the next. A target costing exactly 0.51 is taken
+# and one costing 0.5101 is not, at BOTH hand-overs — which is why the limit is
+# 0.51 and not the 0.5 step it is built out of. Lane 3 (x=2.65635) is the one
+# lane in fifty-five that the fitted law misses, by 1e-4, and it is asserted as
+# a disagreement in `the_hand_over_between_targets_is_exactly_the_step_limit`.
+tools/gametest/capture.sh --structure nucleation:piston_pull_square --max-ticks 12 --entity-log \
+  --spawn 'minecraft:small_fireball@2.66625,1.34375,1.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.65875,1.34375,3.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.65635,1.34375,5.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.65625,1.34375,7.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.65615,1.34375,9.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.65375,1.34375,11.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.65125,1.34375,13.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.64625,1.34375,15.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.40725,1.34375,17.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.40625,1.34375,19.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.40615,1.34375,21.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.40525,1.34375,23.5:0,0,0' \
+  $LANES_AIR --out work/piston_square_threshold.json \
+  | tee "$CAP/piston_square_threshold.entities.log"
+
 echo "captures written to $CAP and $TRACES"

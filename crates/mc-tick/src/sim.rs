@@ -282,6 +282,14 @@ enum PistonPush {
     /// Displace the box this far along this direction.
     Move(crate::Dir, f64),
     /// Vanilla does something here and we do not know what.
+    ///
+    /// **Nothing produces this today.** All three retraction geometries are
+    /// measured and implemented, so the channel is empty and
+    /// [`Simulation::piston_retract_contacts`] reports nothing — including on
+    /// the record 3x3 door, which used to name six. It is kept rather than
+    /// deleted because the next geometry that turns out not to be covered
+    /// should be reported the same way, not guessed at.
+    #[allow(dead_code)]
     Unmodelled,
     /// This step does not touch this entity.
     Nothing,
@@ -903,11 +911,21 @@ impl Simulation {
     /// which is exactly the distinction `PendingMove::source_piston` already
     /// draws.
     ///
-    /// One case is still [`PistonPush::Unmodelled`]: an entity that a
-    /// retracting head is closing over — standing in the piston's own square
-    /// rather than in the block the head is leaving. No capture puts an entity
-    /// there, so it is reported rather than guessed at, exactly as the whole of
-    /// retraction used to be.
+    /// * **retraction closing over the piston's own square** —
+    ///   [`crate::piston::inside_eject_displacement`], the third geometry, and
+    ///   the one the record door's downward-facing pistons actually use. It is
+    ///   gated on the piston *arm's* narrow column rather than on the whole
+    ///   block, which is why `piston_pull_law` lane 1 — a fireball resting on
+    ///   the floor, below the arm — is left alone while the same fireball
+    ///   lifted into the arm's band is thrown clear.
+    ///
+    /// The two retraction cases are tried in that order: an entity in the
+    /// piston's square is resolved there, and only one that is not falls
+    /// through to the vacated block's rule.
+    ///
+    /// [`PistonPush::Unmodelled`] is left in place as the report for a
+    /// retraction geometry that later turns out not to be covered; nothing
+    /// currently produces it.
     fn piston_push(
         destination: Pos,
         sweep: crate::piston::Sweep,
@@ -917,29 +935,21 @@ impl Simulation {
         max: [f64; 3],
     ) -> PistonPush {
         if !sweep.extending && source_piston {
-            if let Some(signed) =
-                crate::piston::head_eject_displacement(destination, sweep.travel, min, max)
-            {
-                return if signed < 0.0 {
-                    PistonPush::Move(sweep.travel.opposite(), -signed)
-                } else {
-                    PistonPush::Move(sweep.travel, signed)
-                };
-            }
-            // The head is retracting and this entity is not in the block it is
-            // vacating — but it *is* in the slab the head is moving into, which
-            // is the piston's own square. Nothing in any capture puts an entity
-            // there, so what vanilla does to it is unknown, and saying so is
-            // better than silently leaving it where it is.
-            return match crate::piston::sweep_displacement(
+            let signed = crate::piston::inside_eject_displacement(
                 destination,
                 sweep.travel,
                 progress,
                 min,
                 max,
-            ) {
-                Some(_) => PistonPush::Unmodelled,
-                None => PistonPush::Nothing,
+            )
+            .or_else(|| {
+                crate::piston::head_eject_displacement(destination, sweep.travel, min, max)
+            });
+            let Some(signed) = signed else { return PistonPush::Nothing };
+            return if signed < 0.0 {
+                PistonPush::Move(sweep.travel.opposite(), -signed)
+            } else {
+                PistonPush::Move(sweep.travel, signed)
             };
         }
         match crate::piston::sweep_displacement(destination, sweep.travel, progress, min, max) {

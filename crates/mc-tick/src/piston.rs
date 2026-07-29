@@ -1939,6 +1939,137 @@ pub fn head_eject_displacement(
     Some(distance.clamp(-PISTON_MAX_STEP, PISTON_MAX_STEP))
 }
 
+/// The near face of a piston arm's cross-section, as a fraction of a block.
+///
+/// `PistonHeadBlock`'s arm is `box(6, 6, 10, 10)` in the two axes across the
+/// piston, and that 4/16 column — not the whole block — is the gate on
+/// [`inside_eject_displacement`]. Measured, not read off the source:
+/// `sq_yband` steps a small fireball's box across the edge in thousandths and
+/// the answer flips exactly here, at both edges, in twelve lanes.
+pub const PISTON_ARM_NEAR: f64 = 6.0 / 16.0;
+
+/// The far face of a piston arm's cross-section. See [`PISTON_ARM_NEAR`].
+pub const PISTON_ARM_FAR: f64 = 10.0 / 16.0;
+
+/// How far a retracting head displaces an entity standing in the **piston's
+/// own square** — the block the head is closing back into — or `None` if this
+/// step does not touch it.
+///
+/// This is the third and last of retraction's three geometries, and the one
+/// that was left unmodelled because two captures appeared to contradict each
+/// other: `piston_pull_inside` moves a vertical entity where `piston_pull_law`
+/// lane 1 leaves a horizontal one alone. **Neither the axis nor the floor is
+/// the difference.** Lane 1's fireball sat at y = 1.0, whose box tops out at
+/// 1.3125 — *below the arm*. Lift the same fireball by 0.34375, change nothing
+/// else, and vanilla moves it exactly as the vertical rig does. See
+/// `tools/gametest/captures/piston_pull_float.entities.log`.
+///
+/// The law, in the outward coordinate `u` — distance along the piston's facing
+/// from the inner face of its own block, so the piston square is `u ∈ [0, 1]`
+/// and the head's block is `u ∈ [1, 2]`:
+///
+/// * **the gate across the axis is the arm column**, [`PISTON_ARM_NEAR`] to
+///   [`PISTON_ARM_FAR`] in both perpendicular axes, strictly — an entity that
+///   only touches the edge is not moved;
+/// * **step one** acts on an entity overlapping the middle half `u ∈ [0.25,
+///   0.75]`, and drives it to the first of these it can reach in one
+///   [`PISTON_MAX_STEP`]: trailing face to `1.01` (clear of the whole square),
+///   trailing face to `0.76` (clear of the arm), leading face to `0.24` (back
+///   out of the arm). If it can reach none, it retreats a full step;
+/// * **step two** acts on an entity still overlapping `u ∈ [0, 1]` and drives
+///   its trailing face to `1.02` — the same `blockMin + 0.02` line
+///   [`head_eject_displacement`] lands on — or, failing that, its leading face
+///   to `-0.01`, or failing that retreats a full step.
+///
+/// `destination` is the piston's own square, `travel` the direction the head is
+/// moving (inward, against the piston's facing) and `progress` is `0.0` on the
+/// first step and [`PISTON_STEP`] on the second. The returned distance is
+/// signed along `travel`, so a negative value means the entity is thrown
+/// *outward*, the way most of them go.
+///
+/// # Provenance
+///
+/// Fitted bit-exactly to four captures totalling forty-one lanes:
+/// `piston_pull_inside` (vertical, 5), `piston_pull_float` (horizontal, 12),
+/// `piston_pull_xsweep` (12) and `sq_cart` (12), covering a small fireball, a
+/// dragon fireball, a minecart, a furnace minecart and a NaN furnace minecart,
+/// on both axes and both sides of the block. It is an empirical fit; the
+/// vanilla call producing it has not been identified.
+///
+/// The rigs matter: `piston_pull_law` lanes z = 15, 17, 19 and 21 carry a
+/// **block to pull** at `(4, 1, z)` and the others do not, so the same entity
+/// in two of its lanes lands 0.02 apart. `piston_pull_square` is the same rig
+/// with twelve pull-free lanes, and every number above comes from it.
+pub fn inside_eject_displacement(
+    destination: Pos,
+    travel: Dir,
+    progress: f64,
+    entity_min: [f64; 3],
+    entity_max: [f64; 3],
+) -> Option<f64> {
+    let axis = match travel {
+        Dir::West | Dir::East => 0,
+        Dir::Down | Dir::Up => 1,
+        Dir::North | Dir::South => 2,
+    };
+    let (dx, dy, dz) = travel.delta();
+    // The head travels *into* the piston, so outward is the other way.
+    let outward = -f64::from([dx, dy, dz][axis]);
+    let origin = [
+        f64::from(destination.x),
+        f64::from(destination.y),
+        f64::from(destination.z),
+    ];
+    // Across the piston: the entity must be in the arm's own column.
+    for i in 0..3 {
+        if i == axis {
+            continue;
+        }
+        let near = origin[i] + PISTON_ARM_NEAR;
+        let far = origin[i] + PISTON_ARM_FAR;
+        if !(entity_min[i] < far && entity_max[i] > near) {
+            return None;
+        }
+    }
+    // Along the piston, in `u`: 0 at the square's inner face, 1 at its outer.
+    let inner = if outward > 0.0 { origin[axis] } else { origin[axis] + 1.0 };
+    let depth = |world: f64| outward * (world - inner);
+    let (trailing, leading) = if outward > 0.0 {
+        (depth(entity_min[axis]), depth(entity_max[axis]))
+    } else {
+        (depth(entity_max[axis]), depth(entity_min[axis]))
+    };
+    let first_step = progress < PISTON_STEP;
+    let (gate_lo, gate_hi) = if first_step { (0.25, 0.75) } else { (0.0, 1.0) };
+    if !(trailing < gate_hi && leading > gate_lo) {
+        return None;
+    }
+    // Outward targets move the trailing face; the retreat moves the leading
+    // one. Outermost first — an entity that can clear the whole square in one
+    // step does, rather than stopping at the arm.
+    let targets: &[(bool, f64)] = if first_step {
+        &[(true, 1.01), (true, 0.76), (false, 0.24)]
+    } else {
+        &[(true, 1.02), (false, -0.01)]
+    };
+    let mut chosen = None;
+    for &(is_outward, target) in targets {
+        let shift = target - if is_outward { trailing } else { leading };
+        if shift == 0.0 {
+            return None;
+        }
+        if shift.abs() <= PISTON_MAX_STEP {
+            chosen = Some(shift);
+            break;
+        }
+    }
+    // Nothing is reachable: the entity is shoved back a whole step and the
+    // next one finishes the job.
+    let shift = chosen.unwrap_or(-PISTON_MAX_STEP);
+    // Back to a distance along `travel`, which points the other way to `u`.
+    Some(-shift)
+}
+
 #[cfg(test)]
 mod sweep_tests {
     use super::*;
@@ -2176,5 +2307,199 @@ mod sweep_tests {
             [1.9, 3.95, 1.9],
         );
         assert_eq!(d, Some((3.95_f64 - 3.5) + PISTON_OVERSHOOT));
+    }
+
+    /// Every lane of every capture of the third geometry lands within this of
+    /// where vanilla put it. The captures print `Entity.position`, so the
+    /// comparison is against a printed double rather than a recomputed one.
+    const HAIR: f64 = 1e-9;
+
+    /// A small fireball's box, the 0.3125 cube every horizontal lane uses.
+    fn fireball(x: f64, y: f64, z: f64) -> ([f64; 3], [f64; 3]) {
+        ([x - 0.15625, y, z - 0.15625], [x + 0.15625, y + 0.3125, z + 0.15625])
+    }
+
+    /// A minecart's box: 0.98 wide, 0.7 tall, standing on the floor at y = 1.
+    fn cart(x: f64, z: f64) -> ([f64; 3], [f64; 3]) {
+        ([x - 0.49, 1.0, z - 0.49], [x + 0.49, 1.7, z + 0.49])
+    }
+
+    /// `piston_pull_square`, the horizontal rig with **no block to pull**:
+    /// sticky piston at (2, 1, 1) facing east, head at (3, 1, 1), power cut so
+    /// the head retracts west into the piston's own square.
+    ///
+    /// The lanes are `piston_pull_xsweep` (small fireballs lifted into the arm's
+    /// band) and `sq_cart` (minecarts, which reach the band from the floor
+    /// because they are 0.7 tall). `d` is the displacement vanilla printed,
+    /// eastward positive; the function reports it signed along the head's
+    /// travel, which is the other way.
+    #[test]
+    fn an_entity_in_the_pistons_own_square_is_ejected_like_the_capture() {
+        let piston = Pos::new(2, 1, 1);
+        #[allow(clippy::type_complexity)]
+        let lanes: &[(&str, ([f64; 3], [f64; 3]), f64, f64)] = &[
+            // small fireball at y = 1.34375, straddling the arm.
+            ("fb 2.40", fireball(2.40, 1.34375, 1.5), -0.31625, -0.25),
+            ("fb 2.45", fireball(2.45, 1.34375, 1.5), 0.46625, 0.26),
+            ("fb 2.50", fireball(2.50, 1.34375, 1.5), 0.41625, 0.26),
+            ("fb 2.55", fireball(2.55, 1.34375, 1.5), 0.36625, 0.26),
+            ("fb 2.60", fireball(2.60, 1.34375, 1.5), 0.31625, 0.26),
+            ("fb 2.65", fireball(2.65, 1.34375, 1.5), 0.26625, 0.26),
+            ("fb 2.70", fireball(2.70, 1.34375, 1.5), 0.46625, 0.01),
+            // minecarts on the floor.
+            ("cart 2.70", cart(2.70, 1.5), -0.51, -0.51),
+            ("cart 2.75", cart(2.75, 1.5), 0.50, 0.26),
+            ("cart 2.80", cart(2.80, 1.5), 0.45, 0.26),
+            ("cart 2.85", cart(2.85, 1.5), 0.40, 0.26),
+            ("cart 2.90", cart(2.90, 1.5), 0.35, 0.26),
+            ("cart 2.95", cart(2.95, 1.5), 0.30, 0.26),
+            ("cart 3.00", cart(3.00, 1.5), 0.50, 0.01),
+            ("cart 3.05", cart(3.05, 1.5), 0.45, 0.01),
+            ("cart 3.10", cart(3.10, 1.5), 0.40, 0.01),
+            ("cart 3.20", cart(3.20, 1.5), 0.30, 0.01),
+            // These two clear the middle half, so the first step is
+            // `head_eject_displacement`'s and the second finds them settled.
+            ("cart 3.25", cart(3.25, 1.5), 0.26, 0.0),
+            ("cart 3.30", cart(3.30, 1.5), 0.21, 0.0),
+        ];
+        for (name, (min, max), first, second) in lanes {
+            let mut min = *min;
+            let mut max = *max;
+            for (step, want) in [(0.0, *first), (PISTON_STEP, *second)] {
+                let got = inside_eject_displacement(piston, Dir::West, step, min, max)
+                    .or_else(|| head_eject_displacement(piston, Dir::West, min, max))
+                    .unwrap_or(0.0);
+                // Travel is west, so a displacement east reads negative.
+                let east = -got;
+                assert!(
+                    (east - want).abs() < HAIR,
+                    "{name} step {step}: got {east}, capture says {want}"
+                );
+                min[0] += east;
+                max[0] += east;
+            }
+        }
+    }
+
+    /// The gate across the piston is the **arm's** 4/16 column, not the block.
+    ///
+    /// `sq_yband` walks a small fireball's box across both edges of the arm in
+    /// thousandths. A box that only touches the edge is not moved — the
+    /// intersection is strict — and one that overlaps it by 0.0025 is thrown
+    /// the full 0.41625. This is what `piston_pull_law` lane 1 was measuring
+    /// all along: a fireball resting on the floor tops out at 1.3125, below the
+    /// arm, so vanilla never touches it.
+    #[test]
+    fn the_gate_across_the_piston_is_the_arm_column() {
+        let piston = Pos::new(2, 1, 1);
+        // (spawn y, whether vanilla moved it)
+        let lanes = [
+            (1.05, false),
+            (1.06, false),
+            (1.0625, false), // box top exactly 1.375: touching is not overlap
+            (1.065, true),
+            (1.08, true),
+            (1.20, true),
+            (1.34375, true),
+            (1.60, true),
+            (1.62, true),
+            (1.625, false), // box bottom exactly 1.625
+            (1.63, false),
+            (1.70, false),
+        ];
+        for (y, moved) in lanes {
+            let (min, max) = fireball(2.5, y, 1.5);
+            let got = inside_eject_displacement(piston, Dir::West, 0.0, min, max);
+            assert_eq!(got.is_some(), moved, "y={y}: {got:?}");
+            if moved {
+                assert!((-got.unwrap() - 0.41625).abs() < HAIR, "y={y}");
+            }
+        }
+        // The same fireball outside the column is untouched on the second step
+        // too, so this is a gate and not a delay.
+        let (min, max) = fireball(2.5, 1.0, 1.5);
+        assert_eq!(inside_eject_displacement(piston, Dir::West, PISTON_STEP, min, max), None);
+        assert_eq!(head_eject_displacement(piston, Dir::West, min, max), None);
+    }
+
+    /// Where one target gives way to the next, to a ten-thousandth.
+    ///
+    /// `sq_thresh` walks a small fireball's box across both hand-overs in
+    /// hundred-thousandths of a block. A target is taken when it costs
+    /// **exactly** [`PISTON_MAX_STEP`] and given up at `0.5101`, at both of
+    /// them — which is what fixes the threshold at 0.51 rather than at the
+    /// 0.5 step it is built from.
+    ///
+    /// One lane of the twelve disagrees and is asserted as a disagreement:
+    /// `x = 2.65635`, whose box starts a ten-thousandth past the hand-over, is
+    /// moved `0.51` by vanilla where this law says `0.5099`. Every neighbour
+    /// on both sides agrees, so it is a seam in the mechanism rather than a
+    /// wrong constant, and it is 1e-4 of a block wide. Pinned here so that it
+    /// cannot be quietly absorbed by a later change.
+    #[test]
+    fn the_hand_over_between_targets_is_exactly_the_step_limit() {
+        let piston = Pos::new(2, 1, 1);
+        // (spawn x, vanilla's displacement east on the first step)
+        let lanes = [
+            (2.66625, 0.50),
+            (2.65875, 0.5075),
+            (2.65625, 0.51),   // costs exactly 0.51: the outer target is taken
+            (2.65615, 0.2601), // costs 0.5101: it is not
+            (2.65375, 0.2625),
+            (2.65125, 0.2650),
+            (2.64625, 0.2700),
+            (2.40725, 0.5090),
+            (2.40625, 0.5100), // again exactly 0.51, and again taken
+            (2.40615, -0.3224), // 0.5101, so it retreats instead
+            (2.40525, -0.3215),
+        ];
+        for (x, want) in lanes {
+            let (min, max) = fireball(x, 1.34375, 1.5);
+            let got = -inside_eject_displacement(piston, Dir::West, 0.0, min, max)
+                .expect("every lane here is inside the square");
+            assert!((got - want).abs() < HAIR, "x={x}: got {got}, capture says {want}");
+        }
+        // The seam. Vanilla moves this one 0.51; the law says 0.5099.
+        let (min, max) = fireball(2.65635, 1.34375, 1.5);
+        let got = -inside_eject_displacement(piston, Dir::West, 0.0, min, max).unwrap();
+        assert!((got - 0.5099).abs() < HAIR, "the law's answer moved: {got}");
+        assert!((got - 0.51).abs() > 1e-5, "vanilla says 0.51 and this now agrees — retest the seam");
+    }
+
+    /// `piston_pull_inside`: the same law on the vertical axis, which is where
+    /// this geometry was first seen and where it looked like a contradiction.
+    ///
+    /// Sticky piston at (2, 3, 1) facing **down**, head at (2, 2, 1), so the
+    /// head travels up into the piston's square and "outward" is downward. The
+    /// displacements are vanilla's printed `y` deltas.
+    #[test]
+    fn the_third_geometry_is_the_same_law_on_the_vertical_axis() {
+        let piston = Pos::new(2, 3, 1);
+        let sfb = |y: f64| fireball(2.5, y, 1.5);
+        let dragon = |y: f64| ([2.0, y, 1.0], [3.0, y + 1.0, 2.0]);
+        #[allow(clippy::type_complexity)]
+        let lanes: &[(&str, ([f64; 3], [f64; 3]), f64, f64)] = &[
+            ("inside 3.2", sfb(3.2), -0.2725, -0.26),
+            // Clear of the middle half, so the first step passes it by.
+            ("inside 2.9", sfb(2.9), 0.0, -0.2325),
+            ("dragon 2.6", dragon(2.6), -0.36, -0.26),
+            // Nearer the far side: thrown *up*, against the head's travel.
+            ("inside 3.6", sfb(3.6), 0.16, 0.25),
+        ];
+        for (name, (min, max), first, second) in lanes {
+            let mut min = *min;
+            let mut max = *max;
+            for (step, want) in [(0.0, *first), (PISTON_STEP, *second)] {
+                let got = inside_eject_displacement(piston, Dir::Up, step, min, max)
+                    .or_else(|| head_eject_displacement(piston, Dir::Up, min, max))
+                    .unwrap_or(0.0);
+                assert!(
+                    (got - want).abs() < HAIR,
+                    "{name} step {step}: got {got}, capture says {want}"
+                );
+                min[1] += got;
+                max[1] += got;
+            }
+        }
     }
 }
