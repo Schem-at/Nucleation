@@ -23,8 +23,8 @@
 
 use crate::behaviour::{BehaviourTable, Inert};
 use crate::components::{
-    Button, Comparator, ComparatorMode, Dropper, Hopper, Lamp, NoteBlock, PowerSource, Trapdoor,
-    PressurePlate, Repeater, StatePair, Torch,
+    Button, Comparator, ComparatorMode, CopperBulb, Door, Dropper, Hopper, Lamp, NoteBlock,
+    PowerSource, PressurePlate, Repeater, StatePair, Torch, Trapdoor,
 };
 use crate::observer::Observer;
 use crate::piston::{Movability, Piston, Sticky};
@@ -717,6 +717,17 @@ pub fn register_all_at(
                 rules.waters.insert(*id, crate::fluid::WaterKind::Source);
                 rules.bubbles.insert(*id, descriptor.get("drag") == Some("true"));
             }
+            // A comparator reads a cauldron's fill level directly: 0 when
+            // empty, 1-3 for the layers of a water or powder-snow cauldron,
+            // and a full 3 for lava, which has no partial states.
+            n if n.ends_with("cauldron") => {
+                let level = if n == "minecraft:lava_cauldron" {
+                    3
+                } else {
+                    descriptor.get("level").and_then(|l| l.parse().ok()).unwrap_or(0)
+                };
+                rules.state_analog.insert(*id, level);
+            }
             "minecraft:composter" => {
                 let level = descriptor.get("level").and_then(|l| l.parse().ok()).unwrap_or(0);
                 rules.state_analog.insert(*id, level);
@@ -747,10 +758,9 @@ pub fn register_all_at(
             "minecraft:repeater" | "minecraft:comparator" | "minecraft:observer" => {
                 descriptor.flag("powered")
             }
-            "minecraft:stone_button"
-            | "minecraft:oak_button"
-            | "minecraft:stone_pressure_plate"
-            | "minecraft:oak_pressure_plate" => descriptor.flag("powered"),
+            n if n.ends_with("_button") || n.ends_with("_pressure_plate") => {
+                descriptor.flag("powered")
+            }
             "minecraft:redstone_torch" | "minecraft:redstone_wall_torch" => descriptor.flag("lit"),
             "minecraft:lever" => descriptor.flag("powered"),
             _ => false,
@@ -767,10 +777,6 @@ pub fn register_all_at(
                 | "minecraft:redstone_wall_torch"
                 | "minecraft:lever"
                 | "minecraft:redstone_block"
-                | "minecraft:stone_button"
-                | "minecraft:oak_button"
-                | "minecraft:stone_pressure_plate"
-                | "minecraft:oak_pressure_plate"
                 | "minecraft:daylight_detector"
                 | "minecraft:trapped_chest"
                 | "minecraft:target"
@@ -784,7 +790,8 @@ pub fn register_all_at(
                 | "minecraft:tripwire_hook"
                 | "minecraft:lightning_rod"
                 | "minecraft:jukebox"
-        ) {
+        ) || is_button_or_plate(&descriptor.name)
+        {
             rules.signal_sources.push(*id);
         }
         if descriptor.name == "minecraft:repeater" {
@@ -815,10 +822,6 @@ pub fn register_all_at(
                 | "minecraft:redstone_torch"
                 | "minecraft:redstone_wall_torch"
                 | "minecraft:lever"
-                | "minecraft:stone_button"
-                | "minecraft:oak_button"
-                | "minecraft:stone_pressure_plate"
-                | "minecraft:oak_pressure_plate"
                 | "minecraft:torch"
                 | "minecraft:wall_torch"
                 // `DiodeBlock` is `PushReaction.DESTROY`: a repeater or
@@ -833,6 +836,7 @@ pub fn register_all_at(
             // properties (`Blocks` bytecode) — a piston breaks one, and the
             // break drops the box as an item that keeps its slots.
             || is_shulker_box(&descriptor.name)
+            || is_button_or_plate(&descriptor.name)
         {
             rules.destroyed_by_push.push(*id);
         }
@@ -1028,15 +1032,18 @@ pub fn register_all_at(
                     Box::new(Observer { facing, powered: descriptor.flag("powered"), states }),
                 );
             }
-            "minecraft:stone_button" | "minecraft:oak_button" => {
+            n if n.ends_with("_button") => {
                 let Some(states) = powered_pair(registry, descriptor) else { continue };
+                let Some(attached) = lever_attachment(descriptor) else { continue };
                 table.register(
                     *id,
                     Box::new(Button {
                         powered: descriptor.flag("powered"),
                         states,
-                        // BlockSetType: stone presses for 20 game ticks, wood 30.
-                        duration: if name == "minecraft:stone_button" { 20 } else { 30 },
+                        // BlockSetType: the stone family presses for 20 game
+                        // ticks, every wooden one for 30.
+                        duration: if is_stone_button(n) { 20 } else { 30 },
+                        attached,
                         power: rules.clone(),
                     }),
                 );
@@ -1047,6 +1054,50 @@ pub fn register_all_at(
                     *id,
                     Box::new(Lamp {
                         lit: descriptor.flag("lit"),
+                        states,
+                        power: rules.clone(),
+                    }),
+                );
+            }
+            n if n.contains("copper_bulb") => {
+                let Some(states) = bulb_states(registry, descriptor) else { continue };
+                table.register(
+                    *id,
+                    Box::new(CopperBulb {
+                        lit: descriptor.flag("lit"),
+                        powered: descriptor.flag("powered"),
+                        states,
+                        power: rules.clone(),
+                    }),
+                );
+            }
+            n if n.ends_with("_door") => {
+                let Some(states) = trapdoor_pair(registry, descriptor) else { continue };
+                // `half` says which way the other half lies. Anything else is
+                // not a door state we can reason about, so leave it unregistered.
+                let other_half = match descriptor.get("half") {
+                    Some("lower") => Dir::Up,
+                    Some("upper") => Dir::Down,
+                    _ => continue,
+                };
+                table.register(
+                    *id,
+                    Box::new(Door {
+                        powered: descriptor.flag("powered"),
+                        other_half,
+                        states,
+                        power: rules.clone(),
+                    }),
+                );
+            }
+            // A fence gate's power response is a trapdoor's exactly: `open` and
+            // `powered` written together, quietly, off the plain neighbour signal.
+            n if n.ends_with("_fence_gate") => {
+                let Some(states) = trapdoor_pair(registry, descriptor) else { continue };
+                table.register(
+                    *id,
+                    Box::new(Trapdoor {
+                        powered: descriptor.flag("powered"),
                         states,
                         power: rules.clone(),
                     }),
@@ -1063,14 +1114,20 @@ pub fn register_all_at(
                     }),
                 );
             }
-            "minecraft:stone_pressure_plate" | "minecraft:oak_pressure_plate" => {
+            // Weighted plates carry `power` rather than `powered`, so they must
+            // be turned away *before* this arm — matching `_pressure_plate` and
+            // then bailing out of `powered_pair` would consume them here and
+            // starve the arm further down that actually handles them.
+            n if n.ends_with("_pressure_plate") && !n.ends_with("_weighted_pressure_plate") => {
                 let Some(states) = powered_pair(registry, descriptor) else { continue };
                 table.register(
                     *id,
                     Box::new(PressurePlate {
                         powered: descriptor.flag("powered"),
                         states,
-                        senses_items: name == "minecraft:oak_pressure_plate",
+                        // Only the stone family ignores items; every wooden
+                        // plate is triggered by anything, dropped items too.
+                        senses_items: !is_stone_button(n),
                         power: rules.clone(),
                     }),
                 );
@@ -1320,6 +1377,41 @@ pub fn register_all_at(
             // `_head` and a decoration family that ran first would claim it,
             // replacing a piston's arm with a brick and quietly breaking every
             // door in the corpus.
+            // The blocks below have real vanilla behaviour, but every input
+            // that could drive it is a player or a mob — and a headless door
+            // simulation has neither. Each is registered only in the state
+            // that is a *fixed point* under that absence; any other state is
+            // left unregistered so the build fails loudly rather than quietly
+            // simulating something the engine cannot actually reproduce.
+
+            // A cauldron only fills or empties by hand or by weather. Its
+            // `level` is read by a comparator and otherwise never moves.
+            n if n.ends_with("cauldron") => {
+                table.register(*id, Box::new(Inert::new("cauldron")));
+            }
+            // A campfire lights, smokes and cooks; none of that is redstone,
+            // and nothing in a door can extinguish it.
+            "minecraft:campfire" | "minecraft:soul_campfire" => {
+                table.register(*id, Box::new(Inert::new("campfire")));
+            }
+            // A lectern pulses and feeds a comparator when a *player* turns a
+            // page. With no book there is no page and no signal, ever.
+            "minecraft:lectern" if !descriptor.flag("has_book") => {
+                table.register(*id, Box::new(Inert::new("lectern")));
+            }
+            // Tripwire is pressed by entities intersecting it. An unpressed
+            // string in an entity-free world stays unpressed.
+            "minecraft:tripwire" if !descriptor.flag("powered") => {
+                table.register(*id, Box::new(Inert::new("tripwire")));
+            }
+            // A weighted plate's `power` counts item entities standing on it.
+            // At zero, with nothing to drop onto it, it is a constant.
+            "minecraft:light_weighted_pressure_plate"
+            | "minecraft:heavy_weighted_pressure_plate"
+                if descriptor.get("power") == Some("0") =>
+            {
+                table.register(*id, Box::new(Inert::new("weighted_pressure_plate")));
+            }
             n if decor_kind(n).is_some() => {
                 table.register(*id, Box::new(Inert::new("material")));
             }
@@ -1423,8 +1515,19 @@ fn is_full_cube(descriptor: &Descriptor) -> bool {
         // A slab is a full cube only when doubled.
         n if n.ends_with("_slab") => descriptor.get("type") == Some("double"),
         // A trapdoor is a 3/16 plate whatever its pose: never a full cube, so
-        // it neither conducts nor blocks hopper suction.
-        n if n.ends_with("_trapdoor") => false,
+        // it neither conducts nor blocks hopper suction. A door is the same
+        // 3/16 slice stood upright, and getting this wrong would route redstone
+        // through the door leaf as if it were a solid block.
+        n if n.ends_with("_trapdoor") || n.ends_with("_door") => false,
+        // Hollow, low or flat: a cauldron's basin, a campfire's logs, a
+        // lectern's desk, a plate and a string. None is a full collision cube,
+        // so none conducts and none blocks a hopper.
+        n if n.ends_with("cauldron") => false,
+        "minecraft:campfire"
+        | "minecraft:soul_campfire"
+        | "minecraft:lectern"
+        | "minecraft:tripwire" => false,
+        n if n.ends_with("_pressure_plate") || n.ends_with("_button") => false,
         "minecraft:redstone_wire"
         | "minecraft:redstone_torch"
         | "minecraft:redstone_wall_torch"
@@ -1435,11 +1538,7 @@ fn is_full_cube(descriptor: &Descriptor) -> bool {
         | "minecraft:trapped_chest"
         | "minecraft:hopper"
         | "minecraft:piston_head"
-        | "minecraft:moving_piston"
-        | "minecraft:stone_button"
-        | "minecraft:oak_button"
-        | "minecraft:stone_pressure_plate"
-        | "minecraft:oak_pressure_plate" => false,
+        | "minecraft:moving_piston" => false,
         "minecraft:piston" | "minecraft:sticky_piston" => !descriptor.flag("extended"),
         // Building material whose shape is not a full cell — walls, fences,
         // panes, stairs, carpets. They must not conduct and must not block a
@@ -1521,6 +1620,25 @@ pub fn fluid_tables(
         bubble_kinds.push(bubble);
     }
     (water_kinds, bubble_kinds)
+}
+
+/// Whether a block is a button or a pressure plate of any material. Both are
+/// signal sources whatever their state, and both are `PushReaction.DESTROY`.
+fn is_button_or_plate(name: &str) -> bool {
+    name.ends_with("_button") || name.ends_with("_pressure_plate")
+}
+
+/// Whether a button or pressure plate belongs to the *stone* `BlockSetType`
+/// rather than a wooden one. Stone presses for 20 game ticks and its plate
+/// ignores dropped items; wood presses for 30 and senses anything.
+fn is_stone_button(name: &str) -> bool {
+    matches!(
+        name,
+        "minecraft:stone_button"
+            | "minecraft:polished_blackstone_button"
+            | "minecraft:stone_pressure_plate"
+            | "minecraft:polished_blackstone_pressure_plate"
+    )
 }
 
 /// The direction from a lever (or similar attachable) to its support block.
@@ -1783,6 +1901,20 @@ fn enabled_pair(registry: &StateRegistry, descriptor: &Descriptor) -> Option<Sta
     })
 }
 
+/// The four `(lit, powered)` states a copper bulb cycles through, indexed
+/// `lit * 2 + powered` to match [`CopperBulb::states`].
+fn bulb_states(registry: &StateRegistry, descriptor: &Descriptor) -> Option<[StateId; 4]> {
+    let mut states = [StateId(0); 4];
+    for lit in [false, true] {
+        let with_lit = Descriptor::parse(&descriptor.with("lit", if lit { "true" } else { "false" }));
+        for powered in [false, true] {
+            let name = with_lit.with("powered", if powered { "true" } else { "false" });
+            states[usize::from(lit) * 2 + usize::from(powered)] = registry.get(&name)?;
+        }
+    }
+    Some(states)
+}
+
 /// A trapdoor's power response sets `open` and `powered` together (see
 /// [`Trapdoor`]): off is both-false, on is both-true.
 fn trapdoor_pair(registry: &StateRegistry, descriptor: &Descriptor) -> Option<StatePair> {
@@ -1898,6 +2030,31 @@ pub fn intern_companions(registry: &mut StateRegistry) {
             }
             "minecraft:redstone_lamp" => {
                 vec![descriptor.with("lit", "false"), descriptor.with("lit", "true")]
+            }
+            // A bulb's `lit` survives losing power, so any of the four
+            // `(lit, powered)` pairings is reachable and all four must exist
+            // before a behaviour can bind to them.
+            n if n.contains("copper_bulb") => {
+                let mut variants = Vec::new();
+                for lit in ["false", "true"] {
+                    let with_lit = Descriptor::parse(&descriptor.with("lit", lit));
+                    for powered in ["false", "true"] {
+                        variants.push(with_lit.with("powered", powered));
+                    }
+                }
+                variants
+            }
+            // Doors and fence gates write `open` and `powered` together, as a
+            // trapdoor does, but a structure may hold any of the four.
+            n if n.ends_with("_door") || n.ends_with("_fence_gate") => {
+                let mut variants = Vec::new();
+                for open in ["false", "true"] {
+                    let opened = Descriptor::parse(&descriptor.with("open", open));
+                    for powered in ["false", "true"] {
+                        variants.push(opened.with("powered", powered));
+                    }
+                }
+                variants
             }
             // A trapdoor's power write flips `open` and `powered` together,
             // but a structure may hold any of the four combinations.

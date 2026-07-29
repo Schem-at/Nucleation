@@ -1,0 +1,63 @@
+{
+  "name": "a copper bulb is a T flip-flop: lit toggles on the rising edge and survives losing power",
+  "structure": "../corpus/structures/copper_bulb_latch.snbt",
+  "settle": "in-world",
+  "actions": [
+    {
+      "tick": 1,
+      "use": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "tick": 10,
+      "use": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "tick": 20,
+      "use": [
+        0,
+        1,
+        0
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "tick": 0,
+      "expect": "blocks",
+      "blocks": {
+        "2,0,0": "minecraft:copper_bulb[lit=false,powered=false]"
+      }
+    },
+    {
+      "tick": 4,
+      "expect": "blocks",
+      "blocks": {
+        "2,0,0": "minecraft:copper_bulb[lit=true,powered=true]",
+        "1,0,0": "minecraft:redstone_wire[power=15]",
+        "0,1,0": "minecraft:lever[powered=true]"
+      }
+    },
+    {
+      "tick": 14,
+      "expect": "blocks",
+      "blocks": {
+        "2,0,0": "minecraft:copper_bulb[lit=true,powered=false]"
+      }
+    },
+    {
+      "tick": 24,
+      "expect": "blocks",
+      "blocks": {
+        "2,0,0": "minecraft:copper_bulb[lit=false,powered=true]"
+      }
+    }
+  ]
+}

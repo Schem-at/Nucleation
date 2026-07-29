@@ -1220,8 +1220,24 @@ pub struct Button<P: PowerSource> {
     pub states: StatePair,
     /// 20 for stone, 30 for wood.
     pub duration: u64,
+    /// The direction from the button to its support block (floor → down,
+    /// ceiling → up, wall → behind the facing).
+    pub attached: Dir,
     /// How power is read (unused today; kept for parity with siblings).
     pub power: P,
+}
+
+impl<P: PowerSource> Button<P> {
+    /// `ButtonBlock.updateNeighbours`: `updateNeighborsAt(pos)` **and**
+    /// `updateNeighborsAt(pos.relative(getConnectedDirection(state).getOpposite()))`
+    /// — the second is the support block, and without it a button strongly
+    /// powers its support and nothing on the far side of that block ever hears
+    /// about it. That is the whole difference between a working button and an
+    /// inert one; `LeverBlock` does exactly the same pair.
+    fn update_neighbours(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        ctx.update_neighbors_at(pos);
+        ctx.update_neighbors_at(pos.offset(self.attached));
+    }
 }
 
 impl<P: PowerSource> BlockBehaviour for Button<P> {
@@ -1230,12 +1246,14 @@ impl<P: PowerSource> BlockBehaviour for Button<P> {
             return; // pressing a pressed button does nothing
         }
         ctx.set(pos, self.states.get(true));
+        self.update_neighbours(ctx, pos);
         ctx.schedule(pos, self.duration, TickPriority::Normal);
     }
 
     fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
         if self.powered {
             ctx.set(pos, self.states.get(false));
+            self.update_neighbours(ctx, pos);
         }
     }
 
@@ -1325,6 +1343,104 @@ impl<P: PowerSource> BlockBehaviour for Trapdoor<P> {
 
     fn name(&self) -> &'static str {
         "trapdoor"
+    }
+}
+
+/// A copper bulb — a latch wearing a building block's shape.
+///
+/// `powered` tracks the neighbour signal, but `lit` toggles only on the
+/// *rising* edge of it, so a bulb is a T flip-flop that a comparator reads as
+/// 15 or 0. That is why it cannot be waved through as decoration: a build that
+/// treats one as inert loses a memory cell, and modern doors use them as such.
+///
+/// `CopperBulbBlock.checkAndFlip` writes with flag 3, i.e. it notifies its
+/// neighbours — unlike a door or trapdoor, which write quietly.
+pub struct CopperBulb<P: PowerSource> {
+    /// Whether this state is lit.
+    pub lit: bool,
+    /// Whether this state is powered.
+    pub powered: bool,
+    /// The four `(lit, powered)` states, indexed `lit * 2 + powered`.
+    pub states: [StateId; 4],
+    /// How power is read.
+    pub power: P,
+}
+
+impl<P: PowerSource> CopperBulb<P> {
+    fn check_and_flip(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        let powered = crate::pos::ALL_DIRS.iter().any(|dir| {
+            self.power
+                .is_powered(ctx.world, ctx.comparator_out, pos.offset(*dir), dir.opposite())
+        });
+        if powered == self.powered {
+            return;
+        }
+        // Losing power leaves the light where it is; only gaining it toggles.
+        let lit = if powered { !self.lit } else { self.lit };
+        ctx.set(pos, self.states[usize::from(lit) * 2 + usize::from(powered)]);
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for CopperBulb<P> {
+    fn on_placed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        self.check_and_flip(ctx, pos);
+    }
+
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        self.check_and_flip(ctx, pos);
+    }
+
+    fn name(&self) -> &'static str {
+        "copper_bulb"
+    }
+}
+
+/// A door: two blocks that open and close as one.
+///
+/// `DoorBlock.neighborChanged` reads the signal at **both** halves and unions
+/// them, which is the whole reason this cannot reuse [`Trapdoor`] — a door
+/// powered only at the foot still opens at the head. Each half sees its own
+/// update and recomputes the same union, so no half ever writes the other.
+///
+/// Vanilla additionally ignores an update whose source is another block of the
+/// same door type. That guard only suppresses the open/close sound: a sibling
+/// half changing state does not alter either half's neighbour signal, so the
+/// `powered != self.powered` test below already makes such an update a no-op.
+///
+/// **Unverified:** a door's piston push reaction is not modelled here, so a
+/// door in the path of a piston moves as ordinary material. If doors are in
+/// fact `PushReaction.DESTROY` that is a divergence, but guessing either way
+/// is a silent one — it wants a gametest capture, not a judgement call.
+pub struct Door<P: PowerSource> {
+    /// Whether this state is powered.
+    pub powered: bool,
+    /// Toward the other half: up from a lower half, down from an upper.
+    pub other_half: Dir,
+    /// Both-false / both-true states for `(open, powered)`.
+    pub states: StatePair,
+    /// How power is read.
+    pub power: P,
+}
+
+impl<P: PowerSource> Door<P> {
+    fn signal_at(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        crate::pos::ALL_DIRS.iter().any(|dir| {
+            self.power
+                .is_powered(ctx.world, ctx.comparator_out, pos.offset(*dir), dir.opposite())
+        })
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for Door<P> {
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        let signal = self.signal_at(ctx, pos) || self.signal_at(ctx, pos.offset(self.other_half));
+        if signal != self.powered {
+            ctx.set_quiet(pos, self.states.get(signal));
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "door"
     }
 }
 

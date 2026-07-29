@@ -1,0 +1,22 @@
+{
+  "name": "a button strongly powers the block it sits on, and the dust beside that block hears it",
+  "structure": "../corpus/structures/button_support.snbt",
+  "settle": "in-world",
+  "actions": [
+    { "tick": 1, "use": [1, 1, 0] }
+  ],
+  "checks": [
+    { "tick": 0, "expect": "blocks", "blocks": {
+        "1,1,0": "minecraft:stone_button[powered=false]",
+        "2,0,0": "minecraft:redstone_wire[power=0]"
+    } },
+    { "tick": 3, "expect": "blocks", "blocks": {
+        "1,1,0": "minecraft:stone_button[powered=true]",
+        "2,0,0": "minecraft:redstone_wire[power=15]"
+    } },
+    { "tick": 25, "expect": "blocks", "blocks": {
+        "1,1,0": "minecraft:stone_button[powered=false]",
+        "2,0,0": "minecraft:redstone_wire[power=0]"
+    } }
+  ]
+}

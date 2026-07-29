@@ -285,7 +285,7 @@ impl<'a> Parser<'a> {
     /// A bare or quoted key.
     fn key(&mut self) -> Result<String, StructureError> {
         self.skip_ws();
-        if self.peek() == Some(b'"') {
+        if matches!(self.peek(), Some(b'"' | b'\'')) {
             return self.string();
         }
         let start = self.at;
@@ -303,12 +303,20 @@ impl<'a> Parser<'a> {
         Ok(String::from_utf8_lossy(&self.text[start..self.at]).into_owned())
     }
 
+    /// A quoted string. SNBT permits either quote character, and writers pick
+    /// whichever avoids escaping — a sign's `Text1` holds JSON full of `"`, so
+    /// vanilla and quartz alike emit it single-quoted. Accepting only `"` made
+    /// every signed build unparseable.
     fn string(&mut self) -> Result<String, StructureError> {
-        self.eat(b'"')?;
+        let quote = match self.peek() {
+            Some(q @ (b'"' | b'\'')) => q,
+            _ => return self.err("expected a quoted string"),
+        };
+        self.at += 1;
         let mut out = String::new();
         while self.at < self.text.len() {
             match self.text[self.at] {
-                b'"' => {
+                b if b == quote => {
                     self.at += 1;
                     return Ok(out);
                 }
@@ -355,7 +363,7 @@ impl<'a> Parser<'a> {
                 let mut depth = 0;
                 while self.at < self.text.len() {
                     match self.text[self.at] {
-                        b'"' => {
+                        b'"' | b'\'' => {
                             self.string()?;
                             continue;
                         }
@@ -373,7 +381,7 @@ impl<'a> Parser<'a> {
                 }
                 self.err("unterminated value")
             }
-            Some(b'"') => self.string().map(|_| ()),
+            Some(b'"' | b'\'') => self.string().map(|_| ()),
             Some(_) => {
                 while self.at < self.text.len() {
                     let c = self.text[self.at] as char;
@@ -897,6 +905,25 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
+
+    /// A sign's `Text1` is JSON, so every writer emits it single-quoted rather
+    /// than escaping each inner `"`. The parser rejected those outright, which
+    /// meant no build containing a signed label could load at all.
+    #[test]
+    fn single_quoted_strings_parse() {
+        let text = r#"{
+            DataVersion: 4903,
+            size: [1, 1, 1],
+            palette: [{Name: "minecraft:oak_sign"}],
+            blocks: [
+                {pos: [0, 0, 0], state: 0, nbt: {Text1: '{"text":"a \"b\" c"}', Color: white}}
+            ],
+            entities: []
+        }"#;
+        let parsed = Structure::parse(text).expect("single-quoted nbt should parse");
+        assert_eq!(parsed.blocks.len(), 1);
+        assert_eq!(parsed.block_entities, vec![Pos::new(0, 0, 0)]);
+    }
     use super::*;
 
     const SAMPLE: &str = r#"{
