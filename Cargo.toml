@@ -394,3 +394,8 @@ required-features = ["rendering"]
 [[example]]
 name = "door_batch_load"
 required-features = ["bridge", "mc-tick"]
+
+# Diagnostic only: how many authored entities survive into the simulator.
+[[example]]
+name = "world_entity_audit"
+required-features = ["bridge", "mc-tick"]
