@@ -307,6 +307,13 @@ function detectInputs(makeSim: () => any, settled: ReplayBlock[]): Detection {
   let movedButOpenedNothing = 0;
   let flickered = 0;
   let tested = 0;
+  /** Controls the engine will not let us throw. A weighted pressure plate is
+   *  the known case: mc-tick registers `power=0` and no powered state above it,
+   *  so writing one back is a `NotFound`. That is a limit of the simulator, not
+   *  a fault in the build — and it must not take the whole file down with it,
+   *  because `55 3x3` carries a perfectly good button alongside two such
+   *  plates and used to be refused outright on the plate's exception. */
+  let unactuatable = 0;
 
   const trial = (c: { b: ReplayBlock; kind: InputControl["kind"] }) => {
     const cp: number = sim.checkpoint();
@@ -317,7 +324,16 @@ function detectInputs(makeSim: () => any, settled: ReplayBlock[]): Detection {
       moved: 0,
       momentary: false,
     };
-    actuateOnce(sim, control);
+    try {
+      actuateOnce(sim, control);
+    } catch {
+      // The engine refused the stroke. Put the world back and move on to the
+      // next control; one input the simulator cannot express says nothing
+      // about the others.
+      unactuatable++;
+      sim.restore(cp);
+      return;
+    }
     // The world at PEAK travel, not at the end: a button springs back on its
     // own, so a door it drives stands fully open mid-trial and is shut again by
     // the time the world goes quiet. Reading only the end would score that door
@@ -372,7 +388,13 @@ function detectInputs(makeSim: () => any, settled: ReplayBlock[]): Detection {
     // than the whole world, because a machine passing through its own doorway
     // clears it for a tick on the way past.
     const cp2: number = sim.checkpoint();
-    actuateOnce(sim, control);
+    try {
+      actuateOnce(sim, control);
+    } catch {
+      unactuatable++;
+      sim.restore(cp2);
+      return;
+    }
     let run = 0;
     let held = 0;
     let open = false;
@@ -420,21 +442,57 @@ function detectInputs(makeSim: () => any, settled: ReplayBlock[]): Detection {
     }
   }
 
+  // A control the engine refused was still reached, so it counts against the
+  // plan; without it the budget note would blame the clock for a skip.
   const budgetNote =
-    tested < planned
+    tested + unactuatable < planned
       ? ` The search stopped after ${tested} of ${planned} controls — it ran out of time, not out of candidates.`
       : "";
+  const engineNote = unactuatable
+    ? ` ${unactuatable} control${unactuatable === 1 ? "" : "s"} could not be thrown at all: the ` +
+      `simulator has no powered state to write back (a weighted pressure plate is the usual ` +
+      `case), so ${unactuatable === 1 ? "it was" : "they were"} skipped rather than counted ` +
+      `against the door.`
+    : "";
+
+  // Every control in the file is a note block, and a note block is an
+  // instrument: it drives a door only by accident, BUDding whatever piston it
+  // happens to be stuck to. So a passage one of them clears is not evidence
+  // about the door — it is evidence about which note block the search reached
+  // first. `780b_0.6s_unseamless_5x5` carries 23 of them and no lever at all:
+  // one reports a 1 x 6 slot, another a 5 x 5 doorway, and the two disagree
+  // because neither is the control. Certifying off whichever won the race
+  // publishes a confident number nobody measured, so the finding is stated
+  // instead: this file is missing its driver.
+  if (drivers.length === 0 && instruments.length > 0) {
+    const jostled = opened.length + movedButOpenedNothing + flickered;
+    const accident = opened.length
+      ? ` ${opened.length} of them did clear a passage, but which one fires first is an ` +
+        `accident of ordering rather than anything the builder wired, so none of it is timed.`
+      : jostled
+        ? ` ${jostled} of them shifted the machine without ever opening it.`
+        : " None of them moved a single block.";
+    return {
+      input: null,
+      alternatives: [],
+      tested,
+      note:
+        `No control to actuate. All ${instruments.length} control` +
+        `${instruments.length === 1 ? "" : "s"} in this build ` +
+        `${instruments.length === 1 ? "is a note block" : "are note blocks"}, and a note ` +
+        `block drives a door only by accident — it emits a block update to whatever it is ` +
+        `stuck to.${accident} Include the lever, button or pressure plate that actually ` +
+        `runs this door.${budgetNote}`,
+    };
+  }
 
   if (opened.length === 0) {
     const kinds = [...new Set(candidates.map((c) => c.kind))].join(", ");
     const n = `${tested} control${tested === 1 ? "" : "s"}`;
-    const onlyInstruments = drivers.length === 0;
-    // Every control in the file is a note block: say that, because it is the
-    // finding. The builder saved the chime and left the lever behind.
-    const instrumentNote = onlyInstruments
-      ? ` Every control in this file is a note block, and a note block drives a door only ` +
-        `by accident — this build is missing the lever, button or plate that runs it.`
-      : "";
+    // A build whose every control is a note block never reaches here — it is
+    // refused above, whether or not one of the chimes happened to open
+    // something. So from this point on there is at least one real driver.
+    const instrumentNote = "";
     if (movedButOpenedNothing + flickered === 0)
       return {
         input: null,
@@ -443,7 +501,7 @@ function detectInputs(makeSim: () => any, settled: ReplayBlock[]): Detection {
         note:
           `Nothing moved. All ${n} in this build (${kinds}) were actuated one at a time ` +
           `and none of them shifted a single block, so this build has no door to time — ` +
-          `or its driver is outside the file.${instrumentNote}${budgetNote}`,
+          `or its driver is outside the file.${instrumentNote}${engineNote}${budgetNote}`,
       };
     const what: string[] = [];
     if (movedButOpenedNothing)
@@ -463,7 +521,7 @@ function detectInputs(makeSim: () => any, settled: ReplayBlock[]): Detection {
       tested,
       note:
         `Nothing opened. All ${n} in this build (${kinds}) were actuated one at a time: ` +
-        `${what.join("; ")}. So there is no doorway here to time.${instrumentNote}${budgetNote}`,
+        `${what.join("; ")}. So there is no doorway here to time.${instrumentNote}${engineNote}${budgetNote}`,
     };
   }
 

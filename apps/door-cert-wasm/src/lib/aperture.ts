@@ -103,10 +103,16 @@ export function aperture(
   //    end on its first step, the escape guard fires, and an ordinary 2 x 2
   //    door with its own lever is reported as having no passage at all.
   //
-  //    Trying the densest axis FIRST is what makes this safe: a door that
-  //    already reads is solved on exactly the plane it was solved on before,
-  //    and the other two axes are reached only where the old rule found
-  //    nothing whatsoever. Nothing that used to yield a passage can change.
+  //    "Trying the densest axis first, first walkable wins" was the original
+  //    rule, defended as safe because nothing that used to yield a passage can
+  //    change. That is true and it is the wrong half of the story: the hazard
+  //    is not that a solved door moves, it is that A WRONG AXIS CAN NOW ANSWER
+  //    WHERE NOTHING ANSWERED BEFORE. `Fastest_3x3_Hipster` is the case —
+  //    its real 3 x 3 doorway sits on an x-plane whose fill escapes, while a
+  //    y-plane grows a 5-cell blob out of two stray vacated cells and, being
+  //    merely first, was published as a "2 × 4 Ceiling Skydoor". A confident
+  //    wrong answer is worse than a refusal, so first-wins is gone: all three
+  //    axes are solved and the winner is chosen STRUCTURALLY, below.
   const axisSeeds: { axis: number; coord: number; n: number }[] = [];
   for (let axis = 0; axis < 3; axis++) {
     const byCoord = new Map<number, number>();
@@ -130,6 +136,11 @@ export function aperture(
     lo: number;
     hi: number;
     passage: { set: Set<string>; parts: number } | null;
+    /** The fill ran off the edge of the build rather than being stopped by a
+     *  wall. Distinct from "found nothing walkable": an escape means the plane
+     *  may still be the right one and only the FILL is unusable — see the
+     *  candidate rules below. */
+    escaped: boolean;
   };
 
   const parse = (key: string) => key.split(",").map(Number) as [number, number];
@@ -240,6 +251,7 @@ export function aperture(
       }
       return r1 - r0 + 1 >= 2 && (vertical || c1 - c0 + 1 >= 2);
     };
+    let escaped = false;
     const floodPassage = (l0: number, l1: number): Fill | null => {
       const clear = (col: number, row: number) => {
         for (let layer = l0; layer <= l1; layer++)
@@ -258,9 +270,15 @@ export function aperture(
         const queue = [seed];
         while (queue.length) {
           const [a, b] = parse(queue.pop()!);
-          // Reaching the outside of the build means the seed was wrong or the
-          // doorway is not enclosed; either way the fill is meaningless.
-          if (a <= domC0 || a >= domC1 || b <= domR0 || b >= domR1) return null;
+          // Reaching the outside of the build means the fill is not bounded by
+          // a wall. Often the seed was wrong — but not always: a builder who
+          // crops the schematic to the machine leaves the doorway touching the
+          // saved region's own edge, with no wall above it to stop anything.
+          // So this kills the FILL, and is recorded rather than thrown away.
+          if (a <= domC0 || a >= domC1 || b <= domR0 || b >= domR1) {
+            escaped = true;
+            return null;
+          }
           for (const [da, db] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
             const na = a + da, nb = b + db;
             const nk = `${na},${nb}`;
@@ -326,21 +344,91 @@ export function aperture(
     return {
       best, vertical, rowAxis, colAxis, flat, at,
       domC0, domC1, domR0, domR1, axis0, axis1,
-      patch, lo, hi, passage,
+      patch, lo, hi, passage, escaped: escaped && passage === null,
     };
   };
 
-  let solved: Solution | null = null;
-  for (const seed of axisSeeds) {
-    const s = solveOnAxis(seed);
-    if (s.passage) {
-      solved = s;
-      break;
+  // Every axis is solved, then one is chosen on the SHAPE of what it found.
+  //
+  // A doorway is a rectangle far more often than a machine's leftover void is,
+  // and that is a structural property of the answer rather than a threshold
+  // tuned until the corpus passed. Two candidates come off each axis:
+  //
+  //   * the flood, when it was stopped by a wall; and
+  //   * failing that, and only when the fill ESCAPED, the vacated patch itself
+  //     — but only if the door blocks left a solid rectangle at least 2 x 2.
+  //     A cropped schematic has no wall to stop a fill, so the door blocks are
+  //     the only evidence of the doorway left; a ragged patch is not evidence.
+  //
+  // Ranked: rectangles before ragged shapes, a measured fill before a bare
+  // patch, and then — deliberately — the DENSEST AXIS, which is the order the
+  // old rule used. Size is not the tiebreak: ranking two equally ragged fills
+  // by area re-decides doors the old rule already answered, and it re-decided
+  // `5x5_circel_entities` into a reading its own timing gate then threw out.
+  // Preserving the old order among like candidates is what keeps this change
+  // additive; the ranking only ever moves a door the old rule got WRONG.
+  //
+  // The patch route can only overrule a fill that actually found something if
+  // it describes a STRICTLY BIGGER opening — otherwise a 2 x 2 scrap of
+  // machinery could unseat a real ragged doorway like an iris, which is
+  // exactly the failure this ranking exists to avoid.
+  const bboxOf = (set: Set<string>) => {
+    let c0 = Infinity, c1 = -Infinity, r0 = Infinity, r1 = -Infinity;
+    for (const key of set) {
+      const [a, b] = parse(key);
+      if (a < c0) c0 = a;
+      if (a > c1) c1 = a;
+      if (b < r0) r0 = b;
+      if (b > r1) r1 = b;
     }
-  }
-  // No axis found anything walkable. The densest plane is still the honest
-  // answer to "where is the machine", and the fallback below measures from it.
-  const sol = solved ?? solveOnAxis(axisSeeds[0]);
+    return { w: c1 - c0 + 1, h: r1 - r0 + 1 };
+  };
+  type Candidate = {
+    sol: Solution;
+    set: Set<string>;
+    size: number;
+    rect: boolean;
+    fromFlood: boolean;
+    /** Position in the densest-first axis order — the old rule's tiebreak. */
+    rank: number;
+  };
+  const solutions = axisSeeds.map(solveOnAxis);
+  const candidates: Candidate[] = [];
+  solutions.forEach((s, rank) => {
+    if (s.passage) {
+      const bb = bboxOf(s.passage.set);
+      candidates.push({
+        sol: s,
+        set: s.passage.set,
+        size: s.passage.set.size,
+        rect: s.passage.set.size === bb.w * bb.h,
+        fromFlood: true,
+        rank,
+      });
+    } else if (s.escaped && s.patch.length > 0) {
+      const set = new Set(s.patch);
+      const bb = bboxOf(set);
+      if (bb.w >= 2 && bb.h >= 2 && set.size === bb.w * bb.h)
+        candidates.push({ sol: s, set, size: set.size, rect: true, fromFlood: false, rank });
+    }
+  });
+  let bestFlood = 0;
+  for (const c of candidates) if (c.fromFlood && c.size > bestFlood) bestFlood = c.size;
+  const eligible = candidates.filter((c) => c.fromFlood || c.size > bestFlood);
+  eligible.sort(
+    (a, b) =>
+      (a.rect ? 0 : 1) - (b.rect ? 0 : 1) ||
+      (a.fromFlood ? 0 : 1) - (b.fromFlood ? 0 : 1) ||
+      a.rank - b.rank,
+  );
+  const chosen = eligible[0] ?? null;
+  // Nothing anywhere. The densest plane is still the honest answer to "where is
+  // the machine", and the fallback below measures from it.
+  const sol = chosen ? chosen.sol : solutions[0];
+  // A patch-derived doorway becomes this solution's passage: those cells are
+  // exactly the ones the door blocks vacated, so they are what the pattern is
+  // read over and what the timing is taken across.
+  if (chosen && !chosen.fromFlood) sol.passage = { set: chosen.set, parts: 1 };
   const { best, vertical, flat, at, patch, passage, lo, hi } = sol;
   const depth = hi - lo + 1;
 
