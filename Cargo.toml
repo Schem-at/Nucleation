@@ -388,3 +388,9 @@ hematite-nbt = { git = "https://github.com/StackDoubleFlow/hematite_nbt" }
 [[example]]
 name = "render_simulation_video"
 required-features = ["rendering"]
+
+# Diagnostic only: loads a list of doors through the public bridge surface, so
+# it needs the same features the browser build has.
+[[example]]
+name = "door_batch_load"
+required-features = ["bridge", "mc-tick"]
