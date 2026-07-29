@@ -216,6 +216,17 @@ pub struct PendingMove {
     /// neighbour update it receives on to its base — updates vanilla never
     /// delivers.
     pub source_piston: bool,
+    /// Which way the block is *travelling*, when a piston is carrying it.
+    ///
+    /// Extension moves toward the piston's facing, retraction away from it.
+    /// `None` for a deferred write that is not a piston movement.
+    ///
+    /// Carried because a `moving_piston` is not only a delayed block write —
+    /// while it is in flight its collision box sweeps forward, and entities in
+    /// that sweep are shoved along. Without the direction the engine knows a
+    /// block is moving but not which way, and cannot displace anything.
+    /// See [`crate::piston::sweep_displacement`].
+    pub sweep: Option<crate::piston::Sweep>,
 }
 
 /// What a behaviour is given when it runs.
@@ -719,21 +730,41 @@ impl<'a> TickCtx<'a> {
 
     /// Schedule a block write for `delay` ticks from now, resolved in the
     /// block-entities phase.
-    pub fn defer(&mut self, pos: Pos, state: StateId, delay: u64) {
-        self.push_move(pos, state, delay, false);
+    pub fn defer(
+        &mut self,
+        pos: Pos,
+        state: StateId,
+        delay: u64,
+        sweep: Option<crate::piston::Sweep>,
+    ) {
+        self.push_move(pos, state, delay, false, sweep);
     }
 
     /// `defer`, for the placeholder a piston writes over its own square.
-    pub fn defer_source(&mut self, pos: Pos, state: StateId, delay: u64) {
-        self.push_move(pos, state, delay, true);
+    pub fn defer_source(
+        &mut self,
+        pos: Pos,
+        state: StateId,
+        delay: u64,
+        sweep: Option<crate::piston::Sweep>,
+    ) {
+        self.push_move(pos, state, delay, true, sweep);
     }
 
-    fn push_move(&mut self, pos: Pos, state: StateId, delay: u64, source_piston: bool) {
+    fn push_move(
+        &mut self,
+        pos: Pos,
+        state: StateId,
+        delay: u64,
+        source_piston: bool,
+        sweep: Option<crate::piston::Sweep>,
+    ) {
         self.moves.push(PendingMove {
             pos,
             state,
             resolve_on: self.tick + delay,
             source_piston,
+            sweep,
         });
     }
 }

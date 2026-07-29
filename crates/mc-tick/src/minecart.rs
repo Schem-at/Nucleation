@@ -267,14 +267,31 @@ fn move_cart(
     // `setDeltaMovement` like everything else: if the cart's other components
     // are non-finite the write is refused and a NaN cart keeps its NaN rather
     // than being quietly converted into a stationary ordinary cart.
+    //
+    // And the zeroing is a **multiply by zero**, not an assignment of zero.
+    // Two captures say so independently:
+    //
+    // * `piston_pull.entities.log` records a cart's velocity as `(-0.0, 0.0,
+    //   0.0)`. A negative zero cannot come from assigning `0.0`; it is what
+    //   `x * 0.0` gives for a negative `x`.
+    // * `piston_entity.entities.log` has a cart resting off-rail on stone with
+    //   `Motion.z` NaN, and it is still NaN thirty ticks later. Assigning
+    //   `0.0` to the clipped z would make the vector finite, and the
+    //   `setDeltaMovement` guard would then *accept* it — quietly turning the
+    //   nan cart into an ordinary stationary one. `NaN * 0.0` is NaN, the
+    //   guard refuses the write, and the cart stays dead. That is the whole
+    //   mechanism the record doors are glued together with.
+    //
+    // For every finite velocity the two are indistinguishable, which is why
+    // this went unnoticed until an entity was parked off-rail.
     if hit[0] {
-        set_delta(cart, [0.0, cart.vel[1], cart.vel[2]]);
+        set_delta(cart, [cart.vel[0] * 0.0, cart.vel[1], cart.vel[2]]);
     }
     if hit[1] {
-        set_delta(cart, [cart.vel[0], 0.0, cart.vel[2]]);
+        set_delta(cart, [cart.vel[0], cart.vel[1] * 0.0, cart.vel[2]]);
     }
     if hit[2] {
-        set_delta(cart, [cart.vel[0], cart.vel[1], 0.0]);
+        set_delta(cart, [cart.vel[0], cart.vel[1], cart.vel[2] * 0.0]);
     }
 }
 
@@ -299,7 +316,14 @@ pub fn tick_minecart_blocked(
     obstacles: &[([f64; 3], [f64; 3])],
 ) {
     let before = [cart.pos[0], cart.pos[2]];
-    cart.vel[1] -= CART_GRAVITY;
+    // Gravity through `set_delta` like every other velocity write. Vanilla's
+    // is `setDeltaMovement(getDeltaMovement().add(0.0, -0.04, 0.0))`, and the
+    // `isFinite` guard refuses the whole vector when any component is
+    // non-finite — so a NaN cart does not accumulate fall speed. The
+    // `piston_entity` capture reads its nan cart's velocity as `(0, 0, NaN)`
+    // on every one of thirty ticks, never `(0, -0.04, NaN)`, which is what a
+    // direct subtraction here produced.
+    set_delta(cart, [cart.vel[0], cart.vel[1] - CART_GRAVITY, cart.vel[2]]);
     let rail_pos = rail_block_pos(cart, world);
     match world.rail(rail_pos) {
         Some(rail) => {

@@ -786,12 +786,22 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     // takes its square, and that booking then strands at a
                     // position the observer no longer occupies.
                     ctx.drain();
-                    ctx.defer(to, *state, PISTON_MOVE_TICKS);
+                    ctx.defer(
+                        to,
+                        *state,
+                        PISTON_MOVE_TICKS,
+                        Some(Sweep { travel: self.facing, extending: true }),
+                    );
                 }
                 // The head slot is itself in motion until the move completes.
                 ctx.set_shape_only(head_slot, self.moving);
                 ctx.drain();
-                ctx.defer_source(head_slot, self.head, PISTON_MOVE_TICKS);
+                ctx.defer_source(
+                    head_slot,
+                    self.head,
+                    PISTON_MOVE_TICKS,
+                    Some(Sweep { travel: self.facing, extending: true }),
+                );
 
                 // `moveBlocks`' tail: `updateNeighborsAt` for every position a
                 // block *left*, walked backwards like the write loop, then the
@@ -972,7 +982,12 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                     ctx.drain();
                 }
                 ctx.set(pos, self.moving);
-                ctx.defer_source(pos, self.states.get(false), PISTON_MOVE_TICKS);
+                ctx.defer_source(
+                    pos,
+                    self.states.get(false),
+                    PISTON_MOVE_TICKS,
+                    Some(Sweep { travel: self.facing.opposite(), extending: false }),
+                );
 
                 if self.sticky {
                     let back = self.facing.opposite();
@@ -1015,7 +1030,12 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                                 // next one is written.
                                 ctx.set_shape_only(to, self.moving_block);
                                 ctx.drain();
-                                ctx.defer(to, *state, PISTON_MOVE_TICKS);
+                                ctx.defer(
+                        to,
+                        *state,
+                        PISTON_MOVE_TICKS,
+                                    Some(Sweep { travel: back, extending: false }),
+                                );
                             }
                             for (from, _) in &carried {
                                 if !destinations.contains(from) {
@@ -1701,5 +1721,221 @@ mod tests {
         let p = piston(false, false);
         let mut ctx = run(&mut w, &mut t, &mut e, &s);
         assert!(!p.on_block_event(&mut ctx, Pos::new(0, 1, 0), 9, 0));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Entities in a moving piston's way.
+// ---------------------------------------------------------------------------
+
+/// A block a piston currently has in flight: which way it is going, and
+/// whether the piston is pushing or pulling.
+///
+/// The direction alone does not say which, and the two are not equally known:
+/// **extension** displacement is measured and reproduced bit-exactly, while
+/// **retraction** is not — see [`sweep_displacement`] and
+/// `crate::sim::Simulation::piston_retract_contacts`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Sweep {
+    /// The direction the block is travelling.
+    pub travel: Dir,
+    /// `true` while the piston pushes, `false` while it pulls back.
+    pub extending: bool,
+}
+
+/// How far a moving-piston step advances, as a fraction of a block.
+///
+/// `PistonMovingBlockEntity.tick` does `float f = progress + 0.5F` once per
+/// block-entity tick, so a move is two steps of half a block. The block itself
+/// lands on the *third* tick, when `progressO` has already reached 1.0 — which
+/// is why [`PISTON_MOVE_TICKS`] is 2 and the two displacement steps happen on
+/// the tick the event ran and the one after it.
+pub const PISTON_STEP: f64 = 0.5;
+
+/// The extra shove vanilla adds on top of the overlap it measured.
+///
+/// `d1 = Math.min(d1, d0) + 0.01D`. It is not cosmetic: it is why a dragon
+/// fireball ends a full extension 1.01 blocks along and not 1.00, and it is
+/// directly visible in `piston_entity.json`.
+pub const PISTON_OVERSHOOT: f64 = 0.01;
+
+/// How far an entity is displaced by one step of a moving piston, or `None` if
+/// this step does not touch it.
+///
+/// The model is `PistonMovingBlockEntity.moveCollidedEntities`, reduced to the
+/// one geometry the captures exercise:
+///
+/// * the moving block's collision box at `progress` is the unit cube at its
+///   **destination**, offset back along the travel direction by `1 - progress`;
+/// * `PistonMath.getMovementArea` turns that into the *slab* the leading face
+///   sweeps through this step — from the leading face, `PISTON_STEP` further
+///   on;
+/// * an entity overlapping the slab is pushed by the depth of that overlap
+///   measured from the slab's trailing edge, capped at the step, plus
+///   [`PISTON_OVERSHOOT`].
+///
+/// # Why a unit cube is exact here, and where it would not be
+///
+/// Vanilla takes the max over the moved state's individual collision boxes. For
+/// the head slot the state is `piston_head`, whose plate sits flush against the
+/// leading face of its block and whose arm trails behind it — so the plate,
+/// not the arm, sets the maximum, and the plate's leading face *is* the unit
+/// cube's. For a pushed block the state is whatever was pushed, and every one
+/// in the record door is a full cube. A pushed slab or stair would have a
+/// leading face short of the cube's and this would over-report; that case is
+/// unmeasured, and noted rather than guessed at.
+///
+/// Verified bit-exact against `crates/mc-tick/tests/traces/piston_entity.json`
+/// (see `tools/gametest/captures/piston_entity.entities.log`) for a minecart,
+/// a NaN minecart, a small fireball and a dragon fireball.
+pub fn sweep_displacement(
+    destination: Pos,
+    travel: Dir,
+    progress: f64,
+    entity_min: [f64; 3],
+    entity_max: [f64; 3],
+) -> Option<f64> {
+    let axis = match travel {
+        Dir::West | Dir::East => 0,
+        Dir::Down | Dir::Up => 1,
+        Dir::North | Dir::South => 2,
+    };
+    let (sx, sy, sz) = travel.delta();
+    let sign = f64::from([sx, sy, sz][axis]);
+    let origin = [
+        f64::from(destination.x),
+        f64::from(destination.y),
+        f64::from(destination.z),
+    ];
+    // `moveByPositionAndProgress`: the cube, shifted back by the distance still
+    // to travel.
+    let behind = 1.0 - progress;
+    let mut block_min = [0.0f64; 3];
+    let mut block_max = [0.0f64; 3];
+    for i in 0..3 {
+        let shift = if i == axis { -behind * sign } else { 0.0 };
+        block_min[i] = origin[i] + shift;
+        block_max[i] = origin[i] + 1.0 + shift;
+    }
+    // `PistonMath.getMovementArea`: the slab in front of the leading face.
+    let leading = if sign > 0.0 { block_max[axis] } else { block_min[axis] };
+    let (slab_lo, slab_hi) = if sign > 0.0 {
+        (leading, leading + PISTON_STEP)
+    } else {
+        (leading - PISTON_STEP, leading)
+    };
+    let mut slab_min = block_min;
+    let mut slab_max = block_max;
+    slab_min[axis] = slab_lo;
+    slab_max[axis] = slab_hi;
+    // `AABB.intersects` — strict, so a face exactly touching is not a hit.
+    for i in 0..3 {
+        if !(entity_min[i] < slab_max[i] && entity_max[i] > slab_min[i]) {
+            return None;
+        }
+    }
+    // `getMovement`: how deep the entity is into the slab, from behind it.
+    let overlap = if sign > 0.0 {
+        slab_max[axis] - entity_min[axis]
+    } else {
+        entity_max[axis] - slab_min[axis]
+    };
+    if overlap <= 0.0 {
+        return None;
+    }
+    Some(overlap.min(PISTON_STEP) + PISTON_OVERSHOOT)
+}
+
+#[cfg(test)]
+mod sweep_tests {
+    use super::*;
+
+    /// The four lanes of `piston_entity.json`, replayed step by step.
+    ///
+    /// Piston at x=2 facing east, head slot x=3, every entity centred at
+    /// x=3.5. Vanilla's answers, from the entity log, are the `expected`
+    /// column — and they are compared exactly, not approximately, because the
+    /// eighth decimal of the cart's is the float width of its hitbox and the
+    /// 0.01 is vanilla's overshoot. Both would survive an epsilon.
+    #[test]
+    fn extension_reproduces_the_capture_to_the_last_bit() {
+        // (kind, half-width, [pos after step 1, pos after step 2])
+        let cases: [(&str, f64, [f64; 2]); 3] = [
+            // minecart and NaN minecart — one hitbox, one answer
+            ("minecart", crate::minecart::CART_HALF_WIDTH, [4.000000009536743, 4.500000009536743]),
+            ("small_fireball", 0.15625, [3.66625, 4.16625]),
+            ("dragon_fireball", 0.5, [4.01, 4.51]),
+        ];
+        for (kind, half, expected) in cases {
+            let mut x = 3.5;
+            for (step, want) in expected.iter().enumerate() {
+                let progress = f64::from(step as u32) * PISTON_STEP;
+                let d = sweep_displacement(
+                    Pos::new(3, 1, 1),
+                    Dir::East,
+                    progress,
+                    [x - half, 1.0, 1.5 - half],
+                    [x + half, 1.7, 1.5 + half],
+                )
+                .unwrap_or_else(|| panic!("{kind} step {step}: vanilla displaced it"));
+                x += d;
+                assert_eq!(x, *want, "{kind} after step {step}");
+            }
+        }
+    }
+
+    /// The same capture's retraction at t14: by then the entities sit a block
+    /// clear of the arm, and vanilla moves nothing for the remaining 15 ticks.
+    #[test]
+    fn a_retracting_arm_does_not_reach_an_entity_that_is_already_clear() {
+        let half = crate::minecart::CART_HALF_WIDTH;
+        for step in 0..2 {
+            let progress = f64::from(step) * PISTON_STEP;
+            // Retraction: the head travels back into the piston's own square.
+            let d = sweep_displacement(
+                Pos::new(2, 1, 1),
+                Dir::West,
+                progress,
+                [4.500000009536743 - half, 1.0, 1.01],
+                [4.500000009536743 + half, 1.7, 1.99],
+            );
+            assert_eq!(d, None, "step {step}");
+        }
+    }
+
+    /// An entity behind the leading face is not dragged along. The sweep is a
+    /// slab in front of the block, not the block's own volume.
+    #[test]
+    fn nothing_behind_the_arm_is_touched() {
+        assert_eq!(
+            sweep_displacement(
+                Pos::new(3, 1, 1),
+                Dir::East,
+                0.0,
+                [1.1, 1.0, 1.1],
+                [1.9, 1.7, 1.9],
+            ),
+            None
+        );
+    }
+
+    /// Vertical and negative axes use the same geometry — a piston facing down
+    /// shoves an entity down by the same overlap-plus-overshoot.
+    #[test]
+    fn the_geometry_is_not_special_cased_per_axis() {
+        // Head slot at y=3 travelling down: at progress 0 the cube still sits
+        // a block back, spanning y in [4, 5], and its leading (lower) face at
+        // 4.0 sweeps down to 3.5. An entity whose head is at 3.95 is 0.45
+        // into that slab. Not a capture — a check that the axis switch is
+        // symmetric, with the arithmetic written out rather than a magic
+        // number.
+        let d = sweep_displacement(
+            Pos::new(1, 3, 1),
+            Dir::Down,
+            0.0,
+            [1.1, 3.0, 1.1],
+            [1.9, 3.95, 1.9],
+        );
+        assert_eq!(d, Some((3.95_f64 - 3.5) + PISTON_OVERSHOOT));
     }
 }

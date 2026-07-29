@@ -200,6 +200,21 @@ pub struct Simulation {
     /// fireballs. `(id, kind, position)`; see
     /// [`Simulation::spawn_frozen_entity`].
     frozen: Vec<(u32, String, [f64; 3])>,
+    /// Which version's `Entity.load` Motion handling the authored spawns run
+    /// under. See [`crate::motion`] — it decides whether a nan cart exists.
+    motion_semantics: crate::motion::MotionSemantics,
+    /// Entities whose box entered a *retracting* piston's sweep.
+    ///
+    /// `(tick, entity id)`, appended and never cleared within a run. Piston
+    /// **extension** displacement is measured and implemented
+    /// ([`piston_entity.json`]); retraction is not — `piston_pull.json` shows
+    /// sub-0.03 displacements that are not uniformly backwards and that no
+    /// model here reproduces. Rather than let "we do nothing on retraction"
+    /// look identical to "vanilla does nothing on retraction", every contact
+    /// is recorded, so a build that depends on the unmodelled path says so.
+    ///
+    /// [`piston_entity.json`]: crate::sim::Simulation::piston_retract_contacts
+    retract_contacts: Vec<(u64, u32)>,
     /// Entity positions as of the last recorded tick, for event emission.
     entity_snapshot: std::collections::HashMap<u32, [f64; 3]>,
     /// Recorded entity events, when recording is enabled.
@@ -295,6 +310,8 @@ impl Simulation {
             conductors: Vec::new(),
             minecarts: Vec::new(),
             frozen: Vec::new(),
+            motion_semantics: crate::motion::MotionSemantics::default(),
+            retract_contacts: Vec::new(),
             entity_snapshot: std::collections::HashMap::new(),
             ent_log: None,
             tickers: Vec::new(),
@@ -485,11 +502,116 @@ impl Simulation {
                 id
             }
         };
-        self.push_minecart(id, cart.kind.clone(), cart.pos, cart.motion);
+        let motion = self.motion_semantics.load_motion(cart.motion, [0.0; 3]);
+        self.push_minecart(id, cart.kind.clone(), cart.pos, motion);
         if let Some(spawned) = self.minecarts.last_mut() {
             spawned.yaw = cart.yaw;
         }
         id
+    }
+
+    /// Which version's `Entity.load` Motion handling authored spawns use.
+    ///
+    /// Set from the save's own DataVersion. Whoever loads a world knows it;
+    /// the engine cannot, and guessing would decide whether a nan cart exists.
+    pub fn set_motion_semantics(&mut self, semantics: crate::motion::MotionSemantics) {
+        self.motion_semantics = semantics;
+    }
+
+    /// The Motion-load path this simulation is running under.
+    ///
+    /// Readable so that a door which only works under one of them cannot look
+    /// identical to a door that works under both.
+    pub fn motion_semantics(&self) -> crate::motion::MotionSemantics {
+        self.motion_semantics
+    }
+
+    /// Entities that touched a **retracting** piston's sweep, as
+    /// `(tick, entity id)`.
+    ///
+    /// Non-empty means the run depended on behaviour this engine does not
+    /// model — see the field docs on `retract_contacts` and
+    /// `tools/gametest/captures/piston_pull.entities.log`. Empty means no
+    /// entity was ever in a retracting arm's way, which is a real answer
+    /// rather than an absence of instrumentation.
+    pub fn piston_retract_contacts(&self) -> &[(u64, u32)] {
+        &self.retract_contacts
+    }
+
+    /// Spawn an authored fireball: a frozen hitbox, and nothing more.
+    ///
+    /// Refuses a fireball that is actually *flying*. The record doors' are
+    /// caught mid-flight by a piston-and-cobweb trick and have zero motion, so
+    /// modelling them as a stationary box is what the game does with them —
+    /// but a fireball with real velocity is a projectile, and this engine has
+    /// no projectile physics. Simulating one as a stationary box would be a
+    /// wrong answer that looks like a right one.
+    pub fn spawn_authored_fireball(
+        &mut self,
+        ball: &crate::structure::SpawnedFireball,
+    ) -> Result<u32, String> {
+        let motion = self.motion_semantics.load_motion(ball.motion, [0.0; 3]);
+        if motion.iter().any(|v| *v != 0.0) {
+            return Err(format!(
+                "{} at {:?} has Motion {:?}: this engine models a fireball only as a \
+                 frozen hitbox (which is what the record doors' are — zero motion, \
+                 caught mid-flight), and has no projectile physics to fly one with",
+                ball.kind, ball.pos, motion
+            ));
+        }
+        self.spawn_frozen_entity(ball.kind.clone(), ball.pos)
+    }
+
+    /// Spawn an authored villager: a frozen hitbox, and nothing more.
+    ///
+    /// Refuses a moving one for the same reason as a flying fireball. In the
+    /// record doors a villager is a wall and a floor — its box holds carts in
+    /// place — and none of AI, pathfinding, trading or gravity is wanted or
+    /// implemented. A villager with velocity is one that is *doing* something,
+    /// and there is nothing here to do it with.
+    pub fn spawn_authored_villager(
+        &mut self,
+        villager: &crate::structure::SpawnedVillager,
+    ) -> Result<u32, String> {
+        let motion = self.motion_semantics.load_motion(villager.motion, [0.0; 3]);
+        if motion.iter().any(|v| *v != 0.0) {
+            return Err(format!(
+                "minecraft:villager at {:?} has Motion {:?}: this engine models a \
+                 villager only as a stationary hitbox, with no AI, pathfinding or \
+                 gravity to move one with",
+                villager.pos, motion
+            ));
+        }
+        self.spawn_frozen_entity("minecraft:villager".to_string(), villager.pos)
+    }
+
+    /// Spawn an authored furnace minecart.
+    ///
+    /// A furnace cart is dimensionally an ordinary cart — one hitbox for every
+    /// variant, measured — so an *unfuelled* one needs nothing the plain cart
+    /// does not already have. All fifteen in the record 3x3 door carry
+    /// `Fuel: 0` with `PushX`/`PushZ` zero, which makes them pure mass.
+    ///
+    /// A fuelled one drives itself, and that is not implemented. It refuses
+    /// rather than running as a plain cart, because a cart that should be
+    /// accelerating and is not produces a plausible-looking wrong trace.
+    pub fn spawn_authored_furnace_minecart(
+        &mut self,
+        cart: &crate::structure::SpawnedFurnaceMinecart,
+    ) -> Result<u32, String> {
+        if cart.fuel != 0 || cart.push != [0.0, 0.0] {
+            return Err(format!(
+                "minecraft:furnace_minecart at {:?} has Fuel {} and Push {:?}: \
+                 self-propulsion is not implemented, and running a fuelled cart as \
+                 an unfuelled one would silently drop its acceleration",
+                cart.pos, cart.fuel, cart.push
+            ));
+        }
+        let motion = self.motion_semantics.load_motion(cart.motion, [0.0; 3]);
+        let id = self.item_entities.next_id;
+        self.item_entities.next_id += 1;
+        self.push_minecart(id, "minecraft:furnace_minecart".to_string(), cart.pos, motion);
+        Ok(id)
     }
 
     fn push_minecart(&mut self, id: u32, kind: String, pos: [f64; 3], vel: [f64; 3]) {
@@ -537,6 +659,141 @@ impl Simulation {
         Ok(id)
     }
 
+    /// Shove entities standing in a moving piston's path — the one thing that
+    /// can move an entity whose own physics are dead.
+    ///
+    /// This is `PistonMovingBlockEntity.moveCollidedEntities`, and the record
+    /// doors are built on it: a NaN minecart ignores gravity, collisions and
+    /// players, but a piston arm still displaces it, and frozen fireballs are
+    /// pushed onto pressure plates by piston heads. The geometry is
+    /// [`crate::piston::sweep_displacement`], fitted bit-exactly to
+    /// `piston_entity.json`.
+    ///
+    /// **Displacement only.** Vanilla calls `entity.move(MoverType.PISTON, …)`
+    /// and never touches `deltaMovement`, so a pushed cart ends the shove with
+    /// exactly the velocity it started with — and a NaN cart keeps its NaN.
+    /// The capture confirms all four lanes end at zero velocity.
+    ///
+    /// A move that is in flight but frozen outside the block-ticking bounds
+    /// does not sweep, for the same reason it does not land: its block entity
+    /// is not ticking.
+    fn displace_entities_by_pistons(&mut self) {
+        let tick = self.tick;
+        let ticking = self.ticking;
+        // Insertion order, which is what `tickBlockEntities` walks.
+        let sweeps: Vec<(Pos, crate::piston::Sweep, f64)> = self
+            .moves
+            .iter()
+            .filter(|m| ticking.as_ref().is_none_or(|bounds| bounds.contains(m.pos)))
+            .filter_map(|m| {
+                let sweep = m.sweep?;
+                // `progress` before this step. A move resolves two ticks after
+                // the event that made it, and the two half-block steps are the
+                // two ticks in between — so the ticks remaining name the step.
+                let progress = match m.resolve_on.checked_sub(tick)? {
+                    2 => 0.0,
+                    1 => crate::piston::PISTON_STEP,
+                    _ => return None,
+                };
+                Some((m.pos, sweep, progress))
+            })
+            .collect();
+        if sweeps.is_empty() {
+            return;
+        }
+        for (destination, sweep, progress) in sweeps {
+            // Carts first, then frozen bodies — the order the entity-box view
+            // is built in, so a trace reads the same way.
+            for index in 0..self.minecarts.len() {
+                if self.minecarts[index].removed {
+                    continue;
+                }
+                let cart = &self.minecarts[index];
+                let (min, max) = crate::minecart::cart_aabb(cart.pos);
+                let Some(distance) =
+                    crate::piston::sweep_displacement(destination, sweep.travel, progress, min, max)
+                else {
+                    continue;
+                };
+                if !sweep.extending {
+                    self.retract_contacts.push((tick, self.minecarts[index].id));
+                    continue;
+                }
+                let moved = self.shove(min, max, sweep.travel, distance, self.minecarts[index].id);
+                for axis in 0..3 {
+                    self.minecarts[index].pos[axis] += moved[axis];
+                }
+            }
+            for index in 0..self.frozen.len() {
+                let (id, kind, pos) = &self.frozen[index];
+                let Some((min, max)) = crate::entity::body_aabb(kind, *pos) else { continue };
+                let Some(distance) =
+                    crate::piston::sweep_displacement(destination, sweep.travel, progress, min, max)
+                else {
+                    continue;
+                };
+                let id = *id;
+                if !sweep.extending {
+                    self.retract_contacts.push((tick, id));
+                    continue;
+                }
+                let moved = self.shove(min, max, sweep.travel, distance, id);
+                for axis in 0..3 {
+                    self.frozen[index].2[axis] += moved[axis];
+                }
+            }
+            self.refresh_bodies();
+        }
+    }
+
+    /// One `moveEntityByPiston`: displace a box `distance` along `travel`,
+    /// clipped by whatever is in the way.
+    ///
+    /// Vanilla's is `entity.move(MoverType.PISTON, …)`, which collides against
+    /// blocks and other entities like any other move — the NOCLIP flag exempts
+    /// only the moving piston doing the shoving, which is behind the entity
+    /// anyway. Reuses the same sweep the carts already collide with, so a
+    /// piston cannot shove a cart through a wall that would stop it rolling.
+    ///
+    /// The clipping itself is **not** separately measured: `piston_entity.json`
+    /// shoves every entity into open air, so it verifies the distance and not
+    /// what happens when the distance is refused.
+    fn shove(
+        &self,
+        min: [f64; 3],
+        max: [f64; 3],
+        travel: crate::pos::Dir,
+        distance: f64,
+        moving_id: u32,
+    ) -> [f64; 3] {
+        let (dx, dy, dz) = travel.delta();
+        let movement = [
+            f64::from(dx) * distance,
+            f64::from(dy) * distance,
+            f64::from(dz) * distance,
+        ];
+        let obstacles: Vec<([f64; 3], [f64; 3])> = self
+            .item_entities
+            .others
+            .iter()
+            .filter(|body| body.id != moving_id)
+            .map(|body| (body.min, body.max))
+            .collect();
+        let collision = SimCollision {
+            world: &self.world,
+            solidity: &self.solidity,
+            frictions: &self.frictions,
+            heights: &self.heights,
+            webs: &self.webs,
+            water_kinds: &self.water_kinds,
+            bubble_kinds: &self.bubble_kinds,
+            rails: &self.rails,
+            conductors: &self.conductors,
+        };
+        let (clipped, _) = crate::entity::collide_move_among(&collision, min, max, movement, &obstacles);
+        clipped
+    }
+
     /// Rebuild the entity-box view block behaviours read
     /// ([`crate::entity::EntityBody`]).
     ///
@@ -572,6 +829,14 @@ impl Simulation {
                 is_minecart: false,
             });
         }
+    }
+
+    /// Every non-item entity's world-space box, as block behaviours see it.
+    ///
+    /// The only public view of a frozen entity's position: it has no state
+    /// beyond a box, so exposing the box *is* exposing the entity.
+    pub fn entity_bodies(&self) -> &[crate::entity::EntityBody] {
+        &self.item_entities.others
     }
 
     /// The live minecarts.
@@ -1570,6 +1835,11 @@ impl Simulation {
                     behaviour.on_block_entity_tick(&mut ctx, pos);
                     self.propagate();
                 }
+                // Entities in the way of anything still in flight. A moving
+                // piston's block-entity tick moves entities *before* the tick
+                // on which it lands, so this runs alongside the landings and
+                // not after them.
+                self.displace_entities_by_pistons();
                 // Where a moving piston's blocks land, two ticks after the block
                 // event that started them. Captured from vanilla:
                 //   tick 0  stone -> moving_piston

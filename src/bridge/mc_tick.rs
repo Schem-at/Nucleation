@@ -362,6 +362,7 @@ fn to_gametest_snbt(schematic: &crate::UniversalSchematic) -> String {
     )
 }
 
+
 /// The sentence shown to whoever is holding a structure that will not load.
 ///
 /// Two very different failures reach the same `parse` call and they need
@@ -614,38 +615,12 @@ fn check_volume(size: (i32, i32, i32)) -> Result<(), String> {
     Ok(())
 }
 
-/// Why a build cannot be simulated, named by entity type and counted.
-///
-/// Deliberately shaped like `unknown_report`'s message for blocks, and for the
-/// same reason: "Simulation" tells someone holding a door that will not load
-/// nothing they can act on, whereas a type name does. The counts matter too —
-/// the record 3x3 door holds fifteen furnace minecarts, and naming the type
-/// once understates how much of the machine would be missing.
-fn entity_gap_report(kinds: &[&str]) -> String {
-    use std::collections::BTreeMap;
-
-    let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
-    for kind in kinds {
-        *counts.entry(*kind).or_default() += 1;
-    }
-    // Sorted by name, so the same build always produces the same sentence.
-    let named: Vec<String> = counts.iter().map(|(kind, n)| format!("{n} x {kind}")).collect();
-    format!(
-        "{} entit{} in this build have no behaviour yet: {}. These are load bearing in \
-         the builds that use them — simulating without them would drop part of the \
-         machine and give a confident wrong answer, so the build is refused instead.",
-        kinds.len(),
-        if kinds.len() == 1 { "y" } else { "ies" },
-        named.join(", ")
-    )
-}
-
-/// The settle recipe, mirroring the engine's conformance harness.
 fn wire_simulation(
     structure: &mc_tick::Structure,
     hash_origin: mc_tick::Pos,
     settle: ffi::TickSettleMode,
     extra_states: &[&str],
+    source_data_version: Option<i32>,
 ) -> Result<mc_tick::Simulation, String> {
     use mc_tick::{Pos, Simulation};
     const MARGIN: i32 = 4;
@@ -654,6 +629,18 @@ fn wire_simulation(
     {
         let (registry, world) = sim.registry_and_world_mut();
         structure.place(world, registry, Pos::new(0, 0, 0));
+    }
+    // Which game's `Entity.load` these entities came through.
+    //
+    // The blocks in `structure` have been converted to the canonical data
+    // version; the *entities* have not been reinterpreted, and whether a NaN
+    // velocity survives being read is decided by the version of the save it
+    // was read from. `Motion` handling changed at 1.21.11, and the record 3x3
+    // door is 1.21.3 — under the new rules its nan carts do not exist. Only
+    // the caller knows the source version, which is why it is a parameter and
+    // not something the engine tries to infer. See [`mc_tick::MotionSemantics`].
+    if let Some(version) = source_data_version {
+        sim.set_motion_semantics(mc_tick::MotionSemantics::for_data_version(version));
     }
     // The universal actuator, plus anything the caller names.
     let mut wanted: Vec<String> = vec!["minecraft:redstone_block".to_string()];
@@ -723,26 +710,52 @@ fn wire_simulation(
     // `SpawnedEntity` variant will fail to compile here until someone decides
     // whether it can be simulated. That is the whole point of the split — the
     // gate cannot silently fall out of date.
-    let mut unsupported: Vec<&str> = Vec::new();
+    // Every arm below either spawns or records a refusal. The match has no
+    // catch-all on purpose: a new `SpawnedEntity` variant fails to compile here
+    // until someone decides whether it can be simulated, so the gate cannot
+    // silently fall out of date.
+    let mut refused: Vec<String> = Vec::new();
     for spawned in &structure.entities {
         match spawned {
             mc_tick::structure::SpawnedEntity::Item(item) => {
                 sim.spawn_item(item.item.clone(), item.pos, item.motion, item.pickup_delay);
             }
             mc_tick::structure::SpawnedEntity::Minecart(cart) => {
-                sim.spawn_minecart(cart.kind.clone(), cart.pos, cart.motion);
+                sim.spawn_authored_minecart(cart, None);
             }
-            // No behaviour yet for any of these. When one lands, swap its arm
-            // for the spawn call — nothing else here needs to change.
-            other @ (mc_tick::structure::SpawnedEntity::FurnaceMinecart(_)
-            | mc_tick::structure::SpawnedEntity::Fireball(_)
-            | mc_tick::structure::SpawnedEntity::Villager(_)) => {
-                unsupported.push(other.kind());
+            // A furnace cart is dimensionally an ordinary cart, so an
+            // *unfuelled* one needs nothing more than being a cart. A fuelled
+            // one drives itself and is refused rather than run as a passenger.
+            mc_tick::structure::SpawnedEntity::FurnaceMinecart(cart) => {
+                if let Err(why) = sim.spawn_authored_furnace_minecart(cart) {
+                    refused.push(why);
+                }
+            }
+            // Fireballs and villagers exist in the record doors as scaffolding:
+            // a hitbox a pressure plate can see and a piston can shove. That is
+            // all that is implemented, and anything that would need more — a
+            // fireball with velocity, a villager that should walk — refuses by
+            // name rather than being quietly frozen.
+            mc_tick::structure::SpawnedEntity::Fireball(ball) => {
+                if let Err(why) = sim.spawn_authored_fireball(ball) {
+                    refused.push(why);
+                }
+            }
+            mc_tick::structure::SpawnedEntity::Villager(villager) => {
+                if let Err(why) = sim.spawn_authored_villager(villager) {
+                    refused.push(why);
+                }
             }
         }
     }
-    if !unsupported.is_empty() {
-        return Err(entity_gap_report(&unsupported));
+    if !refused.is_empty() {
+        return Err(format!(
+            "{} entit{} in this build need behaviour that is not implemented, and the \
+             build is refused rather than simulated with them standing still:\n  - {}",
+            refused.len(),
+            if refused.len() == 1 { "y" } else { "ies" },
+            refused.join("\n  - ")
+        ));
     }
     for (pos, entry) in &structure.blocks {
         let state = sim.registry().get(&structure.palette[*entry]);
@@ -903,6 +916,10 @@ fn fly_metrics(
         mc_tick::Pos::new(0, 0, 0),
         ffi::TickSettleMode::Quiet,
         extras,
+        // SNBT in, and the bridge emits the canonical DataVersion — there is no
+        // source version to read here. `None` keeps the engine's default,
+        // which is the version every captured trace came from.
+        None,
     )?;
     fly_on(&mut sim, kick, eval_ticks, seed, must_move_by_tick, need_period, early_exit)
 }
@@ -1120,6 +1137,7 @@ pub mod ffi {
                 mc_tick::Pos::new(origin_x, origin_y, origin_z),
                 settle,
                 &extras,
+                None,
             )
             .map_err(|e| {
                 super::set_last_error(e);
@@ -1170,6 +1188,13 @@ pub mod ffi {
                 mc_tick::Pos::new(origin_x, origin_y, origin_z),
                 settle,
                 &extras,
+                // The schematic remembers which game wrote it, and that
+                // decides whether a non-finite `Motion` survives
+                // `Entity.load` — the mechanism of the record nan-cart
+                // doors. Passed through rather than defaulted: a 1.21.3
+                // door and a 1.21.11 door are different machines, and
+                // only this layer knows which one this is.
+                schematic.0.metadata.source_data_version,
             )
             .map_err(|e| {
                 super::set_last_error(e);
@@ -1217,6 +1242,7 @@ pub mod ffi {
                 mc_tick::Pos::new(origin_x, origin_y, origin_z),
                 settle,
                 &extras,
+                None,
             )
             .map_err(|_| NucleationError::Simulation)?;
             Ok(Box::new(TickSimulation { sim, checkpoints: Vec::new() }))
@@ -1280,6 +1306,7 @@ pub mod ffi {
                 mc_tick::Pos::new(0, 0, 0),
                 TickSettleMode::Quiet,
                 &extras,
+                None,
             )
             .map_err(|_| NucleationError::Simulation)?;
             let pristine = sim.checkpoint();
@@ -1602,8 +1629,56 @@ pub mod ffi {
                     cart.vel[0], cart.vel[1], cart.vel[2],
                 );
             }
+            json.push_str("],\"frozen\":[");
+            let mut first = true;
+            for body in self.sim.entity_bodies() {
+                if body.is_minecart {
+                    continue;
+                }
+                if !first {
+                    json.push(',');
+                }
+                first = false;
+                let _ = write!(
+                    json,
+                    "{{\"id\":{},\"kind\":\"{}\",\"pos\":[{},{},{}]}}",
+                    body.id,
+                    body.kind,
+                    (body.min[0] + body.max[0]) / 2.0,
+                    body.min[1],
+                    (body.min[2] + body.max[2]) / 2.0,
+                );
+            }
             json.push_str("]}");
             let _ = write!(out, "{json}");
+        }
+
+        /// Which `Entity.load` Motion semantics this run uses:
+        /// `"clamp_abs_ten"` (DataVersion <= 4556 — NaN survives a cold load)
+        /// or `"drop_non_finite"` (>= 4671 — it does not).
+        ///
+        /// Exposed because a door built on nan carts is a *different machine*
+        /// under the two, and a caller that cannot tell them apart cannot
+        /// report why it came apart.
+        pub fn motion_semantics(&self, out: &mut DiplomatWrite) {
+            let name = match self.sim.motion_semantics() {
+                mc_tick::MotionSemantics::ClampAbsTen => "clamp_abs_ten",
+                mc_tick::MotionSemantics::DropNonFinite => "drop_non_finite",
+            };
+            let _ = write!(out, "{name}");
+        }
+
+        /// How many times an entity stood in a **retracting** piston's sweep.
+        ///
+        /// Piston extension displacement is measured and implemented;
+        /// retraction is not — `tools/gametest/captures/piston_pull.entities.log`
+        /// records sub-0.03 movements that are not uniformly backwards and
+        /// that no model here reproduces. Non-zero means this run leaned on
+        /// unimplemented behaviour and its result is not trustworthy. Zero
+        /// means no entity was ever in a retracting arm's way: a real answer,
+        /// not a missing instrument.
+        pub fn piston_retract_contacts(&self) -> u32 {
+            self.sim.piston_retract_contacts().len() as u32
         }
 
         /// Per-tick aggregates over the recorded changes, as JSON:
@@ -1996,43 +2071,78 @@ mod tests {
             mc_tick::Pos::new(0, 0, 0),
             super::ffi::TickSettleMode::InWorld,
             &[],
+            None,
         )
     }
 
     /// The refusal moved from the parser to the simulator, and still names the
-    /// type.
+    /// type — but it now fires on *capability*, not on the type existing.
     ///
-    /// The split is the point: the parser reads every entity faithfully, and
-    /// construction is where "is there a behaviour for this" gets asked. That
-    /// lets a behaviour be developed against a real structure while keeping a
-    /// build that depends on an unmodelled entity from ever loading.
+    /// Furnace carts, fireballs and villagers all load today, as the mass and
+    /// hitboxes the record doors use them for. What is refused is any of them
+    /// that would need behaviour nobody has implemented: a cart with fuel to
+    /// drive itself, a fireball with velocity to fly, a villager with velocity
+    /// to walk. That distinction is the whole gate — running one of those as a
+    /// stationary box is a confident wrong answer, and the wrongness is
+    /// invisible unless it is refused here.
     #[test]
-    fn entities_without_behaviour_are_refused_at_construction_not_at_parse() {
+    fn entities_needing_unimplemented_behaviour_are_refused_by_name() {
         for (entity, expected) in [
             (
-                r#"{pos: [0.5d, 0.0d, 0.5d], nbt: {id: "minecraft:furnace_minecart"}}"#,
+                r#"{pos: [0.5d, 0.0d, 0.5d], nbt: {id: "minecraft:furnace_minecart", Fuel: 3600}}"#,
                 "minecraft:furnace_minecart",
             ),
             (
-                r#"{pos: [0.5d, 0.0d, 0.5d], nbt: {id: "minecraft:dragon_fireball"}}"#,
+                r#"{pos: [0.5d, 0.0d, 0.5d], nbt: {id: "minecraft:furnace_minecart", PushX: 1.0d}}"#,
+                "minecraft:furnace_minecart",
+            ),
+            (
+                r#"{pos: [0.5d, 0.0d, 0.5d], nbt: {id: "minecraft:dragon_fireball", Motion: [0.5d, 0.0d, 0.0d]}}"#,
                 "minecraft:dragon_fireball",
             ),
             (
-                r#"{pos: [0.5d, 0.0d, 0.5d], nbt: {id: "minecraft:small_fireball"}}"#,
+                r#"{pos: [0.5d, 0.0d, 0.5d], nbt: {id: "minecraft:small_fireball", Motion: [0.0d, -0.1d, 0.0d]}}"#,
                 "minecraft:small_fireball",
             ),
             (
-                r#"{pos: [0.5d, 0.0d, 0.5d], nbt: {id: "minecraft:villager"}}"#,
+                r#"{pos: [0.5d, 0.0d, 0.5d], nbt: {id: "minecraft:villager", Motion: [0.0d, 0.0d, 0.2d]}}"#,
                 "minecraft:villager",
             ),
         ] {
-            // `wire_with_entities` already asserts the parse succeeds, which is
-            // half the claim: the refusal is no longer the parser's.
             let error = wire_with_entities(entity)
                 .err()
-                .unwrap_or_else(|| panic!("{expected} must not load without a behaviour"));
+                .unwrap_or_else(|| panic!("{expected} needs behaviour that does not exist"));
             assert!(error.contains(expected), "refusal does not name the type: {error}");
         }
+    }
+
+    /// The scaffolding the record doors actually contain does load.
+    ///
+    /// An unfuelled furnace cart, a frozen fireball of each size and a
+    /// motionless villager: mass and hitboxes, which is all those builds ask
+    /// of them. Without this, a gate that refused every one of these types
+    /// would pass the test above and look correct.
+    #[test]
+    fn frozen_scaffolding_entities_load_as_hitboxes() {
+        let sim = wire_with_entities(
+            r#"{pos: [0.5d, 0.0625d, 0.5d], nbt: {id: "minecraft:furnace_minecart", Fuel: 0}},
+               {pos: [1.5d, 1.0d, 0.5d], nbt: {id: "minecraft:dragon_fireball"}},
+               {pos: [2.5d, 1.0d, 0.5d], nbt: {id: "minecraft:small_fireball"}},
+               {pos: [3.5d, 1.0d, 0.5d], nbt: {id: "minecraft:villager"}}"#,
+        )
+        .expect("the record doors' scaffolding is exactly what this supports");
+        assert_eq!(sim.minecarts().len(), 1, "a furnace cart is a cart");
+        let frozen: Vec<&str> = sim
+            .entity_bodies()
+            .iter()
+            .filter(|b| !b.is_minecart)
+            .map(|b| b.kind.as_str())
+            .collect();
+        assert_eq!(
+            frozen,
+            ["minecraft:dragon_fireball", "minecraft:small_fireball", "minecraft:villager"],
+            "each keeps its own identity, because each has its own hitbox"
+        );
     }
 
     /// Negative control: the gate refuses the unmodelled, not everything.
@@ -2048,26 +2158,6 @@ mod tests {
         .expect("a plain cart and an item are both simulated today");
         assert_eq!(sim.minecarts().len(), 1, "the cart should be live");
         assert_eq!(sim.item_entities().len(), 1, "the item should be live");
-    }
-
-    /// The message names every missing type with its count, not just the first.
-    ///
-    /// `55_3x3.zip` contains fifteen furnace minecarts, two dragon fireballs
-    /// and one small fireball; a refusal naming only one of the three would
-    /// send someone chasing a single entity when eighteen are missing.
-    #[test]
-    fn the_refusal_counts_every_missing_type() {
-        let report = super::entity_gap_report(&[
-            "minecraft:furnace_minecart",
-            "minecraft:dragon_fireball",
-            "minecraft:furnace_minecart",
-        ]);
-        assert!(report.contains("3 entities"), "{report}");
-        assert!(report.contains("2 x minecraft:furnace_minecart"), "{report}");
-        assert!(report.contains("1 x minecraft:dragon_fireball"), "{report}");
-        // Singular reads correctly too.
-        let one = super::entity_gap_report(&["minecraft:villager"]);
-        assert!(one.contains("1 entity in this build"), "{one}");
     }
 
     /// A type the reader cannot even represent is still refused by name.

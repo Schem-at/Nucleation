@@ -122,19 +122,75 @@ sequence and not the closing one**, in a space with no room left for redstone.
 
 ## Checklist for the engine
 
-- [ ] IEEE-754 velocities preserved end to end: NaN, +Inf, -Inf, and denormals,
-      through NBT read, SNBT write, SNBT parse, and the physics itself.
-- [ ] NaN contagion through cart-cart collision (`normal * NaN = NaN`).
-- [ ] Entity-to-entity collision and the resulting velocity amplification.
-- [ ] Pistons move entities — including entities whose own physics are dead.
-- [ ] Per-entity hitbox dimensions, at least for small fireball, dragon
-      fireball, villager and minecart.
-- [ ] Entities resting on other entities' hitboxes.
-- [ ] Pressure plates triggered by entity presence, fireballs included.
-- [ ] Detector rail powered by a cart.
-- [ ] `furnace_minecart` as a cart variant.
+Every line below now says where it stands and what settled it. `[x]` means a
+capture agrees with the engine; `[~]` means measured but only partly modelled;
+`[ ]` means still unverified. **Contagion is struck through because the oracle
+refuted it** — the builders' account was wrong, and this page was wrong with it.
 
-Everything here is second-hand from the builders and **none of it is yet
-verified against a capture.** Treat this document as the specification to test
-against, not as evidence. Where the oracle disagrees with this page, the oracle
-wins and this page is wrong.
+- [x] IEEE-754 velocities preserved end to end: NaN, +Inf, -Inf and denormals,
+      through NBT read, SNBT write, SNBT parse, and the physics itself.
+      *Version-dependent, and the version is the whole story* — see
+      `tools/gametest/NAN-MOTION-VERSIONS.md` and `crates/mc-tick/src/motion.rs`.
+      Under DataVersion <= 4556 `Entity.load` keeps NaN and zeroes infinities;
+      from 4671 it drops the whole vector. The record door is 4082.
+- [ ] ~~NaN contagion through cart-cart collision (`normal * NaN = NaN`).~~
+      **REFUTED by `nan_contagion.entities.log`.** `setDeltaMovement` refuses a
+      non-finite vector, so a NaN velocity can never be written *into* a cart
+      that does not already have one, and never written *out of* one that does.
+      A NaN cart is a fixed point: inert, unmovable, never lost, never spread.
+      Across 61 samples a normal cart struck a NaN cart at t36 and stayed
+      finite for the remaining 24 ticks; the non-finite count never changed.
+      The "zombie minecart" does not exist.
+- [x] Entity-to-entity collision and the resulting velocity amplification.
+      Bit-exact across five captures, including the chain law — carts block each
+      other through the same sweep as blocks.
+- [~] Pistons move entities — including entities whose own physics are dead.
+      **Extension is measured and exact** (`piston_entity.json`): the shove is
+      the depth of the entity's own hitbox in the arm's half-block sweep, capped
+      at the step, plus 0.01, and it is positional only — no velocity is
+      imparted, so a NaN cart arrives still NaN. A normal cart ends a full
+      extension 1.0 blocks along, a dragon fireball 1.01, a small fireball
+      0.666. **Retraction is not.** `piston_pull.entities.log` shows a solid
+      head does not eject an entity standing inside it, and that a *retracting*
+      `moving_piston` displaces entities only fractionally and not uniformly
+      backwards — nothing here reproduces a "pull" of a whole block, and no
+      model tried so far predicts those numbers. The engine therefore does not
+      displace on retraction, and *counts* every time an entity stands in a
+      retracting sweep instead
+      (`Simulation::piston_retract_contacts`), so a build that depends on the
+      unmodelled path cannot look like one that does not.
+- [x] Per-entity hitbox dimensions. Read out of the game's own registry and
+      cross-checked against plate-edge probes: minecart and every container
+      variant 0.98 x 0.7, dragon fireball 1.0 x 1.0, small fireball 0.3125,
+      villager adult 0.6 x 1.95 and baby 0.49 x 0.98, item 0.25. An unmeasured
+      entity gets **no** box and the simulation refuses it by name.
+- [~] Entities resting on other entities' hitboxes. Carts collide with carts
+      exactly; a *frozen* body (fireball, villager) is an obstacle to a cart but
+      has no support physics of its own, because it has no physics at all.
+- [x] Pressure plates triggered by entity presence, fireballs included —
+      `fireball_reach.json` finds the plate's edge exactly where the measured
+      widths put it.
+- [x] Detector rail powered by a cart, and *only* by a cart:
+      `DetectorRailBlock.checkPressed` selects on `AbstractMinecart`, so a
+      fireball or villager standing on one must not power it.
+- [x] `furnace_minecart` as a cart variant. Dimensionally identical to a plain
+      cart, which is all the record door needs — all fifteen of its furnace
+      carts carry `Fuel: 0` with `PushX`/`PushZ` zero. **Self-propulsion is not
+      implemented**, and a fuelled cart is refused rather than run as a
+      passenger.
+
+Where the oracle disagrees with this page, the oracle wins and this page is
+wrong — which has already happened once, to the contagion line above.
+
+## What is still not known about this door
+
+The door's mechanism is DataVersion 4082 and the only oracle available is 26.2,
+where `Entity.load` destroys that mechanism before the first tick. So there is
+**no capture of this door working**, and there cannot be one without a 1.21.3
+oracle. `door55_in_world.entities.log` is a capture of it *failing*: 24
+entities, zero non-finite, and eight of them — including both former nan carts
+and the minecarts two blazes are riding — moving on tick 0.
+
+That is the boundary of what verification can currently say. Anything below the
+line "the engine keeps the nan carts frozen where 26.2 frees them" is unchecked
+against the game.

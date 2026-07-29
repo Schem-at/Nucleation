@@ -288,15 +288,22 @@ fn build_sim(
                 sim.spawn_item(item.item.clone(), item.pos, item.motion, item.pickup_delay);
             }
             mc_tick::structure::SpawnedEntity::Minecart(cart) => {
-                sim.spawn_minecart(cart.kind.clone(), cart.pos, cart.motion);
+                sim.spawn_authored_minecart(cart, None);
             }
             // A case that authors one of these would otherwise run with the
             // entity missing and quietly "pass". Loud beats silent in a test
-            // harness; swap for a spawn call when the behaviour lands.
-            other => panic!(
-                "no spawn path yet for {} — add one when its behaviour exists",
-                other.kind()
-            ),
+            // harness, so a spawn that refuses still panics rather than
+            // dropping the entity.
+            mc_tick::structure::SpawnedEntity::FurnaceMinecart(cart) => {
+                sim.spawn_authored_furnace_minecart(cart).unwrap_or_else(|e| panic!("{label}: {e}"));
+            }
+            mc_tick::structure::SpawnedEntity::Fireball(ball) => {
+                sim.spawn_authored_fireball(ball).unwrap_or_else(|e| panic!("{label}: {e}"));
+            }
+            mc_tick::structure::SpawnedEntity::Villager(villager) => {
+                sim.spawn_authored_villager(villager)
+                    .unwrap_or_else(|e| panic!("{label}: {e}"));
+            }
         }
     }
     for (pos, entry) in &structure.blocks {
