@@ -215,6 +215,118 @@ export type Census = {
   honey_block: number;
 };
 
+/** ------------------------------------------------------------ engineering --
+ *
+ *  What the door COSTS and what of it is doing any work — the readings that
+ *  need the engine's recorded update stream rather than just the block-change
+ *  log. See `lib/engineering.ts` for the derivations and for the two claims
+ *  this group deliberately refuses to make. */
+
+/** Update dispatches over the measured cycle.
+ *
+ *  Not milliseconds and not a TPS prediction: a dispatch is one delivery of
+ *  one update to one cell, and a dust update and a block-entity tick cost the
+ *  real server wildly different amounts. What it IS good for is comparing
+ *  doors — same engine, same seed, same cycle definition. */
+export type ServerCost = {
+  /** Every update the engine delivered across one open + close. */
+  updates: number;
+  /** …of which these were dispatched in the block-events phase, the one that
+   *  actually moves pistons. */
+  block_events: number;
+  /** The full split, biggest first. Phases that never fired are omitted. */
+  by_phase: { phase: string; n: number }[];
+  /** Busiest single tick, and when. */
+  peak: number;
+  peak_tick: number;
+  /** Normalised so doors of different sizes compare: dispatches per cell of
+   *  walkable doorway, and per cell of travelling mass. Null when there is no
+   *  doorway or nothing moved. */
+  per_passage_cell: number | null;
+  per_moved_cell: number | null;
+  /** Dispatches per real-time second if the door were held on a loop at its
+   *  own measured cycle length. */
+  per_second: number | null;
+};
+
+/** Blocks that neither moved nor received a single update all cycle.
+ *
+ *  An upper bound on decoration and redundancy — NOT a removal list. A block
+ *  that only holds another one up never has to do anything, and is
+ *  load-bearing for exactly that reason. */
+export type DeadWeight = {
+  /** Non-air blocks at rest. */
+  total: number;
+  /** …of which this many did nothing this cycle. */
+  idle: number;
+  /** Their positions, for the replay overlay. Capped; `truncated` says so. */
+  cells: Vec3[];
+  truncated: boolean;
+  /** What they are, most common first. */
+  by_id: { id: string; count: number }[];
+};
+
+/** The components touched between the input click and the first block that
+ *  moved, in the order the engine delivered updates to them.
+ *
+ *  **Order, not causality.** The log records the sequence of dispatches, never
+ *  which dispatch scheduled which, so this is a sequence and is named as one.
+ *  See the note on `firstMovement()`. */
+export type FirstMovement = {
+  /** Updates delivered before the first movement. */
+  hops: number;
+  /** Ticks it took. */
+  ticks: number;
+  /** Distinct components in first-touch order, with how many cells of each. */
+  chain: { id: string; cells: number }[];
+  /** What moved first, and where. */
+  block: string;
+  pos: Vec3;
+};
+
+/** Mirror symmetry. The machine test compares BASE block names only — a
+ *  mirrored piston faces the other way, and demanding the state match would
+ *  report every symmetric door as asymmetric. */
+export type Symmetry = {
+  /** The door blocks' silhouette, mirrored inside the passage bbox. Null when
+   *  no passage was extracted. */
+  pattern: { horizontal: boolean; vertical: boolean } | null;
+  /** The whole build, per axis, named relative to the doorway when one is
+   *  known and `x`/`y`/`z` otherwise. `share` is the fraction of blocks with a
+   *  mirrored twin — the number that carries the signal, because a door with a
+   *  lever on one side is 90-something per cent symmetric and never 100. */
+  machine: { axis: string; mirror: boolean; share: number }[];
+};
+
+/** The four qualifiers pro door makers compete on (ROADMAP §4). */
+export type Badges = {
+  observerless: boolean;
+  dustless: boolean;
+  /** Honey counts as slime — it is the standard substitute, and a door that
+   *  swapped one for the other has not earned the tag. */
+  slimeless: boolean;
+  /** True when no piston fires repeatedly at a steady period. */
+  cycleless: boolean;
+  /** Set when one does: how many pistons run a tape, the busiest one's fire
+   *  count, and the period it runs at. */
+  tape: { pistons: number; fires: number; period: number | null } | null;
+  /** Pistons that fired at all, for context under the badge. */
+  pistons: number;
+  /** Most fires any single piston managed — the evidence the badge turned on,
+   *  present whether or not it did. */
+  busiest: number;
+};
+
+export type Engineering = {
+  /** Null when the update recorder failed — the door still certifies, it just
+   *  has no cost reading. */
+  cost: ServerCost | null;
+  dead: DeadWeight | null;
+  first: FirstMovement | null;
+  symmetry: Symmetry;
+  badges: Badges;
+};
+
 /** Purplers' reset measurement: the shortest delay after a lever click that
  *  still lets the input be used again without breaking the machine. There is
  *  no closed form — every value here comes from a trial. */
@@ -315,6 +427,9 @@ export type Certificate = {
   /** False when the file was saved with its doorway already standing open —
    *  the first lever click then closes it, and the two strokes swap. */
   rest_is_closed: boolean;
+  /** Cost, dead weight, first movement, symmetry and qualifier badges. Null on
+   *  records certified before these were measured. */
+  engineering: Engineering | null;
 };
 
 export type Vec3 = [number, number, number];

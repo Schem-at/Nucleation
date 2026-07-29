@@ -33,6 +33,8 @@ import {
   doorwayFacts,
   doorwayStyles,
   doorwaySummary,
+  idleStyle,
+  IDLE_DOT,
 } from "../lib/doorway";
 import { instanceFor, addDefaultLights, fitCamera, meshStats } from "../lib/mesher";
 import type { ApertureGeometry, Replay, Vec3 } from "../lib/types";
@@ -289,12 +291,15 @@ function WebglReplay({
   lever,
   xray,
   geometry,
+  idle,
   onFail,
 }: {
   replay: Replay;
   lever: Vec3;
   xray: XrayData | null;
   geometry: ApertureGeometry | null;
+  /** Cells that neither moved nor received an update all cycle. */
+  idle: Vec3[] | null;
   onFail: (err: string) => void;
 }) {
   const { simTicks } = replay;
@@ -342,6 +347,12 @@ function WebglReplay({
   const [doorwayOn, setDoorwayOn] = useState(false);
   const [dark, setDark] = useState(pageIsDark);
   const doorwayRef = useRef<((on: boolean) => void) | null>(null);
+  // Dead weight. Its own toggle rather than a third state on the doorway's,
+  // because the two answer unrelated questions and a builder compacting a
+  // design wants to see the idle blocks WHILE watching the doorway work.
+  const idleCells = idle && idle.length > 0 ? idle : null;
+  const [idleOn, setIdleOn] = useState(false);
+  const idleRef = useRef<((on: boolean) => void) | null>(null);
   const paintRef = useRef<((dark: boolean, xrayOn: boolean) => void) | null>(null);
   const focusRef = useRef<(() => void) | null>(null);
 
@@ -570,6 +581,31 @@ function WebglReplay({
       scene.add(doorway);
     }
 
+    /* ---------------------------------------------------- dead weight --- */
+
+    // A small achromatic dot in every block that neither moved nor received
+    // an update. Depth-tested off like the doorway marks: dead weight is
+    // usually buried inside the machine, and a mark you can only see when the
+    // camera happens to have line of sight answers nothing.
+    let idleMesh: THREE.InstancedMesh | null = null;
+    let idleGeo: THREE.BufferGeometry | null = null;
+    const idleMat = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0.85,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    if (idleCells) {
+      idleGeo = new THREE.BoxGeometry(IDLE_DOT, IDLE_DOT, IDLE_DOT);
+      idleMesh = instances(idleCells, idleGeo, idleMat);
+      idleMesh.visible = false;
+      // Below the doorway marks: a block can be both idle and part of the
+      // frame the doorway outlines, and the doorway is the louder answer.
+      idleMesh.renderOrder = 2.5;
+      scene.add(idleMesh);
+    }
+
     /** Repaint for the current plate. Called on theme change and on every
      * x-ray toggle, because the x-ray's darkroom is dark in both themes. */
     const paintDoorway = (isDark: boolean, xrayNow: boolean) => {
@@ -579,12 +615,16 @@ function WebglReplay({
       coreMat.color.setHex(carrier.hex);
       paneMat.opacity = xrayNow ? PANE_ALPHA_XRAY : PANE_ALPHA;
       coreMat.opacity = xrayNow ? CARRIER_ALPHA_XRAY : CARRIER_ALPHA;
+      idleMat.color.setHex(idleStyle(isDark || xrayNow).hex);
     };
     paintDoorway(pageIsDark(), false);
     paintRef.current = paintDoorway;
 
     doorwayRef.current = (on: boolean) => {
       if (doorway) doorway.visible = on;
+    };
+    idleRef.current = (on: boolean) => {
+      if (idleMesh) idleMesh.visible = on;
     };
 
     // Verification aid (scripts/verify-doorway.mjs): frame the doorway so a
@@ -955,6 +995,9 @@ function WebglReplay({
     w.__doorway = facts
       ? { ...facts, focus: () => focusRef.current?.() }
       : null;
+    // Same, for the dead-weight overlay: how many dots were instanced, so a
+    // test can prove the picture matches the certificate's idle count.
+    w.__idle = idleMesh ? { drawn: idleMesh.count } : null;
     // Verification aid (scripts/verify-align.mjs): the numeric half-block
     // check. For a named world cell, report where the MESHED block actually
     // sits and where the overlay drew its passage box, both as world-space
@@ -1119,6 +1162,7 @@ function WebglReplay({
       disposed = true;
       applyRef.current = null;
       doorwayRef.current = null;
+      idleRef.current = null;
       paintRef.current = null;
       focusRef.current = null;
       ro.disconnect();
@@ -1128,9 +1172,11 @@ function WebglReplay({
       paneGeo?.dispose();
       coreGeo?.dispose();
       hatch?.dispose();
+      idleGeo?.dispose();
       edgeMat.dispose();
       paneMat.dispose();
       coreMat.dispose();
+      idleMat.dispose();
       flareGeo.dispose();
       cageGeo.dispose();
       (flares.material as THREE.Material).dispose();
@@ -1140,7 +1186,7 @@ function WebglReplay({
       renderer.forceContextLoss();
       mount.removeChild(renderer.domElement);
     };
-  }, [cast, lever, simTicks, onFail, glNonce, xray, geometry, facts]);
+  }, [cast, lever, simTicks, onFail, glNonce, xray, geometry, facts, idleCells]);
 
   // Mode changes are applied to the LIVE scene rather than rebuilding it, so
   // the x-ray toggle keeps the camera, the tick and the play state.
@@ -1153,6 +1199,9 @@ function WebglReplay({
   useEffect(() => {
     doorwayRef.current?.(doorwayOn);
   }, [doorwayOn, glNonce, geometry, facts]);
+  useEffect(() => {
+    idleRef.current?.(idleOn);
+  }, [idleOn, glNonce, idleCells]);
   useEffect(() => {
     paintRef.current?.(dark, xrayOn);
   }, [dark, xrayOn, glNonce, geometry, facts]);
@@ -1196,6 +1245,7 @@ function WebglReplay({
 
   const legend = xray ? channelStyles(xray, channel) : [];
   const [passageStyle, patternStyle, carrierStyle] = doorwayStyles(dark || xrayOn);
+  const idleDotStyle = idleStyle(dark || xrayOn);
 
   return (
     <div>
@@ -1289,6 +1339,10 @@ function WebglReplay({
             </button>
           ))}
         </div>
+        {/* The three overlays travel together at the right of the control bar:
+            loose, they wrap one-at-a-time as the bar narrows and the group
+            reads as three unrelated buttons on two lines. */}
+        <div className="replay-modes">
         <button
           type="button"
           className={"door-toggle" + (doorwayOn ? " on" : "")}
@@ -1304,6 +1358,22 @@ function WebglReplay({
         >
           <i className="door-dot" aria-hidden />
           Doorway
+        </button>
+        <button
+          type="button"
+          className={"idle-toggle" + (idleOn ? " on" : "")}
+          aria-pressed={idleOn}
+          disabled={!idleCells}
+          data-testid="idle-toggle"
+          title={
+            idleCells
+              ? "Mark the blocks that neither moved nor took an update this cycle"
+              : "Every block in this build did something this cycle"
+          }
+          onClick={() => setIdleOn((v) => !v)}
+        >
+          <i className="idle-dot" aria-hidden />
+          Dead weight
         </button>
         <button
           type="button"
@@ -1329,6 +1399,7 @@ function WebglReplay({
           <i className="xray-dot" aria-hidden />
           X-ray
         </button>
+        </div>
       </div>
 
       {doorwayOn && facts && (
@@ -1383,6 +1454,29 @@ function WebglReplay({
               {" "}box — it is not a clean rectangular opening
             </span>
           )}
+        </div>
+      )}
+
+      {idleOn && idleCells && (
+        <div
+          className={"door-panel" + (xrayOn ? " xr" : "")}
+          data-testid="idle-panel"
+        >
+          <span className="xray-label">dead weight</span>
+          <ul className="door-legend" data-testid="idle-legend">
+            <li>
+              <i
+                className="door-swatch dot"
+                style={{ ["--core" as string]: hexCss(idleDotStyle.hex) }}
+                aria-hidden
+              />
+              {idleDotStyle.label}
+              <b>{fmt(idleCells.length)}</b>
+            </li>
+          </ul>
+          <span className="door-summary" data-testid="idle-summary">
+            no update landed here and nothing moved — decoration, redundancy, or support
+          </span>
         </div>
       )}
 
@@ -1587,11 +1681,13 @@ export function MeshReplay({
   lever,
   xray = null,
   geometry = null,
+  idle = null,
 }: {
   replay: Replay;
   lever: Vec3;
   xray?: XrayData | null;
   geometry?: ApertureGeometry | null;
+  idle?: Vec3[] | null;
 }) {
   const [glFail, setGlFail] = useState<string | null>(null);
   if (glFail !== null) return <VoxelReplay replay={replay} lever={lever} />;
@@ -1601,6 +1697,7 @@ export function MeshReplay({
       lever={lever}
       xray={xray}
       geometry={geometry}
+      idle={idle}
       onFail={setGlFail}
     />
   );

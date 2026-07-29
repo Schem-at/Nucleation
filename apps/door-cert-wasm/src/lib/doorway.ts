@@ -55,8 +55,9 @@ export type DoorwayStyle = {
   label: string;
   /** `edges` — a thin wireframe box on the cell boundary.
    *  `hatch` — a 45°-hatched translucent pane, inset inside that box.
-   *  `core`  — a small plain cube at the centre of the cell. */
-  mark: "edges" | "hatch" | "core";
+   *  `core`  — a small plain cube at the centre of the cell.
+   *  `dot`   — a smaller, ACHROMATIC cube at the centre of the cell. */
+  mark: "edges" | "hatch" | "core" | "dot";
 };
 
 /** The walkable hole. Violet steps for the light page and for the two dark
@@ -106,6 +107,42 @@ export function doorwayStyles(
     { hex: CLOSED_BOTH, label: "pattern blocks (visible)", mark: "hatch" },
     { hex: CLOSED_BOTH, label: "carriers (hidden behind)", mark: "core" },
   ];
+}
+
+/** ------------------------------------------------------------ dead weight --
+ *
+ * The blocks that neither moved nor received a single update all cycle. A
+ * fourth mark on the same stage, and the colour budget documented above is
+ * already spent — so this one does not spend any: it is ACHROMATIC.
+ *
+ * That is not a dodge, it is the right encoding. Every other mark on this
+ * stage names something the machine DID; dead weight names the absence of it,
+ * and a hueless mark reads as exactly that beside three coloured ones. Being
+ * achromatic it enters no hue pair, so it needs no all-pairs check against the
+ * x-ray's three flares or the doorway's violet and magenta — the same escape
+ * `boundary` takes, and for the same reason.
+ *
+ * It still has to separate from `boundary`, which is also hueless. It does, by
+ * MARK and by SIZE: boundary is a full-cell wireframe CAGE, dead weight is a
+ * small solid DOT at the cell centre — a third of the cell, no edges, no
+ * lattice. The two are never confusable at any zoom, and the legend names both.
+ *
+ * One step per plate, chosen for contrast against the build rather than
+ * against a flat surface: the dot is drawn over textured Minecraft blocks in
+ * light mode and over the darkroom in x-ray, so it goes near-black on the
+ * white page and near-white on both dark plates. */
+const IDLE_LIGHT = 0x1f1d1b;
+const IDLE_DARK = 0xe8e6df;
+/** Fraction of a cell the dot covers. Deliberately smaller than the carrier
+ *  core (0.40) so the two never read as the same mark. */
+export const IDLE_DOT = 0.3;
+
+export function idleStyle(dark: boolean): DoorwayStyle {
+  return {
+    hex: dark ? IDLE_DARK : IDLE_LIGHT,
+    label: "did nothing this cycle",
+    mark: "dot",
+  };
 }
 
 /** What the overlay says about itself. Every number here is counted off the

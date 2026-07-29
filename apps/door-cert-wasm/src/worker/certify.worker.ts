@@ -20,6 +20,7 @@ import type {
   WorkerMessage,
 } from "../lib/types";
 import { aperture } from "../lib/aperture";
+import { engineering, isMovement } from "../lib/engineering";
 import { decodeXray, xrayTransferables, type XrayData } from "../lib/xray";
 
 const SEED = 12345n;
@@ -942,14 +943,9 @@ async function certify(job: WorkerJob): Promise<{ record: CertRecord; xray: Xray
   // things: a cell whose *contents* changed is mass in flight, while a cell
   // that merely re-powered is the signal racing ahead of it. Reporting the
   // sum flatters the door — a 6x6's click tick is ~800 dust updates and no
-  // movement at all. Piston bodies count as movement: extended=false->true
-  // is the same block name but is the stroke itself.
-  const isMovement = (c: ReplayChange) => {
-    const from = baseName(c.from);
-    const to = baseName(c.to);
-    if (from !== to) return true;
-    return from.endsWith("piston") || from.endsWith("piston_head");
-  };
+  // movement at all. `isMovement` lives in lib/engineering.ts because the
+  // dead-weight and first-movement readings partition the same log the same
+  // way, and two copies of that rule would drift.
   const moveTick = new Map<number, number>();
   const signalTick = new Map<number, number>();
   for (const c of changes) {
@@ -1028,6 +1024,21 @@ async function certify(job: WorkerJob): Promise<{ record: CertRecord; xray: Xray
     xray = null;
   }
 
+  // -- engineering --------------------------------------------------------
+  // Cost, dead weight, first movement, symmetry, badges. Runs last because
+  // three of the five need the update log the x-ray pass just recorded; the
+  // other two would work without it and are computed the same way either way.
+  const eng = engineering({
+    rest: restBlocks,
+    changes,
+    xray,
+    geometry: geo,
+    census: parts,
+    movedCells,
+    cycleTicks: cycleTicks > 0 ? cycleTicks : null,
+    input: lever,
+  });
+
   const record: CertRecord = {
     certificate: {
       name: job.name,
@@ -1070,6 +1081,7 @@ async function certify(job: WorkerJob): Promise<{ record: CertRecord; xray: Xray
       saved_state_drift: savedStateDrift,
       aperture_conflict: apertureConflict,
       rest_is_closed: restIsClosed,
+      engineering: eng,
     },
     replay: { blocks: restBlocks, changes, simTicks, flips },
   };

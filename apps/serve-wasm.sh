@@ -5,8 +5,16 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# The preview serves dist/, and public/engine is copied into dist at BUILD
+# time — so syncing a fresh wasm into public/ and restarting silently keeps
+# serving the old engine. A whole 28-door batch was once measured against a
+# stale wasm this way. Always rebuild.
 serve() { # serve <app-dir> <port>
     local app="$1" port="$2"
+    if ! (cd "$app" && npm run build >/dev/null 2>&1); then
+        echo "$port: !! BUILD FAILED — serving the PREVIOUS dist. Anything you"
+        echo "$port: !! measure now is the old build. Fix the build first."
+    fi
     kill "$(lsof -nP -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null)" 2>/dev/null || true
     sleep 1
     (cd "$app" && nohup npx vite preview --host 0.0.0.0 --port "$port" --strictPort \

@@ -105,10 +105,32 @@ wool/concrete amongst loads of cyan"**
 A good *ordering* hint for the brute force so the likely input is tried first —
 not a detector on its own. Rank candidates by material rarity within the build.
 
-## 4. Qualifier tags — what pro door makers actually compete on
+## 4. Qualifier tags — what pro door makers actually compete on — BUILT
 
 **"observerless, slimeblockless, and cycle-less are the 3 main qualifiers that
 pro door makers use atm"** — plus **dustless**.
+
+`badges()` in `src/lib/engineering.ts`; rendered as the chip row at the head of
+the certificate's Engineering section. All four are always shown, and the ones
+NOT earned carry their own count — a badge that vanishes when unmet cannot be
+told from one that was never measured.
+
+- **Observerless / dustless** — set membership on the census.
+- **Slimeless** — slime **and honey** together, as the note below demanded.
+- **Cycle-less** — the one that needed measuring, and **two** obvious tests are
+  both wrong. Periodicity in the whole piston-event series flags every
+  sequential door whose stages fire on an even cadence. Per-piston fire counts
+  alone are not enough either: a sliding door routinely extends the same piston
+  twice per stroke, and the first cut of this detector duly labelled the 6 × 6
+  sliding door "runs a tape of period 3" on gaps of `[3, 12, 3]` — modal gap 3,
+  67% agreement, completely wrong. What a tape actually produces is one piston
+  firing repeatedly at a *steady* period, so both are demanded of the same
+  piston: ≥ 4 fires with a run of ≥ 3 **consecutive equal** gaps. All three
+  corpus doors read cycle-less under that rule, which is the right answer for
+  two sliding doors and a vault — but it means the positive branch is
+  **untested**; the corpus has no cycling door in it.
+
+Original notes below.
 
 - **Observerless** — trivial from the census we already compute.
 - **Slimeless** — must check **honey and slime** together; honey is the usual
@@ -123,6 +145,49 @@ pro door makers use atm"** — plus **dustless**.
 
 These four are one-line badges on the certificate and immediately legible to the
 target audience.
+
+## 4b. Engineering insights off the update log — BUILT
+
+Everything the recorded update stream unlocks, in `src/lib/engineering.ts`,
+computed in the worker and rendered as one **Engineering** section on the
+certificate. Verified by `scripts/verify-insights.mjs` (99 assertions, three
+doors).
+
+- **Server cost** — total update dispatches per cycle, the block-events share,
+  the per-tick peak, and two normalisations (per doorway cell, per travelling
+  cell) plus a held-on-a-loop rate. Stated as a **count, not milliseconds**, and
+  explicitly not a TPS prediction: a dust update and a block-entity tick cost a
+  real server different amounts. It compares doors, nothing else. The
+  per-doorway-cell figure is the one a leaderboard should rank on. Measured:
+  6 × 6 sliding 119,247 (1,104/cell) · 4 × 4 sliding 30,886 (644/cell) ·
+  4 × 4 vault 33,346 (695/cell).
+- **Dead weight** — blocks that neither moved nor took an update, a set
+  difference over two complete logs. Shown as its own overlay toggle on the
+  replay (achromatic dot; see `lib/doorway.ts` for why it takes no hue). Copy
+  says "did nothing this cycle", never "can be removed" — a block that only
+  supports another lands here and is load-bearing for exactly that reason.
+  Measured: 8/791, 3/287, **0/345** (the vault has no idle block at all).
+- **First movement** — the components the engine delivered updates to between
+  the click and the first block that moved, in delivery order, seeded with the
+  control and terminated on the part that moved. **Order, not causality**: the
+  log has no parentage, and the copy says so. Measured: the vault reaches its
+  first piston in 5 dispatches, the 6 × 6 in 52, the 4 × 4 in 56 — all on the
+  click tick itself.
+- **Symmetry** — the pattern's mirror symmetry (exact, inside the passage bbox)
+  and the machine's, as a **share** rather than a boolean. The boolean was a
+  dud: all three doors answered "no" on all three axes, which is true and says
+  nothing. The share separates them — 91% / 74% / 91% left–right, where the
+  missing few per cent is the control and its wiring.
+
+## 4c. Still open
+
+- No cycling door in the corpus, so the tape branch of the cycle-less badge has
+  never fired. Find one.
+- `per_second` ("held on a loop") is derived from the reset cycle, so it
+  inherits any doubt about the reset search.
+- The first-movement trace would become a real critical path the moment the
+  engine records update **parentage** (which update scheduled which). That is an
+  engine change, not an app one.
 
 ## 5. Entities: boats, minecarts, mobs
 

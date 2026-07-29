@@ -517,6 +517,167 @@ button { font: inherit; color: inherit; }
 }
 .tile-value small { font-size: 14px; font-weight: 500; color: var(--ink-2); margin-left: 2px; }
 .tile-sub { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-2); margin: 6px 0 0; }
+/* Two tiles that are a PAIR — the mechanical peak and the computational one —
+   sit at half width rather than stranded in a three-up grid. */
+.tiles-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 560px) { .tiles-pair { grid-template-columns: 1fr; } }
+
+/* ------------------------------------------------------------------ */
+/* Engineering                                                         */
+/*                                                                     */
+/* The measurement tiles time the door; this section describes the     */
+/* machine. It reads as an instrument readout rather than a card grid: */
+/* one dominant mono figure under a hairline, a run of label/value     */
+/* pairs beside it, and prose that carries each reading's caveat where */
+/* the reading is — a tile has no room for "this is not a TPS number". */
+/* ------------------------------------------------------------------ */
+
+.eng-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 14px;
+}
+
+/* The qualifiers. Lime is the sheet's affirmative, and an earned qualifier is
+   exactly that — a claim. The ones NOT earned stay and carry their own count,
+   because a badge that vanishes when unmet cannot be told from one that was
+   never measured. */
+.eng-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 0 0 22px;
+  padding: 0;
+}
+.eng-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  border: 1px solid var(--grid);
+  border-radius: var(--r);
+  padding: 5px 10px;
+  background: var(--surface);
+}
+.eng-badge b {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.eng-badge span {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-2);
+}
+.eng-badge.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.eng-badge.on b { color: var(--accent-ink); }
+.eng-badge.on span { color: var(--ink-2); }
+
+/* The headline cost: one figure large enough to quote, with the supporting
+   numbers on the same baseline rather than under it. */
+.eng-lead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px 36px;
+  border-top: 1px solid var(--ink);
+  padding-top: 14px;
+}
+.eng-figure { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.eng-figure b {
+  font-family: var(--font-mono);
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 0.9;
+}
+.eng-figure span {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.eng-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  margin: 0;
+}
+.eng-facts dt {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 4px;
+}
+.eng-facts dd {
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.eng-facts dd i {
+  font-style: normal;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--ink-2);
+}
+/* Doubled up so it outranks `.chart-note`, which is defined further down and
+   would otherwise reset the margin to 14px and close the gap. */
+.chart-note.eng-note { margin: 22px 0 22px; max-width: 78ch; }
+
+.eng-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 22px;
+}
+@media (max-width: 860px) { .eng-grid { grid-template-columns: 1fr; } }
+.eng-item {
+  border: 1px solid var(--grid);
+  border-radius: var(--r);
+  padding: 16px 18px;
+  background: var(--surface);
+}
+.eng-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+.eng-claim { font-size: 15px; line-height: 1.45; margin: 0; }
+.eng-claim b { font-family: var(--font-mono); font-weight: 700; letter-spacing: -0.02em; }
+.eng-detail {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-2);
+  margin: 8px 0 0;
+}
+.eng-body { font-size: 12.5px; line-height: 1.55; color: var(--ink-2); margin: 12px 0 0; }
+.eng-body b { color: var(--ink); font-weight: 700; }
+/* The chain is a sequence, so it is set as one: components in delivery order
+   with an arrow between them, and the arrow is decorative — the order is
+   already the reading order. */
+.eng-chain {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.7;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.eng-chain i { font-style: normal; color: var(--muted); font-weight: 400; }
 
 /* ------------------------------------------------------------------ */
 /* Charts (shared)                                                     */
@@ -947,6 +1108,7 @@ button { font: inherit; color: inherit; }
 /* A panel below the controls takes over the sheet's bottom edge. */
 .replay-controls:has(+ .door-panel) { border-radius: 0; }
 .door-panel:has(+ .xray-panel) { border-radius: 0; }
+.door-panel:has(+ .door-panel) { border-radius: 0; border-bottom: none; }
 
 /* ---------------------------------------------------------- doorway --- */
 
@@ -963,11 +1125,18 @@ button { font: inherit; color: inherit; }
 }
 :root[data-theme="dark"] { --door-passage: #9085e9; }
 
+/* The overlay toggles as one group, pushed to the right of the control bar. */
+.replay-modes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
 .door-toggle {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  margin-left: auto;
   border: 1px solid var(--border);
   border-radius: var(--r);
   background: var(--surface);
@@ -994,6 +1163,36 @@ button { font: inherit; color: inherit; }
 }
 .door-toggle.on .door-dot { border-color: var(--door-passage); }
 .door-toggle + .xray-toggle { margin-left: 0; }
+
+/* Dead weight rides the doorway toggle's chrome — same control, different
+ * question — and keeps its own achromatic mark: a small filled dot, which is
+ * what it draws on the stage. */
+.idle-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface);
+  color: var(--ink-2);
+  padding: 5px 11px 5px 9px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.idle-toggle:hover:not(:disabled) { background: var(--surface-2); }
+.idle-toggle:disabled { opacity: 0.45; cursor: not-allowed; }
+.idle-toggle .idle-dot {
+  width: 6px;
+  height: 6px;
+  margin: 1px;
+  background: var(--baseline);
+}
+.idle-toggle.on { border-color: var(--ink); color: var(--ink); }
+.idle-toggle.on .idle-dot { background: var(--ink); }
+.door-toggle + .idle-toggle { margin-left: 0; }
+.idle-toggle + .xray-toggle { margin-left: 0; }
 
 .door-panel {
   display: flex;
@@ -1054,6 +1253,12 @@ button { font: inherit; color: inherit; }
   );
   border-color: color-mix(in srgb, var(--core) 30%, transparent);
   opacity: 0.85;
+}
+/* Dead weight at swatch scale: a smaller solid dot, no ring. Achromatic, so
+   it never joins the colour pairs the flare and doorway palettes are gated
+   on — see lib/doorway.ts. */
+.door-swatch.dot {
+  background: radial-gradient(circle, var(--core) 0 1.7px, transparent 1.9px);
 }
 .door-summary {
   margin-left: auto;
@@ -1224,7 +1429,7 @@ button { font: inherit; color: inherit; }
 @media (max-width: 640px) {
   .xray-toggle { margin-left: 0; }
   .xray-legend { width: 100%; }
-  .door-toggle { margin-left: 0; }
+  .replay-modes { margin-left: 0; }
   .door-summary { margin-left: 0; flex-basis: 100%; }
 }
 
