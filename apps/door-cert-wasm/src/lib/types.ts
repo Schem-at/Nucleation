@@ -12,11 +12,17 @@ export type TickEvents = {
 
 export type Material = { id: string; count: number };
 
-export type Verdict = "CERTIFIED" | "DID NOT RESET";
+/** `INCONCLUSIVE` is not a failure of the door — it is a refusal by the tool.
+ *  It is issued when the machine ran fine but the run cannot say WHICH door it
+ *  measured: the state the file was saved in and the state the machine settles
+ *  into disagree about where the doorway is. Better a loud refusal than a
+ *  confident wrong number. */
+export type Verdict = "CERTIFIED" | "DID NOT RESET" | "INCONCLUSIVE";
 
 /** The doorway itself: cells that are solid at rest and air once open. */
 export type Aperture = {
-  /** How many cells open up. */
+  /** How many cells open up. This is the MEASUREMENT; `w × h` is only the
+   *  envelope it sits in, and the two are equal only when `rectangular`. */
   cells: number;
   /** Horizontal span of the opening, in blocks. */
   w: number;
@@ -24,9 +30,54 @@ export type Aperture = {
   h: number;
   /** Depth of the opening along the remaining axis. */
   depth: number;
-  /** Set when the measurement needed a caveat — several separate openings, or
-   *  no walkable passage at all. Null when the doorway read cleanly. */
+  /** True when the opening exactly fills its own `w × h` envelope. False for an
+   *  L, a ring, a cross or any ragged edge — and then `cells < w × h`, which
+   *  the sheet has to say out loud rather than let the spans imply a count that
+   *  was never measured. */
+  rectangular: boolean;
+  /** Set when the measurement needed a caveat — a non-rectangular opening,
+   *  several separate openings, or no walkable passage at all. Null when the
+   *  doorway read cleanly. */
   note?: string | null;
+};
+
+/** Which control drives the door, and how hard the evidence for it is.
+ *
+ *  Nothing here is guessed from the palette. Every candidate was actuated in a
+ *  throwaway copy of the world and the build was watched for movement; this is
+ *  the one that moved it. See `detectInputs()` in the worker. */
+export type InputControl = {
+  pos: Vec3;
+  /** Full block state as found, e.g. `minecraft:lever[face=floor,...]`. */
+  state: string;
+  kind: "lever" | "button" | "note block" | "pressure plate";
+  /** Cells that physically moved at the peak of its trial. 0 disqualifies. */
+  moved: number;
+  /** True for a control that springs back on its own — a button, a plate you
+   *  step off. The door's second stroke is then the control's own release, not
+   *  a second actuation. */
+  momentary: boolean;
+};
+
+/** One reading of the doorway, for the two-readings-disagree case. */
+export type ApertureReading = {
+  w: number;
+  h: number;
+  cells: number;
+  depth: number;
+  /** The pattern name this reading classifies as, when it classifies at all. */
+  name: string | null;
+};
+
+/** Raised when the saved state and the settled cycle describe different doors.
+ *  Both readings are kept; neither is presented as the answer. */
+export type ApertureConflict = {
+  /** What the doorway measures in the state the file was saved in. */
+  saved: ApertureReading;
+  /** What it measures once the machine is on its own repeating cycle. */
+  settled: ApertureReading;
+  /** Cells that never came back — the size of the disagreement. */
+  drift: number;
 };
 
 /** The cells the doorway timing is measured over, in world coordinates.
@@ -185,7 +236,18 @@ export type ResetTime = {
 export type Certificate = {
   name: string;
   dims: [number, number, number];
+  /** Position of the control that drives the door. Named `lever` because that
+   *  is what it is on almost every door; `input` carries what it actually is. */
   lever: [number, number, number];
+  /** The control the brute-force search proved drives this door. */
+  input: InputControl | null;
+  /** Other controls that also moved the build on their own. A door with two
+   *  independent inputs is real; the measured cycle used `input`, and these are
+   *  named so nobody has to wonder which one was thrown. */
+  input_alternatives: InputControl[];
+  /** How the input was found, when that is worth saying — an ambiguity, or a
+   *  control that is not a lever. Null when a single lever drove it. */
+  input_note: string | null;
   /** Ticks from the click until every passage cell is clear — the doorway is
    *  walkable. Null when the passage never fully cleared. */
   open_ticks: number | null;
@@ -245,6 +307,11 @@ export type Certificate = {
   priming_cycles: number;
   /** Cells between the saved state and the cycle it settles into. */
   saved_state_drift: number;
+  /** Set when priming moved the doorway itself — the file and the settled
+   *  machine describe different doors. While this is set the verdict is
+   *  INCONCLUSIVE and `classification` is withheld: the run knows it measured
+   *  A door and cannot prove it measured THIS one. */
+  aperture_conflict: ApertureConflict | null;
   /** False when the file was saved with its doorway already standing open —
    *  the first lever click then closes it, and the two strokes swap. */
   rest_is_closed: boolean;
@@ -273,7 +340,15 @@ export type WorkerProgress = { type: "progress"; step: string };
  *  localStorage quota survives. The certificate persists; the x-ray is a
  *  this-session artefact and says so when it is missing. */
 export type WorkerDone = { type: "done"; record: CertRecord; xray: XrayData | null };
-export type WorkerError = { type: "error"; error: string };
+/** `error` is a sentence for the person at the keyboard. `code` is the raw
+ *  engine enum, kept as small print so we can still triage from a screenshot,
+ *  and `detail` is whatever the engine could name — the offending block, say. */
+export type WorkerError = {
+  type: "error";
+  error: string;
+  code?: string | null;
+  detail?: string | null;
+};
 export type WorkerMessage = WorkerProgress | WorkerDone | WorkerError;
 
 /** Page → worker payload. */

@@ -66,9 +66,24 @@ open, the door accepts a re-trigger mid-stroke — a genuinely impressive proper
 and worth a badge. We already know the vault survives interrupted strokes
 (conformance covers it), so the machinery is there.
 
-## 3. Input detection beyond levers
+## 3. Input detection beyond levers — BUILT
 
-Today: first `minecraft:lever` found. Real builds use:
+`detectInputs()` in `src/worker/certify.worker.ts`. Candidates are levers,
+buttons (any material), note blocks and pressure plates; each is actuated in a
+throwaway simulation and the trial is scored by `aperture()` — did a walkable
+passage open? Not "did anything move": playing a note block in `fast tgm 4x4`
+BUDs a piston and shuffles four cells, and in the 6 × 6 it briefly leaves two
+`minecraft:moving_piston` placeholders, so a movement test alone puts three
+drivers on a one-lever door. Rarity orders the queue and nothing else; every
+candidate is still tried. A second control counts as a second input only if it
+opens the SAME passage.
+
+Still open: the engine delivers no power from a floor `stone_button` or
+`stone_pressure_plate` under `TickSettleMode.InWorld` — the button's own
+20-tick press/release is simulated correctly, but the door never moves. So no
+button or plate door can certify yet; the detector is ready for one.
+
+Original notes below. Real builds use:
 
 - **Levers** — the common case.
 - **Buttons** — both as inputs *and* to redirect redstone. Cannot be

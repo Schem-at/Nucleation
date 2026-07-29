@@ -8,16 +8,22 @@ const STEPS = [
   { key: "engine", label: "Waking the wasm engine" },
   { key: "parsing", label: "Parsing schematic" },
   { key: "simulating", label: "Simulating redstone" },
+  { key: "input", label: "Finding what drives it" },
   { key: "measuring", label: "Measuring open / close" },
   { key: "classifying", label: "Classifying the pattern" },
   { key: "reset", label: "Measuring reset time" },
   { key: "x-ray", label: "Recording the update stream" },
 ];
 
+/** What the upload screen shows when a run stops: a sentence for the person,
+ *  and the engine's own words kept as small print so a screenshot is still
+ *  enough for us to triage from. */
+type UploadError = { message: string; code?: string | null; detail?: string | null };
+
 export function UploadPage() {
   const navigate = useNavigate();
   const [drag, setDrag] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UploadError | null>(null);
   const [job, setJob] = useState<{ file: string; step: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const workerRef = useRef<Worker | null>(null);
@@ -29,7 +35,9 @@ export function UploadPage() {
       setError(null);
       const ext = "." + (file.name.split(".").pop() ?? "").toLowerCase();
       if (!ACCEPT.includes(ext)) {
-        setError(`"${file.name}" is not a supported format. Upload ${ACCEPT.join(", ")}.`);
+        setError({
+          message: `"${file.name}" is not a format this reads. Upload ${ACCEPT.join(", ")}.`,
+        });
         return;
       }
       const buffer = await file.arrayBuffer();
@@ -51,13 +59,24 @@ export function UploadPage() {
           worker.terminate();
           navigate(`/door/${id}`);
         } else {
-          setError(data.error || "Simulation failed. Check that the schematic contains a lever.");
+          setError({
+            message:
+              data.error ||
+              "The run stopped without saying why. Reload the page and try the file again.",
+            code: data.code,
+            detail: data.detail,
+          });
           setJob(null);
           worker.terminate();
         }
       };
       worker.onerror = (e) => {
-        setError(e.message || "The wasm engine crashed. Reload and try again.");
+        setError({
+          message:
+            "The wasm engine crashed partway through. Reload the page before trying another door — " +
+            "a crashed engine stays crashed for the rest of the session.",
+          code: e.message || "worker error",
+        });
         setJob(null);
         worker.terminate();
       };
@@ -125,8 +144,13 @@ export function UploadPage() {
             />
           </div>
           {error && (
-            <div className="upload-error" role="alert">
-              {error}
+            <div className="upload-error" role="alert" data-testid="upload-error">
+              <p className="upload-error-msg">{error.message}</p>
+              {(error.code || error.detail) && (
+                <p className="upload-error-code" data-testid="upload-error-code">
+                  {[error.code, error.detail].filter(Boolean).join(" · ")}
+                </p>
+              )}
             </div>
           )}
         </>

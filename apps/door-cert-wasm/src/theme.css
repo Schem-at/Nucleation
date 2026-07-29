@@ -343,6 +343,11 @@ button { font: inherit; color: inherit; }
   text-transform: none;
 }
 
+/* A disputed doorway takes the alarm edge and drops a step in size: two
+   readings side by side are longer, and the line has to stay one line. */
+.hero-aperture-split { border-left-color: var(--alarm); }
+.hero-aperture-split b { font-size: 22px; }
+
 .hero-sub { color: var(--ink-2); margin: 0; max-width: 52ch; }
 .hero-dims {
   display: flex;
@@ -745,6 +750,18 @@ button { font: inherit; color: inherit; }
   font-size: 13.5px;
   color: var(--alarm-ink);
   background: var(--surface);
+}
+.upload-error-msg { margin: 0; line-height: 1.5; }
+/* The engine's own words. Kept for us, sized so they never compete with the
+   sentence above them — a reader who does not need this should not have to
+   read past it. */
+.upload-error-code {
+  margin: 8px 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  word-break: break-word;
 }
 
 /* Processing checklist */
@@ -1235,6 +1252,10 @@ button { font: inherit; color: inherit; }
 
 /* A note worth stopping on — a negative reset, not a caveat. */
 .hero-note.note-flag { border-left-color: var(--accent); }
+/* A refusal, not a warning. It carries the same weight as the seal it replaces,
+   so it takes the alarm edge rather than the quiet grey of an aside. */
+.hero-note.note-alarm { border-left-color: var(--alarm); border-left-width: 3px; }
+.hero-note.note-alarm .badge { margin-right: 6px; vertical-align: 1px; }
 .hero-note.note-flag .badge { margin-right: 6px; vertical-align: 1px; }
 
 /* Priming clause: a fact about how the file was saved, not a fault. */

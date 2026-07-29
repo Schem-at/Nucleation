@@ -7,11 +7,18 @@ import type { Verdict } from "../lib/types";
 
 /** `openTicks` is the doorway time — the tick the passage becomes walkable,
  *  not the tick the machine goes quiet. Null when the passage never cleared,
- *  which the seal says outright rather than quoting the settle time instead. */
+ *  which the seal says outright rather than quoting the settle time instead.
+ *
+ *  An INCONCLUSIVE run has an opening time and must not print it. The number is
+ *  a true measurement of a cycle the run cannot prove is this door's, and a
+ *  stamp is the most quotable thing on the page — "WALKABLE IN 1 TICKS" would
+ *  outlive every caveat around it. So the seal refuses the number outright and
+ *  stamps the refusal instead. */
 export function Seal({ openTicks, verdict }: { openTicks: number | null; verdict: Verdict }) {
   const size = 190;
   const c = size / 2;
   const ok = verdict === "CERTIFIED";
+  const inconclusive = verdict === "INCONCLUSIVE";
   const teeth: ReactNode[] = [];
   const n = 26;
   const rTeeth = 82;
@@ -24,8 +31,8 @@ export function Seal({ openTicks, verdict }: { openTicks: number | null; verdict
       <rect key={i} x={x} y={y} width={px} height={px} fill={ok ? "var(--accent)" : "var(--alarm)"} />,
     );
   }
-  const timed = openTicks !== null;
-  const seconds = timed ? (openTicks / 20).toFixed(2) : null;
+  const timed = openTicks !== null && !inconclusive;
+  const seconds = timed ? (openTicks! / 20).toFixed(2) : null;
   const rText = 62;
   const ring = ok ? "var(--accent)" : "var(--alarm)";
   const ink = ok ? "var(--accent-ink)" : "var(--alarm-ink)";
@@ -37,11 +44,13 @@ export function Seal({ openTicks, verdict }: { openTicks: number | null; verdict
       viewBox={`0 0 ${size} ${size}`}
       role="img"
       aria-label={
-        !ok
-          ? `Not certified: door did not reset after its cycle`
-          : timed
-            ? `Certified: the doorway is walkable ${openTicks} ticks after the lever (${seconds} seconds)`
-            : `Certified: the passage never fully cleared, so no opening time was measured`
+        inconclusive
+          ? `Inconclusive: the file and the settled machine open different doorways, so no opening time is stamped`
+          : !ok
+            ? `Not certified: door did not reset after its cycle`
+            : timed
+              ? `Certified: the doorway is walkable ${openTicks} ticks after the input (${seconds} seconds)`
+              : `Certified: the passage never fully cleared, so no opening time was measured`
       }
     >
       {teeth}
@@ -57,24 +66,30 @@ export function Seal({ openTicks, verdict }: { openTicks: number | null; verdict
         <textPath href="#seal-arc" startOffset="0%">
           {ok
             ? "SCHEMAT.IO DOOR VALIDATOR · SIMULATED IN BROWSER ·"
-            : "SCHEMAT.IO DOOR VALIDATOR · DID NOT RESET ·"}
+            : inconclusive
+              ? "SCHEMAT.IO DOOR VALIDATOR · NOT CLASSIFIED ·"
+              : "SCHEMAT.IO DOOR VALIDATOR · DID NOT RESET ·"}
         </textPath>
       </text>
       <text x={c} y={c - 22} textAnchor="middle" fontSize="9" letterSpacing="1.5" fill={ink}>
-        WALKABLE IN
+        {inconclusive ? "DOORWAY IS" : "WALKABLE IN"}
       </text>
       <text
         x={c}
         y={c + 16}
         textAnchor="middle"
-        fontSize={timed ? 42 : 26}
+        fontSize={timed ? 42 : inconclusive ? 21 : 26}
         fontWeight="700"
         fill={ink}
       >
-        {timed ? openTicks : "n/a"}
+        {timed ? openTicks : inconclusive ? "AMBIGUOUS" : "n/a"}
       </text>
       <text x={c} y={c + 30} textAnchor="middle" fontSize="8" letterSpacing="0.8" fill={ink}>
-        {timed ? `TICKS · ${seconds} S` : "PASSAGE NEVER CLEARED"}
+        {timed
+          ? `TICKS · ${seconds} S`
+          : inconclusive
+            ? "NO TIME STAMPED"
+            : "PASSAGE NEVER CLEARED"}
       </text>
     </svg>
   );

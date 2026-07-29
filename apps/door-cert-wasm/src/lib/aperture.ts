@@ -268,7 +268,7 @@ export function aperture(
 
   let loC: number, hiC: number, loR: number, hiR: number;
   let clearCells: number;
-  let note: string | null = null;
+  const notes: string[] = [];
   if (passage) {
     loC = Infinity; hiC = -Infinity; loR = Infinity; hiR = -Infinity;
     for (const key of passage.set) {
@@ -280,7 +280,7 @@ export function aperture(
     }
     clearCells = passage.set.size;
     if (passage.parts > 1)
-      note = `${passage.parts} separate openings — the largest is reported`;
+      notes.push(`${passage.parts} separate openings — the largest is reported`);
   } else {
     // No passage: the fill leaked past the wall or nothing was clear through
     // it. Fall back to the footprint of the door blocks themselves, which is
@@ -310,7 +310,7 @@ export function aperture(
       if (b > hiR) hiR = b;
     }
     clearCells = patch.length;
-    note = "no clear passage found — measured from the door blocks instead";
+    notes.push("no clear passage found — measured from the door blocks instead");
   }
 
   const spanC = hiC - loC + 1;
@@ -319,7 +319,25 @@ export function aperture(
   // so its two horizontal spans are reported widest-first.
   const h = vertical ? spanR : Math.min(spanC, spanR);
   const w = vertical ? spanC : Math.max(spanC, spanR);
-  const doorway: Aperture = { cells: clearCells, w, h, depth, note };
+  // `w × h` is the ENVELOPE the opening sits in, not its area. A cross, an
+  // iris caught part-open, a ragged extractor result: all of them clear fewer
+  // cells than their own bounding box, and quoting the spans alone invites the
+  // reader to multiply them and get a number nobody measured. So the shape is
+  // stated whenever the two disagree, and `rectangular` carries it to the sheet
+  // rather than leaving the note as the only place it is written down.
+  const rectangular = clearCells === spanC * spanR;
+  if (!rectangular)
+    notes.push(
+      `the opening is not a rectangle — ${clearCells} cells clear inside a ${w} × ${h} envelope`,
+    );
+  const doorway: Aperture = {
+    cells: clearCells,
+    w,
+    h,
+    depth,
+    rectangular,
+    note: notes.length ? notes.join("; ") : null,
+  };
 
   // 5. Read the pattern back off the closed world over the passage bbox: a
   //    cell is door wherever it is solid when shut at any layer of the wall.

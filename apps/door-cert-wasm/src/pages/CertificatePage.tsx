@@ -104,6 +104,10 @@ export function CertificatePage() {
   const totalBlocks = cert.materials.reduce((a, m) => a + m.count, 0);
   const stacks = Math.ceil(totalBlocks / 64);
   const ap = cert.aperture;
+  const conflict = cert.aperture_conflict ?? null;
+  /** What actually drives this door. Older records have no `input`, and a lever
+   *  is what they all were. */
+  const control = cert.input?.kind ?? "lever";
   const rows = censusRows(cert.census);
   const ro = cert.reset_open;
   const rc = cert.reset_close;
@@ -146,12 +150,27 @@ export function CertificatePage() {
           <div className="hero-main">
             <p className="eyebrow">Piston door validation report</p>
             <h1>{cert.name}</h1>
-            {ap ? (
+            {conflict ? (
+              /* The hero line is the most quotable thing on the sheet, so on a
+                 disputed door it carries the dispute rather than one side of
+                 it. Quoting this line alone still tells the truth. */
+              <p className="hero-aperture hero-aperture-split" data-testid="aperture">
+                <b>
+                  {conflict.saved.w} × {conflict.saved.h} or {conflict.settled.w} ×{" "}
+                  {conflict.settled.h}
+                </b>{" "}
+                disputed
+                <span>
+                  {conflict.saved.cells} cells as saved · {conflict.settled.cells} cells on the
+                  cycle it settles into
+                </span>
+              </p>
+            ) : ap ? (
               <p className="hero-aperture" data-testid="aperture">
                 <b>
                   {ap.w} × {ap.h}
                 </b>{" "}
-                aperture
+                {ap.rectangular === false ? "envelope" : "aperture"}
                 <span>
                   {ap.cells} cells clear{ap.depth > 1 ? ` · ${ap.depth} deep` : ""}
                   {ap.note ? ` · ${ap.note}` : ""}
@@ -160,14 +179,14 @@ export function CertificatePage() {
             ) : (
               <p className="hero-aperture" data-testid="aperture">
                 <b>No aperture</b>
-                <span>nothing opened when the lever was thrown</span>
+                <span>nothing opened when the {control} was thrown</span>
               </p>
             )}
             <p className="hero-sub">
               One cycle measured end to end:{" "}
               {cert.rest_is_closed
-                ? "lever on, door opens, lever off, door shuts."
-                : "lever on, door shuts, lever off, door opens."}{" "}
+                ? `${control} on, door opens, ${control} off, door shuts.`
+                : `${control} on, door shuts, ${control} off, door opens.`}{" "}
               Opening and closing are timed at the <b>doorway</b> — the tick the passage
               becomes walkable, and the tick the pattern is solid again — not the tick the
               machine finally goes quiet, which is reported separately as settle.
@@ -181,7 +200,7 @@ export function CertificatePage() {
                 blocks
               </span>
               <span>
-                lever at <b>({cert.lever.join(", ")})</b>
+                {control} at <b>({cert.lever.join(", ")})</b>
               </span>
               <span>
                 {cycleTicks !== null ? (
@@ -200,6 +219,32 @@ export function CertificatePage() {
                 </span>
               )}
             </div>
+            {conflict && (
+              <p className="hero-note note-alarm" data-testid="conflict">
+                <span className="badge badge-alarm">no classification</span>{" "}
+                <b>Two doors, one file.</b> In the state it was saved in, this build opens a{" "}
+                <b>
+                  {conflict.saved.w} × {conflict.saved.h}
+                </b>{" "}
+                doorway of {conflict.saved.cells} cells
+                {conflict.saved.name ? ` — a ${conflict.saved.name}` : ""}. Run it to the cycle
+                it actually repeats and the doorway is{" "}
+                <b>
+                  {conflict.settled.w} × {conflict.settled.h}
+                </b>
+                , {conflict.settled.cells} cells: {conflict.drift} cells never come back. Both
+                are real measurements of the same machine and nothing in the file says which
+                one is the door, so no pattern is named and no opening time is stamped. Every
+                number below describes the settled cycle. Check the build for a part that only
+                works from the saved state — a comparator reading a container, an unpowered
+                loader — and upload it in the state it is meant to run in.
+              </p>
+            )}
+            {cert.input_note && (
+              <p className="hero-note" data-testid="input-note">
+                <b>Input.</b> {cert.input_note}
+              </p>
+            )}
             {cert.timing_note && (
               <p className="hero-note">
                 <b>Doorway timing incomplete.</b> {cert.timing_note}. The settle times below
@@ -222,10 +267,12 @@ export function CertificatePage() {
                 below are named for what the door does, not for which click came first.
               </p>
             )}
-            {cert.needed_priming && (
+            {cert.needed_priming && !conflict && (
               <p className="hero-note">
-                <b>Saved mid-cycle.</b> The door did not return to its saved state, so it
-                was run to its steady state first; timings are measured from there.
+                <b>Saved mid-cycle.</b> The door did not return to its saved state, so it was
+                run to its steady state first; timings are measured from there. The doorway
+                measures the same either way, which is what makes the rest of this sheet safe
+                to read.
               </p>
             )}
           </div>
@@ -248,14 +295,26 @@ export function CertificatePage() {
           geometry={cert.aperture_geometry ?? null}
         />
         <p className="exhibit-caption">
-          Drawn from the recorded block changes. The two lime marks on the scrubber are the
-          lever clicks; it starts on the one that{" "}
+          Drawn from the recorded block changes. The two lime marks on the scrubber are the{" "}
+          {control} throws; it starts on the one that{" "}
           {cert.rest_is_closed ? "opens" : "closes"} the door.
         </p>
       </div>
 
       <div className="sheet-section">
-        <p className="eyebrow">Measurements</p>
+        <p className="eyebrow">
+          {conflict ? "Measurements — of the settled cycle only" : "Measurements"}
+        </p>
+        {conflict && (
+          /* The tiles are the most liftable numbers on the page. On a disputed
+             door they time a cycle the run cannot attribute to this door, so
+             they are labelled where they are read, not only in the banner. */
+          <p className="chart-note" data-testid="measurements-caveat">
+            These time the {conflict.settled.w} × {conflict.settled.h} cycle the machine
+            repeats, not the {conflict.saved.w} × {conflict.saved.h} doorway the file was saved
+            with. Correct for what they measure; not this door's certified numbers.
+          </p>
+        )}
         <div className="tiles">
           <StatTile
             label="Opens in"
