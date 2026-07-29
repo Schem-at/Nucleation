@@ -244,6 +244,18 @@ public final class TraceCapture {
             throw new IllegalStateException("failed to place " + structureId);
         }
 
+        // --spawn: the only way to author a non-finite velocity.
+        //
+        // Structures carry their entities in SNBT, and SNBT's number grammar
+        // requires a digit — there is no production for NaN or Infinity. So the
+        // load-bearing glitch of the record doors, the *nan cart*, cannot be
+        // written into a structure file at all. It can be written here, because
+        // this is Java: Double.parseDouble accepts "NaN", "Infinity" and
+        // "-Infinity", and setDeltaMovement stores whatever it is handed.
+        //
+        // Positions are ORIGIN-relative doubles, matching every other flag.
+        spawnRequested(args, level);
+
         // Redstone settles synchronously while the structure is placed, so a trace
         // taken from here alone records nothing. To observe propagation we have to
         // disturb the settled state: --break removes a block (typically the power
@@ -264,6 +276,30 @@ public final class TraceCapture {
                         .filter(c -> level.isPositionTickingWithEntitiesLoaded(c.pack())).count(),
                 chunks.size());
         reportEntities(level, min, max);
+
+        // An --in-world box with nothing in it is a broken capture, not a quiet
+        // one. It happened: a save in the pre-26.2 directory layout loaded
+        // without a single error and the server generated fresh terrain over
+        // it, so the recording showed a build "at rest" that was never there.
+        // Refuse rather than emit a trace that says nothing and looks fine.
+        if (inWorld != null) {
+            long solid = 0;
+            for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
+                if (!level.getBlockState(pos).isAir()) {
+                    solid++;
+                }
+            }
+            if (solid == 0 && level.getEntitiesOfClass(
+                    net.minecraft.world.entity.Entity.class,
+                    new net.minecraft.world.phys.AABB(
+                            min.getX(), min.getY(), min.getZ(),
+                            max.getX() + 1, max.getY() + 1, max.getZ() + 1)).isEmpty()) {
+                throw new IllegalStateException(
+                        "--in-world box " + inWorld + " holds no blocks and no entities; "
+                                + "the save did not load (pre-26.2 layout? wrong coordinates?) "
+                                + "and a trace from here would record silence, not rest");
+            }
+        }
 
         List<String> ticks = new ArrayList<>();
         List<String> queues = new ArrayList<>();
@@ -402,6 +438,18 @@ public final class TraceCapture {
             }
         }
 
+        // --entity-log prints every entity's position and velocity each tick, to
+        // stdout rather than into the trace. Deliberately not the JSON: NaN and
+        // Infinity have no JSON spelling — Double.toString writes them as bare
+        // `NaN`, which no JSON parser will read back — and the entity_moved diff
+        // above compares positions with `Math.abs(was - now) > 1e-9`, which is
+        // false for every NaN, so a NaN entity is *silently* reported as
+        // unmoved. This channel is what makes non-finite state observable.
+        boolean entityLog = hasFlag(args, "--entity-log");
+        if (entityLog) {
+            logEntities(level, min, max, -1);
+        }
+
         installBlockEventLog(level);
         if (watchAt != null) {
             String[] wp = watchAt.split(",");
@@ -440,6 +488,9 @@ public final class TraceCapture {
             if (tick < 3) {
                 System.out.printf("    t%d gameTime=%d pending=%d%n",
                         tick, level.getGameTime(), level.getBlockTicks().count());
+            }
+            if (entityLog) {
+                logEntities(level, min, max, tick);
             }
 
             Map<BlockPos, String> current = snapshot(level, min, max);
@@ -531,6 +582,21 @@ public final class TraceCapture {
                         }
                     }
                     if (moved) {
+                        // JSON has no spelling for NaN or Infinity, and
+                        // Double.toString writes them bare — the file would
+                        // parse nowhere. Refuse loudly rather than emit a trace
+                        // that is quietly unreadable, or worse, one that rounds
+                        // the mechanism away. `--entity-log` is the channel that
+                        // can carry these.
+                        for (double component : now) {
+                            if (!Double.isFinite(component)) {
+                                throw new IllegalStateException(
+                                        "entity " + entry.getKey() + " has a non-finite"
+                                                + " position or velocity, which JSON cannot"
+                                                + " represent; capture it with --entity-log"
+                                                + " instead of --entities");
+                            }
+                        }
                         events.add(String.format(
                                 "        {\"phase\": \"%s\", \"kind\": \"entity_moved\", "
                                         + "\"id\": %d, \"entity_type\": \"%s\", "
@@ -691,6 +757,191 @@ public final class TraceCapture {
 
     /** Entity id -> registry type name, filled by snapshotItems. */
     private static final Map<Integer, String> ENTITY_TYPES = new HashMap<>();
+
+    /**
+     * {@code --spawn TYPE@x,y,z[:vx,vy,vz][:flag,flag]} — repeatable.
+     *
+     * <p>Exists for one reason: a structure file cannot express a velocity that
+     * is not a finite number, and the record doors are held together by carts
+     * whose velocity is NaN. SNBT's number grammar requires a digit, so there is
+     * no spelling for {@code NaN} or {@code Infinity} in a {@code Motion} list —
+     * vanilla's own writer emits them and vanilla's own parser then rejects
+     * them. Java has no such gap: {@code Double.parseDouble} reads {@code NaN},
+     * {@code Infinity} and {@code -Infinity}, and {@link
+     * net.minecraft.world.entity.Entity#setDeltaMovement} stores exactly what it
+     * is given.
+     *
+     * <p>Coordinates are ORIGIN-relative doubles, like every other flag here.
+     * Flags: {@code baby} sets {@code Age} through {@code AgeableMob.setBaby},
+     * {@code noai} sets {@code NoAI}, {@code nogravity} disables gravity.
+     */
+    private static void spawnRequested(String[] args, ServerLevel level) {
+        for (int i = 0; i + 1 < args.length; i++) {
+            if (!args[i].equals("--spawn")) {
+                continue;
+            }
+            String spec = args[i + 1];
+            int at = spec.indexOf('@');
+            if (at < 0) {
+                throw new IllegalArgumentException(
+                        "--spawn wants TYPE@x,y,z[:vx,vy,vz][:flags], got " + spec);
+            }
+            String typeName = spec.substring(0, at);
+            String[] parts = spec.substring(at + 1).split(":");
+            double[] pos = triple(parts[0]);
+            double[] vel = parts.length > 1 && !parts[1].isEmpty()
+                    ? triple(parts[1]) : new double[] {0, 0, 0};
+            java.util.Set<String> flags = new java.util.HashSet<>();
+            if (parts.length > 2) {
+                for (String flag : parts[2].split(",")) {
+                    flags.add(flag.trim());
+                }
+            }
+
+            net.minecraft.world.entity.EntityType<?> type =
+                    net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE
+                            .getValue(Identifier.parse(typeName));
+            net.minecraft.world.entity.Entity entity = type.create(
+                    level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+            if (entity == null) {
+                throw new IllegalStateException("could not create " + typeName);
+            }
+            entity.snapTo(ORIGIN.getX() + pos[0], ORIGIN.getY() + pos[1],
+                    ORIGIN.getZ() + pos[2], 0.0f, 0.0f);
+            entity.setOldPosAndRot();
+            if (flags.contains("baby")
+                    && entity instanceof net.minecraft.world.entity.AgeableMob ageable) {
+                ageable.setBaby(true);
+            }
+            if (flags.contains("noai") && entity instanceof net.minecraft.world.entity.Mob mob) {
+                mob.setNoAi(true);
+            }
+            if (flags.contains("nogravity")) {
+                entity.setNoGravity(true);
+            }
+            setVelocity(entity, vel);
+            if (!level.addFreshEntity(entity)) {
+                throw new IllegalStateException("level refused " + typeName);
+            }
+            // addFreshEntity can run type-specific setup; restore the requested
+            // velocity afterwards so the spawn means what it says.
+            setVelocity(entity, vel);
+            net.minecraft.world.phys.AABB box = entity.getBoundingBox();
+            // Print what the entity *has*, never what was asked for. The first
+            // draft printed the request, and it lied about exactly the case this
+            // flag exists for: setDeltaMovement had silently discarded the NaN
+            // and the report still showed NaN.
+            Vec3 got = entity.getDeltaMovement();
+            System.out.printf(
+                    "  spawn: id=%d %s at (%s, %s, %s) vel=(%s, %s, %s)%s%n"
+                            + "         bbox=[%s..%s, %s..%s, %s..%s] size=%sx%sx%s%n",
+                    entity.getId(), typeName,
+                    Double.toString(pos[0]), Double.toString(pos[1]), Double.toString(pos[2]),
+                    Double.toString(got.x), Double.toString(got.y), Double.toString(got.z),
+                    flags.isEmpty() ? "" : " flags=" + flags,
+                    Double.toString(box.minX - ORIGIN.getX()),
+                    Double.toString(box.maxX - ORIGIN.getX()),
+                    Double.toString(box.minY - ORIGIN.getY()),
+                    Double.toString(box.maxY - ORIGIN.getY()),
+                    Double.toString(box.minZ - ORIGIN.getZ()),
+                    Double.toString(box.maxZ - ORIGIN.getZ()),
+                    Double.toString(box.getXsize()), Double.toString(box.getYsize()),
+                    Double.toString(box.getZsize()));
+        }
+    }
+
+    /**
+     * Install a velocity, going behind {@code setDeltaMovement} when it refuses.
+     *
+     * <p>26.2's setter is
+     * {@code if (vec3.isFinite()) this.deltaMovement = vec3;} — a non-finite
+     * vector is <em>silently discarded</em> and the old velocity kept. So the
+     * public API cannot construct a nan cart at all, and neither can the save
+     * format: {@code Entity.load} reads {@code Motion} and passes it through the
+     * same setter, so a NaN in a world file is dropped on load.
+     *
+     * <p>That guard is itself a measurement result, and it is the reason this
+     * writes the private field directly: to study what NaN physics <em>does</em>
+     * we first have to be able to have some.
+     */
+    private static void setVelocity(net.minecraft.world.entity.Entity entity, double[] vel) {
+        entity.setDeltaMovement(vel[0], vel[1], vel[2]);
+        Vec3 got = entity.getDeltaMovement();
+        boolean wanted = Double.isFinite(vel[0]) && Double.isFinite(vel[1])
+                && Double.isFinite(vel[2]);
+        if (wanted || (equalBits(got.x, vel[0]) && equalBits(got.y, vel[1])
+                && equalBits(got.z, vel[2]))) {
+            return;
+        }
+        try {
+            java.lang.reflect.Field field =
+                    net.minecraft.world.entity.Entity.class.getDeclaredField("deltaMovement");
+            field.setAccessible(true);
+            field.set(entity, new Vec3(vel[0], vel[1], vel[2]));
+            System.out.printf("  note: setDeltaMovement rejected the non-finite vector; "
+                    + "wrote Entity.deltaMovement directly%n");
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("cannot install non-finite velocity", e);
+        }
+    }
+
+    /** NaN-aware equality: {@code NaN != NaN}, but the same bits are the same value. */
+    private static boolean equalBits(double a, double b) {
+        return Double.doubleToRawLongBits(a) == Double.doubleToRawLongBits(b);
+    }
+
+    /** Three comma-separated doubles; {@code NaN}/{@code Infinity} accepted. */
+    private static double[] triple(String text) {
+        String[] piece = text.split(",");
+        return new double[] {
+                Double.parseDouble(piece[0].trim()),
+                Double.parseDouble(piece[1].trim()),
+                Double.parseDouble(piece[2].trim())};
+    }
+
+    /**
+     * One stdout line per entity per tick, plus the running non-finite count.
+     *
+     * <p>The trace JSON cannot carry this: {@code Double.toString} spells a
+     * non-finite as bare {@code NaN}, which is not JSON, and the entity diff
+     * that feeds the trace uses {@code Math.abs(a - b) > 1e-9}, an expression
+     * that is false whenever either side is NaN. A NaN entity is therefore
+     * invisible to the trace by construction. Printing it is the measurement.
+     */
+    private static void logEntities(ServerLevel level, BlockPos min, BlockPos max, int tick) {
+        net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(
+                min.getX(), min.getY(), min.getZ(),
+                max.getX() + 1, max.getY() + 1, max.getZ() + 1);
+        List<net.minecraft.world.entity.Entity> found = level.getEntitiesOfClass(
+                net.minecraft.world.entity.Entity.class, box);
+        found.sort(java.util.Comparator.comparingInt(net.minecraft.world.entity.Entity::getId));
+        int nonFinite = 0;
+        StringBuilder line = new StringBuilder();
+        for (net.minecraft.world.entity.Entity entity : found) {
+            if (entity instanceof Player) {
+                continue;
+            }
+            Vec3 velocity = entity.getDeltaMovement();
+            boolean bad = !Double.isFinite(velocity.x) || !Double.isFinite(velocity.y)
+                    || !Double.isFinite(velocity.z);
+            if (bad) {
+                nonFinite++;
+            }
+            line.append(String.format(
+                    "  E t%d id=%d %s pos=(%s, %s, %s) vel=(%s, %s, %s)%s%n",
+                    tick, entity.getId(),
+                    net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE
+                            .getKey(entity.getType()).toString(),
+                    Double.toString(entity.getX() - ORIGIN.getX()),
+                    Double.toString(entity.getY() - ORIGIN.getY()),
+                    Double.toString(entity.getZ() - ORIGIN.getZ()),
+                    Double.toString(velocity.x), Double.toString(velocity.y),
+                    Double.toString(velocity.z),
+                    bad ? "  NON-FINITE" : ""));
+        }
+        System.out.printf("ENT t%d entities=%d non-finite=%d%n", tick, found.size(), nonFinite);
+        System.out.print(line);
+    }
 
     /**
      * Every entity in the box at capture start, counted by registry type.

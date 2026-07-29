@@ -1,0 +1,312 @@
+Note: src/TraceCapture.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+[18:44:20] [main/INFO]: Loaded 1585 recipes
+[18:44:20] [main/INFO]: Loaded 1688 advancements
+[18:44:20] [main/INFO]: Selecting global world spawn...
+[18:44:20] [main/INFO]: Loading 0 persistent chunks...
+[18:44:20] [main/INFO]: Time elapsed: 262 ms
+[18:44:20] [main/INFO]: Started game test server
+  origin: BlockPos{x=0, y=100, z=0}
+[18:44:20] [main/INFO]: 2 tests are now running at position -11847499, -59, -9866556!
+[18:44:20] [main/INFO]: Running test environment 'nucleation:default' batch 0 (1 tests)...
+[18:44:20] [main/INFO]: [  ]
+  warmup ticks until entity-ticking: 26 (6/6 chunks ready)
+  spawn: id=1 minecraft:minecart at (3.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+         bbox=[3.009999990463257..3.990000009536743, 1.0..1.699999988079071, 1.0099999904632568..1.9900000095367432] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  note: setDeltaMovement rejected the non-finite vector; wrote Entity.deltaMovement directly
+  spawn: id=2 minecraft:minecart at (3.5, 1.0, 3.5) vel=(0.0, 0.0, NaN)
+         bbox=[3.009999990463257..3.990000009536743, 1.0..1.699999988079071, 3.009999990463257..3.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=3 minecraft:small_fireball at (3.5, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+         bbox=[3.34375..3.65625, 1.0..1.3125, 5.34375..5.65625] size=0.3125x0.3125x0.3125
+  spawn: id=4 minecraft:dragon_fireball at (3.5, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+         bbox=[3.0..4.0, 1.0..2.0, 7.0..8.0] size=1.0x1.0x1.0
+  block-ticking chunks: 6/6
+  pending block ticks: 0
+  runs normally: true
+  entity-ticking chunks: 6/6
+  entities loaded: 4
+    1 x minecraft:dragon_fireball
+    2 x minecraft:minecart
+    1 x minecraft:small_fireball
+  entities with non-finite velocity (nan carts): 1
+  at t2: 1,1,1 -> redstone_block
+  at t2: 1,1,3 -> redstone_block
+  at t2: 1,1,5 -> redstone_block
+  at t2: 1,1,7 -> redstone_block
+  at t14: 1,1,1 -> air
+  at t14: 1,1,3 -> air
+  at t14: 1,1,5 -> air
+  at t14: 1,1,7 -> air
+  initial [0,0,0] minecraft:stone
+  initial [1,0,0] minecraft:stone
+  initial [2,0,0] minecraft:stone
+  initial [3,0,0] minecraft:stone
+  initial [4,0,0] minecraft:stone
+  initial [5,0,0] minecraft:stone
+  initial [6,0,0] minecraft:stone
+  initial [7,0,0] minecraft:stone
+  initial [8,0,0] minecraft:stone
+  initial [9,0,0] minecraft:stone
+  initial [10,0,0] minecraft:stone
+  initial [11,0,0] minecraft:stone
+  initial [0,0,1] minecraft:stone
+  initial [1,0,1] minecraft:stone
+  initial [2,0,1] minecraft:stone
+  initial [3,0,1] minecraft:stone
+  initial [4,0,1] minecraft:stone
+  initial [5,0,1] minecraft:stone
+  initial [6,0,1] minecraft:stone
+  initial [7,0,1] minecraft:stone
+  initial [8,0,1] minecraft:stone
+  initial [9,0,1] minecraft:stone
+  initial [10,0,1] minecraft:stone
+  initial [11,0,1] minecraft:stone
+  initial [2,1,1] minecraft:sticky_piston[extended=false,facing=east]
+  initial [0,0,2] minecraft:stone
+  initial [1,0,2] minecraft:stone
+  initial [2,0,2] minecraft:stone
+  initial [3,0,2] minecraft:stone
+  initial [4,0,2] minecraft:stone
+  initial [5,0,2] minecraft:stone
+  initial [6,0,2] minecraft:stone
+  initial [7,0,2] minecraft:stone
+  initial [8,0,2] minecraft:stone
+  initial [9,0,2] minecraft:stone
+  initial [10,0,2] minecraft:stone
+  initial [11,0,2] minecraft:stone
+  initial [0,0,3] minecraft:stone
+  initial [1,0,3] minecraft:stone
+  initial [2,0,3] minecraft:stone
+  initial [3,0,3] minecraft:stone
+  initial [4,0,3] minecraft:stone
+  initial [5,0,3] minecraft:stone
+  initial [6,0,3] minecraft:stone
+  initial [7,0,3] minecraft:stone
+  initial [8,0,3] minecraft:stone
+  initial [9,0,3] minecraft:stone
+  initial [10,0,3] minecraft:stone
+  initial [11,0,3] minecraft:stone
+  initial [2,1,3] minecraft:sticky_piston[extended=false,facing=east]
+  initial [0,0,4] minecraft:stone
+  initial [1,0,4] minecraft:stone
+  initial [2,0,4] minecraft:stone
+  initial [3,0,4] minecraft:stone
+  initial [4,0,4] minecraft:stone
+  initial [5,0,4] minecraft:stone
+  initial [6,0,4] minecraft:stone
+  initial [7,0,4] minecraft:stone
+  initial [8,0,4] minecraft:stone
+  initial [9,0,4] minecraft:stone
+  initial [10,0,4] minecraft:stone
+  initial [11,0,4] minecraft:stone
+  initial [0,0,5] minecraft:stone
+  initial [1,0,5] minecraft:stone
+  initial [2,0,5] minecraft:stone
+  initial [3,0,5] minecraft:stone
+  initial [4,0,5] minecraft:stone
+  initial [5,0,5] minecraft:stone
+  initial [6,0,5] minecraft:stone
+  initial [7,0,5] minecraft:stone
+  initial [8,0,5] minecraft:stone
+  initial [9,0,5] minecraft:stone
+  initial [10,0,5] minecraft:stone
+  initial [11,0,5] minecraft:stone
+  initial [2,1,5] minecraft:sticky_piston[extended=false,facing=east]
+  initial [0,0,6] minecraft:stone
+  initial [1,0,6] minecraft:stone
+  initial [2,0,6] minecraft:stone
+  initial [3,0,6] minecraft:stone
+  initial [4,0,6] minecraft:stone
+  initial [5,0,6] minecraft:stone
+  initial [6,0,6] minecraft:stone
+  initial [7,0,6] minecraft:stone
+  initial [8,0,6] minecraft:stone
+  initial [9,0,6] minecraft:stone
+  initial [10,0,6] minecraft:stone
+  initial [11,0,6] minecraft:stone
+  initial [0,0,7] minecraft:stone
+  initial [1,0,7] minecraft:stone
+  initial [2,0,7] minecraft:stone
+  initial [3,0,7] minecraft:stone
+  initial [4,0,7] minecraft:stone
+  initial [5,0,7] minecraft:stone
+  initial [6,0,7] minecraft:stone
+  initial [7,0,7] minecraft:stone
+  initial [8,0,7] minecraft:stone
+  initial [9,0,7] minecraft:stone
+  initial [10,0,7] minecraft:stone
+  initial [11,0,7] minecraft:stone
+  initial [2,1,7] minecraft:sticky_piston[extended=false,facing=east]
+  initial [0,0,8] minecraft:stone
+  initial [1,0,8] minecraft:stone
+  initial [2,0,8] minecraft:stone
+  initial [3,0,8] minecraft:stone
+  initial [4,0,8] minecraft:stone
+  initial [5,0,8] minecraft:stone
+  initial [6,0,8] minecraft:stone
+  initial [7,0,8] minecraft:stone
+  initial [8,0,8] minecraft:stone
+  initial [9,0,8] minecraft:stone
+  initial [10,0,8] minecraft:stone
+  initial [11,0,8] minecraft:stone
+ENT t-1 entities=4 non-finite=1
+  E t-1 id=1 minecraft:minecart pos=(3.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=2 minecraft:minecart pos=(3.5, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t-1 id=3 minecraft:small_fireball pos=(3.5, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=4 minecraft:dragon_fireball pos=(3.5, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+  notify hook: installed (maxChained=1000000)
+    t0 gameTime=27 pending=0
+ENT t0 entities=4 non-finite=1
+  E t0 id=1 minecraft:minecart pos=(3.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=2 minecraft:minecart pos=(3.5, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t0 id=3 minecraft:small_fireball pos=(3.5, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=4 minecraft:dragon_fireball pos=(3.5, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+    t1 gameTime=28 pending=0
+ENT t1 entities=4 non-finite=1
+  E t1 id=1 minecraft:minecart pos=(3.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=2 minecraft:minecart pos=(3.5, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t1 id=3 minecraft:small_fireball pos=(3.5, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=4 minecraft:dragon_fireball pos=(3.5, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+    t2 gameTime=29 pending=0
+ENT t2 entities=4 non-finite=1
+  E t2 id=1 minecraft:minecart pos=(4.000000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=2 minecraft:minecart pos=(4.000000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t2 id=3 minecraft:small_fireball pos=(3.66625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=4 minecraft:dragon_fireball pos=(4.01, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t3 entities=4 non-finite=1
+  E t3 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t3 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t4 entities=4 non-finite=1
+  E t4 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t4 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t5 entities=4 non-finite=1
+  E t5 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t5 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t6 entities=4 non-finite=1
+  E t6 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t6 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t7 entities=4 non-finite=1
+  E t7 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t7 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t8 entities=4 non-finite=1
+  E t8 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t8 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t9 entities=4 non-finite=1
+  E t9 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t9 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t10 entities=4 non-finite=1
+  E t10 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t10 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t11 entities=4 non-finite=1
+  E t11 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t11 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t12 entities=4 non-finite=1
+  E t12 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t12 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+[18:44:20] [main/INFO]: [  ]
+ENT t13 entities=4 non-finite=1
+  E t13 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t13 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t14 entities=4 non-finite=1
+  E t14 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t14 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t15 entities=4 non-finite=1
+  E t15 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t15 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t16 entities=4 non-finite=1
+  E t16 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t16 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t16 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t16 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t17 entities=4 non-finite=1
+  E t17 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t17 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t17 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t17 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t18 entities=4 non-finite=1
+  E t18 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t18 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t18 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t18 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t19 entities=4 non-finite=1
+  E t19 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t19 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t19 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t19 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t20 entities=4 non-finite=1
+  E t20 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t20 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t20 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t20 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t21 entities=4 non-finite=1
+  E t21 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t21 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t21 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t21 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t22 entities=4 non-finite=1
+  E t22 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t22 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t22 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t22 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t23 entities=4 non-finite=1
+  E t23 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t23 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t23 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t23 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t24 entities=4 non-finite=1
+  E t24 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t24 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t24 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t24 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t25 entities=4 non-finite=1
+  E t25 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t25 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t25 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t25 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t26 entities=4 non-finite=1
+  E t26 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t26 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t26 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t26 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t27 entities=4 non-finite=1
+  E t27 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t27 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t27 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t27 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t28 entities=4 non-finite=1
+  E t28 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t28 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t28 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t28 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t29 entities=4 non-finite=1
+  E t29 id=1 minecraft:minecart pos=(4.500000009536743, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t29 id=2 minecraft:minecart pos=(4.500000009536743, 1.0, 3.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t29 id=3 minecraft:small_fireball pos=(4.16625, 1.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t29 id=4 minecraft:dragon_fireball pos=(4.51, 1.0, 7.5) vel=(0.0, 0.0, 0.0)
+captured 4 tick(s) with changes -> work/piston_entity.json

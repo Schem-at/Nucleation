@@ -1,0 +1,200 @@
+Note: src/TraceCapture.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+  world: recording /private/tmp/claude-501/-Users-harrison-RustroverProjects-Nucleation/47883f32-6df6-4ed0-a351-7420eee8125a/scratchpad/w55/unz/55 3x3 in place
+  world: pre-26.2 save layout — relocating into dimensions/
+[18:39:00] [main/INFO]: Loaded 1585 recipes
+[18:39:00] [main/INFO]: Loaded 1688 advancements
+[18:39:00] [main/INFO]: Selecting global world spawn...
+[18:39:01] [main/INFO]: Loading 0 persistent chunks...
+[18:39:01] [main/INFO]: Time elapsed: 344 ms
+[18:39:01] [main/INFO]: Started game test server
+  origin: BlockPos{x=-8, y=-2, z=12}
+[18:39:01] [main/INFO]: 2 tests are now running at position 14220965, -59, 2151079!
+[18:39:01] [main/INFO]: Running test environment 'minecraft:default' batch 0 (1 tests)...
+  warmup ticks until entity-ticking: 18 (4/4 chunks ready)
+  block-ticking chunks: 4/4
+  pending block ticks: 0
+  runs normally: true
+  entity-ticking chunks: 4/4
+  entities loaded: 24
+    2 x minecraft:blaze
+    2 x minecraft:dragon_fireball
+    15 x minecraft:furnace_minecart
+    4 x minecraft:minecart
+    1 x minecraft:small_fireball
+  entities with non-finite velocity (nan carts): 0
+  initial [13,4,6] minecraft:oak_button[face=wall,facing=north,powered=false]
+  initial [4,2,7] minecraft:sticky_piston[extended=false,facing=east]
+  initial [5,2,7] minecraft:sticky_piston[extended=false,facing=east]
+  initial [6,2,7] minecraft:quartz_block
+  initial [10,2,7] minecraft:quartz_block
+  initial [11,2,7] minecraft:sticky_piston[extended=false,facing=west]
+  initial [12,2,7] minecraft:quartz_block
+  initial [13,2,7] minecraft:sticky_piston[extended=false,facing=west]
+  initial [14,2,7] minecraft:sticky_piston[extended=false,facing=west]
+  initial [4,3,7] minecraft:sticky_piston[extended=false,facing=east]
+  initial [5,3,7] minecraft:sticky_piston[extended=false,facing=east]
+  initial [6,3,7] minecraft:quartz_block
+  initial [10,3,7] minecraft:quartz_block
+  initial [12,3,7] minecraft:observer[facing=east,powered=false]
+  initial [13,3,7] minecraft:observer[facing=east,powered=false]
+  initial [14,3,7] minecraft:light_weighted_pressure_plate[power=0]
+  initial [4,4,7] minecraft:observer[facing=up,powered=false]
+  initial [5,4,7] minecraft:observer[facing=up,powered=false]
+  initial [6,4,7] minecraft:quartz_block
+  initial [10,4,7] minecraft:quartz_block
+  initial [11,4,7] minecraft:sticky_piston[extended=false,facing=down]
+  initial [12,4,7] minecraft:observer[facing=east,powered=false]
+  initial [13,4,7] minecraft:note_block[instrument=basedrum,note=0,powered=false]
+  initial [14,4,7] minecraft:observer[facing=up,powered=false]
+  initial [4,5,7] minecraft:light_weighted_pressure_plate[power=0]
+  initial [5,5,7] minecraft:repeater[delay=2,facing=west,locked=false,powered=false]
+  initial [6,5,7] minecraft:detector_rail[powered=false,shape=north_south,waterlogged=false]
+  initial [7,5,7] minecraft:quartz_block
+  initial [8,5,7] minecraft:quartz_block
+  initial [9,5,7] minecraft:quartz_block
+  initial [10,5,7] minecraft:sticky_piston[extended=false,facing=down]
+  initial [11,5,7] minecraft:observer[facing=east,powered=false]
+  initial [12,5,7] minecraft:observer[facing=up,powered=false]
+  initial [13,5,7] minecraft:dispenser[facing=east,triggered=false]
+  initial [4,6,7] minecraft:piston[extended=false,facing=east]
+  initial [6,6,7] minecraft:observer[facing=west,powered=false]
+  initial [7,6,7] minecraft:cyan_wool
+  initial [8,6,7] minecraft:sticky_piston[extended=false,facing=down]
+  initial [9,6,7] minecraft:sticky_piston[extended=false,facing=down]
+  initial [10,6,7] minecraft:cyan_wool
+  initial [11,6,7] minecraft:observer[facing=east,powered=false]
+  initial [12,6,7] minecraft:piston[extended=false,facing=west]
+  initial [13,6,7] minecraft:observer[facing=east,powered=false]
+  initial [14,6,7] minecraft:observer[facing=down,powered=false]
+ENT t-1 entities=24 non-finite=0
+  E t-1 id=1 minecraft:furnace_minecart pos=(7.427500009536743, 5.0, 7.61820171863809) vel=(0.0, 0.0, 0.07057258905942601)
+  E t-1 id=2 minecraft:furnace_minecart pos=(7.427500009536743, 5.0, 7.370671758930488) vel=(0.0, 0.0, -0.046276283853632846)
+  E t-1 id=3 minecraft:furnace_minecart pos=(7.384999990463257, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=4 minecraft:minecart pos=(6.115166582149982, 4.0, 7.464531062432332) vel=(-0.2055202825831284, 0.0, -0.3295067422939211)
+  E t-1 id=5 minecraft:blaze pos=(6.115166582149982, 4.1875, 7.464531062432332) vel=(-0.08678269318616004, -0.0784000015258789, 0.1422127523150125)
+  E t-1 id=6 minecraft:minecart pos=(6.421442328701336, 4.0, 7.256804508428029) vel=(-0.044976737101624725, 0.0, -0.4605221309331819)
+  E t-1 id=7 minecraft:blaze pos=(6.421442328701336, 4.1875, 7.256804508428029) vel=(0.09926710966242819, -0.0784000015258789, 0.08744666013706962)
+  E t-1 id=8 minecraft:minecart pos=(6.013506068445649, 4.0, 6.6877094497240925) vel=(-0.20220172509429543, 0.0, -0.5534188569222008)
+  E t-1 id=9 minecraft:minecart pos=(6.170552931300582, 4.0, 6.899636300745872) vel=(-0.12376704265511154, 0.0, -0.41813389339028395)
+  E t-1 id=10 minecraft:dragon_fireball pos=(6.25, 5.000000099999999, 7.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=11 minecraft:dragon_fireball pos=(6.25, 5.000000099999999, 7.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=12 minecraft:small_fireball pos=(13.84375, 2.875, 7.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=13 minecraft:furnace_minecart pos=(8.365000009536743, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=14 minecraft:furnace_minecart pos=(9.927500009536743, 5.099999988079071, 7.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=15 minecraft:furnace_minecart pos=(12.5625, 3.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=16 minecraft:furnace_minecart pos=(12.285000085830688, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=17 minecraft:furnace_minecart pos=(13.265000104904175, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=18 minecraft:furnace_minecart pos=(14.245000123977661, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=19 minecraft:furnace_minecart pos=(11.305000066757202, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=20 minecraft:furnace_minecart pos=(10.325000047683716, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=21 minecraft:furnace_minecart pos=(9.34500002861023, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=22 minecraft:furnace_minecart pos=(11.644999980926514, 3.7, 7.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=23 minecraft:furnace_minecart pos=(10.75, 4.4, 7.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=24 minecraft:furnace_minecart pos=(12.625, 3.7, 7.5) vel=(0.0, 0.0, 0.0)
+  notify hook: installed (maxChained=1000000)
+    t0 gameTime=19 pending=0
+ENT t0 entities=24 non-finite=0
+  E t0 id=1 minecraft:furnace_minecart pos=(7.427500009536743, 5.0, 7.653488013167802) vel=(0.0, 0.0, 0.06990602319295044)
+  E t0 id=2 minecraft:furnace_minecart pos=(7.427500009536743, 5.0, 7.338296632841615) vel=(0.0, 0.0, -0.04688145651274828)
+  E t0 id=3 minecraft:furnace_minecart pos=(7.384999990463257, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=4 minecraft:minecart pos=(6.012406440858417, 4.0, 7.299777691285371) vel=(-0.201391182163536, 0.0, -0.28616000030148125)
+  E t0 id=5 minecraft:blaze pos=(6.012406440858417, 4.1875, 7.299777691285371) vel=(-0.09986295875406202, -0.0784000015258789, 0.15680717360502067)
+  E t0 id=6 minecraft:minecart pos=(6.419644100264335, 4.0, 7.05680450842803) vel=(-0.06391599916414895, 0.0, -0.3910459489343753)
+  E t0 id=7 minecraft:blaze pos=(6.419644100264335, 4.1875, 7.05680450842803) vel=(0.12148388620175427, -0.0784000015258789, 0.08332347457824633)
+  E t0 id=8 minecraft:minecart pos=(5.910228462655285, 4.0, 6.487709449724093) vel=(-0.2736845905802829, 0.0, -0.5974494130465151)
+  E t0 id=9 minecraft:minecart pos=(6.074890295991549, 4.0, 6.699636300745873) vel=(-0.18420438929611765, 0.0, -0.4511614634036068)
+  E t0 id=10 minecraft:dragon_fireball pos=(6.25, 5.000000099999999, 7.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=11 minecraft:dragon_fireball pos=(6.25, 5.000000099999999, 7.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=12 minecraft:small_fireball pos=(13.84375, 2.875, 7.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=13 minecraft:furnace_minecart pos=(8.365000009536743, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=14 minecraft:furnace_minecart pos=(9.927500009536743, 5.099999988079071, 7.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=15 minecraft:furnace_minecart pos=(12.5625, 3.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=16 minecraft:furnace_minecart pos=(12.285000085830688, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=17 minecraft:furnace_minecart pos=(13.265000104904175, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=18 minecraft:furnace_minecart pos=(14.245000123977661, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=19 minecraft:furnace_minecart pos=(11.305000066757202, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=20 minecraft:furnace_minecart pos=(10.325000047683716, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=21 minecraft:furnace_minecart pos=(9.34500002861023, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=22 minecraft:furnace_minecart pos=(11.644999980926514, 3.7, 7.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=23 minecraft:furnace_minecart pos=(10.75, 4.4, 7.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=24 minecraft:furnace_minecart pos=(12.625, 3.7, 7.5) vel=(0.0, 0.0, 0.0)
+[18:39:01] [main/INFO]: [  ]
+    t1 gameTime=20 pending=0
+ENT t1 entities=24 non-finite=0
+  E t1 id=1 minecraft:furnace_minecart pos=(7.427500009536743, 5.0, 7.688441024764277) vel=(0.0, 0.0, 0.0693833385429736)
+  E t1 id=2 minecraft:furnace_minecart pos=(7.427500009536743, 5.0, 7.305626375588744) vel=(0.0, 0.0, -0.047355990518960264)
+  E t1 id=3 minecraft:furnace_minecart pos=(7.384999990463257, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=4 minecraft:minecart pos=(5.911710849776649, 4.0, 7.156697691134632) vel=(-0.23119425447874972, 0.0, -0.28297678484714484)
+  E t1 id=5 minecraft:blaze pos=(5.911710849776649, 4.1875, 7.156697691134632) vel=(-0.11036436302581097, -0.0784000015258789, 0.15328231124517228)
+  E t1 id=6 minecraft:minecart pos=(6.409155208666436, 4.0, 6.856804508428031) vel=(-0.08816476410862667, 0.0, -0.3801408477994813)
+  E t1 id=7 minecraft:blaze pos=(6.409155208666436, 4.1875, 6.856804508428031) vel=(0.13832285540204337, -0.0784000015258789, 0.07124646775489045)
+  E t1 id=8 minecraft:minecart pos=(5.786120861247333, 3.98, 6.287709449724094) vel=(-0.3337483531739692, -0.018999999761581423, -0.6027120827842132)
+  E t1 id=9 minecraft:minecart pos=(5.948421627737275, 4.0, 6.499636300745873) vel=(-0.24049652974955021, 0.0, -0.4539456952538614)
+  E t1 id=10 minecraft:dragon_fireball pos=(6.25, 5.000000099999999, 7.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=11 minecraft:dragon_fireball pos=(6.25, 5.000000099999999, 7.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=12 minecraft:small_fireball pos=(13.84375, 2.875, 7.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=13 minecraft:furnace_minecart pos=(8.365000009536743, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=14 minecraft:furnace_minecart pos=(9.927500009536743, 5.099999988079071, 7.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=15 minecraft:furnace_minecart pos=(12.5625, 3.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=16 minecraft:furnace_minecart pos=(12.285000085830688, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=17 minecraft:furnace_minecart pos=(13.265000104904175, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=18 minecraft:furnace_minecart pos=(14.245000123977661, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=19 minecraft:furnace_minecart pos=(11.305000066757202, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=20 minecraft:furnace_minecart pos=(10.325000047683716, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=21 minecraft:furnace_minecart pos=(9.34500002861023, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=22 minecraft:furnace_minecart pos=(11.644999980926514, 3.7, 7.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=23 minecraft:furnace_minecart pos=(10.75, 4.4, 7.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=24 minecraft:furnace_minecart pos=(12.625, 3.7, 7.5) vel=(0.0, 0.0, 0.0)
+    t2 gameTime=21 pending=0
+ENT t2 entities=24 non-finite=0
+  E t2 id=1 minecraft:furnace_minecart pos=(7.427500009536743, 5.0, 7.723132694035765) vel=(0.0, 0.0, 0.06897348265984443)
+  E t2 id=2 minecraft:furnace_minecart pos=(7.427500009536743, 5.0, 7.27272469585245) vel=(0.0, 0.0, -0.04772808957265411)
+  E t2 id=3 minecraft:furnace_minecart pos=(7.384999990463257, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=4 minecraft:minecart pos=(5.7961137225372745, 4.0, 7.01520929871106) vel=(-0.31983514184600287, 0.0, -0.3146917048940162)
+  E t2 id=5 minecraft:blaze pos=(5.7961137225372745, 4.1875, 7.01520929871106) vel=(-0.08328741447179633, -0.0784000015258789, 0.10581298707751811)
+  E t2 id=6 minecraft:minecart pos=(6.386483014306619, 4.0, 6.656804508428031) vel=(-0.11933083880226635, 0.0, -0.3851325523045833)
+  E t2 id=7 minecraft:blaze pos=(6.386483014306619, 4.1875, 6.656804508428031) vel=(0.117926174936888, -0.0784000015258789, 0.07625986752986125)
+  E t2 id=8 minecraft:minecart pos=(5.490796834076133, 3.9210000002384184, 5.887709449724095) vel=(-0.5094466099143999, -0.05604999907016754, -0.7302332641251948)
+  E t2 id=9 minecraft:minecart pos=(5.765701429922805, 3.98, 6.299636300745874) vel=(-0.43041332299396917, -0.018999999761581423, -0.6013353826040584)
+  E t2 id=10 minecraft:dragon_fireball pos=(6.25, 5.000000099999999, 7.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=11 minecraft:dragon_fireball pos=(6.25, 5.000000099999999, 7.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=12 minecraft:small_fireball pos=(13.84375, 2.875, 7.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=13 minecraft:furnace_minecart pos=(8.365000009536743, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=14 minecraft:furnace_minecart pos=(9.927500009536743, 5.099999988079071, 7.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=15 minecraft:furnace_minecart pos=(12.5625, 3.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=16 minecraft:furnace_minecart pos=(12.285000085830688, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=17 minecraft:furnace_minecart pos=(13.265000104904175, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=18 minecraft:furnace_minecart pos=(14.245000123977661, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=19 minecraft:furnace_minecart pos=(11.305000066757202, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=20 minecraft:furnace_minecart pos=(10.325000047683716, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=21 minecraft:furnace_minecart pos=(9.34500002861023, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=22 minecraft:furnace_minecart pos=(11.644999980926514, 3.7, 7.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=23 minecraft:furnace_minecart pos=(10.75, 4.4, 7.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=24 minecraft:furnace_minecart pos=(12.625, 3.7, 7.5) vel=(0.0, 0.0, 0.0)
+ENT t3 entities=24 non-finite=0
+  E t3 id=1 minecraft:furnace_minecart pos=(7.427500009536743, 5.0, 7.757619435365687) vel=(0.0, 0.0, 0.06865209997259294)
+  E t3 id=2 minecraft:furnace_minecart pos=(7.427500009536743, 5.0, 7.239641549461972) vel=(0.0, 0.0, -0.04801986577355397)
+  E t3 id=3 minecraft:furnace_minecart pos=(7.384999990463257, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=4 minecraft:minecart pos=(5.636196151614273, 4.0, 6.867709468797582) vel=(-0.46183701003647115, 0.0, -0.3535806154939468)
+  E t3 id=5 minecraft:blaze pos=(5.636196151614273, 4.1875, 6.867709468797582) vel=(-0.07701593462335818, -0.0784000015258789, 0.1158423262954702)
+  E t3 id=6 minecraft:minecart pos=(6.348187824375105, 4.0, 6.456804508428032) vel=(-0.31379043285857694, 0.0, -0.5880286548074589)
+  E t3 id=7 minecraft:blaze pos=(6.348187824375105, 4.1875, 6.456804508428032) vel=(0.07242851507794962, -0.0784000015258789, 0.030956735096893655)
+  E t3 id=8 minecraft:minecart pos=(5.120431043748084, 3.824950001168251, 5.487709449724097) vel=(-0.6666789037134395, -0.09124749797165395, -0.7684223881015507)
+  E t3 id=9 minecraft:minecart pos=(5.3657014299228045, 3.9210000002384184, 5.899636300745875) vel=(-0.619692967821323, -0.05604999907016754, -0.6611476985787051)
+  E t3 id=10 minecraft:dragon_fireball pos=(6.25, 5.000000099999999, 7.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=11 minecraft:dragon_fireball pos=(6.25, 5.000000099999999, 7.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=12 minecraft:small_fireball pos=(13.84375, 2.875, 7.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=13 minecraft:furnace_minecart pos=(8.365000009536743, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=14 minecraft:furnace_minecart pos=(9.927500009536743, 5.099999988079071, 7.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=15 minecraft:furnace_minecart pos=(12.5625, 3.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=16 minecraft:furnace_minecart pos=(12.285000085830688, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=17 minecraft:furnace_minecart pos=(13.265000104904175, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=18 minecraft:furnace_minecart pos=(14.245000123977661, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=19 minecraft:furnace_minecart pos=(11.305000066757202, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=20 minecraft:furnace_minecart pos=(10.325000047683716, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=21 minecraft:furnace_minecart pos=(9.34500002861023, 6.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=22 minecraft:furnace_minecart pos=(11.644999980926514, 3.7, 7.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=23 minecraft:furnace_minecart pos=(10.75, 4.4, 7.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=24 minecraft:furnace_minecart pos=(12.625, 3.7, 7.5) vel=(0.0, 0.0, 0.0)
+captured 0 tick(s) with changes -> work/door55_entities.json

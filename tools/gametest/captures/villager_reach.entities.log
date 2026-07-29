@@ -1,0 +1,381 @@
+Note: src/TraceCapture.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+[18:54:38] [main/INFO]: Loaded 1585 recipes
+[18:54:38] [main/INFO]: Loaded 1688 advancements
+[18:54:39] [main/INFO]: Selecting global world spawn...
+[18:54:39] [main/INFO]: Loading 0 persistent chunks...
+[18:54:39] [main/INFO]: Time elapsed: 175 ms
+[18:54:39] [main/INFO]: Started game test server
+  origin: BlockPos{x=0, y=100, z=0}
+[18:54:39] [main/INFO]: 2 tests are now running at position 9022994, -59, 12455725!
+[18:54:39] [main/INFO]: Running test environment 'minecraft:default' batch 0 (1 tests)...
+[18:54:39] [main/INFO]: [  ]
+[18:54:39] [main/INFO]: [  ]
+  warmup ticks until entity-ticking: 42 (10/10 chunks ready)
+  spawn: id=1 minecraft:villager at (1.76, 1.0, 1.5) vel=(0.0, 0.0, 0.0) flags=[noai]
+         bbox=[1.459999988079071..2.0600000119209287, 1.0..2.950000047683716, 1.199999988079071..1.800000011920929] size=0.6000000238418577x1.9500000476837158x0.6000000238418579
+  spawn: id=2 minecraft:villager at (5.77, 1.0, 1.5) vel=(0.0, 0.0, 0.0) flags=[noai]
+         bbox=[5.469999988079071..6.0700000119209285, 1.0..2.950000047683716, 1.199999988079071..1.800000011920929] size=0.6000000238418579x1.9500000476837158x0.6000000238418579
+  spawn: id=3 minecraft:villager at (11.24, 1.0, 1.5) vel=(0.0, 0.0, 0.0) flags=[noai]
+         bbox=[10.939999988079071..11.54000001192093, 1.0..2.950000047683716, 1.199999988079071..1.800000011920929] size=0.6000000238418579x1.9500000476837158x0.6000000238418579
+  spawn: id=4 minecraft:villager at (15.23, 1.0, 1.5) vel=(0.0, 0.0, 0.0) flags=[noai]
+         bbox=[14.929999988079071..15.53000001192093, 1.0..2.950000047683716, 1.199999988079071..1.800000011920929] size=0.6000000238418579x1.9500000476837158x0.6000000238418579
+  spawn: id=5 minecraft:villager at (17.81, 1.0, 1.5) vel=(0.0, 0.0, 0.0) flags=[baby, noai]
+         bbox=[17.564999995231627..18.05500000476837, 1.0..1.9800000190734863, 1.2549999952316284..1.7450000047683716] size=0.49000000953674316x0.9800000190734863x0.49000000953674316
+  spawn: id=6 minecraft:villager at (21.83, 1.0, 1.5) vel=(0.0, 0.0, 0.0) flags=[baby, noai]
+         bbox=[21.584999995231627..22.07500000476837, 1.0..1.9800000190734863, 1.2549999952316284..1.7450000047683716] size=0.49000000953674316x0.9800000190734863x0.49000000953674316
+  spawn: id=7 minecraft:villager at (27.19, 1.0, 1.5) vel=(0.0, 0.0, 0.0) flags=[baby, noai]
+         bbox=[26.94499999523163..27.435000004768373, 1.0..1.9800000190734863, 1.2549999952316284..1.7450000047683716] size=0.49000000953674316x0.9800000190734863x0.49000000953674316
+  spawn: id=8 minecraft:villager at (31.17, 1.0, 1.5) vel=(0.0, 0.0, 0.0) flags=[baby, noai]
+         bbox=[30.92499999523163..31.415000004768373, 1.0..1.9800000190734863, 1.2549999952316284..1.7450000047683716] size=0.49000000953674316x0.9800000190734863x0.49000000953674316
+  spawn: id=9 minecraft:villager at (34.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0) flags=[noai]
+         bbox=[34.19999998807907..34.80000001192093, 1.0..2.950000047683716, 1.199999988079071..1.800000011920929] size=0.6000000238418579x1.9500000476837158x0.6000000238418579
+  spawn: id=10 minecraft:villager at (38.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0) flags=[baby, noai]
+         bbox=[38.25499999523163..38.74500000476837, 1.0..1.9800000190734863, 1.2549999952316284..1.7450000047683716] size=0.49000000953674316x0.9800000190734863x0.49000000953674316
+  spawn: id=11 minecraft:villager at (41.9, 1.0, 2.5) vel=(0.0, 0.0, 0.0) flags=[noai]
+         bbox=[41.59999998807907..42.20000001192093, 1.0..2.950000047683716, 2.199999988079071..2.800000011920929] size=0.6000000238418579x1.9500000476837158x0.6000000238418579
+  spawn: id=12 minecraft:villager at (46.0, 1.0, 2.5) vel=(0.0, 0.0, 0.0) flags=[baby, noai]
+         bbox=[45.75499999523163..46.24500000476837, 1.0..1.9800000190734863, 2.2549999952316284..2.7450000047683716] size=0.49000000953674316x0.9800000190734863x0.49000000953674316
+  block-ticking chunks: 10/10
+  pending block ticks: 0
+  runs normally: true
+  entity-ticking chunks: 10/10
+  entities loaded: 12
+    12 x minecraft:villager
+  entities with non-finite velocity (nan carts): 0
+  initial [0,0,0] minecraft:stone
+  initial [1,0,0] minecraft:stone
+  initial [2,0,0] minecraft:stone
+  initial [3,0,0] minecraft:stone
+  initial [4,0,0] minecraft:stone
+  initial [5,0,0] minecraft:stone
+  initial [6,0,0] minecraft:stone
+  initial [7,0,0] minecraft:stone
+  initial [8,0,0] minecraft:stone
+  initial [9,0,0] minecraft:stone
+  initial [10,0,0] minecraft:stone
+  initial [11,0,0] minecraft:stone
+  initial [12,0,0] minecraft:stone
+  initial [13,0,0] minecraft:stone
+  initial [14,0,0] minecraft:stone
+  initial [15,0,0] minecraft:stone
+  initial [16,0,0] minecraft:stone
+  initial [17,0,0] minecraft:stone
+  initial [18,0,0] minecraft:stone
+  initial [19,0,0] minecraft:stone
+  initial [20,0,0] minecraft:stone
+  initial [21,0,0] minecraft:stone
+  initial [22,0,0] minecraft:stone
+  initial [23,0,0] minecraft:stone
+  initial [24,0,0] minecraft:stone
+  initial [25,0,0] minecraft:stone
+  initial [26,0,0] minecraft:stone
+  initial [27,0,0] minecraft:stone
+  initial [28,0,0] minecraft:stone
+  initial [29,0,0] minecraft:stone
+  initial [30,0,0] minecraft:stone
+  initial [31,0,0] minecraft:stone
+  initial [32,0,0] minecraft:stone
+  initial [33,0,0] minecraft:stone
+  initial [34,0,0] minecraft:stone
+  initial [35,0,0] minecraft:stone
+  initial [36,0,0] minecraft:stone
+  initial [37,0,0] minecraft:stone
+  initial [38,0,0] minecraft:stone
+  initial [39,0,0] minecraft:stone
+  initial [40,0,0] minecraft:stone
+  initial [41,0,0] minecraft:stone
+  initial [42,0,0] minecraft:stone
+  initial [43,0,0] minecraft:stone
+  initial [44,0,0] minecraft:stone
+  initial [45,0,0] minecraft:stone
+  initial [46,0,0] minecraft:stone
+  initial [47,0,0] minecraft:stone
+  initial [48,0,0] minecraft:stone
+  initial [49,0,0] minecraft:stone
+  initial [0,0,1] minecraft:stone
+  initial [1,0,1] minecraft:stone
+  initial [2,0,1] minecraft:stone
+  initial [3,0,1] minecraft:stone
+  initial [4,0,1] minecraft:stone
+  initial [5,0,1] minecraft:stone
+  initial [6,0,1] minecraft:stone
+  initial [7,0,1] minecraft:stone
+  initial [8,0,1] minecraft:stone
+  initial [9,0,1] minecraft:stone
+  initial [10,0,1] minecraft:stone
+  initial [11,0,1] minecraft:stone
+  initial [12,0,1] minecraft:stone
+  initial [13,0,1] minecraft:stone
+  initial [14,0,1] minecraft:stone
+  initial [15,0,1] minecraft:stone
+  initial [16,0,1] minecraft:stone
+  initial [17,0,1] minecraft:stone
+  initial [18,0,1] minecraft:stone
+  initial [19,0,1] minecraft:stone
+  initial [20,0,1] minecraft:stone
+  initial [21,0,1] minecraft:stone
+  initial [22,0,1] minecraft:stone
+  initial [23,0,1] minecraft:stone
+  initial [24,0,1] minecraft:stone
+  initial [25,0,1] minecraft:stone
+  initial [26,0,1] minecraft:stone
+  initial [27,0,1] minecraft:stone
+  initial [28,0,1] minecraft:stone
+  initial [29,0,1] minecraft:stone
+  initial [30,0,1] minecraft:stone
+  initial [31,0,1] minecraft:stone
+  initial [32,0,1] minecraft:stone
+  initial [33,0,1] minecraft:stone
+  initial [34,0,1] minecraft:stone
+  initial [35,0,1] minecraft:stone
+  initial [36,0,1] minecraft:stone
+  initial [37,0,1] minecraft:stone
+  initial [38,0,1] minecraft:stone
+  initial [39,0,1] minecraft:stone
+  initial [40,0,1] minecraft:stone
+  initial [41,0,1] minecraft:stone
+  initial [42,0,1] minecraft:stone
+  initial [43,0,1] minecraft:stone
+  initial [44,0,1] minecraft:stone
+  initial [45,0,1] minecraft:stone
+  initial [46,0,1] minecraft:stone
+  initial [47,0,1] minecraft:stone
+  initial [48,0,1] minecraft:stone
+  initial [49,0,1] minecraft:stone
+  initial [2,1,1] minecraft:light_weighted_pressure_plate[power=0]
+  initial [6,1,1] minecraft:light_weighted_pressure_plate[power=0]
+  initial [10,1,1] minecraft:light_weighted_pressure_plate[power=0]
+  initial [14,1,1] minecraft:light_weighted_pressure_plate[power=0]
+  initial [18,1,1] minecraft:light_weighted_pressure_plate[power=0]
+  initial [22,1,1] minecraft:light_weighted_pressure_plate[power=0]
+  initial [26,1,1] minecraft:light_weighted_pressure_plate[power=0]
+  initial [30,1,1] minecraft:light_weighted_pressure_plate[power=0]
+  initial [34,1,1] minecraft:light_weighted_pressure_plate[power=0]
+  initial [38,1,1] minecraft:light_weighted_pressure_plate[power=0]
+  initial [0,0,2] minecraft:stone
+  initial [1,0,2] minecraft:stone
+  initial [2,0,2] minecraft:stone
+  initial [3,0,2] minecraft:stone
+  initial [4,0,2] minecraft:stone
+  initial [5,0,2] minecraft:stone
+  initial [6,0,2] minecraft:stone
+  initial [7,0,2] minecraft:stone
+  initial [8,0,2] minecraft:stone
+  initial [9,0,2] minecraft:stone
+  initial [10,0,2] minecraft:stone
+  initial [11,0,2] minecraft:stone
+  initial [12,0,2] minecraft:stone
+  initial [13,0,2] minecraft:stone
+  initial [14,0,2] minecraft:stone
+  initial [15,0,2] minecraft:stone
+  initial [16,0,2] minecraft:stone
+  initial [17,0,2] minecraft:stone
+  initial [18,0,2] minecraft:stone
+  initial [19,0,2] minecraft:stone
+  initial [20,0,2] minecraft:stone
+  initial [21,0,2] minecraft:stone
+  initial [22,0,2] minecraft:stone
+  initial [23,0,2] minecraft:stone
+  initial [24,0,2] minecraft:stone
+  initial [25,0,2] minecraft:stone
+  initial [26,0,2] minecraft:stone
+  initial [27,0,2] minecraft:stone
+  initial [28,0,2] minecraft:stone
+  initial [29,0,2] minecraft:stone
+  initial [30,0,2] minecraft:stone
+  initial [31,0,2] minecraft:stone
+  initial [32,0,2] minecraft:stone
+  initial [33,0,2] minecraft:stone
+  initial [34,0,2] minecraft:stone
+  initial [35,0,2] minecraft:stone
+  initial [36,0,2] minecraft:stone
+  initial [37,0,2] minecraft:stone
+  initial [38,0,2] minecraft:stone
+  initial [39,0,2] minecraft:stone
+  initial [40,0,2] minecraft:stone
+  initial [41,0,2] minecraft:stone
+  initial [42,0,2] minecraft:stone
+  initial [43,0,2] minecraft:stone
+  initial [44,0,2] minecraft:stone
+  initial [45,0,2] minecraft:stone
+  initial [46,0,2] minecraft:stone
+  initial [47,0,2] minecraft:stone
+  initial [48,0,2] minecraft:stone
+  initial [49,0,2] minecraft:stone
+  initial [42,1,2] minecraft:cobblestone_wall[east=none,north=none,south=none,up=true,waterlogged=false,west=none]
+  initial [46,1,2] minecraft:cobblestone_wall[east=none,north=none,south=none,up=true,waterlogged=false,west=none]
+  initial [42,2,2] minecraft:light_weighted_pressure_plate[power=0]
+  initial [46,2,2] minecraft:light_weighted_pressure_plate[power=0]
+  initial [0,0,3] minecraft:stone
+  initial [1,0,3] minecraft:stone
+  initial [2,0,3] minecraft:stone
+  initial [3,0,3] minecraft:stone
+  initial [4,0,3] minecraft:stone
+  initial [5,0,3] minecraft:stone
+  initial [6,0,3] minecraft:stone
+  initial [7,0,3] minecraft:stone
+  initial [8,0,3] minecraft:stone
+  initial [9,0,3] minecraft:stone
+  initial [10,0,3] minecraft:stone
+  initial [11,0,3] minecraft:stone
+  initial [12,0,3] minecraft:stone
+  initial [13,0,3] minecraft:stone
+  initial [14,0,3] minecraft:stone
+  initial [15,0,3] minecraft:stone
+  initial [16,0,3] minecraft:stone
+  initial [17,0,3] minecraft:stone
+  initial [18,0,3] minecraft:stone
+  initial [19,0,3] minecraft:stone
+  initial [20,0,3] minecraft:stone
+  initial [21,0,3] minecraft:stone
+  initial [22,0,3] minecraft:stone
+  initial [23,0,3] minecraft:stone
+  initial [24,0,3] minecraft:stone
+  initial [25,0,3] minecraft:stone
+  initial [26,0,3] minecraft:stone
+  initial [27,0,3] minecraft:stone
+  initial [28,0,3] minecraft:stone
+  initial [29,0,3] minecraft:stone
+  initial [30,0,3] minecraft:stone
+  initial [31,0,3] minecraft:stone
+  initial [32,0,3] minecraft:stone
+  initial [33,0,3] minecraft:stone
+  initial [34,0,3] minecraft:stone
+  initial [35,0,3] minecraft:stone
+  initial [36,0,3] minecraft:stone
+  initial [37,0,3] minecraft:stone
+  initial [38,0,3] minecraft:stone
+  initial [39,0,3] minecraft:stone
+  initial [40,0,3] minecraft:stone
+  initial [41,0,3] minecraft:stone
+  initial [42,0,3] minecraft:stone
+  initial [43,0,3] minecraft:stone
+  initial [44,0,3] minecraft:stone
+  initial [45,0,3] minecraft:stone
+  initial [46,0,3] minecraft:stone
+  initial [47,0,3] minecraft:stone
+  initial [48,0,3] minecraft:stone
+  initial [49,0,3] minecraft:stone
+ENT t-1 entities=12 non-finite=0
+  E t-1 id=1 minecraft:villager pos=(1.76, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=2 minecraft:villager pos=(5.77, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=3 minecraft:villager pos=(11.24, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=4 minecraft:villager pos=(15.23, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=5 minecraft:villager pos=(17.81, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=6 minecraft:villager pos=(21.83, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=7 minecraft:villager pos=(27.19, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=8 minecraft:villager pos=(31.17, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=9 minecraft:villager pos=(34.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=10 minecraft:villager pos=(38.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=11 minecraft:villager pos=(41.9, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=12 minecraft:villager pos=(46.0, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  notify hook: installed (maxChained=1000000)
+    t0 gameTime=43 pending=7
+ENT t0 entities=12 non-finite=0
+  E t0 id=1 minecraft:villager pos=(1.76, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=2 minecraft:villager pos=(5.77, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=3 minecraft:villager pos=(11.24, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=4 minecraft:villager pos=(15.23, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=5 minecraft:villager pos=(17.81, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=6 minecraft:villager pos=(21.83, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=7 minecraft:villager pos=(27.19, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=8 minecraft:villager pos=(31.17, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=9 minecraft:villager pos=(34.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=10 minecraft:villager pos=(38.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=11 minecraft:villager pos=(41.9, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=12 minecraft:villager pos=(46.0, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+    t1 gameTime=44 pending=7
+ENT t1 entities=12 non-finite=0
+  E t1 id=1 minecraft:villager pos=(1.76, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=2 minecraft:villager pos=(5.77, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=3 minecraft:villager pos=(11.24, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=4 minecraft:villager pos=(15.23, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=5 minecraft:villager pos=(17.81, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=6 minecraft:villager pos=(21.83, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=7 minecraft:villager pos=(27.19, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=8 minecraft:villager pos=(31.17, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=9 minecraft:villager pos=(34.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=10 minecraft:villager pos=(38.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=11 minecraft:villager pos=(41.9, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=12 minecraft:villager pos=(46.0, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+    t2 gameTime=45 pending=7
+ENT t2 entities=12 non-finite=0
+  E t2 id=1 minecraft:villager pos=(1.76, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=2 minecraft:villager pos=(5.77, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=3 minecraft:villager pos=(11.24, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=4 minecraft:villager pos=(15.23, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=5 minecraft:villager pos=(17.81, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=6 minecraft:villager pos=(21.83, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=7 minecraft:villager pos=(27.19, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=8 minecraft:villager pos=(31.17, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=9 minecraft:villager pos=(34.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=10 minecraft:villager pos=(38.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=11 minecraft:villager pos=(41.9, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=12 minecraft:villager pos=(46.0, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t3 entities=12 non-finite=0
+  E t3 id=1 minecraft:villager pos=(1.76, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=2 minecraft:villager pos=(5.77, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=3 minecraft:villager pos=(11.24, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=4 minecraft:villager pos=(15.23, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=5 minecraft:villager pos=(17.81, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=6 minecraft:villager pos=(21.83, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=7 minecraft:villager pos=(27.19, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=8 minecraft:villager pos=(31.17, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=9 minecraft:villager pos=(34.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=10 minecraft:villager pos=(38.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=11 minecraft:villager pos=(41.9, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=12 minecraft:villager pos=(46.0, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t4 entities=12 non-finite=0
+  E t4 id=1 minecraft:villager pos=(1.76, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=2 minecraft:villager pos=(5.77, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=3 minecraft:villager pos=(11.24, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=4 minecraft:villager pos=(15.23, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=5 minecraft:villager pos=(17.81, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=6 minecraft:villager pos=(21.83, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=7 minecraft:villager pos=(27.19, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=8 minecraft:villager pos=(31.17, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=9 minecraft:villager pos=(34.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=10 minecraft:villager pos=(38.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=11 minecraft:villager pos=(41.9, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=12 minecraft:villager pos=(46.0, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t5 entities=12 non-finite=0
+  E t5 id=1 minecraft:villager pos=(1.76, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=2 minecraft:villager pos=(5.77, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=3 minecraft:villager pos=(11.24, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=4 minecraft:villager pos=(15.23, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=5 minecraft:villager pos=(17.81, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=6 minecraft:villager pos=(21.83, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=7 minecraft:villager pos=(27.19, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=8 minecraft:villager pos=(31.17, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=9 minecraft:villager pos=(34.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=10 minecraft:villager pos=(38.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=11 minecraft:villager pos=(41.9, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=12 minecraft:villager pos=(46.0, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t6 entities=12 non-finite=0
+  E t6 id=1 minecraft:villager pos=(1.76, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=2 minecraft:villager pos=(5.77, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=3 minecraft:villager pos=(11.24, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=4 minecraft:villager pos=(15.23, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=5 minecraft:villager pos=(17.81, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=6 minecraft:villager pos=(21.83, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=7 minecraft:villager pos=(27.19, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=8 minecraft:villager pos=(31.17, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=9 minecraft:villager pos=(34.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=10 minecraft:villager pos=(38.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=11 minecraft:villager pos=(41.9, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=12 minecraft:villager pos=(46.0, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t7 entities=12 non-finite=0
+  E t7 id=1 minecraft:villager pos=(1.76, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=2 minecraft:villager pos=(5.77, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=3 minecraft:villager pos=(11.24, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=4 minecraft:villager pos=(15.23, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=5 minecraft:villager pos=(17.81, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=6 minecraft:villager pos=(21.83, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=7 minecraft:villager pos=(27.19, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=8 minecraft:villager pos=(31.17, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=9 minecraft:villager pos=(34.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=10 minecraft:villager pos=(38.5, 1.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=11 minecraft:villager pos=(41.9, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=12 minecraft:villager pos=(46.0, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+captured 1 tick(s) with changes -> work/villager_reach.json

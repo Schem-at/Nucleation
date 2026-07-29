@@ -49,10 +49,42 @@ done < <(find pack -name '*.snbt')
 # that was actually built.
 rm -rf "$UNIVERSE"
 mkdir -p "$UNIVERSE/gametestworld/datapacks"
+#
+# A save from before the layout change needs relocating first. 26.2 keeps every
+# dimension under `dimensions/<namespace>/<path>/`; saves up to at least 1.21
+# put the overworld's `region/`, `entities/` and `poi/` at the world root and
+# the other two in `DIM-1`/`DIM1`. The server does not look at the old paths and
+# does not complain about them: it simply generates fresh terrain over the top,
+# and the recording then shows an empty world with no error anywhere. That cost
+# a whole investigation once — a capture of the 3x3 record door that recorded
+# nothing, which read as "the door is at rest" rather than "the door is not
+# there". Move the folders, and let the game's own DataFixers handle the rest.
 if [[ -n "${WORLD:-}" ]]; then
     echo "  world: recording $WORLD in place"
     rsync -a --exclude session.lock "$WORLD/" "$UNIVERSE/gametestworld/"
     mkdir -p "$UNIVERSE/gametestworld/datapacks"
+    WORLDDIR="$UNIVERSE/gametestworld"
+    if [[ -d "$WORLDDIR/region" ]]; then
+        echo "  world: pre-26.2 save layout — relocating into dimensions/"
+        mkdir -p "$WORLDDIR/dimensions/minecraft/overworld"
+        for part in region entities poi data; do
+            [[ -d "$WORLDDIR/$part" ]] || continue
+            # `data/` at the root is world-wide (scoreboard, random sequences)
+            # in both layouts, so only the dimension-scoped parts move.
+            [[ "$part" == "data" ]] && continue
+            mv "$WORLDDIR/$part" "$WORLDDIR/dimensions/minecraft/overworld/$part"
+        done
+        for pair in "DIM-1:the_nether" "DIM1:the_end"; do
+            old="${pair%%:*}"; new="${pair##*:}"
+            [[ -d "$WORLDDIR/$old" ]] || continue
+            mkdir -p "$WORLDDIR/dimensions/minecraft/$new"
+            for part in region entities poi; do
+                [[ -d "$WORLDDIR/$old/$part" ]] || continue
+                mv "$WORLDDIR/$old/$part" "$WORLDDIR/dimensions/minecraft/$new/$part"
+            done
+            rm -rf "$WORLDDIR/$old"
+        done
+    fi
 fi
 cp -R "$STAGE" "$UNIVERSE/gametestworld/datapacks/nucleation_tests"
 

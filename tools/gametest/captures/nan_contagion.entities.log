@@ -1,0 +1,501 @@
+Note: src/TraceCapture.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+[18:18:48] [main/INFO]: Loaded 1585 recipes
+[18:18:48] [main/INFO]: Loaded 1688 advancements
+[18:18:48] [main/INFO]: Selecting global world spawn...
+[18:18:48] [main/INFO]: Loading 0 persistent chunks...
+[18:18:48] [main/INFO]: Time elapsed: 215 ms
+[18:18:48] [main/INFO]: Started game test server
+  origin: BlockPos{x=0, y=100, z=0}
+[18:18:48] [main/INFO]: 2 tests are now running at position 1291619, -59, -2713410!
+[18:18:49] [main/INFO]: Running test environment 'nucleation:default' batch 0 (1 tests)...
+[18:18:49] [main/INFO]: [  ]
+  warmup ticks until entity-ticking: 26 (6/6 chunks ready)
+  spawn: id=1 minecraft:minecart at (5.5, 1.0625, 1.5) vel=(0.3, 0.0, 0.0)
+         bbox=[5.009999990463257..5.990000009536743, 1.0625..1.762499988079071, 1.0099999904632568..1.9900000095367432] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  note: setDeltaMovement rejected the non-finite vector; wrote Entity.deltaMovement directly
+  spawn: id=2 minecraft:minecart at (12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)
+         bbox=[12.009999990463257..12.990000009536743, 1.0625..1.762499988079071, 1.0099999904632568..1.9900000095367432] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  note: setDeltaMovement rejected the non-finite vector; wrote Entity.deltaMovement directly
+  spawn: id=3 minecraft:minecart at (18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)
+         bbox=[18.009999990463257..18.990000009536743, 1.0625..1.762499988079071, 1.0099999904632568..1.9900000095367432] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  note: setDeltaMovement rejected the non-finite vector; wrote Entity.deltaMovement directly
+  spawn: id=4 minecraft:minecart at (2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)
+         bbox=[2.009999990463257..2.990000009536743, 3.0..3.699999988079071, 1.0099999904632568..1.9900000095367432] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=5 minecraft:minecart at (21.5, 3.0, 1.5) vel=(0.0, 0.0, 0.0)
+         bbox=[21.009999990463257..21.990000009536743, 3.0..3.699999988079071, 1.0099999904632568..1.9900000095367432] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  block-ticking chunks: 6/6
+  pending block ticks: 0
+  runs normally: true
+  entity-ticking chunks: 6/6
+  entities loaded: 5
+    5 x minecraft:minecart
+  entities with non-finite velocity (nan carts): 3
+  initial [0,0,0] minecraft:stone
+  initial [1,0,0] minecraft:stone
+  initial [2,0,0] minecraft:stone
+  initial [3,0,0] minecraft:stone
+  initial [4,0,0] minecraft:stone
+  initial [5,0,0] minecraft:stone
+  initial [6,0,0] minecraft:stone
+  initial [7,0,0] minecraft:stone
+  initial [8,0,0] minecraft:stone
+  initial [9,0,0] minecraft:stone
+  initial [10,0,0] minecraft:stone
+  initial [11,0,0] minecraft:stone
+  initial [12,0,0] minecraft:stone
+  initial [13,0,0] minecraft:stone
+  initial [14,0,0] minecraft:stone
+  initial [15,0,0] minecraft:stone
+  initial [16,0,0] minecraft:stone
+  initial [17,0,0] minecraft:stone
+  initial [18,0,0] minecraft:stone
+  initial [19,0,0] minecraft:stone
+  initial [20,0,0] minecraft:stone
+  initial [21,0,0] minecraft:stone
+  initial [22,0,0] minecraft:stone
+  initial [23,0,0] minecraft:stone
+  initial [0,0,1] minecraft:stone
+  initial [1,0,1] minecraft:stone
+  initial [2,0,1] minecraft:stone
+  initial [3,0,1] minecraft:stone
+  initial [4,0,1] minecraft:stone
+  initial [5,0,1] minecraft:stone
+  initial [6,0,1] minecraft:stone
+  initial [7,0,1] minecraft:stone
+  initial [8,0,1] minecraft:stone
+  initial [9,0,1] minecraft:stone
+  initial [10,0,1] minecraft:stone
+  initial [11,0,1] minecraft:stone
+  initial [12,0,1] minecraft:stone
+  initial [13,0,1] minecraft:stone
+  initial [14,0,1] minecraft:stone
+  initial [15,0,1] minecraft:stone
+  initial [16,0,1] minecraft:stone
+  initial [17,0,1] minecraft:stone
+  initial [18,0,1] minecraft:stone
+  initial [19,0,1] minecraft:stone
+  initial [20,0,1] minecraft:stone
+  initial [21,0,1] minecraft:stone
+  initial [22,0,1] minecraft:stone
+  initial [23,0,1] minecraft:stone
+  initial [1,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [2,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [3,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [4,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [5,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [6,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [7,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [8,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [9,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [10,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [11,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [12,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [13,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [14,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [15,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [16,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [17,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [18,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [19,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [20,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [21,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [22,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [0,0,2] minecraft:stone
+  initial [1,0,2] minecraft:stone
+  initial [2,0,2] minecraft:stone
+  initial [3,0,2] minecraft:stone
+  initial [4,0,2] minecraft:stone
+  initial [5,0,2] minecraft:stone
+  initial [6,0,2] minecraft:stone
+  initial [7,0,2] minecraft:stone
+  initial [8,0,2] minecraft:stone
+  initial [9,0,2] minecraft:stone
+  initial [10,0,2] minecraft:stone
+  initial [11,0,2] minecraft:stone
+  initial [12,0,2] minecraft:stone
+  initial [13,0,2] minecraft:stone
+  initial [14,0,2] minecraft:stone
+  initial [15,0,2] minecraft:stone
+  initial [16,0,2] minecraft:stone
+  initial [17,0,2] minecraft:stone
+  initial [18,0,2] minecraft:stone
+  initial [19,0,2] minecraft:stone
+  initial [20,0,2] minecraft:stone
+  initial [21,0,2] minecraft:stone
+  initial [22,0,2] minecraft:stone
+  initial [23,0,2] minecraft:stone
+ENT t-1 entities=5 non-finite=3
+  E t-1 id=1 minecraft:minecart pos=(5.5, 1.0625, 1.5) vel=(0.3, 0.0, 0.0)
+  E t-1 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t-1 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t-1 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t-1 id=5 minecraft:minecart pos=(21.5, 3.0, 1.5) vel=(0.0, 0.0, 0.0)
+  notify hook: installed (maxChained=1000000)
+    t0 gameTime=27 pending=0
+ENT t0 entities=5 non-finite=3
+  E t0 id=1 minecraft:minecart pos=(5.8, 1.0625, 1.5) vel=(0.288, -0.0, 0.0)
+  E t0 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t0 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t0 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t0 id=5 minecraft:minecart pos=(21.5, 2.9599999999999937, 1.5) vel=(0.0, -0.037999999523162846, 0.0)
+    t1 gameTime=28 pending=0
+ENT t1 entities=5 non-finite=3
+  E t1 id=1 minecraft:minecart pos=(6.088, 1.0625, 1.5) vel=(0.27647999999999995, -0.0, 0.0)
+  E t1 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t1 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t1 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t1 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+    t2 gameTime=29 pending=0
+ENT t2 entities=5 non-finite=3
+  E t2 id=1 minecraft:minecart pos=(6.36448, 1.0625, 1.5) vel=(0.26542079999999996, -0.0, 0.0)
+  E t2 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t2 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t2 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t2 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t3 entities=5 non-finite=3
+  E t3 id=1 minecraft:minecart pos=(6.629900800000001, 1.0625, 1.5) vel=(0.25480396799999994, -0.0, 0.0)
+  E t3 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t3 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t3 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t3 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t4 entities=5 non-finite=3
+  E t4 id=1 minecraft:minecart pos=(6.884704768000001, 1.0625, 1.5) vel=(0.24461180927999993, -0.0, 0.0)
+  E t4 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t4 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t4 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t4 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t5 entities=5 non-finite=3
+  E t5 id=1 minecraft:minecart pos=(7.129316577280001, 1.0625, 1.5) vel=(0.23482733690879992, -0.0, 0.0)
+  E t5 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t5 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t5 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t5 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t6 entities=5 non-finite=3
+  E t6 id=1 minecraft:minecart pos=(7.3641439141888005, 1.0625, 1.5) vel=(0.22543424343244792, -0.0, 0.0)
+  E t6 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t6 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t6 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t6 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t7 entities=5 non-finite=3
+  E t7 id=1 minecraft:minecart pos=(7.589578157621249, 1.0625, 1.5) vel=(0.21641687369515, -0.0, 0.0)
+  E t7 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t7 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t7 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t7 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t8 entities=5 non-finite=3
+  E t8 id=1 minecraft:minecart pos=(7.805995031316399, 1.0625, 1.5) vel=(0.207760198747344, -0.0, 0.0)
+  E t8 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t8 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t8 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t8 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t9 entities=5 non-finite=3
+  E t9 id=1 minecraft:minecart pos=(8.013755230063742, 1.0625, 1.5) vel=(0.19944979079745023, -0.0, 0.0)
+  E t9 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t9 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t9 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t9 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t10 entities=5 non-finite=3
+  E t10 id=1 minecraft:minecart pos=(8.213205020861192, 1.0625, 1.5) vel=(0.1914717991655522, -0.0, 0.0)
+  E t10 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t10 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t10 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t10 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t11 entities=5 non-finite=3
+  E t11 id=1 minecraft:minecart pos=(8.404676820026744, 1.0625, 1.5) vel=(0.1838129271989301, -0.0, 0.0)
+  E t11 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t11 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t11 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t11 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t12 entities=5 non-finite=3
+  E t12 id=1 minecraft:minecart pos=(8.588489747225674, 1.0625, 1.5) vel=(0.1764604101109729, -0.0, 0.0)
+  E t12 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t12 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t12 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t12 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+[18:18:49] [main/INFO]: [  ]
+ENT t13 entities=5 non-finite=3
+  E t13 id=1 minecraft:minecart pos=(8.764950157336648, 1.0625, 1.5) vel=(0.169401993706534, -0.0, 0.0)
+  E t13 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t13 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t13 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t13 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t14 entities=5 non-finite=3
+  E t14 id=1 minecraft:minecart pos=(8.934352151043182, 1.0625, 1.5) vel=(0.16262591395827264, -0.0, 0.0)
+  E t14 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t14 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t14 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t14 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t15 entities=5 non-finite=3
+  E t15 id=1 minecraft:minecart pos=(9.096978065001455, 1.0625, 1.5) vel=(0.15612087739994174, -0.0, 0.0)
+  E t15 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t15 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t15 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t15 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t16 entities=5 non-finite=3
+  E t16 id=1 minecraft:minecart pos=(9.253098942401397, 1.0625, 1.5) vel=(0.14987604230394405, -0.0, 0.0)
+  E t16 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t16 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t16 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t16 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t17 entities=5 non-finite=3
+  E t17 id=1 minecraft:minecart pos=(9.402974984705342, 1.0625, 1.5) vel=(0.1438810006117863, -0.0, 0.0)
+  E t17 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t17 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t17 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t17 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t18 entities=5 non-finite=3
+  E t18 id=1 minecraft:minecart pos=(9.546855985317128, 1.0625, 1.5) vel=(0.13812576058731485, -0.0, 0.0)
+  E t18 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t18 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t18 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t18 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t19 entities=5 non-finite=3
+  E t19 id=1 minecraft:minecart pos=(9.684981745904443, 1.0625, 1.5) vel=(0.13260073016382226, -0.0, 0.0)
+  E t19 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t19 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t19 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t19 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t20 entities=5 non-finite=3
+  E t20 id=1 minecraft:minecart pos=(9.817582476068266, 1.0625, 1.5) vel=(0.12729670095726936, -0.0, 0.0)
+  E t20 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t20 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t20 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t20 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t21 entities=5 non-finite=3
+  E t21 id=1 minecraft:minecart pos=(9.944879177025534, 1.0625, 1.5) vel=(0.12220483291897859, -0.0, 0.0)
+  E t21 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t21 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t21 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t21 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t22 entities=5 non-finite=3
+  E t22 id=1 minecraft:minecart pos=(10.067084009944512, 1.0625, 1.5) vel=(0.11731663960221944, -0.0, 0.0)
+  E t22 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t22 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t22 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t22 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t23 entities=5 non-finite=3
+  E t23 id=1 minecraft:minecart pos=(10.184400649546731, 1.0625, 1.5) vel=(0.11262397401813067, -0.0, 0.0)
+  E t23 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t23 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t23 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t23 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t24 entities=5 non-finite=3
+  E t24 id=1 minecraft:minecart pos=(10.297024623564862, 1.0625, 1.5) vel=(0.10811901505740544, -0.0, 0.0)
+  E t24 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t24 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t24 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t24 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t25 entities=5 non-finite=3
+  E t25 id=1 minecraft:minecart pos=(10.405143638622269, 1.0625, 1.5) vel=(0.10379425445510922, -0.0, 0.0)
+  E t25 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t25 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t25 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t25 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t26 entities=5 non-finite=3
+  E t26 id=1 minecraft:minecart pos=(10.508937893077379, 1.0625, 1.5) vel=(0.09964248427690485, -0.0, 0.0)
+  E t26 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t26 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t26 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t26 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t27 entities=5 non-finite=3
+  E t27 id=1 minecraft:minecart pos=(10.608580377354283, 1.0625, 1.5) vel=(0.09565678490582866, -0.0, 0.0)
+  E t27 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t27 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t27 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t27 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t28 entities=5 non-finite=3
+  E t28 id=1 minecraft:minecart pos=(10.704237162260112, 1.0625, 1.5) vel=(0.09183051350959551, -0.0, 0.0)
+  E t28 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t28 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t28 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t28 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t29 entities=5 non-finite=3
+  E t29 id=1 minecraft:minecart pos=(10.796067675769708, 1.0625, 1.5) vel=(0.08815729296921168, -0.0, 0.0)
+  E t29 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t29 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t29 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t29 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t30 entities=5 non-finite=3
+  E t30 id=1 minecraft:minecart pos=(10.88422496873892, 1.0625, 1.5) vel=(0.0846310012504432, -0.0, 0.0)
+  E t30 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t30 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t30 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t30 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t31 entities=5 non-finite=3
+  E t31 id=1 minecraft:minecart pos=(10.968855969989363, 1.0625, 1.5) vel=(0.08124576120042547, -0.0, 0.0)
+  E t31 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t31 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t31 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t31 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t32 entities=5 non-finite=3
+  E t32 id=1 minecraft:minecart pos=(11.05010173118979, 1.0625, 1.5) vel=(0.07799593075240845, -0.0, 0.0)
+  E t32 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t32 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t32 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t32 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+[18:18:49] [main/INFO]: [  ]
+ENT t33 entities=5 non-finite=3
+  E t33 id=1 minecraft:minecart pos=(11.128097661942197, 1.0625, 1.5) vel=(0.0748760935223121, -0.0, 0.0)
+  E t33 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t33 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t33 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t33 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t34 entities=5 non-finite=3
+  E t34 id=1 minecraft:minecart pos=(11.202973755464509, 1.0625, 1.5) vel=(0.07188104978141961, -0.0, 0.0)
+  E t34 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t34 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t34 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t34 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t35 entities=5 non-finite=3
+  E t35 id=1 minecraft:minecart pos=(11.274854805245928, 1.0625, 1.5) vel=(0.06900580779016283, -0.0, 0.0)
+  E t35 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t35 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t35 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t35 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t36 entities=5 non-finite=3
+  E t36 id=1 minecraft:minecart pos=(11.34386061303609, 1.0625, 1.5) vel=(0.002649823019142253, -0.0, 0.0)
+  E t36 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t36 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t36 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t36 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t37 entities=5 non-finite=3
+  E t37 id=1 minecraft:minecart pos=(11.346510436055233, 1.0625, 1.5) vel=(1.0175320393506251E-4, -0.0, 0.0)
+  E t37 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t37 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t37 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t37 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t38 entities=5 non-finite=3
+  E t38 id=1 minecraft:minecart pos=(11.346612189259169, 1.0625, 1.5) vel=(3.907323031106401E-6, -0.0, 0.0)
+  E t38 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t38 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t38 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t38 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t39 entities=5 non-finite=3
+  E t39 id=1 minecraft:minecart pos=(11.3466160965822, 1.0625, 1.5) vel=(1.500412043944858E-7, -0.0, 0.0)
+  E t39 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t39 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t39 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t39 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t40 entities=5 non-finite=3
+  E t40 id=1 minecraft:minecart pos=(11.346616246623404, 1.0625, 1.5) vel=(5.761582248748255E-9, -0.0, 0.0)
+  E t40 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t40 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t40 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t40 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t41 entities=5 non-finite=3
+  E t41 id=1 minecraft:minecart pos=(11.346616252384985, 1.0625, 1.5) vel=(2.2124475835193298E-10, -0.0, 0.0)
+  E t41 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t41 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t41 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t41 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t42 entities=5 non-finite=3
+  E t42 id=1 minecraft:minecart pos=(11.34661625260623, 1.0625, 1.5) vel=(8.495798720714227E-12, -0.0, 0.0)
+  E t42 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t42 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t42 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t42 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t43 entities=5 non-finite=3
+  E t43 id=1 minecraft:minecart pos=(11.346616252614727, 1.0625, 1.5) vel=(3.2623867087542637E-13, -0.0, 0.0)
+  E t43 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t43 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t43 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t43 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t44 entities=5 non-finite=3
+  E t44 id=1 minecraft:minecart pos=(11.346616252615053, 1.0625, 1.5) vel=(1.2527564961616372E-14, -0.0, 0.0)
+  E t44 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t44 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t44 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t44 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t45 entities=5 non-finite=3
+  E t45 id=1 minecraft:minecart pos=(11.346616252615066, 1.0625, 1.5) vel=(4.810584945260687E-16, -0.0, 0.0)
+  E t45 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t45 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t45 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t45 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t46 entities=5 non-finite=3
+  E t46 id=1 minecraft:minecart pos=(11.346616252615066, 1.0625, 1.5) vel=(1.8472646189801037E-17, -0.0, 0.0)
+  E t46 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t46 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t46 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t46 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t47 entities=5 non-finite=3
+  E t47 id=1 minecraft:minecart pos=(11.346616252615066, 1.0625, 1.5) vel=(7.0934961368836E-19, -0.0, 0.0)
+  E t47 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t47 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t47 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t47 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t48 entities=5 non-finite=3
+  E t48 id=1 minecraft:minecart pos=(11.346616252615066, 1.0625, 1.5) vel=(2.7239025165633025E-20, -0.0, 0.0)
+  E t48 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t48 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t48 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t48 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t49 entities=5 non-finite=3
+  E t49 id=1 minecraft:minecart pos=(11.346616252615066, 1.0625, 1.5) vel=(1.0459785663603081E-21, -0.0, 0.0)
+  E t49 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t49 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t49 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t49 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t50 entities=5 non-finite=3
+  E t50 id=1 minecraft:minecart pos=(11.346616252615066, 1.0625, 1.5) vel=(4.0165576948235834E-23, -0.0, 0.0)
+  E t50 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t50 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t50 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t50 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t51 entities=5 non-finite=3
+  E t51 id=1 minecraft:minecart pos=(11.346616252615066, 1.0625, 1.5) vel=(1.5423581548122561E-24, -0.0, 0.0)
+  E t51 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t51 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t51 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t51 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t52 entities=5 non-finite=3
+  E t52 id=1 minecraft:minecart pos=(11.346616252615066, 1.0625, 1.5) vel=(5.922655314479064E-26, -0.0, 0.0)
+  E t52 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t52 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t52 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t52 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+[18:18:49] [main/INFO]: [  ]
+ENT t53 entities=5 non-finite=3
+  E t53 id=1 minecraft:minecart pos=(11.346616252615066, 1.0625, 1.5) vel=(2.2742996407599608E-27, -0.0, 0.0)
+  E t53 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t53 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t53 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t53 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t54 entities=5 non-finite=3
+  E t54 id=1 minecraft:minecart pos=(11.346616252615066, 1.0625, 1.5) vel=(8.73331062051825E-29, -0.0, 0.0)
+  E t54 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t54 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t54 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t54 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t55 entities=5 non-finite=3
+  E t55 id=1 minecraft:minecart pos=(11.346616252615066, 1.0625, 1.5) vel=(3.353591278279008E-30, -0.0, 0.0)
+  E t55 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t55 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t55 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t55 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t56 entities=5 non-finite=3
+  E t56 id=1 minecraft:minecart pos=(11.346616252615066, 1.0625, 1.5) vel=(1.2877790508591393E-31, -0.0, 0.0)
+  E t56 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t56 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t56 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t56 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t57 entities=5 non-finite=3
+  E t57 id=1 minecraft:minecart pos=(11.346616252615066, 1.0625, 1.5) vel=(4.945071555299094E-33, -0.0, 0.0)
+  E t57 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t57 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t57 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t57 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t58 entities=5 non-finite=3
+  E t58 id=1 minecraft:minecart pos=(11.346616252615066, 1.0625, 1.5) vel=(1.8989074772348525E-34, -0.0, 0.0)
+  E t58 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t58 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t58 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t58 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+ENT t59 entities=5 non-finite=3
+  E t59 id=1 minecraft:minecart pos=(11.346616252615066, 1.0625, 1.5) vel=(7.291804712581834E-36, -0.0, 0.0)
+  E t59 id=2 minecraft:minecart pos=(12.5, 1.0625, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t59 id=3 minecraft:minecart pos=(18.5, 1.0625, 1.5) vel=(NaN, 0.0, 0.0)  NON-FINITE
+  E t59 id=4 minecraft:minecart pos=(2.5, 3.0, 1.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t59 id=5 minecraft:minecart pos=(21.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+captured 0 tick(s) with changes -> work/nan_contagion.json
