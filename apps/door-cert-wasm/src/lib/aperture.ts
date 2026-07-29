@@ -89,181 +89,259 @@ export function aperture(
     return b !== undefined && !isAir(b.state);
   };
 
-  // 1. The plane holding the most vacated cells — the seed for everything
-  //    below. Only its axis has to be right; its coordinate and extent are
-  //    both re-derived once the passage is known.
-  let best = { axis: 0, coord: 0, n: 0 };
+  // 1. The seed plane. For each axis, the plane of that axis holding the most
+  //    vacated cells; the axes are then tried in that order and the first one
+  //    that finds a walkable passage wins.
+  //
+  //    Taking the single densest plane and stopping there — which is what this
+  //    used to do — is right for every door whose opening is wider and taller
+  //    than its wall is deep, and wrong for every door that is not. A 2 x 2
+  //    doorway in a 3-deep wall leaves 6 vacated cells on an x-plane and 6 on
+  //    a y-plane against only 4 on the z-plane the passage actually lies in,
+  //    so the seed plane gets chosen THROUGH the doorway rather than across
+  //    it: the row axis becomes the wall's own depth, the fill spans it end to
+  //    end on its first step, the escape guard fires, and an ordinary 2 x 2
+  //    door with its own lever is reported as having no passage at all.
+  //
+  //    Trying the densest axis FIRST is what makes this safe: a door that
+  //    already reads is solved on exactly the plane it was solved on before,
+  //    and the other two axes are reached only where the old rule found
+  //    nothing whatsoever. Nothing that used to yield a passage can change.
+  const axisSeeds: { axis: number; coord: number; n: number }[] = [];
   for (let axis = 0; axis < 3; axis++) {
     const byCoord = new Map<number, number>();
     for (const p of cells) byCoord.set(p[axis], (byCoord.get(p[axis]) ?? 0) + 1);
-    for (const [coord, n] of byCoord) if (n > best.n) best = { axis, coord, n };
+    let top = { axis, coord: 0, n: 0 };
+    for (const [coord, n] of byCoord) if (n > top.n) top = { axis, coord, n };
+    axisSeeds.push(top);
   }
-  // Matrix axes, in the standard's terms: a wall reads rows down the y-axis,
-  // a floor hatch reads rows along z. Which of the two the door is decides
-  // the orientation (Definition 2.4).
-  const vertical = best.axis !== 1;
-  const rowAxis = vertical ? 1 : 2;
-  const colAxis = best.axis === 0 ? 2 : 0;
-  const flat = (p: Vec3) => `${p[colAxis]},${p[rowAxis]}`;
-  const at = (col: number, row: number, layer: number): Vec3 => {
-    const p: Vec3 = [0, 0, 0];
-    p[colAxis] = col;
-    p[rowAxis] = row;
-    p[best.axis] = layer;
-    return p;
+  axisSeeds.sort((a, b) => b.n - a.n || a.axis - b.axis);
+
+  type Solution = {
+    best: { axis: number; coord: number; n: number };
+    vertical: boolean;
+    rowAxis: number;
+    colAxis: number;
+    flat: (p: Vec3) => string;
+    at: (col: number, row: number, layer: number) => Vec3;
+    domC0: number; domC1: number; domR0: number; domR1: number;
+    axis0: number; axis1: number;
+    patch: string[];
+    lo: number;
+    hi: number;
+    passage: { set: Set<string>; parts: number } | null;
   };
+
   const parse = (key: string) => key.split(",").map(Number) as [number, number];
 
-  // The build's own extent, in flat coordinates and along the plane axis. A
-  // fill that reaches the edge of it has left the building.
-  let domC0 = Infinity, domC1 = -Infinity, domR0 = Infinity, domR1 = -Infinity;
-  let axis0 = Infinity, axis1 = -Infinity;
-  for (const m of [closedMap, openMap])
-    for (const b of m.values()) {
-      const c = b.pos[colAxis], r = b.pos[rowAxis], k = b.pos[best.axis];
-      if (c < domC0) domC0 = c;
-      if (c > domC1) domC1 = c;
-      if (r < domR0) domR0 = r;
-      if (r > domR1) domR1 = r;
-      if (k < axis0) axis0 = k;
-      if (k > axis1) axis1 = k;
-    }
-
-  // 2. The largest 4-connected patch of vacated cells inside the seed plane.
-  //    These are the seeds the passage is flooded from: wherever a door block
-  //    came from, a person can walk.
-  const plane = new Set(cells.filter((p) => p[best.axis] === best.coord).map(flat));
-  const seen = new Set<string>();
-  let patch: string[] = [];
-  for (const start of plane) {
-    if (seen.has(start)) continue;
-    const comp: string[] = [];
-    const queue = [start];
-    seen.add(start);
-    while (queue.length) {
-      const key = queue.pop()!;
-      comp.push(key);
-      const [a, b] = parse(key);
-      for (const [da, db] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const nk = `${a + da},${b + db}`;
-        if (plane.has(nk) && !seen.has(nk)) {
-          seen.add(nk);
-          queue.push(nk);
-        }
-      }
-    }
-    if (comp.length > patch.length) patch = comp;
-  }
-  const patchSet = new Set(patch);
-
-  // 3. A first guess at the wall's depth: parallel planes that repeat most of
-  //    the same patch. Only a starting point — a door whose layers hold
-  //    different parts of the pattern (a vault's outer ring and inner panel
-  //    sit on different layers) repeats nothing, and reads one layer thick.
-  const byPlane = new Map<number, Set<string>>();
-  for (const p of cells) {
-    const c = p[best.axis];
-    if (!byPlane.has(c)) byPlane.set(c, new Set());
-    byPlane.get(c)!.add(flat(p));
-  }
-  const repeats = (c: number) => {
-    const s = byPlane.get(c);
-    if (!s) return false;
-    let hit = 0;
-    for (const key of patchSet) if (s.has(key)) hit++;
-    return hit >= patch.length * 0.5;
-  };
-  let lo = best.coord;
-  let hi = best.coord;
-  while (repeats(lo - 1)) lo--;
-  while (repeats(hi + 1)) hi++;
-
-  // 4. The passage. A flat cell is passage if it is air at EVERY layer of the
-  //    wall — that is what "you could walk through it" means, and it is why
-  //    the middle of a two-layer door is passage even though no single layer
-  //    is clear. Flood out from the seeds; anything still solid when open
-  //    (frame, parked panels, machinery) is a wall.
-  type Fill = { set: Set<string>; parts: number };
-  const floodPassage = (l0: number, l1: number): Fill | null => {
-    const clear = (col: number, row: number) => {
-      for (let layer = l0; layer <= l1; layer++)
-        if (solidIn(vacant, at(col, row, layer))) return false;
-      return true;
+  const solveOnAxis = (best: { axis: number; coord: number; n: number }): Solution => {
+    // Matrix axes, in the standard's terms: a wall reads rows down the y-axis,
+    // a floor hatch reads rows along z. Which of the two the door is decides
+    // the orientation (Definition 2.4).
+    const vertical = best.axis !== 1;
+    const rowAxis = vertical ? 1 : 2;
+    const colAxis = best.axis === 0 ? 2 : 0;
+    const flat = (p: Vec3) => `${p[colAxis]},${p[rowAxis]}`;
+    const at = (col: number, row: number, layer: number): Vec3 => {
+      const p: Vec3 = [0, 0, 0];
+      p[colAxis] = col;
+      p[rowAxis] = row;
+      p[best.axis] = layer;
+      return p;
     };
-    const visited = new Set<string>();
-    let biggest: Set<string> | null = null;
-    let parts = 0;
-    for (const seed of patch) {
-      if (visited.has(seed)) continue;
-      const [sc, sr] = parse(seed);
-      if (!clear(sc, sr)) continue;
-      const comp = new Set<string>([seed]);
-      visited.add(seed);
-      const queue = [seed];
+
+    // The build's own extent, in flat coordinates and along the plane axis. A
+    // fill that reaches the edge of it has left the building.
+    let domC0 = Infinity, domC1 = -Infinity, domR0 = Infinity, domR1 = -Infinity;
+    let axis0 = Infinity, axis1 = -Infinity;
+    for (const m of [closedMap, openMap])
+      for (const b of m.values()) {
+        const c = b.pos[colAxis], r = b.pos[rowAxis], k = b.pos[best.axis];
+        if (c < domC0) domC0 = c;
+        if (c > domC1) domC1 = c;
+        if (r < domR0) domR0 = r;
+        if (r > domR1) domR1 = r;
+        if (k < axis0) axis0 = k;
+        if (k > axis1) axis1 = k;
+      }
+
+    // 2. The largest 4-connected patch of vacated cells inside the seed plane.
+    //    These are the seeds the passage is flooded from: wherever a door block
+    //    came from, a person can walk.
+    const plane = new Set(cells.filter((p) => p[best.axis] === best.coord).map(flat));
+    const seen = new Set<string>();
+    let patch: string[] = [];
+    for (const start of plane) {
+      if (seen.has(start)) continue;
+      const comp: string[] = [];
+      const queue = [start];
+      seen.add(start);
       while (queue.length) {
-        const [a, b] = parse(queue.pop()!);
-        // Reaching the outside of the build means the seed was wrong or the
-        // doorway is not enclosed; either way the fill is meaningless.
-        if (a <= domC0 || a >= domC1 || b <= domR0 || b >= domR1) return null;
+        const key = queue.pop()!;
+        comp.push(key);
+        const [a, b] = parse(key);
         for (const [da, db] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-          const na = a + da, nb = b + db;
-          const nk = `${na},${nb}`;
-          if (comp.has(nk) || !clear(na, nb)) continue;
-          comp.add(nk);
-          visited.add(nk);
-          queue.push(nk);
+          const nk = `${a + da},${b + db}`;
+          if (plane.has(nk) && !seen.has(nk)) {
+            seen.add(nk);
+            queue.push(nk);
+          }
         }
       }
-      parts++;
-      if (biggest === null || comp.size > biggest.size) biggest = comp;
+      if (comp.length > patch.length) patch = comp;
     }
-    if (biggest === null) return null;
-    let c0 = Infinity, c1 = -Infinity, r0 = Infinity, r1 = -Infinity;
-    for (const key of biggest) {
-      const [a, b] = parse(key);
-      if (a < c0) c0 = a;
-      if (a > c1) c1 = a;
-      if (b < r0) r0 = b;
-      if (b > r1) r1 = b;
-    }
-    if (c1 - c0 + 1 > MAX_SPAN || r1 - r0 + 1 > MAX_SPAN) return null;
-    return { set: biggest, parts };
-  };
+    const patchSet = new Set(patch);
 
-  // The layers the door blocks actually span, read over the passage. This is
-  // what fixes the depth guess above: a layer counts if a passage cell is
-  // filled there when shut and clear when open. The moving test matters —
-  // a lever sits on the frame inside the doorway on both states, and counting
-  // it would drag the wall's depth onto the lever's own layer and then wall
-  // the lever's cell out of its own doorway.
-  const doorLayers = (passage: Set<string>) => {
-    let l0 = Infinity, l1 = -Infinity;
-    for (const key of passage) {
-      const [a, b] = parse(key);
-      for (let layer = axis0; layer <= axis1; layer++) {
-        const p = at(a, b, layer);
-        if (!solidIn(filled, p) || solidIn(vacant, p)) continue;
-        if (layer < l0) l0 = layer;
-        if (layer > l1) l1 = layer;
+    // 3. A first guess at the wall's depth: parallel planes that repeat most of
+    //    the same patch. Only a starting point — a door whose layers hold
+    //    different parts of the pattern (a vault's outer ring and inner panel
+    //    sit on different layers) repeats nothing, and reads one layer thick.
+    const byPlane = new Map<number, Set<string>>();
+    for (const p of cells) {
+      const c = p[best.axis];
+      if (!byPlane.has(c)) byPlane.set(c, new Set());
+      byPlane.get(c)!.add(flat(p));
+    }
+    const repeats = (c: number) => {
+      const s = byPlane.get(c);
+      if (!s) return false;
+      let hit = 0;
+      for (const key of patchSet) if (s.has(key)) hit++;
+      return hit >= patch.length * 0.5;
+    };
+    let lo = best.coord;
+    let hi = best.coord;
+    while (repeats(lo - 1)) lo--;
+    while (repeats(hi + 1)) hi++;
+
+    // 4. The passage. A flat cell is passage if it is air at EVERY layer of the
+    //    wall — that is what "you could walk through it" means, and it is why
+    //    the middle of a two-layer door is passage even though no single layer
+    //    is clear. Flood out from the seeds; anything still solid when open
+    //    (frame, parked panels, machinery) is a wall.
+    type Fill = { set: Set<string>; parts: number };
+    /** Could a person get through this component?
+     *
+     *  A wall opening is walked through, and a player is one cell wide and TWO
+     *  cells tall, so one row high is a letterbox. A floor opening is dropped
+     *  through, which needs no height — but a one-cell-wide slot in a floor is
+     *  a gap between blocks, not a hatch, so a hatch has to be two cells in
+     *  both directions to count. Between them these are what stop a machine's
+     *  own voids reading as doorways: `skittles-270b-3x3hipster` BUDs a 3 × 1
+     *  slot open, and it is not the 3 × 3 doorway the build is named for. */
+    const walkable = (comp: Set<string>) => {
+      let c0 = Infinity, c1 = -Infinity, r0 = Infinity, r1 = -Infinity;
+      for (const key of comp) {
+        const [a, b] = parse(key);
+        if (a < c0) c0 = a;
+        if (a > c1) c1 = a;
+        if (b < r0) r0 = b;
+        if (b > r1) r1 = b;
       }
+      return r1 - r0 + 1 >= 2 && (vertical || c1 - c0 + 1 >= 2);
+    };
+    const floodPassage = (l0: number, l1: number): Fill | null => {
+      const clear = (col: number, row: number) => {
+        for (let layer = l0; layer <= l1; layer++)
+          if (solidIn(vacant, at(col, row, layer))) return false;
+        return true;
+      };
+      const visited = new Set<string>();
+      let biggest: Set<string> | null = null;
+      let parts = 0;
+      for (const seed of patch) {
+        if (visited.has(seed)) continue;
+        const [sc, sr] = parse(seed);
+        if (!clear(sc, sr)) continue;
+        const comp = new Set<string>([seed]);
+        visited.add(seed);
+        const queue = [seed];
+        while (queue.length) {
+          const [a, b] = parse(queue.pop()!);
+          // Reaching the outside of the build means the seed was wrong or the
+          // doorway is not enclosed; either way the fill is meaningless.
+          if (a <= domC0 || a >= domC1 || b <= domR0 || b >= domR1) return null;
+          for (const [da, db] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const na = a + da, nb = b + db;
+            const nk = `${na},${nb}`;
+            if (comp.has(nk) || !clear(na, nb)) continue;
+            comp.add(nk);
+            visited.add(nk);
+            queue.push(nk);
+          }
+        }
+        // "A passage anyone could walk through" is meant literally, and it is
+        // the only thing standing between a doorway and a gap in a machine.
+        if (!walkable(comp)) continue;
+        parts++;
+        if (biggest === null || comp.size > biggest.size) biggest = comp;
+      }
+      if (biggest === null) return null;
+      let c0 = Infinity, c1 = -Infinity, r0 = Infinity, r1 = -Infinity;
+      for (const key of biggest) {
+        const [a, b] = parse(key);
+        if (a < c0) c0 = a;
+        if (a > c1) c1 = a;
+        if (b < r0) r0 = b;
+        if (b > r1) r1 = b;
+      }
+      if (c1 - c0 + 1 > MAX_SPAN || r1 - r0 + 1 > MAX_SPAN) return null;
+      return { set: biggest, parts };
+    };
+
+    // The layers the door blocks actually span, read over the passage. This is
+    // what fixes the depth guess above: a layer counts if a passage cell is
+    // filled there when shut and clear when open. The moving test matters —
+    // a lever sits on the frame inside the doorway on both states, and counting
+    // it would drag the wall's depth onto the lever's own layer and then wall
+    // the lever's cell out of its own doorway.
+    const doorLayers = (passageSet: Set<string>) => {
+      let l0 = Infinity, l1 = -Infinity;
+      for (const key of passageSet) {
+        const [a, b] = parse(key);
+        for (let layer = axis0; layer <= axis1; layer++) {
+          const p = at(a, b, layer);
+          if (!solidIn(filled, p) || solidIn(vacant, p)) continue;
+          if (layer < l0) l0 = layer;
+          if (layer > l1) l1 = layer;
+        }
+      }
+      return l1 < l0 ? null : { l0, l1 };
+    };
+
+    // Passage and depth define each other, so run them to a fixed point. One
+    // round settles every door tested; the cap is there for the door that
+    // oscillates, and lo/hi is only advanced together with the fill it produced
+    // so the two never disagree.
+    let passage = floodPassage(lo, hi);
+    for (let iter = 0; iter < 3 && passage; iter++) {
+      const span = doorLayers(passage.set);
+      if (!span || (span.l0 === lo && span.l1 === hi)) break;
+      const next = floodPassage(span.l0, span.l1);
+      if (!next) break;
+      lo = span.l0;
+      hi = span.l1;
+      passage = next;
     }
-    return l1 < l0 ? null : { l0, l1 };
+    return {
+      best, vertical, rowAxis, colAxis, flat, at,
+      domC0, domC1, domR0, domR1, axis0, axis1,
+      patch, lo, hi, passage,
+    };
   };
 
-  // Passage and depth define each other, so run them to a fixed point. One
-  // round settles every door tested; the cap is there for the door that
-  // oscillates, and lo/hi is only advanced together with the fill it produced
-  // so the two never disagree.
-  let passage = floodPassage(lo, hi);
-  for (let iter = 0; iter < 3 && passage; iter++) {
-    const span = doorLayers(passage.set);
-    if (!span || (span.l0 === lo && span.l1 === hi)) break;
-    const next = floodPassage(span.l0, span.l1);
-    if (!next) break;
-    lo = span.l0;
-    hi = span.l1;
-    passage = next;
+  let solved: Solution | null = null;
+  for (const seed of axisSeeds) {
+    const s = solveOnAxis(seed);
+    if (s.passage) {
+      solved = s;
+      break;
+    }
   }
+  // No axis found anything walkable. The densest plane is still the honest
+  // answer to "where is the machine", and the fallback below measures from it.
+  const sol = solved ?? solveOnAxis(axisSeeds[0]);
+  const { best, vertical, flat, at, patch, passage, lo, hi } = sol;
   const depth = hi - lo + 1;
 
   let loC: number, hiC: number, loR: number, hiR: number;

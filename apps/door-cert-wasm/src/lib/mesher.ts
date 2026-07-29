@@ -50,18 +50,48 @@ function b64ToBytes(b64: string): Uint8Array {
 
 const loader = new GLTFLoader();
 const modelCache = new Map<string, Promise<THREE.Group>>();
+/** The resolved env, so the synchronous encode path can reach it. */
+let envSync: MeshEnv | null = null;
+const baseState = (state: string) => state.split("[", 1)[0];
 
 /** Instrumentation: unique states meshed + summed SYNC wasm mesh ms (the
  * schematic build + mesh + GLB encode; GLTF parse is async and overlaps). */
 export const meshStats = { states: 0, totalMs: 0 };
 
+/** GLB bytes for one blockstate, or null if the mesher will not encode it.
+ *
+ *  Two kinds of failure, and only one of them is recoverable. A state that
+ *  fails on its PROPERTIES can be drawn from the bare id: wrong about the
+ *  rotation, right about everything else, and better than a hole. A block the
+ *  mesher cannot encode at all cannot be drawn — `minecraft:chain` raises
+ *  `NucleationError.Serialize` for `axis=x`, `axis=z` AND its own default
+ *  `axis=y`, so there is nothing to fall back to. That one is reported: the
+ *  caller leaves the cells empty and the replay says which block is missing,
+ *  because a hole nobody names is the worst of the three outcomes. */
+function encode(state: string): Uint8Array | null {
+  const { eng, pack, cfg } = envSync!;
+  try {
+    const sc = eng.Schematic.create("cell");
+    sc.setBlockFromString(0, 0, 0, state);
+    return b64ToBytes(eng.MeshResult.create(sc, pack, cfg).glbDataB64());
+  } catch {
+    return null;
+  }
+}
+
 async function buildModel(state: string): Promise<THREE.Group> {
-  const { eng, pack, cfg } = await loadMeshEnv();
+  envSync = await loadMeshEnv();
   const t0 = performance.now();
-  const sc = eng.Schematic.create("cell");
-  sc.setBlockFromString(0, 0, 0, state);
-  const mr = eng.MeshResult.create(sc, pack, cfg);
-  const glb = b64ToBytes(mr.glbDataB64());
+  const bare = baseState(state);
+  let glb = encode(state);
+  if (!glb && bare !== state) {
+    glb = encode(bare);
+    if (glb)
+      console.warn(
+        `[mesh] ${state} could not be encoded; drawn as ${bare} in its default orientation`,
+      );
+  }
+  if (!glb) throw new Error(`the mesher cannot encode ${state}`);
   meshStats.states += 1;
   meshStats.totalMs += performance.now() - t0;
   const gltf = await loader.parseAsync(glb.buffer as ArrayBuffer, "");

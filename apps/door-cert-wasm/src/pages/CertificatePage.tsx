@@ -495,7 +495,14 @@ export function CertificatePage() {
                 {control} at <b>({cert.lever.join(", ")})</b>
               </span>
               <span>
-                {cycleTicks !== null ? (
+                {/* On a disputed door the hero carries no timings at all. The
+                    numbers exist and are printed below, marked; up here, beside
+                    the door's name, they would be read as the door's time. */}
+                {conflict ? (
+                  <>
+                    doorway cycle <b>not certified</b>
+                  </>
+                ) : cycleTicks !== null ? (
                   <>
                     doorway cycle <b>{cycleTicks} ticks</b> · {secs(cycleTicks)} s in game
                   </>
@@ -505,7 +512,7 @@ export function CertificatePage() {
                   </>
                 )}
               </span>
-              {settleCycle !== null && (
+              {!conflict && settleCycle !== null && (
                 <span>
                   settles after <b>{settleCycle} ticks</b>
                 </span>
@@ -603,12 +610,16 @@ export function CertificatePage() {
         </p>
         {conflict && (
           /* The tiles are the most liftable numbers on the page. On a disputed
-             door they time a cycle the run cannot attribute to this door, so
-             they are labelled where they are read, not only in the banner. */
-          <p className="chart-note" data-testid="measurements-caveat">
-            These time the {conflict.settled.w} × {conflict.settled.h} cycle the machine
-            repeats, not the {conflict.saved.w} × {conflict.saved.h} doorway the file was saved
-            with. Correct for what they measure; not this door's certified numbers.
+             door every one of them times a cycle the run cannot attribute to
+             this door, so the refusal is set at reading size and each tile is
+             marked where it is read, not only in the banner up in the hero. */
+          <p className="tiles-refusal" data-testid="measurements-caveat">
+            <b>Not certified, and these are the reason.</b> Every figure below was measured on
+            the {conflict.settled.w} × {conflict.settled.h} cycle the machine settles into —
+            one of the two doors in this file. The other is the{" "}
+            {conflict.saved.w} × {conflict.saved.h} doorway it was saved with, and nothing in
+            the file says which one is the door. Quote none of these as this build's opening
+            time or rate; they are true of a cycle, not of a door.
           </p>
         )}
         <div className="tiles">
@@ -617,12 +628,14 @@ export function CertificatePage() {
             value={cert.open_ticks ?? "—"}
             unit={cert.open_ticks !== null ? " ticks" : undefined}
             sub={strokeSub(cert.open_ticks, cert.open_settle_ticks, cert.open_latency)}
+            disputed={!!conflict}
           />
           <StatTile
             label="Closes in"
             value={cert.close_ticks ?? "—"}
             unit={cert.close_ticks !== null ? " ticks" : undefined}
             sub={strokeSub(cert.close_ticks, cert.close_settle_ticks, cert.close_latency)}
+            disputed={!!conflict}
           />
           <StatTile
             label="Settles at"
@@ -635,18 +648,21 @@ export function CertificatePage() {
                     cert.close_settle_ticks ?? "—"
                   } closing · when the last block stops`
             }
+            disputed={!!conflict}
           />
           <StatTile
             label="Reset after opening"
             value={ro?.ticks ?? "—"}
             unit={ro?.ticks != null ? " ticks" : undefined}
             sub={resetSub(ro, "open")}
+            disputed={!!conflict}
           />
           <StatTile
             label="Reset after closing"
             value={rc?.ticks ?? "—"}
             unit={rc?.ticks != null ? " ticks" : undefined}
             sub={resetSub(rc, "close")}
+            disputed={!!conflict}
           />
           <StatTile
             label="Cycle rate"
@@ -659,12 +675,14 @@ export function CertificatePage() {
                   ? `doorway cycle of ${cycleTicks} ticks — reset not measured`
                   : `from settle: ${settleCycle ?? "—"} ticks`
             }
+            disputed={!!conflict}
           />
           <StatTile
             label="Stroke mass"
             value={cert.moved_cells}
             unit=" cells"
             sub={`travel per stroke · ${movingBlocks} columns active`}
+            disputed={!!conflict}
           />
           <StatTile
             label="Aperture cost"
@@ -674,6 +692,7 @@ export function CertificatePage() {
                 ? `${ap.cells}-cell doorway in a ${cert.volume}-cell build`
                 : "no doorway measured"
             }
+            disputed={!!conflict}
           />
         </div>
       </div>

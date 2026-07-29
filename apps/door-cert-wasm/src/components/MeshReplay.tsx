@@ -319,6 +319,9 @@ function WebglReplay({
   const [playing, setPlaying] = useState(playingRef.current);
   const [speed, setSpeed] = useState(1);
   const [ready, setReady] = useState(false);
+  /** Blocks the mesher would not encode. They are still simulated, still timed
+   *  and still counted; they are only absent from the 3-D view. */
+  const [unmeshed, setUnmeshed] = useState<string[]>([]);
   // Bumped on WebGL context loss so the stage rebuilds its renderer.
   const [glNonce, setGlNonce] = useState(0);
 
@@ -695,8 +698,14 @@ function WebglReplay({
           if (xrayOnRef.current) applyXray(true);
         })
         .catch((e) => {
-          // A state the pack can't mesh: leave the slot empty, keep going.
+          // A state the mesher can't encode: leave the slot empty, keep going,
+          // and say which one. `minecraft:chain` fails on every axis including
+          // its default, so it is the block and not the rotation — the replay
+          // is complete apart from those cells, and a viewer counting blocks
+          // in the 3-D view needs to know which ones are not there.
           console.warn("mesh failed for", m.state, e);
+          const id = m.state.split("[", 1)[0];
+          setUnmeshed((prev) => (prev.includes(id) ? prev : [...prev, id]));
         })
         .finally(() => {
           pending -= 1;
@@ -1273,6 +1282,15 @@ function WebglReplay({
           </div>
         )}
       </div>
+      {unmeshed.length > 0 && (
+        <p className="replay-unmeshed" data-testid="unmeshed">
+          Not drawn: {unmeshed.join(", ")}. The mesher has no model it can encode for{" "}
+          {unmeshed.length === 1 ? "this block" : "these blocks"}, so{" "}
+          {unmeshed.length === 1 ? "its cells are" : "their cells are"} empty in the view
+          above. Everything else is here, and the simulation counted{" "}
+          {unmeshed.length === 1 ? "it" : "them"} in full.
+        </p>
+      )}
 
       <div className="replay-controls">
         <button

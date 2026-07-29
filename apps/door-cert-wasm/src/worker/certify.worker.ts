@@ -36,23 +36,44 @@ const RESET_BUDGET_MS = 25_000;
  *
  *  The simulator builds a full block-entity world before it can be asked
  *  anything, so an oversized file is not slow — it is an out-of-memory trap
- *  that takes the tab with it. `IRIS_B.schem` is 1.4 MB on disk and 9,654,922
- *  blocks in a 499 × 379 × 442 volume; nothing about the download says so.
- *  Both numbers are checked, because a sparse world export blows the volume
- *  and a dense one blows the block count.
+ *  that takes the tab with it. `IRIS_B.schem` is 1.4 MB on disk and spans
+ *  499 × 379 × 442; nothing about the download says so.
  *
- *  The ceilings are deliberately far above any door. The pattern standard tops
- *  out at 32 × 32, and the largest door in the corpus is a 6 × 6 at 791 blocks
- *  in a 1,200-cell volume — so a 250k-block, 2M-cell limit leaves two orders of
- *  magnitude of headroom and still refuses a world. */
-const MAX_BLOCKS = 250_000;
-const MAX_VOLUME = 2_000_000;
+ *  ONE unit, and it is CELLS of the file's own bounding box — the thing the
+ *  simulator actually materialises, and the same unit the engine's own limit
+ *  is written in. This used to check the non-air block count as well and
+ *  refuse on whichever tripped first, which meant the app said "9,654,922
+ *  blocks" about the file the engine called "83,591,482 cells": two numbers,
+ *  two units, one download, and nothing on screen saying which was which.
+ *
+ *  The ceiling is deliberately far above any door. The pattern standard tops
+ *  out at 32 × 32 and the largest door in the corpus is a 6 × 6 inside 1,200
+ *  cells, so 2,000,000 leaves three orders of magnitude of headroom and still
+ *  refuses a world. */
+const MAX_CELLS = 2_000_000;
 
 /** ------------------------------------------------- input detection budget --
  *  Ticks a single actuation trial is allowed before it is called quiet, and the
  *  wall-clock ceiling on the whole search across every candidate. */
 const DETECT_TICKS = 200;
 const DETECT_BUDGET_MS = 20_000;
+
+/** ---------------------------------------------- what counts as an opening --
+ *
+ *  A passage that reads open is not the same thing as a passage this control
+ *  OPENED. `330b_unseamless_5x5` is saved with its 5 x 5 doorway standing
+ *  clear; a note block in it BUDs one piston, and the fill then runs happily
+ *  through air that was already there and reports a 5 x 5 opening from a
+ *  control that shifted five of its twenty-five cells. So the doorway has to
+ *  change STATE, over a real fraction of its own volume, and it has to hold
+ *  that state — a shape that flickers for a single tick is the machine
+ *  passing through itself, not a door standing open.
+ *
+ *  Measured over the corpus: real drivers swing 0.50 - 1.00 of the passage
+ *  volume and hold it for 4 - 13 ticks; the note-block BUDs swing 0.20 and
+ *  hold nothing. */
+const MIN_DOORWAY_SWING = 0.25;
+const SUSTAIN_TICKS = 2;
 
 const post = (m: WorkerMessage, transfer?: Transferable[]) =>
   (self as unknown as Worker).postMessage(m, transfer ?? []);
@@ -129,20 +150,19 @@ function replayStroke(
 }
 
 /** Refuse a build that is plainly not a door, before anything expensive. The
- *  message names the numbers it refused on, because "too large" on its own
- *  tells nobody whether they picked the wrong file or hit an arbitrary cap. */
-function guardSize(name: string, volume: number, blocks: number | null) {
+ *  message shows the arithmetic it refused on — the dimensions, their product,
+ *  and the ceiling — because "too large" on its own tells nobody whether they
+ *  picked the wrong file or hit an arbitrary cap, and a bare total tells nobody
+ *  what was counted. */
+function guardSize(name: string, w: number, h: number, l: number) {
+  const cells = w * h * l;
+  if (cells <= MAX_CELLS) return;
   const n = (v: number) => v.toLocaleString("en-US");
-  if (blocks !== null && blocks > MAX_BLOCKS)
-    throw new Error(
-      `SIZE: "${name}" is ${n(blocks)} blocks. That is a world export, not a door — ` +
-        `the simulator would run out of memory building it. Cut the door out and upload that.`,
-    );
-  if (volume > MAX_VOLUME)
-    throw new Error(
-      `SIZE: "${name}" spans ${n(volume)} cells. That is a world export, not a door — ` +
-        `the simulator would run out of memory building it. Cut the door out and upload that.`,
-    );
+  throw new Error(
+    `SIZE: "${name}" spans ${w} × ${h} × ${l} = ${n(cells)} cells, over the ` +
+      `${n(MAX_CELLS)}-cell limit. That is a world export, not a door — the simulator ` +
+      `would run out of memory building it. Cut the door out and upload that.`,
+  );
 }
 
 /** ------------------------------------------------------ input detection --
@@ -274,13 +294,20 @@ function detectInputs(makeSim: () => any, settled: ReplayBlock[]): Detection {
   sim.setRngSeed(SEED);
   sim.runUntilQuiescent(200);
   const atRest = massMap(sim);
+  /** The cells that hold a block with the build standing as it was saved. The
+   *  doorway's state is read against this, so "opened" means changed from
+   *  here — not merely "is clear now". */
+  const restSolid = new Set(
+    settled.filter((b) => !isAir(b.state)).map((b) => posKey(b.pos)),
+  );
   const deadline = Date.now() + DETECT_BUDGET_MS;
   /** Every control that opened a walkable passage, with the passage it opened. */
   const opened: { control: InputControl; passage: Set<string> }[] = [];
   let movedButOpenedNothing = 0;
+  let flickered = 0;
   let tested = 0;
 
-  for (const c of candidates) {
+  const trial = (c: { b: ReplayBlock; kind: InputControl["kind"] }) => {
     const cp: number = sim.checkpoint();
     const control: InputControl = {
       pos: c.b.pos,
@@ -316,38 +343,126 @@ function detectInputs(makeSim: () => any, settled: ReplayBlock[]): Detection {
     control.momentary = c.kind !== "lever" && sim.getBlock(x, y, z) === c.b.state;
     tested++;
     sim.restore(cp);
+    if (peak === 0) return;
 
-    if (peak > 0) {
-      // The actual question: is there something to walk through now?
-      const geo = peak > 0 ? aperture(settled, peakWorld)?.geometry : null;
-      if (geo && geo.passage.length > 0)
-        opened.push({ control, passage: new Set(geo.passage.map(posKey)) });
-      else movedButOpenedNothing++;
+    // The actual question: is there something to walk through now?
+    const passage = aperture(settled, peakWorld)?.geometry?.passage ?? [];
+    if (passage.length === 0) {
+      movedButOpenedNothing++;
+      return;
     }
+
+    // …and did THIS control open it? A doorway that is clear in the file stays
+    // clear whatever you throw, so the fill will happily report it as an
+    // opening for a note block that shifted one piston beside it. Measured
+    // against rest, that control swings 0.20 of the passage volume where a
+    // real driver swings half of it or more.
+    const restCount = passage.filter((p) => restSolid.has(posKey(p))).length;
+    const swing = (solid: number) => Math.abs(restCount - solid) / passage.length;
+    const peakOpen = new Set(
+      peakWorld.filter((b) => !isAir(b.state)).map((b) => posKey(b.pos)),
+    );
+    if (swing(passage.filter((p) => peakOpen.has(posKey(p))).length) < MIN_DOORWAY_SWING) {
+      movedButOpenedNothing++;
+      return;
+    }
+
+    // …and does it hold? Same stroke again, watching the doorway itself rather
+    // than the whole world, because a machine passing through its own doorway
+    // clears it for a tick on the way past.
+    const cp2: number = sim.checkpoint();
+    actuateOnce(sim, control);
+    let run = 0;
+    let held = 0;
+    let open = false;
+    for (let i = 0; i < DETECT_TICKS; i++) {
+      sim.step();
+      let solid = 0;
+      for (const p of passage) if (!isAir(sim.getBlock(p[0], p[1], p[2]))) solid++;
+      open = swing(solid) >= MIN_DOORWAY_SWING;
+      if (open) {
+        run++;
+        if (run > held) held = run;
+      } else run = 0;
+      if (sim.isQuiescent()) break;
+    }
+    // A quiet world does not change its mind: a doorway still open when the
+    // machine stops is open for as long as you like.
+    if (open) held = Math.max(held, SUSTAIN_TICKS);
+    sim.restore(cp2);
+    if (held < SUSTAIN_TICKS) {
+      flickered++;
+      return;
+    }
+    opened.push({ control, passage: new Set(passage.map(posKey)) });
+  };
+
+  // Controls a builder puts on a door, then the ones they put on a door for
+  // fun. A note block is an instrument that happens to emit a block update, so
+  // it BUDs whatever piston it is stuck to and moves two or three cells with
+  // no say in what the door does. Brute-forcing them alongside real controls
+  // let that noise compete with the lever; brute-forcing them only when
+  // nothing else answers keeps them as the last resort they are.
+  const drivers = candidates.filter((c) => c.kind !== "note block");
+  const instruments = candidates.filter((c) => c.kind === "note block");
+  let planned = drivers.length;
+  for (const c of drivers) {
+    trial(c);
     if (Date.now() > deadline) break;
+  }
+  const fellBackToInstruments = opened.length === 0 && instruments.length > 0;
+  if (fellBackToInstruments) {
+    planned += instruments.length;
+    for (const c of instruments) {
+      trial(c);
+      if (Date.now() > deadline) break;
+    }
   }
 
   const budgetNote =
-    tested < candidates.length
-      ? ` The search stopped after ${tested} of ${candidates.length} controls — it ran out of time, not out of candidates.`
+    tested < planned
+      ? ` The search stopped after ${tested} of ${planned} controls — it ran out of time, not out of candidates.`
       : "";
 
   if (opened.length === 0) {
     const kinds = [...new Set(candidates.map((c) => c.kind))].join(", ");
+    const n = `${tested} control${tested === 1 ? "" : "s"}`;
+    const onlyInstruments = drivers.length === 0;
+    // Every control in the file is a note block: say that, because it is the
+    // finding. The builder saved the chime and left the lever behind.
+    const instrumentNote = onlyInstruments
+      ? ` Every control in this file is a note block, and a note block drives a door only ` +
+        `by accident — this build is missing the lever, button or plate that runs it.`
+      : "";
+    if (movedButOpenedNothing + flickered === 0)
+      return {
+        input: null,
+        alternatives: [],
+        tested,
+        note:
+          `Nothing moved. All ${n} in this build (${kinds}) were actuated one at a time ` +
+          `and none of them shifted a single block, so this build has no door to time — ` +
+          `or its driver is outside the file.${instrumentNote}${budgetNote}`,
+      };
+    const what: string[] = [];
+    if (movedButOpenedNothing)
+      what.push(
+        `${movedButOpenedNothing} moved blocks without opening a passage anyone could ` +
+          `walk through — a doorway is at least two cells tall, and it has to be this ` +
+          `control that clears it`,
+      );
+    if (flickered)
+      what.push(
+        `${flickered} cleared a doorway for less than a redstone tick as the machine ` +
+          `passed through it, then filled it again`,
+      );
     return {
       input: null,
       alternatives: [],
       tested,
       note:
-        movedButOpenedNothing > 0
-          ? `Nothing opened. All ${tested} control${tested === 1 ? "" : "s"} in this build ` +
-            `(${kinds}) were actuated one at a time; ${movedButOpenedNothing} of them moved ` +
-            `blocks but none opened a passage anyone could walk through, so there is no ` +
-            `doorway here to time.` + budgetNote
-          : `Nothing moved. All ${tested} control${tested === 1 ? "" : "s"} in this build ` +
-            `(${kinds}) were actuated one at a time and none of them shifted a single ` +
-            `block, so this build has no door to time — or its driver is outside the file.` +
-            budgetNote,
+        `Nothing opened. All ${n} in this build (${kinds}) were actuated one at a time: ` +
+        `${what.join("; ")}. So there is no doorway here to time.${instrumentNote}${budgetNote}`,
     };
   }
 
@@ -381,10 +496,18 @@ function detectInputs(makeSim: () => any, settled: ReplayBlock[]): Detection {
   if (input.kind !== "lever")
     notes.push(
       `Driven by a ${input.kind}, not a lever — found by actuating every control in the ` +
-        `build and watching for a passage to open.` +
+        `build and watching for a passage to open and stay open.` +
         (input.momentary
           ? ` It is momentary: it releases itself, so the return stroke is the control's own, not a second throw.`
           : ""),
+    );
+  if (fellBackToInstruments)
+    notes.push(
+      `No lever, button or plate in this file opens anything, so the note block${
+        instruments.length === 1 ? "" : "s"
+      } ${instruments.length === 1 ? "was" : "were"} tried as a last resort and this one ` +
+        `does drive the door. Read the timings as the note block's: it is an instrument ` +
+        `standing in for the control the build was saved without.`,
     );
   if (budgetNote) notes.push(budgetNote.trim());
   return { input, alternatives, tested, note: notes.length ? notes.join(" ") : null };
@@ -394,46 +517,91 @@ function detectInputs(makeSim: () => any, settled: ReplayBlock[]): Detection {
  *
  * The engine throws `NucleationError.Simulation` and little else. That is a
  * type name, not a sentence, and it reached the upload screen verbatim on 20 of
- * 28 doors in the last batch run. Each known kind gets a sentence that says
- * what happened and what to do; the raw name is kept beside it as small print
- * so a screenshot is still triageable, and `detail` carries whatever the engine
- * could name — once it names the offending block, that block appears here with
- * no further change. */
+ * 28 doors in the last batch run.
+ *
+ * It does know more than it throws. `NucleationError` is a fieldless enum, so
+ * nothing rides along on the exception, but the engine records the diagnostic
+ * separately and hands it over on request: `TickSimulation.lastErrorDetail()`
+ * returns lines like *"1 block state(s) have no behaviour and were simulated as
+ * nothing: minecraft:campfire[facing=south,…]"*. Reading it off the thrown
+ * message — which is what this used to try — always came back empty, so every
+ * failure rendered the same blockless sentence. It is asked for directly now,
+ * and the offending block is lifted into the sentence itself: naming the block
+ * is the difference between "some block" and "delete the campfire". */
+const ENGINE_MODULE: { m: any } = { m: null };
+
+/** Whatever the engine last recorded about why it stopped, or null. Never
+ *  throws: this runs inside a catch, and a diagnostic that fails to fetch must
+ *  not replace the error it was meant to explain. */
+function engineErrorDetail(): string | null {
+  try {
+    const d = ENGINE_MODULE.m?.TickSimulation?.lastErrorDetail?.();
+    return typeof d === "string" && d.trim() ? d.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The block ids inside an engine diagnostic, deduped, in the order named. */
+function blocksNamedIn(detail: string): string[] {
+  const seen = new Set<string>();
+  for (const m of detail.matchAll(/\b[a-z0-9_]+:[a-z0-9_/.]+/g)) seen.add(baseName(m[0]));
+  return [...seen];
+}
+
+/** "minecraft:campfire", "minecraft:chain and minecraft:lantern",
+ *  "minecraft:a, minecraft:b and 3 more". */
+function nameList(ids: string[]): string {
+  if (ids.length <= 2) return ids.join(" and ");
+  return `${ids.slice(0, 2).join(", ")} and ${ids.length - 2} more`;
+}
+
 function humanError(e: unknown): { message: string; code: string | null; detail: string | null } {
   const raw = e instanceof Error ? e.message : String(e);
   const m = raw.match(/NucleationError\.(\w+)\s*[:\-—]?\s*([\s\S]*)$/);
-  if (!m) return { message: raw, code: null, detail: null };
+  // Anything the engine recorded beats anything scraped off the message: the
+  // message is a bare enum name and carries no tail at all.
+  const detail = engineErrorDetail() ?? (m && m[2].trim()) ?? null;
+  if (!m) return { message: raw, code: null, detail };
   const kind = m[1];
-  const detail = m[2].trim() || null;
-  const tail = detail ? ` ${detail}` : "";
+  const ids = detail ? blocksNamedIn(detail) : [];
+  const named = ids.length ? ` — ${nameList(ids)}` : "";
+  // No detail and no block name: say the engine went quiet rather than
+  // implying a block was identified.
+  const tail = ids.length || !detail ? "" : ` The engine reported: ${detail}`;
   switch (kind) {
     case "Simulation":
       return {
-        message:
-          "The redstone engine will not load this build: it contains a block the simulator " +
-          "does not model yet, and one is enough to stop the whole schematic." + tail,
+        message: ids.length
+          ? `The redstone engine will not load this build. It does not model ${nameList(ids)} ` +
+            `yet, and one unmodelled block stops the whole schematic. Take ${
+              ids.length > 1 ? "them" : "it"
+            } out and upload it again.`
+          : `The redstone engine will not load this build: it contains a block the ` +
+            `simulator does not model yet, and one is enough to stop the whole ` +
+            `schematic.${tail}`,
         code: `NucleationError.${kind}`,
         detail,
       };
     case "Parse":
       return {
         message:
-          "This file could not be read as a schematic. It may be a newer save format than " +
-          "the parser knows, or the download may be truncated." + tail,
+          `This file could not be read as a schematic${named}. It may be a newer save ` +
+          `format than the parser knows, or the download may be truncated.${tail}`,
         code: `NucleationError.${kind}`,
         detail,
       };
     case "Io":
       return {
-        message: "The file could not be read off disk. Try the upload again." + tail,
+        message: `The file could not be read off disk. Try the upload again.${tail}`,
         code: `NucleationError.${kind}`,
         detail,
       };
     default:
       return {
         message:
-          "The engine stopped on this build and did not say why in words we can pass on." +
-          tail,
+          `The engine stopped on this build${named} and did not say why in words we can ` +
+          `pass on.${tail}`,
         code: `NucleationError.${kind}`,
         detail,
       };
@@ -489,6 +657,9 @@ async function certify(job: WorkerJob): Promise<{ record: CertRecord; xray: Xray
   // and rollup from trying to resolve it at build time.
   const engineUrl = "/engine/index.mjs";
   const engine: any = await import(/* @vite-ignore */ engineUrl);
+  // Held for the error path: the exception carries a bare enum name, and the
+  // sentence the user reads is built from what the engine recorded instead.
+  ENGINE_MODULE.m = engine;
   const { TickSimulation, TickSettleMode, Schematic } = engine;
 
   // -- parsing ------------------------------------------------------------
@@ -511,7 +682,7 @@ async function certify(job: WorkerJob): Promise<{ record: CertRecord; xray: Xray
     // and wire connections and loads block-entity NBT after the block writes,
     // which destroys derived state the author saved (a vault's repeater locks
     // go `locked=true` -> `false`). That models pasting, not the schematic.
-    guardSize(job.name, w * h * l, null);
+    guardSize(job.name, w, h, l);
     makeSim = () => TickSimulation.fromSnbt(snbt, TickSettleMode.InWorld, 0, 0, 0, "");
     sim = makeSim();
   } else {
@@ -521,7 +692,7 @@ async function certify(job: WorkerJob): Promise<{ record: CertRecord; xray: Xray
     // Parsing is cheap and answers the only question that matters here; it is
     // `fromSchematic` that materialises a world and takes the tab with it. So
     // the size is checked between the two.
-    guardSize(job.name, w * h * l, typeof schem.blockCount === "function" ? schem.blockCount() : null);
+    guardSize(job.name, w, h, l);
     makeSim = () => TickSimulation.fromSchematic(schem, TickSettleMode.InWorld, 0, 0, 0, "");
     sim = makeSim();
   }

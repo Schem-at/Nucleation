@@ -482,6 +482,20 @@ button { font: inherit; color: inherit; }
   color: var(--muted);
 }
 
+/* A gap in the 3-D view, named. Sits directly under the stage rather than in
+   the caption below the controls: it describes what is missing from the
+   picture, so it belongs against the picture. */
+.replay-unmeshed {
+  margin: 8px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--grid);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  max-width: 78ch;
+}
+
 /* ------------------------------------------------------------------ */
 /* Stat tiles                                                          */
 /* ------------------------------------------------------------------ */
@@ -517,6 +531,46 @@ button { font: inherit; color: inherit; }
 }
 .tile-value small { font-size: 14px; font-weight: 500; color: var(--ink-2); margin-left: 2px; }
 .tile-sub { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-2); margin: 6px 0 0; }
+
+/* A reading the run will not stand behind. It keeps its slot and loses its
+   voice: no surface to sit on, a dashed edge so the tile reads as provisional,
+   and a figure set at prose size in the muted ink so it can never be lifted
+   off the page as the answer. */
+.tile-disputed {
+  background: none;
+  border-style: dashed;
+  border-color: var(--grid);
+}
+.tile-disputed .tile-value {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--ink-2);
+}
+.tile-disputed .tile-value small { font-size: 11px; }
+.tile-label .tile-tag {
+  margin-left: 7px;
+  padding: 1px 5px;
+  border: 1px solid var(--alarm);
+  border-radius: 2px;
+  color: var(--alarm);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+
+/* The refusal, where the numbers are. Same weight as the banner in the hero:
+   if the tiles below it are only readable through this paragraph, this
+   paragraph cannot be grey small print. */
+.tiles-refusal {
+  border-left: 3px solid var(--alarm);
+  padding: 10px 0 10px 14px;
+  margin: 0 0 16px;
+  max-width: 82ch;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.tiles-refusal b { font-weight: 700; }
 /* Two tiles that are a PAIR — the mechanical peak and the computational one —
    sit at half width rather than stranded in a three-up grid. */
 .tiles-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); }
