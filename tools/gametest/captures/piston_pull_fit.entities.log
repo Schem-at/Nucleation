@@ -1,0 +1,410 @@
+Note: src/TraceCapture.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+[22:14:40] [main/INFO]: Loaded 1585 recipes
+[22:14:40] [main/INFO]: Loaded 1688 advancements
+[22:14:40] [main/INFO]: Selecting global world spawn...
+[22:14:40] [main/INFO]: Loading 0 persistent chunks...
+[22:14:40] [main/INFO]: Time elapsed: 268 ms
+[22:14:40] [main/INFO]: Started game test server
+  origin: BlockPos{x=0, y=100, z=0}
+[22:14:40] [main/INFO]: 2 tests are now running at position 9240808, -59, 7275230!
+[22:14:40] [main/INFO]: Running test environment 'minecraft:default' batch 0 (1 tests)...
+[22:14:40] [main/INFO]: [  ]
+  warmup ticks until entity-ticking: 26 (6/6 chunks ready)
+  spawn: id=1 minecraft:small_fireball at (4.15, 2.0, 1.5) vel=(0.0, 0.0, 0.0)
+         bbox=[3.9937500000000004..4.30625, 2.0..2.3125, 1.34375..1.65625] size=0.3125x0.3125x0.3125
+  spawn: id=2 minecraft:small_fireball at (4.1, 2.0, 3.5) vel=(0.0, 0.0, 0.0)
+         bbox=[3.9437499999999996..4.25625, 2.0..2.3125, 3.34375..3.65625] size=0.3125x0.3125x0.3125
+  spawn: id=3 minecraft:small_fireball at (3.9, 2.0, 5.5) vel=(0.0, 0.0, 0.0)
+         bbox=[3.74375..4.05625, 2.0..2.3125, 5.34375..5.65625] size=0.31250000000000044x0.3125x0.3125
+  spawn: id=4 minecraft:small_fireball at (3.6, 2.0, 7.5) vel=(0.0, 0.0, 0.0)
+         bbox=[3.44375..3.75625, 2.0..2.3125, 7.34375..7.65625] size=0.3125x0.3125x0.3125
+  spawn: id=5 minecraft:small_fireball at (3.2, 2.0, 9.5) vel=(0.0, 0.0, 0.0)
+         bbox=[3.04375..3.35625, 2.0..2.3125, 9.34375..9.65625] size=0.3125x0.3125x0.3125
+  spawn: id=6 minecraft:dragon_fireball at (4.05, 2.0, 11.5) vel=(0.0, 0.0, 0.0)
+         bbox=[3.55..4.55, 2.0..3.0, 11.0..12.0] size=1.0x1.0x1.0
+  spawn: id=7 minecraft:small_fireball at (3.5, 2.0, 13.5) vel=(0.0, 0.0, 0.0)
+         bbox=[3.34375..3.65625, 2.0..2.3125, 13.34375..13.65625] size=0.3125x0.3125x0.3125
+  spawn: id=8 minecraft:small_fireball at (3.9, 2.0, 15.5) vel=(0.0, 0.0, 0.0)
+         bbox=[3.74375..4.05625, 2.0..2.3125, 15.34375..15.65625] size=0.31250000000000044x0.3125x0.3125
+  spawn: id=9 minecraft:small_fireball at (4.14, 2.0, 17.5) vel=(0.0, 0.0, 0.0)
+         bbox=[3.9837499999999997..4.29625, 2.0..2.3125, 17.34375..17.65625] size=0.3125x0.3125x0.3125
+  block-ticking chunks: 6/6
+  pending block ticks: 0
+  runs normally: true
+  entity-ticking chunks: 6/6
+  entities loaded: 9
+    1 x minecraft:dragon_fireball
+    8 x minecraft:small_fireball
+  entities with non-finite velocity (nan carts): 0
+  at t8: 1,2,1 -> air
+  at t8: 1,2,3 -> air
+  at t8: 1,2,5 -> air
+  at t8: 1,2,7 -> air
+  at t8: 1,2,9 -> air
+  at t8: 1,2,11 -> air
+  at t8: 1,2,13 -> air
+  at t8: 1,2,15 -> air
+  at t8: 1,2,17 -> air
+  initial [0,0,0] minecraft:stone
+  initial [1,0,0] minecraft:stone
+  initial [2,0,0] minecraft:stone
+  initial [3,0,0] minecraft:stone
+  initial [4,0,0] minecraft:stone
+  initial [5,0,0] minecraft:stone
+  initial [6,0,0] minecraft:stone
+  initial [7,0,0] minecraft:stone
+  initial [0,0,1] minecraft:stone
+  initial [1,0,1] minecraft:stone
+  initial [2,0,1] minecraft:stone
+  initial [3,0,1] minecraft:stone
+  initial [4,0,1] minecraft:stone
+  initial [5,0,1] minecraft:stone
+  initial [6,0,1] minecraft:stone
+  initial [7,0,1] minecraft:stone
+  initial [1,2,1] minecraft:redstone_block
+  initial [2,2,1] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,2,1] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [4,2,1] minecraft:stone
+  initial [0,0,2] minecraft:stone
+  initial [1,0,2] minecraft:stone
+  initial [2,0,2] minecraft:stone
+  initial [3,0,2] minecraft:stone
+  initial [4,0,2] minecraft:stone
+  initial [5,0,2] minecraft:stone
+  initial [6,0,2] minecraft:stone
+  initial [7,0,2] minecraft:stone
+  initial [0,0,3] minecraft:stone
+  initial [1,0,3] minecraft:stone
+  initial [2,0,3] minecraft:stone
+  initial [3,0,3] minecraft:stone
+  initial [4,0,3] minecraft:stone
+  initial [5,0,3] minecraft:stone
+  initial [6,0,3] minecraft:stone
+  initial [7,0,3] minecraft:stone
+  initial [1,2,3] minecraft:redstone_block
+  initial [2,2,3] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,2,3] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [4,2,3] minecraft:stone
+  initial [0,0,4] minecraft:stone
+  initial [1,0,4] minecraft:stone
+  initial [2,0,4] minecraft:stone
+  initial [3,0,4] minecraft:stone
+  initial [4,0,4] minecraft:stone
+  initial [5,0,4] minecraft:stone
+  initial [6,0,4] minecraft:stone
+  initial [7,0,4] minecraft:stone
+  initial [0,0,5] minecraft:stone
+  initial [1,0,5] minecraft:stone
+  initial [2,0,5] minecraft:stone
+  initial [3,0,5] minecraft:stone
+  initial [4,0,5] minecraft:stone
+  initial [5,0,5] minecraft:stone
+  initial [6,0,5] minecraft:stone
+  initial [7,0,5] minecraft:stone
+  initial [1,2,5] minecraft:redstone_block
+  initial [2,2,5] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,2,5] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [4,2,5] minecraft:stone
+  initial [0,0,6] minecraft:stone
+  initial [1,0,6] minecraft:stone
+  initial [2,0,6] minecraft:stone
+  initial [3,0,6] minecraft:stone
+  initial [4,0,6] minecraft:stone
+  initial [5,0,6] minecraft:stone
+  initial [6,0,6] minecraft:stone
+  initial [7,0,6] minecraft:stone
+  initial [0,0,7] minecraft:stone
+  initial [1,0,7] minecraft:stone
+  initial [2,0,7] minecraft:stone
+  initial [3,0,7] minecraft:stone
+  initial [4,0,7] minecraft:stone
+  initial [5,0,7] minecraft:stone
+  initial [6,0,7] minecraft:stone
+  initial [7,0,7] minecraft:stone
+  initial [1,2,7] minecraft:redstone_block
+  initial [2,2,7] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,2,7] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [4,2,7] minecraft:stone
+  initial [0,0,8] minecraft:stone
+  initial [1,0,8] minecraft:stone
+  initial [2,0,8] minecraft:stone
+  initial [3,0,8] minecraft:stone
+  initial [4,0,8] minecraft:stone
+  initial [5,0,8] minecraft:stone
+  initial [6,0,8] minecraft:stone
+  initial [7,0,8] minecraft:stone
+  initial [0,0,9] minecraft:stone
+  initial [1,0,9] minecraft:stone
+  initial [2,0,9] minecraft:stone
+  initial [3,0,9] minecraft:stone
+  initial [4,0,9] minecraft:stone
+  initial [5,0,9] minecraft:stone
+  initial [6,0,9] minecraft:stone
+  initial [7,0,9] minecraft:stone
+  initial [1,2,9] minecraft:redstone_block
+  initial [2,2,9] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,2,9] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [4,2,9] minecraft:stone
+  initial [0,0,10] minecraft:stone
+  initial [1,0,10] minecraft:stone
+  initial [2,0,10] minecraft:stone
+  initial [3,0,10] minecraft:stone
+  initial [4,0,10] minecraft:stone
+  initial [5,0,10] minecraft:stone
+  initial [6,0,10] minecraft:stone
+  initial [7,0,10] minecraft:stone
+  initial [0,0,11] minecraft:stone
+  initial [1,0,11] minecraft:stone
+  initial [2,0,11] minecraft:stone
+  initial [3,0,11] minecraft:stone
+  initial [4,0,11] minecraft:stone
+  initial [5,0,11] minecraft:stone
+  initial [6,0,11] minecraft:stone
+  initial [7,0,11] minecraft:stone
+  initial [1,2,11] minecraft:redstone_block
+  initial [2,2,11] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,2,11] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [4,2,11] minecraft:stone
+  initial [0,0,12] minecraft:stone
+  initial [1,0,12] minecraft:stone
+  initial [2,0,12] minecraft:stone
+  initial [3,0,12] minecraft:stone
+  initial [4,0,12] minecraft:stone
+  initial [5,0,12] minecraft:stone
+  initial [6,0,12] minecraft:stone
+  initial [7,0,12] minecraft:stone
+  initial [0,0,13] minecraft:stone
+  initial [1,0,13] minecraft:stone
+  initial [2,0,13] minecraft:stone
+  initial [3,0,13] minecraft:stone
+  initial [4,0,13] minecraft:stone
+  initial [5,0,13] minecraft:stone
+  initial [6,0,13] minecraft:stone
+  initial [7,0,13] minecraft:stone
+  initial [1,2,13] minecraft:redstone_block
+  initial [2,2,13] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,2,13] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [0,0,14] minecraft:stone
+  initial [1,0,14] minecraft:stone
+  initial [2,0,14] minecraft:stone
+  initial [3,0,14] minecraft:stone
+  initial [4,0,14] minecraft:stone
+  initial [5,0,14] minecraft:stone
+  initial [6,0,14] minecraft:stone
+  initial [7,0,14] minecraft:stone
+  initial [0,0,15] minecraft:stone
+  initial [1,0,15] minecraft:stone
+  initial [2,0,15] minecraft:stone
+  initial [3,0,15] minecraft:stone
+  initial [4,0,15] minecraft:stone
+  initial [5,0,15] minecraft:stone
+  initial [6,0,15] minecraft:stone
+  initial [7,0,15] minecraft:stone
+  initial [1,2,15] minecraft:redstone_block
+  initial [2,2,15] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,2,15] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [0,0,16] minecraft:stone
+  initial [1,0,16] minecraft:stone
+  initial [2,0,16] minecraft:stone
+  initial [3,0,16] minecraft:stone
+  initial [4,0,16] minecraft:stone
+  initial [5,0,16] minecraft:stone
+  initial [6,0,16] minecraft:stone
+  initial [7,0,16] minecraft:stone
+  initial [0,0,17] minecraft:stone
+  initial [1,0,17] minecraft:stone
+  initial [2,0,17] minecraft:stone
+  initial [3,0,17] minecraft:stone
+  initial [4,0,17] minecraft:stone
+  initial [5,0,17] minecraft:stone
+  initial [6,0,17] minecraft:stone
+  initial [7,0,17] minecraft:stone
+  initial [1,2,17] minecraft:redstone_block
+  initial [2,2,17] minecraft:sticky_piston[extended=true,facing=east]
+  initial [3,2,17] minecraft:piston_head[facing=east,short=false,type=sticky]
+  initial [4,2,17] minecraft:stone
+  initial [0,0,18] minecraft:stone
+  initial [1,0,18] minecraft:stone
+  initial [2,0,18] minecraft:stone
+  initial [3,0,18] minecraft:stone
+  initial [4,0,18] minecraft:stone
+  initial [5,0,18] minecraft:stone
+  initial [6,0,18] minecraft:stone
+  initial [7,0,18] minecraft:stone
+ENT t-1 entities=9 non-finite=0
+  E t-1 id=1 minecraft:small_fireball pos=(4.15, 2.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=2 minecraft:small_fireball pos=(4.1, 2.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=3 minecraft:small_fireball pos=(3.9, 2.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=4 minecraft:small_fireball pos=(3.6, 2.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=5 minecraft:small_fireball pos=(3.2, 2.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=6 minecraft:dragon_fireball pos=(4.05, 2.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=7 minecraft:small_fireball pos=(3.5, 2.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=8 minecraft:small_fireball pos=(3.9, 2.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=9 minecraft:small_fireball pos=(4.14, 2.0, 17.5) vel=(0.0, 0.0, 0.0)
+  notify hook: installed (maxChained=1000000)
+    t0 gameTime=27 pending=0
+ENT t0 entities=9 non-finite=0
+  E t0 id=1 minecraft:small_fireball pos=(4.15, 2.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=2 minecraft:small_fireball pos=(4.1, 2.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=3 minecraft:small_fireball pos=(3.9, 2.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=4 minecraft:small_fireball pos=(3.6, 2.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=5 minecraft:small_fireball pos=(3.2, 2.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=6 minecraft:dragon_fireball pos=(4.05, 2.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=7 minecraft:small_fireball pos=(3.5, 2.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=8 minecraft:small_fireball pos=(3.9, 2.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=9 minecraft:small_fireball pos=(4.14, 2.0, 17.5) vel=(0.0, 0.0, 0.0)
+    t1 gameTime=28 pending=0
+ENT t1 entities=9 non-finite=0
+  E t1 id=1 minecraft:small_fireball pos=(4.15, 2.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=2 minecraft:small_fireball pos=(4.1, 2.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=3 minecraft:small_fireball pos=(3.9, 2.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=4 minecraft:small_fireball pos=(3.6, 2.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=5 minecraft:small_fireball pos=(3.2, 2.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=6 minecraft:dragon_fireball pos=(4.05, 2.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=7 minecraft:small_fireball pos=(3.5, 2.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=8 minecraft:small_fireball pos=(3.9, 2.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=9 minecraft:small_fireball pos=(4.14, 2.0, 17.5) vel=(0.0, 0.0, 0.0)
+    t2 gameTime=29 pending=0
+ENT t2 entities=9 non-finite=0
+  E t2 id=1 minecraft:small_fireball pos=(4.15, 2.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=2 minecraft:small_fireball pos=(4.1, 2.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=3 minecraft:small_fireball pos=(3.9, 2.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=4 minecraft:small_fireball pos=(3.6, 2.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=5 minecraft:small_fireball pos=(3.2, 2.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=6 minecraft:dragon_fireball pos=(4.05, 2.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=7 minecraft:small_fireball pos=(3.5, 2.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=8 minecraft:small_fireball pos=(3.9, 2.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=9 minecraft:small_fireball pos=(4.14, 2.0, 17.5) vel=(0.0, 0.0, 0.0)
+ENT t3 entities=9 non-finite=0
+  E t3 id=1 minecraft:small_fireball pos=(4.15, 2.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=2 minecraft:small_fireball pos=(4.1, 2.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=3 minecraft:small_fireball pos=(3.9, 2.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=4 minecraft:small_fireball pos=(3.6, 2.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=5 minecraft:small_fireball pos=(3.2, 2.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=6 minecraft:dragon_fireball pos=(4.05, 2.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=7 minecraft:small_fireball pos=(3.5, 2.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=8 minecraft:small_fireball pos=(3.9, 2.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=9 minecraft:small_fireball pos=(4.14, 2.0, 17.5) vel=(0.0, 0.0, 0.0)
+ENT t4 entities=9 non-finite=0
+  E t4 id=1 minecraft:small_fireball pos=(4.15, 2.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=2 minecraft:small_fireball pos=(4.1, 2.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=3 minecraft:small_fireball pos=(3.9, 2.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=4 minecraft:small_fireball pos=(3.6, 2.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=5 minecraft:small_fireball pos=(3.2, 2.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=6 minecraft:dragon_fireball pos=(4.05, 2.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=7 minecraft:small_fireball pos=(3.5, 2.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=8 minecraft:small_fireball pos=(3.9, 2.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=9 minecraft:small_fireball pos=(4.14, 2.0, 17.5) vel=(0.0, 0.0, 0.0)
+ENT t5 entities=9 non-finite=0
+  E t5 id=1 minecraft:small_fireball pos=(4.15, 2.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=2 minecraft:small_fireball pos=(4.1, 2.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=3 minecraft:small_fireball pos=(3.9, 2.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=4 minecraft:small_fireball pos=(3.6, 2.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=5 minecraft:small_fireball pos=(3.2, 2.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=6 minecraft:dragon_fireball pos=(4.05, 2.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=7 minecraft:small_fireball pos=(3.5, 2.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=8 minecraft:small_fireball pos=(3.9, 2.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=9 minecraft:small_fireball pos=(4.14, 2.0, 17.5) vel=(0.0, 0.0, 0.0)
+ENT t6 entities=9 non-finite=0
+  E t6 id=1 minecraft:small_fireball pos=(4.15, 2.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=2 minecraft:small_fireball pos=(4.1, 2.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=3 minecraft:small_fireball pos=(3.9, 2.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=4 minecraft:small_fireball pos=(3.6, 2.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=5 minecraft:small_fireball pos=(3.2, 2.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=6 minecraft:dragon_fireball pos=(4.05, 2.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=7 minecraft:small_fireball pos=(3.5, 2.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=8 minecraft:small_fireball pos=(3.9, 2.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=9 minecraft:small_fireball pos=(4.14, 2.0, 17.5) vel=(0.0, 0.0, 0.0)
+ENT t7 entities=9 non-finite=0
+  E t7 id=1 minecraft:small_fireball pos=(4.15, 2.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=2 minecraft:small_fireball pos=(4.1, 2.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=3 minecraft:small_fireball pos=(3.9, 2.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=4 minecraft:small_fireball pos=(3.6, 2.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=5 minecraft:small_fireball pos=(3.2, 2.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=6 minecraft:dragon_fireball pos=(4.05, 2.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=7 minecraft:small_fireball pos=(3.5, 2.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=8 minecraft:small_fireball pos=(3.9, 2.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=9 minecraft:small_fireball pos=(4.14, 2.0, 17.5) vel=(0.0, 0.0, 0.0)
+ENT t8 entities=9 non-finite=0
+  E t8 id=1 minecraft:small_fireball pos=(3.6400000000000006, 2.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=2 minecraft:small_fireball pos=(3.59, 2.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=3 minecraft:small_fireball pos=(3.3899999999999997, 2.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=4 minecraft:small_fireball pos=(3.17625, 2.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=5 minecraft:small_fireball pos=(3.17625, 2.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=6 minecraft:dragon_fireball pos=(3.54, 2.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=7 minecraft:small_fireball pos=(3.17625, 2.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=8 minecraft:small_fireball pos=(3.3899999999999997, 2.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=9 minecraft:small_fireball pos=(3.63, 2.0, 17.5) vel=(0.0, 0.0, 0.0)
+ENT t9 entities=9 non-finite=0
+  E t9 id=1 minecraft:small_fireball pos=(3.15625, 2.0, 1.5) vel=(-0.0, 0.0, 0.0)
+  E t9 id=2 minecraft:small_fireball pos=(3.15625, 2.0, 3.5) vel=(-0.0, 0.0, 0.0)
+  E t9 id=3 minecraft:small_fireball pos=(3.15625, 2.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=4 minecraft:small_fireball pos=(3.15625, 2.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=5 minecraft:small_fireball pos=(3.15625, 2.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=6 minecraft:dragon_fireball pos=(3.5, 2.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=7 minecraft:small_fireball pos=(3.17625, 2.0, 13.5) vel=(-0.0, 0.0, 0.0)
+  E t9 id=8 minecraft:small_fireball pos=(3.17625, 2.0, 15.5) vel=(-0.0, 0.0, 0.0)
+  E t9 id=9 minecraft:small_fireball pos=(3.15625, 2.0, 17.5) vel=(-0.0, 0.0, 0.0)
+ENT t10 entities=9 non-finite=0
+  E t10 id=1 minecraft:small_fireball pos=(3.15625, 2.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=2 minecraft:small_fireball pos=(3.15625, 2.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=3 minecraft:small_fireball pos=(3.15625, 2.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=4 minecraft:small_fireball pos=(3.15625, 2.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=5 minecraft:small_fireball pos=(3.15625, 2.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=6 minecraft:dragon_fireball pos=(3.5, 2.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=7 minecraft:small_fireball pos=(3.17625, 2.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=8 minecraft:small_fireball pos=(3.17625, 2.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=9 minecraft:small_fireball pos=(3.15625, 2.0, 17.5) vel=(0.0, 0.0, 0.0)
+ENT t11 entities=9 non-finite=0
+  E t11 id=1 minecraft:small_fireball pos=(3.15625, 2.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=2 minecraft:small_fireball pos=(3.15625, 2.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=3 minecraft:small_fireball pos=(3.15625, 2.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=4 minecraft:small_fireball pos=(3.15625, 2.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=5 minecraft:small_fireball pos=(3.15625, 2.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=6 minecraft:dragon_fireball pos=(3.5, 2.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=7 minecraft:small_fireball pos=(3.17625, 2.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=8 minecraft:small_fireball pos=(3.17625, 2.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=9 minecraft:small_fireball pos=(3.15625, 2.0, 17.5) vel=(0.0, 0.0, 0.0)
+ENT t12 entities=9 non-finite=0
+  E t12 id=1 minecraft:small_fireball pos=(3.15625, 2.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=2 minecraft:small_fireball pos=(3.15625, 2.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=3 minecraft:small_fireball pos=(3.15625, 2.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=4 minecraft:small_fireball pos=(3.15625, 2.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=5 minecraft:small_fireball pos=(3.15625, 2.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=6 minecraft:dragon_fireball pos=(3.5, 2.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=7 minecraft:small_fireball pos=(3.17625, 2.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=8 minecraft:small_fireball pos=(3.17625, 2.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=9 minecraft:small_fireball pos=(3.15625, 2.0, 17.5) vel=(0.0, 0.0, 0.0)
+[22:14:41] [main/INFO]: [  ]
+ENT t13 entities=9 non-finite=0
+  E t13 id=1 minecraft:small_fireball pos=(3.15625, 2.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=2 minecraft:small_fireball pos=(3.15625, 2.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=3 minecraft:small_fireball pos=(3.15625, 2.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=4 minecraft:small_fireball pos=(3.15625, 2.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=5 minecraft:small_fireball pos=(3.15625, 2.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=6 minecraft:dragon_fireball pos=(3.5, 2.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=7 minecraft:small_fireball pos=(3.17625, 2.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=8 minecraft:small_fireball pos=(3.17625, 2.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=9 minecraft:small_fireball pos=(3.15625, 2.0, 17.5) vel=(0.0, 0.0, 0.0)
+ENT t14 entities=9 non-finite=0
+  E t14 id=1 minecraft:small_fireball pos=(3.15625, 2.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=2 minecraft:small_fireball pos=(3.15625, 2.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=3 minecraft:small_fireball pos=(3.15625, 2.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=4 minecraft:small_fireball pos=(3.15625, 2.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=5 minecraft:small_fireball pos=(3.15625, 2.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=6 minecraft:dragon_fireball pos=(3.5, 2.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=7 minecraft:small_fireball pos=(3.17625, 2.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=8 minecraft:small_fireball pos=(3.17625, 2.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=9 minecraft:small_fireball pos=(3.15625, 2.0, 17.5) vel=(0.0, 0.0, 0.0)
+ENT t15 entities=9 non-finite=0
+  E t15 id=1 minecraft:small_fireball pos=(3.15625, 2.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=2 minecraft:small_fireball pos=(3.15625, 2.0, 3.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=3 minecraft:small_fireball pos=(3.15625, 2.0, 5.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=4 minecraft:small_fireball pos=(3.15625, 2.0, 7.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=5 minecraft:small_fireball pos=(3.15625, 2.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=6 minecraft:dragon_fireball pos=(3.5, 2.0, 11.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=7 minecraft:small_fireball pos=(3.17625, 2.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=8 minecraft:small_fireball pos=(3.17625, 2.0, 15.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=9 minecraft:small_fireball pos=(3.15625, 2.0, 17.5) vel=(0.0, 0.0, 0.0)
+captured 2 tick(s) with changes -> work/piston_pull_fit.json

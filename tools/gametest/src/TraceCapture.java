@@ -773,9 +773,17 @@ public final class TraceCapture {
      *
      * <p>Coordinates are ORIGIN-relative doubles, like every other flag here.
      * Flags: {@code baby} sets {@code Age} through {@code AgeableMob.setBaby},
-     * {@code noai} sets {@code NoAI}, {@code nogravity} disables gravity.
+     * {@code noai} sets {@code NoAI}, {@code nogravity} disables gravity,
+     * {@code ride} mounts this entity onto the entity spawned just before it.
+     *
+     * <p>{@code ride} exists because the record 3x3 door's two blazes are
+     * <em>passengers</em> nested in a minecart's {@code Passengers} list, not
+     * top-level entities, and a structure file cannot express that either — the
+     * only way to ask what a mount does to a rider is to build one here. A
+     * refusal throws rather than producing a silently rider-less capture.
      */
     private static void spawnRequested(String[] args, ServerLevel level) {
+        net.minecraft.world.entity.Entity previousSpawn = null;
         for (int i = 0; i + 1 < args.length; i++) {
             if (!args[i].equals("--spawn")) {
                 continue;
@@ -826,6 +834,26 @@ public final class TraceCapture {
             // addFreshEntity can run type-specific setup; restore the requested
             // velocity afterwards so the spawn means what it says.
             setVelocity(entity, vel);
+            if (flags.contains("ride")) {
+                if (previousSpawn == null) {
+                    throw new IllegalArgumentException(
+                            "--spawn flag `ride` needs a preceding --spawn to ride");
+                }
+                if (!entity.startRiding(previousSpawn)) {
+                    throw new IllegalStateException(
+                            typeName + " refused to ride " + previousSpawn.getType());
+                }
+                // Mounting moves the rider to the vehicle's passenger seat, so
+                // the requested velocity is restored once more and the position
+                // printed below is the *seated* one, not the one asked for.
+                setVelocity(entity, vel);
+                System.out.printf("  ride: id=%d -> vehicle id=%d, seated at (%s, %s, %s)%n",
+                        entity.getId(), previousSpawn.getId(),
+                        Double.toString(entity.getX() - ORIGIN.getX()),
+                        Double.toString(entity.getY() - ORIGIN.getY()),
+                        Double.toString(entity.getZ() - ORIGIN.getZ()));
+            }
+            previousSpawn = entity;
             net.minecraft.world.phys.AABB box = entity.getBoundingBox();
             // Print what the entity *has*, never what was asked for. The first
             // draft printed the request, and it lied about exactly the case this
@@ -927,8 +955,14 @@ public final class TraceCapture {
             if (bad) {
                 nonFinite++;
             }
+            // A passenger is not a separate body in the world — it is carried,
+            // and whether its position is slaved to the vehicle or its own is
+            // exactly the question the record door's two blazes pose. Printed
+            // only when there is a vehicle, so no existing capture's text moves.
+            String riding = entity.getVehicle() == null
+                    ? "" : " vehicle=" + entity.getVehicle().getId();
             line.append(String.format(
-                    "  E t%d id=%d %s pos=(%s, %s, %s) vel=(%s, %s, %s)%s%n",
+                    "  E t%d id=%d %s pos=(%s, %s, %s) vel=(%s, %s, %s)%s%s%n",
                     tick, entity.getId(),
                     net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE
                             .getKey(entity.getType()).toString(),
@@ -937,6 +971,7 @@ public final class TraceCapture {
                     Double.toString(entity.getZ() - ORIGIN.getZ()),
                     Double.toString(velocity.x), Double.toString(velocity.y),
                     Double.toString(velocity.z),
+                    riding,
                     bad ? "  NON-FINITE" : ""));
         }
         System.out.printf("ENT t%d entities=%d non-finite=%d%n", tick, found.size(), nonFinite);

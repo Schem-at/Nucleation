@@ -1846,6 +1846,99 @@ pub fn sweep_displacement(
     Some(overlap.min(PISTON_STEP) + PISTON_OVERSHOOT)
 }
 
+/// How far clear of the vacated block a retracting head leaves an entity that
+/// was standing in it: `2 * PISTON_OVERSHOOT`.
+///
+/// Measured, not derived. Every entity ejected by a head-only retraction ends
+/// with its trailing face exactly `0.02` inside the block the head left, across
+/// four hitboxes and every start position tried — see
+/// [`head_eject_displacement`].
+pub const PISTON_EJECT_CLEARANCE: f64 = 2.0 * PISTON_OVERSHOOT;
+
+/// The furthest one moving-piston step will carry an entity.
+///
+/// `PISTON_STEP + PISTON_OVERSHOOT`. Visible directly in the captures: an
+/// entity that needs `0.72375` to reach its target takes it as `0.51` then
+/// `0.21375`.
+pub const PISTON_MAX_STEP: f64 = PISTON_STEP + PISTON_OVERSHOOT;
+
+/// How far a retracting **head** ejects an entity that is standing in the block
+/// it is leaving, or `None` if it does not touch it.
+///
+/// This is the second, separate way a retraction moves an entity, and it is not
+/// the [`sweep_displacement`] slab. A retracting head does **not** reach
+/// forwards: an entity in front of the head is untouched no matter how close it
+/// is (`piston_pull_plate` lane `headonly`, a dragon fireball overlapping the
+/// head's block by 0.05, never moves). What it does instead is clear out the
+/// block it is vacating:
+///
+/// * it fires only when the entity's **centre** lies in the vacated block —
+///   a box-overlap gate is refuted by the `headonly` lane above, and the
+///   centre-block gate agrees with all fifteen head lanes across three
+///   captures, on both sides of the block and at two heights;
+/// * the entity is moved along the piston axis until its trailing face — the
+///   one on the piston's side — sits [`PISTON_EJECT_CLEARANCE`] inside the
+///   vacated block, **in either direction**: an entity that is already past
+///   that line is nudged *back* towards it, against the head's travel;
+/// * each step moves at most [`PISTON_MAX_STEP`], so a deep entity takes two.
+///
+/// `destination` is the block the head is retracting *into* (the piston's own
+/// square), `travel` the direction it is going. The returned distance is signed
+/// along `travel`: negative means the entity is pushed the other way.
+///
+/// # Provenance
+///
+/// Fitted to `tools/gametest/captures/piston_pull.entities.log`,
+/// `piston_pull_law.entities.log`, `piston_pull_plate.entities.log` and
+/// `piston_pull_fit.entities.log`, bit-exactly, for a minecart, a NaN minecart,
+/// a small fireball and a dragon fireball. It is an empirical fit to what the
+/// game does, not a transcription of a mechanism — the vanilla call that
+/// produces it has not been identified, and the `+0.02` is measured rather than
+/// explained. Only the `-X` travel direction is covered by a capture; the axis
+/// switch is assumed symmetric, as it is for [`sweep_displacement`].
+pub fn head_eject_displacement(
+    destination: Pos,
+    travel: Dir,
+    entity_min: [f64; 3],
+    entity_max: [f64; 3],
+) -> Option<f64> {
+    let axis = match travel {
+        Dir::West | Dir::East => 0,
+        Dir::Down | Dir::Up => 1,
+        Dir::North | Dir::South => 2,
+    };
+    let (dx, dy, dz) = travel.delta();
+    let step = [dx, dy, dz];
+    let sign = f64::from(step[axis]);
+    // The block being vacated is one step back along the travel.
+    let vacated = [
+        destination.x - step[0],
+        destination.y - step[1],
+        destination.z - step[2],
+    ];
+    // The gate is the entity's centre block, not its box.
+    for i in 0..3 {
+        let centre = (entity_min[i] + entity_max[i]) * 0.5;
+        if centre.floor() != f64::from(vacated[i]) {
+            return None;
+        }
+    }
+    let lo = f64::from(vacated[axis]);
+    // The vacated block's face on the piston's side, and the line the entity's
+    // matching face is driven to.
+    let (near, face) = if sign < 0.0 {
+        (lo, entity_min[axis])
+    } else {
+        (lo + 1.0, entity_max[axis])
+    };
+    let target = near - sign * PISTON_EJECT_CLEARANCE;
+    let distance = sign * (target - face);
+    if distance == 0.0 {
+        return None;
+    }
+    Some(distance.clamp(-PISTON_MAX_STEP, PISTON_MAX_STEP))
+}
+
 #[cfg(test)]
 mod sweep_tests {
     use super::*;
@@ -1881,6 +1974,152 @@ mod sweep_tests {
                 x += d;
                 assert_eq!(x, *want, "{kind} after step {step}");
             }
+        }
+    }
+
+    /// `piston_pull.entities.log`: a sticky piston with **nothing to pull**,
+    /// entities standing in the head's own block, power cut at t6.
+    ///
+    /// Every one of the four lanes ends with its box's trailing face at exactly
+    /// `3.02`, which is the whole content of the law. Read as *displacement*
+    /// the four answers look unrelated — the carts move `+0.01`, the small
+    /// fireball `-0.32375` — and that is what made this capture read as
+    /// inconclusive the first time. Read as a box edge they are one number.
+    #[test]
+    fn head_ejection_reproduces_piston_pull_to_the_last_bit() {
+        // (kind, half-width, vanilla's final centre x)
+        let cases: [(&str, f64, f64); 4] = [
+            ("minecart", crate::minecart::CART_HALF_WIDTH, 3.510_000_009_536_743),
+            ("nan minecart", crate::minecart::CART_HALF_WIDTH, 3.510_000_009_536_743),
+            ("small_fireball", 0.156_25, 3.176_25),
+            ("dragon_fireball", 0.5, 3.52),
+        ];
+        for (kind, half, want) in cases {
+            let mut x = 3.5;
+            for step in 0..2 {
+                // The head leaves block x=3 for the piston's own square, x=2.
+                if let Some(d) = head_eject_displacement(
+                    Pos::new(2, 1, 1),
+                    Dir::West,
+                    [x - half, 1.0, 1.01],
+                    [x + half, 1.7, 1.99],
+                ) {
+                    x -= d;
+                }
+                let _ = step;
+            }
+            assert_eq!(x, want, "{kind}");
+            assert_eq!(x - half, 3.02, "{kind} trailing face");
+        }
+    }
+
+    /// `piston_pull_law` and `piston_pull_fit`: the same rig, with the entity
+    /// started all over the head's block and outside it.
+    ///
+    /// The two `None` rows are the negative controls that pin the gate. A
+    /// fireball whose centre is in the piston's own square is not ejected, and
+    /// neither is one whose centre is in the block *in front* — even though the
+    /// latter's box overlaps the head's block, which is what rules a
+    /// box-overlap gate out.
+    #[test]
+    fn head_ejection_is_gated_on_the_entity_centre_not_its_box() {
+        const HALF: f64 = 0.156_25;
+        // (start x, how many steps vanilla needed, whether it ends on the line)
+        //
+        // The answers are asserted as the trailing *face* rather than as a
+        // decimal delta: 3.02 is exact in binary, and the deltas are not — for
+        // a start of 3.1 the true displacement is 3.1 - HALF - 3.02, which no
+        // short decimal literal spells.
+        let cases: [(f64, usize); 6] = [
+            (2.5, 0),      // centre in the piston: untouched
+            (4.3, 0),      // centre in front of the head: untouched
+            (3.1, 1),      // nudged *back* east onto the line
+            (3.5, 1),      // the plain case
+            (3.9, 2),      // too deep for one step
+            (3.176_25, 0), // already on the line
+        ];
+        for (start, steps) in cases {
+            let mut x = start;
+            let mut moved = 0usize;
+            for step in 0..2 {
+                let got = head_eject_displacement(
+                    Pos::new(2, 1, 1),
+                    Dir::West,
+                    [x - HALF, 1.0, 1.4],
+                    [x + HALF, 1.3125, 1.6],
+                );
+                if let Some(d) = got {
+                    assert!(d.abs() <= PISTON_MAX_STEP, "start {start} step {step}: {d}");
+                    if steps == 2 && step == 0 {
+                        assert_eq!(d, PISTON_MAX_STEP, "start {start}: first step is capped");
+                    }
+                    x -= d;
+                    moved += 1;
+                }
+            }
+            assert_eq!(moved, steps, "start {start}: number of steps that moved it");
+            let want = if steps == 0 && start < 3.0 || start > 4.0 { start - HALF } else { 3.02 };
+            assert_eq!(x - HALF, want, "start {start}: trailing face");
+        }
+    }
+
+    /// A dragon fireball overlapping the vacated block by 0.05 in x *and* 0.02
+    /// in y, whose centre is in neither — `piston_pull_plate`'s `headonly`
+    /// lane, which vanilla leaves alone for the whole run.
+    ///
+    /// This is the negative control the first attempt at this could not build,
+    /// and it is the one that separates the two retraction mechanisms: the same
+    /// entity in the same place *is* moved, almost a full block, as soon as the
+    /// piston has a block to pull.
+    #[test]
+    fn a_retracting_head_does_not_reach_forward_out_of_its_own_block() {
+        // Head in block (3,2,1) leaving for the piston at (2,2,1).
+        let min = [3.95, 1.02, 1.0];
+        let max = [4.95, 2.02, 2.0];
+        assert_eq!(head_eject_displacement(Pos::new(2, 2, 1), Dir::West, min, max), None);
+        // ...but the block the sticky piston pulls into (3,2,1) sweeps it.
+        assert_eq!(
+            sweep_displacement(Pos::new(3, 2, 1), Dir::West, 0.0, min, max),
+            Some(PISTON_MAX_STEP),
+        );
+    }
+
+    /// `piston_pull_fit`, the lanes with a stone block for the sticky head to
+    /// pull: the pulled block's own sweep, which is [`sweep_displacement`]
+    /// unchanged, and which the engine already computed and then threw away.
+    ///
+    /// The second step is short in every lane because the entity fetches up
+    /// against the piston body — clipping that the caller does, so what is
+    /// checked here is the unclipped distance and the resulting stop line.
+    #[test]
+    fn a_pulled_block_sweeps_entities_a_real_distance() {
+        const HALF: f64 = 0.156_25;
+        // (start x, whether the first step is capped, whether it is touched)
+        let cases: [(f64, bool, bool); 4] = [
+            (4.15, true, true),
+            (4.10, true, true),
+            (3.60, false, true), // shallow: the overlap, not the cap
+            (3.20, false, false), // behind the first slab entirely
+        ];
+        for (start, capped, touched) in cases {
+            let min = [start - HALF, 2.0, 1.4];
+            let max = [start + HALF, 2.3125, 1.6];
+            // The pulled block lands on the head's block, x=3, travelling west.
+            let got = sweep_displacement(Pos::new(3, 2, 1), Dir::West, 0.0, min, max);
+            assert_eq!(got.is_some(), touched, "start {start}");
+            if let Some(d) = got {
+                if capped {
+                    assert_eq!(d, PISTON_MAX_STEP, "start {start}");
+                } else {
+                    // The overlap of the box with the slab behind x=3.5, plus
+                    // the overshoot — written out rather than as a literal.
+                    assert_eq!(d, (max[0] - 3.5) + PISTON_OVERSHOOT, "start {start}");
+                    assert!(d < PISTON_MAX_STEP, "start {start}");
+                }
+            }
+            // Every lane is stopped by the piston body and finishes flush at
+            // x=3.0 — clipping the caller does, recorded here as the contract.
+            assert_eq!(3.156_25 - HALF, 3.0);
         }
     }
 

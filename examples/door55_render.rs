@@ -372,8 +372,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("entities alive at the end: {survivors} of {}", start_entities.len());
     println!(
         "NOTE: passengers are never instantiated, so the two blazes riding nan \
-         carts are absent from this run; piston *retraction* does not displace \
-         entities, it is only counted above."
+         carts are absent from this run. Piston retraction *does* displace \
+         entities now — a pulled block sweeps them, and a retracting head \
+         clears the square it leaves — but an entity in the piston's OWN \
+         square is still unmodelled, and every contact counted above is one \
+         of those. See `piston_pull_inside` in capture-entity-evidence.sh."
     );
 
     if report_only {

@@ -188,4 +188,265 @@ tools/gametest/capture.sh --structure nucleation:cart_ledge --max-ticks 40 \
   --out work/cart_ledge.json | tee "$CAP/cart_ledge.entities.log"
 cp work/cart_ledge.json "$TRACES/cart_ledge.json"
 
+# ---------------------------------------------------------------------------
+# 7. Blaze hitbox, by the fireball_reach / villager_reach method.
+#
+# The record 3x3 door's two riders are blazes, and an unmeasured entity is
+# refused by name — so the box has to come from the game. `blaze_reach` is
+# `villager_reach`'s rig with the same ten floor plates, plus a second height
+# rig two blocks up (a cobblestone-wall post carrying a plate at y=3) that a
+# 1.8-tall body straddles and a 1.95-tall one clears.
+#
+#   plate  offset   edge tested                          expected
+#   2      1.76     west, centre - 0.3                   clear
+#   6      5.77     west, centre - 0.3                   touching
+#   10     11.24    east, centre + 0.3                   clear
+#   14     15.23    east, centre + 0.3                   touching
+#   18     17.81    baby-villager west edge (0.245)      touching   <- discriminates
+#   22     21.83                                         touching
+#   26     27.19    baby-villager east edge (0.245)      touching   <- discriminates
+#   30     31.17                                         touching
+#   34     34.5     centred control                      touching
+#   42     41.9     height > 1.0                         touching
+#   44     43.9 @ feet 1.205, nogravity: top 3.005 > 3.0 touching
+#   48     47.9 @ feet 1.195, nogravity: top 2.995 < 3.0 clear
+#
+# The two discriminating rows are why this is not just villager_reach again: a
+# 0.49-wide body reads *clear* at 17.81 and 27.19. Width lands in (0.585, 0.605)
+# and height in (1.795, 1.805) — 0.6 x 1.8, which is what the registry says.
+tools/gametest/capture.sh --structure nucleation:blaze_reach --max-ticks 8 --entity-log \
+  --spawn 'minecraft:blaze@1.76,1.0,1.5:0,0,0:noai' \
+  --spawn 'minecraft:blaze@5.77,1.0,1.5:0,0,0:noai' \
+  --spawn 'minecraft:blaze@11.24,1.0,1.5:0,0,0:noai' \
+  --spawn 'minecraft:blaze@15.23,1.0,1.5:0,0,0:noai' \
+  --spawn 'minecraft:blaze@17.81,1.0,1.5:0,0,0:noai' \
+  --spawn 'minecraft:blaze@21.83,1.0,1.5:0,0,0:noai' \
+  --spawn 'minecraft:blaze@27.19,1.0,1.5:0,0,0:noai' \
+  --spawn 'minecraft:blaze@31.17,1.0,1.5:0,0,0:noai' \
+  --spawn 'minecraft:blaze@34.5,1.0,1.5:0,0,0:noai' \
+  --spawn 'minecraft:blaze@41.9,1.0,2.5:0,0,0:noai' \
+  --spawn 'minecraft:blaze@43.9,1.205,2.5:0,0,0:noai,nogravity' \
+  --spawn 'minecraft:blaze@47.9,1.195,2.5:0,0,0:noai,nogravity' \
+  --out work/blaze_reach.json | tee "$CAP/blaze_reach.entities.log"
+cp work/blaze_reach.json "$TRACES/blaze_reach.json"
+
+# The control for the height rig: the same twelve offsets with villagers. Both
+# fine plates fire for a 1.95-tall body, so a rig that reported "clear" for
+# everything could not produce the blaze result above.
+tools/gametest/capture.sh --structure nucleation:blaze_reach --max-ticks 8 --entity-log \
+  --spawn 'minecraft:villager@1.76,1.0,1.5:0,0,0:noai' \
+  --spawn 'minecraft:villager@5.77,1.0,1.5:0,0,0:noai' \
+  --spawn 'minecraft:villager@11.24,1.0,1.5:0,0,0:noai' \
+  --spawn 'minecraft:villager@15.23,1.0,1.5:0,0,0:noai' \
+  --spawn 'minecraft:villager@17.81,1.0,1.5:0,0,0:noai' \
+  --spawn 'minecraft:villager@21.83,1.0,1.5:0,0,0:noai' \
+  --spawn 'minecraft:villager@27.19,1.0,1.5:0,0,0:noai' \
+  --spawn 'minecraft:villager@31.17,1.0,1.5:0,0,0:noai' \
+  --spawn 'minecraft:villager@34.5,1.0,1.5:0,0,0:noai' \
+  --spawn 'minecraft:villager@41.9,1.0,2.5:0,0,0:noai' \
+  --spawn 'minecraft:villager@43.9,1.205,2.5:0,0,0:noai,nogravity' \
+  --spawn 'minecraft:villager@47.9,1.195,2.5:0,0,0:noai,nogravity' \
+  --out work/blaze_reach_villager_control.json \
+  | tee "$CAP/blaze_reach_villager_control.entities.log"
+
+# ---------------------------------------------------------------------------
+# 8. What a mount does to a rider.
+#
+# `Passengers` cannot be authored in a structure file any more than a NaN
+# velocity can, so `--spawn ...:ride` seats an entity on the one spawned before
+# it. Nine lanes:
+#
+#   z=1.5   cart at rest on rail + blaze     -> the seat offset
+#   z=4.5   NaN cart + blaze                 -> is the rider pinned?
+#   z=7.5   cart rolling east + blaze        -> does the rider track x?
+#   z=10.5  cart falling through air + blaze -> does the rider fall with it?
+#   z=13.5  blaze alone in the air (control)
+#   z=16.5  NaN cart + blaze + a cart dropped on the blaze's head
+#   z=19.5  the same cart with nothing under it (control)
+#   z=22.5  cart + villager                  -> a *different* seat
+#   z=25.5  cart + small fireball
+#
+# Result: every rider sits at vehicle + seat on every tick of twenty, x and z
+# included, and the seat is a property of the pair — blaze and small fireball
+# 0.1875, villager 0.0. The NaN cart's rider never moves. The cart dropped on
+# the blaze settles at 2.9875, the blaze's exact top, while its control falls to
+# the floor.
+tools/gametest/capture.sh --structure nucleation:blaze_ride --max-ticks 20 --entity-log \
+  --spawn 'minecraft:minecart@2.5,1.0625,1.5:0,0,0' \
+  --spawn 'minecraft:blaze@2.5,1.0625,1.5:0,0,0:noai,ride' \
+  --spawn 'minecraft:minecart@2.5,1.0,4.5:0,0,NaN' \
+  --spawn 'minecraft:blaze@2.5,1.0,4.5:0,0,0:noai,ride' \
+  --spawn 'minecraft:minecart@0.5,1.0625,7.5:0.3,0,0' \
+  --spawn 'minecraft:blaze@0.5,1.0625,7.5:0,0,0:noai,ride' \
+  --spawn 'minecraft:minecart@2.5,4.0,10.5:0,0,0' \
+  --spawn 'minecraft:blaze@2.5,4.0,10.5:0,0,0:noai,ride' \
+  --spawn 'minecraft:blaze@2.5,4.0,13.5:0,0,0:noai' \
+  --spawn 'minecraft:minecart@2.5,1.0,16.5:0,0,NaN' \
+  --spawn 'minecraft:blaze@2.5,1.0,16.5:0,0,0:noai,ride' \
+  --spawn 'minecraft:minecart@2.5,3.0,16.5:0,0,0' \
+  --spawn 'minecraft:minecart@2.5,3.0,19.5:0,0,0' \
+  --spawn 'minecraft:minecart@2.5,1.0625,22.5:0,0,0' \
+  --spawn 'minecraft:villager@2.5,1.0625,22.5:0,0,0:noai,ride' \
+  --spawn 'minecraft:minecart@2.5,1.0625,25.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.5,1.0625,25.5:0,0,0:ride' \
+  --out work/blaze_ride.json | tee "$CAP/blaze_ride.entities.log"
+
+# The same questions with AI *on*, plus what a cart will and will not rest on.
+#
+# A riding blaze with AI reads vel=(0, -0.0784000015258789, 0) on every one of
+# thirty ticks and never moves a millimetre: `Entity.rideTick` zeroes the delta,
+# the tick applies one step of gravity, and `positionRider` overwrites the
+# position anyway. The door's saved riders carry exactly that number, so it is
+# not evidence that they fall.
+#
+# The four support lanes settle it for carts too: a cart dropped from y=3 rests
+# on a blaze (2.799999952316284) and on a villager (2.950000047683716), each the
+# body's exact top, and falls straight through a small fireball and a dragon
+# fireball to the floor. `Entity.canBeCollidedWith` is true for a living entity
+# and false for a projectile. The engine models neither yet.
+tools/gametest/capture.sh --structure nucleation:blaze_ride --max-ticks 30 --entity-log \
+  --spawn 'minecraft:minecart@2.5,1.0625,1.5:0,0,0' \
+  --spawn 'minecraft:blaze@2.5,1.0625,1.5:0,0,0:ride' \
+  --spawn 'minecraft:minecart@2.5,1.0,4.5:0,0,NaN' \
+  --spawn 'minecraft:blaze@2.5,1.0,4.5:0,0,0:ride' \
+  --spawn 'minecraft:blaze@2.5,1.0,10.5:0,0,0:noai' \
+  --spawn 'minecraft:minecart@2.5,3.0,10.5:0,0,0' \
+  --spawn 'minecraft:villager@2.5,1.0,13.5:0,0,0:noai' \
+  --spawn 'minecraft:minecart@2.5,3.0,13.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.5,1.0,16.5:0,0,0:nogravity' \
+  --spawn 'minecraft:minecart@2.5,3.0,16.5:0,0,0' \
+  --spawn 'minecraft:dragon_fireball@2.5,1.0,19.5:0,0,0:nogravity' \
+  --spawn 'minecraft:minecart@2.5,3.0,19.5:0,0,0' \
+  --spawn 'minecraft:minecart@2.5,3.0,27.5:0,0,0' \
+  --out work/blaze_ride_ai.json | tee "$CAP/blaze_ride_ai.entities.log"
+
+# ---------------------------------------------------------------------------
+# 9. Piston RETRACTION moving entities — the half that piston_pull left open.
+#
+# `piston_pull` put every entity inside the head's own block and read the
+# answers as displacements, where they look unrelated: the carts move +0.01 and
+# the small fireball -0.32375. Read as a box edge they are one number — all four
+# finish with their trailing face at exactly 3.02 — and that is the law.
+#
+# Three rigs, because there turned out to be two mechanisms and they had been
+# run together:
+#
+#   piston_pull_law    a sticky piston with NOTHING to pull, entity started all
+#                      over the head's block and outside it, at two heights,
+#                      plus a non-sticky control. Every lane whose entity CENTRE
+#                      is in the head's block finishes at 3.02 no matter which
+#                      side it started or how tall it sits; every lane whose
+#                      centre is outside is untouched. The gate is the centre,
+#                      not the box.
+#
+#   piston_pull_plate  the record door's own trick, read off a PRESSURE PLATE
+#                      rather than off the entity. A dragon fireball at y=1.02
+#                      dips into the plate's touch box and pokes into the
+#                      piston's block at once — which is what the doc says the
+#                      dragon fireball is *for*. With a stone block for the
+#                      sticky head to pull it is dragged 4.45 -> 3.94 -> 3.50,
+#                      nearly a full block, and the plate it lands on POWERS at
+#                      t8. With nothing to pull, the same entity in the same
+#                      place never moves. So the "pull" is the pulled block's
+#                      sweep, not the arm's: a retracting head reaches nowhere
+#                      outside the square it is leaving.
+#
+#                      The plates are OAK. A stone plate is Sensitivity.MOBS and
+#                      cannot see a fireball at all; the first cut of this rig
+#                      used stone and recorded a flat nothing that read as "it
+#                      never reached the plate" when it meant "this plate is
+#                      blind to fireballs".
+#
+#   piston_pull_fit    start-position sweep with a non-cube hitbox, to separate
+#                      "flush against the arriving block" from the real answer.
+#                      Every lane stops at 3.00 — the piston body — and the
+#                      per-step distances are the ordinary sweep capped at
+#                      PISTON_STEP + PISTON_OVERSHOOT.
+#
+#   piston_pull_inside a VERTICAL piston whose head retracts UP into its own
+#                      square, with entities standing in THAT square rather than
+#                      in the one the head leaves. This is the geometry the
+#                      record door uses — its pistons face down — and none of
+#                      the rigs above covers it.
+#
+#                      Vanilla moves them, and within this capture the law is
+#                      exact, 8 predictions out of 8: on the first step the
+#                      entity is pushed out of the middle half of the piston's
+#                      square, [3.25, 3.75], to whichever side it is nearer, to
+#                      3.24 or 3.76; on the second it is pushed out of the whole
+#                      square, to 2.98 or 4.01. It reproduces the lane that does
+#                      not move on the first step (its box clears [3.25,3.75])
+#                      and the one that is thrown upward instead of down.
+#
+#                      **It is still not implemented, because it contradicts a
+#                      lane we already have.** `piston_pull_law`'s first lane is
+#                      the same situation on the x axis — a small fireball at
+#                      2.5, inside the horizontal piston's own square — and
+#                      vanilla leaves it exactly where it is for twenty ticks,
+#                      where this law demands a shove of 0.41625. Two captures,
+#                      one answer each, and no single rule gives both. So the
+#                      engine reports this case (`PistonPush::Unmodelled` ->
+#                      `Simulation::piston_retract_contacts`) rather than
+#                      guessing, and the next experiment is the one that
+#                      separates them: the horizontal rig rebuilt with the
+#                      entity floating clear of the floor, to find out whether
+#                      the difference is the axis or the support.
+tools/gametest/capture.sh --structure nucleation:piston_pull_law --max-ticks 16 --entity-log \
+  --spawn 'minecraft:small_fireball@2.5,1.0,1.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@3.1,1.0,3.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@3.5,1.0,5.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@3.9,1.0,7.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.3,1.0,9.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@3.5,1.5,11.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@3.17625,1.0,13.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@3.5,1.0,15.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@3.1,1.0,17.5:0,0,0' \
+  --spawn 'minecraft:minecart@3.5,1.0,19.5:0,0,0' \
+  --spawn 'minecraft:dragon_fireball@3.5,1.0,21.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@3.5,1.0,23.5:0,0,0' \
+  --at 6:1,1,1:air --at 6:1,1,3:air --at 6:1,1,5:air --at 6:1,1,7:air \
+  --at 6:1,1,9:air --at 6:1,1,11:air --at 6:1,1,13:air --at 6:1,1,15:air \
+  --at 6:1,1,17:air --at 6:1,1,19:air --at 6:1,1,21:air --at 6:1,1,23:air \
+  --out work/piston_pull_law.json | tee "$CAP/piston_pull_law.entities.log"
+
+tools/gametest/capture.sh --structure nucleation:piston_pull_plate --max-ticks 18 --entity-log \
+  --spawn 'minecraft:dragon_fireball@4.45,1.02,1.5:0,0,0' \
+  --spawn 'minecraft:dragon_fireball@4.6,1.02,3.5:0,0,0' \
+  --spawn 'minecraft:dragon_fireball@4.45,1.02,5.5:0,0,0' \
+  --spawn 'minecraft:dragon_fireball@4.45,1.02,7.5:0,0,0' \
+  --spawn 'minecraft:dragon_fireball@3.55,1.02,9.5:0,0,0' \
+  --spawn 'minecraft:dragon_fireball@4.2,2.0,11.5:0,0,0' \
+  --spawn 'minecraft:dragon_fireball@4.8,2.0,13.5:0,0,0' \
+  --spawn 'minecraft:dragon_fireball@5.2,2.0,15.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.45,2.0,17.5:0,0,0' \
+  --spawn 'minecraft:minecart@4.45,2.0,19.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.9,2.0,21.5:0,0,0' \
+  --at 8:1,2,1:air --at 8:1,2,3:air --at 8:1,2,7:air --at 8:6,2,9:air \
+  --at 8:1,2,11:air --at 8:1,2,13:air --at 8:1,2,15:air --at 8:1,2,17:air \
+  --at 8:1,2,19:air --at 8:1,2,21:air \
+  --out work/piston_pull_plate.json | tee "$CAP/piston_pull_plate.entities.log"
+
+tools/gametest/capture.sh --structure nucleation:piston_pull_fit --max-ticks 16 --entity-log \
+  --spawn 'minecraft:small_fireball@4.15,2.0,1.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.1,2.0,3.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@3.9,2.0,5.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@3.6,2.0,7.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@3.2,2.0,9.5:0,0,0' \
+  --spawn 'minecraft:dragon_fireball@4.05,2.0,11.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@3.5,2.0,13.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@3.9,2.0,15.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.14,2.0,17.5:0,0,0' \
+  --at 8:1,2,1:air --at 8:1,2,3:air --at 8:1,2,5:air --at 8:1,2,7:air \
+  --at 8:1,2,9:air --at 8:1,2,11:air --at 8:1,2,13:air --at 8:1,2,15:air --at 8:1,2,17:air \
+  --out work/piston_pull_fit.json | tee "$CAP/piston_pull_fit.entities.log"
+
+tools/gametest/capture.sh --structure nucleation:piston_pull_inside --max-ticks 16 --entity-log \
+  --spawn 'minecraft:small_fireball@2.5,3.2,1.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.5,2.9,3.5:0,0,0' \
+  --spawn 'minecraft:dragon_fireball@2.5,2.6,5.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.5,3.2,7.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@2.5,3.6,9.5:0,0,0' \
+  --at 6:2,4,1:air --at 6:2,4,3:air --at 6:2,4,5:air --at 6:2,4,9:air \
+  --out work/piston_pull_inside.json | tee "$CAP/piston_pull_inside.entities.log"
+
 echo "captures written to $CAP and $TRACES"

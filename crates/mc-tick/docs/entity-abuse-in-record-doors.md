@@ -150,15 +150,43 @@ refuted it** — the builders' account was wrong, and this page was wrong with i
       at the step, plus 0.01, and it is positional only — no velocity is
       imparted, so a NaN cart arrives still NaN. A normal cart ends a full
       extension 1.0 blocks along, a dragon fireball 1.01, a small fireball
-      0.666. **Retraction is not.** `piston_pull.entities.log` shows a solid
-      head does not eject an entity standing inside it, and that a *retracting*
-      `moving_piston` displaces entities only fractionally and not uniformly
-      backwards — nothing here reproduces a "pull" of a whole block, and no
-      model tried so far predicts those numbers. The engine therefore does not
-      displace on retraction, and *counts* every time an entity stands in a
-      retracting sweep instead
-      (`Simulation::piston_retract_contacts`), so a build that depends on the
-      unmodelled path cannot look like one that does not.
+      0.666. **Retraction is now measured too, and it is two mechanisms, not
+      one.** `piston_pull.entities.log` read as inconclusive only because it was
+      read as displacements — the carts move `+0.01` and the small fireball
+      `-0.32375`, which look unrelated. As a box edge they are one number: all
+      four finish with their trailing face at exactly `3.02`.
+      - **A pulled block sweeps.** A sticky piston retracting *with a block to
+        pull* drags entities by the ordinary `sweep_displacement` slab, the same
+        one extension uses. This is the real "pull", and it is worth almost a
+        whole block: in `piston_pull_plate` a dragon fireball goes 4.45 → 3.94 →
+        3.50 and **the pressure plate it lands on powers** — a block-state
+        reading, so no entity filter can distort it. Mirrored on the opposite
+        axis, with negative controls for "never retracts" and "clear of the
+        sweep". `piston_pull.snbt` had **nothing to pull**, which is why it saw
+        none of this.
+      - **A retracting head ejects its own square, and reaches nowhere else.**
+        `head_eject_displacement`: gated on the entity's *centre* being in the
+        block the head is leaving — a box-overlap gate is refuted by a dragon
+        fireball overlapping that block by 0.05 which vanilla never touches —
+        and it drives the trailing face to `blockMin + 0.02`, in **either**
+        direction, at most `PISTON_STEP + PISTON_OVERSHOOT` per step. Fitted
+        bit-exactly to fifteen lanes across four captures, sticky and
+        non-sticky, at two heights, both sides of the block.
+      - **Measured but NOT determined:** an entity standing in the piston's
+        *own* square as the head retracts into it — which is what the record
+        door does, its pistons facing down. `piston_pull_inside` captures it
+        vertically and the law is exact within that capture (8 of 8): first step
+        pushes the entity out of the middle half of the piston's square to
+        `3.24`/`3.76`, second step out of the whole square to `2.98`/`4.01`,
+        nearer side each time. **It is not implemented, because
+        `piston_pull_law`'s first lane is the same situation on the x axis and
+        vanilla does not move that entity at all**, where this rule demands
+        `0.41625`. No single law gives both answers, so the engine reports the
+        case instead of guessing: `Simulation::piston_retract_contacts` still
+        names them (**6** on the 3x3 door, down from 7), and a build that
+        depends on the unmodelled path cannot look like one that does not. The
+        experiment that would settle it is the horizontal rig with the entity
+        floating clear of the floor, to tell the axis apart from the support.
 - [x] Per-entity hitbox dimensions. Read out of the game's own registry and
       cross-checked against plate-edge probes: minecart and every container
       variant 0.98 x 0.7, dragon fireball 1.0 x 1.0, small fireball 0.3125,
