@@ -49,6 +49,9 @@ fn main() {
     // By type, so "stacked entities inside the door" is visible as a count
     // rather than a total.
     let json = read_out(|w| schem.get_entities_json(w));
+    if std::env::var("DUMP_JSON").is_ok() {
+        println!("--- raw entities json (first 1200 bytes) ---\n{}\n---", &json[..json.len().min(1200)]);
+    }
     let mut by_id: BTreeMap<String, usize> = BTreeMap::new();
     // The JSON is a list of objects with an `id`; count without pulling in a
     // parser, since all we need is the type histogram.
@@ -61,6 +64,37 @@ fn main() {
     for (id, n) in &by_id {
         println!("   {n:>6}  {id}");
     }
+
+    // Where the entities actually sit, and what is under them. A weighted
+    // pressure plate reads the number of entities standing on it, so a stack of
+    // carts on a plate is a constant signal source — and that is invisible in a
+    // schematic, which records only the plate's resulting `power`.
+    let mut positions: Vec<(f64, f64, f64)> = Vec::new();
+    for chunk in json.split("\"position\"").skip(1) {
+        let after = chunk.trim_start().trim_start_matches(':').trim_start();
+        let Some(rest) = after.strip_prefix('[') else { continue };
+        let Some(end) = rest.find(']') else { continue };
+        let nums: Vec<f64> =
+            rest[..end].split(',').filter_map(|n| n.trim().parse().ok()).collect();
+        if nums.len() == 3 {
+            positions.push((nums[0], nums[1], nums[2]));
+        }
+    }
+    let mut cells: BTreeMap<(i32, i32, i32), usize> = BTreeMap::new();
+    for (px, py, pz) in &positions {
+        *cells.entry((px.floor() as i32, py.floor() as i32, pz.floor() as i32)).or_default() += 1;
+    }
+    println!("\nentity cells (and the block beneath each):");
+    for ((cx, cy, cz), n) in &cells {
+        let below = read_out(|w| {
+            let _ = schem.get_block_name(*cx, cy - 1, *cz, w);
+        });
+        let here = read_out(|w| {
+            let _ = schem.get_block_name(*cx, *cy, *cz, w);
+        });
+        println!("   {n:>3} entities at ({cx},{cy},{cz})  in={here:<28} below={below}");
+    }
+
 
     // Now the conversion the app performs. `entities: []` in the emitted SNBT
     // means every one of the above is dropped before the engine ever runs.

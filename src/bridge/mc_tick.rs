@@ -131,6 +131,158 @@ fn block_entity_audit(schematic: &crate::UniversalSchematic) -> String {
     json
 }
 
+/// One double, written the way mc-tick's `float` reader reads it.
+///
+/// Finite values are written in full rather than with an exponent: `{}` and not
+/// `{:?}`, because Rust's `Display` for `f64` never emits an exponent (it
+/// spells `4.3e-59` out in full) while `Debug` does. The parser understands
+/// exponents now, so this is belt and braces rather than a requirement — but it
+/// keeps the output readable by any stricter SNBT reader, and an exponent is
+/// unforgiving when it goes wrong: `4.3e-59` read without exponent support
+/// becomes `4.3` followed by a *second* number `-59`, silently turning a
+/// three-element `Motion` into four. Display drops the fractional part of
+/// integral values, so `.0` goes back on to keep the tag a double.
+///
+/// `NaN` and `±Infinity` are written out as themselves, and **must not be
+/// sanitised**. They are not corrupt data — they are the mechanism. The record
+/// 3x3 door is glued together by *nan carts*: minecarts whose velocity was
+/// deliberately overflowed to ±Infinity on sloped rails, then collided so that
+/// `+Inf + -Inf` = NaN. A NaN velocity is dead physics — the cart does not fall
+/// when the block under it goes, and nothing but a piston can move it — which
+/// is exactly why the builders use them to pin villagers and other carts at
+/// exact positions. Rewriting one as `0.0` turns it back into an ordinary cart
+/// that moves, falls, and is shoved by its neighbours, and the door comes apart
+/// with no error anywhere. This world really does carry six of them; see
+/// `crates/mc-tick/docs/entity-abuse-in-record-doors.md`.
+///
+/// The spelling is Java's `Double.toString` — `NaN`, `Infinity`, `-Infinity` —
+/// which is what vanilla's own NBT writer emits, and what mc-tick's `float`
+/// reader was taught to accept. The `d` suffix is dropped for these three: no
+/// other tag type can hold them, so there is nothing to disambiguate.
+fn snbt_double(value: f64) -> String {
+    if value.is_nan() {
+        return "NaN".to_string();
+    }
+    if value.is_infinite() {
+        return if value.is_sign_positive() { "Infinity" } else { "-Infinity" }.to_string();
+    }
+    let mut text = format!("{value}");
+    if !text.contains('.') {
+        text.push_str(".0");
+    }
+    text.push('d');
+    text
+}
+
+/// Any numeric NBT tag as `f64`, whatever width the file happened to use.
+fn nbt_number(value: &crate::entity::NbtValue) -> Option<f64> {
+    use crate::entity::NbtValue as V;
+    match value {
+        V::Double(v) => Some(*v),
+        V::Float(v) => Some(f64::from(*v)),
+        V::Int(v) => Some(f64::from(*v)),
+        V::Short(v) => Some(f64::from(*v)),
+        V::Byte(v) => Some(f64::from(*v)),
+        V::Long(v) => Some(*v as f64),
+        _ => None,
+    }
+}
+
+/// A three-element numeric NBT list — `Motion`, in practice.
+///
+/// A missing or malformed one is zero rather than an error: vanilla omits
+/// `Motion` on a resting entity, and that is exactly what zero means.
+fn nbt_vec3(value: Option<&crate::entity::NbtValue>) -> [f64; 3] {
+    if let Some(crate::entity::NbtValue::List(items)) = value {
+        if items.len() == 3 {
+            let parsed: Vec<f64> = items.iter().filter_map(nbt_number).collect();
+            if parsed.len() == 3 {
+                return [parsed[0], parsed[1], parsed[2]];
+            }
+        }
+    }
+    [0.0; 3]
+}
+
+/// Render a schematic's mobile entities as the gametest `entities` list.
+///
+/// The shape is the one `mc_tick::structure`'s `entity_entry` reads:
+/// `{pos: [..], blockPos: [..], nbt: {id, Motion, Item, PickupDelay}}`. Only
+/// `pos` and `nbt` are consumed; `blockPos` is skipped by the parser but
+/// written anyway so the output stays a real structure file rather than a
+/// private dialect that only we can read.
+///
+/// Positions shift by the same `bb.min` the blocks use, because the parser
+/// places entities in the structure's own frame, not the schematic's.
+///
+/// Every entity is emitted, including types the engine cannot model. That is
+/// deliberate: the parser refuses those by name, which is the whole point —
+/// filtering here would restore the silent drop this replaced.
+fn entities_snbt(schematic: &crate::UniversalSchematic, min: (i32, i32, i32)) -> String {
+    use crate::entity::NbtValue as V;
+    use std::fmt::Write as _;
+
+    let (mx, my, mz) = min;
+    let mut out = String::new();
+    for entity in schematic.get_entities_as_list() {
+        // The parser matches ids exactly (`minecraft:item`), and some writers
+        // store the short form. Namespace it here so a bare `item` is not
+        // mistaken for a type we cannot simulate.
+        let id = if entity.id.contains(':') {
+            entity.id.clone()
+        } else {
+            format!("minecraft:{}", entity.id)
+        };
+        let pos = [
+            entity.position.0 - f64::from(mx),
+            entity.position.1 - f64::from(my),
+            entity.position.2 - f64::from(mz),
+        ];
+        let motion = nbt_vec3(entity.nbt.get("Motion"));
+
+        if !out.is_empty() {
+            out.push_str(",\n    ");
+        }
+        let _ = write!(
+            out,
+            "{{pos: [{}, {}, {}], blockPos: [{}, {}, {}], nbt: {{id: \"{id}\"",
+            snbt_double(pos[0]),
+            snbt_double(pos[1]),
+            snbt_double(pos[2]),
+            pos[0].floor() as i32,
+            pos[1].floor() as i32,
+            pos[2].floor() as i32,
+        );
+        let _ = write!(
+            out,
+            ", Motion: [{}, {}, {}]",
+            snbt_double(motion[0]),
+            snbt_double(motion[1]),
+            snbt_double(motion[2])
+        );
+        // An item entity is nothing without its stack, and the engine refuses
+        // one that arrives without an `Item`.
+        if let Some(V::Compound(stack)) = entity.nbt.get("Item") {
+            if let Some(V::String(item_id)) = stack.get("id") {
+                // Both spellings are in the wild — `Count` before the item
+                // components rework, `count` after — and the engine's reader
+                // takes either, so normalise to one rather than guess.
+                let count = stack
+                    .get("count")
+                    .or_else(|| stack.get("Count"))
+                    .and_then(nbt_number)
+                    .unwrap_or(1.0);
+                let _ = write!(out, ", Item: {{id: \"{item_id}\", count: {}b}}", count as i64);
+            }
+        }
+        if let Some(delay) = entity.nbt.get("PickupDelay").and_then(nbt_number) {
+            let _ = write!(out, ", PickupDelay: {}s", delay as i64);
+        }
+        out.push_str("}}");
+    }
+    out
+}
+
 /// Render a schematic as vanilla gametest structure SNBT — the flavor
 /// `mc_tick::Structure::parse` reads (`palette` + indexed `blocks` +
 /// bracketless `Properties`, block-entity `nbt` inline). The
@@ -200,13 +352,40 @@ fn to_gametest_snbt(schematic: &crate::UniversalSchematic) -> String {
     }
 
     format!(
-        "{{\n  DataVersion: 4903,\n  size: [{}, {}, {}],\n  palette: [\n    {}\n  ],\n  blocks: [\n    {}\n  ],\n  entities: []\n}}\n",
+        "{{\n  DataVersion: 4903,\n  size: [{}, {}, {}],\n  palette: [\n    {}\n  ],\n  blocks: [\n    {}\n  ],\n  entities: [\n    {}\n  ]\n}}\n",
         size.0,
         size.1,
         size.2,
         palette.join(",\n    "),
-        blocks
+        blocks,
+        entities_snbt(schematic, (mx, my, mz))
     )
+}
+
+/// The sentence shown to whoever is holding a structure that will not load.
+///
+/// Two very different failures reach the same `parse` call and they need
+/// opposite answers. An unsupported entity means their *build* names something
+/// the engine cannot model — nothing is wrong with the file, so it is reported
+/// by name and without blame. Anything else means the text itself is bad;
+/// when we generated that text (`converted`), that is our bug and saying so
+/// keeps us from accusing a perfectly good upload.
+fn structure_parse_detail(error: &mc_tick::structure::StructureError, converted: bool) -> String {
+    if let mc_tick::structure::StructureError::UnsupportedEntity { entity_type, .. } = error {
+        return format!(
+            "this build contains a `{entity_type}` entity, which the engine cannot simulate \
+             yet — loading it would mean dropping the entity, and a run without it would not \
+             match the real build"
+        );
+    }
+    if converted {
+        format!(
+            "converted structure did not parse: {error:?} — this is an engine fault, \
+             not a problem with the uploaded file"
+        )
+    } else {
+        format!("structure SNBT did not parse: {error:?}")
+    }
 }
 
 /// Serialise recorded updates for ticks in `[from, to)`.
@@ -871,8 +1050,14 @@ pub mod ffi {
                 std::str::from_utf8(extra_states).map_err(|_| NucleationError::InvalidArgument)?;
             super::clear_last_error();
             let structure = mc_tick::Structure::parse(snbt).map_err(|e| {
-                super::set_last_error(format!("structure SNBT did not parse: {e:?}"));
-                NucleationError::Parse
+                super::set_last_error(super::structure_parse_detail(&e, false));
+                // An entity we cannot model is not a malformed file, so it
+                // reports as a simulator limit rather than a parse failure.
+                if matches!(e, mc_tick::structure::StructureError::UnsupportedEntity { .. }) {
+                    NucleationError::Simulation
+                } else {
+                    NucleationError::Parse
+                }
             })?;
             super::check_volume(structure.size).map_err(|e| {
                 super::set_last_error(e);
@@ -921,13 +1106,11 @@ pub mod ffi {
             })?;
             let snbt = super::to_gametest_snbt(&schematic.0);
             let structure = mc_tick::Structure::parse(&snbt).map_err(|e| {
-                // The schematic loaded; it is our own rendering of it that the
-                // engine rejected. Saying "Parse" here blames the user's file
-                // for our bug, so this reports as an engine failure.
-                super::set_last_error(format!(
-                    "converted structure did not parse: {e:?} — this is an engine fault, \
-                     not a problem with the uploaded file"
-                ));
+                // The schematic loaded; either it names an entity we cannot
+                // model, or our own rendering of it was rejected. Saying
+                // "Parse" here blames the user's file for our bug, so both
+                // report as an engine failure and the detail says which.
+                super::set_last_error(super::structure_parse_detail(&e, true));
                 NucleationError::Simulation
             })?;
             let extras: Vec<&str> =
@@ -1569,5 +1752,209 @@ mod tests {
         assert!(needs_block_entity("minecraft:shulker_box"));
         assert!(needs_block_entity("minecraft:lime_shulker_box"));
         assert!(!needs_block_entity("minecraft:oak_sign"));
+    }
+
+    /// Entities survive the trip from schematic to engine input.
+    ///
+    /// The converter used to write a hardcoded `entities: []`, so a build whose
+    /// mechanism depends on entities loaded clean and simulated as though they
+    /// were not there. This asserts the whole path: emitted, re-read by the
+    /// engine's own parser, with the fields that change a run intact.
+    #[test]
+    fn entities_round_trip_from_schematic_into_the_engines_parser() {
+        use crate::entity::{Entity, NbtValue};
+        use std::collections::HashMap;
+
+        let mut schem = UniversalSchematic::new("carts".into());
+        // Away from the origin on purpose: entity positions are absolute in
+        // the schematic and structure-relative in the SNBT, so a missing
+        // `bb.min` shift would sail through a build placed at 0,0,0.
+        schem.set_block(10, 0, 5, &BlockState::new("minecraft:rail"));
+        schem.set_block(12, 2, 7, &BlockState::new("minecraft:stone"));
+
+        let mut cart = Entity::new("minecraft:minecart".into(), (10.5, 0.0625, 5.5));
+        cart.nbt.insert(
+            "Motion".into(),
+            NbtValue::List(vec![
+                NbtValue::Double(0.25),
+                NbtValue::Double(0.0),
+                NbtValue::Double(-0.5),
+            ]),
+        );
+        assert!(schem.add_entity(cart));
+
+        let mut stack = HashMap::new();
+        stack.insert("id".to_string(), NbtValue::String("minecraft:redstone".into()));
+        stack.insert("count".to_string(), NbtValue::Byte(7));
+        let mut item = Entity::new("minecraft:item".into(), (11.5, 1.0, 6.5));
+        item.nbt.insert("Item".into(), NbtValue::Compound(stack));
+        item.nbt.insert("PickupDelay".into(), NbtValue::Short(40));
+        assert!(schem.add_entity(item));
+
+        let snbt = to_gametest_snbt(&schem);
+        let parsed = mc_tick::Structure::parse(&snbt)
+            .unwrap_or_else(|e| panic!("engine rejected our own output: {e}\n{snbt}"));
+
+        assert_eq!(parsed.entities.len(), 2, "entities dropped: {snbt}");
+        match &parsed.entities[0] {
+            mc_tick::structure::SpawnedEntity::Minecart(cart) => {
+                assert_eq!(cart.kind, "minecraft:minecart");
+                assert_eq!(cart.pos, [0.5, 0.0625, 0.5], "position not shifted into structure space");
+                assert_eq!(cart.motion, [0.25, 0.0, -0.5]);
+            }
+            other => panic!("expected a minecart, got {other:?}"),
+        }
+        match &parsed.entities[1] {
+            mc_tick::structure::SpawnedEntity::Item(item) => {
+                assert_eq!(item.pos, [1.5, 1.0, 1.5]);
+                assert_eq!(item.item, ("minecraft:redstone".to_string(), 7));
+                assert_eq!(item.pickup_delay, 40);
+            }
+            other => panic!("expected an item, got {other:?}"),
+        }
+        // The same list also reaches the item-entity view the simulator spawns from.
+        assert_eq!(parsed.item_entities.len(), 1);
+    }
+
+    /// A denormal motion must not corrupt the entity it belongs to.
+    ///
+    /// Real furnace minecarts in the 55_3x3 door carry motions like 4.3e-59.
+    /// Written with an exponent, the engine's reader takes `4.3` and `-59` as
+    /// two numbers, turning a three-element `Motion` into four — which it then
+    /// silently discards. The value has to be spelled out in full.
+    #[test]
+    fn tiny_motions_are_written_without_an_exponent() {
+        use crate::entity::{Entity, NbtValue};
+
+        let mut schem = UniversalSchematic::new("denormal".into());
+        schem.set_block(0, 0, 0, &BlockState::new("minecraft:rail"));
+        let mut cart = Entity::new("minecraft:minecart".into(), (0.5, 0.0, 0.5));
+        cart.nbt.insert(
+            "Motion".into(),
+            NbtValue::List(vec![
+                NbtValue::Double(4.27987680632209e-59),
+                NbtValue::Double(0.0),
+                NbtValue::Double(0.0),
+            ]),
+        );
+        assert!(schem.add_entity(cart));
+
+        let snbt = to_gametest_snbt(&schem);
+        let (_, entities) = snbt.split_once("entities:").expect("an entities section");
+        assert!(
+            !entities.contains("e-") && !entities.contains("e+"),
+            "an exponent reached the engine's input: {entities}"
+        );
+
+        let parsed = mc_tick::Structure::parse(&snbt).expect("parse");
+        match &parsed.entities[0] {
+            mc_tick::structure::SpawnedEntity::Minecart(cart) => {
+                assert_eq!(cart.motion, [4.27987680632209e-59, 0.0, 0.0]);
+            }
+            other => panic!("expected a minecart, got {other:?}"),
+        }
+    }
+
+    /// A nan cart's velocity must reach the engine as NaN, not as zero.
+    ///
+    /// These exact numbers are lifted from `55_3x3.zip`: a furnace minecart
+    /// whose `Motion` is `[4.27987680632209e-59, 0.0, NaN]`. The NaN is the
+    /// mechanism — it is what makes the cart's physics dead so it can be used
+    /// as glue — so rewriting it to 0.0 turns the cart back into an ordinary
+    /// one that moves, and the door quietly falls apart. This pins both halves
+    /// at once: the denormal must not become an exponent, and the NaN must not
+    /// become a number.
+    #[test]
+    fn a_nan_cart_velocity_survives_the_round_trip() {
+        use crate::entity::{Entity, NbtValue};
+
+        let mut schem = UniversalSchematic::new("nan cart".into());
+        schem.set_block(0, 0, 0, &BlockState::new("minecraft:rail"));
+        let mut cart = Entity::new("minecraft:minecart".into(), (0.5, 0.0, 0.5));
+        cart.nbt.insert(
+            "Motion".into(),
+            NbtValue::List(vec![
+                NbtValue::Double(4.27987680632209e-59),
+                NbtValue::Double(0.0),
+                NbtValue::Double(f64::NAN),
+            ]),
+        );
+        assert!(schem.add_entity(cart));
+
+        let snbt = to_gametest_snbt(&schem);
+        let parsed = mc_tick::Structure::parse(&snbt)
+            .unwrap_or_else(|e| panic!("a NaN motion must parse, not error: {e}\n{snbt}"));
+
+        match &parsed.entities[0] {
+            mc_tick::structure::SpawnedEntity::Minecart(cart) => {
+                assert_eq!(cart.motion[0], 4.27987680632209e-59, "denormal mangled: {snbt}");
+                assert_eq!(cart.motion[1], 0.0);
+                assert!(
+                    cart.motion[2].is_nan(),
+                    "the NaN was sanitised to {} — this un-glues the door: {snbt}",
+                    cart.motion[2]
+                );
+            }
+            other => panic!("expected a minecart, got {other:?}"),
+        }
+    }
+
+    /// The ±Infinity that a nan cart is made from round-trips too.
+    ///
+    /// Overflowed-but-not-yet-collided carts hold these, and a build captured
+    /// mid-sequence carries them. Signed, because `+Inf` and `-Inf` are what
+    /// collide to produce the NaN in the first place.
+    #[test]
+    fn infinite_velocities_survive_the_round_trip() {
+        use crate::entity::{Entity, NbtValue};
+
+        let mut schem = UniversalSchematic::new("overflowed".into());
+        schem.set_block(0, 0, 0, &BlockState::new("minecraft:rail"));
+        let mut cart = Entity::new("minecraft:minecart".into(), (0.5, 0.0, 0.5));
+        cart.nbt.insert(
+            "Motion".into(),
+            NbtValue::List(vec![
+                NbtValue::Double(f64::INFINITY),
+                NbtValue::Double(f64::NEG_INFINITY),
+                NbtValue::Double(0.0),
+            ]),
+        );
+        assert!(schem.add_entity(cart));
+
+        let snbt = to_gametest_snbt(&schem);
+        let parsed = mc_tick::Structure::parse(&snbt).expect("infinities must parse");
+        match &parsed.entities[0] {
+            mc_tick::structure::SpawnedEntity::Minecart(cart) => {
+                assert_eq!(cart.motion[0], f64::INFINITY);
+                assert_eq!(cart.motion[1], f64::NEG_INFINITY, "the sign was lost: {snbt}");
+            }
+            other => panic!("expected a minecart, got {other:?}"),
+        }
+    }
+
+    /// An entity the engine cannot model refuses by name rather than vanishing.
+    #[test]
+    fn an_unsupported_entity_is_refused_and_named() {
+        use crate::entity::Entity;
+
+        let mut schem = UniversalSchematic::new("furnace".into());
+        schem.set_block(0, 0, 0, &BlockState::new("minecraft:rail"));
+        assert!(schem
+            .add_entity(Entity::new("minecraft:furnace_minecart".into(), (0.5, 0.0, 0.5))));
+
+        let snbt = to_gametest_snbt(&schem);
+        let err = mc_tick::Structure::parse(&snbt).expect_err("should refuse the furnace cart");
+        assert!(
+            matches!(
+                &err,
+                mc_tick::structure::StructureError::UnsupportedEntity { entity_type, .. }
+                    if entity_type == "minecraft:furnace_minecart"
+            ),
+            "wrong error: {err}"
+        );
+        // And the sentence the app shows blames the build, not the converter.
+        let detail = super::structure_parse_detail(&err, true);
+        assert!(detail.contains("minecraft:furnace_minecart"), "{detail}");
+        assert!(!detail.contains("engine fault"), "{detail}");
     }
 }

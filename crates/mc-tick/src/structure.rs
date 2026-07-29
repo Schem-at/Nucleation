@@ -125,6 +125,22 @@ pub enum StructureError {
         /// The out-of-range entry.
         entry: usize,
     },
+    /// The structure named an entity the engine has no behaviour for.
+    ///
+    /// Deliberately *not* a `Malformed`, because the two demand opposite
+    /// answers. Malformed means whatever wrote the text got the format wrong —
+    /// our bug. This one means the text is perfectly well-formed and describes
+    /// a build we cannot honestly simulate — the user's build. Callers have to
+    /// be able to tell them apart to say whose problem it is, and to name the
+    /// offending type instead of printing a byte offset at someone holding a
+    /// door that will not load.
+    #[error("unsupported entity type `{entity_type}` at byte {offset}")]
+    UnsupportedEntity {
+        /// The `id` the entity carried, e.g. `minecraft:furnace_minecart`.
+        entity_type: String,
+        /// Where in the text it appeared.
+        offset: usize,
+    },
 }
 
 impl Structure {
@@ -414,13 +430,71 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Skip a trailing NBT type letter (`d`, `f`, `b`, …) if one is present.
+    fn eat_type_suffix(&mut self) {
+        if self.at < self.text.len() && (self.text[self.at] as char).is_alphabetic() {
+            self.at += 1;
+        }
+    }
+
+    /// `NaN` or `Infinity`, the spellings Java's `Double.toString` produces.
+    /// The sign has already been consumed by the caller.
+    fn non_finite(&mut self, negative: bool) -> Option<f64> {
+        for (word, value) in [("NaN", f64::NAN), ("Infinity", f64::INFINITY)] {
+            if self.text[self.at..].starts_with(word.as_bytes()) {
+                self.at += word.len();
+                self.eat_type_suffix();
+                // Negating NaN leaves NaN; only infinity carries the sign.
+                return Some(if negative { -value } else { value });
+            }
+        }
+        None
+    }
+
     /// A floating-point number, tolerating NBT's `d`/`f` suffixes.
+    ///
+    /// Two things here go beyond plain digits, and both are load bearing.
+    ///
+    /// **`NaN` / `Infinity` / `-Infinity`.** SNBT has no grammar for these —
+    /// vanilla's own number pattern demands a digit — while binary NBT stores
+    /// them without fuss, as raw IEEE-754 doubles. Vanilla's *writer* then
+    /// emits exactly these words via Java's `Double.toString`, so the text
+    /// format can produce values it cannot read back. Accepting the words the
+    /// vanilla writer already emits is the narrowest way to close that gap; it
+    /// invents no new notation.
+    ///
+    /// This must never be "cleaned up" to 0.0. The record 3x3 door is held
+    /// together by *nan carts*: minecarts whose velocity was deliberately
+    /// overflowed to ±Infinity on sloped rails and then collided, so that
+    /// `+Inf + -Inf` = NaN. A NaN velocity is dead physics — the cart does not
+    /// fall when unsupported and nothing but a piston can move it — and the
+    /// builders use them as glue to pin villagers and other carts in place.
+    /// Round one to zero and it becomes an ordinary cart that moves, falls and
+    /// is shoved by its neighbours, and the machine comes apart silently.
+    /// See `docs/entity-abuse-in-record-doors.md`.
+    ///
+    /// **Exponents.** `4.27987680632209e-59` is a real motion component in that
+    /// same world. Without handling it here, `e` would be eaten as a type
+    /// suffix and `-59` read as a *second* list element — quietly turning a
+    /// three-element `Motion` into four, which the caller then discards.
     fn float(&mut self) -> Result<f64, StructureError> {
         self.skip_ws();
         let start = self.at;
-        if self.peek() == Some(b'-') {
-            self.at += 1;
+        let negative = match self.peek() {
+            Some(b'-') => {
+                self.at += 1;
+                true
+            }
+            Some(b'+') => {
+                self.at += 1;
+                false
+            }
+            _ => false,
+        };
+        if let Some(value) = self.non_finite(negative) {
+            return Ok(value);
         }
+        let mantissa = self.at;
         while self.at < self.text.len() {
             let c = self.text[self.at] as char;
             if c.is_ascii_digit() || c == '.' {
@@ -429,15 +503,28 @@ impl<'a> Parser<'a> {
                 break;
             }
         }
-        if start == self.at {
+        if self.at == mantissa {
             return self.err("expected a number");
         }
-        let digits = String::from_utf8_lossy(&self.text[start..self.at]).into_owned();
-        if self.at < self.text.len() && (self.text[self.at] as char).is_alphabetic() {
+        // Only an exponent if digits actually follow; otherwise `e` was a type
+        // suffix and the position is given back.
+        if matches!(self.peek(), Some(b'e' | b'E')) {
+            let mark = self.at;
             self.at += 1;
+            if matches!(self.peek(), Some(b'-' | b'+')) {
+                self.at += 1;
+            }
+            let digits = self.at;
+            while self.at < self.text.len() && (self.text[self.at] as char).is_ascii_digit() {
+                self.at += 1;
+            }
+            if self.at == digits {
+                self.at = mark;
+            }
         }
-        digits
-            .parse()
+        let text = String::from_utf8_lossy(&self.text[start..self.at]).into_owned();
+        self.eat_type_suffix();
+        text.parse()
             .map_or_else(|_| self.err("number out of range"), Ok)
     }
 
@@ -533,7 +620,19 @@ impl<'a> Parser<'a> {
                 })),
                 None => self.err("minecart entity needs `pos`"),
             },
-            _ => self.err(format!("unsupported entity type `{entity_id}`")),
+            // Everything else is refused by name. Dropping it instead would
+            // let a build whose mechanism depends on the entity load clean and
+            // simulate as though it were not there — a confident wrong answer.
+            other => Err(StructureError::UnsupportedEntity {
+                // An entry with no `id` at all still has to say something
+                // useful; `unsupported entity type ``` names nothing.
+                entity_type: if other.is_empty() {
+                    "<entity with no id>".to_string()
+                } else {
+                    other.to_string()
+                },
+                offset: self.at,
+            }),
         }
     }
 
@@ -1029,5 +1128,103 @@ mod tests {
     fn malformed_input_reports_where_it_failed() {
         let err = Structure::parse("{size: [1,1,1], palette: [").unwrap_err();
         assert!(matches!(err, StructureError::Malformed { .. }), "{err}");
+    }
+
+    /// Carts and items share the `entities` list and keep their order.
+    ///
+    /// Order is not cosmetic: it is the placement spawn order, which is also
+    /// the server's id-assignment order, and ids break ties in update order.
+    #[test]
+    fn an_entities_list_carries_carts_and_items_in_order() {
+        const TEXT: &str = r#"{
+            size: [1, 1, 1],
+            palette: [{Name: "minecraft:rail"}],
+            blocks: [{pos: [0, 0, 0], state: 0}],
+            entities: [
+                {pos: [0.5d, 0.0625d, 0.5d], blockPos: [0, 0, 0], nbt: {id: "minecraft:minecart", Motion: [0.25d, 0.0d, -0.5d]}},
+                {pos: [0.5d, 1.0d, 0.5d], blockPos: [0, 1, 0], nbt: {id: "minecraft:item", Motion: [0.0d, 0.0d, 0.0d], Item: {id: "minecraft:redstone", count: 7b}, PickupDelay: 40s}}
+            ]
+        }"#;
+        let s = Structure::parse(TEXT).unwrap();
+        assert_eq!(s.entities.len(), 2);
+        match &s.entities[0] {
+            SpawnedEntity::Minecart(cart) => {
+                assert_eq!(cart.kind, "minecraft:minecart");
+                assert_eq!(cart.pos, [0.5, 0.0625, 0.5]);
+                assert_eq!(cart.motion, [0.25, 0.0, -0.5]);
+            }
+            other => panic!("expected a minecart, got {other:?}"),
+        }
+        match &s.entities[1] {
+            SpawnedEntity::Item(item) => {
+                assert_eq!(item.item, ("minecraft:redstone".to_string(), 7));
+                assert_eq!(item.pickup_delay, 40);
+            }
+            other => panic!("expected an item, got {other:?}"),
+        }
+        assert_eq!(s.item_entities.len(), 1);
+    }
+
+    /// Non-finite and exponent-bearing velocities parse, and keep their values.
+    ///
+    /// The two interact: `55_3x3.zip` carries `Motion: [4.27987680632209e-59,
+    /// 0.0, NaN]` on a single cart. Read without exponent support that is four
+    /// numbers, not three, and the motion is discarded; read with NaN
+    /// sanitised the cart stops being a nan cart and the door breaks. Both
+    /// halves have to work at once, so they are asserted together.
+    #[test]
+    fn nan_infinity_and_exponents_survive_the_parser() {
+        const TEXT: &str = r#"{
+            size: [1, 1, 1],
+            palette: [{Name: "minecraft:rail"}],
+            blocks: [{pos: [0, 0, 0], state: 0}],
+            entities: [
+                {pos: [0.5d, 0.0d, 0.5d], nbt: {id: "minecraft:minecart", Motion: [4.27987680632209e-59d, 0.0d, NaN]}},
+                {pos: [0.5d, 0.0d, 0.5d], nbt: {id: "minecraft:minecart", Motion: [Infinity, -Infinity, 1.5E+2d]}}
+            ]
+        }"#;
+        let s = Structure::parse(TEXT).unwrap();
+        assert_eq!(s.entities.len(), 2);
+        match &s.entities[0] {
+            SpawnedEntity::Minecart(cart) => {
+                // Three elements, not four — the exponent stayed one number.
+                assert_eq!(cart.motion[0], 4.27987680632209e-59);
+                assert_eq!(cart.motion[1], 0.0);
+                assert!(cart.motion[2].is_nan(), "NaN was lost: {:?}", cart.motion);
+            }
+            other => panic!("expected a minecart, got {other:?}"),
+        }
+        match &s.entities[1] {
+            SpawnedEntity::Minecart(cart) => {
+                assert_eq!(cart.motion[0], f64::INFINITY);
+                assert_eq!(cart.motion[1], f64::NEG_INFINITY);
+                assert_eq!(cart.motion[2], 150.0);
+            }
+            other => panic!("expected a minecart, got {other:?}"),
+        }
+    }
+
+    /// An entity with no behaviour refuses by name, in its own error variant.
+    ///
+    /// The variant matters as much as the message: the bridge tells the user
+    /// "your build has a furnace minecart" only if it can distinguish this
+    /// from "our converter emitted garbage", and those read identically once
+    /// both collapse into `Malformed`.
+    #[test]
+    fn an_unmodelled_entity_type_is_refused_by_name() {
+        const TEXT: &str = r#"{
+            size: [1, 1, 1],
+            palette: [{Name: "minecraft:rail"}],
+            blocks: [{pos: [0, 0, 0], state: 0}],
+            entities: [{pos: [0.5d, 0.0d, 0.5d], nbt: {id: "minecraft:furnace_minecart"}}]
+        }"#;
+        let err = Structure::parse(TEXT).unwrap_err();
+        match &err {
+            StructureError::UnsupportedEntity { entity_type, .. } => {
+                assert_eq!(entity_type, "minecraft:furnace_minecart");
+            }
+            other => panic!("expected UnsupportedEntity, got {other:?}"),
+        }
+        assert!(err.to_string().contains("minecraft:furnace_minecart"), "{err}");
     }
 }
