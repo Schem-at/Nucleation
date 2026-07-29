@@ -13,6 +13,7 @@ import type {
   Material,
   ReplayBlock,
   ReplayChange,
+  ReplayEntity,
   ResetTime,
   TickEvents,
   Vec3,
@@ -117,6 +118,40 @@ type Probe = { key: string; test: () => boolean };
  *  as 0. Everything after is `tick - clickTick + 1`, which is the number of
  *  game ticks that had to run. That is also what the activity chart calls
  *  "quiet at t=N · N ticks", so the two now agree by construction. */
+/* -------------------------------------------------------------- entities -- */
+
+/** One live entity as the engine reports it this instant. */
+type LiveEntity = { id: number; kind: string; cart: boolean; count: number; pos: Vec3 };
+
+/** Decode `TickSimulation.itemEntitiesJson()`:
+ *  `{"items":[{id,item,count,pos,vel,on_ground,contents}],
+ *    "minecarts":[{id,kind,pos,vel}]}`.
+ *
+ *  Item and minecart ids come from one counter in the engine, so they share a
+ *  namespace and one map keyed by id is enough to follow both. */
+function readEntities(sim: { itemEntitiesJson(): string }): LiveEntity[] {
+  const raw = JSON.parse(sim.itemEntitiesJson()) as {
+    items?: { id: number; item: string; count: number; pos: Vec3 }[];
+    minecarts?: { id: number; kind: string; pos: Vec3 }[];
+  };
+  const out: LiveEntity[] = [];
+  for (const c of raw.minecarts ?? [])
+    out.push({ id: c.id, kind: c.kind, cart: true, count: 1, pos: c.pos });
+  for (const i of raw.items ?? [])
+    out.push({ id: i.id, kind: i.item, cart: false, count: i.count, pos: i.pos });
+  return out;
+}
+
+/** Whether this world holds any entity at all — the cheap check that keeps the
+ *  per-tick sampling pass off every build that has none. */
+function hasEntities(sim: { itemEntitiesJson(): string }): boolean {
+  try {
+    return readEntities(sim).length > 0;
+  } catch {
+    return false;
+  }
+}
+
 function replayStroke(
   world: Map<string, string>,
   changes: ReplayChange[],
@@ -1292,6 +1327,58 @@ async function certify(job: WorkerJob): Promise<{ record: CertRecord; xray: Xray
     xray = null;
   }
 
+  // -- entities: minecarts and dropped items ------------------------------
+  // `itemEntitiesJson()` is a SNAPSHOT, not a log — there is no per-tick
+  // entity history to read back the way `changesJson()` gives block history.
+  // So the cycle is stepped one tick at a time from its own checkpoint and
+  // sampled, which is the only way to get a track a replay can interpolate.
+  //
+  // The first sample is taken before any stepping and decides whether the
+  // pass runs at all: a build with no entities — every door in the corpus —
+  // costs one JSON read and nothing else, so the certified set cannot move.
+  const entities: ReplayEntity[] = [];
+  try {
+    sim.restore(cycle.cp);
+    if (hasEntities(sim)) {
+      const tracks = new Map<number, ReplayEntity>();
+      const sample = (t: number) => {
+        const live = readEntities(sim);
+        for (const e of live) {
+          let track = tracks.get(e.id);
+          if (!track) {
+            track = {
+              id: e.id,
+              kind: e.kind,
+              cart: e.cart,
+              count: e.count,
+              // Dense and null-filled: an entity that spawns mid-cycle is
+              // absent (not drawn) for every tick before it existed.
+              track: Array.from({ length: simTicks + 1 }, () => null),
+            };
+            tracks.set(e.id, track);
+            entities.push(track);
+          }
+          track.track[t] = e.pos;
+        }
+      };
+      // Same trace as the measured cycle: the opening click at replay tick 0,
+      // the closing click at the tick the certificate reports it on.
+      const closeAt = cycle.tClose - tRebase;
+      throwInput();
+      sample(0);
+      for (let t = 1; t <= simTicks; t++) {
+        if (t - 1 === closeAt) throwInput();
+        sim.step();
+        sample(t);
+      }
+    }
+  } catch (e) {
+    // Entities are decoration on a certificate about blocks. A build whose
+    // entity pass throws still certifies; it simply replays without them.
+    console.warn("[entities] sampling failed", e);
+    entities.length = 0;
+  }
+
   // -- engineering --------------------------------------------------------
   // Cost, dead weight, first movement, symmetry, badges. Runs last because
   // three of the five need the update log the x-ray pass just recorded; the
@@ -1352,7 +1439,7 @@ async function certify(job: WorkerJob): Promise<{ record: CertRecord; xray: Xray
       rest_is_closed: restIsClosed,
       engineering: eng,
     },
-    replay: { blocks: restBlocks, changes, simTicks, flips },
+    replay: { blocks: restBlocks, changes, simTicks, flips, entities },
   };
   return { record, xray };
 }

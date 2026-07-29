@@ -475,12 +475,36 @@ export type ReplayBlock = { pos: Vec3; state: string };
 export type ReplayChange = { tick: number; pos: Vec3; from: string; to: string };
 export type LeverFlip = { tick: number; label: string; measured: boolean };
 
+/** A live entity's path through the measured cycle.
+ *
+ *  Entity positions are FLOATING POINT and are not block centres: a minecart
+ *  sits at (x + 0.5, y + 0.0625, z + 0.5) when it is on a rail at (x, y, z),
+ *  and a dropped item rests wherever it fell. `track[t]` is the position at
+ *  tick `t` (0..simTicks inclusive) or null while the entity is not alive —
+ *  the same dense per-tick form `examples/render_simulation_video.rs` builds
+ *  from the engine's entity events, so the replay can interpolate between two
+ *  ticks exactly as the video renderer does. */
+export type ReplayEntity = {
+  /** The engine's entity id, stable for the entity's whole life. */
+  id: number;
+  /** `minecraft:minecart` (any cart kind) or the dropped item's id. */
+  kind: string;
+  /** Carts are drawn as the vanilla entity model; items as a small block. */
+  cart: boolean;
+  /** Stack size, for dropped items. */
+  count: number;
+  track: (Vec3 | null)[];
+};
+
 /** Everything the voxel replay needs: t=0 world + the recorded change log. */
 export type Replay = {
   blocks: ReplayBlock[];
   changes: ReplayChange[];
   simTicks: number;
   flips: LeverFlip[];
+  /** Optional because certificates saved before entities were drawn are still
+   *  in localStorage and must keep replaying. Absent reads as "none". */
+  entities?: ReplayEntity[];
 };
 
 export type CertRecord = { certificate: Certificate; replay: Replay };

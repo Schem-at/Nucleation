@@ -26,7 +26,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { buildCast, headClipHalfSpace, type CastMember } from "../lib/cast";
+import {
+  buildCast,
+  entityPosAt,
+  headClipHalfSpace,
+  itemDrawState,
+  type CastMember,
+} from "../lib/cast";
 import {
   CARRIER_ALPHA,
   CARRIER_ALPHA_XRAY,
@@ -36,7 +42,13 @@ import {
   idleStyle,
   IDLE_DOT,
 } from "../lib/doorway";
-import { instanceFor, addDefaultLights, fitCamera, meshStats } from "../lib/mesher";
+import {
+  instanceFor,
+  instanceForEntity,
+  addDefaultLights,
+  fitCamera,
+  meshStats,
+} from "../lib/mesher";
 import type { ApertureGeometry, Replay, Vec3 } from "../lib/types";
 import {
   channelStyles,
@@ -449,6 +461,15 @@ function WebglReplay({
         );
       }
     }
+    // Entities travel, and a cart that rolls out of the block bounds must
+    // still be on screen — the framing is of the replay, not of the blocks.
+    for (const e of replay.entities ?? []) {
+      for (const p of e.track) {
+        if (!p) continue;
+        box.expandByPoint(new THREE.Vector3(p[0] - 0.5, p[1], p[2] - 0.5));
+        box.expandByPoint(new THREE.Vector3(p[0] + 0.5, p[1] + 1, p[2] + 0.5));
+      }
+    }
     const center = fitCamera(camera, box);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.copy(center);
@@ -718,6 +739,76 @@ function WebglReplay({
           }
         });
     });
+
+    /* ------------------------------------------------------- entities --- */
+    //
+    // Minecarts and dropped items. They are NOT part of the block cast: they
+    // live at floating-point positions that move every tick, so each gets its
+    // own group posed from its track in the frame loop below rather than a
+    // static cell.
+    //
+    // Placement, which is where a half-block is easiest to lose. A meshed GLB
+    // comes back in coordinates shifted -0.5 on every axis from the world it
+    // describes (that is why a block group sits at its cell CENTRE above). The
+    // cart is meshed with the entity at (0.5, 0, 0.5) — its own cell's bottom
+    // centre — so a cart whose entity position is P belongs at:
+    //
+    //     group = (0.5, 0.5, 0.5) + P - (0.5, 0, 0.5) = (P.x, P.y + 0.5, P.z)
+    //
+    // Measured, not assumed: a cart meshed at (0.5, 0, 0.5) spans y -0.4375 ..
+    // 0.1875 in GLB space, which is 0.0625 .. 0.6875 above the entity once the
+    // shift is undone — the vanilla hull sitting on its rail exactly as the
+    // native renderer draws it.
+    //
+    // A dropped item draws at vanilla's quarter-block size. Its GLB is centred
+    // on its own origin, so scaling the group scales about the cube's centre
+    // and the group simply goes where that centre belongs: 0.125 above the
+    // entity position, matching the native renderer's item pose.
+    const ITEM_SCALE = 0.25;
+    const ITEM_LIFT = 0.125;
+    const entities = replay.entities ?? [];
+    const entityGroups: THREE.Group[] = entities.map(() => {
+      const g = new THREE.Group();
+      g.visible = false;
+      scene.add(g);
+      return g;
+    });
+    entities.forEach((e, i) => {
+      const g = entityGroups[i];
+      if (e.cart) {
+        instanceForEntity(e.kind)
+          .then((inst) => {
+            if (!disposed) g.add(inst);
+          })
+          .catch((err) => {
+            console.warn("mesh failed for entity", e.kind, err);
+            setUnmeshed((prev) =>
+              prev.includes(e.kind) ? prev : [...prev, e.kind],
+            );
+          });
+        return;
+      }
+      const state = itemDrawState(e.kind);
+      if (!state) {
+        // No block form to draw it as. Saying so beats inventing a shape.
+        console.info("[entity] no block form for dropped item", e.kind);
+        return;
+      }
+      g.scale.setScalar(ITEM_SCALE);
+      instanceFor(state)
+        .then((inst) => {
+          if (!disposed) g.add(inst);
+        })
+        .catch((err) => {
+          console.warn("mesh failed for item", e.kind, err);
+          setUnmeshed((prev) =>
+            prev.includes(e.kind) ? prev : [...prev, e.kind],
+          );
+        });
+    });
+    /** Last heading per cart, so a cart that stops keeps facing where it went
+     *  instead of snapping back to its modelled orientation. */
+    const entityYaw = new Float32Array(entities.length);
 
     /* ---------------------------------------------------------- x-ray --- */
 
@@ -1148,6 +1239,31 @@ function WebglReplay({
             m.y + (m.motion.fy - m.y) * remaining + CELL_MID,
             m.z + (m.motion.fz - m.z) * remaining + CELL_MID,
           );
+        }
+      }
+      for (let i = 0; i < entities.length; i++) {
+        const e = entities[i];
+        const g = entityGroups[i];
+        const p = entityPosAt(e.track, t);
+        if (!p) {
+          g.visible = false;
+          continue;
+        }
+        g.visible = true;
+        if (e.cart) {
+          g.position.set(p[0], p[1] + CELL_MID, p[2]);
+          // Point the hull along its travel. The model's long axis is +Z at
+          // yaw 0, and three.js rotates +Z toward +X at +90 degrees, so
+          // atan2(dx, dz) aims it down the direction of motion directly.
+          const ahead = entityPosAt(e.track, Math.min(t + 1, simTicks));
+          if (ahead) {
+            const dx = ahead[0] - p[0];
+            const dz = ahead[2] - p[2];
+            if (dx * dx + dz * dz > 1e-8) entityYaw[i] = Math.atan2(dx, dz);
+          }
+          g.rotation.y = entityYaw[i];
+        } else {
+          g.position.set(p[0], p[1] + ITEM_LIFT, p[2]);
         }
       }
       if (xrayOnRef.current && X) {

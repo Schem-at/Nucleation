@@ -478,3 +478,66 @@ export function boxesForItem(item: Pick<DrawItem, "state" | "ext">): IsoBox[] {
   posedMemo.set(key, boxes);
   return boxes;
 }
+
+/* --------------------------------------------------------------- entities -- */
+
+/** Where an entity is at continuous replay time `t`, or null if it is not
+ *  alive then.
+ *
+ *  Entity positions are floating point and change every tick, so the replay
+ *  interpolates between the two bracketing samples exactly as the video
+ *  renderer does (`render_simulation_video.rs`, the `item_tracks` loop): a
+ *  cart crossing a rail at 0.18 blocks/tick has to slide, not step. The last
+ *  sample of a track holds rather than vanishing, so an entity that comes to
+ *  rest stays put instead of blinking out on the final frame. */
+export function entityPosAt(track: (Vec3 | null)[], t: number): Vec3 | null {
+  const t0 = Math.floor(t);
+  const alpha = t - t0;
+  const here = track[t0] ?? null;
+  const next = track[t0 + 1] ?? null;
+  if (!here) return null;
+  if (!next) return here;
+  return [
+    here[0] + (next[0] - here[0]) * alpha,
+    here[1] + (next[1] - here[1]) * alpha,
+    here[2] + (next[2] - here[2]) * alpha,
+  ];
+}
+
+/** The block a dropped item is drawn as.
+ *
+ *  Item ids are not block ids. Most of what a redstone build drops has a block
+ *  form under a predictable name, and the ones that do not (`diamond`, and the
+ *  other gems and dusts) get theirs named here — the same table the native
+ *  renderer uses. A shulker box passes straight through, because the mesher's
+ *  block-entity path draws the real base + lid from `entity/shulker/*.png`
+ *  rather than a cube. Anything with no block form at all returns null and is
+ *  simply not drawn, which is honest: a stray cube in the wrong shape would
+ *  claim the build drops something it does not. */
+const GEM_BLOCKS = new Set([
+  "diamond",
+  "emerald",
+  "lapis_lazuli",
+  "coal",
+  "redstone",
+  "quartz",
+  "amethyst_shard",
+]);
+
+export function itemDrawState(item: string): string | null {
+  const bare = item.startsWith("minecraft:") ? item.slice(10) : item;
+  if (bare.endsWith("shulker_box")) return `minecraft:${bare}`;
+  if (GEM_BLOCKS.has(bare)) return `minecraft:${bare.replace("_shard", "")}_block`;
+  if (bare.endsWith("_ingot")) return `minecraft:${bare.replace("_ingot", "_block")}`;
+  // Blocks dropped as themselves: the id already names a block.
+  if (
+    bare.endsWith("_block") ||
+    bare.endsWith("_concrete") ||
+    bare.endsWith("_wool") ||
+    bare.endsWith("_planks") ||
+    bare.endsWith("_terracotta") ||
+    ["stone", "obsidian", "glass", "sand", "gravel", "dirt", "target", "observer"].includes(bare)
+  )
+    return `minecraft:${bare}`;
+  return null;
+}
