@@ -595,9 +595,14 @@ impl Simulation {
     /// A fuelled one drives itself, and that is not implemented. It refuses
     /// rather than running as a plain cart, because a cart that should be
     /// accelerating and is not produces a plausible-looking wrong trace.
+    ///
+    /// `id` is the id a capture recorded, when there is one — same contract as
+    /// [`Simulation::spawn_authored_minecart`], so a conformance run can line
+    /// its carts up with the golden's.
     pub fn spawn_authored_furnace_minecart(
         &mut self,
         cart: &crate::structure::SpawnedFurnaceMinecart,
+        id: Option<u32>,
     ) -> Result<u32, String> {
         if cart.fuel != 0 || cart.push != [0.0, 0.0] {
             return Err(format!(
@@ -608,9 +613,25 @@ impl Simulation {
             ));
         }
         let motion = self.motion_semantics.load_motion(cart.motion, [0.0; 3]);
-        let id = self.item_entities.next_id;
-        self.item_entities.next_id += 1;
+        let id = match id {
+            Some(id) => {
+                self.item_entities.next_id = self.item_entities.next_id.max(id + 1);
+                id
+            }
+            None => {
+                let id = self.item_entities.next_id;
+                self.item_entities.next_id += 1;
+                id
+            }
+        };
         self.push_minecart(id, "minecraft:furnace_minecart".to_string(), cart.pos, motion);
+        // Same reason as `spawn_authored_minecart`: yaw is the push gate, and a
+        // furnace cart is an `AbstractMinecart` like any other. Leaving it at
+        // the spawn default here is what made the record door's top row shove
+        // itself apart — see `SpawnedFurnaceMinecart::yaw`.
+        if let Some(spawned) = self.minecarts.last_mut() {
+            spawned.yaw = cart.yaw;
+        }
         Ok(id)
     }
 

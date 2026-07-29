@@ -1,0 +1,160 @@
+Note: src/TraceCapture.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+[20:42:26] [main/INFO]: Loaded 1585 recipes
+[20:42:26] [main/INFO]: Loaded 1688 advancements
+[20:42:26] [main/INFO]: Selecting global world spawn...
+[20:42:26] [main/INFO]: Loading 0 persistent chunks...
+[20:42:26] [main/INFO]: Time elapsed: 184 ms
+[20:42:26] [main/INFO]: Started game test server
+  origin: BlockPos{x=0, y=100, z=0}
+[20:42:26] [main/INFO]: 2 tests are now running at position -1148497, -59, 4595473!
+[20:42:27] [main/INFO]: Running test environment 'nucleation:default' batch 0 (1 tests)...
+  warmup ticks until entity-ticking: 18 (4/4 chunks ready)
+  block-ticking chunks: 4/4
+  pending block ticks: 0
+  runs normally: true
+  entity-ticking chunks: 4/4
+  entities loaded: 2
+    2 x minecraft:furnace_minecart
+  entities with non-finite velocity (nan carts): 0
+  initial [0,0,0] minecraft:stone
+  initial [1,0,0] minecraft:stone
+  initial [2,0,0] minecraft:stone
+  initial [3,0,0] minecraft:stone
+  initial [0,0,1] minecraft:stone
+  initial [1,0,1] minecraft:stone
+  initial [2,0,1] minecraft:stone
+  initial [3,0,1] minecraft:stone
+  initial [0,0,2] minecraft:stone
+  initial [1,0,2] minecraft:stone
+  initial [2,0,2] minecraft:stone
+  initial [3,0,2] minecraft:stone
+  initial [0,0,3] minecraft:stone
+  initial [1,0,3] minecraft:stone
+  initial [2,0,3] minecraft:stone
+  initial [3,0,3] minecraft:stone
+  initial [0,0,4] minecraft:stone
+  initial [1,0,4] minecraft:stone
+  initial [2,0,4] minecraft:stone
+  initial [3,0,4] minecraft:stone
+  initial [0,0,5] minecraft:stone
+  initial [1,0,5] minecraft:stone
+  initial [2,0,5] minecraft:stone
+  initial [3,0,5] minecraft:stone
+  initial [0,0,6] minecraft:stone
+  initial [1,0,6] minecraft:stone
+  initial [2,0,6] minecraft:stone
+  initial [3,0,6] minecraft:stone
+  initial [0,0,7] minecraft:stone
+  initial [1,0,7] minecraft:stone
+  initial [2,0,7] minecraft:stone
+  initial [3,0,7] minecraft:stone
+ENT t-1 entities=2 non-finite=0
+  E t-1 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=2 minecraft:furnace_minecart pos=(5.5, 1.0, 6.5) vel=(0.0, 0.0, 0.0)
+  notify hook: installed (maxChained=1000000)
+    t0 gameTime=19 pending=0
+ENT t0 entities=2 non-finite=0
+  E t0 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=2 minecraft:furnace_minecart pos=(5.5, 0.9599999999999937, 6.5) vel=(0.0, -0.037999999523162846, 0.0)
+[20:42:27] [main/INFO]: [  ]
+    t1 gameTime=20 pending=0
+ENT t1 entities=2 non-finite=0
+  E t1 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=2 minecraft:furnace_minecart pos=(5.5, 0.882000000476836, 6.5) vel=(0.0, -0.07409999861717226, 0.0)
+    t2 gameTime=21 pending=0
+ENT t2 entities=2 non-finite=0
+  E t2 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=2 minecraft:furnace_minecart pos=(5.5, 0.7679000018596582, 6.5) vel=(0.0, -0.10839499732613568, 0.0)
+ENT t3 entities=2 non-finite=0
+  E t3 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=2 minecraft:furnace_minecart pos=(5.5, 0.6195050045335222, 6.5) vel=(0.0, -0.14097524569082268, 0.0)
+ENT t4 entities=2 non-finite=0
+  E t4 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=2 minecraft:furnace_minecart pos=(5.5, 0.43852975884270506, 6.5) vel=(0.0, -0.1719264812488885, 0.0)
+ENT t5 entities=2 non-finite=0
+  E t5 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=2 minecraft:furnace_minecart pos=(5.5, 0.22660327759381005, 6.5) vel=(0.0, -0.20133015466008355, 0.0)
+ENT t6 entities=2 non-finite=0
+  E t6 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=2 minecraft:furnace_minecart pos=(5.5, -0.014726877066280508, 6.5) vel=(0.0, -0.22926364405019975, 0.0)
+ENT t7 entities=2 non-finite=0
+  E t7 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=2 minecraft:furnace_minecart pos=(5.5, -0.28399052111647904, 6.5) vel=(0.0, -0.255800458637817, 0.0)
+ENT t8 entities=2 non-finite=0
+  E t8 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=2 minecraft:furnace_minecart pos=(5.5, -0.5797909797542928, 6.5) vel=(0.0, -0.28101043217970983, 0.0)
+ENT t9 entities=2 non-finite=0
+  E t9 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=2 minecraft:furnace_minecart pos=(5.5, -0.9008014119339975, 6.5) vel=(0.0, -0.30495990674398177, 0.0)
+ENT t10 entities=2 non-finite=0
+  E t10 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=2 minecraft:furnace_minecart pos=(5.5, -1.2457613186779781, 6.5) vel=(0.0, -0.32771190729454014, 0.0)
+ENT t11 entities=2 non-finite=0
+  E t11 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=2 minecraft:furnace_minecart pos=(5.5, -1.6134732259725126, 6.5) vel=(0.0, -0.3493263075463456, 0.0)
+ENT t12 entities=2 non-finite=0
+  E t12 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=2 minecraft:furnace_minecart pos=(5.5, -2.0027995335188535, 6.5) vel=(0.0, -0.369859987527897, 0.0)
+ENT t13 entities=2 non-finite=0
+  E t13 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=2 minecraft:furnace_minecart pos=(5.5, -2.4126595210467485, 6.5) vel=(0.0, -0.3893669832655903, 0.0)
+ENT t14 entities=2 non-finite=0
+  E t14 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=2 minecraft:furnace_minecart pos=(5.5, -2.8420265043123436, 6.5) vel=(0.0, -0.4078986289838575, 0.0)
+ENT t15 entities=2 non-finite=0
+  E t15 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=2 minecraft:furnace_minecart pos=(5.5, -3.289925133296208, 6.5) vel=(0.0, -0.4255036921952969, 0.0)
+ENT t16 entities=2 non-finite=0
+  E t16 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t16 id=2 minecraft:furnace_minecart pos=(5.5, -3.7554288254915065, 6.5) vel=(0.0, -0.44222850203629555, 0.0)
+ENT t17 entities=2 non-finite=0
+  E t17 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+  E t17 id=2 minecraft:furnace_minecart pos=(5.5, -4.237657327527799, 6.5) vel=(0.0, -0.45811707118586903, 0.0)
+ENT t18 entities=1 non-finite=0
+  E t18 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t19 entities=1 non-finite=0
+  E t19 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t20 entities=1 non-finite=0
+  E t20 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+[20:42:27] [main/INFO]: [  ]
+ENT t21 entities=1 non-finite=0
+  E t21 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t22 entities=1 non-finite=0
+  E t22 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t23 entities=1 non-finite=0
+  E t23 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t24 entities=1 non-finite=0
+  E t24 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t25 entities=1 non-finite=0
+  E t25 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t26 entities=1 non-finite=0
+  E t26 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t27 entities=1 non-finite=0
+  E t27 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t28 entities=1 non-finite=0
+  E t28 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t29 entities=1 non-finite=0
+  E t29 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t30 entities=1 non-finite=0
+  E t30 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t31 entities=1 non-finite=0
+  E t31 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t32 entities=1 non-finite=0
+  E t32 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t33 entities=1 non-finite=0
+  E t33 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t34 entities=1 non-finite=0
+  E t34 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t35 entities=1 non-finite=0
+  E t35 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t36 entities=1 non-finite=0
+  E t36 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t37 entities=1 non-finite=0
+  E t37 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t38 entities=1 non-finite=0
+  E t38 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+ENT t39 entities=1 non-finite=0
+  E t39 id=1 minecraft:furnace_minecart pos=(4.245, 1.0, 2.5) vel=(0.0, 0.0, 0.0)
+captured 19 tick(s) with changes -> work/cart_ledge.json
+EXIT=0

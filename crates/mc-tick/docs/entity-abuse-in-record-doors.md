@@ -165,8 +165,36 @@ refuted it** — the builders' account was wrong, and this page was wrong with i
       villager adult 0.6 x 1.95 and baby 0.49 x 0.98, item 0.25. An unmeasured
       entity gets **no** box and the simulation refuses it by name.
 - [~] Entities resting on other entities' hitboxes. Carts collide with carts
-      exactly; a *frozen* body (fireball, villager) is an obstacle to a cart but
-      has no support physics of its own, because it has no physics at all.
+      exactly; a *frozen* body (fireball, villager, blaze) is **not** an
+      obstacle to a cart at all — `tick_minecart_among` builds its obstacle list
+      from the other carts only, and `SimCollision` carries no entity boxes. An
+      earlier version of this line claimed otherwise and was wrong.
+      Still unverified either way, because the door turned out not to need it —
+      see the next entry.
+- [x] A cart with **no block under its own column** is held up by a block under
+      any column its box overlaps. This is what actually holds the record door's
+      end cart: it stands in an `observer` over air, with 0.245 of its 0.98
+      width above the dispenser in the column before it. `cart_ledge.json` is
+      the capture — the overhanging cart never moves for forty ticks, and its
+      control, the same cart clear of the ledge, falls at once and is removed.
+      **The "carts resting on carts" hypothesis for that cart is refuted.**
+      Nothing rests on anything; the engine's block sweep already had it right,
+      and the cart only fell because it was being shoved off the ledge first.
+- [x] `Rotation` on a **furnace** cart. `AbstractMinecart`'s push gate reads yaw
+      as a polar angle and demands a dot of 0.8 against the line between the
+      pair, so a cart facing ±Z is inert to a neighbour offset along ±X.
+      `cart_furnace_yaw.json` is two identical x-separated furnace pairs that
+      differ in nothing but this number, and only the yaw-0 one moves.
+      Every one of the door's fifteen furnace carts carries `Rotation: [±90, 0]`
+      and its top row is strung out along x — so vanilla never touches that row,
+      and `door55_in_world.entities.log` shows it perfectly motionless.
+      This was a **silent drop in three places at once**: the bridge's SNBT
+      writer emitted no `Rotation` tag, `SpawnedFurnaceMinecart` had no `yaw`
+      field to put it in, and `spawn_authored_furnace_minecart` hard-coded 0.
+      Loaded facing +X the row shoved itself apart on tick 2 and walked its end
+      cart out of the world by tick 200. The same writer also dropped `Fuel` and
+      `PushX`/`PushZ`, which made the engine's refusal to run a self-propelled
+      cart unreachable from any loaded world; both are emitted now.
 - [x] Pressure plates triggered by entity presence, fireballs included —
       `fireball_reach.json` finds the plate's edge exactly where the measured
       widths put it.
@@ -194,3 +222,40 @@ and the minecarts two blazes are riding — moving on tick 0.
 That is the boundary of what verification can currently say. Anything below the
 line "the engine keeps the nan carts frozen where 26.2 frees them" is unchecked
 against the game.
+
+Two things that capture *can* still say, and does:
+
+**The two blazes are passengers, not missing entities.** The save holds 22
+top-level entities and our extraction keeps all 22; the capture's 24 counts the
+two `minecraft:blaze` riders nested in the `Passengers` list of two of the four
+plain minecarts — both of them nan carts, riders sitting 0.1875 above their
+vehicle with ordinary finite gravity of their own. Extraction is not cropping
+anything. The engine, however, **never instantiates a passenger**, so those two
+blaze hitboxes are simply absent from every run. Blaze dimensions are also
+unmeasured, so the entity would be refused by name if it were spawned.
+
+**Vanilla does not move that door's top row, and does not change a block.**
+Over the four ticks of `door55_in_world.entities.log` the seven furnace carts at
+y = 6 hold their positions to the last digit and the capture records *zero* tick
+with a block change. That is a hard target for any run of ours, and the engine
+now meets the first half of it: with `Rotation` plumbed through, no cart in the
+row moves and none falls out of the world. It does **not** meet the second half.
+
+## The open problem: the door actuates itself on load
+
+Ticking the save through the schematic path with nothing triggered, the engine
+changes **68 blocks** over the first ten ticks — a bank of observers flipping
+`powered=false → true` at tick 1, then the cascade that follows — before going
+quiescent. Vanilla, ticking the same save in place, changes nothing at all.
+
+The difference is almost certainly **paste versus load**. `--in-world` ticks a
+world the server read off disk, where every observer's `powered` and every
+pending block tick came out of the save with it. Our path renders the schematic
+to structure SNBT and *places* it, and a placed observer arms — which is correct
+vanilla behaviour for placement and wrong for this comparison. `TickSettleMode`
+is meant to absorb exactly that and does not absorb this.
+
+Until it does, **every door result from the schematic path is downstream of an
+unmodelled load**, and the ten `piston_retract_contacts` the run reports are
+ten entities standing in a retracting sweep the engine also does not model. Two
+independent reasons not to believe a door that looks like it works.

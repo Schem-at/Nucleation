@@ -149,4 +149,43 @@ tools/gametest/capture.sh --structure nucleation:villager_reach --max-ticks 8 --
   --out work/villager_reach.json | tee "$CAP/villager_reach.entities.log"
 cp work/villager_reach.json "$TRACES/villager_reach.json"
 
+# ---------------------------------------------------------------------------
+# 6. What actually holds the record 3x3 door's top row up.
+#
+# Two structures rather than one, because the conformance harness numbers
+# entities by the order they *start moving* — see `normalize_entity_ids` — and
+# lanes whose movers interleave would compare a different cart against a
+# different cart.
+#
+# cart_furnace_yaw: two pairs of furnace carts, each 0.98 apart along +X on
+# flat stone, differing in nothing but Rotation.
+#
+#   z=2   Rotation 90    facing +-Z against an +-X separation, dot 0
+#   z=7   Rotation 0     facing +-X, dot 1
+#
+# Result: the z=7 pair shoves itself apart on tick 0 and the z=2 pair never
+# moves at all, for forty ticks. `AbstractMinecart`'s push gate reads yaw as a
+# polar angle, and a furnace cart is subject to it exactly like a plain one.
+# Every one of the door's fifteen furnace carts carries Rotation [+-90, 0] and
+# its top row runs along x, which is why vanilla leaves that row alone.
+tools/gametest/capture.sh --structure nucleation:cart_furnace_yaw --max-ticks 40 \
+  --entities --entity-log \
+  --out work/cart_furnace_yaw.json | tee "$CAP/cart_furnace_yaw.entities.log"
+cp work/cart_furnace_yaw.json "$TRACES/cart_furnace_yaw.json"
+
+# cart_ledge: a ledge of stone that stops at x=3, and two carts.
+#
+#   z=2   x=4.245   air under its own column, 0.245 of its box over x=3
+#   z=6   x=5.5     clear of the ledge entirely — the control
+#
+# Result: the overhanging cart never moves; the control falls at once and is
+# removed on tick 18. A cart is held by a block under *any* column its box
+# overlaps, so the door's end cart — an observer at its own x, air below, and a
+# quarter of its width over the dispenser before it — needs nothing beneath it.
+# This is what refuted "carts resting on carts" as the reason it fell.
+tools/gametest/capture.sh --structure nucleation:cart_ledge --max-ticks 40 \
+  --entities --entity-log \
+  --out work/cart_ledge.json | tee "$CAP/cart_ledge.entities.log"
+cp work/cart_ledge.json "$TRACES/cart_ledge.json"
+
 echo "captures written to $CAP and $TRACES"

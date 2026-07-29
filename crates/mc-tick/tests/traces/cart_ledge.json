@@ -1,0 +1,166 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:cart_ledge",
+  "origin": [0, 100, 0],
+  "detail": "normal",
+  "game_time_at_start": 18,
+  "queues": [
+    {"tick": 0, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 1, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 2, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 3, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 4, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 5, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 6, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 7, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 8, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 9, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 10, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 11, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 12, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 13, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 14, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 15, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 16, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 17, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 18, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 19, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 20, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 21, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 22, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 23, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 24, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 25, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 26, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 27, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 28, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 29, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 30, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 31, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 32, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 33, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 34, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 35, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 36, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 37, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 38, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 39, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []}
+  ],
+  "ticks": [
+    {
+      "tick": 0,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 2, "entity_type": "minecraft:furnace_minecart", "pos": [5.5, 0.9599999999999937, 6.5], "velocity": [0.0, -0.037999999523162846, 0.0]}
+      ]
+    },
+    {
+      "tick": 1,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 2, "entity_type": "minecraft:furnace_minecart", "pos": [5.5, 0.882000000476836, 6.5], "velocity": [0.0, -0.07409999861717226, 0.0]}
+      ]
+    },
+    {
+      "tick": 2,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 2, "entity_type": "minecraft:furnace_minecart", "pos": [5.5, 0.7679000018596582, 6.5], "velocity": [0.0, -0.10839499732613568, 0.0]}
+      ]
+    },
+    {
+      "tick": 3,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 2, "entity_type": "minecraft:furnace_minecart", "pos": [5.5, 0.6195050045335222, 6.5], "velocity": [0.0, -0.14097524569082268, 0.0]}
+      ]
+    },
+    {
+      "tick": 4,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 2, "entity_type": "minecraft:furnace_minecart", "pos": [5.5, 0.43852975884270506, 6.5], "velocity": [0.0, -0.1719264812488885, 0.0]}
+      ]
+    },
+    {
+      "tick": 5,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 2, "entity_type": "minecraft:furnace_minecart", "pos": [5.5, 0.22660327759381005, 6.5], "velocity": [0.0, -0.20133015466008355, 0.0]}
+      ]
+    },
+    {
+      "tick": 6,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 2, "entity_type": "minecraft:furnace_minecart", "pos": [5.5, -0.014726877066280508, 6.5], "velocity": [0.0, -0.22926364405019975, 0.0]}
+      ]
+    },
+    {
+      "tick": 7,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 2, "entity_type": "minecraft:furnace_minecart", "pos": [5.5, -0.28399052111647904, 6.5], "velocity": [0.0, -0.255800458637817, 0.0]}
+      ]
+    },
+    {
+      "tick": 8,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 2, "entity_type": "minecraft:furnace_minecart", "pos": [5.5, -0.5797909797542928, 6.5], "velocity": [0.0, -0.28101043217970983, 0.0]}
+      ]
+    },
+    {
+      "tick": 9,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 2, "entity_type": "minecraft:furnace_minecart", "pos": [5.5, -0.9008014119339975, 6.5], "velocity": [0.0, -0.30495990674398177, 0.0]}
+      ]
+    },
+    {
+      "tick": 10,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 2, "entity_type": "minecraft:furnace_minecart", "pos": [5.5, -1.2457613186779781, 6.5], "velocity": [0.0, -0.32771190729454014, 0.0]}
+      ]
+    },
+    {
+      "tick": 11,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 2, "entity_type": "minecraft:furnace_minecart", "pos": [5.5, -1.6134732259725126, 6.5], "velocity": [0.0, -0.3493263075463456, 0.0]}
+      ]
+    },
+    {
+      "tick": 12,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 2, "entity_type": "minecraft:furnace_minecart", "pos": [5.5, -2.0027995335188535, 6.5], "velocity": [0.0, -0.369859987527897, 0.0]}
+      ]
+    },
+    {
+      "tick": 13,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 2, "entity_type": "minecraft:furnace_minecart", "pos": [5.5, -2.4126595210467485, 6.5], "velocity": [0.0, -0.3893669832655903, 0.0]}
+      ]
+    },
+    {
+      "tick": 14,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 2, "entity_type": "minecraft:furnace_minecart", "pos": [5.5, -2.8420265043123436, 6.5], "velocity": [0.0, -0.4078986289838575, 0.0]}
+      ]
+    },
+    {
+      "tick": 15,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 2, "entity_type": "minecraft:furnace_minecart", "pos": [5.5, -3.289925133296208, 6.5], "velocity": [0.0, -0.4255036921952969, 0.0]}
+      ]
+    },
+    {
+      "tick": 16,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 2, "entity_type": "minecraft:furnace_minecart", "pos": [5.5, -3.7554288254915065, 6.5], "velocity": [0.0, -0.44222850203629555, 0.0]}
+      ]
+    },
+    {
+      "tick": 17,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 2, "entity_type": "minecraft:furnace_minecart", "pos": [5.5, -4.237657327527799, 6.5], "velocity": [0.0, -0.45811707118586903, 0.0]}
+      ]
+    },
+    {
+      "tick": 18,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_removed", "id": 2}
+      ]
+    }
+  ]
+}

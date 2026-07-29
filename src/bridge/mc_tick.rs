@@ -278,6 +278,39 @@ fn entities_snbt(schematic: &crate::UniversalSchematic, min: (i32, i32, i32)) ->
         if let Some(delay) = entity.nbt.get("PickupDelay").and_then(nbt_number) {
             let _ = write!(out, ", PickupDelay: {}s", delay as i64);
         }
+        // `Rotation` is mechanism, not decoration. A cart's yaw gates whether
+        // it can push a neighbour at all, so dropping the tag here silently
+        // turned every parked cart in a loaded world into one facing +X. In the
+        // record 3x3 door that is the difference between a motionless top row
+        // and a row that shoves itself apart on tick 2 — see
+        // `mc_tick::structure::SpawnedFurnaceMinecart::yaw`.
+        if let Some(V::List(rotation)) = entity.nbt.get("Rotation") {
+            if let Some(yaw) = rotation.first().and_then(nbt_number) {
+                // `Rotation` is a float list, so the suffix is `f` — not the
+                // `d` `snbt_double` appends, which the reader rejects outright.
+                let mut text = format!("{yaw}");
+                if !text.contains('.') {
+                    text.push_str(".0");
+                }
+                let _ = write!(out, ", Rotation: [{text}f, 0.0f]");
+            }
+        }
+        // A furnace cart's self-drive. Every one in that door reads zero, but
+        // the engine *refuses* a fuelled cart rather than running it as an
+        // unfuelled one, and a writer that never emits `Fuel` makes that
+        // refusal unreachable — the exact shape of silent wrongness the
+        // refusal exists to prevent.
+        for (tag, key) in [("Fuel", "Fuel"), ("PushX", "PushX"), ("PushZ", "PushZ")] {
+            if let Some(value) = entity.nbt.get(key).and_then(nbt_number) {
+                if value != 0.0 {
+                    if tag == "Fuel" {
+                        let _ = write!(out, ", Fuel: {}s", value as i64);
+                    } else {
+                        let _ = write!(out, ", {tag}: {}", snbt_double(value));
+                    }
+                }
+            }
+        }
         out.push_str("}}");
     }
     out
@@ -727,7 +760,7 @@ fn wire_simulation(
             // *unfuelled* one needs nothing more than being a cart. A fuelled
             // one drives itself and is refused rather than run as a passenger.
             mc_tick::structure::SpawnedEntity::FurnaceMinecart(cart) => {
-                if let Err(why) = sim.spawn_authored_furnace_minecart(cart) {
+                if let Err(why) = sim.spawn_authored_furnace_minecart(cart, None) {
                     refused.push(why);
                 }
             }

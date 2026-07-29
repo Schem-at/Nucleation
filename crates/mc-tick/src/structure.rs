@@ -162,6 +162,19 @@ pub struct SpawnedFurnaceMinecart {
     pub fuel: u32,
     /// `PushX`/`PushZ` — the drive direction. Also zero throughout that door.
     pub push: [f64; 2],
+    /// `Rotation[0]` — yaw in degrees, read exactly as [`SpawnedMinecart::yaw`]
+    /// is, because a furnace cart *is* an `AbstractMinecart` and its push gate
+    /// is the same code.
+    ///
+    /// Its absence here was a silent hole with a measurable cost: every one of
+    /// the record 3x3 door's fifteen furnace carts carries `Rotation: [±90, 0]`,
+    /// its top row is strung out along **x**, and yaw ±90 scores a dot of zero
+    /// against that separation — so vanilla never pushes them and the row is
+    /// motionless. Defaulted to 0 the row scores 1, shoves itself apart on
+    /// tick 2, and walks the end cart off its ledge. `cart_furnace_yaw` is the
+    /// capture: two identical x-separated furnace pairs that differ in nothing
+    /// but this number, and only the yaw-0 one moves.
+    pub yaw: f64,
 }
 
 /// An authored fireball, either size.
@@ -751,6 +764,7 @@ impl<'a> Parser<'a> {
                     motion,
                     fuel,
                     push,
+                    yaw,
                 })),
                 None => self.err("furnace minecart entity needs `pos`"),
             },
@@ -1301,6 +1315,35 @@ mod tests {
                 assert_eq!(plain.yaw, 0.0, "no Rotation tag means vanilla's default");
             }
             other => panic!("expected two minecarts, got {other:?}"),
+        }
+    }
+
+    /// And a **furnace** cart's `Rotation` is read the same way.
+    ///
+    /// Its own test because it was its own hole: `SpawnedFurnaceMinecart` had
+    /// no `yaw` field at all, so every furnace cart in every loaded build
+    /// arrived facing +X no matter what its NBT said. The record 3x3 door is
+    /// fifteen furnace carts, its top row is strung out along x, and all of
+    /// them read `Rotation: [±90, 0]` — the difference between a row vanilla
+    /// never touches and a row that shoves itself apart.
+    #[test]
+    fn a_furnace_carts_rotation_is_read_and_defaults_to_zero() {
+        const TEXT: &str = r#"{
+            size: [1, 1, 1],
+            palette: [{Name: "minecraft:rail"}],
+            blocks: [{pos: [0, 0, 0], state: 0}],
+            entities: [
+                {pos: [0.5d, 0.0625d, 0.5d], blockPos: [0, 0, 0], nbt: {id: "minecraft:furnace_minecart", Motion: [0.0d, 0.0d, 0.0d], Rotation: [-90.0f, 0.0f]}},
+                {pos: [0.5d, 0.0625d, 1.5d], blockPos: [0, 0, 1], nbt: {id: "minecraft:furnace_minecart", Motion: [0.0d, 0.0d, 0.0d]}}
+            ]
+        }"#;
+        let s = Structure::parse(TEXT).unwrap();
+        match (&s.entities[0], &s.entities[1]) {
+            (SpawnedEntity::FurnaceMinecart(turned), SpawnedEntity::FurnaceMinecart(plain)) => {
+                assert_eq!(turned.yaw, -90.0);
+                assert_eq!(plain.yaw, 0.0, "no Rotation tag means vanilla's default");
+            }
+            other => panic!("expected two furnace minecarts, got {other:?}"),
         }
     }
 

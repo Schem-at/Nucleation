@@ -295,7 +295,7 @@ fn build_sim(
             // harness, so a spawn that refuses still panics rather than
             // dropping the entity.
             mc_tick::structure::SpawnedEntity::FurnaceMinecart(cart) => {
-                sim.spawn_authored_furnace_minecart(cart).unwrap_or_else(|e| panic!("{label}: {e}"));
+                sim.spawn_authored_furnace_minecart(cart, None).unwrap_or_else(|e| panic!("{label}: {e}"));
             }
             mc_tick::structure::SpawnedEntity::Fireball(ball) => {
                 sim.spawn_authored_fireball(ball).unwrap_or_else(|e| panic!("{label}: {e}"));

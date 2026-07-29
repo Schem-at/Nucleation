@@ -207,6 +207,14 @@ fn golden_entity_ids(trace: &Trace) -> Vec<u32> {
 /// Renumber entity ids by first appearance, so the capture's server-global ids
 /// compare against the engine's zero-based ones. Spawn order is deterministic
 /// on both sides, which is what makes the mapping meaningful.
+///
+/// Note the sharp edge this leaves: "first appearance" is the order things
+/// *start moving*, which only tracks spawn order when every entity moves. A
+/// structure whose entities begin moving in a different order than they are
+/// listed will number the two sides differently and diverge on identity while
+/// agreeing on every position. Keep such lanes in separate structures — that is
+/// why the furnace-cart evidence is `cart_furnace_yaw` plus `cart_ledge` rather
+/// than one file with four lanes in it.
 fn normalize_entity_ids(trace: &mut Trace) {
     let mut mapping: HashMap<u32, u32> = HashMap::new();
     for record in &mut trace.ticks {
@@ -427,6 +435,9 @@ fn run_conformance_full(
             mc_tick::structure::SpawnedEntity::Minecart(cart) => {
                 sim.spawn_authored_minecart(cart, raw_id)
             }
+            mc_tick::structure::SpawnedEntity::FurnaceMinecart(cart) => sim
+                .spawn_authored_furnace_minecart(cart, raw_id)
+                .unwrap_or_else(|why| panic!("{label}: {why}")),
             // A golden that contains one of these would otherwise be compared
             // against a run with the entity missing, which is worse than no
             // comparison; swap for a spawn call when the behaviour lands.
@@ -1191,6 +1202,42 @@ fn a_cart_only_pushes_along_its_facing_so_one_lane_moves_and_the_other_does_not(
     // which is what makes this structure worth capturing: the moving lane and
     // the still lane are the two readings, side by side in one golden.
     run_cart("cart_yaw.snbt", "cart_yaw.json", "nucleation:cart_yaw");
+}
+
+#[test]
+fn a_furnace_cart_obeys_the_same_facing_gate_a_plain_one_does() {
+    // Half of what holds the record 3x3 door's top row up.
+    //
+    // Two lanes of two furnace carts, each pair 0.98 apart along **+X**, on the
+    // same flat stone, differing in one number:
+    //
+    // * z=2, `Rotation: 90` — the dot is 0 and vanilla never touches them.
+    //   Neither id appears anywhere in the golden, for forty ticks.
+    // * z=7, `Rotation: 0` — the dot is 1 and they shove apart on tick 0. This
+    //   is what makes the still lane evidence rather than an absence.
+    //
+    // It was a live bug that they behaved alike. `SpawnedFurnaceMinecart`
+    // carried no yaw field at all and the bridge's SNBT writer emitted no
+    // `Rotation`, so all fifteen of the door's furnace carts loaded facing +X —
+    // the axis their top row is strung out along. They shoved themselves apart
+    // on tick 2 and walked the end cart off its ledge and out of the world.
+    run_cart("cart_furnace_yaw.snbt", "cart_furnace_yaw.json", "nucleation:cart_furnace_yaw");
+}
+
+#[test]
+fn a_cart_hangs_off_a_ledge_whose_last_column_its_box_still_overlaps() {
+    // The other half, and the answer to "what holds up a cart with nothing
+    // under it?" — a block, not another entity.
+    //
+    // * z=2 — a cart with **air directly beneath its own column**, its box
+    //   overhanging the ledge's last solid column by 0.245. It never moves.
+    //   A cart is held by any block under any column its box overlaps, which is
+    //   exactly the door's end cart: `observer` at its own x, air below, and
+    //   0.245 of its width over the dispenser in the column before it.
+    // * z=6 — the same cart clear of the ledge. It falls immediately and is
+    //   removed. Without it, "the overhang cart did not move" would be equally
+    //   consistent with gravity not running in this structure at all.
+    run_cart("cart_ledge.snbt", "cart_ledge.json", "nucleation:cart_ledge");
 }
 
 #[test]
