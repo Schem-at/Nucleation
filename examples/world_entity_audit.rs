@@ -49,9 +49,16 @@ fn main() {
     // By type, so "stacked entities inside the door" is visible as a count
     // rather than a total.
     let json = read_out(|w| schem.get_entities_json(w));
+    if let Ok(path) = std::env::var("DUMP_JSON_TO") {
+        std::fs::write(&path, &json).expect("write the entity json");
+        println!("wrote full entity json to {path} ({} bytes)", json.len());
+    }
     if std::env::var("DUMP_JSON").is_ok() {
         println!("--- raw entities json (first 1200 bytes) ---\n{}\n---", &json[..json.len().min(1200)]);
     }
+    // Riders are nested inside their vehicle rather than listed separately, so a
+    // top-level count under-reports what the game will instantiate.
+    println!("\n`Passengers` compounds nested in these entities: {}", json.matches("\"Passengers\"").count());
     let mut by_id: BTreeMap<String, usize> = BTreeMap::new();
     // The JSON is a list of objects with an `id`; count without pulling in a
     // parser, since all we need is the type histogram.
