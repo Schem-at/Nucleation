@@ -563,6 +563,9 @@ const IMMOVABLE: &[&str] = &[
     "minecraft:moving_piston",
     "minecraft:piston_head",
     "minecraft:jukebox",
+    "minecraft:furnace",
+    "minecraft:blast_furnace",
+    "minecraft:smoker",
     // Shulker boxes of every colour are also immovable; they match by name
     // pattern in `register_all_at` rather than sixteen entries here.
 ];
@@ -626,6 +629,12 @@ const INERT: &[&str] = &[
     "minecraft:player_wall_head",
     "minecraft:lightning_rod",
     "minecraft:tripwire_hook",
+    // Smelting is not modelled, but a furnace is comparator-readable and its
+    // slot count is carried in `container_slots`, so a stocked one still
+    // reads correctly.
+    "minecraft:furnace",
+    "minecraft:blast_furnace",
+    "minecraft:smoker",
 ];
 
 /// Register vanilla behaviour for every state currently in `registry`.
@@ -1306,6 +1315,14 @@ pub fn register_all_at(
             "minecraft:bubble_column" => {
                 table.register(*id, Box::new(Inert::new("bubble_column")));
             }
+            // Building material, checked only once every implemented block has
+            // had its say. Order matters: `minecraft:piston_head` ends in
+            // `_head` and a decoration family that ran first would claim it,
+            // replacing a piston's arm with a brick and quietly breaking every
+            // door in the corpus.
+            n if decor_kind(n).is_some() => {
+                table.register(*id, Box::new(Inert::new("material")));
+            }
             // Anything else stays unregistered, and will be named in the report.
             _ => {}
         }
@@ -1327,6 +1344,10 @@ pub fn container_slots(name: &str) -> Option<u32> {
         n if is_shulker_box(n) => Some(27),
         "minecraft:hopper" => Some(5),
         "minecraft:dropper" | "minecraft:dispenser" => Some(9),
+        // A furnace is comparator-readable, so it needs its slot count even
+        // though its smelting is not modelled — registering it inert without
+        // this would silently read every furnace as empty.
+        "minecraft:furnace" | "minecraft:blast_furnace" | "minecraft:smoker" => Some(3),
         _ => None,
     }
 }
@@ -1369,6 +1390,12 @@ fn is_conductor(descriptor: &Descriptor) -> bool {
             | "minecraft:piston"
             | "minecraft:sticky_piston"
     )
+    // The rest of the same families: every stained glass, tinted glass, the
+    // ices and every leaf. Generalising the entries above rather than adding
+    // new judgement — `glass`, `white_stained_glass`, `sea_lantern` and
+    // `oak_leaves` were each read off a capture, and their siblings share the
+    // registration that produced them.
+    && decor_kind(&descriptor.name) != Some(Decor::Glassy)
 }
 
 /// Whether a block state is a full collision cube.
@@ -1414,6 +1441,10 @@ fn is_full_cube(descriptor: &Descriptor) -> bool {
         | "minecraft:stone_pressure_plate"
         | "minecraft:oak_pressure_plate" => false,
         "minecraft:piston" | "minecraft:sticky_piston" => !descriptor.flag("extended"),
+        // Building material whose shape is not a full cell — walls, fences,
+        // panes, stairs, carpets. They must not conduct and must not block a
+        // hopper, which both follow from answering false here.
+        n if decor_kind(n) == Some(Decor::Partial) => false,
         _ => true,
     }
 }
@@ -1521,6 +1552,150 @@ pub fn has_dynamic_shape(descriptor: &str) -> bool {
 /// undyed `minecraft:shulker_box`.
 fn is_shulker_box(name: &str) -> bool {
     name.ends_with("_shulker_box") || name == "minecraft:shulker_box"
+}
+
+/// The shape of an inert building material, for the two questions the engine
+/// asks about a block that does nothing: does it fill its cell, and does it
+/// carry redstone?
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Decor {
+    /// An ordinary opaque cube: fills the cell, conducts.
+    Cube,
+    /// Fills the cell but its registration calls `isRedstoneConductor(never)`
+    /// — glass and its kin. Conducts nothing.
+    Glassy,
+    /// Not a full cell at all: walls, fences, panes, stairs, carpets. Neither
+    /// conducts nor blocks a hopper.
+    Partial,
+}
+
+/// Classify a block as inert building material, or `None` if the engine has no
+/// business guessing.
+///
+/// A door is mostly decoration, and refusing a whole build because one cell
+/// holds yellow wool is useless — 20 of 28 real community doors were rejected
+/// that way, several for a single colour. But the gate exists for a reason: a
+/// block wrongly called a conductor silently changes where redstone goes, and
+/// a wrong answer is worse than a refusal. So this names families whose vanilla
+/// answer is not in doubt and leaves everything else unregistered.
+///
+/// Deliberately absent, and still failing loudly:
+/// - **copper bulbs** — they latch on a pulse and a comparator reads them.
+///   They are redstone components wearing a building block's shape.
+/// - **doors, lecterns, cauldrons, campfires** — each has behaviour worth
+///   modelling properly rather than asserting away.
+///
+/// Known simplification: gravity is not simulated, so `sand` and `gravel` are
+/// inert here. A door whose pattern is sand (§5.5) holds its shape while
+/// vanilla would drop an unsupported grain.
+pub(crate) fn decor_kind(name: &str) -> Option<Decor> {
+    let short = name.strip_prefix("minecraft:")?;
+
+    // Blocks the engine implements, or means to, are never decoration however
+    // their name reads. `piston_head` ends in `_head` and would otherwise be
+    // claimed by the head-and-skull family — replacing a piston's arm with a
+    // brick. The registration match already puts material last, but this is
+    // also called straight from `is_full_cube` and `is_conductor`, where no
+    // ordering protects anything.
+    if matches!(
+        short,
+        "piston_head"
+            | "moving_piston"
+            | "piston"
+            | "sticky_piston"
+            | "observer"
+            | "redstone_lamp"
+            | "note_block"
+            | "target"
+            | "lectern"
+    ) || short.ends_with("_door")
+        || short.ends_with("_trapdoor")
+        || short.contains("copper_bulb")
+    {
+        return None;
+    }
+
+    // Shapes that plainly do not fill their cell. Checked first: a
+    // `stone_brick_wall` must never be mistaken for the stone family below.
+    const PARTIAL_SUFFIX: &[&str] = &[
+        "_stairs",
+        "_wall",
+        "_fence",
+        "_fence_gate",
+        "_pane",
+        "_carpet",
+        "_sign",
+        "_head",
+        "_skull",
+        "_banner",
+        "_candle",
+        "_lantern",
+        "_bars",
+        "_ladder",
+    ];
+    if PARTIAL_SUFFIX.iter().any(|s| short.ends_with(s))
+        || matches!(short, "chain" | "scaffolding" | "iron_bars" | "ladder" | "snow")
+    {
+        // A wall sign is a sign; a player head is a head. Both land here.
+        return Some(Decor::Partial);
+    }
+
+    // Glass and its kin: full cells whose registration refuses to conduct.
+    // The engine already carried `glass`, `white_stained_glass` and
+    // `sea_lantern` from capture-verified builds; these are the rest of the
+    // same families, and `*_leaves` generalises the verified `oak_leaves`.
+    if short.ends_with("_stained_glass")
+        || short.ends_with("_leaves")
+        || matches!(
+            short,
+            "glass" | "tinted_glass" | "ice" | "packed_ice" | "blue_ice" | "sea_lantern"
+        )
+    {
+        return Some(Decor::Glassy);
+    }
+
+    // Ordinary opaque cubes. Dye-colour and wood-species families are matched
+    // by suffix so a new colour never has to be added by hand again — that is
+    // the mistake this whole function exists to stop repeating.
+    const CUBE_SUFFIX: &[&str] = &[
+        "_wool",
+        "_concrete",
+        "_concrete_powder",
+        "_terracotta", // covers `*_glazed_terracotta`
+        "_planks",
+        "_log",
+        "_wood",
+        "_bricks",
+        "_ore",
+        "_nylium",
+        "_wart_block",
+    ];
+    if CUBE_SUFFIX.iter().any(|s| short.ends_with(s)) || short.starts_with("stripped_") {
+        return Some(Decor::Cube);
+    }
+    if matches!(
+        short,
+        // Stone family.
+        "stone" | "granite" | "diorite" | "andesite" | "calcite" | "tuff" | "basalt"
+            | "smooth_basalt" | "deepslate" | "cobbled_deepslate" | "polished_deepslate"
+            | "blackstone" | "polished_blackstone" | "netherrack" | "end_stone"
+            | "dripstone_block" | "obsidian" | "crying_obsidian" | "bricks" | "prismarine"
+            | "purpur_block" | "clay" | "mud" | "snow_block"
+            // Quartz family.
+            | "quartz_block" | "quartz_bricks" | "smooth_quartz" | "chiseled_quartz_block"
+            | "quartz_pillar"
+            // Mineral blocks.
+            | "iron_block" | "gold_block" | "diamond_block" | "emerald_block" | "lapis_block"
+            | "coal_block" | "netherite_block" | "copper_block" | "raw_iron_block"
+            | "raw_gold_block" | "raw_copper_block"
+            // Miscellany that turns up in builds.
+            | "hay_block" | "bone_block" | "sponge" | "wet_sponge" | "dried_kelp_block"
+            | "moss_block" | "glowstone" | "tnt" | "sand" | "red_sand" | "gravel"
+            | "shroomlight" | "sculk" | "amethyst_block" | "budding_amethyst"
+    ) {
+        return Some(Decor::Cube);
+    }
+    None
 }
 
 /// The instrument a block gives a note block sitting on it.
@@ -1749,8 +1924,20 @@ pub fn intern_companions(registry: &mut StateRegistry) {
                 // Every pitch, powered and not: a click cycles `note` and wraps at
                 // 24, and a product run may click any number of times, so the
                 // whole cycle is interned rather than one step of it.
+                //
+                // The instrument is read off the block *underneath* — wool gives
+                // `guitar`, glass `hat`, wood `bass` — so harp and basedrum alone
+                // cover only note blocks sitting on dirt or stone. Interning just
+                // those two left every other note block without its powered
+                // partner, `powered_pair` returned nothing, and the block was
+                // dropped as unimplemented: three doors in the corpus were
+                // rejected over an instrument we simply never interned. The
+                // instrument each note block actually has is added to the pair,
+                // so the palette's own instruments are always covered without
+                // interning all twenty-three.
                 let mut all = Vec::new();
-                for instrument in ["harp", "basedrum"] {
+                let own = descriptor.get("instrument").unwrap_or("harp").to_string();
+                for instrument in ["harp", "basedrum", own.as_str()] {
                     let at_inst = Descriptor::parse(&descriptor.with("instrument", instrument));
                     for note in 0..crate::components::NOTE_VALUES {
                         let at_note = Descriptor::parse(&at_inst.with("note", &note.to_string()));
@@ -2057,5 +2244,163 @@ mod tests {
         assert!(rules.powered.contains(&on), "a powered repeater emits");
         assert!(!rules.powered.contains(&off), "an unpowered one does not");
         assert!(rules.diodes.contains_key(&off), "both states are diodes");
+    }
+
+    /// The blocks that rejected twenty of twenty-eight community doors, each
+    /// one an ordinary piece of decoration. Taken from the minimal breaking
+    /// sets the batch run bisected out of the real files.
+    #[test]
+    fn ordinary_decoration_is_building_material() {
+        for name in [
+            "minecraft:yellow_wool",
+            "minecraft:light_blue_wool",
+            "minecraft:green_wool",
+            "minecraft:white_wool",
+            "minecraft:red_concrete",
+            "minecraft:yellow_concrete",
+            "minecraft:orange_concrete",
+            "minecraft:purple_concrete",
+            "minecraft:purple_concrete_powder",
+            "minecraft:magenta_stained_glass",
+            "minecraft:quartz_bricks",
+            "minecraft:stone_brick_wall",
+            "minecraft:polished_deepslate_wall",
+            "minecraft:oak_log",
+            "minecraft:sand",
+            "minecraft:gray_glazed_terracotta",
+            "minecraft:polished_deepslate_stairs",
+            "minecraft:cyan_carpet",
+            "minecraft:white_stained_glass_pane",
+        ] {
+            assert!(decor_kind(name).is_some(), "{name} should be building material");
+        }
+    }
+
+    /// Shape drives conduction and hopper suction, so a wall must never be
+    /// mistaken for the stone it is cut from.
+    #[test]
+    fn decoration_keeps_its_shape() {
+        for name in [
+            "minecraft:stone_brick_wall",
+            "minecraft:oak_fence",
+            "minecraft:quartz_stairs",
+            "minecraft:cyan_carpet",
+            "minecraft:glass_pane",
+        ] {
+            assert_eq!(decor_kind(name), Some(Decor::Partial), "{name} is not a full cell");
+            assert!(!is_full_cube(&Descriptor::parse(name)), "{name} must not fill its cell");
+            assert!(!is_conductor(&Descriptor::parse(name)), "{name} must not conduct");
+        }
+        for name in ["minecraft:blue_stained_glass", "minecraft:birch_leaves", "minecraft:ice"] {
+            assert_eq!(decor_kind(name), Some(Decor::Glassy), "{name} is glass-like");
+            assert!(is_full_cube(&Descriptor::parse(name)), "{name} still fills its cell");
+            assert!(!is_conductor(&Descriptor::parse(name)), "{name} must not conduct");
+        }
+        for name in ["minecraft:yellow_wool", "minecraft:red_concrete", "minecraft:oak_planks"] {
+            assert!(is_conductor(&Descriptor::parse(name)), "{name} is an ordinary solid");
+        }
+    }
+
+    /// `minecraft:piston_head` ends in `_head`. A decoration family that ran
+    /// before the implemented blocks claimed it and replaced a piston's arm
+    /// with a brick, which broke every door in the corpus — the reason the
+    /// material check is the *last* arm of the registration match.
+    #[test]
+    fn implemented_blocks_outrank_the_decoration_families() {
+        let mut registry = StateRegistry::new();
+        let head = registry.intern("minecraft:piston_head[facing=up,short=false,type=normal]").unwrap();
+        let mut table = BehaviourTable::default();
+        register_all(&mut registry, &mut table);
+        assert_eq!(
+            table.get(head).map(|b| b.name()),
+            Some("piston_head"),
+            "a piston head is an arm, not decoration"
+        );
+    }
+
+    /// Blocks that carry redstone state are not decoration, however solid they
+    /// look. Asserting one away would silently change what a door does.
+    #[test]
+    fn redstone_components_are_never_called_decoration() {
+        for name in [
+            "minecraft:waxed_copper_bulb",
+            "minecraft:waxed_oxidized_copper_bulb",
+            "minecraft:piston_head",
+            "minecraft:observer",
+            "minecraft:redstone_lamp",
+            "minecraft:iron_door",
+        ] {
+            assert_eq!(decor_kind(name), None, "{name} has behaviour worth modelling");
+        }
+    }
+
+    /// The whole point, end to end: a build dressed in the decoration that used
+    /// to be fatal still loads *and* still works. Twenty of twenty-eight
+    /// community doors were rejected outright because a wool block somewhere in
+    /// the casing had no behaviour, so this asserts both halves — nothing is
+    /// reported unknown, and the piston the decoration surrounds still extends.
+    #[test]
+    fn a_decorated_build_loads_and_its_piston_still_fires() {
+        use crate::Bounds;
+        let mut sim = crate::Simulation::new(Bounds::new(Pos::new(0, 0, 0), Pos::new(15, 15, 15)));
+
+        // A note block sitting on wool plays `guitar`, not `harp` — the
+        // instrument is read off the block underneath. Interning only harp and
+        // basedrum left every other note block without its powered partner and
+        // dropped it as unimplemented, which is three more doors in the corpus.
+        let decoration = [
+            "minecraft:yellow_wool",
+            "minecraft:purple_concrete",
+            "minecraft:magenta_stained_glass",
+            "minecraft:stone_brick_wall",
+            "minecraft:polished_deepslate_stairs",
+            "minecraft:cyan_carpet",
+            "minecraft:oak_log",
+            "minecraft:quartz_bricks",
+            "minecraft:shroomlight",
+            "minecraft:note_block[instrument=guitar,note=0,powered=false]",
+        ];
+        let mut placed = Vec::new();
+        for (i, name) in decoration.iter().enumerate() {
+            let id = sim.registry_mut().intern(name).unwrap();
+            let at = Pos::new(7, 1 + i as i32, 7);
+            sim.world_mut().set(at, id);
+            placed.push((at, id, *name));
+        }
+
+        let piston = sim
+            .registry_mut()
+            .intern("minecraft:piston[extended=false,facing=east]")
+            .unwrap();
+        let lever = sim
+            .registry_mut()
+            .intern("minecraft:lever[face=floor,facing=north,powered=false]")
+            .unwrap();
+        let base = sim.registry_mut().intern("minecraft:stone").unwrap();
+        sim.world_mut().set(Pos::new(2, 1, 2), piston);
+        sim.world_mut().set(Pos::new(2, 0, 3), base);
+        sim.world_mut().set(Pos::new(2, 1, 3), lever);
+
+        intern_companions(sim.registry_mut());
+        let mut table = std::mem::take(sim.behaviours_mut());
+        register_all(sim.registry_mut(), &mut table);
+        *sim.behaviours_mut() = table;
+
+        assert_eq!(
+            sim.unknown_report(),
+            None,
+            "ordinary decoration must not reject the build"
+        );
+        for (at, id, name) in placed {
+            assert_eq!(sim.world().get(at), id, "{name} must survive registration");
+        }
+
+        sim.use_block(Pos::new(2, 1, 3));
+        sim.run_until_quiescent(50);
+        assert!(
+            Descriptor::parse(sim.registry().descriptor(sim.world().get(Pos::new(2, 1, 2))).unwrap())
+                .flag("extended"),
+            "the piston inside the decoration must still extend"
+        );
     }
 }
