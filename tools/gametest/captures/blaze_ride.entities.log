@@ -1,0 +1,648 @@
+Note: src/TraceCapture.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+[22:08:53] [main/INFO]: Loaded 1585 recipes
+[22:08:53] [main/INFO]: Loaded 1688 advancements
+[22:08:53] [main/INFO]: Selecting global world spawn...
+[22:08:53] [main/INFO]: Loading 0 persistent chunks...
+[22:08:53] [main/INFO]: Time elapsed: 171 ms
+[22:08:53] [main/INFO]: Started game test server
+  origin: BlockPos{x=0, y=100, z=0}
+[22:08:53] [main/INFO]: 2 tests are now running at position -6662499, -59, 9335172!
+[22:08:53] [main/INFO]: Running test environment 'minecraft:default' batch 0 (1 tests)...
+[22:08:53] [main/INFO]: [  ]
+  warmup ticks until entity-ticking: 34 (8/8 chunks ready)
+  spawn: id=1 minecraft:minecart at (2.5, 1.0625, 1.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.009999990463257..2.990000009536743, 1.0625..1.762499988079071, 1.0099999904632568..1.9900000095367432] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  ride: id=2 -> vehicle id=1, seated at (2.5, 1.0625, 1.5)
+  spawn: id=2 minecraft:blaze at (2.5, 1.0625, 1.5) vel=(0.0, 0.0, 0.0) flags=[noai, ride]
+         bbox=[2.199999988079071..2.800000011920929, 1.0625..2.862499952316284, 1.199999988079071..1.800000011920929] size=0.6000000238418579x1.7999999523162842x0.6000000238418579
+  note: setDeltaMovement rejected the non-finite vector; wrote Entity.deltaMovement directly
+  spawn: id=3 minecraft:minecart at (2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)
+         bbox=[2.009999990463257..2.990000009536743, 1.0..1.699999988079071, 4.009999990463257..4.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  ride: id=4 -> vehicle id=3, seated at (2.5, 1.0, 4.5)
+  spawn: id=4 minecraft:blaze at (2.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0) flags=[noai, ride]
+         bbox=[2.199999988079071..2.800000011920929, 1.0..2.799999952316284, 4.199999988079071..4.800000011920929] size=0.6000000238418579x1.7999999523162842x0.6000000238418579
+  spawn: id=5 minecraft:minecart at (0.5, 1.0625, 7.5) vel=(0.3, 0.0, 0.0)
+         bbox=[0.009999990463256836..0.9900000095367432, 1.0625..1.762499988079071, 7.009999990463257..7.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  ride: id=6 -> vehicle id=5, seated at (0.5, 1.0625, 7.5)
+  spawn: id=6 minecraft:blaze at (0.5, 1.0625, 7.5) vel=(0.0, 0.0, 0.0) flags=[noai, ride]
+         bbox=[0.19999998807907104..0.800000011920929, 1.0625..2.862499952316284, 7.199999988079071..7.800000011920929] size=0.6000000238418579x1.7999999523162842x0.6000000238418579
+  spawn: id=7 minecraft:minecart at (2.5, 4.0, 10.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.009999990463257..2.990000009536743, 4.0..4.699999988079071, 10.009999990463257..10.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  ride: id=8 -> vehicle id=7, seated at (2.5, 4.0, 10.5)
+  spawn: id=8 minecraft:blaze at (2.5, 4.0, 10.5) vel=(0.0, 0.0, 0.0) flags=[noai, ride]
+         bbox=[2.199999988079071..2.800000011920929, 4.0..5.799999952316284, 10.199999988079071..10.800000011920929] size=0.6000000238418579x1.7999999523162842x0.6000000238418579
+  spawn: id=9 minecraft:blaze at (2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0) flags=[noai]
+         bbox=[2.199999988079071..2.800000011920929, 4.0..5.799999952316284, 13.199999988079071..13.800000011920929] size=0.6000000238418579x1.7999999523162842x0.6000000238418579
+  note: setDeltaMovement rejected the non-finite vector; wrote Entity.deltaMovement directly
+  spawn: id=10 minecraft:minecart at (2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)
+         bbox=[2.009999990463257..2.990000009536743, 1.0..1.699999988079071, 16.009999990463257..16.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  ride: id=11 -> vehicle id=10, seated at (2.5, 1.0, 16.5)
+  spawn: id=11 minecraft:blaze at (2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0) flags=[noai, ride]
+         bbox=[2.199999988079071..2.800000011920929, 1.0..2.799999952316284, 16.19999998807907..16.80000001192093] size=0.6000000238418579x1.7999999523162842x0.6000000238418579
+  spawn: id=12 minecraft:minecart at (2.5, 3.0, 16.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.009999990463257..2.990000009536743, 3.0..3.699999988079071, 16.009999990463257..16.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=13 minecraft:minecart at (2.5, 3.0, 19.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.009999990463257..2.990000009536743, 3.0..3.699999988079071, 19.009999990463257..19.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=14 minecraft:minecart at (2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.009999990463257..2.990000009536743, 1.0625..1.762499988079071, 22.009999990463257..22.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  ride: id=15 -> vehicle id=14, seated at (2.5, 1.0625, 22.5)
+  spawn: id=15 minecraft:villager at (2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) flags=[noai, ride]
+         bbox=[2.199999988079071..2.800000011920929, 1.0625..3.012500047683716, 22.19999998807907..22.80000001192093] size=0.6000000238418579x1.9500000476837158x0.6000000238418579
+  spawn: id=16 minecraft:minecart at (2.5, 1.0625, 25.5) vel=(0.0, 0.0, 0.0)
+         bbox=[2.009999990463257..2.990000009536743, 1.0625..1.762499988079071, 25.009999990463257..25.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  ride: id=17 -> vehicle id=16, seated at (2.5, 1.0625, 25.5)
+  spawn: id=17 minecraft:small_fireball at (2.5, 1.0625, 25.5) vel=(0.0, 0.0, 0.0) flags=[ride]
+         bbox=[2.34375..2.65625, 1.0625..1.375, 25.34375..25.65625] size=0.3125x0.3125x0.3125
+  block-ticking chunks: 8/8
+  pending block ticks: 0
+  runs normally: true
+  entity-ticking chunks: 8/8
+  entities loaded: 17
+    6 x minecraft:blaze
+    9 x minecraft:minecart
+    1 x minecraft:small_fireball
+    1 x minecraft:villager
+  entities with non-finite velocity (nan carts): 2
+  initial [0,0,0] minecraft:stone
+  initial [1,0,0] minecraft:stone
+  initial [2,0,0] minecraft:stone
+  initial [3,0,0] minecraft:stone
+  initial [4,0,0] minecraft:stone
+  initial [5,0,0] minecraft:stone
+  initial [0,0,1] minecraft:stone
+  initial [1,0,1] minecraft:stone
+  initial [2,0,1] minecraft:stone
+  initial [3,0,1] minecraft:stone
+  initial [4,0,1] minecraft:stone
+  initial [5,0,1] minecraft:stone
+  initial [0,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [1,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [2,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [3,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [4,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [5,1,1] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [0,0,2] minecraft:stone
+  initial [1,0,2] minecraft:stone
+  initial [2,0,2] minecraft:stone
+  initial [3,0,2] minecraft:stone
+  initial [4,0,2] minecraft:stone
+  initial [5,0,2] minecraft:stone
+  initial [0,0,3] minecraft:stone
+  initial [1,0,3] minecraft:stone
+  initial [2,0,3] minecraft:stone
+  initial [3,0,3] minecraft:stone
+  initial [4,0,3] minecraft:stone
+  initial [5,0,3] minecraft:stone
+  initial [0,0,4] minecraft:stone
+  initial [1,0,4] minecraft:stone
+  initial [2,0,4] minecraft:stone
+  initial [3,0,4] minecraft:stone
+  initial [4,0,4] minecraft:stone
+  initial [5,0,4] minecraft:stone
+  initial [0,0,5] minecraft:stone
+  initial [1,0,5] minecraft:stone
+  initial [2,0,5] minecraft:stone
+  initial [3,0,5] minecraft:stone
+  initial [4,0,5] minecraft:stone
+  initial [5,0,5] minecraft:stone
+  initial [0,0,6] minecraft:stone
+  initial [1,0,6] minecraft:stone
+  initial [2,0,6] minecraft:stone
+  initial [3,0,6] minecraft:stone
+  initial [4,0,6] minecraft:stone
+  initial [5,0,6] minecraft:stone
+  initial [0,0,7] minecraft:stone
+  initial [1,0,7] minecraft:stone
+  initial [2,0,7] minecraft:stone
+  initial [3,0,7] minecraft:stone
+  initial [4,0,7] minecraft:stone
+  initial [5,0,7] minecraft:stone
+  initial [0,1,7] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [1,1,7] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [2,1,7] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [3,1,7] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [4,1,7] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [5,1,7] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [0,0,8] minecraft:stone
+  initial [1,0,8] minecraft:stone
+  initial [2,0,8] minecraft:stone
+  initial [3,0,8] minecraft:stone
+  initial [4,0,8] minecraft:stone
+  initial [5,0,8] minecraft:stone
+  initial [0,0,9] minecraft:stone
+  initial [1,0,9] minecraft:stone
+  initial [2,0,9] minecraft:stone
+  initial [3,0,9] minecraft:stone
+  initial [4,0,9] minecraft:stone
+  initial [5,0,9] minecraft:stone
+  initial [0,0,10] minecraft:stone
+  initial [1,0,10] minecraft:stone
+  initial [2,0,10] minecraft:stone
+  initial [3,0,10] minecraft:stone
+  initial [4,0,10] minecraft:stone
+  initial [5,0,10] minecraft:stone
+  initial [0,0,11] minecraft:stone
+  initial [1,0,11] minecraft:stone
+  initial [2,0,11] minecraft:stone
+  initial [3,0,11] minecraft:stone
+  initial [4,0,11] minecraft:stone
+  initial [5,0,11] minecraft:stone
+  initial [0,0,12] minecraft:stone
+  initial [1,0,12] minecraft:stone
+  initial [2,0,12] minecraft:stone
+  initial [3,0,12] minecraft:stone
+  initial [4,0,12] minecraft:stone
+  initial [5,0,12] minecraft:stone
+  initial [0,0,13] minecraft:stone
+  initial [1,0,13] minecraft:stone
+  initial [2,0,13] minecraft:stone
+  initial [3,0,13] minecraft:stone
+  initial [4,0,13] minecraft:stone
+  initial [5,0,13] minecraft:stone
+  initial [0,0,14] minecraft:stone
+  initial [1,0,14] minecraft:stone
+  initial [2,0,14] minecraft:stone
+  initial [3,0,14] minecraft:stone
+  initial [4,0,14] minecraft:stone
+  initial [5,0,14] minecraft:stone
+  initial [0,0,15] minecraft:stone
+  initial [1,0,15] minecraft:stone
+  initial [2,0,15] minecraft:stone
+  initial [3,0,15] minecraft:stone
+  initial [4,0,15] minecraft:stone
+  initial [5,0,15] minecraft:stone
+  initial [0,0,16] minecraft:stone
+  initial [1,0,16] minecraft:stone
+  initial [2,0,16] minecraft:stone
+  initial [3,0,16] minecraft:stone
+  initial [4,0,16] minecraft:stone
+  initial [5,0,16] minecraft:stone
+  initial [0,0,17] minecraft:stone
+  initial [1,0,17] minecraft:stone
+  initial [2,0,17] minecraft:stone
+  initial [3,0,17] minecraft:stone
+  initial [4,0,17] minecraft:stone
+  initial [5,0,17] minecraft:stone
+  initial [0,0,18] minecraft:stone
+  initial [1,0,18] minecraft:stone
+  initial [2,0,18] minecraft:stone
+  initial [3,0,18] minecraft:stone
+  initial [4,0,18] minecraft:stone
+  initial [5,0,18] minecraft:stone
+  initial [0,0,19] minecraft:stone
+  initial [1,0,19] minecraft:stone
+  initial [2,0,19] minecraft:stone
+  initial [3,0,19] minecraft:stone
+  initial [4,0,19] minecraft:stone
+  initial [5,0,19] minecraft:stone
+  initial [0,0,20] minecraft:stone
+  initial [1,0,20] minecraft:stone
+  initial [2,0,20] minecraft:stone
+  initial [3,0,20] minecraft:stone
+  initial [4,0,20] minecraft:stone
+  initial [5,0,20] minecraft:stone
+  initial [0,0,21] minecraft:stone
+  initial [1,0,21] minecraft:stone
+  initial [2,0,21] minecraft:stone
+  initial [3,0,21] minecraft:stone
+  initial [4,0,21] minecraft:stone
+  initial [5,0,21] minecraft:stone
+  initial [0,0,22] minecraft:stone
+  initial [1,0,22] minecraft:stone
+  initial [2,0,22] minecraft:stone
+  initial [3,0,22] minecraft:stone
+  initial [4,0,22] minecraft:stone
+  initial [5,0,22] minecraft:stone
+  initial [0,1,22] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [1,1,22] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [2,1,22] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [3,1,22] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [4,1,22] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [5,1,22] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [0,0,23] minecraft:stone
+  initial [1,0,23] minecraft:stone
+  initial [2,0,23] minecraft:stone
+  initial [3,0,23] minecraft:stone
+  initial [4,0,23] minecraft:stone
+  initial [5,0,23] minecraft:stone
+  initial [0,0,24] minecraft:stone
+  initial [1,0,24] minecraft:stone
+  initial [2,0,24] minecraft:stone
+  initial [3,0,24] minecraft:stone
+  initial [4,0,24] minecraft:stone
+  initial [5,0,24] minecraft:stone
+  initial [0,0,25] minecraft:stone
+  initial [1,0,25] minecraft:stone
+  initial [2,0,25] minecraft:stone
+  initial [3,0,25] minecraft:stone
+  initial [4,0,25] minecraft:stone
+  initial [5,0,25] minecraft:stone
+  initial [0,1,25] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [1,1,25] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [2,1,25] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [3,1,25] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [4,1,25] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [5,1,25] minecraft:rail[shape=east_west,waterlogged=false]
+  initial [0,0,26] minecraft:stone
+  initial [1,0,26] minecraft:stone
+  initial [2,0,26] minecraft:stone
+  initial [3,0,26] minecraft:stone
+  initial [4,0,26] minecraft:stone
+  initial [5,0,26] minecraft:stone
+  initial [0,0,27] minecraft:stone
+  initial [1,0,27] minecraft:stone
+  initial [2,0,27] minecraft:stone
+  initial [3,0,27] minecraft:stone
+  initial [4,0,27] minecraft:stone
+  initial [5,0,27] minecraft:stone
+  initial [0,0,28] minecraft:stone
+  initial [1,0,28] minecraft:stone
+  initial [2,0,28] minecraft:stone
+  initial [3,0,28] minecraft:stone
+  initial [4,0,28] minecraft:stone
+  initial [5,0,28] minecraft:stone
+ENT t-1 entities=17 non-finite=2
+  E t-1 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=2 minecraft:blaze pos=(2.5, 1.0625, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t-1 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t-1 id=4 minecraft:blaze pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t-1 id=5 minecraft:minecart pos=(0.5, 1.0625, 7.5) vel=(0.3, 0.0, 0.0)
+  E t-1 id=6 minecraft:blaze pos=(0.5, 1.0625, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t-1 id=7 minecraft:minecart pos=(2.5, 4.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=8 minecraft:blaze pos=(2.5, 4.0, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t-1 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t-1 id=11 minecraft:blaze pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t-1 id=12 minecraft:minecart pos=(2.5, 3.0, 16.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=13 minecraft:minecart pos=(2.5, 3.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t-1 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=17 minecraft:small_fireball pos=(2.5, 1.0625, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+  notify hook: installed (maxChained=1000000)
+    t0 gameTime=35 pending=0
+ENT t0 entities=17 non-finite=2
+  E t0 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+  E t0 id=2 minecraft:blaze pos=(2.5, 1.25, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t0 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t0 id=4 minecraft:blaze pos=(2.5, 1.1875, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t0 id=5 minecraft:minecart pos=(0.725, 1.0625, 7.5) vel=(0.2991, -0.0, 0.0)
+  E t0 id=6 minecraft:blaze pos=(0.725, 1.25, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t0 id=7 minecraft:minecart pos=(2.5, 3.9599999999999937, 10.5) vel=(0.0, -0.037999999523162846, 0.0)
+  E t0 id=8 minecraft:blaze pos=(2.5, 4.147499999999994, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t0 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t0 id=11 minecraft:blaze pos=(2.5, 1.1875, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t0 id=12 minecraft:minecart pos=(2.5, 2.987499952316284, 16.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=13 minecraft:minecart pos=(2.5, 2.9599999999999937, 19.5) vel=(0.0, -0.037999999523162846, 0.0)
+  E t0 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, -0.0, 0.0)
+  E t0 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t0 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, -0.0, 0.0)
+  E t0 id=17 minecraft:small_fireball pos=(2.5, 1.25, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+    t1 gameTime=36 pending=0
+ENT t1 entities=17 non-finite=2
+  E t1 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+  E t1 id=2 minecraft:blaze pos=(2.5, 1.25, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t1 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t1 id=4 minecraft:blaze pos=(2.5, 1.1875, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t1 id=5 minecraft:minecart pos=(0.949325, 1.0625, 7.5) vel=(0.2982027, -0.0, 0.0)
+  E t1 id=6 minecraft:blaze pos=(0.949325, 1.25, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t1 id=7 minecraft:minecart pos=(2.5, 3.882000000476836, 10.5) vel=(0.0, -0.07409999861717226, 0.0)
+  E t1 id=8 minecraft:blaze pos=(2.5, 4.069500000476836, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t1 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t1 id=11 minecraft:blaze pos=(2.5, 1.1875, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t1 id=12 minecraft:minecart pos=(2.5, 2.987499952316284, 16.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=13 minecraft:minecart pos=(2.5, 2.882000000476836, 19.5) vel=(0.0, -0.07409999861717226, 0.0)
+  E t1 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, -0.0, 0.0)
+  E t1 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t1 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, -0.0, 0.0)
+  E t1 id=17 minecraft:small_fireball pos=(2.5, 1.25, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+    t2 gameTime=37 pending=0
+ENT t2 entities=17 non-finite=2
+  E t2 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+  E t2 id=2 minecraft:blaze pos=(2.5, 1.25, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t2 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t2 id=4 minecraft:blaze pos=(2.5, 1.1875, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t2 id=5 minecraft:minecart pos=(1.172977025, 1.0625, 7.5) vel=(0.29730809189999996, -0.0, 0.0)
+  E t2 id=6 minecraft:blaze pos=(1.172977025, 1.25, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t2 id=7 minecraft:minecart pos=(2.5, 3.7679000018596582, 10.5) vel=(0.0, -0.10839499732613568, 0.0)
+  E t2 id=8 minecraft:blaze pos=(2.5, 3.9554000018596582, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t2 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t2 id=11 minecraft:blaze pos=(2.5, 1.1875, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t2 id=12 minecraft:minecart pos=(2.5, 2.987499952316284, 16.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=13 minecraft:minecart pos=(2.5, 2.7679000018596582, 19.5) vel=(0.0, -0.10839499732613568, 0.0)
+  E t2 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, -0.0, 0.0)
+  E t2 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t2 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, -0.0, 0.0)
+  E t2 id=17 minecraft:small_fireball pos=(2.5, 1.25, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+ENT t3 entities=17 non-finite=2
+  E t3 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+  E t3 id=2 minecraft:blaze pos=(2.5, 1.25, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t3 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t3 id=4 minecraft:blaze pos=(2.5, 1.1875, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t3 id=5 minecraft:minecart pos=(1.395958093925, 1.0625, 7.5) vel=(0.29641616762429995, -0.0, 0.0)
+  E t3 id=6 minecraft:blaze pos=(1.395958093925, 1.25, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t3 id=7 minecraft:minecart pos=(2.5, 3.619505004533522, 10.5) vel=(0.0, -0.14097524569082268, 0.0)
+  E t3 id=8 minecraft:blaze pos=(2.5, 3.807005004533522, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t3 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t3 id=11 minecraft:blaze pos=(2.5, 1.1875, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t3 id=12 minecraft:minecart pos=(2.5, 2.987499952316284, 16.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=13 minecraft:minecart pos=(2.5, 2.619505004533522, 19.5) vel=(0.0, -0.14097524569082268, 0.0)
+  E t3 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, -0.0, 0.0)
+  E t3 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t3 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, -0.0, 0.0)
+  E t3 id=17 minecraft:small_fireball pos=(2.5, 1.25, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+ENT t4 entities=17 non-finite=2
+  E t4 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+  E t4 id=2 minecraft:blaze pos=(2.5, 1.25, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t4 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t4 id=4 minecraft:blaze pos=(2.5, 1.1875, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t4 id=5 minecraft:minecart pos=(1.618270219643225, 1.0625, 7.5) vel=(0.29552691912142703, -0.0, 0.0)
+  E t4 id=6 minecraft:blaze pos=(1.618270219643225, 1.25, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t4 id=7 minecraft:minecart pos=(2.5, 3.438529758842705, 10.5) vel=(0.0, -0.1719264812488885, 0.0)
+  E t4 id=8 minecraft:blaze pos=(2.5, 3.626029758842705, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t4 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t4 id=11 minecraft:blaze pos=(2.5, 1.1875, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t4 id=12 minecraft:minecart pos=(2.5, 2.987499952316284, 16.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=13 minecraft:minecart pos=(2.5, 2.438529758842705, 19.5) vel=(0.0, -0.1719264812488885, 0.0)
+  E t4 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, -0.0, 0.0)
+  E t4 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t4 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, -0.0, 0.0)
+  E t4 id=17 minecraft:small_fireball pos=(2.5, 1.25, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+[22:08:53] [main/INFO]: [  ]
+ENT t5 entities=17 non-finite=2
+  E t5 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+  E t5 id=2 minecraft:blaze pos=(2.5, 1.25, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t5 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t5 id=4 minecraft:blaze pos=(2.5, 1.1875, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t5 id=5 minecraft:minecart pos=(1.8399154089842953, 1.0625, 7.5) vel=(0.2946403383640627, -0.0, 0.0)
+  E t5 id=6 minecraft:blaze pos=(1.8399154089842953, 1.25, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t5 id=7 minecraft:minecart pos=(2.5, 3.22660327759381, 10.5) vel=(0.0, -0.20133015466008355, 0.0)
+  E t5 id=8 minecraft:blaze pos=(2.5, 3.41410327759381, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t5 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t5 id=11 minecraft:blaze pos=(2.5, 1.1875, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t5 id=12 minecraft:minecart pos=(2.5, 2.987499952316284, 16.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=13 minecraft:minecart pos=(2.5, 2.22660327759381, 19.5) vel=(0.0, -0.20133015466008355, 0.0)
+  E t5 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, -0.0, 0.0)
+  E t5 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t5 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, -0.0, 0.0)
+  E t5 id=17 minecraft:small_fireball pos=(2.5, 1.25, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+ENT t6 entities=17 non-finite=2
+  E t6 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+  E t6 id=2 minecraft:blaze pos=(2.5, 1.25, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t6 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t6 id=4 minecraft:blaze pos=(2.5, 1.1875, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t6 id=5 minecraft:minecart pos=(2.0608956627573423, 1.0625, 7.5) vel=(0.2937564173489705, -0.0, 0.0)
+  E t6 id=6 minecraft:blaze pos=(2.0608956627573423, 1.25, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t6 id=7 minecraft:minecart pos=(2.5, 2.9852731229337195, 10.5) vel=(0.0, -0.22926364405019975, 0.0)
+  E t6 id=8 minecraft:blaze pos=(2.5, 3.1727731229337195, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t6 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t6 id=11 minecraft:blaze pos=(2.5, 1.1875, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t6 id=12 minecraft:minecart pos=(2.5, 2.987499952316284, 16.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=13 minecraft:minecart pos=(2.5, 1.9852731229337195, 19.5) vel=(0.0, -0.22926364405019975, 0.0)
+  E t6 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, -0.0, 0.0)
+  E t6 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t6 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, -0.0, 0.0)
+  E t6 id=17 minecraft:small_fireball pos=(2.5, 1.25, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+ENT t7 entities=17 non-finite=2
+  E t7 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+  E t7 id=2 minecraft:blaze pos=(2.5, 1.25, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t7 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t7 id=4 minecraft:blaze pos=(2.5, 1.1875, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t7 id=5 minecraft:minecart pos=(2.28121297576907, 1.0625, 7.5) vel=(0.2928751480969236, -0.0, 0.0)
+  E t7 id=6 minecraft:blaze pos=(2.28121297576907, 1.25, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t7 id=7 minecraft:minecart pos=(2.5, 2.716009478883521, 10.5) vel=(0.0, -0.255800458637817, 0.0)
+  E t7 id=8 minecraft:blaze pos=(2.5, 2.903509478883521, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t7 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t7 id=11 minecraft:blaze pos=(2.5, 1.1875, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t7 id=12 minecraft:minecart pos=(2.5, 2.987499952316284, 16.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=13 minecraft:minecart pos=(2.5, 1.716009478883521, 19.5) vel=(0.0, -0.255800458637817, 0.0)
+  E t7 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, -0.0, 0.0)
+  E t7 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t7 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, -0.0, 0.0)
+  E t7 id=17 minecraft:small_fireball pos=(2.5, 1.25, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+ENT t8 entities=17 non-finite=2
+  E t8 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+  E t8 id=2 minecraft:blaze pos=(2.5, 1.25, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t8 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t8 id=4 minecraft:blaze pos=(2.5, 1.1875, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t8 id=5 minecraft:minecart pos=(2.5008693368417627, 1.0625, 7.5) vel=(0.2919965226526328, -0.0, 0.0)
+  E t8 id=6 minecraft:blaze pos=(2.5008693368417627, 1.25, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t8 id=7 minecraft:minecart pos=(2.5, 2.420209020245707, 10.5) vel=(0.0, -0.28101043217970983, 0.0)
+  E t8 id=8 minecraft:blaze pos=(2.5, 2.607709020245707, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t8 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t8 id=11 minecraft:blaze pos=(2.5, 1.1875, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t8 id=12 minecraft:minecart pos=(2.5, 2.987499952316284, 16.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=13 minecraft:minecart pos=(2.5, 1.4202090202457072, 19.5) vel=(0.0, -0.28101043217970983, 0.0)
+  E t8 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, -0.0, 0.0)
+  E t8 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t8 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, -0.0, 0.0)
+  E t8 id=17 minecraft:small_fireball pos=(2.5, 1.25, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+ENT t9 entities=17 non-finite=2
+  E t9 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+  E t9 id=2 minecraft:blaze pos=(2.5, 1.25, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t9 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t9 id=4 minecraft:blaze pos=(2.5, 1.1875, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t9 id=5 minecraft:minecart pos=(2.7198667288312373, 1.0625, 7.5) vel=(0.2911205330846749, -0.0, 0.0)
+  E t9 id=6 minecraft:blaze pos=(2.7198667288312373, 1.25, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t9 id=7 minecraft:minecart pos=(2.5, 2.0991985880660025, 10.5) vel=(0.0, -0.30495990674398177, 0.0)
+  E t9 id=8 minecraft:blaze pos=(2.5, 2.2866985880660025, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t9 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t9 id=11 minecraft:blaze pos=(2.5, 1.1875, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t9 id=12 minecraft:minecart pos=(2.5, 2.987499952316284, 16.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=13 minecraft:minecart pos=(2.5, 1.0991985880660025, 19.5) vel=(0.0, -0.30495990674398177, 0.0)
+  E t9 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, -0.0, 0.0)
+  E t9 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t9 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, -0.0, 0.0)
+  E t9 id=17 minecraft:small_fireball pos=(2.5, 1.25, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+ENT t10 entities=17 non-finite=2
+  E t10 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+  E t10 id=2 minecraft:blaze pos=(2.5, 1.25, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t10 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t10 id=4 minecraft:blaze pos=(2.5, 1.1875, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t10 id=5 minecraft:minecart pos=(2.9382071286447435, 1.0625, 7.5) vel=(0.29024717148542084, -0.0, 0.0)
+  E t10 id=6 minecraft:blaze pos=(2.9382071286447435, 1.25, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t10 id=7 minecraft:minecart pos=(2.5, 1.7542386813220219, 10.5) vel=(0.0, -0.32771190729454014, 0.0)
+  E t10 id=8 minecraft:blaze pos=(2.5, 1.9417386813220219, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t10 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t10 id=11 minecraft:blaze pos=(2.5, 1.1875, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t10 id=12 minecraft:minecart pos=(2.5, 2.987499952316284, 16.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=13 minecraft:minecart pos=(2.5, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, -0.0, 0.0)
+  E t10 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t10 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, -0.0, 0.0)
+  E t10 id=17 minecraft:small_fireball pos=(2.5, 1.25, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+ENT t11 entities=17 non-finite=2
+  E t11 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+  E t11 id=2 minecraft:blaze pos=(2.5, 1.25, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t11 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t11 id=4 minecraft:blaze pos=(2.5, 1.1875, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t11 id=5 minecraft:minecart pos=(3.1558925072588093, 1.0625, 7.5) vel=(0.2893764299709646, -0.0, 0.0)
+  E t11 id=6 minecraft:blaze pos=(3.1558925072588093, 1.25, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t11 id=7 minecraft:minecart pos=(2.5, 1.3865267740274874, 10.5) vel=(0.0, -0.3493263075463456, 0.0)
+  E t11 id=8 minecraft:blaze pos=(2.5, 1.5740267740274874, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t11 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t11 id=11 minecraft:blaze pos=(2.5, 1.1875, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t11 id=12 minecraft:minecart pos=(2.5, 2.987499952316284, 16.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=13 minecraft:minecart pos=(2.5, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, -0.0, 0.0)
+  E t11 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t11 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, -0.0, 0.0)
+  E t11 id=17 minecraft:small_fireball pos=(2.5, 1.25, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+ENT t12 entities=17 non-finite=2
+  E t12 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+  E t12 id=2 minecraft:blaze pos=(2.5, 1.25, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t12 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t12 id=4 minecraft:blaze pos=(2.5, 1.1875, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t12 id=5 minecraft:minecart pos=(3.3729248297370327, 1.0625, 7.5) vel=(0.2885083006810517, -0.0, 0.0)
+  E t12 id=6 minecraft:blaze pos=(3.3729248297370327, 1.25, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t12 id=7 minecraft:minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=8 minecraft:blaze pos=(2.5, 1.1875, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t12 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t12 id=11 minecraft:blaze pos=(2.5, 1.1875, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t12 id=12 minecraft:minecart pos=(2.5, 2.987499952316284, 16.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=13 minecraft:minecart pos=(2.5, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, -0.0, 0.0)
+  E t12 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t12 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, -0.0, 0.0)
+  E t12 id=17 minecraft:small_fireball pos=(2.5, 1.25, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+ENT t13 entities=17 non-finite=2
+  E t13 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+  E t13 id=2 minecraft:blaze pos=(2.5, 1.25, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t13 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t13 id=4 minecraft:blaze pos=(2.5, 1.1875, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t13 id=5 minecraft:minecart pos=(3.5893060552478215, 1.0625, 7.5) vel=(0.28764277577900854, -0.0, 0.0)
+  E t13 id=6 minecraft:blaze pos=(3.5893060552478215, 1.25, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t13 id=7 minecraft:minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=8 minecraft:blaze pos=(2.5, 1.1875, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t13 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t13 id=11 minecraft:blaze pos=(2.5, 1.1875, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t13 id=12 minecraft:minecart pos=(2.5, 2.987499952316284, 16.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=13 minecraft:minecart pos=(2.5, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, -0.0, 0.0)
+  E t13 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t13 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, -0.0, 0.0)
+  E t13 id=17 minecraft:small_fireball pos=(2.5, 1.25, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+ENT t14 entities=17 non-finite=2
+  E t14 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+  E t14 id=2 minecraft:blaze pos=(2.5, 1.25, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t14 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t14 id=4 minecraft:blaze pos=(2.5, 1.1875, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t14 id=5 minecraft:minecart pos=(3.805038137082078, 1.0625, 7.5) vel=(0.2867798474516715, -0.0, 0.0)
+  E t14 id=6 minecraft:blaze pos=(3.805038137082078, 1.25, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t14 id=7 minecraft:minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=8 minecraft:blaze pos=(2.5, 1.1875, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t14 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t14 id=11 minecraft:blaze pos=(2.5, 1.1875, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t14 id=12 minecraft:minecart pos=(2.5, 2.987499952316284, 16.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=13 minecraft:minecart pos=(2.5, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, -0.0, 0.0)
+  E t14 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t14 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, -0.0, 0.0)
+  E t14 id=17 minecraft:small_fireball pos=(2.5, 1.25, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+ENT t15 entities=17 non-finite=2
+  E t15 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+  E t15 id=2 minecraft:blaze pos=(2.5, 1.25, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t15 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t15 id=4 minecraft:blaze pos=(2.5, 1.1875, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t15 id=5 minecraft:minecart pos=(4.020123022670831, 1.0625, 7.5) vel=(0.2859195079093165, -0.0, 0.0)
+  E t15 id=6 minecraft:blaze pos=(4.020123022670831, 1.25, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t15 id=7 minecraft:minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=8 minecraft:blaze pos=(2.5, 1.1875, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t15 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t15 id=11 minecraft:blaze pos=(2.5, 1.1875, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t15 id=12 minecraft:minecart pos=(2.5, 2.987499952316284, 16.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=13 minecraft:minecart pos=(2.5, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, -0.0, 0.0)
+  E t15 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t15 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, -0.0, 0.0)
+  E t15 id=17 minecraft:small_fireball pos=(2.5, 1.25, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+ENT t16 entities=17 non-finite=2
+  E t16 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+  E t16 id=2 minecraft:blaze pos=(2.5, 1.25, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t16 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t16 id=4 minecraft:blaze pos=(2.5, 1.1875, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t16 id=5 minecraft:minecart pos=(4.2345626536028185, 1.0625, 7.5) vel=(0.28506174938558854, -0.0, 0.0)
+  E t16 id=6 minecraft:blaze pos=(4.2345626536028185, 1.25, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t16 id=7 minecraft:minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t16 id=8 minecraft:blaze pos=(2.5, 1.1875, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t16 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t16 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t16 id=11 minecraft:blaze pos=(2.5, 1.1875, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t16 id=12 minecraft:minecart pos=(2.5, 2.987499952316284, 16.5) vel=(0.0, 0.0, 0.0)
+  E t16 id=13 minecraft:minecart pos=(2.5, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t16 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, -0.0, 0.0)
+  E t16 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t16 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, -0.0, 0.0)
+  E t16 id=17 minecraft:small_fireball pos=(2.5, 1.25, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+ENT t17 entities=17 non-finite=2
+  E t17 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+  E t17 id=2 minecraft:blaze pos=(2.5, 1.25, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t17 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t17 id=4 minecraft:blaze pos=(2.5, 1.1875, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t17 id=5 minecraft:minecart pos=(4.44835896564201, 1.0625, 7.5) vel=(0.2842065641374318, -0.0, 0.0)
+  E t17 id=6 minecraft:blaze pos=(4.44835896564201, 1.25, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t17 id=7 minecraft:minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t17 id=8 minecraft:blaze pos=(2.5, 1.1875, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t17 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t17 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t17 id=11 minecraft:blaze pos=(2.5, 1.1875, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t17 id=12 minecraft:minecart pos=(2.5, 2.987499952316284, 16.5) vel=(0.0, 0.0, 0.0)
+  E t17 id=13 minecraft:minecart pos=(2.5, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t17 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, -0.0, 0.0)
+  E t17 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t17 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, -0.0, 0.0)
+  E t17 id=17 minecraft:small_fireball pos=(2.5, 1.25, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+ENT t18 entities=17 non-finite=2
+  E t18 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+  E t18 id=2 minecraft:blaze pos=(2.5, 1.25, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t18 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t18 id=4 minecraft:blaze pos=(2.5, 1.1875, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t18 id=5 minecraft:minecart pos=(4.661513888745084, 1.0625, 7.5) vel=(0.2833539444450195, -0.0, 0.0)
+  E t18 id=6 minecraft:blaze pos=(4.661513888745084, 1.25, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t18 id=7 minecraft:minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t18 id=8 minecraft:blaze pos=(2.5, 1.1875, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t18 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t18 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t18 id=11 minecraft:blaze pos=(2.5, 1.1875, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t18 id=12 minecraft:minecart pos=(2.5, 2.987499952316284, 16.5) vel=(0.0, 0.0, 0.0)
+  E t18 id=13 minecraft:minecart pos=(2.5, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t18 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, -0.0, 0.0)
+  E t18 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t18 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, -0.0, 0.0)
+  E t18 id=17 minecraft:small_fireball pos=(2.5, 1.25, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+ENT t19 entities=17 non-finite=2
+  E t19 id=1 minecraft:minecart pos=(2.5, 1.0625, 1.5) vel=(0.0, -0.0, 0.0)
+  E t19 id=2 minecraft:blaze pos=(2.5, 1.25, 1.5) vel=(0.0, 0.0, 0.0) vehicle=1
+  E t19 id=3 minecraft:minecart pos=(2.5, 1.0, 4.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t19 id=4 minecraft:blaze pos=(2.5, 1.1875, 4.5) vel=(0.0, 0.0, 0.0) vehicle=3
+  E t19 id=5 minecraft:minecart pos=(4.8740293470788485, 1.0625, 7.5) vel=(0.2825038826116844, -0.0, 0.0)
+  E t19 id=6 minecraft:blaze pos=(4.8740293470788485, 1.25, 7.5) vel=(0.0, 0.0, 0.0) vehicle=5
+  E t19 id=7 minecraft:minecart pos=(2.5, 1.0, 10.5) vel=(0.0, 0.0, 0.0)
+  E t19 id=8 minecraft:blaze pos=(2.5, 1.1875, 10.5) vel=(0.0, 0.0, 0.0) vehicle=7
+  E t19 id=9 minecraft:blaze pos=(2.5, 4.0, 13.5) vel=(0.0, 0.0, 0.0)
+  E t19 id=10 minecraft:minecart pos=(2.5, 1.0, 16.5) vel=(0.0, 0.0, NaN)  NON-FINITE
+  E t19 id=11 minecraft:blaze pos=(2.5, 1.1875, 16.5) vel=(0.0, 0.0, 0.0) vehicle=10
+  E t19 id=12 minecraft:minecart pos=(2.5, 2.987499952316284, 16.5) vel=(0.0, 0.0, 0.0)
+  E t19 id=13 minecraft:minecart pos=(2.5, 1.0, 19.5) vel=(0.0, 0.0, 0.0)
+  E t19 id=14 minecraft:minecart pos=(2.5, 1.0625, 22.5) vel=(0.0, -0.0, 0.0)
+  E t19 id=15 minecraft:villager pos=(2.5, 1.0625, 22.5) vel=(0.0, 0.0, 0.0) vehicle=14
+  E t19 id=16 minecraft:minecart pos=(2.5, 1.0625, 25.5) vel=(0.0, -0.0, 0.0)
+  E t19 id=17 minecraft:small_fireball pos=(2.5, 1.25, 25.5) vel=(0.0, 0.0, 0.0) vehicle=16
+captured 0 tick(s) with changes -> work/blaze_ride.json

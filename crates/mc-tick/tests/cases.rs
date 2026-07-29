@@ -288,7 +288,11 @@ fn build_sim(
                 sim.spawn_item(item.item.clone(), item.pos, item.motion, item.pickup_delay);
             }
             mc_tick::structure::SpawnedEntity::Minecart(cart) => {
-                sim.spawn_authored_minecart(cart, None);
+                let vehicle = sim.spawn_authored_minecart(cart, None);
+                for rider in &cart.passengers {
+                    sim.spawn_authored_rider(vehicle, rider)
+                        .unwrap_or_else(|e| panic!("{label}: {e}"));
+                }
             }
             // A case that authors one of these would otherwise run with the
             // entity missing and quietly "pass". Loud beats silent in a test
@@ -303,6 +307,9 @@ fn build_sim(
             mc_tick::structure::SpawnedEntity::Villager(villager) => {
                 sim.spawn_authored_villager(villager)
                     .unwrap_or_else(|e| panic!("{label}: {e}"));
+            }
+            mc_tick::structure::SpawnedEntity::Blaze(blaze) => {
+                sim.spawn_authored_blaze(blaze).unwrap_or_else(|e| panic!("{label}: {e}"));
             }
         }
     }

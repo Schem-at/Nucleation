@@ -399,3 +399,15 @@ required-features = ["bridge", "mc-tick"]
 [[example]]
 name = "world_entity_audit"
 required-features = ["bridge", "mc-tick"]
+
+# Ticks the record 3x3 door through the bridge and reports what moved. Needs the
+# bridge because it goes through the product loading path on purpose.
+[[example]]
+name = "door55_sim"
+required-features = ["bridge", "mc-tick"]
+
+# Actuates the record 3x3 door through the bridge (InWorld) and renders it, so
+# it needs both the loader's features and the renderer's.
+[[example]]
+name = "door55_render"
+required-features = ["bridge", "mc-tick", "rendering"]

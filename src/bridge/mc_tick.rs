@@ -311,6 +311,61 @@ fn entities_snbt(schematic: &crate::UniversalSchematic, min: (i32, i32, i32)) ->
                 }
             }
         }
+        // `Passengers` — riders nested inside their vehicle's compound rather
+        // than listed beside it. Dropping this tag is a *silent under-report of
+        // the world*: `55_3x3.zip` holds 22 top-level entities and vanilla's own
+        // capture of the same save counts 24, and the two missing bodies are
+        // blazes riding two of its nan carts. Whether they are there decides
+        // whether two hitboxes the build is glued together with exist at all.
+        //
+        // The rider's `Pos` is shifted like every other position so the file
+        // stays coherent, though the engine does not use it — a rider's seat is
+        // re-derived from its vehicle every tick. See
+        // `mc_tick::entity::passenger_attachment`.
+        if let Some(V::List(passengers)) = entity.nbt.get("Passengers") {
+            let mut riders = String::new();
+            for rider in passengers {
+                let V::Compound(fields) = rider else { continue };
+                let Some(V::String(rider_id)) = fields.get("id") else { continue };
+                let rider_id = if rider_id.contains(':') {
+                    rider_id.clone()
+                } else {
+                    format!("minecraft:{rider_id}")
+                };
+                // The engine refuses a passenger with no `Pos`, which is the
+                // right outcome — leave the tag off rather than invent one.
+                let seat: Vec<f64> = match fields.get("Pos") {
+                    Some(V::List(values)) if values.len() == 3 => {
+                        values.iter().map(|v| nbt_number(v).unwrap_or(0.0)).collect()
+                    }
+                    _ => Vec::new(),
+                };
+                let motion = nbt_vec3(fields.get("Motion"));
+                if !riders.is_empty() {
+                    riders.push_str(", ");
+                }
+                let _ = write!(riders, "{{id: \"{rider_id}\"");
+                if seat.len() == 3 {
+                    let _ = write!(
+                        riders,
+                        ", Pos: [{}, {}, {}]",
+                        snbt_double(seat[0] - f64::from(mx)),
+                        snbt_double(seat[1] - f64::from(my)),
+                        snbt_double(seat[2] - f64::from(mz)),
+                    );
+                }
+                let _ = write!(
+                    riders,
+                    ", Motion: [{}, {}, {}]}}",
+                    snbt_double(motion[0]),
+                    snbt_double(motion[1]),
+                    snbt_double(motion[2])
+                );
+            }
+            if !riders.is_empty() {
+                let _ = write!(out, ", Passengers: [{riders}]");
+            }
+        }
         out.push_str("}}");
     }
     out
@@ -754,7 +809,15 @@ fn wire_simulation(
                 sim.spawn_item(item.item.clone(), item.pos, item.motion, item.pickup_delay);
             }
             mc_tick::structure::SpawnedEntity::Minecart(cart) => {
-                sim.spawn_authored_minecart(cart, None);
+                let vehicle = sim.spawn_authored_minecart(cart, None);
+                // Riders are seated immediately after their vehicle, so a
+                // capture's ids line up and so the rider cannot outlive a
+                // vehicle that failed to spawn.
+                for rider in &cart.passengers {
+                    if let Err(why) = sim.spawn_authored_rider(vehicle, rider) {
+                        refused.push(why);
+                    }
+                }
             }
             // A furnace cart is dimensionally an ordinary cart, so an
             // *unfuelled* one needs nothing more than being a cart. A fuelled
@@ -776,6 +839,15 @@ fn wire_simulation(
             }
             mc_tick::structure::SpawnedEntity::Villager(villager) => {
                 if let Err(why) = sim.spawn_authored_villager(villager) {
+                    refused.push(why);
+                }
+            }
+            // A blaze reached here is one standing on its own, not riding —
+            // a rider is spawned by its vehicle's arm above and never appears
+            // in this list. Standing alone it is scaffolding like a villager,
+            // and a blaze that should fly or fight refuses by name.
+            mc_tick::structure::SpawnedEntity::Blaze(blaze) => {
+                if let Err(why) = sim.spawn_authored_blaze(blaze) {
                     refused.push(why);
                 }
             }
@@ -2151,6 +2223,65 @@ mod tests {
             "placing this build must disturb it — an observer whose neighbour just \
              appeared pulses. If this is empty, `InWorld` proves nothing."
         );
+    }
+
+    /// The record door's two blazes are **passengers**, and they are now here.
+    ///
+    /// The save holds 22 top-level entities; vanilla's own capture of it
+    /// (`tools/gametest/captures/door55_in_world.entities.log`) counts 24,
+    /// because two of the four plain minecarts carry a `minecraft:blaze` in
+    /// their `Passengers` list. This asserts both halves — that the top level is
+    /// still 22, so the 24 cannot be a miscount of it, and that the two extra
+    /// bodies are blazes seated at exactly the y the save records.
+    ///
+    /// `2.2500` and `2.1875` are lifted from the file, not from the seat
+    /// constant: each is its vehicle's y plus 0.1875, which is what
+    /// `blaze_ride.entities.log` measures a blaze's seat on a minecart to be,
+    /// and getting them from the door as well makes this two independent
+    /// measurements agreeing rather than one restated.
+    #[test]
+    fn the_record_doors_two_blazes_are_seated_passengers() {
+        let path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/samples/55_3x3.zip");
+        let bytes = std::fs::read(&path).expect("the record-door sample must be present");
+        let schematic = crate::formats::world::from_world_zip(&bytes).expect("the sample loads");
+        let snbt = to_gametest_snbt(&schematic);
+        let structure = mc_tick::Structure::parse(&snbt).expect("the sample parses");
+        assert_eq!(
+            structure.entities.len(),
+            22,
+            "the control: the *top level* is 22, so a 24 below cannot be a recount \
+             of it — the two extra bodies have to come from somewhere else"
+        );
+
+        let sim = wire_record_door(super::ffi::TickSettleMode::InWorld);
+        assert_eq!(
+            sim.entity_bodies().len(),
+            24,
+            "22 top-level entities plus two riders is what vanilla counts in this world"
+        );
+
+        let riders = sim.riders();
+        assert_eq!(riders.len(), 2, "two blazes ride two of the four plain carts");
+        let mut seats: Vec<f64> = riders
+            .iter()
+            .map(|(_, kind, pos)| {
+                assert_eq!(kind, "minecraft:blaze");
+                pos[1]
+            })
+            .collect();
+        seats.sort_by(f64::total_cmp);
+        assert_eq!(seats, vec![2.1875, 2.25], "the exact y the save records");
+
+        // And each sits 0.1875 above the cart it is on, horizontally identical.
+        for (_, _, pos) in &riders {
+            let vehicle = sim
+                .minecarts()
+                .iter()
+                .find(|c| (c.pos[1] + 0.1875 - pos[1]).abs() < 1.0e-12)
+                .expect("every rider has a vehicle 0.1875 below it");
+            assert_eq!([vehicle.pos[0], vehicle.pos[2]], [pos[0], pos[2]]);
+        }
     }
 
     /// Wire a one-rail structure carrying `entities`, as the app would.

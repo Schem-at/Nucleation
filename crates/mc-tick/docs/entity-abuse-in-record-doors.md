@@ -162,15 +162,69 @@ refuted it** — the builders' account was wrong, and this page was wrong with i
 - [x] Per-entity hitbox dimensions. Read out of the game's own registry and
       cross-checked against plate-edge probes: minecart and every container
       variant 0.98 x 0.7, dragon fireball 1.0 x 1.0, small fireball 0.3125,
-      villager adult 0.6 x 1.95 and baby 0.49 x 0.98, item 0.25. An unmeasured
-      entity gets **no** box and the simulation refuses it by name.
-- [~] Entities resting on other entities' hitboxes. Carts collide with carts
-      exactly; a *frozen* body (fireball, villager, blaze) is **not** an
-      obstacle to a cart at all — `tick_minecart_among` builds its obstacle list
-      from the other carts only, and `SimCollision` carries no entity boxes. An
-      earlier version of this line claimed otherwise and was wrong.
-      Still unverified either way, because the door turned out not to need it —
-      see the next entry.
+      villager adult 0.6 x 1.95 and baby 0.49 x 0.98, **blaze 0.6 x 1.8**,
+      item 0.25. An unmeasured entity gets **no** box and the simulation refuses
+      it by name. The blaze is `blaze_reach.entities.log`: nine floor plates
+      straddling the width edges — clear at 1.76 and 11.24, touching at 5.77 and
+      15.23, which bounds the half-width in (0.2925, 0.3025) — plus the four
+      baby-villager offsets, where a 0.49-wide body reads clear and a blaze
+      reads *touching*, so it cannot be the baby's width either. Height comes
+      from a plate two blocks up that a blaze with its feet at 1.205 reaches and
+      one at 1.195 does not, bounding it in (1.795, 1.805);
+      `blaze_reach_villager_control.entities.log` is the same rig with a
+      1.95-tall villager, which reaches both.
+- [x] **Passengers.** Entities nested in a vehicle's `Passengers` list rather
+      than listed at the top level, which is what the record door's two blazes
+      are and why a top-level count of the save reads 22 where vanilla reads 24.
+      Read by the parser, emitted by the bridge's SNBT writer, seated by
+      `Simulation::spawn_authored_rider`. A rider has **no position of its own**:
+      `Entity.rideTick` zeroes its velocity, ticks it, and `positionRider` then
+      hard-sets it to `vehicle.position() + seat` with no collision check — so
+      the engine stores `(vehicle, seat)` and re-derives the box whenever
+      anything moves. `blaze_ride.entities.log` measures all of it over twenty
+      ticks: a cart at rest, a cart rolling east (the rider's x tracks to the
+      last digit), a cart falling through air (the rider lands with it), and a
+      **NaN** cart, whose rider is pinned forever. `blaze_ride_ai.entities.log`
+      repeats the last two with AI on and gets the same positions with the
+      rider's velocity reading `(0, -0.0784000015258789, 0)` every tick and
+      never moving it — one step of living-entity gravity, overwritten before it
+      can do anything. That number is exactly what the door's saved riders
+      carry, which is why it is *not* evidence they are falling.
+
+      The seat is a property of the **pair**, not a constant and not derivable
+      from the hitboxes: on one and the same minecart a blaze sits 0.1875 above
+      it, a small fireball 0.1875, and a **villager 0.0** — lower, despite being
+      taller. `entity::passenger_attachment` is that measured table and refuses
+      every pair it has not seen; `Passengers` on any vehicle but a plain
+      minecart refuses in the parser.
+
+      **Not modelled: the rider's velocity.** The engine exposes a rider as a
+      box with no velocity, where vanilla reports −0.0784. It is inert — nothing
+      reads it and it never moves the rider — but it is a difference, and a
+      future behaviour that reads passenger velocity would find zero here.
+- [~] Entities resting on other entities' hitboxes. **Half of this line was
+      wrong, and the oracle says which half.** `blaze_ride_ai.entities.log` drops
+      a minecart from y = 3.0 onto four different bodies at y = 1.0, with a fifth
+      lane over bare floor as the control:
+
+      | body under it | cart settles at | reading |
+      |---|---|---|
+      | blaze (1.8 tall) | 2.799999952316284 | rests on it, exactly its top |
+      | villager (1.95) | 2.950000047683716 | rests on it, exactly its top |
+      | small fireball | 1.0 | falls straight through |
+      | dragon fireball | 1.0 | falls straight through |
+      | nothing (control) | 1.0 | falls |
+
+      So a **living** body *is* a hard obstacle to a cart and a **projectile** is
+      not, which is `Entity.canBeCollidedWith` — true for a living entity, false
+      for a fireball. The engine implements neither: `tick_minecart_among` still
+      builds its obstacle list from the other carts only, so a cart that vanilla
+      would park on a villager or a blaze falls through it here. That is now a
+      **known, measured gap** rather than an open question, and it is not
+      silently counted the way `piston_retract_contacts` is. The record 3x3 door
+      does not appear to need it — it is at rest for 400 ticks without it, and
+      its one cart over air is held by a block ledge (see the next entry) — but
+      any build that stacks a cart on a mob is mis-simulated today.
 - [x] A cart with **no block under its own column** is held up by a block under
       any column its box overlaps. This is what actually holds the record door's
       end cart: it stands in an `observer` over air, with 0.245 of its 0.98
@@ -225,14 +279,21 @@ against the game.
 
 Two things that capture *can* still say, and does:
 
-**The two blazes are passengers, not missing entities.** The save holds 22
-top-level entities and our extraction keeps all 22; the capture's 24 counts the
-two `minecraft:blaze` riders nested in the `Passengers` list of two of the four
-plain minecarts — both of them nan carts, riders sitting 0.1875 above their
-vehicle with ordinary finite gravity of their own. Extraction is not cropping
-anything. The engine, however, **never instantiates a passenger**, so those two
-blaze hitboxes are simply absent from every run. Blaze dimensions are also
-unmeasured, so the entity would be refused by name if it were spawned.
+**The two blazes are passengers, not missing entities — and they are in now.**
+The save holds 22 top-level entities and our extraction keeps all 22; the
+capture's 24 counts the two `minecraft:blaze` riders nested in the `Passengers`
+list of two of the four plain minecarts — both of them nan carts, riders sitting
+0.1875 above their vehicle with ordinary finite gravity of their own. Extraction
+was never cropping anything; the engine was dropping the tag.
+
+It no longer does. Loaded under `InWorld`, `55_3x3.zip` now yields **24 bodies**,
+with the two blazes at y = 2.2500 and 2.1875 — each its cart's y plus 0.1875,
+which is the seat measured independently in `blaze_ride.entities.log` — and the
+door is still at rest: zero block changes over 400 ticks, quiescent, no entity
+moved, zero `piston_retract_contacts`. Pinned by
+`the_record_doors_two_blazes_are_seated_passengers` in `src/bridge/mc_tick.rs`,
+which asserts the top level is 22 *and* the loaded world is 24, so the second
+number cannot be a recount of the first.
 
 **Vanilla does not move that door's top row, and does not change a block.**
 Over the four ticks of `door55_in_world.entities.log` the seven furnace carts at

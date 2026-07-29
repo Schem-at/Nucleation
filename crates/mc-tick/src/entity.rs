@@ -129,6 +129,24 @@ pub fn entity_dimensions(kind: &str) -> Option<(f64, f64)> {
         "minecraft:dragon_fireball" | "minecraft:fireball" => (1.0, 1.0),
         "minecraft:small_fireball" => (0.3125, 0.3125),
         "minecraft:villager" => (0.6, 1.95),
+        // The record 3x3 door's two riders. Registry says `sized(0.6F, 1.8F)`,
+        // and `blaze_reach.entities.log` walks a blaze across a weighted plate's
+        // touch box at twelve offsets and agrees at all twelve: clear at 1.76
+        // and 11.24, touching at 5.77 and 15.23, which bounds the half-width in
+        // (0.2925, 0.3025). The four baby-villager offsets are the cross-check —
+        // a 0.49-wide body reads clear at 17.81 and 27.19 and a blaze reads
+        // *touching*, so the width cannot be the baby's.
+        //
+        // Height is bounded the same way by a plate two blocks up: a blaze with
+        // its feet at 1.205 reaches it and one at 1.195 does not, so the height
+        // is in (1.795, 1.805). `blaze_reach_villager_control.entities.log` is
+        // the negative control — the same rig, a 1.95-tall villager, and *both*
+        // plates fire.
+        //
+        // Written as the float the registry holds rather than the decimal,
+        // because the eighth decimal is observable: in `blaze_ride_ai` a cart
+        // dropped onto a blaze settles at exactly 1.0 + 1.7999999523162842.
+        "minecraft:blaze" => (0.6_f32 as f64, 1.8_f32 as f64),
         "minecraft:item" => (0.25, 0.25),
         // Anything else is *not* guessed. An unknown entity gets no box, and
         // the simulation refuses it by name rather than quietly giving it a
@@ -153,6 +171,48 @@ pub fn body_aabb(kind: &str, pos: [f64; 3]) -> Option<([f64; 3], [f64; 3])> {
     ))
 }
 
+/// Where a passenger sits relative to its vehicle's position, measured.
+///
+/// A rider is not a body with a position of its own. Vanilla's
+/// `Entity.positionRider` hard-sets the passenger every tick to
+/// `vehicle.position() + vehiclePassengerAttachment - riderVehicleAttachment`,
+/// with no collision check, so this offset *is* the rider's position — see
+/// [`crate::sim::Simulation::spawn_authored_rider`].
+///
+/// The two attachment points are properties of the two entity *types*, so the
+/// offset is neither a constant nor derivable from the hitboxes, and this table
+/// says so by refusing every pair it has not seen. `blaze_ride.entities.log`
+/// measures three riders on one and the same minecart and gets two different
+/// answers:
+///
+/// | vehicle | rider | seated y − vehicle y |
+/// |---|---|---|
+/// | `minecart` | `blaze` | **0.1875** |
+/// | `minecart` | `small_fireball` | 0.1875 |
+/// | `minecart` | `villager` | **0.0** |
+///
+/// A villager therefore rides *lower* than a blaze on the same cart despite
+/// being taller, which rules out any rule of the form "half the vehicle's
+/// height" or "derived from the rider's box". Horizontal offset is zero in all
+/// three lanes, over twenty ticks and including a cart rolling east.
+///
+/// The blaze row is confirmed twice over: `55_3x3.zip` itself holds a blaze at
+/// y = 2.2500 on a cart at 2.062 and another at 2.1875 on a cart at 2.000 —
+/// 0.1875 both times.
+pub fn passenger_attachment(vehicle_kind: &str, rider_kind: &str) -> Option<[f64; 3]> {
+    // Only the plain cart is measured. The container and furnace variants share
+    // its *hitbox*, but an attachment point is not a hitbox — none of them was
+    // put under the oracle, so none of them is assumed to match.
+    if vehicle_kind != "minecraft:minecart" {
+        return None;
+    }
+    Some(match rider_kind {
+        "minecraft:blaze" | "minecraft:small_fireball" => [0.0, 0.1875, 0.0],
+        "minecraft:villager" => [0.0, 0.0, 0.0],
+        _ => return None,
+    })
+}
+
 #[cfg(test)]
 mod hitbox_tests {
     use super::*;
@@ -168,6 +228,75 @@ mod hitbox_tests {
         let body = EntityBody { id: 0, kind: kind.into(), min, max, is_minecart: false };
         let (tmin, tmax) = touch(plate[0], plate[1], plate[2]);
         body.intersects(tmin, tmax)
+    }
+
+    /// The twelve probes of `blaze_reach.entities.log`, replayed against the
+    /// engine's own box.
+    ///
+    /// Nine plates on the floor walk a blaze across their touch box; the last
+    /// three are the height rig. Four of the floor probes straddle the width
+    /// edges at ±0.0025 and ±0.0075, so the assertion fails if the half-width is
+    /// wrong by a hundredth in either direction. The four *baby-villager*
+    /// offsets are the discriminator: a 0.49-wide body reads clear at 17.81 and
+    /// 27.19 and vanilla read a blaze as touching both, so this cannot pass with
+    /// the baby's width either.
+    #[test]
+    fn the_blaze_box_reproduces_the_captured_plate_probes() {
+        // (plate cell x, blaze centre x, what vanilla's `power` said)
+        const FLOOR: [(f64, f64, bool); 9] = [
+            (2.0, 1.76, false),
+            (6.0, 5.77, true),
+            (10.0, 11.24, false),
+            (14.0, 15.23, true),
+            (18.0, 17.81, true),
+            (22.0, 21.83, true),
+            (26.0, 27.19, true),
+            (30.0, 31.17, true),
+            (34.0, 34.5, true),
+        ];
+        for (plate, at, expected) in FLOOR {
+            assert_eq!(
+                presses("minecraft:blaze", [plate, 1.0, 1.0], [at, 1.0, 1.5]),
+                expected,
+                "blaze at x={at} against the plate at {plate}"
+            );
+        }
+        // The height rig: a plate two blocks up, and a blaze whose feet straddle
+        // the height that just reaches it. 1.205 + h > 3.0 > 1.195 + h pins h to
+        // (1.795, 1.805). `blaze_reach_villager_control.entities.log` is the
+        // control — a 1.95-tall villager reaches both, so the rig can say yes.
+        assert!(presses("minecraft:blaze", [44.0, 3.0, 2.0], [43.9, 1.205, 2.5]));
+        assert!(!presses("minecraft:blaze", [48.0, 3.0, 2.0], [47.9, 1.195, 2.5]));
+        assert!(
+            presses("minecraft:villager", [48.0, 3.0, 2.0], [47.9, 1.195, 2.5]),
+            "the control: a taller body must reach the plate the blaze misses, or \
+             the assertion above is passing because the rig cannot reach at all"
+        );
+    }
+
+    /// The seat is a property of the *pair*, and the table refuses the rest.
+    ///
+    /// The villager row is the control: same vehicle, taller rider, different
+    /// answer. Any rule derived from the vehicle alone, or from the rider's box,
+    /// would have to give these two the same offset — and vanilla does not.
+    #[test]
+    fn the_measured_seats_disagree_with_each_other() {
+        assert_eq!(
+            passenger_attachment("minecraft:minecart", "minecraft:blaze"),
+            Some([0.0, 0.1875, 0.0])
+        );
+        assert_eq!(
+            passenger_attachment("minecraft:minecart", "minecraft:villager"),
+            Some([0.0, 0.0, 0.0])
+        );
+        // Unmeasured pairs get nothing rather than a plausible default.
+        assert_eq!(passenger_attachment("minecraft:minecart", "minecraft:creeper"), None);
+        assert_eq!(
+            passenger_attachment("minecraft:furnace_minecart", "minecraft:blaze"),
+            None,
+            "a furnace cart shares the plain cart's hitbox, but an attachment point \
+             is not a hitbox and this one was never put under the oracle"
+        );
     }
 
     /// The six probes of `fireball_reach.json`, replayed against the engine's

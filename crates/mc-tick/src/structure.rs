@@ -95,6 +95,8 @@ pub enum SpawnedEntity {
     Fireball(SpawnedFireball),
     /// A villager.
     Villager(SpawnedVillager),
+    /// A blaze. In the record 3x3 door, always a minecart's passenger.
+    Blaze(SpawnedBlaze),
 }
 
 impl SpawnedEntity {
@@ -106,6 +108,7 @@ impl SpawnedEntity {
             Self::FurnaceMinecart(_) => "minecraft:furnace_minecart",
             Self::Fireball(ball) => &ball.kind,
             Self::Villager(_) => "minecraft:villager",
+            Self::Blaze(_) => "minecraft:blaze",
         }
     }
 }
@@ -138,6 +141,19 @@ pub struct SpawnedMinecart {
     /// its yaw-90 lane scores 1 and shoves itself apart. Under the compass
     /// reading the two lanes would swap.
     pub yaw: f64,
+    /// `Passengers` — entities this cart carries.
+    ///
+    /// Nested in the vehicle's own compound rather than listed alongside it, so
+    /// a reader that only walks the top level under-reports the world. The
+    /// record 3x3 door is exactly that case: 22 top-level entities on disk, and
+    /// two `minecraft:blaze` riding two of its four plain minecarts, which is
+    /// how vanilla's own capture of the save counts 24.
+    ///
+    /// A passenger's `Pos` in the file is where it *was* when the world saved;
+    /// the engine does not use it, because vanilla re-derives a rider's position
+    /// from its vehicle on the first tick — see
+    /// [`crate::entity::passenger_attachment`].
+    pub passengers: Vec<SpawnedEntity>,
 }
 
 /// An authored furnace minecart.
@@ -209,6 +225,32 @@ pub struct SpawnedVillager {
     /// Spawn position.
     pub pos: [f64; 3],
     /// Spawn velocity.
+    pub motion: [f64; 3],
+}
+
+/// An authored blaze.
+///
+/// Present in the record 3x3 door only as a **passenger**: two of them ride two
+/// of its four plain minecarts, and both of those carts are nan carts. The
+/// builders' published account described villagers doing this job; the save says
+/// blazes. Either way what the build wants from the mob is its box — the cart it
+/// rides pins it, and its own box is scaffolding.
+///
+/// Like [`SpawnedFireball`], no hitbox field: dimensions belong to the entity
+/// type and the engine's tables, not to a file that could claim otherwise.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpawnedBlaze {
+    /// Spawn position. Ignored while it is a rider, whose position vanilla
+    /// re-derives from its vehicle every tick.
+    pub pos: [f64; 3],
+    /// Spawn velocity.
+    ///
+    /// A riding blaze in 26.2 reads exactly `(0, -0.0784000015258789, 0)` every
+    /// tick, forever, and never moves: `Entity.rideTick` zeroes the passenger's
+    /// delta, runs its tick — one step of living-entity gravity, 0.08 × 0.98 —
+    /// and then `positionRider` overwrites the position anyway. That is why the
+    /// door's saved riders carry a finite gravity velocity beside vehicles whose
+    /// velocity is NaN, and why the number is not evidence that they fall.
     pub motion: [f64; 3],
 }
 
@@ -666,6 +708,83 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// A `Passengers` list — entity compounds nested inside a vehicle's own.
+    ///
+    /// The shape differs from an `entities` entry: there is no wrapping
+    /// `{pos, blockPos, nbt}`, the compound *is* the entity, and its position
+    /// tag is `Pos` rather than `pos`. That `Pos` is read only so an
+    /// unparseable rider still fails loudly; the engine seats a rider from its
+    /// vehicle, not from the file — see [`crate::entity::passenger_attachment`].
+    fn passenger_list(&mut self) -> Result<Vec<SpawnedEntity>, StructureError> {
+        self.eat(b'[')?;
+        let mut out = Vec::new();
+        loop {
+            self.skip_ws();
+            if self.peek() == Some(b']') {
+                self.at += 1;
+                return Ok(out);
+            }
+            out.push(self.passenger_entry()?);
+            self.skip_ws();
+            if self.peek() == Some(b',') {
+                self.at += 1;
+            }
+        }
+    }
+
+    /// One passenger compound: `{id: "...", Pos: [x, y, z], Motion: [..]}`.
+    fn passenger_entry(&mut self) -> Result<SpawnedEntity, StructureError> {
+        self.eat(b'{')?;
+        let mut id = String::new();
+        let mut pos: Option<[f64; 3]> = None;
+        let mut motion = [0.0f64; 3];
+        loop {
+            self.skip_ws();
+            if self.peek() == Some(b'}') {
+                self.at += 1;
+                break;
+            }
+            let field = self.key()?;
+            self.eat(b':')?;
+            match field.as_str() {
+                "id" => id = self.string()?,
+                "Pos" => {
+                    let values = self.float_list()?;
+                    if values.len() != 3 {
+                        return self.err("passenger `Pos` must have three elements");
+                    }
+                    pos = Some([values[0], values[1], values[2]]);
+                }
+                "Motion" => {
+                    let values = self.float_list()?;
+                    if values.len() == 3 {
+                        motion = [values[0], values[1], values[2]];
+                    }
+                }
+                _ => self.skip_value()?,
+            }
+            self.skip_ws();
+            if self.peek() == Some(b',') {
+                self.at += 1;
+            }
+        }
+        let Some(pos) = pos else {
+            return self.err("passenger entity needs `Pos`");
+        };
+        match id.as_str() {
+            "minecraft:blaze" => Ok(SpawnedEntity::Blaze(SpawnedBlaze { pos, motion })),
+            "minecraft:villager" => Ok(SpawnedEntity::Villager(SpawnedVillager { pos, motion })),
+            other => Err(StructureError::UnsupportedEntity {
+                entity_type: if other.is_empty() {
+                    "<no id>".to_string()
+                } else {
+                    other.to_string()
+                },
+                offset: self.at,
+            }),
+        }
+    }
+
     /// One `entities` entry: an authored item entity or minecart.
     fn entity_entry(&mut self) -> Result<SpawnedEntity, StructureError> {
         self.eat(b'{')?;
@@ -677,6 +796,7 @@ impl<'a> Parser<'a> {
         let mut push = [0.0f64; 2];
         let mut yaw = 0.0f64;
         let mut entity_id = String::new();
+        let mut passengers: Vec<SpawnedEntity> = Vec::new();
         loop {
             if self.peek() == Some(b'}') {
                 self.at += 1;
@@ -693,7 +813,8 @@ impl<'a> Parser<'a> {
                     pos = Some([values[0], values[1], values[2]]);
                 }
                 "nbt" => {
-                    // The entity compound: id, Item, Motion, PickupDelay.
+                    // The entity compound: id, Item, Motion, PickupDelay,
+                    // Rotation, Fuel/Push, Passengers.
                     self.eat(b'{')?;
                     loop {
                         if self.peek() == Some(b'}') {
@@ -729,6 +850,12 @@ impl<'a> Parser<'a> {
                                 let stack = self.item_entry()?;
                                 item = Some((stack.id, stack.count));
                             }
+                            // Riders. A list of entity compounds nested inside
+                            // the vehicle's own — the one place in a world file
+                            // where an entity is not at the top level, and the
+                            // reason a top-level count of `55_3x3.zip` reports
+                            // 22 where vanilla's own capture of it reports 24.
+                            "Passengers" => passengers = self.passenger_list()?,
                             _ => self.skip_value()?,
                         }
                         if self.peek() == Some(b',') {
@@ -741,6 +868,18 @@ impl<'a> Parser<'a> {
             if self.peek() == Some(b',') {
                 self.at += 1;
             }
+        }
+        // A rider changes what a vehicle *is* — its passenger's box is in the
+        // world, and it moves when the vehicle moves. Only the plain minecart's
+        // seat has been measured (`blaze_ride.entities.log`), so a `Passengers`
+        // list on anything else refuses instead of being dropped: dropping it is
+        // precisely the silent under-report this whole seam exists to stop.
+        if !passengers.is_empty() && entity_id != "minecraft:minecart" {
+            return self.err(
+                "`Passengers` on an entity other than minecraft:minecart: no seat \
+                 offset has been measured for that vehicle, and carrying the rider \
+                 at a guessed one would move a hitbox the build depends on",
+            );
         }
         match entity_id.as_str() {
             "minecraft:item" => match (pos, item) {
@@ -755,8 +894,13 @@ impl<'a> Parser<'a> {
                     pos,
                     motion,
                     yaw,
+                    passengers,
                 })),
                 None => self.err("minecart entity needs `pos`"),
+            },
+            "minecraft:blaze" => match pos {
+                Some(pos) => Ok(SpawnedEntity::Blaze(SpawnedBlaze { pos, motion })),
+                None => self.err("blaze entity needs `pos`"),
             },
             "minecraft:furnace_minecart" => match pos {
                 Some(pos) => Ok(SpawnedEntity::FurnaceMinecart(SpawnedFurnaceMinecart {
@@ -1290,6 +1434,87 @@ mod tests {
     fn malformed_input_reports_where_it_failed() {
         let err = Structure::parse("{size: [1,1,1], palette: [").unwrap_err();
         assert!(matches!(err, StructureError::Malformed { .. }), "{err}");
+    }
+
+    /// A cart's `Passengers` are read, and an absent tag means none.
+    ///
+    /// The second cart is the control, and it is the point: without it a
+    /// passenger-shaped assertion could pass on a reader that put *every* cart's
+    /// rider list at one element. `55_3x3.zip` has both kinds — two of its four
+    /// plain carts carry a blaze and two do not — and reading the tag is the
+    /// difference between counting 22 entities and counting the 24 vanilla does.
+    #[test]
+    fn a_carts_passengers_are_read_and_default_to_none() {
+        const TEXT: &str = r#"{
+            size: [1, 1, 1],
+            palette: [{Name: "minecraft:rail"}],
+            blocks: [{pos: [0, 0, 0], state: 0}],
+            entities: [
+                {pos: [0.5d, 2.0625d, 0.5d], blockPos: [0, 2, 0], nbt: {id: "minecraft:minecart", Motion: [0.0d, 0.0d, NaN], Passengers: [{id: "minecraft:blaze", Pos: [0.5d, 2.25d, 0.5d], Motion: [-0.039d, -0.0784d, 0.0253d]}]}},
+                {pos: [0.5d, 2.0625d, 1.5d], blockPos: [0, 2, 1], nbt: {id: "minecraft:minecart", Motion: [0.0d, 0.0d, 0.0d]}}
+            ]
+        }"#;
+        let s = Structure::parse(TEXT).unwrap();
+        match (&s.entities[0], &s.entities[1]) {
+            (SpawnedEntity::Minecart(carrying), SpawnedEntity::Minecart(empty)) => {
+                assert_eq!(carrying.passengers.len(), 1);
+                match &carrying.passengers[0] {
+                    SpawnedEntity::Blaze(blaze) => {
+                        assert_eq!(blaze.pos, [0.5, 2.25, 0.5]);
+                        // The gravity a rider accrues and never uses.
+                        assert_eq!(blaze.motion, [-0.039, -0.0784, 0.0253]);
+                    }
+                    other => panic!("expected a blaze rider, got {other:?}"),
+                }
+                assert!(
+                    empty.passengers.is_empty(),
+                    "no Passengers tag means no riders — if this cart has one, the \
+                     reader is inventing them and the assertion above proves nothing"
+                );
+            }
+            other => panic!("expected two minecarts, got {other:?}"),
+        }
+    }
+
+    /// A rider on a vehicle whose seat nobody measured refuses.
+    ///
+    /// The plain-minecart case above is the control: the same tag on the type
+    /// that *has* been measured parses fine, so this is a refusal about the
+    /// vehicle and not a reader that cannot read `Passengers` at all.
+    #[test]
+    fn passengers_on_an_unmeasured_vehicle_refuse() {
+        const TEXT: &str = r#"{
+            size: [1, 1, 1],
+            palette: [{Name: "minecraft:rail"}],
+            blocks: [{pos: [0, 0, 0], state: 0}],
+            entities: [
+                {pos: [0.5d, 2.0d, 0.5d], blockPos: [0, 2, 0], nbt: {id: "minecraft:furnace_minecart", Passengers: [{id: "minecraft:blaze", Pos: [0.5d, 2.2d, 0.5d]}]}}
+            ]
+        }"#;
+        let err = Structure::parse(TEXT).unwrap_err();
+        assert!(
+            format!("{err}").contains("Passengers"),
+            "the refusal must name the tag it refused: {err}"
+        );
+    }
+
+    /// A rider this reader cannot even represent is named, not dropped.
+    #[test]
+    fn an_unrepresentable_rider_is_refused_by_name() {
+        const TEXT: &str = r#"{
+            size: [1, 1, 1],
+            palette: [{Name: "minecraft:rail"}],
+            blocks: [{pos: [0, 0, 0], state: 0}],
+            entities: [
+                {pos: [0.5d, 2.0d, 0.5d], blockPos: [0, 2, 0], nbt: {id: "minecraft:minecart", Passengers: [{id: "minecraft:creeper", Pos: [0.5d, 2.2d, 0.5d]}]}}
+            ]
+        }"#;
+        match Structure::parse(TEXT).unwrap_err() {
+            StructureError::UnsupportedEntity { entity_type, .. } => {
+                assert_eq!(entity_type, "minecraft:creeper");
+            }
+            other => panic!("expected UnsupportedEntity, got {other:?}"),
+        }
     }
 
     /// A cart's `Rotation` is read, and defaults to 0 when absent.
