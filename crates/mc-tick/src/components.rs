@@ -1540,6 +1540,195 @@ impl<P: PowerSource> BlockBehaviour for PressurePlate<P> {
     }
 }
 
+/// `BasePressurePlateBlock.TOUCH_AABB` moved to a cell: the plate inset by a
+/// pixel on each horizontal side (14/16 wide, from 1/16 to 15/16) and 4/16
+/// tall. Read from `BasePressurePlateBlock`'s static initialiser — the
+/// constants there are literally `14.0, 0.5, 14.0, 14.0, 4.0`.
+fn touch_aabb(pos: Pos) -> ([f64; 3], [f64; 3]) {
+    (
+        [f64::from(pos.x) + 0.0625, f64::from(pos.y), f64::from(pos.z) + 0.0625],
+        [f64::from(pos.x) + 0.9375, f64::from(pos.y) + 0.25, f64::from(pos.z) + 0.9375],
+    )
+}
+
+/// Ticks between a *weighted* plate's presence rechecks.
+///
+/// `WeightedPressurePlateBlock.getPressedTime()` returns `10`, overriding
+/// `BasePressurePlateBlock`'s `20` — read from the bytecode (`bipush 10`).
+pub const WEIGHTED_PLATE_RECHECK: u64 = 10;
+
+/// A weighted pressure plate: `power` counts the entities standing on it.
+///
+/// `WeightedPressurePlateBlock.getSignalStrength` is
+/// `Mth.ceil(min(count, maxWeight) * 15.0f / maxWeight)` over
+/// `getEntitiesOfClass(Entity.class, TOUCH_AABB.move(pos))` — **every** entity
+/// type counts, items included. Captured in `weighted_plates.json`: a light
+/// plate (`maxWeight` 15) under 1, 3 and 5 items reads 1, 3 and 5; a heavy
+/// plate (`maxWeight` 150) under 1, 3 and 11 items reads 1, 1 and 2.
+pub struct WeightedPlate {
+    /// This state's `power`.
+    pub power: u8,
+    /// `maxWeight`: 15 for the light plate, 150 for the heavy one.
+    pub max_weight: u32,
+    /// `power=0`..`power=15`, indexed by level.
+    pub states: Vec<StateId>,
+}
+
+impl WeightedPlate {
+    /// The signal this plate should be showing right now.
+    fn signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> u8 {
+        let (min, max) = touch_aabb(pos);
+        let mut count: u32 = 0;
+        for item in &ctx.item_entities.items {
+            if item.removed {
+                continue;
+            }
+            let (emin, emax) = crate::entity::item_aabb(item.pos);
+            if emin[0] < max[0]
+                && emax[0] > min[0]
+                && emin[1] < max[1]
+                && emax[1] > min[1]
+                && emin[2] < max[2]
+                && emax[2] > min[2]
+            {
+                count += 1;
+            }
+        }
+        for body in &ctx.item_entities.others {
+            if body.intersects(min, max) {
+                count += 1;
+            }
+        }
+        // Mth.ceil(min(count, maxWeight) * 15.0f / maxWeight), in f32 exactly
+        // as vanilla computes it.
+        let clamped = count.min(self.max_weight);
+        let raw = clamped as f32 * 15.0 / self.max_weight as f32;
+        raw.ceil() as u8
+    }
+
+    fn apply(&self, ctx: &mut TickCtx<'_>, pos: Pos, signal: u8) {
+        if signal == self.power {
+            return;
+        }
+        let Some(&state) = self.states.get(usize::from(signal)) else { return };
+        ctx.set(pos, state);
+    }
+}
+
+impl BlockBehaviour for WeightedPlate {
+    /// `entityInside`: an unpressed plate notices whatever just arrived and
+    /// starts the recheck cadence.
+    fn on_entity_inside(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if self.power != 0 {
+            return;
+        }
+        let signal = self.signal(ctx, pos);
+        if signal > 0 {
+            self.apply(ctx, pos, signal);
+            ctx.schedule(pos, WEIGHTED_PLATE_RECHECK, TickPriority::Normal);
+        }
+    }
+
+    /// `tick`: recount. Still occupied → recheck in ten; empty → release.
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if self.power == 0 {
+            return;
+        }
+        let signal = self.signal(ctx, pos);
+        self.apply(ctx, pos, signal);
+        if signal > 0 {
+            ctx.schedule(pos, WEIGHTED_PLATE_RECHECK, TickPriority::Normal);
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "weighted_pressure_plate"
+    }
+}
+
+/// Ticks a detector rail waits before rechecking for a cart.
+///
+/// `DetectorRailBlock.checkPressed` ends with `level.scheduleTick(pos, this,
+/// 20)`. Captured in `detector_rail.json`: the rail powers on tick 13 as the
+/// cart arrives and releases on tick 33 — twenty ticks later, *not* when the
+/// cart left.
+pub const DETECTOR_RAIL_RECHECK: u64 = 20;
+
+/// A detector rail.
+///
+/// `checkPressed` selects on `AbstractMinecart.class` only, so no other entity
+/// powers it, and searches `getSearchBB(pos)` — the cell inset by 0.2 on every
+/// side except the bottom: `AABB(x+0.2, y, z+0.2, x+0.8, y+0.8, z+0.8)`, read
+/// from the bytecode's five `0.2d` constants.
+///
+/// It powers like a plate: `getSignal` is 15 in every direction while powered,
+/// and `getDirectSignal` is 15 only for `Direction.UP` — that is, it strongly
+/// powers the block *below* it. Both captured: `detector_rail.json` lights
+/// lamps above, beside and below, and `detector_strong.json` runs dust that
+/// touches only the block under the rail and reads 15 there.
+pub struct DetectorRail {
+    /// Whether this state is powered.
+    pub powered: bool,
+    /// Unpowered/powered states.
+    pub states: StatePair,
+}
+
+impl DetectorRail {
+    fn occupied(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        let min = [f64::from(pos.x) + 0.2, f64::from(pos.y), f64::from(pos.z) + 0.2];
+        let max = [
+            f64::from(pos.x) + 0.8,
+            f64::from(pos.y) + 0.8,
+            f64::from(pos.z) + 0.8,
+        ];
+        ctx.item_entities
+            .others
+            .iter()
+            .any(|body| body.is_minecart && body.intersects(min, max))
+    }
+}
+
+impl DetectorRail {
+    /// `checkPressed`'s write: set the state, then update the neighbours of
+    /// **both** the rail and the block under it.
+    ///
+    /// That second `updateNeighborsAt(pos.below())` is not decoration — it is
+    /// the only thing that tells dust sitting beside the rail's floor to
+    /// re-read it. Because the rail strongly powers only downward, a component
+    /// touching the floor block and not the rail hears about the change by no
+    /// other route. `detector_strong.json` fails without it: the rail flips and
+    /// the dust two cells away stays dark.
+    fn write(&self, ctx: &mut TickCtx<'_>, pos: Pos, powered: bool) {
+        ctx.set(pos, self.states.get(powered));
+        ctx.update_neighbors_at(pos);
+        ctx.update_neighbors_at(pos.offset(crate::pos::Dir::Down));
+    }
+}
+
+impl BlockBehaviour for DetectorRail {
+    fn on_entity_inside(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if !self.powered && self.occupied(ctx, pos) {
+            self.write(ctx, pos, true);
+            ctx.schedule(pos, DETECTOR_RAIL_RECHECK, TickPriority::Normal);
+        }
+    }
+
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if !self.powered {
+            return;
+        }
+        if self.occupied(ctx, pos) {
+            ctx.schedule(pos, DETECTOR_RAIL_RECHECK, TickPriority::Normal);
+        } else {
+            self.write(ctx, pos, false);
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "detector_rail"
+    }
+}
+
 /// How many pitches a note block cycles through before wrapping.
 ///
 /// `NoteBlock.NOTE` is `IntegerProperty.create("note", 0, 24)`; `cycle` wraps 24

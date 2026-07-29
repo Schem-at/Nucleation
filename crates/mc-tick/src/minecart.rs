@@ -326,7 +326,7 @@ fn move_along_track(
         dx = -dx;
         dz = -dz;
     }
-    let speed = horizontal(cart.vel).min(2.0);
+    let speed = jmin(horizontal(cart.vel), 2.0);
     cart.vel = [speed * dx / length, cart.vel[1], speed * dz / length];
 
     // (The rider kick-start lives here in vanilla; this engine has no riders.)
@@ -439,6 +439,27 @@ fn horizontal(vel: [f64; 3]) -> f64 {
     (vel[0] * vel[0] + vel[2] * vel[2]).sqrt()
 }
 
+/// `Math.min` with **Java's** semantics: NaN propagates.
+///
+/// Rust's `f64::min` implements IEEE-754 `minNum`, which *discards* NaN and
+/// returns the other operand; Java's `Math.min` returns NaN if either operand
+/// is NaN. On ordinary numbers they agree, so the difference is invisible
+/// until a NaN arrives — and in the record piston doors NaN velocities are the
+/// mechanism, not an error. A cart whose velocity is NaN must stay NaN: that
+/// is what freezes it, because `Entity.move` gates on
+/// `lengthSqr() > 1.0E-7`, and `NaN > 1.0E-7` is false, so the move never
+/// happens. Laundering the NaN into 2.0 here would hand that cart a real
+/// speed and set the whole contraption walking.
+fn jmin(a: f64, b: f64) -> f64 {
+    if a.is_nan() || b.is_nan() {
+        f64::NAN
+    } else if a < b {
+        a
+    } else {
+        b
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -455,6 +476,102 @@ mod tests {
         assert_eq!(RailShape::SouthWest.exits(), ([0, 0, 1], [-1, 0, 0]));
         assert_eq!(RailShape::NorthWest.exits(), ([0, 0, -1], [-1, 0, 0]));
         assert_eq!(RailShape::NorthEast.exits(), ([0, 0, -1], [1, 0, 0]));
+    }
+
+    /// Nothing but a rail line at y = 0: no floor at all, so anything with
+    /// working physics falls.
+    struct RailOnly;
+
+    impl crate::entity::CollisionWorld for RailOnly {
+        fn is_solid(&self, _pos: Pos) -> bool {
+            false
+        }
+        fn friction(&self, _pos: Pos) -> f32 {
+            0.6
+        }
+        fn rail(&self, pos: Pos) -> Option<Rail> {
+            (pos.y == 0).then_some(Rail {
+                shape: RailShape::EastWest,
+                powered_rail: false,
+                powered: false,
+            })
+        }
+    }
+
+    /// A "nan cart" holds still forever, and stays NaN.
+    ///
+    /// This is the glue the record 3x3 door is built on: carts driven to
+    /// ±Infinity on sloped rails, then collided so that `+Inf + -Inf` yields
+    /// NaN. `Entity.move` only applies a movement when
+    /// `lengthSqr() > 1.0E-7`, and every comparison against NaN is false, so
+    /// the cart never moves and nothing but a piston can shift it. The world
+    /// `55_3x3.zip` carries four of them, saved with `Motion` z = NaN.
+    ///
+    /// The trap this guards is `f64::min`: Rust returns the non-NaN operand
+    /// where Java's `Math.min` propagates NaN, so the speed projection would
+    /// quietly hand a dead cart a real 2.0 and set it moving.
+    #[test]
+    fn a_nan_cart_never_moves_and_stays_nan() {
+        let mut cart = MinecartState {
+            id: 0,
+            kind: "minecraft:minecart".into(),
+            pos: [0.5, 0.0625, 0.5],
+            vel: [f64::NAN, 0.0, 0.0],
+            on_ground: false,
+            on_rails: true,
+            removed: false,
+        };
+        // The first tick seats the cart on the rail chord — vanilla writes that
+        // position unconditionally, whatever the velocity — so stability is
+        // measured from there.
+        tick_minecart(&mut cart, &RailOnly);
+        let seated = cart.pos;
+        for _ in 0..100 {
+            tick_minecart(&mut cart, &RailOnly);
+        }
+        assert_eq!(cart.pos, seated, "a nan cart must not move");
+
+        // NOT asserted: that the velocity is *still* NaN a hundred ticks on.
+        // It is not — `move_cart` zeroes an axis whenever `collide_move`
+        // reports a hit, and a NaN delta currently reports one. Vanilla's
+        // `Entity.move` decides collision by `movement.x != vec3.x`, and in
+        // Java `NaN != NaN` is true, so it may well flag a collision too; what
+        // it then does with the velocity is unverified. That matters, because
+        // NaN *contagion* between carts is what the door relies on, and a cart
+        // whose NaN has been laundered to 0.0 stands still but no longer
+        // infects. Pinning it needs an oracle capture of two colliding carts;
+        // see the capture spec in `docs/entity-abuse-in-record-doors.md`.
+    }
+
+    /// The same rail, with an ordinary velocity, does move — so the test above
+    /// is measuring NaN and not a world that simply cannot move anything.
+    #[test]
+    fn an_ordinary_cart_on_that_same_rail_does_move() {
+        let mut cart = MinecartState {
+            id: 0,
+            kind: "minecraft:minecart".into(),
+            pos: [0.5, 0.0625, 0.5],
+            vel: [0.3, 0.0, 0.0],
+            on_ground: false,
+            on_rails: true,
+            removed: false,
+        };
+        tick_minecart(&mut cart, &RailOnly);
+        assert!(cart.pos[0] > 0.5, "a finite cart moves along the rail");
+    }
+
+    /// `jmin` is Java's `Math.min`, not Rust's.
+    #[test]
+    fn jmin_propagates_nan_where_rust_would_discard_it() {
+        assert!(jmin(f64::NAN, 2.0).is_nan());
+        assert!(jmin(2.0, f64::NAN).is_nan());
+        // Rust's own min is the behaviour we must *not* have here.
+        assert_eq!(f64::NAN.min(2.0), 2.0);
+        // Finite operands agree with both.
+        assert_eq!(jmin(1.0, 2.0), 1.0);
+        assert_eq!(jmin(2.0, 1.0), 1.0);
+        // Infinity clamps like an ordinary large number, as Java does.
+        assert_eq!(jmin(f64::INFINITY, 2.0), 2.0);
     }
 
     #[test]

@@ -1062,6 +1062,36 @@ fn run_cart(structure_file: &str, golden_file: &str, label: &str) {
 }
 
 #[test]
+fn a_cart_powers_a_detector_rail_and_it_releases_twenty_ticks_later() {
+    // The rail powers the tick the cart's box enters `getSearchBB` — the cell
+    // inset 0.2 on every side but the bottom — and lights lamps above, beside
+    // and below it at 15. It does *not* release when the cart leaves:
+    // `checkPressed` books a tick 20 later and only that recheck clears it, so
+    // the golden shows power on tick 13 and off on tick 33 with the cart long
+    // gone. The lamps then follow four ticks behind, on their own off-delay.
+    run_cart("detector_rail.snbt", "detector_rail.json", "nucleation:detector_rail");
+}
+
+#[test]
+fn a_detector_rail_strongly_powers_only_the_block_beneath_it() {
+    // `DetectorRailBlock.getDirectSignal` answers 15 for `Direction.UP` alone.
+    // The dust here touches the block *under* the rail and nothing else — it
+    // reads 15 — while the control dust under a plain rail one block along
+    // stays dark for the whole run.
+    run_cart("detector_strong.snbt", "detector_strong.json", "nucleation:detector_strong");
+}
+
+#[test]
+fn weighted_plates_count_entities_and_the_two_kinds_scale_differently() {
+    // `getSignalStrength` is `ceil(min(count, maxWeight) * 15 / maxWeight)`
+    // over *every* entity class, so dropped items count. The light plate's
+    // maxWeight is 15 — one item, one level — and the heavy plate's is 150,
+    // one level per ten. The golden holds six plates: light under 1/3/5 items
+    // reading 1/3/5, heavy under 1/3/11 reading 1/1/2.
+    run_cart("weighted_plates.snbt", "weighted_plates.json", "nucleation:weighted_plates");
+}
+
+#[test]
 fn a_coasting_cart_decays_at_ninety_six_percent_and_flies_off_the_end() {
     // OldMinecartBehavior on a plain line: velocity projected onto the rail
     // chord, ×0.96 a tick, then comeOffTrack past the last rail — clamp,

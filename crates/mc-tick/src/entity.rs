@@ -66,12 +66,58 @@ pub struct ItemEntityState {
     pub stuck: Option<[f64; 3]>,
 }
 
+/// A non-item entity as *blocks* see it: an id, a kind, and a world-space box.
+///
+/// Detector rails and weighted pressure plates ask the world "what is standing
+/// here?", and the honest answer includes entities this engine does not
+/// otherwise simulate — minecarts, and later fireballs and villagers, which
+/// exist in the record doors purely as hitboxes. Mirroring their boxes here
+/// keeps that question answerable through the single entity handle a
+/// [`crate::behaviour::TickCtx`] already carries, rather than threading a new
+/// borrow through forty context literals.
+///
+/// This is a *view*, rebuilt from the owning entity lists — never the
+/// authoritative copy of an entity's position.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EntityBody {
+    /// Trace-stable entity id.
+    pub id: u32,
+    /// Registry name, e.g. `minecraft:furnace_minecart`.
+    pub kind: String,
+    /// Box minimum corner.
+    pub min: [f64; 3],
+    /// Box maximum corner.
+    pub max: [f64; 3],
+    /// Whether this is an `AbstractMinecart`. Detector rails select on exactly
+    /// this class (`DetectorRailBlock.checkPressed` passes
+    /// `AbstractMinecart.class` to `getInteractingMinecartOfType`), so a
+    /// fireball or a villager standing on one must *not* power it.
+    pub is_minecart: bool,
+}
+
+impl EntityBody {
+    /// Whether this body overlaps a box, by vanilla's strict `AABB.intersects`
+    /// (touching faces do not count).
+    pub fn intersects(&self, min: [f64; 3], max: [f64; 3]) -> bool {
+        self.min[0] < max[0]
+            && self.max[0] > min[0]
+            && self.min[1] < max[1]
+            && self.max[1] > min[1]
+            && self.min[2] < max[2]
+            && self.max[2] > min[2]
+    }
+}
+
 /// All item entities plus the id counter — one bundle so the tick context
 /// carries a single handle.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ItemEntities {
     /// In spawn order, which is also vanilla's entity-list iteration order.
     pub items: Vec<ItemEntityState>,
+    /// Non-item entities' boxes, mirrored from the simulation's own lists so
+    /// block behaviours can see every entity, not just the items. Rebuilt by
+    /// [`crate::sim::Simulation::refresh_bodies`]; see [`EntityBody`].
+    pub others: Vec<EntityBody>,
     /// The next id to assign.
     pub next_id: u32,
     /// Every id ever spawned with its item, surviving removal — a renderer

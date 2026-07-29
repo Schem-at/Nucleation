@@ -186,6 +186,8 @@ adding a file, no recompilation. `load <name>.snbt` runs a real structure.
 | **Item fluid physics** | buoyancy (×0.99f, 5e-4f nudge), the double 0.014 current push per tick, raw-vs-deflated fluid height, flow-carried drift, bubble-column clamps incl. rest-skipped ticks |
 | **Item surfaces** | ice friction family (0.98/0.989), cobweb stuck multiplier, soul sand 14/16 box, the 1e-7 move gate |
 | **Minecarts** | OldMinecartBehavior end to end: chord projection, 0.96 drag, powered boost/launch/brake, slopes (doubled y-delta), corners, comeOffTrack — six goldens incl. a 200-tick powered loop |
+| **Detector rail** | Powers on a cart entering `getSearchBB` (the cell inset 0.2 on all sides but the bottom); releases only on the **20-tick** recheck, not when the cart leaves; 15 weak all round and 15 **strong downward**, with `updateNeighborsAt` on the rail *and* the block below (`detector_rail.json`, `detector_strong.json`) |
+| **Weighted plates** | `ceil(min(count, maxWeight) × 15 / maxWeight)` over **every** entity class, items included; light `maxWeight` 15, heavy 150; 10-tick recheck (`weighted_plates.json`) |
 
 ### Pistons (the accuracy crux)
 - Extend/retract via block events (phase 7, *same tick* as the trigger), with

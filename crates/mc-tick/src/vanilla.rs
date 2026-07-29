@@ -131,6 +131,13 @@ pub struct VanillaRules {
     /// otherwise.
     hash_origin: Pos,
     powered: Vec<StateId>,
+    /// States that emit a *level* rather than a flat 15.
+    ///
+    /// A weighted pressure plate's signal is the number of entities on it
+    /// (`WeightedPressurePlateBlock.getSignalStrength`), carried in its `power`
+    /// property. Everything else in `powered` answers 15, so without this a
+    /// plate holding one item would drive a full-strength line.
+    analog_emission: HashMap<StateId, u8>,
     /// States that emit in **one** direction only, and which one.
     ///
     /// An observer powers only out of its back — `ObserverBlock.getSignal`
@@ -226,6 +233,8 @@ impl VanillaRules {
             // state says `powered=true`.
             return if self.comparators.contains(&state) {
                 outs.get(&pos).copied().unwrap_or(0)
+            } else if let Some(&level) = self.analog_emission.get(&state) {
+                level
             } else {
                 15
             };
@@ -758,9 +767,16 @@ pub fn register_all_at(
             "minecraft:repeater" | "minecraft:comparator" | "minecraft:observer" => {
                 descriptor.flag("powered")
             }
+            // A weighted plate carries `power`, not `powered`, and emits that
+            // number rather than a flat 15 — see `analog_emission`.
+            n if n.ends_with("_weighted_pressure_plate") => {
+                weighted_plate_power(descriptor).is_some_and(|power| power > 0)
+            }
             n if n.ends_with("_button") || n.ends_with("_pressure_plate") => {
                 descriptor.flag("powered")
             }
+            // `DetectorRailBlock.getSignal` answers 15 whenever POWERED.
+            "minecraft:detector_rail" => descriptor.flag("powered"),
             "minecraft:redstone_torch" | "minecraft:redstone_wall_torch" => descriptor.flag("lit"),
             "minecraft:lever" => descriptor.flag("powered"),
             _ => false,
@@ -790,6 +806,9 @@ pub fn register_all_at(
                 | "minecraft:tripwire_hook"
                 | "minecraft:lightning_rod"
                 | "minecraft:jukebox"
+                // `DetectorRailBlock.isSignalSource` is true whatever POWERED
+                // says, so dust turns to face one even while it is dark.
+                | "minecraft:detector_rail"
         ) || is_button_or_plate(&descriptor.name)
         {
             rules.signal_sources.push(*id);
@@ -916,12 +935,21 @@ pub fn register_all_at(
                     rules.comparators.push(*id);
                 }
             }
-            // Plates strongly power their floor; floor buttons theirs.
+            // Plates strongly power their floor; floor buttons theirs. A
+            // detector rail does the same: `DetectorRailBlock.getDirectSignal`
+            // answers 15 only for `Direction.UP`, i.e. only to the block
+            // beneath it. Captured in `detector_strong.json`, where dust that
+            // touches the block under the rail — and nothing else — reads 15.
             if descriptor.name.ends_with("_pressure_plate")
+                || descriptor.name == "minecraft:detector_rail"
                 || (descriptor.name.ends_with("_button")
                     && descriptor.get("face") == Some("floor"))
             {
                 rules.strong_into.insert(*id, Dir::Down);
+            }
+            // A weighted plate emits its `power`, not 15.
+            if let Some(power) = weighted_plate_power(descriptor) {
+                rules.analog_emission.insert(*id, power);
             }
             // A lit torch powers every face but the one below it, and
             // strongly powers the block **above** — which is how a torch
@@ -1346,10 +1374,20 @@ pub fn register_all_at(
                     }),
                 );
             }
-            "minecraft:rail" | "minecraft:detector_rail" => {
-                // Cart physics reads rails through the rail tables; detector
-                // dynamics still await their captures.
+            "minecraft:rail" => {
+                // Cart physics reads rails through the rail tables; a plain
+                // rail has no redstone behaviour of its own.
                 table.register(*id, Box::new(Inert::new("rail")));
+            }
+            "minecraft:detector_rail" => {
+                let Some(states) = powered_pair(registry, descriptor) else { continue };
+                table.register(
+                    *id,
+                    Box::new(crate::components::DetectorRail {
+                        powered: descriptor.flag("powered"),
+                        states,
+                    }),
+                );
             }
             "minecraft:powered_rail" | "minecraft:activator_rail" => {
                 let Some(shape) = descriptor
@@ -1401,6 +1439,13 @@ pub fn register_all_at(
             // that is a *fixed point* under that absence; any other state is
             // left unregistered so the build fails loudly rather than quietly
             // simulating something the engine cannot actually reproduce.
+            //
+            // This covers the cauldron, the campfire, the lectern and unpressed
+            // tripwire. It used to cover the weighted pressure plates too, on
+            // the reasoning that nothing could stand on one. The record 3x3
+            // door disproved that: its plates are pressed by *entities the
+            // pistons move* — frozen fireballs — with no player anywhere. They
+            // are now fully simulated, below.
 
             // A cauldron only fills or empties by hand or by weather. Its
             // `level` is read by a comparator and otherwise never moves.
@@ -1422,13 +1467,39 @@ pub fn register_all_at(
             "minecraft:tripwire" if !descriptor.flag("powered") => {
                 table.register(*id, Box::new(Inert::new("tripwire")));
             }
-            // A weighted plate's `power` counts item entities standing on it.
-            // At zero, with nothing to drop onto it, it is a constant.
+            // A weighted plate's `power` is the number of entities standing on
+            // it — every entity type, items included
+            // (`getEntitiesOfClass(Entity.class, ...)`). `maxWeight` is 15 for
+            // the light plate and 150 for the heavy one, which is the whole
+            // difference between them: light reads one per entity, heavy one
+            // per ten. Captured in `weighted_plates.json`.
             "minecraft:light_weighted_pressure_plate"
-            | "minecraft:heavy_weighted_pressure_plate"
-                if descriptor.get("power") == Some("0") =>
-            {
-                table.register(*id, Box::new(Inert::new("weighted_pressure_plate")));
+            | "minecraft:heavy_weighted_pressure_plate" => {
+                let Some(power) = weighted_plate_power(descriptor) else { continue };
+                let mut states = Vec::with_capacity(16);
+                for level in 0u8..16 {
+                    let Some(state) = registry.get(&descriptor.with("power", &level.to_string()))
+                    else {
+                        break;
+                    };
+                    states.push(state);
+                }
+                if states.len() != 16 {
+                    continue;
+                }
+                table.register(
+                    *id,
+                    Box::new(crate::components::WeightedPlate {
+                        power,
+                        max_weight: if descriptor.name == "minecraft:heavy_weighted_pressure_plate"
+                        {
+                            150
+                        } else {
+                            15
+                        },
+                        states,
+                    }),
+                );
             }
             n if decor_kind(n).is_some() => {
                 table.register(*id, Box::new(Inert::new("material")));
@@ -1644,6 +1715,14 @@ pub fn fluid_tables(
 /// signal sources whatever their state, and both are `PushReaction.DESTROY`.
 fn is_button_or_plate(name: &str) -> bool {
     name.ends_with("_button") || name.ends_with("_pressure_plate")
+}
+
+/// A weighted pressure plate's `power`, or `None` for any other block.
+fn weighted_plate_power(descriptor: &Descriptor) -> Option<u8> {
+    if !descriptor.name.ends_with("_weighted_pressure_plate") {
+        return None;
+    }
+    descriptor.get("power").and_then(|p| p.parse().ok())
 }
 
 /// Whether a button or pressure plate belongs to the *stone* `BlockSetType`
@@ -2122,8 +2201,13 @@ pub fn intern_companions(registry: &mut StateRegistry) {
                 }
                 all
             }
-            "minecraft:powered_rail" | "minecraft:activator_rail" => {
+            "minecraft:powered_rail" | "minecraft:activator_rail" | "minecraft:detector_rail" => {
                 vec![descriptor.with("powered", "false"), descriptor.with("powered", "true")]
+            }
+            // Every count a weighted plate can show.
+            "minecraft:light_weighted_pressure_plate"
+            | "minecraft:heavy_weighted_pressure_plate" => {
+                (0u8..16).map(|power| descriptor.with("power", &power.to_string())).collect()
             }
             "minecraft:water" | "minecraft:bubble_column" => {
                 // Every level a flow can take, and air to empty into. Falling

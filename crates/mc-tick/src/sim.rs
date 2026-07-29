@@ -464,6 +464,32 @@ impl Simulation {
             on_rails: false,
             removed: false,
         });
+        self.refresh_bodies();
+    }
+
+    /// Rebuild the entity-box view block behaviours read
+    /// ([`crate::entity::EntityBody`]).
+    ///
+    /// Vanilla answers `getEntitiesOfClass` against the live entity list, so
+    /// this has to be current wherever a behaviour might ask: after the carts
+    /// move, and after any spawn. It is a derived view — cheap to rebuild and
+    /// never the authoritative copy.
+    fn refresh_bodies(&mut self) {
+        let bodies = &mut self.item_entities.others;
+        bodies.clear();
+        for cart in &self.minecarts {
+            if cart.removed {
+                continue;
+            }
+            let (min, max) = crate::minecart::cart_aabb(cart.pos);
+            bodies.push(crate::entity::EntityBody {
+                id: cart.id,
+                kind: cart.kind.clone(),
+                min,
+                max,
+                is_minecart: true,
+            });
+        }
     }
 
     /// The live minecarts.
@@ -1665,14 +1691,24 @@ impl Simulation {
                         crate::entity::merge_neighbours(&mut self.item_entities, index);
                     }
                 }
-                // entityInside: every cell an item overlaps hears about it —
-                // how a wooden pressure plate notices the item on it.
+                // The carts have finished moving, so the box view behaviours
+                // read has to catch up before entityInside runs.
+                self.refresh_bodies();
+                // entityInside: every cell an entity overlaps hears about it —
+                // how a wooden pressure plate notices the item on it, and how a
+                // detector rail notices the cart.
                 let mut cells: Vec<Pos> = Vec::new();
+                let mut boxes: Vec<([f64; 3], [f64; 3])> = Vec::new();
                 for item in &self.item_entities.items {
                     if item.removed {
                         continue;
                     }
-                    let (emin, emax) = crate::entity::item_aabb(item.pos);
+                    boxes.push(crate::entity::item_aabb(item.pos));
+                }
+                for body in &self.item_entities.others {
+                    boxes.push((body.min, body.max));
+                }
+                for (emin, emax) in boxes {
                     for x in (emin[0].floor() as i32)..=(emax[0].floor() as i32) {
                         for y in (emin[1].floor() as i32)..=(emax[1].floor() as i32) {
                             for z in (emin[2].floor() as i32)..=(emax[2].floor() as i32) {

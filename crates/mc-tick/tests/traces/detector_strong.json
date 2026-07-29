@@ -1,0 +1,440 @@
+{
+  "format_version": 1,
+  "mc_version": "26.2",
+  "structure": "nucleation:detector_strong",
+  "origin": [0, 100, 0],
+  "detail": "normal",
+  "game_time_at_start": 14,
+  "queues": [
+    {"tick": 0, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 1, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 2, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 3, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 4, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 5, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 6, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 7, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 8, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": [{"kind": "neighbors_at", "pos": [4, 2, 1], "at": "minecraft:detector_rail"}, {"kind": "neighbors_at", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [3, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [4, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [4, 0, 0], "at": "minecraft:stone"}, {"kind": "shape", "pos": [4, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 0, 0], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "neighbors_at", "pos": [4, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, -1], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [3, 1, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [6, 1, 0], "at": "minecraft:redstone_lamp"}, {"kind": "shape", "pos": [5, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [5, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [5, 0, 0], "at": "minecraft:stone"}, {"kind": "shape", "pos": [5, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "neighbors_at", "pos": [5, 0, 0], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [5, 1, 1], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [6, 1, 0], "at": "minecraft:redstone_lamp"}, {"kind": "neighbors_at", "pos": [5, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [5, 1, -1], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [7, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [6, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [6, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [6, 0, 0], "at": "minecraft:stone"}, {"kind": "shape", "pos": [6, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 2, 1], "at": "minecraft:detector_rail"}, {"kind": "shape", "pos": [3, 2, 1], "at": "minecraft:rail"}, {"kind": "shape", "pos": [5, 2, 1], "at": "minecraft:rail"}, {"kind": "shape", "pos": [4, 2, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [4, 2, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [4, 3, 1], "at": "minecraft:air"}, {"kind": "neighbor", "pos": [3, 2, 1], "at": "minecraft:rail"}, {"kind": "neighbor", "pos": [5, 2, 1], "at": "minecraft:rail"}, {"kind": "neighbors_at", "pos": [4, 2, 1], "at": "minecraft:detector_rail"}, {"kind": "neighbors_at", "pos": [4, 1, 1], "at": "minecraft:stone"}]},
+    {"tick": 9, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 10, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 11, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 12, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 13, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 14, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 15, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 16, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 17, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 18, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 19, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 20, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 21, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 22, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 23, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 24, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 25, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 26, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 27, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "log": [], "notify": []},
+    {"tick": 28, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [4, 2, 1], "block": "minecraft:detector_rail", "at": 43, "priority": "NORMAL", "order": 0}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [6, 1, 0], "block": "minecraft:redstone_lamp", "at": 47, "priority": "NORMAL", "order": 1}]}, "log": [], "notify": [{"kind": "neighbors_at", "pos": [4, 2, 1], "at": "minecraft:detector_rail"}, {"kind": "neighbors_at", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [3, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [4, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [4, 0, 0], "at": "minecraft:stone"}, {"kind": "shape", "pos": [4, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 0, 0], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "neighbors_at", "pos": [4, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, -1], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [3, 1, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [6, 1, 0], "at": "minecraft:redstone_lamp"}, {"kind": "shape", "pos": [5, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [5, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [5, 0, 0], "at": "minecraft:stone"}, {"kind": "shape", "pos": [5, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "neighbors_at", "pos": [5, 0, 0], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [5, 1, 1], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [6, 1, 0], "at": "minecraft:redstone_lamp"}, {"kind": "neighbors_at", "pos": [5, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [5, 1, -1], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [3, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [4, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [4, 0, 0], "at": "minecraft:stone"}, {"kind": "shape", "pos": [4, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 0, 0], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "neighbors_at", "pos": [4, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, -1], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [3, 1, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [6, 1, 0], "at": "minecraft:redstone_lamp"}, {"kind": "shape", "pos": [5, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [5, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [5, 0, 0], "at": "minecraft:stone"}, {"kind": "shape", "pos": [5, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "neighbors_at", "pos": [5, 0, 0], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [5, 1, 1], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [6, 1, 0], "at": "minecraft:redstone_lamp"}, {"kind": "neighbors_at", "pos": [5, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [5, 1, -1], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [3, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [4, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [4, 0, 0], "at": "minecraft:stone"}, {"kind": "shape", "pos": [4, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 0, 0], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "neighbors_at", "pos": [4, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, -1], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [3, 1, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [6, 1, 0], "at": "minecraft:redstone_lamp"}, {"kind": "shape", "pos": [5, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [5, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [5, 0, 0], "at": "minecraft:stone"}, {"kind": "shape", "pos": [5, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "neighbors_at", "pos": [5, 0, 0], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [5, 1, 1], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [6, 1, 0], "at": "minecraft:redstone_lamp"}, {"kind": "neighbors_at", "pos": [5, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [5, 1, -1], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [3, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [4, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [4, 0, 0], "at": "minecraft:stone"}, {"kind": "shape", "pos": [4, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 0, 0], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "neighbors_at", "pos": [4, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, -1], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [3, 1, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [6, 1, 0], "at": "minecraft:redstone_lamp"}, {"kind": "shape", "pos": [5, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [5, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [5, 0, 0], "at": "minecraft:stone"}, {"kind": "shape", "pos": [5, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "neighbors_at", "pos": [5, 0, 0], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [5, 1, 1], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [6, 1, 0], "at": "minecraft:redstone_lamp"}, {"kind": "neighbors_at", "pos": [5, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [5, 1, -1], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [3, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [4, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [4, 0, 0], "at": "minecraft:stone"}, {"kind": "shape", "pos": [4, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 0, 0], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "neighbors_at", "pos": [4, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, -1], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [3, 1, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [6, 1, 0], "at": "minecraft:redstone_lamp"}, {"kind": "shape", "pos": [5, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [5, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [5, 0, 0], "at": "minecraft:stone"}, {"kind": "shape", "pos": [5, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "neighbors_at", "pos": [5, 0, 0], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [5, 1, 1], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [6, 1, 0], "at": "minecraft:redstone_lamp"}, {"kind": "neighbors_at", "pos": [5, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [5, 1, -1], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [3, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [4, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [4, 0, 0], "at": "minecraft:stone"}, {"kind": "shape", "pos": [4, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 0, 0], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "neighbors_at", "pos": [4, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, -1], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [3, 1, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [6, 1, 0], "at": "minecraft:redstone_lamp"}, {"kind": "shape", "pos": [5, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [5, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [5, 0, 0], "at": "minecraft:stone"}, {"kind": "shape", "pos": [5, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "neighbors_at", "pos": [5, 0, 0], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [5, 1, 1], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [6, 1, 0], "at": "minecraft:redstone_lamp"}, {"kind": "neighbors_at", "pos": [5, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [5, 1, -1], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [3, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [4, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [4, 0, 0], "at": "minecraft:stone"}, {"kind": "shape", "pos": [4, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 0, 0], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "neighbors_at", "pos": [4, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, -1], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [3, 1, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [6, 1, 0], "at": "minecraft:redstone_lamp"}, {"kind": "shape", "pos": [5, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [5, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [5, 0, 0], "at": "minecraft:stone"}, {"kind": "shape", "pos": [5, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "neighbors_at", "pos": [5, 0, 0], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [5, 1, 1], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [6, 1, 0], "at": "minecraft:redstone_lamp"}, {"kind": "neighbors_at", "pos": [5, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [5, 1, -1], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [3, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [4, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [4, 0, 0], "at": "minecraft:stone"}, {"kind": "shape", "pos": [4, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 0, 0], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "neighbors_at", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "neighbors_at", "pos": [4, 2, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, -1], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [3, 1, 0], "at": "minecraft:air"}, {"kind": "neighbors_at", "pos": [4, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "neighbors_at", "pos": [4, 2, 1], "at": "minecraft:detector_rail"}, {"kind": "shape", "pos": [3, 2, 1], "at": "minecraft:rail"}, {"kind": "shape", "pos": [5, 2, 1], "at": "minecraft:rail"}, {"kind": "shape", "pos": [4, 2, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [4, 2, 2], "at": "minecraft:air"}, {"kind": "shape", "pos": [4, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [4, 3, 1], "at": "minecraft:air"}, {"kind": "neighbor", "pos": [3, 2, 1], "at": "minecraft:rail"}, {"kind": "neighbor", "pos": [5, 2, 1], "at": "minecraft:rail"}, {"kind": "neighbors_at", "pos": [4, 2, 1], "at": "minecraft:detector_rail"}, {"kind": "neighbors_at", "pos": [4, 1, 1], "at": "minecraft:stone"}]},
+    {"tick": 29, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [6, 1, 0], "block": "minecraft:redstone_lamp", "at": 47, "priority": "NORMAL", "order": 1}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [6, 1, 0], "block": "minecraft:redstone_lamp", "at": 47, "priority": "NORMAL", "order": 1}]}, "log": [], "notify": []},
+    {"tick": 30, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [6, 1, 0], "block": "minecraft:redstone_lamp", "at": 47, "priority": "NORMAL", "order": 1}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [6, 1, 0], "block": "minecraft:redstone_lamp", "at": 47, "priority": "NORMAL", "order": 1}]}, "log": [], "notify": []},
+    {"tick": 31, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [6, 1, 0], "block": "minecraft:redstone_lamp", "at": 47, "priority": "NORMAL", "order": 1}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [6, 1, 0], "block": "minecraft:redstone_lamp", "at": 47, "priority": "NORMAL", "order": 1}]}, "log": [], "notify": []},
+    {"tick": 32, "before": {"events": [], "rescheduled": 0, "block_ticks": 1, "scheduled": [{"pos": [6, 1, 0], "block": "minecraft:redstone_lamp", "at": 47, "priority": "NORMAL", "order": 1}]}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": [{"kind": "shape", "pos": [5, 1, 0], "at": "minecraft:redstone_wire"}, {"kind": "shape", "pos": [7, 1, 0], "at": "minecraft:air"}, {"kind": "shape", "pos": [6, 1, -1], "at": "minecraft:air"}, {"kind": "shape", "pos": [6, 1, 1], "at": "minecraft:stone"}, {"kind": "shape", "pos": [6, 0, 0], "at": "minecraft:stone"}, {"kind": "shape", "pos": [6, 2, 0], "at": "minecraft:air"}]},
+    {"tick": 33, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 34, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 35, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 36, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 37, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 38, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 39, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 40, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 41, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 42, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 43, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 44, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 45, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 46, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 47, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 48, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 49, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 50, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 51, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 52, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 53, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 54, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 55, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 56, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 57, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 58, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []},
+    {"tick": 59, "before": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "after": {"events": [], "rescheduled": 0, "block_ticks": 0, "scheduled": []}, "log": [], "notify": []}
+  ],
+  "ticks": [
+    {
+      "tick": 0,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [1.8, 2.0625, 1.5], "velocity": [0.288, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 1,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [2.088, 2.0625, 1.5], "velocity": [0.27647999999999995, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 2,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [2.36448, 2.0625, 1.5], "velocity": [0.26542079999999996, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 3,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [2.6299007999999997, 2.0625, 1.5], "velocity": [0.25480396799999994, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 4,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [2.8847047679999998, 2.0625, 1.5], "velocity": [0.24461180927999993, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 5,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [3.1293165772799996, 2.0625, 1.5], "velocity": [0.23482733690879992, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 6,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [3.3641439141887997, 2.0625, 1.5], "velocity": [0.22543424343244792, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 7,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [3.5895781576212475, 2.0625, 1.5], "velocity": [0.21641687369515, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 8,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [4, 1, 0], "from": "minecraft:redstone_wire[east=side,north=none,power=0,south=none,west=side]", "to": "minecraft:redstone_wire[east=side,north=none,power=15,south=none,west=side]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [5, 1, 0], "from": "minecraft:redstone_wire[east=side,north=none,power=0,south=none,west=side]", "to": "minecraft:redstone_wire[east=side,north=none,power=14,south=none,west=side]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [6, 1, 0], "from": "minecraft:redstone_lamp[lit=false]", "to": "minecraft:redstone_lamp[lit=true]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [4, 2, 1], "from": "minecraft:detector_rail[powered=false,shape=east_west,waterlogged=false]", "to": "minecraft:detector_rail[powered=true,shape=east_west,waterlogged=false]"},
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [3.8059950313163977, 2.0625, 1.5], "velocity": [0.207760198747344, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 9,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [4.013755230063742, 2.0625, 1.5], "velocity": [0.19944979079745023, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 10,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [4.213205020861192, 2.0625, 1.5], "velocity": [0.1914717991655522, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 11,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [4.4046768200267445, 2.0625, 1.5], "velocity": [0.1838129271989301, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 12,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [4.588489747225674, 2.0625, 1.5], "velocity": [0.1764604101109729, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 13,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [4.7649501573366475, 2.0625, 1.5], "velocity": [0.169401993706534, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 14,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [4.934352151043181, 2.0625, 1.5], "velocity": [0.16262591395827264, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 15,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [5.096978065001454, 2.0625, 1.5], "velocity": [0.15612087739994174, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 16,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [5.253098942401396, 2.0625, 1.5], "velocity": [0.14987604230394405, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 17,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [5.40297498470534, 2.0625, 1.5], "velocity": [0.1438810006117863, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 18,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [5.546855985317126, 2.0625, 1.5], "velocity": [0.13812576058731485, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 19,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [5.684981745904441, 2.0625, 1.5], "velocity": [0.13260073016382226, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 20,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [5.817582476068263, 2.0625, 1.5], "velocity": [0.12729670095726936, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 21,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [5.944879177025532, 2.0625, 1.5], "velocity": [0.12220483291897859, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 22,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [6.0670840099445105, 2.0625, 1.5], "velocity": [0.11731663960221944, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 23,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [6.18440064954673, 2.0625, 1.5], "velocity": [0.11262397401813067, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 24,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [6.297024623564861, 2.0625, 1.5], "velocity": [0.10811901505740544, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 25,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [6.405143638622266, 2.0625, 1.5], "velocity": [0.10379425445510922, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 26,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [6.508937893077375, 2.0625, 1.5], "velocity": [0.09964248427690485, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 27,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [6.60858037735428, 2.0625, 1.5], "velocity": [0.09565678490582866, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 28,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [4, 1, 0], "from": "minecraft:redstone_wire[east=side,north=none,power=15,south=none,west=side]", "to": "minecraft:redstone_wire[east=side,north=none,power=0,south=none,west=side]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [5, 1, 0], "from": "minecraft:redstone_wire[east=side,north=none,power=14,south=none,west=side]", "to": "minecraft:redstone_wire[east=side,north=none,power=0,south=none,west=side]"},
+        {"phase": "tick_end", "kind": "block_changed", "pos": [4, 2, 1], "from": "minecraft:detector_rail[powered=true,shape=east_west,waterlogged=false]", "to": "minecraft:detector_rail[powered=false,shape=east_west,waterlogged=false]"},
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [6.7042371622601085, 2.0625, 1.5], "velocity": [0.09183051350959551, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 29,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [6.796067675769704, 2.0625, 1.5], "velocity": [0.08815729296921168, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 30,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [6.884224968738915, 2.0625, 1.5], "velocity": [0.0846310012504432, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 31,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [6.968855969989359, 2.0625, 1.5], "velocity": [0.08124576120042547, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 32,
+      "events": [
+        {"phase": "tick_end", "kind": "block_changed", "pos": [6, 1, 0], "from": "minecraft:redstone_lamp[lit=true]", "to": "minecraft:redstone_lamp[lit=false]"},
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [7.050101731189784, 2.0625, 1.5], "velocity": [0.07799593075240845, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 33,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [7.128097661942192, 2.0625, 1.5], "velocity": [0.0748760935223121, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 34,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [7.202973755464504, 2.0625, 1.5], "velocity": [0.07188104978141961, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 35,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [7.274854805245924, 2.0625, 1.5], "velocity": [0.06900580779016283, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 36,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [7.343860613036086, 2.0625, 1.5], "velocity": [0.0662455754785563, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 37,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [7.410106188514643, 2.0625, 1.5], "velocity": [0.06359575245941405, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 38,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [7.473701940974057, 2.0625, 1.5], "velocity": [0.061051922361037486, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 39,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [7.534753863335094, 2.0625, 1.5], "velocity": [0.058609845466595985, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 40,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [7.59336370880169, 2.0625, 1.5], "velocity": [0.056265451647932146, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 41,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [7.6496291604496225, 2.0625, 1.5], "velocity": [0.05401483358201486, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 42,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [7.703643994031637, 2.0625, 1.5], "velocity": [0.051854240238734264, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 43,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [7.755498234270371, 2.0625, 1.5], "velocity": [0.049780070629184894, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 44,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [7.805278304899557, 2.0625, 1.5], "velocity": [0.0477888678040175, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 45,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [7.853067172703574, 2.0625, 1.5], "velocity": [0.045877313091856796, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 46,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [7.898944485795431, 2.0625, 1.5], "velocity": [0.04404222056818252, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 47,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [7.942986706363613, 2.0625, 1.5], "velocity": [0.04228053174545522, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 48,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [7.985267238109069, 2.0625, 1.5], "velocity": [0.04058931047563701, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 49,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [8.025856548584706, 2.0625, 1.5], "velocity": [0.03896573805661153, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 50,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [8.064822286641318, 2.0625, 1.5], "velocity": [0.03740710853434707, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 51,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [8.102229395175666, 2.0625, 1.5], "velocity": [0.03591082419297319, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 52,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [8.138140219368639, 2.0625, 1.5], "velocity": [0.03447439122525426, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 53,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [8.172614610593893, 2.0625, 1.5], "velocity": [0.03309541557624409, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 54,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [8.205710026170138, 2.0625, 1.5], "velocity": [0.03177159895319433, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 55,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [8.237481625123332, 2.0625, 1.5], "velocity": [0.03050073499506655, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 56,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [8.267982360118397, 2.0625, 1.5], "velocity": [0.029280705595263887, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 57,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [8.297263065713661, 2.0625, 1.5], "velocity": [0.02810947737145333, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 58,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [8.325372543085114, 2.0625, 1.5], "velocity": [0.026985098276595197, -0.0, 0.0]}
+      ]
+    },
+    {
+      "tick": 59,
+      "events": [
+        {"phase": "tick_end", "kind": "entity_moved", "id": 1, "entity_type": "minecraft:minecart", "pos": [8.35235764136171, 2.0625, 1.5], "velocity": [0.025905694345531388, -0.0, 0.0]}
+      ]
+    }
+  ]
+}
