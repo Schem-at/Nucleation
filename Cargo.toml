@@ -406,6 +406,13 @@ required-features = ["bridge", "mc-tick"]
 name = "door55_sim"
 required-features = ["bridge", "mc-tick"]
 
+# Forensic x-ray of the same door: the block layout and every entity box in
+# simulation coordinates, plus the whole update log across a press, so the
+# question "which component never heard anything" has an answer.
+[[example]]
+name = "door55_xray"
+required-features = ["bridge", "mc-tick"]
+
 # Actuates the record 3x3 door through the bridge (InWorld) and renders it, so
 # it needs both the loader's features and the renderer's.
 [[example]]
