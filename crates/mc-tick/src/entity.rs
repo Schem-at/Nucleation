@@ -116,11 +116,16 @@ pub fn entity_dimensions(kind: &str) -> Option<(f64, f64)> {
         // Every minecart variant shares one hitbox — furnace, chest, hopper and
         // TNT carts included. A furnace minecart is dimensionally an ordinary
         // cart.
+        // `EntityDimensions.scalable(0.98F, 0.7F)` — float literals, so the
+        // real box is 0.9800000190734863 by 0.699999988079071. The width's
+        // eighth decimal is observable now that carts clip against each other:
+        // `cart_gap` measures a squeezed approach as 0.009999981, which is the
+        // float width and not the decimal one.
         "minecraft:minecart"
         | "minecraft:furnace_minecart"
         | "minecraft:chest_minecart"
         | "minecraft:hopper_minecart"
-        | "minecraft:tnt_minecart" => (0.98, 0.7),
+        | "minecraft:tnt_minecart" => (0.98_f32 as f64, 0.7_f32 as f64),
         "minecraft:dragon_fireball" | "minecraft:fireball" => (1.0, 1.0),
         "minecraft:small_fireball" => (0.3125, 0.3125),
         "minecraft:villager" => (0.6, 1.95),
@@ -205,7 +210,11 @@ mod hitbox_tests {
             "minecraft:hopper_minecart",
             "minecraft:tnt_minecart",
         ] {
-            assert_eq!(entity_dimensions(kind), Some((0.98, 0.7)), "{kind}");
+            assert_eq!(
+                entity_dimensions(kind),
+                Some((0.98_f32 as f64, 0.7_f32 as f64)),
+                "{kind}: the vanilla literals are floats"
+            );
         }
         // The engine's cart box must agree with the generic table.
         let (min, max) = body_aabb("minecraft:minecart", [0.5, 1.0, 0.5]).unwrap();
@@ -636,15 +645,24 @@ fn move_with_collision(
 /// `Entity.collideBoundingBox` for any box: clip `movement` (Y first, then
 /// the larger horizontal axis) and report which axes hit. Shared by items and
 /// minecarts.
-pub(crate) fn collide_move(
+/// The same sweep, plus a list of other entities' boxes to clip against.
+///
+/// `Entity.collide` feeds `level.getEntityCollisions(this, box.expandTowards(v))`
+/// into the same sweep the blocks go through, so an entity that collides with
+/// entities is stopped by them exactly as it is stopped by a wall. Minecarts do,
+/// and it turns out to be the whole story behind chains of touching carts: a
+/// cart shoved into a neighbour it is already flush against does not move at
+/// all, and has that axis of its velocity zeroed.
+pub(crate) fn collide_move_among(
     world: &dyn CollisionWorld,
     mut min: [f64; 3],
     mut max: [f64; 3],
     movement: [f64; 3],
+    obstacles: &[([f64; 3], [f64; 3])],
 ) -> ([f64; 3], [bool; 3]) {
     let mut movement = movement;
     let mut hit = [false; 3];
-    let clipped = clip_axis(world, min, max, 1, movement[1]);
+    let clipped = clip_boxes(min, max, 1, clip_axis(world, min, max, 1, movement[1]), obstacles);
     hit[1] = clipped != movement[1];
     min[1] += clipped;
     max[1] += clipped;
@@ -652,13 +670,61 @@ pub(crate) fn collide_move(
     let x_first = movement[0].abs() > movement[2].abs();
     let order: [usize; 2] = if x_first { [0, 2] } else { [2, 0] };
     for &axis in &order {
-        let clipped = clip_axis(world, min, max, axis, movement[axis]);
+        let clipped = clip_boxes(
+            min,
+            max,
+            axis,
+            clip_axis(world, min, max, axis, movement[axis]),
+            obstacles,
+        );
         hit[axis] = hit[axis] || clipped != movement[axis];
         min[axis] += clipped;
         max[axis] += clipped;
         movement[axis] = clipped;
     }
     (movement, hit)
+}
+
+/// Clip a single-axis movement against other entities' boxes — `VoxelShape.collide`.
+///
+/// The `1e-7` slack is vanilla's, and it is load-bearing rather than cosmetic:
+/// two carts parked at exactly 0.98 have boxes that miss touching by about
+/// 1.8e-15 one way or 1.9e-8 the other, purely from the float arithmetic in
+/// `0.98F`, and only a tolerance this size makes them reliably block each other.
+fn clip_boxes(
+    min: [f64; 3],
+    max: [f64; 3],
+    axis: usize,
+    mut delta: f64,
+    obstacles: &[([f64; 3], [f64; 3])],
+) -> f64 {
+    const EPSILON: f64 = 1.0e-7;
+    for (omin, omax) in obstacles {
+        if delta.abs() < EPSILON {
+            return 0.0;
+        }
+        // A box only blocks this axis if it overlaps on the other two.
+        let clear = (0..3)
+            .filter(|other| *other != axis)
+            .any(|other| min[other] >= omax[other] - EPSILON || max[other] <= omin[other] + EPSILON);
+        if clear {
+            continue;
+        }
+        // Written so NaN takes neither branch, as it does in Java: `f64::min`
+        // and `max` discard NaN where this must propagate it.
+        if delta > 0.0 {
+            let room = omin[axis] - max[axis];
+            if room >= -EPSILON && room < delta {
+                delta = room;
+            }
+        } else if delta < 0.0 {
+            let room = omax[axis] - min[axis];
+            if room <= EPSILON && room > delta {
+                delta = room;
+            }
+        }
+    }
+    delta
 }
 
 /// Clip a single-axis movement of the box `(min, max)` against solid blocks.

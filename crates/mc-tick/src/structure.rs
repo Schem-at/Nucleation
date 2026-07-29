@@ -119,6 +119,25 @@ pub struct SpawnedMinecart {
     pub pos: [f64; 3],
     /// Spawn velocity.
     pub motion: [f64; 3],
+    /// `Rotation[0]` — yaw in degrees, 0 when the tag is absent, as vanilla
+    /// defaults it.
+    ///
+    /// Carried because cart-cart pushing gates on it: two carts only shove
+    /// each other when the line between them lies within ~37° of the facing,
+    /// so a cart parked on a stale heading is inert to its neighbour. The
+    /// `cart_yaw` capture is two identical lanes that differ in nothing but
+    /// this number, and only one of them moves.
+    ///
+    /// Passed through unconverted, and that is deliberate. `Rotation[0]` loads
+    /// straight into `yRot`, and `AbstractMinecart` reads `yRot` as a plain
+    /// polar angle in XZ — it writes it as `atan2(dz, dx)` and consumes it as
+    /// `(cos yaw, 0, sin yaw)` — so 0 means +X, not south. That is 90° off the
+    /// compass convention every other entity uses, and it is the game's quirk,
+    /// not a transcription slip. `cart_yaw` settles which reading is right: its
+    /// yaw-0 lane, separated along +Z, scores a dot of 0 and never moves, while
+    /// its yaw-90 lane scores 1 and shoves itself apart. Under the compass
+    /// reading the two lanes would swap.
+    pub yaw: f64,
 }
 
 /// An authored furnace minecart.
@@ -643,6 +662,7 @@ impl<'a> Parser<'a> {
         let mut pickup_delay = 0u32;
         let mut fuel = 0u32;
         let mut push = [0.0f64; 2];
+        let mut yaw = 0.0f64;
         let mut entity_id = String::new();
         loop {
             if self.peek() == Some(b'}') {
@@ -678,6 +698,14 @@ impl<'a> Parser<'a> {
                                 }
                             }
                             "PickupDelay" => pickup_delay = self.int()? as u32,
+                            // `Rotation: [yaw, pitch]`. Only yaw matters here:
+                            // it is the gate on cart-cart pushing.
+                            "Rotation" => {
+                                let values = self.float_list()?;
+                                if !values.is_empty() {
+                                    yaw = values[0];
+                                }
+                            }
                             // A furnace cart's self-drive. Zero on every cart
                             // in the record door, but a fuelled one propels
                             // itself, so it is read rather than assumed.
@@ -713,6 +741,7 @@ impl<'a> Parser<'a> {
                     kind: entity_id,
                     pos,
                     motion,
+                    yaw,
                 })),
                 None => self.err("minecart entity needs `pos`"),
             },
@@ -1247,6 +1276,32 @@ mod tests {
     fn malformed_input_reports_where_it_failed() {
         let err = Structure::parse("{size: [1,1,1], palette: [").unwrap_err();
         assert!(matches!(err, StructureError::Malformed { .. }), "{err}");
+    }
+
+    /// A cart's `Rotation` is read, and defaults to 0 when absent.
+    ///
+    /// Not decoration: yaw gates cart-cart pushing, so dropping this tag turns
+    /// a cart that vanilla leaves alone into one the engine shoves. The
+    /// `cart_yaw` conformance golden is the end-to-end version of this.
+    #[test]
+    fn a_carts_rotation_is_read_and_defaults_to_zero() {
+        const TEXT: &str = r#"{
+            size: [1, 1, 1],
+            palette: [{Name: "minecraft:rail"}],
+            blocks: [{pos: [0, 0, 0], state: 0}],
+            entities: [
+                {pos: [0.5d, 0.0625d, 0.5d], blockPos: [0, 0, 0], nbt: {id: "minecraft:minecart", Motion: [0.0d, 0.0d, 0.0d], Rotation: [90.0f, 0.0f]}},
+                {pos: [0.5d, 0.0625d, 1.5d], blockPos: [0, 0, 1], nbt: {id: "minecraft:minecart", Motion: [0.0d, 0.0d, 0.0d]}}
+            ]
+        }"#;
+        let s = Structure::parse(TEXT).unwrap();
+        match (&s.entities[0], &s.entities[1]) {
+            (SpawnedEntity::Minecart(turned), SpawnedEntity::Minecart(plain)) => {
+                assert_eq!(turned.yaw, 90.0);
+                assert_eq!(plain.yaw, 0.0, "no Rotation tag means vanilla's default");
+            }
+            other => panic!("expected two minecarts, got {other:?}"),
+        }
     }
 
     /// Carts and items share the `entities` list and keep their order.

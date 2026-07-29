@@ -39,10 +39,15 @@ pub const MAX_SPEED: f64 = 0.4;
 pub const SLOPE_ACCELERATION: f64 = 0.0078125;
 /// `getAirDrag` for carts, applied off-rail while airborne.
 pub const CART_AIR_DRAG: f32 = 0.95;
-/// The cart hitbox: 0.98 × 0.7 (`EntityType.MINECART`).
-pub const CART_HALF_WIDTH: f64 = 0.49;
+/// Half the cart hitbox width — `EntityType.MINECART` is `scalable(0.98F, 0.7F)`.
+///
+/// The literal is a **float**, so the width is 0.9800000190734863 and this is
+/// 0.49000000953674316, not 0.49. That eighth decimal is measurable: two carts
+/// parked 0.99 apart have their approach clipped to 0.009999981, not to 0.01,
+/// and the `cart_gap` golden reads exactly the former.
+pub const CART_HALF_WIDTH: f64 = (0.98_f32 as f64) / 2.0;
 /// The cart hitbox height.
-pub const CART_HEIGHT: f64 = 0.7;
+pub const CART_HEIGHT: f64 = 0.7_f32 as f64;
 
 /// The ten rail shapes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -234,24 +239,42 @@ pub fn cart_aabb(pos: [f64; 3]) -> ([f64; 3], [f64; 3]) {
 
 /// `Entity.move(SELF, movement)` for a cart: clip, apply (past the 1e-7
 /// gate), zero clipped components, set `on_ground`.
-fn move_cart(cart: &mut MinecartState, world: &dyn CollisionWorld, movement: [f64; 3]) {
+fn move_cart(
+    cart: &mut MinecartState,
+    world: &dyn CollisionWorld,
+    movement: [f64; 3],
+    obstacles: &[([f64; 3], [f64; 3])],
+) {
     let (min, max) = cart_aabb(cart.pos);
-    let (clipped, hit) = crate::entity::collide_move(world, min, max, movement);
+    let (clipped, hit) = crate::entity::collide_move_among(world, min, max, movement, obstacles);
+    // Vanilla applies a movement once it exceeds 1e-7 in *length*. The obvious
+    // reading — `lengthSqr() > 1.0E-7` — is too coarse by seven orders of
+    // magnitude, and `cart_gap` catches it: a squeezed cart there creeps
+    // 4.75e-5 a tick, which that reading would round away and the game does
+    // not. Dropping the gate entirely is also wrong; the goldens want one.
+    //
+    // Any threshold keeps a NaN cart frozen, since every comparison against NaN
+    // is false. That is what makes a nan cart immovable by anything but a
+    // piston, and it survives this change.
     let sqr = clipped[0] * clipped[0] + clipped[1] * clipped[1] + clipped[2] * clipped[2];
-    if sqr > 1.0e-7 {
+    if sqr > 1.0e-14 {
         cart.pos[0] += clipped[0];
         cart.pos[1] += clipped[1];
         cart.pos[2] += clipped[2];
     }
     cart.on_ground = hit[1] && movement[1] < 0.0;
+    // Through `set_delta`, because vanilla zeroes a clipped axis with
+    // `setDeltaMovement` like everything else: if the cart's other components
+    // are non-finite the write is refused and a NaN cart keeps its NaN rather
+    // than being quietly converted into a stationary ordinary cart.
     if hit[0] {
-        cart.vel[0] = 0.0;
+        set_delta(cart, [0.0, cart.vel[1], cart.vel[2]]);
     }
     if hit[1] {
-        cart.vel[1] = 0.0;
+        set_delta(cart, [cart.vel[0], 0.0, cart.vel[2]]);
     }
     if hit[2] {
-        cart.vel[2] = 0.0;
+        set_delta(cart, [cart.vel[0], cart.vel[1], 0.0]);
     }
 }
 
@@ -262,17 +285,30 @@ fn move_cart(cart: &mut MinecartState, world: &dyn CollisionWorld, movement: [f6
 /// the caller runs straight after this for the same cart, because it needs the
 /// other carts and this function only has one.
 pub fn tick_minecart(cart: &mut MinecartState, world: &dyn CollisionWorld) {
+    tick_minecart_blocked(cart, world, &[]);
+}
+
+/// One cart tick, with the boxes of the other carts it can be stopped by.
+///
+/// Prefer [`tick_minecart_among`], which builds the list. This is the seam for
+/// a caller that already has the boxes, and for tests that want one cart and an
+/// explicit obstacle.
+pub fn tick_minecart_blocked(
+    cart: &mut MinecartState,
+    world: &dyn CollisionWorld,
+    obstacles: &[([f64; 3], [f64; 3])],
+) {
     let before = [cart.pos[0], cart.pos[2]];
     cart.vel[1] -= CART_GRAVITY;
     let rail_pos = rail_block_pos(cart, world);
     match world.rail(rail_pos) {
         Some(rail) => {
             cart.on_rails = true;
-            move_along_track(cart, world, rail_pos, rail);
+            move_along_track(cart, world, rail_pos, rail, obstacles);
         }
         None => {
             cart.on_rails = false;
-            come_off_track(cart, world);
+            come_off_track(cart, world, obstacles);
         }
     }
     // `yRot = atan2(zo - z, xo - x)`, but only once the tick's travel clears
@@ -289,6 +325,28 @@ pub fn tick_minecart(cart: &mut MinecartState, world: &dyn CollisionWorld) {
     if dx * dx + dz * dz > 0.001 {
         cart.yaw = dz.atan2(dx).to_degrees();
     }
+}
+
+/// Tick the cart at `index`, stopped by the boxes of every other live cart.
+///
+/// Carts block each other's movement. That single fact is what turns the
+/// two-body push into the behaviour of a *chain*: shove a cart into a
+/// neighbour it is already flush against and it does not move, and its velocity
+/// on that axis is zeroed — so it goes on to push its own neighbours from a
+/// standstill rather than from the velocity it was handed. Every chain golden
+/// falls out of it, and none of them falls out without it.
+pub fn tick_minecart_among(
+    carts: &mut [MinecartState],
+    index: usize,
+    world: &dyn CollisionWorld,
+) {
+    let obstacles: Vec<([f64; 3], [f64; 3])> = carts
+        .iter()
+        .enumerate()
+        .filter(|(other, cart)| *other != index && !cart.removed)
+        .map(|(_, cart)| cart_aabb(cart.pos))
+        .collect();
+    tick_minecart_blocked(&mut carts[index], world, &obstacles);
 }
 
 /// `Mth.SIN`: 65536 **float** samples of one turn, the table `Mth.sin`/`Mth.cos`
@@ -316,7 +374,11 @@ fn mth_cos(radians: f32) -> f32 {
 }
 
 /// `comeOffTrack`: clamp, halve when grounded, move, air-drag when airborne.
-fn come_off_track(cart: &mut MinecartState, world: &dyn CollisionWorld) {
+fn come_off_track(
+    cart: &mut MinecartState,
+    world: &dyn CollisionWorld,
+    obstacles: &[([f64; 3], [f64; 3])],
+) {
     cart.vel[0] = cart.vel[0].clamp(-MAX_SPEED, MAX_SPEED);
     cart.vel[2] = cart.vel[2].clamp(-MAX_SPEED, MAX_SPEED);
     if cart.on_ground {
@@ -324,7 +386,7 @@ fn come_off_track(cart: &mut MinecartState, world: &dyn CollisionWorld) {
             *axis *= 0.5;
         }
     }
-    move_cart(cart, world, cart.vel);
+    move_cart(cart, world, cart.vel, obstacles);
     if !cart.on_ground {
         for axis in &mut cart.vel {
             *axis *= f64::from(CART_AIR_DRAG);
@@ -338,6 +400,7 @@ fn move_along_track(
     world: &dyn CollisionWorld,
     rail_pos: Pos,
     rail: Rail,
+    obstacles: &[([f64; 3], [f64; 3])],
 ) {
     let x = cart.pos[0];
     let z = cart.pos[2];
@@ -419,6 +482,7 @@ fn move_along_track(
             0.0,
             cart.vel[2].clamp(-MAX_SPEED, MAX_SPEED),
         ],
+        obstacles,
     );
 
     // Corner fixups: the cart crossed onto a sloped exit's block.
@@ -551,7 +615,10 @@ fn push(this: &mut MinecartState, other: &mut MinecartState) {
     let raw_x = other.pos[0] - this.pos[0];
     let raw_z = other.pos[2] - this.pos[2];
     let sq = raw_x * raw_x + raw_z * raw_z;
-    // Java: `if (d2 >= 1.0E-4)`. NaN fails it, so a NaN separation pushes nothing.
+    // Java: `if (d2 >= 1.0E-4)`. NaN fails it, so a NaN separation pushes
+    // nothing. Written negated on purpose — `sq < 1.0e-4` is *not* the same
+    // thing, because it is false for NaN and would let the push through.
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
     if !(sq >= 1.0e-4) {
         return;
     }
@@ -588,10 +655,43 @@ fn push(this: &mut MinecartState, other: &mut MinecartState) {
     let (ox, oz) = (other.vel[0], other.vel[2]);
     let mid_x = (ox + tx) / 2.0;
     let mid_z = (oz + tz) / 2.0;
-    this.vel[0] = tx * 0.2 + (mid_x - d0);
-    this.vel[2] = tz * 0.2 + (mid_z - d1);
-    other.vel[0] = ox * 0.2 + (mid_x + d0);
-    other.vel[2] = oz * 0.2 + (mid_z + d1);
+    // Vanilla writes this as two calls each, and the split is observable
+    // through `set_delta`: the scale lands, the add is refused.
+    //   this.setDeltaMovement(v.multiply(0.2, 1.0, 0.2));
+    //   this.push(mid - d0, 0.0, mid - d1);   // = setDeltaMovement(v.add(..))
+    set_delta(this, [tx * 0.2, this.vel[1], tz * 0.2]);
+    set_delta(this, [this.vel[0] + (mid_x - d0), this.vel[1], this.vel[2] + (mid_z - d1)]);
+    set_delta(other, [ox * 0.2, other.vel[1], oz * 0.2]);
+    set_delta(other, [other.vel[0] + (mid_x + d0), other.vel[1], other.vel[2] + (mid_z + d1)]);
+}
+
+/// `Entity.setDeltaMovement`: **a non-finite vector is silently dropped.**
+///
+/// ```java
+/// public void setDeltaMovement(Vec3 vec3) {
+///     if (vec3.isFinite()) this.deltaMovement = vec3;
+/// }
+/// ```
+///
+/// `Vec3.isFinite` is all-or-nothing over the three components, so one NaN
+/// refuses the whole write and the previous velocity stands. Two consequences,
+/// both load-bearing for the record doors and both measured rather than
+/// reasoned:
+///
+/// * **A NaN cart stays NaN.** Every arithmetic path out of a NaN velocity is
+///   itself non-finite, so every attempt to overwrite it is refused. NaN is a
+///   fixed point — which is exactly why the builders can use one as glue.
+/// * **NaN does not spread.** A finite cart colliding with a NaN one computes a
+///   NaN mean, and that write is refused too, leaving it with the 0.2 scaling
+///   that landed just before. The oracle capture shows a striker going
+///   0.069 -> 0.0027 across one tick, which is 0.2 squared: two pushes, each
+///   keeping the multiply and dropping the add. The "zombie minecart" in
+///   `docs/entity-abuse-in-record-doors.md` is folklore, and the document says
+///   the oracle wins.
+fn set_delta(cart: &mut MinecartState, velocity: [f64; 3]) {
+    if velocity.iter().all(|component| component.is_finite()) {
+        cart.vel = velocity;
+    }
 }
 
 /// The push half of `AbstractMinecart.tick` for the cart at `index`: every other
@@ -606,34 +706,27 @@ fn push(this: &mut MinecartState, other: &mut MinecartState) {
 /// on its own: the first tick's numbers only come out right if the pusher has
 /// already moved when it pushes.
 ///
-/// # What is verified, and what is not
+/// # Chains
 ///
-/// Returns how many carts were pushed. **One is proven; two or more is not**,
-/// and the caller is expected to treat anything above one as a run that has
-/// left the captured envelope.
+/// Returns how many carts were pushed. Nothing here special-cases two, and it
+/// does not need to: what makes a *chain* behave unlike a pair is not the push
+/// at all, it is that carts block each other's movement — see
+/// [`tick_minecart_among`]. A cart shoved into a neighbour it is already flush
+/// against does not move and has that axis zeroed, so it pushes its own
+/// neighbours from a standstill instead of from the velocity it was handed.
 ///
-/// A cart with exactly one neighbour reproduces vanilla *bit for bit* — same
-/// doubles, not "within 1e-6" — across four independent captures:
-/// `cart_collide` (a pair on rail, 80 ticks, plus a third cart rammed into
-/// them), `cart_offrail` (a pair with no track), `cart_group`'s pair lane, and
-/// both lanes of `cart_yaw`.
+/// That was worth chasing rather than approximating. `cart_group` puts a pair,
+/// a triple and a quad of touching carts on one line; vanilla moves only the
+/// far cart of each group on the first tick, by 1, 1.25, 1.3375 and (in
+/// `cart_chain`, five carts) 1.368125 times the impulse — a geometric series in
+/// 0.35, which is the push matrix's own 0.7 self-retention times its 0.5
+/// transfer. An exhaustive search over every interleaving of moves and pushes
+/// showed no composition of the two-body law could reach that state at all, and
+/// the missing ingredient turned out to be the collision.
 ///
-/// A cart with **two** neighbours does not. `cart_group` puts a pair, a triple
-/// and a quad of touching carts on one line and lets them shove themselves
-/// apart; vanilla moves only the far cart of each group on the first tick, by
-/// 1, 1.25, 1.3375 and (in `cart_chain`, five carts) 1.368125 times the 0.05
-/// impulse — a clean geometric series in 0.35 that this pairwise law does not
-/// produce under *any* ordering. Every permutation of tick order, neighbour
-/// order, push-before-move versus push-after-move, frozen versus live
-/// positions, and once-per-pair versus twice was searched: the pair matches
-/// exactly, the triple and quad match nothing. So vanilla does something
-/// structurally different once a cart has neighbours on both sides, and this
-/// engine does not know what. The middle carts of a chain are quietly wrong
-/// here, and the divergence starts on the very first tick.
-///
-/// That matters directly: the record 3x3 door is built out of exactly such
-/// chains. See `cart_group.json` and `cart_chain.json`, which are kept in the
-/// tree as the evidence, and the ignored `cart_group` conformance test.
+/// The whole family now reproduces vanilla bit for bit: `cart_collide`,
+/// `cart_offrail`, `cart_yaw`, `cart_group` (9 carts), `cart_chain` (6),
+/// `cart_triad` (11) and `cart_gap` (21).
 #[must_use]
 pub fn push_neighbours(carts: &mut [MinecartState], index: usize) -> usize {
     if carts[index].removed {
@@ -758,17 +851,16 @@ mod tests {
             tick_minecart(&mut cart, &RailOnly);
         }
         assert_eq!(cart.pos, seated, "a nan cart must not move");
-
-        // NOT asserted: that the velocity is *still* NaN a hundred ticks on.
-        // It is not — `move_cart` zeroes an axis whenever `collide_move`
-        // reports a hit, and a NaN delta currently reports one. Vanilla's
-        // `Entity.move` decides collision by `movement.x != vec3.x`, and in
-        // Java `NaN != NaN` is true, so it may well flag a collision too; what
-        // it then does with the velocity is unverified. That matters, because
-        // NaN *contagion* between carts is what the door relies on, and a cart
-        // whose NaN has been laundered to 0.0 stands still but no longer
-        // infects. Pinning it needs an oracle capture of two colliding carts;
-        // see the capture spec in `docs/entity-abuse-in-record-doors.md`.
+        // Now asserted, where it once could not be. `move_cart` used to zero a
+        // clipped axis by writing the field, which laundered a NaN cart into an
+        // ordinary stationary one; it goes through `set_delta` now, and 26.2's
+        // `setDeltaMovement` refuses any write whose result is non-finite. So
+        // the NaN is not merely undisturbed, it is unreachable — a hundred
+        // ticks of collision cannot clear it.
+        assert!(
+            cart.vel[0].is_nan(),
+            "the nan must survive, or the cart stops being glue"
+        );
     }
 
     /// The same rail, with an ordinary velocity, does move — so the test above
@@ -910,29 +1002,116 @@ mod tests {
         assert_eq!(far[1].vel, [0.0; 3]);
     }
 
-    /// A NaN cart's velocity survives being collided with.
+    /// A cart cannot move into a cart it is already flush against.
     ///
-    /// The record doors use NaN carts as glue, and a NaN that gets laundered
-    /// into a real number sets the whole contraption walking. Every comparison
-    /// in the push is written the way Java drops it, and none of the arithmetic
-    /// clamps — so a NaN velocity comes out the other side still NaN, and
-    /// spreads to whatever it was collided with, which is the contagion the
-    /// builders rely on.
+    /// This is what makes a chain a chain. The middle cart of a row spaced at
+    /// 0.98 — the hitbox width, so the boxes touch with nothing between them —
+    /// is handed the full impulse and still goes nowhere, and its velocity on
+    /// that axis is zeroed. It then pushes its own neighbours from rest, which
+    /// is where the far cart's 1.25x impulse in `cart_group` comes from.
     ///
-    /// NOT asserted: that vanilla agrees. This pins the engine's own IEEE-754
-    /// behaviour so a later `min`/`clamp`/`is_finite` "tidy-up" trips a test;
-    /// whether the game propagates NaN across a cart-cart collision needs a
-    /// capture driven from a world save, because SNBT cannot express NaN.
+    /// The control is the same test one hitbox further apart, where the cart
+    /// has room and takes it.
     #[test]
-    fn a_nan_velocity_survives_a_collision_and_spreads() {
+    fn a_cart_is_stopped_by_a_cart_it_is_flush_against() {
+        // RailOnly's track is at y = 0, so everything sits on the rail surface.
+        let blocker = cart_aabb([9.48, 0.0625, 0.5]);
+        let mut cart = parked(0, 8.5, 0.5, 0.0);
+        cart.pos[1] = 0.0625;
+        cart.vel[0] = 0.05;
+        tick_minecart_blocked(&mut cart, &RailOnly, &[blocker]);
+        assert_eq!(cart.pos[0], 8.5, "flush against a cart, so it cannot move");
+        assert_eq!(cart.vel[0], 0.0, "and the blocked axis is zeroed");
+
+        // Same push, same everything, one hitbox further out: it moves.
+        let far = cart_aabb([10.48, 0.0625, 0.5]);
+        let mut free = parked(1, 8.5, 0.5, 0.0);
+        free.pos[1] = 0.0625;
+        free.vel[0] = 0.05;
+        tick_minecart_blocked(&mut free, &RailOnly, &[far]);
+        assert!(free.pos[0] > 8.5, "with room, the same cart travels");
+    }
+
+    /// A cart with only part of the gap it wants takes exactly that much.
+    ///
+    /// `cart_gap` measures this in the game at 0.99 spacing and gets
+    /// 0.009999981 rather than 0.01 — the difference being the float slop in
+    /// `EntityType.MINECART`'s `0.98F` width, which is why [`CART_HALF_WIDTH`]
+    /// is derived from the float and not written as 0.49.
+    #[test]
+    fn a_squeezed_cart_moves_by_exactly_the_gap() {
+        // The geometry of `cart_gap`'s 0.99 lane, so the number below is the
+        // game's own rather than this engine agreeing with itself.
+        let blocker = cart_aabb([25.48, 0.0625, 0.5]);
+        let mut cart = parked(0, 24.49, 0.5, 0.0);
+        cart.pos[1] = 0.0625;
+        cart.vel[0] = 0.05;
+        tick_minecart_blocked(&mut cart, &RailOnly, &[blocker]);
+        let travelled = cart.pos[0] - 24.49;
+
+        // What vanilla did, out of `cart_gap.json`: 24.49 -> 24.499999980926514.
+        const VANILLA: f64 = 0.009999980926515661;
+        assert!(
+            (travelled - VANILLA).abs() < 1.0e-12,
+            "must clip to vanilla's gap {VANILLA}, got {travelled}"
+        );
+        // Write the hitbox as a round 0.49 and this comes out 0.0100000000000016
+        // instead — 1.9e-8 away, far outside the tolerance above. That gap is
+        // the entire evidence for the float width, and it is *below* the 1e-6
+        // the conformance diff uses, so this unit test is the only thing that
+        // holds it.
+        assert!(
+            (travelled - 0.01).abs() > 1.0e-9,
+            "0.01 exactly would mean the hitbox was read as a decimal 0.98"
+        );
+    }
+
+    /// A NaN cart stays NaN, and does **not** infect what hits it.
+    ///
+    /// The folklore — and `docs/entity-abuse-in-record-doors.md`, which says to
+    /// believe the oracle over itself — has a NaN cart turning whatever touches
+    /// it into a "zombie minecart". The capture refutes it, and 26.2's
+    /// `Entity.setDeltaMovement` says why: a non-finite vector is dropped, so
+    /// the NaN mean never reaches the striker. What lands instead is the 0.2
+    /// scaling from the line before, twice a tick — the oracle watched a
+    /// striker go 0.069 to 0.0027, which is 0.2 squared, and stay finite for
+    /// the next 24 ticks.
+    ///
+    /// The NaN cart itself is untouched, because every write aimed at it is
+    /// non-finite too. That is what makes it glue: inert, unmovable by any
+    /// entity, and impossible to clear by accident.
+    #[test]
+    fn a_nan_cart_stays_nan_and_does_not_infect_the_cart_that_hits_it() {
         let mut carts = vec![parked(0, 8.5, 1.5, 0.0), parked(1, 9.48, 1.5, 0.0)];
         carts[0].vel[0] = f64::NAN;
+        carts[1].vel[0] = 0.069;
         assert_eq!(shove(&mut carts), 1);
         assert!(carts[0].vel[0].is_nan(), "the nan cart must stay nan");
         assert!(
-            carts[1].vel[0].is_nan(),
-            "and must infect the cart it hit — this is the zombie minecart"
+            carts[1].vel[0].is_finite(),
+            "and must NOT infect the cart it hit: contagion is refuted"
         );
+        // One push keeps the multiply and refuses the add.
+        assert_eq!(carts[1].vel[0], 0.069 * 0.2);
+    }
+
+    /// The same thing a whole tick at a time: 0.2 per push, two pushes, and the
+    /// oracle's 0.0027.
+    #[test]
+    fn a_striker_loses_a_fifth_of_its_speed_per_push_against_a_nan_cart() {
+        let mut carts = vec![parked(0, 8.5, 1.5, 0.0), parked(1, 9.48, 1.5, 0.0)];
+        carts[0].vel[0] = f64::NAN;
+        carts[1].vel[0] = 0.069;
+        // Each cart's tick runs a push phase, so a touching pair interacts twice.
+        assert_eq!(shove(&mut carts), 1);
+        assert_eq!(push_neighbours(&mut carts, 1), 1);
+        let expected = 0.069 * 0.2 * 0.2;
+        assert!(
+            (carts[1].vel[0] - expected).abs() < 1.0e-12,
+            "0.2 squared, the oracle's 0.069 -> 0.0027: got {}",
+            carts[1].vel[0]
+        );
+        assert!(carts[0].vel[0].is_nan());
     }
 
     /// A NaN *position* pushes nothing: `sq >= 1e-4` is false for NaN in Java

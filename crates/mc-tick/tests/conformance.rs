@@ -424,10 +424,9 @@ fn run_conformance_full(
                 ),
                 None => sim.spawn_item(item.item.clone(), item.pos, item.motion, item.pickup_delay),
             },
-            mc_tick::structure::SpawnedEntity::Minecart(cart) => match raw_id {
-                Some(id) => sim.spawn_minecart_with_id(id, cart.kind.clone(), cart.pos, cart.motion),
-                None => sim.spawn_minecart(cart.kind.clone(), cart.pos, cart.motion),
-            },
+            mc_tick::structure::SpawnedEntity::Minecart(cart) => {
+                sim.spawn_authored_minecart(cart, raw_id)
+            }
             // A golden that contains one of these would otherwise be compared
             // against a run with the entity missing, which is worse than no
             // comparison; swap for a spawn call when the behaviour lands.
@@ -1177,28 +1176,80 @@ fn carts_with_no_rail_under_them_still_shove_each_other() {
 }
 
 #[test]
-#[ignore = "three touching carts are not reproduced by any ordering of the \
-            pairwise law; kept as the evidence, see minecart::push_neighbours"]
-fn a_chain_of_touching_carts_is_not_reproduced_yet() {
-    // Deliberately failing, and kept.
+fn a_cart_only_pushes_along_its_facing_so_one_lane_moves_and_the_other_does_not() {
+    // The alignment gate, as a differential test rather than a claim.
+    //
+    // Two identical north-south lanes, each holding a pair parked 0.98 apart
+    // along +Z. Everything about them is the same except `Rotation`: one lane's
+    // carts carry yaw 0 and the other's carry yaw 90. Vanilla shoves the yaw-90
+    // lane apart exactly the way the east-west pairs go, and leaves the yaw-0
+    // lane sitting there, untouched, for all 80 ticks.
+    //
+    // `AbstractMinecart` reads yaw as a polar angle — 0 is +X, not south — so a
+    // +Z separation against a yaw-0 facing scores a dot of 0, under the 0.8 the
+    // push demands. Read yaw as a compass angle instead and the two lanes swap,
+    // which is what makes this structure worth capturing: the moving lane and
+    // the still lane are the two readings, side by side in one golden.
+    run_cart("cart_yaw.snbt", "cart_yaw.json", "nucleation:cart_yaw");
+}
+
+#[test]
+fn chains_of_touching_carts_hold_because_carts_block_each_other() {
+    // The mechanism the record doors are actually built on.
     //
     // `cart_group` is one rail line holding a pair, a triple and a quad of
-    // carts all touching at 0.98. The pair is bit-exact. The triple and the
-    // quad are not: vanilla moves only the far cart of each group on the first
-    // tick, by 1, 1.25 and 1.3375 times the 0.05 impulse — a geometric series
-    // in 0.35 — and the engine moves several of them instead.
+    // carts all touching at 0.98, left to shove themselves apart. Vanilla moves
+    // only the *far* cart of each group on the first tick, by 1, 1.25 and
+    // 1.3375 times the impulse, and nine carts stay in lockstep for sixty
+    // ticks — including where the groups drift into each other.
     //
-    // This is not an ordering bug that a bit of shuffling fixes. Every
-    // permutation of tick order, neighbour order, push-before-move versus
-    // push-after-move, live versus tick-start positions, and once- versus
-    // twice-per-pair was searched against this golden: the two-cart case comes
-    // out exact under the obvious one and the three-cart case comes out exact
-    // under none of them. Vanilla is doing something else once a cart has a
-    // neighbour on each side, and guessing at it would put a plausible,
-    // unverified number underneath the door.
-    //
-    // Un-ignore this when the capture that explains it exists.
+    // What makes a chain unlike a pair is not the push. It is that a cart
+    // shoved into a neighbour it is flush against cannot move: `Entity.collide`
+    // sweeps against other entities' boxes as well as blocks, the movement
+    // clips to nothing, and the zeroed axis means that cart goes on to push its
+    // own neighbours from a standstill. Take the collision away and the first
+    // tick is already wrong.
     run_cart("cart_group.snbt", "cart_group.json", "nucleation:cart_group");
+}
+
+#[test]
+fn a_five_cart_chain_absorbs_a_rammed_cart() {
+    // The door's geometry with something actually hitting it: five carts
+    // touching at 0.98 and a sixth arriving at 0.4. The cascade runs the length
+    // of the chain and the far end is spat out, which is how these builds move
+    // a cart without a rail powering it.
+    run_cart("cart_chain.snbt", "cart_chain.json", "nucleation:cart_chain");
+}
+
+#[test]
+fn triples_behave_differently_when_they_have_room_to_move() {
+    // The capture that separated "the push is wrong" from "the movement is
+    // blocked". Four configurations: a triple spaced 0.98/1.10, a triple at
+    // 0.98/0.98 whose middle cart starts at 0.2, a triple at 1.10/1.10, and a
+    // plain pair at 1.10.
+    //
+    // The middle cart moves in the wide ones and not in the tight ones, which
+    // is not something a push law can explain — the push is identical in both.
+    // It is the hitboxes: at 1.10 there is 0.12 of clearance and the ~0.045
+    // impulse fits inside it, at 0.98 there is none. The 1.10 pair also pins
+    // the `min(1/dist, 1)` scaling, which a touching pair cannot see because
+    // its 1/dist is clamped.
+    run_cart("cart_triad.snbt", "cart_triad.json", "nucleation:cart_triad");
+}
+
+#[test]
+fn a_squeezed_cart_creeps_by_exactly_the_room_it_has() {
+    // Seven equal-spaced triples at 0.95, 0.98, 0.99, 1.00, 1.02, 1.06 and
+    // 1.10, which walks the middle cart's first step across the whole boundary:
+    // free at 0.95 (already overlapping, so nothing clips), zero at 0.98,
+    // then clipped to exactly the gap — 0.009999981, 0.019999981, 0.039999981
+    // — and free again by 1.06 where the impulse fits.
+    //
+    // Those trailing 81s are the test. The gap is not 0.01 but 0.01 minus the
+    // float slop in `0.98F`, so this golden is what says the cart hitbox is
+    // 0.9800000190734863 and not 0.98, and separately that vanilla applies a
+    // movement once it clears 1e-7 in length rather than in length *squared*.
+    run_cart("cart_gap.snbt", "cart_gap.json", "nucleation:cart_gap");
 }
 
 #[test]

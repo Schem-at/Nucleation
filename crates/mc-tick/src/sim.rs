@@ -196,15 +196,6 @@ pub struct Simulation {
     conductors: Vec<bool>,
     /// The world's minecarts, in spawn order.
     minecarts: Vec<crate::minecart::MinecartState>,
-    /// How many cart-push phases this run found **more than one** neighbour.
-    ///
-    /// Nonzero means the run leaned on the part of cart-cart collision that is
-    /// not pinned by any capture: one neighbour reproduces vanilla bit for bit,
-    /// two does not, and no ordering of the pairwise law reproduces a chain of
-    /// touching carts (see `minecart::push_neighbours`). Kept as a count rather
-    /// than a panic because the record doors are *made* of such chains — the
-    /// simulation still runs, it just must not be believed about them.
-    cart_chain_ticks: u64,
     /// Entities that are a hitbox and nothing else — the record doors' frozen
     /// fireballs. `(id, kind, position)`; see
     /// [`Simulation::spawn_frozen_entity`].
@@ -303,7 +294,6 @@ impl Simulation {
             rails: Vec::new(),
             conductors: Vec::new(),
             minecarts: Vec::new(),
-            cart_chain_ticks: 0,
             frozen: Vec::new(),
             entity_snapshot: std::collections::HashMap::new(),
             ent_log: None,
@@ -471,6 +461,37 @@ impl Simulation {
         id
     }
 
+    /// Spawn an authored minecart, carrying everything the structure said about
+    /// it — including its yaw, which the three-argument spawns cannot express
+    /// and which decides whether the cart can be pushed at all.
+    ///
+    /// Takes the parsed entity rather than loose arguments so that a new field
+    /// on [`crate::structure::SpawnedMinecart`] reaches the simulation by being
+    /// read here, instead of by being silently dropped at a call site that was
+    /// never updated. `id` is the id a capture recorded, when there is one.
+    pub fn spawn_authored_minecart(
+        &mut self,
+        cart: &crate::structure::SpawnedMinecart,
+        id: Option<u32>,
+    ) -> u32 {
+        let id = match id {
+            Some(id) => {
+                self.item_entities.next_id = self.item_entities.next_id.max(id + 1);
+                id
+            }
+            None => {
+                let id = self.item_entities.next_id;
+                self.item_entities.next_id += 1;
+                id
+            }
+        };
+        self.push_minecart(id, cart.kind.clone(), cart.pos, cart.motion);
+        if let Some(spawned) = self.minecarts.last_mut() {
+            spawned.yaw = cart.yaw;
+        }
+        id
+    }
+
     fn push_minecart(&mut self, id: u32, kind: String, pos: [f64; 3], vel: [f64; 3]) {
         self.minecarts.push(crate::minecart::MinecartState {
             id,
@@ -551,13 +572,6 @@ impl Simulation {
                 is_minecart: false,
             });
         }
-    }
-
-    /// Whether this run ever pushed a cart that had two or more neighbours —
-    /// the regime `minecart::push_neighbours` documents as unverified. A
-    /// conformance claim about a run with this set is not worth making.
-    pub fn cart_chain_unverified(&self) -> bool {
-        self.cart_chain_ticks > 0
     }
 
     /// The live minecarts.
@@ -1740,18 +1754,13 @@ impl Simulation {
                     if self.minecarts[index].removed {
                         continue;
                     }
-                    crate::minecart::tick_minecart(&mut self.minecarts[index], &collision);
+                    crate::minecart::tick_minecart_among(&mut self.minecarts, index, &collision);
                     // The push half of the same cart's tick, in the same pass:
                     // a cart shoves its neighbours the moment it has finished
                     // moving, before the next cart ticks. That interleaving is
                     // observable — in `cart_collide` the pushed cart travels on
                     // its own tick, later the same tick it did the pushing.
-                    let pushed = crate::minecart::push_neighbours(&mut self.minecarts, index);
-                    // One neighbour is bit-exact against vanilla; two is not,
-                    // and no ordering of the pairwise law reproduces a chain.
-                    // Rather than let that be invisible, remember it — see
-                    // `cart_chain_unverified`.
-                    self.cart_chain_ticks += u64::from(pushed > 1);
+                    let _ = crate::minecart::push_neighbours(&mut self.minecarts, index);
                 }
                 for index in 0..self.item_entities.items.len() {
                     if self.item_entities.items[index].removed {
