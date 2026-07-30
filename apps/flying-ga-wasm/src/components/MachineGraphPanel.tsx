@@ -125,12 +125,19 @@ export default function MachineGraphPanel({ graph, error }: Props) {
   const roles = useMemo(() => {
     const map = new Map<string, Role>();
     if (!graph) return map;
+    // Painted weakest-claim first, so the last writer wins. The precedence is
+    // engine > kicker > payload > dead, and the kicker/payload order is the
+    // part that is easy to get wrong: a kicker usually sits INSIDE the push
+    // closure — it is bolted to the machine it starts — so painting payload
+    // after it silently repainted it blue and the panel under-reported kickers
+    // against the JSON (0 shown against 2, 1 against 3). Being carried does not
+    // stop a device being the thing that starts the machine.
     for (const cell of graph.dead_weight) map.set(key(cell), "dead");
+    for (const cell of graph.payload) map.set(key(cell), "payload");
     for (const id of graph.kickers) {
       const d = graph.devices[id];
       if (d) map.set(key(d.pos), "kicker");
     }
-    for (const cell of graph.payload) map.set(key(cell), "payload");
     // Engine last: a cell that is engine is engine, whatever else claimed it.
     for (const e of graph.engines) for (const cell of e.cells) map.set(key(cell), "engine");
     return map;

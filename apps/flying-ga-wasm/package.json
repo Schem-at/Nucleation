@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "sync-engine": "rm -rf public/engine && mkdir -p public/engine && cp -R ../../dist/npm-mctick/. public/engine/",
+    "sync-engine": "rm -rf public/engine && mkdir -p public/engine && cp -R ../../dist/npm-mctick/. public/engine/ && node -e \"const f='public/engine/TickSimulation.mjs',s=require('fs').readFileSync(f,'utf8');if(!s.includes('machineGraphJson')){console.error('\\n  engine lacks machineGraphJson \u2014 package-npm.sh defaults to bridge,simulation,meshing and OMITS mc-tick.\\n  rebuild: NUCLEATION_WASM_FEATURES=bridge,simulation,meshing,mc-tick ./tools/package-npm.sh dist/npm-mctick\\n');process.exit(1)}\"",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview"
