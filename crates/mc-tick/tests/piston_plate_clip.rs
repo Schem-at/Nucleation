@@ -540,6 +540,34 @@ mod wide_bodies {
     ///
     /// The narrow lanes hide it: a 0.3125 fireball fits inside the arm column, so
     /// every lane of `piston_plate_clip` proper takes the other branch.
+    ///
+    /// # The mechanism, now confirmed against these numbers
+    ///
+    /// `+0.25` then `-0.25` is not one constant twice. It is **two different
+    /// surfaces on the two steps**, and the capture identifies both to the last
+    /// bit — which is why two body widths agree on it:
+    ///
+    /// | | dragon fireball, 1.0 wide | furnace cart, 0.98F wide |
+    /// |---|---|---|
+    /// | east face at rest | `5.0` | `5.000000009536743` |
+    /// | after step one | **`5.25`** | **`5.25`** |
+    /// | after step two | `5.0` | `5.0` |
+    ///
+    /// Step one drags the body *inward*, toward the retracting piston at
+    /// `(5,1,z)`, and clips it against [`mc_tick::piston::retracting_base_box`] —
+    /// the extended base's own collision box, `[5.25, 6.0]`, the block minus the
+    /// `4/16` slot the arm sits in. The body's leading face comes to rest flush on
+    /// the slot face. Step two clips against the base's **landed** state, the
+    /// retracted full cube `[5.0, 6.0]`, and pushes it back out to `5.0`.
+    ///
+    /// So [`mc_tick::piston::PISTON_BASE_SLOT`] is vindicated as *geometry*: a
+    /// 0.98-wide and a 1.0-wide body, starting 9.5e-9 apart, both land on `5.25`
+    /// exactly, which no constant displacement explains. What remains unbuilt is
+    /// the **wiring** — `retracting_base_box` still has no call site and
+    /// `base_fix_displacement` still has none, so the engine takes the pulled
+    /// block's unclipped sweep and answers `+0.49`. Fixing that is a change to
+    /// retraction's law, not to this test; when it lands, this test fails, and
+    /// that is the signal to move both lanes into the agreeing set.
     #[test]
     fn retracting_a_body_wider_than_the_arm_still_disagrees() {
         /// What the engine says today, lane for lane, for the two `agrees: false`

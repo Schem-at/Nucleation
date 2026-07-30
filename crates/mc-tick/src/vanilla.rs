@@ -1867,6 +1867,34 @@ pub fn physics_tables(registry: &StateRegistry) -> (Vec<bool>, Vec<f32>, Vec<f32
                 match d.name.as_str() {
                     "minecraft:soul_sand" => (true, friction, 0.875, false),
                     "minecraft:cobweb" => (false, friction, 1.0, true),
+                    // An extended piston base is still something to stand on.
+                    //
+                    // `is_full_cube` answers the *conduction* question —
+                    // `isCollisionShapeFullBlock`, which an extended base fails
+                    // because `PistonBaseBlock` opens a 4-pixel slot on its
+                    // facing side for the head's stem. Entity collision asks
+                    // `getCollisionShape` instead, and that shape is the rest of
+                    // the block: a real surface. Routing entity solidity through
+                    // the conduction answer made a piston delete the support of
+                    // anything standing on it the tick it fired, which is how
+                    // three of the record door's furnace carts left the world.
+                    //
+                    // Measured by `piston_cart_support.json`: a furnace cart on
+                    // a west-facing piston at y=1 does not move for forty ticks
+                    // across a full extend/retract, while its negative-control
+                    // twin over air falls immediately.
+                    //
+                    // Height stays 1.0 for every facing. The slot is on the
+                    // facing side, so a horizontal or downward piston's top face
+                    // is untouched; for `facing=up` the slot is the top 4 pixels,
+                    // but whenever a base reads `extended=true` the cell above it
+                    // holds the head (or the `moving_piston` becoming it), so
+                    // nothing can rest on that face to tell 0.75 from 1.0. That
+                    // makes the difference unobservable rather than verified —
+                    // it is **not** measured here.
+                    "minecraft:piston" | "minecraft:sticky_piston" => {
+                        (true, friction, 1.0, false)
+                    }
                     _ => (is_full_cube(d), friction, 1.0, false),
                 }
             }

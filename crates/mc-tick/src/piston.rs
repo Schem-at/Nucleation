@@ -2003,6 +2003,23 @@ pub const PISTON_BASE_SLOT: f64 = 4.0 / 16.0;
 ///
 /// `travel` is the direction the head is moving, which is *inward*, so the slot
 /// is at the `travel.opposite()` end of the block.
+///
+/// # Status: geometry confirmed, still not wired in
+///
+/// The `5.25` above was checked against **both** wide lanes of the capture, not
+/// just the cart: a 1.0-wide dragon fireball starting with its east face on
+/// `5.0` and a 0.98F cart starting on `5.000000009536743` — 9.5e-9 apart — both
+/// end step one with that face on `5.25` exactly, and both end step two on
+/// `5.0`, the retracted base's full cube. Two widths landing on the same
+/// absolute line is what rules out a fixed `0.25` displacement and makes this a
+/// surface. So the geometry is measured.
+///
+/// What is still missing is a **call site**. This function and
+/// [`base_fix_displacement`] are both unreferenced, so the engine takes the
+/// pulled block's unclipped sweep instead and shoves a wide body `+0.49` with no
+/// return. `piston_plate_clip.rs`'s
+/// `retracting_a_body_wider_than_the_arm_still_disagrees` pins that wrong answer
+/// as a tripwire and carries the table above.
 pub fn retracting_base_box(piston: Pos, travel: Dir) -> ([f64; 3], [f64; 3]) {
     let axis = match travel {
         Dir::West | Dir::East => 0,

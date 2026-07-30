@@ -1,0 +1,20 @@
+{
+  DataVersion: 4903,
+  size: [8, 5, 20],
+  palette: [
+    {Name: "minecraft:stone"},
+    {Name: "minecraft:sticky_piston", Properties: {extended: "false", facing: "west"}},
+    {Name: "minecraft:piston", Properties: {extended: "false", facing: "west"}}
+  ],
+  blocks: [
+    {pos: [4, 1, 2], state: 1},
+    {pos: [4, 1, 7], state: 2},
+    {pos: [4, 1, 12], state: 0}
+  ],
+  entities: [
+    {blockPos: [4, 2, 2], pos: [4.5d, 2.0d, 2.5d], nbt: {id: "minecraft:furnace_minecart", Motion: [0.0d, 0.0d, 0.0d], Rotation: [90f, 0f]}},
+    {blockPos: [4, 2, 7], pos: [4.5d, 2.0d, 7.5d], nbt: {id: "minecraft:furnace_minecart", Motion: [0.0d, 0.0d, 0.0d], Rotation: [90f, 0f]}},
+    {blockPos: [4, 2, 12], pos: [4.5d, 2.0d, 12.5d], nbt: {id: "minecraft:furnace_minecart", Motion: [0.0d, 0.0d, 0.0d], Rotation: [90f, 0f]}},
+    {blockPos: [4, 2, 17], pos: [4.5d, 2.0d, 17.5d], nbt: {id: "minecraft:furnace_minecart", Motion: [0.0d, 0.0d, 0.0d], Rotation: [90f, 0f]}}
+  ]
+}

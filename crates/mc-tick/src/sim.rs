@@ -1240,6 +1240,42 @@ impl Simulation {
             .collect()
     }
 
+    /// The same in-flight boxes, for an entity moving under its **own** power.
+    ///
+    /// [`Simulation::blocks_in_flight`] answers for the entity a piston is
+    /// shoving, and drops the first of the two half-block steps because vanilla
+    /// exempts it: `PistonMovingBlockEntity.getCollisionShape` skips the shape
+    /// while `progress < 1.0` *and* the entity's NOCLIP direction matches the
+    /// stroke. An entity falling of its own accord matches neither clause, so it
+    /// gets the shape on both steps — and that is the only difference between
+    /// this list and that one.
+    ///
+    /// That was recorded as an open question on `blocks_in_flight` ("a minecart
+    /// rolling of its own accord still passes through a moving block, which is a
+    /// separate and unmeasured question"). It is measured now.
+    /// `piston_cart_support.json` retracts a west-facing piston out from under a
+    /// furnace cart resting on its top face: the base cell holds a
+    /// `moving_piston` for the two ticks the head takes to come home, and the
+    /// cart does not move a thousandth in either of them. Without this the cart
+    /// took gravity for those two ticks, ended up inside the cell the retracted
+    /// base was about to reoccupy, and fell out of the world from there — three
+    /// of the record door's fifteen furnace carts, ids 14, 21 and 23, each
+    /// standing over a `sticky_piston` that fires when the button is pressed.
+    ///
+    /// Like `blocks_in_flight` this counts only cells whose **landed** state is
+    /// solid, so a stroke that lands a `piston_head` contributes nothing.
+    fn blocks_in_flight_to_ordinary_motion(&self) -> Vec<([f64; 3], [f64; 3])> {
+        self.moves
+            .iter()
+            .filter(|m| m.sweep.is_some())
+            .filter(|m| self.solidity.get(m.state.raw() as usize).copied().unwrap_or(false))
+            .map(|m| {
+                let lo = [f64::from(m.pos.x), f64::from(m.pos.y), f64::from(m.pos.z)];
+                (lo, [lo[0] + 1.0, lo[1] + 1.0, lo[2] + 1.0])
+            })
+            .collect()
+    }
+
     /// The boxes of the non-cart entities a moving minecart is stopped by.
     ///
     /// Carts are **not** here — [`crate::minecart::tick_minecart_among`] adds
@@ -1260,7 +1296,7 @@ impl Simulation {
     /// the vehicle's y, plus the 0.1875 seat, plus the blaze's 1.8 — so a
     /// rider's box holds a cart up just as a standing body does.
     fn cart_obstacle_bodies(&self) -> Vec<([f64; 3], [f64; 3])> {
-        let mut out = Vec::new();
+        let mut out = self.blocks_in_flight_to_ordinary_motion();
         for standing in [true, false] {
             for body in &self.bodies {
                 if matches!(body.physics, crate::entity::BodyPhysics::Frozen { .. }) != standing {

@@ -1471,6 +1471,72 @@ fn a_squeezed_cart_creeps_by_exactly_the_room_it_has() {
 }
 
 #[test]
+fn an_extended_piston_base_still_holds_up_the_cart_standing_on_it() {
+    // `piston_cart_support.json`, four lanes, the capture that explains three
+    // furnace carts leaving the record door's world.
+    //
+    // A furnace cart rests on the top face of a block at y=1 and the block
+    // underneath it is toggled through a stroke at t5 and back at t20:
+    //
+    //   z=2   sticky_piston[facing=west]  extends and retracts under the cart
+    //   z=7   piston[facing=west]         the same, non-sticky
+    //   z=12  stone                       positive control, nothing happens to it
+    //   z=17  air                          negative control, falls at once
+    //
+    // Vanilla's answer for the two horizontal lanes is that **nothing moves at
+    // all**: y stays 2.0 for all forty ticks. A piston base that has gone
+    // `extended=true` is still a surface to stand on — the 4-pixel slot
+    // `PistonBaseBlock` opens is on the *facing* side, and for a horizontal
+    // piston the top face is untouched. The engine had
+    // `is_full_cube(piston[extended=true]) == false` feeding `physics_tables`
+    // solidity, so the cart lost its support the tick the piston fired and fell
+    // out of the world — which is exactly what the door's carts 14, 21 and 23
+    // were doing, each of them standing over a `sticky_piston[extended=false]`.
+    //
+    // The negative control is what makes the three quiet lanes mean something:
+    // the z=17 cart over air falls immediately and is gone by t20, so "did not
+    // move" is a measurement and not a blind instrument. The capture's own block
+    // events are the other guard — they show all three pistons really going
+    // `extended=false` -> `extended=true` -> `moving_piston` -> `extended=false`,
+    // so these are quiet lanes under a piston that fired, not lanes where
+    // nothing happened.
+    //
+    // Two ticks of that stroke are a second hole, and the same capture closes
+    // it. On retraction the *base* cell itself holds a `moving_piston` for the
+    // two ticks the head takes to come home, and vanilla's cart does not budge
+    // in either of them — so a moving block is solid to an entity falling under
+    // its own power, on both half-steps. That was written down as an open
+    // question on `Simulation::blocks_in_flight` and is now
+    // `blocks_in_flight_to_ordinary_motion`.
+    //
+    // A fifth lane was captured and is **not** here, deliberately:
+    // `tools/gametest/captures/piston_cart_support_5lane.entities.log` adds a
+    // `sticky_piston[facing=up]` that extends into the cart, and vanilla lifts
+    // it 2.0 -> 2.51 -> 3.01 -> 3.0, resting it on the head's top face. The
+    // engine leaves it at 2.0, because holding a cart up there needs
+    // `piston_head` to be solid to entity collision — and `piston_head`
+    // answering `false` to the *full-cube* question is load-bearing for
+    // `blocks_in_flight`, which is what keeps `piston_plate_clip`'s fireball at
+    // 4.15625 inside the head slot instead of stopping it at 4.25. Separating
+    // those two predicates is the next piece of work, not a tweak to this one.
+    run_conformance_full(
+        "piston_cart_support.snbt",
+        "piston_cart_support.json",
+        "nucleation:piston_cart_support",
+        &["minecraft:redstone_block"],
+        &[
+            (5, Actuate::Place(Pos::new(5, 1, 2), "minecraft:redstone_block")),
+            (20, Actuate::Place(Pos::new(5, 1, 2), "minecraft:air")),
+            (5, Actuate::Place(Pos::new(5, 1, 7), "minecraft:redstone_block")),
+            (20, Actuate::Place(Pos::new(5, 1, 7), "minecraft:air")),
+        ],
+        None,
+        Settle::Placement,
+        1.0e-6,
+    );
+}
+
+#[test]
 fn a_redstone_block_lights_nine_golden_rails_and_no_more() {
     // findPoweredRailSignal: the direct neighbour plus a chain of at most 8
     // already-powered rails — nine light up, the tenth stays dark, and the
