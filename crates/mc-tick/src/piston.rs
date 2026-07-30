@@ -1970,6 +1970,145 @@ pub const PISTON_ARM_NEAR: f64 = 6.0 / 16.0;
 /// The far face of a piston arm's cross-section. See [`PISTON_ARM_NEAR`].
 pub const PISTON_ARM_FAR: f64 = 10.0 / 16.0;
 
+/// How deep the arm's slot is in an extended piston's own block: `4/16`.
+///
+/// `PistonBaseBlock`'s collision shape when `extended=true` is the block minus a
+/// 4-pixel slab on the facing side — the slot the arm sits in. It is the only
+/// part of a retracting piston's own square that is **not** solid, and the face
+/// at `4/16` is a real surface an entity is stopped flush against.
+pub const PISTON_BASE_SLOT: f64 = 4.0 / 16.0;
+
+/// The box a retracting piston's own square keeps solid for the whole stroke.
+///
+/// `PistonMovingBlockEntity.getCollisionShape` opens with
+///
+/// ```text
+/// if (!extending && isSourcePiston && movedState.getBlock() instanceof PistonBaseBlock)
+///     shape = movedState.setValue(EXTENDED, true).getCollisionShape(...)
+/// else
+///     shape = Shapes.empty()
+/// ```
+///
+/// and that first shape is **never suppressed**: the `NOCLIP` early return a
+/// line later returns *it*, not nothing. So while a sticky piston pulls, the cell
+/// holding the piston keeps the 12/16 box of its own extended base, and an entity
+/// the stroke shoves inward is stopped dead against it.
+///
+/// This is what pins the wide-body numbers in
+/// `tools/gametest/captures/piston_clip_sizes.entities.log`. The 0.98-wide
+/// furnace minecart in lane `z=9` starts with its east face at
+/// `5.000000009536743` and ends the first step at exactly `5.25` — the slot face
+/// of the piston at `(5,1,9)`, to the last bit — where the unclipped step would
+/// have been `0.51`.
+///
+/// `travel` is the direction the head is moving, which is *inward*, so the slot
+/// is at the `travel.opposite()` end of the block.
+pub fn retracting_base_box(piston: Pos, travel: Dir) -> ([f64; 3], [f64; 3]) {
+    let axis = match travel {
+        Dir::West | Dir::East => 0,
+        Dir::Down | Dir::Up => 1,
+        Dir::North | Dir::South => 2,
+    };
+    let (dx, dy, dz) = travel.delta();
+    let outward = -f64::from([dx, dy, dz][axis]);
+    let lo = [
+        f64::from(piston.x),
+        f64::from(piston.y),
+        f64::from(piston.z),
+    ];
+    let mut min = lo;
+    let mut max = [lo[0] + 1.0, lo[1] + 1.0, lo[2] + 1.0];
+    if outward > 0.0 {
+        max[axis] -= PISTON_BASE_SLOT;
+    } else {
+        min[axis] += PISTON_BASE_SLOT;
+    }
+    (min, max)
+}
+
+/// `PistonMovingBlockEntity.fixEntityWithinPistonBase`, as an outward distance.
+///
+/// The call the engine had no model of at all, and the missing half of
+/// retracting a body wider than the arm. After **every** shove by a retracting
+/// source piston, vanilla runs
+///
+/// ```text
+/// if (!extending && isSourcePiston)
+///     fixEntityWithinPistonBase(pos, entity, movementDirection, d0)
+/// ```
+///
+/// which shoves any entity still overlapping the piston's **own full cell** back
+/// out of it, against the head's travel:
+///
+/// ```text
+/// AABB cell = Shapes.block().bounds().move(pos);
+/// if (box.intersects(cell)) {
+///     Direction out = dir.getOpposite();
+///     double d1 = getMovement(cell, out, box) + 0.01;
+///     double d2 = getMovement(cell, out, box.intersect(cell)) + 0.01;
+///     if (Math.abs(d1 - d2) < 0.01) {
+///         d1 = Math.min(d1, d0) + 0.01;
+///         moveEntityByPiston(dir, entity, d1, out);
+///     }
+/// }
+/// ```
+///
+/// `d1` is the distance from the cell's outward face to the entity's *inward*
+/// face — how far out it has to go to leave the cell. `d2` is the same measured
+/// against the clipped box, so the two differ only when the entity reaches past
+/// the cell's inward face; that guard declines a body that engulfs the piston
+/// rather than merely poking into it.
+///
+/// `travel` is the head's inward travel, and the returned distance is **outward**
+/// — the opposite direction — so a caller shoves along `travel.opposite()`.
+///
+/// # Why the door needs it
+///
+/// `piston_clip_sizes` lanes `z=5` (a 1.0-wide dragon fireball) and `z=9` (a 0.98
+/// furnace minecart) are shoved a quarter block east and then a quarter block
+/// back, a round trip. The outward half is this call: the cart's east face lands
+/// on exactly `5.0`, the west face of the piston's own cell, having been stopped
+/// on the previous step against `5.25` by [`retracting_base_box`]. Two surfaces,
+/// two bit-exact landings, and neither of them a fitted constant.
+pub fn base_fix_displacement(
+    piston: Pos,
+    travel: Dir,
+    entity_min: [f64; 3],
+    entity_max: [f64; 3],
+) -> Option<f64> {
+    let axis = match travel {
+        Dir::West | Dir::East => 0,
+        Dir::Down | Dir::Up => 1,
+        Dir::North | Dir::South => 2,
+    };
+    let (dx, dy, dz) = travel.delta();
+    let outward = -f64::from([dx, dy, dz][axis]);
+    let lo = [
+        f64::from(piston.x),
+        f64::from(piston.y),
+        f64::from(piston.z),
+    ];
+    // `AABB.intersects` against the whole cell — strict, as everywhere else.
+    for i in 0..3 {
+        if !(entity_min[i] < lo[i] + 1.0 && entity_max[i] > lo[i]) {
+            return None;
+        }
+    }
+    // `getMovement(cell, outward, box)`: the cell's outward face to the entity's
+    // inward one.
+    let (cell_face, inward_face, clipped_face) = if outward > 0.0 {
+        (lo[axis] + 1.0, entity_min[axis], entity_min[axis].max(lo[axis]))
+    } else {
+        (lo[axis], entity_max[axis], entity_max[axis].min(lo[axis] + 1.0))
+    };
+    let d1 = outward * (cell_face - inward_face) + PISTON_OVERSHOOT;
+    let d2 = outward * (cell_face - clipped_face) + PISTON_OVERSHOOT;
+    if (d1 - d2).abs() >= PISTON_OVERSHOOT {
+        return None;
+    }
+    Some(d1.min(PISTON_STEP) + PISTON_OVERSHOOT)
+}
+
 /// How far a retracting head displaces an entity standing in the **piston's
 /// own square** — the block the head is closing back into — or `None` if this
 /// step does not touch it.
