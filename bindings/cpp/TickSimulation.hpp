@@ -101,6 +101,11 @@ namespace capi {
 
     void TickSimulation_world_snapshot_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
 
+    void TickSimulation_machine_graph_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct TickSimulation_machine_graph_batch_json_result {union { diplomat::capi::NucleationError err;}; bool is_ok;} TickSimulation_machine_graph_batch_json_result;
+    TickSimulation_machine_graph_batch_json_result TickSimulation_machine_graph_batch_json(int32_t bx, int32_t by, int32_t bz, int32_t travel, int32_t x_off, diplomat::capi::DiplomatStringView palette, diplomat::capi::DiplomatU16View cells, uint16_t air_index, diplomat::capi::DiplomatWrite* write);
+
     void TickSimulation_destroy(TickSimulation* self);
 
     } // extern "C"
@@ -484,6 +489,49 @@ inline void TickSimulation::world_snapshot_json_write(W& writeable) const {
     diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
     diplomat::capi::TickSimulation_world_snapshot_json(this->AsFFI(),
         &write);
+}
+
+inline std::string TickSimulation::machine_graph_json() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::TickSimulation_machine_graph_json(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void TickSimulation::machine_graph_json_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::TickSimulation_machine_graph_json(this->AsFFI(),
+        &write);
+}
+
+inline diplomat::result<std::string, NucleationError> TickSimulation::machine_graph_batch_json(int32_t bx, int32_t by, int32_t bz, int32_t travel, int32_t x_off, std::string_view palette, diplomat::span<const uint16_t> cells, uint16_t air_index) {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    auto result = diplomat::capi::TickSimulation_machine_graph_batch_json(bx,
+        by,
+        bz,
+        travel,
+        x_off,
+        {palette.data(), palette.size()},
+        {cells.data(), cells.size()},
+        air_index,
+        &write);
+    return result.is_ok ? diplomat::result<std::string, NucleationError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
+}
+template<typename W>
+inline diplomat::result<std::monostate, NucleationError> TickSimulation::machine_graph_batch_json_write(int32_t bx, int32_t by, int32_t bz, int32_t travel, int32_t x_off, std::string_view palette, diplomat::span<const uint16_t> cells, uint16_t air_index, W& writeable) {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    auto result = diplomat::capi::TickSimulation_machine_graph_batch_json(bx,
+        by,
+        bz,
+        travel,
+        x_off,
+        {palette.data(), palette.size()},
+        {cells.data(), cells.size()},
+        air_index,
+        &write);
+    return result.is_ok ? diplomat::result<std::monostate, NucleationError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, NucleationError>(diplomat::Err<NucleationError>(NucleationError::FromFFI(result.err)));
 }
 
 inline const diplomat::capi::TickSimulation* TickSimulation::AsFFI() const {

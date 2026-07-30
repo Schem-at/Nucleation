@@ -822,6 +822,75 @@ export class TickSimulation {
         }
     }
 
+    /**
+     * Static structural analysis of the build standing in this world.
+     *
+     * One call, one JSON document: adhesion groups, piston/observer/source
+     * nodes, the four edge kinds, every minimal self-translating subgraph
+     * (the engine), payload, kickers, dead weight, and any proof that the
+     * machine cannot move.
+     *
+     * The analysis lives in the engine rather than in the caller on
+     * purpose. Every "what would this piston move?" answer comes from
+     * `resolve_push`/`resolve_pull` — the same oracle-verified resolver the
+     * tick loop runs — and a second copy of Minecraft's push rules written
+     * on the far side of this boundary would drift from it silently.
+     */
+    machineGraphJson() {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.TickSimulation_machine_graph_json(this.ffiValue, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            write.free();
+        }
+    }
+
+    /**
+     * GA pre-filter: static verdicts for a whole batch of genomes.
+     *
+     * Same flat-cell layout as {@link Self::eval_flight_batch}, and meant to run
+     * immediately before it: whatever this rejects never needs simulating.
+     * Writes one row per genome, `[rejected, rejected_for_sustained,
+     * engine_cell_count, payload_cell_count, dead_cell_count, "codes"]`.
+     *
+     * The registry, behaviour table and movability rules are built once for
+     * the batch — building them per genome costs more than the analysis.
+     */
+    static machineGraphBatchJson(bx, by, bz, travel, xOff, palette, cells, airIndex) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const paletteSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.str8(wasm, palette)));
+        const cellsSlice = functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.sliceWrapper(wasm, diplomatRuntime.DiplomatBuf.slice(wasm, cells, "u16")));
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+
+        const result = wasm.TickSimulation_machine_graph_batch_json(diplomatReceive.buffer, bx, by, bz, travel, xOff, paletteSlice.ptr, cellsSlice.ptr, airIndex, write.buffer);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new NucleationError(diplomatRuntime.internalConstructor, diplomatRuntime.enumDiscriminant(wasm, diplomatReceive.buffer));
+                throw new globalThis.Error('NucleationError.' + cause.value, { cause });
+            }
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+            write.free();
+        }
+    }
+
     constructor(symbol, ptr, selfEdge) {
         return this.#internalConstructor(...arguments)
     }

@@ -151,6 +151,66 @@ function flyBatch(
   return JSON.parse(json) as FlightRow[];
 }
 
+/** One row of `machineGraphBatchJson`. */
+type GraphRow = [
+  boolean, // provably immobile — no block in the build can ever move
+  boolean, // provably incapable of sustained self-propulsion
+  number, // engine cells
+  number, // payload cells
+  number, // dead-weight cells
+  string, // rejection codes, "|"-joined
+];
+
+/** Static structural verdicts for a batch, without simulating anything.
+ *
+ * The rejections are *sound negatives*: they never fire on a machine that
+ * works. That is what makes this usable as a gate rather than a heuristic —
+ * see `crates/mc-tick/src/machine_graph.rs`, whose test suite sweeps thousands
+ * of candidates and asserts a zero false-reject rate against this app's own
+ * fitness. Analysis is roughly two orders of magnitude cheaper than a flight,
+ * so anything it can rule out is a flight the search never has to pay for. */
+function staticVerdicts(
+  eng: EngineModule,
+  genomes: Genome[],
+  bbox: BBox,
+  evalTicks: number,
+): GraphRow[] | null {
+  const [bx, by, bz] = bbox;
+  const cells: number[] = [];
+  for (const g of genomes) for (const s of g) cells.push(s);
+  try {
+    const json = eng.TickSimulation.machineGraphBatchJson(
+      bx,
+      by,
+      bz,
+      travelRoom(evalTicks),
+      X_OFF,
+      PALETTE,
+      cells,
+      AIR,
+    );
+    return JSON.parse(json) as GraphRow[];
+  } catch {
+    // A filter is an optimization. If it cannot run, everything simulates.
+    return null;
+  }
+}
+
+/** Human-readable reason for a static rejection. */
+const REJECTION_TEXT: Record<string, string> = {
+  empty: "no blocks",
+  no_piston: "no piston — nothing can move",
+  all_pistons_blocked: "every piston is blocked — nothing can move",
+  no_driver: "no observer or power source — cannot fire twice",
+  drive_never_moves: "the drive cannot move itself — a cannon, not a machine",
+  acyclic_drive: "nothing re-triggers — fires once and stops",
+};
+
+function rejectionText(codes: string): string {
+  const first = codes.split("|")[0] ?? "";
+  return REJECTION_TEXT[first] ?? `statically rejected (${first})`;
+}
+
 interface Precheck {
   violation: string | null;
   kicks: Array<[number, number, number]>;
@@ -291,18 +351,44 @@ export function evaluateBatch(
     else survivors.push(i);
   }
   if (survivors.length === 0) return out;
+
+  // Static pre-filter. `requireSustained` runs already say a one-stroke lurch is
+  // not a result, so those runs may also use the drive-topology rejections;
+  // every other run gets only the rejections that prove nothing moves at all.
+  const graphs = staticVerdicts(
+    eng,
+    survivors.map((i) => genomes[i]),
+    bbox,
+    evalTicks,
+  );
+  const flyable: number[] = [];
+  if (graphs && graphs.length === survivors.length) {
+    survivors.forEach((i, k) => {
+      const [immobile, noSustain, , , , codes] = graphs[k];
+      if (immobile || (constraints.requireSustained && noSustain)) {
+        out[i] = zeroMetrics(rejectionText(codes));
+      } else {
+        flyable.push(i);
+      }
+    });
+  } else {
+    flyable.push(...survivors);
+  }
+  if (flyable.length === 0) return out;
+
+  const preFiltered = flyable;
   try {
     const rows = flyBatch(
       eng,
-      survivors.map((i) => genomes[i]),
-      survivors.map((i) => pres[i].kicks[0]),
+      preFiltered.map((i) => genomes[i]),
+      preFiltered.map((i) => pres[i].kicks[0]),
       bbox,
       evalTicks,
       seed,
       constraints.mustMoveByTick,
       needPeriod,
     );
-    survivors.forEach((i, k) => {
+    preFiltered.forEach((i, k) => {
       const first = flightFromRow(rows[k], constraints.mustMoveByTick);
       out[i] = metricsFromFlight(
         first,
@@ -314,7 +400,7 @@ export function evaluateBatch(
       );
     });
   } catch {
-    for (const i of survivors) out[i] = zeroMetrics("engine error");
+    for (const i of preFiltered) out[i] = zeroMetrics("engine error");
   }
   return out;
 }

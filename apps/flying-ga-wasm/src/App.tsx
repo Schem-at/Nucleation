@@ -6,6 +6,9 @@ import FlightLoop from "./components/FlightLoop";
 import HallOfFame from "./components/HallOfFame";
 import Leaderboard from "./components/Leaderboard";
 import MachineViewer from "./components/MachineViewer";
+import MachineGraphPanel, {
+  useMachineGraph,
+} from "./components/MachineGraphPanel";
 import MapElitesGrid from "./components/MapElitesGrid";
 import ParetoChart from "./components/ParetoChart";
 import PopulationInspector from "./components/PopulationInspector";
@@ -533,6 +536,14 @@ export default function App() {
     view.leaderboard.find((m) => m.id === selectedLbId) ??
     view.archive.find((m) => m.id === selectedLbId) ??
     null;
+
+  // The sections view. Static analysis is cheap enough to re-run on every
+  // selection change without a worker.
+  const { graph: machineGraph, error: machineGraphError } = useMachineGraph(
+    selectedMachine?.genome ?? null,
+    viewCfg?.bbox ?? [1, 1, 1],
+    viewCfg?.eval_ticks ?? 100,
+  );
 
   /** Population-inspector click-through: stage the member in the viewer. */
   const inspectMember = useCallback(
@@ -1124,6 +1135,14 @@ export default function App() {
                     setSelectedLbId(view.leaderboard[0].id);
                 }}
               />
+            </section>
+
+            <section className="panel">
+              <div className="panel-head">
+                <h2 className="eyebrow">Sections</h2>
+                <span className="note">static analysis, no simulation</span>
+              </div>
+              <MachineGraphPanel graph={machineGraph} error={machineGraphError} />
             </section>
           </div>
         </main>

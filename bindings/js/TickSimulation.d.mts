@@ -309,4 +309,33 @@ export class TickSimulation {
     changesCount(): number;
 
     worldSnapshotJson(): string;
+
+    /**
+     * Static structural analysis of the build standing in this world.
+     *
+     * One call, one JSON document: adhesion groups, piston/observer/source
+     * nodes, the four edge kinds, every minimal self-translating subgraph
+     * (the engine), payload, kickers, dead weight, and any proof that the
+     * machine cannot move.
+     *
+     * The analysis lives in the engine rather than in the caller on
+     * purpose. Every "what would this piston move?" answer comes from
+     * `resolve_push`/`resolve_pull` — the same oracle-verified resolver the
+     * tick loop runs — and a second copy of Minecraft's push rules written
+     * on the far side of this boundary would drift from it silently.
+     */
+    machineGraphJson(): string;
+
+    /**
+     * GA pre-filter: static verdicts for a whole batch of genomes.
+     *
+     * Same flat-cell layout as {@link Self::eval_flight_batch}, and meant to run
+     * immediately before it: whatever this rejects never needs simulating.
+     * Writes one row per genome, `[rejected, rejected_for_sustained,
+     * engine_cell_count, payload_cell_count, dead_cell_count, "codes"]`.
+     *
+     * The registry, behaviour table and movability rules are built once for
+     * the batch — building them per genome costs more than the analysis.
+     */
+    static machineGraphBatchJson(bx: number, by: number, bz: number, travel: number, xOff: number, palette: string, cells: Array<number>, airIndex: number): string;
 }

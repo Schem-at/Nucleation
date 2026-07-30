@@ -313,6 +313,41 @@ final class TickSimulation {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function machineGraphJson() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->TickSimulation_machine_graph_json($this->ptr, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public static function machineGraphBatchJson( $bx,  $by,  $bz,  $travel,  $x_off, string $palette, array $cells,  $air_index) {
+        $__n5 = strlen($palette);
+        $__view5 = Lib::ffi()->new('DiplomatStringView');
+        if ($__n5 > 0) {
+            $__buf5 = Lib::ffi()->new("uint8_t[" . $__n5 . "]", false);
+            \FFI::memcpy($__buf5, $palette, $__n5);
+            $__view5->data = Lib::ffi()->cast('const char*', \FFI::addr($__buf5[0]));
+        } else {
+            $__view5->data = null;
+        }
+        $__view5->len = $__n5;
+        $__n6 = count($cells);
+        $__view6 = Lib::ffi()->new('DiplomatU16View');
+        if ($__n6 > 0) {
+            $__arr6 = Lib::ffi()->new("uint16_t[" . $__n6 . "]", false);
+            foreach ($cells as $__i6 => $__v6) { $__arr6[$__i6] = $__v6; }
+            $__view6->data = \FFI::addr($__arr6[0]);
+        } else {
+            $__view6->data = null;
+        }
+        $__view6->len = $__n6;
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        $result = Lib::ffi()->TickSimulation_machine_graph_batch_json($bx, $by, $bz, $travel, $x_off, $__view5, $__view6, $air_index, $write);
+        if (!$result->is_ok) {
+            throw new DiplomatError('NucleationError', $result->err, NucleationError::name($result->err));
+        }
+        return Lib::readAndFreeWrite($write);
+    }
+
     public function __destruct() {
         if ($this->owned) {
             Lib::ffi()->TickSimulation_destroy($this->ptr);

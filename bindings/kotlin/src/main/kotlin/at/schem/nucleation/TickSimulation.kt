@@ -44,6 +44,8 @@ internal interface TickSimulationLib: Library {
     fun TickSimulation_non_air_max_x(handle: Pointer): Int
     fun TickSimulation_changes_count(handle: Pointer): FFIUint32
     fun TickSimulation_world_snapshot_json(handle: Pointer, write: Pointer): Unit
+    fun TickSimulation_machine_graph_json(handle: Pointer, write: Pointer): Unit
+    fun TickSimulation_machine_graph_batch_json(bx: Int, by: Int, bz: Int, travel: Int, xOff: Int, palette: Slice, cells: Slice, airIndex: FFIUint16, write: Pointer): ResultUnitInt
 }
 /** A headless, vanilla-accurate tick simulation of one structure.
 */
@@ -264,6 +266,37 @@ class TickSimulation internal constructor (
 
             val returnString = DW.writeToString(write)
             return returnString
+        }
+        @JvmStatic
+
+        /** GA pre-filter: static verdicts for a whole batch of genomes.
+        *
+        *Same flat-cell layout as [Self::eval_flight_batch], and meant to run
+        *immediately before it: whatever this rejects never needs simulating.
+        *Writes one row per genome, `[rejected, rejected_for_sustained,
+        *engine_cell_count, payload_cell_count, dead_cell_count, "codes"]`.
+        *
+        *The registry, behaviour table and movability rules are built once for
+        *the batch — building them per genome costs more than the analysis.
+        */
+        fun machineGraphBatchJson(bx: Int, by: Int, bz: Int, travel: Int, xOff: Int, palette: String, cells: UShortArray, airIndex: UShort): Result<String> {
+            val paletteSliceMemory = PrimitiveArrayTools.borrowUtf8(palette)
+            val cellsSliceMemory = PrimitiveArrayTools.borrow(cells)
+            val write = DW.lib.diplomat_buffer_write_create(0)
+            val returnVal = lib.TickSimulation_machine_graph_batch_json(bx, by, bz, travel, xOff, paletteSliceMemory.slice, cellsSliceMemory.slice, FFIUint16(airIndex), write);
+            try {
+                val nativeOkVal = returnVal.getNativeOk();
+                if (nativeOkVal != null) {
+
+                    val returnString = DW.writeToString(write)
+                    return returnString.ok()
+                } else {
+                    return NucleationErrorError(NucleationError.fromNative(returnVal.getNativeErr()!!)).err()
+                }
+            } finally {
+                paletteSliceMemory.close()
+                cellsSliceMemory.close()
+            }
         }
     }
 
@@ -585,6 +618,27 @@ class TickSimulation internal constructor (
     fun worldSnapshotJson(): String {
         val write = DW.lib.diplomat_buffer_write_create(0)
         val returnVal = lib.TickSimulation_world_snapshot_json(handle, write);
+
+        val returnString = DW.writeToString(write)
+        return returnString
+    }
+
+    /** Static structural analysis of the build standing in this world.
+    *
+    *One call, one JSON document: adhesion groups, piston/observer/source
+    *nodes, the four edge kinds, every minimal self-translating subgraph
+    *(the engine), payload, kickers, dead weight, and any proof that the
+    *machine cannot move.
+    *
+    *The analysis lives in the engine rather than in the caller on
+    *purpose. Every "what would this piston move?" answer comes from
+    *`resolve_push`/`resolve_pull` — the same oracle-verified resolver the
+    *tick loop runs — and a second copy of Minecraft's push rules written
+    *on the far side of this boundary would drift from it silently.
+    */
+    fun machineGraphJson(): String {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.TickSimulation_machine_graph_json(handle, write);
 
         val returnString = DW.writeToString(write)
         return returnString

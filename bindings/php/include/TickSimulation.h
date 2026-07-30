@@ -98,6 +98,11 @@ uint32_t TickSimulation_changes_count(const TickSimulation* self);
 
 void TickSimulation_world_snapshot_json(const TickSimulation* self, DiplomatWrite* write);
 
+void TickSimulation_machine_graph_json(const TickSimulation* self, DiplomatWrite* write);
+
+typedef struct TickSimulation_machine_graph_batch_json_result {union { NucleationError err;}; bool is_ok;} TickSimulation_machine_graph_batch_json_result;
+TickSimulation_machine_graph_batch_json_result TickSimulation_machine_graph_batch_json(int32_t bx, int32_t by, int32_t bz, int32_t travel, int32_t x_off, DiplomatStringView palette, DiplomatU16View cells, uint16_t air_index, DiplomatWrite* write);
+
 void TickSimulation_destroy(TickSimulation* self);
 
 

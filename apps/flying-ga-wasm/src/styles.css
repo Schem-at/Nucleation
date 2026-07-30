@@ -2009,3 +2009,24 @@ select {
   border-color: var(--me-4);
   color: var(--ink);
 }
+
+/* Sections panel: what the machine is made of, from static analysis. */
+.graph-panel { display: flex; flex-direction: column; gap: 0.6rem; }
+.graph-panel-empty,
+.graph-panel-error,
+.graph-panel-note { color: var(--muted, #8a8f98); font-size: 0.8rem; margin: 0; }
+.graph-verdict { font-size: 0.8rem; font-weight: 600; }
+.graph-verdict.ok { color: #2f9e6b; }
+.graph-verdict.warn { color: #d99a2b; }
+.graph-verdict.bad { color: #d6553d; }
+.graph-panel-layers { display: flex; flex-wrap: wrap; gap: 0.8rem; align-items: flex-end; }
+.graph-layer { margin: 0; }
+.graph-layer figcaption { font-size: 0.7rem; color: var(--muted, #8a8f98); }
+.graph-legend { display: flex; flex-wrap: wrap; gap: 0.7rem; list-style: none; padding: 0; margin: 0; }
+.graph-legend li { display: flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; }
+.graph-legend .swatch { width: 0.7rem; height: 0.7rem; border-radius: 2px; display: inline-block; }
+.graph-legend b { font-variant-numeric: tabular-nums; }
+.graph-edges { font-size: 0.75rem; }
+.graph-edges summary { cursor: pointer; color: var(--muted, #8a8f98); }
+.graph-edges table { border-collapse: collapse; margin-top: 0.4rem; }
+.graph-edges td { padding: 0 0.5rem 0 0; font-variant-numeric: tabular-nums; }

@@ -19,6 +19,10 @@ export interface TickSimulationT {
   changesCount(): number;
   changesJson(): string;
   worldSnapshotJson(): string;
+  /** Static structural analysis of the build in this world — sections,
+   * edges, and any proof that it cannot move. See
+   * `crates/mc-tick/src/machine_graph.rs`. */
+  machineGraphJson(): string;
 }
 
 export interface EngineModule {
@@ -63,6 +67,18 @@ export interface EngineModule {
       mustMoveByTick: number,
       needPeriod: boolean,
       earlyExit: boolean,
+    ): string;
+    /** One call per generation chunk: static verdicts for N genomes, JSON
+     * rows (see evalCore.GraphRow). Cheap enough to run before every batch. */
+    machineGraphBatchJson(
+      bx: number,
+      by: number,
+      bz: number,
+      travel: number,
+      xOff: number,
+      palette: string,
+      cells: number[],
+      airIndex: number,
     ): string;
   };
   TickSettleMode: { Quiet: unknown };

@@ -356,6 +356,39 @@ public:
   template<typename W>
   inline void world_snapshot_json_write(W& writeable_output) const;
 
+  /**
+   * Static structural analysis of the build standing in this world.
+   *
+   * One call, one JSON document: adhesion groups, piston/observer/source
+   * nodes, the four edge kinds, every minimal self-translating subgraph
+   * (the engine), payload, kickers, dead weight, and any proof that the
+   * machine cannot move.
+   *
+   * The analysis lives in the engine rather than in the caller on
+   * purpose. Every "what would this piston move?" answer comes from
+   * `resolve_push`/`resolve_pull` — the same oracle-verified resolver the
+   * tick loop runs — and a second copy of Minecraft's push rules written
+   * on the far side of this boundary would drift from it silently.
+   */
+  inline std::string machine_graph_json() const;
+  template<typename W>
+  inline void machine_graph_json_write(W& writeable_output) const;
+
+  /**
+   * GA pre-filter: static verdicts for a whole batch of genomes.
+   *
+   * Same flat-cell layout as {@link Self::eval_flight_batch}, and meant to run
+   * immediately before it: whatever this rejects never needs simulating.
+   * Writes one row per genome, `[rejected, rejected_for_sustained,
+   * engine_cell_count, payload_cell_count, dead_cell_count, "codes"]`.
+   *
+   * The registry, behaviour table and movability rules are built once for
+   * the batch — building them per genome costs more than the analysis.
+   */
+  inline static nucleation::diplomat::result<std::string, nucleation::NucleationError> machine_graph_batch_json(int32_t bx, int32_t by, int32_t bz, int32_t travel, int32_t x_off, std::string_view palette, nucleation::diplomat::span<const uint16_t> cells, uint16_t air_index);
+  template<typename W>
+  inline static nucleation::diplomat::result<std::monostate, nucleation::NucleationError> machine_graph_batch_json_write(int32_t bx, int32_t by, int32_t bz, int32_t travel, int32_t x_off, std::string_view palette, nucleation::diplomat::span<const uint16_t> cells, uint16_t air_index, W& writeable_output);
+
     inline const nucleation::capi::TickSimulation* AsFFI() const;
     inline nucleation::capi::TickSimulation* AsFFI();
     inline static const nucleation::TickSimulation* FromFFI(const nucleation::capi::TickSimulation* ptr);

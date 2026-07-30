@@ -1681,12 +1681,145 @@ pub mod ffi {
             json.push(']');
             let _ = write!(out, "{json}");
         }
+
+        /// Static structural analysis of the build standing in this world.
+        ///
+        /// One call, one JSON document: adhesion groups, piston/observer/source
+        /// nodes, the four edge kinds, every minimal self-translating subgraph
+        /// (the engine), payload, kickers, dead weight, and any proof that the
+        /// machine cannot move.
+        ///
+        /// The analysis lives in the engine rather than in the caller on
+        /// purpose. Every "what would this piston move?" answer comes from
+        /// `resolve_push`/`resolve_pull` — the same oracle-verified resolver the
+        /// tick loop runs — and a second copy of Minecraft's push rules written
+        /// on the far side of this boundary would drift from it silently.
+        pub fn machine_graph_json(&self, out: &mut DiplomatWrite) {
+            let graph = super::analyse_world(self.sim.world(), self.sim.registry());
+            let _ = write!(out, "{}", graph.to_json());
+        }
+
+        /// GA pre-filter: static verdicts for a whole batch of genomes.
+        ///
+        /// Same flat-cell layout as [`Self::eval_flight_batch`], and meant to run
+        /// immediately before it: whatever this rejects never needs simulating.
+        /// Writes one row per genome, `[rejected, rejected_for_sustained,
+        /// engine_cell_count, payload_cell_count, dead_cell_count, "codes"]`.
+        ///
+        /// The registry, behaviour table and movability rules are built once for
+        /// the batch — building them per genome costs more than the analysis.
+        #[allow(clippy::too_many_arguments)]
+        pub fn machine_graph_batch_json(
+            bx: i32,
+            by: i32,
+            bz: i32,
+            travel: i32,
+            x_off: i32,
+            palette: &DiplomatStr,
+            cells: &[u16],
+            air_index: u16,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), NucleationError> {
+            let palette =
+                std::str::from_utf8(palette).map_err(|_| NucleationError::InvalidArgument)?;
+            let json = super::machine_graph_batch(
+                bx, by, bz, travel, x_off, palette, cells, air_index,
+            )
+            .map_err(|_| NucleationError::InvalidArgument)?;
+            let _ = write!(out, "{json}");
+            Ok(())
+        }
     }
+}
+
+/// Static verdicts for a batch of genomes, as JSON rows.
+///
+/// Split out of the bridge method so the GA's contract can be tested without
+/// standing up a `DiplomatWrite`.
+fn machine_graph_batch(
+    bx: i32,
+    by: i32,
+    bz: i32,
+    travel: i32,
+    x_off: i32,
+    palette: &str,
+    cells: &[u16],
+    air_index: u16,
+) -> Result<String, String> {
+    use std::fmt::Write as _;
+
+    let pal: Vec<String> = palette
+        .split(';')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect();
+    let volume = (bx.max(0) as usize) * (by.max(0) as usize) * (bz.max(0) as usize);
+    if volume == 0 || cells.is_empty() || cells.len() % volume != 0 {
+        return Err("cells length is not a whole number of bbox volumes".into());
+    }
+    let n_genomes = cells.len() / volume;
+
+    // One registry, one behaviour table and one set of movability rules for the
+    // whole batch. Building them per genome costs more than the analysis does.
+    let mut registry = mc_tick::StateRegistry::new();
+    for descriptor in &pal {
+        registry.intern(descriptor).map_err(|e| format!("{e:?}"))?;
+    }
+    mc_tick::intern_companions(&mut registry);
+    let mut table = mc_tick::BehaviourTable::default();
+    let rules = mc_tick::register_all_at(&mut registry, &mut table, mc_tick::Pos::new(0, 0, 0));
+
+    let empty = vec![air_index; volume];
+    let reference = structure_from_blocks(bx, by, bz, travel, x_off, &pal, &empty, air_index)?;
+    let bounds = reference.bounds(4);
+
+    let mut json = String::from("[");
+    for g in 0..n_genomes {
+        let slice = &cells[g * volume..(g + 1) * volume];
+        let structure = structure_from_blocks(bx, by, bz, travel, x_off, &pal, slice, air_index)?;
+        let mut world = mc_tick::World::new(bounds);
+        structure.place(&mut world, &mut registry, mc_tick::Pos::new(0, 0, 0));
+        let graph = mc_tick::machine_graph::analyse(&world, &registry, &rules);
+        let codes: Vec<&str> = graph.rejections.iter().map(|r| r.code).collect();
+        let engine_cells: usize = graph.engines.iter().map(|e| e.cells.len()).sum();
+        if g > 0 {
+            json.push(',');
+        }
+        let _ = write!(
+            json,
+            "[{},{},{},{},{},\"{}\"]",
+            graph.rejected(),
+            graph.rejected_for_sustained(),
+            engine_cells,
+            graph.payload.len(),
+            graph.dead_weight.len(),
+            codes.join("|")
+        );
+    }
+    json.push(']');
+    Ok(json)
+}
+
+/// Build the machine graph for a world, deriving the movability rules it needs.
+///
+/// `Simulation` does not keep the [`mc_tick::vanilla::VanillaRules`] its wiring
+/// produced, so they are rebuilt against a *clone* of the registry: cloning
+/// preserves every existing [`mc_tick::StateId`], so the rules are valid for the
+/// caller's world, and re-registering cannot disturb a live simulation.
+fn analyse_world(
+    world: &mc_tick::World,
+    registry: &mc_tick::StateRegistry,
+) -> mc_tick::machine_graph::MachineGraph {
+    let mut scratch = registry.clone();
+    let mut table = mc_tick::BehaviourTable::default();
+    let rules = mc_tick::register_all_at(&mut scratch, &mut table, mc_tick::Pos::new(0, 0, 0));
+    mc_tick::machine_graph::analyse(world, registry, &rules)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{block_entity_audit, needs_block_entity, to_gametest_snbt};
+    use super::{block_entity_audit, machine_graph_batch, needs_block_entity, to_gametest_snbt};
     use crate::{BlockState, UniversalSchematic};
 
     /// `{simulate=true}` places through the engine: a wire set next to a
@@ -1729,6 +1862,57 @@ mod tests {
             .set_block_from_string(0, 0, 0, "minecraft:barrel{signal=3,simulate=true}")
             .unwrap_err();
         assert!(err.contains("only tag"), "got {err}");
+    }
+
+    /// The GA's pre-filter contract, over the batch path it actually calls.
+    ///
+    /// Two genomes in one call: engine B, which must survive both tiers, and a
+    /// lone slime block, which must be rejected outright. The order of the rows
+    /// is the order of the genomes — the app maps them back positionally, so a
+    /// silent reordering here would score the wrong machines zero.
+    #[test]
+    fn the_batch_prefilter_keeps_an_engine_and_rejects_a_lone_block() {
+        // Same palette shape the app builds: air first, then the alphabet.
+        const PALETTE: &str = "minecraft:air;minecraft:slime_block;\
+            minecraft:sticky_piston[extended=false,facing=east];\
+            minecraft:sticky_piston[extended=false,facing=west];\
+            minecraft:observer[facing=east,powered=false];\
+            minecraft:observer[facing=west,powered=false]";
+        // bbox 4x1x2. `structure_from_blocks` walks y, then z, then x.
+        // z=0: obsW slime stickyW  _        z=1: _ stickyE slime obsE
+        let engine_b: [u16; 8] = [5, 1, 3, 0, 0, 2, 1, 4];
+        let lone_slime: [u16; 8] = [0, 1, 0, 0, 0, 0, 0, 0];
+        let mut cells = engine_b.to_vec();
+        cells.extend_from_slice(&lone_slime);
+
+        let json = machine_graph_batch(4, 1, 2, 26, 1, PALETTE, &cells, 0)
+            .expect("batch analysis runs");
+
+        // [rejected, rejected_for_sustained, engine, payload, dead, "codes"]
+        let rows: Vec<&str> = json
+            .trim_start_matches('[')
+            .trim_end_matches(']')
+            .split("],[")
+            .map(|r| r.trim_matches(|c| c == '[' || c == ']'))
+            .collect();
+        assert_eq!(rows.len(), 2, "one row per genome: {json}");
+
+        assert!(
+            rows[0].starts_with("false,false,"),
+            "engine B must survive both filter tiers, got {}",
+            rows[0]
+        );
+        assert!(
+            rows[0].contains(",6,"),
+            "engine B's engine is its six blocks, got {}",
+            rows[0]
+        );
+        assert!(
+            rows[1].starts_with("true,true,"),
+            "a lone slime block cannot move, got {}",
+            rows[1]
+        );
+        assert!(rows[1].contains("no_piston"), "and the reason is why: {}", rows[1]);
     }
 
     /// A 1.12 build must reach the engine flattened.

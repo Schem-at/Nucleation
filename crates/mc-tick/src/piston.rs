@@ -105,7 +105,7 @@ pub trait Movability: Send + Sync {
 ///
 /// A sticky block adheres to any movable neighbour, **except** that slime and
 /// honey do not adhere to each other.
-fn adheres(a: Option<Sticky>, b: Option<Sticky>) -> bool {
+pub fn adheres(a: Option<Sticky>, b: Option<Sticky>) -> bool {
     match (a, b) {
         (None, None) => false,
         (Some(x), Some(y)) => x == y,
