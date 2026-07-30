@@ -559,6 +559,8 @@ void TickSimulation_updates_heat_json(TickSimulation* self, uint32_t from_tick, 
 void TickSimulation_updates_wave_json(TickSimulation* self, uint32_t tick, DiplomatWrite* write);
 void TickSimulation_changes_json(TickSimulation* self, DiplomatWrite* write);
 void TickSimulation_item_entities_json(TickSimulation* self, DiplomatWrite* write);
+void TickSimulation_motion_semantics(TickSimulation* self, DiplomatWrite* write);
+uint32_t TickSimulation_piston_retract_contacts(TickSimulation* self);
 void TickSimulation_events_summary_json(TickSimulation* self, DiplomatWrite* write);
 uint32_t TickSimulation_non_air_count(TickSimulation* self);
 double TickSimulation_non_air_center_x(TickSimulation* self);

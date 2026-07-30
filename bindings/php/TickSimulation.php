@@ -265,6 +265,17 @@ final class TickSimulation {
         return Lib::readAndFreeWrite($write);
     }
 
+    public function motionSemantics() {
+        $write = Lib::ffi()->diplomat_buffer_write_create(0);
+        Lib::ffi()->TickSimulation_motion_semantics($this->ptr, $write);
+        return Lib::readAndFreeWrite($write);
+    }
+
+    public function pistonRetractContacts() {
+        $ret = Lib::ffi()->TickSimulation_piston_retract_contacts($this->ptr);
+        return $ret;
+    }
+
     public function eventsSummaryJson() {
         $write = Lib::ffi()->diplomat_buffer_write_create(0);
         Lib::ffi()->TickSimulation_events_summary_json($this->ptr, $write);

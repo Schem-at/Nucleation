@@ -644,6 +644,54 @@ export class TickSimulation {
     }
 
     /**
+     * Which `Entity.load` Motion semantics this run uses:
+     * `"clamp_abs_ten"` (DataVersion <= 4556 — NaN survives a cold load)
+     * or `"drop_non_finite"` (>= 4671 — it does not).
+     *
+     * Exposed because a door built on nan carts is a *different machine*
+     * under the two, and a caller that cannot tell them apart cannot
+     * report why it came apart.
+     */
+    motionSemantics() {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.TickSimulation_motion_semantics(this.ffiValue, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+            write.free();
+        }
+    }
+
+    /**
+     * How many times an entity stood in a **retracting** piston's sweep.
+     *
+     * Piston extension displacement is measured and implemented;
+     * retraction is not — `tools/gametest/captures/piston_pull.entities.log`
+     * records sub-0.03 movements that are not uniformly backwards and
+     * that no model here reproduces. Non-zero means this run leaned on
+     * unimplemented behaviour and its result is not trustworthy. Zero
+     * means no entity was ever in a retracting arm's way: a real answer,
+     * not a missing instrument.
+     */
+    pistonRetractContacts() {
+
+        const result = wasm.TickSimulation_piston_retract_contacts(this.ffiValue);
+
+        try {
+            return result;
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
      * Per-tick aggregates over the recorded changes, as JSON:
      * `[{"tick":N,"changes":N,"piston":N,"redstone":N}]` — `piston`
      * counts changes touching piston blocks (base, head, moving), and

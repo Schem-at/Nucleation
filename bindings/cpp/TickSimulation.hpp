@@ -83,6 +83,10 @@ namespace capi {
 
     void TickSimulation_item_entities_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
 
+    void TickSimulation_motion_semantics(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
+
+    uint32_t TickSimulation_piston_retract_contacts(const diplomat::capi::TickSimulation* self);
+
     void TickSimulation_events_summary_json(const diplomat::capi::TickSimulation* self, diplomat::capi::DiplomatWrite* write);
 
     uint32_t TickSimulation_non_air_count(const diplomat::capi::TickSimulation* self);
@@ -408,6 +412,25 @@ inline void TickSimulation::item_entities_json_write(W& writeable) const {
     diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
     diplomat::capi::TickSimulation_item_entities_json(this->AsFFI(),
         &write);
+}
+
+inline std::string TickSimulation::motion_semantics() const {
+    std::string output;
+    diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+    diplomat::capi::TickSimulation_motion_semantics(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void TickSimulation::motion_semantics_write(W& writeable) const {
+    diplomat::capi::DiplomatWrite write = diplomat::WriteTrait<W>::Construct(writeable);
+    diplomat::capi::TickSimulation_motion_semantics(this->AsFFI(),
+        &write);
+}
+
+inline uint32_t TickSimulation::piston_retract_contacts() const {
+    auto result = diplomat::capi::TickSimulation_piston_retract_contacts(this->AsFFI());
+    return result;
 }
 
 inline std::string TickSimulation::events_summary_json() const {

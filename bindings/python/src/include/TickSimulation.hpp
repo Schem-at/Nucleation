@@ -83,6 +83,10 @@ namespace capi {
 
     void TickSimulation_item_entities_json(const nucleation::capi::TickSimulation* self, nucleation::diplomat::capi::DiplomatWrite* write);
 
+    void TickSimulation_motion_semantics(const nucleation::capi::TickSimulation* self, nucleation::diplomat::capi::DiplomatWrite* write);
+
+    uint32_t TickSimulation_piston_retract_contacts(const nucleation::capi::TickSimulation* self);
+
     void TickSimulation_events_summary_json(const nucleation::capi::TickSimulation* self, nucleation::diplomat::capi::DiplomatWrite* write);
 
     uint32_t TickSimulation_non_air_count(const nucleation::capi::TickSimulation* self);
@@ -408,6 +412,25 @@ inline void nucleation::TickSimulation::item_entities_json_write(W& writeable) c
     nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
     nucleation::capi::TickSimulation_item_entities_json(this->AsFFI(),
         &write);
+}
+
+inline std::string nucleation::TickSimulation::motion_semantics() const {
+    std::string output;
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteFromString(output);
+    nucleation::capi::TickSimulation_motion_semantics(this->AsFFI(),
+        &write);
+    return output;
+}
+template<typename W>
+inline void nucleation::TickSimulation::motion_semantics_write(W& writeable) const {
+    nucleation::diplomat::capi::DiplomatWrite write = nucleation::diplomat::WriteTrait<W>::Construct(writeable);
+    nucleation::capi::TickSimulation_motion_semantics(this->AsFFI(),
+        &write);
+}
+
+inline uint32_t nucleation::TickSimulation::piston_retract_contacts() const {
+    auto result = nucleation::capi::TickSimulation_piston_retract_contacts(this->AsFFI());
+    return result;
 }
 
 inline std::string nucleation::TickSimulation::events_summary_json() const {

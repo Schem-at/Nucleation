@@ -80,6 +80,10 @@ void TickSimulation_changes_json(const TickSimulation* self, DiplomatWrite* writ
 
 void TickSimulation_item_entities_json(const TickSimulation* self, DiplomatWrite* write);
 
+void TickSimulation_motion_semantics(const TickSimulation* self, DiplomatWrite* write);
+
+uint32_t TickSimulation_piston_retract_contacts(const TickSimulation* self);
+
 void TickSimulation_events_summary_json(const TickSimulation* self, DiplomatWrite* write);
 
 uint32_t TickSimulation_non_air_count(const TickSimulation* self);

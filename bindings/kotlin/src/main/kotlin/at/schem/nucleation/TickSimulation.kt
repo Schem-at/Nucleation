@@ -35,6 +35,8 @@ internal interface TickSimulationLib: Library {
     fun TickSimulation_updates_wave_json(handle: Pointer, tick: FFIUint32, write: Pointer): Unit
     fun TickSimulation_changes_json(handle: Pointer, write: Pointer): Unit
     fun TickSimulation_item_entities_json(handle: Pointer, write: Pointer): Unit
+    fun TickSimulation_motion_semantics(handle: Pointer, write: Pointer): Unit
+    fun TickSimulation_piston_retract_contacts(handle: Pointer): FFIUint32
     fun TickSimulation_events_summary_json(handle: Pointer, write: Pointer): Unit
     fun TickSimulation_non_air_count(handle: Pointer): FFIUint32
     fun TickSimulation_non_air_center_x(handle: Pointer): Double
@@ -478,6 +480,38 @@ class TickSimulation internal constructor (
 
         val returnString = DW.writeToString(write)
         return returnString
+    }
+
+    /** Which `Entity.load` Motion semantics this run uses:
+    *`"clamp_abs_ten"` (DataVersion <= 4556 — NaN survives a cold load)
+    *or `"drop_non_finite"` (>= 4671 — it does not).
+    *
+    *Exposed because a door built on nan carts is a *different machine*
+    *under the two, and a caller that cannot tell them apart cannot
+    *report why it came apart.
+    */
+    fun motionSemantics(): String {
+        val write = DW.lib.diplomat_buffer_write_create(0)
+        val returnVal = lib.TickSimulation_motion_semantics(handle, write);
+
+        val returnString = DW.writeToString(write)
+        return returnString
+    }
+
+    /** How many times an entity stood in a **retracting** piston's sweep.
+    *
+    *Piston extension displacement is measured and implemented;
+    *retraction is not — `tools/gametest/captures/piston_pull.entities.log`
+    *records sub-0.03 movements that are not uniformly backwards and
+    *that no model here reproduces. Non-zero means this run leaned on
+    *unimplemented behaviour and its result is not trustworthy. Zero
+    *means no entity was ever in a retracting arm's way: a real answer,
+    *not a missing instrument.
+    */
+    fun pistonRetractContacts(): UInt {
+
+        val returnVal = lib.TickSimulation_piston_retract_contacts(handle);
+        return (returnVal.toUInt())
     }
 
     /** Per-tick aggregates over the recorded changes, as JSON:
