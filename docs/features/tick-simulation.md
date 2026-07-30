@@ -106,7 +106,9 @@ On real doors that is not a rounding error — the certified reference set chang
 If you are timing a saved build, use `InWorld` and check `changes_count() == 0`
 before you start the clock. A door that is already moving when you actuate it
 gives an open time that is confidently wrong rather than obviously wrong.
-`examples/door_batch_load.rs` does exactly this check over a list of files.
+`examples/scenario_inspect.rs` does exactly this check for a path, and the
+`{"expect": "changes", "count": 0}` assertion in a scenario descriptor pins it —
+see `tests/scenarios/README.md`.
 
 ### `extra_states`, and why your redstone block does nothing
 
