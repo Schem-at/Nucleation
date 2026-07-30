@@ -604,6 +604,74 @@ mod tests {
         root
     }
 
+    /// A litematic must carry entity state a tick simulation depends on.
+    ///
+    /// This is the feasibility question for using `.litematic` as the container
+    /// for self-contained simulation tests: the record 3x3 piston door is held
+    /// together by minecarts whose velocity is **NaN**, and by two blazes riding
+    /// inside carts as `Passengers`. Both are ordinary NBT — TAG_Double is eight
+    /// raw IEEE-754 bytes and a passenger is a nested compound — so a faithful
+    /// writer keeps them. That is worth pinning rather than assuming, because
+    /// sanitising a non-finite velocity to 0.0 turns a frozen cart into an
+    /// ordinary one and quietly un-glues the machine. See
+    /// `crates/mc-tick/docs/entity-abuse-in-record-doors.md`.
+    #[test]
+    fn litematic_round_trips_nan_velocities_and_passengers() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/samples/55_3x3.zip");
+        let bytes = std::fs::read(&path).expect("the record-door sample must be present");
+        let source = crate::formats::world::from_world_zip(&bytes).expect("the sample loads");
+
+        // What the world itself carries, so the assertions below compare against
+        // the file rather than against a number written down here.
+        let count_nan = |s: &UniversalSchematic| -> usize {
+            s.get_entities_as_list()
+                .iter()
+                .filter_map(|e| e.nbt.get("Motion"))
+                .filter_map(|m| match m {
+                    crate::entity::NbtValue::List(v) => Some(v),
+                    _ => None,
+                })
+                .flatten()
+                .filter(|v| matches!(v, crate::entity::NbtValue::Double(d) if d.is_nan()))
+                .count()
+        };
+        let count_riders = |s: &UniversalSchematic| -> usize {
+            s.get_entities_as_list()
+                .iter()
+                .filter_map(|e| e.nbt.get("Passengers"))
+                .filter_map(|p| match p {
+                    crate::entity::NbtValue::List(v) => Some(v.len()),
+                    _ => None,
+                })
+                .sum()
+        };
+
+        let entities_before = source.get_entities_as_list().len();
+        let nan_before = count_nan(&source);
+        let riders_before = count_riders(&source);
+        assert!(nan_before > 0, "the sample must contain nan carts to be worth testing");
+        assert!(riders_before > 0, "the sample must contain passengers to be worth testing");
+
+        let lit = to_litematic(&source).expect("the door writes as a litematic");
+        let back = from_litematic(&lit).expect("and reads back");
+
+        assert_eq!(
+            back.get_entities_as_list().len(),
+            entities_before,
+            "every entity must survive the round trip"
+        );
+        assert_eq!(
+            count_nan(&back),
+            nan_before,
+            "NaN velocities must survive — sanitising one un-glues the build"
+        );
+        assert_eq!(
+            count_riders(&back),
+            riders_before,
+            "passengers ride inside their vehicle's NBT and must survive with it"
+        );
+    }
+
     #[test]
     fn schematic_version_maps_data_versions_correctly() {
         assert_eq!(schematic_version_for_data_version(1343), (4, None)); // 1.12.2
