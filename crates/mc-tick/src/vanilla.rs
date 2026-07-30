@@ -1788,6 +1788,146 @@ fn is_shulker_box(name: &str) -> bool {
     name.ends_with("_shulker_box") || name == "minecraft:shulker_box"
 }
 
+/// What a **dispenser** does with a bucket in its slot.
+///
+/// Vanilla splits the bucket family in two (`DispenseItemBehavior`'s static
+/// registration, `$3` and `$4`): every *filled* bucket empties its contents
+/// into the cell in front, and the *empty* bucket picks a placeable block back
+/// up. Both are measured end to end — `bucket_dispense.json` and
+/// `bucket_pickup.json`, five and six lanes, both directions on the same
+/// geometry — and both leave the dispenser holding the other half of the pair.
+///
+/// The third arm is why this is a table and not an `if`. `$3` is registered for
+/// ten items, and seven of them are mob buckets whose `emptyContents` *also*
+/// spawns a mob. That is not measured, and the default eject is not what
+/// vanilla does with them, so they are named rather than approximated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BucketDispense {
+    /// A filled bucket. `emptyContents` writes `block` into the front cell —
+    /// `SolidBucketItem` gates on `isEmptyBlock` (strictly air) and writes with
+    /// flags 3, so the landing block hands out ordinary neighbour updates and
+    /// an observer watching that cell pulses two ticks later. The dispenser is
+    /// left holding `minecraft:bucket`.
+    ///
+    /// A non-air front cell is *not* a refusal: `emptyContents` returns false
+    /// and `$3` falls through to `DefaultDispenseItemBehavior`, ejecting the
+    /// filled bucket as an item entity. Lane `z=6` of `bucket_dispense.json`
+    /// is that case — the slot empties and no block changes.
+    Empties {
+        /// The block state the contents become.
+        block: &'static str,
+    },
+    /// The empty bucket. `BucketPickup.pickupBlock` on the front cell, then the
+    /// same `consumeWithRemainder`. See [`bucket_pickup`] for what the front
+    /// cell may be.
+    Fills,
+    /// Vanilla gives this bucket a dispense behaviour this engine has not
+    /// measured. Refused by name at dispense time: falling through to the
+    /// default eject would be a plausible, wrong answer.
+    Unmeasured,
+}
+
+/// [`BucketDispense`] for an item id, or `None` for an item vanilla gives no
+/// bucket behaviour at all (`minecraft:milk_bucket` is the one that looks like
+/// it should and does not — it appears nowhere in `DispenseItemBehavior`).
+pub fn bucket_dispense(item: &str) -> Option<BucketDispense> {
+    let name = item.split('[').next().unwrap_or(item);
+    Some(match name {
+        // `bucket_dispense.json` tick 13: lanes z=0 and z=8.
+        "minecraft:powder_snow_bucket" => {
+            BucketDispense::Empties { block: "minecraft:powder_snow" }
+        }
+        // Lane z=2. `level=0` — a source, not flowing.
+        "minecraft:water_bucket" => BucketDispense::Empties { block: "minecraft:water[level=0]" },
+        // Lane z=4.
+        "minecraft:lava_bucket" => BucketDispense::Empties { block: "minecraft:lava[level=0]" },
+        // `bucket_pickup.json` tick 13, all six lanes.
+        "minecraft:bucket" => BucketDispense::Fills,
+        // `MobBucketItem.emptyContents` places the fluid *and* spawns the mob
+        // it carries. The block half would be easy; the entity half is a whole
+        // subsystem, so the pair is refused rather than half-modelled.
+        "minecraft:cod_bucket"
+        | "minecraft:salmon_bucket"
+        | "minecraft:pufferfish_bucket"
+        | "minecraft:tropical_fish_bucket"
+        | "minecraft:axolotl_bucket"
+        | "minecraft:tadpole_bucket"
+        // Registered alongside them in `$3`'s item list and equally unmeasured.
+        | "minecraft:sulfur_cube_bucket" => BucketDispense::Unmeasured,
+        _ => return None,
+    })
+}
+
+/// What the **empty** bucket finds in the cell in front of the dispenser.
+///
+/// Exactly four types implement `BucketPickup` in 26.2 — `LiquidBlock`,
+/// `PowderSnowBlock`, `BubbleColumnBlock` and every `SimpleWaterloggedBlock`.
+/// Cauldrons do **not**, which is worth stating because they used to and a
+/// remembered rule would have added them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BucketPickupOutcome {
+    /// `pickupBlock` writes air (flags 11 — neighbour updates included, so the
+    /// observers fire) and yields this item.
+    Yields(&'static str),
+    /// A `BucketPickup` whose pickup this engine has not measured. Named, not
+    /// guessed.
+    Unmeasured,
+    /// Not a pickup: `$4` falls through to `DefaultDispenseItemBehavior` and
+    /// the empty bucket is ejected as an item entity. Lane `z=6` of
+    /// `bucket_pickup.json` — an air front cell — is that case.
+    Ejects,
+}
+
+/// [`BucketPickupOutcome`] for the block state in front of the dispenser.
+pub fn bucket_pickup(descriptor: &str) -> BucketPickupOutcome {
+    let name = descriptor.split('[').next().unwrap_or(descriptor);
+    match name {
+        // `bucket_pickup.json` lanes z=0, z=8, z=10.
+        "minecraft:powder_snow" => BucketPickupOutcome::Yields("minecraft:powder_snow_bucket"),
+        // Lanes z=2 and z=4. `LiquidBlock.pickupBlock` yields a bucket only for
+        // `level=0`; for a flowing level it returns an empty stack and the
+        // bucket is ejected instead. That fall-through is legible in the
+        // bytecode but no capture of ours exercises it, so it is refused.
+        "minecraft:water" if descriptor.contains("level=0") => {
+            BucketPickupOutcome::Yields("minecraft:water_bucket")
+        }
+        "minecraft:lava" if descriptor.contains("level=0") => {
+            BucketPickupOutcome::Yields("minecraft:lava_bucket")
+        }
+        "minecraft:water" | "minecraft:lava" | "minecraft:bubble_column" => {
+            BucketPickupOutcome::Unmeasured
+        }
+        // `SimpleWaterloggedBlock.pickupBlock` drains the block rather than
+        // removing it, and re-checks `canSurvive` afterwards. Unmeasured.
+        // `waterlogged=false` is a plain empty return and ejects, which is the
+        // measured shape.
+        _ if descriptor.contains("waterlogged=true") => BucketPickupOutcome::Unmeasured,
+        _ => BucketPickupOutcome::Ejects,
+    }
+}
+
+/// Every block state a dispenser could have to write because it holds `item`.
+///
+/// Behaviours bind to *interned* states, so a block a dispenser can produce out
+/// of an item has to be in the registry before the behaviour table is built —
+/// it is by definition not in the build's own palette. Every loader performs
+/// this pre-intern; it lives here so the three of them cannot drift.
+pub fn dispensable_states(item: &str) -> Vec<String> {
+    let name = item.split('[').next().unwrap_or(item);
+    if is_shulker_box(name) {
+        return ["up", "down", "north", "south", "west", "east"]
+            .iter()
+            .map(|facing| format!("{name}[facing={facing}]"))
+            .collect();
+    }
+    match bucket_dispense(name) {
+        Some(BucketDispense::Empties { block }) => vec![block.to_string()],
+        // The empty bucket only ever *removes* a block, and air is always
+        // interned.
+        _ => Vec::new(),
+    }
+}
+
 /// The shape of an inert building material, for the two questions the engine
 /// asks about a block that does nothing: does it fill its cell, and does it
 /// carry redstone?
@@ -1868,7 +2008,15 @@ pub(crate) fn decor_kind(name: &str) -> Option<Decor> {
         "_ladder",
     ];
     if PARTIAL_SUFFIX.iter().any(|s| short.ends_with(s))
-        || matches!(short, "chain" | "scaffolding" | "iron_bars" | "ladder" | "snow")
+        // `powder_snow` reads as a full cube and is not one. Its registration is
+        // `Properties.of().dynamicShape().noOcclusion().isRedstoneConductor(Blocks::never)`,
+        // so it never carries redstone; and `PowderSnowBlock.getCollisionShape`
+        // returns `Shapes.empty()` for a placement context, a descending entity
+        // and — the case the state cache uses — a context with a **null**
+        // entity, which is what makes `isCollisionShapeFullBlock` false. A
+        // dispenser can put one of these anywhere (`bucket_dispense.json`), so
+        // the engine needs it whether or not a build was saved with one.
+        || matches!(short, "chain" | "scaffolding" | "iron_bars" | "ladder" | "snow" | "powder_snow")
     {
         // A wall sign is a sign; a player head is a head. Both land here.
         return Some(Decor::Partial);

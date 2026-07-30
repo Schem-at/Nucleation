@@ -1,0 +1,41 @@
+# bucket_dispense, the WITH-LAVA capture (lane z=4), kept as evidence.
+# Lava is measured here and NOT pinned in conformance: minecraft:lava has no
+# behaviour in mc-tick, so a build holding one refuses at load by name. The
+# rule generalises to it exactly — see the z=4 lines below.
+t1   B [1, 0, 8] minecraft:observer[facing=up,powered=false] -> minecraft:observer[facing=up,powered=true]
+t1   B [1, 2, 8] minecraft:observer[facing=down,powered=false] -> minecraft:observer[facing=down,powered=true]
+t3   B [1, 0, 8] minecraft:observer[facing=up,powered=true] -> minecraft:observer[facing=up,powered=false]
+t3   B [1, 2, 8] minecraft:observer[facing=down,powered=true] -> minecraft:observer[facing=down,powered=false]
+t10  B [0, 1, 0] minecraft:dispenser[facing=east,triggered=false] -> minecraft:dispenser[facing=east,triggered=true]
+t10  B [0, 2, 0] minecraft:air -> minecraft:redstone_block
+t10  B [0, 1, 2] minecraft:dispenser[facing=east,triggered=false] -> minecraft:dispenser[facing=east,triggered=true]
+t10  B [0, 2, 2] minecraft:air -> minecraft:redstone_block
+t10  B [0, 1, 4] minecraft:dispenser[facing=east,triggered=false] -> minecraft:dispenser[facing=east,triggered=true]
+t10  B [0, 2, 4] minecraft:air -> minecraft:redstone_block
+t10  B [0, 1, 6] minecraft:dispenser[facing=east,triggered=false] -> minecraft:dispenser[facing=east,triggered=true]
+t10  B [0, 2, 6] minecraft:air -> minecraft:redstone_block
+t10  B [0, 1, 8] minecraft:dispenser[facing=east,triggered=false] -> minecraft:dispenser[facing=east,triggered=true]
+t10  B [0, 2, 8] minecraft:air -> minecraft:redstone_block
+t12  B [0, 1, 0] minecraft:dispenser[facing=east,triggered=true] -> minecraft:dispenser[facing=east,triggered=false]
+t12  B [0, 2, 0] minecraft:redstone_block -> minecraft:air
+t12  B [0, 1, 2] minecraft:dispenser[facing=east,triggered=true] -> minecraft:dispenser[facing=east,triggered=false]
+t12  B [0, 2, 2] minecraft:redstone_block -> minecraft:air
+t12  B [0, 1, 4] minecraft:dispenser[facing=east,triggered=true] -> minecraft:dispenser[facing=east,triggered=false]
+t12  B [0, 2, 4] minecraft:redstone_block -> minecraft:air
+t12  B [0, 1, 6] minecraft:dispenser[facing=east,triggered=true] -> minecraft:dispenser[facing=east,triggered=false]
+t12  B [0, 2, 6] minecraft:redstone_block -> minecraft:air
+t12  B [0, 1, 8] minecraft:dispenser[facing=east,triggered=true] -> minecraft:dispenser[facing=east,triggered=false]
+t12  B [0, 2, 8] minecraft:redstone_block -> minecraft:air
+t13  I [0, 1, 0] slot 4 '1x minecraft:powder_snow_bucket' -> '1x minecraft:bucket'
+t13  B [1, 1, 0] minecraft:air -> minecraft:powder_snow
+t13  I [0, 1, 2] slot 4 '1x minecraft:water_bucket' -> '1x minecraft:bucket'
+t13  B [1, 1, 2] minecraft:air -> minecraft:water[level=0]
+t13  I [0, 1, 4] slot 4 '1x minecraft:lava_bucket' -> '1x minecraft:bucket'
+t13  B [1, 1, 4] minecraft:air -> minecraft:lava[level=0]
+t13  I [0, 1, 6] slot 4 '1x minecraft:powder_snow_bucket' -> ''
+t13  I [0, 1, 8] slot 4 '1x minecraft:powder_snow_bucket' -> '1x minecraft:bucket'
+t13  B [1, 1, 8] minecraft:air -> minecraft:powder_snow
+t15  B [1, 0, 8] minecraft:observer[facing=up,powered=false] -> minecraft:observer[facing=up,powered=true]
+t15  B [1, 2, 8] minecraft:observer[facing=down,powered=false] -> minecraft:observer[facing=down,powered=true]
+t17  B [1, 0, 8] minecraft:observer[facing=up,powered=true] -> minecraft:observer[facing=up,powered=false]
+t17  B [1, 2, 8] minecraft:observer[facing=down,powered=true] -> minecraft:observer[facing=down,powered=false]

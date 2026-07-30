@@ -1138,6 +1138,80 @@ impl<P: PowerSource> BlockBehaviour for Dropper<P> {
             // Front obstructed: the placement fails and the item stays put.
             return;
         }
+        // The bucket family. `DispenseItemBehavior`'s static block registers
+        // `$3` for every filled bucket and `$4` for the empty one; both end in
+        // `consumeWithRemainder`, which is why the two directions are one code
+        // path with the roles swapped. Measured in `bucket_dispense.json` and
+        // `bucket_pickup.json` — see `crate::vanilla::bucket_dispense`.
+        if self.dispenser {
+            match crate::vanilla::bucket_dispense(&id) {
+                Some(crate::vanilla::BucketDispense::Empties { block }) => {
+                    let front = pos.offset(self.facing);
+                    // `SolidBucketItem.emptyContents` gates on `isEmptyBlock`,
+                    // and `BucketItem`'s gate reduces to the same thing for a
+                    // dispenser (no living entity, so no shift, and no hit
+                    // result): strictly air, not "replaceable".
+                    if ctx.world.get(front) == StateId::AIR {
+                        let state = ctx.states.get(block).unwrap_or_else(|| {
+                            panic!(
+                                "dispenser at {pos:?} holds {id}, whose contents are {block}, \
+                                 but that state was never interned — every loader must call \
+                                 `vanilla::dispensable_states` before building the behaviour table"
+                            )
+                        });
+                        // Flags 3: neighbour updates, so the observers watching
+                        // this cell pulse two ticks later
+                        // (`bucket_dispense.json` ticks 13 → 15 → 17).
+                        ctx.set(front, state);
+                        consume_with_remainder(
+                            ctx,
+                            pos,
+                            slot,
+                            &id,
+                            count,
+                            "minecraft:bucket",
+                            self.facing,
+                        );
+                        return;
+                    }
+                    // Not air: `emptyContents` returns false and `$3` falls
+                    // through to the default eject below, keeping nothing.
+                }
+                Some(crate::vanilla::BucketDispense::Fills) => {
+                    let front = pos.offset(self.facing);
+                    let front_descriptor = ctx
+                        .states
+                        .descriptor(ctx.world.get(front))
+                        .unwrap_or_default()
+                        .to_string();
+                    match crate::vanilla::bucket_pickup(&front_descriptor) {
+                        crate::vanilla::BucketPickupOutcome::Yields(item) => {
+                            // Flags 11 — the extra bit over 3 is client-side
+                            // re-render, so server-side this is the same
+                            // neighbour-updating write.
+                            ctx.set(front, StateId::AIR);
+                            consume_with_remainder(
+                                ctx, pos, slot, &id, count, item, self.facing,
+                            );
+                            return;
+                        }
+                        crate::vanilla::BucketPickupOutcome::Unmeasured => panic!(
+                            "dispenser at {pos:?} fires an empty bucket at {front_descriptor}, \
+                             a BucketPickup block whose pickup this engine has not measured — \
+                             capture it before trusting this run"
+                        ),
+                        // Not a pickup at all: eject, which is measured.
+                        crate::vanilla::BucketPickupOutcome::Ejects => {}
+                    }
+                }
+                Some(crate::vanilla::BucketDispense::Unmeasured) => panic!(
+                    "dispenser at {pos:?} holds {id}, whose vanilla dispense behaviour spawns a \
+                     mob as well as placing a block — unmeasured, so this engine refuses it \
+                     rather than ejecting it and reporting a plausible wrong answer"
+                ),
+                None => {}
+            }
+        }
         if !self.dispenser {
             let front = pos.offset(self.facing);
             if let Some(front_slots) = self.power.container_slots_at(ctx.world, front) {
@@ -1154,32 +1228,9 @@ impl<P: PowerSource> BlockBehaviour for Dropper<P> {
             }
         }
         // No container in front: the item is ejected into the world as an item
-        // entity — `DefaultDispenseItemBehavior.spawnItem`, speed multiplier 6.
-        // Position: 0.7 blocks out of the face (0.125 down for vertical
-        // facings, 0.15625 for horizontal). Velocity: speed `0.2 + 0.1 *
-        // nextDouble()` along the facing, a constant upward 0.2 mean, and
-        // `triangle(_, 0.0172275 * 6)` noise on every component. Without a
-        // seeded rng the engine uses the distribution means (speed 0.25, no
-        // noise) — what the conformance goldens' tolerance compares against.
-        let (dx, dy, dz) = self.facing.delta();
-        let vertical = dy != 0;
-        let x = f64::from(pos.x) + 0.5 + 0.7 * f64::from(dx);
-        let y = f64::from(pos.y) + 0.5 + 0.7 * f64::from(dy)
-            - if vertical { 0.125 } else { 0.15625 };
-        let z = f64::from(pos.z) + 0.5 + 0.7 * f64::from(dz);
-        let vel = if let Some(rng) = ctx.item_entities.rng.as_mut() {
-            let speed = rng.next_double() * 0.1 + 0.2;
-            let dev = 0.0172275 * 6.0;
-            [
-                rng.triangle(f64::from(dx) * speed, dev),
-                rng.triangle(0.2, dev),
-                rng.triangle(f64::from(dz) * speed, dev),
-            ]
-        } else {
-            [f64::from(dx) * 0.25, 0.2, f64::from(dz) * 0.25]
-        };
+        // entity.
         let carried = ctx.take_slot_contents(pos, slot);
-        let entity = ctx.item_entities.spawn((id.clone(), 1), [x, y, z], vel, 10);
+        let entity = spawn_dispensed_item(ctx, pos, self.facing, &id);
         if let Some(carried) = carried {
             ctx.item_entities.contents.insert(entity, carried);
         }
@@ -1194,6 +1245,80 @@ impl<P: PowerSource> BlockBehaviour for Dropper<P> {
             "dropper"
         }
     }
+}
+
+/// Eject one item out of the dispenser's face as an item entity, returning its
+/// entity id.
+///
+/// `DefaultDispenseItemBehavior.spawnItem`, speed multiplier 6. Position: 0.7
+/// blocks out of the face (0.125 down for vertical facings, 0.15625 for
+/// horizontal). Velocity: speed `0.2 + 0.1 * nextDouble()` along the facing, a
+/// constant upward 0.2 mean, and `triangle(_, 0.0172275 * 6)` noise on every
+/// component. Without a seeded rng the engine uses the distribution means
+/// (speed 0.25, no noise) — what the conformance goldens' tolerance compares
+/// against.
+fn spawn_dispensed_item(ctx: &mut TickCtx<'_>, pos: Pos, facing: Dir, id: &str) -> u32 {
+    let (dx, dy, dz) = facing.delta();
+    let vertical = dy != 0;
+    let x = f64::from(pos.x) + 0.5 + 0.7 * f64::from(dx);
+    let y =
+        f64::from(pos.y) + 0.5 + 0.7 * f64::from(dy) - if vertical { 0.125 } else { 0.15625 };
+    let z = f64::from(pos.z) + 0.5 + 0.7 * f64::from(dz);
+    let vel = if let Some(rng) = ctx.item_entities.rng.as_mut() {
+        let speed = rng.next_double() * 0.1 + 0.2;
+        let dev = 0.0172275 * 6.0;
+        [
+            rng.triangle(f64::from(dx) * speed, dev),
+            rng.triangle(0.2, dev),
+            rng.triangle(f64::from(dz) * speed, dev),
+        ]
+    } else {
+        [f64::from(dx) * 0.25, 0.2, f64::from(dz) * 0.25]
+    };
+    ctx.item_entities.spawn((id.to_string(), 1), [x, y, z], vel, 10)
+}
+
+/// `DefaultDispenseItemBehavior.consumeWithRemainder`: shrink the dispensed
+/// stack by one and put `remainder` where vanilla puts it.
+///
+/// Two cases, both measured in `bucket_pickup.json` tick 13. With the stack down
+/// to nothing the remainder simply *replaces* it in the same slot (lanes z=0 to
+/// z=8: slot 4 goes `1x bucket` → `1x powder_snow_bucket`). With items left
+/// over, `addToInventoryOrDispense` runs `DispenserBlockEntity.insertItem`,
+/// which scans slots in index order for the first that is empty or already
+/// holds the same item — lane z=10 keeps `1x bucket` in slot 4 and the
+/// `powder_snow_bucket` lands in **slot 0**. If nothing takes it, it is ejected.
+fn consume_with_remainder(
+    ctx: &mut TickCtx<'_>,
+    pos: Pos,
+    slot: u8,
+    id: &str,
+    count: u8,
+    remainder: &str,
+    facing: Dir,
+) {
+    let remaining = count - 1;
+    if remaining == 0 {
+        ctx.set_inventory_slot(pos, slot, Some((remainder.to_string(), 1)));
+        return;
+    }
+    ctx.set_inventory_slot(pos, slot, Some((id.to_string(), remaining)));
+    let slots = ctx.inventories.get(&pos).map(|inv| inv.slots).unwrap_or(0);
+    for target in 0..u8::try_from(slots).unwrap_or(u8::MAX) {
+        match ctx.inventory_slot(pos, target) {
+            None => {
+                ctx.set_inventory_slot(pos, target, Some((remainder.to_string(), 1)));
+                return;
+            }
+            Some((existing, held)) if existing == remainder && held < MERGE_LIMIT => {
+                ctx.set_inventory_slot(pos, target, Some((existing, held + 1)));
+                return;
+            }
+            Some(_) => continue,
+        }
+    }
+    // Full: `addToInventoryOrDispense` ejects the remainder instead.
+    spawn_dispensed_item(ctx, pos, facing, remainder);
 }
 
 /// A `facing=` property value.

@@ -250,16 +250,13 @@ fn build_sim(
             .intern(descriptor)
             .unwrap_or_else(|e| panic!("{label}: interning {descriptor}: {e:?}"));
     }
-    // A dispenser can *place* a shulker box it holds as an item. Those block
-    // states are not in the structure's palette, and behaviours bind only to
-    // interned states — so intern every facing of any shulker item up front.
+    // A dispenser can *place* a block it holds as an item — a shulker box, or a
+    // bucket's contents. Those block states are not in the structure's palette,
+    // and behaviours bind only to interned states, so intern them up front.
     for (_, stacks) in &structure.inventories {
         for stack in stacks {
-            let base = stack.id.split('[').next().unwrap_or(&stack.id);
-            if base.ends_with("_shulker_box") || base == "minecraft:shulker_box" {
-                for facing in ["up", "down", "north", "south", "west", "east"] {
-                    let _ = sim.registry_mut().intern(&format!("{base}[facing={facing}]"));
-                }
+            for descriptor in mc_tick::vanilla::dispensable_states(&stack.id) {
+                let _ = sim.registry_mut().intern(&descriptor);
             }
         }
     }

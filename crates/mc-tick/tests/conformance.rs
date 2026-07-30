@@ -342,16 +342,14 @@ fn run_conformance_full(
         let (registry, world) = sim.registry_and_world_mut();
         structure.place(world, registry, Pos::new(0, 0, 0));
     }
-    // A dispenser can *place* a shulker box it holds as an item; behaviours
-    // bind only to interned states, so intern every facing up front — the
-    // same pre-intern the dynamic-case harness and the bridge perform.
+    // A dispenser can *place* a block it holds as an item — a shulker box, or a
+    // bucket's contents. Behaviours bind only to interned states, so intern
+    // them up front, the same pre-intern the dynamic-case harness and the
+    // bridge perform.
     for (_, stacks) in &structure.inventories {
         for stack in stacks {
-            let base = stack.id.split('[').next().unwrap_or(&stack.id);
-            if base.ends_with("_shulker_box") || base == "minecraft:shulker_box" {
-                for facing in ["up", "down", "north", "south", "west", "east"] {
-                    let _ = sim.registry_mut().intern(&format!("{base}[facing={facing}]"));
-                }
+            for descriptor in mc_tick::vanilla::dispensable_states(&stack.id) {
+                let _ = sim.registry_mut().intern(&descriptor);
             }
         }
     }
@@ -769,6 +767,88 @@ fn an_ejected_item_flies_the_mean_trajectory_within_jitter_bounds() {
         None,
         Settle::Placement,
         0.5,
+    );
+}
+
+/// The lanes of the two bucket rigs, powered at tick 10 and released at 12.
+/// Written out so the two tests cannot drift apart.
+fn bucket_actuations(lanes: &[i32]) -> Vec<(u64, Actuate)> {
+    let mut actions = Vec::new();
+    for z in lanes {
+        actions.push((10, Actuate::Place(Pos::new(0, 2, *z), "minecraft:redstone_block")));
+    }
+    for z in lanes {
+        actions.push((12, Actuate::Place(Pos::new(0, 2, *z), "minecraft:air")));
+    }
+    actions
+}
+
+#[test]
+fn a_dispenser_empties_a_filled_bucket_into_the_cell_in_front() {
+    // Four lanes, one trigger, four rules:
+    //
+    // - `powder_snow_bucket` → `minecraft:powder_snow` (z=0) and `water_bucket`
+    //   → `minecraft:water[level=0]` (z=2). Two items, so the rule is not
+    //   fitted to one. A **third**, `lava_bucket` →
+    //   `minecraft:lava[level=0]`, was captured on the same rig and agrees
+    //   exactly; it is not pinned here because `minecraft:lava` has no
+    //   behaviour in this engine, so a build holding one refuses at load rather
+    //   than running. The evidence is
+    //   `tools/gametest/captures/bucket_dispense_lava.log`.
+    // - Each leaves `1x minecraft:bucket` in the slot it came from —
+    //   `consumeWithRemainder` with the stack down to nothing.
+    // - z=6's front cell is stone. `emptyContents` gates on `isEmptyBlock`, so
+    //   it fails, `$3` falls through to the default eject, and the *only* thing
+    //   the world records is the slot emptying.
+    // - z=8 is the record door's geometry: the same air cell watched by an
+    //   observer below facing up and one above facing down. Both pulse at tick
+    //   15 and clear at 17 — the placement writes with flags 3, so it hands out
+    //   ordinary neighbour updates. Their tick-1/tick-3 pulse is the placement
+    //   pass arming them, which is why the trigger waits until tick 10.
+    //
+    // The dispense is on tick 13, the 4-game-tick delay after the tick-10 edge.
+    //
+    // Negative control: with `BucketDispense::Empties` deleted from
+    // `vanilla::bucket_dispense` — the pre-fix engine — this fails at tick 13
+    // with the front cells still air, the slots emptied instead of holding
+    // buckets, and no observer pulse at 15.
+    run_conformance_actuated(
+        "bucket_dispense.snbt",
+        "bucket_dispense.json",
+        "nucleation:bucket_dispense",
+        &["minecraft:redstone_block"],
+        &bucket_actuations(&[0, 2, 6, 8]),
+    );
+}
+
+#[test]
+fn a_dispenser_fills_an_empty_bucket_from_the_cell_in_front() {
+    // The same geometry with the roles swapped, which is the half the record
+    // door needs on the way back:
+    //
+    // - `powder_snow` (z=0) and `water[level=0]` (z=2) are each picked up,
+    //   leaving air and the matching filled bucket. `lava[level=0]` was
+    //   measured too and is unpinned for the same reason as above
+    //   (`tools/gametest/captures/bucket_pickup_lava.log`).
+    // - z=6's front cell is air, which is not a `BucketPickup` at all: `$4`
+    //   ejects the empty bucket and the slot goes empty. This is the lane that
+    //   makes "picks up" falsifiable — the same dispenser, the same item, no
+    //   block to take.
+    // - z=8 pins that the *removal* pulses the observers too (flags 11).
+    // - z=10 holds **two** buckets, so `consumeWithRemainder` cannot reuse the
+    //   slot: slot 4 keeps `1x bucket` and `insertItem` puts the
+    //   `powder_snow_bucket` in slot 0, the first empty one.
+    //
+    // Negative control: with `BucketDispense::Fills` deleted, all five lanes
+    // eject their bucket, so z=0/2/8/10 keep their front block and lose the
+    // filled bucket — and z=6, the one lane whose vanilla answer *is* an eject,
+    // still passes. That asymmetry is the point of including it.
+    run_conformance_actuated(
+        "bucket_pickup.snbt",
+        "bucket_pickup.json",
+        "nucleation:bucket_pickup",
+        &["minecraft:redstone_block"],
+        &bucket_actuations(&[0, 2, 6, 8, 10]),
     );
 }
 

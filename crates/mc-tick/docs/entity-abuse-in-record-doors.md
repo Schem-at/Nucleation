@@ -468,7 +468,71 @@ changes — and it removes the second of the two reasons given here not to belie
 a door: the ten `piston_retract_contacts` were ten entities standing in a
 retraction that only happened because the build had been pasted.
 
-### What happens when somebody does touch it
+### Settled: the dispenser places its powder snow, and the machine runs
+
+The section below records the state before bucket dispensing existed: 23–25
+block changes, the first extender and nothing else. **That stall was the
+dispenser.** The build's only block entity, the dispenser at `(73,3,20)`, holds
+one `minecraft:powder_snow_bucket`, and the engine had no bucket behaviour — so
+the bucket was ejected as an item entity and fell to y ≈ −30, leaving the cell
+two observers are watching permanently empty.
+
+Both directions are now measured (`bucket_dispense.json`, `bucket_pickup.json`,
+five and six lanes, negative-controlled) and implemented. Pressed on tick 5
+under `InWorld`, the door now runs:
+
+| | before | after |
+|---|---|---|
+| block changes | 25 | **186**, over ticks 5–39 |
+| components receiving updates | 12 of 32 | **32 of 32** |
+| powder snow at `(74,3,20)` | never | **tick 7** |
+| observers `(74,2,20)` / `(74,4,20)` | never | **both fire, tick 9**, clear at 11 |
+| `piston_retract_contacts` | 0 | 0 |
+| quiescent | true | true, from tick 40 |
+
+The chain is: button (t4) → note block → dispenser `triggered` (t4) → the
+down-facing sticky pair at `(71,2,20)`/`(71,1,20)` extends (t5) → **powder snow
+lands at `(74,3,20)` (t7)** → both watching observers pulse (t9) → the bottom
+double extender at `(73,0,20)`/`(74,0,20)` runs (t9–11) → the west end of the
+build finally moves (t11 onward), and at **t13 the light weighted pressure plate
+at `(64,3,20)` reads `power=2`** — the two dragon fireballs, which have arrived
+at x = 65.5, being counted as two entities on a `maxWeight` 15 plate. That plate
+is the first trigger in this build the engine has ever made fire.
+
+Three things it does **not** do, all named rather than smoothed over:
+
+- **Fireball id=11 never reaches its plate.** It sat 0.0625 short of the light
+  weighted plate at `(74,1,20)`; on tick 10 it moves **the other way**, from
+  x = 73.84375 to 73.15625, because the retracting head at `(73,0,20)` ejects
+  the square it is leaving and id=11's centre is in it. The plate at
+  `(74,1,20)` never leaves `power=0` in any tick of the run. Whether vanilla
+  also throws it west is unknown — that is the measured `head_eject`
+  displacement law applied to a geometry no capture covers with a *plate* to
+  read out.
+- **Two quartz blocks end at y = −1.** The down-facing sticky pistons at
+  `(70,3,20)` (t15) and `(71,2,20)` (t35) push their quartz columns one cell
+  down and land a block at `(70,-1,20)` and `(71,-1,20)` — one cell below the
+  build's own floor, in cells the loaded region holds no block for. Either the
+  extraction cropped the machine's floor or the machine stands on air, and which
+  it is decides whether that push is legitimate. **Everything after t15 is
+  running on a world that may be one cell too shallow**, and this is the next
+  thing to settle.
+- **There is no passage in this sample to open.** The extracted region declares
+  `size: [103, 7, 66]` and contains **53 blocks**: the mechanism, an 11×5 slice
+  one block thick at `z=20` (plus the button at `z=19`), and a detached 3×3
+  quartz pad with a sea lantern at `(67..69, 0, 0..2)`, nineteen cells away in
+  z. No 3×3 panel, no doorway. Net of the whole cycle only **6 cells** differ
+  from the start state — two emptied (`(70,1,20)`, `(73,0,20)`), the two quartz
+  blocks at y = −1, a piston that ended one cell along at `(72,0,20)`, and the
+  powder snow. So "does it open" cannot be answered from `55_3x3.zip` as it
+  stands; what can be said is that the mechanism cycles end to end and returns
+  almost exactly home.
+
+`examples/door55_render.rs` output of this run:
+`/Users/harrison/Desktop/nucleation-handoff/door55/door55_bucket_dispense.mp4`
+(60 ticks, press on 5).
+
+### What happened before that — the first extender and nothing else
 
 `examples/door55_sim.rs` takes `--press T` now (and `--button x,y,z`; the button
 is otherwise searched for, because the extraction's origin is not the save's).
