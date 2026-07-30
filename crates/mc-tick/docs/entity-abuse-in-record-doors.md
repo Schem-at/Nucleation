@@ -542,7 +542,8 @@ diffing: 171 identical entity lines, only the known warmup count differing.
 **light weighted pressure plate** to read out — a block-state channel, so no
 entity filter can distort it. In the replica lane the extension throws the
 fireball west 0.6875 (0.51 then 0.5, clipped by the moving block behind it,
-which is bit-for-bit what our engine already did) and then **the retraction
+which the engine did **not** do either — see "Settled: the sweep is clipped by
+the block in flight" below) and then **the retraction
 brings it all the way back east**, +0.51 then +0.1775, settling with its east
 face on 5.0 — exactly where it started — and **the plate powers**. Negative
 controls in the same rig: extend-only never powers it, no-fireball never powers
@@ -591,6 +592,104 @@ Two law corrections came out of that, both implemented:
 passage cells and then falls back, and it ends well away from home with the plate
 at `(74,1,20)` reading `power=1`. The three cells that never fill are `(67,2)`,
 `(68,0)` and `(69,2)`.
+
+### Settled: the sweep is clipped by the block in flight
+
+The trailing `power=1` above was the last symptom, and its cause was that
+**nothing clipped a piston's shove**. `Simulation::shove` has always run
+`entity.move`'s block collision, but the cells a piston is moving a block into
+hold a `moving_piston` placeholder, and `moving_piston` is not a full cube — so
+the whole stroke read as empty air and the fireball was carried the full distance
+the sweep asked for. It ended `0.3225` **east** of its start, inside the plate's
+touch box, where the plate latched and held the west closing pair out.
+
+`piston_plate_clip` had the answer in it all along; it had only ever been read
+for the plate. Read for the *positions*, all fifteen lanes say the same thing,
+and they say it about extension as well as retraction:
+
+- **extension.** Lane `z=1` step two asks for `0.5` west and vanilla gives
+  `0.1775` — the room from `4.1775` to `x = 4.0`, the east face of the cell the
+  pushed sticky piston is arriving in. The engine gave the full `0.5` and ended
+  at `3.83375`, a whole block west, which is why the retraction could not reach
+  it: the replica lane was silently behaving like the `replica_nopush` control.
+  So extension was **not** bit-exact here, and the four captures it was verified
+  against never posed the question — `piston_entity` shoves everything into open
+  air.
+- **it is a distance to a surface.** Lane `z=21` starts the same fireball
+  `0.25625` further east and its second step is `0.43375`, not `0.1775`. Both
+  land the west face on exactly `4.0`.
+- **retraction.** Lane `z=5` retracts twice from two different places — `0.02`
+  out of the head's own eject and `0.1775` out of a full stroke — and both land
+  the **east** face on `x = 5.0`, the west face of the piston's own square. That
+  square holds a `moving_piston` for the two ticks the head takes to come home,
+  and its pending write is the retracted base, which *is* a full cube.
+- **the negative controls are in the same rig.** `z=17` has nothing to push, so
+  its second step is the full `0.5` and it is right to be unclipped; `z=19` has
+  nothing to *pull*, so its retraction is the head's eject alone and stops at
+  `4.82375`.
+
+A fifth capture, `piston_clip_sizes`, settles **when** the block in flight starts
+colliding, which fifteen lanes of 0.3125 fireball cannot: every one of them is
+still a whole block clear of the arriving block when its first step is taken, so
+"solid at its destination all along" fits as well as "solid only on the second
+step". Widen the body until its leading face already sits on the line and the two
+rules give opposite answers. A **dragon fireball** in the replica lane, box
+`[4.0, 5.0]`, starts flush against the cell the pushed sticky piston is arriving
+in — and vanilla moves it the full `0.51` anyway, then clips its *second* step to
+`0.49` against the cell the pushed **quartz** is arriving in, `x = 3.0`. A 0.98
+furnace minecart, `0.02` clear of the same line, gets `0.51` and then a full
+`0.5`. So a moving block is transparent on the first step and solid at its
+destination on the second, which is `PistonMovingBlockEntity`'s `progress < 1.0`
+read *after* the step's increment — half a block, then a whole one.
+
+`Simulation::blocks_in_flight` supplies those cells to `shove` as unit cubes at
+their destinations, for moves on their second step (`resolve_on == tick + 1`)
+whose **landed** state is a full cube — which is why an extension's own head slot
+is not among them: it lands `piston_head`, and a cube there would have stopped
+lane `z=1` at `4.25` instead of `4.15625`. `tests/piston_plate_clip.rs` pins all
+fifteen small-fireball lanes, every position and all thirty-seven plate
+transitions, plus the three wide-body lanes. Two negative controls, both observed
+failing: with the clip disabled five of its six tests fail and the "nothing in the
+way" control still passes; with the clip present on *both* steps the narrow lanes
+still pass and the dragon fireball is pinned at `4.5` and never moves at all.
+
+The wide-body capture also found a hole that is **not** this clip, recorded as a
+disagreement in `retracting_a_body_wider_than_the_arm_still_disagrees`: retracting
+a body wider than the piston arm. Lanes `z=5` (dragon fireball) and `z=9` (furnace
+minecart) are shoved `+0.25` east by vanilla and then `-0.25` back, a round trip;
+the engine shoves `+0.49`, and the cart never returns. A 1.0-wide box straddles
+the arm's 4/16 column instead of lying inside it, so
+`inside_eject_displacement`'s cross-axis gate declines and the pulled block's own
+sweep answers instead. Every lane of `piston_plate_clip` proper takes the other
+branch, which is why fifteen lanes never saw it.
+
+On the door: fireball id=11 now ends at `73.84375`, its exact start, flush on
+`x = 74.0`; the plate returns to `power=0` at t33; `(73,0,20)` returns to
+`extended=false`; block changes go 219 → 227; the run reaches **quiescence**
+where it did not before; and the world ends 10 cells from home instead of 12.
+
+**The passage count is measuring nothing.** A census of the whole declared
+region — `CENSUS=1 examples/door55_doorway` — finds **53 blocks, at z ∈ {0,1,2},
+19 and 20 only**: the 43-block mechanism slab at `z=20`, the button at `z=19`,
+and the 3×3 quartz pad with its sea lantern lying **flat at y=0, z=0..2**,
+eighteen cells away. There is no panel at `(67..69, 0..2, z=20)`; those are
+interior voids of the mechanism's own slab, and "9 of 9" is unreachable in this
+save no matter what the physics does. The four cells that stay filled —
+`(67,1)`, `(68,1)`, `(69,0)`, `(69,1)` — are quartz the mechanism pushed into
+that void and had nothing to push back out.
+
+**The next thing to measure is three furnace carts.** ids 14, 21 and 23, the
+east column's scaffolding, end at y ≈ −72 with `vel = -0.757` and are still
+falling at t120. They fall in the same tick with the clip and without it, so it
+is not this fix, and they do not move at all until the button is pressed. Each
+was last over a column whose `y=0` cell holds `sticky_piston[extended=false]` —
+a full cube by `is_full_cube` — where carts 13 and 22, over quartz, both land at
+`y = 1.0`. Whether the cycle legitimately empties everything beneath them at the
+moment they let go, or the support test misses a retracted piston, cannot be read
+off this save: `door55_in_world.entities.log`'s entity lines are not
+reproducible. It needs a rig of its own — a furnace cart at `y = 1.7` embedded in
+a down-facing sticky piston's head slot, the piston cycled under it, and the
+cart's settled `y` read off the entity log.
 
 ### Retracted: the plate's recheck was never being lost
 

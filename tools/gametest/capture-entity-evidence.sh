@@ -844,6 +844,43 @@ tools/gametest/capture.sh --structure nucleation:piston_plate_clip --max-ticks 3
   --at 2:6,1,29:redstone_block --at 20:6,1,29:air --at 2:6,1,31:redstone_block --at 8:6,1,31:air \
   --out work/piston_plate_clip.json | tee "$CAP/piston_plate_clip.entities.log"
 
+# The same rig with WIDE bodies, which is what settles *when* the block in flight
+# starts colliding. Every lane above is a 0.3125 fireball that is still a whole
+# block clear of the arriving block when its first step is taken, so the first
+# step never binds and both "solid at its destination all along" and "solid only
+# on the second step" fit. A dragon fireball is 1.0 wide, so in the replica lane
+# its box is [4.0, 5.0] — its leading face already flush on the line the small
+# fireball is clipped to — and the two rules give opposite answers.
+#
+# Result: vanilla moves it the full 0.51 on the first step and only then clips,
+# to 0.49, against the cell the pushed *quartz* is arriving in (x = 3.0). So a
+# moving block is transparent on the first step and solid at its destination on
+# the second, which is `progress < 1.0` read after the step's increment. The
+# 0.98 furnace minecart, 0.02 clear of the same line, gets 0.51 then a full 0.5.
+#
+#   z=1   dragon fireball,  extend then retract,  a block to push  4.5 -> 3.5
+#   z=5   dragon fireball,  starts extended                       round trip +-0.25
+#   z=17  dragon fireball,  nothing to push (control)              4.5 -> 3.49
+#   z=9   furnace minecart, starts extended                        round trip +-0.25
+#   z=29  furnace minecart, extend then retract                    4.51 -> 3.4999999905
+#
+# The two `starts extended` lanes are *not* clip evidence and are recorded as a
+# disagreement instead: a 1.0-wide body straddles the piston arm's 4/16 column
+# rather than sitting inside it, so `inside_eject_displacement` declines and
+# `head_eject_displacement` answers -0.02 where vanilla moves it +0.25 and back.
+# That is a hole in retraction's law for wide bodies, not in this clip.
+tools/gametest/capture.sh --structure nucleation:piston_plate_clip --max-ticks 24 --entity-log \
+  --spawn 'minecraft:dragon_fireball@4.5,1.875,1.5:0,0,0:nogravity' \
+  --spawn 'minecraft:dragon_fireball@4.5,1.875,5.5:0,0,0:nogravity' \
+  --spawn 'minecraft:dragon_fireball@4.5,1.875,17.5:0,0,0:nogravity' \
+  --spawn 'minecraft:furnace_minecart@4.51,1.0,9.5:0,0,0' \
+  --spawn 'minecraft:furnace_minecart@4.51,1.0,29.5:0,0,0' \
+  --at 2:6,1,1:redstone_block --at 8:6,1,1:air \
+  --at 6:6,1,5:air --at 6:6,1,9:air \
+  --at 2:6,1,17:redstone_block --at 8:6,1,17:air \
+  --at 2:6,1,29:redstone_block --at 14:6,1,29:air \
+  --out work/piston_clip_sizes.json | tee "$CAP/piston_clip_sizes.entities.log"
+
 tools/gametest/capture.sh --structure nucleation:plate_reach_flush --max-ticks 24 --entity-log \
   --spawn 'minecraft:small_fireball@4.84375,1.875,1.5:0,0,0' \
   --spawn 'minecraft:small_fireball@4.84375,1.875,3.5:0,0,0' \

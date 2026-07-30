@@ -1126,9 +1126,9 @@ impl Simulation {
     /// anyway. Reuses the same sweep the carts already collide with, so a
     /// piston cannot shove a cart through a wall that would stop it rolling.
     ///
-    /// The clipping itself is **not** separately measured: `piston_entity.json`
-    /// shoves every entity into open air, so it verifies the distance and not
-    /// what happens when the distance is refused.
+    /// The clipping itself **is** measured, and it was the last thing holding the
+    /// record 3x3 door shut — see [`Simulation::blocks_in_flight`] for the
+    /// surface that does it and the capture that pins it.
     fn shove(
         &self,
         min: [f64; 3],
@@ -1143,13 +1143,14 @@ impl Simulation {
             f64::from(dy) * distance,
             f64::from(dz) * distance,
         ];
-        let obstacles: Vec<([f64; 3], [f64; 3])> = self
+        let mut obstacles: Vec<([f64; 3], [f64; 3])> = self
             .item_entities
             .others
             .iter()
             .filter(|body| body.id != moving_id)
             .map(|body| (body.min, body.max))
             .collect();
+        obstacles.extend(self.blocks_in_flight());
         let collision = SimCollision {
             world: &self.world,
             solidity: &self.solidity,
@@ -1163,6 +1164,94 @@ impl Simulation {
         };
         let (clipped, _) = crate::entity::collide_move_among(&collision, min, max, movement, &obstacles);
         clipped
+    }
+
+    /// The boxes a piston's in-flight blocks collide with, as unit cubes at the
+    /// cells they are travelling *into*.
+    ///
+    /// A cell a piston is moving a block into holds a `moving_piston`
+    /// placeholder, and a `moving_piston` is not a full cube — so as far as
+    /// [`Simulation::shove`]'s ordinary block collision is concerned the whole
+    /// stroke is empty air. It is not. Vanilla's `MovingPistonBlock` delegates
+    /// its collision shape to the block entity, which answers with the moved
+    /// block's own shape, and an entity a piston shoves is stopped by it exactly
+    /// as by a settled block.
+    ///
+    /// This is the clip that makes the record 3x3 door's fireball trick work,
+    /// and it is worth reading the two halves of it off
+    /// `tools/gametest/captures/piston_plate_clip.entities.log`, lane `z=1`,
+    /// whose sticky piston at `(5,1,z)` pushes another at `(4,1,z)` and a quartz
+    /// block at `(3,1,z)`, with a small fireball embedded in the head slot at
+    /// `x = 4.84375` — box `[4.6875, 5.0]`:
+    ///
+    /// * **extension.** Step one sweeps the fireball `0.51` west, to
+    ///   `[4.1775, 4.49]`. Step two asks for `0.5` more and vanilla delivers
+    ///   `0.1775` — the room left to `x = 4.0`, which is the east face of the
+    ///   cell the *pushed sticky piston* is arriving in. Lane `z=21` starts the
+    ///   same fireball 0.25625 further east and vanilla clips its second step to
+    ///   `0.43375`, the room from *its* position to the same line, which is what
+    ///   rules out a fixed distance.
+    /// * **retraction.** Step one is the head's own eject, `0.02` west to
+    ///   `[4.6675, 4.98]`. Step two — the pulled quartz's sweep — asks for
+    ///   `0.3425` east and vanilla delivers `0.02`, the room left to `x = 5.0`,
+    ///   the west face of the piston's **own** square. That square holds a
+    ///   `moving_piston` for the two ticks the head takes to come home, and its
+    ///   pending write is the retracted base, which is a full cube.
+    ///
+    /// Without this the fireball leaves the door's plate reach entirely — it ends
+    /// `0.3225` east of where it started instead of flush against the piston, the
+    /// plate at `(74,1,20)` latches, and the door's west pair never releases.
+    ///
+    /// Only cells whose **landed** state is a full cube count, which is why an
+    /// extension's own head slot is not here: it lands `piston_head`, whose plate
+    /// and arm are not a cube, and the fireball above ends its extension inside
+    /// that slot at `x = 4.15625` — a cube there would have stopped it at
+    /// `4.25`. A pending write with no [`crate::piston::Sweep`] is an ordinary
+    /// deferred block write whose cell already holds its real state, and is not
+    /// in flight at all.
+    ///
+    /// # Only on the second step
+    ///
+    /// A moving block is transparent to the entity it is shoving on the *first*
+    /// of the two half-block steps and solid on the second, and that is measured
+    /// rather than assumed. Widen the entity until its leading face already sits
+    /// on the line and the two rules give opposite answers: a **dragon
+    /// fireball** in the replica lane, box `[4.0, 5.0]`, starts flush against
+    /// the cell the pushed sticky piston is arriving in, so a box there would
+    /// pin it in place — and vanilla moves it the full `0.51` anyway, then
+    /// clips its *second* step to `0.49` against the cell the pushed **quartz**
+    /// is arriving in, `x = 3.0`. A furnace minecart, 0.02 clear of the same
+    /// line, is moved `0.51` and then a full `0.5`. See
+    /// `tools/gametest/captures/piston_clip_sizes.log`, and
+    /// `piston_plate_clip.rs`'s `the_first_step_of_a_stroke_is_not_clipped`.
+    ///
+    /// This is `PistonMovingBlockEntity.getCollisionShape`'s `progress < 1.0 &&
+    /// NOCLIP == getMovementDirection()` showing through, with `progress` read
+    /// *after* the step's increment: half a block on the first step, a whole one
+    /// on the second. `resolve_on == tick + 1` is that second step, and it is
+    /// per-move rather than per-stroke because two pistons can be out of phase.
+    ///
+    /// # What this does not do
+    ///
+    /// Vanilla exempts only moving blocks travelling the **same** way as the
+    /// shove; one crossing it would collide on both steps, at a box offset back
+    /// by its own progress. No capture has a stroke crossing another, so the
+    /// direction is not part of the test here.
+    ///
+    /// It also applies to a piston's shove alone. A minecart rolling of its own
+    /// accord still passes through a moving block, which is a separate and
+    /// unmeasured question.
+    fn blocks_in_flight(&self) -> Vec<([f64; 3], [f64; 3])> {
+        self.moves
+            .iter()
+            .filter(|m| m.sweep.is_some())
+            .filter(|m| m.resolve_on == self.tick + 1)
+            .filter(|m| self.solidity.get(m.state.raw() as usize).copied().unwrap_or(false))
+            .map(|m| {
+                let lo = [f64::from(m.pos.x), f64::from(m.pos.y), f64::from(m.pos.z)];
+                (lo, [lo[0] + 1.0, lo[1] + 1.0, lo[2] + 1.0])
+            })
+            .collect()
     }
 
     /// The boxes of the non-cart entities a moving minecart is stopped by.

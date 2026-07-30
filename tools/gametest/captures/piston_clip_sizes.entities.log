@@ -1,0 +1,410 @@
+Note: src/TraceCapture.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+[15:40:49] [main/INFO]: Loaded 1585 recipes
+[15:40:49] [main/INFO]: Loaded 1688 advancements
+[15:40:49] [main/INFO]: Selecting global world spawn...
+[15:40:49] [main/INFO]: Loading 0 persistent chunks...
+[15:40:49] [main/INFO]: Time elapsed: 162 ms
+[15:40:50] [main/INFO]: Started game test server
+  origin: BlockPos{x=0, y=100, z=0}
+[15:40:50] [main/INFO]: 2 tests are now running at position 5131159, -59, -9356206!
+[15:40:50] [main/INFO]: Running test environment 'minecraft:default' batch 0 (1 tests)...
+[15:40:50] [main/INFO]: [  ]
+  warmup ticks until entity-ticking: 34 (8/8 chunks ready)
+  spawn: id=1 minecraft:dragon_fireball at (4.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0) flags=[nogravity]
+         bbox=[4.0..5.0, 1.875..2.875, 1.0..2.0] size=1.0x1.0x1.0
+  spawn: id=2 minecraft:dragon_fireball at (4.5, 1.875, 5.5) vel=(0.0, 0.0, 0.0) flags=[nogravity]
+         bbox=[4.0..5.0, 1.875..2.875, 5.0..6.0] size=1.0x1.0x1.0
+  spawn: id=3 minecraft:dragon_fireball at (4.5, 1.875, 17.5) vel=(0.0, 0.0, 0.0) flags=[nogravity]
+         bbox=[4.0..5.0, 1.875..2.875, 17.0..18.0] size=1.0x1.0x1.0
+  spawn: id=4 minecraft:furnace_minecart at (4.51, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+         bbox=[4.019999990463257..5.000000009536743, 1.0..1.699999988079071, 9.009999990463257..9.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=5 minecraft:furnace_minecart at (4.51, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+         bbox=[4.019999990463257..5.000000009536743, 1.0..1.699999988079071, 29.009999990463257..29.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  block-ticking chunks: 8/8
+  pending block ticks: 0
+  runs normally: true
+  entity-ticking chunks: 8/8
+  entities loaded: 5
+    3 x minecraft:dragon_fireball
+    2 x minecraft:furnace_minecart
+  entities with non-finite velocity (nan carts): 0
+  at t2: 6,1,1 -> redstone_block
+  at t8: 6,1,1 -> air
+  at t6: 6,1,5 -> air
+  at t6: 6,1,9 -> air
+  at t2: 6,1,17 -> redstone_block
+  at t8: 6,1,17 -> air
+  at t2: 6,1,29 -> redstone_block
+  at t14: 6,1,29 -> air
+  initial [0,0,1] minecraft:stone
+  initial [1,0,1] minecraft:stone
+  initial [2,0,1] minecraft:stone
+  initial [3,0,1] minecraft:stone
+  initial [4,0,1] minecraft:stone
+  initial [5,0,1] minecraft:stone
+  initial [6,0,1] minecraft:stone
+  initial [7,0,1] minecraft:stone
+  initial [3,1,1] minecraft:quartz_block
+  initial [4,1,1] minecraft:sticky_piston[extended=false,facing=west]
+  initial [5,1,1] minecraft:sticky_piston[extended=false,facing=west]
+  initial [4,2,1] minecraft:quartz_block
+  initial [5,2,1] minecraft:light_weighted_pressure_plate[power=0]
+  initial [0,0,3] minecraft:stone
+  initial [1,0,3] minecraft:stone
+  initial [2,0,3] minecraft:stone
+  initial [3,0,3] minecraft:stone
+  initial [4,0,3] minecraft:stone
+  initial [5,0,3] minecraft:stone
+  initial [6,0,3] minecraft:stone
+  initial [7,0,3] minecraft:stone
+  initial [3,1,3] minecraft:quartz_block
+  initial [4,1,3] minecraft:sticky_piston[extended=false,facing=west]
+  initial [5,1,3] minecraft:sticky_piston[extended=false,facing=west]
+  initial [4,2,3] minecraft:quartz_block
+  initial [5,2,3] minecraft:light_weighted_pressure_plate[power=0]
+  initial [0,0,5] minecraft:stone
+  initial [1,0,5] minecraft:stone
+  initial [2,0,5] minecraft:stone
+  initial [3,0,5] minecraft:stone
+  initial [4,0,5] minecraft:stone
+  initial [5,0,5] minecraft:stone
+  initial [6,0,5] minecraft:stone
+  initial [7,0,5] minecraft:stone
+  initial [3,1,5] minecraft:quartz_block
+  initial [4,1,5] minecraft:piston_head[facing=west,short=false,type=sticky]
+  initial [5,1,5] minecraft:sticky_piston[extended=true,facing=west]
+  initial [6,1,5] minecraft:redstone_block
+  initial [4,2,5] minecraft:quartz_block
+  initial [5,2,5] minecraft:light_weighted_pressure_plate[power=0]
+  initial [0,0,7] minecraft:stone
+  initial [1,0,7] minecraft:stone
+  initial [2,0,7] minecraft:stone
+  initial [3,0,7] minecraft:stone
+  initial [4,0,7] minecraft:stone
+  initial [5,0,7] minecraft:stone
+  initial [6,0,7] minecraft:stone
+  initial [7,0,7] minecraft:stone
+  initial [3,1,7] minecraft:quartz_block
+  initial [4,1,7] minecraft:piston_head[facing=west,short=false,type=sticky]
+  initial [5,1,7] minecraft:sticky_piston[extended=true,facing=west]
+  initial [6,1,7] minecraft:redstone_block
+  initial [4,2,7] minecraft:quartz_block
+  initial [5,2,7] minecraft:light_weighted_pressure_plate[power=0]
+  initial [0,0,9] minecraft:stone
+  initial [1,0,9] minecraft:stone
+  initial [2,0,9] minecraft:stone
+  initial [3,0,9] minecraft:stone
+  initial [4,0,9] minecraft:stone
+  initial [5,0,9] minecraft:stone
+  initial [6,0,9] minecraft:stone
+  initial [7,0,9] minecraft:stone
+  initial [3,1,9] minecraft:quartz_block
+  initial [4,1,9] minecraft:piston_head[facing=west,short=false,type=sticky]
+  initial [5,1,9] minecraft:sticky_piston[extended=true,facing=west]
+  initial [6,1,9] minecraft:redstone_block
+  initial [4,2,9] minecraft:quartz_block
+  initial [5,2,9] minecraft:light_weighted_pressure_plate[power=0]
+  initial [0,0,11] minecraft:stone
+  initial [1,0,11] minecraft:stone
+  initial [2,0,11] minecraft:stone
+  initial [3,0,11] minecraft:stone
+  initial [4,0,11] minecraft:stone
+  initial [5,0,11] minecraft:stone
+  initial [6,0,11] minecraft:stone
+  initial [7,0,11] minecraft:stone
+  initial [3,1,11] minecraft:quartz_block
+  initial [4,1,11] minecraft:piston_head[facing=west,short=false,type=sticky]
+  initial [5,1,11] minecraft:sticky_piston[extended=true,facing=west]
+  initial [6,1,11] minecraft:redstone_block
+  initial [4,2,11] minecraft:quartz_block
+  initial [5,2,11] minecraft:light_weighted_pressure_plate[power=0]
+  initial [0,0,13] minecraft:stone
+  initial [1,0,13] minecraft:stone
+  initial [2,0,13] minecraft:stone
+  initial [3,0,13] minecraft:stone
+  initial [4,0,13] minecraft:stone
+  initial [5,0,13] minecraft:stone
+  initial [6,0,13] minecraft:stone
+  initial [7,0,13] minecraft:stone
+  initial [3,1,13] minecraft:quartz_block
+  initial [4,1,13] minecraft:piston_head[facing=west,short=false,type=sticky]
+  initial [5,1,13] minecraft:sticky_piston[extended=true,facing=west]
+  initial [6,1,13] minecraft:redstone_block
+  initial [4,2,13] minecraft:quartz_block
+  initial [5,2,13] minecraft:light_weighted_pressure_plate[power=0]
+  initial [0,0,15] minecraft:stone
+  initial [1,0,15] minecraft:stone
+  initial [2,0,15] minecraft:stone
+  initial [3,0,15] minecraft:stone
+  initial [4,0,15] minecraft:stone
+  initial [5,0,15] minecraft:stone
+  initial [6,0,15] minecraft:stone
+  initial [7,0,15] minecraft:stone
+  initial [3,1,15] minecraft:quartz_block
+  initial [4,1,15] minecraft:piston_head[facing=west,short=false,type=sticky]
+  initial [5,1,15] minecraft:sticky_piston[extended=true,facing=west]
+  initial [6,1,15] minecraft:redstone_block
+  initial [4,2,15] minecraft:quartz_block
+  initial [5,2,15] minecraft:light_weighted_pressure_plate[power=0]
+  initial [0,0,17] minecraft:stone
+  initial [1,0,17] minecraft:stone
+  initial [2,0,17] minecraft:stone
+  initial [3,0,17] minecraft:stone
+  initial [4,0,17] minecraft:stone
+  initial [5,0,17] minecraft:stone
+  initial [6,0,17] minecraft:stone
+  initial [7,0,17] minecraft:stone
+  initial [5,1,17] minecraft:sticky_piston[extended=false,facing=west]
+  initial [4,2,17] minecraft:quartz_block
+  initial [5,2,17] minecraft:light_weighted_pressure_plate[power=0]
+  initial [0,0,19] minecraft:stone
+  initial [1,0,19] minecraft:stone
+  initial [2,0,19] minecraft:stone
+  initial [3,0,19] minecraft:stone
+  initial [4,0,19] minecraft:stone
+  initial [5,0,19] minecraft:stone
+  initial [6,0,19] minecraft:stone
+  initial [7,0,19] minecraft:stone
+  initial [4,1,19] minecraft:piston_head[facing=west,short=false,type=sticky]
+  initial [5,1,19] minecraft:sticky_piston[extended=true,facing=west]
+  initial [6,1,19] minecraft:redstone_block
+  initial [4,2,19] minecraft:quartz_block
+  initial [5,2,19] minecraft:light_weighted_pressure_plate[power=0]
+  initial [0,0,21] minecraft:stone
+  initial [1,0,21] minecraft:stone
+  initial [2,0,21] minecraft:stone
+  initial [3,0,21] minecraft:stone
+  initial [4,0,21] minecraft:stone
+  initial [5,0,21] minecraft:stone
+  initial [6,0,21] minecraft:stone
+  initial [7,0,21] minecraft:stone
+  initial [3,1,21] minecraft:quartz_block
+  initial [4,1,21] minecraft:sticky_piston[extended=false,facing=west]
+  initial [5,1,21] minecraft:sticky_piston[extended=false,facing=west]
+  initial [4,2,21] minecraft:quartz_block
+  initial [5,2,21] minecraft:light_weighted_pressure_plate[power=0]
+  initial [0,0,23] minecraft:stone
+  initial [1,0,23] minecraft:stone
+  initial [2,0,23] minecraft:stone
+  initial [3,0,23] minecraft:stone
+  initial [4,0,23] minecraft:stone
+  initial [5,0,23] minecraft:stone
+  initial [6,0,23] minecraft:stone
+  initial [7,0,23] minecraft:stone
+  initial [3,1,23] minecraft:quartz_block
+  initial [4,1,23] minecraft:piston_head[facing=west,short=false,type=sticky]
+  initial [5,1,23] minecraft:sticky_piston[extended=true,facing=west]
+  initial [6,1,23] minecraft:redstone_block
+  initial [4,2,23] minecraft:quartz_block
+  initial [5,2,23] minecraft:light_weighted_pressure_plate[power=0]
+  initial [0,0,25] minecraft:stone
+  initial [1,0,25] minecraft:stone
+  initial [2,0,25] minecraft:stone
+  initial [3,0,25] minecraft:stone
+  initial [4,0,25] minecraft:stone
+  initial [5,0,25] minecraft:stone
+  initial [6,0,25] minecraft:stone
+  initial [7,0,25] minecraft:stone
+  initial [3,1,25] minecraft:quartz_block
+  initial [4,1,25] minecraft:piston_head[facing=west,short=false,type=sticky]
+  initial [5,1,25] minecraft:sticky_piston[extended=true,facing=west]
+  initial [6,1,25] minecraft:redstone_block
+  initial [4,2,25] minecraft:quartz_block
+  initial [5,2,25] minecraft:light_weighted_pressure_plate[power=0]
+  initial [0,0,27] minecraft:stone
+  initial [1,0,27] minecraft:stone
+  initial [2,0,27] minecraft:stone
+  initial [3,0,27] minecraft:stone
+  initial [4,0,27] minecraft:stone
+  initial [5,0,27] minecraft:stone
+  initial [6,0,27] minecraft:stone
+  initial [7,0,27] minecraft:stone
+  initial [3,1,27] minecraft:quartz_block
+  initial [4,1,27] minecraft:piston_head[facing=west,short=false,type=sticky]
+  initial [5,1,27] minecraft:sticky_piston[extended=true,facing=west]
+  initial [6,1,27] minecraft:redstone_block
+  initial [4,2,27] minecraft:quartz_block
+  initial [5,2,27] minecraft:light_weighted_pressure_plate[power=0]
+  initial [0,0,29] minecraft:stone
+  initial [1,0,29] minecraft:stone
+  initial [2,0,29] minecraft:stone
+  initial [3,0,29] minecraft:stone
+  initial [4,0,29] minecraft:stone
+  initial [5,0,29] minecraft:stone
+  initial [6,0,29] minecraft:stone
+  initial [7,0,29] minecraft:stone
+  initial [3,1,29] minecraft:quartz_block
+  initial [4,1,29] minecraft:sticky_piston[extended=false,facing=west]
+  initial [5,1,29] minecraft:sticky_piston[extended=false,facing=west]
+  initial [4,2,29] minecraft:quartz_block
+  initial [5,2,29] minecraft:light_weighted_pressure_plate[power=0]
+  initial [0,0,31] minecraft:stone
+  initial [1,0,31] minecraft:stone
+  initial [2,0,31] minecraft:stone
+  initial [3,0,31] minecraft:stone
+  initial [4,0,31] minecraft:stone
+  initial [5,0,31] minecraft:stone
+  initial [6,0,31] minecraft:stone
+  initial [7,0,31] minecraft:stone
+  initial [3,1,31] minecraft:quartz_block
+  initial [4,1,31] minecraft:sticky_piston[extended=false,facing=west]
+  initial [5,1,31] minecraft:sticky_piston[extended=false,facing=west]
+  initial [4,2,31] minecraft:quartz_block
+  initial [5,2,31] minecraft:light_weighted_pressure_plate[power=0]
+ENT t-1 entities=5 non-finite=0
+  E t-1 id=1 minecraft:dragon_fireball pos=(4.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=2 minecraft:dragon_fireball pos=(4.5, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=3 minecraft:dragon_fireball pos=(4.5, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=4 minecraft:furnace_minecart pos=(4.51, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=5 minecraft:furnace_minecart pos=(4.51, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+  notify hook: installed (maxChained=1000000)
+    t0 gameTime=35 pending=0
+ENT t0 entities=5 non-finite=0
+  E t0 id=1 minecraft:dragon_fireball pos=(4.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=2 minecraft:dragon_fireball pos=(4.5, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=3 minecraft:dragon_fireball pos=(4.5, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=4 minecraft:furnace_minecart pos=(4.51, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=5 minecraft:furnace_minecart pos=(4.51, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+    t1 gameTime=36 pending=0
+ENT t1 entities=5 non-finite=0
+  E t1 id=1 minecraft:dragon_fireball pos=(4.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=2 minecraft:dragon_fireball pos=(4.5, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=3 minecraft:dragon_fireball pos=(4.5, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=4 minecraft:furnace_minecart pos=(4.51, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=5 minecraft:furnace_minecart pos=(4.51, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+    t2 gameTime=37 pending=0
+ENT t2 entities=5 non-finite=0
+  E t2 id=1 minecraft:dragon_fireball pos=(3.99, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=2 minecraft:dragon_fireball pos=(4.5, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=3 minecraft:dragon_fireball pos=(3.99, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=4 minecraft:furnace_minecart pos=(4.51, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=5 minecraft:furnace_minecart pos=(4.0, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+ENT t3 entities=5 non-finite=0
+  E t3 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(-0.0, 0.0, 0.0)
+  E t3 id=2 minecraft:dragon_fireball pos=(4.5, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=4 minecraft:furnace_minecart pos=(4.51, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+ENT t4 entities=5 non-finite=0
+  E t4 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=2 minecraft:dragon_fireball pos=(4.5, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=4 minecraft:furnace_minecart pos=(4.51, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+[15:40:50] [main/INFO]: [  ]
+ENT t5 entities=5 non-finite=0
+  E t5 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=2 minecraft:dragon_fireball pos=(4.5, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=4 minecraft:furnace_minecart pos=(4.51, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+ENT t6 entities=5 non-finite=0
+  E t6 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=2 minecraft:dragon_fireball pos=(4.75, 1.875, 5.5) vel=(-0.0, 0.0, 0.0)
+  E t6 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=4 minecraft:furnace_minecart pos=(4.759999990463257, 1.0, 9.5) vel=(-0.0, 0.0, 0.0)
+  E t6 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+ENT t7 entities=5 non-finite=0
+  E t7 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=2 minecraft:dragon_fireball pos=(4.5, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=4 minecraft:furnace_minecart pos=(4.509999990463257, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+ENT t8 entities=5 non-finite=0
+  E t8 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=2 minecraft:dragon_fireball pos=(4.5, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=4 minecraft:furnace_minecart pos=(4.509999990463257, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+ENT t9 entities=5 non-finite=0
+  E t9 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=2 minecraft:dragon_fireball pos=(3.99, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=4 minecraft:furnace_minecart pos=(4.509999990463257, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+ENT t10 entities=5 non-finite=0
+  E t10 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=2 minecraft:dragon_fireball pos=(3.4800000000000004, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=4 minecraft:furnace_minecart pos=(4.509999990463257, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+ENT t11 entities=5 non-finite=0
+  E t11 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=2 minecraft:dragon_fireball pos=(3.4800000000000004, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=4 minecraft:furnace_minecart pos=(4.509999990463257, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+ENT t12 entities=5 non-finite=0
+  E t12 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=2 minecraft:dragon_fireball pos=(3.4800000000000004, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=4 minecraft:furnace_minecart pos=(4.509999990463257, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+ENT t13 entities=5 non-finite=0
+  E t13 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=2 minecraft:dragon_fireball pos=(3.4800000000000004, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=4 minecraft:furnace_minecart pos=(4.509999990463257, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+ENT t14 entities=5 non-finite=0
+  E t14 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=2 minecraft:dragon_fireball pos=(3.4800000000000004, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=4 minecraft:furnace_minecart pos=(4.509999990463257, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+ENT t15 entities=5 non-finite=0
+  E t15 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=2 minecraft:dragon_fireball pos=(3.4800000000000004, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=4 minecraft:furnace_minecart pos=(4.509999990463257, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+ENT t16 entities=5 non-finite=0
+  E t16 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t16 id=2 minecraft:dragon_fireball pos=(3.4800000000000004, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t16 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t16 id=4 minecraft:furnace_minecart pos=(4.509999990463257, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t16 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+ENT t17 entities=5 non-finite=0
+  E t17 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t17 id=2 minecraft:dragon_fireball pos=(3.4800000000000004, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t17 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t17 id=4 minecraft:furnace_minecart pos=(4.509999990463257, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t17 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+ENT t18 entities=5 non-finite=0
+  E t18 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t18 id=2 minecraft:dragon_fireball pos=(3.4800000000000004, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t18 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t18 id=4 minecraft:furnace_minecart pos=(4.509999990463257, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t18 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+ENT t19 entities=5 non-finite=0
+  E t19 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t19 id=2 minecraft:dragon_fireball pos=(3.4800000000000004, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t19 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t19 id=4 minecraft:furnace_minecart pos=(4.509999990463257, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t19 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+ENT t20 entities=5 non-finite=0
+  E t20 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t20 id=2 minecraft:dragon_fireball pos=(3.4800000000000004, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t20 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t20 id=4 minecraft:furnace_minecart pos=(4.509999990463257, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t20 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+ENT t21 entities=5 non-finite=0
+  E t21 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t21 id=2 minecraft:dragon_fireball pos=(3.4800000000000004, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t21 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t21 id=4 minecraft:furnace_minecart pos=(4.509999990463257, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t21 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+ENT t22 entities=5 non-finite=0
+  E t22 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t22 id=2 minecraft:dragon_fireball pos=(3.4800000000000004, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t22 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t22 id=4 minecraft:furnace_minecart pos=(4.509999990463257, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t22 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+ENT t23 entities=5 non-finite=0
+  E t23 id=1 minecraft:dragon_fireball pos=(3.5, 1.875, 1.5) vel=(0.0, 0.0, 0.0)
+  E t23 id=2 minecraft:dragon_fireball pos=(3.4800000000000004, 1.875, 5.5) vel=(0.0, 0.0, 0.0)
+  E t23 id=3 minecraft:dragon_fireball pos=(3.49, 1.875, 17.5) vel=(0.0, 0.0, 0.0)
+  E t23 id=4 minecraft:furnace_minecart pos=(4.509999990463257, 1.0, 9.5) vel=(0.0, 0.0, 0.0)
+  E t23 id=5 minecraft:furnace_minecart pos=(3.499999990463257, 1.0, 29.5) vel=(0.0, 0.0, 0.0)
+captured 10 tick(s) with changes -> /private/tmp/claude-501/-Users-harrison-RustroverProjects-Nucleation/47883f32-6df6-4ed0-a351-7420eee8125a/scratchpad/piston_clip_sizes.json
