@@ -413,6 +413,15 @@ required-features = ["bridge", "mc-tick"]
 name = "door55_xray"
 required-features = ["bridge", "mc-tick"]
 
+# Reports the record 3x3 door's own doorway, cell by cell and tick by tick, plus
+# a block census. Needs the same features the rest of the door55 set does —
+# without this stanza cargo auto-discovers it and a bare `cargo test` tries to
+# compile it against a crate that has no `bridge` module, which is how it broke
+# the pre-push gate.
+[[example]]
+name = "door55_doorway"
+required-features = ["bridge", "mc-tick"]
+
 # Actuates the record 3x3 door through the bridge (InWorld) and renders it, so
 # it needs both the loader's features and the renderer's.
 [[example]]
