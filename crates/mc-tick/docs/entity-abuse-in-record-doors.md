@@ -587,17 +587,56 @@ Two law corrections came out of that, both implemented:
   per axis. This is precisely why id=11 was refused: feet 0.875 are in the
   piston's row, its centre 1.03125 is not.
 
-**The door still does not close, and this is now the nearest gap.** With both
-fixes the machine reaches 6 of 9 passage cells at tick 26 and then falls back to
-3, quiescent at 39, and it ends **9 cells away from home** with `(73,0,20)`
-extended, a stray `piston_head` at `(72,0,20)` and the plate at `(74,1,20)`
-**latched at `power=1` with no recheck pending**. That last one is a concrete
-defect rather than a mystery: the plate powers at t12 and releases correctly ten
-ticks later at t22, re-powers at t23, and then never reschedules — so the
-`WEIGHTED_PLATE_RECHECK` a probe-driven `on_entity_inside` schedules from the
-block-entities phase is being lost. A latched plate holds the west closing pair,
-which is enough on its own to explain a door that gets six cells in and stops.
-The three cells that never fill are `(67,2)`, `(68,0)` and `(69,2)`.
+**The door still does not close.** With both fixes the machine fills 6 of the 9
+passage cells and then falls back, and it ends well away from home with the plate
+at `(74,1,20)` reading `power=1`. The three cells that never fill are `(67,2)`,
+`(68,0)` and `(69,2)`.
+
+### Retracted: the plate's recheck was never being lost
+
+An earlier revision of this section called that trailing `power=1` "a concrete
+defect rather than a mystery" — the plate powers at t12, releases at t22,
+re-powers at t23 "and then never reschedules", so the `WEIGHTED_PLATE_RECHECK`
+scheduled from the block-entities phase "is being lost". **That was wrong, and it
+was wrong because the run it was read off ended between two rechecks.** Traced at
+the plate, with a press on tick 5, the cadence is intact: power at t12, release at
+t22, re-power at t23, and then a recheck at t33, t43, t53, t63 … each one finding
+the fireball still in the touch box and re-booking the next. Nothing is lost;
+`TickQueue::schedule`'s dedup never fires for that position, and the schedule
+made from the block-entities phase lands exactly where it should. The plate holds
+because **the fireball is genuinely parked inside its touch box** — id=11 settles
+at x = 74.16625, east face 74.3225, and `piston_plate_clip` says vanilla returns
+it to its start with its east face flush on 74.0, where `plate_reach_flush` proves
+it does not press. The plate is reporting its input correctly; the input is wrong.
+
+That is the fourteenth time in this effort an instrument reported an absence that
+was really a blind spot, and it cost a full investigation. The lesson is the same
+one as before: a cadence claim needs a run long enough to contain two of them.
+
+What the investigation *did* turn up is a real deviation, in the same block and
+found by reading `BasePressurePlateBlock.checkPressed` rather than by guessing:
+its write is `Level.setBlock(pos, state, 2)` followed by `updateNeighbours`,
+which is `updateNeighborsAt(pos)` **and `updateNeighborsAt(pos.below())`**. Both
+plates in this engine did a plain flag-3 `set`, so the second call was missing
+entirely — and because `getDirectSignal` answers for `Direction.UP` alone, a
+plate strongly powers the block it stands on, and anything touching only that
+block learns of the change by no other route. `plate_recheck.json` (section 13 of
+`capture-entity-evidence.sh`, eleven lanes) measures both halves: the ten-tick
+interval and its release, anchored on the press across five staggered
+departures — the first capture ever to see a weighted plate release, which needs
+a gravityless entity because an item pressing a plate is an item resting on it —
+and dust beside a plate's support reading 1 under a light weighted plate and 15
+under an oak plate, with a plain-stone control lane that stays dark. The engine
+left all three at zero.
+
+Fixing it changes the door's numbers and does not close it: 220 block changes →
+219, cells differing from the start state 9 → 12, the doorway peak still 6 of 9
+(t27 rather than t26) falling back to 4 rather than 3, and the same three cells
+never fill. **The nearest gap is now the fireball's resting place, not the
+plate.** Our engine grants id=11 a net +0.3225 east where the replica lane says
+vanilla nets zero, so the collision clip that should stop it against the piston
+base at 74.0 is not being applied to the pulled-block sweep. That is what to
+measure next.
 
 Two things this work leaves unverified. The intermediate-box law is measured for
 `head_eject_displacement` and for the pulled-block sweep; it is *applied* to

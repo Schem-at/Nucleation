@@ -899,4 +899,59 @@ tools/gametest/capture.sh --structure nucleation:piston_head_yband --max-ticks 1
   --at 6:6,1,21:air --at 6:6,1,23:air --at 6:6,1,25:air \
   --out work/piston_head_yband.json | tee "$CAP/piston_head_yband.entities.log"
 
+# ---------------------------------------------------------------------------
+# 13. A weighted plate's recheck cadence, and what a plate powers underneath it.
+#
+# Two things the engine had never measured, in one rig of eleven lanes.
+#
+# The cadence first. `WeightedPressurePlateBlock.getPressedTime()` is `bipush
+# 10`, but no capture had ever *seen* a weighted plate release: every one of them
+# kept an item on the plate, and an item pressing a plate is an item **resting**
+# on it. `TOUCH_AABB` and the plate's collision shape share the same 14/16
+# footprint, so anything inside the touch box is standing on the plate and can
+# never fall out of it — which is why the constant stayed bytecode-only. Only a
+# gravityless entity moved by something else releases one.
+#
+#   lanes z=1..13   a small fireball straddles the plate's touch box from the
+#                   cell east of it, and a +z piston shoves it out at a
+#                   staggered tick. The plates all press at t0; the fireball
+#                   leaves at roughly t3, t7, t11, t15 and t21; the plates
+#                   release at t10, t10, t20, t20 and t30. That is the ten-tick
+#                   interval, measured, and it is anchored on the PRESS — never
+#                   on the departure, though `entityInside` fires every tick the
+#                   fireball is there and could have re-booked it.
+#   lane z=16       negative control: nothing shoves it, so it stays powered for
+#                   all 44 ticks — four consecutive rechecks, none lost.
+#   lane z=19       negative control: no entity at all, so it never powers.
+#   lane z=22       MEANT to test a second entity arriving while the plate is
+#                   already pressed, and does NOT: the head-eject shoves the
+#                   second fireball only 0.16625 west (just clear of the cell it
+#                   vacates), so it never reaches the touch box. Recorded as a
+#                   null result rather than dropped.
+#
+# Then the strong power. `BasePressurePlateBlock.checkPressed` writes with flags
+# **2** and then calls `updateNeighbours`, which is `updateNeighborsAt(pos)` AND
+# `updateNeighborsAt(pos.below())` — the same pair the detector rail needs, for
+# the same reason: `getDirectSignal` answers for `Direction.UP` alone, so a plate
+# strongly powers the block it stands on and a component touching only that
+# block hears about the change by no other route.
+#
+#   lanes z=25/28/31  dust laid beside the plate's stone support and never
+#                     adjacent to the plate reads 1 under a light weighted plate
+#                     and 15 under an oak plate, while the control lane whose
+#                     (5,2,z) is plain stone stays dark for all 44 ticks. The
+#                     engine left all three at zero until this landed.
+#
+# The plate's `power` and the dust's `power` are both block states, so the trace
+# JSON carries the whole result; the entity log gives the shove distances.
+tools/gametest/capture.sh --structure nucleation:plate_recheck --max-ticks 44 --entity-log \
+  --at 1:7,2,0:redstone_block \
+  --at 1:7,2,18:redstone_block \
+  --at 3:9,2,22:redstone_block \
+  --at 5:7,2,3:redstone_block \
+  --at 9:7,2,6:redstone_block \
+  --at 13:7,2,9:redstone_block \
+  --at 19:7,2,12:redstone_block \
+  --out "$TRACES/plate_recheck.json" | tee "$CAP/plate_recheck.entities.log"
+
 echo "captures written to $CAP and $TRACES"

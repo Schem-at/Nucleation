@@ -436,6 +436,13 @@ fn run_conformance_full(
             mc_tick::structure::SpawnedEntity::FurnaceMinecart(cart) => sim
                 .spawn_authored_furnace_minecart(cart, raw_id)
                 .unwrap_or_else(|why| panic!("{label}: {why}")),
+            // A motionless fireball is a hitbox and nothing else, which is all
+            // `spawn_authored_fireball` claims to model — it refuses one with
+            // real velocity rather than flying it wrongly. No id is passed
+            // because a frozen body has no rest-flush cadence to line up.
+            mc_tick::structure::SpawnedEntity::Fireball(ball) => sim
+                .spawn_authored_fireball(ball)
+                .unwrap_or_else(|why| panic!("{label}: {why}")),
             // A golden that contains one of these would otherwise be compared
             // against a run with the entity missing, which is worse than no
             // comparison; swap for a spawn call when the behaviour lands.
@@ -1208,6 +1215,58 @@ fn a_detector_rail_strongly_powers_only_the_block_beneath_it() {
     // reads 15 — while the control dust under a plain rail one block along
     // stays dark for the whole run.
     run_cart("detector_strong.snbt", "detector_strong.json", "nucleation:detector_strong");
+}
+
+#[test]
+fn a_weighted_plate_rechecks_every_ten_ticks_and_powers_the_block_it_stands_on() {
+    // `plate_recheck.json`, eleven lanes, two claims neither of which the
+    // engine had measured.
+    //
+    // **The cadence.** `WeightedPressurePlateBlock.getPressedTime()` is 10, and
+    // until now that was bytecode only: every capture that read a weighted
+    // plate kept an item on it, and an item pressing a plate is an item
+    // *resting* on it — a plate's `TOUCH_AABB` and its collision shape have the
+    // same 14/16 footprint, so anything inside the touch box is standing on the
+    // plate and can never fall out of it. Only a gravityless entity shoved by a
+    // piston releases one. Five lanes do that at staggered ticks: the fireball
+    // leaves at roughly t3, t7, t11, t15 and t21, and the plates release at
+    // **t10, t10, t20, t20 and t30** — the press+10k grid, never
+    // departure+10. That is the interval, the release, and the fact that the
+    // `entityInside` firing every tick an entity sits there neither re-books
+    // nor resets the pending recheck. Two negative controls: a lane nothing
+    // shoves stays powered for all 44 ticks (four consecutive rechecks), and a
+    // lane with no entity never powers at all.
+    //
+    // **The strong power.** `BasePressurePlateBlock.checkPressed` writes with
+    // flags **2** and then calls `updateNeighbours`, which is
+    // `updateNeighborsAt(pos)` *and* `updateNeighborsAt(pos.below())`. That
+    // second call is the whole point: `getDirectSignal` answers for
+    // `Direction.UP` alone, so a plate strongly powers the block underneath it
+    // and a component touching only that block hears about the change by no
+    // other route. Three lanes read it off dust that touches the *support* and
+    // never the plate: under the light weighted plate it reads 1, under an oak
+    // plate 15, and the control lane whose (5,2,z) is plain stone stays dark.
+    // Without the below-neighbour update the engine leaves all three at 0.
+    //
+    // Not settled here: a *second* entity arriving while the plate is already
+    // pressed. The lane meant to test it (z=22) shoves its second fireball
+    // only 0.16625 west — a head-eject clears the vacated cell and no more —
+    // so it never reaches the touch box and the plate stays at 1 throughout.
+    run_conformance_actuated(
+        "plate_recheck.snbt",
+        "plate_recheck.json",
+        "nucleation:plate_recheck",
+        &["minecraft:redstone_block"],
+        &[
+            (1, Actuate::Place(Pos::new(7, 2, 0), "minecraft:redstone_block")),
+            (1, Actuate::Place(Pos::new(7, 2, 18), "minecraft:redstone_block")),
+            (3, Actuate::Place(Pos::new(9, 2, 22), "minecraft:redstone_block")),
+            (5, Actuate::Place(Pos::new(7, 2, 3), "minecraft:redstone_block")),
+            (9, Actuate::Place(Pos::new(7, 2, 6), "minecraft:redstone_block")),
+            (13, Actuate::Place(Pos::new(7, 2, 9), "minecraft:redstone_block")),
+            (19, Actuate::Place(Pos::new(7, 2, 12), "minecraft:redstone_block")),
+        ],
+    );
 }
 
 #[test]

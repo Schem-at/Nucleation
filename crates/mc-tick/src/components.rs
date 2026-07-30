@@ -1643,7 +1643,7 @@ impl<P: PowerSource> BlockBehaviour for PressurePlate<P> {
     /// `entityInside`: press and start the recheck cadence.
     fn on_entity_inside(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
         if !self.powered && self.pressed_by_item(ctx, pos) {
-            ctx.set(pos, self.states.get(true));
+            write_plate(ctx, pos, self.states.get(true));
             ctx.schedule(pos, PLATE_RECHECK, TickPriority::Normal);
         }
     }
@@ -1656,13 +1656,37 @@ impl<P: PowerSource> BlockBehaviour for PressurePlate<P> {
         if self.pressed_by_item(ctx, pos) {
             ctx.schedule(pos, PLATE_RECHECK, TickPriority::Normal);
         } else {
-            ctx.set(pos, self.states.get(false));
+            write_plate(ctx, pos, self.states.get(false));
         }
     }
 
     fn name(&self) -> &'static str {
         "pressure_plate"
     }
+}
+
+/// `BasePressurePlateBlock.checkPressed`'s write, which is **not** a flag-3
+/// `setBlock` — and getting that wrong silently disconnects half of what a plate
+/// can drive.
+///
+/// The bytecode is `Level.setBlock(pos, newState, 2)` followed by
+/// `updateNeighbours(level, pos)`, and `updateNeighbours` is two calls:
+/// `updateNeighborsAt(pos)` **and** `updateNeighborsAt(pos.below())`. The second
+/// one is load bearing for the same reason the detector rail's is (see
+/// [`DetectorRail`]): `getDirectSignal` answers for `Direction.UP` alone, so a
+/// plate *strongly* powers the block it stands on, and anything touching only
+/// that block — not the plate — learns about the change by no other route.
+/// A flag-3 write reaches the plate's own six neighbours and stops there.
+///
+/// Captured in `plate_recheck.json`: dust laid beside a plate's support block
+/// and nowhere near the plate reads 1 under a pressed light weighted plate and
+/// 15 under a pressed oak plate, while the control lane whose support carries
+/// plain stone above it stays dark for the whole run. Before this, the engine
+/// left all three at zero.
+fn write_plate(ctx: &mut TickCtx<'_>, pos: Pos, state: StateId) {
+    ctx.set_shape_only(pos, state);
+    ctx.update_neighbors_at(pos);
+    ctx.update_neighbors_at(pos.offset(crate::pos::Dir::Down));
 }
 
 /// `BasePressurePlateBlock.TOUCH_AABB` moved to a cell: the plate inset by a
@@ -1736,7 +1760,7 @@ impl WeightedPlate {
             return;
         }
         let Some(&state) = self.states.get(usize::from(signal)) else { return };
-        ctx.set(pos, state);
+        write_plate(ctx, pos, state);
     }
 }
 
