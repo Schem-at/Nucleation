@@ -501,14 +501,12 @@ is the first trigger in this build the engine has ever made fire.
 
 Three things it does **not** do, all named rather than smoothed over:
 
-- **Fireball id=11 never reaches its plate.** It sat 0.0625 short of the light
-  weighted plate at `(74,1,20)`; on tick 10 it moves **the other way**, from
-  x = 73.84375 to 73.15625, because the retracting head at `(73,0,20)` ejects
-  the square it is leaving and id=11's centre is in it. The plate at
-  `(74,1,20)` never leaves `power=0` in any tick of the run. Whether vanilla
-  also throws it west is unknown — that is the measured `head_eject`
-  displacement law applied to a geometry no capture covers with a *plate* to
-  read out.
+- ~~**Fireball id=11 never reaches its plate.**~~ **Settled: vanilla throws it
+  EAST, the plate does fire, and two things about our retraction law were
+  wrong.** See "Settled: the fireball does clip its plate" below. The plate at
+  `(74,1,20)` now reads `power=1` from tick 12, all three of the pistons that
+  never moved now move, block changes go 186 → 220, and the passage fills
+  **6 of 9** instead of 3.
 - **Two quartz blocks end at y = −1.** The down-facing sticky pistons at
   `(70,3,20)` (t15) and `(71,2,20)` (t35) push their quartz columns one cell
   down and land a block at `(70,-1,20)` and `(71,-1,20)` — one cell below the
@@ -531,6 +529,82 @@ Three things it does **not** do, all named rather than smoothed over:
 `examples/door55_render.rs` output of this run:
 `/Users/harrison/Desktop/nucleation-handoff/door55/door55_bucket_dispense.mp4`
 (60 ticks, press on 5).
+
+### Settled: the fireball does clip its plate, and vanilla throws it east
+
+The builders' account of this gadget — *"when this piston that has the pressure
+plate on it pulls back, the fireball will barely clip the pressure plate"* — is
+correct, and the engine was wrong twice. Four new captures settle it, and the
+oracle was sanity-checked first by re-capturing `piston_square_yband` and
+diffing: 171 identical entity lines, only the known warmup count differing.
+
+`piston_plate_clip` is the door's own geometry rebuilt as sixteen lanes with a
+**light weighted pressure plate** to read out — a block-state channel, so no
+entity filter can distort it. In the replica lane the extension throws the
+fireball west 0.6875 (0.51 then 0.5, clipped by the moving block behind it,
+which is bit-for-bit what our engine already did) and then **the retraction
+brings it all the way back east**, +0.51 then +0.1775, settling with its east
+face on 5.0 — exactly where it started — and **the plate powers**. Negative
+controls in the same rig: extend-only never powers it, no-fireball never powers
+it, and a lane with nothing for the piston to push (so the fireball ends a block
+west, out of reach) never powers it.
+
+`plate_reach_flush` then rules out the obvious explanation. Twelve static lanes,
+no pistons, nothing moving: a fireball whose east face is **5.0625 exactly does
+not** press the plate and one at 5.0626 does. `TOUCH_AABB` is the cell inset a
+pixel and `AABB.intersects` is strict, exactly as modelled — and a fireball
+parked with its east face flush on 5.0, which is where the replica lane
+*settles*, never presses it in 24 ticks, on a piston or on stone. **So the
+trigger is inside the tick.**
+
+Two law corrections came out of that, both implemented:
+
+- **A piston shove has an intermediate position, and `entityInside` fires at
+  it.** `piston_head_transient`, sixteen lanes sweeping the start x with and
+  without a block to pull: every lane settles with its east face on 4.98, and
+  the plate fires on the tick the *step* would have carried the box past
+  5.0625 — x = 4.45 on the first step, x = 4.35 not until the second. The
+  threshold is one `PISTON_MAX_STEP` from the box's leading face, so a
+  retraction drags the entity a whole step inward and *then* corrects it back to
+  the line. That is `entity.move(MoverType.PISTON, …)` followed by the push out
+  of the piston base, and it explains where head-eject's unexplained `+0.02`
+  comes from. `Simulation::piston_probes` is the intermediate box and
+  `notify_piston_probes` fires `entityInside` at it, with the body view pointed
+  at the probe so a plate counts the entity once (the capture reads `power=1`,
+  never 2). For a pulled-block sweep the probe is the *requested* displacement,
+  before collision clips it — which is the door's own case, where the fireball is
+  aimed 0.3425 east and stops at 5.0 against the piston base.
+- **The gate across the piston axis is the entity's FEET, not its centre.**
+  `piston_head_yband`, eleven lanes with x fixed at the door's own 4.84375 and
+  only y varying: a fireball at `[1.99, 2.3025]` — two thirds of its box in the
+  block *above* the vacated one, centre y 2.14 — **is** ejected, and one at
+  `[0.95, 1.2625]` — overlapping the vacated block by 0.2625 from below, centre
+  y 1.11 — is **not**. Neither a centre gate nor a box-overlap gate produces
+  that pair; `BlockPos.containing(position())` does, because an entity's
+  `position()` is (centre x, **min** y, centre z). Along the piston the gate
+  stays the centre — `piston_pull_plate`'s `headonly` lane and
+  `piston_pull_inside`'s `inside 2.9` lane both demand it — so the probe is now
+  per axis. This is precisely why id=11 was refused: feet 0.875 are in the
+  piston's row, its centre 1.03125 is not.
+
+**The door still does not close, and this is now the nearest gap.** With both
+fixes the machine reaches 6 of 9 passage cells at tick 26 and then falls back to
+3, quiescent at 39, and it ends **9 cells away from home** with `(73,0,20)`
+extended, a stray `piston_head` at `(72,0,20)` and the plate at `(74,1,20)`
+**latched at `power=1` with no recheck pending**. That last one is a concrete
+defect rather than a mystery: the plate powers at t12 and releases correctly ten
+ticks later at t22, re-powers at t23, and then never reschedules — so the
+`WEIGHTED_PLATE_RECHECK` a probe-driven `on_entity_inside` schedules from the
+block-entities phase is being lost. A latched plate holds the west closing pair,
+which is enough on its own to explain a door that gets six cells in and stops.
+The three cells that never fill are `(67,2)`, `(68,0)` and `(69,2)`.
+
+Two things this work leaves unverified. The intermediate-box law is measured for
+`head_eject_displacement` and for the pulled-block sweep; it is *applied* to
+`inside_eject_displacement` on the assumption that the same
+`entity.move(MoverType.PISTON, …)` produces it, and no capture reads a plate on
+that geometry. And nothing here was captured against the door itself, which
+remains impossible: the only oracle is 26.2 and the door is DataVersion 4082.
 
 ### What happened before that — the first extender and nothing else
 

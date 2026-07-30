@@ -1916,10 +1916,29 @@ pub fn head_eject_displacement(
         destination.y - step[1],
         destination.z - step[2],
     ];
-    // The gate is the entity's centre block, not its box.
+    // The gate is a point in the vacated block, and *which* point differs by
+    // axis. Along the piston it is the box centre — `piston_pull_plate`'s
+    // `headonly` lane refutes an overlap gate, and `piston_pull_inside`'s
+    // `inside 2.9` lane, a vertical piston whose fireball has its feet in the
+    // vacated block and its centre in the next one, is left alone. **Across**
+    // the piston the vertical coordinate is the entity's **feet**, not its
+    // centre: `piston_head_yband.entities.log` ejects a fireball with two
+    // thirds of its box in the block above the vacated one and refuses one
+    // whose box overlaps the vacated block by 0.2625 from below, and only
+    // `min y` separates those eleven lanes. Horizontal cross axes stay on the
+    // centre, which is all any capture constrains them to.
+    //
+    // The asymmetry is the shape of `Entity.position()` — (centre x, min y,
+    // centre z) — showing through, and it is why the record door's fireball
+    // id=11, feet at y = 0.875 and centre at 1.03125, was refused by a gate
+    // that used the centre everywhere.
     for i in 0..3 {
-        let centre = (entity_min[i] + entity_max[i]) * 0.5;
-        if centre.floor() != f64::from(vacated[i]) {
+        let probe = if i == 1 && axis != 1 {
+            entity_min[i]
+        } else {
+            (entity_min[i] + entity_max[i]) * 0.5
+        };
+        if probe.floor() != f64::from(vacated[i]) {
             return None;
         }
     }
@@ -2191,6 +2210,64 @@ mod sweep_tests {
             assert_eq!(moved, steps, "start {start}: number of steps that moved it");
             let want = if steps == 0 && start < 3.0 || start > 4.0 { start - HALF } else { 3.02 };
             assert_eq!(x - HALF, want, "start {start}: trailing face");
+        }
+    }
+
+    /// `piston_head_yband.entities.log`: the gate across the axis is the
+    /// entity's **feet**, not its centre.
+    ///
+    /// Eleven lanes, one sticky piston retracting east with nothing to pull, one
+    /// small fireball each at x = 4.84375 — the record 3x3 door's own offset,
+    /// east face flush on the block boundary — and nothing varying but y. The
+    /// head leaves block `(4,1,z)` for the piston at `(5,1,z)`.
+    ///
+    /// Vanilla ejects a fireball whose box is `[1.99, 2.3025]`, two thirds of it
+    /// in the block *above* the vacated one and its centre y at 2.14, and leaves
+    /// alone one at `[0.95, 1.2625]` whose box overlaps the vacated block by
+    /// 0.2625 and whose centre y is 1.11. Neither a centre gate nor a
+    /// box-overlap gate can produce that pair; `BlockPos.containing(position())`
+    /// can, because an entity's `position()` is (centre x, **min** y, centre z),
+    /// so the y coordinate the game floors is the entity's feet.
+    ///
+    /// This is exactly the record door's fireball id=11: min y 0.875 puts its
+    /// feet in the piston's row, its centre y 1.03125 does not, and a centre
+    /// gate is why the engine refused to eject it.
+    #[test]
+    fn head_ejection_gates_on_the_feet_across_the_axis_not_the_centre() {
+        const HALF: f64 = 0.156_25;
+        const HEIGHT: f64 = 0.3125;
+        // (spawn y, does vanilla eject it) — read straight off the capture.
+        let cases: [(f64, bool); 11] = [
+            (0.5, false),      // wholly below the vacated block
+            (0.7, false),      // box overlaps it by 0.0125; feet do not
+            (0.95, false),     // box overlaps it by 0.2625; feet do not
+            (1.0, true),       // feet exactly on the floor of it
+            (1.34375, true),
+            (1.6875, true),    // box top exactly flush with the block above
+            (1.7, true),
+            (1.875, true),     // the record door's own y
+            (1.99, true),      // feet barely inside; centre is a block higher
+            (2.0, false),      // feet exactly on the block above: refused
+            (2.5, false),
+        ];
+        let x = 4.843_75;
+        for (y, ejected) in cases {
+            let got = head_eject_displacement(
+                Pos::new(5, 1, 1),
+                Dir::East,
+                [x - HALF, y, 1.343_75],
+                [x + HALF, y + HEIGHT, 1.656_25],
+            );
+            if ejected {
+                // Asserted as the trailing face, not as a delta: 4.98 is what
+                // the capture shows and the delta from a flush 5.0 has no short
+                // decimal spelling.
+                let d = got.expect("y {y}: ejected");
+                assert!(d < 0.0, "y {y}: nudged back against the head, got {d}");
+                assert_eq!(x + HALF + d, 5.0 - PISTON_EJECT_CLEARANCE, "y {y}: trailing face");
+            } else {
+                assert_eq!(got, None, "y {y}: left alone");
+            }
         }
     }
 

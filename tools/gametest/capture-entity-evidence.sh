@@ -757,4 +757,146 @@ tools/gametest/capture.sh --structure nucleation:piston_pull_square --max-ticks 
   $LANES_AIR --out work/piston_square_threshold.json \
   | tee "$CAP/piston_square_threshold.entities.log"
 
+# ---------------------------------------------------------------------------
+# 12. The record 3x3 door's fireball-onto-a-plate trick, read off the PLATE.
+#
+# Every capture above reads a retraction through the *entity log*, which prints
+# settled positions only. The record door's own gadget cannot be answered that
+# way: a small fireball sits inside the sticky piston at (74,0,20) with its east
+# face flush on the block boundary at x = 74.0, exactly 0.0625 short of the
+# light weighted plate at (74,1,20), and the builders say that when "the piston
+# that has the pressure plate on it pulls back, the fireball will barely clip
+# the pressure plate". A plate's `power` is a block state, so it survives every
+# entity filter — and it is the only channel that can see *inside* a tick.
+#
+# Rig frame, mapped from the door: piston (74,0,20) -> (5,1,z), the plate
+# (74,1,20) -> (5,2,z), the pushed sticky piston (73,0,20) -> (4,1,z), the
+# pushed quartz (72,0,20) -> (3,1,z), the observer the fireball is also embedded
+# in (73,1,20) -> quartz at (4,2,z). The fireball's box x [73.6875, 74.0],
+# y [0.875, 1.1875] becomes a spawn at (4.84375, 1.875).
+#
+# What the three captures settle, in order:
+#
+#   piston_plate_clip  the door's own sequence and its variants. Lane z=1 is the
+#                      replica: the extension throws the fireball WEST 0.6875
+#                      (0.51 then 0.5, clipped by the moving block at x=3), and
+#                      then **the retraction brings it all the way back east**,
+#                      +0.51 then +0.1775, clipped with its east face on 5.0 —
+#                      its exact start — and the PLATE POWERS at t9. So vanilla
+#                      throws it east, and the door's plate does fire.
+#                      Negative controls in the same rig: `extend_only` never
+#                      powers the plate, `negcontrol_noball` never powers it,
+#                      `replica_nopush` (nothing to push, so the fireball ends a
+#                      block west and the retraction cannot reach it) never
+#                      powers it. Positive control: `poscontrol_onplate` powers
+#                      it on tick 0.
+#   plate_reach_flush  and yet the plate's sensing edge is exactly where it was
+#                      always modelled. Twelve lanes, no pistons, nothing moves:
+#                      a fireball whose east face is 5.0625 does NOT press it and
+#                      one at 5.0626 does, so `TOUCH_AABB` really is the cell
+#                      inset a pixel and `AABB.intersects` really is strict. A
+#                      fireball parked with its east face flush at 5.0 — the
+#                      settled position lane z=1 above ends in — never presses
+#                      it, on a piston or on stone, for 24 ticks.
+#                      **So the trigger is intra-tick.**
+#   piston_head_transient  how far intra-tick. Sixteen lanes sweep the start x
+#                      with and without a block to pull. Every lane ends with its
+#                      east face on 4.98, and the plate fires on the tick the
+#                      *step* would have carried it past 5.0625 — x = 4.45 fires
+#                      on the first step, x = 4.35 does not and fires on the
+#                      second. The threshold is one PISTON_MAX_STEP (0.51) from
+#                      the box's east face, so a retraction drags the entity a
+#                      whole step inward and only then corrects it back to the
+#                      line. That intermediate box is what presses the plate.
+#   piston_head_yband  and the gate across the axis is the entity's FEET. Eleven
+#                      lanes, x fixed at the door's own 4.84375, y swept: a
+#                      fireball at [1.99, 2.3025] — two thirds of it in the block
+#                      above the vacated one, centre y 2.14 — is ejected, and one
+#                      at [0.95, 1.2625] — overlapping the vacated block by
+#                      0.2625, centre y 1.11 — is not. Only `min y` separates
+#                      them, which is `BlockPos.containing(position())` showing
+#                      through, and it is why `head_eject_displacement`'s
+#                      all-three-axes centre gate refused the door's fireball
+#                      id=11 (feet 0.875, centre 1.03125).
+#
+# Plate `power` is in the trace JSON at (5,2,z); the entity log gives the
+# settled positions. Read both.
+tools/gametest/capture.sh --structure nucleation:piston_plate_clip --max-ticks 32 --entity-log \
+  --spawn 'minecraft:small_fireball@4.84375,1.875,1.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,1.875,3.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,1.875,5.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.15625,1.875,7.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,1.0,9.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.9,1.875,11.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.95,1.875,13.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,1.875,17.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,1.875,19.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@5.1,1.875,21.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.8,1.875,23.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.875,1.875,25.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@5.0,1.875,27.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,1.875,29.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,1.0,31.5:0,0,0' \
+  --at 2:6,1,1:redstone_block --at 8:6,1,1:air --at 2:6,1,3:redstone_block --at 6:6,1,5:air \
+  --at 6:6,1,7:air --at 6:6,1,9:air --at 6:6,1,11:air --at 6:6,1,13:air --at 6:6,1,15:air \
+  --at 2:6,1,17:redstone_block --at 8:6,1,17:air --at 6:6,1,19:air --at 2:6,1,21:redstone_block \
+  --at 8:6,1,21:air --at 6:6,1,23:air --at 6:6,1,25:air --at 6:6,1,27:air \
+  --at 2:6,1,29:redstone_block --at 20:6,1,29:air --at 2:6,1,31:redstone_block --at 8:6,1,31:air \
+  --out work/piston_plate_clip.json | tee "$CAP/piston_plate_clip.entities.log"
+
+tools/gametest/capture.sh --structure nucleation:plate_reach_flush --max-ticks 24 --entity-log \
+  --spawn 'minecraft:small_fireball@4.84375,1.875,1.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,1.875,3.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.83375,1.875,5.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.8,1.875,7.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.90625,1.875,9.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.90635,1.875,11.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.9,1.875,13.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.6875,1.875,15.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,1.9375,19.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,2.25,21.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,1.875,23.5:0,0,0' \
+  --out work/plate_reach_flush.json | tee "$CAP/plate_reach_flush.entities.log"
+
+tools/gametest/capture.sh --structure nucleation:piston_head_transient --max-ticks 16 --entity-log \
+  --spawn 'minecraft:small_fireball@4.2,1.875,1.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.35,1.875,3.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.45,1.875,5.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.5,1.875,7.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.55,1.875,9.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.65,1.875,11.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.75,1.875,13.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.9,1.875,15.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.2,1.875,17.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.35,1.875,19.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.45,1.875,21.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.5,1.875,23.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.55,1.875,25.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.65,1.875,27.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.75,1.875,29.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.9,1.875,31.5:0,0,0' \
+  --at 6:6,1,1:air --at 6:6,1,3:air --at 6:6,1,5:air --at 6:6,1,7:air --at 6:6,1,9:air \
+  --at 6:6,1,11:air --at 6:6,1,13:air --at 6:6,1,15:air --at 6:6,1,17:air --at 6:6,1,19:air \
+  --at 6:6,1,21:air --at 6:6,1,23:air --at 6:6,1,25:air --at 6:6,1,27:air --at 6:6,1,29:air \
+  --at 6:6,1,31:air \
+  --out work/piston_head_transient.json | tee "$CAP/piston_head_transient.entities.log"
+
+tools/gametest/capture.sh --structure nucleation:piston_head_yband --max-ticks 14 --entity-log \
+  --spawn 'minecraft:small_fireball@4.84375,0.5,1.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,0.7,3.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,0.95,5.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,1.0,7.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,1.34375,9.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,1.6875,11.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,1.7,13.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,1.875,15.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,1.99,17.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,2.0,19.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,2.5,21.5:0,0,0' \
+  --spawn 'minecraft:small_fireball@4.84375,1.875,23.5:0,0,0' \
+  --at 6:6,1,1:air --at 6:6,1,3:air --at 6:6,1,5:air --at 6:6,1,7:air --at 6:6,1,9:air \
+  --at 6:6,1,11:air --at 6:6,1,13:air --at 6:6,1,15:air --at 6:6,1,17:air --at 6:6,1,19:air \
+  --at 6:6,1,21:air --at 6:6,1,23:air --at 6:6,1,25:air \
+  --out work/piston_head_yband.json | tee "$CAP/piston_head_yband.entities.log"
+
 echo "captures written to $CAP and $TRACES"

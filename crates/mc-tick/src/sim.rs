@@ -223,6 +223,24 @@ pub struct Simulation {
     ///
     /// [`piston_entity.json`]: crate::sim::Simulation::piston_retract_contacts
     retract_contacts: Vec<(u64, u32)>,
+    /// Boxes a moving piston carried an entity *through* this tick, before the
+    /// step's own correction and before collision clipped it: `(id, min, max)`.
+    ///
+    /// A piston shove is not a jump from one settled box to another. Vanilla
+    /// calls `entity.move(MoverType.PISTON, …)` with the whole step, then pushes
+    /// the entity back out of the piston's block — and `entityInside` fires at
+    /// the far position, before the correction. That intermediate box is
+    /// invisible in an entity log, which only prints settled positions, but it
+    /// is perfectly visible in a **pressure plate's block state**, and the
+    /// record 3x3 door is built on exactly that: `piston_head_transient` and
+    /// `piston_plate_clip` power a light weighted plate on the retraction tick
+    /// while the fireball's settled box never comes within 0.08 of the plate's
+    /// touch box, and `plate_reach_flush` proves the same fireball parked there
+    /// never presses it.
+    ///
+    /// Filled by [`Simulation::displace_entities_by_pistons`] and consumed in
+    /// the same call, so it never outlives the tick that made it.
+    piston_probes: Vec<(u32, [f64; 3], [f64; 3])>,
     /// Entity positions as of the last recorded tick, for event emission.
     entity_snapshot: std::collections::HashMap<u32, [f64; 3]>,
     /// Recorded entity events, when recording is enabled.
@@ -279,8 +297,15 @@ pub struct Simulation {
 /// [`Simulation::piston_retract_contacts`].
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum PistonPush {
-    /// Displace the box this far along this direction.
-    Move(crate::Dir, f64),
+    /// Displace the box this far along this direction, having first carried it
+    /// `probe` along the *step's* direction.
+    ///
+    /// `probe` is the intermediate displacement the entity is dragged through
+    /// before the step's own correction and before collision clips anything —
+    /// see [`Simulation::piston_probes`]. It is signed along the same `Dir` as
+    /// the settled move so the two can be compared, and it is zero when the
+    /// step has no intermediate position (an extension push simply lands).
+    Move(crate::Dir, f64, f64),
     /// Vanilla does something here and we do not know what.
     ///
     /// **Nothing produces this today.** All three retraction geometries are
@@ -345,6 +370,7 @@ impl Simulation {
             riders: Vec::new(),
             motion_semantics: crate::motion::MotionSemantics::default(),
             retract_contacts: Vec::new(),
+            piston_probes: Vec::new(),
             entity_snapshot: std::collections::HashMap::new(),
             ent_log: None,
             tickers: Vec::new(),
@@ -855,15 +881,24 @@ impl Simulation {
                 }
                 let cart = &self.minecarts[index];
                 let (min, max) = crate::minecart::cart_aabb(cart.pos);
-                let (travel, distance) =
+                let (travel, distance, probe) =
                     match Self::piston_push(destination, sweep, progress, source_piston, min, max) {
-                        PistonPush::Move(travel, distance) => (travel, distance),
+                        PistonPush::Move(travel, distance, probe) => (travel, distance, probe),
                         PistonPush::Unmodelled => {
                             self.retract_contacts.push((tick, self.minecarts[index].id));
                             continue;
                         }
                         PistonPush::Nothing => continue,
                     };
+                Self::record_probe(
+                    &mut self.piston_probes,
+                    self.minecarts[index].id,
+                    min,
+                    max,
+                    travel,
+                    distance,
+                    probe,
+                );
                 let moved = self.shove(min, max, travel, distance, self.minecarts[index].id);
                 for axis in 0..3 {
                     self.minecarts[index].pos[axis] += moved[axis];
@@ -873,21 +908,132 @@ impl Simulation {
                 let (id, kind, pos) = &self.frozen[index];
                 let Some((min, max)) = crate::entity::body_aabb(kind, *pos) else { continue };
                 let id = *id;
-                let (travel, distance) =
+                let (travel, distance, probe) =
                     match Self::piston_push(destination, sweep, progress, source_piston, min, max) {
-                        PistonPush::Move(travel, distance) => (travel, distance),
+                        PistonPush::Move(travel, distance, probe) => (travel, distance, probe),
                         PistonPush::Unmodelled => {
                             self.retract_contacts.push((tick, id));
                             continue;
                         }
                         PistonPush::Nothing => continue,
                     };
+                Self::record_probe(
+                    &mut self.piston_probes,
+                    id,
+                    min,
+                    max,
+                    travel,
+                    distance,
+                    probe,
+                );
                 let moved = self.shove(min, max, travel, distance, id);
                 for axis in 0..3 {
                     self.frozen[index].2[axis] += moved[axis];
                 }
             }
             self.refresh_bodies();
+        }
+        self.notify_piston_probes();
+    }
+
+    /// Remember an intermediate box, if this step even had one.
+    ///
+    /// Skipped when the probe lands where the settled move does — an extension
+    /// push that nothing clipped passes through no cell its resting box does not
+    /// already cover, so recording it would only cost a duplicate notification.
+    fn record_probe(
+        probes: &mut Vec<(u32, [f64; 3], [f64; 3])>,
+        id: u32,
+        min: [f64; 3],
+        max: [f64; 3],
+        travel: crate::Dir,
+        distance: f64,
+        probe: f64,
+    ) {
+        if probe == distance {
+            return;
+        }
+        let (dx, dy, dz) = travel.delta();
+        let step = [f64::from(dx), f64::from(dy), f64::from(dz)];
+        let mut pmin = min;
+        let mut pmax = max;
+        for axis in 0..3 {
+            pmin[axis] += step[axis] * probe;
+            pmax[axis] += step[axis] * probe;
+        }
+        probes.push((id, pmin, pmax));
+    }
+
+    /// Fire `entityInside` at each intermediate box a piston carried an entity
+    /// through this tick.
+    ///
+    /// This is `Entity.move(MoverType.PISTON, …)` running `applyEffectsFromBlocks`
+    /// at the far end of the shove, inside `tickBlockEntities`, before the step's
+    /// correction pulls the entity back. The body view is pointed at the probe
+    /// box for the duration so that a plate *counts* the entity there and not in
+    /// two places at once — `piston_plate_clip` reads `power=1`, never 2 — and
+    /// restored from the authoritative lists afterwards.
+    fn notify_piston_probes(&mut self) {
+        let probes = std::mem::take(&mut self.piston_probes);
+        for (id, min, max) in probes {
+            let Some(slot) = self.item_entities.others.iter().position(|b| b.id == id) else {
+                continue;
+            };
+            let settled = (self.item_entities.others[slot].min, self.item_entities.others[slot].max);
+            self.item_entities.others[slot].min = min;
+            self.item_entities.others[slot].max = max;
+            self.notify_entity_inside(min, max);
+            // `notify_entity_inside` can move blocks, which rebuilds the view.
+            if let Some(slot) = self.item_entities.others.iter().position(|b| b.id == id) {
+                self.item_entities.others[slot].min = settled.0;
+                self.item_entities.others[slot].max = settled.1;
+            }
+        }
+    }
+
+    /// `entityInside` for every cell one box overlaps.
+    fn notify_entity_inside(&mut self, emin: [f64; 3], emax: [f64; 3]) {
+        let mut cells: Vec<Pos> = Vec::new();
+        for x in (emin[0].floor() as i32)..=(emax[0].floor() as i32) {
+            for y in (emin[1].floor() as i32)..=(emax[1].floor() as i32) {
+                for z in (emin[2].floor() as i32)..=(emax[2].floor() as i32) {
+                    cells.push(Pos::new(x, y, z));
+                }
+            }
+        }
+        for cell in cells {
+            let state = self.world.get(cell);
+            if state == StateId::AIR {
+                continue;
+            }
+            let Some(behaviour) = self.behaviours.get(state) else { continue };
+            let mut ctx = TickCtx {
+                drain: Some(crate::behaviour::Drain {
+                    pending: &mut self.pending,
+                    unknown_seen: &mut self.unknown_seen,
+                    upd_log: self.upd_log.as_mut(),
+                    phase: self.phase,
+                }),
+                behaviours: Some(&self.behaviours),
+                world: &mut self.world,
+                ticks: &mut self.ticks,
+                fluids: &mut self.fluids,
+                events: &mut self.events,
+                states: &self.registry,
+                tick: self.tick,
+                boundary: false,
+                updates: &mut self.updates,
+                moves: &mut self.moves,
+                toggles: &mut self.toggles,
+                comparator_out: &mut self.comparator_out,
+                inventories: &mut self.inventories,
+                hopper_state: &mut self.hopper_state,
+                item_entities: &mut self.item_entities,
+                inv_log: self.inv_log.as_mut(),
+                log: self.log.as_mut(),
+            };
+            behaviour.on_entity_inside(&mut ctx, cell);
+            self.propagate();
         }
     }
 
@@ -946,14 +1092,27 @@ impl Simulation {
                 crate::piston::head_eject_displacement(destination, sweep.travel, min, max)
             });
             let Some(signed) = signed else { return PistonPush::Nothing };
+            // The eject is a correction, so there *is* an intermediate: the
+            // entity rides the head a whole step inward first, and only then is
+            // pushed back to the line. Measured through a pressure plate, not an
+            // entity log — `piston_head_transient` fires the plate exactly when
+            // `PISTON_MAX_STEP` along the head's travel reaches its touch box
+            // and not when it falls short, in sixteen lanes.
             return if signed < 0.0 {
-                PistonPush::Move(sweep.travel.opposite(), -signed)
+                PistonPush::Move(
+                    sweep.travel.opposite(),
+                    -signed,
+                    -crate::piston::PISTON_MAX_STEP,
+                )
             } else {
-                PistonPush::Move(sweep.travel, signed)
+                PistonPush::Move(sweep.travel, signed, crate::piston::PISTON_MAX_STEP)
             };
         }
         match crate::piston::sweep_displacement(destination, sweep.travel, progress, min, max) {
-            Some(distance) => PistonPush::Move(sweep.travel, distance),
+            // A push lands where it is aimed; the only thing that can shorten it
+            // is collision, and vanilla's `entity.move` runs `entityInside` after
+            // the clip. So the requested distance *is* the probe.
+            Some(distance) => PistonPush::Move(sweep.travel, distance, distance),
             None => PistonPush::Nothing,
         }
     }
