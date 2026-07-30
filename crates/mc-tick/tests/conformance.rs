@@ -436,12 +436,12 @@ fn run_conformance_full(
             mc_tick::structure::SpawnedEntity::FurnaceMinecart(cart) => sim
                 .spawn_authored_furnace_minecart(cart, raw_id)
                 .unwrap_or_else(|why| panic!("{label}: {why}")),
-            // A motionless fireball is a hitbox and nothing else, which is all
-            // `spawn_authored_fireball` claims to model — it refuses one with
-            // real velocity rather than flying it wrongly. No id is passed
+            // A motionless body is a hitbox and nothing else, which is all
+            // `spawn_authored_body` claims to model — it refuses one with real
+            // velocity rather than flying or walking it wrongly. No id is passed
             // because a frozen body has no rest-flush cadence to line up.
-            mc_tick::structure::SpawnedEntity::Fireball(ball) => sim
-                .spawn_authored_fireball(ball)
+            mc_tick::structure::SpawnedEntity::Body(body) => sim
+                .spawn_authored_body(body)
                 .unwrap_or_else(|why| panic!("{label}: {why}")),
             // A golden that contains one of these would otherwise be compared
             // against a run with the entity missing, which is worse than no

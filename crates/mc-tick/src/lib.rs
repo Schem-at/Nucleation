@@ -31,6 +31,7 @@
 
 pub mod behaviour;
 pub mod entity;
+pub mod entity_kind;
 pub mod fluid;
 pub mod minecart;
 pub mod motion;

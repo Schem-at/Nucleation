@@ -95,71 +95,39 @@ pub struct EntityBody {
     pub is_minecart: bool,
 }
 
+/// Every entity kind vanilla knows, built once.
+///
+/// The block table is per-simulation because a `StateId` only means anything
+/// inside the registry that minted it. An entity kind is a *name*, which means
+/// the same thing in every simulation and in every test, so this is a process
+/// singleton — and it is what lets [`entity_dimensions`] and its neighbours stay
+/// the free functions that forty call sites already use, while all the knowledge
+/// they report lives in one registration list.
+pub fn vanilla_entities() -> &'static crate::entity_kind::EntityTable {
+    static TABLE: std::sync::OnceLock<crate::entity_kind::EntityTable> =
+        std::sync::OnceLock::new();
+    TABLE.get_or_init(crate::vanilla::entity_table)
+}
+
+/// The behaviour registered for `kind`, or `None` if nothing is.
+///
+/// `None` is the loud answer, not a fallback: every caller turns it into a
+/// refusal naming the kind. See [`crate::entity_kind`].
+pub fn entity_behaviour(kind: &str) -> Option<&'static dyn crate::entity_kind::EntityBehaviour> {
+    vanilla_entities().get(kind)
+}
+
 /// An entity type's hitbox, as `EntityType.sized(width, height)` registered it.
 ///
-/// Read out of the game's own registry (`tools/gametest/src/EntityDims.java`
-/// prints `EntityType.getDimensions()` after `Bootstrap.bootStrap`), so these
-/// cannot disagree with the game the way a remembered number can.
+/// A lookup into [`vanilla_entities`]; the numbers, and why each of them is the
+/// float and not the decimal, are on the rows in [`crate::vanilla::entity_table`]
+/// and on [`crate::entity_kind::EntityBehaviour::dimensions`].
 ///
-/// These are mechanism, not trivia. The record 3x3 door uses a **dragon**
-/// fireball where a small one will not do, and the registry says why: a dragon
-/// fireball is exactly one block tall, so resting at the bottom of a cell it
-/// spans the whole cell — reaching a pressure plate at the floor *and* the
-/// piston above. A small fireball is 5/16 and reaches neither.
-///
-/// Verified against the oracle in `fireball_reach.json`, which walks both
-/// fireballs across a weighted plate's touch box and finds the edge exactly
-/// where these widths put it: the dragon registers at 0.90 from centre and not
-/// at 0.95, the small one at 0.55 and not at 0.65.
+/// Anything unregistered is *not* guessed. An unknown entity gets no box, and
+/// the simulation refuses it by name rather than quietly giving it a default
+/// hitbox — a wrong box in this corpus is a wrong door.
 pub fn entity_dimensions(kind: &str) -> Option<(f64, f64)> {
-    Some(match kind {
-        // Every minecart variant shares one hitbox — furnace, chest, hopper and
-        // TNT carts included. A furnace minecart is dimensionally an ordinary
-        // cart.
-        // `EntityDimensions.scalable(0.98F, 0.7F)` — float literals, so the
-        // real box is 0.9800000190734863 by 0.699999988079071. The width's
-        // eighth decimal is observable now that carts clip against each other:
-        // `cart_gap` measures a squeezed approach as 0.009999981, which is the
-        // float width and not the decimal one.
-        "minecraft:minecart"
-        | "minecraft:furnace_minecart"
-        | "minecraft:chest_minecart"
-        | "minecraft:hopper_minecart"
-        | "minecraft:tnt_minecart" => (0.98_f32 as f64, 0.7_f32 as f64),
-        "minecraft:dragon_fireball" | "minecraft:fireball" => (1.0, 1.0),
-        "minecraft:small_fireball" => (0.3125, 0.3125),
-        // `EntityType.VILLAGER` is `sized(0.6F, 1.95F)`, and both literals are
-        // **floats**: 0.6000000238418579 by 1.9500000476837158. Written as
-        // decimals until a cart could stand on one, at which point the eighth
-        // decimal became observable and wrong — `blaze_ride_ai` rests a cart on
-        // a villager at exactly `2.950000047683716`, which is 1.0 + 1.95f and
-        // not 1.0 + 1.95. The width is float for the same reason the cart's is
-        // (see above) even though no capture separates 0.6 from 0.6f yet.
-        "minecraft:villager" => (0.6_f32 as f64, 1.95_f32 as f64),
-        // The record 3x3 door's two riders. Registry says `sized(0.6F, 1.8F)`,
-        // and `blaze_reach.entities.log` walks a blaze across a weighted plate's
-        // touch box at twelve offsets and agrees at all twelve: clear at 1.76
-        // and 11.24, touching at 5.77 and 15.23, which bounds the half-width in
-        // (0.2925, 0.3025). The four baby-villager offsets are the cross-check —
-        // a 0.49-wide body reads clear at 17.81 and 27.19 and a blaze reads
-        // *touching*, so the width cannot be the baby's.
-        //
-        // Height is bounded the same way by a plate two blocks up: a blaze with
-        // its feet at 1.205 reaches it and one at 1.195 does not, so the height
-        // is in (1.795, 1.805). `blaze_reach_villager_control.entities.log` is
-        // the negative control — the same rig, a 1.95-tall villager, and *both*
-        // plates fire.
-        //
-        // Written as the float the registry holds rather than the decimal,
-        // because the eighth decimal is observable: in `blaze_ride_ai` a cart
-        // dropped onto a blaze settles at exactly 1.0 + 1.7999999523162842.
-        "minecraft:blaze" => (0.6_f32 as f64, 1.8_f32 as f64),
-        "minecraft:item" => (0.25, 0.25),
-        // Anything else is *not* guessed. An unknown entity gets no box, and
-        // the simulation refuses it by name rather than quietly giving it a
-        // default hitbox — a wrong box in this corpus is a wrong door.
-        _ => return None,
-    })
+    entity_behaviour(kind).map(crate::entity_kind::EntityBehaviour::dimensions)
 }
 
 /// The world-space box of an entity of `kind` standing at `pos`.
@@ -180,115 +148,26 @@ pub fn body_aabb(kind: &str, pos: [f64; 3]) -> Option<([f64; 3], [f64; 3])> {
 
 /// Whether a body of `kind` stops a **minecart** that moves into it.
 ///
-/// `None` for a kind with no measured hitbox — unreachable from a loaded world,
-/// because [`entity_dimensions`] refuses those at spawn.
+/// `None` for a kind with no registry row — unreachable from a loaded world,
+/// because spawning refuses those by name.
 ///
-/// This is not "living entities are solid". Ten lanes across four captures say
-/// the split runs somewhere else entirely:
-///
-/// | body under / in front of the cart | cart | capture |
-/// |---|---|---|
-/// | `blaze` | **stopped** | `cart_body`, `cart_body2`, `cart_body3` |
-/// | `villager` | **stopped** | `cart_body`, `cart_body2` |
-/// | `zombie` | **stopped** | `cart_body` |
-/// | `oak_boat` | **stopped** | `cart_body2` |
-/// | `minecart` | **stopped** | `cart_body`, and five older goldens |
-/// | `armor_stand` | passes through | `cart_body`, `cart_body2` |
-/// | `small_fireball` | passes through | `blaze_ride_ai`, `cart_body` |
-/// | `dragon_fireball` | passes through | `blaze_ride_ai`, `cart_body2` |
-/// | `fireball` (ghast) | passes through | `cart_body4` |
-/// | `item` | passes through | `cart_body4` |
-///
-/// An **armor stand is a `LivingEntity` and is transparent**; a **boat is not
-/// living and is solid**. So "living" is refuted as the rule by both of its
-/// edges at once. What fits all ten is vanilla's vehicle predicate — a cart's
-/// collision set is `canBeCollidedWith() || isPushable()`, and an armor stand
-/// answers false to both (`ArmorStand.isPushable` is overridden to `false`).
-/// The table below is the measurement, not that reading; the reading is only
-/// why the measurement is not two coincidences.
-///
-/// Two asymmetries are measured and are **not** in this function, because it
-/// only answers "what stops a cart":
-///
-/// * A living body's *own* movement is not stopped by any of this. A blaze
-///   dropped from y = 3 onto a minecart, a NaN minecart and a furnace minecart
-///   lands on the floor at y = 1.0 on tick 19 in all three lanes — the same
-///   tick as the empty control (`cart_body2`). Carts are transparent to a
-///   falling mob. Nothing in this engine moves a mob, so there is nothing to
-///   implement, but a future mob-physics pass must not reuse this table.
-/// * A **rideable** cart that comes within `inflate(0.2, 0, 0.2)` of a free
-///   living entity *mounts* it rather than being stopped by it: in `cart_body`
-///   a plain cart rolling east picks the blaze up at t18, from 0.2 away, and
-///   carries on with the ridden `0.997` slowdown instead of the empty `0.96`.
-///   That is not modelled. It cannot fire on the record door — its rolling
-///   stock is furnace carts, which are not rideable, and both of its blazes are
-///   already passengers, which vanilla's gate excludes.
+/// A lookup into [`vanilla_entities`]; the measurement, and why it is *not*
+/// "living entities are solid", is on
+/// [`crate::entity_kind::EntityBehaviour::obstructs_a_cart`]. The row and the
+/// hitbox are now the same row, so a kind cannot gain a box without someone
+/// deciding what it does to a cart.
 pub fn blocks_a_cart(kind: &str) -> Option<bool> {
-    // Deliberately mirrors `entity_dimensions`' arms one for one, so a kind
-    // cannot gain a hitbox without someone deciding what it does to a cart.
-    Some(match kind {
-        // Cart on cart: `cart_body` drops one onto another and it rests at
-        // 1.699999988079071 — the lower cart's exact float top. The five
-        // cart-cart goldens are the horizontal half of the same fact.
-        "minecraft:minecart"
-        | "minecraft:furnace_minecart"
-        | "minecraft:chest_minecart"
-        | "minecraft:hopper_minecart"
-        | "minecraft:tnt_minecart" => true,
-        // Every projectile measured is transparent, in both axes.
-        "minecraft:dragon_fireball" | "minecraft:fireball" | "minecraft:small_fireball" => false,
-        // `cart_body2`: a furnace cart rolling east stops with its east face at
-        // 6.199999988079071, which is the blaze's and the villager's west face
-        // to the last bit. `cart_body`/`blaze_ride_ai`: a cart dropped on them
-        // rests at 2.799999952316284 and 2.950000047683716, their exact tops.
-        "minecraft:villager" | "minecraft:blaze" => true,
-        // `cart_body4`: an authored item on the rail, and a cart dropped on
-        // one, both reproduce the empty control to the last digit.
-        "minecraft:item" => false,
-        _ => return None,
-    })
+    entity_behaviour(kind).map(crate::entity_kind::EntityBehaviour::obstructs_a_cart)
 }
 
 /// Where a passenger sits relative to its vehicle's position, measured.
 ///
-/// A rider is not a body with a position of its own. Vanilla's
-/// `Entity.positionRider` hard-sets the passenger every tick to
-/// `vehicle.position() + vehiclePassengerAttachment - riderVehicleAttachment`,
-/// with no collision check, so this offset *is* the rider's position — see
-/// [`crate::sim::Simulation::spawn_authored_rider`].
-///
-/// The two attachment points are properties of the two entity *types*, so the
-/// offset is neither a constant nor derivable from the hitboxes, and this table
-/// says so by refusing every pair it has not seen. `blaze_ride.entities.log`
-/// measures three riders on one and the same minecart and gets two different
-/// answers:
-///
-/// | vehicle | rider | seated y − vehicle y |
-/// |---|---|---|
-/// | `minecart` | `blaze` | **0.1875** |
-/// | `minecart` | `small_fireball` | 0.1875 |
-/// | `minecart` | `villager` | **0.0** |
-///
-/// A villager therefore rides *lower* than a blaze on the same cart despite
-/// being taller, which rules out any rule of the form "half the vehicle's
-/// height" or "derived from the rider's box". Horizontal offset is zero in all
-/// three lanes, over twenty ticks and including a cart rolling east.
-///
-/// The blaze row is confirmed twice over: `55_3x3.zip` itself holds a blaze at
-/// y = 2.2500 on a cart at 2.062 and another at 2.1875 on a cart at 2.000 —
-/// 0.1875 both times.
+/// A lookup into [`vanilla_entities`]; the three measured seats, and why the
+/// offset is neither a constant nor derivable from the hitboxes, are on
+/// [`crate::entity_kind::EntityBehaviour::seat_for`]. Every pair that has not
+/// been under the oracle answers `None`, and there is no fallback.
 pub fn passenger_attachment(vehicle_kind: &str, rider_kind: &str) -> Option<[f64; 3]> {
-    // Only the plain cart is measured. The container and furnace variants share
-    // its *hitbox*, but an attachment point is not a hitbox — none of them was
-    // put under the oracle, so none of them is assumed to match.
-    if vehicle_kind != "minecraft:minecart" {
-        return None;
-    }
-    Some(match rider_kind {
-        "minecraft:blaze" | "minecraft:small_fireball" => [0.0, 0.1875, 0.0],
-        "minecraft:villager" => [0.0, 0.0, 0.0],
-        _ => return None,
-    })
+    entity_behaviour(vehicle_kind)?.seat_for(rider_kind)
 }
 
 #[cfg(test)]
@@ -452,6 +331,8 @@ mod hitbox_tests {
             "minecraft:tnt_minecart",
             "minecraft:villager",
             "minecraft:blaze",
+            // Not a `LivingEntity`, and it holds a cart up anyway.
+            "minecraft:oak_boat",
         ] {
             assert_eq!(blocks_a_cart(kind), Some(true), "{kind} was measured solid");
         }
@@ -460,14 +341,110 @@ mod hitbox_tests {
             "minecraft:dragon_fireball",
             "minecraft:fireball",
             "minecraft:item",
+            // A `LivingEntity` a cart falls straight through.
+            "minecraft:armor_stand",
         ] {
             assert_eq!(blocks_a_cart(kind), Some(false), "{kind} was measured transparent");
         }
         // Every kind with a hitbox has an answer here, and no kind without one
-        // does — so a new entity cannot arrive with a box and no decision.
-        for kind in ["minecraft:creeper", "minecraft:armor_stand", "minecraft:oak_boat"] {
+        // does — so a new entity cannot arrive with a box and no decision. A
+        // zombie is the pointed example: `cart_body` measured it *stopped*, and
+        // it still has no row, so it refuses rather than half-existing.
+        for kind in ["minecraft:creeper", "minecraft:zombie"] {
             assert_eq!(blocks_a_cart(kind), None, "{kind} has no box in this engine");
             assert_eq!(entity_dimensions(kind), None);
+        }
+    }
+
+    /// The pair that refuted "living entities are solid", in one assertion.
+    ///
+    /// An armor stand *is* a `LivingEntity` and a cart falls through it; a boat
+    /// is *not* living and holds one up. Either row alone could be a
+    /// coincidence; together they rule the class test out, which is why the
+    /// registry carries a measured vehicle predicate and not a name list.
+    #[test]
+    fn living_is_refuted_as_the_cart_collision_rule() {
+        assert_eq!(blocks_a_cart("minecraft:armor_stand"), Some(false));
+        assert_eq!(blocks_a_cart("minecraft:oak_boat"), Some(true));
+    }
+
+    /// The boat's box, from the game's registry and from the captures.
+    ///
+    /// `EntityDims` prints `sized(1.375F, 0.5625F)`, and both captures agree:
+    /// a cart dropped on a boat at y = 1.0 rests at 1.5625 (`cart_body` id 11,
+    /// `cart_body2` id 22), and a furnace cart driving east stops at
+    /// x = 5.322499990463257, whose east face is the boat's west face.
+    #[test]
+    fn the_boat_box_reproduces_the_captured_cart_rests() {
+        assert_eq!(entity_dimensions("minecraft:oak_boat"), Some((1.375, 0.5625)));
+        let (_, max) = body_aabb("minecraft:oak_boat", [2.5, 1.0, 16.5]).unwrap();
+        assert_eq!(max[1], 1.5625, "a cart rests on the boat's top");
+        let (min, _) = body_aabb("minecraft:oak_boat", [6.5, 1.0, 7.5]).unwrap();
+        // The stopped furnace cart's east face, to the last bit.
+        assert_eq!(min[0], 5.322_499_990_463_257 + (0.98_f32 as f64) / 2.0);
+    }
+
+    /// The armor stand's box is the game's float, not a decimal.
+    ///
+    /// Nothing measures it — a cart never touches it — but a non-marker armor
+    /// stand triggers pressure plates, so the box matters the moment one stands
+    /// on one. `sized(0.5F, 1.975F)`, and 1.975f is 1.9750000238418579.
+    #[test]
+    fn the_armor_stand_box_is_the_registrys_float() {
+        assert_eq!(entity_dimensions("minecraft:armor_stand"), Some((0.5, 1.975_f32 as f64)));
+        assert_eq!(entity_dimensions("minecraft:armor_stand").unwrap().1, 1.975_000_023_841_857_9);
+    }
+
+    /// Every row in the table is internally consistent.
+    ///
+    /// The registry is now the only place any of these facts is written down, so
+    /// this is what stops a new row from contradicting itself: a kind that ticks
+    /// minecart physics but is not an `AbstractMinecart` would break detector
+    /// rails, and a kind the engine calls frozen but that claims to tick physics
+    /// would silently never be ticked. Neither is reachable through
+    /// [`crate::vanilla::entity_table`]'s public shape, and this says so out loud
+    /// rather than leaving it to whoever adds the next row.
+    #[test]
+    fn every_registered_kind_agrees_with_itself() {
+        use crate::entity_kind::EntityMotion;
+        let table = vanilla_entities();
+        assert!(!table.kinds().is_empty());
+        for kind in table.kinds() {
+            let row = table.get(kind).expect("listed kinds are registered");
+            assert_eq!(row.kind(), kind, "a row is registered under its own name");
+            let (width, height) = row.dimensions();
+            assert!(width > 0.0 && height > 0.0, "{kind} has a real box");
+            assert_eq!(
+                row.is_minecart(),
+                row.motion() == EntityMotion::Minecart,
+                "{kind}: detector rails select on the minecart class"
+            );
+            assert_eq!(
+                row.motion().ticks_physics(),
+                row.motion() != EntityMotion::Frozen,
+                "{kind}: a frozen body is the one that is never ticked"
+            );
+            // A seat is only meaningful on something that can carry a rider, and
+            // only the measured pairs answer at all.
+            assert_eq!(row.carries_passengers(), row.seat_for("minecraft:blaze").is_some());
+            assert_eq!(row.seat_for("minecraft:creeper"), None, "{kind}: unmeasured pairs refuse");
+        }
+        // The one vehicle with measured seats, so the assertion above is not
+        // vacuously true for every row at once.
+        assert!(table.get("minecraft:minecart").unwrap().carries_passengers());
+        assert!(!table.get("minecraft:furnace_minecart").unwrap().carries_passengers());
+    }
+
+    /// A boat carries no passenger, because nobody has measured one.
+    ///
+    /// The obvious guess — a boat is what people actually ride — is exactly the
+    /// one the seat table refuses, for the same reason it refuses a villager on
+    /// a chest cart: an attachment point is a property of two types and is not
+    /// derivable from the boxes.
+    #[test]
+    fn a_boat_has_no_measured_seat() {
+        for rider in ["minecraft:villager", "minecraft:blaze", "minecraft:armor_stand"] {
+            assert_eq!(passenger_attachment("minecraft:oak_boat", rider), None);
         }
     }
 }
@@ -483,6 +460,54 @@ impl EntityBody {
             && self.min[2] < max[2]
             && self.max[2] > min[2]
     }
+}
+
+/// One entity that carries no physics of its own: an id, a kind, and how it
+/// holds its position.
+///
+/// This replaced two parallel `Vec`s of anonymous tuples — `(u32, String,
+/// [f64;3])` for standing bodies and `(u32, String, u32, [f64;3])` for
+/// passengers — in which a fireball, a villager and a blaze were all a `String`
+/// in a tuple. The kind is still a `String` because that is genuinely an
+/// entity's identity, but everything the engine *knows* about that string now
+/// comes from one registry row (see [`crate::entity_kind`]) rather than from a
+/// `match` in whichever function happened to need it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EntityInstance {
+    /// Trace-stable id, from the one shared entity counter.
+    pub id: u32,
+    /// Registry name, e.g. `minecraft:oak_boat`.
+    pub kind: String,
+    /// Where it is, and what decides that.
+    pub physics: BodyPhysics,
+}
+
+/// How a body without physics of its own comes by a position.
+///
+/// Both variants are [`crate::entity_kind::EntityMotion::Frozen`] kinds — the
+/// difference is not what the *type* does but whether this particular instance
+/// is standing on the ground or sitting on something.
+#[derive(Debug, Clone, PartialEq)]
+pub enum BodyPhysics {
+    /// Standing where it was put. Only a piston sweep moves it.
+    Frozen {
+        /// Feet-centre position, which a piston shove updates in place.
+        pos: [f64; 3],
+    },
+    /// Riding a vehicle, with no position of its own.
+    ///
+    /// `Entity.positionRider` hard-sets a passenger to `vehicle.position() +
+    /// seat` every tick with no collision check, so the position is *derived*
+    /// and never stored — a rider cannot drift from its vehicle even by one
+    /// tick, including a vehicle a piston just shoved and one whose velocity is
+    /// NaN and never moves at all.
+    Rider {
+        /// The vehicle's entity id.
+        vehicle: u32,
+        /// The measured attachment offset; see
+        /// [`crate::entity_kind::EntityBehaviour::seat_for`].
+        seat: [f64; 3],
+    },
 }
 
 /// All item entities plus the id counter — one bundle so the tick context

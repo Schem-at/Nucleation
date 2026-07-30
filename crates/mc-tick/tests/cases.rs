@@ -298,15 +298,8 @@ fn build_sim(
             mc_tick::structure::SpawnedEntity::FurnaceMinecart(cart) => {
                 sim.spawn_authored_furnace_minecart(cart, None).unwrap_or_else(|e| panic!("{label}: {e}"));
             }
-            mc_tick::structure::SpawnedEntity::Fireball(ball) => {
-                sim.spawn_authored_fireball(ball).unwrap_or_else(|e| panic!("{label}: {e}"));
-            }
-            mc_tick::structure::SpawnedEntity::Villager(villager) => {
-                sim.spawn_authored_villager(villager)
-                    .unwrap_or_else(|e| panic!("{label}: {e}"));
-            }
-            mc_tick::structure::SpawnedEntity::Blaze(blaze) => {
-                sim.spawn_authored_blaze(blaze).unwrap_or_else(|e| panic!("{label}: {e}"));
+            mc_tick::structure::SpawnedEntity::Body(body) => {
+                sim.spawn_authored_body(body).unwrap_or_else(|e| panic!("{label}: {e}"));
             }
         }
     }

@@ -79,10 +79,18 @@ pub struct Structure {
 /// adding a variant never quietly weakens anything — a type with no behaviour
 /// still refuses, it just refuses one step later and with a better message.
 ///
-/// Each unsimulatable type gets its own variant rather than hiding behind a
-/// `kind` string, so the gate is a `match` the compiler checks. A hand-kept
-/// list of "kinds we support" would silently drift out of date; a missing match
-/// arm will not compile.
+/// The variants are the **motion classes** of
+/// [`crate::entity_kind::EntityMotion`], not the entity types, and that is the
+/// compile-time half of the gate. Which types exist is a registry question,
+/// answered in one place by [`crate::vanilla::entity_table`]; what the engine
+/// can *do* with one is a question with a fixed, small set of answers, and
+/// adding a new answer to it — real projectile physics, mob AI — has to fail to
+/// compile at every site that dispatches on this.
+///
+/// So a new entity type of an existing motion class is one registry row and no
+/// change here. A type with no row is refused **by name** by
+/// [`Reader::entity_entry`], which is the runtime half: a hand-kept list of
+/// "kinds we support" would drift, but a lookup that returns `None` cannot.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SpawnedEntity {
     /// An item entity.
@@ -91,12 +99,9 @@ pub enum SpawnedEntity {
     Minecart(SpawnedMinecart),
     /// A furnace minecart — a cart that can drive itself.
     FurnaceMinecart(SpawnedFurnaceMinecart),
-    /// A fireball, of either size.
-    Fireball(SpawnedFireball),
-    /// A villager.
-    Villager(SpawnedVillager),
-    /// A blaze. In the record 3x3 door, always a minecart's passenger.
-    Blaze(SpawnedBlaze),
+    /// An entity the engine models as a frozen hitbox and nothing more:
+    /// fireballs, villagers, blazes, boats, armor stands.
+    Body(SpawnedBody),
 }
 
 impl SpawnedEntity {
@@ -106,9 +111,7 @@ impl SpawnedEntity {
             Self::Item(_) => "minecraft:item",
             Self::Minecart(cart) => &cart.kind,
             Self::FurnaceMinecart(_) => "minecraft:furnace_minecart",
-            Self::Fireball(ball) => &ball.kind,
-            Self::Villager(_) => "minecraft:villager",
-            Self::Blaze(_) => "minecraft:blaze",
+            Self::Body(body) => &body.kind,
         }
     }
 }
@@ -193,55 +196,33 @@ pub struct SpawnedFurnaceMinecart {
     pub yaw: f64,
 }
 
-/// An authored fireball, either size.
+/// An authored entity the engine carries as a frozen hitbox and nothing more.
 ///
-/// The record doors freeze these mid-flight with piston-and-cobweb timing and
-/// use them as one-block-tall pressure-plate triggers, so the *size* is
-/// mechanism: a small fireball barely clips a plate, while a dragon fireball is
-/// a full block tall and can reach a plate and the piston above it at once.
-/// Which is why the kind is kept rather than collapsed to "a fireball".
+/// One struct for fireballs, villagers, blazes, boats and armor stands, because
+/// what the engine does with each of them is identical — hold its box where the
+/// file put it, refuse it if it was moving — and the *differences* between them
+/// are entirely in [`crate::vanilla::entity_table`]. Three separate structs used
+/// to spell out that sameness three times.
+///
+/// The `kind` is kept rather than collapsed, because the *type* is mechanism.
+/// The record doors freeze fireballs mid-flight with piston-and-cobweb timing
+/// and use them as pressure-plate triggers, where the size decides everything: a
+/// small fireball barely clips a plate, while a dragon fireball is a full block
+/// tall and can reach a plate and the piston above it at once. In the record 3x3
+/// door the villager is a wall stopping a cart and a floor it lands on, and two
+/// blazes ride two of its four nan carts — the builders' published account said
+/// villagers did that job; the save says blazes.
 ///
 /// Hitbox dimensions deliberately do **not** live here. They are a property of
-/// the entity type, like a container's slot count, and belong to the engine's
-/// tables — a structure file carries no such field, and accepting one would let
-/// a hand-edited file claim a small fireball is a block tall.
+/// the entity type, like a container's slot count, and belong to the registry —
+/// a structure file carries no such field, and accepting one would let a
+/// hand-edited file claim a small fireball is a block tall.
 #[derive(Debug, Clone, PartialEq)]
-pub struct SpawnedFireball {
-    /// `minecraft:small_fireball` or `minecraft:dragon_fireball`.
+pub struct SpawnedBody {
+    /// The registry name, e.g. `minecraft:dragon_fireball`.
     pub kind: String,
-    /// Spawn position.
-    pub pos: [f64; 3],
-    /// Spawn velocity.
-    pub motion: [f64; 3],
-}
-
-/// An authored villager.
-///
-/// Present in the record doors purely as a hitbox — one acts as a wall stopping
-/// a cart, the other as a floor it lands on. No AI, no trading, no pathfinding
-/// is wanted from it, only its box and its solidity to entity collision.
-#[derive(Debug, Clone, PartialEq)]
-pub struct SpawnedVillager {
-    /// Spawn position.
-    pub pos: [f64; 3],
-    /// Spawn velocity.
-    pub motion: [f64; 3],
-}
-
-/// An authored blaze.
-///
-/// Present in the record 3x3 door only as a **passenger**: two of them ride two
-/// of its four plain minecarts, and both of those carts are nan carts. The
-/// builders' published account described villagers doing this job; the save says
-/// blazes. Either way what the build wants from the mob is its box — the cart it
-/// rides pins it, and its own box is scaffolding.
-///
-/// Like [`SpawnedFireball`], no hitbox field: dimensions belong to the entity
-/// type and the engine's tables, not to a file that could claim otherwise.
-#[derive(Debug, Clone, PartialEq)]
-pub struct SpawnedBlaze {
-    /// Spawn position. Ignored while it is a rider, whose position vanilla
-    /// re-derives from its vehicle every tick.
+    /// Spawn position. Ignored while the entity is a rider, whose position
+    /// vanilla re-derives from its vehicle every tick.
     pub pos: [f64; 3],
     /// Spawn velocity.
     ///
@@ -771,15 +752,17 @@ impl<'a> Parser<'a> {
         let Some(pos) = pos else {
             return self.err("passenger entity needs `Pos`");
         };
-        match id.as_str() {
-            "minecraft:blaze" => Ok(SpawnedEntity::Blaze(SpawnedBlaze { pos, motion })),
-            "minecraft:villager" => Ok(SpawnedEntity::Villager(SpawnedVillager { pos, motion })),
-            other => Err(StructureError::UnsupportedEntity {
-                entity_type: if other.is_empty() {
-                    "<no id>".to_string()
-                } else {
-                    other.to_string()
-                },
+        // A passenger is a frozen body and nothing else: `positionRider`
+        // overwrites its position every tick, so nothing with physics of its own
+        // can meaningfully ride. A registered kind with any other motion class
+        // refuses here rather than losing its physics silently.
+        match crate::entity::entity_behaviour(&id).map(crate::entity_kind::EntityBehaviour::motion)
+        {
+            Some(crate::entity_kind::EntityMotion::Frozen) => {
+                Ok(SpawnedEntity::Body(SpawnedBody { kind: id, pos, motion }))
+            }
+            _ => Err(StructureError::UnsupportedEntity {
+                entity_type: if id.is_empty() { "<no id>".to_string() } else { id },
                 offset: self.at,
             }),
         }
@@ -874,68 +857,78 @@ impl<'a> Parser<'a> {
         // seat has been measured (`blaze_ride.entities.log`), so a `Passengers`
         // list on anything else refuses instead of being dropped: dropping it is
         // precisely the silent under-report this whole seam exists to stop.
-        if !passengers.is_empty() && entity_id != "minecraft:minecart" {
+        // Only the plain minecart's seats have been measured
+        // (`blaze_ride.entities.log`), and the registry is what says so — a
+        // `Passengers` list on a vehicle with no measured seat refuses instead of
+        // being dropped, because dropping it is precisely the silent
+        // under-report this whole seam exists to stop.
+        let behaviour = crate::entity::entity_behaviour(&entity_id);
+        if !passengers.is_empty() && !behaviour.is_some_and(|b| b.carries_passengers()) {
             return self.err(
-                "`Passengers` on an entity other than minecraft:minecart: no seat \
-                 offset has been measured for that vehicle, and carrying the rider \
-                 at a guessed one would move a hitbox the build depends on",
+                "`Passengers` on an entity with no measured seat: the offset cannot \
+                 be derived from the hitboxes, and carrying the rider at a guessed \
+                 one would move a hitbox the build depends on",
             );
         }
-        match entity_id.as_str() {
-            "minecraft:item" => match (pos, item) {
+        // Dispatch on the *motion class*, not the name. A new entity type of an
+        // existing class is a registry row and nothing here.
+        match behaviour.map(crate::entity_kind::EntityBehaviour::motion) {
+            Some(crate::entity_kind::EntityMotion::Item) => match (pos, item) {
                 (Some(pos), Some(item)) => {
                     Ok(SpawnedEntity::Item(SpawnedItem { pos, motion, item, pickup_delay }))
                 }
                 _ => self.err("item entity needs `pos` and `Item`"),
             },
-            "minecraft:minecart" => match pos {
-                Some(pos) => Ok(SpawnedEntity::Minecart(SpawnedMinecart {
-                    kind: entity_id,
-                    pos,
-                    motion,
-                    yaw,
-                    passengers,
-                })),
-                None => self.err("minecart entity needs `pos`"),
+            Some(crate::entity_kind::EntityMotion::Frozen) => match pos {
+                Some(pos) => Ok(SpawnedEntity::Body(SpawnedBody { kind: entity_id, pos, motion })),
+                None => self.err("entity needs `pos`"),
             },
-            "minecraft:blaze" => match pos {
-                Some(pos) => Ok(SpawnedEntity::Blaze(SpawnedBlaze { pos, motion })),
-                None => self.err("blaze entity needs `pos`"),
-            },
-            "minecraft:furnace_minecart" => match pos {
-                Some(pos) => Ok(SpawnedEntity::FurnaceMinecart(SpawnedFurnaceMinecart {
-                    pos,
-                    motion,
-                    fuel,
-                    push,
-                    yaw,
-                })),
-                None => self.err("furnace minecart entity needs `pos`"),
-            },
-            "minecraft:small_fireball" | "minecraft:dragon_fireball" => match pos {
-                Some(pos) => Ok(SpawnedEntity::Fireball(SpawnedFireball {
-                    kind: entity_id,
-                    pos,
-                    motion,
-                })),
-                None => self.err("fireball entity needs `pos`"),
-            },
-            "minecraft:villager" => match pos {
-                Some(pos) => Ok(SpawnedEntity::Villager(SpawnedVillager { pos, motion })),
-                None => self.err("villager entity needs `pos`"),
+            // The cart classes are the one place a name still decides, and that
+            // is not a gap in the registry: the reader has a *representation* for
+            // a plain cart and for a furnace cart, and none for the container
+            // variants. A chest, hopper or TNT cart shares the plain cart's
+            // hitbox — which is why it has a row — but it also carries an
+            // inventory or a fuse that this engine does not model, so loading one
+            // as a plain cart would silently drop the thing that makes it that
+            // cart.
+            Some(crate::entity_kind::EntityMotion::Minecart) => match entity_id.as_str() {
+                "minecraft:minecart" => match pos {
+                    Some(pos) => Ok(SpawnedEntity::Minecart(SpawnedMinecart {
+                        kind: entity_id,
+                        pos,
+                        motion,
+                        yaw,
+                        passengers,
+                    })),
+                    None => self.err("minecart entity needs `pos`"),
+                },
+                "minecraft:furnace_minecart" => match pos {
+                    Some(pos) => Ok(SpawnedEntity::FurnaceMinecart(SpawnedFurnaceMinecart {
+                        pos,
+                        motion,
+                        fuel,
+                        push,
+                        yaw,
+                    })),
+                    None => self.err("furnace minecart entity needs `pos`"),
+                },
+                other => Err(StructureError::UnsupportedEntity {
+                    entity_type: other.to_string(),
+                    offset: self.at,
+                }),
             },
             // A type this reader cannot even *represent*. Distinct from one it
             // can represent but the engine cannot yet simulate — that second
             // refusal belongs at construction, where the behaviour tables are.
             // Dropping either would let a build whose mechanism depends on the
             // entity load clean and run as though it were not there.
-            other => Err(StructureError::UnsupportedEntity {
+            None => Err(StructureError::UnsupportedEntity {
                 // An entry with no `id` at all still has to say something
                 // useful; `unsupported entity type ``` names nothing.
-                entity_type: if other.is_empty() {
+                entity_type: if entity_id.is_empty() {
                     "<entity with no id>".to_string()
                 } else {
-                    other.to_string()
+                    entity_id
                 },
                 offset: self.at,
             }),
@@ -1459,7 +1452,8 @@ mod tests {
             (SpawnedEntity::Minecart(carrying), SpawnedEntity::Minecart(empty)) => {
                 assert_eq!(carrying.passengers.len(), 1);
                 match &carrying.passengers[0] {
-                    SpawnedEntity::Blaze(blaze) => {
+                    SpawnedEntity::Body(blaze) => {
+                        assert_eq!(blaze.kind, "minecraft:blaze");
                         assert_eq!(blaze.pos, [0.5, 2.25, 0.5]);
                         // The gravity a rider accrues and never uses.
                         assert_eq!(blaze.motion, [-0.039, -0.0784, 0.0253]);
@@ -1665,11 +1659,13 @@ mod tests {
                 {pos: [1.5d, 0.0d, 0.5d], nbt: {id: "minecraft:furnace_minecart"}},
                 {pos: [2.5d, 0.0d, 0.5d], nbt: {id: "minecraft:small_fireball"}},
                 {pos: [3.5d, 0.0d, 0.5d], nbt: {id: "minecraft:dragon_fireball"}},
-                {pos: [4.5d, 0.0d, 0.5d], nbt: {id: "minecraft:villager"}}
+                {pos: [4.5d, 0.0d, 0.5d], nbt: {id: "minecraft:villager"}},
+                {pos: [5.5d, 0.0d, 0.5d], nbt: {id: "minecraft:oak_boat"}},
+                {pos: [6.5d, 0.0d, 0.5d], nbt: {id: "minecraft:armor_stand"}}
             ]
         }"#;
         let s = Structure::parse(TEXT).unwrap();
-        assert_eq!(s.entities.len(), 5);
+        assert_eq!(s.entities.len(), 7);
         match &s.entities[0] {
             SpawnedEntity::FurnaceMinecart(cart) => {
                 assert_eq!(cart.fuel, 3);
@@ -1689,9 +1685,18 @@ mod tests {
         // difference is why the doors use one rather than the other.
         assert_eq!(s.entities[2].kind(), "minecraft:small_fireball");
         assert_eq!(s.entities[3].kind(), "minecraft:dragon_fireball");
-        assert!(matches!(s.entities[2], SpawnedEntity::Fireball(_)));
-        assert!(matches!(s.entities[3], SpawnedEntity::Fireball(_)));
-        assert!(matches!(s.entities[4], SpawnedEntity::Villager(_)));
+        assert!(matches!(s.entities[2], SpawnedEntity::Body(_)));
+        assert!(matches!(s.entities[3], SpawnedEntity::Body(_)));
+        assert!(matches!(s.entities[4], SpawnedEntity::Body(_)));
+        assert_eq!(s.entities[4].kind(), "minecraft:villager");
+        // A boat and an armor stand read as the same frozen body, because the
+        // reader dispatches on the *motion class* and both rows say `Frozen`.
+        // Nothing in this file was edited to let them through — that is the
+        // whole claim of the registry, asserted rather than asserted-to.
+        assert!(matches!(s.entities[5], SpawnedEntity::Body(_)));
+        assert_eq!(s.entities[5].kind(), "minecraft:oak_boat");
+        assert!(matches!(s.entities[6], SpawnedEntity::Body(_)));
+        assert_eq!(s.entities[6].kind(), "minecraft:armor_stand");
         // None of them are items, so none reach the item-entity view.
         assert!(s.item_entities.is_empty());
     }

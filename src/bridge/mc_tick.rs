@@ -828,22 +828,12 @@ fn wire_simulation(
             // all that is implemented, and anything that would need more — a
             // fireball with velocity, a villager that should walk — refuses by
             // name rather than being quietly frozen.
-            mc_tick::structure::SpawnedEntity::Fireball(ball) => {
-                if let Err(why) = sim.spawn_authored_fireball(ball) {
-                    refused.push(why);
-                }
-            }
-            mc_tick::structure::SpawnedEntity::Villager(villager) => {
-                if let Err(why) = sim.spawn_authored_villager(villager) {
-                    refused.push(why);
-                }
-            }
-            // A blaze reached here is one standing on its own, not riding —
-            // a rider is spawned by its vehicle's arm above and never appears
-            // in this list. Standing alone it is scaffolding like a villager,
-            // and a blaze that should fly or fight refuses by name.
-            mc_tick::structure::SpawnedEntity::Blaze(blaze) => {
-                if let Err(why) = sim.spawn_authored_blaze(blaze) {
+            // A blaze reached here is one standing on its own, not riding — a
+            // rider is spawned by its vehicle's arm above and never appears in
+            // this list. Standing alone it is scaffolding like a villager, and a
+            // blaze that should fly or fight refuses by name.
+            mc_tick::structure::SpawnedEntity::Body(body) => {
+                if let Err(why) = sim.spawn_authored_body(body) {
                     refused.push(why);
                 }
             }

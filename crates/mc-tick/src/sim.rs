@@ -136,8 +136,7 @@ pub struct Checkpoint {
     hopper_state: std::collections::HashMap<Pos, crate::behaviour::HopperState>,
     item_entities: crate::entity::ItemEntities,
     minecarts: Vec<crate::minecart::MinecartState>,
-    frozen: Vec<(u32, String, [f64; 3])>,
-    riders: Vec<(u32, String, u32, [f64; 3])>,
+    bodies: Vec<crate::entity::EntityInstance>,
 }
 
 /// A controllable, deterministic simulation of a bounded region.
@@ -197,17 +196,20 @@ pub struct Simulation {
     conductors: Vec<bool>,
     /// The world's minecarts, in spawn order.
     minecarts: Vec<crate::minecart::MinecartState>,
-    /// Entities that are a hitbox and nothing else — the record doors' frozen
-    /// fireballs. `(id, kind, position)`; see
-    /// [`Simulation::spawn_frozen_entity`].
-    frozen: Vec<(u32, String, [f64; 3])>,
-    /// Passengers. `(id, kind, vehicle cart id, seat offset)`; see
-    /// [`Simulation::spawn_authored_rider`].
+    /// Every entity that is a hitbox and nothing else, in spawn order — the
+    /// record doors' frozen fireballs, their villagers and boats, and the
+    /// passengers riding their nan carts.
     ///
-    /// Separate from `frozen` because a rider is not a body with a position —
-    /// its position is recomputed from its vehicle in [`Simulation::refresh_bodies`]
-    /// every time anything moves, which is what vanilla's `positionRider` does.
-    riders: Vec<(u32, String, u32, [f64; 3])>,
+    /// One collection, not two: a standing body and a passenger differ in how
+    /// they come by a position ([`crate::entity::BodyPhysics`]) and in nothing
+    /// else, and splitting them into two `Vec`s of differently-shaped tuples
+    /// meant every question — what is its box, does it stop a cart, does a
+    /// piston shove it — had to be asked twice.
+    ///
+    /// Wherever order is observable the two are still walked in two passes,
+    /// standing bodies before passengers, because that is the order the
+    /// entity-box view was built in and a trace reads the same way.
+    bodies: Vec<crate::entity::EntityInstance>,
     /// Which version's `Entity.load` Motion handling the authored spawns run
     /// under. See [`crate::motion`] — it decides whether a nan cart exists.
     motion_semantics: crate::motion::MotionSemantics,
@@ -337,8 +339,7 @@ impl Simulation {
             hopper_state: std::collections::HashMap::new(),
             item_entities: crate::entity::ItemEntities::default(),
             minecarts: Vec::new(),
-            frozen: Vec::new(),
-            riders: Vec::new(),
+            bodies: Vec::new(),
         };
         Self {
             block_entities: std::collections::HashSet::new(),
@@ -366,8 +367,7 @@ impl Simulation {
             rails: Vec::new(),
             conductors: Vec::new(),
             minecarts: Vec::new(),
-            frozen: Vec::new(),
-            riders: Vec::new(),
+            bodies: Vec::new(),
             motion_semantics: crate::motion::MotionSemantics::default(),
             retract_contacts: Vec::new(),
             piston_probes: Vec::new(),
@@ -597,78 +597,41 @@ impl Simulation {
         &self.retract_contacts
     }
 
-    /// Spawn an authored fireball: a frozen hitbox, and nothing more.
+    /// Spawn an authored frozen body: a hitbox, and nothing more.
     ///
-    /// Refuses a fireball that is actually *flying*. The record doors' are
-    /// caught mid-flight by a piston-and-cobweb trick and have zero motion, so
-    /// modelling them as a stationary box is what the game does with them —
-    /// but a fireball with real velocity is a projectile, and this engine has
-    /// no projectile physics. Simulating one as a stationary box would be a
-    /// wrong answer that looks like a right one.
-    pub fn spawn_authored_fireball(
-        &mut self,
-        ball: &crate::structure::SpawnedFireball,
-    ) -> Result<u32, String> {
-        let motion = self.motion_semantics.load_motion(ball.motion, [0.0; 3]);
-        if motion.iter().any(|v| *v != 0.0) {
-            return Err(format!(
-                "{} at {:?} has Motion {:?}: this engine models a fireball only as a \
-                 frozen hitbox (which is what the record doors' are — zero motion, \
-                 caught mid-flight), and has no projectile physics to fly one with",
-                ball.kind, ball.pos, motion
-            ));
-        }
-        self.spawn_frozen_entity(ball.kind.clone(), ball.pos)
-    }
-
-    /// Spawn an authored villager: a frozen hitbox, and nothing more.
+    /// One method for fireballs, villagers, blazes, boats and armor stands,
+    /// because the engine does exactly one thing with each of them and the
+    /// refusal below is exactly the same sentence about each of them. What
+    /// differs between them — box, solidity to a cart, seats — is entirely in
+    /// [`crate::vanilla::entity_table`].
     ///
-    /// Refuses a moving one for the same reason as a flying fireball. In the
-    /// record doors a villager is a wall and a floor — its box holds carts in
-    /// place — and none of AI, pathfinding, trading or gravity is wanted or
-    /// implemented. A villager with velocity is one that is *doing* something,
-    /// and there is nothing here to do it with.
-    pub fn spawn_authored_villager(
-        &mut self,
-        villager: &crate::structure::SpawnedVillager,
-    ) -> Result<u32, String> {
-        let motion = self.motion_semantics.load_motion(villager.motion, [0.0; 3]);
-        if motion.iter().any(|v| *v != 0.0) {
-            return Err(format!(
-                "minecraft:villager at {:?} has Motion {:?}: this engine models a \
-                 villager only as a stationary hitbox, with no AI, pathfinding or \
-                 gravity to move one with",
-                villager.pos, motion
-            ));
-        }
-        self.spawn_frozen_entity("minecraft:villager".to_string(), villager.pos)
-    }
-
-    /// Spawn an authored blaze that is **not** riding anything: a frozen
-    /// hitbox, exactly as a villager is.
-    ///
-    /// Refuses a moving one, and the bar is lower than it looks: `noai` is what
-    /// holds a blaze still in `blaze_ride.entities.log`, and a blaze with AI
-    /// hovers, strafes and shoots. Nothing here can do any of that, so a blaze
-    /// that is supposed to move refuses by name rather than standing still and
-    /// looking like a correct answer.
+    /// Refuses one that is actually *moving*, and the bar is lower than it
+    /// looks. The record doors' fireballs are caught mid-flight by a
+    /// piston-and-cobweb trick and have zero motion, so modelling them as a
+    /// stationary box is what the game does with them — but a fireball with real
+    /// velocity is a projectile and there is no projectile physics here; a
+    /// villager is a wall and a floor, and one with velocity is *doing*
+    /// something, with no AI, pathfinding or gravity here to do it with; `noai`
+    /// is what holds a blaze still in `blaze_ride.entities.log`, and a blaze with
+    /// AI hovers, strafes and shoots. In every case a stationary box would be a
+    /// wrong answer that looks like a right one, so it refuses by name instead.
     ///
     /// The record 3x3 door has no free-standing blaze — both of its blazes are
     /// passengers, and go through [`Simulation::spawn_authored_rider`].
-    pub fn spawn_authored_blaze(
+    pub fn spawn_authored_body(
         &mut self,
-        blaze: &crate::structure::SpawnedBlaze,
+        body: &crate::structure::SpawnedBody,
     ) -> Result<u32, String> {
-        let motion = self.motion_semantics.load_motion(blaze.motion, [0.0; 3]);
+        let motion = self.motion_semantics.load_motion(body.motion, [0.0; 3]);
         if motion.iter().any(|v| *v != 0.0) {
             return Err(format!(
-                "minecraft:blaze at {:?} has Motion {:?}: this engine models a blaze \
-                 only as a stationary hitbox, and has no mob AI, flight or gravity to \
+                "{} at {:?} has Motion {:?}: this engine models it only as a frozen \
+                 hitbox, and has no projectile physics, mob AI, flight or gravity to \
                  move one with",
-                blaze.pos, motion
+                body.kind, body.pos, motion
             ));
         }
-        self.spawn_frozen_entity("minecraft:blaze".to_string(), blaze.pos)
+        self.spawn_frozen_entity(body.kind.clone(), body.pos)
     }
 
     /// Seat a passenger on a minecart.
@@ -715,7 +678,7 @@ impl Simulation {
                  for that pair, and it cannot be derived from the hitboxes — on one and \
                  the same minecart a blaze sits 0.1875 above it and a villager sits at \
                  0.0. Measure it with tools/gametest/capture.sh --spawn '...:ride' and \
-                 add it to entity::passenger_attachment()."
+                 add it to the vehicle's `seats` in vanilla::entity_table()."
             ));
         };
         // A rider's own `Motion` is not checked the way a free-standing
@@ -730,7 +693,11 @@ impl Simulation {
         }
         let id = self.item_entities.next_id;
         self.item_entities.next_id += 1;
-        self.riders.push((id, rider_kind, vehicle_id, seat));
+        self.bodies.push(crate::entity::EntityInstance {
+            id,
+            kind: rider_kind,
+            physics: crate::entity::BodyPhysics::Rider { vehicle: vehicle_id, seat },
+        });
         self.refresh_bodies();
         Ok(id)
     }
@@ -820,12 +787,18 @@ impl Simulation {
             return Err(format!(
                 "unknown entity {kind}: no hitbox is known for it, and guessing one \
                  would silently change the simulation. Measure it with \
-                 tools/gametest/src/EntityDims.java and add it to entity_dimensions()."
+                 tools/gametest/src/EntityDims.java, decide whether it stops a cart \
+                 with tools/gametest/capture.sh, and add one row to \
+                 vanilla::entity_table()."
             ));
         }
         let id = self.item_entities.next_id;
         self.item_entities.next_id += 1;
-        self.frozen.push((id, kind, pos));
+        self.bodies.push(crate::entity::EntityInstance {
+            id,
+            kind,
+            physics: crate::entity::BodyPhysics::Frozen { pos },
+        });
         self.refresh_bodies();
         Ok(id)
     }
@@ -904,10 +877,19 @@ impl Simulation {
                     self.minecarts[index].pos[axis] += moved[axis];
                 }
             }
-            for index in 0..self.frozen.len() {
-                let (id, kind, pos) = &self.frozen[index];
-                let Some((min, max)) = crate::entity::body_aabb(kind, *pos) else { continue };
-                let id = *id;
+            // Only a standing body is shoved. A passenger has no position of its
+            // own to shove — it is re-derived from its vehicle every tick — so
+            // shoving one would be overwritten before it could be observed, and
+            // its vehicle is in the cart pass above.
+            for index in 0..self.bodies.len() {
+                let crate::entity::BodyPhysics::Frozen { pos } = self.bodies[index].physics else {
+                    continue;
+                };
+                let id = self.bodies[index].id;
+                let Some((min, max)) = crate::entity::body_aabb(&self.bodies[index].kind, pos)
+                else {
+                    continue;
+                };
                 let (travel, distance, probe) =
                     match Self::piston_push(destination, sweep, progress, source_piston, min, max) {
                         PistonPush::Move(travel, distance, probe) => (travel, distance, probe),
@@ -927,8 +909,12 @@ impl Simulation {
                     probe,
                 );
                 let moved = self.shove(min, max, travel, distance, id);
-                for axis in 0..3 {
-                    self.frozen[index].2[axis] += moved[axis];
+                if let crate::entity::BodyPhysics::Frozen { pos } =
+                    &mut self.bodies[index].physics
+                {
+                    for axis in 0..3 {
+                        pos[axis] += moved[axis];
+                    }
                 }
             }
             self.refresh_bodies();
@@ -1275,33 +1261,38 @@ impl Simulation {
     /// rider's box holds a cart up just as a standing body does.
     fn cart_obstacle_bodies(&self) -> Vec<([f64; 3], [f64; 3])> {
         let mut out = Vec::new();
-        for (_, kind, pos) in &self.frozen {
-            if crate::entity::blocks_a_cart(kind) != Some(true) {
-                continue;
-            }
-            // `None` is unreachable: spawn refuses a kind with no dimensions.
-            if let Some(aabb) = crate::entity::body_aabb(kind, *pos) {
-                out.push(aabb);
-            }
-        }
-        for (_, kind, vehicle_id, seat) in &self.riders {
-            if crate::entity::blocks_a_cart(kind) != Some(true) {
-                continue;
-            }
-            let Some(vehicle) = self.minecarts.iter().find(|c| c.id == *vehicle_id && !c.removed)
-            else {
-                continue;
-            };
-            let pos = [
-                vehicle.pos[0] + seat[0],
-                vehicle.pos[1] + seat[1],
-                vehicle.pos[2] + seat[2],
-            ];
-            if let Some(aabb) = crate::entity::body_aabb(kind, pos) {
-                out.push(aabb);
+        for standing in [true, false] {
+            for body in &self.bodies {
+                if matches!(body.physics, crate::entity::BodyPhysics::Frozen { .. }) != standing {
+                    continue;
+                }
+                if crate::entity::blocks_a_cart(&body.kind) != Some(true) {
+                    continue;
+                }
+                let Some(pos) = self.body_position(body) else { continue };
+                // `None` is unreachable: spawn refuses a kind with no dimensions.
+                if let Some(aabb) = crate::entity::body_aabb(&body.kind, pos) {
+                    out.push(aabb);
+                }
             }
         }
         out
+    }
+
+    /// Where a body actually is: stored for a standing one, derived from its
+    /// vehicle for a passenger.
+    ///
+    /// `None` for a rider whose vehicle has been removed — a removed vehicle
+    /// takes its rider's box with it, which is why the lookup is a filter and
+    /// not an unwrap.
+    fn body_position(&self, body: &crate::entity::EntityInstance) -> Option<[f64; 3]> {
+        match body.physics {
+            crate::entity::BodyPhysics::Frozen { pos } => Some(pos),
+            crate::entity::BodyPhysics::Rider { vehicle, seat } => {
+                let cart = self.minecarts.iter().find(|c| c.id == vehicle && !c.removed)?;
+                Some([cart.pos[0] + seat[0], cart.pos[1] + seat[1], cart.pos[2] + seat[2]])
+            }
+        }
     }
 
     /// Rebuild the entity-box view block behaviours read
@@ -1327,52 +1318,40 @@ impl Simulation {
                 is_minecart: true,
             });
         }
-        for (id, kind, pos) in &self.frozen {
-            // Refused at spawn if the kind had no dimensions, so this cannot
-            // fall back to a guessed box.
-            let Some((min, max)) = crate::entity::body_aabb(kind, *pos) else { continue };
-            bodies.push(crate::entity::EntityBody {
-                id: *id,
-                kind: kind.clone(),
-                min,
-                max,
-                is_minecart: false,
-            });
-        }
-        // Riders last, and derived rather than stored. This is
+        // Standing bodies, then riders — two passes over the one collection,
+        // because the order this view is built in is observable (it is the order
+        // `entityInside` visits cells in) and this is the order it has always
+        // had.
+        //
+        // A rider's box is derived rather than stored. This is
         // `Entity.positionRider`: the passenger is placed at the vehicle's
         // position plus its seat, every tick, unconditionally. Rebuilding it
         // here rather than keeping a rider position means a rider cannot drift
         // from its vehicle even by one tick — including a vehicle a piston just
         // shoved, and including one whose velocity is NaN and never moves at
         // all.
-        //
-        // A vehicle that has been removed takes its rider's box with it, which
-        // is why the lookup is a filter and not an unwrap.
-        let mut seated: Vec<crate::entity::EntityBody> = Vec::new();
-        for (id, kind, vehicle_id, seat) in &self.riders {
-            let Some(vehicle) = self.minecarts.iter().find(|c| c.id == *vehicle_id && !c.removed)
-            else {
-                continue;
-            };
-            let pos = [
-                vehicle.pos[0] + seat[0],
-                vehicle.pos[1] + seat[1],
-                vehicle.pos[2] + seat[2],
-            ];
-            let Some((min, max)) = crate::entity::body_aabb(kind, pos) else { continue };
-            seated.push(crate::entity::EntityBody {
-                id: *id,
-                kind: kind.clone(),
-                min,
-                max,
-                // A blaze on a cart is not an `AbstractMinecart`, and a detector
-                // rail selects on that class — so a rider must not power one
-                // just because its vehicle would.
-                is_minecart: false,
-            });
+        for standing in [true, false] {
+            for body in &self.bodies {
+                if matches!(body.physics, crate::entity::BodyPhysics::Frozen { .. }) != standing {
+                    continue;
+                }
+                let Some(pos) = self.body_position(body) else { continue };
+                // Refused at spawn if the kind had no dimensions, so this cannot
+                // fall back to a guessed box.
+                let Some((min, max)) = crate::entity::body_aabb(&body.kind, pos) else { continue };
+                self.item_entities.others.push(crate::entity::EntityBody {
+                    id: body.id,
+                    kind: body.kind.clone(),
+                    min,
+                    max,
+                    // A blaze on a cart is not an `AbstractMinecart`, and a
+                    // detector rail selects on that class — so a rider must not
+                    // power one just because its vehicle would. No frozen body
+                    // is a cart either: every cart is in `minecarts`.
+                    is_minecart: false,
+                });
+            }
         }
-        self.item_entities.others.extend(seated);
     }
 
     /// Where a passenger is sitting, derived from its vehicle.
@@ -1381,21 +1360,10 @@ impl Simulation {
     /// [`Simulation::entity_bodies`] is: a rider has no state beyond where it
     /// is, so its position *is* the entity.
     pub fn riders(&self) -> Vec<(u32, String, [f64; 3])> {
-        self.riders
+        self.bodies
             .iter()
-            .filter_map(|(id, kind, vehicle_id, seat)| {
-                let vehicle =
-                    self.minecarts.iter().find(|c| c.id == *vehicle_id && !c.removed)?;
-                Some((
-                    *id,
-                    kind.clone(),
-                    [
-                        vehicle.pos[0] + seat[0],
-                        vehicle.pos[1] + seat[1],
-                        vehicle.pos[2] + seat[2],
-                    ],
-                ))
-            })
+            .filter(|body| matches!(body.physics, crate::entity::BodyPhysics::Rider { .. }))
+            .filter_map(|body| Some((body.id, body.kind.clone(), self.body_position(body)?)))
             .collect()
     }
 
@@ -1704,8 +1672,7 @@ impl Simulation {
             hopper_state: self.hopper_state.clone(),
             item_entities: self.item_entities.clone(),
             minecarts: self.minecarts.clone(),
-            frozen: self.frozen.clone(),
-            riders: self.riders.clone(),
+            bodies: self.bodies.clone(),
         }
     }
 
@@ -1728,8 +1695,7 @@ impl Simulation {
         self.hopper_state = checkpoint.hopper_state.clone();
         self.item_entities = checkpoint.item_entities.clone();
         self.minecarts = checkpoint.minecarts.clone();
-        self.frozen = checkpoint.frozen.clone();
-        self.riders = checkpoint.riders.clone();
+        self.bodies = checkpoint.bodies.clone();
         // Event emission restarts from the restored state.
         self.entity_snapshot.clear();
         for item in &self.item_entities.items {
@@ -3102,7 +3068,8 @@ mod tests {
         let rider = s
             .spawn_authored_rider(
                 cart,
-                &crate::structure::SpawnedEntity::Blaze(crate::structure::SpawnedBlaze {
+                &crate::structure::SpawnedEntity::Body(crate::structure::SpawnedBody {
+                    kind: "minecraft:blaze".to_string(),
                     // Deliberately nonsense, and deliberately ignored: a rider is
                     // seated from its vehicle, not from the file.
                     pos: [999.0, 999.0, 999.0],
@@ -3152,7 +3119,8 @@ mod tests {
         let why = s
             .spawn_authored_rider(
                 cart,
-                &crate::structure::SpawnedEntity::Blaze(crate::structure::SpawnedBlaze {
+                &crate::structure::SpawnedEntity::Body(crate::structure::SpawnedBody {
+                    kind: "minecraft:blaze".to_string(),
                     pos: [4.0, 2.2, 8.0],
                     motion: [0.0; 3],
                 }),

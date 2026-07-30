@@ -199,7 +199,8 @@ fn a_cart_rests_on_a_seated_passenger() {
         sim.spawn_minecart("minecraft:minecart".into(), [2.5, 1.0, 40.5], [0.0, 0.0, f64::NAN]);
     sim.spawn_authored_rider(
         vehicle,
-        &mc_tick::structure::SpawnedEntity::Blaze(mc_tick::structure::SpawnedBlaze {
+        &mc_tick::structure::SpawnedEntity::Body(mc_tick::structure::SpawnedBody {
+            kind: "minecraft:blaze".to_string(),
             pos: [0.0; 3],
             motion: [0.0, -0.0784, 0.0],
         }),
@@ -351,4 +352,80 @@ fn a_cart_rests_on_a_cart() {
     }
     assert_eq!(sim.minecarts()[1].pos[1], 1.699999988079071);
     assert_eq!(sim.minecarts()[0].pos[1], 1.0, "the one underneath is not pressed down");
+}
+
+/// A **boat** holds a cart up, and an **armor stand** does not.
+///
+/// The pair that refuted "living entities are solid", vertically. `cart_body`
+/// lane z=16.5 drops a plain minecart from y = 3.0 onto an `oak_boat` at y = 1.0
+/// and vanilla parks it at `1.5625` — the boat's registered height, `sized(1.375F,
+/// 0.5625F)`, on top of the boat's y. Lane z=13.5 is the same drop onto an
+/// `armor_stand` and the cart goes straight past it to the floor, matching
+/// [`FREE_FALL`] tick for tick.
+///
+/// Asserted together on purpose: a `blocks_a_cart` that answered `true` for
+/// everything would pass the first half and fail the second, and one that
+/// answered `false` for everything the other way round. Neither body is a
+/// projectile and neither is a minecart, so no rule short of the measured
+/// vehicle predicate separates them.
+#[test]
+fn a_boat_holds_a_cart_up_and_an_armor_stand_does_not() {
+    let (mut sim, structure) = world("cart_body.snbt");
+    sim.spawn_frozen_entity("minecraft:oak_boat".into(), [2.5, 1.0, 16.5]).unwrap();
+    sim.spawn_minecart("minecraft:minecart".into(), [2.5, 3.0, 16.5], [0.0; 3]);
+    sim.spawn_frozen_entity("minecraft:armor_stand".into(), [2.5, 1.0, 13.5]).unwrap();
+    sim.spawn_minecart("minecraft:minecart".into(), [2.5, 3.0, 13.5], [0.0; 3]);
+    settle(&mut sim, &structure);
+
+    let seen = fall(&mut sim, FREE_FALL.len());
+    assert_eq!(seen[0][10], 1.5625, "resting on the boat's deck");
+    matches_capture(&seen[1], &FREE_FALL, "an armor stand is not there at all");
+    assert_eq!(seen[1][10], 1.0, "on the floor, not on the stand");
+    // And twenty ticks later neither has moved off its answer.
+    for _ in 0..20 {
+        sim.step();
+    }
+    assert_eq!(sim.minecarts()[0].pos[1], 1.5625);
+    assert_eq!(sim.minecarts()[1].pos[1], 1.0);
+}
+
+/// The same pair, sideways — where the boat's *width* is measured.
+///
+/// `cart_body2` lane z=7.5 drives a cart east into an `oak_boat` centred at
+/// x = 6.5 and vanilla stops it at `5.322499990463257`, whose east face is
+/// 5.322499990463257 + 0.98f/2 = `5.8125` — the boat's west face, 6.5 − 1.375/2,
+/// to the last bit. Lane z=10.5 is the same drive at an `armor_stand`, and that
+/// cart is still rolling at x = 5.7646 on the tick the boat lane has been parked
+/// for good.
+///
+/// As in [`a_body_stops_a_cart_sideways_at_its_own_face`], the cart here is a
+/// plain minecart where the capture used a furnace one, and the assertion is the
+/// resting *face* rather than the trajectory: a furnace cart's approach is
+/// governed by two constants this engine does not model yet, and where it stops
+/// is geometry and is not one of them.
+#[test]
+fn a_boat_stops_a_cart_sideways_and_an_armor_stand_is_transparent() {
+    let (mut sim, structure) = world("cart_body2.snbt");
+    sim.spawn_frozen_entity("minecraft:oak_boat".into(), [6.5, 1.0, 1.5]).unwrap();
+    sim.spawn_frozen_entity("minecraft:armor_stand".into(), [6.5, 1.0, 4.5]).unwrap();
+    sim.spawn_minecart("minecraft:minecart".into(), [1.5, 1.0625, 1.5], [0.3, 0.0, 0.0]);
+    sim.spawn_minecart("minecraft:minecart".into(), [1.5, 1.0625, 4.5], [0.3, 0.0, 0.0]);
+    // The empty control, same rail, nothing on it.
+    sim.spawn_minecart("minecraft:minecart".into(), [1.5, 1.0625, 7.5], [0.3, 0.0, 0.0]);
+    settle(&mut sim, &structure);
+
+    for _ in 0..60 {
+        sim.step();
+    }
+    let carts = sim.minecarts();
+    assert_eq!(
+        carts[0].pos[0] + mc_tick::minecart::CART_HALF_WIDTH,
+        5.8125,
+        "parked with its east face on the boat's west face"
+    );
+    assert_eq!(
+        carts[1].pos[0], carts[2].pos[0],
+        "an armor stand in the way is indistinguishable from an empty rail"
+    );
+    assert!(carts[2].pos[0] > 6.5, "and the control really did run past x=6.5");
 }

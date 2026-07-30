@@ -22,6 +22,7 @@
 //! a matter of adding arms below, each backed by a captured trace.
 
 use crate::behaviour::{BehaviourTable, Inert};
+use crate::entity_kind::{EntityKind, EntityTable};
 use crate::components::{
     Button, Comparator, ComparatorMode, CopperBulb, Door, Dropper, Hopper, Lamp, NoteBlock,
     PowerSource, PressurePlate, Repeater, StatePair, Torch, Trapdoor,
@@ -645,6 +646,192 @@ const INERT: &[&str] = &[
     "minecraft:blast_furnace",
     "minecraft:smoker",
 ];
+
+/// Every minecart variant shares one hitbox — furnace, chest, hopper and TNT
+/// carts included. A furnace minecart is dimensionally an ordinary cart.
+///
+/// `EntityDimensions.scalable(0.98F, 0.7F)` — float literals, so the real box is
+/// 0.9800000190734863 by 0.699999988079071. The width's eighth decimal is
+/// observable now that carts clip against each other: `cart_gap` measures a
+/// squeezed approach as 0.009999981, which is the float width and not the
+/// decimal one.
+const CART_BOX: (f64, f64) = (0.98_f32 as f64, 0.7_f32 as f64);
+
+/// The seats measured on a plain minecart; see
+/// [`crate::entity_kind::EntityBehaviour::seat_for`].
+///
+/// Only the plain cart is measured. The container and furnace variants share its
+/// *hitbox*, but an attachment point is not a hitbox — none of them was put
+/// under the oracle, so none of them is assumed to match, and each carries an
+/// empty seat list.
+const MINECART_SEATS: &[(&str, [f64; 3])] = &[
+    ("minecraft:blaze", [0.0, 0.1875, 0.0]),
+    ("minecraft:small_fireball", [0.0, 0.1875, 0.0]),
+    ("minecraft:villager", [0.0, 0.0, 0.0]),
+];
+
+/// Every entity kind this engine models, in one place.
+///
+/// The entity-side counterpart of [`register_all`]: one row per type, and a
+/// type with no row is refused by name wherever it turns up. See
+/// [`crate::entity_kind`] for what a row has to say and why.
+///
+/// Dimensions are the game's own (`tools/gametest/src/EntityDims.java`); the
+/// cart column of `obstructs_a_cart` is measured in
+/// `tools/gametest/captures/cart_body*.entities.log`.
+pub fn entity_table() -> EntityTable {
+    use crate::entity_kind::EntityMotion::{Frozen, Item, Minecart};
+    let mut table = EntityTable::new();
+
+    // --- minecarts ----------------------------------------------------------
+    // Cart on cart: `cart_body` drops one onto another and it rests at
+    // 1.699999988079071 — the lower cart's exact float top. The five cart-cart
+    // goldens are the horizontal half of the same fact.
+    for (name, seats) in [
+        ("minecraft:minecart", MINECART_SEATS),
+        ("minecraft:furnace_minecart", &[][..]),
+        ("minecraft:chest_minecart", &[][..]),
+        ("minecraft:hopper_minecart", &[][..]),
+        ("minecraft:tnt_minecart", &[][..]),
+    ] {
+        table.add(EntityKind {
+            name,
+            width: CART_BOX.0,
+            height: CART_BOX.1,
+            obstructs_a_cart: true,
+            motion: Minecart,
+            seats,
+        });
+    }
+
+    // --- item entities ------------------------------------------------------
+    // `cart_body4`: an authored item on the rail, and a cart dropped on one,
+    // both reproduce the empty control to the last digit.
+    table.add(EntityKind {
+        name: "minecraft:item",
+        width: 0.25,
+        height: 0.25,
+        obstructs_a_cart: false,
+        motion: Item,
+        seats: &[],
+    });
+
+    // --- projectiles, frozen ------------------------------------------------
+    // Every projectile measured is transparent to a cart, in both axes.
+    //
+    // Verified against the oracle in `fireball_reach.json`, which walks both
+    // fireballs across a weighted plate's touch box and finds the edge exactly
+    // where these widths put it: the dragon registers at 0.90 from centre and
+    // not at 0.95, the small one at 0.55 and not at 0.65.
+    for name in ["minecraft:dragon_fireball", "minecraft:fireball"] {
+        table.add(EntityKind {
+            name,
+            width: 1.0,
+            height: 1.0,
+            obstructs_a_cart: false,
+            motion: Frozen,
+            seats: &[],
+        });
+    }
+    table.add(EntityKind {
+        name: "minecraft:small_fireball",
+        width: 0.3125,
+        height: 0.3125,
+        obstructs_a_cart: false,
+        motion: Frozen,
+        seats: &[],
+    });
+
+    // --- mobs, frozen -------------------------------------------------------
+    // `EntityType.VILLAGER` is `sized(0.6F, 1.95F)`, and both literals are
+    // **floats**: 0.6000000238418579 by 1.9500000476837158. Written as decimals
+    // until a cart could stand on one, at which point the eighth decimal became
+    // observable and wrong — `blaze_ride_ai` rests a cart on a villager at
+    // exactly `2.950000047683716`, which is 1.0 + 1.95f and not 1.0 + 1.95.
+    //
+    // `cart_body2`: a furnace cart rolling east stops with its east face at
+    // 6.199999988079071, which is the blaze's and the villager's west face to
+    // the last bit.
+    table.add(EntityKind {
+        name: "minecraft:villager",
+        width: 0.6_f32 as f64,
+        height: 1.95_f32 as f64,
+        obstructs_a_cart: true,
+        motion: Frozen,
+        seats: &[],
+    });
+    // The record 3x3 door's two riders. Registry says `sized(0.6F, 1.8F)`, and
+    // `blaze_reach.entities.log` walks a blaze across a weighted plate's touch
+    // box at twelve offsets and agrees at all twelve: clear at 1.76 and 11.24,
+    // touching at 5.77 and 15.23, which bounds the half-width in (0.2925,
+    // 0.3025). The four baby-villager offsets are the cross-check — a 0.49-wide
+    // body reads clear at 17.81 and 27.19 and a blaze reads *touching*, so the
+    // width cannot be the baby's.
+    //
+    // Height is bounded the same way by a plate two blocks up: a blaze with its
+    // feet at 1.205 reaches it and one at 1.195 does not, so the height is in
+    // (1.795, 1.805). `blaze_reach_villager_control.entities.log` is the
+    // negative control — the same rig, a 1.95-tall villager, and *both* plates
+    // fire. Written as the float the registry holds because the eighth decimal
+    // is observable: in `blaze_ride_ai` a cart dropped onto a blaze settles at
+    // exactly 1.0 + 1.7999999523162842.
+    table.add(EntityKind {
+        name: "minecraft:blaze",
+        width: 0.6_f32 as f64,
+        height: 1.8_f32 as f64,
+        obstructs_a_cart: true,
+        motion: Frozen,
+        seats: &[],
+    });
+
+    // --- the two the vehicle predicate was rewritten for ---------------------
+    // A boat is **not** a `LivingEntity` and stops a cart dead. Two independent
+    // captures put a cart on top of one and it rests at y = 1.5625 on a boat at
+    // 1.0 (`cart_body` id 11, `cart_body2` id 22) — a top of 0.5625 exactly. The
+    // sideways half is `cart_body2` lane z = 7.5: a furnace cart driving east
+    // stops at x = 5.322499990463257, whose east face is 5.322499990463257 +
+    // 0.98f/2 = 5.8125, so the boat's west face is 6.5 − 0.6875 and the width is
+    // 1.375. The registry agrees exactly: `sized(1.375F, 0.5625F)`. Both
+    // literals are dyadic — 11/8 and 9/16 — so float and decimal cannot differ
+    // here, unlike the mobs above.
+    //
+    // No seat: `blaze_ride` measured riders on a *minecart* only, and a boat is
+    // the vehicle people actually ride. Until one is put under the oracle, a
+    // passenger on a boat refuses.
+    table.add(EntityKind {
+        name: "minecraft:oak_boat",
+        width: 1.375,
+        height: 0.5625,
+        obstructs_a_cart: true,
+        motion: Frozen,
+        seats: &[],
+    });
+    // An armor stand **is** a `LivingEntity` and a cart falls straight through
+    // it — the measurement that refutes "living is solid". `cart_body` drops a
+    // cart from y = 3 onto a stand at y = 1 and it lands on the *floor* at 1.0,
+    // not on the stand; `cart_body2` lane z = 10.5 drives a furnace cart at it
+    // and the cart is still rolling (x = 5.7646, v = 0.0261) on the last tick,
+    // where the boat lane one row over stopped dead. `ArmorStand.isPushable` is
+    // overridden to `false` and it cannot be collided with, so vanilla's
+    // `canBeCollidedWith() || isPushable()` says the same thing.
+    //
+    // The box is the game's own `sized(0.5F, 1.975F)`; 1.975f is
+    // 1.9750000238418579 and is written as the float for the same reason the
+    // mobs above are. Nothing measures it yet — a cart never touches it — but a
+    // non-marker armor stand does trigger pressure plates
+    // (`ArmorStand.isIgnoringBlockTriggers` returns `isMarker()`), so the box is
+    // load-bearing the moment one stands on a plate.
+    table.add(EntityKind {
+        name: "minecraft:armor_stand",
+        width: 0.5,
+        height: 1.975_f32 as f64,
+        obstructs_a_cart: false,
+        motion: Frozen,
+        seats: &[],
+    });
+
+    table
+}
 
 /// Register vanilla behaviour for every state currently in `registry`.
 ///
