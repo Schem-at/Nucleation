@@ -11,6 +11,18 @@ conventional redstone allowed, ran out of space, and then used entities to *cram
 redstone circuits inside other redstone circuits*. Entities occupy the space
 that blocks cannot.
 
+> **Where the instruments went.** This document is a narrative and names the
+> diagnostics that were current while it was being written —
+> `examples/door55_sim.rs`, `door55_doorway.rs`, `door55_xray.rs`,
+> `door55_render.rs`, `world_entity_audit.rs`, `door_batch_load.rs`. All six are
+> gone. Everything they measured that mattered now lives in
+> `tests/scenarios/55_3x3.litematic`, which is this door carrying its own test
+> (24 entities, blaze seats at y 2.1875 and 2.25, 0 block changes untouched, 6 of
+> 9 doorway cells when pressed, 227 changes, quiescent, nothing below y=0), and
+> the one general-purpose replacement is `examples/scenario_inspect.rs`, which
+> takes a path and prints those same quantities. Read the references below as
+> history, not as commands.
+
 ## Why the sample is a world and not a schematic
 
 The mechanism is entity state — positions to sub-block precision, hitboxes, and

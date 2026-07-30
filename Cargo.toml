@@ -389,41 +389,22 @@ hematite-nbt = { git = "https://github.com/StackDoubleFlow/hematite_nbt" }
 name = "render_simulation_video"
 required-features = ["rendering"]
 
-# Diagnostic only: loads a list of doors through the public bridge surface, so
-# it needs the same features the browser build has.
+# The one diagnostic left where there used to be six door-specific ones
+# (door55_sim, door55_doorway, door55_xray, door55_render, world_entity_audit,
+# door_batch_load). It takes a path instead of knowing about a door, and prints
+# exactly the quantities a scenario descriptor can assert, so it is the
+# authoring loop for `tests/scenarios/*.litematic` rather than a parallel one.
+#
+# No required-features on purpose, and that is load-bearing: it reaches the
+# engine through `formats::gametest` + the mc-tick dev-dependency rather than
+# through the bridge, so a bare `cargo test` (which builds every example) can
+# compile it. An example that needed `bridge` and said so only in a comment is
+# what broke the pre-push gate before.
 [[example]]
-name = "door_batch_load"
-required-features = ["bridge", "mc-tick"]
+name = "scenario_inspect"
 
-# Diagnostic only: how many authored entities survive into the simulator.
-[[example]]
-name = "world_entity_audit"
-required-features = ["bridge", "mc-tick"]
-
-# Ticks the record 3x3 door through the bridge and reports what moved. Needs the
-# bridge because it goes through the product loading path on purpose.
-[[example]]
-name = "door55_sim"
-required-features = ["bridge", "mc-tick"]
-
-# Forensic x-ray of the same door: the block layout and every entity box in
-# simulation coordinates, plus the whole update log across a press, so the
-# question "which component never heard anything" has an answer.
-[[example]]
-name = "door55_xray"
-required-features = ["bridge", "mc-tick"]
-
-# Reports the record 3x3 door's own doorway, cell by cell and tick by tick, plus
-# a block census. Needs the same features the rest of the door55 set does —
-# without this stanza cargo auto-discovers it and a bare `cargo test` tries to
-# compile it against a crate that has no `bridge` module, which is how it broke
-# the pre-push gate.
-[[example]]
-name = "door55_doorway"
-required-features = ["bridge", "mc-tick"]
-
-# Actuates the record 3x3 door through the bridge (InWorld) and renders it, so
-# it needs both the loader's features and the renderer's.
-[[example]]
-name = "door55_render"
-required-features = ["bridge", "mc-tick", "rendering"]
+# Self-testing builds: each `.litematic` under tests/scenarios/ carries its own
+# scenario. Not a stanza cargo needs — listed so the target is discoverable
+# beside the descriptor-driven `cases` test in crates/mc-tick.
+[[test]]
+name = "litematic_cases"

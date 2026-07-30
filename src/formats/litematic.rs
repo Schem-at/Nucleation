@@ -36,6 +36,12 @@ const DATA_VERSION_1_13_2: i32 = 1631; // Flattening → schematic Version 5
 const DATA_VERSION_1_18: i32 = 2860; // negative-Y height → Version 6
 const DATA_VERSION_1_19_2: i32 = 3120; // SubVersion=1 first written (within v6)
 const DATA_VERSION_1_20_5: i32 = 3837; // item Components → Version 7
+
+/// Schema version of the root-level `NucleationTest` compound.
+///
+/// Bumped only when the *container* changes; the descriptor inside `Spec` is
+/// JSON and versions itself by having no required fields it did not always have.
+const NUCLEATION_TEST_FORMAT: i32 = 1;
 /// Default target data version when a schematic carries none (latest canonical).
 const DEFAULT_TARGET_DATA_VERSION: i32 = 4790; // 26.1.2
 
@@ -106,6 +112,23 @@ pub fn to_litematic_with_compression(
     // Add Regions
     let regions = create_regions(schematic, version);
     root.insert("Regions", NbtTag::Compound(regions));
+
+    // A test the build carries with it, at the *root* beside `Metadata`.
+    //
+    // Root-level and not inside `Metadata` for two reasons: Litematica reads
+    // `Metadata` field by field and ignores unknown root tags, so this survives
+    // a trip through the mod untouched; and `create_metadata` above rebuilds
+    // `Metadata` from scratch on every save, which would silently drop it.
+    // Preservation is the point — a build edited in-game and re-saved must not
+    // lose its test — so this is written from the schematic on every save and
+    // read back in `parse_metadata`, and `litematic_preserves_an_embedded_test_across_a_resave`
+    // pins it.
+    if let Some(spec) = &schematic.metadata.embedded_test {
+        let mut test = NbtCompound::new();
+        test.insert("Format", NbtTag::Int(NUCLEATION_TEST_FORMAT));
+        test.insert("Spec", NbtTag::String(spec.clone()));
+        root.insert("NucleationTest", NbtTag::Compound(test));
+    }
 
     // Compress and return the NBT data
     let mut encoder = flate2::write::GzEncoder::new(Vec::new(), compression);
@@ -407,6 +430,15 @@ fn parse_metadata(root: &NbtCompound, schematic: &mut UniversalSchematic) -> Res
         schematic.metadata.source_data_version = Some(dv);
     }
 
+    // The test the build carries, if any. Root-level, beside `Metadata` — see
+    // the writer for why it is not inside it. An unknown `Format` is read
+    // anyway: the descriptor is JSON and the runner reports what it cannot
+    // parse, which beats a file that silently claims to have no test.
+    if let Ok(test) = root.get::<_, &NbtCompound>("NucleationTest") {
+        schematic.metadata.embedded_test =
+            test.get::<_, &str>("Spec").ok().map(String::from);
+    }
+
     let metadata = root.get::<_, &NbtCompound>("Metadata")?;
 
     schematic.metadata.name = metadata.get::<_, &str>("Name").ok().map(String::from);
@@ -670,6 +702,101 @@ mod tests {
             riders_before,
             "passengers ride inside their vehicle's NBT and must survive with it"
         );
+    }
+
+    /// A `.litematic` that carries its own test keeps it when it is saved again.
+    ///
+    /// This is the whole feature, and it is exactly the thing that was broken by
+    /// construction: `create_metadata` rebuilds `Metadata` from scratch on every
+    /// save, so anything stored in there is dropped on the next write. The test
+    /// lives at the *root* beside `Metadata` instead, and this pins that — a
+    /// build opened in Litematica, nudged, and re-saved must come back still
+    /// knowing how to test itself.
+    #[test]
+    fn litematic_preserves_an_embedded_test_across_a_resave() {
+        let spec = r#"{"name":"a door opens","checks":[{"tick":0,"expect":"initial"}]}"#;
+
+        let mut schem = UniversalSchematic::new("carrier".into());
+        schem.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+        schem.metadata.embedded_test = Some(spec.to_string());
+
+        // Save, load: the test comes back.
+        let first = to_litematic(&schem).expect("writes");
+        let reloaded = from_litematic(&first).expect("reads");
+        assert_eq!(
+            reloaded.metadata.embedded_test.as_deref(),
+            Some(spec),
+            "the embedded test must survive one round trip"
+        );
+
+        // Save *what we loaded*, load again: still there. This is the leg that
+        // a Metadata-hosted spec would have failed.
+        let second = to_litematic(&reloaded).expect("writes again");
+        let twice = from_litematic(&second).expect("reads again");
+        assert_eq!(
+            twice.metadata.embedded_test.as_deref(),
+            Some(spec),
+            "re-saving a loaded build must not drop its test"
+        );
+
+        // And it really is at the root, where Litematica will leave it alone.
+        let root = read_root(&second);
+        let test = root
+            .get::<_, &NbtCompound>("NucleationTest")
+            .expect("NucleationTest sits at the root, beside Metadata");
+        assert_eq!(test.get::<_, i32>("Format").unwrap(), NUCLEATION_TEST_FORMAT);
+        assert!(
+            root.get::<_, &NbtCompound>("Metadata")
+                .unwrap()
+                .get::<_, &str>("NucleationTest")
+                .is_err(),
+            "it must not also be inside Metadata, which is rebuilt on every save"
+        );
+
+        // A build with no test writes no tag at all, rather than an empty one.
+        let plain = to_litematic(&UniversalSchematic::new("plain".into())).expect("writes");
+        assert!(
+            read_root(&plain).get::<_, &NbtCompound>("NucleationTest").is_err(),
+            "a build with no test must not grow an empty NucleationTest"
+        );
+    }
+
+    /// The record door's data version survives a `.litematic` round trip.
+    ///
+    /// Load-bearing and easy to lose: the door is DataVersion 4082, and
+    /// [`crate::formats::gametest`]'s consumers pick the `Entity.load` rules
+    /// from it. 4082 selects the ≤4556 semantics that *keep* a NaN velocity. A
+    /// round trip that dropped or rewrote the version would load the door's nan
+    /// carts as ordinary carts, and the door would silently un-glue with no
+    /// error anywhere.
+    #[test]
+    fn litematic_round_trips_the_record_doors_data_version() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/samples/55_3x3.zip");
+        let bytes = std::fs::read(&path).expect("the record-door sample must be present");
+        let source = crate::formats::world::from_world_zip(&bytes).expect("the sample loads");
+        assert_eq!(
+            source.metadata.source_data_version,
+            Some(4082),
+            "the record door is 1.21.3 — if this moved, the numbers below are about a different save"
+        );
+
+        let lit = to_litematic(&source).expect("writes");
+        assert_eq!(
+            read_root(&lit).get::<_, i32>("MinecraftDataVersion").unwrap(),
+            4082,
+            "the file must state the version it was captured at"
+        );
+
+        let back = from_litematic(&lit).expect("reads");
+        assert_eq!(
+            back.metadata.source_data_version,
+            Some(4082),
+            "losing this loads the nan carts as ordinary carts and un-glues the door"
+        );
+
+        // And again, because a re-save is where a transient field goes missing.
+        let twice = from_litematic(&to_litematic(&back).expect("writes")).expect("reads");
+        assert_eq!(twice.metadata.source_data_version, Some(4082));
     }
 
     #[test]

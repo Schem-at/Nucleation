@@ -20,6 +20,21 @@ pub struct Metadata {
     /// load-time provenance.
     #[serde(default, skip)]
     pub source_data_version: Option<i32>,
+    /// A test scenario carried *inside* the schematic file, as the JSON
+    /// descriptor `crates/mc-tick/tests/cases/README.md` documents.
+    ///
+    /// This is what makes a build its own regression test: a scenario is a file
+    /// you drop in a folder rather than Rust somebody has to compile. Only
+    /// `.litematic` carries it today, in a root-level `NucleationTest` compound
+    /// beside `Metadata` — root-level so Litematica ignores it, and preserved
+    /// on re-save so a build edited in-game and saved again does not silently
+    /// lose its test.
+    ///
+    /// Not serialized: it is file-carried provenance like
+    /// [`Metadata::source_data_version`], written and read by the format
+    /// modules that know where to put it.
+    #[serde(default, skip)]
+    pub embedded_test: Option<String>,
 }
 
 impl Metadata {
@@ -43,6 +58,7 @@ impl Metadata {
             mc_version,
             we_version,
             source_data_version: None,
+            embedded_test: None,
         }
     }
 

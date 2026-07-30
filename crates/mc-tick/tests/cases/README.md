@@ -5,6 +5,30 @@ is adding files — nothing recompiles. Run them all with
 `cargo test -p mc-tick --test cases`, or one while iterating with
 `MC_TICK_CASE=<substring> cargo test -p mc-tick --test cases`.
 
+## Two carriers, one vocabulary
+
+The descriptor below has two homes, and the evaluator
+(`crates/mc-tick/tests/support/scenario.rs`) is shared verbatim between them:
+
+- **`*.test.json` beside an `.snbt`**, here — run by `crates/mc-tick/tests/cases.rs`.
+- **inside a `.litematic`**, in nucleation's `tests/scenarios/` — run by
+  `tests/litematic_cases.rs`. The descriptor is stored in a root-level
+  `NucleationTest` compound (`{Format: 1, Spec: "<this JSON>"}`), beside
+  `Metadata` rather than inside it: Litematica ignores unknown root tags, and
+  our own writer rebuilds `Metadata` from scratch on every save, so a spec
+  stored in there would vanish on the next re-save. `Spec` may be one descriptor
+  object or an array of them — a door needs to prove both that it stays still
+  untouched and that it opens when pressed, and those are two runs of one build,
+  not two copies of it. The `structure` field is rejected there: the carrier
+  *is* the structure. Authoring loop:
+  `cargo run --example scenario_inspect -- <build> --dump-test | ... | --embed spec.json --write <build>`.
+
+A `.litematic` also states the Minecraft data version it was captured at, and
+the runner passes it to the engine as the `Entity.load` Motion semantics. That
+is load-bearing rather than decorative: the record 3x3 door is 4082, which keeps
+NaN velocities, and read at the wrong version its nan carts load as ordinary
+carts and the door silently comes apart with no error anywhere.
+
 These deliberately assert **end states only** — which blocks stand where at
 named ticks — never traces or event order. That is the contract a door owes its
 user: it opens, it closes, it lands back exactly where it started. A different
@@ -65,6 +89,30 @@ per-tick-exact engine tests live in `conformance.rs` and stay engine-specific.
     An item entity can also be required to carry container contents — a
     dropped shulker box keeping its slots:
     `"with_contents": [{ "id": "minecraft:diamond", "count": 2 }]`.
+  - `quiescent` — nothing is pending: no scheduled tick, no queued update. The
+    backend-agnostic spelling of "the run finished", and the only thing that
+    distinguishes a door that came to rest from one still mid-cycle.
+  - `entity-count` — how many entities the world holds, with `count`,
+    `at_least` or `at_most`. A door glued together by nan carts is a door whose
+    entity count is load-bearing.
+  - `changes` — how many blocks changed over the run so far, same three bounds.
+    `{"expect": "changes", "count": 0}` on an untouched build is the strongest
+    claim in the file: vanilla ticking that same save in place changes nothing,
+    so neither may we.
+  - `fill` + `cells` — how many of a named cell set are non-air, same three
+    bounds. A doorway is nine cells and *how many of them are filled* is the
+    question; which nine is the authored part.
+    `"cells": ["3,0,20", "4,0,20", ...]`.
+  - `peak-fill` + `cells` — the most of those cells that were *ever* filled, up
+    to this tick. How far the door got rather than where it stopped: a leaf
+    sweeps through the doorway and settles somewhere, and the width of the sweep
+    is the claim worth pinning — unlike a reading at one named tick, it does not
+    care which tick the sweep peaked on.
+  - `min-entity-y` + `y` — no entity sits below `y`. The cheap form of "it did
+    not fall apart": a cart that lost its NaN velocity leaves through the floor.
+  - `riders` + `kind` + `seats` — the passengers' exact seat heights, ascending.
+    Seats are structure, not physics: a blaze 0.1875 above its cart is where the
+    file put it, and a seat that moved means the save was reinterpreted.
 - `seed` — seeds the vanilla random source (`java.util.Random`'s LCG,
   bit-for-bit). Behaviours that jitter — dispense trajectories, dispenser
   slot choice, piston-destroy drops — draw from it in a fixed order, so a
