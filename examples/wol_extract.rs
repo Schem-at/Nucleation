@@ -22,11 +22,14 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use nucleation::formats::schematic::to_schematic;
+use nucleation::world_segment::ids::ContentId;
+use nucleation::world_segment::provenance::{Provenance, StableBuildId};
+use nucleation::{Connectivity, UniversalSchematic};
 use nucleation::world_segment::partition::{PartitionHint, PartitionIndex, PartitionPolicy};
 use nucleation::world_segment::profile::{ProfileParams, WorldProfile};
 use nucleation::world_segment::runner::{MaterializedBuild, RunStats, SegmentJob, WorldSegmenter};
 use nucleation::world_segment::score::{ScoreConfig, Tier};
-use nucleation::world_segment::segment::SegConfig;
+use nucleation::world_segment::segment::{DisconnectedSplit, SegConfig};
 use nucleation::world_segment::source::{TileError, TileSource};
 use nucleation::world_segment::targz_source::TarGzSource;
 use nucleation::world_segment::tile::VoxelTile;
@@ -45,6 +48,7 @@ struct Cli {
     coverage: f32,
     palette_share: f32,
     floor_share: f32,
+    split_min_blocks: u64,
 }
 
 fn parse_args() -> Cli {
@@ -67,6 +71,14 @@ fn parse_args() -> Cli {
     // where owner-chosen floors (globally rare, locally dominant) form 255x255
     // sheets that closing fuses into whole-plot mega-clusters.
     let mut floor_share: f32 = 0.3;
+    // Post-closing disconnected-build split: a merged cluster whose original
+    // cells fall into two-plus six-connected components that are each at least
+    // this many blocks (and each >= 40% of the cluster, >= 2 cells apart) is
+    // split into one build per component. Fixes the real-data failure where two
+    // spatially-disconnected plot builds sitting within the closing's ~20-block
+    // reach were fused into a single "build". 0 disables the split. The share
+    // and gap tolerances take `DisconnectedSplit`'s defaults.
+    let mut split_min_blocks: u64 = 4096;
 
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut i = 0;
@@ -125,6 +137,14 @@ fn parse_args() -> Cli {
                     .expect("--floor-share must be a float");
                 i += 2;
             }
+            "--split-min-blocks" => {
+                split_min_blocks = args
+                    .get(i + 1)
+                    .expect("--split-min-blocks needs a value")
+                    .parse()
+                    .expect("--split-min-blocks must be a number");
+                i += 2;
+            }
             other => {
                 eprintln!("wol_extract: ignoring unrecognized argument {other}");
                 i += 1;
@@ -132,7 +152,7 @@ fn parse_args() -> Cli {
         }
     }
 
-    Cli { tarball, plots, out, limit, sample, coverage, palette_share, floor_share }
+    Cli { tarball, plots, out, limit, sample, coverage, palette_share, floor_share, split_min_blocks }
 }
 
 /// One row of `wol-project/data-ore-plots-build-20260723.json`.
@@ -361,12 +381,24 @@ fn main() {
         "wol_extract: partition_floor_share = {partition_floor_share:?} (from --floor-share {})",
         cli.floor_share
     );
+    // Split fully-disconnected builds the morphological closing over-merged.
+    // `--split-min-blocks 0` restores the pre-fix behavior (no split).
+    let split_disconnected = if cli.split_min_blocks > 0 {
+        Some(DisconnectedSplit { min_component_blocks: cli.split_min_blocks, ..DisconnectedSplit::default() })
+    } else {
+        None
+    };
+    println!(
+        "wol_extract: split_disconnected = {split_disconnected:?} (from --split-min-blocks {})",
+        cli.split_min_blocks
+    );
     let job = SegmentJob {
         config: SegConfig {
             cell_size: 4,
             closing_radius: 2,
             partition_policy: PartitionPolicy::HardCut,
             partition_floor_share,
+            split_disconnected,
             ..SegConfig::default()
         },
         score_config: ScoreConfig::default(),
@@ -395,9 +427,9 @@ fn main() {
     let mut schem_written: u64 = 0;
     let mut seen_stable_ids: BTreeSet<String> = BTreeSet::new();
 
-    let mut emit = |mb: MaterializedBuild| {
+    // Writes one final build (schematic + its provenance) to disk.
+    let mut emit_one = |schematic: UniversalSchematic, provenance: Provenance| {
         build_count += 1;
-        let MaterializedBuild { schematic, provenance } = mb;
 
         let line = serde_json::to_string(&provenance).expect("provenance must serialize to JSON");
         writeln!(provenance_file, "{line}").expect("failed to write provenance line");
@@ -422,6 +454,57 @@ fn main() {
                     eprintln!("wol_extract: failed to serialize build {stable_id} to .schem: {e}");
                 }
             }
+        }
+    };
+
+    // Final materialization pass: block-level LOSSLESS connected-component
+    // split. The cell-level `split_disconnected` (SegConfig) is a cheap
+    // pre-split during clustering; this block-level pass REFINES the result on
+    // the fully materialized, substrate-subtracted schematic. A build that is
+    // already a single connected mass (or a single substantial core with only
+    // small fragments — e.g. a redstone build that shatters under flood-fill)
+    // returns exactly ONE piece and is emitted unchanged, so the two splits
+    // never double-count. Only when ≥2 substantial cores (≥ `split_min` blocks
+    // each) survive does this split into separate builds, attaching every
+    // sub-threshold fragment to its nearest core so NO block is dropped.
+    // `--split-min-blocks 0` disables this pass (as it disables the cell-level
+    // one).
+    let split_min = cli.split_min_blocks as usize;
+    let mut emit = |mb: MaterializedBuild| {
+        let MaterializedBuild { schematic, provenance } = mb;
+
+        if split_min == 0 {
+            emit_one(schematic, provenance);
+            return;
+        }
+
+        let pieces = schematic.split_connected_attach(Connectivity::Corner, split_min);
+        if pieces.len() <= 1 {
+            // Clean / single-core build: emit the ORIGINAL untouched so its
+            // stable id, name and bytes are preserved exactly (harmless refine).
+            emit_one(schematic, provenance);
+            return;
+        }
+
+        // Genuine multi-core split: emit each piece as its own build with an
+        // extended, still-valid provenance envelope (a per-piece stable id
+        // deterministically derived from the parent id + index, and the piece's
+        // own bbox / block_count).
+        println!(
+            "wol_extract: block-level attach-split fired: build {} -> {} pieces",
+            provenance.stable_build_id, pieces.len()
+        );
+        for (i, piece) in pieces.into_iter().enumerate() {
+            let mut p = provenance.clone();
+            p.stable_build_id = StableBuildId(ContentId::of(&[
+                b"wol.split.v1",
+                provenance.stable_build_id.0.as_bytes(),
+                &(i as u32).to_le_bytes(),
+            ]));
+            let bb = piece.get_bounding_box();
+            p.world_bbox = (bb.min, bb.max);
+            p.block_count = piece.total_blocks().max(0) as u64;
+            emit_one(piece, p);
         }
     };
 
