@@ -733,16 +733,12 @@ fn wire_simulation(
     // The universal actuator, plus anything the caller names.
     let mut wanted: Vec<String> = vec!["minecraft:redstone_block".to_string()];
     wanted.extend(extra_states.iter().map(|s| s.to_string()));
-    // A dispenser can *place* a shulker box it holds as an item; behaviours
-    // bind only to interned states, so intern every facing up front.
+    // A dispenser can *place* a block it holds as an item — a shulker box, or a
+    // bucket's contents. Behaviours bind only to interned states, and those
+    // states are by definition absent from the build's own palette.
     for (_, stacks) in &structure.inventories {
         for stack in stacks {
-            let base = stack.id.split('[').next().unwrap_or(&stack.id);
-            if base.ends_with("_shulker_box") || base == "minecraft:shulker_box" {
-                for facing in ["up", "down", "north", "south", "west", "east"] {
-                    wanted.push(format!("{base}[facing={facing}]"));
-                }
-            }
+            wanted.extend(mc_tick::vanilla::dispensable_states(&stack.id));
         }
     }
     for descriptor in &wanted {
