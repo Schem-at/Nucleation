@@ -32,6 +32,23 @@ for target_root in ("examples", "tests", "benches"):
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
 
+# The root manifest declares `[workspace] members = ["crates/*"]`, and cargo
+# resolves that glob before it builds anything — so every member's manifest must
+# exist in the sdist or the build dies at manifest load with "failed to read
+# crates/*/Cargo.toml", long before a single feature is considered. `bridge-full`
+# also turns on `mc-tick`, which is a real path dependency, so its sources have
+# to be here regardless.
+#
+# Manifest plus `src` only, for the same reason examples and tests are copied as
+# bare `.rs` above: mc-tick's `tests/` is 10 MB of oracle captures, and none of
+# it is needed to build the library.
+for member in sorted((ROOT / "crates").glob("*")):
+    if not (member / "Cargo.toml").is_file():
+        continue
+    (DEST / "crates" / member.name).mkdir(parents=True, exist_ok=True)
+    shutil.copy2(member / "Cargo.toml", DEST / "crates" / member.name / "Cargo.toml")
+    shutil.copytree(member / "src", DEST / "crates" / member.name / "src")
+
 # Cargo validates every explicitly declared target path even when only --lib is
 # built. Copy those target sources without dragging unrelated examples/assets
 # into the source distribution.

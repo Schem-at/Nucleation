@@ -16,6 +16,22 @@ CHECKS: list[tuple[str, list[str]]] = [
     ("bridge builds", ["cargo", "build", "--lib", "--features", "bridge"]),
     ("bindings fresh", ["bash", "-c", "./tools/gen-bindings.sh && git diff --exit-code -- bindings"]),
     ("bridge coverage", ["python3", "tools/check_bridge_coverage.py"]),
+    # The sdist is staged from a *copy* of the tree, so it can be broken by
+    # something the in-tree build never notices. v0.9.0 shipped exactly that:
+    # `[workspace] members = ["crates/*"]` resolved fine here and died in CI with
+    # "failed to read crates/*/Cargo.toml", because the staging script did not
+    # copy the members. Resolving the staged manifest is a couple of seconds and
+    # catches that whole class; actually building it is CI's job.
+    (
+        "sdist manifest resolves",
+        [
+            "bash",
+            "-c",
+            "python3 tools/stage-python-sdist.py >/dev/null "
+            "&& cargo metadata --manifest-path bindings/python/rust/Cargo.toml "
+            "--no-deps --format-version 1 >/dev/null",
+        ],
+    ),
     ("smoke: C", ["./examples/bridge_smoke/c/run.sh"]),
     ("smoke: C++", ["./examples/bridge_smoke/cpp/run.sh"]),
     ("smoke: PHP", ["./examples/bridge_smoke/php/run.sh"]),
