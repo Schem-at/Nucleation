@@ -289,9 +289,37 @@ fn entities_snbt(schematic: &crate::UniversalSchematic, min: (i32, i32, i32)) ->
 ///
 /// Pre-flattening builds are converted first; see [`modernized`].
 pub fn to_gametest_snbt(schematic: &crate::UniversalSchematic) -> String {
+    // Decided *before* any block conversion, and threaded through it.
+    //
+    // `Entity.load`'s handling of a non-finite `Motion` changed at 1.21.11, so
+    // the stamped version is what tells a reader whether this build's NaN
+    // velocities are real. Modernising blocks does not reinterpret entities, so
+    // the answer is the version the *save* was written at either way — which is
+    // why this is read here rather than off the converted clone below, whose
+    // `source_data_version` has been rewritten to the canonical one.
+    let data_version = source_data_version(schematic);
     if let Some(modern) = modernized(schematic) {
-        return to_gametest_snbt(&modern);
+        return render(&modern, data_version);
     }
+    render(schematic, data_version)
+}
+
+/// The version to stamp: what the file says, else the canonical one.
+///
+/// A build that states nothing gets today's canonical version, which selects the
+/// modern NaN-dropping rule. That is the right default — a schematic with no
+/// provenance is not evidence of an old save — but it is a default, and a file
+/// that does state a version always wins over it.
+fn source_data_version(schematic: &crate::UniversalSchematic) -> i32 {
+    schematic
+        .metadata
+        .source_data_version
+        .or(schematic.metadata.mc_version)
+        .unwrap_or(crate::dataconverter::CANONICAL_DATA_VERSION)
+}
+
+/// Render `schematic`, stamping `data_version`, with no further conversion.
+fn render(schematic: &crate::UniversalSchematic, data_version: i32) -> String {
     use std::collections::HashMap;
     use std::fmt::Write as _;
 
@@ -348,7 +376,8 @@ pub fn to_gametest_snbt(schematic: &crate::UniversalSchematic) -> String {
     }
 
     format!(
-        "{{\n  DataVersion: 4903,\n  size: [{}, {}, {}],\n  palette: [\n    {}\n  ],\n  blocks: [\n    {}\n  ],\n  entities: [\n    {}\n  ]\n}}\n",
+        "{{\n  DataVersion: {},\n  size: [{}, {}, {}],\n  palette: [\n    {}\n  ],\n  blocks: [\n    {}\n  ],\n  entities: [\n    {}\n  ]\n}}\n",
+        data_version,
         size.0,
         size.1,
         size.2,

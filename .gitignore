@@ -105,3 +105,8 @@ apps/preview.pid
 
 # Per-agent gametest scratch dirs (jars, .class files, staged worlds)
 /tools/gametest/work-*/
+
+# Stray nanobind object files: the Python binding build writes these into the
+# repo root when run outside its build dir (91 of them after one gen-bindings run).
+*.o
+*.o.tmp

@@ -39,6 +39,16 @@ use crate::world::World;
 pub struct Structure {
     /// Extent along each axis.
     pub size: (i32, i32, i32),
+    /// The save version the text states, from the top-level `DataVersion`.
+    ///
+    /// Not decoration, and not only for block ids: it is the authority on which
+    /// `Entity.load` rules the authored `Motion` vectors were read under, which
+    /// is the difference between a nan cart and an ordinary one. See
+    /// [`crate::motion::MotionSemantics`]. `None` when the text omits the tag —
+    /// hand-written fixtures do, and a caller that cannot tell "the file says
+    /// 4903" from "the file says nothing" cannot decide whether to fall back to
+    /// its own default.
+    pub data_version: Option<i32>,
     /// Block state descriptors, indexed by palette entry.
     pub palette: Vec<String>,
     /// Positions with their palette index.
@@ -1164,6 +1174,7 @@ impl<'a> Parser<'a> {
         let mut block_entities: Vec<Pos> = Vec::new();
         let mut comparator_outputs: Vec<(Pos, u8)> = Vec::new();
         let mut entities: Vec<SpawnedEntity> = Vec::new();
+        let mut data_version: Option<i32> = None;
 
         loop {
             if self.peek() == Some(b'}') {
@@ -1173,6 +1184,13 @@ impl<'a> Parser<'a> {
             let key = self.key()?;
             self.eat(b':')?;
             match key.as_str() {
+                // Read rather than skipped, because `Entity.load`'s treatment of
+                // a non-finite `Motion` changed at 1.21.11 and the tag is the
+                // only record of which side of that a file sits on. Skipping it
+                // made every reader guess the modern rule, which silently
+                // sanitises the NaN velocities an older nan-cart door is glued
+                // together by.
+                "DataVersion" => data_version = Some(self.int()? as i32),
                 "size" => {
                     let values = self.int_list()?;
                     if values.len() != 3 {
@@ -1283,6 +1301,7 @@ impl<'a> Parser<'a> {
         }
 
         Ok(Structure {
+            data_version,
             size: size.ok_or(StructureError::Missing("size"))?,
             palette: palette.ok_or(StructureError::Missing("palette"))?,
             blocks: blocks.ok_or(StructureError::Missing("blocks"))?,

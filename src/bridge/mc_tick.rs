@@ -596,6 +596,10 @@ fn structure_from_blocks(
         }
     }
     Ok(mc_tick::Structure {
+        // Genome cells, not a save: there is no file and so no version to
+        // report. The caller's own default decides Motion semantics, and this
+        // path authors no entities for it to apply to.
+        data_version: None,
         size: (bx + travel, by + 2, bz + 2),
         palette: palette.to_vec(),
         blocks,
@@ -852,6 +856,14 @@ pub mod ffi {
         /// construction). `minecraft:redstone_block` is always available.
         /// `origin_*`: where the build's (0,0,0) sits in world coordinates —
         /// wire update order hashes absolute positions.
+        ///
+        /// The text's own `DataVersion` selects `Entity.load` Motion semantics,
+        /// exactly as [`TickSimulation::from_schematic`] uses the schematic's —
+        /// so `gametest_snbt` → `from_snbt` keeps a nan-cart build's NaN
+        /// velocities instead of quietly sanitising them. A text with no
+        /// `DataVersion` gets the engine default (the modern, NaN-dropping
+        /// rule); read [`TickSimulation::motion_semantics`] to see which
+        /// applied.
         pub fn from_snbt(
             snbt: &DiplomatStr,
             settle: TickSettleMode,
@@ -886,7 +898,13 @@ pub mod ffi {
                 mc_tick::Pos::new(origin_x, origin_y, origin_z),
                 settle,
                 &extras,
-                None,
+                // The text states the version it was saved at, and that decides
+                // whether its non-finite `Motion` vectors survive being read.
+                // Ignoring it made this path disagree with `from_schematic`
+                // about the same build: the NaN token round-trips through the
+                // SNBT fine, but the load rule chosen for it did not, so a
+                // door held together by nan carts came out as ordinary carts.
+                structure.data_version,
             )
             .map_err(|e| {
                 super::set_last_error(e);
@@ -1417,15 +1435,18 @@ pub mod ffi {
             let _ = write!(out, "{name}");
         }
 
-        /// How many times an entity stood in a **retracting** piston's sweep.
+        /// How many times an entity stood in a **retracting** piston's sweep
+        /// that the engine could not reproduce.
         ///
-        /// Piston extension displacement is measured and implemented;
-        /// retraction is not — `tools/gametest/captures/piston_pull.entities.log`
-        /// records sub-0.03 movements that are not uniformly backwards and
-        /// that no model here reproduces. Non-zero means this run leaned on
-        /// unimplemented behaviour and its result is not trustworthy. Zero
-        /// means no entity was ever in a retracting arm's way: a real answer,
-        /// not a missing instrument.
+        /// A tripwire from when retraction was unmodelled — extension
+        /// displacement was measured and implemented while
+        /// `tools/gametest/captures/piston_pull.entities.log`'s sub-0.03
+        /// movements, not uniformly backwards, had no model here. All three
+        /// retraction geometries are implemented now, so this reports **0**,
+        /// including on the record 3x3 door, which used to name six. It is kept
+        /// because the next geometry that turns out not to be covered should be
+        /// reported rather than guessed at: non-zero means this run leaned on
+        /// behaviour we do not reproduce and its result is not trustworthy.
         pub fn piston_retract_contacts(&self) -> u32 {
             self.sim.piston_retract_contacts().len() as u32
         }
@@ -1806,16 +1827,148 @@ mod tests {
         }
     }
 
+    /// The record 3x3 door sample, as a schematic.
+    fn record_door_schematic() -> UniversalSchematic {
+        let path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/samples/55_3x3.zip");
+        let bytes = std::fs::read(&path).expect("the record-door sample must be present");
+        crate::formats::world::from_world_zip(&bytes).expect("the sample loads")
+    }
+
+    /// How many of a run's minecarts hold a NaN anywhere in their velocity.
+    ///
+    /// The carts the record door is glued together by. Counted off the live
+    /// simulation rather than off the text, because the question is what
+    /// `Entity.load` did with the token, not whether the token was written.
+    fn nan_carts(sim: &mc_tick::Simulation) -> usize {
+        sim.minecarts().iter().filter(|c| c.vel.iter().any(|v| v.is_nan())).count()
+    }
+
+    /// Load gametest SNBT through the shipped bridge entry point.
+    fn from_snbt(snbt: &str) -> mc_tick::Simulation {
+        super::ffi::TickSimulation::from_snbt(
+            snbt.as_bytes(),
+            super::ffi::TickSettleMode::InWorld,
+            0,
+            0,
+            0,
+            b"",
+        )
+        .expect("the round-tripped text must load")
+        .sim
+    }
+
+    /// A schematic's own DataVersion reaches the engine through the SNBT.
+    ///
+    /// The write half of the round trip. `to_gametest_snbt` used to stamp the
+    /// canonical oracle version unconditionally, throwing the source's away
+    /// before any reader could see it.
+    #[test]
+    fn the_emitted_snbt_states_the_schematics_own_data_version() {
+        let mut schem = UniversalSchematic::new("versioned".into());
+        schem.set_block(0, 0, 0, &BlockState::new("minecraft:stone"));
+
+        schem.metadata.source_data_version = Some(4082);
+        let snbt = to_gametest_snbt(&schem);
+        assert!(snbt.contains("DataVersion: 4082"), "the file's own version must win: {snbt}");
+        assert_eq!(
+            mc_tick::Structure::parse(&snbt).expect("parses").data_version,
+            Some(4082),
+            "and it must survive being read back"
+        );
+
+        // No provenance is not evidence of an old save, so it falls back to the
+        // canonical version — a value, not a silent absence.
+        schem.metadata.source_data_version = None;
+        schem.metadata.mc_version = None;
+        let snbt = to_gametest_snbt(&schem);
+        assert!(
+            snbt.contains(&format!(
+                "DataVersion: {}",
+                crate::dataconverter::CANONICAL_DATA_VERSION
+            )),
+            "a schematic with no version must still stamp one: {snbt}"
+        );
+    }
+
+    /// `gametest_snbt` → `from_snbt` must not un-glue a nan-cart build.
+    ///
+    /// The NaN *token* always survived the text; the *load rule* did not. The
+    /// emitted SNBT hardcoded the canonical oracle version (>= 4671) and
+    /// mc-tick's parser never read `DataVersion` at all, so `from_snbt` chose
+    /// `drop_non_finite` for a 1.21.3 save and its six nan carts came back as
+    /// ordinary carts — live physics, in a machine whose whole construction
+    /// depends on dead physics.
+    ///
+    /// `from_schematic` is the reference: it has always read the version off the
+    /// file. Both sides assert `motion_semantics` *and* the cart count, because
+    /// either alone can pass for the wrong reason — the semantics could be right
+    /// while the entities were dropped, and the count could be right on a build
+    /// that never had a NaN.
+    #[test]
+    fn the_snbt_round_trip_keeps_the_record_doors_nan_carts() {
+        let schematic = record_door_schematic();
+        assert_eq!(
+            schematic.metadata.source_data_version,
+            Some(4082),
+            "the record door is a 1.21.3 save — if that changed, this test is measuring nothing"
+        );
+
+        let direct = wire_record_door(super::ffi::TickSettleMode::InWorld);
+        assert_eq!(
+            direct.motion_semantics(),
+            mc_tick::MotionSemantics::ClampAbsTen,
+            "4082 is below the boundary, so a cold load keeps NaN"
+        );
+        assert_eq!(nan_carts(&direct), 6, "the reference path's nan carts");
+
+        let snbt = to_gametest_snbt(&schematic);
+        let round_tripped = from_snbt(&snbt);
+        assert_eq!(
+            round_tripped.motion_semantics(),
+            mc_tick::MotionSemantics::ClampAbsTen,
+            "the round trip changed which game loaded the door"
+        );
+        assert_eq!(
+            nan_carts(&round_tripped),
+            nan_carts(&direct),
+            "the same door, through its own SNBT, must be the same machine"
+        );
+    }
+
+    /// The negative control: after the boundary, the NaN really is dropped.
+    ///
+    /// Without this, the test above could pass by the engine having simply
+    /// stopped sanitising anything, which would be a different bug wearing the
+    /// same result. The identical door stamped 4671 must lose every nan cart.
+    #[test]
+    fn a_build_stamped_after_the_boundary_still_drops_its_nan_carts() {
+        let mut schematic = record_door_schematic();
+        schematic.metadata.source_data_version =
+            Some(mc_tick::motion::FIRST_NAN_DROPPING_DATA_VERSION);
+
+        let snbt = to_gametest_snbt(&schematic);
+        assert!(snbt.contains("DataVersion: 4671"), "the restamp must reach the text");
+        let sim = from_snbt(&snbt);
+        assert_eq!(
+            sim.motion_semantics(),
+            mc_tick::MotionSemantics::DropNonFinite,
+            "4671 and later guard the whole vector on `isFinite`"
+        );
+        assert_eq!(
+            nan_carts(&sim),
+            0,
+            "the same six carts must come back finite — the door is un-glued, correctly"
+        );
+    }
+
     /// Load the record 3x3 door sample and wire it under `settle`.
     ///
     /// This goes through the product path — world zip, schematic, gametest
     /// SNBT, `wire_simulation` — because the question is about that path and a
     /// test that reached past it would answer a different one.
     fn wire_record_door(settle: super::ffi::TickSettleMode) -> mc_tick::Simulation {
-        let path =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/samples/55_3x3.zip");
-        let bytes = std::fs::read(&path).expect("the record-door sample must be present");
-        let schematic = crate::formats::world::from_world_zip(&bytes).expect("the sample loads");
+        let schematic = record_door_schematic();
         let snbt = to_gametest_snbt(&schematic);
         let structure = mc_tick::Structure::parse(&snbt).expect("the sample parses");
         super::wire_simulation(

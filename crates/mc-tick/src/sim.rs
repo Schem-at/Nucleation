@@ -215,13 +215,16 @@ pub struct Simulation {
     motion_semantics: crate::motion::MotionSemantics,
     /// Entities whose box entered a *retracting* piston's sweep.
     ///
-    /// `(tick, entity id)`, appended and never cleared within a run. Piston
-    /// **extension** displacement is measured and implemented
-    /// ([`piston_entity.json`]); retraction is not — `piston_pull.json` shows
-    /// sub-0.03 displacements that are not uniformly backwards and that no
-    /// model here reproduces. Rather than let "we do nothing on retraction"
-    /// look identical to "vanilla does nothing on retraction", every contact
-    /// is recorded, so a build that depends on the unmodelled path says so.
+    /// `(tick, entity id)`, appended and never cleared within a run. A tripwire
+    /// from when retraction was unmodelled: extension displacement was measured
+    /// and implemented ([`piston_entity.json`]) while `piston_pull.json`'s
+    /// sub-0.03 displacements, not uniformly backwards, had no model here.
+    /// All three retraction geometries are measured and implemented now — see
+    /// `Simulation::piston_push` — so nothing appends to this and it stays
+    /// empty, including on the record 3x3 door, which used to name six. Kept
+    /// rather than deleted because the next geometry that turns out not to be
+    /// covered should be reported the same way, not guessed at: a non-zero
+    /// value means a run leaned on behaviour we do not reproduce.
     ///
     /// [`piston_entity.json`]: crate::sim::Simulation::piston_retract_contacts
     retract_contacts: Vec<(u64, u32)>,

@@ -86,9 +86,10 @@ bytes yourself and hand them to `Schematic.fromLitematic` (or `fromData`,
 
 `gametest_snbt(schematic)` converts a schematic to the SNBT flavor the engine and
 the gametest oracle both read, which is also what the video renderer consumes.
-**It is not a lossless hop for a build with entities** — see
-[the version gate](#nan-velocities-and-the-version-gate), which is the single
-most consequential thing on this page.
+It carries the schematic's `DataVersion` through, so `gametest_snbt` → `from_snbt`
+loads a build under the same `Entity.load` rules `from_schematic` would — read
+[the version gate](#nan-velocities-and-the-version-gate) anyway, because *which*
+rules those are is the single most consequential thing on this page.
 
 ### Settle mode is the most consequential argument
 
@@ -210,22 +211,30 @@ print(sum(1 for c in carts
           if any(isinstance(v, float) and math.isnan(v) for v in c["vel"])))  # 6
 ```
 
-**`from_snbt` does not do this.** It has no schematic metadata to read, so it
-always uses the modern, NaN-dropping rule — regardless of the `DataVersion`
-written in the SNBT text. Combined with `gametest_snbt`, which stamps the
-canonical oracle version (4903) rather than the source's, that makes the obvious
-round trip lossy:
+**`from_snbt` does this too**, from the text's own `DataVersion`. `gametest_snbt`
+stamps the schematic's version rather than a fixed one, and mc-tick's parser
+reads it back, so the obvious round trip is faithful:
 
 ```python
-snbt = TickSimulation.gametest_snbt(schem)   # DataVersion: 4903, NaN token intact
+snbt = TickSimulation.gametest_snbt(schem)   # DataVersion: 4082, NaN token intact
 b = TickSimulation.from_snbt(snbt, TickSettleMode.InWorld, 0, 0, 0, "")
-print(b.motion_semantics())                  # drop_non_finite
-# ... and the six NaN velocities are now zero. The door is un-glued.
+print(b.motion_semantics())                  # clamp_abs_ten — same machine
 ```
 
-The velocities are *in* the text — the NaN token survives the write. It is the
-load rule that drops them. If you are working with a nan-cart build, go through
-`from_schematic` and check `motion_semantics()`.
+This used to be lossy in a way that was invisible: the emitted text hardcoded the
+canonical oracle version (4903) and the parser skipped `DataVersion` entirely, so
+`from_snbt` always chose `drop_non_finite` and the door's six NaN velocities came
+back as zero. The NaN *token* survived the write the whole time — it was the load
+rule that was thrown away. Both halves are pinned by
+`the_snbt_round_trip_keeps_the_record_doors_nan_carts` and its negative control
+in `src/bridge/mc_tick.rs`.
+
+Two things still to know. A schematic that states no version at all is stamped
+with the canonical one, which selects the modern NaN-dropping rule — a default,
+not a reading of the file. And SNBT text written by hand may carry no
+`DataVersion`, in which case `from_snbt` falls back to the engine default, also
+`drop_non_finite`. Either way `motion_semantics()` tells you which rule you got,
+and on a nan-cart build it is worth reading.
 
 ### SNBT can hold NaN; JSON cannot
 
@@ -792,8 +801,9 @@ suspecting the engine.
 
 **A JSON hop can destroy the mechanism.** Not a hypothetical: see
 [the version gate](#nan-velocities-and-the-version-gate). NaN does not survive
-JSON, and neither `from_snbt` nor `gametest_snbt` preserves the DataVersion that
-decides whether it survives loading.
+JSON. The SNBT round trip does — `gametest_snbt` writes both the NaN token and the
+DataVersion that decides whether loading keeps it, and `from_snbt` reads both —
+but any detour through JSON still flattens the velocity to `null` or `0`.
 
 **Derived properties are real state.** Repeater `locked`, note-block
 `instrument`, wire connections: the game recomputes these on placement. Under

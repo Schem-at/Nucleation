@@ -111,6 +111,14 @@ class TickSimulation internal constructor (
         *construction). `minecraft:redstone_block` is always available.
         *`origin_*`: where the build's (0,0,0) sits in world coordinates —
         *wire update order hashes absolute positions.
+        *
+        *The text's own `DataVersion` selects `Entity.load` Motion semantics,
+        *exactly as [TickSimulation::from_schematic] uses the schematic's —
+        *so `gametest_snbt` → `from_snbt` keeps a nan-cart build's NaN
+        *velocities instead of quietly sanitising them. A text with no
+        *`DataVersion` gets the engine default (the modern, NaN-dropping
+        *rule); read [TickSimulation::motion_semantics] to see which
+        *applied.
         */
         fun fromSnbt(snbt: String, settle: TickSettleMode, originX: Int, originY: Int, originZ: Int, extraStates: String): Result<TickSimulation> {
             val snbtSliceMemory = PrimitiveArrayTools.borrowUtf8(snbt)
@@ -498,15 +506,18 @@ class TickSimulation internal constructor (
         return returnString
     }
 
-    /** How many times an entity stood in a **retracting** piston's sweep.
+    /** How many times an entity stood in a **retracting** piston's sweep
+    *that the engine could not reproduce.
     *
-    *Piston extension displacement is measured and implemented;
-    *retraction is not — `tools/gametest/captures/piston_pull.entities.log`
-    *records sub-0.03 movements that are not uniformly backwards and
-    *that no model here reproduces. Non-zero means this run leaned on
-    *unimplemented behaviour and its result is not trustworthy. Zero
-    *means no entity was ever in a retracting arm's way: a real answer,
-    *not a missing instrument.
+    *A tripwire from when retraction was unmodelled — extension
+    *displacement was measured and implemented while
+    *`tools/gametest/captures/piston_pull.entities.log`'s sub-0.03
+    *movements, not uniformly backwards, had no model here. All three
+    *retraction geometries are implemented now, so this reports **0**,
+    *including on the record 3x3 door, which used to name six. It is kept
+    *because the next geometry that turns out not to be covered should be
+    *reported rather than guessed at: non-zero means this run leaned on
+    *behaviour we do not reproduce and its result is not trustworthy.
     */
     fun pistonRetractContacts(): UInt {
 
