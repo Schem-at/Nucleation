@@ -370,13 +370,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let survivors = entity_ticks.last().map(|s| s.len()).unwrap_or(0);
     println!("entities alive at the end: {survivors} of {}", start_entities.len());
+    // Keep this honest about what the run covers and what the *picture* covers,
+    // because they are not the same thing and conflating them has already cost
+    // this project a day. Passengers ARE simulated — the entity count above is
+    // the proof — but the renderer resolves an entity through its blockstate,
+    // and `minecraft:blaze` has none, so the two riders are invisible rather
+    // than absent.
     println!(
-        "NOTE: passengers are never instantiated, so the two blazes riding nan \
-         carts are absent from this run. Piston retraction *does* displace \
-         entities now — a pulled block sweeps them, and a retracting head \
-         clears the square it leaves — but an entity in the piston's OWN \
-         square is still unmodelled, and every contact counted above is one \
-         of those. See `piston_pull_inside` in capture-entity-evidence.sh."
+        "NOTE: the two blazes riding nan carts ARE simulated — see the count \
+         above — but they do not draw: the renderer resolves entities through \
+         blockstates and there is none for `minecraft:blaze`, so it warns and \
+         skips them. Their absence on screen is not absence in the run. \
+         Piston retraction *does* displace entities — a pulled block sweeps \
+         them, and a retracting head clears the square it leaves — but an \
+         entity in the piston's OWN square is still unmodelled, and every \
+         contact counted above is one of those. See `piston_pull_inside` in \
+         capture-entity-evidence.sh."
     );
 
     if report_only {
