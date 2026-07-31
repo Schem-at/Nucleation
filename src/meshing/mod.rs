@@ -689,6 +689,16 @@ fn entity_to_input_block(entity: &Entity) -> InputBlock {
         }
     }
 
+    // A dropped item's sprite: the mesher's `entity:item` path reads the item
+    // id from an `item` property. Carried through from the entity's own
+    // `Item.id` tag — this is also how fireballs render, since vanilla draws
+    // them as exactly these item sprites (`fire_charge`, `dragon_fireball`).
+    if let Some(NbtValue::Compound(item)) = entity.nbt.get("Item") {
+        if let Some(NbtValue::String(id)) = item.get("id") {
+            input.properties.insert("item".to_string(), id.clone());
+        }
+    }
+
     // Pass through relevant NBT as properties for the mesher
     // Baby entities
     if let Some(NbtValue::Byte(1)) = entity.nbt.get("IsBaby") {

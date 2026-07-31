@@ -134,7 +134,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // per-tick block changes, which is exactly what the simulation produces.
     // Being able to watch the two side by side is the point — a divergence in
     // a 200-event tick is far easier to recognise than to read.
-    let (initial, changes, item_tracks) = match flag(&args, "--trace") {
+    let (initial, changes, mut item_tracks) = match flag(&args, "--trace") {
         Some(trace_path) => {
             let (initial, changes) = replay(snbt_path, trace_path, ticks);
             println!("replayed {ticks} ticks, {} block changes", changes.len());
@@ -147,6 +147,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             out
         }
     };
+
+    // --entity-log <file>: per-tick entity positions in TraceCapture's
+    // `E tN id=K kind pos=(x, y, z)` lines — carts, fireballs and blazes ride
+    // along as posed meshes. Works for a capture and for an engine dump alike,
+    // which is what makes the side-by-side videos carry their entities.
+    if let Some(log_path) = flag(&args, "--entity-log") {
+        let mut tracks = parse_entity_log(log_path, ticks);
+        println!("entity log: {} tracks from {log_path}", tracks.len());
+        item_tracks.append(&mut tracks);
+    }
+    let item_tracks = item_tracks;
 
     println!(
         "item tracks: {} ({} entity events)",
@@ -192,9 +203,58 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // block form scaled to vanilla's item-cube proportions, positioned along
     // the simulation's per-tick track with sub-tick interpolation.
     let mut item_mesh_range = Vec::new();
+    // Measured world-space bounds of each track's mesh, so posing never rests
+    // on assumptions about where a mesher path puts its geometry.
+    let mut item_mesh_bounds: Vec<([f32; 3], [f32; 3])> = Vec::new();
     for track in &item_tracks {
         let mut one = UniversalSchematic::new("item".to_string());
-        if track.item == "minecraft:minecart" {
+        let cart_kind = track.kind.ends_with("minecart");
+        let fireball_item = match track.kind.as_str() {
+            // Vanilla renders both fireball entities as exactly these item
+            // sprites, so the mesher's `entity:item` path *is* the real look.
+            "minecraft:small_fireball" | "minecraft:fireball" => Some("minecraft:fire_charge"),
+            "minecraft:dragon_fireball" => Some("minecraft:dragon_fireball"),
+            _ => None,
+        };
+        if cart_kind {
+            // The cart hull, oriented along its direction of travel; a cart
+            // that never moves lies along x, which is every one of the record
+            // door's parked furnace carts (`Rotation: [±90, 0]`).
+            let pts: Vec<[f64; 3]> = track.positions.iter().flatten().copied().collect();
+            let yaw: f32 = match (pts.first(), pts.last()) {
+                (Some(a), Some(b)) if (b[0] - a[0]).abs() + (b[2] - a[2]).abs() > 1e-6 => {
+                    let (dx, dz) = (b[0] - a[0], b[2] - a[2]);
+                    if dx.abs() >= dz.abs() {
+                        if dx >= 0.0 { -90.0 } else { 90.0 }
+                    } else if dz >= 0.0 {
+                        0.0
+                    } else {
+                        180.0
+                    }
+                }
+                _ => -90.0,
+            };
+            let mut cart =
+                nucleation::Entity::new("minecraft:minecart".to_string(), (0.5, 0.0, 0.5));
+            cart.nbt.insert(
+                "Rotation".to_string(),
+                nucleation::NbtValue::List(vec![
+                    nucleation::NbtValue::Float(yaw),
+                    nucleation::NbtValue::Float(0.0),
+                ]),
+            );
+            one.add_entity(cart);
+        } else if let Some(item_id) = fireball_item {
+            let mut ball = nucleation::Entity::new("minecraft:item".to_string(), (0.5, 0.0, 0.5));
+            let mut item = std::collections::HashMap::new();
+            item.insert("id".to_string(), nucleation::NbtValue::String(item_id.to_string()));
+            ball.nbt.insert("Item".to_string(), nucleation::NbtValue::Compound(item));
+            one.add_entity(ball);
+        } else if track.kind == "minecraft:blaze" {
+            // No blaze model in the mesher; a magma cube of the head's size at
+            // the top of its box reads unmistakably as one from this distance.
+            one.set_block_from_string(0, 0, 0, "minecraft:magma_block").ok();
+        } else if track.item == "minecraft:minecart" {
             // The real cart: meshed through the mesher's entity path — the
             // vanilla MinecartModel hull, UV'd from entity/minecart.png in
             // the client jar — oriented along its direction of travel.
@@ -236,13 +296,48 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         item_mesh_range.push(meshes.len());
-        let mesh = one.to_mesh(&pack, &mesh_config)?;
+        let mut mesh = one.to_mesh(&pack, &mesh_config)?;
+        if mesh.opaque.positions.is_empty()
+            && mesh.cutout.positions.is_empty()
+            && mesh.transparent.positions.is_empty()
+            && fireball_item.is_some()
+        {
+            // Not every fireball's own item resolves through the item-model
+            // path (`minecraft:dragon_fireball` comes back empty); the
+            // fire charge is the same class of sprite and scales to size.
+            let mut retry = UniversalSchematic::new("item".to_string());
+            let mut ball =
+                nucleation::Entity::new("minecraft:item".to_string(), (0.5, 0.0, 0.5));
+            let mut item = std::collections::HashMap::new();
+            item.insert(
+                "id".to_string(),
+                nucleation::NbtValue::String("minecraft:fire_charge".to_string()),
+            );
+            ball.nbt.insert("Item".to_string(), nucleation::NbtValue::Compound(item));
+            retry.add_entity(ball);
+            mesh = retry.to_mesh(&pack, &mesh_config)?;
+        }
+        let mut lo = [f32::INFINITY; 3];
+        let mut hi = [f32::NEG_INFINITY; 3];
+        for layer in [&mesh.opaque, &mesh.cutout, &mesh.transparent] {
+            for v in &layer.positions {
+                for axis in 0..3 {
+                    lo[axis] = lo[axis].min(v[axis]);
+                    hi[axis] = hi[axis].max(v[axis]);
+                }
+            }
+        }
         println!(
-            "item mesh {} ({}): {} opaque verts",
+            "item mesh {} ({} {}): {} verts, bounds {:?}..{:?}",
             meshes.len(),
+            track.kind,
             track.item,
-            mesh.opaque.positions.len()
+            mesh.opaque.positions.len() + mesh.cutout.positions.len()
+                + mesh.transparent.positions.len(),
+            lo,
+            hi
         );
+        item_mesh_bounds.push((lo, hi));
         meshes.push(mesh);
     }
 
@@ -300,24 +395,61 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
             if let Some(p) = position {
                 let mut pose = Pose::IDENTITY;
-                let cart = track.item == "minecraft:minecart";
-                if cart {
-                    // The cart is meshed as the real entity model inside one
-                    // block (vanilla hull, 0.375 rail lift baked in): put the
-                    // block's bottom centre at the entity position, unscaled.
-                    pose.pivot = [0.5, 0.0, 0.5];
-                    pose.translate = [p[0] as f32 - 0.5, p[1] as f32, p[2] as f32 - 0.5];
+                let (lo, hi) = item_mesh_bounds[track_index];
+                let center = [
+                    (lo[0] + hi[0]) * 0.5,
+                    (lo[1] + hi[1]) * 0.5,
+                    (lo[2] + hi[2]) * 0.5,
+                ];
+                let size = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
+                let cart =
+                    track.kind.ends_with("minecart") || track.item == "minecraft:minecart";
+                // Anchor the *measured* mesh box onto the entity's hitbox:
+                // scale about the mesh centre, then move that centre onto the
+                // target point. No assumptions about any mesher path's origin.
+                let (scale, target): (f32, [f32; 3]) = if cart {
+                    // The vanilla cart model, bottom-centre on the feet,
+                    // unscaled — the hull is wider than the 0.98 box in the
+                    // game too. A hair down so an entombed cart's floor-flush
+                    // rim does not z-fight its block.
+                    (1.0, [p[0] as f32, p[1] as f32 - 0.005 + size[1] * 0.5, p[2] as f32])
+                } else if track.kind == "minecraft:small_fireball"
+                    || track.kind == "minecraft:fireball"
+                    || track.kind == "minecraft:dragon_fireball"
+                {
+                    // The item sprite scaled to the fireball's height, centred
+                    // on its box.
+                    let height: f32 =
+                        if track.kind == "minecraft:dragon_fireball" { 1.0 } else { 0.3125 };
+                    let extent = size[0].max(size[1]).max(size[2]).max(1.0e-4);
+                    (height / extent, [p[0] as f32, p[1] as f32 + height * 0.5, p[2] as f32])
+                } else if track.kind == "minecraft:blaze" {
+                    // The stand-in head: half a block at the top of the
+                    // 1.8-tall box.
+                    let extent = size[0].max(size[1]).max(size[2]).max(1.0e-4);
+                    (0.5 / extent, [p[0] as f32, p[1] as f32 + 1.55, p[2] as f32])
                 } else {
                     // Dropped items draw at vanilla's quarter block scale,
-                    // scaled in place about the block's centre, then moved so
-                    // that centre sits just above the entity position.
-                    pose.scale = [0.25; 3];
-                    pose.pivot = [0.5, 0.5, 0.5];
-                    pose.translate = [
-                        p[0] as f32 - 0.5,
-                        p[1] as f32 + 0.125 - 0.5,
-                        p[2] as f32 - 0.5,
-                    ];
+                    // hovering an eighth above the entity position.
+                    let extent = size[0].max(size[1]).max(size[2]).max(1.0e-4);
+                    (0.25 / extent, [p[0] as f32, p[1] as f32 + 0.125, p[2] as f32])
+                };
+                pose.scale = [scale; 3];
+                pose.pivot = center;
+                // The mesher emits entity geometry offset from the block grid
+                // by (+0.5, +0.25, +0.5) relative to its own vertex data —
+                // measured on the calibration grid, where every kind sat half
+                // a block east of its marker and a quarter block above it.
+                pose.translate = [
+                    target[0] - center[0] - 0.5,
+                    target[1] - center[1] - 0.25,
+                    target[2] - center[2] - 0.5,
+                ];
+                // A sprite meshed lying flat (thin in y) is stood upright so
+                // the camera sees it face-on; rotation is about the mesh
+                // centre, so the anchoring above is unaffected.
+                if track.kind.contains("fireball") && size[1] < size[0].min(size[2]) * 0.5 {
+                    pose.rotate_deg = [90.0, 0.0, 0.0];
                 }
                 poses[item_mesh_range[track_index]] = pose;
             }
@@ -378,8 +510,68 @@ fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
 /// One item entity's life for the renderer: its block id and a per-tick
 /// position track (`None` once removed).
 struct ItemTrack {
+    /// The entity type, e.g. `minecraft:furnace_minecart`; `minecraft:item`
+    /// for a dropped item, whose id is then in `item`.
+    kind: String,
     item: String,
     positions: Vec<Option<[f64; 3]>>,
+}
+
+/// Parse a capture's `--entity-log` lines into dense per-tick tracks.
+///
+/// Both sides of a comparison speak this format: TraceCapture prints every
+/// entity every tick as `  E tN id=K minecraft:kind pos=(x, y, z) ...`, and
+/// the engine-side trace dumper emits the same lines. Positions are absolute,
+/// riders included, so no seat math is needed here.
+fn parse_entity_log(path: &str, ticks: u64) -> Vec<ItemTrack> {
+    let text = std::fs::read_to_string(path).expect("read entity log");
+    let mut index_of: HashMap<u32, usize> = HashMap::new();
+    let mut tracks: Vec<ItemTrack> = Vec::new();
+    for line in text.lines() {
+        let line = line.trim_start();
+        let Some(rest) = line.strip_prefix("E t") else { continue };
+        let mut parts = rest.split_whitespace();
+        let Some(tick) = parts.next().and_then(|v| v.parse::<u64>().ok()) else { continue };
+        let Some(id) = parts
+            .next()
+            .and_then(|v| v.strip_prefix("id="))
+            .and_then(|v| v.parse::<u32>().ok())
+        else {
+            continue;
+        };
+        let Some(kind) = parts.next() else { continue };
+        let Some(pos_text) = line.split("pos=(").nth(1).and_then(|v| v.split(')').next())
+        else {
+            continue;
+        };
+        let coords: Vec<f64> = pos_text
+            .split(',')
+            .filter_map(|v| v.trim().parse::<f64>().ok())
+            .collect();
+        if coords.len() != 3 || tick >= ticks {
+            continue;
+        }
+        let index = *index_of.entry(id).or_insert_with(|| {
+            tracks.push(ItemTrack {
+                kind: kind.to_string(),
+                item: String::new(),
+                positions: vec![None; ticks as usize],
+            });
+            tracks.len() - 1
+        });
+        tracks[index].positions[tick as usize] = Some([coords[0], coords[1], coords[2]]);
+    }
+    // A logged entity holds its last position through any gap.
+    for track in &mut tracks {
+        let mut last: Option<[f64; 3]> = None;
+        for slot in &mut track.positions {
+            match slot {
+                Some(p) => last = Some(*p),
+                None => *slot = last,
+            }
+        }
+    }
+    tracks
 }
 
 /// Rebuild `(initial, changes)` from a captured vanilla trace.
@@ -512,7 +704,16 @@ fn simulate(
                 sim.spawn_item(item.item.clone(), item.pos, item.motion, item.pickup_delay);
             }
             mc_tick::structure::SpawnedEntity::Minecart(cart) => {
-                sim.spawn_minecart(cart.kind.clone(), cart.pos, cart.motion);
+                let vehicle = sim.spawn_authored_minecart(cart, None);
+                for rider in &cart.passengers {
+                    sim.spawn_authored_rider(vehicle, rider).expect("rider spawn");
+                }
+            }
+            mc_tick::structure::SpawnedEntity::FurnaceMinecart(cart) => {
+                sim.spawn_authored_furnace_minecart(cart, None).expect("furnace cart spawn");
+            }
+            mc_tick::structure::SpawnedEntity::Body(body) => {
+                sim.spawn_authored_body(body).expect("body spawn");
             }
         }
     }
@@ -615,6 +816,7 @@ fn simulate(
                 if !index_of.contains_key(id) {
                     index_of.insert(*id, tracks.len());
                     tracks.push(ItemTrack {
+                        kind: "minecraft:item".to_string(),
                         item: item_names
                             .get(id)
                             .cloned()

@@ -12,6 +12,12 @@
 //!   --dump-test                         print the build's embedded scenario and stop
 //!   --embed spec.json --write out.litematic
 //!                                       attach a scenario to the build and save it
+//!   --dump-trace out.json               write the run's block changes as a
+//!                                       capture-shaped trace (render with
+//!                                       render_simulation_video --trace)
+//!   --dump-entities out.log             write per-tick entity positions in
+//!                                       TraceCapture's `E t...` lines (render
+//!                                       with --entity-log)
 //! ```
 //!
 //! The last two are the authoring loop for a self-testing `.litematic`: measure
@@ -183,11 +189,23 @@ fn main() {
         println!("t0     fill {filled}/{} {picture}", cells.len());
     }
 
+    let mut entity_lines = String::new();
     for tick in 0..=ticks {
         if at.contains(&tick) {
             if let Some(pos) = press {
                 sim.use_block(pos);
             }
+        }
+        // TraceCapture's own `E t...` shape, absolute positions riders
+        // included, so the render pipeline draws either side of a comparison
+        // from the same kind of file.
+        for body in sim.entity_bodies() {
+            let x = (body.min[0] + body.max[0]) * 0.5;
+            let z = (body.min[2] + body.max[2]) * 0.5;
+            entity_lines.push_str(&format!(
+                "  E t{tick} id={} {} pos=({}, {}, {})\n",
+                body.id, body.kind, x, body.min[1], z
+            ));
         }
         if tick < ticks {
             sim.step();
@@ -212,5 +230,48 @@ fn main() {
     if !cells.is_empty() {
         let (filled, picture) = fill(&sim, &cells);
         println!("  fill {filled}/{} {picture}", cells.len());
+    }
+
+    if let Some(path) = flag(&args, "--dump-entities") {
+        std::fs::write(path, &entity_lines).expect("write entity log");
+        println!("  wrote {path}");
+    }
+    if let Some(path) = flag(&args, "--dump-trace") {
+        // The same JSON shape a TraceCapture recording has, minimally: enough
+        // for `mc_tick_trace::Trace::from_json` and therefore for
+        // `render_simulation_video --trace`.
+        let mut ticks_out: Vec<String> = Vec::new();
+        let mut current: Option<(u64, Vec<String>)> = None;
+        let escape = |s: &str| s.replace('\\', "\\\\").replace('"', "\\\"");
+        for change in sim.recorded() {
+            let from = sim.registry().descriptor(change.from).unwrap_or("?");
+            let to = sim.registry().descriptor(change.to).unwrap_or("?");
+            let event = format!(
+                "{{\"phase\": \"tick_end\", \"kind\": \"block_changed\", \"pos\": [{}, {}, {}], \"from\": \"{}\", \"to\": \"{}\"}}",
+                change.pos.x, change.pos.y, change.pos.z, escape(from), escape(to)
+            );
+            match &mut current {
+                Some((tick, events)) if *tick == change.tick => events.push(event),
+                _ => {
+                    if let Some((tick, events)) = current.take() {
+                        ticks_out.push(format!(
+                            "{{\"tick\": {tick}, \"events\": [{}]}}",
+                            events.join(", ")
+                        ));
+                    }
+                    current = Some((change.tick, vec![event]));
+                }
+            }
+        }
+        if let Some((tick, events)) = current.take() {
+            ticks_out
+                .push(format!("{{\"tick\": {tick}, \"events\": [{}]}}", events.join(", ")));
+        }
+        let json = format!(
+            "{{\"format_version\": 1, \"mc_version\": \"mc-tick\", \"structure\": \"inspect\", \"detail\": \"normal\", \"ticks\": [{}]}}",
+            ticks_out.join(", ")
+        );
+        std::fs::write(path, json).expect("write trace");
+        println!("  wrote {path}");
     }
 }
