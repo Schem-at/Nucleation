@@ -246,6 +246,17 @@ pub struct Simulation {
     /// Filled by [`Simulation::displace_entities_by_pistons`] and consumed in
     /// the same call, so it never outlives the tick that made it.
     piston_probes: Vec<(u32, [f64; 3], [f64; 3])>,
+    /// `Entity.pistonDeltas`: how far each entity has already been carried by
+    /// pistons this tick, per axis.
+    ///
+    /// `Entity.limitPistonMovement` clamps the *running total* of a tick's
+    /// piston displacements to ±[`crate::piston::PISTON_MAX_STEP`] per axis and
+    /// zeroes a residual under 1e-5, so two strokes shoving one entity in the
+    /// same tick compose through this and not by addition — the "combination of
+    /// two laws" the record door's captures kept being 0.02 away from. Cleared
+    /// at the top of [`Simulation::displace_entities_by_pistons`], which is the
+    /// once-a-tick that `pistonDeltasGameTime` implements in vanilla.
+    piston_deltas: std::collections::HashMap<u32, [f64; 3]>,
     /// Entity positions as of the last recorded tick, for event emission.
     entity_snapshot: std::collections::HashMap<u32, [f64; 3]>,
     /// Recorded entity events, when recording is enabled.
@@ -293,36 +304,6 @@ pub struct Simulation {
     /// Held from construction so `reset` is exactly "as loaded" rather than
     /// "as I last remembered to snapshot".
     initial: Checkpoint,
-}
-
-/// The outcome of one moving-piston step for one entity box.
-///
-/// The third arm is the point: a contact the engine can see but cannot yet
-/// reproduce is named, not silently ignored. See
-/// [`Simulation::piston_retract_contacts`].
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum PistonPush {
-    /// Displace the box this far along this direction, having first carried it
-    /// `probe` along the *step's* direction.
-    ///
-    /// `probe` is the intermediate displacement the entity is dragged through
-    /// before the step's own correction and before collision clips anything —
-    /// see [`Simulation::piston_probes`]. It is signed along the same `Dir` as
-    /// the settled move so the two can be compared, and it is zero when the
-    /// step has no intermediate position (an extension push simply lands).
-    Move(crate::Dir, f64, f64),
-    /// Vanilla does something here and we do not know what.
-    ///
-    /// **Nothing produces this today.** All three retraction geometries are
-    /// measured and implemented, so the channel is empty and
-    /// [`Simulation::piston_retract_contacts`] reports nothing — including on
-    /// the record 3x3 door, which used to name six. It is kept rather than
-    /// deleted because the next geometry that turns out not to be covered
-    /// should be reported the same way, not guessed at.
-    #[allow(dead_code)]
-    Unmodelled,
-    /// This step does not touch this entity.
-    Nothing,
 }
 
 impl Simulation {
@@ -374,6 +355,7 @@ impl Simulation {
             motion_semantics: crate::motion::MotionSemantics::default(),
             retract_contacts: Vec::new(),
             piston_probes: Vec::new(),
+            piston_deltas: std::collections::HashMap::new(),
             entity_snapshot: std::collections::HashMap::new(),
             ent_log: None,
             tickers: Vec::new(),
@@ -827,12 +809,17 @@ impl Simulation {
     fn displace_entities_by_pistons(&mut self) {
         let tick = self.tick;
         let ticking = self.ticking;
-        // Insertion order, which is what `tickBlockEntities` walks.
-        let sweeps: Vec<(Pos, crate::piston::Sweep, f64, bool)> = self
+        // `pistonDeltasGameTime`: the running per-axis totals reset once a tick.
+        self.piston_deltas.clear();
+        // Insertion order, which is what `tickBlockEntities` walks — and the
+        // index rides along, because *when* another move's cell turns solid
+        // depends on whether its block entity has already ticked this tick.
+        let sweeps: Vec<(usize, Pos, crate::piston::Sweep, f64, bool)> = self
             .moves
             .iter()
-            .filter(|m| ticking.as_ref().is_none_or(|bounds| bounds.contains(m.pos)))
-            .filter_map(|m| {
+            .enumerate()
+            .filter(|(_, m)| ticking.as_ref().is_none_or(|bounds| bounds.contains(m.pos)))
+            .filter_map(|(index, m)| {
                 let sweep = m.sweep?;
                 // `progress` before this step. A move resolves two ticks after
                 // the event that made it, and the two half-block steps are the
@@ -842,81 +829,132 @@ impl Simulation {
                     1 => crate::piston::PISTON_STEP,
                     _ => return None,
                 };
-                Some((m.pos, sweep, progress, m.source_piston))
+                Some((index, m.pos, sweep, progress, m.source_piston))
             })
             .collect();
         if sweeps.is_empty() {
             return;
         }
-        for (destination, sweep, progress, source_piston) in sweeps {
+        for (shover, destination, sweep, progress, source_piston) in sweeps {
+            let boxes =
+                crate::piston::shove_shape_boxes(destination, sweep, progress, source_piston);
             // Carts first, then frozen bodies — the order the entity-box view
-            // is built in, so a trace reads the same way.
+            // is built in, so a trace reads the same way. Only a standing body
+            // is shoved: a passenger has no position of its own — it is
+            // re-derived from its vehicle every tick — so shoving one would be
+            // overwritten before it could be observed, and its vehicle is in
+            // the cart pass.
+            enum Slot {
+                Cart(usize),
+                Body(usize),
+            }
+            let mut slots: Vec<Slot> = Vec::new();
             for index in 0..self.minecarts.len() {
-                if self.minecarts[index].removed {
-                    continue;
-                }
-                let cart = &self.minecarts[index];
-                let (min, max) = crate::minecart::cart_aabb(cart.pos);
-                let (travel, distance, probe) =
-                    match Self::piston_push(destination, sweep, progress, source_piston, min, max) {
-                        PistonPush::Move(travel, distance, probe) => (travel, distance, probe),
-                        PistonPush::Unmodelled => {
-                            self.retract_contacts.push((tick, self.minecarts[index].id));
-                            continue;
-                        }
-                        PistonPush::Nothing => continue,
-                    };
-                Self::record_probe(
-                    &mut self.piston_probes,
-                    self.minecarts[index].id,
-                    min,
-                    max,
-                    travel,
-                    distance,
-                    probe,
-                );
-                let moved = self.shove(min, max, travel, distance, self.minecarts[index].id);
-                for axis in 0..3 {
-                    self.minecarts[index].pos[axis] += moved[axis];
+                if !self.minecarts[index].removed {
+                    slots.push(Slot::Cart(index));
                 }
             }
-            // Only a standing body is shoved. A passenger has no position of its
-            // own to shove — it is re-derived from its vehicle every tick — so
-            // shoving one would be overwritten before it could be observed, and
-            // its vehicle is in the cart pass above.
             for index in 0..self.bodies.len() {
-                let crate::entity::BodyPhysics::Frozen { pos } = self.bodies[index].physics else {
-                    continue;
+                if matches!(self.bodies[index].physics, crate::entity::BodyPhysics::Frozen { .. })
+                {
+                    slots.push(Slot::Body(index));
+                }
+            }
+            for slot in slots {
+                let (id, is_cart, min, max) = match &slot {
+                    Slot::Cart(index) => {
+                        let cart = &self.minecarts[*index];
+                        let (min, max) = crate::minecart::cart_aabb(cart.pos);
+                        (cart.id, true, min, max)
+                    }
+                    Slot::Body(index) => {
+                        let body = &self.bodies[*index];
+                        let crate::entity::BodyPhysics::Frozen { pos } = body.physics else {
+                            continue;
+                        };
+                        let Some((min, max)) = crate::entity::body_aabb(&body.kind, pos) else {
+                            continue;
+                        };
+                        (body.id, false, min, max)
+                    }
                 };
-                let id = self.bodies[index].id;
-                let Some((min, max)) = crate::entity::body_aabb(&self.bodies[index].kind, pos)
+                // `moveCollidedEntities`: the shape's swept slabs, max
+                // penetration, capped at the step plus the overshoot.
+                let Some(distance) =
+                    crate::piston::moved_shape_displacement(&boxes, sweep.travel, min, max)
                 else {
                     continue;
                 };
-                let (travel, distance, probe) =
-                    match Self::piston_push(destination, sweep, progress, source_piston, min, max) {
-                        PistonPush::Move(travel, distance, probe) => (travel, distance, probe),
-                        PistonPush::Unmodelled => {
-                            self.retract_contacts.push((tick, id));
-                            continue;
-                        }
-                        PistonPush::Nothing => continue,
-                    };
-                Self::record_probe(
-                    &mut self.piston_probes,
-                    id,
-                    min,
-                    max,
-                    travel,
-                    distance,
-                    probe,
-                );
-                let moved = self.shove(min, max, travel, distance, id);
-                if let crate::entity::BodyPhysics::Frozen { pos } =
-                    &mut self.bodies[index].physics
-                {
+                if std::env::var_os("MC_TICK_TRACE_SHOVE").is_some() {
+                    eprintln!(
+                        "t{tick} SHOVE id={id} cart={is_cart} dest={destination:?} \
+                         sweep={sweep:?} progress={progress} src={source_piston} \
+                         dist={distance} min={min:?}",
+                    );
+                }
+                let mut current = (min, max);
+                let mut apply = |sim: &mut Self, from: ([f64; 3], [f64; 3]), travel, amount| {
+                    let moved = sim.shove(from.0, from.1, travel, amount, id, is_cart, shover);
+                    if std::env::var_os("MC_TICK_TRACE_SHOVE").is_some() {
+                        eprintln!(
+                            "        APPLY id={id} travel={travel:?} asked={amount} moved={moved:?}"
+                        );
+                    }
+                    let mut nmin = from.0;
+                    let mut nmax = from.1;
                     for axis in 0..3 {
-                        pos[axis] += moved[axis];
+                        nmin[axis] += moved[axis];
+                        nmax[axis] += moved[axis];
+                    }
+                    match &slot {
+                        Slot::Cart(index) => {
+                            for axis in 0..3 {
+                                sim.minecarts[*index].pos[axis] += moved[axis];
+                            }
+                        }
+                        Slot::Body(index) => {
+                            if let crate::entity::BodyPhysics::Frozen { pos } =
+                                &mut sim.bodies[*index].physics
+                            {
+                                for axis in 0..3 {
+                                    pos[axis] += moved[axis];
+                                }
+                            }
+                        }
+                    }
+                    // `moveEntityByPiston` ends with `applyEffectsFromBlocks`:
+                    // `entityInside` fires the moment the entity lands, within
+                    // the same block-entity tick — which is how the record
+                    // door's plate presses on the very tick the drag delivers
+                    // its fireball, and why it counts 1 and not 2: the second
+                    // fireball has not moved yet when the first one is counted.
+                    // The body view is updated to this entity's new box only,
+                    // leaving everyone else where this instant has them.
+                    if moved.iter().any(|&d| d != 0.0) {
+                        sim.notify_shoved(id, nmin, nmax);
+                    }
+                    (nmin, nmax)
+                };
+                if let Some(amount) = self.limit_piston_movement(id, sweep.travel, distance) {
+                    current = apply(self, current, sweep.travel, amount);
+                }
+                // `fixEntityWithinPistonBase`: after every shove by a retracting
+                // source piston, an entity still overlapping the piston's own
+                // full cell is pushed back out of it, against the head's travel.
+                // The box the drag reached is a real intermediate the fix takes
+                // back, and `entityInside` has already fired at it above — that
+                // transient is what presses the record door's plates.
+                if !sweep.extending && source_piston {
+                    if let Some(fix) = crate::piston::base_fix_displacement(
+                        destination,
+                        sweep.travel,
+                        current.0,
+                        current.1,
+                    ) {
+                        let out = sweep.travel.opposite();
+                        if let Some(amount) = self.limit_piston_movement(id, out, fix) {
+                            current = apply(self, current, out, amount);
+                        }
                     }
                 }
             }
@@ -925,32 +963,54 @@ impl Simulation {
         self.notify_piston_probes();
     }
 
-    /// Remember an intermediate box, if this step even had one.
+    /// `Entity.limitPistonMovement` + `applyPistonMovementRestriction`: clamp
+    /// this tick's running piston displacement to ±0.51 per axis and zero a
+    /// residual under 1e-5.
     ///
-    /// Skipped when the probe lands where the settled move does — an extension
-    /// push that nothing clipped passes through no cell its resting box does not
-    /// already cover, so recording it would only cost a duplicate notification.
-    fn record_probe(
-        probes: &mut Vec<(u32, [f64; 3], [f64; 3])>,
+    /// `distance` is nonnegative along `travel`; the return value is too, and
+    /// `None` means the move is swallowed entirely (`Vec3.ZERO`). The
+    /// accumulator records what was *asked*, not what collision later grants —
+    /// vanilla runs this at the top of `Entity.move`, before `collide`.
+    fn limit_piston_movement(
+        &mut self,
         id: u32,
-        min: [f64; 3],
-        max: [f64; 3],
-        travel: crate::Dir,
+        travel: crate::pos::Dir,
         distance: f64,
-        probe: f64,
-    ) {
-        if probe == distance {
-            return;
-        }
+    ) -> Option<f64> {
         let (dx, dy, dz) = travel.delta();
-        let step = [f64::from(dx), f64::from(dy), f64::from(dz)];
-        let mut pmin = min;
-        let mut pmax = max;
-        for axis in 0..3 {
-            pmin[axis] += step[axis] * probe;
-            pmax[axis] += step[axis] * probe;
+        let axis = if dx != 0 {
+            0
+        } else if dy != 0 {
+            1
+        } else {
+            2
+        };
+        let sign = f64::from([dx, dy, dz][axis]);
+        let acc = self.piston_deltas.entry(id).or_insert([0.0; 3]);
+        let requested = sign * distance;
+        let clamped = (requested + acc[axis])
+            .clamp(-crate::piston::PISTON_MAX_STEP, crate::piston::PISTON_MAX_STEP);
+        let amount = clamped - acc[axis];
+        acc[axis] = clamped;
+        if amount.abs() <= f64::from(1.0e-5f32) {
+            return None;
         }
-        probes.push((id, pmin, pmax));
+        Some(amount * sign)
+    }
+
+    /// `applyEffectsFromBlocks` for one piston-moved entity: update its view
+    /// box to where the move just put it and fire `entityInside` there.
+    ///
+    /// The view is *advanced*, not swapped and restored: the entity really is
+    /// at the new box now, and anything counting bodies mid-tick — a weighted
+    /// plate pressed by the first of two stacked fireballs — must see exactly
+    /// this instant's arrangement, later movers still at their old boxes.
+    fn notify_shoved(&mut self, id: u32, min: [f64; 3], max: [f64; 3]) {
+        if let Some(slot) = self.item_entities.others.iter().position(|b| b.id == id) {
+            self.item_entities.others[slot].min = min;
+            self.item_entities.others[slot].max = max;
+        }
+        self.notify_entity_inside(min, max);
     }
 
     /// Fire `entityInside` at each intermediate box a piston carried an entity
@@ -1026,98 +1086,31 @@ impl Simulation {
         }
     }
 
-    /// What one moving-piston step does to one entity box.
-    ///
-    /// Three cases, and which applies is decided by the move, not the entity:
-    ///
-    /// * **extension** — [`crate::piston::sweep_displacement`], the slab the
-    ///   leading face sweeps. Measured against `piston_entity.json`.
-    /// * **retraction carrying a block** — the *same* slab, because a pulled
-    ///   block sweeps exactly as a pushed one does. This is what drags a frozen
-    ///   fireball onto a pressure plate, and it is worth almost a whole block:
-    ///   `piston_pull_plate` moves a dragon fireball from 4.45 to 3.50 and the
-    ///   plate it lands on powers.
-    /// * **retraction of the head itself** — [`crate::piston::head_eject_displacement`],
-    ///   which is not a slab at all. It clears the block the head is leaving
-    ///   and reaches nowhere else, and it can push an entity *backwards*, so it
-    ///   returns a signed distance and the direction is chosen from its sign.
-    ///
-    /// A retracting head is a source-piston move and a pulled block is not,
-    /// which is exactly the distinction `PendingMove::source_piston` already
-    /// draws.
-    ///
-    /// * **retraction closing over the piston's own square** —
-    ///   [`crate::piston::inside_eject_displacement`], the third geometry, and
-    ///   the one the record door's downward-facing pistons actually use. It is
-    ///   gated on the piston *arm's* narrow column rather than on the whole
-    ///   block, which is why `piston_pull_law` lane 1 — a fireball resting on
-    ///   the floor, below the arm — is left alone while the same fireball
-    ///   lifted into the arm's band is thrown clear.
-    ///
-    /// The two retraction cases are tried in that order: an entity in the
-    /// piston's square is resolved there, and only one that is not falls
-    /// through to the vacated block's rule.
-    ///
-    /// [`PistonPush::Unmodelled`] is left in place as the report for a
-    /// retraction geometry that later turns out not to be covered; nothing
-    /// currently produces it.
-    fn piston_push(
-        destination: Pos,
-        sweep: crate::piston::Sweep,
-        progress: f64,
-        source_piston: bool,
-        min: [f64; 3],
-        max: [f64; 3],
-    ) -> PistonPush {
-        if !sweep.extending && source_piston {
-            let signed = crate::piston::inside_eject_displacement(
-                destination,
-                sweep.travel,
-                progress,
-                min,
-                max,
-            )
-            .or_else(|| {
-                crate::piston::head_eject_displacement(destination, sweep.travel, min, max)
-            });
-            let Some(signed) = signed else { return PistonPush::Nothing };
-            // The eject is a correction, so there *is* an intermediate: the
-            // entity rides the head a whole step inward first, and only then is
-            // pushed back to the line. Measured through a pressure plate, not an
-            // entity log — `piston_head_transient` fires the plate exactly when
-            // `PISTON_MAX_STEP` along the head's travel reaches its touch box
-            // and not when it falls short, in sixteen lanes.
-            return if signed < 0.0 {
-                PistonPush::Move(
-                    sweep.travel.opposite(),
-                    -signed,
-                    -crate::piston::PISTON_MAX_STEP,
-                )
-            } else {
-                PistonPush::Move(sweep.travel, signed, crate::piston::PISTON_MAX_STEP)
-            };
-        }
-        match crate::piston::sweep_displacement(destination, sweep.travel, progress, min, max) {
-            // A push lands where it is aimed; the only thing that can shorten it
-            // is collision, and vanilla's `entity.move` runs `entityInside` after
-            // the clip. So the requested distance *is* the probe.
-            Some(distance) => PistonPush::Move(sweep.travel, distance, distance),
-            None => PistonPush::Nothing,
-        }
-    }
-
     /// One `moveEntityByPiston`: displace a box `distance` along `travel`,
     /// clipped by whatever is in the way.
     ///
     /// Vanilla's is `entity.move(MoverType.PISTON, …)`, which collides against
     /// blocks and other entities like any other move — the NOCLIP flag exempts
-    /// only the moving piston doing the shoving, which is behind the entity
-    /// anyway. Reuses the same sweep the carts already collide with, so a
-    /// piston cannot shove a cart through a wall that would stop it rolling.
+    /// only moving blocks travelling the shove's own way, which is why the
+    /// stroke's own blocks do not wall their cargo in.
     ///
-    /// The clipping itself **is** measured, and it was the last thing holding the
+    /// **Which bodies stop the entity depends on who is being shoved.**
+    /// `Entity.collide` asks `getEntityCollisions`, whose predicate is
+    /// `source.canCollideWith(other)` — and `AbstractMinecart` overrides it to
+    /// the vehicle rule `other.canBeCollidedWith() || other.isPushable()`,
+    /// which is [`crate::entity::blocks_a_cart`]'s measured table, while every
+    /// other entity keeps `Entity`'s default of `other.canBeCollidedWith()`
+    /// alone — true for a boat, false for a blaze, a cart, a villager and every
+    /// fireball. So a piston-shoved cart is stopped by a blaze, and a
+    /// piston-shoved fireball passes straight through one. The record 3x3 door
+    /// depends on the second half: its dragon fireballs return east *through*
+    /// the blaze wall its nan carts are seating.
+    ///
+    /// The block clipping **is** measured, and it was the last thing holding the
     /// record 3x3 door shut — see [`Simulation::blocks_in_flight`] for the
-    /// surface that does it and the capture that pins it.
+    /// surface that does it and the capture that pins it, and
+    /// [`Simulation::retracting_base_boxes`] for the 12/16 slab a retracting
+    /// piston's own square keeps solid.
     fn shove(
         &self,
         min: [f64; 3],
@@ -1125,6 +1118,8 @@ impl Simulation {
         travel: crate::pos::Dir,
         distance: f64,
         moving_id: u32,
+        moving_is_cart: bool,
+        shover: usize,
     ) -> [f64; 3] {
         let (dx, dy, dz) = travel.delta();
         let movement = [
@@ -1137,9 +1132,43 @@ impl Simulation {
             .others
             .iter()
             .filter(|body| body.id != moving_id)
+            .filter(|body| {
+                if moving_is_cart {
+                    crate::entity::blocks_a_cart(&body.kind) == Some(true)
+                } else {
+                    crate::entity::hard_collides(&body.kind)
+                }
+            })
             .map(|body| (body.min, body.max))
             .collect();
-        obstacles.extend(self.blocks_in_flight());
+        // What each in-flight cell contributes depends on whether its block
+        // entity has already ticked this tick, which is insertion order:
+        //
+        // * a move on its **second step** whose entity ran *before* the shover
+        //   has set `progress = 1.0` by now, so `getCollisionShape` answers
+        //   with the landed block at its destination — a full cube, if what
+        //   lands is one. This is the "solid at its destination on the second
+        //   step" the wide-body capture measured, made per-observer: to its own
+        //   shove a cell is never its landed cube;
+        // * every other in-flight cell still has `progress < 1.0`, and the
+        //   shover's NOCLIP exemption reduces it to
+        //   `getCollisionShape`'s early return: the extended base's 12/16 slab
+        //   for a retracting source piston, nothing at all otherwise.
+        for (index, m) in self.moves.iter().enumerate() {
+            let Some(sw) = m.sweep else { continue };
+            let steps_left = m.resolve_on.saturating_sub(self.tick);
+            if !(1..=2).contains(&steps_left) {
+                continue;
+            }
+            if steps_left == 1 && index < shover {
+                if self.solidity.get(m.state.raw() as usize).copied().unwrap_or(false) {
+                    let lo = [f64::from(m.pos.x), f64::from(m.pos.y), f64::from(m.pos.z)];
+                    obstacles.push((lo, [lo[0] + 1.0, lo[1] + 1.0, lo[2] + 1.0]));
+                }
+            } else if m.source_piston && !sw.extending {
+                obstacles.push(crate::piston::retracting_base_box(m.pos, sw.travel));
+            }
+        }
         let collision = SimCollision {
             world: &self.world,
             solidity: &self.solidity,
@@ -1155,107 +1184,20 @@ impl Simulation {
         clipped
     }
 
-    /// The boxes a piston's in-flight blocks collide with, as unit cubes at the
-    /// cells they are travelling *into*.
+    /// The in-flight cells' boxes, for an entity moving under its **own** power.
     ///
-    /// A cell a piston is moving a block into holds a `moving_piston`
-    /// placeholder, and a `moving_piston` is not a full cube — so as far as
-    /// [`Simulation::shove`]'s ordinary block collision is concerned the whole
-    /// stroke is empty air. It is not. Vanilla's `MovingPistonBlock` delegates
-    /// its collision shape to the block entity, which answers with the moved
-    /// block's own shape, and an entity a piston shoves is stopped by it exactly
-    /// as by a settled block.
+    /// [`Simulation::shove`] answers for the entity a piston is shoving, and
+    /// there the cells turn solid one by one, in block-entity order, because
+    /// vanilla exempts the shove's own stroke: `PistonMovingBlockEntity
+    /// .getCollisionShape` skips the shape while `progress < 1.0` *and* the
+    /// entity's NOCLIP direction matches the stroke. An entity falling of its
+    /// own accord matches neither clause, so it gets the shape on both steps of
+    /// every move — and that is the only difference between this list and the
+    /// per-shover set `shove` builds.
     ///
-    /// This is the clip that makes the record 3x3 door's fireball trick work,
-    /// and it is worth reading the two halves of it off
-    /// `tools/gametest/captures/piston_plate_clip.entities.log`, lane `z=1`,
-    /// whose sticky piston at `(5,1,z)` pushes another at `(4,1,z)` and a quartz
-    /// block at `(3,1,z)`, with a small fireball embedded in the head slot at
-    /// `x = 4.84375` — box `[4.6875, 5.0]`:
-    ///
-    /// * **extension.** Step one sweeps the fireball `0.51` west, to
-    ///   `[4.1775, 4.49]`. Step two asks for `0.5` more and vanilla delivers
-    ///   `0.1775` — the room left to `x = 4.0`, which is the east face of the
-    ///   cell the *pushed sticky piston* is arriving in. Lane `z=21` starts the
-    ///   same fireball 0.25625 further east and vanilla clips its second step to
-    ///   `0.43375`, the room from *its* position to the same line, which is what
-    ///   rules out a fixed distance.
-    /// * **retraction.** Step one is the head's own eject, `0.02` west to
-    ///   `[4.6675, 4.98]`. Step two — the pulled quartz's sweep — asks for
-    ///   `0.3425` east and vanilla delivers `0.02`, the room left to `x = 5.0`,
-    ///   the west face of the piston's **own** square. That square holds a
-    ///   `moving_piston` for the two ticks the head takes to come home, and its
-    ///   pending write is the retracted base, which is a full cube.
-    ///
-    /// Without this the fireball leaves the door's plate reach entirely — it ends
-    /// `0.3225` east of where it started instead of flush against the piston, the
-    /// plate at `(74,1,20)` latches, and the door's west pair never releases.
-    ///
-    /// Only cells whose **landed** state is a full cube count, which is why an
-    /// extension's own head slot is not here: it lands `piston_head`, whose plate
-    /// and arm are not a cube, and the fireball above ends its extension inside
-    /// that slot at `x = 4.15625` — a cube there would have stopped it at
-    /// `4.25`. A pending write with no [`crate::piston::Sweep`] is an ordinary
-    /// deferred block write whose cell already holds its real state, and is not
-    /// in flight at all.
-    ///
-    /// # Only on the second step
-    ///
-    /// A moving block is transparent to the entity it is shoving on the *first*
-    /// of the two half-block steps and solid on the second, and that is measured
-    /// rather than assumed. Widen the entity until its leading face already sits
-    /// on the line and the two rules give opposite answers: a **dragon
-    /// fireball** in the replica lane, box `[4.0, 5.0]`, starts flush against
-    /// the cell the pushed sticky piston is arriving in, so a box there would
-    /// pin it in place — and vanilla moves it the full `0.51` anyway, then
-    /// clips its *second* step to `0.49` against the cell the pushed **quartz**
-    /// is arriving in, `x = 3.0`. A furnace minecart, 0.02 clear of the same
-    /// line, is moved `0.51` and then a full `0.5`. See
-    /// `tools/gametest/captures/piston_clip_sizes.log`, and
-    /// `piston_plate_clip.rs`'s `the_first_step_of_a_stroke_is_not_clipped`.
-    ///
-    /// This is `PistonMovingBlockEntity.getCollisionShape`'s `progress < 1.0 &&
-    /// NOCLIP == getMovementDirection()` showing through, with `progress` read
-    /// *after* the step's increment: half a block on the first step, a whole one
-    /// on the second. `resolve_on == tick + 1` is that second step, and it is
-    /// per-move rather than per-stroke because two pistons can be out of phase.
-    ///
-    /// # What this does not do
-    ///
-    /// Vanilla exempts only moving blocks travelling the **same** way as the
-    /// shove; one crossing it would collide on both steps, at a box offset back
-    /// by its own progress. No capture has a stroke crossing another, so the
-    /// direction is not part of the test here.
-    ///
-    /// It also applies to a piston's shove alone. A minecart rolling of its own
-    /// accord still passes through a moving block, which is a separate and
-    /// unmeasured question.
-    fn blocks_in_flight(&self) -> Vec<([f64; 3], [f64; 3])> {
-        self.moves
-            .iter()
-            .filter(|m| m.sweep.is_some())
-            .filter(|m| m.resolve_on == self.tick + 1)
-            .filter(|m| self.solidity.get(m.state.raw() as usize).copied().unwrap_or(false))
-            .map(|m| {
-                let lo = [f64::from(m.pos.x), f64::from(m.pos.y), f64::from(m.pos.z)];
-                (lo, [lo[0] + 1.0, lo[1] + 1.0, lo[2] + 1.0])
-            })
-            .collect()
-    }
-
-    /// The same in-flight boxes, for an entity moving under its **own** power.
-    ///
-    /// [`Simulation::blocks_in_flight`] answers for the entity a piston is
-    /// shoving, and drops the first of the two half-block steps because vanilla
-    /// exempts it: `PistonMovingBlockEntity.getCollisionShape` skips the shape
-    /// while `progress < 1.0` *and* the entity's NOCLIP direction matches the
-    /// stroke. An entity falling of its own accord matches neither clause, so it
-    /// gets the shape on both steps — and that is the only difference between
-    /// this list and that one.
-    ///
-    /// That was recorded as an open question on `blocks_in_flight` ("a minecart
-    /// rolling of its own accord still passes through a moving block, which is a
-    /// separate and unmeasured question"). It is measured now.
+    /// That was recorded as an open question here ("a minecart rolling of its
+    /// own accord still passes through a moving block, which is a separate and
+    /// unmeasured question"). It is measured now.
     /// `piston_cart_support.json` retracts a west-facing piston out from under a
     /// furnace cart resting on its top face: the base cell holds a
     /// `moving_piston` for the two ticks the head takes to come home, and the
@@ -1265,7 +1207,7 @@ impl Simulation {
     /// of the record door's fifteen furnace carts, ids 14, 21 and 23, each
     /// standing over a `sticky_piston` that fires when the button is pressed.
     ///
-    /// Like `blocks_in_flight` this counts only cells whose **landed** state is
+    /// Like the shove path this counts only cells whose **landed** state is
     /// solid, so a stroke that lands a `piston_head` contributes nothing.
     fn blocks_in_flight_to_ordinary_motion(&self) -> Vec<([f64; 3], [f64; 3])> {
         self.moves

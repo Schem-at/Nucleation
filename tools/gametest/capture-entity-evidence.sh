@@ -66,6 +66,36 @@ WORLD="${WORLD55:-/tmp/w55/55 3x3}" tools/gametest/capture.sh \
   --out work/door55_entities.json | tee "$CAP/door55_in_world.entities.log"
 
 # ---------------------------------------------------------------------------
+# 2b. The record door, PRESSED — twice.
+#
+# door55_pressed: the save's own entities, loaded (so 26.2 strips the NaN and
+# the glue carts drift). The block choreography of the close is still readable
+# for the early ticks and this run is what first showed it.
+#
+#   WORLD="${WORLD55:-/tmp/w55/55 3x3}" tools/gametest/capture.sh \
+#     --structure nucleation:nan_contagion --in-world -8,-2,12,12,10,28 \
+#     --use 13,4,6 --use-tick 5 --max-ticks 140 --entity-log \
+#     --out work/door55_pressed.json | tee "$CAP/door55_pressed.entities.log"
+#
+# door55_replica: the capture that "could not exist". Entity.load's NaN-drop
+# only bites at *load* — so delete entities/*.mca from a copy of the save and
+# respawn all 24 entities exactly: positions, Motion (NaN components and the
+# 4.28e-59 denormal), Rotation via the `yaw=` spawn flag (a furnace cart's yaw
+# is its push gate), and the two blaze riders via `ride`. --spawn sets motion
+# directly, bypassing setDeltaMovement, so the nan carts stay frozen. The spawn
+# list is generated from the litematic (region-local entity coords + region
+# offset (4,0,1) + world offset (4,2,-13) = +(8,2,-12)). Result: the door
+# closes 9/9 from one press and is quiescent by t42, and the engine matches it
+# tick for tick.
+#
+#   rm -f "$W55COPY/entities/"*.mca
+#   WORLD="$W55COPY" tools/gametest/capture.sh \
+#     --structure nucleation:nan_contagion --in-world -8,-2,12,12,10,28 \
+#     --use 13,4,6 --use-tick 5 --max-ticks 140 --entity-log \
+#     <24 x --spawn, see captures/door55_replica.entities.log's spawn echo> \
+#     --out work/door55_replica.json | tee "$CAP/door55_replica.entities.log"
+
+# ---------------------------------------------------------------------------
 # 3. Pistons moving entities — the extension half.
 #
 # Four lanes, one sticky piston each facing east, one entity per lane standing

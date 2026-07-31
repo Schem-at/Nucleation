@@ -97,8 +97,16 @@ impl BlockBehaviour for Observer {
 
     fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
         if self.powered {
-            // End of the pulse.
-            ctx.set(pos, self.states.get(false));
+            // End of the pulse. `ObserverBlock.tick` writes with **flag 2**:
+            // the shape pass runs (a watching observer sees it) but no
+            // neighbour updates are dispatched — the only blocks told about
+            // the change are the front-side pair `updateNeighborsInFront`
+            // names. A piston *beside* an observer never hears its pulse, and
+            // the record 3x3 door is built on that: the row-shifter piston
+            // behind the row's west observer must sleep through the pulse
+            // that fires the down-pistons, or it re-shifts the row a whole
+            // phase early and the top corners never close.
+            ctx.set_shape_only(pos, self.states.get(false));
         } else {
             // Start of the pulse, and schedule its end.
             //
@@ -115,7 +123,8 @@ impl BlockBehaviour for Observer {
             // that would restart it arrives while it is still lit and
             // `updateShape` drops it. Scheduling before draining reversed the
             // pair and the 6x6 door's observer clocks stopped after one cycle.
-            ctx.set(pos, self.states.get(true));
+            // Flag 2, same as the turn-off above.
+            ctx.set_shape_only(pos, self.states.get(true));
             ctx.drain();
             ctx.schedule(pos, OBSERVER_PULSE_TICKS, TickPriority::Normal);
         }

@@ -973,6 +973,14 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                         landed.state
                     };
                     ctx.set(head, state);
+                    // `finalTick` lands through `setBlock`, so `onPlace` runs
+                    // for whatever landed — same hook as the short-pulse drop
+                    // below, and a no-op for the air a source piston leaves.
+                    if let Some(behaviour) =
+                        ctx.behaviours.and_then(|table| table.get(state))
+                    {
+                        behaviour.on_placed(ctx, head);
+                    }
                     ctx.drain();
                     // `finalTick` ends with `neighborChanged` at its own
                     // position, whether it runs from the block-entity phase or
@@ -992,7 +1000,19 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 if self.sticky {
                     let back = self.facing.opposite();
                     let target = head.offset(self.facing);
-                    let target_pending = ctx.moves.iter().position(|m| m.pos == target);
+                    // Vanilla's gate is `entity.getDirection() == direction &&
+                    // entity.isExtending()`: only a block still travelling
+                    // *away* on this piston's own extension is finalised in
+                    // place. A move retracting through that cell is left to
+                    // land on its own two-tick cadence — dropping it too
+                    // landed the record door's (2,1) piston a tick early on
+                    // the reopen, the one seam in an otherwise tick-exact
+                    // cycle.
+                    let target_pending = ctx.moves.iter().position(|m| {
+                        m.pos == target
+                            && m.sweep
+                                .is_some_and(|s| s.extending && s.travel == self.facing)
+                    });
                     let target_state = ctx.world.get(target);
                     let target_moving =
                         target_state == self.moving || target_state == self.moving_block;
@@ -1002,6 +1022,19 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                         // short-pulse drop.
                         let landed = ctx.moves.remove(index);
                         ctx.set(target, landed.state);
+                        // `finalTick` lands through `setBlock`, and `onPlace`
+                        // runs for the landed block exactly as for an ordinary
+                        // landing. A **piston** dropped in place re-checks its
+                        // power right here, inside the events phase, and a
+                        // queued extension chains into this same phase — the
+                        // record door's repositioned west piston lands at
+                        // (7,0) and fires the very same tick, which is what
+                        // closes the doorway's bottom-middle cell.
+                        if let Some(behaviour) =
+                            ctx.behaviours.and_then(|table| table.get(landed.state))
+                        {
+                            behaviour.on_placed(ctx, target);
+                        }
                         ctx.set(head, StateId::AIR);
                     } else if id == TRIGGER_CONTRACT {
                         // `moveBlocks` begins a retraction by silently clearing a
@@ -2243,6 +2276,210 @@ pub fn inside_eject_displacement(
     let shift = chosen.unwrap_or(-PISTON_MAX_STEP);
     // Back to a distance along `travel`, which points the other way to `u`.
     Some(-shift)
+}
+
+/// One box of a block's collision shape, in world coordinates.
+pub type ShapeBox = ([f64; 3], [f64; 3]);
+
+/// The axis a direction runs along: 0 = x, 1 = y, 2 = z.
+fn axis_of(travel: Dir) -> usize {
+    match travel {
+        Dir::West | Dir::East => 0,
+        Dir::Down | Dir::Up => 1,
+        Dir::North | Dir::South => 2,
+    }
+}
+
+/// `PistonHeadBlock`'s collision shape, in local `[0, 1]` cell coordinates.
+///
+/// Two boxes, straight out of the block's own definition:
+///
+/// * the **plate**, `Block.boxZ(16, 0, 4)` — the full 16×16 cross-section,
+///   4/16 deep, flush against the cell's face on the *facing* side;
+/// * the **arm**, `Block.boxZ(4, 4, 16|20)` — a 4×4 column
+///   ([`PISTON_ARM_NEAR`]..[`PISTON_ARM_FAR`] in both cross axes) running from
+///   the plate back towards the base. A `short=false` head's arm is 16/16 long
+///   and pokes 4/16 **beyond** the cell into the base's square; `short=true`
+///   (which `getCollisionRelatedBlockState` selects once `progress > 0.25`)
+///   stops flush at the cell boundary.
+///
+/// This is the shape `PistonMovingBlockEntity.moveCollidedEntities` sweeps for
+/// a source piston, and the arm's 4/16 column is why the cross-axis gate
+/// measured by `piston_square_yband` flips at exactly 6/16 and 10/16: the gate
+/// *is* this box.
+pub fn head_shape_boxes(facing: Dir, short: bool) -> [ShapeBox; 2] {
+    let axis = axis_of(facing);
+    let (dx, dy, dz) = facing.delta();
+    let sign = f64::from([dx, dy, dz][axis]);
+    let mut plate_min = [0.0; 3];
+    let mut plate_max = [1.0; 3];
+    let mut arm_min = [PISTON_ARM_NEAR; 3];
+    let mut arm_max = [PISTON_ARM_FAR; 3];
+    let arm_len = if short { 12.0 / 16.0 } else { 1.0 };
+    if sign > 0.0 {
+        plate_min[axis] = 1.0 - PISTON_BASE_SLOT;
+        plate_max[axis] = 1.0;
+        arm_max[axis] = 1.0 - PISTON_BASE_SLOT;
+        arm_min[axis] = arm_max[axis] - arm_len;
+    } else {
+        plate_min[axis] = 0.0;
+        plate_max[axis] = PISTON_BASE_SLOT;
+        arm_min[axis] = PISTON_BASE_SLOT;
+        arm_max[axis] = arm_min[axis] + arm_len;
+    }
+    [(plate_min, plate_max), (arm_min, arm_max)]
+}
+
+/// The collision boxes one moving-piston step sweeps, placed in the world.
+///
+/// This is `getCollisionRelatedBlockState().getCollisionShape()` +
+/// `moveByPositionAndProgress`, the shape side of
+/// `PistonMovingBlockEntity.moveCollidedEntities`:
+///
+/// * a **source piston** — the head extending, or the base retracting — sweeps
+///   the piston head's own shape, [`head_shape_boxes`], with `SHORT` selected
+///   by `progress > 0.25` while retracting and never while extending;
+/// * every **carried block** sweeps its own collision shape. Every block a
+///   capture has ever seen a piston carry is a full cube, and a cube is what a
+///   carried block gets; a pushed slab or stair would need its real shape here.
+///
+/// `destination` is the cell the move lands in (where vanilla's
+/// `moving_piston` block sits), and the boxes are offset back along the
+/// piston's *facing* by `getExtendedProgress(progress)` — one whole block at
+/// `progress = 0`, half at [`PISTON_STEP`].
+pub fn shove_shape_boxes(
+    destination: Pos,
+    sweep: Sweep,
+    progress: f64,
+    source_piston: bool,
+) -> Vec<SweptBox> {
+    let facing = if sweep.extending { sweep.travel } else { sweep.travel.opposite() };
+    let axis = axis_of(facing);
+    let (dx, dy, dz) = facing.delta();
+    let sign = f64::from([dx, dy, dz][axis]);
+    // `getExtendedProgress`: how far the shape still is from home, along facing.
+    let behind = if sweep.extending { progress - 1.0 } else { 1.0 - progress };
+    let mut origin = [
+        f64::from(destination.x),
+        f64::from(destination.y),
+        f64::from(destination.z),
+    ];
+    origin[axis] += behind * sign;
+    let local: Vec<(ShapeBox, bool)> = if source_piston {
+        let short = !sweep.extending && progress > 0.25;
+        let [plate, arm] = head_shape_boxes(facing, short);
+        vec![(plate, false), (arm, true)]
+    } else {
+        vec![(([0.0; 3], [1.0; 3]), false)]
+    };
+    local
+        .into_iter()
+        .map(|((bmin, bmax), is_arm)| {
+            let mut wmin = [0.0; 3];
+            let mut wmax = [0.0; 3];
+            for i in 0..3 {
+                wmin[i] = origin[i] + bmin[i];
+                wmax[i] = origin[i] + bmax[i];
+            }
+            SweptBox { min: wmin, max: wmax, arm: is_arm }
+        })
+        .collect()
+}
+
+/// One box of a moving piston's swept shape, with the arm marked out.
+///
+/// The plate (and any carried block) sweeps by plain strict `AABB.intersects`.
+/// The **arm** does not: `piston_drop_lift.entities.log` is a furnace cart
+/// whose box overlaps a retracting arm's 4/16 column by a genuine 0.205 and is
+/// never touched, beside the same cart centred on the column, which is. What
+/// separates every measured lane — that rig's two, `piston_square_yband`'s
+/// twelve (min-y flips at exactly 6/16 and 10/16), `piston_head_yband`'s feet
+/// gate, and the record door's critical cart, which vanilla leaves alone so it
+/// can fall onto the detector rail — is the entity's `position()` point:
+/// (centre x, **min** y, centre z), inside the arm's cross-section on both
+/// cross axes. The point gate is `Entity.position()`'s shape showing through,
+/// exactly as the fitted `inside_eject_displacement` had measured before the
+/// algorithm replaced it.
+#[derive(Debug, Clone, Copy)]
+pub struct SweptBox {
+    /// World-space minimum corner.
+    pub min: [f64; 3],
+    /// World-space maximum corner.
+    pub max: [f64; 3],
+    /// Whether this is the head's arm, with the position-point gate.
+    pub arm: bool,
+}
+
+/// How far one moving-piston step displaces an entity, over the real shape.
+///
+/// The exact loop of `PistonMovingBlockEntity.moveCollidedEntities`: for each
+/// shape box, `PistonMath.getMovementArea` turns it into the slab its leading
+/// face sweeps this step; an entity strictly intersecting the slab contributes
+/// its penetration depth (`getMovement`), the boxes' maximum wins, and the
+/// search stops early once a whole step is reached. The result is capped at
+/// [`PISTON_STEP`] and gets vanilla's [`PISTON_OVERSHOOT`] on top.
+///
+/// Returns `None` when no box touches the entity, exactly like
+/// `d0 <= 0.0 → continue`.
+pub fn moved_shape_displacement(
+    boxes: &[SweptBox],
+    travel: Dir,
+    entity_min: [f64; 3],
+    entity_max: [f64; 3],
+) -> Option<f64> {
+    let axis = axis_of(travel);
+    let (dx, dy, dz) = travel.delta();
+    let sign = f64::from([dx, dy, dz][axis]);
+    let mut delta = 0.0f64;
+    for swept in boxes {
+        let (bmin, bmax) = (&swept.min, &swept.max);
+        // The arm's gate: the entity's `position()` point — centre x, min y,
+        // centre z — must lie inside the arm's cross-section. See [`SweptBox`].
+        if swept.arm {
+            let inside = (0..3).filter(|i| *i != axis).all(|i| {
+                let point = if i == 1 {
+                    entity_min[1]
+                } else {
+                    (entity_min[i] + entity_max[i]) * 0.5
+                };
+                point > bmin[i] && point < bmax[i]
+            });
+            if !inside {
+                continue;
+            }
+        }
+        // `PistonMath.getMovementArea`: the slab in front of the leading face.
+        let leading = if sign > 0.0 { bmax[axis] } else { bmin[axis] };
+        let mut slab_min = *bmin;
+        let mut slab_max = *bmax;
+        if sign > 0.0 {
+            slab_min[axis] = leading;
+            slab_max[axis] = leading + PISTON_STEP;
+        } else {
+            slab_min[axis] = leading - PISTON_STEP;
+            slab_max[axis] = leading;
+        }
+        // `AABB.intersects` — strict, a face exactly touching is not a hit.
+        let touches = (0..3)
+            .all(|i| entity_min[i] < slab_max[i] && entity_max[i] > slab_min[i]);
+        if !touches {
+            continue;
+        }
+        // `getMovement`: how deep the entity is into the slab, from behind it.
+        let overlap = if sign > 0.0 {
+            slab_max[axis] - entity_min[axis]
+        } else {
+            entity_max[axis] - slab_min[axis]
+        };
+        delta = delta.max(overlap);
+        if delta >= PISTON_STEP {
+            break;
+        }
+    }
+    if delta <= 0.0 {
+        return None;
+    }
+    Some(delta.min(PISTON_STEP) + PISTON_OVERSHOOT)
 }
 
 #[cfg(test)]

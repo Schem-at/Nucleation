@@ -160,6 +160,20 @@ pub fn blocks_a_cart(kind: &str) -> Option<bool> {
     entity_behaviour(kind).map(crate::entity_kind::EntityBehaviour::obstructs_a_cart)
 }
 
+/// Whether this body's box stops **any** moving entity — vanilla's
+/// `Entity.canBeCollidedWith`.
+///
+/// The default is `false`, and almost nothing overrides it: a blaze, a
+/// villager, a minecart and every fireball all answer no, so an entity a
+/// piston shoves passes straight through them. `AbstractBoat` (and a shulker)
+/// answer yes. This is deliberately **not** [`blocks_a_cart`]: that table is
+/// `AbstractMinecart.canCollideWith`'s vehicle rule
+/// `canBeCollidedWith() || isPushable()`, which applies only when the moving
+/// entity is itself a cart.
+pub fn hard_collides(kind: &str) -> bool {
+    matches!(kind, "minecraft:oak_boat")
+}
+
 /// Where a passenger sits relative to its vehicle's position, measured.
 ///
 /// A lookup into [`vanilla_entities`]; the three measured seats, and why the

@@ -384,25 +384,28 @@ mod wide_bodies {
         // the pushed *quartz* is arriving in, because the cell the pushed piston
         // arrives in is one the box already overlaps by then.
         (1, "minecraft:dragon_fireball", [4.5, 1.875, 1.5], &[4.5, 3.99, 3.5], true),
-        // Starts extended and retracts: the wide-body hole, see below.
+        // Starts extended and retracts: the wide-body round trip. The outward
+        // quarter is the head's drag clipped against the retracting base's
+        // 12/16 slab (`retracting_base_box`), and the return quarter is
+        // `fixEntityWithinPistonBase` (`base_fix_displacement`) — the pair of
+        // calls this file's tripwire held open until both were wired in.
         (
             5,
             "minecraft:dragon_fireball",
             [4.5, 1.875, 5.5],
-            // The round trip, then the plate's re-extension — which agrees
-            // bit-exactly, so only the shove magnitude is wrong.
             &[4.5, 4.75, 4.5, 3.99, 3.4800000000000004],
-            false,
+            true,
         ),
         // Nothing to push, so nothing to clip: 0.51 then a full 0.5.
         (17, "minecraft:dragon_fireball", [4.5, 1.875, 17.5], &[4.5, 3.99, 3.49], true),
-        // The same hole with a 0.98 x 0.7 cart.
+        // The same round trip with a 0.98 x 0.7 cart, whose `0.98F` float slop
+        // survives both quarters.
         (
             9,
             "minecraft:furnace_minecart",
             [4.51, 1.0, 9.5],
             &[4.51, 4.759999990463257, 4.509999990463257],
-            false,
+            true,
         ),
         // A 0.98 cart starts 0.02 clear of the line and is not clipped either.
         (
@@ -562,43 +565,26 @@ mod wide_bodies {
     ///
     /// So [`mc_tick::piston::PISTON_BASE_SLOT`] is vindicated as *geometry*: a
     /// 0.98-wide and a 1.0-wide body, starting 9.5e-9 apart, both land on `5.25`
-    /// exactly, which no constant displacement explains. What remains unbuilt is
-    /// the **wiring** — `retracting_base_box` still has no call site and
-    /// `base_fix_displacement` still has none, so the engine takes the pulled
-    /// block's unclipped sweep and answers `+0.49`. Fixing that is a change to
-    /// retraction's law, not to this test; when it lands, this test fails, and
-    /// that is the signal to move both lanes into the agreeing set.
+    /// exactly, which no constant displacement explains. Both surfaces are now
+    /// wired in — the base slab clips the drag leg and
+    /// `base_fix_displacement` runs after every retracting source's shove — so
+    /// the tripwire test that pinned the engine's old `+0.49` answer is gone
+    /// and both lanes sit in the agreeing set above, checked by
+    /// `every_wide_lane_agrees`.
     #[test]
-    fn retracting_a_body_wider_than_the_arm_still_disagrees() {
-        /// What the engine says today, lane for lane, for the two `agrees: false`
-        /// lanes above. Not a target — a tripwire.
-        const ENGINE_TODAY: &[(i32, &[f64])] = &[
-            (5, &[4.5, 4.99, 4.5, 3.99, 3.4800000000000004]),
-            (9, &[4.51, 4.999999990463257, 5.509999990463257]),
-        ];
+    fn every_wide_lane_agrees() {
         let xs = run();
         for (index, (z, kind, _, vanilla, agrees)) in WIDE.iter().enumerate() {
-            if *agrees {
-                continue;
-            }
-            assert_ne!(
-                &xs[index], vanilla,
-                "lane z={z} ({kind}) now agrees with vanilla — move it into the \
-                 agreeing set and delete it from here"
-            );
-            let (_, today) = ENGINE_TODAY
-                .iter()
-                .find(|(lane, _)| lane == z)
-                .unwrap_or_else(|| panic!("no recorded answer for lane z={z}"));
+            assert!(*agrees, "lane z={z} ({kind}) is still marked disagreeing");
             assert_eq!(
-                &xs[index], today,
-                "lane z={z} ({kind}): the engine's answer changed without becoming \
-                 right. Vanilla is {vanilla:?}"
+                &xs[index], vanilla,
+                "lane z={z} ({kind}): positions diverge from the capture"
             );
         }
-        // And the shove that is wrong, named: a quarter block, not 0.49.
+        // The shove that used to be wrong, named: a quarter block out and a
+        // quarter block back.
         let five = WIDE.iter().position(|(z, _, _, _, _)| *z == 5).unwrap();
-        assert_eq!(WIDE[five].3[1] - WIDE[five].3[0], 0.25, "vanilla's outward shove");
-        assert_eq!(xs[five][1] - xs[five][0], 0.4900000000000002, "and the engine's");
+        assert_eq!(WIDE[five].3[1] - WIDE[five].3[0], 0.25, "the outward shove");
+        assert_eq!(WIDE[five].3[2] - WIDE[five].3[1], -0.25, "and the return");
     }
 }

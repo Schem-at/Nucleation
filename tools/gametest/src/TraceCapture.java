@@ -814,8 +814,19 @@ public final class TraceCapture {
             if (entity == null) {
                 throw new IllegalStateException("could not create " + typeName);
             }
+            // `yaw=N` in the flag list: the entity's Rotation[0]. A furnace
+            // cart's yaw gates `AbstractMinecart`'s push interaction — the
+            // record door's top row carries `Rotation: [±90, 0]` so its carts
+            // ignore x-offset neighbours — so a spawn that cannot say it
+            // cannot reproduce the door.
+            float yaw = 0.0f;
+            for (String flag : flags) {
+                if (flag.startsWith("yaw=")) {
+                    yaw = Float.parseFloat(flag.substring(4));
+                }
+            }
             entity.snapTo(ORIGIN.getX() + pos[0], ORIGIN.getY() + pos[1],
-                    ORIGIN.getZ() + pos[2], 0.0f, 0.0f);
+                    ORIGIN.getZ() + pos[2], yaw, 0.0f);
             entity.setOldPosAndRot();
             if (flags.contains("baby")
                     && entity instanceof net.minecraft.world.entity.AgeableMob ageable) {

@@ -37,13 +37,22 @@ measured *only* there.
   `tests/samples/55_3x3.zip`, DataVersion 4082. Two scenarios in one file:
   untouched it changes no block in 400 ticks and stays quiescent with all 24 of
   its entities and both blaze riders on their exact seats; pressed at tick 5 it
-  opens 6 of its 9 doorway cells, settles at 4, records 227 block changes,
-  comes to rest, and drops nothing below y=0.
+  **closes all 9 doorway cells**, records 266 block changes, comes to rest,
+  and drops nothing below y=0.
 
-  **6 of 9 is today's truth, not the goal.** The door does not close yet. The
-  number is pinned so that a regression reads as a different number instead of
-  as nothing at all; when the door does close, this becomes 9 and the settled
-  fill becomes 0.
+  **9 of 9 is measured, not aspirational.** The close was captured from real
+  Minecraft 26.2 — the save's blocks ticked in place with all 24 entities
+  respawned exactly, NaN velocities and rider seats included
+  (`tools/gametest/captures/door55_replica.entities.log`) — and the engine's
+  block timeline is tick-for-tick identical to that capture across the whole
+  cycle.
+
+  A third scenario presses the button **twice** (t5 and t60): the door closes,
+  the reopen's detector rail fires at t67 and releases at t87 — the critical
+  cart falling onto it and riding home again — and by t96 the world is
+  **bit-identical to its initial state**, which the scenario pins with
+  `expect: initial`. Zero divergent ticks against the two-press capture
+  (`captures/door55_cycle.entities.log`), write-coalescing aside.
 
   Its DataVersion is not decoration. 4082 selects the `Entity.load` rules that
   *keep* a NaN velocity, and this door is glued together by nan carts — minecarts

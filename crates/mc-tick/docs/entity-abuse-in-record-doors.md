@@ -156,7 +156,31 @@ refuted it** — the builders' account was wrong, and this page was wrong with i
 - [x] Entity-to-entity collision and the resulting velocity amplification.
       Bit-exact across five captures, including the chain law — carts block each
       other through the same sweep as blocks.
-- [~] Pistons move entities — including entities whose own physics are dead.
+- [x] Pistons move entities — including entities whose own physics are dead.
+      **Superseded: the fitted laws below are history.** The engine now runs
+      vanilla's actual `PistonMovingBlockEntity.moveCollidedEntities`, read out
+      of the 26.2 server jar (unobfuscated) and reproduced shape for shape:
+      the real piston-head boxes (`piston::head_shape_boxes`, `SHORT` once
+      `progress > 0.25`), `getMovementArea`'s swept slab per box
+      (`piston::moved_shape_displacement`), the drag toward a retracting base
+      clipped by the base's own 12/16 slab (`piston::retracting_base_box`),
+      `fixEntityWithinPistonBase` pushing back out (`base_fix_displacement` —
+      both finally wired in), `Entity.limitPistonMovement`'s ±0.51-per-axis
+      running total, per-move `applyEffectsFromBlocks` (`entityInside` fires
+      the tick the drag lands, which is how the door's plate presses at t13
+      with `power=1`), and in-flight cells turning solid one by one in
+      block-entity order rather than all at once. Every capture lane the fitted
+      laws were tuned to still passes, and the two wide-body lanes that never
+      fitted — `piston_plate_clip`'s `retracting_a_body_wider_than_the_arm` —
+      now agree bit-exactly: the +0.25 out is the drag clipped on the base
+      slab, the −0.25 back is `fixEntityWithinPistonBase`, and head-eject's
+      mysterious `+0.02` is the two calls' `+0.01` overshoots stacked. The
+      fitted functions (`head_eject_displacement`,
+      `inside_eject_displacement`, `sweep_displacement`) remain as measured
+      documentation with their unit tests, but nothing in the simulation calls
+      the first two any more; their 1e-4 seam at `x = 2.65635` was an artifact
+      of the fit, not of the game. The history below is how the shape of the
+      real algorithm was cornered one capture at a time.
       **Extension is measured and exact** (`piston_entity.json`): the shove is
       the depth of the entity's own hitbox in the arm's half-block sweep, capped
       at the step, plus 0.01, and it is positional only — no velocity is
@@ -600,7 +624,9 @@ Two law corrections came out of that, both implemented:
   per axis. This is precisely why id=11 was refused: feet 0.875 are in the
   piston's row, its centre 1.03125 is not.
 
-**The door still does not close.** With both fixes the machine fills 6 of the 9
+**The door still does not close.** *(Superseded — it closes now; see "Settled:
+the door closes, tick-exact against a full-fidelity replica" at the end of this
+page.)* With both fixes the machine fills 6 of the 9
 passage cells and then falls back, and it ends well away from home with the plate
 at `(74,1,20)` reading `power=1`. The three cells that never fill are `(67,2)`,
 `(68,0)` and `(69,2)`.
@@ -831,3 +857,115 @@ certificate path (`apps/door-cert-wasm`) already uses `InWorld` and is clean.
 but the former is not, and every verdict it has produced is downstream of the
 disturbance in the table above. That is an `apps/` change and is left to whoever
 owns it.
+
+## Settled: the door closes, tick-exact against a full-fidelity replica
+
+One button press now closes all nine doorway cells — `t38 fill 9/9`, 266 block
+changes, quiescent, all 24 entities intact — and the engine's block timeline is
+**tick-for-tick identical to real Minecraft** across the whole cycle. The only
+diffs in a per-tick set comparison are write-coalescing artifacts: six cells
+where vanilla's capture logs `A -> B` and the engine logs `A -> air -> B`
+within the same tick, identical states before and after.
+
+### The oracle that finally existed
+
+"There cannot be a capture of this door working without a 1.21.3 oracle" turned
+out to be wrong by one idea: the 26.2 `Entity.load` NaN-drop only bites at
+**load**. `tools/gametest/capture.sh`'s world mode ticks the save's blocks in
+place (no placement disturbance), and TraceCapture's `--spawn` sets motion
+directly, bypassing `setDeltaMovement` — so deleting `entities/*.mca` from the
+save and respawning all 24 entities with their exact positions, `Motion` (NaN
+components and the 4.28e-59 denormal included), `Rotation` (a new `yaw=` spawn
+flag; a furnace cart's yaw is its push gate) and the two blaze riders (`ride`)
+reproduces the door entirely. `captures/door55_replica.entities.log` is that
+run: nan carts frozen, blaze wall standing, pressed at t5, **closed 9/9 and
+quiescent by t42**. `captures/door55_pressed.entities.log` is the same press
+over the loaded (NaN-stripped) entities — the run that first showed the block
+choreography, at the cost of the freed carts drifting.
+
+### What the engine was missing, in causal order
+
+Every one of these was found by diffing the engine against the two captures and
+confirmed in the 26.2 source (the jar is unobfuscated; 1.21.3's Mojang
+mappings were pulled to check nothing here is version-gated — it is not):
+
+1. **The piston-entity laws were fits; the algorithm is now vanilla's.**
+   `moveCollidedEntities` reproduced shape for shape — see the superseded note
+   on the pistons checklist entry above. This is what returns every fireball
+   and cart to its exact rest position and makes the machine re-triggerable.
+2. **A cleanly-shoved entity fires `entityInside` the tick it moves.**
+   `moveEntityByPiston` ends in `applyEffectsFromBlocks`, so the plate at
+   (0,3) presses at t13 — the drag's own tick — reading `power=1`, because the
+   second stacked fireball has not moved yet when the first is counted (an
+   already-pressed plate's `entityInside` is a no-op; the 10-tick recheck
+   reads 2 at t23). The engine notified shoved entities a tick late, and that
+   one tick let its (0,4) row-return event run after the row had landed and
+   succeed — vanilla's runs at t14, mid-flight, fails, and **is dropped**,
+   which is the window the whole close fits through.
+3. **An observer's pulse is a flag-2 write.** `ObserverBlock.tick` dispatches
+   no generic neighbour updates; only `updateNeighborsInFront`'s pair hears
+   the pulse. The engine's flag-3 write poked the row-shifter piston behind
+   the row's west observer, re-shifting the row a phase early. With flag 2 the
+   land-pulses of the two moved observers fire the down-pistons at t16 over
+   columns 3 and 4 — the row is still west — and the top corners close.
+4. **`finalTick` lands through `setBlock`, so `onPlace` runs.** Both engine
+   finalTick sites (the interrupted extension and the short-pulse drop) now
+   run the landed block's `on_placed`. The repositioned west piston lands at
+   (7,0) during t38's events phase, re-checks its power inside that phase —
+   QC through the observer's emission into the air above — queues, chains,
+   and fires the same tick, closing the bottom-middle cell. That is the last
+   stroke of the close.
+
+### What one press does, measured
+
+Button t5 → dispenser plants powder snow t8 → east bottom battery stages t10-12
+→ row shifts west t12-14, dragging the 1e-7-straddling dragon fireballs onto
+the west plate (t13, power=1) and pinning the small fireball's plate (t13) →
+west DPEs push the middle and bottom west cells t14-18 → the moved observers'
+land-pulses fire the down-pistons over columns 3/4 at t16, short-pulse-dropping
+quartz into the top cells t18 → east side fills (5,1)/(5,0) t17-19 → the
+plate recheck reads 2 at t23, the row returns east t23-25, carrying the
+fireballs home → the down-pistons fire again over columns 4/5 t27-31 (the
+middle-top quartz cycles down one) → button releases t34 → the release chain
+re-stages the west piston down to (7,0) t36-38, which fires on landing and
+pushes the last two quartz west, **(4,0) closes t38-40** → quiescent. The
+detector rail never powers during the close: the top-row cart the row drags
+west stops flush against the seated blaze at x = 2.6 (a cart's collision set
+includes a pushable mob, and carts have no step-up), exactly as vanilla does.
+The rail is the *opening* trigger — the builders' "powers during the opening
+sequence and not the closing one" — and the reopen, a second press, is the
+next thing to build a scenario for.
+
+## Settled: the reopen too — the full cycle is a bit-identical round trip
+
+The second press works. Pressed again at t60, the row shifts west, the critical
+cart — parked flush against the seated blaze since the close — is dragged the
+last 0.28 west, falls onto the **detector rail** (t67), and the rail powers the
+deep pistons that pull the whole panel back out. The rail releases at t87 as
+the cart rides the returning row home, and by t96 the world is **bit-identical
+to its initial state**: every block, and every one of the 24 entities, back
+where the save put them. `tests/scenarios/55_3x3.litematic`'s third scenario
+pins the round trip with `expect: initial`, and the whole 220-tick two-press
+timeline has **zero divergent ticks** against the replica capture
+(`captures/door55_cycle.entities.log`).
+
+Two more vanilla laws fell out of the reopen, both measured on
+`captures/piston_drop_lift.entities.log` (a two-lane rig replicating the
+door's (3,4)-drop geometry) and then confirmed on the door:
+
+- **The arm's drag is gated on the entity's `position()` point, not its box.**
+  A furnace cart whose box genuinely overlaps a retracting arm's 4/16 column
+  by 0.205 is never touched; the same cart centred on the column is. What
+  separates every measured lane — that rig, `piston_square_yband`'s 6/16 and
+  10/16 min-y flips, `piston_head_yband`'s feet gate, and the door's critical
+  cart — is (centre x, **min** y, centre z) lying inside the arm's
+  cross-section. The plate (and any carried block) still sweeps by plain
+  strict `AABB.intersects`. This is `piston::SweptBox`'s `arm` flag, and it is
+  the one place the "real algorithm" rewrite had to re-admit a fitted gate:
+  the oracle refused the pure box-intersect reading of the source, and the
+  oracle wins.
+- **A sticky piston only drops a block that is still travelling away from
+  it.** Vanilla's short-pulse gate is `entity.getDirection() == direction &&
+  entity.isExtending()`; finalising *any* in-flight move at the target — a
+  move retracting through that cell included — landed the reopen's (2,1)
+  piston one tick early, the single seam in an otherwise exact cycle.

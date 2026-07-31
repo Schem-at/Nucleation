@@ -1,0 +1,109 @@
+Note: src/TraceCapture.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+[12:38:22] [main/INFO]: Loaded 1585 recipes
+[12:38:22] [main/INFO]: Loaded 1688 advancements
+[12:38:23] [main/INFO]: Selecting global world spawn...
+[12:38:23] [main/INFO]: Loading 0 persistent chunks...
+[12:38:23] [main/INFO]: Time elapsed: 162 ms
+[12:38:23] [main/INFO]: Started game test server
+  origin: BlockPos{x=0, y=100, z=0}
+[12:38:23] [main/INFO]: 2 tests are now running at position 10690752, -59, -13771165!
+[12:38:23] [main/INFO]: Running test environment 'nucleation:default' batch 0 (1 tests)...
+  warmup ticks until entity-ticking: 18 (4/4 chunks ready)
+  spawn: id=1 minecraft:furnace_minecart at (2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0) flags=[yaw=90]
+         bbox=[1.5999999904632567..2.580000009536743, 4.0..4.699999988079071, 1.0099999904632568..1.9900000095367432] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  spawn: id=2 minecraft:furnace_minecart at (2.5, 4.0, 5.5) vel=(0.0, 0.0, 0.0) flags=[yaw=90]
+         bbox=[2.009999990463257..2.990000009536743, 4.0..4.699999988079071, 5.009999990463257..5.990000009536743] size=0.9800000190734863x0.699999988079071x0.9800000190734863
+  block-ticking chunks: 4/4
+  pending block ticks: 0
+  runs normally: true
+  entity-ticking chunks: 4/4
+  entities loaded: 2
+    2 x minecraft:furnace_minecart
+  entities with non-finite velocity (nan carts): 0
+  at t2: 3,4,1 -> redstone_block
+  at t4: 3,4,1 -> air
+  at t2: 3,4,5 -> redstone_block
+  at t4: 3,4,5 -> air
+  initial [0,0,1] minecraft:stone
+  initial [1,0,1] minecraft:stone
+  initial [2,0,1] minecraft:stone
+  initial [3,0,1] minecraft:stone
+  initial [1,3,1] minecraft:stone
+  initial [2,3,1] minecraft:quartz_block
+  initial [2,4,1] minecraft:sticky_piston[extended=false,facing=down]
+  initial [0,0,5] minecraft:stone
+  initial [1,0,5] minecraft:stone
+  initial [2,0,5] minecraft:stone
+  initial [3,0,5] minecraft:stone
+  initial [2,3,5] minecraft:quartz_block
+  initial [2,4,5] minecraft:sticky_piston[extended=false,facing=down]
+ENT t-1 entities=2 non-finite=0
+  E t-1 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t-1 id=2 minecraft:furnace_minecart pos=(2.5, 4.0, 5.5) vel=(0.0, 0.0, 0.0)
+  notify hook: installed (maxChained=1000000)
+    t0 gameTime=19 pending=0
+ENT t0 entities=2 non-finite=0
+  E t0 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t0 id=2 minecraft:furnace_minecart pos=(2.5, 4.0, 5.5) vel=(0.0, 0.0, 0.0)
+[12:38:23] [main/INFO]: [  ]
+    t1 gameTime=20 pending=0
+ENT t1 entities=2 non-finite=0
+  E t1 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t1 id=2 minecraft:furnace_minecart pos=(2.5, 4.0, 5.5) vel=(0.0, 0.0, 0.0)
+    t2 gameTime=21 pending=0
+ENT t2 entities=2 non-finite=0
+  E t2 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t2 id=2 minecraft:furnace_minecart pos=(2.5, 3.489999999999995, 5.5) vel=(0.0, 0.0, 0.0)
+ENT t3 entities=2 non-finite=0
+  E t3 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t3 id=2 minecraft:furnace_minecart pos=(2.5, 3.0, 5.5) vel=(0.0, 0.0, 0.0)
+ENT t4 entities=2 non-finite=0
+  E t4 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t4 id=2 minecraft:furnace_minecart pos=(2.5, 3.280000011920933, 5.5) vel=(0.0, 0.0, 0.0)
+ENT t5 entities=2 non-finite=0
+  E t5 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t5 id=2 minecraft:furnace_minecart pos=(2.5, 3.280000011920933, 5.5) vel=(0.0, 0.0, 0.0)
+ENT t6 entities=2 non-finite=0
+  E t6 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t6 id=2 minecraft:furnace_minecart pos=(2.5, 3.2400000119209267, 5.5) vel=(0.0, -0.037999999523162846, 0.0)
+ENT t7 entities=2 non-finite=0
+  E t7 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t7 id=2 minecraft:furnace_minecart pos=(2.5, 3.162000012397769, 5.5) vel=(0.0, -0.07409999861717226, 0.0)
+ENT t8 entities=2 non-finite=0
+  E t8 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t8 id=2 minecraft:furnace_minecart pos=(2.5, 3.047900013780591, 5.5) vel=(0.0, -0.10839499732613568, 0.0)
+ENT t9 entities=2 non-finite=0
+  E t9 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t9 id=2 minecraft:furnace_minecart pos=(2.5, 3.0, 5.5) vel=(0.0, 0.0, 0.0)
+ENT t10 entities=2 non-finite=0
+  E t10 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t10 id=2 minecraft:furnace_minecart pos=(2.5, 3.0, 5.5) vel=(0.0, 0.0, 0.0)
+ENT t11 entities=2 non-finite=0
+  E t11 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t11 id=2 minecraft:furnace_minecart pos=(2.5, 3.0, 5.5) vel=(0.0, 0.0, 0.0)
+ENT t12 entities=2 non-finite=0
+  E t12 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t12 id=2 minecraft:furnace_minecart pos=(2.5, 3.0, 5.5) vel=(0.0, 0.0, 0.0)
+ENT t13 entities=2 non-finite=0
+  E t13 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t13 id=2 minecraft:furnace_minecart pos=(2.5, 3.0, 5.5) vel=(0.0, 0.0, 0.0)
+ENT t14 entities=2 non-finite=0
+  E t14 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t14 id=2 minecraft:furnace_minecart pos=(2.5, 3.0, 5.5) vel=(0.0, 0.0, 0.0)
+ENT t15 entities=2 non-finite=0
+  E t15 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t15 id=2 minecraft:furnace_minecart pos=(2.5, 3.0, 5.5) vel=(0.0, 0.0, 0.0)
+ENT t16 entities=2 non-finite=0
+  E t16 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t16 id=2 minecraft:furnace_minecart pos=(2.5, 3.0, 5.5) vel=(0.0, 0.0, 0.0)
+ENT t17 entities=2 non-finite=0
+  E t17 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t17 id=2 minecraft:furnace_minecart pos=(2.5, 3.0, 5.5) vel=(0.0, 0.0, 0.0)
+ENT t18 entities=2 non-finite=0
+  E t18 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t18 id=2 minecraft:furnace_minecart pos=(2.5, 3.0, 5.5) vel=(0.0, 0.0, 0.0)
+ENT t19 entities=2 non-finite=0
+  E t19 id=1 minecraft:furnace_minecart pos=(2.09, 4.0, 1.5) vel=(0.0, 0.0, 0.0)
+  E t19 id=2 minecraft:furnace_minecart pos=(2.5, 3.0, 5.5) vel=(0.0, 0.0, 0.0)
+captured 3 tick(s) with changes -> work/piston_drop_lift.json
