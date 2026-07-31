@@ -254,6 +254,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // No blaze model in the mesher; a magma cube of the head's size at
             // the top of its box reads unmistakably as one from this distance.
             one.set_block_from_string(0, 0, 0, "minecraft:magma_block").ok();
+        } else if !track.kind.is_empty() && track.kind != "minecraft:item" {
+            // Any other entity kind goes to the mesher's entity path as-is —
+            // zombies, villagers, boats, the whole mob roster. A kind without
+            // a model meshes empty and simply does not draw.
+            one.add_entity(nucleation::Entity::new(track.kind.clone(), (0.5, 0.0, 0.5)));
         } else if track.item == "minecraft:minecart" {
             // The real cart: meshed through the mesher's entity path — the
             // vanilla MinecartModel hull, UV'd from entity/minecart.png in
@@ -428,6 +433,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // 1.8-tall box.
                     let extent = size[0].max(size[1]).max(size[2]).max(1.0e-4);
                     (0.5 / extent, [p[0] as f32, p[1] as f32 + 1.55, p[2] as f32])
+                } else if !track.kind.is_empty() && track.kind != "minecraft:item" {
+                    // A mob model draws at its authored size, feet on the
+                    // entity position.
+                    (1.0, [p[0] as f32, p[1] as f32 + size[1] * 0.5, p[2] as f32])
                 } else {
                     // Dropped items draw at vanilla's quarter block scale,
                     // hovering an eighth above the entity position.

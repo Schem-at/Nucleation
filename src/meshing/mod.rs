@@ -119,6 +119,32 @@ impl ResourcePackSource {
                 pack.add_texture("minecraft", "entity/minecart", texture);
             }
         }
+        // More renames between the names schematic-mesher 0.2 asks for and
+        // what the current client jar ships: the 1.21.5 mob-variant split
+        // named files `<mob>/temperate_<mob>.png`, and 26.2 flipped them to
+        // `<mob>/<mob>_temperate.png`; the bat moved into a folder; the cat
+        // breeds gained a `cat_` prefix. Alias each canonical name the mesher
+        // reads to whichever spelling the pack actually has, so these mobs
+        // render with their skins instead of the missing-texture tile.
+        for (wanted, candidates) in [
+            ("entity/pig/temperate_pig", ["entity/pig/pig_temperate", "entity/pig/pig"]),
+            ("entity/cow/temperate_cow", ["entity/cow/cow_temperate", "entity/cow/cow"]),
+            (
+                "entity/chicken/temperate_chicken",
+                ["entity/chicken/chicken_temperate", "entity/chicken/chicken"],
+            ),
+            ("entity/cat/tabby", ["entity/cat/cat_tabby", "entity/cat/tabby"]),
+            ("entity/bat", ["entity/bat/bat", "entity/bat"]),
+        ] {
+            if pack.get_texture(wanted).is_some() {
+                continue;
+            }
+            if let Some(texture) =
+                candidates.iter().find_map(|c| pack.get_texture(c).cloned())
+            {
+                pack.add_texture("minecraft", wanted, texture);
+            }
+        }
         Self { pack }
     }
 
@@ -673,6 +699,10 @@ fn entity_to_input_block(entity: &Entity) -> InputBlock {
         | "hopper_minecart"
         | "spawner_minecart"
         | "command_block_minecart" => "minecart",
+        // Wood-specific boat ids all render the one boat model; the mesher
+        // keys on the plain names.
+        id if id.ends_with("_chest_boat") || id.ends_with("_chest_raft") => "chest_boat",
+        id if id.ends_with("_boat") || id.ends_with("_raft") => "boat",
         id => id,
     };
 
