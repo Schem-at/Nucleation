@@ -57,6 +57,8 @@ print(sim.get_block(4, 1, 0))   # minecraft:stone
 print(sim.tick_count(), sim.changes_count())   # 32 30
 ```
 
+<img src="../media/tick-sim/quickstart.gif" width="560" alt="The scene above animated: the button is pressed, the dust powers, the sticky piston pushes the stone one cell east, and pulls it back when the button pops">
+
 Every block change carries its tick:
 
 ```python
@@ -76,6 +78,8 @@ sim = TickSimulation.from_schematic(schem, TickSettleMode.InWorld, 0, 0, 0, "")
 sim.use_block(9, 2, 19)         # the door's button
 sim.run_until_quiescent(400)    # all 9 doorway cells close by tick 38
 ```
+
+<img src="../media/tick-sim/door-cycle.gif" width="560" alt="The record 55-block 3x3 piston door running its close-and-reopen cycle in the engine, minecarts and fireballs included">
 
 The arguments after the schematic: a settle mode, a world origin (x, y, z), and
 `extra_states`.
@@ -190,6 +194,16 @@ dispatch time. The phase legend rides in the payload (`heat["phases"]`).
 Prefer these views over raw `updates_json()` — one door cycle can be a hundred
 thousand raw updates.
 
+The wave data animates naturally — this is one press of the record door's
+button, each frame one tick, each cell lit by how many updates it received
+(front view of the machine's redstone wall):
+
+<img src="../media/tick-sim/subtick-wave.gif" width="548" alt="Update wave animation: one press of the record door, updates rippling from the button across the machine tick by tick">
+
+And the same run's total per cell — the machine's hot spots:
+
+<img src="../media/tick-sim/subtick-heat.png" width="548" alt="Total update heat per cell over the press: piston columns and the wire bus glow hottest">
+
 ## Checkpoints
 
 ```python
@@ -248,6 +262,9 @@ for i in range(12):
 
 Twelve PNGs, one every two ticks; `ffmpeg -i frame_%03d.png out.mp4` turns
 them into a clip. Any resource pack works — the vanilla client jar included.
+This is the loop above, exactly as written:
+
+<img src="../media/tick-sim/render-a-run.gif" width="560" alt="The twelve snapshot frames as a flipbook: the piston scene stepping through its press-extend-retract cycle, two ticks per frame">
 
 For polished animations — smooth piston interpolation, entities drawn as their
 real models, side-by-side comparison against a captured vanilla trace — there
@@ -265,7 +282,9 @@ no code naming the build. The vocabulary and workflow are in
 is the record 55-block 3x3 piston door: pinned at rest, closing all 9 doorway
 cells on one press, and returning the world bit-identical after a second —
 with the whole cycle verified tick-for-tick against a capture of real
-Minecraft.
+Minecraft:
+
+<img src="../media/tick-sim/vanilla-vs-engine.gif" width="840" alt="Side by side: real Minecraft 26.2 (left) and the engine (right) running the record door's full close-and-reopen cycle in lockstep">
 
 ## Performance
 

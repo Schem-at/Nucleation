@@ -228,6 +228,8 @@ than loaded inert. Adding a frozen type is one row.
 A row says four things — dimensions, whether the body stops a minecart, its
 motion class, and which riders sit where on it.
 
+<img src="../media/tick-sim/entity-cast.png" width="880" alt="The registry's cast rendered: the five minecart variants, a blaze riding a cart, a blaze, a villager, an armor stand, an oak boat, and the three fireball sizes as sprites">
+
 ### Dimensions are mechanism, not trivia
 
 Read out of the game's own registry (`tools/gametest/src/EntityDims.java` prints
@@ -364,6 +366,12 @@ as a stationary box is a confident wrong answer whose wrongness is invisible.
 
 The engine runs vanilla's actual `PistonMovingBlockEntity.moveCollidedEntities`,
 shape for shape, rather than a fitted approximation:
+
+<img src="../media/tick-sim/piston-shove.gif" width="560" alt="A sticky piston extends into a frozen dragon fireball, displacing it by exactly its penetration depth plus 0.01, and leaves it exactly where it was shoved when the head retracts">
+
+That clip is the engine: the stroke displaces the fireball by its penetration
+depth plus vanilla's `0.01`, imparts no velocity, and the retraction — with the
+fireball outside the head's drag shapes — leaves it exactly where it landed.
 
 - **The swept shape is the real one.** A carried block sweeps its collision
   shape; a source piston sweeps the piston head's own plate-and-arm boxes, with
