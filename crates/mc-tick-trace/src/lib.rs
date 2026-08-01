@@ -572,6 +572,9 @@ mod tests {
             mc_version: "26.2".into(),
             structure: "test".into(),
             detail: Detail::Normal,
+            queues: Vec::new(),
+            game_time_at_start: None,
+            origin: None,
             ticks,
         }
     }
