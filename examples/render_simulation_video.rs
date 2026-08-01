@@ -3,6 +3,7 @@
 //!     cargo run --release --example render_simulation_video --features rendering -- \
 //!         <pack.zip|client.jar> <structure.snbt> <out.mp4> \
 //!         [--ticks N] [--click x,y,z@T] [--frames-per-tick 6] [--fps 30]
+//!         [--assemble N]   animate the initial blocks into place over N ticks
 //!
 //! The simulation is the source of truth: the world's per-tick block changes are
 //! reconstructed into a cast of `(position, state, lifetime)` members, each
@@ -157,7 +158,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("entity log: {} tracks from {log_path}", tracks.len());
         item_tracks.append(&mut tracks);
     }
-    let item_tracks = item_tracks;
+    let mut item_tracks = item_tracks;
 
     println!(
         "item tracks: {} ({} entity events)",
@@ -165,8 +166,47 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         item_tracks.iter().map(|t| t.positions.iter().flatten().count()).sum::<usize>()
     );
 
+    // --assemble N: stagger the initial world's blocks into view across the
+    // first N display ticks, bottom layer first, then run the simulation —
+    // one renderer and one fixed camera for both phases, so the piston
+    // interpolation stays smooth through the cut that used to exist between
+    // a snapshot-rendered assembly and the animated run.
+    let assemble: u64 = flag(&args, "--assemble").map_or(0, |v| v.parse().expect("--assemble N"));
+    let display_ticks = ticks + assemble;
+    let changes: Vec<(u64, Pos, String, String)> = changes
+        .into_iter()
+        .map(|(tick, pos, from, to)| (tick + assemble, pos, from, to))
+        .collect();
+    if assemble > 0 {
+        for track in &mut item_tracks {
+            let mut shifted = vec![None; assemble as usize];
+            shifted.append(&mut track.positions);
+            track.positions = shifted;
+        }
+    }
+    let item_tracks = item_tracks;
+
     // ── 2. Reconstruct the cast ─────────────────────────────────────────────
-    let members = build_cast(&initial, &changes, ticks);
+    let mut members = build_cast(&initial, &changes, display_ticks);
+    if assemble > 0 {
+        // Everything alive from display tick 0 is part of the standing world;
+        // deal those members their entrance one by one.
+        let mut order: Vec<usize> = members
+            .iter()
+            .enumerate()
+            .filter(|(_, m)| m.start == 0.0)
+            .map(|(i, _)| i)
+            .collect();
+        order.sort_by_key(|&i| {
+            let p = members[i].pos;
+            (p.y, p.z, p.x)
+        });
+        let count = order.len().max(1) as f64;
+        for (slot, &i) in order.iter().enumerate() {
+            members[i].start = slot as f64 * assemble as f64 / count;
+        }
+    }
+    let members = members;
     println!("cast: {} members", members.len());
 
     // ── 3. Mesh each member once ────────────────────────────────────────────
@@ -348,7 +388,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         opacity: 0.0,
         ..Pose::IDENTITY
     };
-    let frame_count = ticks as u32 * frames_per_tick;
+    let frame_count = display_ticks as u32 * frames_per_tick;
     let mut frames = Vec::with_capacity(frame_count as usize);
     for f in 0..frame_count {
         let t = f as f64 / frames_per_tick as f64;
