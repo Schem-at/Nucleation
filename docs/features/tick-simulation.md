@@ -57,7 +57,7 @@ print(sim.get_block(4, 1, 0))   # minecraft:stone
 print(sim.tick_count(), sim.changes_count())   # 32 30
 ```
 
-<img src="../media/tick-sim/quickstart.gif" width="560" alt="The scene above: each set_block call lands one block, then the button is pressed, the sticky piston pushes the stone one cell east, and pulls it back when the button pops">
+<img src="../media/tick-sim/quickstart.gif?v=2" width="560" alt="The scene above: each set_block call lands one block, then the button is pressed, the sticky piston pushes the stone one cell east, and pulls it back when the button pops">
 
 That is the code above, animated: the `set_block` loop assembling the scene one
 block at a time, then the simulation running — press, push, button pop,
@@ -246,14 +246,14 @@ button in the middle and press it. The button's press and the entire power
 cascade — 11,784 update dispatches — happen inside game tick 0. This animation
 is that *one tick*, played back in dispatch order:
 
-<img src="../media/tick-sim/subtick-wave.gif" width="470" alt="One game tick played in dispatch order: the update cursor sweeping a 13x13 dust field after a button press, in position-hash order rather than a tidy radial bloom">
+<img src="../media/tick-sim/subtick-wave.gif?v=2" width="470" alt="One game tick played in dispatch order: the update cursor sweeping a 13x13 dust field after a button press, in position-hash order rather than a tidy radial bloom">
 
 The bright cursor is the engine delivering updates. Notice it does not bloom
 outward from the button — dust hands out its updates in a position-hashed
 order, the same locational ordering vanilla uses (and the reason the world
 origin argument exists). The same run's totals, per cell:
 
-<img src="../media/tick-sim/subtick-heat.png" width="470" alt="Total dispatches per cell for the press: the field is hottest near the button and cools toward the corners">
+<img src="../media/tick-sim/subtick-heat.png?v=2" width="470" alt="Total dispatches per cell for the press: the field is hottest near the button and cools toward the corners">
 
 ## Small scenes
 
