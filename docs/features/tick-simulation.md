@@ -57,6 +57,16 @@ print(sim.get_block(4, 1, 0))   # minecraft:stone
 print(sim.tick_count(), sim.changes_count())   # 32 30
 ```
 
+Every block change carries its tick:
+
+```python
+for c in json.loads(sim.changes_json())[:3]:
+    print(c["tick"], c["pos"], c["from"], "->", c["to"])
+# 0 [0, 1, 0] minecraft:oak_button[...powered=false] -> ...powered=true
+# 0 [1, 1, 0] minecraft:redstone_wire[...power=0]    -> ...power=15
+# 0 [2, 1, 0] minecraft:redstone_wire[...power=0]    -> ...power=14
+```
+
 <img src="../media/tick-sim/quickstart.gif?v=2" width="560" alt="The scene above: each set_block call lands one block, then the button is pressed, the sticky piston pushes the stone one cell east, and pulls it back when the button pops">
 
 That is the code above, animated: the `set_block` loop assembling the scene one
@@ -107,16 +117,6 @@ Details worth knowing: the tag must stand alone in the braces (combine it with
 than three blocks from all other content skips the engine, since nothing is in
 range to interact; and every block already in the schematic must be one the
 engine can simulate, or the call errors by name.
-
-Every block change carries its tick:
-
-```python
-for c in json.loads(sim.changes_json())[:3]:
-    print(c["tick"], c["pos"], c["from"], "->", c["to"])
-# 0 [0, 1, 0] minecraft:oak_button[...powered=false] -> ...powered=true
-# 0 [1, 1, 0] minecraft:redstone_wire[...power=0]    -> ...power=15
-# 0 [2, 1, 0] minecraft:redstone_wire[...power=0]    -> ...power=14
-```
 
 ## Loading a real build
 
