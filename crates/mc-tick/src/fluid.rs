@@ -296,6 +296,13 @@ pub struct Water<R: FluidWorld> {
 }
 
 impl<R: FluidWorld + 'static> BlockBehaviour for Water<R> {
+    fn on_state_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        // `LiquidBlock.onPlace` schedules the fluid's first tick — unguarded,
+        // on every write. Without this a placed source sits inert until a
+        // neighbour happens to change.
+        schedule_fluid(ctx, pos);
+    }
+
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
         // LiquidBlock reacts to any neighbour change by scheduling a fluid tick.
         schedule_fluid(ctx, pos);
