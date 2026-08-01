@@ -1936,6 +1936,100 @@ impl Simulation {
         }
     }
 
+    /// Place one block the way a player's hand does.
+    ///
+    /// Vanilla's placement derives the block's state from its surroundings
+    /// *before* anything reacts — `getStateForPlacement` plus the
+    /// `updateShape` chain — so a wire arrives already connected, and only
+    /// then does `onPlace` run and the neighbourhood hear about it. The
+    /// engine's equivalent, in order:
+    ///
+    /// 1. write the state, and deliver a shape update *to* the placed block
+    ///    from all six sides — the placed state re-derives itself in place;
+    /// 2. `on_placed` — the genuine-placement hook (a wire recomputes its
+    ///    power, a repeater its lock);
+    /// 3. the flag-3 notification: neighbour updates plus the shape pass.
+    ///
+    /// This differs from [`Self::place_block`], which is an *actuator write*
+    /// (a dropped-in redstone block, a test harness poke): that path runs
+    /// `on_state_changed` and never the placement derivation, which is why a
+    /// wire written through it stays shaped as authored.
+    pub fn place_block_by_hand(&mut self, pos: Pos, state: StateId) {
+        let previous = self.world.get(pos);
+        if previous == state {
+            return;
+        }
+        self.world.set(pos, state);
+        self.inventories.remove(&pos);
+        if let Some(log) = self.log.as_mut() {
+            log.push(BlockChange { tick: self.tick, pos, from: previous, to: state });
+        }
+
+        // 1. The placement derivation: the placed block hears a shape update
+        //    from every side, in vanilla's own shape order.
+        let items: Vec<(Pos, crate::pos::Dir, crate::behaviour::UpdateKind)> =
+            crate::pos::UPDATE_SHAPE_ORDER
+                .iter()
+                .map(|dir| (pos, *dir, crate::behaviour::UpdateKind::Shape))
+                .collect();
+        self.updates.push(crate::behaviour::UpdateEntry::new(items));
+        self.propagate();
+
+        // 2. `onPlace`, on whatever the derivation left in the cell.
+        let state = self.world.get(pos);
+        if state != StateId::AIR {
+            if let Some(behaviour) = self.behaviours.get(state) {
+                let mut ctx = TickCtx {
+                    drain: Some(crate::behaviour::Drain {
+                        pending: &mut self.pending,
+                        unknown_seen: &mut self.unknown_seen,
+                        upd_log: self.upd_log.as_mut(),
+                        phase: self.phase,
+                    }),
+                    behaviours: Some(&self.behaviours),
+                    world: &mut self.world,
+                    ticks: &mut self.ticks,
+                    fluids: &mut self.fluids,
+                    events: &mut self.events,
+                    states: &self.registry,
+                    tick: self.tick,
+                    boundary: true,
+                    updates: &mut self.updates,
+                    moves: &mut self.moves,
+                    toggles: &mut self.toggles,
+                    comparator_out: &mut self.comparator_out,
+                    inventories: &mut self.inventories,
+                    hopper_state: &mut self.hopper_state,
+                    item_entities: &mut self.item_entities,
+                    inv_log: self.inv_log.as_mut(),
+                    log: self.log.as_mut(),
+                };
+                behaviour.on_placed(&mut ctx, pos);
+            } else {
+                self.unknown_seen.push(state);
+            }
+            self.propagate();
+        }
+
+        // 2b. Vanilla's `getStateForPlacement` also reads the *inputs* — a
+        //     repeater arrives already knowing whether it should turn on. The
+        //     engine derives that lazily instead: one neighbour-changed poke
+        //     to the placed block, so anything input-driven schedules its own
+        //     check. Idempotent for everything else (a wire just recomputes
+        //     the power it already has).
+        self.updates.push(crate::behaviour::UpdateEntry::new(vec![(
+            pos,
+            crate::pos::Dir::Down,
+            crate::behaviour::UpdateKind::Neighbor,
+        )]));
+        self.propagate();
+
+        // 3. markAndNotifyBlock, flag 3: neighbours and the observer pass.
+        self.updates.push(crate::behaviour::UpdateEntry::neighbors_at(pos));
+        self.updates.push(crate::behaviour::UpdateEntry::neighbor_shapes(pos));
+        self.propagate();
+    }
+
     /// `Level.updateNeighbourForOutputSignal`: the *comparator* notification a
     /// changed container sends.
     ///
