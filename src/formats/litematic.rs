@@ -646,7 +646,7 @@ mod tests {
     /// writer keeps them. That is worth pinning rather than assuming, because
     /// sanitising a non-finite velocity to 0.0 turns a frozen cart into an
     /// ordinary one and quietly un-glues the machine. See
-    /// `crates/mc-tick/docs/entity-abuse-in-record-doors.md`.
+    /// `crates/mc-tick/docs/history/entity-abuse-in-record-doors.md`.
     #[test]
     fn litematic_round_trips_nan_velocities_and_passengers() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/samples/55_3x3.zip");

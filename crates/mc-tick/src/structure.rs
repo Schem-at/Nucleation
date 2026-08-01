@@ -626,7 +626,7 @@ impl<'a> Parser<'a> {
     /// builders use them as glue to pin villagers and other carts in place.
     /// Round one to zero and it becomes an ordinary cart that moves, falls and
     /// is shoved by its neighbours, and the machine comes apart silently.
-    /// See `docs/entity-abuse-in-record-doors.md`.
+    /// See `docs/history/entity-abuse-in-record-doors.md`.
     ///
     /// **Exponents.** `4.27987680632209e-59` is a real motion component in that
     /// same world. Without handling it here, `e` would be eaten as a type

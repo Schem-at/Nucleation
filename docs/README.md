@@ -27,6 +27,9 @@ JS/Kotlin/PHP), unified `NucleationError` errors.
   provenance, the 26.2 refresh pipeline, Bedrock mappings
 - [Insign IO integration](features/redstone-simulation.md) — executors from sign
   annotations
+- [Tick simulation](features/tick-simulation.md) — run a build the way the game
+  would and read the results as data
+  ([mechanics notes](features/tick-simulation-mechanics.md))
 - [Meshing, .nucm, and rendering](features/meshing-and-rendering.md)
 - [Animating a build](features/animation.md) — assembly, layer printing,
   reveals along a shape's own curve; deterministic frame sampling

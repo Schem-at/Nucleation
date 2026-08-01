@@ -305,7 +305,7 @@ fn a_cart_resting_on_a_body_is_on_the_ground() {
 /// The cart here is a plain minecart where the capture used a furnace one, and
 /// the assertion is the resting *face* rather than the trajectory, because a
 /// furnace cart's approach is governed by two constants this engine does not
-/// model yet (see the note in `docs/entity-abuse-in-record-doors.md`). Where it
+/// model yet (see the note in `docs/history/entity-abuse-in-record-doors.md`). Where it
 /// stops is geometry and is not one of them.
 #[test]
 fn a_body_stops_a_cart_sideways_at_its_own_face() {

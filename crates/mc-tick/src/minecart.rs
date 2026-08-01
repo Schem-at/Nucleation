@@ -730,7 +730,7 @@ fn push(this: &mut MinecartState, other: &mut MinecartState) {
 ///   that landed just before. The oracle capture shows a striker going
 ///   0.069 -> 0.0027 across one tick, which is 0.2 squared: two pushes, each
 ///   keeping the multiply and dropping the add. The "zombie minecart" in
-///   `docs/entity-abuse-in-record-doors.md` is folklore, and the document says
+///   `docs/history/entity-abuse-in-record-doors.md` is folklore, and the document says
 ///   the oracle wins.
 fn set_delta(cart: &mut MinecartState, velocity: [f64; 3]) {
     if velocity.iter().all(|component| component.is_finite()) {
@@ -1112,7 +1112,7 @@ mod tests {
 
     /// A NaN cart stays NaN, and does **not** infect what hits it.
     ///
-    /// The folklore — and `docs/entity-abuse-in-record-doors.md`, which says to
+    /// The folklore — and `docs/history/entity-abuse-in-record-doors.md`, which says to
     /// believe the oracle over itself — has a NaN cart turning whatever touches
     /// it into a "zombie minecart". The capture refutes it, and 26.2's
     /// `Entity.setDeltaMovement` says why: a non-finite vector is dropped, so

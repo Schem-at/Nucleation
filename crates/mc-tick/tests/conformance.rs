@@ -22,7 +22,7 @@
 //!
 //! The corpus runner registers no behaviour, so it cannot simulate. Wiring real
 //! Minecraft blocks to behaviours needs a descriptor-to-behaviour registry that
-//! does not exist yet — see `ROADMAP.md`. Until it does, conformance tests
+//! does not exist yet — see `docs/history/ROADMAP.md`. Until it does, conformance tests
 //! register the handful of blocks their structure uses, explicitly, here.
 
 use mc_tick::{Pos, Simulation, Structure};

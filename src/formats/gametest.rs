@@ -61,7 +61,7 @@ fn modernized(schematic: &crate::UniversalSchematic) -> Option<crate::UniversalS
 /// exact positions. Rewriting one as `0.0` turns it back into an ordinary cart
 /// that moves, falls, and is shoved by its neighbours, and the door comes apart
 /// with no error anywhere. This world really does carry six of them; see
-/// `crates/mc-tick/docs/entity-abuse-in-record-doors.md`.
+/// `crates/mc-tick/docs/history/entity-abuse-in-record-doors.md`.
 ///
 /// The spelling is Java's `Double.toString` — `NaN`, `Infinity`, `-Infinity` —
 /// which is what vanilla's own NBT writer emits, and what mc-tick's `float`
