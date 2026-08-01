@@ -425,9 +425,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let extent = size[0].max(size[1]).max(size[2]).max(1.0e-4);
                     (height / extent, [p[0] as f32, p[1] as f32 + height * 0.5, p[2] as f32])
                 } else if !track.kind.is_empty() && track.kind != "minecraft:item" {
-                    // A mob model draws at its authored size, feet on the
-                    // entity position.
-                    (1.0, [p[0] as f32, p[1] as f32 + size[1] * 0.5, p[2] as f32])
+                    // A mob model draws at its authored size, anchored by the
+                    // model's own ground plane — mesh-frame y = -0.5, where a
+                    // zombie's soles sit — not by its bounding box. The
+                    // difference is every mob whose visual floats: a blaze's
+                    // lowest rod hangs 0.2525 above its feet, and bbox
+                    // anchoring would plant it on the ground.
+                    (1.0, [p[0] as f32, p[1] as f32 + 0.5 + center[1], p[2] as f32])
                 } else {
                     // Dropped items draw at vanilla's quarter block scale,
                     // hovering an eighth above the entity position.
