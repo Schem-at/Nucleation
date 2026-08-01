@@ -135,6 +135,7 @@ impl ResourcePackSource {
             ),
             ("entity/cat/tabby", ["entity/cat/cat_tabby", "entity/cat/tabby"]),
             ("entity/bat", ["entity/bat/bat", "entity/bat"]),
+            ("entity/blaze", ["entity/blaze/blaze", "entity/blaze"]),
         ] {
             if pack.get_texture(wanted).is_some() {
                 continue;

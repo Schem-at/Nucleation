@@ -250,10 +250,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             item.insert("id".to_string(), nucleation::NbtValue::String(item_id.to_string()));
             ball.nbt.insert("Item".to_string(), nucleation::NbtValue::Compound(item));
             one.add_entity(ball);
-        } else if track.kind == "minecraft:blaze" {
-            // No blaze model in the mesher; a magma cube of the head's size at
-            // the top of its box reads unmistakably as one from this distance.
-            one.set_block_from_string(0, 0, 0, "minecraft:magma_block").ok();
         } else if !track.kind.is_empty() && track.kind != "minecraft:item" {
             // Any other entity kind goes to the mesher's entity path as-is —
             // zombies, villagers, boats, the whole mob roster. A kind without
@@ -428,11 +424,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         if track.kind == "minecraft:dragon_fireball" { 1.0 } else { 0.3125 };
                     let extent = size[0].max(size[1]).max(size[2]).max(1.0e-4);
                     (height / extent, [p[0] as f32, p[1] as f32 + height * 0.5, p[2] as f32])
-                } else if track.kind == "minecraft:blaze" {
-                    // The stand-in head: half a block at the top of the
-                    // 1.8-tall box.
-                    let extent = size[0].max(size[1]).max(size[2]).max(1.0e-4);
-                    (0.5 / extent, [p[0] as f32, p[1] as f32 + 1.55, p[2] as f32])
                 } else if !track.kind.is_empty() && track.kind != "minecraft:item" {
                     // A mob model draws at its authored size, feet on the
                     // entity position.
