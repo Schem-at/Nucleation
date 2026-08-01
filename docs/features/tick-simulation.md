@@ -57,7 +57,11 @@ print(sim.get_block(4, 1, 0))   # minecraft:stone
 print(sim.tick_count(), sim.changes_count())   # 32 30
 ```
 
-<img src="../media/tick-sim/quickstart.gif" width="560" alt="The scene above animated: the button is pressed, the dust powers, the sticky piston pushes the stone one cell east, and pulls it back when the button pops">
+<img src="../media/tick-sim/quickstart.gif" width="560" alt="The scene above: each set_block call lands one block, then the button is pressed, the sticky piston pushes the stone one cell east, and pulls it back when the button pops">
+
+That is the code above, animated: the `set_block` loop assembling the scene one
+block at a time, then the simulation running — press, push, button pop,
+retract.
 
 Every block change carries its tick:
 
@@ -72,14 +76,12 @@ for c in json.loads(sim.changes_json())[:3]:
 ## Loading a real build
 
 ```python
-schem = Schematic.load_from_file("tests/scenarios/55_3x3.litematic")
+schem = Schematic.load_from_file("my_machine.litematic")
 sim = TickSimulation.from_schematic(schem, TickSettleMode.InWorld, 0, 0, 0, "")
 
-sim.use_block(9, 2, 19)         # the door's button
-sim.run_until_quiescent(400)    # all 9 doorway cells close by tick 38
+sim.use_block(9, 2, 19)         # right-click its button
+sim.run_until_quiescent(400)
 ```
-
-<img src="../media/tick-sim/door-cycle.gif" width="560" alt="The record 55-block 3x3 piston door running its close-and-reopen cycle in the engine, minecarts and fireballs included">
 
 The arguments after the schematic: a settle mode, a world origin (x, y, z), and
 `extra_states`.
@@ -103,8 +105,8 @@ build at different origins can order their updates differently. Pass the
 coordinates the build really lived at when exactness matters.
 
 **`extra_states`** pre-registers block states you plan to `place_block` later,
-as a comma-separated list of descriptors. The engine wires behaviour only for
-states it has seen; placing an unregistered state is a no-op.
+as a semicolon-separated list of descriptors. The engine wires behaviour only
+for states it has seen; placing an unregistered state is a no-op.
 
 Before trusting a file you did not save yourself:
 
@@ -194,15 +196,112 @@ dispatch time. The phase legend rides in the payload (`heat["phases"]`).
 Prefer these views over raw `updates_json()` — one door cycle can be a hundred
 thousand raw updates.
 
-The wave data animates naturally — this is one press of the record door's
-button, each frame one tick, each cell lit by how many updates it received
-(front view of the machine's redstone wall):
+To see what "inside a tick" means, take a 13x13 carpet of redstone dust with a
+button in the middle and press it. The button's press and the entire power
+cascade — 11,784 update dispatches — happen inside game tick 0. This animation
+is that *one tick*, played back in dispatch order:
 
-<img src="../media/tick-sim/subtick-wave.gif" width="548" alt="Update wave animation: one press of the record door, updates rippling from the button across the machine tick by tick">
+<img src="../media/tick-sim/subtick-wave.gif" width="470" alt="One game tick played in dispatch order: the update cursor sweeping a 13x13 dust field after a button press, in position-hash order rather than a tidy radial bloom">
 
-And the same run's total per cell — the machine's hot spots:
+The bright cursor is the engine delivering updates. Notice it does not bloom
+outward from the button — dust hands out its updates in a position-hashed
+order, the same locational ordering vanilla uses (and the reason the world
+origin argument exists). The same run's totals, per cell:
 
-<img src="../media/tick-sim/subtick-heat.png" width="548" alt="Total update heat per cell over the press: piston columns and the wire bus glow hottest">
+<img src="../media/tick-sim/subtick-heat.png" width="470" alt="Total dispatches per cell for the press: the field is hottest near the button and cools toward the corners">
+
+## Small scenes
+
+Three more scenes, each a handful of lines, each exercising a different part
+of the engine.
+
+### Water
+
+Water is fully simulated — sources, flowing levels, falling columns, the
+5-tick fluid cadence, the slope search toward holes. A source in a walled
+basin fills it ring by ring:
+
+```python
+bowl = Schematic.create("bowl")
+for x in range(11):
+    for z in range(11):
+        bowl.set_block(x, 0, z, "minecraft:smooth_stone")
+        if x in (0, 10) or z in (0, 10):
+            bowl.set_block(x, 1, z, "minecraft:smooth_stone")
+bowl.set_block(5, 1, 5, "minecraft:water")
+
+sim = TickSimulation.from_schematic(bowl, TickSettleMode.Placement, 0, 0, 0, "")
+sim.run(60)
+sum(1 for c in json.loads(sim.world_snapshot_json())
+    if "water" in c["state"])                      # 77
+```
+
+<img src="../media/tick-sim/water.gif" width="560" alt="A water source placed in the middle of a walled stone basin spreading outward ring by ring until the basin is covered">
+
+Settle mode matters here too, instructively: the same file under `InWorld`
+keeps its single still source — a saved world at rest has no fluid ticks
+pending, and the engine trusts that. Under `Placement` the source is freshly
+placed, schedules its first tick, and floods the basin.
+
+### Entity hitboxes
+
+Entity dimensions are measured out of the game's own registry and are load
+bearing: drop a minecart onto three different bodies and it lands at three
+different heights.
+
+```python
+scene = Schematic.create("drop_test")
+for x in range(7):
+    for z in range(7):
+        scene.set_block(x, 0, z, "minecraft:smooth_stone")
+for z, body in [(1, "villager"), (3, "oak_boat"), (5, "armor_stand")]:
+    scene.add_entity_from_snbt(f'{{id: "minecraft:{body}", Pos: [3.5d, 1.0d, {z}.5d]}}')
+    scene.add_entity_from_snbt(f'{{id: "minecraft:minecart", Pos: [3.5d, 4.5d, {z}.5d]}}')
+
+sim = TickSimulation.from_schematic(scene, TickSettleMode.InWorld, 0, 0, 0, "")
+sim.run(40)
+for cart in json.loads(sim.item_entities_json())["minecarts"]:
+    print(cart["pos"][2], cart["pos"][1])
+# 1.5  2.950000047683716   — on the villager's head: 1.0 + 1.95f, in f32
+# 3.5  1.5625              — resting in the oak boat
+# 5.5  1                   — straight through the armor stand to the floor
+```
+
+<img src="../media/tick-sim/hitbox.gif" width="560" alt="Three minecarts dropped at once: one lands on a villager's head, one rests in an oak boat, one falls straight through an armor stand to the floor">
+
+The armor stand is a `LivingEntity` and still stops nothing — vanilla's
+vehicle-collision predicate is what the engine implements, measured body by
+body, not the "living things are solid" folklore. The eighth decimal on the
+villager lane is real too: vanilla sizes a villager as `1.95F`, a float, and
+the engine lands exactly there.
+
+### Items
+
+Item entities fly, fall, drag, land and merge. A dropper full of redstone,
+a button, and sixty ticks:
+
+```python
+scene = Schematic.create("dropper_demo")
+for x in range(7):
+    for z in range(5):
+        scene.set_block(x, 0, z, "minecraft:smooth_stone")
+scene.set_block(1, 1, 2, "minecraft:dropper[facing=east,triggered=false]")
+scene.set_block_entity(1, 1, 2, "minecraft:dropper",
+    '{Items: [{Slot: 0b, id: "minecraft:redstone", count: 8}]}')
+scene.set_block(0, 1, 2, "minecraft:oak_button[face=wall,facing=west,powered=false]")
+
+sim = TickSimulation.from_schematic(scene, TickSettleMode.InWorld, 0, 0, 0, "")
+sim.use_block(0, 1, 2)
+sim.run(60)
+json.loads(sim.item_entities_json())["items"]
+# [{"item": "minecraft:redstone", "pos": [4.98, 1.0, 2.5], ...}]
+```
+
+<img src="../media/tick-sim/items.gif" width="560" alt="A dropper ejecting items on each button press; they arc out, fall, and slide to rest on the stone floor">
+
+Unseeded, the ejection uses the distribution's mean, so this scene lands the
+item in the same spot every run; seed the RNG and it draws vanilla's actual
+spread instead.
 
 ## Checkpoints
 
@@ -277,14 +376,12 @@ block-change trace and an entity-position log, both of which
 
 A `.litematic` can carry its own scenario — press this, expect that — in an
 embedded descriptor, and `cargo test --test litematic_cases` picks it up with
-no code naming the build. The vocabulary and workflow are in
-[`tests/scenarios/README.md`](../../tests/scenarios/README.md). The flagship
-is the record 55-block 3x3 piston door: pinned at rest, closing all 9 doorway
-cells on one press, and returning the world bit-identical after a second —
-with the whole cycle verified tick-for-tick against a capture of real
-Minecraft:
-
-<img src="../media/tick-sim/vanilla-vs-engine.gif" width="840" alt="Side by side: real Minecraft 26.2 (left) and the engine (right) running the record door's full close-and-reopen cycle in lockstep">
+no code naming the build. A scenario can pin a build at rest, assert the fill
+of a cell box after a press, or require the world to return bit-identical
+after a full cycle. The vocabulary and workflow are in
+[`tests/scenarios/README.md`](../../tests/scenarios/README.md); the engine's
+own conformance suite runs the same way, diffed tick-for-tick against
+captures of real Minecraft.
 
 ## Performance
 

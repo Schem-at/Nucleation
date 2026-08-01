@@ -50,7 +50,7 @@ Every capability, with its own deep-dive doc:
 - [Redstone simulation](docs/features/redstone-simulation.md) — MCHPRS redpiler, typed circuit executors
 - [Tick simulation](docs/features/tick-simulation.md) — vanilla-accurate tick loop, verified against captures from the game
 
-  <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/tick-sim/subtick-wave.gif" width="548" alt="One button press of the record 3x3 piston door as an update heatmap: neighbour updates rippling from the button across the machine's redstone wall, one frame per game tick">
+  <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/tick-sim/subtick-wave.gif" width="470" alt="One game tick played in dispatch order: after a button press, the update cursor sweeps a 13x13 field of redstone dust in the engine's position-hash order">
 
 - [Meshing and rendering](docs/features/meshing-and-rendering.md) — GLB/glTF/USDZ and the headless renderer
 - [Animating a build](docs/features/animation.md) — assembly, layer printing, reveals along a curve
