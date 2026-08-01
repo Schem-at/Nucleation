@@ -67,7 +67,7 @@ for c in json.loads(sim.changes_json())[:3]:
 # 0 [2, 1, 0] minecraft:redstone_wire[...power=0]    -> ...power=14
 ```
 
-<img src="../media/tick-sim/quickstart.gif?v=2" width="560" alt="The scene above: each set_block call lands one block, then the button is pressed, the sticky piston pushes the stone one cell east, and pulls it back when the button pops">
+<img src="../media/tick-sim/quickstart.gif?v=3" width="560" alt="The scene above: each set_block call lands one block, then the button is pressed, the sticky piston pushes the stone one cell east, and pulls it back when the button pops">
 
 That is the code above, animated: the `set_block` loop assembling the scene one
 block at a time, then the simulation running — press, push, button pop,
