@@ -40,8 +40,8 @@ scene = Schematic.create("piston_demo")
 for x in range(6):
     scene.set_block(x, 0, 0, "minecraft:smooth_stone")
 scene.set_block(0, 1, 0, "minecraft:oak_button[face=floor,facing=east,powered=false]")
-scene.set_block(1, 1, 0, "minecraft:redstone_wire")
-scene.set_block(2, 1, 0, "minecraft:redstone_wire")
+scene.set_block(1, 1, 0, "minecraft:redstone_wire{simulate=true}")   # placed through the
+scene.set_block(2, 1, 0, "minecraft:redstone_wire{simulate=true}")   # engine — see below
 scene.set_block(3, 1, 0, "minecraft:sticky_piston[facing=east,extended=false]")
 scene.set_block(4, 1, 0, "minecraft:stone")
 
@@ -61,7 +61,9 @@ print(sim.tick_count(), sim.changes_count())   # 32 30
 
 That is the code above, animated: the `set_block` loop assembling the scene one
 block at a time, then the simulation running — press, push, button pop,
-retract.
+retract. The wires were placed with a `{simulate=true}` tag, so the schematic
+stores them already connected (`east=side`, `west=side`) instead of as bare
+defaults — that tag is the next section.
 
 ## Placing through the engine
 
