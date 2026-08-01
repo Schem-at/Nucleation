@@ -114,6 +114,23 @@ A jukebox accepts a disc name through `record=`, or a comparator strength throug
 `signal=`. See [Block entities and NBT](block-entities-nbt.md) for explicit NBT
 and [Redstone simulation](redstone-simulation.md) for running circuits.
 
+One more brace tag places through the **tick engine** rather than writing NBT:
+
+```python
+build.set_block(4, 0, 0, "minecraft:redstone_block")
+build.set_block(5, 0, 0, "minecraft:redstone_wire{simulate=true}")
+build.get_block(5, 0, 0)   # ...redstone_wire[east=side,...,power=15,west=side]
+```
+
+`{simulate=true}` treats the schematic as a world and places the block the way
+a hand would: the state derives its connections from the neighbourhood, its
+`onPlace` runs, and whatever the placement genuinely triggers is written back —
+a wire arrives connected and powered, a repeater locked or lit, and a piston
+that ends up powered really extends. It must be the only tag in the braces,
+and it needs the tick engine — present in every published binding; in a Rust
+build, the `bridge` and `mc-tick` features. Details in
+[Tick simulation](tick-simulation.md#placing-through-the-engine).
+
 ## Inspect blocks
 
 `get_block(x, y, z)` returns the complete `BlockState`:

@@ -63,6 +63,49 @@ That is the code above, animated: the `set_block` loop assembling the scene one
 block at a time, then the simulation running — press, push, button pop,
 retract.
 
+## Placing through the engine
+
+Writing full state strings — every wire connection, every `powered` flag — is
+exact but tedious. The `{simulate=true}` brace tag hands the placement to the
+tick engine instead: the schematic is treated as a world, and the block is
+placed the way a hand would place it. Its state derives from the
+neighbourhood, its `onPlace` runs, and whatever the placement genuinely
+triggers is written back into the schematic:
+
+```python
+scene = Schematic.create("tagged")
+for x in range(4):
+    scene.set_block(x, 0, 0, "minecraft:smooth_stone")
+scene.set_block(0, 1, 0, "minecraft:redstone_block")
+
+scene.set_block(1, 1, 0, "minecraft:redstone_wire{simulate=true}")
+# stored: redstone_wire[east=side,north=none,power=15,south=none,west=side]
+
+scene.set_block(2, 1, 0, "minecraft:redstone_wire{simulate=true}")
+# stored: power=14, connected west — and the first wire's shape updated too
+```
+
+The tag is not a connectivity heuristic — it is the real engine reacting, so
+it covers whatever a placement covers. A repeater placed in front of power
+comes back `powered=true`. And a piston placed where it is powered **really
+extends**:
+
+```python
+scene.set_block(1, 1, 0, "minecraft:piston[facing=east,extended=false]{simulate=true}")
+# stored: piston[extended=true,facing=east], with a piston_head in the next cell
+```
+
+If you want the piston stored retracted, place it unpowered — or without the
+tag. The world runs to quiescence after the placement (capped at 255 ticks),
+so anything the placement sets off — a repeater's delay, a piston stroke —
+lands before the write-back.
+
+Details worth knowing: the tag must stand alone in the braces (combine it with
+`signal=` and the call is refused rather than half-honoured); a placement more
+than three blocks from all other content skips the engine, since nothing is in
+range to interact; and every block already in the schematic must be one the
+engine can simulate, or the call errors by name.
+
 Every block change carries its tick:
 
 ```python
