@@ -2103,6 +2103,35 @@ impl UniversalSchematic {
         z: i32,
         block_string: &str,
     ) -> Result<bool, String> {
+        // `{simulate=true}`: place this block into the schematic-as-world and
+        // let the tick engine react — the wire arrives with its real
+        // connections and power, the repeater with its lock, and anything the
+        // placement genuinely triggers (a piston that ends up powered
+        // extends) is written back too. Needs the `simulation` feature; the
+        // tag is an instruction, so without the engine it is an error rather
+        // than a silent plain write.
+        if let Some(descriptor) = Self::strip_simulate_tag(block_string)? {
+            #[cfg(all(feature = "bridge", feature = "mc-tick"))]
+            {
+                return crate::bridge::mc_tick::simulate_placement_into(
+                    self,
+                    x,
+                    y,
+                    z,
+                    &descriptor,
+                )
+                .map(|written| written > 0);
+            }
+            #[cfg(not(all(feature = "bridge", feature = "mc-tick")))]
+            {
+                let _ = descriptor;
+                return Err(
+                    "{simulate=true} needs the tick engine — build with the `bridge` and \
+                     `mc-tick` features (both part of `bridge-full`)"
+                        .to_string(),
+                );
+            }
+        }
         let (block_state, nbt) = self.parse_block_string_cached(block_string)?;
 
         // Set the basic block first
@@ -2126,6 +2155,33 @@ impl UniversalSchematic {
         }
 
         Ok(true)
+    }
+
+    /// Detects and strips the `{simulate=true}` tag from a block string.
+    ///
+    /// Returns the block string without the tag when present, `None` when
+    /// absent. The tag must stand alone in the braces — combining it with the
+    /// other brace shorthands (`signal=`, `items=`) would need the engine to
+    /// know about inventories mid-placement, and half-honouring a string is
+    /// worse than refusing it.
+    fn strip_simulate_tag(block_string: &str) -> Result<Option<String>, String> {
+        let Some((head, tag)) = block_string.split_once('{') else {
+            return Ok(None);
+        };
+        let Some(inner) = tag.strip_suffix('}') else {
+            return Ok(None); // malformed braces are the ordinary parser's error to report
+        };
+        let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
+        if !parts.iter().any(|p| *p == "simulate=true") {
+            return Ok(None);
+        }
+        if parts.len() > 1 {
+            return Err(
+                "simulate=true must be the only tag in the braces — set other NBT in a separate call"
+                    .to_string(),
+            );
+        }
+        Ok(Some(head.trim().to_string()))
     }
 
     /// Parses a block string into its components (block state and optional NBT data)

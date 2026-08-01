@@ -18,6 +18,118 @@
 
 use crate::formats::gametest::to_gametest_snbt;
 
+/// `{simulate=true}`: place a block into the schematic *as a world* and let
+/// the engine react — connectivity, power, scheduled ticks, all of it — then
+/// write every resulting block change back into the schematic.
+///
+/// The semantics are "a hand placed this block in a loaded world": the rest
+/// of the schematic is trusted exactly as saved (`InWorld`), the new block
+/// arrives through the engine's `place_block` (vanilla's flag-3 write, so
+/// `onPlace` runs and neighbours hear about it), and the world then runs to
+/// quiescence. A wire comes out with its real connections and power; a
+/// repeater locks or lights; a piston that ends up powered genuinely
+/// extends, head and all — the write-back records whatever the world became.
+///
+/// A placement more than three blocks from everything else can interact with
+/// nothing, so it short-circuits to a plain write — which also covers the
+/// first block of an empty schematic.
+///
+/// Returns the number of blocks the write-back touched (at least one: the
+/// placed block itself).
+pub(crate) fn simulate_placement_into(
+    schematic: &mut crate::UniversalSchematic,
+    x: i32,
+    y: i32,
+    z: i32,
+    descriptor: &str,
+) -> Result<usize, String> {
+    use mc_tick::Pos;
+
+    // Far from everything (or into an empty schematic): nothing to react.
+    let bb = schematic.get_bounding_box();
+    let isolated = schematic.total_blocks() == 0 || {
+        let (min, max) = (bb.min, bb.max);
+        x < min.0 - 3
+            || x > max.0 + 3
+            || y < min.1 - 3
+            || y > max.1 + 3
+            || z < min.2 - 3
+            || z > max.2 + 3
+    };
+    if isolated {
+        schematic.set_block_from_string(x, y, z, descriptor)?;
+        return Ok(1);
+    }
+
+    check_volume((bb.max.0 - bb.min.0 + 1, bb.max.1 - bb.min.1 + 1, bb.max.2 - bb.min.2 + 1))?;
+
+    // The world is the schematic *without* the new block; gametest SNBT
+    // rebases everything to the bounding box's low corner, so the engine
+    // works in shifted coordinates and the write-back shifts them home.
+    let offset = (bb.min.0, bb.min.1, bb.min.2);
+    let snbt = to_gametest_snbt(schematic);
+    let structure = mc_tick::Structure::parse(&snbt)
+        .map_err(|e| format!("simulate=true could not load this schematic: {e:?}"))?;
+    let mut sim = wire_simulation(
+        &structure,
+        Pos::new(0, 0, 0),
+        ffi::TickSettleMode::InWorld,
+        &[descriptor],
+        schematic.metadata.source_data_version,
+    )
+    .map_err(|e| format!("simulate=true could not simulate this schematic: {e}"))?;
+
+    let state = sim
+        .registry_mut()
+        .intern(descriptor)
+        .map_err(|e| format!("simulate=true: interning {descriptor}: {e:?}"))?;
+    let pos = Pos::new(x - offset.0, y - offset.1, z - offset.2);
+    let placed_bounds = structure.bounds(4);
+    if pos.x < placed_bounds.min.x
+        || pos.x > placed_bounds.max.x
+        || pos.y < placed_bounds.min.y
+        || pos.y > placed_bounds.max.y
+        || pos.z < placed_bounds.min.z
+        || pos.z > placed_bounds.max.z
+    {
+        // Inside the 3-block interaction range but outside the engine's
+        // padded world — cannot happen while the margin is 4, but a changed
+        // margin must fail loudly here rather than panic in the engine.
+        return Err("simulate=true: position outside the simulated bounds".to_string());
+    }
+    sim.record();
+    // A *genuine* hand placement: the state derives its shape from the
+    // neighbourhood first (a wire arrives connected), then `onPlace` runs
+    // (the wire powers, a repeater locks), then the neighbours are told.
+    sim.place_block_by_hand(pos, state);
+    sim.run_until_quiescent(255);
+
+    // The placed cell first, then every recorded change on top — including
+    // the placed cell's own evolved state, and anything the placement set
+    // off elsewhere.
+    schematic.set_block_from_string(x, y, z, descriptor)?;
+    let mut finals: std::collections::HashMap<Pos, mc_tick::StateId> =
+        std::collections::HashMap::new();
+    for change in sim.recorded() {
+        finals.insert(change.pos, change.to);
+    }
+    let mut written = 1;
+    for (cell, state) in finals {
+        let descriptor = sim
+            .registry()
+            .descriptor(state)
+            .ok_or_else(|| "simulate=true: a written state with no descriptor".to_string())?;
+        schematic.set_block_from_string(
+            cell.x + offset.0,
+            cell.y + offset.1,
+            cell.z + offset.2,
+            descriptor,
+        )?;
+        written += 1;
+    }
+    Ok(written)
+}
+
 
 /// Whether a block's simulated behaviour depends on block-entity data.
 ///
@@ -1576,6 +1688,48 @@ pub mod ffi {
 mod tests {
     use super::{block_entity_audit, needs_block_entity, to_gametest_snbt};
     use crate::{BlockState, UniversalSchematic};
+
+    /// `{simulate=true}` places through the engine: a wire set next to a
+    /// redstone block comes back with its real power and connections, not the
+    /// default state — and the write-back also carries whatever the placement
+    /// caused elsewhere.
+    #[test]
+    fn simulate_tag_derives_wire_power_and_connections() {
+        let mut schem = UniversalSchematic::new("wired".into());
+        for x in 0..4 {
+            schem.set_block(x, 0, 0, &BlockState::new("minecraft:smooth_stone"));
+        }
+        schem.set_block(0, 1, 0, &BlockState::new("minecraft:redstone_block"));
+        schem
+            .set_block_from_string(1, 1, 0, "minecraft:redstone_wire{simulate=true}")
+            .expect("simulated placement");
+        let wire = schem.get_block(1, 1, 0).expect("wire exists").to_string();
+        assert!(wire.contains("power=15"), "wire next to a redstone block reads 15, got {wire}");
+        assert!(wire.contains("west=side"), "wire connects toward the block powering it, got {wire}");
+    }
+
+    /// The tag on an isolated placement (or the first block of an empty
+    /// schematic) degrades to a plain write instead of refusing.
+    #[test]
+    fn simulate_tag_on_an_isolated_block_is_a_plain_write() {
+        let mut schem = UniversalSchematic::new("empty".into());
+        schem
+            .set_block_from_string(0, 0, 0, "minecraft:redstone_wire{simulate=true}")
+            .expect("plain write");
+        let wire = schem.get_block(0, 0, 0).expect("wire exists").to_string();
+        assert!(wire.contains("redstone_wire"), "got {wire}");
+    }
+
+    /// Combining simulate with the other brace shorthands is refused, not
+    /// half-honoured.
+    #[test]
+    fn simulate_tag_refuses_company_in_the_braces() {
+        let mut schem = UniversalSchematic::new("combo".into());
+        let err = schem
+            .set_block_from_string(0, 0, 0, "minecraft:barrel{signal=3,simulate=true}")
+            .unwrap_err();
+        assert!(err.contains("only tag"), "got {err}");
+    }
 
     /// A 1.12 build must reach the engine flattened.
     ///
