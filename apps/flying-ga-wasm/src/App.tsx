@@ -1126,6 +1126,8 @@ export default function App() {
               <MachineViewer
                 machine={selectedMachine}
                 evalTicks={evalTicks}
+                graph={machineGraph}
+                graphError={machineGraphError}
                 following={followLeader}
                 onInteract={() => setFollowLeader(false)}
                 onResumeFollow={() => {

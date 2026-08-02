@@ -2030,3 +2030,89 @@ select {
 .graph-edges summary { cursor: pointer; color: var(--muted, #8a8f98); }
 .graph-edges table { border-collapse: collapse; margin-top: 0.4rem; }
 .graph-edges td { padding: 0 0.5rem 0 0; font-variant-numeric: tabular-nums; }
+
+/* ----------------------------------------------- meta-structure overlay --- */
+/* A cage swatch is a hollow box, matching the mark the stage actually draws;
+   dead weight has no hue to fill it with (see src/meta.ts). */
+.graph-legend .swatch.cage,
+.meta-roles-legend .swatch.cage {
+  background: none;
+  border: 1.5px solid currentColor;
+}
+
+.meta-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.75rem;
+  color: var(--ink-2, #52514e);
+  margin-bottom: 0.35rem;
+}
+.meta-controls-title {
+  color: var(--muted, #898781);
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+.meta-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  user-select: none;
+}
+.meta-controls input {
+  margin: 0;
+  accent-color: var(--ink-2, #52514e);
+}
+
+.meta-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+}
+.meta-roles-legend,
+.meta-graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.75rem;
+}
+.meta-roles-legend li,
+.meta-graph-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.meta-roles-legend .swatch {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 2px;
+  display: inline-block;
+  flex: none;
+}
+.meta-roles-legend b,
+.meta-graph-legend b {
+  font-variant-numeric: tabular-nums;
+}
+.meta-graph-legend svg {
+  flex: none;
+}
+.meta-phase-note {
+  margin: 0.1rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--muted, #898781);
+}
+.meta-phase-note b {
+  color: var(--ink-2, #52514e);
+  font-weight: 600;
+}
+.meta-controls-unavailable {
+  color: var(--muted, #898781);
+  font-style: italic;
+}
