@@ -408,3 +408,9 @@ name = "scenario_inspect"
 # beside the descriptor-driven `cases` test in crates/mc-tick.
 [[test]]
 name = "litematic_cases"
+
+# Headless proof of concept for the meta-structure overlay: analyse a machine and
+# write it twice, as built and recoloured by role. No app, no browser.
+[[example]]
+name = "meta_overlay_poc"
+required-features = ["bridge", "mc-tick"]
