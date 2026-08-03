@@ -521,7 +521,12 @@ public:
   inline void debug_json_string_write(W& writeable_output) const;
 
   /**
-   * The schematic name. `NotFound` if not set.
+   * The schematic name, or the empty string if not set.
+   *
+   * Total, like every other metadata accessor: absence is a blank
+   * field, not an error — a file that simply doesn't carry the field
+   * (Sponge without attribution, a fresh schematic) reads as `""`,
+   * the same value a litematic round-trip of an unset field yields.
    */
   inline nucleation::diplomat::result<std::string, nucleation::NucleationError> name() const;
   template<typename W>
@@ -533,7 +538,12 @@ public:
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> set_name(std::string_view name);
 
   /**
-   * The schematic author. `NotFound` if not set.
+   * The schematic author, or the empty string if not set.
+   *
+   * Total, like every other metadata accessor: absence is a blank
+   * field, not an error — a file that simply doesn't carry the field
+   * (Sponge without attribution, a fresh schematic) reads as `""`,
+   * the same value a litematic round-trip of an unset field yields.
    */
   inline nucleation::diplomat::result<std::string, nucleation::NucleationError> author() const;
   template<typename W>
@@ -545,7 +555,12 @@ public:
   inline nucleation::diplomat::result<std::monostate, nucleation::NucleationError> set_author(std::string_view author);
 
   /**
-   * The schematic description. `NotFound` if not set.
+   * The schematic description, or the empty string if not set.
+   *
+   * Total, like every other metadata accessor: absence is a blank
+   * field, not an error — a file that simply doesn't carry the field
+   * (Sponge without attribution, a fresh schematic) reads as `""`,
+   * the same value a litematic round-trip of an unset field yields.
    */
   inline nucleation::diplomat::result<std::string, nucleation::NucleationError> description() const;
   template<typename W>

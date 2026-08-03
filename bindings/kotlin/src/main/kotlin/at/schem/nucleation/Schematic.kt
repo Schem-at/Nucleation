@@ -1397,7 +1397,12 @@ class Schematic internal constructor (
         return returnString
     }
 
-    /** The schematic name. `NotFound` if not set.
+    /** The schematic name, or the empty string if not set.
+    *
+    *Total, like every other metadata accessor: absence is a blank
+    *field, not an error — a file that simply doesn't carry the field
+    *(Sponge without attribution, a fresh schematic) reads as `""`,
+    *the same value a litematic round-trip of an unset field yields.
     */
     fun name(): Result<String> {
         val write = DW.lib.diplomat_buffer_write_create(0)
@@ -1430,7 +1435,12 @@ class Schematic internal constructor (
         }
     }
 
-    /** The schematic author. `NotFound` if not set.
+    /** The schematic author, or the empty string if not set.
+    *
+    *Total, like every other metadata accessor: absence is a blank
+    *field, not an error — a file that simply doesn't carry the field
+    *(Sponge without attribution, a fresh schematic) reads as `""`,
+    *the same value a litematic round-trip of an unset field yields.
     */
     fun author(): Result<String> {
         val write = DW.lib.diplomat_buffer_write_create(0)
@@ -1463,7 +1473,12 @@ class Schematic internal constructor (
         }
     }
 
-    /** The schematic description. `NotFound` if not set.
+    /** The schematic description, or the empty string if not set.
+    *
+    *Total, like every other metadata accessor: absence is a blank
+    *field, not an error — a file that simply doesn't carry the field
+    *(Sponge without attribution, a fresh schematic) reads as `""`,
+    *the same value a litematic round-trip of an unset field yields.
     */
     fun description(): Result<String> {
         val write = DW.lib.diplomat_buffer_write_create(0)
