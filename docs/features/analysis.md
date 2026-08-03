@@ -14,12 +14,29 @@ Fingerprint.is_duplicate(before, after, "exact")   # False (fingerprints are tra
 ```
 
 Fingerprints are position-blind, and the `shape` preset is orientation-blind
-too: a build moved and turned still reads as a duplicate, while adding one block
-makes it unique. Deduplicate a library no matter how each copy was placed:
+too: a build moved and turned still reads as a duplicate, while under `shape`
+and `exact` adding one block makes it unique. Deduplicate a library no matter
+how each copy was placed:
 
 <div align="center">
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/fingerprint.png" width="820" alt="One build, a moved and turned copy flagged DUPLICATE, and a one-block-different copy flagged UNIQUE">
 </div>
+
+Each preset is an equivalence class, and they are *not* interchangeable —
+pick by what you need to be blind to:
+
+| preset | invariant to | a block is | one added block |
+|---|---|---|---|
+| `exact` | translation only | full id + properties + block-entity NBT | unique |
+| `shape` | translation + all 48 orientations | its id only | unique |
+| `structural` | translation + yaw rotations + mirror | **"solid" or invisible** | unique only if it changes the solid massing |
+
+`structural` answers "is this the same solid *massing*?" — every solid block
+collapses to one token and everything else (glass, dust, torches, air) is
+invisible to it. Two builds differing by a pane of glass are duplicates under
+`structural` and distance 0.0 apart; that is its purpose, not a bug. **Do not
+index deduplication on `structural`** — use `exact` (content identity) or
+`shape` (orientation-blind identity) for that.
 
 And nucleation can *find the repetition in a build*, the lattice of a tiling
 wall, a repeater bus, or a pixel grid, and restamp it to a new size:
@@ -27,7 +44,8 @@ wall, a repeater bus, or a pixel grid, and restamp it to a new size:
 <img src="https://raw.githubusercontent.com/Schem-at/Nucleation/master/docs/media/autostack.png" width="760" alt="A 2-unit wall module restamped to 6 units">
 
 ```python
-Autostack.detect_structures(wall)        # {"mode": "1d", "vectors": [[4,0,0]], "coverage": 1.0}
+json.loads(Autostack.detect_structures(wall))
+# a JSON list, ranked: [{"mode": "1d", "vectors": [[4,0,0]], "coverage": 1.0, ...}]
 longer = Autostack.resize_1d(wall, 4, 0, 0, 6)   # 2 units → 6: (8,4,1) → (24,4,1)
 ```
 
