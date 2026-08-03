@@ -27,7 +27,11 @@ Learn these once and the whole surface reads predictably:
   `changes_json()`. Parse with `json.loads`.
 - **Binary returns are base64 strings**, suffixed `_b64`:
   `to_litematic_b64()`, `render_png_b64()`. Decode with `base64.b64decode`.
-- **Failures raise `NucleationError`.**
+- **Failures raise `NucleationError`.** Metadata accessors are the deliberate
+  exception — they are total: `name()`, `author()`, `description()` return
+  `""` when the field is absent, and the numeric getters (`created()`,
+  `mc_version()`, …) return `-1`. Absence of an optional field is a blank,
+  not an error. (`get_block` on air *does* raise — that is a lookup.)
 - **Sizes come back as a `Dimensions` object** with `.x`, `.y`, `.z` fields,
   not a tuple.
 - Multi-value string parameters (like `TickSimulation`'s `extra_states`) are

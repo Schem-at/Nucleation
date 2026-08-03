@@ -1202,15 +1202,17 @@ pub mod ffi {
 
         // --- Metadata Accessors ---
 
-        /// The schematic name. `NotFound` if not set.
+        /// The schematic name, or the empty string if not set.
+        ///
+        /// Total, like every other metadata accessor: absence is a blank
+        /// field, not an error — a file that simply doesn't carry the field
+        /// (Sponge without attribution, a fresh schematic) reads as `""`,
+        /// the same value a litematic round-trip of an unset field yields.
         pub fn name(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
-            match &self.0.metadata.name {
-                Some(name) => {
-                    let _ = write!(out, "{}", name);
-                    Ok(())
-                }
-                None => Err(NucleationError::NotFound),
+            if let Some(name) = &self.0.metadata.name {
+                let _ = write!(out, "{}", name);
             }
+            Ok(())
         }
 
         /// Set the schematic name.
@@ -1219,15 +1221,17 @@ pub mod ffi {
             Ok(())
         }
 
-        /// The schematic author. `NotFound` if not set.
+        /// The schematic author, or the empty string if not set.
+        ///
+        /// Total, like every other metadata accessor: absence is a blank
+        /// field, not an error — a file that simply doesn't carry the field
+        /// (Sponge without attribution, a fresh schematic) reads as `""`,
+        /// the same value a litematic round-trip of an unset field yields.
         pub fn author(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
-            match &self.0.metadata.author {
-                Some(author) => {
-                    let _ = write!(out, "{}", author);
-                    Ok(())
-                }
-                None => Err(NucleationError::NotFound),
+            if let Some(author) = &self.0.metadata.author {
+                let _ = write!(out, "{}", author);
             }
+            Ok(())
         }
 
         /// Set the schematic author.
@@ -1236,15 +1240,17 @@ pub mod ffi {
             Ok(())
         }
 
-        /// The schematic description. `NotFound` if not set.
+        /// The schematic description, or the empty string if not set.
+        ///
+        /// Total, like every other metadata accessor: absence is a blank
+        /// field, not an error — a file that simply doesn't carry the field
+        /// (Sponge without attribution, a fresh schematic) reads as `""`,
+        /// the same value a litematic round-trip of an unset field yields.
         pub fn description(&self, out: &mut DiplomatWrite) -> Result<(), NucleationError> {
-            match &self.0.metadata.description {
-                Some(desc) => {
-                    let _ = write!(out, "{}", desc);
-                    Ok(())
-                }
-                None => Err(NucleationError::NotFound),
+            if let Some(desc) = &self.0.metadata.description {
+                let _ = write!(out, "{}", desc);
             }
+            Ok(())
         }
 
         /// Set the schematic description.
