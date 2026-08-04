@@ -1,0 +1,15 @@
+[package]
+name = "mc-test"
+version = "0.1.0"
+edition = "2021"
+description = "Scenario harness for mc-tick: schematic-embedded tests, one vocabulary for every carrier"
+license = "MIT"
+
+[dependencies]
+mc-tick = { path = "../mc-tick" }
+mc-tick-trace = { path = "../mc-tick-trace" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints.rust]
+missing_docs = "warn"

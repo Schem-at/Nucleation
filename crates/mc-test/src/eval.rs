@@ -1,230 +1,14 @@
-//! The scenario descriptor and its evaluator — one vocabulary, two carriers.
+//! The evaluator: wire a structure into a simulation, run a [`Case`], report.
 //!
-//! A scenario is a structure plus a list of player actions plus end-state
-//! checks at named ticks. It is deliberately blind to *how* the engine got
-//! there (no traces, no event order, no intra-tick expectations): a faster
-//! redstone backend that still opens and resets the door passes unchanged.
-//!
-//! This file is compiled into two test binaries, by `#[path]`:
-//!
-//! - `crates/mc-tick/tests/cases.rs`, where the carrier is a `*.test.json`
-//!   descriptor beside an `.snbt` structure, and
-//! - `tests/litematic_cases.rs` in nucleation, where the carrier is a single
-//!   `.litematic` with the descriptor stored inside it.
-//!
-//! It lives under `tests/support/` rather than `tests/` so cargo does not
-//! auto-discover it as a test target of its own.
-//!
-//! See `crates/mc-tick/tests/cases/README.md` for the descriptor format.
-
-#![allow(dead_code)]
+//! Failure reports are multi-line human text, one line per missed check — a
+//! scenario that misses in four places should say so once rather than four
+//! runs later.
 
 use std::collections::BTreeMap;
 
 use mc_tick::{Pos, Simulation, Structure};
-use serde::Deserialize;
 
-/// Air margin around the build, matching `conformance.rs`.
-pub const MARGIN: i32 = 4;
-
-/// One scenario.
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Case {
-    /// What this proves, in one sentence. Used in every failure message.
-    pub name: String,
-    /// Structure file, relative to the case file. Defaults to `<stem>.snbt`.
-    /// Meaningless — and rejected — for a carrier that *is* the structure.
-    #[serde(default)]
-    pub structure: Option<String>,
-    /// Where the capture's (0,0,0) sat in the game's coordinates — wire update
-    /// order hashes absolute positions, so an in-world build needs its origin.
-    #[serde(default)]
-    pub origin: [i32; 3],
-    #[serde(default)]
-    pub settle: SettleMode,
-    /// Seed for the vanilla random source. Behaviours that jitter (dispense
-    /// trajectories, dispenser slot choice, destroy drops) draw from it in a
-    /// fixed order, so a seeded case is exactly reproducible. Omitted: the
-    /// engine uses each distribution's mean.
-    #[serde(default)]
-    pub seed: Option<i64>,
-    #[serde(default)]
-    pub actions: Vec<Action>,
-    pub checks: Vec<Check>,
-}
-
-/// How the loaded structure is settled before tick 0.
-#[derive(Deserialize, PartialEq, Clone, Copy, Default)]
-#[serde(rename_all = "kebab-case")]
-pub enum SettleMode {
-    /// Vanilla placement pass + ordered settle — a build saved at rest.
-    #[default]
-    Placement,
-    /// `onPlace` only, no settle — a knownShape capture.
-    Quiet,
-    /// Neither — the build was recorded in the world it stood in, mid-state.
-    InWorld,
-}
-
-/// One thing a player does, during tick `tick`.
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Action {
-    pub tick: u64,
-    /// Right-click with an empty hand (a lever, a button, a note block).
-    #[serde(rename = "use")]
-    pub use_pos: Option<[i32; 3]>,
-    /// Write a block state (`"minecraft:air"` breaks a block).
-    pub place: Option<[i32; 3]>,
-    pub state: Option<String>,
-}
-
-/// One end-state assertion, evaluated after exactly `tick` ticks.
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Check {
-    pub tick: u64,
-    pub expect: Expect,
-    #[serde(default)]
-    pub as_tick: Option<u64>,
-    /// Restrict the comparison to an inclusive box; whole world when absent.
-    #[serde(default)]
-    pub region: Option<[[i32; 3]; 2]>,
-    /// With `expect: "blocks"`: `"x,y,z"` → expected state. A descriptor
-    /// without properties matches on block name alone; listed properties must
-    /// each hold, unlisted ones are free (`redstone_wire[power=15]` matches
-    /// any fully-connected dust at power 15).
-    #[serde(default)]
-    pub blocks: Option<BTreeMap<String, String>>,
-    /// With `expect: "entities"`: each entry must be satisfied.
-    #[serde(default)]
-    pub entities: Option<Vec<EntityExpect>>,
-    /// With `expect: "fill"`: the cell set whose non-air members are counted.
-    /// A doorway is nine cells; how many of them are filled is the whole
-    /// question, and *which* nine is the authored part.
-    #[serde(default)]
-    pub cells: Option<Vec<String>>,
-    /// Exact count, for `entity-count`, `fill` and `changes`.
-    #[serde(default)]
-    pub count: Option<usize>,
-    /// Lower/upper bounds, for the same three. A count is pinned with `count`;
-    /// a budget is expressed with these.
-    #[serde(default)]
-    pub at_least: Option<usize>,
-    #[serde(default)]
-    pub at_most: Option<usize>,
-    /// With `expect: "min-entity-y"`: no entity may sit below this y. The
-    /// cheap, backend-agnostic form of "the build did not fall apart" — a cart
-    /// that lost its NaN velocity leaves through the floor.
-    #[serde(default)]
-    pub y: Option<f64>,
-    /// With `expect: "riders"`: the passenger kind, and the exact seat heights
-    /// the save records, ascending. Entity *seats* are structure, not physics:
-    /// a rider 0.1875 above its cart is where the file put it.
-    #[serde(default)]
-    pub kind: Option<String>,
-    #[serde(default)]
-    pub seats: Option<Vec<f64>>,
-}
-
-/// One entity expectation inside an `entities` check.
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct EntityExpect {
-    /// Item id for item entities (`minecraft:iron_ingot`).
-    pub item: Option<String>,
-    /// Entity kind for minecarts (`minecraft:minecart`).
-    pub kind: Option<String>,
-    /// Inclusive block box the entity's position must fall inside.
-    pub region: [[i32; 3]; 2],
-    /// Exact count; when absent, at least one.
-    pub count: Option<usize>,
-    /// Container contents the item must carry (a dropped shulker box's
-    /// slots): every listed `{id, count}` must appear.
-    #[serde(default)]
-    pub with_contents: Option<Vec<ContentExpect>>,
-    /// The item must carry no container contents at all — a shulker box that
-    /// was drained before it dropped.
-    #[serde(default)]
-    pub empty_contents: Option<bool>,
-    /// Total item count summed over matching entities. Two ejected diamonds
-    /// may merge into one entity of two, or land as two of one — this asserts
-    /// the diamonds, not the entity bookkeeping.
-    #[serde(default)]
-    pub items_total: Option<u32>,
-}
-
-/// One `{id, count}` a container must hold.
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ContentExpect {
-    pub id: String,
-    pub count: u8,
-}
-
-/// What a check asserts.
-#[derive(Deserialize, PartialEq, Clone, Copy)]
-#[serde(rename_all = "kebab-case")]
-pub enum Expect {
-    /// Equals the settled pre-action world (a reset check).
-    Initial,
-    /// Differs from initial (the machine actually moved).
-    Changed,
-    /// Equals the world at an earlier check's tick (`as_tick`).
-    SameAs,
-    /// Every block in `region` is air.
-    Air,
-    /// Exact states at named positions.
-    Blocks,
-    /// Item entities and minecarts.
-    Entities,
-    /// Nothing is pending: no scheduled tick, no queued update. The
-    /// backend-agnostic spelling of "the run finished", and the one thing that
-    /// says a door came to rest rather than still being mid-cycle.
-    Quiescent,
-    /// How many entities the world holds. A door glued together by nan carts
-    /// is a door whose entity count is load-bearing.
-    EntityCount,
-    /// How many of `cells` are non-air. The doorway metric.
-    Fill,
-    /// The most of `cells` that were *ever* non-air, up to this tick.
-    ///
-    /// How far the door got, rather than where it stopped. A door leaf sweeps
-    /// through the doorway and settles somewhere; the width of the sweep is the
-    /// claim worth pinning, and unlike a reading at one named tick it does not
-    /// care which tick the sweep peaked on.
-    PeakFill,
-    /// How many blocks changed over the run so far.
-    Changes,
-    /// The lowest y any entity occupies.
-    MinEntityY,
-    /// The passenger seats, ascending.
-    Riders,
-}
-
-/// Does `actual` satisfy `expected`? Same block name, and every property the
-/// expectation lists holds in the actual state; unlisted properties are free.
-pub fn state_matches(expected: &str, actual: &str) -> bool {
-    let (want_name, want_props) = match expected.split_once('[') {
-        Some((name, props)) => (name, props.trim_end_matches(']')),
-        None => (expected, ""),
-    };
-    let (got_name, got_props) = match actual.split_once('[') {
-        Some((name, props)) => (name, props.trim_end_matches(']')),
-        None => (actual, ""),
-    };
-    if want_name != got_name {
-        return false;
-    }
-    want_props
-        .split(',')
-        .filter(|p| !p.is_empty())
-        .all(|want| got_props.split(',').any(|got| got == want))
-}
-
-/// A world snapshot: every non-air block.
-pub type Snapshot = BTreeMap<Pos, String>;
+use crate::spec::{state_matches, Case, Check, Expect, SettleMode, Snapshot, MARGIN};
 
 fn snapshot(sim: &Simulation) -> Snapshot {
     sim.world()
@@ -294,26 +78,37 @@ fn parse_pos(key: &str) -> Result<Pos, String> {
 }
 
 /// `count` / `at_least` / `at_most` against one measured number.
-fn check_bounds(check: &Check, what: &str, got: usize) -> Option<String> {
-    if let Some(want) = check.count {
+fn bounds_of(
+    count: Option<usize>,
+    at_least: Option<usize>,
+    at_most: Option<usize>,
+    what: &str,
+    got: usize,
+) -> Option<String> {
+    if let Some(want) = count {
         if got != want {
             return Some(format!("expected {what} to be {want}, got {got}"));
         }
     }
-    if let Some(least) = check.at_least {
+    if let Some(least) = at_least {
         if got < least {
             return Some(format!("expected {what} to be at least {least}, got {got}"));
         }
     }
-    if let Some(most) = check.at_most {
+    if let Some(most) = at_most {
         if got > most {
             return Some(format!("expected {what} to be at most {most}, got {got}"));
         }
     }
-    if check.count.is_none() && check.at_least.is_none() && check.at_most.is_none() {
+    if count.is_none() && at_least.is_none() && at_most.is_none() {
         return Some(format!("{what} needs \"count\", \"at_least\" or \"at_most\""));
     }
     None
+}
+
+/// [`bounds_of`], spelled with a [`Check`]'s fields.
+fn check_bounds(check: &Check, what: &str, got: usize) -> Option<String> {
+    bounds_of(check.count, check.at_least, check.at_most, what, got)
 }
 
 /// Is there a non-air block at `pos`? Read straight from the world rather than
@@ -336,7 +131,7 @@ fn min_entity_y(sim: &Simulation) -> Option<f64> {
     })
 }
 
-/// The full vanilla wiring recipe, mirrored from `conformance.rs`.
+/// The full vanilla wiring recipe, mirrored from mc-tick's `conformance.rs`.
 ///
 /// `motion_data_version` is the data version of the *save the entities came
 /// from*, and it decides whether a NaN velocity survives being loaded. The
@@ -348,9 +143,28 @@ pub fn build_sim(
     hash_origin: Pos,
     settle: SettleMode,
     extra_states: &[String],
+    extra_inert: &[String],
     motion_data_version: Option<i32>,
     label: &str,
 ) -> Simulation {
+    try_build_sim(structure, hash_origin, settle, extra_states, extra_inert, motion_data_version, label)
+        .unwrap_or_else(|report| panic!("{report}"))
+}
+
+/// [`build_sim`], reporting an unsimulable structure instead of panicking.
+///
+/// `Err` is the unknown-block report — the caller can read the block names out
+/// of it (a porting tool probing what a foreign structure needs asserted
+/// inert) where `build_sim`'s panic is the right behaviour for a test carrier.
+pub fn try_build_sim(
+    structure: &Structure,
+    hash_origin: Pos,
+    settle: SettleMode,
+    extra_states: &[String],
+    extra_inert: &[String],
+    motion_data_version: Option<i32>,
+    label: &str,
+) -> Result<Simulation, String> {
     let mut sim = Simulation::new(structure.bounds(MARGIN));
     {
         let (registry, world) = sim.registry_and_world_mut();
@@ -395,22 +209,79 @@ pub fn build_sim(
             }
         }
     }
+    // Command blocks: parse the supported subset, intern each program's
+    // target state before behaviours bind, and hand the sim its programs.
+    // Unsupported commands (summon, data, queries) get no program: the block
+    // powers on and runs nothing, like an unparseable command in game.
+    for (pos, text) in &structure.commands {
+        let Some(parsed) = mc_tick::vanilla::parse_command(text) else { continue };
+        let program = match parsed {
+            mc_tick::vanilla::ParsedCommand::SetBlock { offset, state } => {
+                let state = sim.registry_mut().intern(&state).unwrap_or_else(|e| {
+                    panic!("{label}: interning command target {state}: {e:?}")
+                });
+                mc_tick::behaviour::CommandProgram::SetBlock { offset, state }
+            }
+            mc_tick::vanilla::ParsedCommand::Fill { a, b, state } => {
+                let state = sim.registry_mut().intern(&state).unwrap_or_else(|e| {
+                    panic!("{label}: interning command target {state}: {e:?}")
+                });
+                mc_tick::behaviour::CommandProgram::Fill { a, b, state }
+            }
+            mc_tick::vanilla::ParsedCommand::Summon { kind, offset, fuse } => {
+                // Leaked once per build, like the retype's item id.
+                mc_tick::behaviour::CommandProgram::Summon {
+                    kind: Box::leak(kind.into_boxed_str()),
+                    offset,
+                    fuse,
+                }
+            }
+            mc_tick::vanilla::ParsedCommand::RetypeNearestItem { radius, item } => {
+                // Leaked once per build: programs are build-time config and
+                // the id must live as long as the (Copy) program does.
+                mc_tick::behaviour::CommandProgram::RetypeNearestItem {
+                    radius,
+                    item: Box::leak(item.into_boxed_str()),
+                }
+            }
+        };
+        sim.set_command(*pos, program);
+    }
     mc_tick::intern_companions(sim.registry_mut());
     {
         let mut table = std::mem::take(sim.behaviours_mut());
         mc_tick::register_all_at(sim.registry_mut(), &mut table, hash_origin);
         *sim.behaviours_mut() = table;
     }
-    assert_eq!(
-        sim.unknown_report(),
-        None,
-        "{label}: every block must have behaviour, or this runs a partially-simulated world"
-    );
+    // The case's own inert assertions, after vanilla registration and before
+    // the unknown sweep: every matching interned state (any property set)
+    // becomes explicitly inert, on the author's authority.
+    if !extra_inert.is_empty() {
+        let ids: Vec<mc_tick::StateId> = (0..sim.registry().len() as u16)
+            .map(mc_tick::StateId)
+            .filter(|id| {
+                sim.registry().descriptor(*id).is_some_and(|d| {
+                    let name = d.split('[').next().unwrap_or(d);
+                    extra_inert.iter().any(|n| n == name)
+                })
+            })
+            .collect();
+        for id in ids {
+            sim.behaviours_mut().register(id, Box::new(mc_tick::Inert::new("case-inert")));
+        }
+    }
+    if let Some(report) = sim.unknown_report() {
+        return Err(format!(
+            "{label}: every block must have behaviour, or this runs a partially-simulated \
+             world — {report}"
+        ));
+    }
     {
         let (solidity, frictions, heights, webs) = mc_tick::vanilla::physics_tables(sim.registry());
         sim.set_physics_tables(solidity, frictions, heights, webs);
         let (water_kinds, bubble_kinds) = mc_tick::vanilla::fluid_tables(sim.registry());
         sim.set_fluid_tables(water_kinds, bubble_kinds);
+        sim.set_lava_table(mc_tick::vanilla::lava_table(sim.registry()));
         let (rails, conductors) = mc_tick::vanilla::rail_tables(sim.registry());
         sim.set_rail_tables(rails, conductors);
     }
@@ -458,7 +329,44 @@ pub fn build_sim(
         sim.settle_with_order(&order);
     }
     sim.record();
-    sim
+    Ok(sim)
+}
+
+/// How a run reports, beyond pass/fail.
+pub struct RunOptions {
+    /// On failure, how many ticks of recorded block changes to include before
+    /// the first failing tick. Diagnostics only — never part of pass/fail.
+    pub trace_window: u64,
+}
+
+impl Default for RunOptions {
+    fn default() -> Self {
+        Self { trace_window: 2 }
+    }
+}
+
+/// One case's verdict, with the numbers a grid wants beside it.
+pub struct CaseResult {
+    /// `case.name`.
+    pub name: String,
+    /// The horizon the case ran to (its highest action or check tick).
+    pub ticks: u64,
+    /// Wall-clock for build + run.
+    pub wall: std::time::Duration,
+    /// `Err` is the multi-line human report, one line per missed check.
+    pub outcome: Result<(), String>,
+}
+
+/// Wire `structure`, run `case`, and report the verdict with timing.
+pub fn run_with(
+    structure: &Structure,
+    case: &Case,
+    motion_data_version: Option<i32>,
+    options: &RunOptions,
+) -> CaseResult {
+    let start = std::time::Instant::now();
+    let (ticks, outcome) = run_inner(structure, case, motion_data_version, options);
+    CaseResult { name: case.name.clone(), ticks, wall: start.elapsed(), outcome }
 }
 
 /// Wire `structure`, run `case`, and report every check that failed.
@@ -470,13 +378,66 @@ pub fn run(
     case: &Case,
     motion_data_version: Option<i32>,
 ) -> Result<(), String> {
+    run_with(structure, case, motion_data_version, &RunOptions::default()).outcome
+}
+
+fn run_inner(
+    structure: &Structure,
+    case: &Case,
+    motion_data_version: Option<i32>,
+    options: &RunOptions,
+) -> (u64, Result<(), String>) {
     let label = &case.name;
     let hash_origin = Pos::new(case.origin[0], case.origin[1], case.origin[2]);
     let action_states: Vec<String> = case.actions.iter().filter_map(|a| a.state.clone()).collect();
-    let mut sim =
-        build_sim(structure, hash_origin, case.settle, &action_states, motion_data_version, label);
+    let mut sim = build_sim(
+        structure,
+        hash_origin,
+        case.settle,
+        &action_states,
+        &case.inert,
+        motion_data_version,
+        label,
+    );
     if let Some(seed) = case.seed {
         sim.set_rng_seed(seed);
+    }
+    sim.set_random_ticks(case.random_ticks);
+    // Setup ticks: placement transients play out off the record, exactly as
+    // gametest `setup_ticks` do. Recorded ticks keep counting from the sim's
+    // own clock, so everything below reads through `tick_base`.
+    let tick_base = case.setup;
+    if case.setup > 0 {
+        for _ in 0..case.setup {
+            sim.step();
+        }
+        sim.record();
+        // Re-arm accept test blocks that latched during setup: placement
+        // transients (an observer's placement pulse crossing the accept
+        // wiring) can fire them before the test begins, and vanilla only
+        // counts an accept once the test is running. The silent world write
+        // keeps the reset out of the recorded log and out of the update
+        // graph both.
+        let rearm: Vec<(Pos, mc_tick::StateId)> = sim
+            .world()
+            .iter_non_air()
+            .filter_map(|(pos, id)| {
+                let descriptor = sim.registry().descriptor(id)?;
+                if !descriptor.starts_with("minecraft:test_block")
+                    || !descriptor.contains("fired=true")
+                {
+                    return None;
+                }
+                let unfired = descriptor.replace("fired=true", "fired=false");
+                sim.registry().get(&unfired).map(|state| (pos, state))
+            })
+            .collect();
+        if !rearm.is_empty() {
+            let (_, world) = sim.registry_and_world_mut();
+            for (pos, state) in rearm {
+                world.set(pos, state);
+            }
+        }
     }
 
     let initial = snapshot(&sim);
@@ -489,6 +450,9 @@ pub fn run(
         .max()
         .unwrap_or(0);
 
+    // The rest may bail early (a malformed check, an impossible action); the
+    // closure keeps `?` working while the horizon still reaches the caller.
+    let outcome = (|| -> Result<(), String> {
     // `peak-fill` watches its cells on every tick, so its cell lists are parsed
     // once up front — a typo in one should fail before the run, not after it.
     let mut watched: Vec<(usize, Vec<Pos>, usize)> = Vec::new();
@@ -508,7 +472,10 @@ pub fn run(
     }
 
     let mut failures: Vec<String> = Vec::new();
+    // For the diagnostic dump: the first tick that pushed a failure.
+    let mut first_failing_tick: Option<u64> = None;
     for tick in 0..=horizon {
+        let failures_before = failures.len();
         for (_, cells, peak) in watched.iter_mut() {
             let filled = cells.iter().filter(|pos| cell_filled(&sim, **pos)).count();
             *peak = (*peak).max(filled);
@@ -779,9 +746,79 @@ pub fn run(
                 _ => return Err(format!("{label}: tick {tick}: an action is either \"use\" or \"place\"+\"state\"")),
             }
         }
+        if failures.len() > failures_before {
+            first_failing_tick.get_or_insert(tick);
+        }
         if tick < horizon {
             sim.step();
         }
+    }
+
+    // Opt-in event assertions, against the whole recorded change log. They run
+    // after the loop because `recorded()` persists everything with its tick.
+    for expect in &case.events {
+        if expect.kind != "block-changed" {
+            failures.push(format!(
+                "{label}: event kind {:?} is not one this runner understands (only \"block-changed\")",
+                expect.kind
+            ));
+            continue;
+        }
+        let descriptor = |id| sim.registry().descriptor(id).unwrap_or("<unknown>");
+        let matched = sim
+            .recorded()
+            .iter()
+            .filter(|c| expect.tick.is_none_or(|t| c.tick == t + tick_base))
+            .filter(|c| expect.after.is_none_or(|a| c.tick >= a + tick_base))
+            .filter(|c| expect.pos.is_none_or(|p| c.pos == Pos::new(p[0], p[1], p[2])))
+            .filter(|c| expect.from.as_deref().is_none_or(|w| state_matches(w, descriptor(c.from))))
+            .filter(|c| expect.to.as_deref().is_none_or(|w| state_matches(w, descriptor(c.to))))
+            .count();
+        let what = format!(
+            "the count of block-changed events{}{}{}{}{}",
+            expect.tick.map_or(String::new(), |t| format!(" at tick {t}")),
+            expect.after.map_or(String::new(), |a| format!(" from tick {a} on")),
+            expect.pos.map_or(String::new(), |p| format!(" at {p:?}")),
+            expect.from.as_deref().map_or(String::new(), |w| format!(" from {w}")),
+            expect.to.as_deref().map_or(String::new(), |w| format!(" to {w}")),
+        );
+        // All bounds absent means "it happened at least once".
+        let at_least = if expect.count.is_none() && expect.at_least.is_none() && expect.at_most.is_none() {
+            Some(1)
+        } else {
+            expect.at_least
+        };
+        if let Some(why) = bounds_of(expect.count, at_least, expect.at_most, &what, matched) {
+            failures.push(format!("{label}: {why}"));
+        }
+    }
+
+    // Diagnostics for every failure, opted into or not: the recorded block
+    // changes around the first failing tick. This is the harness answering
+    // "what actually happened" without a rerun.
+    if !failures.is_empty() {
+        let upto = first_failing_tick.unwrap_or(horizon);
+        let from = upto.saturating_sub(options.trace_window);
+        let mut log: Vec<String> = sim
+            .recorded()
+            .iter()
+            .filter(|c| c.tick >= from + tick_base && c.tick <= upto + tick_base)
+            .map(|c| {
+                format!(
+                    "  tick {}: {:?}: {} -> {}",
+                    c.tick - tick_base,
+                    c.pos,
+                    sim.registry().descriptor(c.from).unwrap_or("<unknown>"),
+                    sim.registry().descriptor(c.to).unwrap_or("<unknown>"),
+                )
+            })
+            .collect();
+        let total = log.len();
+        log.truncate(200);
+        failures.push(format!(
+            "{label}: event log, ticks {from}..={upto} ({total} block changes):\n{}",
+            if log.is_empty() { "  (none recorded)".to_string() } else { log.join("\n") }
+        ));
     }
 
     if failures.is_empty() {
@@ -789,6 +826,8 @@ pub fn run(
     } else {
         Err(failures.join("\n"))
     }
+    })();
+    (horizon, outcome)
 }
 
 /// Run every scenario a driver found, printing one line each, and fail once

@@ -131,3 +131,71 @@ actually *closed* — not merely different. Author those positions with
 the failure diff prints every block that appeared, which is the door leaf.
 
 Failures print per-block diffs (`pos: expected X, got Y`), capped at 20 lines.
+
+## Suites: more than one test per build
+
+An embedded or sidecar descriptor may be any of three spellings:
+
+- one case object — `{"name": ..., "checks": [...]}`,
+- an array of them — a door proves it stays still untouched *and* opens when
+  pressed, as separate runs of the same build,
+- a versioned suite — `{"format": 1, "cases": [...]}`. An unknown `format`
+  is refused, so a future container change cannot be silently misread.
+
+An empty suite is refused too: a build whose test says nothing would pass by
+having nothing to say.
+
+## `events`: opt-in ordering claims
+
+Checks are deliberately end-state only, so a faster backend that preserves
+observable behaviour passes without golden churn. When a case's *point* is
+ordering — a subtick race, an update that must fire exactly once — it opts in:
+
+```json
+"events": [
+  { "kind": "block-changed", "pos": [0, 1, 0],
+    "to": "minecraft:redstone_lamp[lit=true]", "count": 1 }
+]
+```
+
+Each entry counts matching entries in the recorded change log — filtered by
+`tick` (any tick when absent), `pos`, and `from`/`to` (property-subset matched
+like a `blocks` check) — and bounds the count with `count`/`at_least`/
+`at_most` (all absent: at least one). `kind` currently understands
+`"block-changed"`.
+
+Diagnostics are separate and always on: every failing case appends the
+recorded block changes around the first failing tick (`--trace-window` in the
+CLI, `RunOptions.trace_window` in code), so "what actually happened" arrives
+without a rerun.
+
+## `inert`: foreign blocks, by assertion
+
+The engine refuses to half-simulate a world: a block with no behaviour fails
+the run rather than sitting quietly. A foreign structure can still carry
+blocks the engine does not model — lithium's `test_block` — so a case may
+assert them inert for its own run:
+
+```json
+"inert": ["minecraft:test_block"]
+```
+
+This is the author's explicit claim, per case, never an engine default.
+
+## The CLI
+
+`nucleation test` runs every carrier from one place and prints a grid — one
+row per file, one glyph per case (`✓` pass, `✗` fail, `∅` unported, `!`
+unreadable), failures in full above it, exit 1 on any red:
+
+```sh
+cargo run -p nucleation-cli -- \
+    run tests/scenarios crates/mc-tick/tests/cases
+```
+
+Carriers: any schematic nucleation's `FormatManager` detects (`.litematic`,
+`.schem`, ... — the suite travels in the root `NucleationTest` tag), `.snbt`
+structures with a `<stem>.test.json` sidecar or standalone descriptors, and
+`--specs DIR` for spec trees that mirror a fetched corpus — see
+`tests/corpus/lithium-specs/README.md` for that loop. `--json` emits machine
+output; `--filter S` narrows by substring.

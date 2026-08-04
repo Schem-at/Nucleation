@@ -1,3 +1,8 @@
+/// Version of the root-level `NucleationTest {Format, Spec}` compound that
+/// carries a build's embedded test. Written identically by every format whose
+/// writer preserves the tag (`litematic`, `schematic`).
+pub(crate) const NUCLEATION_TEST_FORMAT: i32 = 1;
+
 pub mod anvil;
 pub mod classic_schematic;
 pub mod error;

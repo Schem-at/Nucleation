@@ -8,7 +8,7 @@
 //!
 //! Run one case while iterating: `MC_TICK_CASE=vault cargo test -p mc-tick --test cases`
 //!
-//! The descriptor and its evaluator live in `tests/support/scenario.rs`, shared
+//! The descriptor and its evaluator live in the `mc-test` crate, shared
 //! with nucleation's `.litematic` driver — one vocabulary, two carriers. This
 //! file is only the *carrier*: JSON descriptor plus SNBT structure, side by
 //! side on disk. See `tests/cases/README.md` for the format.
@@ -17,8 +17,7 @@ use std::path::{Path, PathBuf};
 
 use mc_tick::Structure;
 
-#[path = "support/scenario.rs"]
-mod scenario;
+use mc_test as scenario;
 
 fn run_case(case_path: &Path) -> Result<(), String> {
     let text = std::fs::read_to_string(case_path)

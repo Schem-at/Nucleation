@@ -202,6 +202,17 @@ fn to_schematic_v3(schematic: &UniversalSchematic, compression: Compression) -> 
     let mut root = NbtCompound::new();
     root.insert("Schematic", NbtTag::Compound(schematic_data));
 
+    // The test the build carries, at the root beside `Schematic` — the same
+    // placement and reasoning as the `.litematic` writer: Sponge readers walk
+    // the `Schematic` compound and ignore unknown root tags, so this survives
+    // other tools, and it cannot be silently dropped by a Metadata rebuild.
+    if let Some(spec) = &schematic.metadata.embedded_test {
+        let mut test = NbtCompound::new();
+        test.insert("Format", NbtTag::Int(super::NUCLEATION_TEST_FORMAT));
+        test.insert("Spec", NbtTag::String(spec.clone()));
+        root.insert("NucleationTest", NbtTag::Compound(test));
+    }
+
     let mut encoder = GzEncoder::new(Vec::new(), compression);
     quartz_nbt::io::write_nbt(
         &mut encoder,
@@ -277,6 +288,17 @@ fn to_schematic_v2(schematic: &UniversalSchematic, compression: Compression) -> 
     // Create the proper root structure with "Schematic" tag
     let mut root = NbtCompound::new();
     root.insert("Schematic", NbtTag::Compound(schematic_data));
+
+    // The test the build carries, at the root beside `Schematic` — the same
+    // placement and reasoning as the `.litematic` writer: Sponge readers walk
+    // the `Schematic` compound and ignore unknown root tags, so this survives
+    // other tools, and it cannot be silently dropped by a Metadata rebuild.
+    if let Some(spec) = &schematic.metadata.embedded_test {
+        let mut test = NbtCompound::new();
+        test.insert("Format", NbtTag::Int(super::NUCLEATION_TEST_FORMAT));
+        test.insert("Spec", NbtTag::String(spec.clone()));
+        root.insert("NucleationTest", NbtTag::Compound(test));
+    }
 
     let mut encoder = GzEncoder::new(Vec::new(), compression);
     quartz_nbt::io::write_nbt(
@@ -403,6 +425,15 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic> {
     let schem = root.get::<_, &NbtCompound>("Schematic").unwrap_or(&root);
     let schem_version = schem.get::<_, i32>("Version")?;
 
+    // The test the build carries, if any. On the *outer* root, beside
+    // `Schematic` — see the writer for why. An unknown `Format` is read
+    // anyway: the descriptor is JSON and the runner reports what it cannot
+    // parse, which beats a file that silently claims to have no test.
+    let embedded_test = root
+        .get::<_, &NbtCompound>("NucleationTest")
+        .ok()
+        .and_then(|test| test.get::<_, &str>("Spec").ok().map(String::from));
+
     let mut definition_regions = HashMap::new();
 
     let name = if let Ok(metadata) = schem.get::<_, &NbtCompound>("Metadata") {
@@ -421,6 +452,7 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic> {
 
     let mut schematic = UniversalSchematic::new(name);
     schematic.definition_regions = definition_regions;
+    schematic.metadata.embedded_test = embedded_test;
     schematic.metadata.mc_version = mc_version;
     // The Sponge `DataVersion` is the file's source version for conversion.
     schematic.metadata.source_data_version = mc_version;
@@ -850,6 +882,43 @@ mod tests {
     use crate::{BlockState, UniversalSchematic};
 
     use super::*;
+
+    /// A `.schem` that carries its own test keeps it across resaves, exactly
+    /// as a `.litematic` does — one embedding, every carrier. Root-level and
+    /// not inside `Metadata`, for the same reasons as the litematic writer.
+    #[test]
+    fn schematic_preserves_an_embedded_test_across_a_resave() {
+        let spec = r#"{"name":"a door opens","checks":[{"tick":0,"expect":"quiescent"}]}"#;
+
+        for version in [SchematicVersion::V2, SchematicVersion::V3] {
+            let mut schem = UniversalSchematic::new("carrier".into());
+            schem.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+            schem.metadata.embedded_test = Some(spec.to_string());
+
+            let first = to_schematic_version(&schem, version).expect("writes");
+            let reloaded = from_schematic(&first).expect("reads");
+            assert_eq!(
+                reloaded.metadata.embedded_test.as_deref(),
+                Some(spec),
+                "{version:?}: the embedded test must survive one round trip"
+            );
+
+            let second = to_schematic_version(&reloaded, version).expect("writes again");
+            let twice = from_schematic(&second).expect("reads again");
+            assert_eq!(
+                twice.metadata.embedded_test.as_deref(),
+                Some(spec),
+                "{version:?}: re-saving a loaded build must not drop its test"
+            );
+
+            // A build with no test writes no tag at all, rather than an empty one.
+            let plain =
+                to_schematic_version(&UniversalSchematic::new("plain".into()), version)
+                    .expect("writes");
+            let back = from_schematic(&plain).expect("reads");
+            assert_eq!(back.metadata.embedded_test, None, "{version:?}");
+        }
+    }
 
     #[test]
     fn test_schematic_file_generation() {

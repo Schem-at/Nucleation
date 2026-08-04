@@ -67,6 +67,82 @@ fn modernized(schematic: &crate::UniversalSchematic) -> Option<crate::UniversalS
 /// which is what vanilla's own NBT writer emits, and what mc-tick's `float`
 /// reader was taught to accept. The `d` suffix is dropped for these three: no
 /// other tag type can hold them, so there is nothing to disambiguate.
+/// Serialise a block entity's NBT as SNBT with *correct* string quoting.
+///
+/// quartz_nbt's `to_snbt` leaves a string like `summon tnt ~ 10000 ~` bare —
+/// its `should_quote` misses interior spaces — and no SNBT parser accepts
+/// that back, which cost every command-block build its round trip. String
+/// values are therefore always quoted here; keys are quoted only when they
+/// need it, and everything else follows vanilla's suffix spelling.
+fn compound_snbt(map: &crate::utils::NbtMap) -> String {
+    use std::fmt::Write as _;
+    let mut entries: Vec<(&String, &crate::nbt::NbtValue)> = map.iter().collect();
+    // Deterministic output: the same build must emit the same file.
+    entries.sort_by(|a, b| a.0.cmp(b.0));
+    let mut out = String::from("{");
+    for (index, (key, value)) in entries.into_iter().enumerate() {
+        if index > 0 {
+            out.push_str(", ");
+        }
+        let bare = !key.is_empty()
+            && key.chars().all(|c| c.is_ascii_alphanumeric() || "_-.+".contains(c));
+        if bare {
+            out.push_str(key);
+        } else {
+            let _ = write!(out, "{}", quoted_snbt(key));
+        }
+        out.push_str(": ");
+        out.push_str(&value_snbt(value));
+    }
+    out.push('}');
+    out
+}
+
+fn value_snbt(value: &crate::nbt::NbtValue) -> String {
+    use crate::nbt::NbtValue as V;
+    use std::fmt::Write as _;
+    match value {
+        V::Byte(v) => format!("{v}b"),
+        V::Short(v) => format!("{v}s"),
+        V::Int(v) => v.to_string(),
+        V::Long(v) => format!("{v}L"),
+        V::Float(v) => format!("{v}f"),
+        V::Double(v) => format!("{}", snbt_double(*v)),
+        V::String(v) => quoted_snbt(v),
+        V::ByteArray(values) => {
+            let body: Vec<String> = values.iter().map(|v| format!("{v}b")).collect();
+            format!("[B; {}]", body.join(", "))
+        }
+        V::IntArray(values) => {
+            let body: Vec<String> = values.iter().map(i32::to_string).collect();
+            format!("[I; {}]", body.join(", "))
+        }
+        V::LongArray(values) => {
+            let body: Vec<String> = values.iter().map(|v| format!("{v}L")).collect();
+            format!("[L; {}]", body.join(", "))
+        }
+        V::List(values) => {
+            let body: Vec<String> = values.iter().map(value_snbt).collect();
+            format!("[{}]", body.join(", "))
+        }
+        V::Compound(map) => {
+            let mut out = String::new();
+            let _ = write!(out, "{}", compound_snbt(map));
+            out
+        }
+    }
+}
+
+/// Always-quoted SNBT string: double quotes unless the content prefers single.
+fn quoted_snbt(text: &str) -> String {
+    if text.contains('"') && !text.contains('\'') {
+        format!("'{text}'")
+    } else {
+        let escaped = text.replace('\\', "\\\\").replace('"', "\\\"");
+        format!("\"{escaped}\"")
+    }
+}
+
 fn snbt_double(value: f64) -> String {
     if value.is_nan() {
         return "NaN".to_string();
@@ -219,6 +295,33 @@ fn entities_snbt(schematic: &crate::UniversalSchematic, min: (i32, i32, i32)) ->
                 }
             }
         }
+        // A container cart's inventory — a hopper or chest minecart parked on
+        // a detector rail *is* a comparator input, and a cart emitted without
+        // its `Items` reads as empty on the other side.
+        if let Some(V::List(items)) = entity.nbt.get("Items") {
+            let mut body = String::new();
+            for item in items {
+                let V::Compound(fields) = item else { continue };
+                let Some(V::String(id)) = fields.get("id") else { continue };
+                let slot = match fields.get("Slot") {
+                    Some(V::Byte(v)) => i64::from(*v),
+                    Some(V::Int(v)) => i64::from(*v),
+                    _ => 0,
+                };
+                let count = match fields.get("count").or_else(|| fields.get("Count")) {
+                    Some(V::Byte(v)) => i64::from(*v),
+                    Some(V::Int(v)) => i64::from(*v),
+                    _ => 1,
+                };
+                if !body.is_empty() {
+                    body.push_str(", ");
+                }
+                let _ = write!(body, "{{Slot: {slot}b, count: {count}, id: \"{id}\"}}");
+            }
+            if !body.is_empty() {
+                let _ = write!(out, ", Items: [{body}]");
+            }
+        }
         // `Passengers` — riders nested inside their vehicle's compound rather
         // than listed beside it. Dropping this tag is a *silent under-report of
         // the world*: `55_3x3.zip` holds 22 top-level entities and vanilla's own
@@ -329,8 +432,7 @@ fn render(schematic: &crate::UniversalSchematic, data_version: i32) -> String {
 
     let mut nbt_at: HashMap<(i32, i32, i32), String> = HashMap::new();
     for be in schematic.get_block_entities_as_list() {
-        let snbt = quartz_nbt::NbtTag::Compound(be.nbt.to_quartz_nbt()).to_snbt();
-        nbt_at.insert(be.position, snbt);
+        nbt_at.insert(be.position, compound_snbt(&be.nbt));
     }
 
     let mut palette: Vec<String> = Vec::new();

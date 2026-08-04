@@ -37,11 +37,9 @@ const DATA_VERSION_1_18: i32 = 2860; // negative-Y height → Version 6
 const DATA_VERSION_1_19_2: i32 = 3120; // SubVersion=1 first written (within v6)
 const DATA_VERSION_1_20_5: i32 = 3837; // item Components → Version 7
 
-/// Schema version of the root-level `NucleationTest` compound.
-///
-/// Bumped only when the *container* changes; the descriptor inside `Spec` is
-/// JSON and versions itself by having no required fields it did not always have.
-const NUCLEATION_TEST_FORMAT: i32 = 1;
+// The root-level `NucleationTest` schema version is shared with every other
+// format whose writer preserves the tag — see `formats::NUCLEATION_TEST_FORMAT`.
+use super::NUCLEATION_TEST_FORMAT;
 /// Default target data version when a schematic carries none (latest canonical).
 const DEFAULT_TARGET_DATA_VERSION: i32 = 4790; // 26.1.2
 
