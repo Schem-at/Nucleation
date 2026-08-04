@@ -110,3 +110,8 @@ apps/preview.pid
 # repo root when run outside its build dir (91 of them after one gen-bindings run).
 *.o
 *.o.tmp
+# Raw lithium gametest structures, fetched at a pinned commit by
+# tools/fetch-lithium-gametests.sh. The converted self-contained .litematic
+# tests in tests/corpus/lithium-litematic/ ARE tracked (with their NOTICE);
+# this raw mirror regenerates on demand.
+tests/corpus/lithium/

@@ -62,6 +62,10 @@ bridge-full = [
 # declarations are independent.
 mc-tick = ["dep:mc-tick"]
 
+# The `nucleation` CLI lives in crates/nucleation-cli (binary name
+# `nucleation`, run with `cargo run -p nucleation-cli -- ...`). No feature
+# here: the published library carries no CLI dependencies.
+
 # Storage backends (the `store` module). `mem` is always available; the rest
 # are feature-gated so you only pull the deps you enable. Networked backends
 # wrap async SDKs behind an internal `block_on` so the trait stays sync.
@@ -241,6 +245,7 @@ bincode = "1"
 # production dependency direction stays one-way (mc-tick never sees nucleation).
 mc-tick = { path = "crates/mc-tick" }
 mc-tick-trace = { path = "crates/mc-tick-trace" }
+mc-test = { path = "crates/mc-test" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 criterion = "0.5.1"
@@ -403,11 +408,12 @@ required-features = ["rendering"]
 [[example]]
 name = "scenario_inspect"
 
-# Self-testing builds: each `.litematic` under tests/scenarios/ carries its own
-# scenario. Not a stanza cargo needs — listed so the target is discoverable
-# beside the descriptor-driven `cases` test in crates/mc-tick.
+# Self-testing builds: each schematic under tests/scenarios/ — any format the
+# FormatManager detects — carries its own scenario. Not a stanza cargo needs —
+# listed so the target is discoverable beside the descriptor-driven `cases`
+# test in crates/mc-tick.
 [[test]]
-name = "litematic_cases"
+name = "embedded_cases"
 
 # Headless proof of concept for the meta-structure overlay: analyse a machine and
 # write it twice, as built and recoloured by role. No app, no browser.
