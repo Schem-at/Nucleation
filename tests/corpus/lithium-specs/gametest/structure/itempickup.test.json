@@ -1,0 +1,18 @@
+{
+  "name": "itempickup: a start pulse fires the dropper, the stream carries the terracotta, and hoppers collect every floating item (lithium block-based test, start emulated by hand)",
+  "inert": ["minecraft:test_block"],
+  "actions": [
+    { "tick": 0, "place": [1, 1, 1], "state": "minecraft:redstone_block" },
+    { "tick": 4, "place": [1, 1, 1], "state": "minecraft:air" }
+  ],
+  "checks": [
+    { "tick": 30, "expect": "entities",
+      "entities": [
+        { "item": "minecraft:red_terracotta", "region": [[2, 1, 2], [8, 4, 12]] }
+      ] },
+    { "tick": 400, "expect": "entities",
+      "entities": [
+        { "item": "minecraft:red_terracotta", "count": 0, "region": [[0, 1, 0], [9, 9, 29]] }
+      ] }
+  ]
+}

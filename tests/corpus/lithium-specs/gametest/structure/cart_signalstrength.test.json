@@ -1,0 +1,20 @@
+{
+  "name": "cart_signalstrength: three parked hopper carts keep their detector rails powered and their comparators reading (lithium block-based test, machine state asserted directly)",
+  "inert": ["minecraft:test_block"],
+  "checks": [
+    { "tick": 10, "expect": "entities",
+      "entities": [
+        { "kind": "minecraft:hopper_minecart", "count": 2, "region": [[0, 0, 0], [6, 4, 19]] },
+        { "kind": "minecraft:chest_minecart", "count": 1, "region": [[0, 0, 0], [6, 4, 19]] }
+      ] },
+    { "tick": 10, "expect": "blocks",
+      "blocks": {
+        "1,1,1": "minecraft:detector_rail[powered=true]",
+        "3,1,1": "minecraft:detector_rail[powered=true]",
+        "5,1,1": "minecraft:detector_rail[powered=true]",
+        "1,1,2": "minecraft:comparator[powered=true]",
+        "3,1,2": "minecraft:comparator[powered=true]",
+        "5,1,2": "minecraft:comparator[powered=true]"
+      } }
+  ]
+}
