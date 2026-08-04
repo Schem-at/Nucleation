@@ -62,20 +62,39 @@ impl Inventory {
         self.stacks.iter().all(|stack| stack.count == 0)
     }
 
-    /// The comparator signal this container produces, 0-15.
+    /// The comparator signal this container produces, 0-15, using its own
+    /// stored slot count. Prefer [`analog_signal_in`](Self::analog_signal_in)
+    /// with the block's authoritative count where one is known: an inventory
+    /// materialised by a runtime insertion (a hopper pushing into a container
+    /// the save left empty) carries `slots: 0`, and trusting that read every
+    /// such container as permanently empty.
     pub fn analog_signal(&self) -> u8 {
-        if self.slots == 0 {
-            return 0;
-        }
-        let fullness: f32 = self
-            .stacks
-            .iter()
-            .map(|stack| f32::from(stack.count) / ASSUMED_MAX_STACK)
-            .sum::<f32>()
-            / self.slots as f32;
-        let stepped = (fullness * 14.0).floor() as u8;
-        stepped + u8::from(fullness > 0.0)
+        self.analog_signal_in(self.slots)
     }
+
+    /// The comparator signal at an authoritative container size.
+    pub fn analog_signal_in(&self, slots: u32) -> u8 {
+        analog_from(self.fullness_sum(), slots)
+    }
+
+    /// The sum of per-stack fullness fractions — the numerator of
+    /// `AbstractContainerMenu.getRedstoneSignalFromContainer`, before dividing
+    /// by the container size. Summable across a double chest's halves.
+    pub fn fullness_sum(&self) -> f32 {
+        self.stacks.iter().map(|stack| f32::from(stack.count) / ASSUMED_MAX_STACK).sum()
+    }
+}
+
+/// The comparator signal for a total fullness over `slots` slots — the
+/// stepping half of `getRedstoneSignalFromContainer`, shared by single
+/// containers and combined double-chest reads.
+pub fn analog_from(fullness_sum: f32, slots: u32) -> u8 {
+    if slots == 0 {
+        return 0;
+    }
+    let fullness = fullness_sum / slots as f32;
+    let stepped = (fullness * 14.0).floor() as u8;
+    stepped + u8::from(fullness > 0.0)
 }
 
 #[cfg(test)]

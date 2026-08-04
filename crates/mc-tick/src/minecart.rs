@@ -157,6 +157,11 @@ pub struct MinecartState {
     pub on_rails: bool,
     /// Set when discarded.
     pub removed: bool,
+    /// The cart's container — `AbstractMinecartContainer`'s inventory, for
+    /// chest and hopper carts. `None` for cart kinds that carry no items.
+    pub inventory: Option<crate::inventory::Inventory>,
+    /// A TNT cart's lit fuse — `MinecartTNT.fuse`, `None` unprimed.
+    pub fuse: Option<i32>,
     /// `yRot`, degrees, as the *polar angle in the XZ plane* — the sense
     /// `AbstractMinecart` writes and reads it, `atan2(dz, dx)`, so 0 points
     /// +X and 90 points +Z.
@@ -226,6 +231,15 @@ pub fn rail_snap(world: &dyn CollisionWorld, x: f64, y: f64, z: f64) -> Option<[
 }
 
 /// The cart's AABB at `pos`.
+/// Container slots by cart kind — `MinecartChest` carries 27, `MinecartHopper` 5.
+pub fn cart_container_slots(kind: &str) -> Option<u32> {
+    match kind {
+        "minecraft:chest_minecart" => Some(27),
+        "minecraft:hopper_minecart" => Some(5),
+        _ => None,
+    }
+}
+
 pub fn cart_aabb(pos: [f64; 3]) -> ([f64; 3], [f64; 3]) {
     (
         [pos[0] - CART_HALF_WIDTH, pos[1], pos[2] - CART_HALF_WIDTH],
@@ -884,6 +898,8 @@ mod tests {
             on_ground: false,
             on_rails: true,
             removed: false,
+            inventory: None,
+            fuse: None,
             yaw: 0.0,
         };
         // The first tick seats the cart on the rail chord — vanilla writes that
@@ -919,6 +935,8 @@ mod tests {
             on_ground: false,
             on_rails: true,
             removed: false,
+            inventory: None,
+            fuse: None,
             yaw: 0.0,
         };
         tick_minecart(&mut cart, &RailOnly);
@@ -948,6 +966,8 @@ mod tests {
             on_ground: false,
             on_rails: true,
             removed: false,
+            inventory: None,
+            fuse: None,
             yaw,
         }
     }
@@ -1346,7 +1366,26 @@ impl<P: PowerSource> PoweredRail<P> {
 }
 
 impl<P: PowerSource + 'static> BlockBehaviour for PoweredRail<P> {
+    /// `BaseRailBlock.onPlace` ends in the same `updateState` the neighbour
+    /// path runs — a rail a command block sets next to a redstone block must
+    /// light up on placement, not wait for a poke that may never come.
+    fn on_placed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        self.on_neighbor_changed(ctx, pos, Dir::Up);
+    }
+
+    /// The same hook off a *write* — `LevelChunk.setBlockState` runs
+    /// `onPlace` for a `/setblock` too, and that is the only poke a rail a
+    /// command placed ever gets. Idempotent when the write was the rail's
+    /// own powered flip: the recomputed target equals the state just
+    /// written.
+    fn on_state_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        self.on_neighbor_changed(ctx, pos, Dir::Up);
+    }
+
     fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        if crate::components::rail_pops_off(&self.power, ctx, pos, self.block) {
+            return;
+        }
         let target = self.has_neighbor_signal(ctx, pos)
             || self.find_signal(ctx, pos, self.shape, true, 0)
             || self.find_signal(ctx, pos, self.shape, false, 0);

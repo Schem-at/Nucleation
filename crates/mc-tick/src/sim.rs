@@ -134,8 +134,10 @@ pub struct Checkpoint {
     comparator_out: std::collections::HashMap<Pos, u8>,
     inventories: std::collections::HashMap<Pos, crate::inventory::Inventory>,
     hopper_state: std::collections::HashMap<Pos, crate::behaviour::HopperState>,
+    command_powered: std::collections::HashMap<Pos, bool>,
     item_entities: crate::entity::ItemEntities,
     minecarts: Vec<crate::minecart::MinecartState>,
+    tnts: Vec<crate::explosion::PrimedTnt>,
     bodies: Vec<crate::entity::EntityInstance>,
 }
 
@@ -176,6 +178,15 @@ pub struct Simulation {
     block_entities: std::collections::HashSet<Pos>,
     /// Per-hopper cooldown and tick bookkeeping.
     hopper_state: std::collections::HashMap<Pos, crate::behaviour::HopperState>,
+    /// Command-block programs by position — see [`Simulation::set_command`].
+    commands: std::collections::HashMap<Pos, crate::behaviour::CommandProgram>,
+    /// Command blocks' last-seen powered flags, for rising-edge detection.
+    command_powered: std::collections::HashMap<Pos, bool>,
+    /// `randomTickSpeed`: attempts per 4096-block volume per tick; 0 = off.
+    random_tick_speed: u8,
+    /// The random source feeding random-tick position picks. Reset by
+    /// [`Simulation::set_rng_seed`] so a seeded run replays exactly.
+    random_rng: crate::rng::JavaRandom,
     /// The world's item entities.
     item_entities: crate::entity::ItemEntities,
     /// Full-cube collision, indexed by `StateId`; see [`Simulation::set_physics_tables`].
@@ -188,6 +199,7 @@ pub struct Simulation {
     webs: Vec<bool>,
     /// Water per state, indexed by `StateId`; see [`Simulation::set_fluid_tables`].
     water_kinds: Vec<Option<crate::fluid::WaterKind>>,
+    lava_kinds: Vec<Option<crate::fluid::WaterKind>>,
     /// Bubble columns per state (`Some(drag_down)`), indexed by `StateId`.
     bubble_kinds: Vec<Option<bool>>,
     /// Rails per state, indexed by `StateId`; see [`Simulation::set_rail_tables`].
@@ -196,6 +208,7 @@ pub struct Simulation {
     conductors: Vec<bool>,
     /// The world's minecarts, in spawn order.
     minecarts: Vec<crate::minecart::MinecartState>,
+    tnts: Vec<crate::explosion::PrimedTnt>,
     /// Every entity that is a hitbox and nothing else, in spawn order — the
     /// record doors' frozen fireballs, their villagers and boats, and the
     /// passengers riding their nan carts.
@@ -321,8 +334,10 @@ impl Simulation {
             comparator_out: std::collections::HashMap::new(),
             inventories: std::collections::HashMap::new(),
             hopper_state: std::collections::HashMap::new(),
+            command_powered: std::collections::HashMap::new(),
             item_entities: crate::entity::ItemEntities::default(),
             minecarts: Vec::new(),
+            tnts: Vec::new(),
             bodies: Vec::new(),
         };
         Self {
@@ -341,16 +356,22 @@ impl Simulation {
             comparator_out: std::collections::HashMap::new(),
             inventories: std::collections::HashMap::new(),
             hopper_state: std::collections::HashMap::new(),
+            commands: std::collections::HashMap::new(),
+            command_powered: std::collections::HashMap::new(),
+            random_tick_speed: 0,
+            random_rng: crate::rng::JavaRandom::new(0),
             item_entities: crate::entity::ItemEntities::default(),
             solidity: Vec::new(),
             frictions: Vec::new(),
             heights: Vec::new(),
             webs: Vec::new(),
             water_kinds: Vec::new(),
+            lava_kinds: Vec::new(),
             bubble_kinds: Vec::new(),
             rails: Vec::new(),
             conductors: Vec::new(),
             minecarts: Vec::new(),
+            tnts: Vec::new(),
             bodies: Vec::new(),
             motion_semantics: crate::motion::MotionSemantics::default(),
             retract_contacts: Vec::new(),
@@ -479,6 +500,12 @@ impl Simulation {
     /// Set the rail and conductor tables, indexed by `StateId`.
     ///
     /// Built by `vanilla::rail_tables`. Cart physics reads these.
+    /// The lava-per-state table — [`crate::vanilla::lava_table`]. Optional:
+    /// a wiring recipe that never simulates an entity in lava can skip it.
+    pub fn set_lava_table(&mut self, lava_kinds: Vec<Option<crate::fluid::WaterKind>>) {
+        self.lava_kinds = lava_kinds;
+    }
+
     pub fn set_rail_tables(
         &mut self,
         rails: Vec<Option<crate::minecart::Rail>>,
@@ -500,6 +527,21 @@ impl Simulation {
     /// `ServerLevel.random` is shared with the whole world.
     pub fn set_rng_seed(&mut self, seed: i64) {
         self.item_entities.rng = Some(crate::rng::JavaRandom::new(seed));
+        self.random_rng = crate::rng::JavaRandom::new(seed);
+    }
+
+    /// `randomTickSpeed`: how many random-tick attempts each 4096-block
+    /// volume gets per tick (vanilla's default is 3; gametest environments
+    /// set their own). Zero — the default — disables the pass entirely, so
+    /// existing corpora never pay for it.
+    ///
+    /// Position selection is an approximation: vanilla draws per 16³ chunk
+    /// section with one packed `nextInt`, this draws three bounded ints
+    /// uniformly over the world box. The *rate* matches; the exact cells and
+    /// draw order do not, so a seeded run is reproducible against itself but
+    /// not against a vanilla capture.
+    pub fn set_random_ticks(&mut self, speed: u8) {
+        self.random_tick_speed = speed;
     }
 
     pub fn spawn_minecart(&mut self, kind: String, pos: [f64; 3], vel: [f64; 3]) -> u32 {
@@ -550,6 +592,16 @@ impl Simulation {
         self.push_minecart(id, cart.kind.clone(), cart.pos, motion);
         if let Some(spawned) = self.minecarts.last_mut() {
             spawned.yaw = cart.yaw;
+            if !cart.items.is_empty() {
+                let inv = spawned.inventory.as_mut().unwrap_or_else(|| {
+                    panic!(
+                        "a {} at {:?} carries Items, but that cart kind has no \
+                         container — the save is corrupt or the kind is unmodelled",
+                        cart.kind, cart.pos
+                    )
+                });
+                inv.stacks = cart.items.clone();
+            }
         }
         id
     }
@@ -737,7 +789,595 @@ impl Simulation {
         Ok(id)
     }
 
+    /// Materialise everything `summon` queued this tick.
+    fn drain_pending_spawns(&mut self) {
+        let pending: Vec<crate::entity::PendingSpawn> =
+            self.item_entities.pending_spawns.drain(..).collect();
+        for spawn in pending {
+            match spawn {
+                crate::entity::PendingSpawn::Tnt { pos, fuse } => {
+                    let id = self.item_entities.next_id;
+                    self.item_entities.next_id += 1;
+                    self.tnts.push(crate::explosion::PrimedTnt {
+                        id,
+                        pos,
+                        vel: [0.0; 3],
+                        fuse,
+                        removed: false,
+                    });
+                }
+                crate::entity::PendingSpawn::Minecart { kind, pos } => {
+                    self.spawn_minecart(kind.to_string(), pos, [0.0; 3]);
+                }
+                crate::entity::PendingSpawn::Body { kind, pos } => {
+                    let Some((_, height)) = crate::entity::entity_dimensions(kind) else {
+                        panic!(
+                            "summon {kind} at {pos:?}: this engine has no measured \
+                             dimensions for that kind — add its EntityType row first"
+                        );
+                    };
+                    let _ = height;
+                    let Some(hp) = crate::entity::mob_health(kind) else {
+                        panic!(
+                            "summon {kind} at {pos:?}: no measured max health — a \
+                             body an explosion can hit needs one to die honestly"
+                        );
+                    };
+                    let id = self.item_entities.next_id;
+                    self.item_entities.next_id += 1;
+                    self.bodies.push(crate::entity::EntityInstance {
+                        id,
+                        kind: kind.to_string(),
+                        physics: crate::entity::BodyPhysics::Ballistic {
+                            pos,
+                            vel: [0.0; 3],
+                            on_ground: false,
+                            hp,
+                        },
+                    });
+                }
+            }
+        }
+    }
+
+    /// Tick primed TNT and ballistic bodies — the entity pass between carts
+    /// and items. Fuses that run out explode *after* the loop, in trigger
+    /// order: a chain where one explosion must be visible to a same-tick
+    /// later entity is unmeasured.
+    fn tick_tnt_and_bodies(&mut self) {
+        let mut explosions: Vec<([f64; 3], f32, bool)> = Vec::new();
+        {
+            let collision = SimCollision {
+                world: &self.world,
+                solidity: &self.solidity,
+                frictions: &self.frictions,
+                heights: &self.heights,
+                webs: &self.webs,
+                water_kinds: &self.water_kinds,
+                bubble_kinds: &self.bubble_kinds,
+                rails: &self.rails,
+                conductors: &self.conductors,
+            };
+            for tnt in &mut self.tnts {
+                if tnt.removed {
+                    continue;
+                }
+                if crate::explosion::tick_tnt(tnt, &collision) {
+                    tnt.removed = true;
+                    // `PrimedTnt.explode`: centred at `y + height * 0.0625`.
+                    explosions.push((
+                        [tnt.pos[0], tnt.pos[1] + 0.98 * 0.0625, tnt.pos[2]],
+                        4.0,
+                        false,
+                    ));
+                }
+            }
+            // `LivingEntity.travel` with no AI input: move, then
+            // `x *= friction`, `y = (y - 0.08) * 0.98`, `z *= friction`,
+            // friction 0.91 airborne and `0.6 * 0.91` on ordinary ground. In
+            // lava the branch is different: the fluid current pushes first
+            // (`updateFluidHeightAndDoFluidPushing`, scale 0.0023333333333333335),
+            // then move, then a uniform 0.5 drag and a quarter of gravity.
+            for body in &mut self.bodies {
+                let kind = body.kind.clone();
+                let crate::entity::BodyPhysics::Ballistic { pos, vel, on_ground, .. } =
+                    &mut body.physics
+                else {
+                    continue;
+                };
+                let Some((min, max)) = crate::entity::body_aabb(&kind, *pos) else {
+                    continue;
+                };
+                // Which lava cells the body stands in, and their net flow.
+                let mut flow = [0.0f64; 3];
+                let mut in_lava = false;
+                for x in (min[0].floor() as i32)..=((max[0] - 1e-9).floor() as i32) {
+                    for y in (min[1].floor() as i32)..=((max[1] - 1e-9).floor() as i32) {
+                        for z in (min[2].floor() as i32)..=((max[2] - 1e-9).floor() as i32) {
+                            let cell = Pos::new(x, y, z);
+                            let state = self.world.get(cell);
+                            let Some(kind) =
+                                self.lava_kinds.get(state.raw() as usize).copied().flatten()
+                            else {
+                                continue;
+                            };
+                            in_lava = true;
+                            // `FlowingFluid.getFlow`, reduced to the measured
+                            // case: amount gradients across the four
+                            // horizontals; an empty passable neighbour reads
+                            // as amount 0.
+                            let own = f64::from(kind.amount());
+                            for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                                let npos = Pos::new(x + dx, y, z + dz);
+                                let nstate = self.world.get(npos);
+                                let namount = match self
+                                    .lava_kinds
+                                    .get(nstate.raw() as usize)
+                                    .copied()
+                                    .flatten()
+                                {
+                                    Some(nkind) => f64::from(nkind.amount()),
+                                    None if self
+                                        .solidity
+                                        .get(nstate.raw() as usize)
+                                        .copied()
+                                        .unwrap_or(false) =>
+                                    {
+                                        continue; // solid wall: no gradient
+                                    }
+                                    None => 0.0,
+                                };
+                                let delta = own - namount;
+                                flow[0] += f64::from(dx) * delta;
+                                flow[2] += f64::from(dz) * delta;
+                            }
+                        }
+                    }
+                }
+                if in_lava {
+                    let norm =
+                        (flow[0] * flow[0] + flow[1] * flow[1] + flow[2] * flow[2]).sqrt();
+                    if norm > 0.0 {
+                        let scale = 0.002_333_333_333_333_333_5;
+                        for axis in 0..3 {
+                            vel[axis] += flow[axis] / norm * scale;
+                        }
+                    }
+                }
+                let (moved, grounded) = crate::explosion::move_box(&collision, min, max, *vel);
+                for axis in 0..3 {
+                    pos[axis] += moved[axis];
+                    if moved[axis] != vel[axis] {
+                        vel[axis] = 0.0;
+                    }
+                }
+                *on_ground = grounded;
+                if in_lava {
+                    for axis in 0..3 {
+                        vel[axis] *= 0.5;
+                    }
+                    vel[1] -= 0.08 / 4.0;
+                } else {
+                    let friction = if grounded { 0.6 * 0.91 } else { 0.91 };
+                    vel[0] *= friction;
+                    vel[1] = (vel[1] - 0.08) * 0.98;
+                    vel[2] *= friction;
+                }
+                if grounded && vel[1] < 0.0 {
+                    vel[1] = 0.0;
+                }
+            }
+            // A primed TNT cart counts down here; the activator-rail check
+            // that primes it lives in the cart loop's wake, below.
+            for cart in &mut self.minecarts {
+                if cart.removed || cart.kind != "minecraft:tnt_minecart" {
+                    continue;
+                }
+                let cell = Pos::new(
+                    cart.pos[0].floor() as i32,
+                    cart.pos[1].floor() as i32,
+                    cart.pos[2].floor() as i32,
+                );
+                let on_rail = [cell, Pos::new(cell.x, cell.y - 1, cell.z)]
+                    .into_iter()
+                    .find(|p| crate::entity::CollisionWorld::rail(&collision, *p).is_some());
+                if cart.fuse.is_none() {
+                    if let Some(rail_cell) = on_rail {
+                        let descriptor =
+                            self.registry.descriptor(self.world.get(rail_cell)).unwrap_or("");
+                        // `ActivatorRailBlock` → `activateMinecart(powered)`
+                        // → `MinecartTNT.primeFuse`: 80 ticks.
+                        if descriptor.starts_with("minecraft:activator_rail")
+                            && descriptor.contains("powered=true")
+                        {
+                            cart.fuse = Some(80);
+                        }
+                    }
+                }
+                if let Some(fuse) = cart.fuse.as_mut() {
+                    *fuse -= 1;
+                    if *fuse <= 0 {
+                        cart.removed = true;
+                        // `MinecartTNT.explode(speedSq)`: parked, the speed
+                        // term is zero and the power is exactly 4.
+                        explosions.push(([cart.pos[0], cart.pos[1], cart.pos[2]], 4.0, true));
+                    }
+                }
+            }
+        }
+        for (center, power, rail_shielded) in explosions {
+            self.explode(center, power, rail_shielded);
+        }
+    }
+
+    /// `ServerExplosion.explode`: destruction rays, entity knockback and
+    /// damage, then block removal — in that order, so line-of-sight reads
+    /// the pre-blast world exactly as vanilla's does.
+    ///
+    /// `rail_shielded` carries `MinecartTNT`'s damage calculator: while
+    /// primed, a TNT cart's blast reads every rail — and every block
+    /// directly *under* a rail — as resistance 0 and indestructible
+    /// (`BlockTags.RAILS` in both overrides). A block-drop TNT passes
+    /// `false`.
+    pub fn explode(&mut self, center: [f64; 3], power: f32, rail_shielded: bool) {
+        // Phase A: read-only sweeps.
+        let collision = SimCollision {
+            world: &self.world,
+            solidity: &self.solidity,
+            frictions: &self.frictions,
+            heights: &self.heights,
+            webs: &self.webs,
+            water_kinds: &self.water_kinds,
+            bubble_kinds: &self.bubble_kinds,
+            rails: &self.rails,
+            conductors: &self.conductors,
+        };
+        let registry = &self.registry;
+        let world = &self.world;
+        let rng = &mut self.item_entities.rng;
+        let rails = &self.rails;
+        let is_rail = |pos: Pos| {
+            rails.get(world.get(pos).raw() as usize).copied().flatten().is_some()
+        };
+        let shielded = |pos: Pos| {
+            rail_shielded && (is_rail(pos) || is_rail(Pos::new(pos.x, pos.y + 1, pos.z)))
+        };
+        let cleared = crate::explosion::destruction_set(
+            center,
+            power,
+            || match rng.as_mut() {
+                Some(rng) => rng.next_float(),
+                None => 0.5,
+            },
+            |pos| {
+                let state = world.get(pos);
+                if state == StateId::AIR {
+                    return None;
+                }
+                if shielded(pos) {
+                    return Some(0.0);
+                }
+                let descriptor = registry.descriptor(state).unwrap_or("minecraft:air");
+                let name = descriptor.split('[').next().unwrap_or(descriptor);
+                crate::vanilla::blast_resistance(name)
+            },
+            |pos| !shielded(pos),
+        );
+        // Entity sweep: `radius * 2` reach, feet-distance falloff, eye-height
+        // direction (feet for another primed TNT), seen-percent scaling.
+        let reach = f64::from(power) * 2.0;
+        enum Hit {
+            Item(usize),
+            Cart(usize),
+            Tnt(usize),
+            Body(usize),
+        }
+        let mut hits: Vec<(Hit, [f64; 3], f32)> = Vec::new();
+        {
+            let mut consider =
+                |slot: Hit, feet: [f64; 3], eye_y: f64, bb: ([f64; 3], [f64; 3])| {
+                    let d = ((feet[0] - center[0]).powi(2)
+                        + (feet[1] - center[1]).powi(2)
+                        + (feet[2] - center[2]).powi(2))
+                    .sqrt()
+                        / reach;
+                    if d > 1.0 {
+                        return;
+                    }
+                    let dir = [feet[0] - center[0], eye_y - center[1], feet[2] - center[2]];
+                    let norm = (dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]).sqrt();
+                    if norm == 0.0 {
+                        return;
+                    }
+                    let seen = crate::explosion::seen_percent(center, bb.0, bb.1, &collision);
+                    let impact = (1.0 - d) * seen;
+                    if impact <= 0.0 {
+                        return;
+                    }
+                    let push = [
+                        dir[0] / norm * impact,
+                        dir[1] / norm * impact,
+                        dir[2] / norm * impact,
+                    ];
+                    // `((impact² + impact) / 2) * 7 * diameter + 1`.
+                    let damage =
+                        ((impact * impact + impact) / 2.0 * 7.0 * reach + 1.0) as f32;
+                    hits.push((slot, push, damage));
+                };
+            for (index, item) in self.item_entities.items.iter().enumerate() {
+                if item.removed {
+                    continue;
+                }
+                let bb = crate::entity::item_aabb(item.pos);
+                consider(Hit::Item(index), item.pos, item.pos[1] + 0.25 * 0.85, bb);
+            }
+            for (index, cart) in self.minecarts.iter().enumerate() {
+                if cart.removed {
+                    continue;
+                }
+                let bb = crate::minecart::cart_aabb(cart.pos);
+                consider(Hit::Cart(index), cart.pos, cart.pos[1] + 0.7 * 0.85, bb);
+            }
+            for (index, tnt) in self.tnts.iter().enumerate() {
+                if tnt.removed {
+                    continue;
+                }
+                let bb = crate::explosion::tnt_aabb(tnt.pos);
+                // The one eye-height exception: another primed TNT is pushed
+                // from its feet.
+                consider(Hit::Tnt(index), tnt.pos, tnt.pos[1], bb);
+            }
+            for (index, body) in self.bodies.iter().enumerate() {
+                let crate::entity::BodyPhysics::Ballistic { pos, .. } = body.physics else {
+                    // A frozen body is scaffolding this engine does not blow
+                    // around; nothing measured explodes near one.
+                    continue;
+                };
+                let Some(bb) = crate::entity::body_aabb(&body.kind, pos) else { continue };
+                let eye = pos[1] + (bb.1[1] - bb.0[1]) * 0.85;
+                consider(Hit::Body(index), pos, eye, bb);
+            }
+        }
+        // Phase B: apply. Deaths are collected and removed after the loop —
+        // removing mid-loop would shift the indices later hits carry.
+        let mut dead_bodies: Vec<u32> = Vec::new();
+        for (slot, push, damage) in hits {
+            match slot {
+                Hit::Item(index) => {
+                    // An item entity has 5 health and explosion damage is
+                    // never below 1 at nonzero impact — it dies.
+                    let _ = damage;
+                    self.item_entities.items[index].removed = true;
+                }
+                Hit::Cart(index) => {
+                    for axis in 0..3 {
+                        self.minecarts[index].vel[axis] += push[axis];
+                    }
+                }
+                Hit::Tnt(index) => {
+                    for axis in 0..3 {
+                        self.tnts[index].vel[axis] += push[axis];
+                    }
+                }
+                Hit::Body(index) => {
+                    let id = self.bodies[index].id;
+                    let crate::entity::BodyPhysics::Ballistic { vel, hp, .. } =
+                        &mut self.bodies[index].physics
+                    else {
+                        unreachable!("collected as ballistic above");
+                    };
+                    *hp -= damage;
+                    if *hp <= 0.0 {
+                        // Dead: the body leaves the world (drops unmodelled).
+                        dead_bodies.push(id);
+                        continue;
+                    }
+                    for axis in 0..3 {
+                        vel[axis] += push[axis];
+                    }
+                }
+            }
+        }
+        self.bodies.retain(|body| !dead_bodies.contains(&body.id));
+        // Phase C: the destruction, in sorted order (vanilla shuffles with
+        // world random; nothing measured reads the difference yet). Every
+        // write goes through the context so neighbour updates, observers and
+        // ticker reconciliation all fire as for any other removal.
+        for pos in cleared {
+            let mut ctx = TickCtx {
+                drain: Some(crate::behaviour::Drain {
+                    pending: &mut self.pending,
+                    unknown_seen: &mut self.unknown_seen,
+                    upd_log: self.upd_log.as_mut(),
+                    phase: self.phase,
+                }),
+                behaviours: Some(&self.behaviours),
+                world: &mut self.world,
+                ticks: &mut self.ticks,
+                fluids: &mut self.fluids,
+                events: &mut self.events,
+                states: &self.registry,
+                tick: self.tick,
+                boundary: false,
+                updates: &mut self.updates,
+                moves: &mut self.moves,
+                toggles: &mut self.toggles,
+                comparator_out: &mut self.comparator_out,
+                inventories: &mut self.inventories,
+                hopper_state: &mut self.hopper_state,
+                commands: &self.commands,
+                command_powered: &mut self.command_powered,
+                tickers: &mut self.tickers,
+                item_entities: &mut self.item_entities,
+                minecarts: &mut self.minecarts,
+                conductors: &self.conductors,
+                inv_log: self.inv_log.as_mut(),
+                log: self.log.as_mut(),
+            };
+            ctx.set(pos, StateId::AIR);
+            drop(ctx);
+            self.propagate();
+        }
+    }
+
+    /// `MinecartHopper.tick`: an enabled hopper cart pulls **one item per
+    /// game tick** — no transfer cooldown; the 8-a-second hopper cadence is a
+    /// block-entity affair the cart does not share. The source is the
+    /// container block above the cart's head (`suckInItems` checks the cell
+    /// at `y + 1`).
+    ///
+    /// Not modelled, loudly: the activator-rail disable and item-entity
+    /// vacuuming — nothing measured exercises them, and each belongs in here
+    /// when something does. A double chest above reads as its own half only:
+    /// the cart path does not walk segments.
+    fn tick_hopper_carts(&mut self) {
+        for index in 0..self.minecarts.len() {
+            let above = {
+                let cart = &self.minecarts[index];
+                if cart.removed || cart.kind != "minecraft:hopper_minecart" {
+                    continue;
+                }
+                // `Hopper.getLevelY` for a cart is `getY() + 0.5`, and
+                // `suckInItems` looks one block above that — a cart parked
+                // under a top-half trapdoor still reaches the container over
+                // the gap.
+                Pos::new(
+                    cart.pos[0].floor() as i32,
+                    (cart.pos[1] + 1.5).floor() as i32,
+                    cart.pos[2].floor() as i32,
+                )
+            };
+            let source_block = self
+                .registry
+                .descriptor(self.world.get(above))
+                .map(|descriptor| descriptor.split('[').next().unwrap_or(descriptor))
+                .and_then(crate::vanilla::container_slots)
+                .is_some();
+            // With no container *block* there, `getSourceContainer` falls to
+            // the entity container in that cell — a chest cart resting where
+            // the block was. Never the pulling cart itself.
+            let source_cart = if source_block {
+                None
+            } else {
+                let center = [
+                    f64::from(above.x) + 0.5,
+                    f64::from(above.y) + 0.5,
+                    f64::from(above.z) + 0.5,
+                ];
+                let mut found: Option<usize> = None;
+                for (other, cart) in self.minecarts.iter().enumerate() {
+                    if other == index || cart.removed || cart.inventory.is_none() {
+                        continue;
+                    }
+                    let (emin, emax) = crate::minecart::cart_aabb(cart.pos);
+                    let hit = (0..3).all(|axis| {
+                        emin[axis] < center[axis] + 0.5 && emax[axis] > center[axis] - 0.5
+                    });
+                    if hit
+                        && found
+                            .is_none_or(|prev: usize| cart.id < self.minecarts[prev].id)
+                    {
+                        found = Some(other);
+                    }
+                }
+                if found.is_none() {
+                    continue;
+                }
+                found
+            };
+            // First occupied source slot, in slot order.
+            let source_stacks = match source_cart {
+                Some(other) => self.minecarts[other].inventory.as_ref().map(|inv| &inv.stacks),
+                None => self.inventories.get(&above).map(|inv| &inv.stacks),
+            };
+            let Some((source_slot, id, count)) = source_stacks.and_then(|stacks| {
+                stacks
+                    .iter()
+                    .filter(|stack| stack.count > 0)
+                    .min_by_key(|stack| stack.slot)
+                    .map(|stack| (stack.slot, stack.id.clone(), stack.count))
+            }) else {
+                continue;
+            };
+            // First cart slot that takes it: stackable or empty, one walk —
+            // `HopperBlockEntity.addItem`'s loop.
+            let target_slot = {
+                let inv = self.minecarts[index]
+                    .inventory
+                    .as_ref()
+                    .expect("a hopper cart always has its 5 slots");
+                let mut found = None;
+                for slot in 0..inv.slots.min(255) as u8 {
+                    match inv.stacks.iter().find(|s| s.slot == slot && s.count > 0) {
+                        None => {
+                            found = Some((slot, 1));
+                            break;
+                        }
+                        Some(stack)
+                            if stack.id == id
+                                && stack.count < crate::vanilla::max_stack(&id) =>
+                        {
+                            found = Some((slot, stack.count + 1));
+                            break;
+                        }
+                        Some(_) => {}
+                    }
+                }
+                found
+            };
+            let Some((target_slot, new_count)) = target_slot else { continue };
+            let mut ctx = TickCtx {
+                drain: Some(crate::behaviour::Drain {
+                    pending: &mut self.pending,
+                    unknown_seen: &mut self.unknown_seen,
+                    upd_log: self.upd_log.as_mut(),
+                    phase: self.phase,
+                }),
+                behaviours: Some(&self.behaviours),
+                world: &mut self.world,
+                ticks: &mut self.ticks,
+                fluids: &mut self.fluids,
+                events: &mut self.events,
+                states: &self.registry,
+                tick: self.tick,
+                boundary: false,
+                updates: &mut self.updates,
+                moves: &mut self.moves,
+                toggles: &mut self.toggles,
+                comparator_out: &mut self.comparator_out,
+                inventories: &mut self.inventories,
+                hopper_state: &mut self.hopper_state,
+                commands: &self.commands,
+                command_powered: &mut self.command_powered,
+                tickers: &mut self.tickers,
+                item_entities: &mut self.item_entities,
+                minecarts: &mut self.minecarts,
+                conductors: &self.conductors,
+                inv_log: self.inv_log.as_mut(),
+                log: self.log.as_mut(),
+            };
+            let remaining = count - 1;
+            match source_cart {
+                Some(other) => ctx.set_cart_slot(
+                    other,
+                    source_slot,
+                    (remaining > 0).then(|| (id.clone(), remaining)),
+                ),
+                None => ctx.set_inventory_slot(
+                    above,
+                    source_slot,
+                    (remaining > 0).then(|| (id.clone(), remaining)),
+                ),
+            }
+            ctx.set_cart_slot(index, target_slot, Some((id, new_count)));
+            drop(ctx);
+            self.propagate();
+        }
+    }
+
     fn push_minecart(&mut self, id: u32, kind: String, pos: [f64; 3], vel: [f64; 3]) {
+        let inventory =
+            crate::minecart::cart_container_slots(&kind).map(crate::inventory::Inventory::empty);
         self.minecarts.push(crate::minecart::MinecartState {
             id,
             kind,
@@ -750,6 +1390,8 @@ impl Simulation {
             // tag. The structure reader does not carry rotation, so a build
             // that means to park a cart on a stale heading cannot say so yet —
             // see `push_neighbours`, which gates on this.
+            inventory,
+            fuse: None,
             yaw: 0.0,
         });
         self.refresh_bodies();
@@ -1077,7 +1719,12 @@ impl Simulation {
                 comparator_out: &mut self.comparator_out,
                 inventories: &mut self.inventories,
                 hopper_state: &mut self.hopper_state,
+                commands: &self.commands,
+                command_powered: &mut self.command_powered,
+                tickers: &mut self.tickers,
                 item_entities: &mut self.item_entities,
+                minecarts: &mut self.minecarts,
+                conductors: &self.conductors,
                 inv_log: self.inv_log.as_mut(),
                 log: self.log.as_mut(),
             };
@@ -1268,7 +1915,8 @@ impl Simulation {
     /// not an unwrap.
     fn body_position(&self, body: &crate::entity::EntityInstance) -> Option<[f64; 3]> {
         match body.physics {
-            crate::entity::BodyPhysics::Frozen { pos } => Some(pos),
+            crate::entity::BodyPhysics::Frozen { pos }
+            | crate::entity::BodyPhysics::Ballistic { pos, .. } => Some(pos),
             crate::entity::BodyPhysics::Rider { vehicle, seat } => {
                 let cart = self.minecarts.iter().find(|c| c.id == vehicle && !c.removed)?;
                 Some([cart.pos[0] + seat[0], cart.pos[1] + seat[1], cart.pos[2] + seat[2]])
@@ -1373,6 +2021,63 @@ impl Simulation {
     pub fn add_block_entity_ticker(&mut self, pos: Pos) {
         if !self.tickers.contains(&pos) {
             self.tickers.push(pos);
+        }
+    }
+
+    /// One random-tick pass — `randomTickSpeed` attempts per 4096 blocks.
+    fn run_random_ticks(&mut self) {
+        let bounds = self.world.bounds();
+        let (min, max) = (bounds.min, bounds.max);
+        let size = (
+            (max.x - min.x + 1).max(1),
+            (max.y - min.y + 1).max(1),
+            (max.z - min.z + 1).max(1),
+        );
+        let volume = i64::from(size.0) * i64::from(size.1) * i64::from(size.2);
+        let attempts = ((volume + 4095) / 4096) * i64::from(self.random_tick_speed);
+        let mut picks = Vec::with_capacity(attempts as usize);
+        for _ in 0..attempts {
+            picks.push(Pos::new(
+                min.x + self.random_rng.next_int(size.0),
+                min.y + self.random_rng.next_int(size.1),
+                min.z + self.random_rng.next_int(size.2),
+            ));
+        }
+        for pos in picks {
+            let state = self.world.get(pos);
+            let Some(behaviour) = self.behaviours.get(state) else { continue };
+            let mut ctx = TickCtx {
+                drain: Some(crate::behaviour::Drain {
+                    pending: &mut self.pending,
+                    unknown_seen: &mut self.unknown_seen,
+                    upd_log: self.upd_log.as_mut(),
+                    phase: self.phase,
+                }),
+                behaviours: Some(&self.behaviours),
+                world: &mut self.world,
+                ticks: &mut self.ticks,
+                fluids: &mut self.fluids,
+                events: &mut self.events,
+                states: &self.registry,
+                tick: self.tick,
+                boundary: false,
+                updates: &mut self.updates,
+                moves: &mut self.moves,
+                toggles: &mut self.toggles,
+                comparator_out: &mut self.comparator_out,
+                inventories: &mut self.inventories,
+                hopper_state: &mut self.hopper_state,
+                commands: &self.commands,
+                command_powered: &mut self.command_powered,
+                tickers: &mut self.tickers,
+                item_entities: &mut self.item_entities,
+                minecarts: &mut self.minecarts,
+                conductors: &self.conductors,
+                inv_log: self.inv_log.as_mut(),
+                log: self.log.as_mut(),
+            };
+            behaviour.on_random_tick(&mut ctx, pos);
+            self.propagate();
         }
     }
 
@@ -1651,9 +2356,11 @@ impl Simulation {
             comparator_out: self.comparator_out.clone(),
             inventories: self.inventories.clone(),
             hopper_state: self.hopper_state.clone(),
+            command_powered: self.command_powered.clone(),
             item_entities: self.item_entities.clone(),
             minecarts: self.minecarts.clone(),
             bodies: self.bodies.clone(),
+            tnts: self.tnts.clone(),
         }
     }
 
@@ -1674,9 +2381,11 @@ impl Simulation {
         self.comparator_out = checkpoint.comparator_out.clone();
         self.inventories = checkpoint.inventories.clone();
         self.hopper_state = checkpoint.hopper_state.clone();
+        self.command_powered = checkpoint.command_powered.clone();
         self.item_entities = checkpoint.item_entities.clone();
         self.minecarts = checkpoint.minecarts.clone();
         self.bodies = checkpoint.bodies.clone();
+        self.tnts = checkpoint.tnts.clone();
         // Event emission restarts from the restored state.
         self.entity_snapshot.clear();
         for item in &self.item_entities.items {
@@ -1694,6 +2403,16 @@ impl Simulation {
     /// it re-evaluates, and a schematic saved mid-cycle carries it. Without
     /// this every loaded comparator starts at zero — true of a freshly placed
     /// one, false of a saved one.
+    /// Give the command block at `pos` its program.
+    ///
+    /// Parsed from the block's `Command` NBT at load — see
+    /// [`crate::vanilla::parse_command`] for the supported subset. A command
+    /// block with no program still powers on and off; it just runs nothing,
+    /// like an unparseable command in game.
+    pub fn set_command(&mut self, pos: Pos, program: crate::behaviour::CommandProgram) {
+        self.commands.insert(pos, program);
+    }
+
     pub fn set_comparator_output(&mut self, pos: Pos, strength: u8) {
         self.comparator_out.insert(pos, strength);
     }
@@ -1761,7 +2480,12 @@ impl Simulation {
             comparator_out: &mut self.comparator_out,
             inventories: &mut self.inventories,
             hopper_state: &mut self.hopper_state,
+            commands: &self.commands,
+            command_powered: &mut self.command_powered,
+            tickers: &mut self.tickers,
             item_entities: &mut self.item_entities,
+                minecarts: &mut self.minecarts,
+                conductors: &self.conductors,
             inv_log: self.inv_log.as_mut(),
             log: self.log.as_mut(),
         }
@@ -1898,7 +2622,12 @@ impl Simulation {
                 comparator_out: &mut self.comparator_out,
                 inventories: &mut self.inventories,
                 hopper_state: &mut self.hopper_state,
+                commands: &self.commands,
+                command_powered: &mut self.command_powered,
+                tickers: &mut self.tickers,
                 item_entities: &mut self.item_entities,
+                minecarts: &mut self.minecarts,
+                conductors: &self.conductors,
                 inv_log: self.inv_log.as_mut(),
                 log: self.log.as_mut(),
             };
@@ -2000,7 +2729,12 @@ impl Simulation {
                     comparator_out: &mut self.comparator_out,
                     inventories: &mut self.inventories,
                     hopper_state: &mut self.hopper_state,
+                    commands: &self.commands,
+                    command_powered: &mut self.command_powered,
+                    tickers: &mut self.tickers,
                     item_entities: &mut self.item_entities,
+                minecarts: &mut self.minecarts,
+                conductors: &self.conductors,
                     inv_log: self.inv_log.as_mut(),
                     log: self.log.as_mut(),
                 };
@@ -2227,7 +2961,12 @@ impl Simulation {
                 comparator_out: &mut self.comparator_out,
                 inventories: &mut self.inventories,
                 hopper_state: &mut self.hopper_state,
+                commands: &self.commands,
+                command_powered: &mut self.command_powered,
+                tickers: &mut self.tickers,
                 item_entities: &mut self.item_entities,
+                minecarts: &mut self.minecarts,
+                conductors: &self.conductors,
                 inv_log: self.inv_log.as_mut(),
                 log: self.log.as_mut(),
             };
@@ -2284,7 +3023,12 @@ impl Simulation {
             comparator_out: &mut self.comparator_out,
                 inventories: &mut self.inventories,
                 hopper_state: &mut self.hopper_state,
+                commands: &self.commands,
+                command_powered: &mut self.command_powered,
+                tickers: &mut self.tickers,
                 item_entities: &mut self.item_entities,
+                minecarts: &mut self.minecarts,
+                conductors: &self.conductors,
                 inv_log: self.inv_log.as_mut(),
             log: self.log.as_mut(),
         };
@@ -2301,7 +3045,16 @@ impl Simulation {
         match phase {
             // Not simulated. Named and walked so the order stays structurally
             // right and filling one in never re-plumbs its neighbours.
-            Phase::WorldBorder | Phase::Weather | Phase::Raids | Phase::ChunkManager => None,
+            Phase::WorldBorder | Phase::Weather | Phase::Raids => None,
+
+            // Random ticks live in chunk ticking. See `set_random_ticks` for
+            // what is exact (the rate) and what is approximate (the cells).
+            Phase::ChunkManager => {
+                if self.random_tick_speed > 0 {
+                    self.run_random_ticks();
+                }
+                None
+            }
 
             Phase::BlockTicks => {
                 // Drain first, then dispatch: a behaviour may schedule further
@@ -2348,7 +3101,12 @@ impl Simulation {
                         comparator_out: &mut self.comparator_out,
                 inventories: &mut self.inventories,
                 hopper_state: &mut self.hopper_state,
+                commands: &self.commands,
+                command_powered: &mut self.command_powered,
+                tickers: &mut self.tickers,
                 item_entities: &mut self.item_entities,
+                minecarts: &mut self.minecarts,
+                conductors: &self.conductors,
                 inv_log: self.inv_log.as_mut(),
                         log: self.log.as_mut(),
                     };
@@ -2393,7 +3151,12 @@ impl Simulation {
                         comparator_out: &mut self.comparator_out,
                         inventories: &mut self.inventories,
                         hopper_state: &mut self.hopper_state,
+                        commands: &self.commands,
+                        command_powered: &mut self.command_powered,
+                        tickers: &mut self.tickers,
                         item_entities: &mut self.item_entities,
+                minecarts: &mut self.minecarts,
+                conductors: &self.conductors,
                         inv_log: self.inv_log.as_mut(),
                         log: self.log.as_mut(),
                     };
@@ -2439,7 +3202,12 @@ impl Simulation {
                         comparator_out: &mut self.comparator_out,
                         inventories: &mut self.inventories,
                         hopper_state: &mut self.hopper_state,
+                        commands: &self.commands,
+                        command_powered: &mut self.command_powered,
+                        tickers: &mut self.tickers,
                 item_entities: &mut self.item_entities,
+                minecarts: &mut self.minecarts,
+                conductors: &self.conductors,
                         inv_log: self.inv_log.as_mut(),
                         log: self.log.as_mut(),
                     };
@@ -2575,7 +3343,12 @@ impl Simulation {
                         comparator_out: &mut self.comparator_out,
                 inventories: &mut self.inventories,
                 hopper_state: &mut self.hopper_state,
+                commands: &self.commands,
+                command_powered: &mut self.command_powered,
+                tickers: &mut self.tickers,
                 item_entities: &mut self.item_entities,
+                minecarts: &mut self.minecarts,
+                conductors: &self.conductors,
                 inv_log: self.inv_log.as_mut(),
                         log: self.log.as_mut(),
                     };
@@ -2653,6 +3426,25 @@ impl Simulation {
                     // its own tick, later the same tick it did the pushing.
                     let _ = crate::minecart::push_neighbours(&mut self.minecarts, index);
                 }
+                // A hopper cart's own pull, part of the same entity pass —
+                // vanilla runs it inside `MinecartHopper.tick`, right after
+                // the movement above. The item loop below rebuilds its
+                // collision view because this can write the world's
+                // inventories (never its blocks).
+                drop(collision);
+                self.tick_hopper_carts();
+                self.tick_tnt_and_bodies();
+                let collision = SimCollision {
+                    world: &self.world,
+                    solidity: &self.solidity,
+                    frictions: &self.frictions,
+                    heights: &self.heights,
+                    webs: &self.webs,
+                    water_kinds: &self.water_kinds,
+                    bubble_kinds: &self.bubble_kinds,
+                    rails: &self.rails,
+                    conductors: &self.conductors,
+                };
                 for index in 0..self.item_entities.items.len() {
                     if self.item_entities.items[index].removed {
                         continue;
@@ -2672,6 +3464,10 @@ impl Simulation {
                         crate::entity::merge_neighbours(&mut self.item_entities, index);
                     }
                 }
+                // Entities summoned this tick materialise now — they first
+                // *act* next tick, which is when vanilla's entity list picks
+                // up a mid-tick addition.
+                self.drain_pending_spawns();
                 // The carts have finished moving, so the box view behaviours
                 // read has to catch up before entityInside runs.
                 self.refresh_bodies();
@@ -2728,7 +3524,12 @@ impl Simulation {
                         comparator_out: &mut self.comparator_out,
                         inventories: &mut self.inventories,
                         hopper_state: &mut self.hopper_state,
+                        commands: &self.commands,
+                        command_powered: &mut self.command_powered,
+                        tickers: &mut self.tickers,
                         item_entities: &mut self.item_entities,
+                minecarts: &mut self.minecarts,
+                conductors: &self.conductors,
                         inv_log: self.inv_log.as_mut(),
                         log: self.log.as_mut(),
                     };
@@ -2816,7 +3617,12 @@ impl Simulation {
                         comparator_out: &mut self.comparator_out,
                 inventories: &mut self.inventories,
                 hopper_state: &mut self.hopper_state,
+                commands: &self.commands,
+                command_powered: &mut self.command_powered,
+                tickers: &mut self.tickers,
                 item_entities: &mut self.item_entities,
+                minecarts: &mut self.minecarts,
+                conductors: &self.conductors,
                 inv_log: self.inv_log.as_mut(),
                         log: self.log.as_mut(),
                 };

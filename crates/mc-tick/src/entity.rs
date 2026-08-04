@@ -508,6 +508,20 @@ pub enum BodyPhysics {
         /// Feet-centre position, which a piston shove updates in place.
         pos: [f64; 3],
     },
+    /// Falling and flying under `LivingEntity.travel` with no AI input:
+    /// gravity 0.08, 0.98 vertical drag, 0.91 air / friction ground
+    /// horizontal drag. What a summoned mob does, and the only physics an
+    /// explosion's knockback needs.
+    Ballistic {
+        /// Feet-centre position.
+        pos: [f64; 3],
+        /// Velocity, blocks per tick.
+        vel: [f64; 3],
+        /// Whether the last move ended on the ground.
+        on_ground: bool,
+        /// Health left — explosion damage subtracts, zero removes the body.
+        hp: f32,
+    },
     /// Riding a vehicle, with no position of its own.
     ///
     /// `Entity.positionRider` hard-sets a passenger to `vehicle.position() +
@@ -521,6 +535,51 @@ pub enum BodyPhysics {
         /// The measured attachment offset; see
         /// [`crate::entity_kind::EntityBehaviour::seat_for`].
         seat: [f64; 3],
+    },
+}
+
+/// `createAttributes().add(MAX_HEALTH, ...)` for the mobs a summon can
+/// produce. `None` refuses at spawn — a body an explosion can hit needs a
+/// real number to die honestly, and a guessed one dies wrong.
+pub fn mob_health(kind: &str) -> Option<f32> {
+    match kind {
+        "minecraft:witch" => Some(26.0),
+        "minecraft:villager" | "minecraft:zombie" => Some(20.0),
+        "minecraft:blaze" => Some(20.0),
+        "minecraft:armor_stand" => Some(20.0),
+        _ => None,
+    }
+}
+
+/// An entity a command block asked for, waiting for the entity pass.
+///
+/// A block behaviour runs with a `TickCtx` that cannot reach the
+/// simulation's cart and body lists, so `summon` queues here and the
+/// simulation materialises the queue before entities tick — the spawn
+/// exists the tick the command ran and first *acts* the tick after, which
+/// is when vanilla's entity list picks a mid-tick addition up.
+#[derive(Debug, Clone, PartialEq)]
+pub enum PendingSpawn {
+    /// A `PrimedTnt` with an explicit or default (80) fuse.
+    Tnt {
+        /// Spawn position (feet centre).
+        pos: [f64; 3],
+        /// Ticks until detonation.
+        fuse: i32,
+    },
+    /// Any minecart kind, dropped onto whatever is there.
+    Minecart {
+        /// Registry name, e.g. `minecraft:tnt_minecart`.
+        kind: &'static str,
+        /// Spawn position.
+        pos: [f64; 3],
+    },
+    /// A living body with ballistic physics — what an explosion can throw.
+    Body {
+        /// Registry name, e.g. `minecraft:witch`.
+        kind: &'static str,
+        /// Spawn position.
+        pos: [f64; 3],
     },
 }
 
@@ -542,6 +601,8 @@ pub struct ItemEntities {
     /// Container contents carried *by an item* — a dropped shulker box keeps
     /// its slots. Keyed by entity id; moves with the item through hoppers.
     pub contents: std::collections::HashMap<u32, Vec<crate::inventory::ItemStack>>,
+    /// Entities queued by `summon`, drained by the simulation's entity pass.
+    pub pending_spawns: Vec<PendingSpawn>,
     /// The seeded random source, when the simulation opted in
     /// ([`crate::sim::Simulation::set_rng_seed`]). Lives here rather than on
     /// `TickCtx` because every consumer today — dispense jitter, dispenser

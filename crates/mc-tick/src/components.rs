@@ -147,6 +147,7 @@ pub trait PowerSource: Send + Sync {
         &self,
         _world: &World,
         _inventories: &crate::inventory::InventoryMap,
+        _carts: &[crate::minecart::MinecartState],
         _pos: Pos,
     ) -> Option<u8> {
         None
@@ -163,10 +164,33 @@ pub trait PowerSource: Send + Sync {
         None
     }
 
+    /// The container at `pos` as ordered `(position, slots)` segments: two
+    /// for a double-chest half — vanilla's `CompoundContainer` order, RIGHT
+    /// half first (`ChestBlock.getBlockType`: RIGHT is FIRST) — one for any
+    /// other container, `None` for a non-container. Hoppers, droppers and
+    /// comparators walk segments so a double chest reads and fills as the
+    /// single 54-slot container it is in game.
+    fn container_segments(&self, world: &World, pos: Pos) -> Option<Vec<(Pos, u32)>> {
+        self.container_slots_at(world, pos).map(|slots| vec![(pos, slots)])
+    }
+
     /// Whether the block at `pos` is a hopper — the destination-cooldown rule
     /// applies only to hoppers.
     fn hopper_at(&self, _world: &World, _pos: Pos) -> bool {
         false
+    }
+
+    /// An item's max stack size — 64 unless the rules know better. Hopper
+    /// merges and comparator fullness both depend on it (shears stop at 1).
+    /// Whether the block at `pos` offers the sturdy top face a rail's
+    /// `canSurvive` wants. Defaults to `false`: a rule set that never
+    /// registers rails never asks.
+    fn rail_support_at(&self, _world: &World, _pos: Pos) -> bool {
+        false
+    }
+
+    fn max_stack_of(&self, _id: &str) -> u8 {
+        64
     }
 
     /// Whether the block at `pos` is a full collision cube — what blocks a
@@ -612,20 +636,30 @@ impl<P: PowerSource> Comparator<P> {
         world: &World,
         outs: &crate::behaviour::ComparatorOutputs,
         inventories: &crate::inventory::InventoryMap,
+        carts: &[crate::minecart::MinecartState],
         pos: Pos,
     ) -> u8 {
         let back = self.input_side();
         let rear_pos = pos.offset(back);
-        let mut rear = self.power.signal_strength(world, outs, rear_pos, back.opposite());
-        if let Some(analog) = self.power.analog_signal(world, inventories, rear_pos) {
+        let redstone = self.power.signal_strength(world, outs, rear_pos, back.opposite());
+        let mut rear = redstone;
+        if let Some(analog) = self.power.analog_signal(world, inventories, carts, rear_pos) {
             rear = analog;
         } else if rear < 15 && self.power.is_conductor(world, rear_pos) {
             if let Some(analog) =
                 self.power
-                    .analog_signal(world, inventories, rear_pos.offset(back))
+                    .analog_signal(world, inventories, carts, rear_pos.offset(back))
             {
                 rear = analog;
             }
+        }
+        // `MC_TICK_DEBUG_COMPARATOR=1` — every strength evaluation, with the
+        // rear redstone and analog readings split out.
+        if std::env::var_os("MC_TICK_DEBUG_COMPARATOR").is_some() {
+            eprintln!(
+                "[cmp] at {pos:?} rear_pos {rear_pos:?} redstone {redstone} analog {:?} rear {rear}",
+                self.power.analog_signal(world, inventories, carts, rear_pos)
+            );
         }
         let side = perpendicular(back)
             .into_iter()
@@ -664,7 +698,7 @@ impl<P: PowerSource> BlockBehaviour for Comparator<P> {
         if ctx.ticks.will_tick_this_tick(pos) {
             return;
         }
-        let output = self.output_strength(ctx.world, ctx.comparator_out, ctx.inventories, pos);
+        let output = self.output_strength(ctx.world, ctx.comparator_out, ctx.inventories, ctx.minecarts, pos);
         let stored = ctx.stored_comparator_output(pos);
         let should_be_on = output > 0;
 
@@ -694,7 +728,7 @@ impl<P: PowerSource> BlockBehaviour for Comparator<P> {
     /// fired, and the opposed pistons on the door's other side won a race they
     /// lose in the real game.
     fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
-        let output = self.output_strength(ctx.world, ctx.comparator_out, ctx.inventories, pos);
+        let output = self.output_strength(ctx.world, ctx.comparator_out, ctx.inventories, ctx.minecarts, pos);
         let stored = ctx.stored_comparator_output(pos);
         ctx.store_comparator_output(pos, output);
         if stored == output && self.mode != ComparatorMode::Compare {
@@ -719,7 +753,7 @@ impl<P: PowerSource> BlockBehaviour for Comparator<P> {
             // comparator's *strength* is not visible here — only its powered
             // block state is. Nothing consumes analog strength through this
             // path yet (dust is not integrated); revisit when it is.
-            self.output_strength(world, &Default::default(), &Default::default(), pos)
+            self.output_strength(world, &Default::default(), &Default::default(), &[], pos)
         } else {
             0
         }
@@ -786,29 +820,33 @@ impl<P: PowerSource> Hopper<P> {
     }
 
     /// `ejectItems`: one item from our first occupied slot into the container
-    /// we face.
+    /// we face — walked as segments, so a double chest fills as one container.
     fn eject(&self, ctx: &mut TickCtx<'_>, pos: Pos) -> bool {
         let target = pos.offset(self.facing);
-        let Some(target_slots) = self.power.container_slots_at(ctx.world, target) else {
-            return false;
+        let Some(segments) = self.power.container_segments(ctx.world, target) else {
+            // `getAttachedContainer`: no container *block* in front — a
+            // container cart overlapping that cell is the target instead.
+            return self.eject_into_cart(ctx, pos, target);
         };
-        if inventory_is_full(ctx, target, target_slots) {
+        if segments.iter().all(|(seg, slots)| inventory_is_full(ctx, *seg, *slots)) {
             return false;
         }
         for slot in 0..HOPPER_SLOTS {
             if let Some((id, count)) = ctx.inventory_slot(pos, slot) {
-                if let Some(target_slot) =
-                    insert_one(ctx, &self.power, Some(pos), target, target_slots, &id)
-                {
-                    let carried = ctx.take_slot_contents(pos, slot);
-                    let remaining = count - 1;
-                    ctx.set_inventory_slot(
-                        pos,
-                        slot,
-                        (remaining > 0).then(|| (id, remaining)),
-                    );
-                    ctx.set_slot_contents(target, target_slot, carried);
-                    return true;
+                for (seg, seg_slots) in &segments {
+                    if let Some(target_slot) =
+                        insert_one(ctx, &self.power, Some(pos), *seg, *seg_slots, &id)
+                    {
+                        let carried = ctx.take_slot_contents(pos, slot);
+                        let remaining = count - 1;
+                        ctx.set_inventory_slot(
+                            pos,
+                            slot,
+                            (remaining > 0).then(|| (id, remaining)),
+                        );
+                        ctx.set_slot_contents(*seg, target_slot, carried);
+                        return true;
+                    }
                 }
             }
         }
@@ -821,24 +859,103 @@ impl<P: PowerSource> Hopper<P> {
     /// y+11/16 to y+2).
     fn suck(&self, ctx: &mut TickCtx<'_>, pos: Pos) -> bool {
         let source = pos.offset(Dir::Up);
-        let Some(source_slots) = self.power.container_slots_at(ctx.world, source) else {
+        let Some(segments) = self.power.container_segments(ctx.world, source) else {
+            // `getSourceContainer`: no container block above — a container
+            // cart overlapping the cell above is the source instead, and it
+            // comes before item pickup, which the check point (`y + 1.5`)
+            // reaches even when the cart's box only pokes into the cell.
+            let center = [
+                f64::from(pos.x) + 0.5,
+                f64::from(pos.y) + 1.5,
+                f64::from(pos.z) + 0.5,
+            ];
+            if let Some(cart) = ctx.cart_container_at(center) {
+                return self.suck_from_cart(ctx, pos, cart);
+            }
             if self.power.is_solid_at(ctx.world, source) {
                 return false; // a full block above blocks suction
             }
             return self.suck_entities(ctx, pos);
         };
-        for slot in 0..source_slots.min(255) as u8 {
-            if let Some((id, count)) = ctx.inventory_slot(source, slot) {
-                if let Some(target_slot) =
-                    insert_one(ctx, &self.power, None, pos, u32::from(HOPPER_SLOTS), &id)
-                {
-                    let carried = ctx.take_slot_contents(source, slot);
+        // Segments in combined order: under a double chest, "the first
+        // occupied slot of the container above" spans both halves.
+        let mut attempted: Option<Pos> = None;
+        for (seg, seg_slots) in &segments {
+            for slot in 0..(*seg_slots).min(255) as u8 {
+                if let Some((id, count)) = ctx.inventory_slot(*seg, slot) {
+                    attempted.get_or_insert(*seg);
+                    if let Some(target_slot) =
+                        insert_one(ctx, &self.power, None, pos, u32::from(HOPPER_SLOTS), &id)
+                    {
+                        let carried = ctx.take_slot_contents(*seg, slot);
+                        let remaining = count - 1;
+                        ctx.set_inventory_slot(
+                            *seg,
+                            slot,
+                            (remaining > 0).then(|| (id, remaining)),
+                        );
+                        ctx.set_slot_contents(pos, target_slot, carried);
+                        return true;
+                    }
+                }
+            }
+        }
+        // `tryTakeInItemFromSlot` on a take nothing fit: the item came out
+        // and went back, and *both* halves ran the container's `setChanged`
+        // — a failed pull still schedules every comparator watching the
+        // source, every tick the hopper is enabled. Lithium's update
+        // collection batches exactly this churn, and its gametest measures
+        // the batching's visible effects.
+        if let Some(seg) = attempted {
+            ctx.poke_container_output(seg);
+        }
+        false
+    }
+
+    /// The cart half of [`Hopper::eject`]: one item from our first occupied
+    /// slot into the container cart overlapping the facing cell.
+    fn eject_into_cart(&self, ctx: &mut TickCtx<'_>, pos: Pos, target: Pos) -> bool {
+        let center = [
+            f64::from(target.x) + 0.5,
+            f64::from(target.y) + 0.5,
+            f64::from(target.z) + 0.5,
+        ];
+        let Some(cart) = ctx.cart_container_at(center) else {
+            return false;
+        };
+        for slot in 0..HOPPER_SLOTS {
+            if let Some((id, count)) = ctx.inventory_slot(pos, slot) {
+                if let Some(target_slot) = cart_insert_one(ctx, &self.power, cart, &id) {
+                    let carried = ctx.take_slot_contents(pos, slot);
                     let remaining = count - 1;
                     ctx.set_inventory_slot(
-                        source,
+                        pos,
                         slot,
                         (remaining > 0).then(|| (id, remaining)),
                     );
+                    ctx.set_cart_slot_contents(cart, target_slot, carried);
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// The cart half of [`Hopper::suck`]: one item from the cart's first
+    /// occupied slot, in container order, into us.
+    fn suck_from_cart(&self, ctx: &mut TickCtx<'_>, pos: Pos, cart: usize) -> bool {
+        let slots = ctx.minecarts[cart]
+            .inventory
+            .as_ref()
+            .map_or(0, |inv| inv.slots);
+        for slot in 0..slots.min(255) as u8 {
+            if let Some((id, count)) = ctx.cart_slot(cart, slot) {
+                if let Some(target_slot) =
+                    insert_one(ctx, &self.power, None, pos, u32::from(HOPPER_SLOTS), &id)
+                {
+                    let carried = ctx.take_cart_slot_contents(cart, slot);
+                    let remaining = count - 1;
+                    ctx.set_cart_slot(cart, slot, (remaining > 0).then(|| (id, remaining)));
                     ctx.set_slot_contents(pos, target_slot, carried);
                     return true;
                 }
@@ -953,6 +1070,43 @@ impl<P: PowerSource> BlockBehaviour for Hopper<P> {
 }
 
 /// Whether every slot of the container at `pos` holds a full stack.
+/// `BaseRailBlock.neighborChanged` → `canSurvive`: every rail needs a rigid
+/// top face under it, and one whose support vanishes is destroyed on the
+/// spot, dropping itself (`destroyBlock(pos, true)`). Returns `true` when the
+/// rail popped — the caller's own update logic is moot then.
+///
+/// Rigid support is read as "sturdy top face, or a hopper": dust's
+/// `canSurviveOn` table covers the full cubes (an observer supports a rail
+/// while conducting nothing), and the hopper's rim is rigid support vanilla
+/// accepts rails on (lithium's storage-cart machine runs a rail over one)
+/// even though dust cannot sit there. The drop lands at
+/// the cell centre with no velocity — vanilla scatters it with world random,
+/// which nothing measured reads.
+pub(crate) fn rail_pops_off<P: PowerSource>(
+    power: &P,
+    ctx: &mut TickCtx<'_>,
+    pos: Pos,
+    item: &'static str,
+) -> bool {
+    let below = pos.offset(Dir::Down);
+    let supported = power.rail_support_at(ctx.world, below)
+        || ctx
+            .states
+            .descriptor(ctx.world.get(below))
+            .is_some_and(|descriptor| descriptor.starts_with("minecraft:hopper"));
+    if supported {
+        return false;
+    }
+    ctx.item_entities.spawn(
+        (item.to_string(), 1),
+        [f64::from(pos.x) + 0.5, f64::from(pos.y) + 0.5, f64::from(pos.z) + 0.5],
+        [0.0; 3],
+        10,
+    );
+    ctx.set(pos, StateId::AIR);
+    true
+}
+
 fn inventory_is_full(ctx: &TickCtx<'_>, pos: Pos, slots: u32) -> bool {
     let Some(inventory) = ctx.inventories.get(&pos) else {
         return slots == 0;
@@ -1004,7 +1158,7 @@ fn insert_one<P: PowerSource>(
                 }
                 return Some(slot);
             }
-            Some((existing, count)) if existing == id && count < MERGE_LIMIT => {
+            Some((existing, count)) if existing == id && count < power.max_stack_of(id) => {
                 ctx.set_inventory_slot(target, slot, Some((existing, count + 1)));
                 return Some(slot);
             }
@@ -1012,6 +1166,101 @@ fn insert_one<P: PowerSource>(
         }
     }
     None
+}
+
+/// [`insert_one`], into a container cart: first empty or stackable slot.
+/// No cooldown clause — vanilla's applies to `HopperBlockEntity` only, and a
+/// hopper *minecart* is not one.
+fn cart_insert_one<P: PowerSource>(
+    ctx: &mut TickCtx<'_>,
+    power: &P,
+    cart: usize,
+    id: &str,
+) -> Option<u8> {
+    let slots = ctx.minecarts[cart].inventory.as_ref().map_or(0, |inv| inv.slots);
+    for slot in 0..slots.min(255) as u8 {
+        match ctx.cart_slot(cart, slot) {
+            None => {
+                ctx.set_cart_slot(cart, slot, Some((id.to_string(), 1)));
+                return Some(slot);
+            }
+            Some((existing, count)) if existing == id && count < power.max_stack_of(id) => {
+                ctx.set_cart_slot(cart, slot, Some((existing, count + 1)));
+                return Some(slot);
+            }
+            Some(_) => continue,
+        }
+    }
+    None
+}
+
+/// A tripwire string, without its hooks: `TripWireBlock`'s entity side.
+///
+/// `entityInside` powers the wire and schedules a 10-tick recheck; the
+/// recheck holds it powered while anything still touches the string's box
+/// (the bottom half of the cell, unattached) and releases it after. Hook
+/// circuits are not modelled — the corpus reads the wire itself, through an
+/// observer.
+pub struct TripWire {
+    /// Whether this state is powered.
+    pub powered: bool,
+    /// Unpowered/powered states.
+    pub states: StatePair,
+}
+
+impl TripWire {
+    fn occupied(ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        let min = [f64::from(pos.x), f64::from(pos.y), f64::from(pos.z)];
+        let max = [f64::from(pos.x) + 1.0, f64::from(pos.y) + 0.5, f64::from(pos.z) + 1.0];
+        let items = ctx.item_entities.items.iter().filter(|item| !item.removed).map(|item| {
+            crate::entity::item_aabb(item.pos)
+        });
+        let others = ctx.item_entities.others.iter().map(|body| (body.min, body.max));
+        items.chain(others).any(|(emin, emax)| {
+            (0..3).all(|axis| emin[axis] < max[axis] && emax[axis] > min[axis])
+        })
+    }
+}
+
+impl BlockBehaviour for TripWire {
+    fn on_entity_inside(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if !self.powered {
+            ctx.set(pos, self.states.on);
+            ctx.schedule(pos, 10, TickPriority::Normal);
+        }
+    }
+
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        if !self.powered {
+            return;
+        }
+        if Self::occupied(ctx, pos) {
+            ctx.schedule(pos, 10, TickPriority::Normal);
+        } else {
+            ctx.set(pos, self.states.off);
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "tripwire"
+    }
+}
+
+/// A plain rail: no redstone behaviour, but it still pops off a vanished
+/// support like every `BaseRailBlock`.
+pub struct PlainRail<P: PowerSource> {
+    /// The world's power rules — solidity, for the support-pop check.
+    pub power: P,
+}
+
+impl<P: PowerSource + 'static> BlockBehaviour for PlainRail<P> {
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        rail_pops_off(&self.power, ctx, pos, "minecraft:rail");
+    }
+
+    fn name(&self) -> &'static str {
+        "rail"
+    }
 }
 
 /// A dropper or dispenser.
@@ -1138,6 +1387,27 @@ impl<P: PowerSource> BlockBehaviour for Dropper<P> {
             // Front obstructed: the placement fails and the item stays put.
             return;
         }
+        // `ArmorStandItem`'s dispense behaviour: the stand appears at the
+        // front cell's floor centre, facing away — a real entity spawn, the
+        // one non-block thing a dispenser produces that this engine models.
+        // (A splash potion, by contrast, is a thrown projectile; it falls
+        // through to the default eject below and leaves the world, which for
+        // the measured machine — a fire-resistance splash that only cancels
+        // burning, and this engine burns nothing — changes no outcome.)
+        if self.dispenser && id == "minecraft:armor_stand" {
+            let front = pos.offset(self.facing);
+            ctx.item_entities.pending_spawns.push(crate::entity::PendingSpawn::Body {
+                kind: "minecraft:armor_stand",
+                pos: [
+                    f64::from(front.x) + 0.5,
+                    f64::from(front.y),
+                    f64::from(front.z) + 0.5,
+                ],
+            });
+            let remaining = count - 1;
+            ctx.set_inventory_slot(pos, slot, (remaining > 0).then(|| (id.clone(), remaining)));
+            return;
+        }
         // The bucket family. `DispenseItemBehavior`'s static block registers
         // `$3` for every filled bucket and `$4` for the empty one; both end in
         // `consumeWithRemainder`, which is why the two directions are one code
@@ -1214,16 +1484,23 @@ impl<P: PowerSource> BlockBehaviour for Dropper<P> {
         }
         if !self.dispenser {
             let front = pos.offset(self.facing);
-            if let Some(front_slots) = self.power.container_slots_at(ctx.world, front) {
-                if let Some(target_slot) =
-                    insert_one(ctx, &self.power, None, front, front_slots, &id)
-                {
-                    let carried = ctx.take_slot_contents(pos, slot);
-                    let remaining = count - 1;
-                    ctx.set_inventory_slot(pos, slot, (remaining > 0).then(|| (id.clone(), remaining)));
-                    ctx.set_slot_contents(front, target_slot, carried);
+            if let Some(segments) = self.power.container_segments(ctx.world, front) {
+                for (seg, seg_slots) in &segments {
+                    if let Some(target_slot) =
+                        insert_one(ctx, &self.power, None, *seg, *seg_slots, &id)
+                    {
+                        let carried = ctx.take_slot_contents(pos, slot);
+                        let remaining = count - 1;
+                        ctx.set_inventory_slot(
+                            pos,
+                            slot,
+                            (remaining > 0).then(|| (id.clone(), remaining)),
+                        );
+                        ctx.set_slot_contents(*seg, target_slot, carried);
+                        break;
+                    }
                 }
-                // Insert refused (target full): the item stays put.
+                // Insert refused (every segment full): the item stays put.
                 return;
             }
         }
@@ -1432,6 +1709,161 @@ impl<P: PowerSource> BlockBehaviour for Lamp<P> {
     }
 }
 
+/// `minecraft:ice`, for the one thing it does on its own: melt.
+///
+/// `IceBlock.randomTick` melts when the light level clears 11. There is no
+/// light engine here, so eligibility is assumed — gametest platforms are lit
+/// and that is the world this runs; a deliberately dark build would diverge,
+/// and this comment is where that approximation is written down. Melting in
+/// the overworld leaves a water source.
+pub struct Ice {
+    /// `minecraft:water[level=0]`.
+    pub water: StateId,
+}
+
+impl BlockBehaviour for Ice {
+    fn on_random_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        ctx.set(pos, self.water);
+    }
+
+    fn name(&self) -> &'static str {
+        "ice"
+    }
+}
+
+/// An impulse `minecraft:command_block`.
+///
+/// `CommandBlock.neighborChanged`, shape only: on a rising edge of neighbour
+/// signal it schedules a 1-tick delay, and on that tick runs its program —
+/// the [`CommandProgram`](crate::behaviour::CommandProgram) subset resolved
+/// at load. A block whose command is outside that subset (summon, data,
+/// queries) powers on and runs nothing, which is also what an unparseable
+/// command does in game. Chain and repeating blocks are not modelled.
+pub struct CommandBlock<P: PowerSource> {
+    /// How power is read.
+    pub power: P,
+}
+
+impl<P: PowerSource> CommandBlock<P> {
+    fn has_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        crate::pos::ALL_DIRS.iter().any(|dir| {
+            self.power
+                .is_powered(ctx.world, ctx.comparator_out, pos.offset(*dir), dir.opposite())
+        })
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for CommandBlock<P> {
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        let powered = self.has_signal(ctx, pos);
+        let was = ctx.command_powered.insert(pos, powered).unwrap_or(false);
+        if powered && !was {
+            ctx.schedule(pos, 1, TickPriority::Normal);
+        }
+    }
+
+    fn on_scheduled_tick(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        let Some(program) = ctx.commands.get(&pos).copied() else { return };
+        match program {
+            crate::behaviour::CommandProgram::SetBlock { offset, state } => {
+                let target = Pos::new(pos.x + offset.0, pos.y + offset.1, pos.z + offset.2);
+                ctx.set(target, state);
+            }
+            crate::behaviour::CommandProgram::Fill { a, b, state } => {
+                for x in a.0.min(b.0)..=a.0.max(b.0) {
+                    for y in a.1.min(b.1)..=a.1.max(b.1) {
+                        for z in a.2.min(b.2)..=a.2.max(b.2) {
+                            ctx.set(Pos::new(pos.x + x, pos.y + y, pos.z + z), state);
+                        }
+                    }
+                }
+            }
+            crate::behaviour::CommandProgram::Summon { kind, offset, fuse } => {
+                // A command block executes at its centre; the spawn queues
+                // and materialises before the next entity pass.
+                let at = [
+                    f64::from(pos.x) + 0.5 + offset[0],
+                    f64::from(pos.y) + 0.5 + offset[1],
+                    f64::from(pos.z) + 0.5 + offset[2],
+                ];
+                let spawn = match kind {
+                    "minecraft:tnt" => crate::entity::PendingSpawn::Tnt {
+                        pos: at,
+                        fuse: fuse.unwrap_or(80),
+                    },
+                    k if k.ends_with("_minecart") || k == "minecraft:minecart" => {
+                        crate::entity::PendingSpawn::Minecart { kind, pos: at }
+                    }
+                    _ => crate::entity::PendingSpawn::Body { kind, pos: at },
+                };
+                ctx.item_entities.pending_spawns.push(spawn);
+            }
+            crate::behaviour::CommandProgram::RetypeNearestItem { radius, item } => {
+                // Nearest live item entity within `radius` of the block
+                // centre; `limit=1` semantics. Distance is euclidean, like
+                // the selector's.
+                let centre =
+                    [f64::from(pos.x) + 0.5, f64::from(pos.y) + 0.5, f64::from(pos.z) + 0.5];
+                let mut best: Option<(usize, f64)> = None;
+                for (index, entity) in ctx.item_entities.items.iter().enumerate() {
+                    if entity.removed {
+                        continue;
+                    }
+                    let d2 = (entity.pos[0] - centre[0]).powi(2)
+                        + (entity.pos[1] - centre[1]).powi(2)
+                        + (entity.pos[2] - centre[2]).powi(2);
+                    if d2 <= radius * radius && best.is_none_or(|(_, b)| d2 < b) {
+                        best = Some((index, d2));
+                    }
+                }
+                if let Some((index, _)) = best {
+                    ctx.item_entities.items[index].item.0 = item.to_string();
+                }
+            }
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "command_block"
+    }
+}
+
+/// A gametest `minecraft:test_block` in `accept` mode.
+///
+/// Vanilla's accept block notifies its test instance the moment any neighbour
+/// signal reaches it. A headless engine has no test instance to notify, so
+/// the fact is recorded as a state change instead: the block latches to an
+/// engine-internal `fired=true` variant on its first signal, which lands in
+/// the recorded change log — exactly where a harness can assert on it. It
+/// never unlatches; an accept condition met once is met.
+pub struct TestAccept<P: PowerSource> {
+    /// The `fired=true` variant this latches to.
+    pub fired: StateId,
+    /// How power is read.
+    pub power: P,
+}
+
+impl<P: PowerSource> TestAccept<P> {
+    fn has_signal(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
+        crate::pos::ALL_DIRS.iter().any(|dir| {
+            self.power
+                .is_powered(ctx.world, ctx.comparator_out, pos.offset(*dir), dir.opposite())
+        })
+    }
+}
+
+impl<P: PowerSource> BlockBehaviour for TestAccept<P> {
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        if self.has_signal(ctx, pos) {
+            ctx.set_quiet(pos, self.fired);
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "test_block"
+    }
+}
+
 /// A trapdoor — any wood variant or iron.
 ///
 /// `TrapDoorBlock.neighborChanged`, from bytecode: `hasNeighborSignal` (plain —
@@ -1614,9 +2046,6 @@ pub struct PressurePlate<P: PowerSource> {
 
 impl<P: PowerSource> PressurePlate<P> {
     fn pressed_by_item(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
-        if !self.senses_items {
-            return false;
-        }
         // BasePressurePlateBlock.TOUCH_AABB: the plate cell inset by a pixel.
         let min = [f64::from(pos.x) + 0.0625, f64::from(pos.y), f64::from(pos.z) + 0.0625];
         let max = [
@@ -1624,17 +2053,32 @@ impl<P: PowerSource> PressurePlate<P> {
             f64::from(pos.y) + 0.25,
             f64::from(pos.z) + 0.9375,
         ];
-        ctx.item_entities.items.iter().any(|item| {
-            if item.removed {
-                return false;
-            }
-            let (emin, emax) = crate::entity::item_aabb(item.pos);
+        let hit = |emin: [f64; 3], emax: [f64; 3]| {
             emin[0] < max[0]
                 && emax[0] > min[0]
                 && emin[1] < max[1]
                 && emax[1] > min[1]
                 && emin[2] < max[2]
                 && emax[2] > min[2]
+        };
+        if self.senses_items
+            && ctx.item_entities.items.iter().any(|item| {
+                if item.removed {
+                    return false;
+                }
+                let (emin, emax) = crate::entity::item_aabb(item.pos);
+                hit(emin, emax)
+            })
+        {
+            return true;
+        }
+        // The entity side. Wooden plates (`Sensitivity.EVERYTHING`) press
+        // under any entity; stone (`Sensitivity.MOBS`) under living ones
+        // only — read as "has a measured max health", which admits the mobs
+        // and the armor stand and excludes boats, fireballs and carts.
+        ctx.item_entities.others.iter().any(|body| {
+            let living = crate::entity::mob_health(&body.kind).is_some();
+            (self.senses_items || living) && hit(body.min, body.max)
         })
     }
 }
@@ -1815,14 +2259,16 @@ pub const DETECTOR_RAIL_RECHECK: u64 = 20;
 /// powers the block *below* it. Both captured: `detector_rail.json` lights
 /// lamps above, beside and below, and `detector_strong.json` runs dust that
 /// touches only the block under the rail and reads 15 there.
-pub struct DetectorRail {
+pub struct DetectorRail<P: PowerSource> {
     /// Whether this state is powered.
     pub powered: bool,
     /// Unpowered/powered states.
     pub states: StatePair,
+    /// The world's power rules — solidity, for the support-pop check.
+    pub power: P,
 }
 
-impl DetectorRail {
+impl<P: PowerSource> DetectorRail<P> {
     fn occupied(&self, ctx: &TickCtx<'_>, pos: Pos) -> bool {
         let min = [f64::from(pos.x) + 0.2, f64::from(pos.y), f64::from(pos.z) + 0.2];
         let max = [
@@ -1837,7 +2283,7 @@ impl DetectorRail {
     }
 }
 
-impl DetectorRail {
+impl<P: PowerSource> DetectorRail<P> {
     /// `checkPressed`'s write: set the state, then update the neighbours of
     /// **both** the rail and the block under it.
     ///
@@ -1854,7 +2300,11 @@ impl DetectorRail {
     }
 }
 
-impl BlockBehaviour for DetectorRail {
+impl<P: PowerSource + 'static> BlockBehaviour for DetectorRail<P> {
+    fn on_neighbor_changed(&self, ctx: &mut TickCtx<'_>, pos: Pos, _from: Dir) {
+        rail_pops_off(&self.power, ctx, pos, "minecraft:detector_rail");
+    }
+
     fn on_entity_inside(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
         if !self.powered && self.occupied(ctx, pos) {
             self.write(ctx, pos, true);
@@ -2091,7 +2541,12 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
             log: None,
         };
@@ -2132,7 +2587,12 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
             log: None,
         };
@@ -2180,7 +2640,12 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
             log: None,
         };
@@ -2223,7 +2688,12 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
             log: None,
         };
@@ -2266,7 +2736,12 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
             log: None,
         };
@@ -2310,7 +2785,12 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
             log: None,
         };
@@ -2366,7 +2846,12 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
             log: None,
         };
@@ -2418,7 +2903,12 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
             log: None,
         };
@@ -2465,7 +2955,12 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
             log: None,
         };
@@ -2568,7 +3063,12 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
             log: None,
         };
@@ -2611,7 +3111,12 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
             log: None,
         };
@@ -2656,7 +3161,12 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
             log: None,
         };
@@ -2746,7 +3256,12 @@ mod tests {
             comparator_out: &mut stored,
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
             log: None,
         };
@@ -2782,7 +3297,12 @@ mod tests {
             comparator_out: &mut stored,
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
             log: None,
         };
@@ -2820,7 +3340,12 @@ mod tests {
             comparator_out: &mut stored,
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
             log: None,
         };
@@ -2866,7 +3391,12 @@ mod tests {
             comparator_out: &mut stored,
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
             log: None,
         };

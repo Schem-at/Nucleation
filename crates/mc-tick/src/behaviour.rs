@@ -347,8 +347,26 @@ pub struct TickCtx<'a> {
     pub inventories: &'a mut std::collections::HashMap<Pos, crate::inventory::Inventory>,
     /// Per-hopper cooldown and tick bookkeeping.
     pub hopper_state: &'a mut std::collections::HashMap<Pos, HopperState>,
+    /// Pre-resolved command-block programs by position — set at build from
+    /// each command block's `Command` NBT, immutable during a run.
+    pub commands: &'a std::collections::HashMap<Pos, CommandProgram>,
+    /// Command blocks' last-seen powered flags, for rising-edge detection.
+    pub command_powered: &'a mut std::collections::HashMap<Pos, bool>,
+    /// The block-entity tick list, reconciled on every block write: a hopper
+    /// a command block setblocks into existence must tick, and one it
+    /// removes must stop. Vanilla creates/destroys the block entity with the
+    /// block; the engine keeps the tick list in step instead.
+    pub tickers: &'a mut Vec<Pos>,
     /// The world's item entities — what hoppers vacuum and droppers eject.
     pub item_entities: &'a mut crate::entity::ItemEntities,
+    /// The world's minecarts — for a hopper meeting a container cart
+    /// (`HopperBlockEntity.getEntityContainer`) and a detector rail reading
+    /// the cart parked on it.
+    pub minecarts: &'a mut Vec<crate::minecart::MinecartState>,
+    /// Conductor-per-state, for `updateNeighbourForOutputSignal`'s
+    /// through-a-solid extension — a comparator reading a container through
+    /// one conductor hears about the container's change via exactly this.
+    pub conductors: &'a [bool],
     /// Container-slot changes made this tick, when recording is on.
     pub inv_log: Option<&'a mut Vec<InventoryChange>>,
     /// Recent redstone-torch toggles, for burnout detection.
@@ -558,6 +576,22 @@ impl<'a> TickCtx<'a> {
         if let Some(log) = self.log.as_deref_mut() {
             log.push(BlockChange { tick: self.tick, pos, from: previous, to: state });
         }
+        self.reconcile_ticker(pos, previous, state);
+        // `LevelChunk.setBlockState`: `onRemove` runs first, and only when
+        // the block *identity* changed — a wire flipping power stays a wire
+        // and hears nothing.
+        let block_of = |states: &StateRegistry, id: StateId| {
+            states
+                .descriptor(id)
+                .map(|d| d.split('[').next().unwrap_or(d).to_string())
+        };
+        if block_of(self.states, previous) != block_of(self.states, state) {
+            if let Some(table) = self.behaviours {
+                if let Some(behaviour) = table.get(previous) {
+                    behaviour.on_removed(self, pos);
+                }
+            }
+        }
         // `LevelChunk.setBlockState` runs `onPlace` before `markAndNotifyBlock`
         // reaches the neighbours at all.
         if let Some(table) = self.behaviours {
@@ -607,6 +641,7 @@ impl<'a> TickCtx<'a> {
         if let Some(log) = self.log.as_deref_mut() {
             log.push(BlockChange { tick: self.tick, pos, from: previous, to: state });
         }
+        self.reconcile_ticker(pos, previous, state);
     }
 
     /// A **flag 2** write: no neighbour updates, but the shape pass still
@@ -623,9 +658,28 @@ impl<'a> TickCtx<'a> {
         if let Some(log) = self.log.as_deref_mut() {
             log.push(BlockChange { tick: self.tick, pos, from: previous, to: state });
         }
+        self.reconcile_ticker(pos, previous, state);
         self.indirect_shapes(pos, previous);
         self.updates.push(UpdateEntry::neighbor_shapes(pos));
         self.indirect_shapes(pos, state);
+    }
+
+
+    /// Keep the block-entity tick list in step with a write — see
+    /// [`TickCtx::tickers`]. Appended in write order, which is vanilla's
+    /// creation order for freshly made block entities.
+    fn reconcile_ticker(&mut self, pos: Pos, previous: StateId, state: StateId) {
+        let Some(table) = self.behaviours else { return };
+        let ticks = |s: StateId| table.get(s).is_some_and(|b| b.ticks_as_block_entity());
+        let was = ticks(previous);
+        let is = ticks(state);
+        if is && !was {
+            if !self.tickers.contains(&pos) {
+                self.tickers.push(pos);
+            }
+        } else if was && !is {
+            self.tickers.retain(|p| *p != pos);
+        }
     }
 
     /// The output strength a comparator at `pos` last emitted.
@@ -692,6 +746,108 @@ impl<'a> TickCtx<'a> {
         }
     }
 
+    /// `HopperBlockEntity.getEntityContainer`: the container cart whose box
+    /// intersects the 1-cube centred at `center`. Vanilla picks a *random*
+    /// entity when several overlap; the engine takes the lowest id, which is
+    /// identical whenever at most one cart straddles the cell — true of every
+    /// measured machine, and the honest place to look when one day it is not.
+    pub fn cart_container_at(&self, center: [f64; 3]) -> Option<usize> {
+        let mut found: Option<usize> = None;
+        for (index, cart) in self.minecarts.iter().enumerate() {
+            if cart.removed || cart.inventory.is_none() {
+                continue;
+            }
+            let (emin, emax) = crate::minecart::cart_aabb(cart.pos);
+            let hit = (0..3).all(|axis| {
+                emin[axis] < center[axis] + 0.5 && emax[axis] > center[axis] - 0.5
+            });
+            if hit && found.is_none_or(|prev: usize| cart.id < self.minecarts[prev].id) {
+                found = Some(index);
+            }
+        }
+        found
+    }
+
+    /// Read a container cart's slot, hopper-style: `(id, count)` or `None`.
+    pub fn cart_slot(&self, cart: usize, slot: u8) -> Option<(String, u8)> {
+        self.minecarts[cart].inventory.as_ref().and_then(|inv| {
+            inv.stacks
+                .iter()
+                .find(|stack| stack.slot == slot && stack.count > 0)
+                .map(|stack| (stack.id.clone(), stack.count))
+        })
+    }
+
+    /// Write a container cart's slot, recording the change (keyed at the
+    /// cart's block cell) and poking `updateNeighbourForOutputSignal` there —
+    /// how a comparator behind the detector rail under the cart notices.
+    pub fn set_cart_slot(&mut self, cart: usize, slot: u8, to: Option<(String, u8)>) {
+        let from = self.cart_slot(cart, slot);
+        if from == to {
+            return;
+        }
+        let cell = {
+            let pos = self.minecarts[cart].pos;
+            Pos::new(pos[0].floor() as i32, pos[1].floor() as i32, pos[2].floor() as i32)
+        };
+        let inv = self.minecarts[cart]
+            .inventory
+            .as_mut()
+            .expect("set_cart_slot on a cart with no container");
+        inv.stacks.retain(|stack| stack.slot != slot);
+        if let Some((id, count)) = &to {
+            inv.stacks.push(crate::inventory::ItemStack {
+                slot,
+                id: id.clone(),
+                count: *count,
+                contents: None,
+            });
+        }
+        if let Some(log) = self.inv_log.as_deref_mut() {
+            log.push(InventoryChange { tick: self.tick, pos: cell, slot, from, to });
+        }
+        // The same `Plane.HORIZONTAL` sweep as [`TickCtx::set_inventory_slot`].
+        for dir in [Dir::North, Dir::East, Dir::South, Dir::West] {
+            let neighbor = cell.offset(dir);
+            self.notify(neighbor, dir.opposite());
+            let state = self.world.get(neighbor);
+            if self.conductors.get(state.raw() as usize).copied().unwrap_or(false) {
+                self.notify(neighbor.offset(dir), dir.opposite());
+            }
+        }
+    }
+
+    /// Detach and return container contents riding a cart's slot — the cart
+    /// half of [`TickCtx::take_slot_contents`].
+    pub fn take_cart_slot_contents(
+        &mut self,
+        cart: usize,
+        slot: u8,
+    ) -> Option<Vec<crate::inventory::ItemStack>> {
+        self.minecarts[cart].inventory.as_mut().and_then(|inv| {
+            inv.stacks
+                .iter_mut()
+                .find(|stack| stack.slot == slot)
+                .and_then(|stack| stack.contents.take())
+        })
+    }
+
+    /// Attach container contents to a cart's slot — the cart half of
+    /// [`TickCtx::set_slot_contents`].
+    pub fn set_cart_slot_contents(
+        &mut self,
+        cart: usize,
+        slot: u8,
+        contents: Option<Vec<crate::inventory::ItemStack>>,
+    ) {
+        let Some(contents) = contents else { return };
+        if let Some(inv) = self.minecarts[cart].inventory.as_mut() {
+            if let Some(stack) = inv.stacks.iter_mut().find(|stack| stack.slot == slot) {
+                stack.contents = Some(contents);
+            }
+        }
+    }
+
     /// Write a container slot, recording the change and updating comparators.
     ///
     /// The comparator update mirrors `Level.updateNeighbourForOutputSignal`,
@@ -720,12 +876,44 @@ impl<'a> TickCtx<'a> {
         if let Some(log) = self.inv_log.as_deref_mut() {
             log.push(InventoryChange { tick: self.tick, pos, slot, from, to });
         }
-        // updateNeighbourForOutputSignal: direct notifications in Java's
-        // Direction.values() order.
-        for dir in crate::pos::JAVA_DIRECTIONS {
-            self.notify(pos.offset(dir), dir.opposite());
+        // `Level.updateNeighbourForOutputSignal`: the four *horizontals*, in
+        // `Direction.Plane.HORIZONTAL`'s declared order — NORTH, EAST,
+        // SOUTH, WEST — not Direction.values(). The order is load-bearing:
+        // lithium's comparator_update_collection hangs two comparators off
+        // one chest, east and south, and their submission order into the
+        // tick queue decides which of two pistons claims a shared redstone
+        // block. The vanilla oracle's queue log shows the east one
+        // scheduled first (`cuc_trace.json`, order 32 vs 33).
+        //
+        // Each horizontal is notified, and when it is a conductor the cell
+        // one further along the same direction hears too — how the
+        // comparator behind the concrete beside lithium's chest learns that
+        // a hopper touched it (`comparator_update_collection`'s core).
+        for dir in [Dir::North, Dir::East, Dir::South, Dir::West] {
+            let neighbor = pos.offset(dir);
+            self.notify(neighbor, dir.opposite());
+            let state = self.world.get(neighbor);
+            if self.conductors.get(state.raw() as usize).copied().unwrap_or(false) {
+                self.notify(neighbor.offset(dir), dir.opposite());
+            }
         }
-        // (updateNeighbourForOutputSignal: direct neighborChanged calls.)
+    }
+
+    /// `updateNeighbourForOutputSignal` with no slot write — what a hopper's
+    /// *failed* take fires: vanilla's `tryTakeInItemFromSlot` removes the
+    /// item and puts it back, and both halves call the container's
+    /// `setChanged`. The no-op still schedules every comparator watching the
+    /// container, which is the churn lithium's update collection exists to
+    /// batch — and what its gametest measures.
+    pub fn poke_container_output(&mut self, pos: Pos) {
+        for dir in [Dir::North, Dir::East, Dir::South, Dir::West] {
+            let neighbor = pos.offset(dir);
+            self.notify(neighbor, dir.opposite());
+            let state = self.world.get(neighbor);
+            if self.conductors.get(state.raw() as usize).copied().unwrap_or(false) {
+                self.notify(neighbor.offset(dir), dir.opposite());
+            }
+        }
     }
 
     /// Schedule a block write for `delay` ticks from now, resolved in the
@@ -848,6 +1036,14 @@ pub trait BlockBehaviour: Send + Sync {
     /// torch never hears that the torch came on.
     fn on_state_changed(&self, _ctx: &mut TickCtx<'_>, _pos: Pos) {}
 
+    /// This block was just replaced by a *different* block — vanilla's
+    /// `onRemove`, which `LevelChunk.setBlockState` only calls when the
+    /// block identity changes, never on a state flip of the same block.
+    /// Dust needs it: `RedStoneWireBlock.onRemove` updates the neighbours
+    /// of each of its six neighbours, and a torch two steps away relights
+    /// on exactly that sweep when an explosion eats the wire.
+    fn on_removed(&self, _ctx: &mut TickCtx<'_>, _pos: Pos) {}
+
     /// This block was just written into the world by a completed piston move.
     ///
     /// Mirrors the `onPlace` a landed block receives from vanilla's `setBlock`.
@@ -861,8 +1057,59 @@ pub trait BlockBehaviour: Send + Sync {
         0
     }
 
+    /// A random tick landed on this block — `Block.randomTick`. Only blocks
+    /// with random-tick behaviour (ice melting) implement it; the pass runs
+    /// only when [`randomTickSpeed`](crate::Simulation::set_random_ticks) is
+    /// nonzero.
+    fn on_random_tick(&self, _ctx: &mut TickCtx<'_>, _pos: Pos) {}
+
     /// A short name for traces and diagnostics.
     fn name(&self) -> &'static str;
+}
+
+/// One pre-resolved command-block program — the world-edit shapes an
+/// impulse command block can run headlessly. Commands outside this set
+/// (summon, data, queries) simply have no program: their block powers on
+/// and executes nothing, which is also what an unparseable command does
+/// in game.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CommandProgram {
+    /// `setblock ~dx ~dy ~dz <state>`: one write, relative to the block.
+    SetBlock {
+        /// Offset from the command block.
+        offset: (i32, i32, i32),
+        /// The pre-interned state to write.
+        state: StateId,
+    },
+    /// `fill ~.. ~.. ~.. <state>`: every cell of the inclusive box between
+    /// the two relative corners.
+    Fill {
+        /// First corner, relative to the command block.
+        a: (i32, i32, i32),
+        /// Second corner, relative to the command block.
+        b: (i32, i32, i32),
+        /// The pre-interned state to write.
+        state: StateId,
+    },
+    /// `summon <kind> ~dx ~dy ~dz [{fuse:N}]`: queue an entity spawn at the
+    /// block's centre plus the offset. The spawn lands next entity pass.
+    Summon {
+        /// Normalised entity id, interned like the item names.
+        kind: &'static str,
+        /// Offset from the block centre.
+        offset: [f64; 3],
+        /// A `{fuse:N}` tag, when present.
+        fuse: Option<i32>,
+    },
+    /// `data merge entity @e[type=item,distance=..N,limit=1] {Item:{id: X}}`:
+    /// retype the nearest item entity within `radius` of the block.
+    RetypeNearestItem {
+        /// Selector radius in blocks.
+        radius: f64,
+        /// The item id to write. Boxed str keeps the enum `Copy`-adjacent
+        /// cheap without a full `String` clone per dispatch.
+        item: &'static str,
+    },
 }
 
 /// A block that does nothing at all.
@@ -1138,7 +1385,12 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
             log: None,
         };
@@ -1170,7 +1422,12 @@ mod tests {
             comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
             log: None,
         };

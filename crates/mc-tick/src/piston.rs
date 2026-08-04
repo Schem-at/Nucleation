@@ -548,7 +548,7 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
             })
         }) {
             let above = pos.offset(Dir::Up);
-            let qc: Vec<String> = crate::pos::ALL_DIRS
+            let mut qc: Vec<String> = crate::pos::ALL_DIRS
                 .iter()
                 .filter(|d| **d != Dir::Down)
                 .filter(|d| {
@@ -556,6 +556,26 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                 })
                 .map(|d| format!("qc:{d:?}"))
                 .collect();
+            qc.extend(
+                crate::pos::ALL_DIRS
+                    .iter()
+                    .filter(|d| **d != self.facing)
+                    .filter(|d| {
+                        self.power.is_powered(
+                            ctx.world,
+                            ctx.comparator_out,
+                            pos.offset(**d),
+                            d.opposite(),
+                        )
+                    })
+                    .map(|d| {
+                        let neighbor = pos.offset(*d);
+                        format!(
+                            "direct:{d:?}={}",
+                            ctx.states.descriptor(ctx.world.get(neighbor)).unwrap_or("?")
+                        )
+                    }),
+            );
             eprintln!(
                 "[pwr] {:?} extended={} powered={} {}",
                 (pos.x, pos.y, pos.z),
@@ -1223,7 +1243,12 @@ mod tests {
         comparator_out: Box::leak(Box::new(Default::default())),
         inventories: Box::leak(Box::new(Default::default())),
         hopper_state: Box::leak(Box::new(Default::default())),
+        commands: Box::leak(Box::new(Default::default())),
+        command_powered: Box::leak(Box::new(Default::default())),
+        tickers: Box::leak(Box::new(Default::default())),
         item_entities: Box::leak(Box::new(Default::default())),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
         inv_log: None, log: None }
     }
 
@@ -1283,7 +1308,12 @@ mod tests {
                 comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
                 log: None,
             };
@@ -1394,7 +1424,12 @@ mod tests {
                 comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
                 log: None,
             };
@@ -1451,7 +1486,12 @@ mod tests {
                 comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
                 log: None,
             };
@@ -1501,7 +1541,12 @@ mod tests {
                 comparator_out: &mut Default::default(),
             inventories: &mut Default::default(),
             hopper_state: &mut Default::default(),
+            commands: &Default::default(),
+            command_powered: &mut Default::default(),
+            tickers: &mut Default::default(),
             item_entities: &mut Default::default(),
+            minecarts: Box::leak(Box::new(Vec::new())),
+            conductors: &[],
             inv_log: None,
                 log: None,
             };

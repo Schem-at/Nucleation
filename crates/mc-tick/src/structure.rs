@@ -69,6 +69,9 @@ pub struct Structure {
     /// which pokes neighbouring comparators, so the list is load-bearing even
     /// when the compound holds nothing we model (an empty barrel still counts).
     pub block_entities: Vec<Pos>,
+    /// Command-block `Command` strings, from block-entity `nbt`. Raw text:
+    /// the loader decides what subset it can run (`vanilla::parse_command`).
+    pub commands: Vec<(Pos, String)>,
     /// Every authored entity, in list order — the placement spawn order,
     /// which is also the server's id-assignment order.
     pub entities: Vec<SpawnedEntity>,
@@ -131,6 +134,10 @@ impl SpawnedEntity {
 pub struct SpawnedMinecart {
     /// e.g. `minecraft:minecart`.
     pub kind: String,
+    /// Container contents for chest/hopper carts, empty for a plain cart.
+    /// The loader mirrors these where its comparator rules can read them —
+    /// a parked container cart on a detector rail is a comparator input.
+    pub items: Vec<crate::inventory::ItemStack>,
     /// Spawn position.
     pub pos: [f64; 3],
     /// Spawn velocity.
@@ -785,6 +792,7 @@ impl<'a> Parser<'a> {
         let mut motion = [0.0f64; 3];
         let mut item: Option<(String, u8)> = None;
         let mut pickup_delay = 0u32;
+        let mut entity_items: Vec<crate::inventory::ItemStack> = Vec::new();
         let mut fuel = 0u32;
         let mut push = [0.0f64; 2];
         let mut yaw = 0.0f64;
@@ -836,6 +844,19 @@ impl<'a> Parser<'a> {
                             // A furnace cart's self-drive. Zero on every cart
                             // in the record door, but a fuelled one propels
                             // itself, so it is read rather than assumed.
+                            "Items" => {
+                                self.eat(b'[')?;
+                                loop {
+                                    if self.peek() == Some(b']') {
+                                        self.at += 1;
+                                        break;
+                                    }
+                                    entity_items.push(self.item_entry()?);
+                                    if self.peek() == Some(b',') {
+                                        self.at += 1;
+                                    }
+                                }
+                            }
                             "Fuel" => fuel = self.int()? as u32,
                             "PushX" => push[0] = self.float()?,
                             "PushZ" => push[1] = self.float()?,
@@ -902,16 +923,22 @@ impl<'a> Parser<'a> {
             // as a plain cart would silently drop the thing that makes it that
             // cart.
             Some(crate::entity_kind::EntityMotion::Minecart) => match entity_id.as_str() {
-                "minecraft:minecart" => match pos {
-                    Some(pos) => Ok(SpawnedEntity::Minecart(SpawnedMinecart {
-                        kind: entity_id,
-                        pos,
-                        motion,
-                        yaw,
-                        passengers,
-                    })),
-                    None => self.err("minecart entity needs `pos`"),
-                },
+                // Container carts ride the same hitbox as a plain cart, and
+                // their inventory now rides with them — which is the thing
+                // that made loading them as plain carts a silent lie.
+                "minecraft:minecart" | "minecraft:chest_minecart" | "minecraft:hopper_minecart" => {
+                    match pos {
+                        Some(pos) => Ok(SpawnedEntity::Minecart(SpawnedMinecart {
+                            kind: entity_id,
+                            items: entity_items,
+                            pos,
+                            motion,
+                            yaw,
+                            passengers,
+                        })),
+                        None => self.err("minecart entity needs `pos`"),
+                    }
+                }
                 "minecraft:furnace_minecart" => match pos {
                     Some(pos) => Ok(SpawnedEntity::FurnaceMinecart(SpawnedFurnaceMinecart {
                         pos,
@@ -955,19 +982,23 @@ impl<'a> Parser<'a> {
     /// is true of a freshly placed one and false of a saved one.
     fn nbt_items(
         &mut self,
-    ) -> Result<(Vec<crate::inventory::ItemStack>, Option<u8>), StructureError> {
+    ) -> Result<(Vec<crate::inventory::ItemStack>, Option<u8>, Option<String>), StructureError>
+    {
         self.eat(b'{')?;
         let mut items = Vec::new();
         let mut output_signal = None;
+        let mut command = None;
         loop {
             if self.peek() == Some(b'}') {
                 self.at += 1;
-                return Ok((items, output_signal));
+                return Ok((items, output_signal, command));
             }
             let key = self.key()?;
             self.eat(b':')?;
             if key == "OutputSignal" {
                 output_signal = Some(self.int()? as u8);
+            } else if key == "Command" {
+                command = Some(self.string()?).filter(|c| !c.is_empty());
             } else if key == "Items" {
                 self.eat(b'[')?;
                 loop {
@@ -1173,6 +1204,7 @@ impl<'a> Parser<'a> {
         let mut inventories: Vec<(Pos, Vec<crate::inventory::ItemStack>)> = Vec::new();
         let mut block_entities: Vec<Pos> = Vec::new();
         let mut comparator_outputs: Vec<(Pos, u8)> = Vec::new();
+        let mut commands: Vec<(Pos, String)> = Vec::new();
         let mut entities: Vec<SpawnedEntity> = Vec::new();
         let mut data_version: Option<i32> = None;
 
@@ -1239,6 +1271,7 @@ impl<'a> Parser<'a> {
                         let mut state = None;
                         let mut items: Vec<crate::inventory::ItemStack> = Vec::new();
                         let mut output_signal: Option<u8> = None;
+                        let mut command: Option<String> = None;
                         let mut has_nbt = false;
                         loop {
                             if self.peek() == Some(b'}') {
@@ -1264,6 +1297,7 @@ impl<'a> Parser<'a> {
                                     let parsed = self.nbt_items()?;
                                     items = parsed.0;
                                     output_signal = parsed.1;
+                                    command = parsed.2;
                                     has_nbt = true;
                                 }
                                 _ => self.skip_value()?,
@@ -1283,6 +1317,9 @@ impl<'a> Parser<'a> {
                                 }
                                 if let Some(signal) = output_signal {
                                     comparator_outputs.push((p, signal));
+                                }
+                                if let Some(text) = command {
+                                    commands.push((p, text));
                                 }
                             }
                             _ => return self.err("block needs both `pos` and `state`"),
@@ -1307,6 +1344,7 @@ impl<'a> Parser<'a> {
             blocks: blocks.ok_or(StructureError::Missing("blocks"))?,
             inventories,
             comparator_outputs,
+            commands,
             block_entities,
             item_entities: entities
                 .iter()

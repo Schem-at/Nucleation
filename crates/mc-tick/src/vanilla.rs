@@ -24,6 +24,7 @@
 use crate::behaviour::{BehaviourTable, Inert};
 use crate::entity_kind::{EntityKind, EntityTable};
 use crate::components::{
+    CommandBlock, Ice, TestAccept,
     Button, Comparator, ComparatorMode, CopperBulb, Door, Dropper, Hopper, Lamp, NoteBlock,
     PowerSource, PressurePlate, Repeater, StatePair, Torch, Trapdoor,
 };
@@ -139,6 +140,18 @@ pub struct VanillaRules {
     /// property. Everything else in `powered` answers 15, so without this a
     /// plate holding one item would drive a full-strength line.
     analog_emission: HashMap<StateId, u8>,
+    /// Detector rails, for the comparator's container-cart read.
+    detector_rails: Vec<StateId>,
+    /// Double-chest halves: `(is_first, direction of the partner half)`.
+    ///
+    /// From `ChestBlock`: the partner sits at `getConnectedDirection` (a LEFT
+    /// half's partner is clockwise of its facing, a RIGHT half's counter-
+    /// clockwise), and `getBlockType` makes the RIGHT half FIRST in the
+    /// combined container — its slots come before the left half's.
+    chest_halves: HashMap<StateId, (bool, Dir)>,
+    /// Chest states whose lid a solid block can pin shut — a *blocked*
+    /// chest's analog reads 0 (`ChestBlock.getContainer` answers null).
+    lidded_chests: Vec<StateId>,
     /// States that emit in **one** direction only, and which one.
     ///
     /// An observer powers only out of its back — `ObserverBlock.getSignal`
@@ -454,26 +467,370 @@ impl crate::fluid::FluidWorld for VanillaRules {
     }
 }
 
+/// A command-block command the engine can run, before state resolution.
+///
+/// The `setblock`/`fill` subset lithium's block-based tests drive machines
+/// with: relative (`~`/`~N`) coordinates only, one block state. `None` for
+/// anything else — the block will power on and run nothing, exactly like an
+/// unparseable command in game.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ParsedCommand {
+    /// `setblock ~dx ~dy ~dz <state>`.
+    SetBlock {
+        /// Offset from the command block.
+        offset: (i32, i32, i32),
+        /// The normalised state descriptor to intern and write.
+        state: String,
+    },
+    /// `fill ~.. ~.. ~.. ~.. ~.. ~.. <state>`.
+    Fill {
+        /// First corner offset.
+        a: (i32, i32, i32),
+        /// Second corner offset.
+        b: (i32, i32, i32),
+        /// The normalised state descriptor to intern and write.
+        state: String,
+    },
+    /// `summon <kind> ~dx ~dy ~dz [{nbt}]` — the corpus's three kinds. The
+    /// offsets are doubles from the command block's **centre**, which is
+    /// where a command block executes.
+    Summon {
+        /// Normalised entity id, e.g. `minecraft:tnt`.
+        kind: String,
+        /// Offset from the block centre.
+        offset: [f64; 3],
+        /// A `{fuse:N}` tag, when present.
+        fuse: Option<i32>,
+    },
+    /// `data merge entity @e[type=item,distance=..N,limit=1] {Item:{id: X}}`
+    /// — retype the nearest item entity. The one `/data` shape the corpus
+    /// uses; anything else `data`-flavoured stays unsupported.
+    RetypeNearestItem {
+        /// Selector radius in blocks.
+        radius: f64,
+        /// The item id to write.
+        item: String,
+    },
+}
+
+/// Parse one command-block `Command` string into the supported subset.
+/// `Block.getExplosionResistance` for every block an explosion has been
+/// allowed near — the `Blocks.java` registration literals. `None` means air
+/// or a fluid-free cell with nothing to resist **only for `minecraft:air`**;
+/// an unlisted block panics at the explosion site instead of guessing,
+/// because a wrong resistance silently flips a machine.
+pub fn blast_resistance(name: &str) -> Option<f32> {
+    let short = name.strip_prefix("minecraft:").unwrap_or(name);
+    Some(match short {
+        "air" | "cave_air" | "void_air" => return None,
+        "obsidian" | "crying_obsidian" => 1200.0,
+        "bedrock" | "command_block" | "chain_command_block" | "repeating_command_block"
+        | "test_block" | "barrier" => 3_600_000.0,
+        "water" | "lava" => 100.0,
+        "stone" | "smooth_stone" | "andesite" | "granite" | "diorite" | "stone_bricks"
+        | "cobblestone" | "furnace" | "dropper" | "quartz_block" => 6.0,
+        "dispenser" => 3.5,
+        "observer" | "sticky_piston" | "piston" | "piston_head" | "moving_piston" => 3.0,
+        "redstone_block" | "iron_block" | "gold_block" => 6.0,
+        "hopper" => 4.8,
+        "iron_trapdoor" => 5.0,
+        "barrel" | "chest" | "trapped_chest" | "crafting_table" => 2.5,
+        "target" | "dirt" | "sand" | "gravel" | "grass_block" | "stone_pressure_plate"
+        | "stone_button" => 0.5,
+        "slime_block" | "honey_block" | "redstone_wire" | "redstone_torch"
+        | "redstone_wall_torch" | "repeater" | "comparator" | "lever" | "tripwire"
+        | "tripwire_hook" | "tnt" => 0.0,
+        "rail" | "powered_rail" | "detector_rail" | "activator_rail" => 0.7,
+        "glass" | "tinted_glass" => 0.3,
+        n if n.ends_with("_wool") => 0.8,
+        n if n.ends_with("_concrete") => 1.8,
+        n if n.ends_with("_concrete_powder") => 0.5,
+        n if n.ends_with("_stained_glass") || n.ends_with("_glass_pane") => 0.3,
+        n if n.ends_with("_carpet") => 0.1,
+        n if n.ends_with("_terracotta") => 4.2,
+        n if n.ends_with("_planks") || n.ends_with("_log") => 3.0,
+        n if n.ends_with("_slab") || n.ends_with("_stairs") => 6.0,
+        other => panic!(
+            "an explosion reached minecraft:{other}, whose blast resistance this \
+             engine has not measured — add the Blocks.java literal before trusting \
+             this run"
+        ),
+    })
+}
+
+pub fn parse_command(text: &str) -> Option<ParsedCommand> {
+    let mut words = text.trim().trim_start_matches('/').split_whitespace();
+    match words.next()? {
+        "setblock" => {
+            let offset = (rel(words.next()?)?, rel(words.next()?)?, rel(words.next()?)?);
+            let state = normalize_command_state(words.next()?);
+            words.next().is_none().then_some(ParsedCommand::SetBlock { offset, state })
+        }
+        "fill" => {
+            let a = (rel(words.next()?)?, rel(words.next()?)?, rel(words.next()?)?);
+            let b = (rel(words.next()?)?, rel(words.next()?)?, rel(words.next()?)?);
+            let state = normalize_command_state(words.next()?);
+            words.next().is_none().then_some(ParsedCommand::Fill { a, b, state })
+        }
+        "summon" => {
+            let kind = words.next()?;
+            let kind = if kind.contains(':') {
+                kind.to_string()
+            } else {
+                format!("minecraft:{kind}")
+            };
+            let offset = [rel_f(words.next()?)?, rel_f(words.next()?)?, rel_f(words.next()?)?];
+            // Only kinds the engine can actually spawn parse; an unsupported
+            // kind leaves the command block programless — powering silently,
+            // exactly like every other unsupported command shape — which is
+            // what keeps spawn_almost_all_entities honest instead of
+            // panicking at runtime.
+            let spawnable = matches!(
+                kind.as_str(),
+                "minecraft:tnt"
+                    | "minecraft:minecart"
+                    | "minecraft:chest_minecart"
+                    | "minecraft:hopper_minecart"
+                    | "minecraft:tnt_minecart"
+            ) || (crate::entity::entity_dimensions(&kind).is_some()
+                && crate::entity::mob_health(&kind).is_some());
+            if !spawnable {
+                return None;
+            }
+            // The only NBT shapes the corpus writes: `{fuse:N}` and
+            // `{PersistenceRequired:1b}` — the latter suppresses despawning,
+            // which this engine never does anyway.
+            let rest: Vec<&str> = words.collect();
+            let rest = rest.join(" ");
+            let fuse = rest
+                .split("fuse:")
+                .nth(1)
+                .and_then(|tail| {
+                    tail.split(|c: char| !c.is_ascii_digit() && c != '-')
+                        .find(|s| !s.is_empty())
+                        .and_then(|n| n.parse::<i32>().ok())
+                });
+            Some(ParsedCommand::Summon { kind, offset, fuse })
+        }
+        "data" => {
+            // `data merge entity @e[type=item,distance=..N,limit=1] {Item:{id: "X"}}`.
+            let rest = text.trim().trim_start_matches('/');
+            if !rest.contains("merge entity @e[") || !rest.contains("type=item") {
+                return None;
+            }
+            let radius = rest
+                .split("distance=..")
+                .nth(1)
+                .and_then(|tail| {
+                    tail.split(|c: char| !c.is_ascii_digit() && c != '.')
+                        .next()
+                        .and_then(|n| n.parse::<f64>().ok())
+                })
+                .unwrap_or(2.0);
+            let item = rest.split("id:").nth(1)?;
+            let item = item.split('"').nth(1)?;
+            let item = if item.contains(':') {
+                item.to_string()
+            } else {
+                format!("minecraft:{item}")
+            };
+            Some(ParsedCommand::RetypeNearestItem { radius, item })
+        }
+        _ => None,
+    }
+}
+
+/// `~` / `~N`: a relative coordinate. Absolute coordinates are refused —
+/// a structure-local program must not write at world-absolute positions.
+/// `~` / `~N` with a fractional part — summon offsets are doubles measured
+/// from the block centre, and the corpus writes `~.5` and `~-3.5`.
+fn rel_f(token: &str) -> Option<f64> {
+    let rest = token.strip_prefix('~')?;
+    if rest.is_empty() {
+        Some(0.0)
+    } else {
+        // Rust's float grammar takes `.5` and `-3.5` both.
+        rest.parse().ok()
+    }
+}
+
+fn rel(token: &str) -> Option<i32> {
+    let rest = token.strip_prefix('~')?;
+    if rest.is_empty() {
+        Some(0)
+    } else {
+        rest.parse().ok()
+    }
+}
+
+/// Normalise a command's block token into a full engine descriptor.
+///
+/// Commands write states with vanilla's *default* properties filled in
+/// (`setblock ~ ~ ~ chest` places `chest[facing=north,type=single,...]`).
+/// The engine has no per-block default tables, so the blocks the corpus
+/// actually setblocks are listed here; anything else passes through as
+/// written and had better be a complete descriptor.
+fn normalize_command_state(token: &str) -> String {
+    let (name, explicit) = match token.split_once('[') {
+        Some((name, props)) => (name, props.trim_end_matches(']')),
+        None => (token, ""),
+    };
+    let name = if name.contains(':') { name.to_string() } else { format!("minecraft:{name}") };
+    let defaults: &[(&str, &str)] = match name.as_str() {
+        "minecraft:chest" | "minecraft:trapped_chest" => {
+            &[("facing", "north"), ("type", "single"), ("waterlogged", "false")]
+        }
+        "minecraft:hopper" => &[("enabled", "true"), ("facing", "down")],
+        "minecraft:redstone_wire" => &[
+            ("east", "none"),
+            ("north", "none"),
+            ("power", "0"),
+            ("south", "none"),
+            ("west", "none"),
+        ],
+        "minecraft:activator_rail" => {
+            &[("powered", "false"), ("shape", "north_south"), ("waterlogged", "false")]
+        }
+        _ => &[],
+    };
+    let mut props: Vec<(String, String)> = explicit
+        .split(',')
+        .filter(|p| !p.is_empty())
+        .filter_map(|p| p.split_once('=').map(|(k, v)| (k.to_string(), v.to_string())))
+        .collect();
+    for (key, value) in defaults {
+        if !props.iter().any(|(k, _)| k == key) {
+            props.push((key.to_string(), value.to_string()));
+        }
+    }
+    if props.is_empty() {
+        return name;
+    }
+    props.sort();
+    let joined: Vec<String> = props.into_iter().map(|(k, v)| format!("{k}={v}")).collect();
+    format!("{name}[{}]", joined.join(","))
+}
+
+/// An item's max stack size — `Item.getMaxStackSize`, the part comparators
+/// and hopper merges genuinely depend on. Shears in a barrel read fullness
+/// per *their* stack limit (1), not per 64; lithium's
+/// hopper_dc_interaction_change counts shears with a comparator and is off
+/// by a factor of 64 otherwise. Unlisted ids default to 64, which is right
+/// for ordinary blocks and materials.
+pub fn max_stack(id: &str) -> u8 {
+    let name = id.strip_prefix("minecraft:").unwrap_or(id);
+    // Unstackables: tools, weapons, armor, and the odd utility item.
+    const ONES: &[&str] = &[
+        "shears", "flint_and_steel", "fishing_rod", "bow", "crossbow", "trident", "shield",
+        "elytra", "saddle", "spyglass", "brush", "mace", "totem_of_undying",
+        "water_bucket", "lava_bucket", "milk_bucket", "powder_snow_bucket",
+    ];
+    const SIXTEENS: &[&str] = &["ender_pearl", "snowball", "egg", "sign", "bucket", "honey_bottle"];
+    if ONES.contains(&name)
+        || name.ends_with("_sword")
+        || name.ends_with("_pickaxe")
+        || name.ends_with("_axe")
+        || name.ends_with("_shovel")
+        || name.ends_with("_hoe")
+        || name.ends_with("_helmet")
+        || name.ends_with("_chestplate")
+        || name.ends_with("_leggings")
+        || name.ends_with("_boots")
+        || name.ends_with("_horse_armor")
+        || name.ends_with("_music_disc")
+        || name.starts_with("music_disc")
+    {
+        1
+    } else if SIXTEENS.contains(&name) || name.ends_with("_banner_pattern") {
+        16
+    } else {
+        64
+    }
+}
+
+/// `Direction.getClockWise`, horizontals only (vertical dirs pass through).
+fn clockwise(dir: Dir) -> Dir {
+    match dir {
+        Dir::North => Dir::East,
+        Dir::East => Dir::South,
+        Dir::South => Dir::West,
+        Dir::West => Dir::North,
+        other => other,
+    }
+}
+
 impl PowerSource for VanillaRules {
     fn analog_signal(
         &self,
         world: &World,
         inventories: &crate::inventory::InventoryMap,
+        carts: &[crate::minecart::MinecartState],
         pos: Pos,
     ) -> Option<u8> {
         // State-derived reads first: a composter's level is its signal.
         if let Some(level) = self.state_analog.get(&world.get(pos)) {
             return Some(*level);
         }
-        let slots = *self.containers.get(&world.get(pos))?;
-        // A container with no recorded contents is an empty container — its
-        // analog output is a real 0, not an absence.
-        Some(
-            inventories
-                .get(&pos)
-                .map_or(0, crate::inventory::Inventory::analog_signal)
-                .min(if slots == 0 { 0 } else { 15 }),
-        )
+        // `DetectorRailBlock.getAnalogOutputSignal`: a comparator behind a
+        // detector rail reads the fullness of the first container cart in
+        // the rail's search box — the cell, inset 0.2 on the horizontals and
+        // 0.8 tall (`getSearchShape`). A rail with no cart reads 0.
+        if self.detector_rails.contains(&world.get(pos)) {
+            let (bmin, bmax) = (
+                [f64::from(pos.x) + 0.2, f64::from(pos.y), f64::from(pos.z) + 0.2],
+                [f64::from(pos.x) + 0.8, f64::from(pos.y) + 0.8, f64::from(pos.z) + 0.8],
+            );
+            let cart = carts.iter().find(|cart| {
+                if cart.removed {
+                    return false;
+                }
+                let Some(_) = cart.inventory.as_ref() else { return false };
+                let (emin, emax) = crate::minecart::cart_aabb(cart.pos);
+                (0..3).all(|axis| emin[axis] < bmax[axis] && emax[axis] > bmin[axis])
+            });
+            return Some(cart.map_or(0, |cart| {
+                let inv = cart.inventory.as_ref().expect("filtered above");
+                crate::inventory::analog_from(
+                    inv.stacks
+                        .iter()
+                        .map(|stack| f32::from(stack.count) / f32::from(max_stack(&stack.id)))
+                        .sum(),
+                    inv.slots,
+                )
+            }));
+        }
+        // `ChestBlock.getAnalogOutputSignal` goes through `getContainer`,
+        // and a *blocked* chest — a solid block sitting on it (or vanilla's
+        // cat, unmodelled) — answers null there: the comparator reads 0 from
+        // a chest whose lid cannot open, whatever the slots hold.
+        // lithium's comparator_update_collection turns exactly this on and
+        // off by pistoning the concrete above its chests.
+        if self.lidded_chests.contains(&world.get(pos))
+            && self.is_solid_at(world, Pos::new(pos.x, pos.y + 1, pos.z))
+        {
+            return Some(0);
+        }
+        // Segments, so a double chest reads as its combined 54 slots. The
+        // *block's* slot count is authoritative: an inventory materialised by
+        // a runtime insertion (a hopper pushing into a container the save
+        // left empty) is stored with `slots: 0`, and reading fullness against
+        // that would call every such container empty forever — which parked
+        // lithium's hopper_transfer_speed item at its relay dropper. An
+        // absent inventory is an empty container: a real 0, not an absence.
+        let segments = self.container_segments(world, pos)?;
+        let slots: u32 = segments.iter().map(|(_, slots)| *slots).sum();
+        let fullness: f32 = segments
+            .iter()
+            .map(|(pos, _)| {
+                inventories.get(pos).map_or(0.0, |inv| {
+                    inv.stacks
+                        .iter()
+                        .map(|stack| f32::from(stack.count) / f32::from(max_stack(&stack.id)))
+                        .sum::<f32>()
+                })
+            })
+            .sum();
+        Some(crate::inventory::analog_from(fullness, slots))
     }
 
     fn is_conductor(&self, world: &World, pos: Pos) -> bool {
@@ -492,8 +849,36 @@ impl PowerSource for VanillaRules {
         self.containers.get(&world.get(pos)).copied()
     }
 
+    fn container_segments(&self, world: &World, pos: Pos) -> Option<Vec<(Pos, u32)>> {
+        let slots = self.container_slots_at(world, pos)?;
+        if let Some((first, dir)) = self.chest_halves.get(&world.get(pos)) {
+            let partner = pos.offset(*dir);
+            if let Some((partner_first, partner_dir)) = self.chest_halves.get(&world.get(partner))
+            {
+                // A real pair is one of each half, each pointing at the other.
+                if *partner_first != *first && partner.offset(*partner_dir) == pos {
+                    let partner_slots = self.container_slots_at(world, partner).unwrap_or(slots);
+                    return Some(if *first {
+                        vec![(pos, slots), (partner, partner_slots)]
+                    } else {
+                        vec![(partner, partner_slots), (pos, slots)]
+                    });
+                }
+            }
+        }
+        Some(vec![(pos, slots)])
+    }
+
     fn hopper_at(&self, world: &World, pos: Pos) -> bool {
         self.hoppers.contains(&world.get(pos))
+    }
+
+    fn max_stack_of(&self, id: &str) -> u8 {
+        max_stack(id)
+    }
+
+    fn rail_support_at(&self, world: &World, pos: Pos) -> bool {
+        self.sturdy_up.contains(&world.get(pos))
     }
 
     fn is_solid_at(&self, world: &World, pos: Pos) -> bool {
@@ -609,7 +994,6 @@ const INERT: &[&str] = &[
     "minecraft:redstone_block",
     "minecraft:soul_sand",
     "minecraft:magma_block",
-    "minecraft:ice",
     "minecraft:packed_ice",
     "minecraft:blue_ice",
     "minecraft:cobweb",
@@ -760,6 +1144,17 @@ pub fn entity_table() -> EntityTable {
         motion: Frozen,
         seats: &[],
     });
+    // `EntityType.WITCH` is `sized(0.6F, 1.95F)` — the villager's box. The
+    // corpus summons one as an explosion's knockback target; the *type* still
+    // registers Frozen, and the summoned instance carries ballistic physics.
+    table.add(EntityKind {
+        name: "minecraft:witch",
+        width: 0.6_f32 as f64,
+        height: 1.95_f32 as f64,
+        obstructs_a_cart: true,
+        motion: Frozen,
+        seats: &[],
+    });
     // The record 3x3 door's two riders. Registry says `sized(0.6F, 1.8F)`, and
     // `blaze_reach.entities.log` walks a blaze across a weighted plate's touch
     // box at twelve offsets and agrees at all twelve: clear at 1.76 and 11.24,
@@ -870,10 +1265,29 @@ pub fn register_all_at(
                 rules.slime.push(*id);
             }
             "minecraft:honey_block" => rules.honey.push(*id),
+            "minecraft:detector_rail" => rules.detector_rails.push(*id),
             n if container_slots(n).is_some() => {
                 rules.containers.insert(*id, container_slots(n).unwrap());
                 if n == "minecraft:hopper" {
                     rules.hoppers.push(*id);
+                }
+                if matches!(n, "minecraft:chest" | "minecraft:trapped_chest") {
+                    rules.lidded_chests.push(*id);
+                }
+                if n == "minecraft:chest" || n == "minecraft:trapped_chest" {
+                    if let (Some(half), Some(facing)) =
+                        (descriptor.get("type"), descriptor.facing())
+                    {
+                        if half != "single" {
+                            // `ChestBlock.getConnectedDirection`.
+                            let partner = if half == "left" {
+                                clockwise(facing)
+                            } else {
+                                clockwise(facing).opposite()
+                            };
+                            rules.chest_halves.insert(*id, (half == "right", partner));
+                        }
+                    }
                 }
             }
             _ => {}
@@ -996,6 +1410,12 @@ pub fn register_all_at(
                 // `DetectorRailBlock.isSignalSource` is true whatever POWERED
                 // says, so dust turns to face one even while it is dark.
                 | "minecraft:detector_rail"
+                // `TestBlock.isSignalSource` is true in every mode — an
+                // accept block only listens, but dust still turns to face it,
+                // and lithium's lava machine relies on exactly that: a dust L
+                // that reshaped away from the accept never delivers the
+                // plate's pulse.
+                | "minecraft:test_block"
         ) || is_button_or_plate(&descriptor.name)
         {
             rules.signal_sources.push(*id);
@@ -1298,6 +1718,28 @@ pub fn register_all_at(
                     }),
                 );
             }
+            "minecraft:command_block" => {
+                table.register(*id, Box::new(CommandBlock { power: rules.clone() }));
+            }
+            "minecraft:ice" => {
+                let Some(water) = registry.get("minecraft:water[level=0]") else { continue };
+                table.register(*id, Box::new(Ice { water }));
+            }
+            "minecraft:test_block" => {
+                // A gametest structure's own assertion carrier. `accept`
+                // latches to an engine-internal `fired=true` variant on its
+                // first neighbour signal — see [`TestAccept`]. Other modes
+                // are inert here: the start pulse is a harness's job, and
+                // log/fail assert nothing an engine must model.
+                if descriptor.get("mode") == Some("accept") && !descriptor.flag("fired") {
+                    let Some(fired) = registry.get(&descriptor.with("fired", "true")) else {
+                        continue;
+                    };
+                    table.register(*id, Box::new(TestAccept { fired, power: rules.clone() }));
+                } else {
+                    table.register(*id, Box::new(Inert::new("test_block")));
+                }
+            }
             n if n.contains("copper_bulb") => {
                 let Some(states) = bulb_states(registry, descriptor) else { continue };
                 table.register(
@@ -1577,9 +2019,10 @@ pub fn register_all_at(
                 );
             }
             "minecraft:rail" => {
-                // Cart physics reads rails through the rail tables; a plain
-                // rail has no redstone behaviour of its own.
-                table.register(*id, Box::new(Inert::new("rail")));
+                // Cart physics reads rails through the rail tables; the only
+                // block behaviour a plain rail has is popping off a vanished
+                // support.
+                table.register(*id, Box::new(crate::components::PlainRail { power: rules.clone() }));
             }
             "minecraft:detector_rail" => {
                 let Some(states) = powered_pair(registry, descriptor) else { continue };
@@ -1588,6 +2031,7 @@ pub fn register_all_at(
                     Box::new(crate::components::DetectorRail {
                         powered: descriptor.flag("powered"),
                         states,
+                        power: rules.clone(),
                     }),
                 );
             }
@@ -1666,8 +2110,15 @@ pub fn register_all_at(
             }
             // Tripwire is pressed by entities intersecting it. An unpressed
             // string in an entity-free world stays unpressed.
-            "minecraft:tripwire" if !descriptor.flag("powered") => {
-                table.register(*id, Box::new(Inert::new("tripwire")));
+            "minecraft:tripwire" => {
+                let Some(states) = powered_pair(registry, descriptor) else { continue };
+                table.register(
+                    *id,
+                    Box::new(crate::components::TripWire {
+                        powered: descriptor.flag("powered"),
+                        states,
+                    }),
+                );
             }
             // A weighted plate's `power` is the number of entities standing on
             // it — every entity type, items included
@@ -1790,7 +2241,9 @@ fn is_conductor(descriptor: &Descriptor) -> bool {
 /// not a full cube; a retracted one is.
 fn is_full_cube(descriptor: &Descriptor) -> bool {
     match descriptor.name.as_str() {
-        "minecraft:air" | "minecraft:water" | "minecraft:bubble_column" => false,
+        "minecraft:air" | "minecraft:water" | "minecraft:lava" | "minecraft:bubble_column" => {
+            false
+        }
         // Soul sand's collision column tops at 14/16: not a full cube, so it
         // neither conducts nor blocks hopper suction (isCollisionShapeFullBlock).
         "minecraft:soul_sand" | "minecraft:cobweb" => false,
@@ -1895,6 +2348,32 @@ pub fn physics_tables(registry: &StateRegistry) -> (Vec<bool>, Vec<f32>, Vec<f32
                     "minecraft:piston" | "minecraft:sticky_piston" => {
                         (true, friction, 1.0, false)
                     }
+                    // A carpet is a 1/16-high surface an item rests on —
+                    // lithium's hopper_item_datacommand parks its test item
+                    // on one, inside a /data selector's radius. Falling
+                    // through put the item out of range and out of the
+                    // hopper's suck column both.
+                    n if n.ends_with("_carpet") || n == "minecraft:moss_carpet" => {
+                        (true, friction, 0.0625, false)
+                    }
+                    // A *closed, top-half* trapdoor is a surface flush with
+                    // the cell's top — lithium's interaction_change_v2 lands
+                    // a chest cart on one. Open or bottom-half trapdoors stay
+                    // pass-through: their real shapes are unmeasured here.
+                    n if n.ends_with("_trapdoor")
+                        && d.get("half") == Some("top")
+                        && d.get("open") == Some("false") =>
+                    {
+                        (true, friction, 1.0, false)
+                    }
+                    // A hopper is something to rest on, at the funnel floor —
+                    // 11/16, `HopperBlock`'s interaction bowl. Lithium's
+                    // hopper_interaction_change drops a chest cart onto one
+                    // when the rail under it pops; falling through the cell
+                    // put the cart a block below both hoppers' reach. An item
+                    // that lands here sits exactly at the suck column's floor,
+                    // which is the same 0.6875 — collected, as vanilla does.
+                    "minecraft:hopper" => (true, friction, 0.6875, false),
                     _ => (is_full_cube(d), friction, 1.0, false),
                 }
             }
@@ -1939,6 +2418,27 @@ pub fn fluid_tables(
         bubble_kinds.push(bubble);
     }
     (water_kinds, bubble_kinds)
+}
+
+/// Lava per state, indexed by `StateId` — the lava analog of
+/// [`fluid_tables`], separate because most wiring recipes never need it.
+/// Lava reuses the water-kind vocabulary: source / flowing(n) / falling is
+/// a property of the level, not the material.
+pub fn lava_table(registry: &StateRegistry) -> Vec<Option<crate::fluid::WaterKind>> {
+    let mut lava_kinds = Vec::with_capacity(registry.len());
+    for index in 0..registry.len() {
+        let descriptor = registry
+            .descriptor(StateId(index as u16))
+            .map(Descriptor::parse);
+        lava_kinds.push(match &descriptor {
+            Some(d) if d.name == "minecraft:lava" => {
+                let level = d.get("level").and_then(|l| l.parse().ok()).unwrap_or(0);
+                Some(crate::fluid::WaterKind::from_level(level))
+            }
+            _ => None,
+        });
+    }
+    lava_kinds
 }
 
 /// Whether a block is a button or a pressure plate of any material. Both are
@@ -2457,7 +2957,8 @@ pub fn intern_companions(registry: &mut StateRegistry) {
                 }
                 all
             }
-            "minecraft:comparator" | "minecraft:observer" | "minecraft:lever" => {
+            "minecraft:comparator" | "minecraft:observer" | "minecraft:lever"
+            | "minecraft:tripwire" => {
                 vec![descriptor.with("powered", "false"), descriptor.with("powered", "true")]
             }
             "minecraft:redstone_torch" | "minecraft:redstone_wall_torch" => {
@@ -2509,6 +3010,13 @@ pub fn intern_companions(registry: &mut StateRegistry) {
             }
             "minecraft:redstone_lamp" => {
                 vec![descriptor.with("lit", "false"), descriptor.with("lit", "true")]
+            }
+            // Melting needs somewhere to melt to.
+            "minecraft:ice" => vec!["minecraft:water[level=0]".to_string()],
+            // An accept test_block's latched variant must exist before its
+            // behaviour can bind to it — see `TestAccept`.
+            "minecraft:test_block" if descriptor.get("mode") == Some("accept") => {
+                vec![descriptor.with("fired", "false"), descriptor.with("fired", "true")]
             }
             // A bulb's `lit` survives losing power, so any of the four
             // `(lit, powered)` pairings is reachable and all four must exist

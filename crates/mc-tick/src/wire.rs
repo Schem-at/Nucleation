@@ -321,6 +321,16 @@ pub struct Wire<R: WireWorld + Clone> {
 }
 
 impl<R: WireWorld + Clone + 'static> BlockBehaviour for Wire<R> {
+    /// `RedStoneWireBlock.onRemove`: with the wire gone, update the
+    /// neighbours of each of its six neighbours — the two-step sweep that
+    /// tells a torch mounted on the wire's target block that its support
+    /// went dark.
+    fn on_removed(&self, ctx: &mut TickCtx<'_>, pos: Pos) {
+        for dir in crate::pos::ALL_DIRS {
+            ctx.update_neighbors_at(pos.offset(dir));
+        }
+    }
+
     /// `RedStoneWireBlock.updateIndirectNeighbourShapes`: for every horizontal
     /// side this wire is connected on whose neighbour is *not itself wire*,
     /// shape-update the wire directly below that neighbour and the wire
@@ -392,8 +402,14 @@ impl<R: WireWorld + Clone + 'static> BlockBehaviour for Wire<R> {
     /// which preserves an `up` that a full recompute would flatten. Anything
     /// else recomputes from scratch, keeping only the power level.
     ///
-    /// From below vanilla asks whether the dust can still survive; this engine
-    /// does not break blocks, so that case is left alone.
+    /// From below vanilla asks whether the dust can still survive
+    /// (`canSurviveOn`) and pops it when it cannot. The one measured pop is
+    /// dust on a **test block** under a *plain* structure placement
+    /// (`cuc_placed.txt`, the oracle's dump) — but the gametest framework
+    /// places with `knownShape`, no update passes run, and lithium's
+    /// machines bank on that dust surviving: five of them hang their start
+    /// wiring on it. The engine models the framework's placement, so no pop
+    /// here.
     fn on_shape_update(&self, ctx: &mut TickCtx<'_>, pos: Pos, from: Dir) {
         if from == Dir::Down {
             return;
