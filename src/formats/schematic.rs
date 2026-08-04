@@ -436,24 +436,35 @@ pub fn from_schematic(data: &[u8]) -> Result<UniversalSchematic> {
 
     let mut definition_regions = HashMap::new();
 
-    let name = if let Ok(metadata) = schem.get::<_, &NbtCompound>("Metadata") {
+    // The full Metadata compound, not just Name: our own writer emits Author
+    // and Description there (and the Sponge v2/v3 spec puts them there), so
+    // dropping them on read made `.litematic -> .schem` lose attribution.
+    let mut file_metadata = crate::metadata::Metadata::default();
+    if let Ok(metadata) = schem.get::<_, &NbtCompound>("Metadata") {
         if let Ok(json) = metadata.get::<_, &str>("NucleationDefinitions") {
             if let Ok(regions) = serde_json::from_str(json) {
                 definition_regions = regions;
             }
         }
-        metadata.get::<_, &str>("Name").ok().map(|s| s.to_string())
-    } else {
-        None
+        if let Ok(parsed) = crate::metadata::Metadata::from_nbt(metadata) {
+            file_metadata = parsed;
+        }
     }
-    .unwrap_or_else(|| "Unnamed".to_string());
+    let name = file_metadata
+        .name
+        .clone()
+        .unwrap_or_else(|| "Unnamed".to_string());
 
     let mc_version = schem.get::<_, i32>("DataVersion").ok();
 
-    let mut schematic = UniversalSchematic::new(name);
+    let mut schematic = UniversalSchematic::new(name.clone());
+    schematic.metadata = file_metadata;
+    schematic.metadata.name = Some(name);
     schematic.definition_regions = definition_regions;
     schematic.metadata.embedded_test = embedded_test;
-    schematic.metadata.mc_version = mc_version;
+    // The root DataVersion is authoritative when present; a Metadata-carried
+    // mc_version (our own writer emits one) fills in otherwise.
+    schematic.metadata.mc_version = mc_version.or(schematic.metadata.mc_version);
     // The Sponge `DataVersion` is the file's source version for conversion.
     schematic.metadata.source_data_version = mc_version;
 
@@ -918,6 +929,43 @@ mod tests {
             let back = from_schematic(&plain).expect("reads");
             assert_eq!(back.metadata.embedded_test, None, "{version:?}");
         }
+    }
+
+    /// Author and Description must survive our own `.schem` round trip.
+    ///
+    /// The writer always emitted `Metadata.{Name, Author, Description}`; the
+    /// reader used to take only `Name` back, so `.litematic -> .schem`
+    /// conversion silently dropped attribution (issue #7).
+    #[test]
+    fn schem_round_trip_keeps_author_and_description() {
+        let mut schematic = UniversalSchematic::new("demo".to_string());
+        schematic.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+        schematic.metadata.author = Some("Notch".to_string());
+        schematic.metadata.description = Some("desc-marker".to_string());
+        schematic.metadata.created = Some(1_700_000_000_000);
+
+        let bytes = to_schematic(&schematic).expect("write .schem");
+        let back = from_schematic(&bytes).expect("read .schem");
+
+        assert_eq!(back.metadata.name.as_deref(), Some("demo"));
+        assert_eq!(back.metadata.author.as_deref(), Some("Notch"));
+        assert_eq!(back.metadata.description.as_deref(), Some("desc-marker"));
+        assert_eq!(back.metadata.created, Some(1_700_000_000_000));
+    }
+
+    /// A `.schem` with no attribution still reads, with the fields absent
+    /// rather than invented.
+    #[test]
+    fn schem_without_attribution_reads_with_absent_fields() {
+        let mut schematic = UniversalSchematic::new("plain".to_string());
+        schematic.set_block(0, 0, 0, &BlockState::new("minecraft:stone".to_string()));
+
+        let bytes = to_schematic(&schematic).expect("write .schem");
+        let back = from_schematic(&bytes).expect("read .schem");
+
+        assert_eq!(back.metadata.name.as_deref(), Some("plain"));
+        assert_eq!(back.metadata.author, None);
+        assert_eq!(back.metadata.description, None);
     }
 
     #[test]

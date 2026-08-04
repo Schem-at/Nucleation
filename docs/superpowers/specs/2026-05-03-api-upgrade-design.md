@@ -1,6 +1,11 @@
 # Nucleation API Upgrade — Design Spec
 
-**Status:** Approved 2026-05-03
+**Status:** SUPERSEDED — never shipped. This spec targets the PyO3/maturin
+binding architecture, which was replaced wholesale by the generated Diplomat
+surface (`src/bridge/`, one API for Python/JS/PHP/C/Kotlin). The polished
+wrapper described below does not exist in any published artifact; the shipped
+surface is documented in `docs/api-reference-python.md`. Kept as design
+history. (See issue #3.)
 **Source proposal:** `api_upgrade.md` (Python redesign)
 **Scope expansion:** Apply analogous polish to JS/WASM and minimal-but-honest convenience to FFI.
 

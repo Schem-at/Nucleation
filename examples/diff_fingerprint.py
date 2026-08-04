@@ -1,34 +1,36 @@
 #!/usr/bin/env python3
 """End-to-end demo of the diff + fingerprint engines from Python.
 
-Build the extension first:
-    maturin develop --features python,meshing
+Uses the published wheel's real surface (`pip install nucleation`):
+static `Fingerprint.*` / `Diff.*` entry points taking schematics as
+arguments — see docs/api-reference-python.md.
 
 Run:
     python examples/diff_fingerprint.py [build_a] [build_b]
 
 With one path, B is derived from A by adding a few blocks (so the diff is
 non-trivial). With two paths, A and B are diffed directly.
-
-The glowing-overlay GLB step only runs if PACK points at a resource pack zip:
-    PACK=render_work/pack.zip python examples/diff_fingerprint.py
 """
-import os
+import json
 import sys
 
-from nucleation import Schematic
+from nucleation import Diff, Fingerprint, Schematic
 
-PRESET_FP = "structural"  # rotation/material-agnostic structural equivalence
-PRESET_DIFF = "exact"     # material- + orientation-sensitive edit distance
+# `shape` is orientation-blind but still an identity on content: one added
+# block makes a build unique. `structural` is deliberately coarser — it sees
+# only solid massing (glass and redstone are invisible to it), so it is NOT
+# usable for deduplication. See docs/features/analysis.md for the preset table.
+PRESET_FP = "shape"
+PRESET_DIFF = "exact"  # material- + orientation-sensitive edit distance
 
 
 def load_pair(argv):
     path_a = argv[1] if len(argv) > 1 else "tests/fixtures/4bit_adder.litematic"
-    a = Schematic.open(path_a)
+    a = Schematic.load_from_file(path_a)
     if len(argv) > 2:
-        return a, Schematic.open(argv[2]), argv[2]
+        return a, Schematic.load_from_file(argv[2]), argv[2]
     # Derive B from A: same build plus three glass blocks (real "added" cells).
-    b = Schematic.open(path_a)
+    b = Schematic.load_from_file(path_a)
     for k in range(3):
         b.set_block(-2 - k, 0, 0, "minecraft:glass")
     return a, b, f"{path_a} + 3 glass"
@@ -39,46 +41,26 @@ def main():
     print(f"A = {sys.argv[1] if len(sys.argv) > 1 else 'tests/fixtures/4bit_adder.litematic'}")
     print(f"B = {b_label}\n")
 
-    # ── Fingerprint: canonical hash + fuzzy/dedup helpers ──
-    fa = a.fingerprint(PRESET_FP)
-    fb = b.fingerprint(PRESET_FP)
-    print(f"fingerprint A ({PRESET_FP}): {fa}")
-    print(f"fingerprint B ({PRESET_FP}): {fb}")
-    print(f"is_duplicate_of           : {a.is_duplicate_of(b, PRESET_FP)}")
-    print(f"footprint_distance        : {a.footprint_distance(b, PRESET_FP):.4f}")
-    print(f"signature A               : {a.signature(PRESET_FP)[:80]}…\n")
+    # ── Fingerprint: canonical digest + fuzzy/dedup helpers ──
+    print(f"fingerprint A ({PRESET_FP}): {Fingerprint.compute(a, PRESET_FP)}")
+    print(f"fingerprint B ({PRESET_FP}): {Fingerprint.compute(b, PRESET_FP)}")
+    print(f"is_duplicate              : {Fingerprint.is_duplicate(a, b, PRESET_FP)}")
+    print(f"footprint_distance        : {Fingerprint.footprint_distance(b, a, PRESET_FP):.4f}")
+    print(f"signature A               : {Fingerprint.signature_json(a, PRESET_FP)[:80]}…\n")
 
     # ── Diff: structural edit distance + projections ──
-    d = a.diff(b, PRESET_DIFF)
-    print(f"diff ({PRESET_DIFF}): distance={d.distance}  support={d.support:.3f}")
-    summary = d.summary_json()
-    print(f"summary_json: {summary}\n")
+    d = Diff.compute(a, b, PRESET_DIFF)
+    print(f"diff ({PRESET_DIFF}): distance={d.distance()}  support={d.support():.3f}")
+    print(f"summary_json: {json.dumps(json.loads(d.summary_json()))[:200]}\n")
 
     # Lossless round-trip: to_json() reconstructs a full Diff.
-    from nucleation import Diff
     d2 = Diff.from_json(d.to_json())
-    assert d2.distance == d.distance, "round-trip preserved distance"
-    print(f"to_json round-trip OK (distance still {d2.distance})")
+    assert d2.distance() == d.distance(), "round-trip preserved distance"
+    print(f"to_json round-trip OK (distance still {d2.distance()})")
 
     # Projections are schematics you can save / render.
-    d.markers().save("diff_markers.schem")
+    d.markers().save_to_file("diff_markers.schem")
     print("wrote diff_markers.schem (added=lime, removed=red, changed=yellow, swapped=blue)")
-
-    # ── Glowing overlay GLB (needs meshing + a resource pack) ──
-    pack_path = os.environ.get("PACK")
-    if pack_path:
-        try:
-            from nucleation import ResourcePack
-            pack = ResourcePack.from_file(pack_path)
-            after_glb = b.to_mesh(pack).glb_data  # property, returns bytes
-            overlay = d.to_overlay_glb(bytes(after_glb))
-            with open("diff_overlay.glb", "wb") as f:
-                f.write(overlay)
-            print(f"wrote diff_overlay.glb ({len(overlay)} bytes, glowing markers on the after-build)")
-        except Exception as e:  # meshing feature off, or pack missing
-            print(f"overlay skipped: {e}")
-    else:
-        print("overlay skipped: set PACK=<resource pack zip> to render diff_overlay.glb")
 
 
 if __name__ == "__main__":
