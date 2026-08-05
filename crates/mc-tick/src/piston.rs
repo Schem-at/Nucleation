@@ -95,6 +95,22 @@ pub trait Movability: Send + Sync {
         world.get(pos) == StateId::AIR
     }
 
+    /// `PushReaction.PUSH_ONLY`: shoved willingly, never dragged back.
+    ///
+    /// `isPushable` answers `direction == moveDirection` for these, and the two
+    /// differ on every stroke that is not a straight shove — a sticky piston's
+    /// retract passes `(dir.getOpposite(), false, dir)`. So glazed terracotta
+    /// rides a push and refuses a pull, including the sideways drag a slime
+    /// block would otherwise give it.
+    ///
+    /// Missing this cost a whole machine: BB's retract collected a glazed
+    /// terracotta and the observer and slime stuck behind it, went three blocks
+    /// over [`MAX_PUSH_DEPTH`], and cancelled a twelve-block pull that vanilla
+    /// makes — which stalled a flying machine forty ticks later.
+    fn push_only(&self, _world: &World, _pos: Pos) -> bool {
+        false
+    }
+
     /// The sticky kind of the block at `pos`, if it is one.
     fn sticky(&self, _world: &World, _pos: Pos) -> Option<Sticky> {
         None
@@ -201,11 +217,25 @@ fn add_block_line(
     piston: Pos,
     push_dir: Dir,
     origin: Pos,
-    _face: Dir,
+    face: Dir,
     to_push: &mut Vec<Pos>,
     to_destroy: &mut Vec<Pos>,
 ) -> bool {
     if movability.is_empty(world, origin) {
+        return true;
+    }
+    // `isPushable(state, level, pos, this.pushDirection, false, **face**)` — the
+    // last argument is the line's own direction, not the stroke's, and
+    // `PushReaction.PUSH_ONLY` answers `direction == moveDirection`. So glazed
+    // terracotta joins the line the piston shoves head-on and refuses every
+    // sideways one: a slime block does not drag it along.
+    //
+    // Skipped like an unpushable block rather than failing the resolve —
+    // `addBlockLine` returns true here, it does not abort. Collecting it
+    // instead dragged a terracotta and the four slabs stuck behind it into
+    // BB's push, which then ran into a wall twelve blocks out and refused a
+    // move the game makes.
+    if face != push_dir && movability.push_only(world, origin) {
         return true;
     }
     // `isPushable(..., allowDestroy = false, ...)`, which is what `addBlockLine`
@@ -268,9 +298,25 @@ fn add_block_line(
             return true;
         }
         if movability.is_empty(world, next) {
+            if std::env::var_os("MC_TICK_TRACE_LINE").is_some() {
+                eprintln!(
+                    "       line from {:?} dir={push_dir:?} stopped: {:?} is empty ({} collected)",
+                    (origin.x, origin.y, origin.z),
+                    (next.x, next.y, next.z),
+                    to_push.len()
+                );
+            }
             return true;
         }
         if !movability.is_movable(world, next) || next == piston {
+            if std::env::var_os("MC_TICK_TRACE_LINE").is_some() {
+                eprintln!(
+                    "       line from {:?} dir={push_dir:?} FAILED at {:?}: immovable ({} collected)",
+                    (origin.x, origin.y, origin.z),
+                    (next.x, next.y, next.z),
+                    to_push.len()
+                );
+            }
             return false;
         }
         // `MC_TICK_TRACE_REACH=1` — every breakable block a push line walks into.
@@ -391,6 +437,14 @@ pub fn resolve_pull(world: &World, movability: &dyn Movability, piston: Pos, fac
         &mut to_push,
         &mut to_destroy,
     ) {
+        if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
+            eprintln!(
+                "       pull-fail line {:?} had {} collected: {:?}",
+                (piston.x, piston.y, piston.z),
+                to_push.len(),
+                to_push.iter().map(|p| (p.x, p.y, p.z)).collect::<Vec<_>>()
+            );
+        }
         return failed;
     }
     let mut index = 0;
@@ -407,6 +461,15 @@ pub fn resolve_pull(world: &World, movability: &dyn Movability, piston: Pos, fac
                 &mut to_destroy,
             )
         {
+            if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
+                eprintln!(
+                    "       pull-fail branch {:?} at {:?}, {} collected: {:?}",
+                    (piston.x, piston.y, piston.z),
+                    (pos.x, pos.y, pos.z),
+                    to_push.len(),
+                    to_push.iter().map(|p| (p.x, p.y, p.z)).collect::<Vec<_>>()
+                );
+            }
             return failed;
         }
         index += 1;
@@ -1042,6 +1105,26 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                         // short-pulse drop.
                         let landed = ctx.moves.remove(index);
                         ctx.set(target, landed.state);
+                        // `finalTick` opens with `updateFromNeighbourShapes` on
+                        // the state it is about to land — the same call the
+                        // ordinary two-tick landing makes. Skipping it here left
+                        // a dropped **observer** deaf to the world it woke up
+                        // in: `ObserverBlock.updateShape` is what calls
+                        // `startSignal`, and it fires for any observer that
+                        // lands unpowered, so a pushed observer pulses two ticks
+                        // after it settles. Without it the observer this piston
+                        // drops never signals, and a piston diagonal to it —
+                        // quasi-powered through the cell above — never fires.
+                        //
+                        // Drained before `onPlace`, not merely queued. The order
+                        // is load-bearing in the other direction too: an
+                        // observer dropped mid-pulse still carries `powered`
+                        // when the shape update reaches it, so it does *not*
+                        // re-schedule, and only then does `onPlace` clear the
+                        // flag. Clearing first would start a pulse vanilla never
+                        // starts.
+                        ctx.update_self_shapes(target);
+                        ctx.drain();
                         // `finalTick` lands through `setBlock`, and `onPlace`
                         // runs for the landed block exactly as for an ordinary
                         // landing. A **piston** dropped in place re-checks its
@@ -1066,6 +1149,31 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                         // a pushed one does. The return stroke matters as much as
                         // the push for doors.
                         let plan = resolve_pull(ctx.world, &self.movability, pos, self.facing);
+                        // The retract stroke gets the same trace the push does.
+                        // Without it a pull that silently resolves to nothing is
+                        // invisible, which is exactly how a failed one hid.
+                        if std::env::var_os("MC_TICK_TRACE_EVENTS").is_some() {
+                            let names: Vec<String> = plan
+                                .to_push
+                                .iter()
+                                .map(|p| {
+                                    let d = ctx
+                                        .states
+                                        .descriptor(ctx.world.get(*p))
+                                        .unwrap_or_default()
+                                        .to_string();
+                                    format!("{:?}{}", (p.x, p.y, p.z), d.trim_start_matches("minecraft:"))
+                                })
+                                .collect();
+                            eprintln!(
+                                "[t{}] pull {:?} possible={} n={} [{}]",
+                                ctx.tick,
+                                (pos.x, pos.y, pos.z),
+                                plan.possible,
+                                plan.to_push.len(),
+                                names.join(", ")
+                            );
+                        }
                         if plan.possible {
                             let carried: Vec<(Pos, StateId)> = plan
                                 .to_push
@@ -1076,7 +1184,17 @@ impl<P: PowerSource, M: Movability> BlockBehaviour for Piston<P, M> {
                                 .iter()
                                 .map(|(from, _)| from.offset(back))
                                 .collect();
-                            for (from, state) in &carried {
+                            // Backwards, exactly as the extension path walks it.
+                            // `moveBlocks` is one method for both strokes and
+                            // always runs `for (i = toPush.size() - 1; i >= 0;
+                            // --i)`, so the far end of the structure is written —
+                            // and its block entity created — first. Walking a
+                            // retract forwards instead reversed the order its
+                            // blocks land in, and landing order is the order
+                            // they book their scheduled ticks in: BB's two
+                            // observers then raced in the wrong direction and a
+                            // piston extended that vanilla leaves retracted.
+                            for (from, state) in carried.iter().rev() {
                                 let to = from.offset(back);
                                 // Flag 324, the same as a push: the placeholder
                                 // write propagates shape, and does so before the

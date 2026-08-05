@@ -201,6 +201,9 @@ pub struct VanillaRules {
     /// `(wire state, power)` -> the same shape at that power.
     wire_siblings: HashMap<(StateId, u8), StateId>,
     immovable: Vec<StateId>,
+    /// `PushReaction.PUSH_ONLY` — shoved, never dragged back. See
+    /// [`crate::piston::Movability::push_only`].
+    push_only: Vec<StateId>,
     slime: Vec<StateId>,
     honey: Vec<StateId>,
     diodes: HashMap<StateId, Dir>,
@@ -927,6 +930,9 @@ impl Movability for VanillaRules {
         let state = world.get(pos);
         state != StateId::AIR && !self.immovable.contains(&state)
     }
+    fn push_only(&self, world: &World, pos: Pos) -> bool {
+        self.push_only.contains(&world.get(pos))
+    }
     fn sticky(&self, world: &World, pos: Pos) -> Option<Sticky> {
         let state = world.get(pos);
         if self.slime.contains(&state) {
@@ -1294,6 +1300,14 @@ pub fn register_all_at(
         }
         if IMMOVABLE.contains(&descriptor.name.as_str()) || is_shulker_box(&descriptor.name) {
             rules.immovable.push(*id);
+        }
+        // Glazed terracotta is the whole of `PushReaction.PUSH_ONLY` in the
+        // vanilla block list. Matched on the full suffix, not `_terracotta`,
+        // which also names the sixteen ordinary dyed terracottas and the
+        // undyed one — those are plain NORMAL blocks and pull like anything
+        // else.
+        if descriptor.name.ends_with("_glazed_terracotta") {
+            rules.push_only.push(*id);
         }
         // `PistonBaseBlock.getPistonPushReaction` answers BLOCK while
         // EXTENDED: an extended piston base cannot be pushed, though a
@@ -2706,8 +2720,14 @@ pub(crate) fn decor_kind(name: &str) -> Option<Decor> {
 
     // Shapes that plainly do not fill their cell. Checked first: a
     // `stone_brick_wall` must never be mistaken for the stone family below.
+    //
+    // `_slab` belongs here even though a doubled slab *is* a full cube:
+    // [`is_full_cube`] reads the `type` property and answers that question
+    // state by state. What this function decides is only "is it decoration",
+    // and every slab is.
     const PARTIAL_SUFFIX: &[&str] = &[
         "_stairs",
+        "_slab",
         "_wall",
         "_fence",
         "_fence_gate",
@@ -2721,6 +2741,22 @@ pub(crate) fn decor_kind(name: &str) -> Option<Decor> {
         "_lantern",
         "_bars",
         "_ladder",
+        "_coral_fan",
+        "_coral_wall_fan",
+        "_coral",
+        "_amethyst_bud",
+        "_sapling",
+        "_mushroom",
+        "_flower",
+        "_tulip",
+        "_orchid",
+        "_bush",
+        "_fern",
+        "_grass",
+        "_vines",
+        "_roots",
+        "_sprouts",
+        "_pot",
     ];
     if PARTIAL_SUFFIX.iter().any(|s| short.ends_with(s))
         // `powder_snow` reads as a full cube and is not one. Its registration is
@@ -2731,7 +2767,27 @@ pub(crate) fn decor_kind(name: &str) -> Option<Decor> {
         // entity, which is what makes `isCollisionShapeFullBlock` false. A
         // dispenser can put one of these anywhere (`bucket_dispense.json`), so
         // the engine needs it whether or not a build was saved with one.
-        || matches!(short, "chain" | "scaffolding" | "iron_bars" | "ladder" | "snow" | "powder_snow")
+        || matches!(
+            short,
+            "chain"
+                | "scaffolding"
+                | "iron_bars"
+                | "ladder"
+                | "snow"
+                | "powder_snow"
+                | "end_rod"
+                | "lightning_rod"
+                | "amethyst_cluster"
+                | "torch"
+                | "wall_torch"
+                | "soul_torch"
+                | "soul_wall_torch"
+                | "flower_pot"
+                | "turtle_egg"
+                | "sea_pickle"
+                | "conduit"
+                | "bell"
+        )
     {
         // A wall sign is a sign; a player head is a head. Both land here.
         return Some(Decor::Partial);
@@ -2767,7 +2823,71 @@ pub(crate) fn decor_kind(name: &str) -> Option<Decor> {
         "_nylium",
         "_wart_block",
     ];
-    if CUBE_SUFFIX.iter().any(|s| short.ends_with(s)) || short.starts_with("stripped_") {
+    // The rest of the building palette, by family rather than by name — the
+    // same reasoning as CUBE_SUFFIX. A battleship's hull is nothing but
+    // these, and every one of them refusing to register stopped whole builds
+    // from simulating at all.
+    //
+    // `polished_*` and `*sandstone` need care: `polished_blackstone_button`
+    // and friends carry behaviour, and this function is called straight from
+    // `is_full_cube`, where no match ordering protects them. The
+    // partial-shape and behaviour checks above already claimed those, so by
+    // here a `polished_` name is the plain block.
+    // Workstations, furniture and the other block-entity-bearing cubes that
+    // carry no *redstone* behaviour. A player's build is full of them and
+    // each one refusing stopped the whole simulation; none of them can
+    // power, move or observe anything, so inert is the honest answer.
+    if matches!(
+        short,
+        "loom"
+            | "stonecutter"
+            | "heavy_core"
+            | "cartography_table"
+            | "fletching_table"
+            | "smithing_table"
+            | "crafting_table"
+            | "grindstone"
+            | "anvil"
+            | "chipped_anvil"
+            | "damaged_anvil"
+            | "enchanting_table"
+            | "brewing_stand"
+            | "bookshelf"
+            | "chiseled_bookshelf"
+            | "lectern_base"
+            | "beehive"
+            | "bee_nest"
+            | "lodestone"
+            | "respawn_anchor"
+            | "bell_base"
+            | "decorated_pot"
+            | "flower_bed"
+            | "sniffer_egg"
+            | "spawner"
+            | "trial_spawner"
+            | "vault"
+            | "end_portal_frame"
+            | "dragon_egg"
+            | "cake"
+            | "beacon"
+    ) {
+        return Some(Decor::Cube);
+    }
+    if CUBE_SUFFIX.iter().any(|s| short.ends_with(s))
+        || short.starts_with("stripped_")
+        || short.starts_with("polished_")
+        || short.starts_with("smooth_")
+        || short.starts_with("cut_")
+        || short.starts_with("chiseled_")
+        || short.ends_with("sandstone")
+        || short.ends_with("_block")
+        || short.ends_with("_tiles")
+        || short.ends_with("_pillar")
+        || short.ends_with("_stone")
+        || short.ends_with("_deepslate")
+        || short.ends_with("_basalt")
+        || short.ends_with("_prismarine")
+    {
         return Some(Decor::Cube);
     }
     if matches!(

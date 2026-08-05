@@ -33,13 +33,27 @@ STAGE="$WORK/packs/nucleation_tests"
 rm -rf "$WORK/packs"
 mkdir -p "$STAGE"
 cp -R pack/. "$STAGE/"
+# Converted files are cached across runs, keyed on the source being no newer
+# than its .nbt. Every conversion is its own JVM launch, and the corpus is well
+# past a hundred structures — converting the lot each time spent about two
+# minutes of pure startup before a single tick of Minecraft ran, on every
+# capture, however small. Only what actually changed is rebuilt now.
+CACHE="$WORK/nbtcache"
+converted=0
 while IFS= read -r snbt; do
     rel="${snbt#pack/}"
-    out="$STAGE/${rel%.snbt}.nbt"
-    java -cp "$WORK/classes:$CP" Snbt2Nbt "$snbt" "$out" >/dev/null 2>&1 \
-        || { echo "FAILED converting $snbt" >&2; exit 1; }
+    cached="$CACHE/${rel%.snbt}.nbt"
+    if [[ ! -f "$cached" || "$snbt" -nt "$cached" ]]; then
+        mkdir -p "$(dirname "$cached")"
+        java -cp "$WORK/classes:$CP" Snbt2Nbt "$snbt" "$cached" >/dev/null 2>&1 \
+            || { echo "FAILED converting $snbt" >&2; exit 1; }
+        converted=$((converted + 1))
+    fi
+    mkdir -p "$(dirname "$STAGE/${rel%.snbt}.nbt")"
+    cp "$cached" "$STAGE/${rel%.snbt}.nbt"
     rm -f "$STAGE/$rel"
 done < <(find pack -name '*.snbt')
+echo "  structures: $converted converted, $(find "$CACHE" -name '*.nbt' 2>/dev/null | wc -l | tr -d ' ') cached"
 
 # WORLD=<path to a save> records that world in place rather than pasting into a
 # fresh one. Every paste disturbs a machine — placeInWorld recomputes repeater

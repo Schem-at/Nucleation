@@ -1,0 +1,80 @@
+:root {
+  color-scheme: dark;
+  --bg: #0f1115;
+  --panel: #171a21cc;
+  --line: #2a2f3a;
+  --ink: #e7eaf0;
+  --dim: #8b93a3;
+  --accent: #6fd66a;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.app { position: relative; height: 100%; overflow: hidden; }
+
+.viewport { position: absolute; inset: 0; }
+.viewport canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+
+.crosshair {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  color: #fff; opacity: 0.75;
+  font-size: 18px; pointer-events: none;
+  text-shadow: 0 0 3px #000;
+}
+
+.bar, .hud {
+  position: absolute; left: 0; right: 0;
+  display: flex; gap: 14px; align-items: center;
+  padding: 8px 12px;
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+.bar { top: 0; border-bottom: 1px solid var(--line); }
+.hud { bottom: 0; border-top: 1px solid var(--line); }
+
+button, .file {
+  background: #222735; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 5px;
+  padding: 4px 12px; cursor: pointer; font: inherit;
+}
+button:hover:not(:disabled), .file:hover { border-color: var(--accent); }
+button:disabled { opacity: 0.4; cursor: default; }
+.file input { display: none; }
+
+.rate { display: flex; align-items: center; gap: 8px; color: var(--dim); }
+.rate input { width: 130px; }
+
+.tick { color: var(--dim); }
+.status { margin-left: auto; color: var(--dim); }
+.status.error { color: #ff6b6b; }
+.status.ready { color: var(--accent); }
+.status.loading { color: #e8c14a; }
+
+.target { color: var(--accent); }
+.hint, .info { color: var(--dim); }
+.info { margin-left: auto; }
+
+.steps { display: flex; align-items: center; gap: 4px; }
+.steps button { padding: 4px 8px; }
+.stepn {
+  width: 62px; background: #11141c; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 5px;
+  padding: 4px 6px; font: inherit;
+}
+
+.settle select {
+  background: #11141c; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 5px;
+  padding: 4px 6px; font: inherit;
+}

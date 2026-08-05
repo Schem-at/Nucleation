@@ -1,0 +1,28 @@
+{
+  "name": "a pushed observer signals when it lands, so the piston diagonal to it fires",
+  "structure": "../corpus/structures/observer_diagonal_piston.snbt",
+  "settle": "quiet",
+  "actions": [
+    { "tick": 5, "use": [6, 1, 0] },
+    { "tick": 15, "use": [6, 1, 0] }
+  ],
+  "checks": [
+    { "tick": 19, "expect": "blocks", "blocks": {
+        "2,1,0": "minecraft:observer[facing=east,powered=false]",
+        "1,0,0": "minecraft:sticky_piston[extended=false,facing=west]",
+        "0,0,0": "minecraft:gray_concrete"
+    } },
+    { "tick": 21, "expect": "blocks", "blocks": {
+        "2,1,0": "minecraft:observer[facing=east,powered=true]",
+        "1,0,0": "minecraft:sticky_piston[extended=true,facing=west]"
+    } },
+    { "tick": 23, "expect": "blocks", "blocks": {
+        "2,1,0": "minecraft:observer[facing=east,powered=false]",
+        "0,0,0": "minecraft:air",
+        "-1,0,0": "minecraft:gray_concrete"
+    } },
+    { "tick": 25, "expect": "blocks", "blocks": {
+        "1,0,0": "minecraft:sticky_piston[extended=false,facing=west]"
+    } }
+  ]
+}

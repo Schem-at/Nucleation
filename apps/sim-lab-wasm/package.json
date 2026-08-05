@@ -1,0 +1,27 @@
+{
+  "name": "nucleation-sim-lab",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "sync-engine": "rm -rf public/engine && mkdir -p public/engine && cp -R ../../dist/npm-mctick/. public/engine/ && node -e \"const f='public/engine/TickSimulation.mjs',s=require('fs').readFileSync(f,'utf8');if(!s.includes('machineGraphJson')){console.error('\\n  engine lacks machineGraphJson \u2014 package-npm.sh defaults to bridge,simulation,meshing and OMITS mc-tick.\\n  rebuild: NUCLEATION_WASM_FEATURES=bridge,simulation,meshing,mc-tick ./tools/package-npm.sh dist/npm-mctick\\n');process.exit(1)}\"",
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "engine": "cd ../.. && ./tools/package-npm.sh dist/npm-simlab && cp dist/npm-simlab/*.mjs dist/npm-simlab/*.wasm dist/npm-simlab/*.d.mts apps/sim-lab-wasm/public/engine/ && echo 'engine refreshed \u2014 now: npm run build'"
+  },
+  "dependencies": {
+    "@types/three": "^0.185.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "playwright": "^1.62.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

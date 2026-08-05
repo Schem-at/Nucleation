@@ -720,6 +720,8 @@ fn structure_from_blocks(
         block_entities: Vec::new(),
         entities: Vec::new(),
         item_entities: Vec::new(),
+        // Genome cells carry no command blocks.
+        commands: Vec::new(),
     })
 }
 

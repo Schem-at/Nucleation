@@ -472,6 +472,23 @@ impl<'a> TickCtx<'a> {
     /// `self.tick` here is the tick the change will be *observed* in, which is one
     /// later. See [`TickCtx::boundary`].
     pub fn schedule(&mut self, pos: Pos, delay: u64, priority: TickPriority) {
+        // `MC_TICK_TRACE_SCHED=x,y,z[;...]` — who books a tick, and in what
+        // order. Two blocks scheduled for the same tick fire in insertion
+        // order, so this is what decides races between them.
+        if let Some(filter) = std::env::var_os("MC_TICK_TRACE_SCHED") {
+            let wanted = filter.to_string_lossy().split(';').any(|t| {
+                let c: Vec<i32> = t.split(',').filter_map(|n| n.trim().parse().ok()).collect();
+                matches!(c[..], [x, y, z] if Pos::new(x, y, z) == pos)
+            });
+            if wanted {
+                eprintln!(
+                    "[sched] t{} {:?} delay={delay} prio={priority:?} boundary={}",
+                    self.tick,
+                    (pos.x, pos.y, pos.z),
+                    self.boundary
+                );
+            }
+        }
         // Folded into the delay rather than the tick so that a boundary schedule
         // before tick 0 still lands on tick `delay - 1` instead of underflowing.
         // A boundary delay of 0 stays 0: it would fire in the upcoming tick's

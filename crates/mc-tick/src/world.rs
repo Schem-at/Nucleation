@@ -10,11 +10,29 @@
 use crate::pos::{Bounds, Dir, Pos};
 use crate::state::StateId;
 
+/// How far the region will enlarge itself before refusing, in cells.
+///
+/// A flying machine travels until something stops it, and nothing here does.
+/// The cap is what keeps "runs off to the horizon" from becoming "allocates
+/// until the process dies"; past it, writes are dropped exactly as they were
+/// before the region could grow at all. 32 M cells is a 320x320x320 room —
+/// far more than any contraption needs, and a few hundred MB at worst.
+pub const DEFAULT_GROWTH_LIMIT: u64 = 32_000_000;
+
+/// How much the region overshoots a write that lands outside it.
+///
+/// Growing to exactly the offending block would reallocate on every step of a
+/// machine that moves one block at a time. A chunk's worth of slack amortises
+/// that to one reallocation per 16 blocks travelled.
+const GROWTH_STEP: i32 = 16;
+
 /// The simulated region's blocks.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct World {
     bounds: Bounds,
     states: Vec<StateId>,
+    /// Ceiling on [`World::grow_to_include`]; see [`DEFAULT_GROWTH_LIMIT`].
+    growth_limit: u64,
 }
 
 impl World {
@@ -23,7 +41,75 @@ impl World {
         Self {
             bounds,
             states: vec![StateId::AIR; bounds.volume() as usize],
+            growth_limit: DEFAULT_GROWTH_LIMIT,
         }
+    }
+
+    /// Cap how far this world will enlarge itself, in cells.
+    ///
+    /// Zero pins the region to its current extent, restoring the original
+    /// behaviour of dropping every write that lands outside. Useful when the
+    /// region is meant to be the whole story — a conformance run whose capture
+    /// has a world of its own, or a search that would rather a machine died at
+    /// a known wall than wandered off and kept allocating.
+    pub fn set_growth_limit(&mut self, cells: u64) {
+        self.growth_limit = cells;
+    }
+
+    /// Enlarge the region so `pos` falls inside it.
+    ///
+    /// Returns whether it now does: growth stops at [`World::set_growth_limit`],
+    /// and a refusal leaves the region exactly as it was.
+    pub fn grow_to_include(&mut self, pos: Pos) -> bool {
+        if self.bounds.contains(pos) {
+            return true;
+        }
+        // Round outwards to a whole step, so travel costs one reallocation per
+        // `GROWTH_STEP` blocks rather than one per block. Saturating, so a
+        // coordinate near the end of the range cannot wrap the overshoot round
+        // into a small number.
+        let floor_step = |v: i32| v.div_euclid(GROWTH_STEP) * GROWTH_STEP;
+        let lo = |current: i32, p: i32| current.min(floor_step(p));
+        let hi = |current: i32, p: i32| current.max(floor_step(p).saturating_add(GROWTH_STEP - 1));
+        let (min, max) = (
+            Pos::new(
+                lo(self.bounds.min.x, pos.x),
+                lo(self.bounds.min.y, pos.y),
+                lo(self.bounds.min.z, pos.z),
+            ),
+            Pos::new(
+                hi(self.bounds.max.x, pos.x),
+                hi(self.bounds.max.y, pos.y),
+                hi(self.bounds.max.z, pos.z),
+            ),
+        );
+        // Measured before the region is built, and in `u128`: `Bounds::size`
+        // subtracts in `i32` and `volume` multiplies into a `u64`, so a write
+        // far enough away overflows *both* — and a wrapped volume would look
+        // small, slip past the cap, and allocate whatever the garbage said.
+        let span = |a: i32, b: i32| u128::from((i64::from(b) - i64::from(a) + 1) as u64);
+        if span(min.x, max.x) * span(min.y, max.y) * span(min.z, max.z)
+            > u128::from(self.growth_limit)
+        {
+            return false;
+        }
+        let grown = Bounds::new(min, max);
+        let mut states = vec![StateId::AIR; grown.volume() as usize];
+        // Only non-air needs carrying over, and skipping air makes the copy
+        // proportional to what the build actually contains rather than to the
+        // volume it rattles around in.
+        let old = self.bounds;
+        for (index, state) in self.states.iter().enumerate() {
+            if *state == StateId::AIR {
+                continue;
+            }
+            if let Some(index) = old.position_of(index).and_then(|p| grown.index(p)) {
+                states[index] = *state;
+            }
+        }
+        self.bounds = grown;
+        self.states = states;
+        true
     }
 
     /// The region this world covers.
@@ -53,13 +139,32 @@ impl World {
 
     /// Set the state at `pos`, returning the previous one.
     ///
-    /// Returns `None` and changes nothing if `pos` is outside the region —
-    /// silently dropping the write, deliberately, for the same reason [`get`]
-    /// reads air: callers push blocks around and would otherwise all need edge
-    /// handling.
+    /// # Outside the region
+    ///
+    /// A block written outside the region **grows the region to fit it**. The
+    /// game's world does not end where a schematic does, and pretending it
+    /// does is not a neutral simplification: a flying machine that reached the
+    /// edge used to have whichever of its blocks crossed first deleted, and
+    /// what was left — a piston here, a slime block two cells away — was
+    /// wreckage that could not fly, sitting in a world that reported no
+    /// further changes. Silent, and indistinguishable from a redstone bug.
+    ///
+    /// Growth is capped ([`World::set_growth_limit`]); past the cap the write
+    /// is dropped as it always was. Writing **air** outside never grows the
+    /// region — outside is already air, and a machine clears the cells behind
+    /// itself every step, which would otherwise enlarge the world in the
+    /// direction it is travelling away from.
+    ///
+    /// Reads still answer air outside the region rather than growing it; see
+    /// [`get`].
     ///
     /// [`get`]: World::get
     pub fn set(&mut self, pos: Pos, state: StateId) -> Option<StateId> {
+        if !self.bounds.contains(pos) {
+            if state == StateId::AIR || !self.grow_to_include(pos) {
+                return None;
+            }
+        }
         let index = self.bounds.index(pos)?;
         let previous = self.states[index];
         self.states[index] = state;
@@ -130,14 +235,78 @@ mod tests {
     }
 
     #[test]
-    fn out_of_bounds_reads_air_and_drops_writes() {
+    fn out_of_bounds_reads_air() {
         // Documented divergence: neighbours outside the region read as air so the
         // tick loop needs no edge branches. Pinned here so it stays a decision.
+        // Reading does *not* grow the region — only writing does.
+        let world = small();
+        assert_eq!(world.get(Pos::new(99, 0, 0)), StateId::AIR);
+        assert_eq!(world.bounds(), small().bounds());
+    }
+
+    #[test]
+    fn a_block_written_outside_grows_the_region_to_hold_it() {
         let mut world = small();
         let outside = Pos::new(99, 0, 0);
-        assert_eq!(world.get(outside), StateId::AIR);
-        assert_eq!(world.set(outside, StateId(7)), None);
+        assert_eq!(world.set(outside, StateId(7)), Some(StateId::AIR));
+        assert_eq!(world.get(outside), StateId(7));
+        assert_eq!(world.non_air_count(), 1);
+        assert!(world.bounds().contains(outside));
+    }
+
+    #[test]
+    fn growing_keeps_everything_already_placed() {
+        let mut world = small();
+        let (a, b) = (Pos::new(1, 1, 1), Pos::new(3, 2, 0));
+        world.set(a, StateId(7));
+        world.set(b, StateId(9));
+        world.set(Pos::new(-40, 0, 0), StateId(5));
+        assert_eq!(world.get(a), StateId(7));
+        assert_eq!(world.get(b), StateId(9));
+        assert_eq!(world.non_air_count(), 3);
+    }
+
+    #[test]
+    fn air_written_outside_does_not_grow_the_region() {
+        // A machine clears the cells behind itself every step. Growing for
+        // those would enlarge the world in the direction it is leaving.
+        let mut world = small();
+        let before = world.bounds();
+        assert_eq!(world.set(Pos::new(99, 0, 0), StateId::AIR), None);
+        assert_eq!(world.bounds(), before);
+    }
+
+    #[test]
+    fn growth_stops_at_the_limit_and_changes_nothing_when_it_refuses() {
+        let mut world = small();
+        world.set_growth_limit(0);
+        let before = world.bounds();
+        assert_eq!(world.set(Pos::new(99, 0, 0), StateId(7)), None);
+        assert_eq!(world.bounds(), before);
         assert_eq!(world.non_air_count(), 0);
+    }
+
+    #[test]
+    fn a_wild_coordinate_is_refused_rather_than_overflowing_the_extent() {
+        // `Bounds::size` subtracts in i32 and `volume` multiplies into u64;
+        // both overflow long before this coordinate, so the cap has to be
+        // decided without going through either.
+        let mut world = small();
+        for far in [i32::MAX, i32::MIN, 2_000_000_000, -2_000_000_000] {
+            assert_eq!(world.set(Pos::new(far, far, far), StateId(7)), None);
+            assert_eq!(world.bounds(), small().bounds());
+            assert_eq!(world.non_air_count(), 0);
+        }
+    }
+
+    #[test]
+    fn growth_overshoots_so_travel_does_not_reallocate_every_block() {
+        let mut world = small();
+        world.set(Pos::new(4, 0, 0), StateId(7));
+        let grown = world.bounds();
+        // The next few blocks along are already covered by the overshoot.
+        world.set(Pos::new(5, 0, 0), StateId(7));
+        assert_eq!(world.bounds(), grown);
     }
 
     #[test]

@@ -3246,6 +3246,15 @@ impl Simulation {
                 //
                 // A stable sort on the due tick alone preserves that order.
                 due.sort_by_key(|m| m.resolve_on);
+                // Landing order is this list's order, and this list's order is
+                // `moveBlocks`': each stroke appends `to_push` reversed, so the
+                // far end of a pushed line lands first. Both a blanket reverse
+                // and a per-stroke reverse were measured against the corpus:
+                // each makes BB's t34 piston race come out vanilla's way and
+                // each breaks `door_4x4_vault_cycle` and `door_6x6_cycle` — so
+                // the direction is not the variable. What differs is the
+                // *sequence* `resolve_push` builds for some structures, which
+                // is where a divergence from `getToPush` has to be chased.
                 // Frozen moves (outside the ticking bounds) stay pending: a
                 // block entity in a non-ticking chunk is suspended, not gone.
                 self.moves

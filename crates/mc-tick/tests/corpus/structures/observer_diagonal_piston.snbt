@@ -1,0 +1,19 @@
+{
+  DataVersion: 4903,
+  size: [7, 2, 1],
+  palette: [
+    {Name: "minecraft:gray_concrete"},
+    {Name: "minecraft:sticky_piston", Properties: {extended: "false", facing: "west"}},
+    {Name: "minecraft:observer", Properties: {facing: "east", powered: "false"}},
+    {Name: "minecraft:note_block", Properties: {instrument: "harp", note: "0", powered: "false"}}
+  ],
+  blocks: [
+    {pos: [0, 0, 0], state: 0},
+    {pos: [1, 0, 0], state: 1},
+    {pos: [3, 1, 0], state: 2},
+    {pos: [4, 1, 0], state: 1},
+    {pos: [5, 1, 0], state: 2},
+    {pos: [6, 1, 0], state: 3}
+  ],
+  entities: []
+}

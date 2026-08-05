@@ -9,7 +9,11 @@ OUT="${1:-dist/npm}"
 # simulation+meshing ride along (schemati's flow runs redstone sim in the
 # browser); rendering (wgpu needs wasm-bindgen glue) and scripting (luajit
 # can't target wasm) stay out of the wasm build.
-FEATURES="${NUCLEATION_WASM_FEATURES:-bridge,simulation,meshing}"
+# `mc-tick` is the headless tick engine (TickSimulation); `simulation` is the
+# separate MCHPRS-backed redstone world and is NOT what the browser apps use.
+# Naming the wrong one produces an engine that loads, meshes, and silently has
+# no TickSimulation at all — which is how a whole app came up dead.
+FEATURES="${NUCLEATION_WASM_FEATURES:-bridge,mc-tick,meshing}"
 cargo build --release --target wasm32-unknown-unknown --lib --features "$FEATURES"
 
 rm -rf "$OUT"
