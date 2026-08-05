@@ -20,6 +20,11 @@ mc-tick-trace = { path = "../mc-tick-trace" }
 # The shared scenario harness; a dev-only cycle (mc-test depends on this
 # crate's lib), which cargo permits and publish strips.
 mc-test = { path = "../mc-test" }
+criterion = "0.5.1"
 
 [lints.rust]
 missing_docs = "warn"
+
+[[bench]]
+name = "tick"
+harness = false

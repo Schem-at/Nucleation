@@ -195,3 +195,58 @@ mod tests {
         assert!(!registry.is_empty());
     }
 }
+
+/// A set of block states, indexed rather than searched.
+///
+/// The rules table classifies states a dozen ways — conductor, full cube,
+/// comparator, slime, immovable — and the redstone hot path asks those
+/// questions per neighbour, per block, per tick. Held as `Vec<StateId>` and
+/// answered with `contains`, each question was a linear scan of every state
+/// wearing that label; a wire-and-comparator build made construction alone
+/// take 88 ms where a larger piston build took 2.7 ms.
+///
+/// `StateId` is a dense `u16`, so a bitset answers the same question by
+/// indexing. `push` and `contains` keep the shapes `Vec` had, which is what
+/// makes the swap a type change rather than a rewrite.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct StateSet {
+    bits: Vec<u64>,
+}
+
+impl StateSet {
+    /// Add `state` to the set.
+    pub fn insert(&mut self, state: StateId) {
+        let index = state.0 as usize;
+        let word = index / 64;
+        if word >= self.bits.len() {
+            self.bits.resize(word + 1, 0);
+        }
+        self.bits[word] |= 1u64 << (index % 64);
+    }
+
+    /// Alias for [`StateSet::insert`], so `Vec::push` call sites still read.
+    pub fn push(&mut self, state: StateId) {
+        self.insert(state);
+    }
+
+    /// Whether `state` is in the set.
+    pub fn contains(&self, state: &StateId) -> bool {
+        let index = state.0 as usize;
+        self.bits.get(index / 64).is_some_and(|w| (w >> (index % 64)) & 1 == 1)
+    }
+
+    /// Whether nothing is in the set.
+    pub fn is_empty(&self) -> bool {
+        self.bits.iter().all(|w| *w == 0)
+    }
+}
+
+impl FromIterator<StateId> for StateSet {
+    fn from_iter<I: IntoIterator<Item = StateId>>(iter: I) -> Self {
+        let mut set = Self::default();
+        for state in iter {
+            set.insert(state);
+        }
+        set
+    }
+}

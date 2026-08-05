@@ -31,7 +31,7 @@ use crate::components::{
 use crate::observer::Observer;
 use crate::piston::{Movability, Piston, Sticky};
 use crate::pos::{Dir, Pos};
-use crate::state::{StateId, StateRegistry};
+use crate::state::{StateId, StateRegistry, StateSet};
 use crate::world::World;
 use std::collections::HashMap;
 
@@ -132,7 +132,7 @@ pub struct VanillaRules {
     /// [`crate::wire::WireWorld::hash_origin`]. Zero unless a capture says
     /// otherwise.
     hash_origin: Pos,
-    powered: Vec<StateId>,
+    powered: StateSet,
     /// States that emit a *level* rather than a flat 15.
     ///
     /// A weighted pressure plate's signal is the number of entities on it
@@ -141,7 +141,7 @@ pub struct VanillaRules {
     /// plate holding one item would drive a full-strength line.
     analog_emission: HashMap<StateId, u8>,
     /// Detector rails, for the comparator's container-cart read.
-    detector_rails: Vec<StateId>,
+    detector_rails: StateSet,
     /// Double-chest halves: `(is_first, direction of the partner half)`.
     ///
     /// From `ChestBlock`: the partner sits at `getConnectedDirection` (a LEFT
@@ -151,7 +151,7 @@ pub struct VanillaRules {
     chest_halves: HashMap<StateId, (bool, Dir)>,
     /// Chest states whose lid a solid block can pin shut — a *blocked*
     /// chest's analog reads 0 (`ChestBlock.getContainer` answers null).
-    lidded_chests: Vec<StateId>,
+    lidded_chests: StateSet,
     /// States that emit in **one** direction only, and which one.
     ///
     /// An observer powers only out of its back — `ObserverBlock.getSignal`
@@ -171,13 +171,13 @@ pub struct VanillaRules {
     ///
     /// Growing this list is capture-driven: slime is on it because the flying
     /// machine's trace proves the signal crossed it. Glass famously is not.
-    conductors: Vec<StateId>,
+    conductors: StateSet,
     /// Container states and their slot counts, for the comparator's analog read.
     containers: HashMap<StateId, u32>,
     /// Hopper states, for the destination-cooldown rule.
-    hoppers: Vec<StateId>,
+    hoppers: StateSet,
     /// Full-cube states, for hopper-suction blocking and item collision.
-    full_cubes: Vec<StateId>,
+    full_cubes: StateSet,
     /// Wire states: power level and horizontal connections (true = side or up).
     wires: HashMap<StateId, (u8, [crate::wire::WireSide; 4])>,
     /// `(power, connections)` -> the wire state with that shape, for the
@@ -185,27 +185,27 @@ pub struct VanillaRules {
     wire_shapes: HashMap<(u8, [crate::wire::WireSide; 4]), StateId>,
     /// `isSignalSource`: whether the block *can* emit, powered or not — which
     /// is what decides whether dust turns to face it.
-    signal_sources: Vec<StateId>,
+    signal_sources: StateSet,
     /// Blocks dust can climb: `canSurviveOn`, i.e. a sturdy upward face.
-    sturdy_up: Vec<StateId>,
+    sturdy_up: StateSet,
     /// `PushReaction.DESTROY`: broken by a push rather than carried.
-    destroyed_by_push: Vec<StateId>,
+    destroyed_by_push: StateSet,
     /// A leaf state's `distance`, and the log states that count as distance 0.
     leaf_distance: HashMap<StateId, u8>,
-    logs: Vec<StateId>,
+    logs: StateSet,
     /// Repeater states, which dust faces only along their axis.
-    repeaters: Vec<StateId>,
+    repeaters: StateSet,
     /// Observer states and the direction they look, which is the only face
     /// dust turns toward.
     observer_facing: HashMap<StateId, Dir>,
     /// `(wire state, power)` -> the same shape at that power.
     wire_siblings: HashMap<(StateId, u8), StateId>,
-    immovable: Vec<StateId>,
+    immovable: StateSet,
     /// `PushReaction.PUSH_ONLY` — shoved, never dragged back. See
     /// [`crate::piston::Movability::push_only`].
-    push_only: Vec<StateId>,
-    slime: Vec<StateId>,
-    honey: Vec<StateId>,
+    push_only: StateSet,
+    slime: StateSet,
+    honey: StateSet,
     diodes: HashMap<StateId, Dir>,
     /// Water per state: plain water blocks, waterlogged states and bubble
     /// columns (`getFluidState`).
@@ -215,7 +215,7 @@ pub struct VanillaRules {
     /// Bubble columns: `Some(drag_down)`.
     bubbles: HashMap<StateId, bool>,
     /// Comparator states, whose emission is their stored strength.
-    comparators: Vec<StateId>,
+    comparators: StateSet,
     /// States that emit in every direction **except** one — a lit redstone
     /// torch, which powers everything but the block beneath it
     /// (`RedstoneTorchBlock.getSignal` returns 0 for a query from below).

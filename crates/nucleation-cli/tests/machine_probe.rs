@@ -32,9 +32,21 @@ fn footprint(sim: &mc_test::mc_tick::Simulation) -> Option<(Pos, Pos)> {
 }
 
 fn coords(var: &str) -> Option<(i32, i32, i32)> {
-    let v = std::env::var(var).ok()?;
-    let c: Vec<i32> = v.split(',').filter_map(|n| n.trim().parse().ok()).collect();
-    if let [x, y, z] = c[..] { Some((x, y, z)) } else { None }
+    coord_list(var).first().copied()
+}
+
+/// `x,y,z;x,y,z;…` — several positions, for a build with more than one input.
+///
+/// An adder has seventeen levers; driving it one `MC_USE` at a time is not a
+/// probe, it is a typing exercise.
+fn coord_list(var: &str) -> Vec<(i32, i32, i32)> {
+    let Ok(v) = std::env::var(var) else { return Vec::new() };
+    v.split(';')
+        .filter_map(|part| {
+            let c: Vec<i32> = part.split(',').filter_map(|n| n.trim().parse().ok()).collect();
+            if let [x, y, z] = c[..] { Some((x, y, z)) } else { None }
+        })
+        .collect()
 }
 
 fn ticks_list(var: &str, default: &str) -> Vec<u64> {
@@ -130,8 +142,11 @@ fn run_machine() {
     sim.record();
     let air = sim.registry_mut().intern("minecraft:air").expect("air interns");
 
-    let use_at = coords("MC_USE");
+    let use_at = coord_list("MC_USE");
     let use_ticks = ticks_list("MC_USE_TICK", "5");
+    // `MC_READ=x,y,z;…` — print these cells' states when the run ends. For a
+    // build whose answer is a row of lamps rather than a change count.
+    let read_at = coord_list("MC_READ");
     let break_at = coords("MC_BREAK");
     let break_ticks = ticks_list("MC_BREAK_TICK", "5");
     eprintln!(
@@ -143,8 +158,8 @@ fn run_machine() {
     let mut last_print: Option<String> = None;
     for t in 0..ticks {
         if use_ticks.contains(&t) {
-            if let Some((x, y, z)) = use_at {
-                sim.use_block(Pos::new(x, y, z));
+            for (x, y, z) in &use_at {
+                sim.use_block(Pos::new(*x, *y, *z));
                 eprintln!("  -- used ({x},{y},{z}) at t{t}");
             }
         }
@@ -229,6 +244,16 @@ fn run_machine() {
         eprintln!("=== {} unresolved moving_piston cell(s):", stuck.len());
         for p in stuck.iter().take(12) {
             eprintln!("      [{},{},{}]", p.x, p.y, p.z);
+        }
+    }
+    if !read_at.is_empty() {
+        eprintln!("=== read:");
+        for (x, y, z) in &read_at {
+            let state = sim.world().get(Pos::new(*x, *y, *z));
+            eprintln!(
+                "  READ [{x},{y},{z}] {}",
+                sim.registry().descriptor(state).unwrap_or("?")
+            );
         }
     }
     eprintln!("=== {} change(s) total over {ticks} ticks", sim.recorded().len());
