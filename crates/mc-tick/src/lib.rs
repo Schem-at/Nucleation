@@ -30,6 +30,7 @@
 #![forbid(unsafe_code)]
 
 pub mod behaviour;
+pub mod embed;
 pub mod entity;
 pub mod entity_kind;
 pub mod explosion;
