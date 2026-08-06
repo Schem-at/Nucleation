@@ -162,7 +162,11 @@ fn min_gap_blocks(a: &[P], b: &[P]) -> i64 {
         .max(sep(amn.2, amx.2, bmn.2, bmx.2));
 
     let (scan, other) = if a.len() <= b.len() { (a, b) } else { (b, a) };
-    let (omn, omx) = if a.len() <= b.len() { (bmn, bmx) } else { (amn, amx) };
+    let (omn, omx) = if a.len() <= b.len() {
+        (bmn, bmx)
+    } else {
+        (amn, amx)
+    };
     let oset: FxHashSet<P> = other.iter().copied().collect();
 
     // Chebyshev distance from a point to the other component's bbox (0 if inside).
@@ -235,7 +239,10 @@ fn min_cell_gap(a: &[P], b: &[P]) -> i32 {
     let mut best = i32::MAX;
     for &c in scan {
         for &o in oset.iter() {
-            let d = (c.0 - o.0).abs().max((c.1 - o.1).abs()).max((c.2 - o.2).abs());
+            let d = (c.0 - o.0)
+                .abs()
+                .max((c.1 - o.1).abs())
+                .max((c.2 - o.2).abs());
             best = best.min(d);
         }
     }
@@ -251,7 +258,11 @@ fn audit_one(path: &Path) -> Option<Record> {
     let mut set: FxHashSet<P> = FxHashSet::default();
     for (pos, bs) in schem.iter_blocks() {
         let n = bs.get_name();
-        if n == "minecraft:air" || n == "air" || n == "minecraft:cave_air" || n == "minecraft:void_air" {
+        if n == "minecraft:air"
+            || n == "air"
+            || n == "minecraft:cave_air"
+            || n == "minecraft:void_air"
+        {
             continue;
         }
         set.insert((pos.x, pos.y, pos.z));
@@ -302,7 +313,11 @@ fn audit_one(path: &Path) -> Option<Record> {
     // Bin blocks into cells; count blocks per cell; six-connected cell comps.
     let mut cell_blocks: FxHashMap<P, u64> = FxHashMap::default();
     for &(x, y, z) in &set {
-        let cell = (x.div_euclid(CELL_SIZE), y.div_euclid(CELL_SIZE), z.div_euclid(CELL_SIZE));
+        let cell = (
+            x.div_euclid(CELL_SIZE),
+            y.div_euclid(CELL_SIZE),
+            z.div_euclid(CELL_SIZE),
+        );
         *cell_blocks.entry(cell).or_insert(0) += 1;
     }
     let cell_set: FxHashSet<P> = cell_blocks.keys().copied().collect();
@@ -320,7 +335,9 @@ fn audit_one(path: &Path) -> Option<Record> {
     let cell_total: u64 = cell_comp_blocks.iter().sum();
     let cell_share_floor = (MIN_COMPONENT_SHARE * cell_total as f64).ceil() as u64;
     let seed_idx: Vec<usize> = (0..cell_comps.len())
-        .filter(|&i| cell_comp_blocks[i] >= MIN_COMPONENT_BLOCKS && cell_comp_blocks[i] >= cell_share_floor)
+        .filter(|&i| {
+            cell_comp_blocks[i] >= MIN_COMPONENT_BLOCKS && cell_comp_blocks[i] >= cell_share_floor
+        })
         .collect();
     let fix_seed_blocks: Vec<u64> = seed_idx.iter().map(|&i| cell_comp_blocks[i]).collect();
     let fix_seed_count = seed_idx.len();
@@ -375,7 +392,15 @@ fn collect_schems(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 fn fmt_bbox(b: &(P, P)) -> String {
-    format!("({},{},{})..({},{},{})", (b.0).0, (b.0).1, (b.0).2, (b.1).0, (b.1).1, (b.1).2)
+    format!(
+        "({},{},{})..({},{},{})",
+        (b.0).0,
+        (b.0).1,
+        (b.0).2,
+        (b.1).0,
+        (b.1).1,
+        (b.1).2
+    )
 }
 
 fn main() {
@@ -448,15 +473,25 @@ fn main() {
     // ---- Aggregate summary to stdout ---------------------------------------
     let n = records.len();
     let single = records.iter().filter(|r| r.class == "SINGLE").count();
-    let minor = records.iter().filter(|r| r.class == "MINOR-FRAGMENTS").count();
-    let multi = records.iter().filter(|r| r.class == "MULTI-SUBSTANTIAL").count();
+    let minor = records
+        .iter()
+        .filter(|r| r.class == "MINOR-FRAGMENTS")
+        .count();
+    let multi = records
+        .iter()
+        .filter(|r| r.class == "MULTI-SUBSTANTIAL")
+        .count();
     let multi26 = records
         .iter()
         .filter(|r| {
             // 26-conn "MULTI-SUBSTANTIAL": >=2 comps26 each >=4096 & >=40%
             let total = r.total;
             let sf = (SUBSTANTIAL_SHARE * total as f64).ceil() as u64;
-            r.comp26_top.iter().filter(|&&s| s >= SUBSTANTIAL_BLOCKS && s >= sf).count() >= 2
+            r.comp26_top
+                .iter()
+                .filter(|&&s| s >= SUBSTANTIAL_BLOCKS && s >= sf)
+                .count()
+                >= 2
         })
         .count();
     let would_split = records.iter().filter(|r| r.fix_would_split).count();
@@ -502,7 +537,10 @@ fn main() {
 
     // worst offenders: MULTI-SUBSTANTIAL sorted by 2nd comp size desc
     println!("--- MULTI-SUBSTANTIAL builds (id | total | comp6 | top1 | top2 | gap_blocks | fix_split | seed_gap_cells) ---");
-    let mut ms: Vec<&Record> = records.iter().filter(|r| r.class == "MULTI-SUBSTANTIAL").collect();
+    let mut ms: Vec<&Record> = records
+        .iter()
+        .filter(|r| r.class == "MULTI-SUBSTANTIAL")
+        .collect();
     ms.sort_by(|a, b| {
         let sb = b.comp6_sizes.get(1).copied().unwrap_or(0);
         let sa = a.comp6_sizes.get(1).copied().unwrap_or(0);

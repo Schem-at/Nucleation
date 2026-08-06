@@ -18,10 +18,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let max = triple(&args.next().unwrap());
     let out = args.next().unwrap();
 
-    let schematic =
-        nucleation::formats::world::from_world_directory_bounded(
-            std::path::Path::new(&dir), min.0, min.1, min.2, max.0, max.1, max.2,
-        )?;
+    let schematic = nucleation::formats::world::from_world_directory_bounded(
+        std::path::Path::new(&dir),
+        min.0,
+        min.1,
+        min.2,
+        max.0,
+        max.1,
+        max.2,
+    )?;
 
     let solid: Vec<_> = schematic
         .iter_blocks()

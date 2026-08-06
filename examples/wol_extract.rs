@@ -23,16 +23,16 @@ use std::path::PathBuf;
 
 use nucleation::formats::schematic::to_schematic;
 use nucleation::world_segment::ids::ContentId;
-use nucleation::world_segment::provenance::{Provenance, StableBuildId};
-use nucleation::{Connectivity, UniversalSchematic};
 use nucleation::world_segment::partition::{PartitionHint, PartitionIndex, PartitionPolicy};
 use nucleation::world_segment::profile::{ProfileParams, WorldProfile};
+use nucleation::world_segment::provenance::{Provenance, StableBuildId};
 use nucleation::world_segment::runner::{MaterializedBuild, RunStats, SegmentJob, WorldSegmenter};
 use nucleation::world_segment::score::{ScoreConfig, Tier};
 use nucleation::world_segment::segment::{DisconnectedSplit, SegConfig};
 use nucleation::world_segment::source::{TileError, TileSource};
 use nucleation::world_segment::targz_source::TarGzSource;
 use nucleation::world_segment::tile::VoxelTile;
+use nucleation::{Connectivity, UniversalSchematic};
 
 /// Old (pre-`world_segment`) evidence baseline this run is compared against.
 const OLD_LARGEST_BLOCK_COUNT: u64 = 574_902_785;
@@ -52,8 +52,7 @@ struct Cli {
 }
 
 fn parse_args() -> Cli {
-    let mut tarball =
-        PathBuf::from("experiments/build-extractor/data/build_20260519080014.tar.gz");
+    let mut tarball = PathBuf::from("experiments/build-extractor/data/build_20260519080014.tar.gz");
     let mut plots = PathBuf::from("wol-project/data-ore-plots-build-20260723.json");
     let mut out = PathBuf::from("wol-project/m10-out");
     let mut limit: Option<usize> = None;
@@ -152,7 +151,17 @@ fn parse_args() -> Cli {
         }
     }
 
-    Cli { tarball, plots, out, limit, sample, coverage, palette_share, floor_share, split_min_blocks }
+    Cli {
+        tarball,
+        plots,
+        out,
+        limit,
+        sample,
+        coverage,
+        palette_share,
+        floor_share,
+        split_min_blocks,
+    }
 }
 
 /// One row of `wol-project/data-ore-plots-build-20260723.json`.
@@ -171,7 +180,11 @@ fn load_plot_hints(path: &std::path::Path) -> Vec<PartitionHint> {
     let rows: Vec<PlotRow> = serde_json::from_str(&data)
         .unwrap_or_else(|e| panic!("failed to parse plots JSON {}: {e}", path.display()));
     rows.into_iter()
-        .map(|r| PartitionHint { id: r.id, bbox_xz: (r.x0, r.x1, r.z0, r.z1), y_range: None })
+        .map(|r| PartitionHint {
+            id: r.id,
+            bbox_xz: (r.x0, r.x1, r.z0, r.z1),
+            y_range: None,
+        })
         .collect()
 }
 
@@ -228,7 +241,11 @@ fn main() {
 
     // 1. Load plots -> partition hints.
     let hints = load_plot_hints(&cli.plots);
-    println!("wol_extract: loaded {} plot partition hints from {}", hints.len(), cli.plots.display());
+    println!(
+        "wol_extract: loaded {} plot partition hints from {}",
+        hints.len(),
+        cli.plots.display()
+    );
 
     // Overall bbox of every plot, so the sampling pass below can restrict
     // itself to tiles that actually cover the plotted area, instead of
@@ -240,7 +257,12 @@ fn main() {
         (i32::MAX, i32::MIN, i32::MAX, i32::MIN),
         |(minx, maxx, minz, maxz), h| {
             let (x0, x1, z0, z1) = h.bbox_xz;
-            (minx.min(x0).min(x1), maxx.max(x0).max(x1), minz.min(z0).min(z1), maxz.max(z0).max(z1))
+            (
+                minx.min(x0).min(x1),
+                maxx.max(x0).max(x1),
+                minz.min(z0).min(z1),
+                maxz.max(z0).max(z1),
+            )
         },
     );
     if has_bbox {
@@ -262,8 +284,12 @@ fn main() {
         "wol_extract: deriving world profile from up to {sample_cap} sample tiles intersecting the plotted-area bbox ({})",
         cli.tarball.display()
     );
-    let profile_source = TarGzSource::open(&cli.tarball, -64, 320)
-        .unwrap_or_else(|e| panic!("failed to open tarball {} for sampling: {e}", cli.tarball.display()));
+    let profile_source = TarGzSource::open(&cli.tarball, -64, 320).unwrap_or_else(|e| {
+        panic!(
+            "failed to open tarball {} for sampling: {e}",
+            cli.tarball.display()
+        )
+    });
     let mut samples: Vec<VoxelTile> = Vec::new();
     profile_source
         .for_each_tile(&mut |tile| {
@@ -296,7 +322,10 @@ fn main() {
             }
         })
         .expect("sampling pass over tarball failed");
-    println!("wol_extract: collected {} sample tiles for profile derivation", samples.len());
+    println!(
+        "wol_extract: collected {} sample tiles for profile derivation",
+        samples.len()
+    );
 
     // Diagnostics: per-Y-level column coverage across the collected samples,
     // mirroring `WorldProfile::derive`'s slab-detection logic, so band
@@ -327,8 +356,7 @@ fn main() {
             footprint.len()
         );
         for y in -64..=-40 {
-            let coverage =
-                cols_at_y.get(&y).map(|s| s.len()).unwrap_or(0) as f32 / footprint_size;
+            let coverage = cols_at_y.get(&y).map(|s| s.len()).unwrap_or(0) as f32 / footprint_size;
             println!("wol_extract:   y={y} coverage={coverage:.3}");
         }
     }
@@ -362,7 +390,11 @@ fn main() {
             profile.substrate_y_band
         );
         for (name, count) in by_count.iter().take(15) {
-            let share = if total > 0 { *count as f64 / total as f64 } else { 0.0 };
+            let share = if total > 0 {
+                *count as f64 / total as f64
+            } else {
+                0.0
+            };
             println!("wol_extract:   {name} {count} ({:.1}%)", share * 100.0);
         }
     }
@@ -376,7 +408,11 @@ fn main() {
 
     // 3. Build the segmentation job.
     // 0 or negative disables the per-partition floor subtraction entirely.
-    let partition_floor_share = if cli.floor_share > 0.0 { Some(cli.floor_share) } else { None };
+    let partition_floor_share = if cli.floor_share > 0.0 {
+        Some(cli.floor_share)
+    } else {
+        None
+    };
     println!(
         "wol_extract: partition_floor_share = {partition_floor_share:?} (from --floor-share {})",
         cli.floor_share
@@ -384,7 +420,10 @@ fn main() {
     // Split fully-disconnected builds the morphological closing over-merged.
     // `--split-min-blocks 0` restores the pre-fix behavior (no split).
     let split_disconnected = if cli.split_min_blocks > 0 {
-        Some(DisconnectedSplit { min_component_blocks: cli.split_min_blocks, ..DisconnectedSplit::default() })
+        Some(DisconnectedSplit {
+            min_component_blocks: cli.split_min_blocks,
+            ..DisconnectedSplit::default()
+        })
     } else {
         None
     };
@@ -414,8 +453,12 @@ fn main() {
     // 4. Open a FRESH TarGzSource for the run (the sampling one above is
     //    fully consumed and cannot be rewound).
     println!("wol_extract: opening fresh source for the main run");
-    let run_source = TarGzSource::open(&cli.tarball, job.min_y, job.max_y)
-        .unwrap_or_else(|e| panic!("failed to open tarball {} for the run: {e}", cli.tarball.display()));
+    let run_source = TarGzSource::open(&cli.tarball, job.min_y, job.max_y).unwrap_or_else(|e| {
+        panic!(
+            "failed to open tarball {} for the run: {e}",
+            cli.tarball.display()
+        )
+    });
 
     std::fs::create_dir_all(&cli.out)
         .unwrap_or_else(|e| panic!("failed to create output dir {}: {e}", cli.out.display()));
@@ -471,7 +514,10 @@ fn main() {
     // one).
     let split_min = cli.split_min_blocks as usize;
     let mut emit = |mb: MaterializedBuild| {
-        let MaterializedBuild { schematic, provenance } = mb;
+        let MaterializedBuild {
+            schematic,
+            provenance,
+        } = mb;
 
         if split_min == 0 {
             emit_one(schematic, provenance);
@@ -492,7 +538,8 @@ fn main() {
         // own bbox / block_count).
         println!(
             "wol_extract: block-level attach-split fired: build {} -> {} pieces",
-            provenance.stable_build_id, pieces.len()
+            provenance.stable_build_id,
+            pieces.len()
         );
         for (i, piece) in pieces.into_iter().enumerate() {
             let mut p = provenance.clone();
@@ -511,7 +558,10 @@ fn main() {
     println!("wol_extract: running WorldSegmenter::run_streaming...");
     let stats: RunStats = if let Some(limit) = cli.limit {
         println!("wol_extract: --limit {limit} set, wrapping source in LimitedSource");
-        let limited = LimitedSource { inner: &run_source, limit };
+        let limited = LimitedSource {
+            inner: &run_source,
+            limit,
+        };
         WorldSegmenter::run_streaming(&limited, &profile, &partitions, &job, &[], &mut emit)
     } else {
         WorldSegmenter::run_streaming(&run_source, &profile, &partitions, &job, &[], &mut emit)
@@ -524,7 +574,10 @@ fn main() {
         "wol_extract: emitted {build_count} builds ({} distinct stable ids), wrote {schem_written} .schem files",
         seen_stable_ids.len()
     );
-    println!("wol_extract: provenance written to {}", provenance_path.display());
+    println!(
+        "wol_extract: provenance written to {}",
+        provenance_path.display()
+    );
 
     println!();
     println!("wol_extract: --- comparison vs pre-world_segment evidence baseline ---");

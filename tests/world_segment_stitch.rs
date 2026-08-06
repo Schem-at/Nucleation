@@ -6,26 +6,42 @@ use nucleation::world_segment::ids::{ClusterId, ContentId, TileId};
 use nucleation::world_segment::segment::{Cluster, MarginCell, TileSegments};
 use nucleation::world_segment::stitch::{Build, StitchState};
 
-fn cid(tile: TileId, anchor: (i32,i32,i32)) -> ClusterId {
+fn cid(tile: TileId, anchor: (i32, i32, i32)) -> ClusterId {
     ClusterId::new(ContentId::of(&[b"t"]), tile, None, anchor)
 }
 
 // A deterministic chain of N tiles, each with one cluster one global cell from
 // the next, so the whole chain should stitch into a single build.
 fn chain(n: i32) -> Vec<StitchState> {
-    (0..n).map(|i| {
-        let id = cid(TileId{x:i, z:0}, (0,1,1));
-        let seg = TileSegments {
-            tile_id: TileId{x:i, z:0},
-            // left edge cell (global 128*i) and right edge cell (global 128*i+127)
-            clusters: vec![Cluster{ id, bbox:((0,0,0),(1,1,1)), block_count:1, cell_count:1, partition_id:None }],
-            margin: vec![
-                MarginCell{ cell:(0,1,1), cluster:id, partition:None },
-                MarginCell{ cell:(127,1,1), cluster:id, partition:None },
-            ],
-        };
-        StitchState::from(&seg, 4, -64)
-    }).collect()
+    (0..n)
+        .map(|i| {
+            let id = cid(TileId { x: i, z: 0 }, (0, 1, 1));
+            let seg = TileSegments {
+                tile_id: TileId { x: i, z: 0 },
+                // left edge cell (global 128*i) and right edge cell (global 128*i+127)
+                clusters: vec![Cluster {
+                    id,
+                    bbox: ((0, 0, 0), (1, 1, 1)),
+                    block_count: 1,
+                    cell_count: 1,
+                    partition_id: None,
+                }],
+                margin: vec![
+                    MarginCell {
+                        cell: (0, 1, 1),
+                        cluster: id,
+                        partition: None,
+                    },
+                    MarginCell {
+                        cell: (127, 1, 1),
+                        cluster: id,
+                        partition: None,
+                    },
+                ],
+            };
+            StitchState::from(&seg, 4, -64)
+        })
+        .collect()
 }
 
 fn build_ids(mut b: Vec<Build>) -> Vec<ClusterId> {
@@ -34,7 +50,10 @@ fn build_ids(mut b: Vec<Build>) -> Vec<ClusterId> {
 }
 
 fn reduce_left(parts: Vec<StitchState>) -> StitchState {
-    parts.into_iter().reduce(|a, b| StitchState::merge(a, b, 2)).unwrap()
+    parts
+        .into_iter()
+        .reduce(|a, b| StitchState::merge(a, b, 2))
+        .unwrap()
 }
 
 #[test]
@@ -46,7 +65,10 @@ fn merge_is_commutative() {
     let (ab_len, ba_len) = (ab.len(), ba.len());
     assert_eq!(build_ids(ab), build_ids(ba));
     assert_eq!(ab_len, 1, "the two-tile chain must collapse to one build");
-    assert_eq!(ba_len, 1, "the two-tile chain must collapse to one build regardless of merge order");
+    assert_eq!(
+        ba_len, 1,
+        "the two-tile chain must collapse to one build regardless of merge order"
+    );
 }
 
 #[test]
@@ -54,7 +76,8 @@ fn merge_is_associative() {
     // (a·b)·c == a·(b·c) for a 3-tile chain.
     let p = chain(3);
     let (a, b, c) = (p[0].clone(), p[1].clone(), p[2].clone());
-    let left = StitchState::merge(StitchState::merge(a.clone(), b.clone(), 2), c.clone(), 2).finish();
+    let left =
+        StitchState::merge(StitchState::merge(a.clone(), b.clone(), 2), c.clone(), 2).finish();
     let right = StitchState::merge(a, StitchState::merge(b, c, 2), 2).finish();
     assert_eq!(left.len(), 1);
     assert_eq!(build_ids(left), build_ids(right));
@@ -71,8 +94,14 @@ fn merge_is_idempotent() {
     let twice_block_count = twice[0].block_count;
     assert_eq!(build_ids(once), build_ids(twice));
     assert_eq!(once_len, 1, "the two-tile chain must collapse to one build");
-    assert_eq!(twice_len, 1, "re-merging the already-merged state must still collapse to one build");
-    assert_eq!(once_block_count, twice_block_count, "idempotent merge must not double-count blocks");
+    assert_eq!(
+        twice_len, 1,
+        "re-merging the already-merged state must still collapse to one build"
+    );
+    assert_eq!(
+        once_block_count, twice_block_count,
+        "idempotent merge must not double-count blocks"
+    );
 }
 
 #[test]
@@ -90,7 +119,8 @@ fn transitive_closure_when_endpoints_are_not_directly_adjacent() {
     // split A from C here.
     let p = chain(3);
     let (a, b, c) = (p[0].clone(), p[1].clone(), p[2].clone());
-    let left = StitchState::merge(StitchState::merge(a.clone(), b.clone(), 2), c.clone(), 2).finish();
+    let left =
+        StitchState::merge(StitchState::merge(a.clone(), b.clone(), 2), c.clone(), 2).finish();
     let right = StitchState::merge(a, StitchState::merge(b, c, 2), 2).finish();
     assert_eq!(left.len(), 1, "(A·B)·C must join the whole chain via B");
     assert_eq!(right.len(), 1, "A·(B·C) must join the whole chain via B");
@@ -106,7 +136,11 @@ fn scale_sanity_folds_a_long_chain_into_one_build() {
     // stays near-linear and must still yield exactly one connected build.
     let n = 200;
     let builds = reduce_left(chain(n)).finish();
-    assert_eq!(builds.len(), 1, "a {n}-tile seam chain must stitch into one build");
+    assert_eq!(
+        builds.len(),
+        1,
+        "a {n}-tile seam chain must stitch into one build"
+    );
 }
 
 #[test]

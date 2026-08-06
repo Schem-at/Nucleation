@@ -218,7 +218,9 @@ fn bridge_field_reports_its_range_as_a_single_checked_value() {
     use nucleation::bridge::field::ffi::Field3 as BridgeField3;
 
     let field = BridgeField3::value_noise_fbm(0.125, 17, 4).unwrap();
-    let range = field.output_range().expect("value noise has a proven range");
+    let range = field
+        .output_range()
+        .expect("value noise has a proven range");
 
     assert_eq!(range.min, -1.0);
     assert_eq!(range.max, 1.0);

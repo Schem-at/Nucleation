@@ -43,13 +43,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // container fullness: strength s needs roughly s/14 of the container's
     // slots filled, and 15 means every slot full. Filling by slot rather than
     // by stack is what makes "full barrel" mean what the builder meant.
-    let slots = if count >= 15 { 27 } else { (((count as f32 - 1.0) * 27.0 / 14.0).ceil() as usize).max(1) };
+    let slots = if count >= 15 {
+        27
+    } else {
+        (((count as f32 - 1.0) * 27.0 / 14.0).ceil() as usize).max(1)
+    };
     for mut entity in barrels {
         let items: Vec<NbtValue> = (0..slots)
             .map(|slot| {
                 let mut item = nucleation::nbt::NbtMap::new();
                 item.insert("Slot".to_string(), NbtValue::Byte(slot as i8));
-                item.insert("id".to_string(), NbtValue::String("minecraft:redstone".into()));
+                item.insert(
+                    "id".to_string(),
+                    NbtValue::String("minecraft:redstone".into()),
+                );
                 item.insert("count".to_string(), NbtValue::Int(64));
                 NbtValue::Compound(item)
             })
@@ -87,7 +94,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             y: entity.position.1,
             z: entity.position.2,
         };
-        let Some(state) = schematic.get_block(position.x, position.y, position.z) else { continue };
+        let Some(state) = schematic.get_block(position.x, position.y, position.z) else {
+            continue;
+        };
         let facing = state
             .properties
             .iter()
@@ -112,7 +121,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         entity
             .nbt_mut()
             .insert("OutputSignal".to_string(), NbtValue::Int(count as i32));
-        println!("  {} at {:?} <- OutputSignal {count}", entity.id, entity.position);
+        println!(
+            "  {} at {:?} <- OutputSignal {count}",
+            entity.id, entity.position
+        );
         schematic.set_block_entity(position, entity);
     }
 

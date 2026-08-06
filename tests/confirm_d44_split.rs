@@ -42,7 +42,10 @@ fn d44bbed2_real_voxels_split_into_two_substantial_builds() {
         blocks.push((p, state.clone()));
     }
     let total = blocks.len() as u64;
-    let bounds = TileBounds { min: (mnx, mny, mnz), max: (mxx, mxy, mxz) };
+    let bounds = TileBounds {
+        min: (mnx, mny, mnz),
+        max: (mxx, mxy, mxz),
+    };
     let tile = VoxelTile::from_blocks(TileId { x: 0, z: 0 }, bounds, blocks.into_iter());
 
     // Empty substrate palette: nothing is dropped as ground, so every non-air
@@ -59,7 +62,10 @@ fn d44bbed2_real_voxels_split_into_two_substantial_builds() {
         split_disconnected: Some(DisconnectedSplit::default()),
         ..SegConfig::default()
     };
-    let cfg_off = SegConfig { split_disconnected: None, ..cfg_on.clone() };
+    let cfg_off = SegConfig {
+        split_disconnected: None,
+        ..cfg_on.clone()
+    };
     let no_hints = PartitionIndex::new(vec![]);
 
     let off = segment_tile(&tile, &profile, &cfg_off, &no_hints);
@@ -68,7 +74,8 @@ fn d44bbed2_real_voxels_split_into_two_substantial_builds() {
     let mut counts_on: Vec<u64> = on.clusters.iter().map(|c| c.block_count).collect();
     counts_on.sort_unstable_by(|a, b| b.cmp(a));
     let bboxes: Vec<_> = {
-        let mut cs: Vec<&nucleation::world_segment::segment::Cluster> = on.clusters.iter().collect();
+        let mut cs: Vec<&nucleation::world_segment::segment::Cluster> =
+            on.clusters.iter().collect();
         cs.sort_by_key(|c| std::cmp::Reverse(c.block_count));
         cs.iter().take(2).map(|c| (c.block_count, c.bbox)).collect()
     };
@@ -80,14 +87,26 @@ fn d44bbed2_real_voxels_split_into_two_substantial_builds() {
     eprintln!("D44 top-2 (blocks, bbox) = {bboxes:?}");
 
     // The bug: without the split the whole plot is one merged build.
-    assert_eq!(off.clusters.len(), 1, "closing merges d44bbed2 into one build");
+    assert_eq!(
+        off.clusters.len(),
+        1,
+        "closing merges d44bbed2 into one build"
+    );
 
     // The fix: exactly two substantial (>= 50k-block) build segments, matching
     // build A (~184k) and build B (~179k); everything else attached to a seed.
     let substantial: Vec<u64> = counts_on.iter().copied().filter(|&c| c >= 50_000).collect();
-    assert_eq!(substantial.len(), 2, "exactly two substantial build segments after split");
+    assert_eq!(
+        substantial.len(),
+        2,
+        "exactly two substantial build segments after split"
+    );
     assert!(substantial[0] >= 150_000, "build A is plot-scale");
     assert!(substantial[1] >= 150_000, "build B is plot-scale");
     // No block is lost: the split partitions the whole merged cluster.
-    assert_eq!(counts_on.iter().sum::<u64>(), total, "every block keeps a home");
+    assert_eq!(
+        counts_on.iter().sum::<u64>(),
+        total,
+        "every block keeps a home"
+    );
 }

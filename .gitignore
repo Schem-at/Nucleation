@@ -115,3 +115,6 @@ apps/preview.pid
 # tests in tests/corpus/lithium-litematic/ ARE tracked (with their NOTICE);
 # this raw mirror regenerates on demand.
 tests/corpus/lithium/
+
+# Scratch run logs.
+/logs

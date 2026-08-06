@@ -50,8 +50,20 @@ fn parse_args() -> Cli {
     while let Some(a) = args.next() {
         match a.as_str() {
             "--out" => out = PathBuf::from(args.next().expect("--out needs a value")),
-            "--spacing" => spacing = args.next().expect("--spacing needs a value").parse().unwrap(),
-            "--base-y" => base_y = args.next().expect("--base-y needs a value").parse().unwrap(),
+            "--spacing" => {
+                spacing = args
+                    .next()
+                    .expect("--spacing needs a value")
+                    .parse()
+                    .unwrap()
+            }
+            "--base-y" => {
+                base_y = args
+                    .next()
+                    .expect("--base-y needs a value")
+                    .parse()
+                    .unwrap()
+            }
             other => {
                 // path[@x,y,z]
                 let (path_str, offset) = match other.split_once('@') {
@@ -92,8 +104,8 @@ fn parse_args() -> Cli {
 
 /// Load a `.schem` file into a `UniversalSchematic`.
 fn load_schem(path: &Path) -> UniversalSchematic {
-    let bytes = std::fs::read(path)
-        .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+    let bytes =
+        std::fs::read(path).unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
     from_schematic(&bytes)
         .unwrap_or_else(|e| panic!("failed to parse {} as .schem: {e}", path.display()))
 }
@@ -143,7 +155,10 @@ fn main() {
     };
 
     for p in &placements {
-        println!("wol_pack:   placement key={:?} offset={:?}", p.key, p.offset);
+        println!(
+            "wol_pack:   placement key={:?} offset={:?}",
+            p.key, p.offset
+        );
     }
 
     // --- pack: stream one schematic at a time into the sink ---
@@ -185,7 +200,10 @@ fn main() {
 
     // --- round-trip proof: re-read the world and check every placed block ---
     println!();
-    println!("wol_pack: round-trip verification (re-reading {})...", cli.out.display());
+    println!(
+        "wol_pack: round-trip verification (re-reading {})...",
+        cli.out.display()
+    );
     let world = read_world(&cli.out);
     let mut checked: u64 = 0;
     let mut missing: u64 = 0;
@@ -194,7 +212,10 @@ fn main() {
         let (ox, oy, oz) = p.offset;
         for (bp, block) in s.iter_blocks() {
             let name = block.name.as_str();
-            if matches!(name, "minecraft:air" | "minecraft:cave_air" | "minecraft:void_air") {
+            if matches!(
+                name,
+                "minecraft:air" | "minecraft:cave_air" | "minecraft:void_air"
+            ) {
                 continue;
             }
             let coord = (bp.x + ox, bp.y + oy, bp.z + oz);

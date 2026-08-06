@@ -14,13 +14,15 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use nucleation::BlockState;
 use nucleation::world_segment::ids::TileId;
 use nucleation::world_segment::partition::PartitionIndex;
 use nucleation::world_segment::profile::{ProfileParams, WorldProfile};
 use nucleation::world_segment::segment::{segment_tile, SegConfig};
-use nucleation::world_segment::source::{region_tile_bounds, Access, TileError, TileSource, REGION_BLOCKS};
+use nucleation::world_segment::source::{
+    region_tile_bounds, Access, TileError, TileSource, REGION_BLOCKS,
+};
 use nucleation::world_segment::tile::{TileBounds, VoxelTile};
+use nucleation::BlockState;
 
 /// An in-memory forward source, to exercise the trait without file I/O.
 struct MemSource {
@@ -46,8 +48,11 @@ impl TileSource for MemSource {
             // `TileBounds` is `Clone, Copy` (see `tile.rs`), so `*t.bounds()`
             // is a plain copy, not a move out of a borrow — this keeps the
             // borrow checker happy without changing what the brief intended.
-            let fresh =
-                VoxelTile::from_blocks(t.id(), *t.bounds(), t.blocks().map(|(p, b)| (p, b.clone())));
+            let fresh = VoxelTile::from_blocks(
+                t.id(),
+                *t.bounds(),
+                t.blocks().map(|(p, b)| (p, b.clone())),
+            );
             // Honor the `TileError::Stop` early-termination sentinel: stop
             // iterating and report success, never propagate `Stop` itself.
             match f(fresh) {
@@ -69,10 +74,16 @@ fn flat_tile(id: TileId, ox: i32, oz: i32) -> VoxelTile {
             }
         }
     }
-    blocks.push(((ox + 3, -59, oz + 3), BlockState::new("minecraft:redstone_wire")));
+    blocks.push((
+        (ox + 3, -59, oz + 3),
+        BlockState::new("minecraft:redstone_wire"),
+    ));
     VoxelTile::from_blocks(
         id,
-        TileBounds { min: (ox, -64, oz), max: (ox + 15, 63, oz + 15) },
+        TileBounds {
+            min: (ox, -64, oz),
+            max: (ox + 15, 63, oz + 15),
+        },
         blocks.into_iter(),
     )
 }
@@ -80,7 +91,10 @@ fn flat_tile(id: TileId, ox: i32, oz: i32) -> VoxelTile {
 #[test]
 fn derive_then_segment_end_to_end() {
     let tile = flat_tile(TileId { x: 0, z: 0 }, 0, 0);
-    let profile = WorldProfile::derive(&[flat_tile(TileId { x: 0, z: 0 }, 0, 0)], &ProfileParams::default());
+    let profile = WorldProfile::derive(
+        &[flat_tile(TileId { x: 0, z: 0 }, 0, 0)],
+        &ProfileParams::default(),
+    );
     // The stone slab is substrate; the redstone survives as one cluster.
     let cfg = SegConfig::default();
     let segs = segment_tile(&tile, &profile, &cfg, &PartitionIndex::new(vec![]));
@@ -110,7 +124,10 @@ fn region_tile(region_x: i32, region_z: i32, builds: &[(i32, i32, i32)]) -> Voxe
         }
     }
     for (dx, y, dz) in builds {
-        blocks.push(((ox + dx, *y, oz + dz), BlockState::new("minecraft:redstone_wire")));
+        blocks.push((
+            (ox + dx, *y, oz + dz),
+            BlockState::new("minecraft:redstone_wire"),
+        ));
     }
     VoxelTile::from_blocks(id, bounds, blocks.into_iter())
 }
@@ -178,7 +195,10 @@ fn source_streaming_is_order_independent() {
     };
 
     assert_eq!(forward.access(), Access::Forward);
-    assert!(matches!(forward.tile(TileId { x: 0, z: 0 }), Err(TileError::NotRandomAccess)));
+    assert!(matches!(
+        forward.tile(TileId { x: 0, z: 0 }),
+        Err(TileError::NotRandomAccess)
+    ));
 
     let forward_shape = stream_shape(&forward, &profile, &cfg, &idx);
     let backward_shape = stream_shape(&backward, &profile, &cfg, &idx);
@@ -195,10 +215,16 @@ fn source_streaming_is_order_independent() {
     expected.insert(TileId { x: 0, z: 0 }, vec![((10, -59, 10), (10, -59, 10))]);
     expected.insert(
         TileId { x: 1, z: 0 },
-        vec![((522, -59, 10), (522, -59, 10)), ((912, -59, 400), (912, -59, 400))],
+        vec![
+            ((522, -59, 10), (522, -59, 10)),
+            ((912, -59, 400), (912, -59, 400)),
+        ],
     );
     assert_eq!(forward_shape, expected);
 
     let total: usize = forward_shape.values().map(|v| v.len()).sum();
-    assert_eq!(total, 3, "one tile contributes 1 cluster, the other contributes 2");
+    assert_eq!(
+        total, 3,
+        "one tile contributes 1 cluster, the other contributes 2"
+    );
 }

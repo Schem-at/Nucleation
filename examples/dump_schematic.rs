@@ -6,7 +6,9 @@ use nucleation::formats::manager::get_manager;
 use std::collections::BTreeMap;
 
 fn main() {
-    let path = std::env::args().nth(1).expect("usage: dump_schematic <file>");
+    let path = std::env::args()
+        .nth(1)
+        .expect("usage: dump_schematic <file>");
     let data = std::fs::read(&path).expect("read");
     let schematic = get_manager().lock().unwrap().read(&data).expect("parse");
 

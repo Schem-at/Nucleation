@@ -41,9 +41,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             (pos, descriptor)
         })
         .collect();
-    let (min_x, min_y, min_z) = blocks.iter().fold((i32::MAX, i32::MAX, i32::MAX), |a, (p, _)| {
-        (a.0.min(p.x), a.1.min(p.y), a.2.min(p.z))
-    });
+    let (min_x, min_y, min_z) = blocks
+        .iter()
+        .fold((i32::MAX, i32::MAX, i32::MAX), |a, (p, _)| {
+            (a.0.min(p.x), a.1.min(p.y), a.2.min(p.z))
+        });
 
     // Block entities by (shifted) position, so a block can find its own tag.
     let mut tags: BTreeMap<(i32, i32, i32), String> = BTreeMap::new();
@@ -77,9 +79,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         size_y = size_y.max(y + 1);
         size_z = size_z.max(z + 1);
         match tags.get(&(x, y, z)) {
-            Some(nbt) => {
-                entries.push(format!("{{pos: [{x}, {y}, {z}], state: {index}, nbt: {nbt}}}"))
-            }
+            Some(nbt) => entries.push(format!(
+                "{{pos: [{x}, {y}, {z}], state: {index}, nbt: {nbt}}}"
+            )),
             None => entries.push(format!("{{pos: [{x}, {y}, {z}], state: {index}}}")),
         }
     }
@@ -132,7 +134,9 @@ fn render_nbt(entity: &nucleation::block_entity::BlockEntity) -> Option<String> 
         let rendered: Vec<String> = items
             .iter()
             .filter_map(|item| {
-                let NbtValue::Compound(fields) = item else { return None };
+                let NbtValue::Compound(fields) = item else {
+                    return None;
+                };
                 let id = match fields.get("id") {
                     Some(NbtValue::String(id)) => id.clone(),
                     _ => return None,

@@ -18,8 +18,7 @@ fn main() {
         .and_then(|s| s.parse().ok())
         .unwrap_or(216);
 
-    let a = BlockState::new("minecraft:oak_log")
-        .with_properties(vec![("axis".into(), "y".into())]);
+    let a = BlockState::new("minecraft:oak_log").with_properties(vec![("axis".into(), "y".into())]);
     let b = BlockState::new("minecraft:redstone_wire").with_properties(vec![
         ("north".into(), "side".into()),
         ("south".into(), "up".into()),
@@ -33,7 +32,11 @@ fn main() {
     for x in 0..side {
         for y in 0..side {
             for z in 0..side {
-                let blk = if (x * 7 + y * 13 + z) % 4 == 0 { &b } else { &a };
+                let blk = if (x * 7 + y * 13 + z) % 4 == 0 {
+                    &b
+                } else {
+                    &a
+                };
                 s.set_block(x, y, z, blk);
                 n += 1;
             }

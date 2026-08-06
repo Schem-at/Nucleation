@@ -52,8 +52,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(2);
     };
     let ticks: u64 = flag(&args, "--ticks").map_or(40, |v| v.parse().expect("--ticks N"));
-    let frames_per_tick: u32 = flag(&args, "--frames-per-tick")
-        .map_or(6, |v| v.parse().expect("--frames-per-tick N"));
+    let frames_per_tick: u32 =
+        flag(&args, "--frames-per-tick").map_or(6, |v| v.parse().expect("--frames-per-tick N"));
     let fps: f64 = flag(&args, "--fps").map_or(30.0, |v| v.parse().expect("--fps N"));
     let transparent = args.iter().any(|a| a == "--transparent");
     // Run vanilla's placement pass first — a community build saved mid-cycle
@@ -64,7 +64,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // iterates a HashSet whose order follows from absolute position.
     let hash_origin = flag(&args, "--origin")
         .map(|v| {
-            let c: Vec<i32> = v.split(',').map(|p| p.parse().expect("--origin x,y,z")).collect();
+            let c: Vec<i32> = v
+                .split(',')
+                .map(|p| p.parse().expect("--origin x,y,z"))
+                .collect();
             Pos::new(c[0], c[1], c[2])
         })
         .unwrap_or_default();
@@ -143,7 +146,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         None => {
             let seed: Option<i64> = flag(&args, "--seed").map(|v| v.parse().expect("--seed N"));
-            let out = simulate(snbt_path, ticks, &clicks, &pulses, &breaks, &places, settle, in_world, hash_origin, seed);
+            let out = simulate(
+                snbt_path,
+                ticks,
+                &clicks,
+                &pulses,
+                &breaks,
+                &places,
+                settle,
+                in_world,
+                hash_origin,
+                seed,
+            );
             println!("simulated {ticks} ticks, {} block changes", out.1.len());
             out
         }
@@ -163,7 +177,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "item tracks: {} ({} entity events)",
         item_tracks.len(),
-        item_tracks.iter().map(|t| t.positions.iter().flatten().count()).sum::<usize>()
+        item_tracks
+            .iter()
+            .map(|t| t.positions.iter().flatten().count())
+            .sum::<usize>()
     );
 
     // --assemble N: stagger the initial world's blocks into view across the
@@ -265,7 +282,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 (Some(a), Some(b)) if (b[0] - a[0]).abs() + (b[2] - a[2]).abs() > 1e-6 => {
                     let (dx, dz) = (b[0] - a[0], b[2] - a[2]);
                     if dx.abs() >= dz.abs() {
-                        if dx >= 0.0 { -90.0 } else { 90.0 }
+                        if dx >= 0.0 {
+                            -90.0
+                        } else {
+                            90.0
+                        }
                     } else if dz >= 0.0 {
                         0.0
                     } else {
@@ -287,8 +308,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else if let Some(item_id) = fireball_item {
             let mut ball = nucleation::Entity::new("minecraft:item".to_string(), (0.5, 0.0, 0.5));
             let mut item = std::collections::HashMap::new();
-            item.insert("id".to_string(), nucleation::NbtValue::String(item_id.to_string()));
-            ball.nbt.insert("Item".to_string(), nucleation::NbtValue::Compound(item));
+            item.insert(
+                "id".to_string(),
+                nucleation::NbtValue::String(item_id.to_string()),
+            );
+            ball.nbt
+                .insert("Item".to_string(), nucleation::NbtValue::Compound(item));
             one.add_entity(ball);
         } else if !track.kind.is_empty() && track.kind != "minecraft:item" {
             // Any other entity kind goes to the mesher's entity path as-is —
@@ -304,7 +329,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 (Some(a), Some(b)) => {
                     let (dx, dz) = (b[0] - a[0], b[2] - a[2]);
                     if dx.abs() >= dz.abs() {
-                        if dx >= 0.0 { -90.0 } else { 90.0 }
+                        if dx >= 0.0 {
+                            -90.0
+                        } else {
+                            90.0
+                        }
                     } else if dz >= 0.0 {
                         0.0
                     } else {
@@ -328,8 +357,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // path draws the real base + lid from entity/shulker/*.png. Other
             // item ids are not block ids; ingots and gems have a block form.
             let drawn = match track.item.as_str() {
-                "minecraft:diamond" | "minecraft:emerald" | "minecraft:lapis_lazuli"
-                | "minecraft:coal" | "minecraft:redstone" => format!("{}_block", track.item),
+                "minecraft:diamond"
+                | "minecraft:emerald"
+                | "minecraft:lapis_lazuli"
+                | "minecraft:coal"
+                | "minecraft:redstone" => format!("{}_block", track.item),
                 other => other.replace("_ingot", "_block"),
             };
             if one.set_block_from_string(0, 0, 0, &drawn).is_err() {
@@ -347,14 +379,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // path (`minecraft:dragon_fireball` comes back empty); the
             // fire charge is the same class of sprite and scales to size.
             let mut retry = UniversalSchematic::new("item".to_string());
-            let mut ball =
-                nucleation::Entity::new("minecraft:item".to_string(), (0.5, 0.0, 0.5));
+            let mut ball = nucleation::Entity::new("minecraft:item".to_string(), (0.5, 0.0, 0.5));
             let mut item = std::collections::HashMap::new();
             item.insert(
                 "id".to_string(),
                 nucleation::NbtValue::String("minecraft:fire_charge".to_string()),
             );
-            ball.nbt.insert("Item".to_string(), nucleation::NbtValue::Compound(item));
+            ball.nbt
+                .insert("Item".to_string(), nucleation::NbtValue::Compound(item));
             retry.add_entity(ball);
             mesh = retry.to_mesh(&pack, &mesh_config)?;
         }
@@ -373,7 +405,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             meshes.len(),
             track.kind,
             track.item,
-            mesh.opaque.positions.len() + mesh.cutout.positions.len()
+            mesh.opaque.positions.len()
+                + mesh.cutout.positions.len()
                 + mesh.transparent.positions.len(),
             lo,
             hi
@@ -443,8 +476,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     (lo[2] + hi[2]) * 0.5,
                 ];
                 let size = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
-                let cart =
-                    track.kind.ends_with("minecart") || track.item == "minecraft:minecart";
+                let cart = track.kind.ends_with("minecart") || track.item == "minecraft:minecart";
                 // Anchor the *measured* mesh box onto the entity's hitbox:
                 // scale about the mesh centre, then move that centre onto the
                 // target point. No assumptions about any mesher path's origin.
@@ -453,17 +485,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // unscaled — the hull is wider than the 0.98 box in the
                     // game too. A hair down so an entombed cart's floor-flush
                     // rim does not z-fight its block.
-                    (1.0, [p[0] as f32, p[1] as f32 - 0.005 + size[1] * 0.5, p[2] as f32])
+                    (
+                        1.0,
+                        [
+                            p[0] as f32,
+                            p[1] as f32 - 0.005 + size[1] * 0.5,
+                            p[2] as f32,
+                        ],
+                    )
                 } else if track.kind == "minecraft:small_fireball"
                     || track.kind == "minecraft:fireball"
                     || track.kind == "minecraft:dragon_fireball"
                 {
                     // The item sprite scaled to the fireball's height, centred
                     // on its box.
-                    let height: f32 =
-                        if track.kind == "minecraft:dragon_fireball" { 1.0 } else { 0.3125 };
+                    let height: f32 = if track.kind == "minecraft:dragon_fireball" {
+                        1.0
+                    } else {
+                        0.3125
+                    };
                     let extent = size[0].max(size[1]).max(size[2]).max(1.0e-4);
-                    (height / extent, [p[0] as f32, p[1] as f32 + height * 0.5, p[2] as f32])
+                    (
+                        height / extent,
+                        [p[0] as f32, p[1] as f32 + height * 0.5, p[2] as f32],
+                    )
                 } else if !track.kind.is_empty() && track.kind != "minecraft:item" {
                     // A mob model draws at its authored size, anchored by the
                     // model's own ground plane — mesh-frame y = -0.5, where a
@@ -471,12 +516,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // difference is every mob whose visual floats: a blaze's
                     // lowest rod hangs 0.2525 above its feet, and bbox
                     // anchoring would plant it on the ground.
-                    (1.0, [p[0] as f32, p[1] as f32 + 0.5 + center[1], p[2] as f32])
+                    (
+                        1.0,
+                        [p[0] as f32, p[1] as f32 + 0.5 + center[1], p[2] as f32],
+                    )
                 } else {
                     // Dropped items draw at vanilla's quarter block scale,
                     // hovering an eighth above the entity position.
                     let extent = size[0].max(size[1]).max(size[2]).max(1.0e-4);
-                    (0.25 / extent, [p[0] as f32, p[1] as f32 + 0.125, p[2] as f32])
+                    (
+                        0.25 / extent,
+                        [p[0] as f32, p[1] as f32 + 0.125, p[2] as f32],
+                    )
                 };
                 pose.scale = [scale; 3];
                 pose.pivot = center;
@@ -573,9 +624,13 @@ fn parse_entity_log(path: &str, ticks: u64) -> Vec<ItemTrack> {
     let mut tracks: Vec<ItemTrack> = Vec::new();
     for line in text.lines() {
         let line = line.trim_start();
-        let Some(rest) = line.strip_prefix("E t") else { continue };
+        let Some(rest) = line.strip_prefix("E t") else {
+            continue;
+        };
         let mut parts = rest.split_whitespace();
-        let Some(tick) = parts.next().and_then(|v| v.parse::<u64>().ok()) else { continue };
+        let Some(tick) = parts.next().and_then(|v| v.parse::<u64>().ok()) else {
+            continue;
+        };
         let Some(id) = parts
             .next()
             .and_then(|v| v.strip_prefix("id="))
@@ -584,8 +639,7 @@ fn parse_entity_log(path: &str, ticks: u64) -> Vec<ItemTrack> {
             continue;
         };
         let Some(kind) = parts.next() else { continue };
-        let Some(pos_text) = line.split("pos=(").nth(1).and_then(|v| v.split(')').next())
-        else {
+        let Some(pos_text) = line.split("pos=(").nth(1).and_then(|v| v.split(')').next()) else {
             continue;
         };
         let coords: Vec<f64> = pos_text
@@ -709,7 +763,9 @@ fn simulate(
             let base = stack.id.split('[').next().unwrap_or(&stack.id);
             if base.ends_with("_shulker_box") || base == "minecraft:shulker_box" {
                 for facing in ["up", "down", "north", "south", "west", "east"] {
-                    let _ = sim.registry_mut().intern(&format!("{base}[facing={facing}]"));
+                    let _ = sim
+                        .registry_mut()
+                        .intern(&format!("{base}[facing={facing}]"));
                 }
             }
         }
@@ -750,11 +806,13 @@ fn simulate(
             mc_tick::structure::SpawnedEntity::Minecart(cart) => {
                 let vehicle = sim.spawn_authored_minecart(cart, None);
                 for rider in &cart.passengers {
-                    sim.spawn_authored_rider(vehicle, rider).expect("rider spawn");
+                    sim.spawn_authored_rider(vehicle, rider)
+                        .expect("rider spawn");
                 }
             }
             mc_tick::structure::SpawnedEntity::FurnaceMinecart(cart) => {
-                sim.spawn_authored_furnace_minecart(cart, None).expect("furnace cart spawn");
+                sim.spawn_authored_furnace_minecart(cart, None)
+                    .expect("furnace cart spawn");
             }
             mc_tick::structure::SpawnedEntity::Body(body) => {
                 sim.spawn_authored_body(body).expect("body spawn");
@@ -779,9 +837,19 @@ fn simulate(
             .find(|(p, _)| p == pos)
             .map(|(_, e)| *e)
             .expect("inventory with no block");
-        let name = structure.palette[entry].split('[').next().unwrap_or_default();
+        let name = structure.palette[entry]
+            .split('[')
+            .next()
+            .unwrap_or_default();
         let slots = mc_tick::vanilla::container_slots(name).expect("container slot count");
-        sim.set_inventory(*pos, mc_tick::Inventory { slots, stacks: stacks.clone() });
+        sim.set_inventory(
+            *pos,
+            mc_tick::Inventory {
+                slots,
+                stacks: stacks.clone(),
+                blocked_slots: structure.blocked_slots_at(*pos),
+            },
+        );
     }
     let redstone_block = sim
         .registry_mut()
@@ -975,7 +1043,9 @@ fn build_cast(
                         }),
                     });
                 }
-                Some(next) if next != "minecraft:air" && !next.starts_with("minecraft:moving_piston") => {
+                Some(next)
+                    if next != "minecraft:air" && !next.starts_with("minecraft:moving_piston") =>
+                {
                     // A block in flight toward this position. Its source is the
                     // adjacent position that lost the same state on this tick;
                     // a piston head has no source block — it emerges from the base.
@@ -1078,7 +1148,9 @@ fn type_of(moving_descriptor: &str) -> &'static str {
 /// Whether `next` is `previous` with extended flipped true -> false — the
 /// signature of a retracting piston base.
 fn is_extended_false_of(previous: Option<&str>, next: &str) -> bool {
-    let Some(previous) = previous else { return false };
+    let Some(previous) = previous else {
+        return false;
+    };
     (next.starts_with("minecraft:piston[") || next.starts_with("minecraft:sticky_piston["))
         && next.contains("extended=false")
         && previous.replace("extended=true", "extended=false") == next

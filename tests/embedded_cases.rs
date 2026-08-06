@@ -37,7 +37,9 @@ fn run_file(path: &Path) -> Result<(), String> {
     let bytes = std::fs::read(path).map_err(|e| format!("reading {}: {e}", path.display()))?;
     let schematic = {
         let manager = nucleation::formats::manager::get_manager();
-        let manager = manager.lock().map_err(|e| format!("{file}: format manager: {e}"))?;
+        let manager = manager
+            .lock()
+            .map_err(|e| format!("{file}: format manager: {e}"))?;
         manager
             .read(&bytes)
             .map_err(|e| format!("{file}: no importer recognises it: {e:?}"))?
@@ -73,8 +75,7 @@ fn run_file(path: &Path) -> Result<(), String> {
         // which keeps NaN velocities. Read it at the wrong version and its nan
         // carts load as ordinary carts and the door silently un-glues, so this
         // comes from the file rather than from the descriptor.
-        if let Err(report) =
-            scenario::run(&structure, case, schematic.metadata.source_data_version)
+        if let Err(report) = scenario::run(&structure, case, schematic.metadata.source_data_version)
         {
             failures.push(report);
         }
@@ -97,7 +98,10 @@ fn every_self_testing_schematic_passes() {
         // Anything except documentation is expected to be a loadable carrier;
         // an unreadable file is a loud failure, not a skip.
         .filter(|p| p.is_file())
-        .filter(|p| !p.file_name().is_some_and(|n| n.to_string_lossy().starts_with('.')))
+        .filter(|p| {
+            !p.file_name()
+                .is_some_and(|n| n.to_string_lossy().starts_with('.'))
+        })
         .filter(|p| p.extension().is_none_or(|e| e != "md"))
         .filter(|p| filter.is_empty() || p.to_string_lossy().contains(&filter))
         .collect();

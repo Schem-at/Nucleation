@@ -41,8 +41,11 @@
 use mc_tick::{Pos, Structure};
 use nucleation::formats::gametest::to_gametest_snbt;
 
-#[path = "../crates/mc-tick/tests/support/scenario.rs"]
-mod scenario;
+// The harness the embedded scenarios run on. This was once a `#[path]` module
+// pointing into mc-tick's test support; it is a real crate now, and sharing it
+// is the point — an inspector that measures a build differently from the suite
+// that judges it is an inspector that lies.
+use mc_test as scenario;
 
 fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
     args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).map(String::as_str)
@@ -154,6 +157,7 @@ fn main() {
         &structure,
         Pos::new(0, 0, 0),
         settle,
+        &[],
         &[],
         schematic.metadata.source_data_version,
         "inspect",

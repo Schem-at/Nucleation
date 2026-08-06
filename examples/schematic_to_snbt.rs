@@ -71,7 +71,10 @@ fn main() {
     );
 }
 
-fn render_palette_entry(name: &str, properties: &[(smol_str::SmolStr, smol_str::SmolStr)]) -> String {
+fn render_palette_entry(
+    name: &str,
+    properties: &[(smol_str::SmolStr, smol_str::SmolStr)],
+) -> String {
     if properties.is_empty() {
         return format!("{{Name: \"{name}\"}}");
     }
@@ -81,5 +84,8 @@ fn render_palette_entry(name: &str, properties: &[(smol_str::SmolStr, smol_str::
         .iter()
         .map(|(k, v)| format!("{k}: \"{v}\""))
         .collect();
-    format!("{{Name: \"{name}\", Properties: {{{}}}}}", rendered.join(", "))
+    format!(
+        "{{Name: \"{name}\", Properties: {{{}}}}}",
+        rendered.join(", ")
+    )
 }

@@ -12,9 +12,8 @@
 
 use std::collections::BTreeSet;
 
-use nucleation::BlockState;
-use nucleation::world_segment::ids::TileId;
 use nucleation::world_segment::identity::PriorBuild;
+use nucleation::world_segment::ids::TileId;
 use nucleation::world_segment::partition::PartitionIndex;
 use nucleation::world_segment::profile::WorldProfile;
 use nucleation::world_segment::provenance::Provenance;
@@ -23,6 +22,7 @@ use nucleation::world_segment::score::{ScoreConfig, Tier};
 use nucleation::world_segment::segment::SegConfig;
 use nucleation::world_segment::source::{region_tile_bounds, Access, TileError, TileSource};
 use nucleation::world_segment::tile::{TileBounds, VoxelTile};
+use nucleation::BlockState;
 
 /// An in-memory forward source yielding a fixed list of pre-built tiles, in
 /// whatever order the caller supplied them. Mirrors the `MemSource` pattern
@@ -46,8 +46,11 @@ impl TileSource for MemSource {
         f: &mut dyn FnMut(VoxelTile) -> Result<(), TileError>,
     ) -> Result<(), TileError> {
         for t in &self.tiles {
-            let fresh =
-                VoxelTile::from_blocks(t.id(), *t.bounds(), t.blocks().map(|(p, b)| (p, b.clone())));
+            let fresh = VoxelTile::from_blocks(
+                t.id(),
+                *t.bounds(),
+                t.blocks().map(|(p, b)| (p, b.clone())),
+            );
             // Honor the `TileError::Stop` early-termination sentinel: stop
             // iterating and report success, never propagate `Stop` itself.
             match f(fresh) {
@@ -61,10 +64,7 @@ impl TileSource for MemSource {
 }
 
 fn profile() -> WorldProfile {
-    WorldProfile::new(
-        BTreeSet::from(["minecraft:stone".to_string()]),
-        (-64, -60),
-    )
+    WorldProfile::new(BTreeSet::from(["minecraft:stone".to_string()]), (-64, -60))
 }
 
 fn seg_config() -> SegConfig {
@@ -134,7 +134,10 @@ fn cross_tile_build_stitches_into_one() {
         // so it is unambiguously not scored as Debris — the point of this
         // test is the stitch, not the tiering, so tier is asserted only to
         // rule out the trivial "it's debris and nobody looked" reading.
-        score_config: ScoreConfig { debris_max_blocks: 5, ..ScoreConfig::default() },
+        score_config: ScoreConfig {
+            debris_max_blocks: 5,
+            ..ScoreConfig::default()
+        },
         source_id: "src-stitch".to_string(),
         snapshot_id: "snap-1".to_string(),
         min_y: -64,
@@ -151,18 +154,30 @@ fn cross_tile_build_stitches_into_one() {
         "the substrate slabs vanish and the two build halves stitch into exactly one build; \
          got {} builds: {:?}",
         out.len(),
-        out.iter().map(|b| (b.provenance.world_bbox, b.provenance.block_count)).collect::<Vec<_>>()
+        out.iter()
+            .map(|b| (b.provenance.world_bbox, b.provenance.block_count))
+            .collect::<Vec<_>>()
     );
     let mb = &out[0];
-    assert_eq!(mb.provenance.block_count, 20, "10 blocks from each tile half");
+    assert_eq!(
+        mb.provenance.block_count, 20,
+        "10 blocks from each tile half"
+    );
     assert_eq!(
         mb.provenance.world_bbox,
         ((500, 10, 250), (521, 10, 250)),
         "the bbox must span both tiles' x-range, proving the two halves were stitched, \
          not just independently discovered"
     );
-    assert_ne!(mb.provenance.tier, Tier::Debris, "20 blocks exceeds the lowered debris threshold");
-    assert_eq!(mb.provenance.cluster_count, 2, "one absorbed cluster from each tile");
+    assert_ne!(
+        mb.provenance.tier,
+        Tier::Debris,
+        "20 blocks exceeds the lowered debris threshold"
+    );
+    assert_eq!(
+        mb.provenance.cluster_count, 2,
+        "one absorbed cluster from each tile"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -171,7 +186,10 @@ fn cross_tile_build_stitches_into_one() {
 
 #[test]
 fn substrate_removed_debris_tiered_not_dropped() {
-    let bounds = TileBounds { min: (0, -64, 0), max: (255, 63, 255) };
+    let bounds = TileBounds {
+        min: (0, -64, 0),
+        max: (255, 63, 255),
+    };
     let id = TileId { x: 0, z: 0 };
 
     let mut blocks: Vec<((i32, i32, i32), BlockState)> = Vec::new();
@@ -185,14 +203,19 @@ fn substrate_removed_debris_tiered_not_dropped() {
     // and from the speck below (150 blocks, one contiguous cluster).
     for x in 0..15 {
         for z in 0..10 {
-            blocks.push(((100 + x, 10, 100 + z), BlockState::new("minecraft:redstone_wire")));
+            blocks.push((
+                (100 + x, 10, 100 + z),
+                BlockState::new("minecraft:redstone_wire"),
+            ));
         }
     }
     // A 1-block speck, far from everything above (beyond the closing
     // distance in every direction), so it stays its own cluster.
     blocks.push(((200, 10, 200), BlockState::new("minecraft:redstone_wire")));
 
-    let source = MemSource { tiles: vec![VoxelTile::from_blocks(id, bounds, blocks.into_iter())] };
+    let source = MemSource {
+        tiles: vec![VoxelTile::from_blocks(id, bounds, blocks.into_iter())],
+    };
     let profile = profile();
     let partitions = PartitionIndex::new(vec![]);
     let job = SegmentJob {
@@ -208,18 +231,38 @@ fn substrate_removed_debris_tiered_not_dropped() {
 
     let out = WorldSegmenter::run(&source, &profile, &partitions, &job, &[]);
 
-    assert_eq!(out.len(), 2, "the slab contributes zero builds; the real build and the speck both survive");
+    assert_eq!(
+        out.len(),
+        2,
+        "the slab contributes zero builds; the real build and the speck both survive"
+    );
 
-    let real = out.iter().find(|b| b.provenance.block_count == 150).expect("the real build must be present");
-    let speck = out.iter().find(|b| b.provenance.block_count == 1).expect("the speck must be present, not dropped");
+    let real = out
+        .iter()
+        .find(|b| b.provenance.block_count == 150)
+        .expect("the real build must be present");
+    let speck = out
+        .iter()
+        .find(|b| b.provenance.block_count == 1)
+        .expect("the speck must be present, not dropped");
 
-    assert_ne!(real.provenance.tier, Tier::Debris, "150 blocks exceeds debris_max_blocks (100)");
-    assert_eq!(speck.provenance.tier, Tier::Debris, "a 1-block cluster is debris");
+    assert_ne!(
+        real.provenance.tier,
+        Tier::Debris,
+        "150 blocks exceeds debris_max_blocks (100)"
+    );
+    assert_eq!(
+        speck.provenance.tier,
+        Tier::Debris,
+        "a 1-block cluster is debris"
+    );
 
     // The slab is gone: neither surviving build contains stone, and no build
     // has anything close to the slab's 256-block volume.
     assert_eq!(
-        real.schematic.get_block(0, 0, 0).map(|b| b.get_name().to_string()),
+        real.schematic
+            .get_block(0, 0, 0)
+            .map(|b| b.get_name().to_string()),
         Some("minecraft:redstone_wire".to_string())
     );
     assert!(
@@ -275,13 +318,20 @@ fn order_test_world(reversed: bool) -> MemSource {
     }
     // 6-block build, dead center of region 1 (x in [512,1023]).
     for i in 0..6 {
-        blocks1.push(((512 + 250 + i, 10, 250), BlockState::new("minecraft:redstone_wire")));
+        blocks1.push((
+            (512 + 250 + i, 10, 250),
+            BlockState::new("minecraft:redstone_wire"),
+        ));
     }
 
     let tile0 = VoxelTile::from_blocks(id0, bounds0, blocks0.into_iter());
     let tile1 = VoxelTile::from_blocks(id1, bounds1, blocks1.into_iter());
 
-    let tiles = if reversed { vec![tile1, tile0] } else { vec![tile0, tile1] };
+    let tiles = if reversed {
+        vec![tile1, tile0]
+    } else {
+        vec![tile0, tile1]
+    };
     MemSource { tiles }
 }
 
@@ -318,14 +368,21 @@ fn two_identical_runs_are_byte_identical() {
     a.sort_by_key(|p| p.stable_build_id);
     b.sort_by_key(|p| p.stable_build_id);
 
-    assert_eq!(a.len(), 2, "the two center builds must not stitch across the seam");
+    assert_eq!(
+        a.len(),
+        2,
+        "the two center builds must not stitch across the seam"
+    );
     // Full provenance equality, not merely a count or a stable-id set: this
     // also pins `fingerprint`, `world_bbox`, `block_count`, `tier`,
     // `config_hash` and `profile_hash` being identical across runs. A clock
     // read in `materialize` (instead of using `job.extracted_at`) or a
     // `HashMap` anywhere upstream of these fields would make this fail even
     // though both runs are, by construction, given identical input.
-    assert_eq!(a, b, "two runs of the same world with the same extracted_at must be byte-identical");
+    assert_eq!(
+        a, b,
+        "two runs of the same world with the same extracted_at must be byte-identical"
+    );
 }
 
 #[test]
@@ -341,9 +398,15 @@ fn tile_order_does_not_change_the_result() {
     assert_eq!(backward.len(), 2);
 
     let forward_set: BTreeSet<(nucleation::world_segment::provenance::StableBuildId, u128)> =
-        forward.iter().map(|b| (b.provenance.stable_build_id, b.provenance.fingerprint)).collect();
+        forward
+            .iter()
+            .map(|b| (b.provenance.stable_build_id, b.provenance.fingerprint))
+            .collect();
     let backward_set: BTreeSet<(nucleation::world_segment::provenance::StableBuildId, u128)> =
-        backward.iter().map(|b| (b.provenance.stable_build_id, b.provenance.fingerprint)).collect();
+        backward
+            .iter()
+            .map(|b| (b.provenance.stable_build_id, b.provenance.fingerprint))
+            .collect();
 
     assert_eq!(
         forward_set, backward_set,
@@ -371,7 +434,10 @@ fn tile_order_does_not_change_the_result() {
 
 #[test]
 fn edited_build_inherits_stable_id_new_fingerprint() {
-    let bounds = TileBounds { min: (0, -64, 0), max: (63, 63, 63) };
+    let bounds = TileBounds {
+        min: (0, -64, 0),
+        max: (63, 63, 63),
+    };
     let id = TileId { x: 0, z: 0 };
     let profile = profile();
     let partitions = PartitionIndex::new(vec![]);
@@ -381,7 +447,9 @@ fn edited_build_inherits_stable_id_new_fingerprint() {
     for x in 0..10 {
         blocks1.push(((x, 10, 10), BlockState::new("minecraft:redstone_wire")));
     }
-    let source1 = MemSource { tiles: vec![VoxelTile::from_blocks(id, bounds, blocks1.into_iter())] };
+    let source1 = MemSource {
+        tiles: vec![VoxelTile::from_blocks(id, bounds, blocks1.into_iter())],
+    };
     let job1 = SegmentJob {
         config: seg_config(),
         score_config: ScoreConfig::default(),
@@ -412,8 +480,14 @@ fn edited_build_inherits_stable_id_new_fingerprint() {
     for x in 0..15 {
         blocks2.push(((x, 10, 10), BlockState::new("minecraft:redstone_wire")));
     }
-    let source2 = MemSource { tiles: vec![VoxelTile::from_blocks(id, bounds, blocks2.into_iter())] };
-    let job2 = SegmentJob { snapshot_id: "snap-2".to_string(), extracted_at: 1_700_001_000, ..job1 };
+    let source2 = MemSource {
+        tiles: vec![VoxelTile::from_blocks(id, bounds, blocks2.into_iter())],
+    };
+    let job2 = SegmentJob {
+        snapshot_id: "snap-2".to_string(),
+        extracted_at: 1_700_001_000,
+        ..job1
+    };
     let out2 = WorldSegmenter::run(&source2, &profile, &partitions, &job2, &prior);
     assert_eq!(out2.len(), 1);
     let snap2 = &out2[0];
@@ -427,5 +501,8 @@ fn edited_build_inherits_stable_id_new_fingerprint() {
         "the edit (5 more blocks) must be detected: the fingerprint must differ"
     );
     assert_eq!(snap1.provenance.block_count, 10);
-    assert_eq!(snap2.provenance.block_count, 15, "the extra blocks must actually be present");
+    assert_eq!(
+        snap2.provenance.block_count, 15,
+        "the extra blocks must actually be present"
+    );
 }

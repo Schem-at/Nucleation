@@ -5,22 +5,28 @@
 
 // `block_state` is a private module re-exported at the crate root, so external
 // tests must use `nucleation::BlockState`, not `nucleation::block_state::…`.
-use nucleation::BlockState;
 use nucleation::world_segment::ids::TileId;
 use nucleation::world_segment::partition::{PartitionHint, PartitionIndex};
 use nucleation::world_segment::profile::WorldProfile;
 use nucleation::world_segment::segment::{segment_tile, SegConfig, TileSegments};
 use nucleation::world_segment::tile::{TileBounds, VoxelTile};
+use nucleation::BlockState;
 
 fn profile() -> WorldProfile {
     WorldProfile::new(
-        ["minecraft:stone", "minecraft:bedrock"].iter().map(|s| s.to_string()).collect(),
+        ["minecraft:stone", "minecraft:bedrock"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
         (-64, -50),
     )
 }
 
 fn bounds() -> TileBounds {
-    TileBounds { min: (0, -64, 0), max: (255, 127, 255) }
+    TileBounds {
+        min: (0, -64, 0),
+        max: (255, 127, 255),
+    }
 }
 
 /// A deterministic pseudo-random scene: no RNG, just an arithmetic walk so the
@@ -48,7 +54,12 @@ fn scene() -> Vec<((i32, i32, i32), BlockState)> {
 }
 
 fn config() -> SegConfig {
-    SegConfig { cell_size: 4, closing_radius: 2, min_cluster_blocks: 1, ..SegConfig::default() }
+    SegConfig {
+        cell_size: 4,
+        closing_radius: 2,
+        min_cluster_blocks: 1,
+        ..SegConfig::default()
+    }
 }
 
 fn run(blocks: Vec<((i32, i32, i32), BlockState)>, hints: &PartitionIndex) -> TileSegments {
@@ -76,7 +87,10 @@ fn cluster_ids_match_their_golden_values() {
     // Everything the id depends on is spelled out literally, so that a change
     // to any `Default` cannot silently alter what is being pinned.
     let profile = WorldProfile::new(
-        ["minecraft:bedrock", "minecraft:stone"].iter().map(|s| s.to_string()).collect(),
+        ["minecraft:bedrock", "minecraft:stone"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
         (-64, -50),
     );
     let cfg = SegConfig {
@@ -88,7 +102,10 @@ fn cluster_ids_match_their_golden_values() {
         partition_floor_share: None,
         split_disconnected: None,
     };
-    let tile_bounds = TileBounds { min: (0, -64, 0), max: (127, 63, 127) };
+    let tile_bounds = TileBounds {
+        min: (0, -64, 0),
+        max: (127, 63, 127),
+    };
 
     // Two clusters, far enough apart not to merge:
     //   (40,10,40) -> cell (40/4, (10+64)/4, 40/4) = (10,18,10)
@@ -104,12 +121,19 @@ fn cluster_ids_match_their_golden_values() {
     let tile = VoxelTile::from_blocks(TileId { x: 0, z: 0 }, tile_bounds, blocks.into_iter());
     let segs = segment_tile(&tile, &profile, &cfg, &PartitionIndex::new(vec![]));
 
-    assert_eq!(segs.clusters.len(), 2, "the fixture must produce exactly two clusters");
+    assert_eq!(
+        segs.clusters.len(),
+        2,
+        "the fixture must produce exactly two clusters"
+    );
 
     // Sorted by content so the comparison does not depend on the id ordering
     // that is itself under test.
-    let mut got: Vec<(((i32, i32, i32), (i32, i32, i32)), String)> =
-        segs.clusters.iter().map(|c| (c.bbox, c.id.to_string())).collect();
+    let mut got: Vec<(((i32, i32, i32), (i32, i32, i32)), String)> = segs
+        .clusters
+        .iter()
+        .map(|c| (c.bbox, c.id.to_string()))
+        .collect();
     got.sort();
 
     // Recomputed when `config_hash` gained the partition-hint digest and its
@@ -118,8 +142,14 @@ fn cluster_ids_match_their_golden_values() {
     assert_eq!(
         got,
         vec![
-            (((40, 10, 40), (41, 10, 40)), "9e38703e70fe5d6e43c629571178e2a8".to_string()),
-            (((100, 10, 40), (100, 10, 40)), "b91d2e9ac3f1708aefffe93e44f0f0ac".to_string()),
+            (
+                ((40, 10, 40), (41, 10, 40)),
+                "9e38703e70fe5d6e43c629571178e2a8".to_string()
+            ),
+            (
+                ((100, 10, 40), (100, 10, 40)),
+                "b91d2e9ac3f1708aefffe93e44f0f0ac".to_string()
+            ),
         ],
         "ClusterId hex must be byte-identical across processes and runs"
     );
@@ -146,7 +176,10 @@ fn cluster_ids_match_their_golden_values_under_hard_cut() {
     use nucleation::world_segment::partition::PartitionPolicy;
 
     let profile = WorldProfile::new(
-        ["minecraft:bedrock", "minecraft:stone"].iter().map(|s| s.to_string()).collect(),
+        ["minecraft:bedrock", "minecraft:stone"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
         (-64, -50),
     );
     let cfg = SegConfig {
@@ -158,15 +191,26 @@ fn cluster_ids_match_their_golden_values_under_hard_cut() {
         partition_floor_share: None,
         split_disconnected: None,
     };
-    let tile_bounds = TileBounds { min: (0, -64, 0), max: (127, 63, 127) };
+    let tile_bounds = TileBounds {
+        min: (0, -64, 0),
+        max: (127, 63, 127),
+    };
 
     // Boundary at x = 62 (not a multiple of `cell_size`), so the hints are
     // genuinely exercised rather than being incidentally cell-aligned.
     //   (40,10,40), (41,10,40) -> cell (10,18,10), partition "L"
     //   (100,10,40)            -> cell (25,18,10), partition "R"
     let hints = vec![
-        PartitionHint { id: "L".into(), bbox_xz: (0, 61, 0, 127), y_range: None },
-        PartitionHint { id: "R".into(), bbox_xz: (62, 127, 0, 127), y_range: None },
+        PartitionHint {
+            id: "L".into(),
+            bbox_xz: (0, 61, 0, 127),
+            y_range: None,
+        },
+        PartitionHint {
+            id: "R".into(),
+            bbox_xz: (62, 127, 0, 127),
+            y_range: None,
+        },
     ];
     let blocks = vec![
         ((40, 10, 40), BlockState::new("minecraft:redstone_wire")),
@@ -176,17 +220,30 @@ fn cluster_ids_match_their_golden_values_under_hard_cut() {
     let tile = VoxelTile::from_blocks(TileId { x: 0, z: 0 }, tile_bounds, blocks.into_iter());
     let segs = segment_tile(&tile, &profile, &cfg, &PartitionIndex::new(hints));
 
-    assert_eq!(segs.clusters.len(), 2, "the fixture must produce exactly two clusters");
+    assert_eq!(
+        segs.clusters.len(),
+        2,
+        "the fixture must produce exactly two clusters"
+    );
 
-    let mut got: Vec<(Option<String>, String)> =
-        segs.clusters.iter().map(|c| (c.partition_id.clone(), c.id.to_string())).collect();
+    let mut got: Vec<(Option<String>, String)> = segs
+        .clusters
+        .iter()
+        .map(|c| (c.partition_id.clone(), c.id.to_string()))
+        .collect();
     got.sort();
 
     assert_eq!(
         got,
         vec![
-            (Some("L".to_string()), "fca7f13edbc317c227e41deee7d60552".to_string()),
-            (Some("R".to_string()), "26c7af60fb2a193a0b4421de6806e48b".to_string()),
+            (
+                Some("L".to_string()),
+                "fca7f13edbc317c227e41deee7d60552".to_string()
+            ),
+            (
+                Some("R".to_string()),
+                "26c7af60fb2a193a0b4421de6806e48b".to_string()
+            ),
         ],
         "ClusterId hex under HardCut must be byte-identical across processes and runs"
     );
@@ -209,7 +266,10 @@ fn block_insertion_order_does_not_affect_output() {
     reversed.reverse();
     let backward = run(reversed, &empty);
 
-    assert_eq!(forward, backward, "reversing input order changed the result");
+    assert_eq!(
+        forward, backward,
+        "reversing input order changed the result"
+    );
 }
 
 #[test]
@@ -252,14 +312,29 @@ fn disjoint_hint_order_does_not_affect_output() {
     use nucleation::world_segment::partition::PartitionPolicy;
 
     let hints = vec![
-        PartitionHint { id: "p1".into(), bbox_xz: (0, 127, 0, 127), y_range: None },
-        PartitionHint { id: "p2".into(), bbox_xz: (128, 255, 0, 127), y_range: None },
-        PartitionHint { id: "p3".into(), bbox_xz: (0, 127, 128, 255), y_range: None },
+        PartitionHint {
+            id: "p1".into(),
+            bbox_xz: (0, 127, 0, 127),
+            y_range: None,
+        },
+        PartitionHint {
+            id: "p2".into(),
+            bbox_xz: (128, 255, 0, 127),
+            y_range: None,
+        },
+        PartitionHint {
+            id: "p3".into(),
+            bbox_xz: (0, 127, 128, 255),
+            y_range: None,
+        },
     ];
     let mut reversed = hints.clone();
     reversed.reverse();
 
-    let cfg = SegConfig { partition_policy: PartitionPolicy::HardCut, ..config() };
+    let cfg = SegConfig {
+        partition_policy: PartitionPolicy::HardCut,
+        ..config()
+    };
     let tile_a = VoxelTile::from_blocks(TileId { x: 0, z: 0 }, bounds(), scene().into_iter());
     let tile_b = VoxelTile::from_blocks(TileId { x: 0, z: 0 }, bounds(), scene().into_iter());
 
@@ -287,13 +362,24 @@ fn overlapping_hint_order_does_not_affect_output() {
     use nucleation::world_segment::partition::PartitionPolicy;
 
     let hints = vec![
-        PartitionHint { id: "a".into(), bbox_xz: (0, 200, 0, 255), y_range: None },
-        PartitionHint { id: "b".into(), bbox_xz: (100, 255, 0, 255), y_range: None },
+        PartitionHint {
+            id: "a".into(),
+            bbox_xz: (0, 200, 0, 255),
+            y_range: None,
+        },
+        PartitionHint {
+            id: "b".into(),
+            bbox_xz: (100, 255, 0, 255),
+            y_range: None,
+        },
     ];
     let mut reversed = hints.clone();
     reversed.reverse();
 
-    let cfg = SegConfig { partition_policy: PartitionPolicy::HardCut, ..config() };
+    let cfg = SegConfig {
+        partition_policy: PartitionPolicy::HardCut,
+        ..config()
+    };
     let tile_a = VoxelTile::from_blocks(TileId { x: 0, z: 0 }, bounds(), scene().into_iter());
     let tile_b = VoxelTile::from_blocks(TileId { x: 0, z: 0 }, bounds(), scene().into_iter());
 
@@ -310,10 +396,21 @@ fn no_cluster_spans_a_cell_aligned_partition_boundary_under_hard_cut() {
     use nucleation::world_segment::partition::PartitionPolicy;
 
     let hints = vec![
-        PartitionHint { id: "p1".into(), bbox_xz: (0, 127, 0, 255), y_range: None },
-        PartitionHint { id: "p2".into(), bbox_xz: (128, 255, 0, 255), y_range: None },
+        PartitionHint {
+            id: "p1".into(),
+            bbox_xz: (0, 127, 0, 255),
+            y_range: None,
+        },
+        PartitionHint {
+            id: "p2".into(),
+            bbox_xz: (128, 255, 0, 255),
+            y_range: None,
+        },
     ];
-    let cfg = SegConfig { partition_policy: PartitionPolicy::HardCut, ..config() };
+    let cfg = SegConfig {
+        partition_policy: PartitionPolicy::HardCut,
+        ..config()
+    };
     let tile = VoxelTile::from_blocks(TileId { x: 0, z: 0 }, bounds(), scene().into_iter());
     let segs = segment_tile(&tile, &profile(), &cfg, &PartitionIndex::new(hints));
 
@@ -334,15 +431,30 @@ fn no_cluster_spans_a_non_cell_aligned_partition_boundary_under_hard_cut() {
     use nucleation::world_segment::partition::PartitionPolicy;
 
     let hints = vec![
-        PartitionHint { id: "p1".into(), bbox_xz: (0, 129, 0, 255), y_range: None },
-        PartitionHint { id: "p2".into(), bbox_xz: (130, 255, 0, 255), y_range: None },
+        PartitionHint {
+            id: "p1".into(),
+            bbox_xz: (0, 129, 0, 255),
+            y_range: None,
+        },
+        PartitionHint {
+            id: "p2".into(),
+            bbox_xz: (130, 255, 0, 255),
+            y_range: None,
+        },
     ];
-    let cfg = SegConfig { partition_policy: PartitionPolicy::HardCut, ..config() };
+    let cfg = SegConfig {
+        partition_policy: PartitionPolicy::HardCut,
+        ..config()
+    };
     let tile = VoxelTile::from_blocks(TileId { x: 0, z: 0 }, bounds(), scene().into_iter());
     let segs = segment_tile(&tile, &profile(), &cfg, &PartitionIndex::new(hints));
 
     for c in &segs.clusters {
         let spans = c.bbox.0 .0 <= 129 && c.bbox.1 .0 >= 130;
-        assert!(!spans, "cluster {} spans the boundary at x=130: {:?}", c.id, c.bbox);
+        assert!(
+            !spans,
+            "cluster {} spans the boundary at x=130: {:?}",
+            c.id, c.bbox
+        );
     }
 }
