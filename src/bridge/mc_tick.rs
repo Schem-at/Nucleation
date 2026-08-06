@@ -1585,14 +1585,23 @@ pub mod ffi {
                     json.push(',');
                 }
                 first = false;
+                // `size` is the measured hitbox, not a guess a viewer would
+                // otherwise have to make from the kind name — a boat is
+                // 1.375 x 0.5625 and nothing about "minecraft:oak_boat" says
+                // so. `leashed` distinguishes a tethered boat from one resting
+                // on the ground; they are the same box and not the same thing.
                 let _ = write!(
                     json,
-                    "{{\"id\":{},\"kind\":\"{}\",\"pos\":[{},{},{}]}}",
+                    "{{\"id\":{},\"kind\":\"{}\",\"pos\":[{},{},{}],\"size\":[{},{},{}],\"leashed\":{}}}",
                     body.id,
                     body.kind,
                     (body.min[0] + body.max[0]) / 2.0,
                     body.min[1],
                     (body.min[2] + body.max[2]) / 2.0,
+                    body.max[0] - body.min[0],
+                    body.max[1] - body.min[1],
+                    body.max[2] - body.min[2],
+                    body.leashed,
                 );
             }
             json.push_str("]}");

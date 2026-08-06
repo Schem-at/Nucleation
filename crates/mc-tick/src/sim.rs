@@ -748,7 +748,7 @@ impl Simulation {
                 body.kind, body.pos, motion
             ));
         }
-        self.spawn_frozen_entity(body.kind.clone(), body.pos)
+        self.spawn_frozen_entity_leashed(body.kind.clone(), body.pos, body.leashed)
     }
 
     /// Seat a passenger on a measured vehicle.
@@ -824,6 +824,8 @@ impl Simulation {
             id,
             kind: rider_kind,
             physics: crate::entity::BodyPhysics::Rider { vehicle: vehicle_id, seat },
+            // A passenger is held by its seat, not by a rope.
+            leashed: false,
         });
         self.refresh_bodies();
         Ok(id)
@@ -924,6 +926,8 @@ impl Simulation {
                             on_ground: false,
                             hp,
                         },
+                        // `/summon` has no leash argument.
+                        leashed: false,
                     });
                 }
             }
@@ -1500,6 +1504,22 @@ impl Simulation {
     /// Refuses an unrecognised entity **by name** rather than inventing a
     /// hitbox for it. A wrong box silently produces a wrong door.
     pub fn spawn_frozen_entity(&mut self, kind: String, pos: [f64; 3]) -> Result<u32, String> {
+        self.spawn_frozen_entity_leashed(kind, pos, false)
+    }
+
+    /// [`Simulation::spawn_frozen_entity`], recording whether the entity was
+    /// authored on a leash.
+    ///
+    /// Separate rather than a fourth argument on the original because every
+    /// existing caller means `false` and should keep saying so by saying
+    /// nothing. Nothing in the simulation branches on the flag — see
+    /// [`crate::entity::EntityBody::leashed`] for what it is for.
+    pub fn spawn_frozen_entity_leashed(
+        &mut self,
+        kind: String,
+        pos: [f64; 3],
+        leashed: bool,
+    ) -> Result<u32, String> {
         if crate::entity::entity_dimensions(&kind).is_none() {
             return Err(format!(
                 "unknown entity {kind}: no hitbox is known for it, and guessing one \
@@ -1515,6 +1535,7 @@ impl Simulation {
             id,
             kind,
             physics: crate::entity::BodyPhysics::Frozen { pos },
+            leashed,
         });
         self.refresh_bodies();
         Ok(id)
@@ -2055,6 +2076,8 @@ impl Simulation {
                 min,
                 max,
                 is_minecart: true,
+                // A cart is never tethered: vanilla has no leashable minecart.
+                leashed: false,
             });
         }
         // Standing bodies, then riders — two passes over the one collection,
@@ -2088,6 +2111,7 @@ impl Simulation {
                     // power one just because its vehicle would. No frozen body
                     // is a cart either: every cart is in `minecarts`.
                     is_minecart: false,
+                    leashed: body.leashed,
                 });
             }
         }
@@ -4132,6 +4156,51 @@ mod tests {
                 .expect_err("horizontal boat travel is not a tether-rest residue")
                 .contains("has Motion")
         );
+    }
+
+    /// The tether survives into the public entity view.
+    ///
+    /// A leashed boat and a boat parked on the ground are the same box, so a
+    /// viewer that only reads the box draws the second when it should draw the
+    /// first. The flag was previously consumed by `supported_parked_boat` and
+    /// dropped, which made the distinction unobservable from outside.
+    #[test]
+    fn a_spawned_boat_reports_whether_it_is_leashed() {
+        let mut s = sim();
+        let tethered = crate::structure::SpawnedBody {
+            // Pale oak because it is the one boat with a measured seat, and
+            // this test needs a vehicle that can actually carry a passenger.
+            kind: "minecraft:pale_oak_boat".to_string(),
+            pos: [1.5, 0.0, 2.5],
+            motion: [0.0; 3],
+            leashed: true,
+            passengers: Vec::new(),
+        };
+        let mut grounded = tethered.clone();
+        grounded.pos = [4.5, 0.0, 2.5];
+        grounded.leashed = false;
+
+        let tethered_id = s.spawn_authored_body(&tethered).expect("a still boat is supported");
+        let grounded_id = s.spawn_authored_body(&grounded).expect("a still boat is supported");
+
+        let leashed_of = |s: &Simulation, id: u32| {
+            s.entity_bodies().iter().find(|body| body.id == id).expect("spawned body").leashed
+        };
+        assert!(leashed_of(&s, tethered_id), "the leash tag was dropped on the way out");
+        assert!(!leashed_of(&s, grounded_id), "an unleashed boat must not claim a tether");
+
+        // A rider is held by its seat; the flag must not leak from the vehicle.
+        let passenger = crate::structure::SpawnedEntity::Body(crate::structure::SpawnedBody {
+            kind: "minecraft:silverfish".to_string(),
+            pos: tethered.pos,
+            motion: [0.0; 3],
+            leashed: false,
+            passengers: Vec::new(),
+        });
+        let rider =
+            s.spawn_authored_rider(tethered_id, &passenger).expect("a boat seats a passenger");
+        assert!(!leashed_of(&s, rider), "a passenger is not itself on a leash");
+        assert!(leashed_of(&s, tethered_id), "seating a rider dropped the vehicle's tether");
     }
 
     /// The decorated elevator's vehicle/rider pair is admitted only in the

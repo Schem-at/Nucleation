@@ -56,6 +56,63 @@ const SETTLE_MODE = (eng: Any): Record<SettleName, Any> => ({
   "in-world": eng.TickSettleMode.InWorld,
 });
 
+/** A dropped item's box. Vanilla's is 0.25 cubed; drawn a little larger
+ * because a quarter-block at any sane camera distance is a pixel. */
+const ITEM_SIZE: [number, number, number] = [0.35, 0.35, 0.35];
+/** `minecart::cart_aabb` — the engine reports item and cart positions but not
+ * their boxes, and these two are fixed. */
+const CART_SIZE: [number, number, number] = [0.98, 0.7, 0.98];
+
+/** What colour an entity is drawn, by what it is. Broad classes only — the
+ * point is to tell a boat from a dropped item at a glance, not to be a legend. */
+function entityColour(kind: string): number {
+  if (kind === "item") return 0xffd166; // dropped stack
+  if (kind.includes("minecart")) return 0xc0c6cc; // rolling stock
+  if (kind.includes("boat")) return 0xb07b4f; // wood
+  return 0xe0e0e0; // any other frozen body: mobs, armour stands, riders
+}
+
+/** A translucent box standing in for an entity.
+ *
+ * Deliberately not a model: the engine knows an entity's *hitbox* and its
+ * kind, and nothing else about it. Drawing a real boat here would be drawing
+ * something the simulation does not have — and a box that is exactly the
+ * measured collision volume is the more useful picture anyway, because that
+ * volume is the thing that decides whether a piston can shove it.
+ *
+ * A leashed entity gets a second, brighter wireframe. There is no rope: the
+ * leash *target* is discarded at parse time, on purpose, because a litematic
+ * keeps a fence knot's source-world coordinates while storing the entity
+ * relative to its region — so the anchor cannot be trusted to be anywhere
+ * near the build. A tether drawn to the wrong place is worse than none.
+ */
+function entityBox(
+  kind: string,
+  size: [number, number, number],
+  leashed: boolean,
+): THREE.Object3D {
+  const group = new THREE.Group();
+  const geometry = new THREE.BoxGeometry(size[0], size[1], size[2]);
+  group.add(
+    new THREE.Mesh(
+      geometry,
+      new THREE.MeshBasicMaterial({
+        color: entityColour(kind),
+        transparent: true,
+        opacity: 0.35,
+        depthWrite: false,
+      }),
+    ),
+  );
+  group.add(
+    new THREE.LineSegments(
+      new THREE.EdgesGeometry(geometry),
+      new THREE.LineBasicMaterial({ color: leashed ? 0xffd166 : entityColour(kind) }),
+    ),
+  );
+  return group;
+}
+
 export class World {
   eng: Any;
   pack: Any;
@@ -71,6 +128,10 @@ export class World {
   private dirty = new Set<string>();
   /** Solid cells, for the player's raycast and collision. */
   private solid = new Set<string>();
+  /** One object per live entity, by engine id. Kept apart from the chunk
+   * meshes because entities move without dirtying a chunk. */
+  private entityMeshes = new Map<number, THREE.Object3D>();
+  private entityGroup = new THREE.Group();
   /** How the build is settled before tick 0; see [`SettleName`]. */
   settle: SettleName = "in-world";
 
@@ -78,6 +139,7 @@ export class World {
     this.eng = eng;
     this.pack = pack;
     this.cfg = cfg;
+    this.group.add(this.entityGroup);
   }
 
   static async load(bytes: Uint8Array, settle: SettleName = "in-world"): Promise<World> {
@@ -96,8 +158,9 @@ export class World {
    * carries the blocks an interaction may introduce — a redstone block for
    * manual poking is the one the engine always allows. */
   startSim(): string | null {
-    // Whatever was mid-flight belongs to the run being replaced.
+    // Whatever was mid-flight or alive belongs to the run being replaced.
     this.clearFlights();
+    this.clearEntities();
     try {
       this.sim = this.eng.TickSimulation.fromSchematic(
         this.schem,
@@ -107,6 +170,10 @@ export class World {
         0,
         "",
       );
+      // Draw the entities the build was authored with, before any tick runs.
+      // A boat that only appears once you press play looks like the
+      // simulation spawned it.
+      this.syncEntities();
       return null;
     } catch (e) {
       const detail = this.eng.TickSimulation.lastErrorDetail?.() ?? "";
@@ -323,6 +390,77 @@ export class World {
     });
   }
 
+  /** Redraw every live entity from the engine's own view.
+   *
+   * Entities cannot ride the chunk mesher. A block is a cell that is either
+   * this state or that one; an entity sits at a continuous position, is not
+   * aligned to anything, and moves on ticks that dirty no chunk at all — a
+   * boat shoved by a piston travels without a single block changing. So they
+   * get their own group, rebuilt from `itemEntitiesJson` after every tick.
+   *
+   * Rebuilding rather than diffing is deliberate: the list is short (a build
+   * with a hundred entities is a large one), and an entity that is removed and
+   * an entity that moved look the same to a diff keyed on anything but id.
+   */
+  syncEntities(): void {
+    const raw = this.sim?.itemEntitiesJson?.();
+    if (!raw) return;
+    let view: Any;
+    try {
+      view = JSON.parse(raw);
+    } catch {
+      return;
+    }
+
+    const seen = new Set<number>();
+    const place = (id: number, kind: string, pos: number[], size: [number, number, number], leashed: boolean) => {
+      seen.add(id);
+      let mesh = this.entityMeshes.get(id);
+      if (!mesh) {
+        mesh = entityBox(kind, size, leashed);
+        this.entityMeshes.set(id, mesh);
+        this.entityGroup.add(mesh);
+      }
+      // `pos` is feet-centre — centred on x and z, bottom on y — which is
+      // where vanilla puts an entity's position and not where three.js wants
+      // a box's origin.
+      mesh.position.set(pos[0], pos[1] + size[1] / 2, pos[2]);
+    };
+
+    for (const item of view.items ?? []) {
+      place(item.id, "item", item.pos, ITEM_SIZE, false);
+    }
+    for (const cart of view.minecarts ?? []) {
+      place(cart.id, cart.kind, cart.pos, CART_SIZE, false);
+    }
+    for (const body of view.frozen ?? []) {
+      // The engine reports the measured hitbox; guessing one from the kind
+      // name would draw a boat the size of a villager.
+      place(body.id, body.kind, body.pos, body.size ?? [1, 1, 1], !!body.leashed);
+    }
+
+    for (const [id, mesh] of this.entityMeshes) {
+      if (seen.has(id)) continue;
+      this.entityGroup.remove(mesh);
+      mesh.traverse((o: Any) => o.geometry?.dispose?.());
+      this.entityMeshes.delete(id);
+    }
+  }
+
+  /** How many entities are on screen, for the HUD. */
+  entityCount(): number {
+    return this.entityMeshes.size;
+  }
+
+  /** Drop every entity — on reload or when the simulation is rebuilt. */
+  clearEntities(): void {
+    for (const mesh of this.entityMeshes.values()) {
+      this.entityGroup.remove(mesh);
+      mesh.traverse((o: Any) => o.geometry?.dispose?.());
+    }
+    this.entityMeshes.clear();
+  }
+
   /** Drop every in-flight block — on reload, reset, or a jump in time. */
   clearFlights(): void {
     for (const f of this.flights) {
@@ -341,6 +479,10 @@ export class World {
    * by the next frame just smears it.
    */
   applyChanges(changes: Change[], moveSeconds = 0): void {
+    // Entities first, and unconditionally: an entity can move on a tick that
+    // changes no block at all, so gating this on `changes.length` would freeze
+    // a boat drifting through still air.
+    this.syncEntities();
     // Before anything is written: a cell turning into `moving_piston` is a
     // block arriving from the far side, and the only place its identity still
     // exists is the schematic we are about to overwrite. Read the sources

@@ -93,6 +93,15 @@ pub struct EntityBody {
     /// `AbstractMinecart.class` to `getInteractingMinecartOfType`), so a
     /// fireball or a villager standing on one must *not* power it.
     pub is_minecart: bool,
+    /// Whether the entity was authored with a leash attachment.
+    ///
+    /// No behaviour reads this — a tether changes nothing a block can observe.
+    /// It is carried because a parked boat and a leashed one are the same box
+    /// and not the same entity, and a viewer that cannot tell them apart draws
+    /// a boat resting on nothing. The attachment *target* is still not
+    /// interpreted, for the reason given on
+    /// [`crate::structure::SpawnedBody::leashed`].
+    pub leashed: bool,
 }
 
 /// Every entity kind vanilla knows, built once.
@@ -204,6 +213,7 @@ mod hitbox_tests {
             min,
             max,
             is_minecart: false,
+            leashed: false,
         };
         let (tmin, tmax) = touch(plate[0], plate[1], plate[2]);
         body.intersects(tmin, tmax)
@@ -573,6 +583,9 @@ pub struct EntityInstance {
     pub kind: String,
     /// Where it is, and what decides that.
     pub physics: BodyPhysics,
+    /// Whether it was authored with a leash attachment. Surfaced through
+    /// [`EntityBody::leashed`]; nothing in the simulation branches on it.
+    pub leashed: bool,
 }
 
 /// How a body without physics of its own comes by a position.

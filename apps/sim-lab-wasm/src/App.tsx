@@ -35,6 +35,10 @@ export default function App(): JSX.Element {
   const [stepN, setStepN] = useState(20);
   const [settle, setSettle] = useState<SettleName>("in-world");
   const [tick, setTick] = useState(0);
+  /** Entities on screen. Worth its own readout: a build can be all boats and
+   * carts, and until they were drawn at all an empty-looking room that ticked
+   * was indistinguishable from a broken load. */
+  const [entities, setEntities] = useState(0);
   const [target, setTarget] = useState<string>("");
   const [info, setInfo] = useState<string>("");
   const [locked, setLocked] = useState(false);
@@ -122,7 +126,10 @@ export default function App(): JSX.Element {
             const move = rateRef.current <= 30 && steps === 1 ? 2 / rateRef.current : 0;
             world.applyChanges(world.drainChanges(), move);
           }
-          if (steps) setTick(Number(world.sim.tickCount?.() ?? 0));
+          if (steps) {
+            setTick(Number(world.sim.tickCount?.() ?? 0));
+            setEntities(world.entityCount());
+          }
         }
         world.animate(now);
         if (!flushing) {
@@ -246,6 +253,7 @@ export default function App(): JSX.Element {
             },
       );
       setTick(0);
+      setEntities(world.entityCount());
     } catch (e) {
       setStatus({ kind: "error", message: String(e) });
     }
@@ -274,6 +282,7 @@ export default function App(): JSX.Element {
     world.applyChanges(changes, n === 1 ? 0.25 : 0);
     const ms = performance.now() - t0;
     setTick(Number(world.sim.tickCount?.() ?? 0));
+    setEntities(world.entityCount());
     setInfo(
       `stepped ${n} tick${n === 1 ? "" : "s"} — ${changes.length} block change${
         changes.length === 1 ? "" : "s"
@@ -356,6 +365,7 @@ export default function App(): JSX.Element {
           />
         </label>
         <span className="tick">tick {tick}</span>
+        {entities > 0 && <span className="tick">{entities} entities</span>}
         <span className={`status ${status.kind}`}>{status.message ?? "drop a schematic"}</span>
       </header>
 
