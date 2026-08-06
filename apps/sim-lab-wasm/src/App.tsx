@@ -9,7 +9,7 @@
 
 import * as THREE from "three";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { World, type SettleName } from "./world";
+import { World, loader, type SettleName } from "./world";
 import { Player } from "./player";
 import { addDefaultLights } from "./mesher";
 
@@ -352,6 +352,7 @@ export default function App(): JSX.Element {
       // the UI drives, so a scripted check exercises the real path.
       (window as unknown as { simlab: unknown }).simlab = {
         world,
+        loader,
         player: playerRef.current,
         scene: sceneRef.current,
       };

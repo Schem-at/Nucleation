@@ -16,7 +16,7 @@ import { loadMeshEnv } from "./mesher";
 type Any = any;
 
 export const CHUNK = 16;
-const loader = new GLTFLoader();
+export const loader = new GLTFLoader();
 
 function b64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64);
@@ -111,6 +111,104 @@ function entityBox(
     ),
   );
   return group;
+}
+
+/** Decoded materials, keyed by the bytes of the atlas they were decoded from.
+ *
+ * Each chunk's GLB embeds a texture atlas, and decoding that PNG is **366 ms
+ * of a 367 ms chunk parse** — the geometry itself takes half a millisecond.
+ * Re-meshing one chunk because one block moved paid that every time.
+ *
+ * The atlas is built per chunk from the blocks that chunk actually contains,
+ * so it is *not* shared between chunks and materials cannot simply be reused
+ * globally — checked, and the six chunks of one flying machine embed six
+ * different atlases. What is true is that a chunk's atlas depends only on
+ * which block *types* are in it, and a piston shoving a slime block around
+ * does not change that set. So the key is the atlas content itself: identical
+ * bytes cannot decode to a different texture, which makes reuse correct by
+ * construction rather than by assumption, and still hits nearly every time.
+ */
+const atlasCache = new Map<string, Map<string, THREE.Material>>();
+/** Bounded so a long session over many builds cannot grow it without limit.
+ * Eviction is oldest-first, which for this access pattern is close enough to
+ * least-recently-used and far simpler. */
+const ATLAS_CACHE_MAX = 64;
+
+/** A content hash of the atlas bytes. FNV-1a: not cryptographic, but this
+ * only has to distinguish a few dozen small images, and it costs microseconds
+ * against the 366 ms it decides whether to spend. */
+function hashBytes(bytes: Uint8Array): string {
+  let h = 2166136261;
+  for (let i = 0; i < bytes.length; i++) {
+    h ^= bytes[i];
+    h = Math.imul(h, 16777619);
+  }
+  return `${bytes.length}:${(h >>> 0).toString(16)}`;
+}
+
+/** How a material blends, which is the only thing distinguishing the three a
+ * chunk uses. The mesher leaves them unnamed but their alpha modes — OPAQUE,
+ * MASK, BLEND — are stable and mean exactly opaque, cutout and translucent,
+ * so they key the cache without depending on the order primitives arrive in. */
+function blendKey(m: Any): string {
+  if (m.transparent) return "BLEND";
+  if ((m.alphaTest ?? 0) > 0) return "MASK";
+  return "OPAQUE";
+}
+
+/** The same GLB with its embedded image, textures and samplers removed.
+ *
+ * Geometry is untouched — only the parts that would trigger a redundant PNG
+ * decode are dropped, and the caller puts the cached materials back. Returns
+ * null if the container is not something we recognise, so the caller can fall
+ * back to parsing it whole rather than handing the loader a broken file.
+ */
+function stripEmbeddedImages(bytes: Uint8Array): { buffer: ArrayBuffer; atlas: string } | null {
+  try {
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    if (view.getUint32(0, true) !== 0x46546c67) return null; // not 'glTF'
+    const jsonLen = view.getUint32(12, true);
+    const json = JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + jsonLen)));
+    if (!json.images?.length) return null; // nothing to save
+    // Hash the atlas before dropping it — it is what decides whether an
+    // already-decoded texture may stand in for this one.
+    const bv = json.bufferViews?.[json.images[0].bufferView];
+    if (!bv) return null;
+    const binStart = 20 + jsonLen + 8; // past the JSON chunk and the BIN header
+    const offset = binStart + (bv.byteOffset ?? 0);
+    const atlas = hashBytes(bytes.subarray(offset, offset + bv.byteLength));
+    delete json.images;
+    delete json.textures;
+    delete json.samplers;
+    for (const m of json.materials ?? []) {
+      delete m.normalTexture;
+      delete m.emissiveTexture;
+      delete m.occlusionTexture;
+      if (m.pbrMetallicRoughness) {
+        delete m.pbrMetallicRoughness.baseColorTexture;
+        delete m.pbrMetallicRoughness.metallicRoughnessTexture;
+      }
+    }
+    // The JSON chunk must stay four-byte aligned, padded with spaces.
+    let text = JSON.stringify(json);
+    while (text.length % 4 !== 0) text += " ";
+    const jsonBytes = new TextEncoder().encode(text);
+    // Everything from the end of the JSON chunk on is the BIN chunk, header
+    // included — copied verbatim, since the buffer views still index into it.
+    const rest = bytes.subarray(20 + jsonLen);
+    const out = new Uint8Array(20 + jsonBytes.length + rest.length);
+    const dv = new DataView(out.buffer);
+    dv.setUint32(0, 0x46546c67, true); // 'glTF'
+    dv.setUint32(4, 2, true); // version
+    dv.setUint32(8, out.length, true);
+    dv.setUint32(12, jsonBytes.length, true);
+    dv.setUint32(16, 0x4e4f534a, true); // 'JSON'
+    out.set(jsonBytes, 20);
+    out.set(rest, 20 + jsonBytes.length);
+    return { buffer: out.buffer, atlas };
+  } catch {
+    return null;
+  }
 }
 
 export class World {
@@ -219,13 +317,41 @@ export class World {
         // `.buffer` is typed `ArrayBufferLike`, which admits SharedArrayBuffer;
         // the loader takes a plain ArrayBuffer, and a slice of a Uint8Array
         // backed by wasm memory is always one.
-        const gltf = await loader.parseAsync(
-          bytes.buffer.slice(
-            bytes.byteOffset,
-            bytes.byteOffset + bytes.byteLength,
-          ) as ArrayBuffer,
-          "",
-        );
+        const whole = bytes.buffer.slice(
+          bytes.byteOffset,
+          bytes.byteOffset + bytes.byteLength,
+        ) as ArrayBuffer;
+        // Read the atlas hash out of the container; if this exact atlas has
+        // been decoded before, parse without the image and reuse it.
+        const lean = stripEmbeddedImages(bytes);
+        const cached = lean ? atlasCache.get(lean.atlas) : undefined;
+        const gltf = await loader.parseAsync(cached ? lean!.buffer : whole, "");
+        if (cached) {
+          // Swap the loader's texture-less placeholders for the real thing.
+          // Disposing them matters — one abandoned material per chunk per
+          // re-mesh is a leak that outruns the garbage collector at 20 tps.
+          gltf.scene.traverse((o: Any) => {
+            if (!o.isMesh || !o.material) return;
+            const shared = cached.get(blendKey(o.material));
+            if (!shared) return;
+            o.material.dispose?.();
+            o.material = shared;
+          });
+        } else if (lean) {
+          // First sight of this atlas: this parse paid for the decode, so keep
+          // what it produced for every chunk that turns out to use it too.
+          const harvested = new Map<string, THREE.Material>();
+          gltf.scene.traverse((o: Any) => {
+            if (o.isMesh && o.material) harvested.set(blendKey(o.material), o.material);
+          });
+          if (harvested.size > 0) {
+            if (atlasCache.size >= ATLAS_CACHE_MAX) {
+              const oldest = atlasCache.keys().next().value;
+              if (oldest !== undefined) atlasCache.delete(oldest);
+            }
+            atlasCache.set(lean.atlas, harvested);
+          }
+        }
         // The mesher emits **world** coordinates, not chunk-local ones —
         // measured, after translating each chunk by its origin doubled the
         // build's span (175 wide became 334, one empty chunk between each).
