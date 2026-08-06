@@ -277,13 +277,15 @@ pub fn try_build_sim(
         ));
     }
     {
-        let (solidity, frictions, heights, webs) = mc_tick::vanilla::physics_tables(sim.registry());
+        let (physics, fluids, lava, rails) =
+            mc_tick::vanilla::environment_tables(sim.registry());
+        let (solidity, frictions, heights, webs) = physics;
         sim.set_physics_tables(solidity, frictions, heights, webs);
-        let (water_kinds, bubble_kinds) = mc_tick::vanilla::fluid_tables(sim.registry());
+        let (water_kinds, bubble_kinds) = fluids;
         sim.set_fluid_tables(water_kinds, bubble_kinds);
-        sim.set_lava_table(mc_tick::vanilla::lava_table(sim.registry()));
-        let (rails, conductors) = mc_tick::vanilla::rail_tables(sim.registry());
-        sim.set_rail_tables(rails, conductors);
+        sim.set_lava_table(lava);
+        let (rail_kinds, rail_conductors) = rails;
+        sim.set_rail_tables(rail_kinds, rail_conductors);
     }
     for spawned in &structure.entities {
         match spawned {

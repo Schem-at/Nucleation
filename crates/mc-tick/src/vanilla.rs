@@ -33,7 +33,8 @@ use crate::piston::{Movability, Piston, Sticky};
 use crate::pos::{Dir, Pos};
 use crate::state::{StateId, StateRegistry, StateSet};
 use crate::world::World;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 /// A block descriptor split into its name and properties.
 ///
@@ -96,19 +97,24 @@ impl Descriptor {
     /// Used to find a block's opposite state — the powered twin of an unpowered
     /// repeater, say — without the caller assembling strings by hand.
     pub fn with(&self, key: &str, value: &str) -> String {
-        let mut properties: Vec<(String, String)> = self
-            .properties
-            .iter()
-            .map(|(k, v)| {
-                if k == key {
-                    (k.clone(), value.to_string())
-                } else {
-                    (k.clone(), v.clone())
+        self.with_values([(key, value)])
+    }
+
+    /// Rebuild a descriptor after replacing several properties.
+    fn with_values<const N: usize>(&self, values: [(&str, &str); N]) -> String {
+        let mut properties = self.properties.clone();
+        for (key, value) in values {
+            let mut found = false;
+            for (existing_key, existing_value) in &mut properties {
+                if existing_key == key {
+                    existing_value.clear();
+                    existing_value.push_str(value);
+                    found = true;
                 }
-            })
-            .collect();
-        if !properties.iter().any(|(k, _)| k == key) {
-            properties.push((key.to_string(), value.to_string()));
+            }
+            if !found {
+                properties.push((key.to_string(), value.to_string()));
+            }
         }
         properties.sort();
         if properties.is_empty() {
@@ -450,6 +456,66 @@ impl crate::wire::WireWorld for VanillaRules {
     }
 }
 
+impl crate::wire::WireWorld for Arc<VanillaRules> {
+    fn hash_origin(&self) -> Pos {
+        <VanillaRules as crate::wire::WireWorld>::hash_origin(self.as_ref())
+    }
+
+    fn block_signal(&self, ctx: &crate::behaviour::TickCtx<'_>, pos: Pos) -> u8 {
+        <VanillaRules as crate::wire::WireWorld>::block_signal(self.as_ref(), ctx, pos)
+    }
+
+    fn conductor(&self, world: &World, pos: Pos) -> bool {
+        <VanillaRules as crate::wire::WireWorld>::conductor(self.as_ref(), world, pos)
+    }
+
+    fn wire_power(&self, world: &World, pos: Pos) -> Option<u8> {
+        <VanillaRules as crate::wire::WireWorld>::wire_power(self.as_ref(), world, pos)
+    }
+
+    fn wire_with_power(&self, world: &World, pos: Pos, power: u8) -> Option<StateId> {
+        <VanillaRules as crate::wire::WireWorld>::wire_with_power(
+            self.as_ref(),
+            world,
+            pos,
+            power,
+        )
+    }
+
+    fn wire_shape(
+        &self,
+        world: &World,
+        pos: Pos,
+    ) -> Option<(u8, [crate::wire::WireSide; 4])> {
+        <VanillaRules as crate::wire::WireWorld>::wire_shape(self.as_ref(), world, pos)
+    }
+
+    fn wire_with_shape(
+        &self,
+        power: u8,
+        sides: [crate::wire::WireSide; 4],
+    ) -> Option<StateId> {
+        <VanillaRules as crate::wire::WireWorld>::wire_with_shape(self.as_ref(), power, sides)
+    }
+
+    fn should_connect_to(&self, world: &World, pos: Pos, from: Option<Dir>) -> bool {
+        <VanillaRules as crate::wire::WireWorld>::should_connect_to(
+            self.as_ref(),
+            world,
+            pos,
+            from,
+        )
+    }
+
+    fn sturdy_up(&self, world: &World, pos: Pos) -> bool {
+        <VanillaRules as crate::wire::WireWorld>::sturdy_up(self.as_ref(), world, pos)
+    }
+
+    fn full_block(&self, world: &World, pos: Pos) -> bool {
+        <VanillaRules as crate::wire::WireWorld>::full_block(self.as_ref(), world, pos)
+    }
+}
+
 impl crate::fluid::FluidWorld for VanillaRules {
     fn water(&self, world: &World, pos: Pos) -> Option<crate::fluid::WaterKind> {
         self.waters.get(&world.get(pos)).copied()
@@ -467,6 +533,24 @@ impl crate::fluid::FluidWorld for VanillaRules {
 
     fn water_state(&self, level: u8) -> Option<StateId> {
         self.water_levels.get(&level).copied()
+    }
+}
+
+impl crate::fluid::FluidWorld for Arc<VanillaRules> {
+    fn water(&self, world: &World, pos: Pos) -> Option<crate::fluid::WaterKind> {
+        <VanillaRules as crate::fluid::FluidWorld>::water(self.as_ref(), world, pos)
+    }
+
+    fn can_flow_into(&self, world: &World, pos: Pos) -> bool {
+        <VanillaRules as crate::fluid::FluidWorld>::can_flow_into(self.as_ref(), world, pos)
+    }
+
+    fn is_solid(&self, world: &World, pos: Pos) -> bool {
+        <VanillaRules as crate::fluid::FluidWorld>::is_solid(self.as_ref(), world, pos)
+    }
+
+    fn water_state(&self, level: u8) -> Option<StateId> {
+        <VanillaRules as crate::fluid::FluidWorld>::water_state(self.as_ref(), level)
     }
 }
 
@@ -921,6 +1005,84 @@ impl PowerSource for VanillaRules {
     }
 }
 
+impl PowerSource for Arc<VanillaRules> {
+    fn leaf_distance(&self, world: &World, pos: Pos) -> u8 {
+        <VanillaRules as PowerSource>::leaf_distance(self.as_ref(), world, pos)
+    }
+
+    fn is_powered(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        toward: Dir,
+    ) -> bool {
+        <VanillaRules as PowerSource>::is_powered(self.as_ref(), world, outs, pos, toward)
+    }
+
+    fn analog_signal(
+        &self,
+        world: &World,
+        inventories: &crate::inventory::InventoryMap,
+        carts: &[crate::minecart::MinecartState],
+        pos: Pos,
+    ) -> Option<u8> {
+        <VanillaRules as PowerSource>::analog_signal(
+            self.as_ref(),
+            world,
+            inventories,
+            carts,
+            pos,
+        )
+    }
+
+    fn is_conductor(&self, world: &World, pos: Pos) -> bool {
+        <VanillaRules as PowerSource>::is_conductor(self.as_ref(), world, pos)
+    }
+
+    fn container_slots_at(&self, world: &World, pos: Pos) -> Option<u32> {
+        <VanillaRules as PowerSource>::container_slots_at(self.as_ref(), world, pos)
+    }
+
+    fn container_segments(&self, world: &World, pos: Pos) -> Option<Vec<(Pos, u32)>> {
+        <VanillaRules as PowerSource>::container_segments(self.as_ref(), world, pos)
+    }
+
+    fn hopper_at(&self, world: &World, pos: Pos) -> bool {
+        <VanillaRules as PowerSource>::hopper_at(self.as_ref(), world, pos)
+    }
+
+    fn rail_support_at(&self, world: &World, pos: Pos) -> bool {
+        <VanillaRules as PowerSource>::rail_support_at(self.as_ref(), world, pos)
+    }
+
+    fn max_stack_of(&self, id: &str) -> u8 {
+        <VanillaRules as PowerSource>::max_stack_of(self.as_ref(), id)
+    }
+
+    fn is_solid_at(&self, world: &World, pos: Pos) -> bool {
+        <VanillaRules as PowerSource>::is_solid_at(self.as_ref(), world, pos)
+    }
+
+    fn is_diode(&self, world: &World, pos: Pos) -> bool {
+        <VanillaRules as PowerSource>::is_diode(self.as_ref(), world, pos)
+    }
+
+    fn diode_facing(&self, world: &World, pos: Pos) -> Option<Dir> {
+        <VanillaRules as PowerSource>::diode_facing(self.as_ref(), world, pos)
+    }
+
+    fn signal_strength(
+        &self,
+        world: &World,
+        outs: &crate::behaviour::ComparatorOutputs,
+        pos: Pos,
+        toward: Dir,
+    ) -> u8 {
+        <VanillaRules as PowerSource>::signal_strength(self.as_ref(), world, outs, pos, toward)
+    }
+}
+
 impl Movability for VanillaRules {
     fn destroys(&self, world: &World, pos: Pos) -> bool {
         self.destroyed_by_push.contains(&world.get(pos))
@@ -942,6 +1104,28 @@ impl Movability for VanillaRules {
         } else {
             None
         }
+    }
+}
+
+impl Movability for Arc<VanillaRules> {
+    fn is_movable(&self, world: &World, pos: Pos) -> bool {
+        <VanillaRules as Movability>::is_movable(self.as_ref(), world, pos)
+    }
+
+    fn destroys(&self, world: &World, pos: Pos) -> bool {
+        <VanillaRules as Movability>::destroys(self.as_ref(), world, pos)
+    }
+
+    fn is_empty(&self, world: &World, pos: Pos) -> bool {
+        <VanillaRules as Movability>::is_empty(self.as_ref(), world, pos)
+    }
+
+    fn push_only(&self, world: &World, pos: Pos) -> bool {
+        <VanillaRules as Movability>::push_only(self.as_ref(), world, pos)
+    }
+
+    fn sticky(&self, world: &World, pos: Pos) -> Option<Sticky> {
+        <VanillaRules as Movability>::sticky(self.as_ref(), world, pos)
     }
 }
 
@@ -1633,18 +1817,22 @@ pub fn register_all_at(
 
     // Wire sibling map: every wire state's 16 power variants (same shape).
     {
-        let wire_ids: Vec<StateId> = rules.wires.keys().copied().collect();
-        for id in wire_ids {
-            let Some(text) = registry.descriptor(id).map(str::to_string) else { continue };
-            let descriptor = Descriptor::parse(&text);
+        let wire_states: Vec<(StateId, [crate::wire::WireSide; 4])> = rules
+            .wires
+            .iter()
+            .map(|(id, (_, sides))| (*id, *sides))
+            .collect();
+        for (id, sides) in wire_states {
             for power in 0u8..16 {
-                if let Some(sibling) = registry.get(&descriptor.with("power", &power.to_string()))
-                {
+                if let Some(sibling) = rules.wire_shapes.get(&(power, sides)).copied() {
                     rules.wire_siblings.insert((id, power), sibling);
                 }
             }
         }
     }
+    // Behaviours only read the completed rules. Share that immutable table
+    // instead of deep-cloning every map into every registered state.
+    let rules = Arc::new(rules);
 
     // Second pass: register behaviour, resolving paired states through the
     // registry so a block can find its own opposite.
@@ -2176,7 +2364,7 @@ pub fn register_all_at(
         }
     }
 
-    rules
+    (*rules).clone()
 }
 
 /// How many inventory slots a container block has.
@@ -2314,15 +2502,29 @@ fn is_full_cube(descriptor: &Descriptor) -> bool {
 /// everything else solid is a full cube here). The fourth marks cobwebs,
 /// whose `entityInside` sets the stuck-speed multiplier.
 pub fn physics_tables(registry: &StateRegistry) -> (Vec<bool>, Vec<f32>, Vec<f32>, Vec<bool>) {
-    let mut solidity = Vec::with_capacity(registry.len());
-    let mut frictions = Vec::with_capacity(registry.len());
-    let mut heights = Vec::with_capacity(registry.len());
-    let mut webs = Vec::with_capacity(registry.len());
-    for index in 0..registry.len() {
-        let descriptor = registry
-            .descriptor(StateId(index as u16))
-            .map(Descriptor::parse);
-        let (solid, friction, height, web) = match &descriptor {
+    let descriptors = parsed_descriptors(registry);
+    physics_tables_from(&descriptors)
+}
+
+fn parsed_descriptors(registry: &StateRegistry) -> Vec<Option<Descriptor>> {
+    (0..registry.len())
+        .map(|index| {
+            registry
+                .descriptor(StateId(index as u16))
+                .map(Descriptor::parse)
+        })
+        .collect()
+}
+
+fn physics_tables_from(
+    descriptors: &[Option<Descriptor>],
+) -> (Vec<bool>, Vec<f32>, Vec<f32>, Vec<bool>) {
+    let mut solidity = Vec::with_capacity(descriptors.len());
+    let mut frictions = Vec::with_capacity(descriptors.len());
+    let mut heights = Vec::with_capacity(descriptors.len());
+    let mut webs = Vec::with_capacity(descriptors.len());
+    for descriptor in descriptors {
+        let (solid, friction, height, web) = match descriptor {
             None => (false, 0.6, 1.0, false),
             Some(d) => {
                 let friction = match d.name.as_str() {
@@ -2405,13 +2607,17 @@ pub fn physics_tables(registry: &StateRegistry) -> (Vec<bool>, Vec<f32>, Vec<f32
 pub fn fluid_tables(
     registry: &StateRegistry,
 ) -> (Vec<Option<crate::fluid::WaterKind>>, Vec<Option<bool>>) {
-    let mut water_kinds = Vec::with_capacity(registry.len());
-    let mut bubble_kinds = Vec::with_capacity(registry.len());
-    for index in 0..registry.len() {
-        let descriptor = registry
-            .descriptor(StateId(index as u16))
-            .map(Descriptor::parse);
-        let (water, bubble) = match &descriptor {
+    let descriptors = parsed_descriptors(registry);
+    fluid_tables_from(&descriptors)
+}
+
+fn fluid_tables_from(
+    descriptors: &[Option<Descriptor>],
+) -> (Vec<Option<crate::fluid::WaterKind>>, Vec<Option<bool>>) {
+    let mut water_kinds = Vec::with_capacity(descriptors.len());
+    let mut bubble_kinds = Vec::with_capacity(descriptors.len());
+    for descriptor in descriptors {
+        let (water, bubble) = match descriptor {
             None => (None, None),
             Some(d) => match d.name.as_str() {
                 "minecraft:water" => {
@@ -2439,12 +2645,16 @@ pub fn fluid_tables(
 /// Lava reuses the water-kind vocabulary: source / flowing(n) / falling is
 /// a property of the level, not the material.
 pub fn lava_table(registry: &StateRegistry) -> Vec<Option<crate::fluid::WaterKind>> {
-    let mut lava_kinds = Vec::with_capacity(registry.len());
-    for index in 0..registry.len() {
-        let descriptor = registry
-            .descriptor(StateId(index as u16))
-            .map(Descriptor::parse);
-        lava_kinds.push(match &descriptor {
+    let descriptors = parsed_descriptors(registry);
+    lava_table_from(&descriptors)
+}
+
+fn lava_table_from(
+    descriptors: &[Option<Descriptor>],
+) -> Vec<Option<crate::fluid::WaterKind>> {
+    let mut lava_kinds = Vec::with_capacity(descriptors.len());
+    for descriptor in descriptors {
+        lava_kinds.push(match descriptor {
             Some(d) if d.name == "minecraft:lava" => {
                 let level = d.get("level").and_then(|l| l.parse().ok()).unwrap_or(0);
                 Some(crate::fluid::WaterKind::from_level(level))
@@ -2453,6 +2663,27 @@ pub fn lava_table(registry: &StateRegistry) -> Vec<Option<crate::fluid::WaterKin
         });
     }
     lava_kinds
+}
+
+/// All construction-time physics tables, parsing each descriptor once.
+///
+/// The nested tuples are the values returned by [`physics_tables`],
+/// [`fluid_tables`], [`lava_table`] and [`rail_tables`], in that order.
+pub fn environment_tables(
+    registry: &StateRegistry,
+) -> (
+    (Vec<bool>, Vec<f32>, Vec<f32>, Vec<bool>),
+    (Vec<Option<crate::fluid::WaterKind>>, Vec<Option<bool>>),
+    Vec<Option<crate::fluid::WaterKind>>,
+    (Vec<Option<crate::minecart::Rail>>, Vec<bool>),
+) {
+    let descriptors = parsed_descriptors(registry);
+    (
+        physics_tables_from(&descriptors),
+        fluid_tables_from(&descriptors),
+        lava_table_from(&descriptors),
+        rail_tables_from(&descriptors),
+    )
 }
 
 /// Whether a block is a button or a pressure plate of any material. Both are
@@ -2946,13 +3177,17 @@ pub fn instrument_below(name: &str) -> &'static str {
 pub fn rail_tables(
     registry: &StateRegistry,
 ) -> (Vec<Option<crate::minecart::Rail>>, Vec<bool>) {
-    let mut rails = Vec::with_capacity(registry.len());
-    let mut conductors = Vec::with_capacity(registry.len());
-    for index in 0..registry.len() {
-        let descriptor = registry
-            .descriptor(StateId(index as u16))
-            .map(Descriptor::parse);
-        let (rail, conductor) = match &descriptor {
+    let descriptors = parsed_descriptors(registry);
+    rail_tables_from(&descriptors)
+}
+
+fn rail_tables_from(
+    descriptors: &[Option<Descriptor>],
+) -> (Vec<Option<crate::minecart::Rail>>, Vec<bool>) {
+    let mut rails = Vec::with_capacity(descriptors.len());
+    let mut conductors = Vec::with_capacity(descriptors.len());
+    for descriptor in descriptors {
+        let (rail, conductor) = match descriptor {
             None => (None, false),
             Some(d) => {
                 let rail = match d.name.as_str() {
@@ -3062,6 +3297,7 @@ pub fn intern_companions(registry: &mut StateRegistry) {
     let existing: Vec<String> = (0..registry.len())
         .filter_map(|i| registry.descriptor(StateId(i as u16)).map(str::to_string))
         .collect();
+    let mut wire_families = HashSet::new();
 
     for text in existing {
         let descriptor = Descriptor::parse(&text);
@@ -3095,17 +3331,39 @@ pub fn intern_companions(registry: &mut StateRegistry) {
             // Silent, because a missing state is indistinguishable from no
             // change at the call site.
             "minecraft:redstone_wire" => {
+                // Every member of one wire family reaches the same 1,296
+                // `(power, north, south, east, west)` states. Preserve any
+                // future non-wire properties in the key rather than assuming
+                // the mutable five are the whole descriptor.
+                let mut family: Vec<(String, String)> = descriptor
+                    .properties
+                    .iter()
+                    .filter(|(key, _)| {
+                        !matches!(
+                            key.as_str(),
+                            "power" | "north" | "south" | "east" | "west"
+                        )
+                    })
+                    .cloned()
+                    .collect();
+                family.sort();
+                if !wire_families.insert(family) {
+                    continue;
+                }
                 let mut all = Vec::new();
                 for power in 0u8..16 {
-                    let at = Descriptor::parse(&descriptor.with("power", &power.to_string()));
+                    let power = power.to_string();
                     for north in WIRE_SIDE_VALUES {
-                        let at = Descriptor::parse(&at.with("north", north));
                         for south in WIRE_SIDE_VALUES {
-                            let at = Descriptor::parse(&at.with("south", south));
                             for east in WIRE_SIDE_VALUES {
-                                let at = Descriptor::parse(&at.with("east", east));
                                 for west in WIRE_SIDE_VALUES {
-                                    all.push(at.with("west", west));
+                                    all.push(descriptor.with_values([
+                                        ("power", &power),
+                                        ("north", north),
+                                        ("south", south),
+                                        ("east", east),
+                                        ("west", west),
+                                    ]));
                                 }
                             }
                         }
